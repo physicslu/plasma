@@ -46,6 +46,95 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(state["last_result"], "PASS")
             self.assertEqual(state["run_id"], "39546002")
             self.assertIn("LAST: PASS", mon.render_snapshot(Path(td), "path2"))
+            self.assertIn("STAGE: (not available)", mon.render_snapshot(Path(td), "path2"))
+
+    def test_path2_authorized_goal_stage_and_clock_on_real_wrapper(self):
+        with tempfile.TemporaryDirectory() as td:
+            data = {
+                "GITHUB_RUN_ID": "40056557048",
+                "PLASMA_MONITOR_TASK": "path2-work-order",
+                "PR_NUMBER": "1144",
+                "WORK_ORDER_SHA256": "a" * 64,
+                "PLASMA_MONITOR_SUMMARY": "PATH2 Host-only CLI regression",
+                "PLASMA_MONITOR_STAGE": "CPU-only CLI",
+            }
+            probe = Path(td) / "child-env.txt"
+            code = ("import os,sys,pathlib;pathlib.Path(sys.argv[1]).write_text("
+                    "str('PLASMA_MONITOR_SUMMARY' in os.environ)+' '+"
+                    "str('PLASMA_MONITOR_STAGE' in os.environ))")
+            with patch.dict(os.environ, data, clear=True):
+                self.assertEqual(mon.run_job(
+                    "path2", [sys.executable, "-c", code, str(probe)],
+                    directory=Path(td)), 0)
+            self.assertEqual(probe.read_text(), "False False")
+            state = json.loads((Path(td) / "path2.json").read_text())
+            self.assertEqual(state["monitor_summary"], data["PLASMA_MONITOR_SUMMARY"])
+            self.assertEqual(state["monitor_stage"], "CPU-only CLI")
+            frame = mon.render_snapshot(
+                Path(td), "path2", width=120, height=24, now=FIXED_NOW)
+            self.assertIn("GOAL: PATH2 Host-only CLI regression", frame)
+            self.assertIn("STAGE: CPU-only CLI", frame)
+            self.assertIn("PR: #1144", frame)
+            self.assertIn("NOW: 2026-10-21T16:10+08:00", frame)
+            self.assertIn("LAST: PASS  EXIT: 0", frame)
+            self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
+                             (Path(td) / "path2.log").read_text())
+            self.assertNotIn("WORK_ORDER_SHA256", frame)
+
+    def test_path2_rejects_untrusted_stage_or_summary(self):
+        cases = [
+            ("", "CPU-only CLI", "PATH2 Host-only CLI regression"),
+            ("a"*64, "Erase entire DUT", "PATH2 Host-only CLI regression"),
+            ("a"*64, "Guarded Download", "token SECRET in text"),
+            ("bad-hash", "Guarded Restore", "PATH2 Host-only CLI regression"),
+        ]
+        for sha, stage, summary in cases:
+            with self.subTest(sha=sha, stage=stage):
+                with tempfile.TemporaryDirectory() as td:
+                    with patch.dict(os.environ, {
+                        "GITHUB_RUN_ID": "40056557048",
+                        "PLASMA_MONITOR_TASK": "path2-work-order",
+                        "WORK_ORDER_SHA256": sha,
+                        "PLASMA_MONITOR_SUMMARY": summary,
+                        "PLASMA_MONITOR_STAGE": stage,
+                    }, clear=True):
+                        self.assertEqual(mon.run_job(
+                            "path2", [sys.executable, "-c", "pass"],
+                            directory=Path(td)), 0)
+                    state = json.loads((Path(td) / "path2.json").read_text())
+                    frame = mon.render_snapshot(Path(td), "path2")
+                    if not sha or sha == "bad-hash":
+                        self.assertEqual(state["monitor_summary"], "")
+                        self.assertIn(
+                            "GOAL: (operator summary not provided)", frame)
+                    else:
+                        self.assertNotIn("token SECRET", frame)
+                    if stage == "Erase entire DUT" or sha == "bad-hash":
+                        self.assertEqual(state["monitor_stage"], "")
+                        self.assertIn("STAGE: (not available)", frame)
+
+    def test_shared_100_column_terminal_cap_with_cjk(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            for path, task in (("path2", "path2-work-order"),
+                               ("path3", "path3-work-order")):
+                (d / (path + ".json")).write_text(json.dumps({
+                    "status": "IDLE", "task": task, "run_id": "42",
+                    "monitor_summary": "測試測試測試測試 " + "A"*65,
+                    "monitor_stage": "CPU-only CLI",
+                }))
+                (d / (path + ".log")).write_text("X"*180 + "\n")
+                for width in (28, 80, 100, 150):
+                    with self.subTest(path=path, width=width):
+                        frame = mon.render_snapshot(
+                            d, path, width=width, height=24,
+                            now=FIXED_NOW)
+                        available = max(0, min(width - 1, 100))
+                        for line in frame.splitlines():
+                            self.assertEqual(
+                                line, mon._clip_columns(line, available))
+                        self.assertIn("NOW:", frame)
+                        self.assertIn("RECENT OUTPUT", frame)
 
     def test_authorized_task_and_pr_are_visible_without_work_order_text(self):
         with tempfile.TemporaryDirectory() as td:
@@ -667,7 +756,9 @@ if op in ("new-session", "new-window"):
         self.assertEqual(workflow.count(
             "PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}"), 3)
         self.assertEqual(workflow.count(
-            "PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}"), 2)
+            "PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}"), 3)
+        self.assertEqual(workflow.count(
+            "PLASMA_MONITOR_STAGE: ${{ needs.development-authorize.outputs.monitor_stage }}"), 1)
         self.assertIn(
             'monitor_summary: ${{ steps.approve.outputs.monitor_summary }}',
             workflow)
