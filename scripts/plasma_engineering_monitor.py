@@ -374,10 +374,14 @@ def render_snapshot(directory: Path, path: str, *,
         # Minute precision keeps the fixed clock legible without 1 Hz redraw.
         lines.append("NOW: " + clock.isoformat(timespec="minutes"))
     lines.extend(["", "RECENT OUTPUT", "-" * 35])
-    if height is not None and height <= len(lines) + 1:
-        # Give the newest log line precedence over a decorative separator
-        # on short terminals (the header now includes shortcut guidance).
-        lines.pop()
+    if height is not None:
+        # Preserve at least one latest log row plus a spare bottom row.
+        # Sacrifice decoration before truncating trusted status/goal/stage.
+        for decoration in ("-" * 35, "", "      %s D Detach" % prefix):
+            if height > len(lines) + 1:
+                break
+            if decoration in lines:
+                lines.remove(decoration)
     try:
         if log_file.is_symlink() or not stat.S_ISREG(log_file.stat().st_mode):
             raise OSError("invalid log")
