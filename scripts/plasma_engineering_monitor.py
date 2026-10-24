@@ -35,6 +35,33 @@ PATHS = ("path2", "path3")
 CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 RUN_ID = re.compile(r"[0-9]{1,20}\Z")
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
+PR_NUMBER = re.compile(r"(?:0|[1-9][0-9]{0,7})\Z")
+WORK_ORDER_SHA256 = re.compile(r"[a-f0-9]{64}\Z")
+# Defense-in-depth: hosted Authorizer independently validates the source.
+# The monitor may display only an explicitly submitted public metadata field.
+MONITOR_SUMMARY = re.compile(
+    r"[A-Za-z0-9\u4e00-\u9fff]"
+    r"[A-Za-z0-9\u4e00-\u9fff ._()/+-]{6,78}"
+    r"[A-Za-z0-9\u4e00-\u9fff)]\Z"
+)
+MONITOR_SENSITIVE = re.compile(
+    r"\b(?:password|passwd|secret|credential|token|bearer|"
+    r"private.key|api.key|authorization)\b|[a-fA-F0-9]{32,}",
+    re.IGNORECASE,
+)
+# One layout for both paths. Terminal widths are display cells, not letters.
+MAX_DISPLAY_COLUMNS = 100
+MONITOR_STAGES = frozenset({
+    "CPU-only CLI", "Native preflight", "Vivado host build",
+    "Guarded Download", "Guarded Test", "Guarded Restore",
+    "Guarded Full HIL",
+})
+STATIC_GUARDED_STAGES = {
+    "z2-path2-download": "Guarded Download",
+    "z2-path2-testing": "Guarded Test",
+    "z2-path2-restore": "Guarded Restore",
+    "z2-path2-full-hil": "Guarded Full HIL",
+}
 
 
 def _valid_dir(path: Path, uid: int, gid: int) -> bool:
@@ -134,9 +161,34 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
         run_id = "unknown"
     if not TASK_ID.fullmatch(task):
         task = "unknown"
+    pr_number = os.environ.get("PR_NUMBER", "")
+    if not PR_NUMBER.fullmatch(pr_number):
+        pr_number = "-"
+    work_order_sha = os.environ.get("WORK_ORDER_SHA256", "")
+    summary = os.environ.get("PLASMA_MONITOR_SUMMARY", "")
+    summary_valid = (
+        task == ("path3-work-order" if path == "path3" else "path2-work-order") and
+        WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None and
+        type(summary) is str and MONITOR_SUMMARY.fullmatch(summary) is not None
+        and MONITOR_SENSITIVE.search(summary) is None
+    )
+    stage = os.environ.get("PLASMA_MONITOR_STAGE", "")
+    guarded = stage.startswith("Guarded ") if type(stage) is str else False
+    guarded_verified = (
+        (task == "path2-work-order" and
+         WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None) or
+        STATIC_GUARDED_STAGES.get(task) == stage
+    )
+    if (path != "path2" or type(stage) is not str or
+            stage not in MONITOR_STAGES or
+            (guarded and not guarded_verified)):
+        stage = ""
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
-        "task": task, "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
+        "task": task, "pr_number": pr_number,
+        "monitor_summary": summary if summary_valid else "",
+        "monitor_stage": stage,
+        "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
         "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
     if live:
@@ -150,6 +202,9 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
             print("MONITOR_UNAVAILABLE: %s" % type(exc).__name__, file=sys.stderr)
             live = False
     env = os.environ.copy()
+    # Operator-only metadata never enters the engineering/Codex process env.
+    env.pop("PLASMA_MONITOR_SUMMARY", None)
+    env.pop("PLASMA_MONITOR_STAGE", None)
     if live and path == "path3":
         env["PLASMA_ENGINEERING_MONITOR_LIVE_LOG"] = str(log)
     else:
@@ -285,6 +340,22 @@ def render_snapshot(directory: Path, path: str, *,
              "      %s D Detach" % prefix,
              "=" * 35, "STATUS: " + status,
              "RUN: %s  TASK: %s" % (state.get("run_id", "-"), state.get("task", "-"))]
+    pr_number = state.get("pr_number")
+    if (type(pr_number) is str and PR_NUMBER.fullmatch(pr_number) and
+            pr_number != "0"):
+        lines.append("PR: #" + pr_number)
+    if path in PATHS:
+        summary = state.get("monitor_summary", "")
+        if (type(summary) is str and
+                MONITOR_SUMMARY.fullmatch(summary) is not None and
+                MONITOR_SENSITIVE.search(summary) is None):
+            lines.append("GOAL: " + summary)
+        else:
+            lines.append("GOAL: (operator summary not provided)")
+    if path == "path2":
+        stage = state.get("monitor_stage", "")
+        lines.append("STAGE: " + stage if type(stage) is str and
+                     stage in MONITOR_STAGES else "STAGE: (not available)")
     if status == "RUNNING":
         started = state.get("started", "")
         try:
@@ -296,17 +367,25 @@ def render_snapshot(directory: Path, path: str, *,
     else:
         lines.append("LAST: %s  EXIT: %s" %
                      (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
-    if path == "path3":
+    if path in PATHS:
         clock = dt.datetime.now().astimezone() if now is None else now
         if clock.tzinfo is None or clock.utcoffset() is None:
             raise ValueError("status clock requires a timezone-aware timestamp")
-        # Minute precision keeps the fixed clock legible without 1 Hz redraw.
-        lines.append("NOW: " + clock.isoformat(timespec="minutes"))
+        # Show the SWPC host-local wall clock. Do not render ISO's "T"
+        # separator or UTC offset; keep minute cadence and timestamp inputs
+        # timezone-aware. Evidence and monitor time marks are unchanged.
+        lines.append("NOW: " + clock.strftime("%Y-%m-%d %H:%M"))
     lines.extend(["", "RECENT OUTPUT", "-" * 35])
-    if height is not None and height <= len(lines) + 1:
-        # Give the newest log line precedence over a decorative separator
-        # on short terminals (the header now includes shortcut guidance).
-        lines.pop()
+    if height is not None:
+        # Preserve at least one latest log row plus a spare bottom row.
+        # Sacrifice decoration before truncating trusted status/goal/stage.
+        for decoration in (
+                "-" * 35, "", "      %s D Detach" % prefix,
+                "KEYS: C Clear | %s 1/2 Switch" % prefix):
+            if height > len(lines) + 1:
+                break
+            if decoration in lines:
+                lines.remove(decoration)
     try:
         if log_file.is_symlink() or not stat.S_ISREG(log_file.stat().st_mode):
             raise OSError("invalid log")
@@ -331,7 +410,9 @@ def render_snapshot(directory: Path, path: str, *,
     if height is not None:
         lines = lines[:max(0, height - 1)]
     if width is not None:
-        lines = [_clip_columns(str(line), width) for line in lines]
+        # Leave one physical cell unused to avoid terminal autowrap.
+        lines = [_clip_columns(str(line),
+                max(0, min(width - 1, MAX_DISPLAY_COLUMNS))) for line in lines]
     return CONTROL.sub("", "\n".join(str(x) for x in lines))
 
 
@@ -377,7 +458,8 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
                 clear_from=clear_from, prefix=prefix)
             if frame != previous or size != previous_size:
                 # Only repaint this tmux pane, not global terminal scrollback.
-                output.write("\033[H" + frame + "\033[J")
+                # Clear old cells BEFORE painting shorter replacement lines.
+                output.write("\033[H\033[J" + frame)
                 output.flush()
                 previous = frame
                 previous_size = size

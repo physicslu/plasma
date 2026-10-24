@@ -844,6 +844,34 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertNotIn(b'X', safe)
         self.assertIsNone(collector.snapshot()["input_tokens"])
 
+    def test_codex_monitor_category_allowlist_preserves_evidence_bytes(self):
+        events = [
+            {"type": "item.started", "item": {
+                "type": "command_execution", "command": "TOP_SECRET"}},
+            {"type": "item.updated", "item": {
+                "type": "agent_message", "text": "PRIVATE_MESSAGE"}},
+            {"type": "item.completed", "item": {
+                "type": "file_change", "changes": "PRIVATE_DIFF"}},
+            {"type": "item.started", "item": {
+                "type": "custom_EXFILTRATE", "command": "TOP_SECRET"}},
+            {"type": "item.started", "item": {
+                "type": "command_execution\nINJECTED", "command": "TOP_SECRET"}},
+        ]
+        stream = (b"\n".join(json.dumps(e).encode() for e in events) + b"\n")
+        evidence = dev.CodexUsageCollector()
+        monitor = dev.CodexUsageCollector(monitor_only=True)
+        recorded = evidence.feed(stream) + evidence.finish()
+        visible = monitor.feed(stream[:11]) + monitor.feed(stream[11:]) + monitor.finish()
+        self.assertIn(b"[codex item.started]", recorded)
+        self.assertNotIn(b"command_execution", recorded)
+        self.assertIn(b"[codex command_execution.started]", visible)
+        self.assertIn(b"[codex agent_message.updated]", visible)
+        self.assertIn(b"[codex file_change.completed]", visible)
+        self.assertIn(b"[codex item.started]", visible)
+        for secret in (b"TOP_SECRET", b"PRIVATE_MESSAGE", b"PRIVATE_DIFF",
+                       b"custom_EXFILTRATE", b"INJECTED"):
+            self.assertNotIn(secret, visible + recorded)
+
     def test_codex_failure_preserves_session_log(self):
         with tempfile.TemporaryDirectory() as td:
             work=Path(td)
@@ -1637,38 +1665,6 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["objective"], order["objective"])
             self.assertEqual(task["acceptance"], order["acceptance"])
 
-    def test_path2_cpu_only_uses_existing_checked_script(self):
-        event = self._event(self._order("path2-cli"))
-        req = dev.request(event, self._context())
-        task = dev.task_for_request(self.registry, req, event)
-        self.assertEqual(task["capability"], "cpu-only")
-        result = dev.run_task(task)
-        self.assertEqual(result["status"], "PASS")
-        self.assertEqual(result["rows"], 81)
-        with patch.object(dev.shutil, "which", return_value=None):
-            with self.assertRaisesRegex(dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
-                dev.run_task(task, sandbox=True)
-
-    def test_exact_stage_guard_accepts_only_digest_pinned_stage(self):
-        import plasma_path2_runtime_integration as runtime
-        stage_order = self._order(
-            "path2-cli", capability="path2-stage-contract",
-            scope="guarded-hardware",
-            project="pl/projects/z2-fixed-unified-site1",
-            stage="test")
-        for field in ("script", "argv", "expected_stdout_sha256"):
-            stage_order.pop(field, None)
-        event = self._event(stage_order)
-        req = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
-        task = dev.task_for_request(self.registry, req, event)
-        self.assertEqual(runtime.stage_contract(task, approval), "test")
-        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
-            runtime.stage_contract(task, approval |
-                                   {"work_order_sha256": "0" * 64})
-        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
-            runtime.stage_contract(task | {"stage": "download"}, approval)
-
     def test_dynamic_path2_stage_project_is_generic_but_still_pinned(self):
         import plasma_path2_runtime_integration as runtime
 
@@ -1703,6 +1699,174 @@ class GenericWorkOrderContracts(unittest.TestCase):
             runtime.stage_contract(
                 task | {"project": "pl/projects/z2-another"},
                 approval | {"work_order_sha256": "0" * 64})
+
+    def test_path3_explicit_monitor_summary_is_authorized_and_digest_bound(self):
+        # The objective and acceptance are free-form and must never be copied
+        # into the public monitor metadata or GitHub step output.
+        order = self._order(
+            objective="TOP_SECRET_1234 internal task with private command.",
+            acceptance="Never print PRIVATE_ACCEPTANCE_1234 outside the agent.",
+            monitor_summary="STM32F103 Low-density L1-L2 provider audit")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(
+            approval["monitor_summary"], order["monitor_summary"])
+        self.assertEqual(
+            task["monitor_summary"], order["monitor_summary"])
+        self.assertEqual(
+            approval["work_order_sha256"], dev.work_order_digest(order))
+        for private in ("TOP_SECRET_1234", "PRIVATE_ACCEPTANCE_1234"):
+            self.assertNotIn(private, approval["monitor_summary"])
+        mutated = self._event(order | {
+            "monitor_summary": "STM32F103 Medium-density L1-L2 provider audit"})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, mutated)
+
+        # Backward-compatible historical Work Orders have no public title.
+        old = self._event(self._order())
+        self.assertEqual(
+            dev.authorize(old, self._context(), self.registry)["monitor_summary"],
+            "")
+        self.assertNotIn(
+            "monitor_summary",
+            dev.task_for_request(
+                self.registry, dev.request(old, self._context()), old))
+
+    def test_monitor_summary_denies_secret_multiline_shell_and_path2_injection(self):
+        invalid = (
+            "short", "word" * 100, "Fix\nprivate run",
+            "Fix\rsecret run", "Fix\x1b[31mcontrol",
+            "Run $HOME shell command", "https://example.com/private/key",
+            "token sent to monitor", "Password leaked to operator",
+            "ABCD" * 12, "Fix: secret step", "=malicious=output",
+            "STM32 firmware work \u202eevil", None, 123, [],
+        )
+        for value in invalid:
+            with self.subTest(value=repr(value)):
+                event = self._event(self._order(monitor_summary=value))
+                with self.assertRaises(dev.Denied):
+                    dev.request(event, self._context())
+        # Both Paths share the same strictly validated public summary.
+        # Neither Path may publish unsafe payloads or actual commands.
+        for path in ("path2-cli", "path3-codex"):
+            event = self._event(self._order(
+                path, monitor_summary="token sent to monitor"))
+            with self.assertRaises(dev.Denied):
+                dev.request(event, self._context())
+
+    def test_monitor_summary_is_unicode_one_line_operator_metadata(self):
+        order = self._order(
+            monitor_summary="STM32F103 小容量 L1-L2 Provider Audit")
+        self.assertEqual(
+            dev.authorize(
+                self._event(order), self._context(),
+                self.registry)["monitor_summary"], order["monitor_summary"])
+
+    def test_path2_public_goal_and_safe_stage_from_authorized_contract(self):
+        summary = "PATH2 Host-only CLI regression"
+        case = self._order("path2-cli", monitor_summary=summary)
+        event = self._event(case)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        self.assertEqual(approval["monitor_summary"], summary)
+        self.assertEqual(approval["monitor_stage"], "CPU-only CLI")
+        self.assertEqual(
+            approval["work_order_sha256"], dev.work_order_digest(case))
+        tampered = self._event(case | {
+            "monitor_summary": "PATH2 Unauthorized changed objective"})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, tampered)
+        # Old Work Orders remain admitted and display no invented goal.
+        old = self._event(self._order("path2-cli"))
+        old_approval = dev.authorize(old, self._context(), self.registry)
+        self.assertEqual(old_approval["monitor_summary"], "")
+        self.assertEqual(old_approval["monitor_stage"], "CPU-only CLI")
+
+    def test_path2_protected_stage_labels_are_exact_and_non_authorizing(self):
+        for stage, expected in (
+            ("download", "Guarded Download"),
+            ("test", "Guarded Test"),
+            ("restore", "Guarded Restore"),
+        ):
+            with self.subTest(stage=stage):
+                order = self._order(
+                    "path2-cli", capability="path2-stage-contract",
+                    scope="guarded-hardware",
+                    project="pl/projects/z2-fixed-unified-site1",
+                    stage=stage,
+                    monitor_summary="Guarded FPGA provider validation")
+                for k in ("script", "argv", "expected_stdout_sha256"):
+                    order.pop(k, None)
+                event = self._event(order)
+                approval = dev.authorize(
+                    event, self._context(), self.registry)
+                self.assertEqual(approval["monitor_stage"], expected)
+                self.assertEqual(
+                    approval["monitor_summary"],
+                    "Guarded FPGA provider validation")
+                self.assertEqual(approval["authorized_stage"], stage)
+        bad = self._order(
+            "path2-cli", capability="path2-stage-contract",
+            scope="guarded-hardware",
+            project="pl/projects/z2-fixed-unified-site1",
+            stage="program", monitor_summary="Unauthorized stage test")
+        for k in ("script", "argv", "expected_stdout_sha256"):
+            bad.pop(k, None)
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_STAGE_CAPABILITY_DENIED"):
+            dev.request(self._event(bad), self._context())
+
+    def test_existing_static_path2_full_hil_stage_uses_allowlisted_label(self):
+        event = DevelopmentPath2Contracts().event()
+        event["comment"]["body"] = (
+            "/plasma-dispatch run z2-path2-full-hil 981")
+        plan = dev.authorize(event, self._context(), self.registry)
+        self.assertEqual(plan["task_id"], "z2-path2-full-hil")
+        self.assertEqual(plan["monitor_stage"], "Guarded Full HIL")
+        self.assertEqual(plan["monitor_summary"], "")
+        self.assertIsNone(plan["authorized_stage"])
+
+    def test_path3_does_not_report_path2_cli_stage(self):
+        a = dev.authorize(
+            self._event(self._order()), self._context(), self.registry)
+        self.assertEqual(a["monitor_stage"], "")
+        static = dev.authorize(
+            DevelopmentPath2Contracts().event(),
+            DevelopmentPath2Contracts().context(), self.registry)
+        self.assertEqual(static["monitor_stage"], "CPU-only CLI")
+
+    def test_path2_cpu_only_uses_existing_checked_script(self):
+        event = self._event(self._order("path2-cli"))
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["capability"], "cpu-only")
+        result = dev.run_task(task)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["rows"], 81)
+        with patch.object(dev.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
+                dev.run_task(task, sandbox=True)
+
+    def test_exact_stage_guard_accepts_only_digest_pinned_stage(self):
+        import plasma_path2_runtime_integration as runtime
+        stage_order = self._order(
+            "path2-cli", capability="path2-stage-contract",
+            scope="guarded-hardware",
+            project="pl/projects/z2-fixed-unified-site1",
+            stage="test")
+        for field in ("script", "argv", "expected_stdout_sha256"):
+            stage_order.pop(field, None)
+        event = self._event(stage_order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(runtime.stage_contract(task, approval), "test")
+        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
+            runtime.stage_contract(task, approval |
+                                   {"work_order_sha256": "0" * 64})
+        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
+            runtime.stage_contract(task | {"stage": "download"}, approval)
 
     def test_work_order_tamper_and_replay_denied_before_execution(self):
         order = self._order()
