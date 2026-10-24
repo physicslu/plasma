@@ -482,6 +482,24 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("line-059:", frame)
             self.assertNotIn("line-001:", frame)
 
+    def test_both_paths_keep_latest_log_in_short_12_row_pane(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            for path in ("path2", "path3"):
+                (directory / (path + ".log")).write_text(
+                    "".join(f"old-{i:03d}\n" for i in range(20)) +
+                    "latest-visible-entry\n")
+                frame = mon.render_snapshot(
+                    directory, path, width=38, height=12, now=FIXED_NOW)
+                with self.subTest(path=path):
+                    self.assertLessEqual(len(frame.splitlines()), 11)
+                    self.assertIn("STATUS: IDLE", frame)
+                    self.assertIn("LAST: NOT_RUN", frame)
+                    self.assertIn("NOW: 2026-10-21T16:10+08:00", frame)
+                    self.assertIn("RECENT OUTPUT", frame)
+                    self.assertIn("latest-visible-entry", frame)
+                    self.assertNotIn("old-000", frame)
+
     def test_path3_clock_is_pinned_to_minute_and_has_timezone(self):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
