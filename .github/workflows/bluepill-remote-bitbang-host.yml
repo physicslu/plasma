@@ -17,6 +17,8 @@ on:
       - 'software/python/plasma_interfaces/bluepill_z2_word_port.py'
       - 'software/python/tests/test_bluepill_z2_word_port_host.py'
       - 'pl/tests/test_bluepill_z2_source.py'
+      - 'pl/hil/bluepill_protected_stage.py'
+      - 'pl/tests/test_bluepill_protected_stage.py'
       - 'pl/verification/test_bluepill_pmod_rtl.py'
       - 'pl/verification/cocotb/test_bluepill_pmod_cocotb.py'
       - 'pl/sim/bluepill_pmod_vendor_stub.sv'
@@ -46,6 +48,7 @@ jobs:
         run: |
           python -m pytest -q software/python/tests/test_bluepill_z2_word_port_host.py
           python -m pytest -q pl/tests/test_bluepill_z2_source.py
+          python -m pytest -q pl/tests/test_bluepill_protected_stage.py
       - name: Real AXI-Lite RTL Cocotb simulation
         run: python -m pytest -q pl/verification/test_bluepill_remote_bitbang_rtl.py
       - name: Digital PMODB IOBUF turnaround (ideal vendor model only)
