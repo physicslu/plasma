@@ -163,7 +163,7 @@ def replace_private_file(path: Path, content: bytes) -> None:
 
 
 def consolidate_credentials() -> None:
-    """Local-only safe one-time migration to a single worker Z2 login secret.
+    """Worker-only credential consolidation independent of retired SWD-05 route.
 
     No SSH, sudo, FPGA or network command. Do not delete another user's file.
     """
@@ -172,7 +172,6 @@ def consolidate_credentials() -> None:
         raise ValueError("CONSOLIDATE_NEEDS_TRUSTED_INTERACTIVE_TERMINAL")
     record = creds()  # Existing login + pinned host key must already validate.
     legacy = FILE.parent / "z2-dev-credentials.json"
-    route = FILE.parent / "z2-swd05-oneshot.json"
     candidates = []
     if "sudo_password" in record:
         candidates.append(record["sudo_password"])
@@ -186,20 +185,6 @@ def consolidate_credentials() -> None:
                 not previous["sudo_password"]):
             raise ValueError("LEGACY_Z2_CREDENTIAL_CONFLICT")
         candidates.append(previous["sudo_password"])
-    route_data = None
-    if route.exists() or route.is_symlink():
-        route_data = json.loads(private_file(route))
-        expected = {"source_root", "candidate_bit", "candidate_hwh", "manifest",
-                    "candidate_bin", "recovery_bin", "recovery_hwh", "output"}
-        if type(route_data) is not dict or not (
-                set(route_data) == expected or
-                set(route_data) == expected | {"sudo_password"}):
-            raise ValueError("LEGACY_ROUTE_SCHEMA_CONFLICT")
-        if "sudo_password" in route_data:
-            sudo = route_data["sudo_password"]
-            if type(sudo) is not str or not sudo:
-                raise ValueError("LEGACY_SUDO_CREDENTIAL_INVALID")
-            candidates.append(sudo)
     if candidates and any(candidate != candidates[0] for candidate in candidates):
         raise ValueError("LEGACY_SUDO_CREDENTIAL_CONFLICT")
     selected_sudo = candidates[0] if candidates else record["ssh_password"]
@@ -215,11 +200,6 @@ def consolidate_credentials() -> None:
     validated = creds()
     if validated.get("sudo_password", validated["ssh_password"]) != selected_sudo:
         raise ValueError("CONSOLIDATED_CREDENTIAL_VERIFY_FAILED")
-    if route_data is not None and "sudo_password" in route_data:
-        clean_route = {k: v for k, v in route_data.items() if k != "sudo_password"}
-        replace_private_file(route, json.dumps(clean_route, sort_keys=True).encode())
-        if "sudo_password" in json.loads(private_file(route)):
-            raise ValueError("ROUTE_SECRET_REMOVAL_VERIFY_FAILED")
     # Only remove legacy login credentials from THIS dedicated worker's home.
     # Another account's private lab credentials must never be touched.
     if legacy.exists() or legacy.is_symlink():

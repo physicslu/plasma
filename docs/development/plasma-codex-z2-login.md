@@ -38,7 +38,7 @@ Existing files are **never overwritten automatically**. No credential strings, p
 
 **Legacy worker credential consolidation (local, after merge, no SSH/hardware):**
 `sudo -u plasma-codex -H python3 scripts/plasma-codex-z2-login.py --consolidate`.
-This validates the existing `z2-login-smoke.json` and Host Key, rejects conflicting legacy host/login/sudo values, moves any distinct sudo password into the single login file, strips it from `z2-swd05-oneshot.json`, then removes the worker-owned `z2-dev-credentials.json`. It refuses GitHub Actions and absent trusted interactive SWPC access; it does not delete credentials owned by a different user. Check SWPC live SSH/sudo separately before claiming operational PASS.
+This validates `z2-login-smoke.json` and the pinned Host Key, rejects conflicting worker legacy SSH/sudo credentials, moves any distinct sudo password into the sole login file, then retires only the worker-owned `z2-dev-credentials.json`. The retired SWD-05 route is **never read, validated, modified or deleted** by credential consolidation; a malformed historical route must not block SSH login or single-credential consolidation. It refuses GitHub Actions and absent trusted interactive SWPC access; it does not delete credentials owned by a different user. Check SWPC live SSH/sudo separately before claiming operational PASS.
 
 **Note:** This worker-specific credential expands the hardware Runner's access capability. GitHub's self-hosted Runner labels are not an authentication boundary. Keep only reviewed, immutable `main` code on this Runner and owner-only fixed commands. The test must not run from a public PR checkout.
 
