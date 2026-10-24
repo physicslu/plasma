@@ -7,7 +7,7 @@ set crystal [get_property CONFIG.PCW_CRYSTAL_PERIPHERAL_FREQMHZ $ps]
 if {![string equal [format %.1f $crystal] "50.0"]} {
     error "PYNQ-Z2 board's 50 MHz PS preset is absent"
 }
-set_property -dict [list     CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE {0}     CONFIG.PCW_USE_M_AXI_GP0 {1}     CONFIG.PCW_M_AXI_GP0_FREQMHZ {100}     CONFIG.PCW_EN_CLK0_PORT {1}     CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {100}] $ps
+set_property -dict [list     CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE {0}     CONFIG.PCW_USE_M_AXI_GP0 {1}     CONFIG.PCW_EN_CLK0_PORT {1}     CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {100}] $ps
 
 set swd [create_bd_cell -type module -reference plasma_poc_swd_gpio_axi_lite swd_0]
 set_property CONFIG.AXI_BASE_ADDRESS 0x40008000 $swd
@@ -16,12 +16,6 @@ if {[llength [get_bd_intf_pins -quiet swd_0/S_AXI]] != 1} {
     error "Blue Pill SWD AXI4-Lite inference missing"
 }
 apply_bd_automation -rule xilinx.com:bd_rule:axi4     -config {Master "/ps7_0/M_AXI_GP0" Clk "Auto"}     [get_bd_intf_pins swd_0/S_AXI]
-# The AXI GP0 bus metadata must match the FCLK0-driven ACLK (100 MHz).
-# Do not accept a stale board-preset GP0 10 MHz value after automation.
-set gp0_freq [get_property CONFIG.PCW_M_AXI_GP0_FREQMHZ $ps]
-if {![string equal [format %.1f $gp0_freq] "100.0"]} {
-    error "BLUEPILL_Z2_GP0_CLOCK_METADATA_MISMATCH"
-}
 assign_bd_address -offset 0x40008000 -range 4K -target_address_space     [get_bd_addr_spaces ps7_0/Data] [get_bd_addr_segs swd_0/S_AXI/reg0] -force
 
 foreach signal {swclk swdio_out swdio_oe swdio_in} {
@@ -59,7 +53,16 @@ foreach p [get_bd_ports -quiet *] {
         error "Unexpected external FPGA pin: $name"
     }
 }
+# Discard stale board-preset USER strength; derive read-only GP0 metadata
+# from the connected 100 MHz AXI clock during IP propagation.
+set_property CONFIG.PCW_M_AXI_GP0_FREQMHZ.VALUE_SRC PROPAGATED $ps
 validate_bd_design
+# The AXI GP0 bus metadata must match the FCLK0-driven ACLK (100 MHz).
+# Do not accept a stale board-preset GP0 10 MHz value after automation.
+set gp0_freq [get_property CONFIG.PCW_M_AXI_GP0_FREQMHZ $ps]
+if {![string equal [format %.1f $gp0_freq] "100.0"]} {
+    error "BLUEPILL_Z2_GP0_CLOCK_METADATA_MISMATCH"
+}
 save_bd_design
 set f [open [file join $generated_dir axi-address-map.txt] w]
 puts $f "swd_0 0x40008000 4096"
