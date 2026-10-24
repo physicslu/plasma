@@ -19,6 +19,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
+PROJECT = "pl/projects/z2-fixed-unified-site1"
 FILE = ROOT / "scripts/plasma_development_stage_transport.py"
 loader = SourceFileLoader("path2_swpc_fixed_bridge_test", str(FILE))
 spec = spec_from_loader(loader.name, loader)
@@ -34,19 +35,19 @@ class BridgeContracts(unittest.TestCase):
                     bridge, "enrollment") as creds:
                 with self.assertRaisesRegex(bridge.Blocked,
                                             "STAGE_NOT_ALLOWLISTED"):
-                    bridge.execute(stage, "a" * 40)
+                    bridge.execute(stage, "a" * 40, PROJECT)
                 creds.assert_not_called()
 
     def test_invalid_sha_before_secrets(self):
         with patch.object(bridge, "enrollment") as credentials:
             with self.assertRaisesRegex(bridge.Blocked, "SOURCE_SHA_INVALID"):
-                bridge.execute("test", "invalid")
+                bridge.execute("test", "invalid", PROJECT)
             credentials.assert_not_called()
 
     def test_transport_has_only_fixed_target_and_root_stage_command(self):
         s = FILE.read_text()
         self.assertIn('STAGES = ("download", "test", "restore")', s)
-        self.assertIn('ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-f1b-root-entry"', s)
+        self.assertIn('ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-root-entry"', s)
         self.assertIn('"StrictHostKeyChecking=yes"', s)
         self.assertIn('"SOURCE_SHA_INVALID"', s)
         self.assertNotIn("shell=True", s)
@@ -57,7 +58,7 @@ class BridgeContracts(unittest.TestCase):
     @staticmethod
     def _receipt(result="LOADED_AND_HELD", stage="download"):
         return (bridge.MARK + json.dumps({
-            "stage": stage, "result": result,
+            "stage": stage, "result": result, "project": PROJECT,
             "boot_id": "fe723a58-621e-444a-9171-0c81d35a3b0a",
         }) + "\n").encode()
 
@@ -104,7 +105,7 @@ class BridgeContracts(unittest.TestCase):
                     return_value=([910], [], []))
             replace(bridge.tty, "setraw")
             try:
-                outcome = bridge.execute(stage, "a" * 40)
+                outcome = bridge.execute(stage, "a" * 40, PROJECT)
             finally:
                 args = popen.call_args.args[0]
                 self.assertEqual(args[0], "/usr/bin/ssh")
@@ -207,7 +208,7 @@ class BridgeContracts(unittest.TestCase):
                 patcher(bridge.tty, "setraw")
                 patcher(bridge.os, "read",
                         side_effect=OSError(errno.EPERM, "unexpected"))
-                bridge.execute("download", "a" * 40)
+                bridge.execute("download", "a" * 40, PROJECT)
         self.assertEqual(raised.exception.errno, errno.EPERM)
 
 

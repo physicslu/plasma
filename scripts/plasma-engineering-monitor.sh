@@ -78,7 +78,9 @@ if [ "$path2_panes" -ne 1 ]; then
   exit 1
 fi
 
-if ! tmux display-message -p -t "$session:path3" '#{window_index}' >/dev/null 2>&1; then
+# display-message can resolve a missing named window to the current
+# window and return success. Check the exact published window NAME instead.
+if ! tmux list-windows -t "=$session" -F '#{window_name}' | grep -Fxq path3; then
   right="$(viewer_command path3)"
   tmux new-window -d -t "$session:2" -n path3 -c "$repo" "$right"
 fi

@@ -22,11 +22,13 @@
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
 
-## Blue Pill PS/PL Direct SWD candidate
+## SWD PS/PL FPGA configuration PoC
 
-- **Gate 1 / Draft / Source-only** — [PYNQ-Z2 Blue Pill PS/PL SWD Candidate](../pl/projects/z2-bluepill-rbb/README.md)：隔離 GP0 AXI GPIO、PMODB XDC、SWDIO IOBUF、ARMv7 MMIO WordPort 與復原契約；Vivado BIT/HWH 與 Z2 HIL 均未執行。
+- **Gate 1 / Draft / Host-only policy; SWPC offline image evidence** — [Generic FPGA Configuration Stage + Z2 SWD Image Descriptor](../pl/projects/z2-bluepill-rbb/README.md)：目前為單 Site 的 SWD GPIO PoC，已取得限定於來源 SHA 的 Vivado BIT／HWH／BIN 離線建置證據。通用配置 Stage、來源／恢復驗證與負向測試僅 Host-only PASS；Z2 FPGA 載入、AXI 安全隔離、原始映像恢復與實體 SWD 皆未驗收。不是已完成的八 Site Universal Image。
 
 ## Engineering governance and execution paths
+
+- **Gate 1 / Draft / 未部署** — [Path 2／3 共用 Z2 Protected Root Entry](development/path2-generic-fpga-image-loader.md)：沿用既有 Stage Transport／Root 執行路徑，將 F1-B 專用入口改為 Root-owned Project＋Source SHA 綁定；不另建 Executor／Loader，SWPC／Z2 實機驗收仍 NOT_RUN。
 
 - **Historical Gate 1 offline test / current guarded route separate** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；當前受控執行路徑改由已註冊的可信 Stage Transport 與 Z2 Root SHA256 Manifest 保護。每次實機操作仍須獨立核對授權、映像 Hash、AXI 與 Recovery 證據。\n
 
@@ -95,6 +97,7 @@
 - **CI / Architecture Contract** — [Runtime Data Root Contract v1](architecture/runtime-data-root-contract-v1.md)：所有可安裝 Python 模組使用明確 Data Root，AST CI 禁止新增 wheel `__file__` 相對路徑推算；只保留 2 個受控 Source-tree 開發例外，並守護 NXP、OpenOCD 與 KL25 Root Resolver。
 - **Current** — [Selected IC Profile v1](architecture/selected-ic-profile-v1.md)：將 exact ICPN 的 Device operating characteristics、Programming requirements、Backend evidence 與 PLASMA compatibility 分層組合；STM32F103C8T6 為第一個 manufacturer-first pilot。
 - **Current / Design-input contract** — [Programming Hardware and Socket Profile v1](architecture/programming-hardware-socket-profile-v1.md)：以 STM32F103C8T6/LQFP48/SWD 建立 physical pin map、全部供電/接地 contact、NRST/BOOT0 與 package geometry 的 machine-readable Socket design input；明確不宣稱 socket vendor、signal integrity、runtime hardware、HIL 或 execution readiness。
+- **Gate 1 / Source-only L2 提案（Draft、未合併）** — [STM32F103 Medium-density 非 LQFP 12 顆 exact-ICPN 資格擴展](architecture/stm32f103-medium-nonlqfp-l2-v9.md)：8 顆直接適用性、4 顆 TR 包裝等價；7 顆 VFQFPN36 命名／Geometry 缺口保留 L1，2 顆 R/RTR 特例排除。僅 OpenOCD 0.12.0 原始碼與 ST 原廠證據，不代表實體 HIL 或執行授權。
 - **Design-input only** — [STM32F103VBT6 LQFP100 Socket Reuse](architecture/stm32f103vbt6-lqfp100-socket-v1.md)：第四個 ST exact-ICPN 延伸樣板；原廠 DS5319 x8/xB LQFP100 共用 100-pin 接腳、17 個必要接點（含 VREF+/VREF−）、NC 保護；VBT6 獨立綁定 128 KiB／128 頁 L2 幾何，且保留 V8 的 64 KiB 封裝契約，僅 Host-only 驗證，不宣稱 L3／HIL。
 - **Design-input only** — [STM32F103V8T6 LQFP100 Socket Profile](architecture/stm32f103v8t6-lqfp100-socket-v1.md)：第三個 ST exact-ICPN 封裝樣板；以 LQFP100 原廠 100-pin map、VREF+/VREF−、5 組 VDD/VSS、NC 接點及 Host-only 負向測試定義獨立設計輸入；不宣稱 Socket/HIL/L3。
 - **Design-input only** — [STM32F103RBT6 LQFP64 Socket Reuse](architecture/stm32f103rbt6-lqfp64-socket-v1.md)：在官方 x8/xB 封裝適用性證據下，共用 LQFP64 實體接腳，但將 STM32F103RBT6 的 128 KiB／128 頁 Flash geometry 獨立綁定；不宣稱 HIL、L3 或 execution。
@@ -158,7 +161,8 @@
 - **Plan / Host activation** — [PLASMA Codex Hardware Access Parity](development/plasma-codex-hardware-parity.md)：複製原 Codex 經驗證的 Z2／Hub／KINGST 所需 Linux 裝置權限及已鎖定 sigrok AppImage；僅由 SWPC 受信任管理員在 Gate 2 後啟用，保留原設備權限與兩階段合併審核。
 - **Plan / HIL smoke** — [PLASMA Codex Z2 SSH／UART Login + Live tmux](development/plasma-codex-z2-login.md)：使用現有 SWPC 專用 Runner 執行受控、限時的實機 SSH／UART 登入驗證，支援 SWPC tmux 即時監看；不公開帳密、私有位址或原始 UART 資料。
 - **Plan / HIL readiness** — [PLASMA Codex Z2 SSH-only PS/PL Readiness](development/plasma-codex-z2-readiness.md)：重用已實機通過的 SSH 通道、唯讀觀察 Z2 Linux／FPGA Manager／FCLK／UIO／Driver／服務狀態，獨立記錄尚未符合的 HIL 條件；不執行 FPGA 重載、MMIO 或 DUT 操作。
-- **Plan / supervised SWD-05** — [PLASMA Codex Z2 SSH-based SWD-05 One-shot](development/plasma-codex-z2-swd05.md)：依 Gate 1 將既有四 Aperture SWD-05 實機測試封裝為帶完整 SHA256、FCLK/驅動使用權檢查及 FPGA 原始映像恢復的單次 Supervisor；Gate 2 前僅離線測試。
+- **Gate 1 retirement / Host-only** — [Z2 SWD-05 Legacy Dedicated Dispatch Retirement](development/plasma-z2-swd05-legacy-retirement-gate1.md)：退役 Issue #981 既有專用派工 Workflow／SWPC CLI／歷史 Route；保留 SWD-05 Linux Driver、原本受保護的 FPGA Owner Lock 與 Path 2／3 執行介面，不代表 SWPC 或 Z2 已執行清理。
+- **Gate 1 / Pending Gate 2 / Host-only** — [Nine Legacy Issue #981 Codex Trigger Retirement](development/plasma-legacy-codex-issue981-trigger-retirement.md)：僅移除 9 個舊 `/plasma-codex ... 981` Workflow 的 `issue_comment` 派工事件，保留 GitHub-hosted CI 與底層 Z2／LA2016 安全能力；PR #1154 合併前 `main` 入口仍有效，無 SWPC／硬體操作。
 - **Plan / Agent HIL acceptance** — [PLASMA Codex Agent → KINGST LA2016](development/plasma-codex-la2016.md)：Issue #981 受限 Codex 意圖請求、bubblewrap USB 隔離、PWM1→CH0 兩組波形與 OFF 實證、SHA-256 證據；僅 Gate 2 後允許實機執行。
 - **Plan / Read-only diagnostics** — [PLASMA Codex LA2016 Worker Failure Diagnostics](development/plasma-codex-la2016-diagnose.md)：Issue #981 專用 Codex Runner 的 AppImage、USB 被動存取、bubblewrap 與唯讀 Agent 請求診斷；不執行 PWM、CH0 擷取或硬體操作。
 - **Plan / Agent direct A/B (Gate 1 only)** — [PLASMA Codex Direct LA2016 Loopback](development/plasma-codex-la2016-direct.md)：將 Codex 直接操作 sigrok-cli 與既有 JSON Supervisor 對照；分離 LA-only USB 隔離、獨立 PWM OFF 以及波形驗證，尚未授權實機操作。

@@ -84,8 +84,9 @@ def self_test() -> None:
         assert not allow_event(event, **good), dotted
 
     workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "\n  issue_comment:\n" not in workflow, "RETIRED_ISSUE_DISPATCH_REENABLED"
     mandatory = (
-        "issue_comment:", "github.actor == 'physicslu'",
+        "pull_request:", "github.actor == 'physicslu'",
         "github.event.issue.number == 981",
         "github.event.comment.body == '/plasma-codex preflight 981'",
         "runs-on: [self-hosted, linux, x64, plasma-integration]",

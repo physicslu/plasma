@@ -2,9 +2,8 @@ name: PLASMA LA2016 Codex Direct Execution (Issue 981)
 
 # PR/push: HOSTED/OFFLINE tests ONLY. No self-hosted hardware job from PRs.
 # Physical work requires an additional exact owner comment AFTER Gate 2 merge.
+# Legacy Issue #981 /plasma-codex runtime dispatch retired; hosted CI only.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-la2016-direct.yml"

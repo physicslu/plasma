@@ -66,11 +66,12 @@ def check() -> None:
         assert not allowed(altered, OWNER, REPO, "refs/heads/main"), path
 
     wf = WF.read_text()
+    assert "\n  issue_comment:\n" not in wf, "RETIRED_ISSUE_DISPATCH_REENABLED"
     py = (ROOT / "scripts/plasma-codex-z2-readiness.py").read_text()
     sh = (ROOT / "scripts/plasma-codex-z2-readiness.sh").read_text()
     inner = (ROOT / "scripts/plasma-codex-z2-readiness-inner.sh").read_text()
     for term in (
-        "issue_comment:", "github.actor == 'physicslu'",
+        "pull_request:", "github.actor == 'physicslu'",
         "github.event.issue.number == 981",
         "github.event.comment.body == '/plasma-codex z2-readiness 981'",
         "needs.authorize.outputs.reviewed_sha",

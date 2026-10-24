@@ -19,6 +19,8 @@ import subprocess
 import sys
 import uuid
 
+import plasma_engineering_activity as engineering_activity
+
 REPO = "physicslu/plasma"
 OWNER = "physicslu"
 ISSUE = 981
@@ -29,6 +31,19 @@ COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
+# Explicit operator-public metadata; never derived from objective/acceptance.
+# Single-line restricted vocabulary prevents control sequences, URLs, quotes,
+# shell syntax and raw JSON from crossing the GitHub output/monitor boundary.
+MONITOR_SUMMARY = re.compile(
+    r"[A-Za-z0-9\u4e00-\u9fff]"
+    r"[A-Za-z0-9\u4e00-\u9fff ._()/+-]{6,78}"
+    r"[A-Za-z0-9\u4e00-\u9fff)]\Z"
+)
+MONITOR_SENSITIVE = re.compile(
+    r"\b(?:password|passwd|secret|credential|token|bearer|"
+    r"private.key|api.key|authorization)\b|[a-fA-F0-9]{32,}",
+    re.IGNORECASE,
+)
 # Fixed trusted-main Path 2 observation; NOT an arbitrary-script capability.
 NATIVE_PREFLIGHT = "codex-native-install-v1"
 EXPECTED_RUNNER = "SWPC-plasma-codex"
@@ -205,7 +220,8 @@ def parse_dynamic_work_order(event: object) -> dict:
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
                                "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
-                               "expected_stdout_sha256", "project", "stage"},
+                               "expected_stdout_sha256", "project", "stage",
+                                "monitor_summary"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -216,6 +232,12 @@ def parse_dynamic_work_order(event: object) -> dict:
                             for ch in val), "WORK_ORDER_TEXT_DENIED")
     require(len(order["objective"]) + len(order["acceptance"]) <= 10000,
             "WORK_ORDER_TOO_LARGE")
+    if "monitor_summary" in order:
+        summary = order["monitor_summary"]
+        require(type(summary) is str and
+                MONITOR_SUMMARY.fullmatch(summary) is not None and
+                MONITOR_SENSITIVE.search(summary) is None,
+                "WORK_ORDER_MONITOR_SUMMARY_DENIED")
     path, capability, scope = (order["execution_path"],
                                order["capability"], order.get("scope"))
     require(type(path) is str and path in DYNAMIC_TASKS and
@@ -228,14 +250,14 @@ def parse_dynamic_work_order(event: object) -> dict:
         if "session_resume" in order:
             require(order["session_resume"] == "page-boundary-off-by-one"
                     and scope == "host-only"
-                    and set(order) <= base | optional_ref | {"session_resume"}
+                    and set(order) <= base | optional_ref | {"session_resume", "monitor_summary"}
                     and type(order.get("pr_number")) is int
                     and order["pr_number"] >= 0
                     and "source_sha" in order,
                     "WORK_ORDER_RESUME_SCOPE_DENIED")
         else:
             require(capability == "codex-workspace" and
-                    set(order) <= (base - {"scope"}) | optional_ref,
+                    set(order) <= (base - {"scope"}) | optional_ref | {"monitor_summary"},
                     "WORK_ORDER_PATH3_FIELDS_DENIED")
         require(capability == "codex-workspace",
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
@@ -244,7 +266,8 @@ def parse_dynamic_work_order(event: object) -> dict:
         # path parameters, model or hardware under this one main-only route.
         require(path == "path2-cli" and scope == "host-only" and
                 order["native_preflight"] == NATIVE_PREFLIGHT and
-                set(order) == base | optional_ref | {"native_preflight"} and
+                set(order) == base | optional_ref | {"native_preflight"} |
+                 ({"monitor_summary"} if "monitor_summary" in order else set()) and
                 order.get("pr_number") == 0 and
                 type(order.get("pr_number")) is int and
                 type(order.get("source_sha")) is str,
@@ -253,7 +276,7 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(scope == "host-only" and
                 {"script", "argv", "expected_stdout_sha256"} <= set(order)
                 and set(order) <= base | optional_ref |
-                {"script", "argv", "expected_stdout_sha256"},
+                {"script", "argv", "expected_stdout_sha256", "monitor_summary"},
                 "WORK_ORDER_PATH2_FIELDS_DENIED")
         task_by_id({"schema_version": VERSION, "mode": "development",
                     "tasks": {"work-order-fixture": {
@@ -266,8 +289,10 @@ def parse_dynamic_work_order(event: object) -> dict:
     elif capability == "path2-stage-contract":
         require(scope == "guarded-hardware" and
                 {"project", "stage"} <= set(order) and
-                set(order) <= base | optional_ref | {"project", "stage"} and
-                order["project"] == "pl/projects/z2-fixed-unified-site1" and
+                set(order) <= base | optional_ref | {"project", "stage", "monitor_summary"} and
+                type(order["project"]) is str and
+                re.fullmatch(r"pl/projects/[a-z0-9][a-z0-9-]{2,69}",
+                             order["project"]) is not None and
                 type(order["stage"]) is str and
                 order["stage"] in ("download", "test", "restore"),
                 "WORK_ORDER_STAGE_CAPABILITY_DENIED")
@@ -325,6 +350,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         "acceptance": order["acceptance"],
         "work_order_sha256": req["work_order_sha256"],
     }
+    if "monitor_summary" in order:
+        task["monitor_summary"] = order["monitor_summary"]
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order["scope"]
     if "session_resume" in order:
@@ -490,8 +517,26 @@ def authorize(event: object, context: dict, registry: object,
             (req["pr_number"] > 0 and
              req["source_sha"] != req["trusted_sha"]),
             "HOST_BUILD_SOURCE_BINDING_DENIED")
+    # Display-only category derived from the validated task capability/stage.
+    # No freeform Work Order command, stdout or candidate data enters the pane.
+    monitor_stage = ""
+    if task["execution_path"] == "path2-cli":
+        if task.get("capability") == "path2-stage-contract":
+            monitor_stage = {
+                "download": "Guarded Download",
+                "test": "Guarded Test",
+                "restore": "Guarded Restore",
+                "full": "Guarded Full HIL",  # Existing exact registry task.
+            }[task["stage"]]
+        elif task.get("native_preflight") == NATIVE_PREFLIGHT:
+            monitor_stage = "Native preflight"
+        elif task.get("capability") == "vivado-host-build":
+            monitor_stage = "Vivado host build"
+        else:
+            monitor_stage = "CPU-only CLI"
     return {
         "status": "AUTHORIZED_DEV_TASK",
+        "monitor_stage": monitor_stage,
         "authorized_stage": (task["stage"] if
                              req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
                              task.get("capability") == "path2-stage-contract"
@@ -505,6 +550,9 @@ def authorize(event: object, context: dict, registry: object,
                  if task["execution_path"] == "path2-cli"
             else "codex-workspace"
         ),
+        # Only explicit, checksum-bound, operator-public Path 2/3 metadata.
+        # No objective, acceptance, prompt, or Work Order JSON in this field.
+        "monitor_summary": task.get("monitor_summary", ""),
         **a2_claim,
     }
 
@@ -774,8 +822,18 @@ class CodexUsageCollector:
         "item.started", "item.updated", "item.completed", "error",
     })
     MAX_TOKENS = 2**63 - 1
+    # Only fixed Codex item categories may reach the operator pane.
+    # Never log freeform command, text, path, prompt or other item properties.
+    MONITOR_ITEM_TYPES = frozenset({
+        "command_execution", "agent_message", "reasoning", "file_change",
+        "mcp_tool_call", "web_search", "collab_tool_call",
+    })
 
-    def __init__(self):
+    def __init__(self, *, monitor_only: bool = False,
+                 workspace: Path | None = None):
+        self.monitor_only = monitor_only
+        self.activity = (engineering_activity.Path3Activity(workspace)
+                         if monitor_only and workspace is not None else None)
         self.pending = bytearray()
         self.dropping = False
         self.session_id = None
@@ -820,6 +878,13 @@ class CodexUsageCollector:
                         self.invalid = True
                 self.turns += 1
         label = kind if type(kind) is str and kind in self.EVENTS else "unrecognized event"
+        if self.monitor_only and kind in ("item.started", "item.updated", "item.completed"):
+            if self.activity is not None:
+                return self.activity.project(event)
+            item = event.get("item")
+            category = item.get("type") if type(item) is dict else None
+            if type(category) is str and category in self.MONITOR_ITEM_TYPES:
+                label = category + "." + kind.split(".", 1)[1]
         return f"[codex {label}]\n".encode("ascii")
 
     def feed(self, data: bytes) -> bytes:
@@ -870,7 +935,7 @@ class CodexUsageCollector:
 def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                              evidence: Path, live_log: str,
                              usage: CodexUsageCollector | None = None) -> int:
-    """Stream sanitized Codex event names into evidence and the monitor.
+    """Stream existing type-only evidence and projected safe Monitor events.
 
     Only a trusted main worker supplies the fixed monitor path. Loss of the
     secondary monitor sink must never discard local engineering evidence.
@@ -885,6 +950,7 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                 (info.st_mode & 0o170000) != 0o100000):
             raise LiveMonitorUnavailable("MONITOR_LOG_OWNERSHIP_DENIED")
         usage = usage if usage is not None else CodexUsageCollector()
+        monitor_events = CodexUsageCollector(monitor_only=True, workspace=cwd)
         with evidence.open("wb") as trace:
             trace.write(b"=== Codex JSONL event types (sensitive fields omitted) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,
@@ -902,21 +968,23 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                     if not chunk:
                         break
                     safe = usage.feed(chunk)
+                    monitor_safe = monitor_events.feed(chunk)
                     trace.write(safe)
                     trace.flush()
-                    if live_fd >= 0 and safe:
+                    if live_fd >= 0 and monitor_safe:
                         try:
-                            pending = memoryview(safe)
+                            pending = memoryview(monitor_safe)
                             while pending:
                                 pending = pending[os.write(live_fd, pending):]
                         except OSError:
                             os.close(live_fd)
                             live_fd = -1
                 tail = usage.finish()
+                monitor_tail = monitor_events.finish()
                 trace.write(tail)
-                if live_fd >= 0 and tail:
+                if live_fd >= 0 and monitor_tail:
                     try:
-                        pending = memoryview(tail)
+                        pending = memoryview(monitor_tail)
                         while pending:
                             pending = pending[os.write(live_fd, pending):]
                     except OSError:

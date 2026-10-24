@@ -1,4 +1,4 @@
-# PLASMA — Unified HIL: one SWPC Codex worker for SW / Z2 / LA2016
+# PLASMA — Historical shared SWPC Codex worker for SW and LA2016
 
 ## Scope and operational model
 
@@ -10,18 +10,18 @@ required for merge. **Merge alone is not live-execution authorization.**
 Use the existing, separately registered `SWPC-plasma-codex` GitHub runner and
 non-root `plasma-codex` Linux user, with its existing `plasma-codex-io`
 and `plasma-monitor` groups. Do not create another account, worker or
-hardware-control service. The three supported fixed **workloads** remain:
+hardware-control service. The two retained historical fixed **workloads** are:
 
 | Workload | Workflow | One exact owner command on Issue #981 |
 | --- | --- | --- |
 | C11 SW example | `.github/workflows/plasma-codex-software-mvp.yml` | `/plasma-codex hello-c 981` |
-| Z2 SWD-05 loopback | `.github/workflows/plasma-codex-z2-swd05.yml` | `/plasma-codex z2-swd05 981` |
 | LA2016 Direct PWM / capture | `.github/workflows/plasma-codex-la2016-direct.yml` | `/plasma-codex la2016-direct 981` |
 
-All three schedule exactly the same `[self-hosted, linux, x64, plasma-codex]`
-runner. They are **not** interchangeable authorization scopes. The existing
-Z2 and LA workflows and their bounded recovery/OFF controls are unchanged by
-this PR. Their live device readiness is not certified by hosted CI.
+Both retained workflows schedule the same `[self-hosted, linux, x64, plasma-codex]`
+runner. They are **not** interchangeable authorization scopes. The former dedicated Z2 SWD-05 dispatch has been retired; the existing LA
+workflow retains its OFF controls. Shared Path 2/3 Z2 execution and SSH
+credentials are governed by their current Development Mode contracts, not
+by this historical MVP workflow. Live readiness is not certified by hosted CI.
 
 ## Reason for the change (evidence, not speculation)
 
@@ -60,7 +60,7 @@ already consumed that activation and failed. Merely merging this PR must
 the repo as historical provenance logic, but **no active Workflow calls it**.
 
 The fixed SW task uses the **same explicit Issue comment admission pattern**
-as the existing Z2 and LA workflows:
+as the retained LA workflow (the old Z2 SWD-05 owner command is retired):
 
 1. After an independent Gate 2 merge, the sole trusted owner
    `physicslu` may make a **separate** deliberate `created` comment,
