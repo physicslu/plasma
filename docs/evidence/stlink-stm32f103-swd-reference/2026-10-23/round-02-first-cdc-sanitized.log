@@ -1,0 +1,135 @@
+# sanitized derivative; source SHA256 67376fd19d505086819bc9f1d53eafbe19e130292c4e069343ba5fbc9801ec5b
+command=python3 firmware/blue-pill-usb-cdc/host/cdc_probe.py --port <discovered Blue Pill CDC TTY> --duration 60
+start_epoch=1792758618.9461918
+device=VID:PID cafe:4001; current CDC path checked; serial redacted
+1792758619.464143 HB version=0.1 seq=3 uptime_ms=52929
+1792758619.964087 ERR UNKNOWN_COMMAND
+1792758619.964106 HB version=0.1 seq=4 uptime_ms=53429
+1792758620.464058 HB version=0.1 seq=5 uptime_ms=53929
+1792758620.964022 HB version=0.1 seq=6 uptime_ms=54429
+1792758621.464021 HB version=0.1 seq=7 uptime_ms=54929
+1792758621.964024 HB version=0.1 seq=8 uptime_ms=55429
+1792758622.463940 HB version=0.1 seq=9 uptime_ms=55929
+1792758622.963925 HB version=0.1 seq=10 uptime_ms=56429
+1792758623.463900 HB version=0.1 seq=11 uptime_ms=56929
+1792758623.963847 HB version=0.1 seq=12 uptime_ms=57429
+1792758624.463886 HB version=0.1 seq=13 uptime_ms=57929
+1792758624.963795 HB version=0.1 seq=14 uptime_ms=58429
+1792758625.463832 HB version=0.1 seq=15 uptime_ms=58929
+1792758625.963748 HB version=0.1 seq=16 uptime_ms=59429
+1792758626.463729 HB version=0.1 seq=17 uptime_ms=59929
+1792758626.963688 HB version=0.1 seq=18 uptime_ms=60429
+1792758627.463665 HB version=0.1 seq=19 uptime_ms=60929
+1792758627.963617 HB version=0.1 seq=20 uptime_ms=61429
+1792758628.463570 HB version=0.1 seq=21 uptime_ms=61929
+1792758628.963534 HB version=0.1 seq=22 uptime_ms=62429
+1792758629.463540 HB version=0.1 seq=23 uptime_ms=62929
+1792758629.963495 HB version=0.1 seq=24 uptime_ms=63429
+1792758630.463462 HB version=0.1 seq=25 uptime_ms=63929
+1792758630.963455 HB version=0.1 seq=26 uptime_ms=64429
+1792758631.463402 HB version=0.1 seq=27 uptime_ms=64929
+1792758631.963372 HB version=0.1 seq=28 uptime_ms=65429
+1792758632.463344 HB version=0.1 seq=29 uptime_ms=65929
+1792758632.963259 HB version=0.1 seq=30 uptime_ms=66429
+1792758633.463254 HB version=0.1 seq=31 uptime_ms=66929
+1792758633.963212 HB version=0.1 seq=32 uptime_ms=67429
+1792758634.463201 HB version=0.1 seq=33 uptime_ms=67929
+1792758634.963187 HB version=0.1 seq=34 uptime_ms=68429
+1792758635.463141 HB version=0.1 seq=35 uptime_ms=68929
+1792758635.963132 HB version=0.1 seq=36 uptime_ms=69429
+1792758636.463100 HB version=0.1 seq=37 uptime_ms=69929
+1792758636.963049 HB version=0.1 seq=38 uptime_ms=70429
+1792758637.462958 HB version=0.1 seq=39 uptime_ms=70929
+1792758637.962932 HB version=0.1 seq=40 uptime_ms=71429
+1792758638.462909 HB version=0.1 seq=41 uptime_ms=71929
+1792758638.962864 HB version=0.1 seq=42 uptime_ms=72429
+1792758639.462878 HB version=0.1 seq=43 uptime_ms=72929
+1792758639.962924 HB version=0.1 seq=44 uptime_ms=73429
+1792758640.462840 HB version=0.1 seq=45 uptime_ms=73929
+1792758640.962798 HB version=0.1 seq=46 uptime_ms=74429
+1792758641.462726 HB version=0.1 seq=47 uptime_ms=74929
+1792758641.962725 HB version=0.1 seq=48 uptime_ms=75429
+1792758642.462715 HB version=0.1 seq=49 uptime_ms=75929
+1792758642.962687 HB version=0.1 seq=50 uptime_ms=76429
+1792758643.462625 HB version=0.1 seq=51 uptime_ms=76929
+1792758643.962652 HB version=0.1 seq=52 uptime_ms=77429
+1792758644.462582 HB version=0.1 seq=53 uptime_ms=77929
+1792758644.962545 HB version=0.1 seq=54 uptime_ms=78429
+1792758645.462503 HB version=0.1 seq=55 uptime_ms=78929
+1792758645.962466 HB version=0.1 seq=56 uptime_ms=79429
+1792758646.462399 HB version=0.1 seq=57 uptime_ms=79929
+1792758646.962371 HB version=0.1 seq=58 uptime_ms=80429
+1792758647.462349 HB version=0.1 seq=59 uptime_ms=80929
+1792758647.962327 HB version=0.1 seq=60 uptime_ms=81429
+1792758648.462348 HB version=0.1 seq=61 uptime_ms=81929
+1792758648.962404 HB version=0.1 seq=62 uptime_ms=82429
+1792758649.462267 HB version=0.1 seq=63 uptime_ms=82929
+1792758649.962219 HB version=0.1 seq=64 uptime_ms=83429
+1792758650.462187 HB version=0.1 seq=65 uptime_ms=83929
+1792758650.962166 HB version=0.1 seq=66 uptime_ms=84429
+1792758651.462093 HB version=0.1 seq=67 uptime_ms=84929
+1792758651.962057 HB version=0.1 seq=68 uptime_ms=85429
+1792758652.462020 HB version=0.1 seq=69 uptime_ms=85929
+1792758652.962023 HB version=0.1 seq=70 uptime_ms=86429
+1792758653.461959 HB version=0.1 seq=71 uptime_ms=86929
+1792758653.962017 HB version=0.1 seq=72 uptime_ms=87429
+1792758654.461998 HB version=0.1 seq=73 uptime_ms=87929
+1792758654.961928 HB version=0.1 seq=74 uptime_ms=88429
+1792758655.461870 HB version=0.1 seq=75 uptime_ms=88929
+1792758655.961834 HB version=0.1 seq=76 uptime_ms=89429
+1792758656.461837 HB version=0.1 seq=77 uptime_ms=89929
+1792758656.961788 HB version=0.1 seq=78 uptime_ms=90429
+1792758657.461750 HB version=0.1 seq=79 uptime_ms=90929
+1792758657.961729 HB version=0.1 seq=80 uptime_ms=91429
+1792758658.461690 HB version=0.1 seq=81 uptime_ms=91929
+1792758658.961675 HB version=0.1 seq=82 uptime_ms=92429
+1792758659.461629 HB version=0.1 seq=83 uptime_ms=92929
+1792758659.961847 HB version=0.1 seq=84 uptime_ms=93429
+1792758660.461779 HB version=0.1 seq=85 uptime_ms=93929
+1792758660.961496 HB version=0.1 seq=86 uptime_ms=94429
+1792758661.461723 HB version=0.1 seq=87 uptime_ms=94929
+1792758661.961668 HB version=0.1 seq=88 uptime_ms=95429
+1792758662.461685 HB version=0.1 seq=89 uptime_ms=95929
+1792758662.961712 HB version=0.1 seq=90 uptime_ms=96429
+1792758663.461520 HB version=0.1 seq=91 uptime_ms=96929
+1792758663.961628 HB version=0.1 seq=92 uptime_ms=97429
+1792758664.461561 HB version=0.1 seq=93 uptime_ms=97929
+1792758664.961494 HB version=0.1 seq=94 uptime_ms=98429
+1792758665.461323 HB version=0.1 seq=95 uptime_ms=98929
+1792758665.961372 HB version=0.1 seq=96 uptime_ms=99429
+1792758666.461325 HB version=0.1 seq=97 uptime_ms=99929
+1792758666.961361 HB version=0.1 seq=98 uptime_ms=100429
+1792758667.461175 HB version=0.1 seq=99 uptime_ms=100929
+1792758667.961420 HB version=0.1 seq=100 uptime_ms=101429
+1792758668.461350 HB version=0.1 seq=101 uptime_ms=101929
+1792758668.961356 HB version=0.1 seq=102 uptime_ms=102429
+1792758669.461206 HB version=0.1 seq=103 uptime_ms=102929
+1792758669.961092 HB version=0.1 seq=104 uptime_ms=103429
+1792758670.461019 HB version=0.1 seq=105 uptime_ms=103929
+1792758670.961206 HB version=0.1 seq=106 uptime_ms=104429
+1792758671.461023 HB version=0.1 seq=107 uptime_ms=104929
+1792758671.961087 HB version=0.1 seq=108 uptime_ms=105429
+1792758672.461062 HB version=0.1 seq=109 uptime_ms=105929
+1792758672.960911 HB version=0.1 seq=110 uptime_ms=106429
+1792758673.460967 HB version=0.1 seq=111 uptime_ms=106929
+1792758673.960744 HB version=0.1 seq=112 uptime_ms=107429
+1792758674.460953 HB version=0.1 seq=113 uptime_ms=107929
+1792758674.960902 HB version=0.1 seq=114 uptime_ms=108429
+1792758675.460935 HB version=0.1 seq=115 uptime_ms=108929
+1792758675.960843 HB version=0.1 seq=116 uptime_ms=109429
+1792758676.460781 HB version=0.1 seq=117 uptime_ms=109929
+1792758676.960605 HB version=0.1 seq=118 uptime_ms=110429
+1792758677.460734 HB version=0.1 seq=119 uptime_ms=110929
+1792758677.960729 HB version=0.1 seq=120 uptime_ms=111429
+1792758678.460771 HB version=0.1 seq=121 uptime_ms=111929
+1792758678.960682 HB version=0.1 seq=122 uptime_ms=112429
+1792758679.098050 Traceback (most recent call last):
+1792758679.098074   File "<source>/cdc_probe.py", line 171, in <module>
+1792758679.098142     main()
+1792758679.098153   File "<source>/cdc_probe.py", line 167, in main
+1792758679.098157     run_live(args.port, args.duration, args.tolerance, args.host_port_pause_seconds)
+1792758679.098163   File "<source>/cdc_probe.py", line 141, in run_live
+1792758679.098167     assert got_id, "firmware ID reply absent"
+1792758679.098172 AssertionError: firmware ID reply absent
+end_epoch=1792758679.1010706
+exit_code=1

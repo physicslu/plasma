@@ -1,0 +1,17 @@
+{
+  "reference_programmer": "STLINK-V3SET",
+  "dut": "STM32F103C8T6 Blue Pill",
+  "z2_swd_programming": "NOT_RUN",
+  "strict_post_reset_cdc_acceptance": "FAIL",
+  "rows": [
+    {"test": "ST-LINK Flash command and exit", "round_01": "PASS", "round_02": "PASS", "round_03": "PASS"},
+    {"test": "Independent full-length readback SHA256", "round_01": "PASS", "round_02": "PASS", "round_03": "PASS"},
+    {"test": "LA acquisition and CH0/CH1 activity", "round_01": "PASS", "round_02": "PASS", "round_03": "PASS"},
+    {"test": "SWD DP/AP request and ACK decode", "round_01": "PASS", "round_02": "PASS", "round_03": "PASS"},
+    {"test": "SWD timing qualification", "round_01": "EVIDENCE_INSUFFICIENT", "round_02": "EVIDENCE_INSUFFICIENT", "round_03": "EVIDENCE_INSUFFICIENT"},
+    {"test": "First saved 60-second CDC probe and ID", "round_01": "PASS", "round_02": "FAIL", "round_03": "FAIL"},
+    {"test": "Original initial unconditioned round-01 probe", "round_01": "EVIDENCE_INSUFFICIENT", "round_02": "NOT_RUN", "round_03": "NOT_RUN"},
+    {"test": "CDC after recorded empty-line recovery", "round_01": "PASS", "round_02": "PASS", "round_03": "PASS"},
+    {"test": "Physical NRST assertion", "round_01": "EVIDENCE_INSUFFICIENT", "round_02": "EVIDENCE_INSUFFICIENT", "round_03": "EVIDENCE_INSUFFICIENT"}
+  ]
+}

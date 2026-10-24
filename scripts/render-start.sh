@@ -89,14 +89,15 @@ if provider is None or provider.inventory != {
 if default_pinned_upstream() is None:
     raise SystemExit("[render-start] pinned OpenOCD source reference missing")
 
-# L0 manufacturer evidence is internal-only. Validate its installed data root
-# directly instead of leaking it through the customer-facing IC Selector API.
+# L0 manufacturer evidence is internal-only. Use an exact MCXA185 device,
+# which the pinned NXP SEC 26.06 MCX A route evidence keeps at Level 0.
+# MCXA132 is now Level 1 and must not be used for this negative control.
 catalog = get_default_device_catalog()
-mcx_record = catalog.resolve("NXP", "MCXA132VFM")
+mcx_record = catalog.resolve("NXP", "MCXA185VLH")
 if mcx_record is None:
     raise SystemExit("[render-start] NXP Level 0 identity missing from internal catalog")
 mcx_evidence = get_default_nxp_manufacturer_device_evidence().resolve_exact(mcx_record)
-if not isinstance(mcx_evidence, dict) or mcx_evidence.get("icpn") != "MCXA132VFM":
+if not isinstance(mcx_evidence, dict) or mcx_evidence.get("icpn") != "MCXA185VLH":
     raise SystemExit("[render-start] installed NXP Level 0 evidence path is broken")
 PY
 
@@ -198,10 +199,11 @@ if result.get("icpn") != "STM32F103C8T6" or not isinstance(selected_profile, dic
 if selected_profile.get("icpn") != "STM32F103C8T6":
     raise SystemExit("[render-start] IC Selector selected_profile identity mismatch")
 
-# Public readiness verifies only customer-visible Catalog Levels. NXP KL25
-# is Level 1 in the active runtime; Level 0 MCX evidence was checked internally above.
+# Public readiness checks the exact KL25 commercial identity, not a broad NXP
+# search whose first result changes as other NXP L1 cohorts are admitted.
+# Level 0 MCX evidence was checked internally above.
 with urlopen(
-    f"http://127.0.0.1:{port}/api/devices/search?q=NXP&limit=1",
+    f"http://127.0.0.1:{port}/api/devices/search?q=MKL25Z128VLK4&limit=1",
     timeout=3,
 ) as response:
     nxp_search = json.loads(response.read())
@@ -209,11 +211,12 @@ if nxp_search.get("total_count", 0) < 1 or not nxp_search.get("results"):
     raise SystemExit("[render-start] customer-visible NXP search unexpectedly empty")
 nxp_row = nxp_search["results"][0]
 if (nxp_row.get("vendor") != "NXP"
+        or nxp_row.get("icpn") != "MKL25Z128VLK4"
         or nxp_row.get("catalog_level") != 1
         or nxp_row.get("family") != "KL25"):
     raise SystemExit("[render-start] NXP customer-selector Level 1 boundary drift")
 with urlopen(
-    f"http://127.0.0.1:{port}/api/devices/search?q=MCXA132VFM&limit=1",
+    f"http://127.0.0.1:{port}/api/devices/search?q=MCXA185VLH&limit=1",
     timeout=3,
 ) as response:
     mcx_public = json.loads(response.read())

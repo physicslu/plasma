@@ -332,6 +332,18 @@ Required work:
 - preserve `PROCESSED IC = PASS + FAIL` and exclude infrastructure ERROR;
 - validate sockets, hardware, Z2/FPGA path and real target separately from Mock.
 
+## Low Priority — Development Observability
+
+### Path 3 Per-response Token Attribution
+
+**Status:** TODO / LOW PRIORITY; **not** a blocker for current PLASMA IC programming or the completed Repo-first optimization.
+
+**Evidence:** [Path 3 Token Optimization RCA Closure](plasma-path3-token-optimization-rca-closure-2026-10-23.md).
+
+**Specific gap:** Current `codex exec --json` receipt reports the complete Turn-level Input/Cached/Output totals, but not trustworthy per-model-Response usage counts, effective Model/Reasoning Effort, actual `AGENTS.md` loaded tokens, or attribution by tool-event and context source. Never infer response count from `item.completed`, fabricate Prompt Cache pricing, or read raw private Session/Prompt to force an estimate.
+
+**Trigger / bounded acceptance:** Reopen only if real engineering tasks show renewed abnormal token consumption or the CLI offers a supported, non-sensitive telemetry surface. Prefer the existing Dispatcher and sanitized numeric receipts. A future separately approved Gate 1 must specify what can be measured, redaction, focused Host-only tests, and no additional SWPC, hardware or Runner access by default.
+
 ## Resolved presentation debt
 
 ### PMode / EMode Design System Convergence
@@ -472,5 +484,15 @@ The process-coupled Engineering Mock topology cannot preserve an independent PPU
 See [Batch Persistence and Gateway Restart Recovery](../architecture/batch-persistence-recovery.md).
 
 ## Resolved maintenance debt
+
+### Repo-first Path 3 Token Optimization — DONE (WBS-facing workstream)
+
+**Status:** DONE — source optimization merged in [PR #1128](https://github.com/physicslu/plasma/pull/1128); true SWPC Path 3 old/new CPU-only 9×9 Run evidence both 81/81 PASS; this workstream's closure evidence is archived in [Token Optimization RCA Closure](plasma-path3-token-optimization-rca-closure-2026-10-23.md) (this archive document requires its own Gate 2 merge).
+
+**Scope of DONE:** Reduced root `AGENTS.md` and redundant dispatcher prompt, retained full normative clauses and authority guards, observed Input 251,614 → 148,319 (−41.05%), non-cached 58,718 → 30,047 (−48.83%). Do **not** equate these descriptive deltas with validated causality or cost savings. Real SWPC programming hardware acceptance was not part of this task.
+
+**WBS accounting caveat:** No authoritative WBS item ID or audited WBS item-count ledger was identified in this Repository. This is the workstream status for WBS reporting, **not** a change to a separate dashboard's count. Do not silently revise historical completed/in-progress/not-started WBS totals.
+
+**Residual:** The independently tracked low-priority `Path 3 Per-response Token Attribution` debt above remains TODO; it does not reopen this completed remediation.
 
 Resolved items belong in Git history rather than staying as open TODOs. In particular, do not reintroduce static test-count reports, superseded duplicate UI specifications, retired Programming Image filenames, or the misleading `gateway_legacy` module name. CI documentation integrity checks protect these boundaries.

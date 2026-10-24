@@ -1,0 +1,43 @@
+{
+  "firmware_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+  "la_command": [
+    "<pinned sigrok AppImage>",
+    "--appimage-extract-and-run",
+    "--loglevel",
+    "3",
+    "--driver",
+    "kingst-la2016:conn=<discovered LA>",
+    "--config",
+    "samplerate=5m",
+    "--channels",
+    "CH0,CH1,CH2",
+    "--samples",
+    "50000000",
+    "--output-file",
+    "round-01-verify.sr"
+  ],
+  "la_end_epoch": 1792757506.975034,
+  "la_exit": 0,
+  "la_start_epoch": 1792757495.6769903,
+  "la_tool_sha256": "b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475",
+  "phase": "verify",
+  "readback_matches_firmware": true,
+  "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+  "readback_size_bytes": 18768,
+  "round": "01",
+  "sanitized_derivative": true,
+  "source_receipt_sha256": "1b8c9bb12849e5b4fc93fc1fad8ce86f7e3ac87acc6806fe736e949fdc88f2c0",
+  "stlink_command": [
+    "st-flash",
+    "--freq=100",
+    "read",
+    "round-01-readback.bin",
+    "0x08000000",
+    "18768"
+  ],
+  "stlink_end_epoch": 1792757498.245645,
+  "stlink_exit": 0,
+  "stlink_start_epoch": 1792757495.8276474,
+  "waveform_bytes": 307562,
+  "waveform_sha256": "8790576e0ea341f100a9e81d0cd9789f24cb3b476aa42fafdbe06f5021800707"
+}

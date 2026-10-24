@@ -730,6 +730,62 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(receipt["codex_usage"]["input_tokens"], 1)
             self.assertNotIn("gpt-6-sol", json.dumps(receipt))
 
+    def test_repo_first_codex_guidance_budget_and_safety_preservation(self):
+        root = (ROOT / "AGENTS.md").read_bytes()
+        detail = (ROOT / "docs/development/"
+                  "plasma-autonomous-development-contract-full.md").read_text()
+        # Avoid silent truncation at Codex's default 32 KiB project budget.
+        self.assertLess(len(root), 32768)
+        brief = root.decode("utf-8")
+        for required in ("Gate 1", "Gate 2", "Path 3", "NOT_RUN",
+                         "trusted root executor", "Merge Approval",
+                         "electrical", "B1", "rollback",
+                         "Credential", "AGENTS.md"):
+            with self.subTest(required=required):
+                self.assertIn(required.casefold(), brief.casefold())
+        for required in ("## 1A. Prototype-first",
+                         "## 1B. Canonical Codex task/SSH",
+                         "## 11. Autonomous task execution contract",
+                         "## 20. Workspace and information boundary"):
+            self.assertIn(required, detail)
+        self.assertGreater(len(detail.encode("utf-8")), len(root))
+
+    def test_repo_first_path3_prompt_is_short_and_preserves_scope(self):
+        seen = []
+        class Result:
+            returncode = 0
+            stdout = b""
+            stderr = b""
+        def fake(command, **kwargs):
+            seen.append((list(command), kwargs["input"]))
+            return Result()
+        with tempfile.TemporaryDirectory() as td:
+            receipt = dev.run_codex_task(
+                self.task, workspace=Path(td), executor=fake)
+        self.assertEqual(len(seen), 1)
+        audit = receipt["codex_context_audit"]
+        self.assertEqual(audit["model_request_count_status"], "NOT_AVAILABLE")
+        self.assertIsNone(audit["model_request_count"])
+        self.assertIsNone(audit["repo_root_agents_bytes"])
+        self.assertEqual(audit["actual_instruction_load_status"], "NOT_VERIFIED")
+        self.assertEqual(audit["dispatched_prompt_bytes"], len(seen[0][1]))
+        self.assertNotIn(self.task["objective"], json.dumps(audit))
+        argv, raw_prompt = seen[0]
+        prompt = raw_prompt.decode("utf-8")
+        self.assertLess(len(raw_prompt), 2200 + len(self.task["objective"].encode("utf-8")))
+        self.assertIn("AGENTS.md", prompt)
+        self.assertIn("pinned source SHA", prompt)
+        self.assertIn(self.task["objective"], prompt)
+        self.assertIn("NOT_RUN", prompt)
+        self.assertIn("unsafe hardware writes", prompt)
+        self.assertIn("without another user approval", prompt)
+        self.assertNotIn("Plasma Autonomous Development Contract", prompt)
+        self.assertEqual(argv, [
+            "codex", "--ask-for-approval", "never",
+            "-c", "sandbox_workspace_write.network_access=false",
+            "exec", "--json", "--sandbox", "workspace-write", "-",
+        ])
+
     def test_jsonl_usage_receipt_and_secret_redaction(self):
         secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"
         thread = "0199a213-81c0-7800-8aa1-bbab2a035a53"
@@ -993,7 +1049,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
-        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
+        job=wf.split("  development-codex:",1)[1].split("\n  development-codex-resume:",1)[0]
         self.assertIn("Collect Path 3 evidence even when Codex",job)
         self.assertIn("if: always()",job)
         self.assertIn("git -C candidate diff --binary HEAD",job)
@@ -1707,7 +1763,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn('"path2-stage-contract"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
@@ -1742,6 +1798,202 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertIn("sandbox_workspace_write.network_access=false", captured_commands[0])
             self.assertIn("Acceptance criteria", calls[0])
             self.assertIn("Owner Work Order SHA256", calls[0])
+
+
+class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
+    """Synthetic two-process proof: no real Codex, SWPC or device calls."""
+
+    PIN = "b" * 40
+    SID = "0190deaf-babe-47cd-9e00-a1b2c3d4e5f6"
+    NONCE = "a" * 32
+
+    @staticmethod
+    def module():
+        import plasma_path3_session_resume_probe as probe
+        return probe
+
+    def workspace(self, td):
+        repo = Path(td)
+        (repo / "AGENTS.md").write_text("Test-only AGENTS entrypoint.\n")
+        return repo
+
+    def state(self, root):
+        scratch = root / self.module().ROOT_FOLDER
+        entries = (["?? " + self.module().ROOT_FOLDER + "/" + x.name
+                    for x in scratch.iterdir() if x.is_file()]
+                   if scratch.is_dir() else [])
+        return self.PIN, entries
+
+    def fake(self, repo, *, change_id=False, no_proof=False,
+             first_nonzero=False, premature_fix=False, outside_change=False):
+        probe = self.module()
+        calls = []
+        first_prompt = []
+
+        def invoke(command, **kwargs):
+            calls.append(command)
+            scratch = Path(kwargs["cwd"])
+            prompt = kwargs["input"]
+            self.assertTrue(kwargs["capture_output"])
+            self.assertTrue(kwargs["text"])
+            self.assertEqual(kwargs["timeout"], 240)
+            self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
+            self.assertIn("sandbox_workspace_write.network_access=false", command)
+            self.assertIn('sandbox_mode="workspace-write"', command)
+            if len(calls) == 1:
+                self.assertNotIn("resume", command)
+                self.assertIn("DO NOT fix anything", prompt)
+                self.assertIn(self.NONCE, prompt)
+                first_prompt.append(prompt)
+                if premature_fix:
+                    f = scratch / probe.SOURCE_NAME
+                    f.write_text(f.read_text().replace(
+                        "len(data) - 1", "len(data)"))
+                if first_nonzero:
+                    return subprocess.CompletedProcess(command, 1, "", "")
+                session = self.SID
+            elif len(calls) == 2:
+                self.assertEqual(command[command.index("resume") + 1], self.SID)
+                self.assertNotIn(self.NONCE, prompt)
+                self.assertNotIn("--sandbox", command)
+                # The fake CLI is the only actor which edits the approved source.
+                source = scratch / probe.SOURCE_NAME
+                source.write_text(source.read_text().replace(
+                    "len(data) - 1", "len(data)"))
+                if not no_proof:
+                    (scratch / probe.PROOF_NAME).write_text(self.NONCE + "\n")
+                session = (str(__import__("uuid").uuid4())
+                           if change_id else self.SID)
+            else:
+                self.fail("Unexpected third Codex process")
+            events = [
+                {"type": "thread.started", "thread_id": session},
+                {"type": "turn.completed",
+                 "usage": {"input_tokens": 120, "cached_input_tokens": 80,
+                           "output_tokens": 20}},
+            ]
+            return subprocess.CompletedProcess(
+                command, 0,
+                "".join(json.dumps(e) + "\n" for e in events), "")
+        return invoke, calls
+
+    def test_two_distinct_processes_reuse_thread_and_fix_bug(self):
+        probe = self.module()
+        with tempfile.TemporaryDirectory() as td:
+            repo = self.workspace(td)
+            executor, calls = self.fake(repo)
+            report = probe.run_probe(
+                repo, self.PIN, executor=executor,
+                state=self.state, nonce_factory=lambda: self.NONCE)
+            self.assertEqual(report["result"], "PASS", report)
+            self.assertNotEqual(report["test_before"], 0)
+            self.assertNotEqual(report["test_after_first"], 0)
+            self.assertEqual(report["test_after_resume"], 0)
+            self.assertTrue(report["same_thread"])
+            self.assertEqual(report["context_continuity"], "VERIFIED")
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(report["usage"]), 2)
+            self.assertEqual(report["usage"][0]["input_tokens"], 120)
+            receipt = (repo / probe.ROOT_FOLDER / "receipt.json")
+            self.assertEqual(receipt.stat().st_mode & 0o777, 0o600)
+            self.assertNotIn(self.NONCE, receipt.read_text())
+            self.assertNotIn(self.SID, receipt.read_text())
+            self.assertTrue(report["thread_id_sha256"])
+            self.assertEqual(
+                (repo / probe.ROOT_FOLDER / probe.TEST_NAME).read_text(),
+                probe.TEST_SOURCE)
+
+    def test_mismatched_thread_fails_even_when_bug_fixed(self):
+        probe = self.module()
+        with tempfile.TemporaryDirectory() as td:
+            repo = self.workspace(td)
+            executor, calls = self.fake(repo, change_id=True)
+            report = probe.run_probe(
+                repo, self.PIN, executor=executor,
+                state=self.state, nonce_factory=lambda: self.NONCE)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(report["test_after_resume"], 0)
+            self.assertEqual(report["result"], "FAIL")
+            self.assertEqual(report["failure_reason"], "RESUMED_THREAD_MISMATCH")
+
+    def test_same_thread_without_prior_challenge_is_not_pass(self):
+        probe = self.module()
+        with tempfile.TemporaryDirectory() as td:
+            repo = self.workspace(td)
+            executor, calls = self.fake(repo, no_proof=True)
+            report = probe.run_probe(
+                repo, self.PIN, executor=executor,
+                state=self.state, nonce_factory=lambda: self.NONCE)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(report["test_after_resume"], 0)
+            self.assertEqual(report["result"], "FAIL")
+            self.assertEqual(report["failure_reason"], "CHALLENGE_NOT_RECOVERED")
+
+    def test_first_turn_nonzero_and_unexpected_fix_do_not_resume(self):
+        probe = self.module()
+        for flags,reason in [
+            ({"first_nonzero": True}, "CODEX_NONZERO"),
+            ({"premature_fix": True}, "FIRST_TURN_PREMATURE_FIX"),
+        ]:
+            with self.subTest(reason=reason), tempfile.TemporaryDirectory() as td:
+                repo = self.workspace(td)
+                executor, calls = self.fake(repo, **flags)
+                report = probe.run_probe(
+                    repo, self.PIN, executor=executor,
+                    state=self.state, nonce_factory=lambda: self.NONCE)
+                self.assertEqual(report["result"], "FAIL")
+                self.assertEqual(report["failure_reason"], reason)
+                self.assertEqual(len(calls), 1)
+
+    def test_dirty_pin_and_existing_probe_fail_before_codex(self):
+        probe = self.module()
+        with tempfile.TemporaryDirectory() as td:
+            repo = self.workspace(td)
+            executor, calls = self.fake(repo)
+            with self.assertRaisesRegex(probe.ProbeDenied,
+                                        "SOURCE_NOT_CLEAN_OR_PINNED"):
+                probe.run_probe(
+                    repo, self.PIN, executor=executor,
+                    state=lambda _: ("c" * 40, []))
+            with self.assertRaisesRegex(probe.ProbeDenied,
+                                        "SOURCE_NOT_CLEAN_OR_PINNED"):
+                probe.run_probe(
+                    repo, self.PIN, executor=executor,
+                    state=lambda _: (self.PIN, [" M docs/README.md"]))
+            (repo / probe.ROOT_FOLDER).mkdir()
+            with self.assertRaisesRegex(probe.ProbeDenied,
+                                        "PROBE_ALREADY_EXISTS"):
+                probe.run_probe(
+                    repo, self.PIN, executor=executor,
+                    state=lambda _: (self.PIN, []))
+            self.assertFalse(calls)
+
+    def test_missing_bounded_jsonl_events_fail_closed(self):
+        probe = self.module()
+        for events,reason in [
+            ([], "THREAD_ID_NOT_UNIQUE"),
+            ([{"type":"thread.started","thread_id":self.SID}],
+             "TURN_USAGE_NOT_UNIQUE"),
+            ([{"type":"thread.started","thread_id":self.SID},
+              {"type":"turn.completed",
+               "usage":{"input_tokens":3, "cached_input_tokens":4,
+                        "output_tokens":1}}], "USAGE_INVALID"),
+        ]:
+            with self.subTest(reason=reason), self.assertRaisesRegex(
+                    probe.ProbeDenied, reason):
+                probe.parse_events("".join(json.dumps(x) + "\n" for x in events))
+
+    def test_no_unapproved_runner_or_workflow_resume(self):
+        probe = self.module()
+        self.assertNotIn("resume", dev.run_codex_task.__code__.co_names)
+        self.assertNotIn("--dangerously-bypass-approvals-and-sandbox",
+                         " ".join(probe.cmd(self.SID)))
+        workflow = WORKFLOW.read_text()
+        self.assertIn("github.event_name == 'pull_request'", workflow)
+        self.assertIn("runs-on: ubuntu-24.04", workflow)
+        self.assertIn("scripts/tests/test_plasma_development_dispatch.py",
+                      workflow)
+        self.assertNotIn("plasma-path3-session-resume.yml", workflow)
 
 
 if __name__ == "__main__":

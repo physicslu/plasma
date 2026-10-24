@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-v9",
+  "adr": "ADR-0002",
+  "phase": "02_PROGRAMMING",
+  "status": "reviewed_source_only",
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "provider": {
+    "provider_id": "openocd-upstream",
+    "version": "0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "runtime_id": "0.12.0-9ea7f3d647c8",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "flash_driver": "stm32f1x",
+    "flash_driver_source_path": "src/flash/nor/stm32f1x.c"
+  },
+  "predecessor_qualification": {
+    "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-v8.json",
+    "git_blob_sha1": "ce8cf5ccd1a2f77c1848ce3470aee9006605c398",
+    "qualification_id": "adr0002-phase2-openocd-012-stm32f103-v8",
+    "supported_exact_icpn_count": 65
+  },
+  "added_cohort": {
+    "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-nonlqfp-12-v1.json",
+    "git_blob_sha1": "983b542530695da6c9c08e325a83ac77b53ddc15",
+    "qualification_id": "adr0002-phase2-openocd-012-stm32f103-medium-nonlqfp-12-v1",
+    "supported_exact_icpn_count": 12
+  },
+  "supported_exact_icpn_count": 77,
+  "default_unreviewed_software_state": "UNKNOWN",
+  "acceptance_boundary": {
+    "public_catalog_visibility_changed": false,
+    "job_batch_execution_changed": false,
+    "installed_runtime_attested": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false,
+    "phase3_compatibility_claimed": false,
+    "execution_authorized": false
+  },
+  "excluded_exact_icpns": [
+    "STM32F103RBH6R",
+    "STM32F103RBH6RTR",
+    "STM32F103T8U6",
+    "STM32F103T8U6TR",
+    "STM32F103T8U7",
+    "STM32F103T8U7TR",
+    "STM32F103TBU6",
+    "STM32F103TBU6TR",
+    "STM32F103TBU7"
+  ]
+}

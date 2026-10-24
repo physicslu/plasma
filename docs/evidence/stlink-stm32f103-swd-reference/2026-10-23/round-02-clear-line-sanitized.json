@@ -1,0 +1,11 @@
+{
+  "bytes_written": 1,
+  "end_epoch": 1792759041.72242,
+  "pid": "4001",
+  "port": "<discovered Blue Pill CDC TTY>",
+  "sanitized_derivative": true,
+  "sent_hex": "0a",
+  "source_sha256": "0c9d574fdd55733bf04edb2c4c01ce22bfc6953cfa5d1821a3d3e64e9019f727",
+  "start_epoch": 1792759041.7223294,
+  "vid": "cafe"
+}

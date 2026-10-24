@@ -1,0 +1,144 @@
+{
+  "observations": [
+    {
+      "exit_code": 0,
+      "first_seq_uptime": [
+        137,
+        177449
+      ],
+      "heartbeat_count": 121,
+      "id_assertion_passed": true,
+      "interval_count": 120,
+      "interval_max_us": 500303,
+      "interval_min_us": 499582,
+      "interval_sum_us": 59995921,
+      "label": "round-01-saved-pass",
+      "last_seq_uptime": [
+        257,
+        237449
+      ],
+      "sanitized_log": "round-01-saved-pass-cdc-sanitized.log",
+      "sequence_gaps": 0,
+      "source_log_sha256": "e0d8d0bcde8139b8f837e7a760a87743214e7db5d4f02ba8f2f390db15fb0bfc",
+      "unknown_command_count": 0,
+      "uptime_monotonic": true
+    },
+    {
+      "exit_code": 1,
+      "first_seq_uptime": [
+        3,
+        52929
+      ],
+      "heartbeat_count": 120,
+      "id_assertion_passed": false,
+      "interval_count": 119,
+      "interval_max_us": 500245,
+      "interval_min_us": 499717,
+      "interval_sum_us": 59496539,
+      "label": "round-02-first",
+      "last_seq_uptime": [
+        122,
+        112429
+      ],
+      "sanitized_log": "round-02-first-cdc-sanitized.log",
+      "sequence_gaps": 0,
+      "source_log_sha256": "67376fd19d505086819bc9f1d53eafbe19e130292c4e069343ba5fbc9801ec5b",
+      "unknown_command_count": 1,
+      "uptime_monotonic": true
+    },
+    {
+      "exit_code": 0,
+      "first_seq_uptime": [
+        126,
+        488187
+      ],
+      "heartbeat_count": 121,
+      "id_assertion_passed": true,
+      "interval_count": 120,
+      "interval_max_us": 500268,
+      "interval_min_us": 499631,
+      "interval_sum_us": 59996325,
+      "label": "round-02-retry-01",
+      "last_seq_uptime": [
+        246,
+        548187
+      ],
+      "sanitized_log": "round-02-retry-01-cdc-sanitized.log",
+      "sequence_gaps": 0,
+      "source_log_sha256": "9d5c8615676505e77f0dacf79dfe1010164fc170da9f51083fff7cc6e42e0a6e",
+      "unknown_command_count": 0,
+      "uptime_monotonic": true
+    },
+    {
+      "exit_code": 1,
+      "first_seq_uptime": [
+        3,
+        61136
+      ],
+      "heartbeat_count": 120,
+      "id_assertion_passed": false,
+      "interval_count": 119,
+      "interval_max_us": 500295,
+      "interval_min_us": 499660,
+      "interval_sum_us": 59496555,
+      "label": "round-03-first",
+      "last_seq_uptime": [
+        122,
+        120636
+      ],
+      "sanitized_log": "round-03-first-cdc-sanitized.log",
+      "sequence_gaps": 0,
+      "source_log_sha256": "42e21c89f8241cbf3aead3536b04f9d00161375432ac192f4ebf9d35394d39a4",
+      "unknown_command_count": 1,
+      "uptime_monotonic": true
+    },
+    {
+      "exit_code": 0,
+      "first_seq_uptime": [
+        126,
+        152935
+      ],
+      "heartbeat_count": 121,
+      "id_assertion_passed": true,
+      "interval_count": 120,
+      "interval_max_us": 500292,
+      "interval_min_us": 499496,
+      "interval_sum_us": 59995878,
+      "label": "round-03-retry-01",
+      "last_seq_uptime": [
+        246,
+        212935
+      ],
+      "sanitized_log": "round-03-retry-01-cdc-sanitized.log",
+      "sequence_gaps": 0,
+      "source_log_sha256": "9ae1a33d74f0843b10a18ffa7494175eaf70156dc2751ea030aea7762367d9ab",
+      "unknown_command_count": 0,
+      "uptime_monotonic": true
+    },
+    {
+      "exit_code": 0,
+      "first_seq_uptime": [
+        248,
+        248737
+      ],
+      "heartbeat_count": 111,
+      "id_assertion_passed": true,
+      "interval_count": 110,
+      "interval_max_us": 5042393,
+      "interval_min_us": 499526,
+      "interval_sum_us": 59539220,
+      "label": "host-reopen",
+      "last_seq_uptime": [
+        359,
+        308280
+      ],
+      "sanitized_log": "host-reopen-cdc-sanitized.log",
+      "sequence_gaps": 1,
+      "source_log_sha256": "406d0ddc53f01a56d4ab817e4e1e5f15edb2e5d0d9b0f63cc25372d87957667b",
+      "unknown_command_count": 0,
+      "uptime_monotonic": true
+    }
+  ],
+  "round_01_initial_failure_note": "A first unconditioned attempt exited 1 after 120 heartbeats and no ID; its original raw file was overwritten before archiving. The saved round-01 log is the successful retest.",
+  "round_01_initial_failure_raw_log": "UNAVAILABLE_OVERWRITTEN"
+}
