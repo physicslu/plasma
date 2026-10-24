@@ -171,7 +171,7 @@ produced real BIT/HWH/BIN at exact source
 The artifact was downloaded and independently hashed:
 - `system.bit` SHA256 `f2e59f31bacf6e8ab0ee9325a07125bc155647a261db3f84e67ba71bb0105891`;
 - `system.hwh` SHA256 `84894ae5791a65ec16bd6146779faec4496d47833fd0ad294149d5c46571b510`;
-- `system.bit.bin` SHA256 `bfbd3d872caeff05a8f9daa0829b6292e5b5036c6b927d6c779e13fe9ec1a1`.
+- `system.bit.bin` SHA256 `bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1`.
 This is **historical offline-image evidence**, not a source lock for
 the newer current PR HEAD. A separately authorized actual Vivado
 rebuild on the final source SHA is required before any physical image
