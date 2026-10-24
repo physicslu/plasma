@@ -24,8 +24,7 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
             plasma = home / '.config/plasma'
             plasma.mkdir(parents=True, mode=0o700)
             sources = [plasma / name for name in (
-                'z2-dev-credentials.json', 'z2-login-smoke.json',
-                'z2-login-known_hosts')]
+                'z2-login-smoke.json', 'z2-login-known_hosts')]
             for source in sources:
                 source.touch(mode=0o600)
             unrelated = plasma / 'unrelated-secret'
