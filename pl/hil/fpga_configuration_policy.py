@@ -81,6 +81,7 @@ class ImageDescriptor:
     bin_sha256: str
     recovery_sha256: str | None
     runtime_admitted: bool
+    external_io_timing: str
     evidence_run_id: int
     evidence_artifact_id: int
 
@@ -122,6 +123,7 @@ class ImageDescriptor:
             bin_sha256=im["bin_sha256"],
             recovery_sha256=raw["recovery_sha256"],
             runtime_admitted=raw["runtime_admitted"],
+            external_io_timing=raw["external_io_timing"],
             evidence_run_id=im["github_run_id"],
             evidence_artifact_id=im["github_artifact_id"],
         )
@@ -162,6 +164,12 @@ class ImageDescriptor:
              type(self.evidence_run_id) is int and self.evidence_run_id > 0 and
              type(self.evidence_artifact_id) is int and self.evidence_artifact_id > 0,
              "IMAGE_DESCRIPTOR_PROVENANCE_INVALID")
+        # An unverified external-I/O timing declaration is not a runtime
+        # admission credential. It must remain explicitly unqualified
+        # until independent measured evidence and a reviewed authority
+        # are available; merely writing "QUALIFIED" cannot change status.
+        need(self.external_io_timing == "NOT_QUALIFIED",
+             "IMAGE_DESCRIPTOR_EXTERNAL_IO_UNQUALIFIED")
 
 
 def load_descriptor(path: Path) -> ImageDescriptor:
