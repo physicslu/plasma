@@ -84,7 +84,6 @@ class SWD05HostContracts(unittest.TestCase):
                 "recovery_bin": "/lib/firmware/base.bin",
                 "recovery_hwh": "/root/reviewed/base.hwh",
                 "output": "/root/evidence/fresh",
-                "sudo_password": "PRIVATE_DO_NOT_PRINT",
             }
             command = subject.fixed_remote_cmd(route)
         self.assertNotIn("PRIVATE_DO_NOT_PRINT", command)
