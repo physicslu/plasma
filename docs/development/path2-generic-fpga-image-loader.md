@@ -15,6 +15,14 @@ The protected Root Entry source is now
 F1-B-named Root Entry is removed from the **candidate source**, not
 uninstalled from the live Z2.
 
+The trusted-main Path 2 *dynamic* Work Order now admits the same
+bounded project-name syntax as Stage Transport and Root Entry, instead of
+accepting only the historical F1-B name. This does **not** authorize the
+project on Z2: the independently root-owned installed project, pinned
+SHA, image/recovery and B1/B2/B3 guards must still match. Historical fixed
+F1-B Task IDs remain restricted to their original project; Path 3's
+privileged dynamic delegation is not added here.
+
 The new entry binds exactly three fixed arguments:
 `download|test|restore`, authorized project name and pinned Git SHA.
 It reads one **root-owned, SHA256-manifest-pinned active project**
