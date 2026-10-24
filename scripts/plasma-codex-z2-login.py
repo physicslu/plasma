@@ -21,6 +21,7 @@ import stat
 import subprocess
 import sys
 import termios
+import tempfile
 import time
 import tty
 
@@ -59,7 +60,8 @@ def private_file(path: Path) -> bytes:
 def creds() -> dict[str, str]:
     try:
         record = json.loads(private_file(FILE))
-        if set(record) != {"ssh_host", "ssh_username", "ssh_password"}:
+        if not ({"ssh_host", "ssh_username", "ssh_password"} <= set(record)
+                <= {"ssh_host", "ssh_username", "ssh_password", "sudo_password"}):
             raise ValueError("CREDENTIAL_SCHEMA")
         if record["ssh_username"] != LOGIN or not isinstance(record["ssh_password"], str):
             raise ValueError("CREDENTIAL_USER")
@@ -68,6 +70,9 @@ def creds() -> dict[str, str]:
             raise ValueError("TARGET_INVALID")
         if not record["ssh_password"]:
             raise ValueError("CREDENTIAL_EMPTY")
+        if "sudo_password" in record and (not isinstance(record["sudo_password"], str)
+                                          or not record["sudo_password"]):
+            raise ValueError("SUDO_PASSWORD_INVALID")
         kh = private_file(KNOWN_HOSTS)
         with subprocess.Popen(
             ["ssh-keygen", "-F", target, "-f", str(KNOWN_HOSTS)],
@@ -136,6 +141,93 @@ def enroll() -> None:
         "ssh_host": target, "ssh_username": LOGIN, "ssh_password": pw,
     }).encode())
     print("Private Z2 smoke credential and pinned host key installed; no login executed.")
+
+
+def replace_private_file(path: Path, content: bytes) -> None:
+    """Replace only a worker-owned 0600 file; never publish credential bytes."""
+    private_file(path)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".z2-auth-",
+                                         delete=False) as stream:
+            temporary = Path(stream.name)
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def consolidate_credentials() -> None:
+    """Local-only safe one-time migration to a single worker Z2 login secret.
+
+    No SSH, sudo, FPGA or network command. Do not delete another user's file.
+    """
+    expect_worker()
+    if os.environ.get("GITHUB_ACTIONS") or os.environ.get("RUNNER_NAME") or not sys.stdin.isatty():
+        raise ValueError("CONSOLIDATE_NEEDS_TRUSTED_INTERACTIVE_TERMINAL")
+    record = creds()  # Existing login + pinned host key must already validate.
+    legacy = FILE.parent / "z2-dev-credentials.json"
+    route = FILE.parent / "z2-swd05-oneshot.json"
+    candidates = []
+    if "sudo_password" in record:
+        candidates.append(record["sudo_password"])
+    if legacy.exists() or legacy.is_symlink():
+        previous = json.loads(private_file(legacy))
+        if (type(previous) is not dict or set(previous) != {
+                "ssh_host", "ssh_username", "ssh_password", "sudo_password"} or
+                any(previous[k] != record[k] for k in (
+                    "ssh_host", "ssh_username", "ssh_password")) or
+                type(previous["sudo_password"]) is not str or
+                not previous["sudo_password"]):
+            raise ValueError("LEGACY_Z2_CREDENTIAL_CONFLICT")
+        candidates.append(previous["sudo_password"])
+    route_data = None
+    if route.exists() or route.is_symlink():
+        route_data = json.loads(private_file(route))
+        expected = {"source_root", "candidate_bit", "candidate_hwh", "manifest",
+                    "candidate_bin", "recovery_bin", "recovery_hwh", "output"}
+        if type(route_data) is not dict or not (
+                set(route_data) == expected or
+                set(route_data) == expected | {"sudo_password"}):
+            raise ValueError("LEGACY_ROUTE_SCHEMA_CONFLICT")
+        if "sudo_password" in route_data:
+            sudo = route_data["sudo_password"]
+            if type(sudo) is not str or not sudo:
+                raise ValueError("LEGACY_SUDO_CREDENTIAL_INVALID")
+            candidates.append(sudo)
+    if candidates and any(candidate != candidates[0] for candidate in candidates):
+        raise ValueError("LEGACY_SUDO_CREDENTIAL_CONFLICT")
+    selected_sudo = candidates[0] if candidates else record["ssh_password"]
+    updated = dict(record)
+    if selected_sudo != record["ssh_password"]:
+        updated["sudo_password"] = selected_sudo
+    else:
+        updated.pop("sudo_password", None)
+
+    # Install the consolidated credential before stripping the legacy route.
+    if updated != record:
+        replace_private_file(FILE, json.dumps(updated, sort_keys=True).encode())
+    validated = creds()
+    if validated.get("sudo_password", validated["ssh_password"]) != selected_sudo:
+        raise ValueError("CONSOLIDATED_CREDENTIAL_VERIFY_FAILED")
+    if route_data is not None and "sudo_password" in route_data:
+        clean_route = {k: v for k, v in route_data.items() if k != "sudo_password"}
+        replace_private_file(route, json.dumps(clean_route, sort_keys=True).encode())
+        if "sudo_password" in json.loads(private_file(route)):
+            raise ValueError("ROUTE_SECRET_REMOVAL_VERIFY_FAILED")
+    # Only remove legacy login credentials from THIS dedicated worker's home.
+    # Another account's private lab credentials must never be touched.
+    if legacy.exists() or legacy.is_symlink():
+        private_file(legacy)
+        legacy.unlink()
+        if legacy.exists() or legacy.is_symlink():
+            raise ValueError("LEGACY_CREDENTIAL_REMOVAL_VERIFY_FAILED")
+    print("Z2 worker credentials consolidated; legacy worker login removed; no SSH or hardware executed.")
 
 
 def ssh_login(record: dict[str, str], seconds: int = MAX_SECONDS) -> str:
@@ -397,12 +489,15 @@ def main() -> None:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--run", action="store_true")
     group.add_argument("--enroll", action="store_true")
+    group.add_argument("--consolidate", action="store_true")
     group.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     if args.self_test:
         self_test()
     elif args.enroll:
         enroll()
+    elif args.consolidate:
+        consolidate_credentials()
     else:
         raise SystemExit(execute())
 
