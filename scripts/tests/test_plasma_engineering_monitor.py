@@ -51,6 +51,125 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("WRAPPER: PASS", mon.render_snapshot(Path(td), "path2"))
             self.assertIn("STAGE: (not available)", mon.render_snapshot(Path(td), "path2"))
 
+    def test_native_preflight_receipt_hint_matches_exact_run(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            raw = {
+                "schema": "plasma.codex.native_preflight.v1",
+                "status": "NOT_RUN_OR_FAIL",
+                "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+                "denial_stage": "CLI_WRAPPER",
+                "denial_cause": "PEER_WRITABLE",
+                "denial_component_index": 1,
+                "github_run_id": "39966229598",
+                "task_id": "path2-work-order",
+                "work_order_sha256": "a" * 64,
+                "model_session": "NOT_RUN",
+                "hardware_access": "NOT_RUN",
+                "provenance": "NOT_INDEPENDENTLY_VERIFIED",
+                "sha256_pin_authorized": False,
+                "private_extra": "/private/DO_NOT_SHOW",
+            }
+            receipt = d / "plasma-path2-receipt.json"
+            receipt.write_text(json.dumps(raw))
+            with patch.dict(os.environ, {
+                "RUNNER_TEMP": td, "GITHUB_RUN_ID": "39966229598",
+                "PLASMA_MONITOR_TASK": "path2-work-order",
+                "WORK_ORDER_SHA256": "a" * 64,
+                "PLASMA_MONITOR_STAGE": "Native preflight",
+            }, clear=True):
+                self.assertEqual(mon.run_job(
+                    "path2", [sys.executable, "-c", "import sys;sys.exit(2)"],
+                    directory=d), 2)
+            state = json.loads((d / "path2.json").read_text())
+            self.assertEqual(state["receipt_hint"], {
+                "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+                "stage": "CLI_WRAPPER",
+                "cause": "PEER_WRITABLE",
+                "component_index": 1,
+            })
+            frame = mon.render_snapshot(d, "path2", width=120, height=30)
+            self.assertIn("WRAPPER: FAIL  EXIT: 2", frame)
+            self.assertIn("RECEIPT: NATIVE_PATH_PERMISSIONS_DENIED | CLI_WRAPPER | PEER_WRITABLE | #1", frame)
+            self.assertNotIn("/private/DO_NOT_SHOW", frame)
+            self.assertNotIn("a" * 64, frame)
+            self.assertNotIn("RECEIPT:", (d / "path2.log").read_text())
+
+    def test_native_preflight_receipt_hint_fail_closed(self):
+        source = {
+            "schema": "plasma.codex.native_preflight.v1",
+            "status": "NOT_RUN_OR_FAIL",
+            "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+            "denial_stage": "CLI_WRAPPER",
+            "denial_cause": "PEER_WRITABLE",
+            "denial_component_index": 1,
+            "github_run_id": "39966229598",
+            "task_id": "path2-work-order",
+            "work_order_sha256": "a" * 64,
+            "model_session": "NOT_RUN",
+            "hardware_access": "NOT_RUN",
+            "provenance": "NOT_INDEPENDENTLY_VERIFIED",
+            "sha256_pin_authorized": False,
+        }
+        valid = dict(run_id="39966229598", task="path2-work-order",
+                     work_order_sha="a" * 64, exit_code=2)
+        self.assertIsNotNone(mon._receipt_permission_hint(source, **valid))
+        for changed in (
+            {"github_run_id": "other"},
+            {"task_id": "path3-work-order"},
+            {"work_order_sha256": "b" * 64},
+            {"denial_stage": ["CLI_WRAPPER"]},
+            {"denial_cause": ["PEER_WRITABLE"]},
+            {"denial_cause": "PASSWORD_SECRET"},
+            {"denial_component_index": 0},
+            {"denial_component_index": True},
+            {"denial_component_index": 25},
+            {"status": "PASS"},
+            {"provenance": "VERIFIED"},
+            {"hardware_access": "PASS"},
+            {"sha256_pin_authorized": True},
+        ):
+            with self.subTest(changed=changed):
+                self.assertIsNone(mon._receipt_permission_hint(
+                    dict(source, **changed), **valid))
+        for changed in (
+            {"run_id": "unmatched"},
+            {"task": "nine-nine-path2"},
+            {"work_order_sha": "b" * 64},
+            {"exit_code": 1},
+        ):
+            with self.subTest(changed=changed):
+                self.assertIsNone(mon._receipt_permission_hint(
+                    source, **dict(valid, **changed)))
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            receipt = d / "plasma-path2-receipt.json"
+            receipt.symlink_to(d / "outside.json")
+            self.assertIsNone(mon._read_path2_receipt_hint(
+                runner_temp=td, **valid))
+            receipt.unlink()
+            receipt.write_text(json.dumps(source))
+            receipt.chmod(0o666)
+            self.assertIsNone(mon._read_path2_receipt_hint(
+                runner_temp=td, **valid))
+            receipt.chmod(0o600)
+            self.assertEqual(mon._read_path2_receipt_hint(
+                runner_temp=td, **valid)["component_index"], 1)
+            receipt.write_bytes(b"x" * (mon.MAX_RECEIPT_BYTES + 1))
+            self.assertIsNone(mon._read_path2_receipt_hint(
+                runner_temp=td, **valid))
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            (d / "path2.json").write_text(json.dumps({
+                "status": "IDLE", "last_result": "FAIL", "exit_code": 2,
+                "task": "path2-work-order", "run_id": "39966229598",
+                "receipt_hint": {"reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+                                 "stage": "CLI_WRAPPER",
+                                 "cause": "PEER_WRITABLE",
+                                 "component_index": "SHOULD_NOT_SHOW"},
+            }))
+            self.assertNotIn("RECEIPT:", mon.render_snapshot(d, "path2"))
+
     def test_path2_authorized_goal_stage_and_clock_on_real_wrapper(self):
         with tempfile.TemporaryDirectory() as td:
             data = {
