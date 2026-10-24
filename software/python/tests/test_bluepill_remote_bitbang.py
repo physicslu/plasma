@@ -117,11 +117,12 @@ def test_axi_error_poison_and_no_blind_retry():
     assert len(p.writes) == 0
 
 
-def test_no_quit_tail_commands_or_second_admission():
+@pytest.mark.parametrize("payload", [b"QO", b"QOQ", b"QQ", b"QdfQ"])
+def test_no_quit_tail_commands_or_second_admission(payload):
     b, p = bridge()
     b.admit()
     with pytest.raises(SWDBitbangError):
-        b.exchange(b"QO")
+        b.exchange(payload)
     assert b.closed and p.drive == 2
     with pytest.raises(SWDBitbangError):
         b.admit()
