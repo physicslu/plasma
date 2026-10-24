@@ -75,7 +75,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("GOAL: PATH2 Host-only CLI regression", frame)
             self.assertIn("STAGE: CPU-only CLI", frame)
             self.assertIn("PR: #1144", frame)
-            self.assertIn("NOW: 2026-10-21T16:10+08:00", frame)
+            self.assertIn("NOW: 2026-10-21 16:10", frame)
             self.assertIn("LAST: PASS  EXIT: 0", frame)
             self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
                              (Path(td) / "path2.log").read_text())
@@ -495,12 +495,12 @@ class EngineeringMonitorTests(unittest.TestCase):
                     self.assertLessEqual(len(frame.splitlines()), 11)
                     self.assertIn("STATUS: IDLE", frame)
                     self.assertIn("LAST: NOT_RUN", frame)
-                    self.assertIn("NOW: 2026-10-21T16:10+08:00", frame)
+                    self.assertIn("NOW: 2026-10-21 16:10", frame)
                     self.assertIn("RECENT OUTPUT", frame)
                     self.assertIn("latest-visible-entry", frame)
                     self.assertNotIn("old-000", frame)
 
-    def test_path3_clock_is_pinned_to_minute_and_has_timezone(self):
+    def test_both_paths_use_local_clock_without_iso_offset(self):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
             before = mon.render_snapshot(directory, "path3", now=FIXED_NOW)
@@ -510,10 +510,20 @@ class EngineeringMonitorTests(unittest.TestCase):
                 directory, "path3", now=FIXED_NOW + dt.timedelta(minutes=1))
             self.assertEqual(before, same_minute)
             self.assertNotEqual(before, next_minute)
-            self.assertIn("NOW: 2026-10-21T16:10+08:00", before)
-            self.assertIn("NOW: 2026-10-21T16:11+08:00", next_minute)
-            self.assertIn("NOW: 2026-10-21T16:10+08:00", mon.render_snapshot(
+            self.assertIn("NOW: 2026-10-21 16:10", before)
+            self.assertIn("NOW: 2026-10-21 16:11", next_minute)
+            self.assertIn("NOW: 2026-10-21 16:10", mon.render_snapshot(
                 directory, "path2", now=FIXED_NOW))
+            for path in ("path2", "path3"):
+                frame = mon.render_snapshot(directory, path, now=FIXED_NOW)
+                self.assertNotIn("2026-10-21T16:10", frame)
+                self.assertNotIn("+08:00", frame)
+                self.assertNotIn("NOW: 2026-10-21 16:10:00", frame)
+            with self.assertRaisesRegex(
+                    ValueError, "timezone-aware timestamp"):
+                mon.render_snapshot(
+                    directory, "path2",
+                    now=dt.datetime(2026, 10, 21, 16, 10))
 
     def test_path3_view_redraws_once_at_minute_boundary(self):
         with tempfile.TemporaryDirectory() as td:
@@ -534,8 +544,8 @@ class EngineeringMonitorTests(unittest.TestCase):
                               sleep=fake_sleep, get_now=lambda: next(readings))
             self.assertEqual(output.getvalue().count("\x1b[H"), 2)
             self.assertNotIn("\x1b[2J", output.getvalue())
-            self.assertIn("NOW: 2026-10-21T16:10+08:00", output.getvalue())
-            self.assertIn("NOW: 2026-10-21T16:11+08:00", output.getvalue())
+            self.assertIn("NOW: 2026-10-21 16:10", output.getvalue())
+            self.assertIn("NOW: 2026-10-21 16:11", output.getvalue())
 
     def test_path3_time_marks_only_after_60_elapsed_seconds(self):
         class FakeProcess:
