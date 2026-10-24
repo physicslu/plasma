@@ -61,9 +61,12 @@ def safe_command(value: object) -> tuple[str, str]:
             for grammar, kind in COMMANDS:
                 if grammar.fullmatch(value) is not None:
                     return kind, value
-        for grammar, kind, label in SEMANTIC_COMMANDS:
-            if grammar.fullmatch(value) is not None:
-                return kind, label
+        # Classify relative, single-command forms only. An absolute argument
+        # or a shell control operator falls back to the opaque safe marker.
+        if re.search(r"\s/[A-Za-z]", value) is None:
+            for grammar, kind, label in SEMANTIC_COMMANDS:
+                if grammar.fullmatch(value) is not None:
+                    return kind, label
     return "COMMAND", "(command hidden)"
 
 
