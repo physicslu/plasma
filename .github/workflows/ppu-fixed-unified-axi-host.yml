@@ -4,16 +4,26 @@ on:
     paths:
       - '.github/workflows/ppu-fixed-unified-axi-host.yml'
       - 'pl/rtl/bus/fixed_ppu_unified_axi_site1.sv'
+      - 'pl/rtl/bus/fixed_ppu_unified_axi_dual_site.sv'
       - 'pl/rtl/bus/fixed_fpga_swd_site_axi_lite.sv'
       - 'pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv'
       - 'pl/verification/test_fixed_ppu_unified_axi_rtl.py'
+      - 'pl/verification/test_fixed_ppu_dual_site_rtl.py'
       - 'pl/verification/cocotb/test_fixed_ppu_unified_axi.py'
+      - 'pl/verification/cocotb/test_fixed_ppu_dual_site.py'
       - 'pl/tools/verification_evidence.py'
       - 'pl/verification/verification-result-v1.schema.json'
       - 'pl/tests/test_verification_evidence.py'
       - 'docs/architecture/plasma-verification-platform-v1.md'
       - 'pl/verification/cocotb/test_fixed_fpga_swd_site_axi.py'
       - 'software/python/plasma_interfaces/fixed_abi_swd.py'
+      - 'software/python/plasma_interfaces/fixed_abi_hardware_driver.py'
+      - 'software/python/plasma_interfaces/fixed_abi_mmio_port.py'
+      - 'software/python/plasma_interfaces/linux_mmio.py'
+      - 'software/python/tests/test_fixed_abi_mmio_port_host.py'
+      - 'software/python/tests/test_fixed_abi_hardware_driver_host.py'
+      - 'software/python/native/armv7_mmio_barrier.c'
+      - 'pl/verification/fixed_image_abi_v1_gate1.json'
       - 'pl/verification/models/fixed_swd_site_driver.py'
       - 'docs/architecture/fixed-ppu-unified-axi-site1-gate1.md'
   workflow_dispatch:
@@ -30,14 +40,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install Icarus and Cocotb (Host-only)
+      - name: Install Icarus, Verilator and Cocotb (Host-only)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y iverilog
+          sudo apt-get install -y iverilog verilator
           python -m pip install 'pytest==8.4.2' 'pytest-asyncio>=0.23' 'cocotb==1.9.2' 'cocotb-test==0.2.6' 'PyYAML>=6.0'
           python -m pip install -e ./software/python
       - name: Strict verification evidence Schema and negative contracts
         run: python -m pytest -q pl/tests/test_verification_evidence.py
+      - name: Dual physical RTL Site1/Site2 Verilator elaboration lint
+        run: |
+          verilator --lint-only --top-module fixed_ppu_unified_axi_dual_site \
+            pl/rtl/site/swd_waveform_engine.sv \
+            pl/rtl/site/swd_transaction_master.sv \
+            pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv \
+            pl/rtl/bus/fixed_fpga_swd_site_axi_lite.sv \
+            pl/rtl/bus/fixed_ppu_unified_axi_dual_site.sv
       - name: Unified AXI SIM-2 Production PS Controller / RTL with measured receipt
         run: |
           python -m pl.tools.verification_evidence run \
@@ -56,10 +74,34 @@ jobs:
           python -m pl.tools.verification_evidence validate \
             --receipt pl/build/verification/unified-sim2/verification-result.json \
             --verify-source
+      - name: Dual actual RTL Site1 + Site2 SIM-1 functional/negative regression
+        run: python -m pytest -q pl/verification/test_fixed_ppu_dual_site_rtl.py
+      - name: Dual actual RTL Site1 + Site2 SIM-2 production PS closed loop
+        run: |
+          python -m pl.tools.verification_evidence run \
+            --stage SIM-2 \
+            --suite pl/verification/test_fixed_ppu_dual_site_rtl.py \
+            --rtl-top fixed_ppu_unified_axi_dual_site \
+            --rtl-source pl/rtl/site/swd_waveform_engine.sv \
+            --rtl-source pl/rtl/site/swd_transaction_master.sv \
+            --rtl-source pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv \
+            --rtl-source pl/rtl/bus/fixed_fpga_swd_site_axi_lite.sv \
+            --rtl-source pl/rtl/bus/fixed_ppu_unified_axi_dual_site.sv \
+            --driver-module plasma_interfaces.fixed_abi_hardware_driver.FixedABIHardwareDriver \
+            --output-dir pl/build/verification/dual-site-sim2
+      - name: Validate emitted dual-Site SIM-2 receipt against sources
+        run: |
+          python -m pl.tools.verification_evidence validate \
+            --receipt pl/build/verification/dual-site-sim2/verification-result.json \
+            --verify-source
       - name: Standalone Identity and SWD regressions
         run: |
           python -m pytest -q pl/verification/test_fixed_ppu_global_identity_rtl.py
           python -m pytest -q pl/verification/test_fixed_fpga_swd_site_rtl.py
+      - name: P0 Site1 native MMIO port and DMB boundary Host contracts
+        run: python -m pytest -q software/python/tests/test_fixed_abi_mmio_port_host.py
+      - name: Protocol-neutral driver admission / negative Site boundary contracts
+        run: python -m pytest -q software/python/tests/test_fixed_abi_hardware_driver_host.py software/python/tests/test_fixed_abi_swd_control.py
       - name: ABI/Host Driver admission contracts
         run: |
           python -m pl.tools.fixed_image_abi_contract pl/verification/fixed_image_abi_v1_gate1.json
@@ -70,5 +112,13 @@ jobs:
         with:
           name: plasma-unified-sim2-evidence-${{ github.sha }}
           path: pl/build/verification/unified-sim2/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve dual-Site SIM-2 evidence and diagnostics on PASS or FAIL
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-dual-site-sim2-evidence-${{ github.sha }}
+          path: pl/build/verification/dual-site-sim2/
           if-no-files-found: warn
           retention-days: 14

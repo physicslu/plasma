@@ -19,6 +19,7 @@ from typing import Any
 
 from device_catalog_admission_framework import file_sha256, write_canonical_dataset
 from stm32u0_admission_policy import CANONICAL_FIELDS
+from stm32u0_phase_u0_3_policy import historical_prestate_source_rows
 from stm32u0_phase_u0_4_admission import (
     admission_plan_is_clean,
     admission_summary,
@@ -63,22 +64,33 @@ def _write_empty_canonical(path: Path) -> None:
 
 def _production_snapshot(manifest_path: Path) -> tuple[int, set[tuple[str, str]], dict[str, int]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    historical = manifest_path.resolve() == PRESTATE_MANIFEST.resolve()
+    if historical and (
+        hashlib.sha256(manifest_path.read_bytes()).hexdigest() != EXPECTED_PRESTATE_MANIFEST_SHA256
+        or _git_blob_sha(manifest_path.read_bytes()) != EXPECTED_PRESTATE_MANIFEST_BLOB
+    ):
+        raise RuntimeError("frozen U0.3 Production prestate manifest drifted")
     family_counts: dict[str, int] = {}
     bases: set[tuple[str, str]] = set()
     for source in manifest.get("sources", []):
         family = source["family"]
-        path = (manifest_path.parent / source["path"]).resolve()
-        data = path.read_bytes()
-        with path.open(newline="", encoding="utf-8") as handle:
-            rows = list(csv.DictReader(handle))
-        if len(rows) != source["row_count"]:
-            raise RuntimeError(f"{family}: manifest row_count mismatch")
-        if hashlib.sha256(data).hexdigest() != source["sha256"]:
-            raise RuntimeError(f"{family}: manifest source SHA-256 mismatch")
-        if _git_blob_sha(data) != source["git_blob_sha"]:
-            raise RuntimeError(f"{family}: manifest source Git blob mismatch")
-        if any(row.get("family") != family for row in rows):
-            raise RuntimeError(f"{family}: source contains foreign-family row")
+        if historical:
+            # Historical replay must never dereference today's changing CSV.
+            rows = historical_prestate_source_rows(source)
+        else:
+            # Current Production validation retains its strict live-source hash guards.
+            path = (manifest_path.parent / source["path"]).resolve()
+            data = path.read_bytes()
+            with path.open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+            if len(rows) != source["row_count"]:
+                raise RuntimeError(f"{family}: manifest row_count mismatch")
+            if hashlib.sha256(data).hexdigest() != source["sha256"]:
+                raise RuntimeError(f"{family}: manifest source SHA-256 mismatch")
+            if _git_blob_sha(data) != source["git_blob_sha"]:
+                raise RuntimeError(f"{family}: manifest source Git blob mismatch")
+            if any(row.get("family") != family for row in rows):
+                raise RuntimeError(f"{family}: source contains foreign-family row")
         family_counts[family] = len(rows)
         bases.update((family, row["base_device"]) for row in rows)
     return sum(family_counts.values()), bases, family_counts

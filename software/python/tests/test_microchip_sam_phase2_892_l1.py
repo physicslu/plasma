@@ -17,8 +17,8 @@ from plasma_web.catalog_promotion_framework import (
 from plasma_web.device_catalog import (
     DeviceCatalog, DeviceCatalogIntegrityError, get_default_device_catalog,
 )
-from plasma_web.microchip_sam_phase2_route_evidence import (
-    SAM_EXPLICIT_DEVSEL, admitted_sam_phase2_explicit_devsel_routes,
+from plasma_web.microchip_sam_explicit_devsel_route_evidence import (
+    SAM_EXPLICIT_DEVSEL, admitted_sam_explicit_devsel_routes,
 )
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
@@ -35,7 +35,7 @@ class MicrochipPhase2L1Tests(unittest.TestCase):
                          {"SAMDCRL0": 538, "SAMD5E5": 354})
         self.assertEqual(len(SAM_EXPLICIT_DEVSEL), 84)
         self.assertEqual({r.base_device for r in phase2}, set(SAM_EXPLICIT_DEVSEL))
-        candidate = admitted_sam_phase2_explicit_devsel_routes(catalog)
+        candidate = admitted_sam_explicit_devsel_routes(catalog)
         for row in phase2:
             with self.subTest(icpn=row.identifier):
                 item = candidate.lookup(row)
@@ -85,7 +85,7 @@ class MicrochipPhase2L1Tests(unittest.TestCase):
                 new[idx] = replace(old, source_reference=alteration)
                 unsafe = DeviceCatalog(new, status="production")
                 with self.assertRaises(DeviceCatalogIntegrityError):
-                    admitted_sam_phase2_explicit_devsel_routes(unsafe)
+                    admitted_sam_explicit_devsel_routes(unsafe)
 
     def test_remaining_656_are_not_in_product(self):
         registry = get_default_programming_qualification_registry()

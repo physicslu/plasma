@@ -474,16 +474,25 @@ At the end of a scoped task plan, offer two choices only:
   grant a GitHub owner identity or hardware access. Hardware tasks use
   an *existing separately authorized controlled SWPC channel*, never
   unrestricted cloud-to-device access.
-- **Gate 1 — Approve, Codex executes:** An approved legacy dedicated
-  workflow or, later, a qualified unified Dispatcher can route to Codex.
-  The new unified Dispatcher remains OFF, so this choice is not evidence
-  of actual dispatch or runtime qualification.
+- **Gate 1 — Approve, SWPC Codex executes:** An approved owner-bound
+  GitHub Actions workflow routes to the dedicated `SWPC-plasma-codex`
+  self-hosted Runner using its existing Codex CLI login. The independent
+  GitHub-hosted Publisher is still responsible for scoped PR creation.
+  The generic unified Dispatcher remains OFF. Choosing Codex in chat
+  does not by itself post a trusted GitHub Issue command or prove execution.
 
 **Both routes** terminate in PR + CI + an *independent owner Gate 2*
 merger. Automatic merging, silent retries and automatic actor
 substitution are prohibited. GitHub CI is not equivalent to CD:
 deployment, runtime installation, FPGA reload and device power/reset
 operations require separate exact authorization.
+
+Offer **both executor choices at Gate 1**, with clearly labeled one-click
+actions when available. No implicit switch or fallback is permitted. For
+software-only work, the planning route is `chatgpt-direct-github` or
+`swpc-dedicated-codex`, **not** an additional GitHub-hosted model runner.
+SWPC software-write isolation and actual CLI authentication still require
+live qualification before a successful runtime claim.
 
 The executor choice is **orthogonal** to the existing strict
 Work Order capability (`software-pr`, `la2016-loopback`,

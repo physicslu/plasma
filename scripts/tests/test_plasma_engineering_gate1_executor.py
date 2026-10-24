@@ -49,7 +49,7 @@ class Gate1ExecutorContracts(unittest.TestCase):
                 with self.subTest(capability=cap,executor=executor):
                     result=self.route(order,executor)
                     expected=("chatgpt-direct-github" if executor=="chatgpt" else
-                              "hosted-software-codex")
+                              "swpc-dedicated-codex")
                     self.assertEqual(result["lane"],expected)
                     self.assertFalse(result["hardware"])
                     self.assertFalse(result["hardware_permission_granted"])
@@ -152,8 +152,13 @@ class Gate1ExecutorContracts(unittest.TestCase):
                           "runs-on: [self-hosted","contents: write",
                           "OPENAI_API_KEY:","GITHUB_TOKEN:"):
             self.assertNotIn(forbidden,s)
-        existing=list(OLD_WFS.glob("plasma-codex-*.yml"))
-        self.assertEqual(len(existing),11)
+        # Current main already has twelve legacy Codex workflows other than
+        # the separate fixed software MVP. Keep this baseline explicit;
+        # the reusable Dispatcher must not add a new plasma-codex-* workflow.
+        existing=[p for p in OLD_WFS.glob("plasma-codex-*.yml")
+                  if p.name != "plasma-codex-software-mvp.yml"]
+        self.assertEqual(len(existing),12)
+        self.assertTrue((OLD_WFS/"plasma-codex-software-mvp.yml").is_file())
         src=(ROOT/"scripts/plasma_engineering_gate1_executor.py").read_text()
         for forbidden in ("import subprocess","urllib.request","os.system(", "paramiko",
                           "create_ref(", "run_codex("):

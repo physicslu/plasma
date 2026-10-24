@@ -1,0 +1,63 @@
+name: PPU Fixed ABI Site1 F1 PS7 Vivado Source Gate (host only)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ppu-fixed-site1-f1-host.yml'
+      - 'pl/projects/z2-fixed-unified-site1/**'
+      - 'pl/tests/test_z2_fixed_unified_site1_f1.py'
+      - 'pl/rtl/bus/fixed_ppu_unified_axi_site1.sv'
+      - 'pl/rtl/bus/fixed_fpga_swd_site_axi_lite.sv'
+      - 'pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv'
+      - 'pl/rtl/site/swd_transaction_master.sv'
+      - 'pl/rtl/site/swd_waveform_engine.sv'
+      - 'pl/rtl/site/swd03_dpidr_responder.sv'
+      - 'software/python/plasma_interfaces/linux_mmio.py'
+      - 'software/python/plasma_interfaces/fixed_abi_mmio_port.py'
+      - 'software/python/plasma_interfaces/fixed_abi_swd.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-only-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 pinned
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install host RTL and Python test dependencies (not Vivado)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+          python -m pip install 'pytest==8.4.2' 'pytest-asyncio>=0.23' 'cocotb==1.9.2' 'cocotb-test==0.2.6' 'PyYAML>=6.0'
+          python -m pip install -e ./software/python
+      - name: Compile actual F1 internal-fixture top with Icarus
+        run: |
+          iverilog -g2012 -s fixed_ppu_z2_internal_fixture_axi -t null \
+            pl/projects/z2-fixed-unified-site1/rtl/fixed_ppu_z2_internal_fixture_axi.sv \
+            pl/rtl/bus/fixed_ppu_unified_axi_site1.sv \
+            pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv \
+            pl/rtl/bus/fixed_fpga_swd_site_axi_lite.sv \
+            pl/rtl/site/swd_transaction_master.sv \
+            pl/rtl/site/swd_waveform_engine.sv \
+            pl/rtl/site/swd03_dpidr_responder.sv
+      - name: F1 PS7 HWH mapping, external pins and adversarial contract tests
+        run: python -m pytest -q pl/tests/test_z2_fixed_unified_site1_f1.py
+      - name: Existing unified 64KiB AXI Cocotb production controller regression
+        run: python -m pytest -q pl/verification/test_fixed_ppu_unified_axi_rtl.py
+      - name: Existing production Site1 port and LinuxMMIO host regressions
+        run: |
+          python -m pytest -q \
+            software/python/tests/test_fixed_abi_mmio_port_host.py \
+            software/python/tests/test_fixed_abi_swd_control.py \
+            software/python/tests/test_linux_mmio.py
+      - name: Source-only classification (no Vivado image / no Z2)
+        run: |
+          printf '%s\n' 'FIXED_F1_HOST_ONLY_PASS_IF_ALL_STEPS_PASS'
+          printf '%s\n' 'VIVADO_SYNTHESIS=NOT_RUN'
+          printf '%s\n' 'VIVADO_IMPLEMENTATION=NOT_RUN'
+          printf '%s\n' 'Z2_FIXED_ABI_HIL=NOT_RUN'
+          printf '%s\n' 'M1=NO_GO'

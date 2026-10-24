@@ -82,19 +82,23 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["levels"], [1, 2, 3])
         self.assertLess(payload["catalog_size"], self.catalog.size)
-        self.assertEqual(payload["total_count"], 29)
-        self.assertEqual(len(payload["results"]), 29)
+        self.assertEqual(payload["total_count"], 140)
+        self.assertEqual(len(payload["results"]), 100)
         for item in payload["results"]:
-            self.assertIn(item["family"], {"KL25", "LPC11U6X", "LPC81X", "LPC11U2X"})
+            self.assertIn(item["family"], {"KL25", "LPC11U6X", "LPC81X", "LPC11U2X", "MCX"})
             self.assertEqual(item["catalog_level"], 1)
             self.assertEqual(item["catalog_level_state"], "PROGRAMMING_CANDIDATE")
             self.assertFalse(item["job_selectable"])
-            self.assertIsNone(item["nxp_manufacturer_device_profile"])
+            if item["family"] == "MCX":
+                self.assertEqual(item["nxp_manufacturer_device_profile"]["icpn"], item["identifier"])
+                self.assertFalse(item["nxp_manufacturer_device_profile"]["programming_profile_authority"])
+            else:
+                self.assertIsNone(item["nxp_manufacturer_device_profile"])
             self.assertIsNone(item["selected_profile"])
             self.assertEqual(item["physical_validation"]["ppu_status"], "no_evidence")
 
-        # The 212 MCX/K32L2 exact ICPNs remain admitted identity records but are
-        # Level 0 in the active runtime and therefore absent from the public selector.
+        # The 212 MCX/K32L2 exact identities remain admitted; only the
+        # reviewed 111 MCX A route candidates enter L1, not A18/K32L2.
         self.assertEqual(sum(r.family in {"MCX", "K32L2"} for r in self.nxp), 212)
 
     def test_new_unqualified_discovery_skus_not_added_to_production(self) -> None:

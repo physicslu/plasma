@@ -49,6 +49,14 @@ jobs:
         run: python data/ic-support/semantic_validate.py
       - name: Validate STM32F103C8T6 socket design contract
         run: python data/ic-support/test_socket_profile_contract.py
+      - name: Validate exact STM32F103R8T6 LQFP64 socket contract
+        run: python data/ic-support/test_stm32f103r8t6_lqfp64_socket_profile.py
+      - name: Validate exact STM32F103RBT6 LQFP64 128-KiB socket contract
+        run: python data/ic-support/test_stm32f103rbt6_lqfp64_socket_profile.py
+      - name: Validate exact STM32F103V8T6 LQFP100 socket contract
+        run: python data/ic-support/test_stm32f103v8t6_lqfp100_socket_profile.py
+      - name: Validate exact STM32F103VBT6 LQFP100 128-KiB socket contract
+        run: python data/ic-support/test_stm32f103vbt6_lqfp100_socket_profile.py
       - name: Run IC Support semantic-validator regression
         run: python data/ic-support/test_semantic_validate.py
       - name: Validate vendor-neutral admission governance

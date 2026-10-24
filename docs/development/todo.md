@@ -211,6 +211,26 @@ Architectural invariant:
 
 > Device knowledge and programming orchestration remain high-level and replaceable; the Hardware API describes Plasma hardware capabilities rather than raw registers, and PL owns deterministic protocol execution.
 
+### Z2 AXI Control/Data Plane / DMA Architecture Assessment
+
+**Status:** TODO / deferred until Path 2 real F1-B Provider and independent cross-trigger HIL pass; no immediate RTL or driver change
+
+**Layer:** Zynq-7000 PS/PL Hardware API / FPGA PL / firmware transfer performance / eight-Site programming
+
+**Reason:** PYNQ-Z2 can implement AXI4-Lite register control, memory-mapped AXI4 data movement and AXI4-Stream transfers within PL, but availability is not evidence that DMA is necessary for PLASMA. Zynq-7000 PS GP/HP interfaces have AXI3-specific details; any PL AXI4/AXI4-Stream design must select a compatible Interconnect/Protocol Converter and DMA/FIFO data path rather than assuming PS directly exposes an AXI4-Stream port. Eight simultaneous Sites alone does not prove bulk-transfer bottlenecks.
+
+Required follow-up, **after current PR #1082 Gate 1**:
+
+- preserve the existing AXI4-Lite control/status/identity register ABI and shared Linux MMIO Hardware API rather than rebuilding the current F1-B Provider;
+- measure actual PS-to-PL transfer time, CPU consumption, buffer usage, throughput and Site fairness under representative firmware/image sizes and 1/2/8 concurrent Sites; distinguish SWD/JTAG protocol wait time and DUT Flash programming bottlenecks from PS/PL data-copy cost;
+- compare (A) bounded MMIO register/FIFO writes, (B) an AXI DMA memory-mapped path using Zynq HP/DDR access and (C) AXI4-Stream plus a PL-side FIFO/dispatcher; record coherency, cache maintenance, buffer ownership and IRQ/completion semantics;
+- separately assess AXI3 PS-side compatibility, AXI4/AXI4-Lite IP choices, AXI4-Stream's addressless data-flow model and Xilinx AXI Interconnect/Protocol Converter boundaries;
+- specify stop/quiesce/restore behavior for every DMA/Stream Master **before** FPGA Manager reconfiguration; a DMA engine and a generic UIO driver do not establish AXI idleness or isolation;
+- require an evidence-backed latency/throughput threshold and end-to-end eight-Site HIL before adopting DMA. Defer implementation if simple MMIO/FIFO meets the measured throughput goal;
+- reflect the selected design in the common Linux-to-PL Hardware API, Site safety/ownership contract, RTL tests and operator recovery procedure. No Production hardware readiness follows from Host-only benchmarks.
+
+**Current scope exclusion:** This is a backlog design/performance decision. Do not add AXI DMA, modify PL bitstream, or dispatch hardware work as part of PR #1082's current Real Provider Gate 1. Existing F1-B Build and one-shot HIL evidence may be reused if exact hashes and environment bindings still match.
+
 ### Split Programming Image Data Plane
 
 **Status:** TODO / future architecture optimization
@@ -311,6 +331,18 @@ Required work:
 - bind PASS/FAIL to one physical IC identity or traceable presentation event;
 - preserve `PROCESSED IC = PASS + FAIL` and exclude infrastructure ERROR;
 - validate sockets, hardware, Z2/FPGA path and real target separately from Mock.
+
+## Low Priority — Development Observability
+
+### Path 3 Per-response Token Attribution
+
+**Status:** TODO / LOW PRIORITY; **not** a blocker for current PLASMA IC programming or the completed Repo-first optimization.
+
+**Evidence:** [Path 3 Token Optimization RCA Closure](plasma-path3-token-optimization-rca-closure-2026-10-23.md).
+
+**Specific gap:** Current `codex exec --json` receipt reports the complete Turn-level Input/Cached/Output totals, but not trustworthy per-model-Response usage counts, effective Model/Reasoning Effort, actual `AGENTS.md` loaded tokens, or attribution by tool-event and context source. Never infer response count from `item.completed`, fabricate Prompt Cache pricing, or read raw private Session/Prompt to force an estimate.
+
+**Trigger / bounded acceptance:** Reopen only if real engineering tasks show renewed abnormal token consumption or the CLI offers a supported, non-sensitive telemetry surface. Prefer the existing Dispatcher and sanitized numeric receipts. A future separately approved Gate 1 must specify what can be measured, redaction, focused Host-only tests, and no additional SWPC, hardware or Runner access by default.
 
 ## Resolved presentation debt
 
@@ -452,5 +484,15 @@ The process-coupled Engineering Mock topology cannot preserve an independent PPU
 See [Batch Persistence and Gateway Restart Recovery](../architecture/batch-persistence-recovery.md).
 
 ## Resolved maintenance debt
+
+### Repo-first Path 3 Token Optimization — DONE (WBS-facing workstream)
+
+**Status:** DONE — source optimization merged in [PR #1128](https://github.com/physicslu/plasma/pull/1128); true SWPC Path 3 old/new CPU-only 9×9 Run evidence both 81/81 PASS; this workstream's closure evidence is archived in [Token Optimization RCA Closure](plasma-path3-token-optimization-rca-closure-2026-10-23.md) (this archive document requires its own Gate 2 merge).
+
+**Scope of DONE:** Reduced root `AGENTS.md` and redundant dispatcher prompt, retained full normative clauses and authority guards, observed Input 251,614 → 148,319 (−41.05%), non-cached 58,718 → 30,047 (−48.83%). Do **not** equate these descriptive deltas with validated causality or cost savings. Real SWPC programming hardware acceptance was not part of this task.
+
+**WBS accounting caveat:** No authoritative WBS item ID or audited WBS item-count ledger was identified in this Repository. This is the workstream status for WBS reporting, **not** a change to a separate dashboard's count. Do not silently revise historical completed/in-progress/not-started WBS totals.
+
+**Residual:** The independently tracked low-priority `Path 3 Per-response Token Attribution` debt above remains TODO; it does not reopen this completed remediation.
 
 Resolved items belong in Git history rather than staying as open TODOs. In particular, do not reintroduce static test-count reports, superseded duplicate UI specifications, retired Programming Image filenames, or the misleading `gateway_legacy` module name. CI documentation integrity checks protect these boundaries.

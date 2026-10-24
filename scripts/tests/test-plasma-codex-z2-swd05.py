@@ -52,6 +52,26 @@ class SWD05HostContracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             subject.sanitize_report(receipt, 0)
 
+    def test_strict_sudo_adjacent_marker(self):
+        import json
+        payload = json.dumps({"root": True, "no_hardware_writes": True})
+        marker = subject.MARKER + payload
+        self.assertEqual(subject.extract_receipt_payload(marker + "\n")["root"], True)
+        self.assertEqual(
+            subject.extract_receipt_payload(
+                "\rPLASMA_SWD05_SUDO_PROMPT:" + marker + "\r\n"),
+            {"root": True, "no_hardware_writes": True})
+        for invalid in (
+            "untrusted:" + marker + "\n",
+            "PLASMA_SWD05_SUDO_PROMPT:noise:" + marker + "\n",
+            marker + "\n" + marker + "\n",
+            "PLASMA_SWD05_SUDO_PROMPT:" + subject.MARKER + "not-json\n",
+            marker + "trailing\n",
+        ):
+            with self.subTest(invalid=invalid[:32]), self.assertRaises(
+                    (ValueError, json.JSONDecodeError)):
+                subject.extract_receipt_payload(invalid)
+
     def test_remote_command_only_fixed_exec_and_pins(self):
         with patch.object(subject.Path, "read_bytes", autospec=True) as reader:
             reader.return_value = b"reviewed-test-source"

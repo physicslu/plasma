@@ -1,0 +1,66 @@
+name: PLASMA HIL-A1.5 ARMv7 QEMU Host-only Contract
+
+# PR-only; this runs solely on GitHub-hosted runner, NOT on SWPC.
+# A1 ELF is downloaded from exactly one previously successful GitHub A1 Run.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/plasma-hil-a15-armv7-qemu.yml'
+      - 'scripts/hil-a15-armv7-qemu.py'
+      - 'scripts/hil-a15-gh-hosted-qemu.sh'
+      - 'scripts/hil-a15-contract.py'
+      - 'scripts/tests/test-hil-a15-qemu.py'
+      - 'docs/development/hil-a15-qemu-armv7.md'
+      - 'docs/README.md'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qemu-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Reject unsafe workflow, unpinned artifact or hardware entry points
+        run: python3 scripts/hil-a15-contract.py check
+      - name: Host-only negative artifact and runner contracts
+        run: python3 scripts/tests/test-hil-a15-qemu.py
+      - name: Syntax and shell safety
+        run: |
+          python3 -m py_compile scripts/hil-a15-armv7-qemu.py \
+            scripts/hil-a15-contract.py scripts/tests/test-hil-a15-qemu.py
+          bash -n scripts/hil-a15-gh-hosted-qemu.sh
+      - name: Download exact A1 source run artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          repository: physicslu/plasma
+          run-id: 39192248348
+          name: plasma-armv7-hil-a1-pr-39192248348
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/plasma-hil-a15-artifact
+      - name: Register QEMU ARMv7 binfmt on ephemeral hosted runner
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        with:
+          platforms: arm
+          image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+      - name: Real ARMv7 QEMU ctypes DMB SY fixed 1000-call probe
+        shell: bash
+        run: bash scripts/hil-a15-gh-hosted-qemu.sh
+      - name: Upload bounded QEMU execution evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-hil-a15-qemu-hosted-${{ github.run_id }}
+          path: ${{ runner.temp }}/plasma-hil-a15-report/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Record qualification boundary
+        if: success()
+        run: |
+          echo "A1.5 GitHub-hosted ARMv7 QEMU CPU-only: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "Persistent SWPC Z2-like QEMU: NOT_RUN" >> "$GITHUB_STEP_SUMMARY"
+          echo "Real Z2 A2, MMIO/UIO, FPGA, DUT: NOT_RUN; M1 NO-GO" >> "$GITHUB_STEP_SUMMARY"

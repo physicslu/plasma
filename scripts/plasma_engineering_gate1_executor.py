@@ -35,7 +35,7 @@ def plan_route(order: object, policy: object, choice: object) -> dict:
     # drive physical devices from an arbitrary cloud tool or OS shell.
     lane = ("swpc-controlled-hardware" if hardware else
             ("chatgpt-direct-github" if executor == "chatgpt" else
-             "hosted-software-codex"))
+             "swpc-dedicated-codex"))
     intent = {
         "work_order_sha256": choice["work_order_sha256"],
         "executor": executor,

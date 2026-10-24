@@ -1,0 +1,57 @@
+name: PLASMA ARMv7 Barrier HIL-A1 GitHub-hosted Cross Build
+
+# Owner-only manual main trigger. No persistent runner, SSH or Z2.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: plasma-armv7-barrier-hil-a1
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-cross-compile:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'physicslu/plasma' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'physicslu'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Enforce manual reviewed main and GitHub-hosted runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = physicslu/plasma
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_ACTOR" = physicslu
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_ACTIONS" = true
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          clean: true
+          fetch-depth: 1
+      - name: Cross-compile pinned Debian ARMv7 ELF and validate DMB SY
+        shell: bash
+        run: bash scripts/armv7-barrier-hil-a1-hosted.sh
+      - name: Upload A1 ELF, disassembly, SHA256 and receipt
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-armv7-hil-a1-${{ github.run_id }}
+          path: ${{ runner.temp }}/plasma-armv7-hil-a1-${{ github.run_id }}/build/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Declare exact qualification boundary
+        if: success()
+        run: |
+          echo "HIL-A1 GitHub-hosted cross-build, ELF and DMB SY: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "A2 Z2 native execution: NOT_RUN" >> "$GITHUB_STEP_SUMMARY"
+          echo "SWPC, physical MMIO/UIO, FPGA and DUT: NOT_RUN; M1 NO-GO" >> "$GITHUB_STEP_SUMMARY"

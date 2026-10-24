@@ -131,13 +131,15 @@ def test_capture_real_loading_facts_and_reject_wrong_last_load(tmp_path, monkeyp
     line = '[123] fpga_manager fpga0: writing candidate.bin to Xilinx Zynq FPGA Manager'
     monkeypatch.setattr(d.subprocess, 'run', lambda *a, **kw: SimpleNamespace(stdout=line))
     output = tmp_path/'loaded.json'
-    record = d.record_loaded_image(firmware, output)
-    d.verify_receipt(record, boot_id='boot', load_line=line)
+    from dataclasses import replace
+    profile = replace(d.SWD04_PROFILE, bin_sha256=c.sha256_file(firmware))
+    record = d.record_loaded_image(firmware, output, profile=profile)
+    d.verify_receipt(record, boot_id='boot', load_line=line, profile=profile)
     assert json.loads(output.read_text()) == record
-    with pytest.raises(FileExistsError): d.record_loaded_image(firmware, output)
+    with pytest.raises(FileExistsError): d.record_loaded_image(firmware, output, profile=profile)
     monkeypatch.setattr(d.subprocess, 'run', lambda *a, **kw: SimpleNamespace(stdout=line.replace('candidate.bin', 'base.bin')))
     with pytest.raises(c.SafetyError, match='Last FPGA Manager load'):
-        d.record_loaded_image(firmware, tmp_path/'wrong.json')
+        d.record_loaded_image(firmware, tmp_path/'wrong.json', profile=profile)
     assert not (tmp_path/'wrong.json').exists()
 
 

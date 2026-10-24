@@ -23,9 +23,9 @@ function humanizeStatus(value: string | null): string {
 }
 
 function backendLabel(status: string): string {
-  if (status === "mapped") return "OCD Mapped";
-  if (status === "no_mapping") return "No OCD Mapping";
-  if (status === "rejected") return "OCD Rejected";
+  if (status === "mapped") return "已綁定 / Bound";
+  if (status === "no_mapping") return "未綁定 / Not bound";
+  if (status === "rejected") return "已拒絕 / Rejected";
   return humanizeStatus(status);
 }
 
@@ -61,9 +61,9 @@ function openOcdTagState(device: DeviceSearchResult): OpenOcdTagState {
 }
 
 function openOcdConfigLabel(status: OpenOcdTagState, zh: boolean): string {
-  if (status === "mapped") return zh ? "OpenOCD 設定 · 已存在" : "OpenOCD config · Present";
-  if (status === "candidate") return zh ? "OpenOCD 設定 · 候選" : "OpenOCD config · Candidate";
-  return zh ? "OpenOCD 設定 · 未建立" : "OpenOCD config · Missing";
+  if (status === "mapped") return zh ? "PLASMA CFG · 已綁定" : "PLASMA CFG · Bound";
+  if (status === "candidate") return zh ? "PLASMA CFG · 研究候選" : "PLASMA CFG · Research candidate";
+  return zh ? "PLASMA CFG · 未綁定" : "PLASMA CFG · Not bound";
 }
 
 function softwareQualificationClass(state: string | undefined): string {
@@ -428,7 +428,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                       : selected.nxp_manufacturer_device_profile
                         ? (zh ? "NXP 官方單料號規格；未知欄位不推估，不代表燒錄資格" : "NXP exact-part evidence; unknown fields are not inferred or programming-qualified")
                         : selected.microchip_ic_information
-                          ? (zh ? "Microchip 原廠 MCP 精確料號 + DS60001513G 訂購規則；Catalog Level 0 DISCOVERED，Programming 尚未驗證" : "Microchip official MCP exact part + DS60001513G ordering evidence; Catalog Level 0 DISCOVERED, Programming unqualified")
+                          ? (zh ? `Microchip 原廠 MCP 精確料號${selected.microchip_ic_information.source.pdf_revision ? ` + ${selected.microchip_ic_information.source.pdf_revision} 文件證據` : " + 上游 Driver／DEVID 證據"}；Catalog L${selected.catalog_level}，Programming ${selected.programming_qualification?.state ?? "UNKNOWN"}` : `Microchip official MCP exact part${selected.microchip_ic_information.source.pdf_revision ? ` + ${selected.microchip_ic_information.source.pdf_revision} document evidence` : " + upstream Driver/DEVID evidence"}; Catalog L${selected.catalog_level}, Programming ${selected.programming_qualification?.state ?? "UNKNOWN"}`)
                           : (zh ? "基本身分來自 Catalog；Manufacturer Device Basic Profile 尚未建立" : "Catalog identity only; Manufacturer Device Basic Profile is not available")}
                   </p>
                 </div>
@@ -479,9 +479,10 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                 {selected.microchip_ic_information && (
                   <>
                     <div><dt>Core Model</dt><dd>{selected.microchip_ic_information.core_model}</dd></div>
-                    <div><dt>Catalog Level 0 Evidence</dt><dd>DISCOVERED · INFORMATION_COMPLETE: NO · DS60001513G p.14 / p.16</dd></div>
-                    <div><dt>Programming Qualification</dt><dd>UNKNOWN · {zh ? "尚未取得 Catalog Level 2" : "Catalog Level 2 not reached"}</dd></div>
-                    <div><dt>PLASMA Verification</dt><dd>NOT_TESTED · {zh ? "尚未取得 Catalog Level 3" : "Catalog Level 3 not reached"}</dd></div>
+                    <div><dt>{zh ? "原廠身分證據" : "Manufacturer identity evidence"}</dt><dd>{selected.microchip_ic_information.identity_state} · {zh ? "資訊完整性" : "Information complete"}: {selected.microchip_ic_information.information_complete ? "YES" : "NO"}{selected.microchip_ic_information.source.pdf_revision ? ` · ${selected.microchip_ic_information.source.pdf_revision} p.${selected.microchip_ic_information.source.pdf_printed_pages?.join(" / ") ?? "—"}` : ""}</dd></div>
+                    <div><dt>Catalog Level</dt><dd>{catalogLevelLabel(selected.catalog_level, zh)}</dd></div>
+                    <div><dt>Programming Qualification</dt><dd>{selected.programming_qualification?.state ?? selected.microchip_ic_information.programming_state} · {selected.catalog_level >= 2 ? (zh ? "已達 L2" : "Level 2 reached") : (zh ? "尚未取得 L2" : "Level 2 not reached")}</dd></div>
+                    <div><dt>PLASMA Verification</dt><dd>{selected.catalog_level === 3 ? "L3 VERIFIED" : selected.microchip_ic_information.compatibility_state} · {selected.catalog_level === 3 ? (zh ? "已達 L3" : "Level 3 reached") : (zh ? "尚未取得 L3" : "Level 3 not reached")}</dd></div>
                   </>
                 )}
               </dl>
@@ -495,6 +496,19 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <p>{zh ? "Programming Qualification、燒錄介面、電氣條件、Flash geometry 與程序" : "Programming qualification, interfaces, electrical conditions, Flash geometry, and flow"}</p>
                 </div>
               </div>
+
+              <dl>
+                <div><dt>{zh ? "Upstream OpenOCD CFG（來源證據）" : "Upstream OpenOCD CFG (source evidence)"}</dt><dd>{selected.upstream_openocd_evidence ? <code>{selected.upstream_openocd_evidence.target_cfg.path}</code> : (zh ? "未獨立核對（不代表不存在）" : "Not independently attested (not evidence of absence)")}</dd></div>
+                <div><dt>{zh ? "Upstream Flash Driver（來源證據）" : "Upstream Flash Driver (source evidence)"}</dt><dd>{selected.upstream_openocd_evidence?.flash_driver ? <code>{selected.upstream_openocd_evidence.flash_driver.path}</code> : (zh ? "無此料號的 Flash Driver 證據" : "No part-specific Flash driver evidence")}</dd></div>
+                <div><dt>{zh ? "Upstream Device ID／DEVID" : "Upstream Device ID / DEVID"}</dt><dd>{selected.upstream_openocd_evidence?.device_id ? <code>{selected.upstream_openocd_evidence.device_id.value}</code> : (zh ? "無獨立 DEVID 證據" : "No independent DEVID evidence")}</dd></div>
+                {selected.upstream_openocd_evidence && (
+                  <>
+                    <div><dt>{zh ? "來源版本／Commit" : "Source version / commit"}</dt><dd>{selected.upstream_openocd_evidence.source_version} · <code>{shortRevision(selected.upstream_openocd_evidence.source_commit)}</code></dd></div>
+                    <div><dt>{zh ? "證據／權限界線" : "Evidence / authority boundary"}</dt><dd>{zh ? "僅上游原始碼；不代表已安裝、已綁定、可執行燒錄或實機通過" : "Upstream source only; no installed runtime, Production binding, programming execution or physical qualification"}</dd></div>
+                  </>
+                )}
+              </dl>
+              <dl><div><dt>{zh ? "PLASMA Production CFG Binding" : "PLASMA Production CFG Binding"}</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config || "—"}</code></dd></div></dl>
 
               {selected.programming_qualification ? (
                 <>
@@ -528,7 +542,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                         <dd>{Object.entries(selected.programming_qualification.operations).map(([name, op]) => `${name.toUpperCase()}=${op.state}`).join(" · ")}</dd>
                       </div>
                     )}
-                    <div><dt>{zh ? "CFG Mapping" : "CFG Mapping"}</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config}</code></dd></div>
+                    <div><dt>{zh ? "PLASMA Production CFG Binding" : "PLASMA Production CFG Binding"}</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config || "—"}</code></dd></div>
 
                     {selected.selected_profile && Object.entries(selected.selected_profile.programming.interfaces).map(([name, iface]) => (
                       <div key={name}>
@@ -575,7 +589,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
                   <div><dt>{zh ? "Erase 單位" : "Erase unit"}</dt><dd>{selected.selected_profile.programming.flash_geometry.erase_unit_bytes} bytes</dd></div>
                   <div><dt>{zh ? "Program 單位" : "Program unit"}</dt><dd>{selected.selected_profile.programming.flash_geometry.program_unit} · {selected.selected_profile.programming.flash_geometry.program_unit_bytes} bytes</dd></div>
                   <div><dt>{zh ? "燒錄程序" : "Programming flow"}</dt><dd className="icSelectorProgramFlow">{selected.selected_profile.programming.program_model.normal_write_flow.join(" → ")}</dd></div>
-                  <div><dt>OpenOCD</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config}</code></dd></div>
+                  <div><dt>PLASMA Production CFG Binding</dt><dd>{backendLabel(selected.backend.mapping_status)} · <code>{selected.backend.target_config || "—"}</code></dd></div>
                 </dl>
               ) : (
                 <div className="icSelectorProfileUnavailable">

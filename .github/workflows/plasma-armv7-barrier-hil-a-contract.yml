@@ -1,0 +1,52 @@
+name: PLASMA ARMv7 Barrier HIL-A Host-only Contracts
+
+# PRs perform real pinned ARMv7 cross-build and negative tests on GitHub-hosted only.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/plasma-armv7-barrier-hil-a.yml'
+      - '.github/workflows/plasma-armv7-barrier-hil-a-contract.yml'
+      - 'scripts/armv7-barrier-hil-a1.py'
+      - 'scripts/armv7-barrier-hil-a1-hosted.sh'
+      - 'scripts/armv7-barrier-hil-a-contract.py'
+      - 'scripts/tests/test-armv7-barrier-hil-a.py'
+      - 'software/python/native/armv7_mmio_barrier.c'
+      - 'docs/development/armv7-barrier-hil-a.md'
+      - 'docs/README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Enforce manual A1 and no SWPC/Z2 execution from a PR
+        run: python3 scripts/armv7-barrier-hil-a-contract.py check
+      - name: Synthetic ARMv7 ELF, source and negative security contracts
+        run: python3 scripts/tests/test-armv7-barrier-hil-a.py
+      - name: Build real ARMv7 ELF inside pinned GitHub-hosted Debian toolchain
+        run: bash scripts/armv7-barrier-hil-a1-hosted.sh
+      - name: Upload verified PR ELF, SHA256 and inspection evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-armv7-hil-a1-pr-${{ github.run_id }}
+          path: ${{ runner.temp }}/plasma-armv7-hil-a1-${{ github.run_id }}/build/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Validate Python source syntax and shell without hardware
+        run: |
+          bash -n scripts/armv7-barrier-hil-a1-hosted.sh
+          python3 -m py_compile \
+            scripts/armv7-barrier-hil-a1.py \
+            scripts/armv7-barrier-hil-a-contract.py \
+            scripts/tests/test-armv7-barrier-hil-a.py
+      - name: Declare exact limitation
+        run: |
+          echo "PR Host-only safety, real ARMv7 cross-build and ELF: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "SWPC, Z2 HIL, real MMIO/UIO, FPGA and DUT: NOT_RUN; M1 NO-GO" >> "$GITHUB_STEP_SUMMARY"

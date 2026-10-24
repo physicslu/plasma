@@ -24,6 +24,7 @@ from .backend_candidate_registry import get_default_backend_candidate_registry
 from .backend_source_reference import backend_source_reference, default_pinned_upstream
 from .openocd_provider_registry import get_default_openocd_provider_registry
 from .programming_qualification import get_default_programming_qualification_registry
+from .microchip_upstream_openocd_evidence import microchip_upstream_openocd_evidence
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
 from .durable_batch_runtime import DurableBatchRuntimeManager
@@ -318,6 +319,7 @@ def _device_search_payload(
             else None
         )
         item["microchip_ic_information"] = _microchip_ic_information(record, qualification)
+        item["upstream_openocd_evidence"] = microchip_upstream_openocd_evidence(record)
         support = ic_support.resolve_exact(exact_icpn)
         item["selected_profile"] = (
             support.to_selected_profile_payload()

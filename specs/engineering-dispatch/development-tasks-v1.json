@@ -1,0 +1,92 @@
+{
+  "schema_version": "plasma.engineering.development_tasks.v1",
+  "mode": "development",
+  "tasks": {
+    "nine-nine-path2": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_three_path_nine_nine.py",
+      "argv": [],
+      "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d",
+      "capability": "cpu-only"
+    },
+    "nine-nine-path3": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_nine_nine_codex_generated.py",
+      "objective": "Build a Python 9x9 multiplication-table program for factors 1 through 9. Choose the implementation and CSV column labels yourself. Run your program, independently check all 81 mathematical results, fix any failures, and return real source code, program output, and a test report for reviewer analysis.",
+      "expected_stdout_sha256": "142d9b788a5902e98048690e75e9d91ac8e22334c592f7e2e5a93e8bc878bc5d"
+    },
+    "hil-a2-cpu-only": {
+      "execution_path": "path2-cli",
+      "capability": "z2-cpu-only",
+      "work_order": "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json"
+    },
+    "auto4-premerge-path2": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_auto4_branch_probe.py",
+      "argv": [],
+      "expected_stdout_sha256": "9727532e69a8f60b50dca893192de734bb15d1b92b2ebd4ec639a04ffb0ead0d",
+      "verification": "sha256-only"
+    },
+    "candidate-dispatcher-premerge-sandbox": {
+      "execution_path": "path2-cli",
+      "script": "scripts/experiments/plasma_candidate_dispatcher_branch_smoke.py",
+      "argv": [],
+      "expected_stdout_sha256": "36b4f02f4579ad3460f33292c6b87285d418259d14a6c7267b16d0daa92d45e6",
+      "capability": "cpu-only"
+    },
+    "auto4-premerge-path3": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_auto4_branch_codex_generated.py",
+      "output_format": "csv",
+      "objective": "Implement a CPU-only Python program that prints CSV with exactly header n,triangular and 12 ordered rows for n=1 through 12, using the integer triangular-number result n*(n+1)//2. Run it on this runner, independently verify all twelve rows and edge cases n=1 and n=12, record actual commands, exit codes, and observed outcomes. Do not use hardware, network, SSH, sudo, or any non-Python package."
+    },
+    "fixed-site1-vivado-host-build": {
+      "execution_path": "path2-cli",
+      "capability": "vivado-host-build",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "toolchain": "2026.1",
+      "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
+    },
+    "f1b-path3-codex-vivado-build": {
+      "execution_path": "path3-codex",
+      "objective": "Diagnose the SWPC Path 3 Vivado 2026.1 license failure for F1-B. Compare the sanitized trusted Runner license baseline with the Codex sandbox observation. Do not escape the sandbox or modify the license or Host ID. Record observed evidence and any necessary candidate source fixes. The trusted Dispatcher authenticates reviewed PL inputs and then executes the fixed host Build Engine twice on the licensed Runner. Report real synthesis, implementation, timing, DRC, BIT/HWH SHA256 and repeatability from those actual build results. No Z2, FPGA load, MMIO, USB, DUT or other physical operation."
+    },
+    "z2-path2-build": {
+      "execution_path": "path2-cli",
+      "capability": "vivado-host-build",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "toolchain": "2026.1",
+      "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
+    },
+    "z2-path2-download": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "download"
+    },
+    "z2-path2-testing": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "test"
+    },
+    "z2-path2-restore": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "restore"
+    },
+    "z2-path2-full-hil": {
+      "execution_path": "path2-cli",
+      "capability": "path2-stage-contract",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "stage": "full"
+    },
+    "candidate-dispatcher-e2e-1083": {
+      "execution_path": "path3-codex",
+      "output_path": "scripts/experiments/plasma_auto4_branch_codex_generated.py",
+      "output_format": "csv",
+      "objective": "Implement a CPU-only Python program that prints CSV with exactly header n,triangular and 12 ordered rows for n=1 through 12, using the integer triangular-number result n*(n+1)//2. Run it on this runner, independently verify all twelve rows and edge cases n=1 and n=12, record actual commands, exit codes, and observed outcomes. Do not use hardware, network, SSH, sudo, or any non-Python package."
+    }
+  }
+}

@@ -176,6 +176,20 @@ def sanitize_report(data: object, exit_code: int) -> dict:
     }
 
 
+def extract_receipt_payload(text: str) -> dict:
+    """Exactly one trusted line; tolerate only the known adjacent sudo prompt.
+
+    Does not infer remote success: ssh_execute still requires an actual exit
+    code and validates full stage and firmware receipt fields.
+    """
+    found = re.findall(
+        r"(?m)^\r?(?:PLASMA_SWD05_SUDO_PROMPT:)?" +
+        re.escape(MARKER) + r"([^\r\n]{1,10000})\r?$", text)
+    if len(found) != 1:
+        raise ValueError("MISSING_OR_UNTRUSTED_REMOTE_RECEIPT")
+    return json.loads(found[0])
+
+
 def ssh_execute(record: dict[str, str], route: dict[str, str]) -> dict:
     master, slave = pty.openpty()
     tty.setraw(slave, termios.TCSANOW)
@@ -226,10 +240,9 @@ def ssh_execute(record: dict[str, str], route: dict[str, str]) -> dict:
         # A remote failure is never converted to PASS by reading a stale receipt.
         exitcode = proc.wait(timeout=3)
         text = buf.decode("utf-8", "replace")
-        found = re.findall(r"(?m)^" + re.escape(MARKER) + r"([^\r\n]{1,10000})\r?$", text)
-        if len(found) != 1 or exitcode not in (0, 2):
+        if exitcode not in (0, 2):
             raise ValueError("MISSING_OR_UNTRUSTED_REMOTE_RECEIPT")
-        return sanitize_report(json.loads(found[0]), exitcode)
+        return sanitize_report(extract_receipt_payload(text), exitcode)
     finally:
         if proc.poll() is None:
             try:
