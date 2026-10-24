@@ -1780,7 +1780,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         for k in ("script", "argv", "expected_stdout_sha256"):
             bad.pop(k, None)
         with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_STAGE_CAPABILITY_DENIED"):
-            dev.request(self._event(bad))
+            dev.request(self._event(bad), self._context())
 
     def test_path3_does_not_report_path2_cli_stage(self):
         a = dev.authorize(
