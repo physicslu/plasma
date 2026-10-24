@@ -481,8 +481,13 @@ def render_snapshot(directory: Path, path: str, *,
             elif "-" * 35 in lines:
                 lines.remove("-" * 35)
             elif any(line.startswith("LAST ERROR:") for line in lines):
-                # Short panes must retain the observed failure, if present.
-                break
+                # Prefer the observed failure + recent output to a clock line.
+                clock_index = next((i for i, line in enumerate(lines)
+                                    if line.startswith("NOW:")), None)
+                if clock_index is not None:
+                    lines.pop(clock_index)
+                else:
+                    break
             else:
                 break
     if height is not None:
