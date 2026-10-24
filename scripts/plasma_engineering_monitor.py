@@ -49,6 +49,12 @@ MONITOR_SENSITIVE = re.compile(
     r"private.key|api.key|authorization)\b|[a-fA-F0-9]{32,}",
     re.IGNORECASE,
 )
+# One layout for both paths. Terminal widths are display cells, not letters.
+MAX_DISPLAY_COLUMNS = 100
+MONITOR_STAGES = frozenset({
+    "CPU-only CLI", "Native preflight", "Vivado host build",
+    "Guarded Download", "Guarded Test", "Guarded Restore",
+})
 
 
 def _valid_dir(path: Path, uid: int, gid: int) -> bool:
@@ -154,15 +160,23 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     work_order_sha = os.environ.get("WORK_ORDER_SHA256", "")
     summary = os.environ.get("PLASMA_MONITOR_SUMMARY", "")
     summary_valid = (
-        path == "path3" and task == "path3-work-order" and
+        task == ("path3-work-order" if path == "path3" else "path2-work-order") and
         WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None and
         type(summary) is str and MONITOR_SUMMARY.fullmatch(summary) is not None
         and MONITOR_SENSITIVE.search(summary) is None
     )
+    stage = os.environ.get("PLASMA_MONITOR_STAGE", "")
+    if (path != "path2" or type(stage) is not str or
+            stage not in MONITOR_STAGES or
+            (stage.startswith("Guarded ") and
+             (task != "path2-work-order" or
+              WORK_ORDER_SHA256.fullmatch(work_order_sha) is None))):
+        stage = ""
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
         "task": task, "pr_number": pr_number,
         "monitor_summary": summary if summary_valid else "",
+        "monitor_stage": stage,
         "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
         "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
@@ -179,6 +193,7 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     env = os.environ.copy()
     # Operator-only metadata never enters the engineering/Codex process env.
     env.pop("PLASMA_MONITOR_SUMMARY", None)
+    env.pop("PLASMA_MONITOR_STAGE", None)
     if live and path == "path3":
         env["PLASMA_ENGINEERING_MONITOR_LIVE_LOG"] = str(log)
     else:
@@ -318,7 +333,7 @@ def render_snapshot(directory: Path, path: str, *,
     if (type(pr_number) is str and PR_NUMBER.fullmatch(pr_number) and
             pr_number != "0"):
         lines.append("PR: #" + pr_number)
-    if path == "path3" and state.get("task") == "path3-work-order":
+    if state.get("task") in ("path2-work-order", "path3-work-order"):
         summary = state.get("monitor_summary", "")
         if (type(summary) is str and
                 MONITOR_SUMMARY.fullmatch(summary) is not None and
@@ -326,6 +341,10 @@ def render_snapshot(directory: Path, path: str, *,
             lines.append("GOAL: " + summary)
         else:
             lines.append("GOAL: (operator summary not provided)")
+    if path == "path2":
+        stage = state.get("monitor_stage", "")
+        lines.append("STAGE: " + stage if type(stage) is str and
+                     stage in MONITOR_STAGES else "STAGE: (not available)")
     if status == "RUNNING":
         started = state.get("started", "")
         try:
@@ -337,7 +356,7 @@ def render_snapshot(directory: Path, path: str, *,
     else:
         lines.append("LAST: %s  EXIT: %s" %
                      (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
-    if path == "path3":
+    if path in PATHS:
         clock = dt.datetime.now().astimezone() if now is None else now
         if clock.tzinfo is None or clock.utcoffset() is None:
             raise ValueError("status clock requires a timezone-aware timestamp")
@@ -373,7 +392,8 @@ def render_snapshot(directory: Path, path: str, *,
         lines = lines[:max(0, height - 1)]
     if width is not None:
         # Leave one physical cell unused to avoid terminal autowrap.
-        lines = [_clip_columns(str(line), max(0, width - 1)) for line in lines]
+        lines = [_clip_columns(str(line),
+                max(0, min(width - 1, MAX_DISPLAY_COLUMNS))) for line in lines]
     return CONTROL.sub("", "\n".join(str(x) for x in lines))
 
 
