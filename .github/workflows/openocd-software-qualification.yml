@@ -119,8 +119,9 @@ jobs:
           ok=0
           for url in \
             https://www.st.com/resource/en/datasheet/stm32f103c6.pdf \
-            https://www.st.com/resource/en/datasheet/cd00210843.pdf; do
-            if curl --fail --silent --show-error --location --retry 1 --connect-timeout 10 --max-time 45 \
+            https://www.st.com/resource/en/datasheet/cd00210843.pdf \
+            https://www.st.com/resource/en/datasheet/stm32f103t4.pdf; do
+            if curl --http1.1 --fail --silent --show-error --location --retry 2 --retry-delay 1 --connect-timeout 10 --max-time 45 \
               --user-agent 'Mozilla/5.0 PLASMA-DS5936-Evidence/1.0' "$url" -o "$tmp"; then
               if [[ "$(head -c 5 "$tmp")" == '%PDF-' ]]; then
                 echo "DS5936_OFFICIAL_URL=$url"
