@@ -30,7 +30,9 @@ and retains LAST: PASS or LAST: FAIL and process exit code.
 
 Both panes use the same operator layout: status, Run, Task, PR, GOAL,
 the active-stage category (when applicable), elapsed time or
-LAST/EXIT, local timezone-aware NOW and recent output. Rows are clipped
+LAST/EXIT, SWPC host-local NOW (`YYYY-MM-DD HH:MM` without the ISO `T`
+separator or numeric UTC offset), and recent output. The input clock remains
+timezone-aware internally and changes the visible minute only once per minute. Rows are clipped
 by display **cells** (CJK full-width characters consume two cells),
 not by Python character count. The content uses at most 100 display columns
 and reserves the terminal's last physical column to avoid autowrap;
