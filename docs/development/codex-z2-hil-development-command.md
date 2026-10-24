@@ -67,7 +67,7 @@ execution environment, not a sandbox bypass suggested by this document.
 Canonical **private host file**:
 
 ```text
-~/.config/plasma/z2-dev-credentials.json
+~/.config/plasma/z2-login-smoke.json
 ```
 
 Required JSON keys (example values are **placeholders**, not credentials):
@@ -76,11 +76,13 @@ Required JSON keys (example values are **placeholders**, not credentials):
 {
   "ssh_host": "<actual enrolled board host or IP>",
   "ssh_username": "xilinx",
-  "ssh_password": "<owner-provided password>",
-  "sudo_password": "<owner-provided sudo password>"
+  "ssh_password": "<owner-provided password>"
 }
 ```
 
+- `sudo_password` 為可選欄位：只有 Z2 sudo 密碼與 SSH 密碼不同時才加入同一份 JSON，不可放到另一個登入憑證檔。
+- `z2-login-known_hosts` 是同一 Z2 已確認的公開 Host Key 清單，並非另一份密碼檔。
+- Legacy `z2-dev-credentials.json` 不再是執行來源；必須先安全遷移到唯一 Worker Login，再刪除舊登入檔。
 - Host directory mode `0700`, file mode `0600`, owned by the SWPC user.
 - Use the owner-authorized value for `ssh_password` and `sudo_password`;
   they may be identical. The user granted SSH and sudo use for this

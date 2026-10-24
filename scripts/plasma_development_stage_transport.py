@@ -25,10 +25,8 @@ import tty
 WORKER = "plasma-codex"
 HOME = Path("/home/plasma-codex")
 PRIVATE = HOME / ".config/plasma"
-DEV_CREDENTIALS = PRIVATE / "z2-dev-credentials.json"
 LOGIN = PRIVATE / "z2-login-smoke.json"
 KNOWN_HOSTS = PRIVATE / "z2-login-known_hosts"
-SUDO = PRIVATE / "z2-swd05-oneshot.json"
 ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-root-entry"
 MARK = "PLASMA_PATH2_STAGE="
 PROMPT = "PLASMA_PATH2_SUDO_PROMPT:"
@@ -162,33 +160,14 @@ def private_json(path: Path) -> dict:
 def enrollment() -> tuple[str, str, str]:
     need(pwd.getpwuid(os.geteuid()).pw_name == WORKER and
          os.geteuid() != 0, "SWPC_RUNNER_IDENTITY_DENIED")
-    # Development Mode reuses the canonical, already-authorized Z2 login
-    # source when present; a second Path 2 sudo enrollment is not a gate.
-    # Do not silently fall back if a present canonical source is malformed.
-    if DEV_CREDENTIALS.exists() or DEV_CREDENTIALS.is_symlink():
-        shared = private_json(DEV_CREDENTIALS)
-        need(type(shared) is dict and set(shared) == {
-             "ssh_host", "ssh_username", "ssh_password", "sudo_password"},
-             "SSH_OR_SUDO_ROUTE_NOT_ENROLLED")
-        ssh = {key: shared[key] for key in (
-            "ssh_host", "ssh_username", "ssh_password")}
-        sudo_password = shared["sudo_password"]
-    else:
-        ssh = private_json(LOGIN)
-        # Legacy one-shot sudo file remains supported but optional. The Z2
-        # development image can use its existing SSH password for sudo when
-        # the owner has not configured a distinct sudo credential. An actual
-        # sudo denial still fails; no sudoers or remote permissions change.
-        if SUDO.exists() or SUDO.is_symlink():
-            sudo = private_json(SUDO)
-            need(type(sudo) is dict and
-                 type(sudo.get("sudo_password")) is str,
-                 "SSH_OR_SUDO_ROUTE_NOT_ENROLLED")
-            sudo_password = sudo["sudo_password"]
-        else:
-            sudo_password = ssh.get("ssh_password") if type(ssh) is dict else None
-    need(type(ssh) is dict and set(ssh) == {
-         "ssh_host", "ssh_username", "ssh_password"} and
+    # The ONLY Z2 login/sudo credential file shared by Path 2 and Path 3.
+    # Do not select another host through a legacy per-task or operator file.
+    ssh = private_json(LOGIN)
+    sudo_password = ssh.get("sudo_password", ssh.get("ssh_password")) \
+        if type(ssh) is dict else None
+    need(type(ssh) is dict and
+         {"ssh_host", "ssh_username", "ssh_password"} <= set(ssh) <=
+         {"ssh_host", "ssh_username", "ssh_password", "sudo_password"} and
          ssh["ssh_username"] == "xilinx" and
          type(ssh["ssh_host"]) is str and
          re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,250}", ssh["ssh_host"]) and

@@ -104,8 +104,7 @@ def codex_command(
         require(stat.S_ISDIR(meta.st_mode) and meta.st_uid == os.geteuid()
                 and stat.S_IMODE(meta.st_mode) == 0o700,
                 "CODEX_SANDBOX_Z2_DIRECTORY_DENIED")
-        for name in ("z2-dev-credentials.json", "z2-login-smoke.json",
-                     "z2-login-known_hosts"):
+        for name in ("z2-login-smoke.json", "z2-login-known_hosts"):
             source = plasma / name
             if not source.exists() and not source.is_symlink():
                 continue

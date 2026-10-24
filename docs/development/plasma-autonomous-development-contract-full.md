@@ -352,8 +352,13 @@ criteria; do not invent hardware stages.
 - The SSH password and (unless explicitly different) sudo password come
   from the owner's approved **local** credential source, not from Git.
   Canonical per-user file on the **integration host**:
-  `~/.config/plasma/z2-dev-credentials.json` containing
-  `ssh_host`, `ssh_username`, `ssh_password`, `sudo_password`.
+  `~/.config/plasma/z2-login-smoke.json` containing
+  `ssh_host`, `ssh_username`, `ssh_password`, and optional
+  `sudo_password` only if Z2 sudo differs from the SSH password.
+  Both Path 2 and Path 3 consume this exact same worker-local credential source.
+  `z2-login-known_hosts` is the separately pinned **public host key**, not
+  an alternate credential. Legacy `z2-dev-credentials.json` is no longer an
+  execution fallback; migrate and retire only after verified continuity.
   The file/directory must be owner-only (`0600`/`0700`), outside the
   repository, never committed, copied to a PR/CI artifact, logged, printed,
   or transmitted to unrelated endpoints. A password reused for SSH and
