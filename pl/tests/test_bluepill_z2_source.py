@@ -66,7 +66,9 @@ def test_source_wiring_keeps_real_iobuf_and_no_emio_shortcut():
     assert "IOBUF swdio_pad" in pads and ".T(~swdio_oe)" in pads
     assert "OBUF swclk_pad" in pads
     assert "CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE {0}" in block
-    assert "CONFIG.PCW_M_AXI_GP0_FREQMHZ {100}" in block
+    assert "CONFIG.PCW_M_AXI_GP0_FREQMHZ.VALUE_SRC PROPAGATED" in block
+    assert "CONFIG.PCW_M_AXI_GP0_FREQMHZ {100}" not in block
+    assert block.index("validate_bd_design") < block.index("set gp0_freq")
     assert "BLUEPILL_Z2_GP0_CLOCK_METADATA_MISMATCH" in block
     assert "0x40008000" in block and "4096" in block
     rtl = (PL / "rtl/bus/plasma_poc_swd_gpio_axi_lite.sv").read_text()
