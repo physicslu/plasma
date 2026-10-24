@@ -292,6 +292,22 @@
       "row_count": 893,
       "git_blob_sha": "9eba3e0898a42ef1129a572c5c3a6b0613e01166",
       "sha256": "b40e11e46230b45f8f6d8a078b9c56666be79495908c200c4d22529ffe1043d8"
+    },
+    {
+      "manufacturer": "Microchip",
+      "family": "SAMDCRL0",
+      "path": "../research/microchip-phase2-samdcrl0-538-commercial-l1-v1.csv",
+      "row_count": 538,
+      "git_blob_sha": "f554d5de7de63879ddf0132e9b7a76279249b304",
+      "sha256": "b417a8949bbc5bdbe14c08ca5b45862251dfb4331ff1da4eb219946b7c739bc4"
+    },
+    {
+      "manufacturer": "Microchip",
+      "family": "SAMD5E5",
+      "path": "../research/microchip-phase2-samd5e5-354-commercial-l1-v1.csv",
+      "row_count": 354,
+      "git_blob_sha": "35dc0f61f26229ed5bd6856cb86d240f901285cb",
+      "sha256": "00741bdf43ddcea94e77d25bc7c8734f9de7bc446cde53b16ea3f8f772dacb7b"
     }
   ]
 }
