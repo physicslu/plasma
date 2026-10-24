@@ -37,6 +37,7 @@ def fixture_hwh() -> str:
                 ("PCW_CRYSTAL_PERIPHERAL_FREQMHZ", "50.000000"),
                 ("PCW_FPGA0_PERIPHERAL_FREQMHZ", "100"),
                 ("PCW_USE_M_AXI_GP0", "1"),
+                ("PCW_M_AXI_GP0_FREQMHZ", "100"),
                 ("PCW_GPIO_EMIO_GPIO_ENABLE", "0"),
             ):
                 ET.SubElement(module, "PARAMETER", NAME=key, VALUE=value)
@@ -65,6 +66,8 @@ def test_source_wiring_keeps_real_iobuf_and_no_emio_shortcut():
     assert "IOBUF swdio_pad" in pads and ".T(~swdio_oe)" in pads
     assert "OBUF swclk_pad" in pads
     assert "CONFIG.PCW_GPIO_EMIO_GPIO_ENABLE {0}" in block
+    assert "CONFIG.PCW_M_AXI_GP0_FREQMHZ {100}" in block
+    assert "BLUEPILL_Z2_GP0_CLOCK_METADATA_MISMATCH" in block
     assert "0x40008000" in block and "4096" in block
     rtl = (PL / "rtl/bus/plasma_poc_swd_gpio_axi_lite.sv").read_text()
     assert "ASSOCIATED_BUSIF S_AXI" in rtl
@@ -107,6 +110,7 @@ def test_missing_build_artifacts_never_yield_pass(tmp_path):
     ("PCW_CRYSTAL_PERIPHERAL_FREQMHZ", "125"),
     ("PCW_FPGA0_PERIPHERAL_FREQMHZ", "125"),
     ("PCW_USE_M_AXI_GP0", "0"),
+    ("PCW_M_AXI_GP0_FREQMHZ", "10"),
     ("PCW_GPIO_EMIO_GPIO_ENABLE", "1"),
 ])
 def test_corrupt_ps7_config_fails_closed(key, wrong):
