@@ -783,21 +783,26 @@ elif op == "new-window":
     require(all(w["index"] != idx for w in wins))
     wins.append({"index":idx,"name":args[args.index("-n")+1],
                  "panes":["%102"]})
+elif op == "send-keys":
+    w = get(args[args.index("-t")+1])
+    require(w is not None)
+    if "-l" in args:
+        require(args[-1].startswith("sg plasma-monitor -c "))
+        require("MONITOR_VIEWER_EXIT" in args[-1])
+        w["pending"] = args[-1]
+    else:
+        require(args[-1] == "Enter" and "pending" in w)
+        # Only newly-created windows receive keys; emulate sg/exit without
+        # using or stopping an existing tmux pane.
+        subprocess.run(["bash", "-c", w.pop("pending")], check=True,
+                       stdin=subprocess.DEVNULL, timeout=5)
 elif op in ("select-window", "attach-session"):
     pass
 else:
     sys.exit(2)
 with open(p, "w") as f: json.dump(state, f)
 if op in ("new-session", "new-window"):
-    # A single tmux shell-command invokes its default-shell -c and can
-    # introduce an extra parsing layer. Demand direct argv (bash -c SCRIPT).
-    require(args[-3:-1] == ["bash", "-c"])
-    require("MONITOR_VIEWER_EXIT" in args[-1] and
-            "exec bash -i" in args[-1])
-    # Detached tmux owns a PTY. The mock cannot do that; stdin must not
-    # inherit the caller's interactive SSH terminal or block this test.
-    subprocess.run(args[-3:], check=True,
-                   stdin=subprocess.DEVNULL, timeout=5)
+    require(args[-2:] == ["bash", "-i"])
 ''', python=True)
             env = dict(os.environ)
             env.update({
@@ -983,10 +988,12 @@ if op in ("new-session", "new-window"):
         self.assertNotIn("tmux split-window", script)
         self.assertNotIn("tmux kill-server", script)
         self.assertIn("MONITOR_VIEWER_EXIT", script)
-        self.assertIn("exec bash -i", script)
-        self.assertIn('tmux new-session -d -s "$session" -n path2 -c "$repo" bash -c "$left"', script)
-        self.assertIn('tmux new-window -d -t "$session:2" -n path3 -c "$repo" bash -c "$right"', script)
+        self.assertIn('tmux new-session -d -s "$session" -n path2 -c "$repo" bash -i', script)
+        self.assertIn('tmux new-window -d -t "$session:2" -n path3 -c "$repo" bash -i', script)
+        self.assertIn('tmux send-keys -l -t "$session:path3" "$right"', script)
+        self.assertIn('tmux send-keys -t "$session:path3" Enter', script)
         self.assertNotIn("printf 'bash -c %q'", script)
+        self.assertNotIn("tmux send-keys -t \"$session:1\"", script)
 
 
 
