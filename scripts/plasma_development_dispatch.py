@@ -774,8 +774,15 @@ class CodexUsageCollector:
         "item.started", "item.updated", "item.completed", "error",
     })
     MAX_TOKENS = 2**63 - 1
+    # Only fixed Codex item categories may reach the operator pane.
+    # Never log freeform command, text, path, prompt or other item properties.
+    MONITOR_ITEM_TYPES = frozenset({
+        "command_execution", "agent_message", "reasoning", "file_change",
+        "mcp_tool_call", "web_search", "collab_tool_call",
+    })
 
-    def __init__(self):
+    def __init__(self, *, monitor_only: bool = False):
+        self.monitor_only = monitor_only
         self.pending = bytearray()
         self.dropping = False
         self.session_id = None
@@ -820,6 +827,11 @@ class CodexUsageCollector:
                         self.invalid = True
                 self.turns += 1
         label = kind if type(kind) is str and kind in self.EVENTS else "unrecognized event"
+        if self.monitor_only and kind in ("item.started", "item.updated", "item.completed"):
+            item = event.get("item")
+            category = item.get("type") if type(item) is dict else None
+            if type(category) is str and category in self.MONITOR_ITEM_TYPES:
+                label = category + "." + kind.split(".", 1)[1]
         return f"[codex {label}]\n".encode("ascii")
 
     def feed(self, data: bytes) -> bytes:
@@ -885,6 +897,7 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                 (info.st_mode & 0o170000) != 0o100000):
             raise LiveMonitorUnavailable("MONITOR_LOG_OWNERSHIP_DENIED")
         usage = usage if usage is not None else CodexUsageCollector()
+        monitor_events = CodexUsageCollector(monitor_only=True)
         with evidence.open("wb") as trace:
             trace.write(b"=== Codex JSONL event types (sensitive fields omitted) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,
@@ -902,21 +915,23 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                     if not chunk:
                         break
                     safe = usage.feed(chunk)
+                    monitor_safe = monitor_events.feed(chunk)
                     trace.write(safe)
                     trace.flush()
-                    if live_fd >= 0 and safe:
+                    if live_fd >= 0 and monitor_safe:
                         try:
-                            pending = memoryview(safe)
+                            pending = memoryview(monitor_safe)
                             while pending:
                                 pending = pending[os.write(live_fd, pending):]
                         except OSError:
                             os.close(live_fd)
                             live_fd = -1
                 tail = usage.finish()
+                monitor_tail = monitor_events.finish()
                 trace.write(tail)
-                if live_fd >= 0 and tail:
+                if live_fd >= 0 and monitor_tail:
                     try:
-                        pending = memoryview(tail)
+                        pending = memoryview(monitor_tail)
                         while pending:
                             pending = pending[os.write(live_fd, pending):]
                     except OSError:
