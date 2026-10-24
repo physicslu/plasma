@@ -39,8 +39,8 @@ not stored monitor files, Source, Work Order or Evidence.
 
 PATH 2 additionally shows `STAGE`: a fixed label from the already-authorized
 execution capability: `CPU-only CLI`, `Native preflight`,
-`Vivado host build`, or `Guarded Download/Test/Restore` for a
-previously authorized exact stage. This describes the **approved CLI
+`Vivado host build`, or `Guarded Download/Test/Restore/Full HIL` for a
+previously authorized exact stage or existing fixed Registry task. This describes the **approved CLI
 category**, not confirmed physical progress. It never reveals a shell
 command, argv, raw stdout or hidden script arguments. If there is no
 recognized category, the pane shows `STAGE: (not available)`.
