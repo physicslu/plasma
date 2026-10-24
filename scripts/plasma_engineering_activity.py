@@ -42,7 +42,7 @@ SEMANTIC_COMMANDS = (
     (re.compile(r"(?:sha256sum|shasum)(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
      "CHECK", "Inspect artifact checksums (arguments redacted)"),
 )
-SEMANTIC_LABELS = frozenset(label for _, _, label in SEMANTIC_COMMANDS)
+SEMANTIC_KIND_BY_LABEL = {label: kind for _, kind, label in SEMANTIC_COMMANDS}
 REPO_TOP = frozenset({
     "scripts", "software", "pl", "firmware", "docs", "specs", "packaging",
     "data", "handover", "release",
@@ -207,8 +207,9 @@ def parse_public_line(line: str) -> dict | None:
             obj["kind"] == "FILE" or
             obj["state"] != ("DONE" if code == 0 else "FAIL"))):
         return None
-    if (code is None and obj["state"] == "FAIL") or (
-            obj["kind"] == "FILE" and obj["state"] == "UNKNOWN"):
+    if (code is None and obj["state"] in ("FAIL", "DONE") and
+            obj["kind"] != "FILE") or (
+            obj["kind"] == "FILE" and obj["state"] in ("FAIL", "UNKNOWN")):
         return None
     # Reject forged display records, even if the log was accidentally
     # modified; do not make viewer parse a second arbitrary text channel.
@@ -225,8 +226,12 @@ def parse_public_line(line: str) -> dict | None:
                     any(p in ("", ".", "..") or p.startswith(".") for p in parts)
                     or SENSITIVE.search(name) is not None):
                 return None
-    elif (obj["detail"] != "(command hidden)" and
-          obj["detail"] not in SEMANTIC_LABELS and
-          safe_command(obj["detail"])[1] != obj["detail"]):
-        return None
+    elif obj["detail"] in SEMANTIC_KIND_BY_LABEL:
+        if obj["kind"] != SEMANTIC_KIND_BY_LABEL[obj["detail"]]:
+            return None
+    elif obj["detail"] != "(command hidden)":
+        # Legacy explicitly allowlisted commands must retain their original
+        # category. Arbitrary sanitized-looking strings cannot forge kinds.
+        if safe_command(obj["detail"]) != (obj["kind"], obj["detail"]):
+            return None
     return obj
