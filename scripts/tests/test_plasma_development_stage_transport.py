@@ -61,6 +61,8 @@ class Contracts(unittest.TestCase):
         canonical_file.exists.return_value = canonical is not None
         canonical_file.is_symlink.return_value = False
         login_file = Mock()
+        login_file.exists.return_value = login is not None
+        login_file.is_symlink.return_value = False
         sudo_file = Mock()
         sudo_file.exists.return_value = sudo is not None
         sudo_file.is_symlink.return_value = False
@@ -105,6 +107,42 @@ class Contracts(unittest.TestCase):
             self.assertEqual(t.enrollment(), ('z2.example', 'test-password', 'test-password'))
             reader.assert_called_once_with(login)
 
+    def test_path2_ssh_matches_path3_login_when_both_sources_exist(self):
+        """Path 3's enrolled SSH target/password wins over the old per-user source."""
+        path3 = {'ssh_host': 'path3.example', 'ssh_username': 'xilinx',
+                 'ssh_password': 'path3-login'}
+        old = {'ssh_host': 'other.example', 'ssh_username': 'xilinx',
+               'ssh_password': 'legacy-login', 'sudo_password': 'legacy-sudo'}
+        dev, login, sudo, kh, load = self._mock_dev_credential_sources(
+            canonical=old, login=path3, sudo=None)
+        with patch.object(t, 'DEV_CREDENTIALS', dev), patch.object(t, 'LOGIN', login), \
+             patch.object(t, 'SUDO', sudo), patch.object(t, 'KNOWN_HOSTS', kh), \
+             patch.object(t, 'private_json', side_effect=load) as reader, \
+             patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)), \
+             patch.object(t.os, 'geteuid', return_value=1000), \
+             patch.object(t.subprocess, 'run', return_value=Mock(returncode=0)):
+            self.assertEqual(t.enrollment(),
+                             ('path3.example', 'path3-login', 'path3-login'))
+            reader.assert_called_once_with(login)
+
+    def test_invalid_path3_login_does_not_fall_back_to_other_host(self):
+        old = {'ssh_host': 'other.example', 'ssh_username': 'xilinx',
+               'ssh_password': 'legacy-login', 'sudo_password': 'legacy-sudo'}
+        dev, login, sudo, kh, load = self._mock_dev_credential_sources(
+            canonical=old, login={'ssh_host':'path3.example'}, sudo=None)
+        with patch.object(t, 'DEV_CREDENTIALS', dev), patch.object(t, 'LOGIN', login), \
+             patch.object(t, 'SUDO', sudo), patch.object(t, 'KNOWN_HOSTS', kh), \
+             patch.object(t, 'private_json', side_effect=load) as reader, \
+             patch.object(t.pwd, 'getpwuid', return_value=Mock(pw_name=t.WORKER)), \
+             patch.object(t.os, 'geteuid', return_value=1000), \
+             patch.object(t.subprocess, 'run') as ssh_key, \
+             patch.object(t.subprocess, 'Popen') as remote:
+            with self.assertRaisesRegex(t.Blocked, 'NOT_ENROLLED'):
+                t.execute('test', SHA, PROJECT)
+            reader.assert_called_once_with(login)
+            ssh_key.assert_not_called()
+            remote.assert_not_called()
+
     def test_explicit_legacy_sudo_remains_valid_when_different(self):
         ssh = {'ssh_host':'z2.example', 'ssh_username':'xilinx',
                'ssh_password':'test-login'}
@@ -120,7 +158,7 @@ class Contracts(unittest.TestCase):
 
     def test_malformed_canonical_source_fails_without_legacy_fallback(self):
         dev, login, sudo, kh, load = self._mock_dev_credential_sources(
-            canonical={'ssh_host':'z2.example'}, login={'ssh_host':'other'},
+            canonical={'ssh_host':'z2.example'}, login=None,
             sudo={'sudo_password':'test-value'})
         with patch.object(t, 'DEV_CREDENTIALS', dev), patch.object(t, 'LOGIN', login), \
              patch.object(t, 'SUDO', sudo), patch.object(t, 'KNOWN_HOSTS', kh), \
