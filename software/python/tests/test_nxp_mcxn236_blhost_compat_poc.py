@@ -125,6 +125,31 @@ class CompatibilityTests(unittest.TestCase):
             poc.compare_mock_readback(b"\x01\x02", b"\x01\x03")
         poc.compare_mock_readback(b"\x01\x02", b"\x01\x02")
 
+    def test_scripted_transport_consumes_once_and_does_not_retry(self):
+        plan = poc.plan_mock_operation("erase", 8192, 8192)
+        transport = poc.InMemoryMockTransport((
+            {"operation": "erase", "status": "SUCCESS", "complete": True},
+        ))
+        transport.exchange(plan)
+        self.assertEqual(transport.sent, [plan])
+        with self.assertRaises(poc.CompatibilityBlocked):
+            transport.exchange(plan)
+        self.assertEqual(len(transport.sent), 1)
+
+    def test_scripted_transport_fails_closed_on_timeout_or_wrong_reply(self):
+        plan = poc.plan_mock_operation("program", 0x2000, 128)
+        for replies in (
+            (),
+            ({"operation": "erase", "status": "SUCCESS", "complete": True},),
+            ({"operation": "program", "status": "TIMEOUT", "complete": False},),
+        ):
+            with self.subTest(replies=replies):
+                transport = poc.InMemoryMockTransport(replies)
+                with self.assertRaises(poc.CompatibilityBlocked):
+                    transport.exchange(plan)
+                with self.assertRaises(poc.CompatibilityBlocked):
+                    transport.exchange(plan)
+
     def test_qualification_gap_never_supported_or_registered(self):
         result = poc.qualification_gap()
         self.assertEqual(result["software_state"], "CANDIDATE")
