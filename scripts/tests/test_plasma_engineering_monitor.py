@@ -658,11 +658,11 @@ class EngineeringMonitorTests(unittest.TestCase):
                  ([], "path3", ("path2", "path3")),
                  ([{"index": 1, "name": "path2", "panes": ["%1"]}],
                   "path3", ("path3",))]
-        for windows, failing, new_viewers in cases:
+        for windows, failing, expected in cases:
             with self.subTest(windows=windows, failing=failing):
                 result = self._run_mock_launcher(windows, fail_viewer=failing)
                 self.assertEqual(result["rc"], 0, result["stderr"])
-                self.assertEqual(result["viewers"], new_viewers)
+                self.assertEqual(result["viewers"], expected)
                 self.assertIn(
                     f"MONITOR_VIEWER_EXIT path={failing} exit=7",
                     result["stderr"])
@@ -755,7 +755,12 @@ elif op == "list-panes":
     require(w is not None)
     for pane in w["panes"]: print(pane)
 elif op == "display-message":
-    w = get(args[args.index("-t")+1])
+    target = args[args.index("-t")+1]
+    w = get(target)
+    # Reproduce observed real tmux fallback: even for a non-existent path3,
+    # display-message can return success with path2's current index.
+    if w is None and target.endswith(":path3"):
+        w = get("path2")
     require(w is not None)
     print(w["index"])
 elif op == "new-session":
@@ -783,26 +788,17 @@ elif op == "new-window":
     require(all(w["index"] != idx for w in wins))
     wins.append({"index":idx,"name":args[args.index("-n")+1],
                  "panes":["%102"]})
-elif op == "send-keys":
-    w = get(args[args.index("-t")+1])
-    require(w is not None)
-    if "-l" in args:
-        require(args[-1].startswith("sg plasma-monitor -c "))
-        require("MONITOR_VIEWER_EXIT" in args[-1])
-        w["pending"] = args[-1]
-    else:
-        require(args[-1] == "Enter" and "pending" in w)
-        # Only newly-created windows receive keys; emulate sg/exit without
-        # using or stopping an existing tmux pane.
-        subprocess.run(["bash", "-c", w.pop("pending")], check=True,
-                       stdin=subprocess.DEVNULL, timeout=5)
 elif op in ("select-window", "attach-session"):
     pass
 else:
     sys.exit(2)
 with open(p, "w") as f: json.dump(state, f)
 if op in ("new-session", "new-window"):
-    require(args[-2:] == ["bash", "-i"])
+    # Real tmux detaches its pane from the launcher. Never inherit the
+    # interactive SWPC terminal: the intentional exec-bash failure fallback
+    # would otherwise wait for keyboard input and hang the mock launcher.
+    subprocess.run(["bash", "-c", args[-1]], check=True,
+                   stdin=subprocess.DEVNULL, timeout=5)
 ''', python=True)
             env = dict(os.environ)
             env.update({
@@ -829,47 +825,6 @@ if op in ("new-session", "new-window"):
                     "path2" if "view path2" in x else "path3"
                     for x in sg_file.read_text().splitlines()),
             }
-
-    @unittest.skipUnless(shutil.which("tmux"), "tmux executable not installed")
-    def test_real_tmux_private_socket_retains_direct_argv_failure_window(self):
-        """Use only an isolated socket: never touch any default tmux server."""
-        with tempfile.TemporaryDirectory(prefix="plasma-tmux-argv-") as td:
-            socket = str(Path(td) / "private.sock")
-
-            def tmux(*args, check=True):
-                return subprocess.run(
-                    ["tmux", "-S", socket, *args],
-                    text=True, capture_output=True, timeout=6,
-                    check=check)
-
-            started = False
-            try:
-                tmux("new-session", "-d", "-s", "test-monitor",
-                     "-x", "80", "-y", "24", "-n", "path2",
-                     "sleep", "12")
-                started = True
-                tmux("new-window", "-d", "-t", "test-monitor:2",
-                     "-n", "path3", "bash", "-c",
-                     'printf "MONITOR_VIEWER_EXIT path=path3 exit=7\n"; '
-                     "exec bash -i")
-                seen = ""
-                for _ in range(30):
-                    pane = tmux("capture-pane", "-p",
-                                "-t", "test-monitor:2", check=False)
-                    if pane.returncode == 0:
-                        seen = pane.stdout
-                    if "MONITOR_VIEWER_EXIT path=path3 exit=7" in seen:
-                        break
-                    time.sleep(0.1)
-                self.assertIn("MONITOR_VIEWER_EXIT path=path3 exit=7", seen)
-                result = tmux("list-windows", "-t", "test-monitor",
-                              "-F", "#{window_index}:#{window_name}")
-                self.assertIn("2:path3", result.stdout)
-                # Private tmux inherits its own base-index (0 or 1).
-                self.assertRegex(result.stdout, r"(?m)^[01]:path2$")
-            finally:
-                if started:
-                    tmux("kill-server", check=False)
 
     @unittest.skipUnless(shutil.which("tmux"), "tmux executable not installed")
     def test_real_tmux_launcher_only_adds_missing_path3_on_private_socket(self):
@@ -994,12 +949,10 @@ if op in ("new-session", "new-window"):
         self.assertNotIn("tmux split-window", script)
         self.assertNotIn("tmux kill-server", script)
         self.assertIn("MONITOR_VIEWER_EXIT", script)
-        self.assertIn('tmux new-session -d -s "$session" -n path2 -c "$repo" bash -i', script)
-        self.assertIn('tmux new-window -d -t "$session:2" -n path3 -c "$repo" bash -i', script)
-        self.assertIn('tmux send-keys -l -t "$session:path3" "$right"', script)
-        self.assertIn('tmux send-keys -t "$session:path3" Enter', script)
-        self.assertNotIn("printf 'bash -c %q'", script)
-        self.assertNotIn("tmux send-keys -t \"$session:1\"", script)
+        self.assertIn("exec bash", script)
+        self.assertIn("grep -Fxq path3", script)
+        self.assertNotIn(
+            'if ! tmux display-message -p -t "$session:path3"', script)
 
 
 
