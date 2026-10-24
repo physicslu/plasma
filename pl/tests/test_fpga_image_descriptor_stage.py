@@ -51,7 +51,7 @@ def observed(lock=None, *, image="base"):
         pin_map=d.pin_map, source_manifest_verified=True,
         exclusive_fpga_owner=True, consumers_quiesced=True,
         axi_isolation_proved=True, rollback_available=True,
-        pmod_disconnected=True, active_image_attested=True)
+        external_io_isolated=True, active_image_attested=True)
 
 
 def downloaded(lock=None):
