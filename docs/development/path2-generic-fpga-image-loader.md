@@ -32,7 +32,10 @@ manifest must enumerate the profile, selected Python module, **every**
 installed Python source, existing FPGA safeguards and Linux MMIO driver.
 The entry refuses unpinned Python dependencies, import-tree symlinks or
 non-root-owned/writable directories, preserving the old F1-B dependency
-pinning without hardcoding F1-B in the execution framework. Caller-provided paths, modules
+pinning without hardcoding F1-B in the execution framework.
+Every installed regular source file must also be root-owned and not writable
+by other accounts. Cached Python bytecode (`.pyc`/`.pyo`) is rejected and
+bytecode generation is disabled for the stage and its child processes. Caller-provided paths, modules
 and shell commands are rejected. This is a single per-Z2 installed
 project selection, not another registry, service or Root Executor.
 
