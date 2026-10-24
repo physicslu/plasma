@@ -147,125 +147,80 @@ remain **NOT_QUALIFIED**: without measured board/target timing, no guessed
 I/O delays or false-path exceptions may be introduced. Z2 FPGA load,
 protected Restore, PMODB connection, Blue Pill DPIDR and Flash stay NOT_RUN.
 
-## 2026-10-24 Gate 1 Path 1 — Blue Pill Protected Stage (Host-only)
+## 2026-10-24 Gate 1 — One Generic FPGA Configuration Stage + Image Descriptor
 
-**Exact-source image evidence:** SWPC Path 3 Run
-[#40090390292](https://github.com/physicslu/plasma/actions/runs/40090390292)
-built the actual BIT/HWH/BIN for the **immutable input source**
-`65555410f171e425e61d87ebd42dc4709755f389`, with Vivado 2026.1,
-GP0/FCLK0 100 MHz in generated HWH, WNS +3.070 ns, WHS +0.072 ns and
-zero blocking DRC. The authentic artifact is
+**Current architecture:** exactly one Host-only configuration Stage policy,
+`pl/hil/fpga_configuration_policy.py`, with PYNQ-Z2 Site 1 SWD GPIO
+specifics stored **only as data** in
+`pl/projects/z2-bluepill-rbb/image-descriptor.json`.
+There is **no `bluepill_protected_stage.py` and no separate Blue Pill
+Root Executor**. This replaces the earlier two-module experiment.
+The stage has no real hardware backend and direct execution exits 2
+(`GENERIC_FPGA_CONFIGURATION_LIVE_BACKEND_NOT_IMPLEMENTED`) without a
+`PLASMA_PATH2_STAGE=` receipt. `SIMULATED_*` outputs are *never*
+hardware evidence.
+
+The descriptor is **not** the final universal product image. It identifies
+the exact one-Site experimental FPGA image: board `xc7z020clg400-1`,
+PS7 GP0 `0x40008000`/4 KiB, FCLK0 100 MHz, W14 SWCLK, Y14 SWDIO,
+and the 3 read-only identity/safe-IOBUF register expectations.
+The historical SWPC Path 3 [Run #40090390292](https://github.com/physicslu/plasma/actions/runs/40090390292)
+produced real BIT/HWH/BIN at exact source
+`65555410f171e425e61d87ebd42dc4709755f389`, artifact
 [#12558474564](https://github.com/physicslu/plasma/actions/runs/40090390292/artifacts/12558474564).
-Three TIMING-18 external pin timing warnings remain **NOT_QUALIFIED**.
+The artifact was downloaded and independently hashed:
+- `system.bit` SHA256 `f2e59f31bacf6e8ab0ee9325a07125bc155647a261db3f84e67ba71bb0105891`;
+- `system.hwh` SHA256 `84894ae5791a65ec16bd6146779faec4496d47833fd0ad294149d5c46571b510`;
+- `system.bit.bin` SHA256 `bfbd3d872caeff05a8f9daa0829b6292e5b5036c6b927d6c779e13fe9ec1a1`.
+This is **historical offline-image evidence**, not a source lock for
+the newer current PR HEAD. A separately authorized actual Vivado
+rebuild on the final source SHA is required before any physical image
+admission. External `TIMING-18` SWD pin timing warnings remain
+NOT_QUALIFIED.
 
-**Important image identity boundary:** the new Protected Stage source/test
-commits change PR #1142 HEAD beyond that image's input source commit.
-The historical BIT/HWH/BIN may still be evidence of the *old* design, but
-are **not an exact-source build for the current PR HEAD**. A newly authorized
-SWPC Vivado build and independent artifact SHA256/metadata review are
-required before considering the latest source for any Z2 deployment. Do
-not silently rewrite build manifest or treat an unchanged RTL diff as
-equivalent qualification.
+The descriptor deliberately records `recovery_sha256: null`,
+`runtime_admitted: false` and one physical Site. The generic Stage
+**rejects use of this exact descriptor for stage planning**
+(`RECOVERY_IMAGE_NOT_QUALIFIED`) until an independently reviewed
+recovery image is locked; it cannot assert a synthetic boolean to turn
+a real read-only image into an admitted hardware action.
+Test fixtures may make a *synthetic copy* with fake hashes and
+recovery to exercise the entire policy, but the original evidence
+file stays unchanged and inadmissible.
 
-`pl/hil/bluepill_protected_stage.py` is the **Blue Pill-specific pure
-Host-only policy/transition model**, with tests in
-`pl/tests/test_bluepill_protected_stage.py`.
-It deliberately does not import F1-B's accepted development UIO exception,
-does not install or call the trusted generic Root Entry, and cannot open
-FPGA Manager, MMIO, sockets, USB, SWD or any external target. The CLI
-entrypoint always exits nonzero with
-`BLUEPILL_LIVE_STAGE_BACKEND_NOT_IMPLEMENTED`; **no authentic
-`PLASMA_PATH2_STAGE=` receipt is emitted**.
+**Root integration:** Latest `main` already contains the generic
+Root Entry / project-aware Stage Transport from merged PR #1143.
+Do not recreate or use #1142's outdated F1-B-only transport.
+No Stage may be installed, invoked by the real root executor or
+allowed access to FPGA Manager or MMIO without a separate qualified
+AXI isolation/current-boot/owner/rollback admission and fresh
+explicit hardware scope. Do not inherit F1-B's UIO risk exception.
 
-- Lock model: exact 40-hex reviewed/installed/image-build Source SHA
-  must all match; host-only BIT/HWH/BIN/original bytes must match
-  independent SHA256 pins. Strings or mocked SHA alone never prove an
-  installed root-owned immutable image.
-- Simulated preflight: exact Board, current-boot ID, FPGA Manager identity,
-  recovery/candidate hash, GP0 base `0x40008000` / 4 KiB, FCLK0 100 MHz,
-  W14/Y14 pin assignment, isolated AXI, no conflicting consumers,
-  exclusive owner, independently retained recovery and safe disconnected
-  external PMOD. Synthetic positive fixtures are never hardware
-  admission; unknown evidence fails closed.
-- Three independent Host-only Stage plans: `download` (BASE→HELD),
-  `test` (HELD→read-only ABI identity, no Flash/SWD output), `restore`
-  (HELD→BASE or verified no-op). After-state checks enforce the exact
-  image/boot and read-only `MAGIC`/`ABI`/SWDIO Hi-Z sample; failures
-  or in-flight/UNKNOWN state require an independently qualified manual
-  recovery path. The model emits only `SIMULATED_*` receipts with
-  `real_z2=false` and `runtime_admitted=false`.
-- The production-grade owner/auditor, actual installed root-owned
-  source/manifest/profile, FPGA Manager transition journaling,
-  AXI isolation/drain proof, actual ARMv7 MMIO/ABI, and independently
-  restored original image remain **NOT_IMPLEMENTED / NOT_RUN** for
-  Blue Pill. No live `download/test/restore` adapter is authorized.
-  Current kernel-specific isolation is still unproven; F1-B waiver is
-  explicitly not transferable.
+**Universal fixed-image product boundary (ADR-0003 still Proposed,
+M1 NO-GO):** FPGA configuration is maintenance/provisioning at PPU
+level, never a normal per-IC programming Job. Selecting a different
+ST/NXP/Microchip/other target or SWD/SPI profile must not imply
+reloading the FPGA. The generic Stage rejects `probe`, `erase`,
+`program`, `read`, `verify` and provider/IC switching as
+FPGA configuration commands. The planned eight-Site Universal Image,
+hardware capabilities and runtime Driver are not implemented by this
+one-Site PoC.
 
-The user confirms the existing breadboard, Blue Pill and LA2016 have been
-wired for a previously successful **SWPC/ST-LINK reference SWD** observation.
-**Pmod BB J1 remains DISCONNECTED from Z2 JB**, and must stay disconnected
-until an explicit, separately reviewed physical-connection instruction.
-Before changing the SWD master, ST-LINK output must not contend with Z2;
-no PMOD 3.3 V feed, NRST remains unconnected and passive LA/electrical
-checks precede real DPIDR. Nothing in this Gate 1 operates SWPC, Z2,
-ST-LINK, LA2016, FPGA Manager, MMIO, Blue Pill, USB or DUT; PR remains
-Draft, unmerged, Gate 2/HIL **NO-GO**.
+Host-only verification files:
+`pl/tests/test_fpga_configuration_policy.py` tests independent
+generic Projects, source-locked image bytes and denial of image reload
+from normal jobs; `pl/tests/test_fpga_image_descriptor_stage.py`
+preserves the earlier 60 Blue Pill PoC negative/positive scenarios
+under the *same generic Stage*, and verifies that incorrect/missing
+descriptor/provenance and rollback evidence fail closed.
+These tests cannot verify real AXI isolation, bitstream loaded-image
+identity, OS privilege ownership, readback or physical recovery.
 
-## First-generation universal architecture alignment (Gate 1, Host-only)
-
-**Status: generic source policy only; NO physical Universal Image qualification.**
-The [ADR-0003 first-generation fixed-image amendment](../../../docs/adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)
-is **Proposed / M1 NO-GO**, not Accepted. It aims for **one fixed
-Universal FPGA Image** during normal multi-Site programming (eventual
-eight-Site SWD/SPI capacity), with IC/profile/algorithm/provider selection
-performed in the PS/software data plane. The normal Programming Job
-`Probe / Erase / Program / Read / Verify` **must not** write FPGA
-Manager firmware or trigger a new FPGA image.
-
-The established generic protected Root Entry and project-aware Stage
-Transport live on the **latest main**, from merged PR #1143. Do not
-recreate them in this branch. Because the #1142 branch forked before
-that merge, its old F1-B-only transport must **never** be used as
-Blue Pill production authority; first synchronize with latest main in
-a separately reviewed, non-force step.
-
-The new `pl/hil/fpga_configuration_policy.py` is the **shared,
-hardware-inert** maintenance/provisioning image-source lock, SHA256
-bundle validator and independent `download → read-only identity test →
-restore` state policy. It is not an IC-specific engine, a root-capable
-backend or a normal Job workflow; live CLI invocation fails with exit
-2 and no trusted root receipt. `bluepill_protected_stage.py` is
-only the Site 1 PYNQ-Z2 PS/PL SWD GPIO *PoC adapter* using this shared
-policy; its `W14/Y14`, `0x40008000`/4KiB, GPIO identity and safe
-IOBUF reset state are **evidence for this one FPGA image**, not the
-canonical Universal Image or product eight-Site ABI.
-
-The common SWD Provider is target-agnostic; Blue Pill STM32F103C8T6
-is only the first physical DUT and its expected SWD DPIDR is not
-hardcoded as a general provider qualification. Later ST, NXP,
-Microchip and other ICs use per-exact-part applicability, target probe,
-Flash geometry and algorithms, not separate FPGA configuration Stages.
-No target family can inherit a historical F1-B risk waiver.
-
-Source-only regressions:
-`pl/tests/test_fpga_configuration_policy.py` covers multiple Projects,
-exact source and original-image hashes, invalid transitions and
-**rejects normal IC Job operations as FPGA reload triggers**.
-The existing `pl/tests/test_bluepill_protected_stage.py` continues
-to test the PoC-specific GPIO/IOBUF preflight and fail-closed
-simulated stage results. Host-only booleans and image hashes do
-**not** prove root permissions, AXI isolation/drain, image attestation,
-real MMIO readback or successful restoration.
-
-The last physically synthesized BIT/HWH/BIN belong *only* to source
-SHA `65555410f171e425e61d87ebd42dc4709755f389`,
-SWPC Run #40090390292. These policy/document/test changes make a
-**newer PR HEAD, without an exact-source Vivado rebuild**. Preserve the
-old evidence without promoting it to latest-head Image PASS.
-
-The prototype remains **one Site** and is not electrically or
-functionally a qualified eight-Site Universal Image. Hardware
-configuration/load/rollback and external SWD remain NOT_RUN; current
-Pmod BB J1 remains disconnected from Z2, and no owner-approved real
-FPGA Manager, Z2, MMIO, SWPC or DUT work occurs in this change.
+Physical boundary: The owner has a valid prior **SWPC + ST-LINK +
+LA2016** reference SWD test. **Pmod BB J1 is not yet connected to
+Z2 JB**. Do not connect or drive Z2 until separately authorized
+hardware preflight. Never let ST-LINK and Z2 drive SWCLK/SWDIO
+simultaneously. NRST remains unconnected. In this Path 1 no SWPC,
+Z2, FPGA Manager, MMIO, ST-LINK, LA2016, USB or DUT was operated,
+and no deployment or merge was performed. PR remains Draft;
+Gate 2/HIL **NO-GO**.
