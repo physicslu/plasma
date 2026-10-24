@@ -199,6 +199,20 @@ def confirm(plan: StagePlan, lock: ImageLock, after: Observed,
          "PLAN_RESTORED_NOOP"), "STAGE_PLAN_INVALID")
     need(isinstance(lock, ImageLock), "IMAGE_LOCK_MISSING")
     lock.validate()
+    need(plan.current.boot_id == plan.boot_id and
+         plan.current.source_sha == plan.source_sha and
+         plan.current.phase in ("BASE", "HELD") and
+         plan.current.image_sha256 ==
+         (lock.recovery_sha256 if plan.current.phase == "BASE"
+          else lock.bin_sha256), "STAGE_PLAN_STATE_INVALID")
+    valid = {
+        ("download", "BASE", "PLAN_DOWNLOAD"): lock.bin_sha256,
+        ("test", "HELD", "PLAN_READ_ONLY_ABI"): lock.bin_sha256,
+        ("restore", "HELD", "PLAN_RESTORE"): lock.recovery_sha256,
+        ("restore", "BASE", "PLAN_RESTORED_NOOP"): lock.recovery_sha256,
+    }
+    need(valid.get((plan.stage, plan.current.phase, plan.action)) ==
+         plan.expected_image_sha256, "STAGE_PLAN_TAMPERED")
     _observe(lock, after)
     need(after.boot_id == plan.boot_id and
          plan.source_sha == lock.reviewed_source_sha and
