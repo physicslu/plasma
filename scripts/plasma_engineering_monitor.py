@@ -64,6 +64,85 @@ STATIC_GUARDED_STAGES = {
     "z2-path2-restore": "Guarded Restore",
     "z2-path2-full-hil": "Guarded Full HIL",
 }
+# Narrow receipt projection; a filesystem JSON file is NOT an independently
+# authenticated verification receipt. Project known categorical DENIAL only.
+RECEIPT_PERMISSION_STAGES = frozenset({
+    "CLI_WRAPPER", "CLI_MANIFEST", "PLATFORM_MANIFEST", "NATIVE_BINARY",
+})
+RECEIPT_PERMISSION_CAUSES = frozenset({"OWNER_MISMATCH", "PEER_WRITABLE"})
+MAX_RECEIPT_BYTES = 8192
+
+
+def _receipt_permission_hint(raw: object, *, run_id: str, task: str,
+                             work_order_sha: str, exit_code: int) -> dict | None:
+    """Project only an exact known sanitized native preflight denial."""
+    if (exit_code != 2 or task != "path2-work-order" or
+            WORK_ORDER_SHA256.fullmatch(work_order_sha) is None or
+            type(raw) is not dict):
+        return None
+    if not (
+        raw.get("schema") == "plasma.codex.native_preflight.v1" and
+        raw.get("status") == "NOT_RUN_OR_FAIL" and
+        raw.get("reason") == "NATIVE_PATH_PERMISSIONS_DENIED" and
+        raw.get("github_run_id") == run_id and
+        raw.get("task_id") == task and
+        raw.get("work_order_sha256") == work_order_sha and
+        raw.get("denial_stage") in RECEIPT_PERMISSION_STAGES and
+        raw.get("denial_cause") in RECEIPT_PERMISSION_CAUSES and
+        raw.get("model_session") == "NOT_RUN" and
+        raw.get("hardware_access") == "NOT_RUN" and
+        raw.get("provenance") == "NOT_INDEPENDENTLY_VERIFIED" and
+        raw.get("sha256_pin_authorized") is False
+    ):
+        return None
+    index = raw.get("denial_component_index")
+    if type(index) is not int or not 1 <= index <= 24:
+        return None
+    return {
+        "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+        "stage": raw["denial_stage"],
+        "cause": raw["denial_cause"],
+        "component_index": index,
+    }
+
+
+def _read_path2_receipt_hint(*, runner_temp: object, run_id: str,
+                             task: str, work_order_sha: str,
+                             exit_code: int) -> dict | None:
+    """Read only the fixed Runner Temp receipt, never user-supplied paths.
+
+    No arbitrary output, filenames, stack traces or command arguments are
+    copied into the Monitor. Any absence/race/error fails closed.
+    """
+    if (type(runner_temp) is not str or not runner_temp or
+            not Path(runner_temp).is_absolute() or len(runner_temp) > 512 or
+            run_id == "unknown"):
+        return None
+    # Exact file name is from the trusted workflow, not the Work Order.
+    file_path = Path(runner_temp) / "plasma-path2-receipt.json"
+    fd = -1
+    try:
+        fd = os.open(file_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        st = os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or
+                st.st_nlink != 1 or st.st_mode & 0o022 or
+                not 0 < st.st_size <= MAX_RECEIPT_BYTES):
+            return None
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            body = stream.read(MAX_RECEIPT_BYTES + 1)
+        if len(body) > MAX_RECEIPT_BYTES:
+            return None
+        raw = json.loads(body.decode("utf-8"))
+        return _receipt_permission_hint(
+            raw, run_id=run_id, task=task,
+            work_order_sha=work_order_sha, exit_code=exit_code)
+    except (OSError, ValueError, UnicodeError, TypeError):
+        return None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
 
 
 def _valid_dir(path: Path, uid: int, gid: int) -> bool:
@@ -246,10 +325,18 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     finally:
         if live:
             try:
+                # A verified Runner receipt is NOT asserted: expose only a
+                # bounded categorical hint matching this exact run/Work Order.
+                hint = (_read_path2_receipt_hint(
+                    runner_temp=os.environ.get("RUNNER_TEMP", ""),
+                    run_id=run_id, task=task,
+                    work_order_sha=work_order_sha, exit_code=rc)
+                    if path == "path2" and rc != 0 else None)
                 _append(log, "%s | exit=%s | Run %s" % (result, rc, run_id))
                 _write_state(directory, path, {
                     **state, "status": "IDLE", "last_result": result,
                     "exit_code": rc,
+                    **({"receipt_hint": hint} if hint is not None else {}),
                     "finished": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                 })
             except OSError as exc:
@@ -377,6 +464,28 @@ def render_snapshot(directory: Path, path: str, *,
         # The monitor wrapper's return code is NOT a verification receipt.
         lines.append("WRAPPER: %s  EXIT: %s" %
                      (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
+        hint = state.get("receipt_hint")
+        if (path == "path2" and state.get("last_result") == "FAIL" and
+                type(state.get("exit_code")) is int and
+                _receipt_permission_hint({
+                    "schema": "plasma.codex.native_preflight.v1",
+                    "status": "NOT_RUN_OR_FAIL",
+                    "reason": (hint or {}).get("reason") if type(hint) is dict else None,
+                    "github_run_id": state.get("run_id"),
+                    "task_id": state.get("task"),
+                    "work_order_sha256": "a" * 64,
+                    "denial_stage": (hint or {}).get("stage") if type(hint) is dict else None,
+                    "denial_cause": (hint or {}).get("cause") if type(hint) is dict else None,
+                    "denial_component_index": (hint or {}).get("component_index") if type(hint) is dict else None,
+                    "model_session": "NOT_RUN", "hardware_access": "NOT_RUN",
+                    "provenance": "NOT_INDEPENDENTLY_VERIFIED",
+                    "sha256_pin_authorized": False,
+                }, run_id=state.get("run_id"), task=state.get("task"),
+                work_order_sha="a" * 64, exit_code=state.get("exit_code"))
+                is not None):
+            lines.append("RECEIPT: %s | %s | %s | #%d" % (
+                hint["reason"], hint["stage"], hint["cause"],
+                hint["component_index"]))
     if path in PATHS:
         clock = dt.datetime.now().astimezone() if now is None else now
         if clock.tzinfo is None or clock.utcoffset() is None:
