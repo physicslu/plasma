@@ -110,6 +110,30 @@ jobs:
           python software/python/tests/test_openocd_software_qualification_v1.py
           python software/python/tests/test_programming_qualification.py
           python software/python/tests/test_stm32f103_low_density_v10_candidate.py
+      - name: Collect official DS5936 original PDF hash (host-only evidence, not L2 authority)
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          trap 'rm -f "$tmp"' EXIT
+          ok=0
+          for url in \
+            https://www.st.com/resource/en/datasheet/stm32f103c6.pdf \
+            https://www.st.com/resource/en/datasheet/cd00210843.pdf; do
+            if curl --fail --silent --show-error --location --retry 1 --connect-timeout 10 --max-time 45 \
+              --user-agent 'Mozilla/5.0 PLASMA-DS5936-Evidence/1.0' "$url" -o "$tmp"; then
+              if [[ "$(head -c 5 "$tmp")" == '%PDF-' ]]; then
+                echo "DS5936_OFFICIAL_URL=$url"
+                echo "DS5936_ORIGINAL_BYTE_LENGTH=$(wc -c < "$tmp" | tr -d ' ')"
+                echo "DS5936_SHA256=$(sha256sum "$tmp" | cut -d ' ' -f 1)"
+                ok=1
+                break
+              fi
+            fi
+          done
+          if [[ "$ok" -ne 1 ]]; then
+            echo 'DS5936_ORIGINAL_BYTES=NOT_AVAILABLE; L2 admission remains blocked'
+          fi
       - name: Report reviewed software support
         env:
           PYTHONPATH: software/python
