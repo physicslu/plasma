@@ -120,6 +120,11 @@ def codex_command(
         if private.exists() or private.is_symlink():
             require(private.is_dir() and not private.is_symlink(),
                     "CODEX_SANDBOX_PRIVATE_PATH_DENIED")
+            # Bubblewrap defaults tmpfs to 0755; Stage Transport enrollment
+            # requires this credential parent to remain private (0700).
+            # --perms applies only to the immediately following tmpfs.
+            if name == ".config/plasma":
+                argv += ["--perms", "0700"]
             argv += ["--tmpfs", str(private)]
     for source in z2_sources:
         argv += ["--ro-bind", str(source), str(source)]
