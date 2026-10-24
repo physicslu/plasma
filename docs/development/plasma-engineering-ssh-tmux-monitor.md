@@ -34,6 +34,35 @@ copied into public events. Commands that cannot be safely classified remain
 `(command hidden)`. No classification authorizes execution or proves that
 the named tool actually achieved its intended operation.
 
+### Path 2 native preflight denial receipts (V3)
+
+The trusted Runner already redirects the Path 2 Dispatcher JSON receipt to
+`$RUNNER_TEMP/plasma-path2-receipt.json`. After the wrapped process exits,
+the Monitor may **read but never modify** that fixed file. The projection is
+limited to the existing native Codex preflight permission denial with exact
+`github_run_id`, `task_id`, `work_order_sha256`, nonzero exit code,
+permission-safe file ownership/type, and bounded JSON size.
+The Monitor copies **only** the fixed category values `NATIVE_PATH_PERMISSIONS_DENIED`,
+`CLI_WRAPPER/CLI_MANIFEST/PLATFORM_MANIFEST/NATIVE_BINARY`,
+`OWNER_MISMATCH/PEER_WRITABLE` and the component index (1..24).
+Other statuses, arbitrary errors, paths, raw stdout/stderr and sensitive
+JSON fields are never rendered. Rejected or unavailable receipts omit the
+hint without changing the authorized job outcome.
+
+The additional line looks like:
+
+```text
+WRAPPER: FAIL  EXIT: 2
+RECEIPT: NATIVE_PATH_PERMISSIONS_DENIED | CLI_WRAPPER | PEER_WRITABLE | #1
+```
+
+This is a **sanitized Runner receipt hint**, **not** a new verified `[V]`
+source. A matching source identity and fixed enum do not prove electrical
+or execution safety, and this preflight denial states no model or hardware
+work was run. The index is not a host pathname. The line is available only
+for future runs after the new trusted main implementation is activated;
+an old transient V2 snapshot is not retroactively enriched.
+
 ## Operator workflow (SWPC)
 
 After this change is merged to trusted main and an already authorized SWPC
