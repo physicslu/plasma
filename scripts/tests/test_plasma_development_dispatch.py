@@ -1665,6 +1665,69 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["objective"], order["objective"])
             self.assertEqual(task["acceptance"], order["acceptance"])
 
+    def test_path3_explicit_monitor_summary_is_authorized_and_digest_bound(self):
+        # The objective and acceptance are free-form and must never be copied
+        # into the public monitor metadata or GitHub step output.
+        order = self._order(
+            objective="TOP_SECRET_1234 internal task with private command.",
+            acceptance="Never print PRIVATE_ACCEPTANCE_1234 outside the agent.",
+            monitor_summary="STM32F103 Low-density L1-L2 provider audit")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(
+            approval["monitor_summary"], order["monitor_summary"])
+        self.assertEqual(
+            task["monitor_summary"], order["monitor_summary"])
+        self.assertEqual(
+            approval["work_order_sha256"], dev.work_order_digest(order))
+        for private in ("TOP_SECRET_1234", "PRIVATE_ACCEPTANCE_1234"):
+            self.assertNotIn(private, approval["monitor_summary"])
+        mutated = self._event(order | {
+            "monitor_summary": "STM32F103 Medium-density L1-L2 provider audit"})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, mutated)
+
+        # Backward-compatible historical Work Orders have no public title.
+        old = self._event(self._order())
+        self.assertEqual(
+            dev.authorize(old, self._context(), self.registry)["monitor_summary"],
+            "")
+        self.assertNotIn(
+            "monitor_summary",
+            dev.task_for_request(
+                self.registry, dev.request(old, self._context()), old))
+
+    def test_monitor_summary_denies_secret_multiline_shell_and_path2_injection(self):
+        invalid = (
+            "short", "word" * 100, "Fix\nprivate run",
+            "Fix\rsecret run", "Fix\x1b[31mcontrol",
+            "Run $HOME shell command", "https://example.com/private/key",
+            "token sent to monitor", "Password leaked to operator",
+            "ABCD" * 12, "Fix: secret step", "=malicious=output",
+            "STM32 firmware work \u202eevil", None, 123, [],
+        )
+        for value in invalid:
+            with self.subTest(value=repr(value)):
+                event = self._event(self._order(monitor_summary=value))
+                with self.assertRaises(dev.Denied):
+                    dev.request(event, self._context())
+        # A Path 2 objective is not allowed to introduce a Path 3 viewer field.
+        event = self._event(self._order(
+            "path2-cli", monitor_summary="Authorized metadata only"))
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_PATH2_FIELDS_DENIED"):
+            dev.request(event, self._context())
+
+    def test_monitor_summary_is_unicode_one_line_operator_metadata(self):
+        order = self._order(
+            monitor_summary="STM32F103 小容量 L1-L2 Provider Audit")
+        self.assertEqual(
+            dev.authorize(
+                self._event(order), self._context(),
+                self.registry)["monitor_summary"], order["monitor_summary"])
+
     def test_path2_cpu_only_uses_existing_checked_script(self):
         event = self._event(self._order("path2-cli"))
         req = dev.request(event, self._context())
