@@ -14,6 +14,7 @@ on:
       - "pl/tests/test_swd04_development.py"
       - "pl/tests/test_swd04_collect.py"
       - "pl/tests/test_swd04_staging.py"
+      - "pl/tests/test_swd05_one_shot.py"
       - "pl/verification/test_swd04_hil_rtl.py"
       - "pl/verification/cocotb/swd04_hil_cocotb.py"
       - "docs/development/swd04-offline-execution-checklist.md"
@@ -33,6 +34,7 @@ on:
       - "pl/tests/test_swd04_development.py"
       - "pl/tests/test_swd04_collect.py"
       - "pl/tests/test_swd04_staging.py"
+      - "pl/tests/test_swd05_one_shot.py"
       - "pl/verification/test_swd04_hil_rtl.py"
       - "pl/verification/cocotb/swd04_hil_cocotb.py"
       - "docs/development/swd04-offline-execution-checklist.md"
@@ -73,7 +75,8 @@ jobs:
             pl/tests/test_swd04_hil_contract.py \
             pl/tests/test_swd04_development.py \
             pl/tests/test_swd04_collect.py \
-            pl/tests/test_swd04_staging.py
+            pl/tests/test_swd04_staging.py \
+            pl/tests/test_swd05_one_shot.py
       - name: Exact HIL-02/03 functions against actual RTL
         run: python3 -m pytest -q pl/verification/test_swd04_hil_rtl.py
       - name: Explicit acceptance boundary
