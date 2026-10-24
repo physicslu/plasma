@@ -12,9 +12,9 @@ future reviewed root backend can supply authenticated hardware observations.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
-import re
 import sys
+
+from pl.hil import fpga_configuration_policy as core
 
 PROJECT = "pl/projects/z2-bluepill-rbb"
 MAGIC = 0x50425357
@@ -23,24 +23,12 @@ BASE = 0x40008000
 SIZE = 4096
 CLOCK_HZ = 100_000_000
 BOARD = "pynq-z2:xc7z020clg400-1"
-STAGES = frozenset(("download", "test", "restore"))
-HEX40 = re.compile(r"[0-9a-f]{40}\Z")
-HEX64 = re.compile(r"[0-9a-f]{64}\Z")
-
-
-class StageDenied(ValueError):
-    """Fail closed without emitting a trusted PLASMA_PATH2_STAGE receipt."""
-
-
-def need(ok: bool, code: str) -> None:
-    if not ok:
-        raise StageDenied(code)
-
-
-def hex_pin(value: object, length: int) -> bool:
-    match = HEX40 if length == 40 else HEX64
-    return (type(value) is str and match.fullmatch(value) is not None
-            and any(c != "0" for c in value))
+# Generic image/configuration lifecycle shared across programming providers.
+# This PoC retains only board-specific SWD GPIO identities and wiring.
+STAGES = core.STAGES
+StageDenied = core.StageDenied
+need = core.need
+hex_pin = core.hex_pin
 
 
 @dataclass(frozen=True)
@@ -56,30 +44,22 @@ class ImageLock:
     recovery_sha256: str
 
     def validate(self) -> None:
-        need(self.project == PROJECT, "BLUEPILL_PROJECT_MISMATCH")
-        need(all(hex_pin(s, 40) for s in (
-             self.reviewed_source_sha, self.installed_source_sha,
-             self.image_build_source_sha)), "SOURCE_SHA_INVALID")
-        need(self.reviewed_source_sha == self.installed_source_sha ==
-             self.image_build_source_sha, "IMAGE_SOURCE_REBUILD_REQUIRED")
-        need(all(hex_pin(s, 64) for s in (
-             self.bit_sha256, self.hwh_sha256, self.bin_sha256,
-             self.recovery_sha256)), "IMAGE_SHA_INVALID")
-        need(self.bin_sha256 != self.recovery_sha256,
-             "CANDIDATE_IS_RECOVERY")
+        core.validate_source_lock(
+            project=self.project, expected_project=PROJECT,
+            reviewed_sha=self.reviewed_source_sha,
+            installed_sha=self.installed_source_sha,
+            build_sha=self.image_build_source_sha,
+            bit_sha=self.bit_sha256, hwh_sha=self.hwh_sha256,
+            bin_sha=self.bin_sha256, original_sha=self.recovery_sha256)
 
     def check_bundle(self, *, bit: bytes, hwh: bytes, binary: bytes,
                      original: bytes) -> None:
-        """Host-only content hashes; root provenance is a separate guard."""
+        """Host-only content hashes; no claim of root-installed image."""
         self.validate()
-        need(all(type(x) is bytes and x for x in
-                 (bit, hwh, binary, original)), "BUNDLE_BYTES_MISSING")
-        for data, expected in ((bit, self.bit_sha256),
-                               (hwh, self.hwh_sha256),
-                               (binary, self.bin_sha256),
-                               (original, self.recovery_sha256)):
-            need(hashlib.sha256(data).hexdigest() == expected,
-                 "IMAGE_BUNDLE_HASH_MISMATCH")
+        core.validate_bundle(
+            bit=bit, hwh=hwh, binary=binary, original=original,
+            bit_sha=self.bit_sha256, hwh_sha=self.hwh_sha256,
+            bin_sha=self.bin_sha256, original_sha=self.recovery_sha256)
 
 
 @dataclass(frozen=True)
@@ -171,16 +151,10 @@ def prepare(stage: str, lock: ImageLock, facts: Observed,
              facts.active_image_sha256 == expected,
              "ACTIVE_IMAGE_OR_STATE_UNATTESTED")
         current = state
-    if stage == "download":
-        need(current.phase == "BASE", "DUPLICATE_DOWNLOAD_DENIED")
-        action, target = "PLAN_DOWNLOAD", lock.bin_sha256
-    elif stage == "test":
-        need(current.phase == "HELD", "TEST_REQUIRES_HELD_IMAGE")
-        action, target = "PLAN_READ_ONLY_ABI", lock.bin_sha256
-    elif current.phase == "BASE":
-        action, target = "PLAN_RESTORED_NOOP", lock.recovery_sha256
-    else:
-        action, target = "PLAN_RESTORE", lock.recovery_sha256
+    action = core.choose_stage(stage, current.phase)
+    target = (lock.bin_sha256 if action in
+              ("PLAN_DOWNLOAD", "PLAN_READ_ONLY_ABI")
+              else lock.recovery_sha256)
     return StagePlan(stage, lock.reviewed_source_sha, facts.boot_id,
                      target, current, action)
 
@@ -205,14 +179,10 @@ def confirm(plan: StagePlan, lock: ImageLock, after: Observed,
          plan.current.image_sha256 ==
          (lock.recovery_sha256 if plan.current.phase == "BASE"
           else lock.bin_sha256), "STAGE_PLAN_STATE_INVALID")
-    valid = {
-        ("download", "BASE", "PLAN_DOWNLOAD"): lock.bin_sha256,
-        ("test", "HELD", "PLAN_READ_ONLY_ABI"): lock.bin_sha256,
-        ("restore", "HELD", "PLAN_RESTORE"): lock.recovery_sha256,
-        ("restore", "BASE", "PLAN_RESTORED_NOOP"): lock.recovery_sha256,
-    }
-    need(valid.get((plan.stage, plan.current.phase, plan.action)) ==
-         plan.expected_image_sha256, "STAGE_PLAN_TAMPERED")
+    core.validate_stage_plan(
+        stage=plan.stage, phase=plan.current.phase, action=plan.action,
+        expected_image_sha=plan.expected_image_sha256,
+        candidate_sha=lock.bin_sha256, original_sha=lock.recovery_sha256)
     _observe(lock, after)
     need(after.boot_id == plan.boot_id and
          plan.source_sha == lock.reviewed_source_sha and
@@ -230,13 +200,10 @@ def confirm(plan: StagePlan, lock: ImageLock, after: Observed,
         need(abi_reads == (), "UNEXPECTED_MMIO_OBSERVATION")
     phase = ("HELD" if plan.expected_image_sha256 == lock.bin_sha256
              else "BASE")
-    result = {"PLAN_DOWNLOAD": "SIMULATED_LOADED_AND_HELD",
-              "PLAN_READ_ONLY_ABI": "SIMULATED_IDENTITY_PASS",
-              "PLAN_RESTORE": "SIMULATED_RESTORED_VERIFIED",
-              "PLAN_RESTORED_NOOP": "SIMULATED_ALREADY_RESTORED"}[plan.action]
+    result = core.STAGE_RESULTS[plan.action]
     state = StageState(plan.boot_id, plan.source_sha, phase,
                        plan.expected_image_sha256)
-    receipt = {"model": "plasma.bluepill.protected-stage.host-only.v1",
+    receipt = {"model": "plasma.fpga.configuration.host-only.v1",
                "stage": plan.stage, "result": result, "real_z2": False,
                "hardware_authorized": False, "runtime_admitted": False,
                "boot_id": plan.boot_id, "source_sha": plan.source_sha,
