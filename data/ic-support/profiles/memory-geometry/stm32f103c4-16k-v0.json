@@ -2,7 +2,7 @@
   "schema_version": "0.1.0",
   "profile_id": "stm32f103c4-16k-v0",
   "kind": "memory_geometry",
-  "status": "source_review_candidate_not_qualified",
+  "status": "pilot_source_review_candidate_not_qualified",
   "scope": {
     "manufacturer": "STMicroelectronics",
     "base_device": "STM32F103C4"
