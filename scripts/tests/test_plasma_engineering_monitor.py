@@ -917,6 +917,9 @@ if op in ("new-session", "new-window"):
                 # Capture dead panes during diagnosis; assert they are alive
                 # rather than accepting a retained-but-terminated window.
                 tmux("set-option", "-g", "remain-on-exit", "on")
+                # Existing private server was created before the launcher;
+                # explicitly supply the fake sg PATH to only this socket.
+                tmux("set-environment", "-g", "PATH", env["PATH"])
                 tmux("move-window", "-d",
                      "-s", "plasma-monitor:0", "-t", "plasma-monitor:1")
                 original = tmux(
