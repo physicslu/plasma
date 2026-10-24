@@ -522,6 +522,7 @@ def authorize(event: object, context: dict, registry: object,
                 "download": "Guarded Download",
                 "test": "Guarded Test",
                 "restore": "Guarded Restore",
+                "full": "Guarded Full HIL",  # Existing exact registry task.
             }[task["stage"]]
         elif task.get("native_preflight") == NATIVE_PREFLIGHT:
             monitor_stage = "Native preflight"
