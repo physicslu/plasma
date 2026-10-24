@@ -162,23 +162,14 @@ def private_json(path: Path) -> dict:
 def enrollment() -> tuple[str, str, str]:
     need(pwd.getpwuid(os.geteuid()).pw_name == WORKER and
          os.geteuid() != 0, "SWPC_RUNNER_IDENTITY_DENIED")
-    # Development Mode reuses the canonical, already-authorized Z2 login
-    # source when present; a second Path 2 sudo enrollment is not a gate.
-    # Do not silently fall back if a present canonical source is malformed.
-    if DEV_CREDENTIALS.exists() or DEV_CREDENTIALS.is_symlink():
-        shared = private_json(DEV_CREDENTIALS)
-        need(type(shared) is dict and set(shared) == {
-             "ssh_host", "ssh_username", "ssh_password", "sudo_password"},
-             "SSH_OR_SUDO_ROUTE_NOT_ENROLLED")
-        ssh = {key: shared[key] for key in (
-            "ssh_host", "ssh_username", "ssh_password")}
-        sudo_password = shared["sudo_password"]
-    else:
+    # Match the established Path 3 Z2 SSH route: use its existing
+    # z2-login-smoke.json and pinned host key when the login is enrolled.
+    # A present but invalid login is denied, never silently replaced by a
+    # different target from the legacy development credential file.
+    if LOGIN.exists() or LOGIN.is_symlink():
         ssh = private_json(LOGIN)
-        # Legacy one-shot sudo file remains supported but optional. The Z2
-        # development image can use its existing SSH password for sudo when
-        # the owner has not configured a distinct sudo credential. An actual
-        # sudo denial still fails; no sudoers or remote permissions change.
+        # Preserve the separate sudo password only when explicitly enrolled;
+        # otherwise use the same login password as the Z2 development image.
         if SUDO.exists() or SUDO.is_symlink():
             sudo = private_json(SUDO)
             need(type(sudo) is dict and
@@ -187,6 +178,16 @@ def enrollment() -> tuple[str, str, str]:
             sudo_password = sudo["sudo_password"]
         else:
             sudo_password = ssh.get("ssh_password") if type(ssh) is dict else None
+    else:
+        # Backward compatibility for an already-authorized Development Mode
+        # worker with only the canonical per-user SSH/sudo credential source.
+        shared = private_json(DEV_CREDENTIALS)
+        need(type(shared) is dict and set(shared) == {
+             "ssh_host", "ssh_username", "ssh_password", "sudo_password"},
+             "SSH_OR_SUDO_ROUTE_NOT_ENROLLED")
+        ssh = {key: shared[key] for key in (
+            "ssh_host", "ssh_username", "ssh_password")}
+        sudo_password = shared["sudo_password"]
     need(type(ssh) is dict and set(ssh) == {
          "ssh_host", "ssh_username", "ssh_password"} and
          ssh["ssh_username"] == "xilinx" and
