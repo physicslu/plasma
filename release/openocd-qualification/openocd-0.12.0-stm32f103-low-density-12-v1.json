@@ -21,7 +21,7 @@
   },
   "programming_profile": {
     "path": "data/ic-support/profiles/programming/stm32f1-low-density-flash-v0.json",
-    "git_blob_sha1": "c16f07c1cff7ec1fe442bac0a41347e932c85c5e",
+    "git_blob_sha1": "15aac779bad3e6ef743372aedb05469fa78b404b",
     "profile_id": "stm32f1-low-density-flash-v0"
   },
   "records": [
