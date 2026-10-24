@@ -161,8 +161,9 @@ def parse_public_line(line: str) -> dict | None:
     if (obj["schema"] != 1 or type(obj["seq"]) is not int or
             not 0 < obj["seq"] <= 10000000 or
             type(obj["id"]) is not str or ITEM_ID.fullmatch(obj["id"]) is None or
-            obj["kind"] not in KINDS or obj["state"] not in STATES or
-            obj["source"] != "C" or
+            type(obj["kind"]) is not str or obj["kind"] not in KINDS or
+            type(obj["state"]) is not str or obj["state"] not in STATES or
+            type(obj["source"]) is not str or obj["source"] != "C" or
             type(obj["time"]) is not str or
             re.fullmatch(r"[0-2][0-9]:[0-5][0-9]", obj["time"]) is None or
             type(obj["detail"]) is not str or len(obj["detail"]) > 150 or
@@ -171,10 +172,18 @@ def parse_public_line(line: str) -> dict | None:
     # Reject forged display records, even if the log was accidentally
     # modified; do not make viewer parse a second arbitrary text channel.
     if obj["kind"] == "FILE":
-        if obj["detail"] != "(file paths hidden)" and not re.fullmatch(
-                r"[A-Za-z0-9._/-]{1,96}(?: \(\+[0-9]{1,2} files\))?",
-                obj["detail"]):
-            return None
+        if obj["detail"] != "(file paths hidden)":
+            match = re.fullmatch(
+                r"([A-Za-z0-9._/-]{1,96})(?: \(\+[0-9]{1,2} files\))?",
+                obj["detail"])
+            if match is None:
+                return None
+            name = match.group(1)
+            parts = name.split("/")
+            if (len(parts) < 2 or parts[0] not in REPO_TOP or
+                    any(p in ("", ".", "..") or p.startswith(".") for p in parts)
+                    or SENSITIVE.search(name) is not None):
+                return None
     elif obj["detail"] != "(command hidden)" and safe_command(obj["detail"])[1] != obj["detail"]:
         return None
     return obj
