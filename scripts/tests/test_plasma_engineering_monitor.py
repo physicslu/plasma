@@ -74,10 +74,14 @@ class EngineeringMonitorTests(unittest.TestCase):
                 "PLASMA_MONITOR_SUMMARY":
                     "STM32F103 Low-density L1-L2 provider audit",
             }
+            env_probe = Path(td) / "child-env-probe.txt"
             with patch.dict(os.environ, data, clear=True):
                 self.assertEqual(mon.run_job(
-                    "path3", [sys.executable, "-c", "pass"],
+                    "path3", [sys.executable, "-c",
+                              "import os,pathlib,sys;pathlib.Path(sys.argv[1]).write_text(str('PLASMA_MONITOR_SUMMARY' in os.environ))",
+                              str(env_probe)],
                     directory=Path(td)), 0)
+            self.assertEqual(env_probe.read_text(), "False")
             state = json.loads((Path(td) / "path3.json").read_text())
             frame = mon.render_snapshot(Path(td), "path3")
             self.assertEqual(
