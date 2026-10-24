@@ -413,18 +413,23 @@ def render_snapshot(directory: Path, path: str, *,
     # into commands, files or terminal control sequences.
     activity_rows = []
     active_items = {}
+    last_sequence = 0
     for original in log_lines:
         event = engineering_activity.parse_public_line(original)
-        if event is None:
+        if event is None or event["seq"] <= last_sequence:
             continue
+        last_sequence = event["seq"]
         if event["state"] == "RUNNING":
             active_items[event["id"]] = event
         else:
             active_items.pop(event["id"], None)
+        outcome = event["state"]
+        if event["exit_code"] is not None:
+            outcome += " (exit %d)" % event["exit_code"]
         activity_rows.append(
             "%s [%s] %s %s | %s" %
             (event["time"], event["source"], event["kind"],
-             event["state"], event["detail"]))
+             outcome, event["detail"]))
     if activity_rows:
         # Trust class C = Codex JSON event, never VERIFIED receipt.
         log_lines = activity_rows[-30:]
