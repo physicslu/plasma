@@ -16,6 +16,43 @@ import plasma_development_dispatch as dispatcher
 
 
 class Path3UsbTtySandboxContracts(unittest.TestCase):
+    def test_z2_sources_readonly_after_mask_and_invalid_sources_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            work, home, usb, dev = self.roots(temp)
+            for p in dev.glob('tty*'):
+                p.unlink()
+            plasma = home / '.config/plasma'
+            plasma.mkdir(parents=True, mode=0o700)
+            sources = [plasma / name for name in (
+                'z2-dev-credentials.json', 'z2-login-smoke.json',
+                'z2-login-known_hosts')]
+            for source in sources:
+                source.touch(mode=0o600)
+            unrelated = plasma / 'unrelated-secret'
+            unrelated.touch(mode=0o600)
+            with patch.object(sandbox.shutil, 'which', return_value=sys.executable):
+                args = sandbox.codex_command(work, home=home,
+                                             usb_root=usb, dev_root=dev)
+                mask = next(i for i in range(len(args)-1)
+                            if args[i:i+2] == ['--tmpfs', str(plasma)])
+                for source in sources:
+                    mount = next(i for i in range(len(args)-2)
+                                 if args[i:i+3] == ['--ro-bind', str(source), str(source)])
+                    self.assertGreater(mount, mask)
+                self.assertNotIn(str(unrelated), args)
+                self.assertIn('SSH_AUTH_SOCK', args)
+                sources[0].chmod(0o644)
+                with self.assertRaisesRegex(sandbox.CodexSandboxDenied, 'Z2_SOURCE_DENIED'):
+                    sandbox.codex_command(work, home=home, usb_root=usb, dev_root=dev)
+                sources[0].unlink()
+                sources[0].symlink_to(unrelated)
+                with self.assertRaisesRegex(sandbox.CodexSandboxDenied, 'Z2_SOURCE_DENIED'):
+                    sandbox.codex_command(work, home=home, usb_root=usb, dev_root=dev)
+                sources[0].unlink()
+                plasma.chmod(0o755)
+                with self.assertRaisesRegex(sandbox.CodexSandboxDenied, 'Z2_DIRECTORY_DENIED'):
+                    sandbox.codex_command(work, home=home, usb_root=usb, dev_root=dev)
+
     def roots(self, temp: str):
         root = Path(temp)
         home = root / "home"
