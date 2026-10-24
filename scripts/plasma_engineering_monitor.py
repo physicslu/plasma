@@ -54,7 +54,14 @@ MAX_DISPLAY_COLUMNS = 100
 MONITOR_STAGES = frozenset({
     "CPU-only CLI", "Native preflight", "Vivado host build",
     "Guarded Download", "Guarded Test", "Guarded Restore",
+    "Guarded Full HIL",
 })
+STATIC_GUARDED_STAGES = {
+    "z2-path2-download": "Guarded Download",
+    "z2-path2-testing": "Guarded Test",
+    "z2-path2-restore": "Guarded Restore",
+    "z2-path2-full-hil": "Guarded Full HIL",
+}
 
 
 def _valid_dir(path: Path, uid: int, gid: int) -> bool:
@@ -166,11 +173,15 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
         and MONITOR_SENSITIVE.search(summary) is None
     )
     stage = os.environ.get("PLASMA_MONITOR_STAGE", "")
+    guarded = stage.startswith("Guarded ") if type(stage) is str else False
+    guarded_verified = (
+        (task == "path2-work-order" and
+         WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None) or
+        STATIC_GUARDED_STAGES.get(task) == stage
+    )
     if (path != "path2" or type(stage) is not str or
             stage not in MONITOR_STAGES or
-            (stage.startswith("Guarded ") and
-             (task != "path2-work-order" or
-              WORK_ORDER_SHA256.fullmatch(work_order_sha) is None))):
+            (guarded and not guarded_verified)):
         stage = ""
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
@@ -333,7 +344,7 @@ def render_snapshot(directory: Path, path: str, *,
     if (type(pr_number) is str and PR_NUMBER.fullmatch(pr_number) and
             pr_number != "0"):
         lines.append("PR: #" + pr_number)
-    if state.get("task") in ("path2-work-order", "path3-work-order"):
+    if path in PATHS:
         summary = state.get("monitor_summary", "")
         if (type(summary) is str and
                 MONITOR_SUMMARY.fullmatch(summary) is not None and
