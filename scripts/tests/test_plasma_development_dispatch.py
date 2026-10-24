@@ -1782,6 +1782,16 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_STAGE_CAPABILITY_DENIED"):
             dev.request(self._event(bad), self._context())
 
+    def test_existing_static_path2_full_hil_stage_uses_allowlisted_label(self):
+        event = DevelopmentPath2Contracts().event()
+        event["comment"]["body"] = (
+            "/plasma-dispatch run z2-path2-full-hil 981")
+        plan = dev.authorize(event, self._context(), self.registry)
+        self.assertEqual(plan["task_id"], "z2-path2-full-hil")
+        self.assertEqual(plan["monitor_stage"], "Guarded Full HIL")
+        self.assertEqual(plan["monitor_summary"], "")
+        self.assertIsNone(plan["authorized_stage"])
+
     def test_path3_does_not_report_path2_cli_stage(self):
         a = dev.authorize(
             self._event(self._order()), self._context(), self.registry)
