@@ -428,6 +428,11 @@ def render_snapshot(directory: Path, path: str, *,
     if activity_rows:
         # Trust class C = Codex JSON event, never VERIFIED receipt.
         log_lines = activity_rows[-30:]
+    else:
+        # Invalid structured records are never echoed as raw terminal lines.
+        log_lines = [
+            line for line in log_lines
+            if not line.startswith(engineering_activity.PREFIX)]
     if status == "RUNNING" and active_items:
         last = next(reversed(active_items.values()))
         doing = "%s | %s" % (last["kind"], last["detail"])
