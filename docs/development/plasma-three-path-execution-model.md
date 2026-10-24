@@ -67,7 +67,7 @@ flowchart TD
 
 **執行者：** SWPC Runner 執行已審查的固定 CLI 命令；不是讓 Codex 推理與改碼。CLI 任務不可偷偷轉為 Path 3。沒有符合 Gate 1 條件的已啟用 Trigger／Runner 時，必須回報 `NOT_RUN` 和具體阻礙，不能把批准訊息當作 GitHub Job 已經啟動。
 
-**Development Mode Z2 SSH／sudo 共用原則：** Path 2 的受保護 Stage 不要求在既有 SWPC Z2 身分之外，另完成一次 Path 2 專屬 sudo Enrollment。Stage Transport 優先使用同一 `plasma-codex` 使用者已有的 `~/.config/plasma/z2-dev-credentials.json`（SSH 與 sudo 憑證一起保存）；若未配置此共用檔案，則沿用原有 `z2-login-smoke.json`，並在沒有獨立 `z2-swd05-oneshot.json` 時以該 SSH 密碼嘗試 Z2 的原生 sudo 驗證。若 sudo 密碼不同，仍支援舊獨立憑證檔；已存在但無效的共用檔不得靜默回退。**這只移除重複的 Enrollment 前置條件，不移除真實 SSH／sudo 驗證**；SSH Host Key、worker 憑證檔權限、Trusted Main Dispatcher、來源 SHA、Generic Root Entry、B1/B2/B3 及 Restore 保護維持不變。連線或權限不符必須回報阻擋，不得藉由修改 sudoers 或停用 SSH 驗證來處理。
+**Development Mode Z2 SSH／sudo 共用原則：** Path 2 的受保護 Stage 不要求在既有 SWPC Z2 身分之外，另完成一次 Path 2 專屬 sudo Enrollment。Stage Transport 的 SSH 來源優先與 Path 3 既有的 Z2 Login／HIL 工具一致，使用同一 `plasma-codex` 使用者的 `~/.config/plasma/z2-login-smoke.json` 和 `z2-login-known_hosts`；若不存在 Path 3 登錄檔，才相容沿用既有 `z2-dev-credentials.json`（SSH 與 sudo 憑證一起保存）。兩份來源並存時，不能讓 Path 2 默默連到另一台 Z2；已存在但無效的優先來源不得自動切換目標。沒有獨立 `z2-swd05-oneshot.json` 時，使用目前選定的 SSH 密碼嘗試 Z2 原生 sudo；若 sudo 密碼不同，仍支援原有獨立憑證檔。**這只移除重複的 Enrollment 前置條件，不移除真實 SSH／sudo 驗證**；SSH Host Key、worker 憑證檔權限、Trusted Main Dispatcher、來源 SHA、Generic Root Entry、B1/B2/B3 及 Restore 保護維持不變。連線或權限不符必須回報阻擋，不得藉由修改 sudoers 或停用 SSH 驗證來處理。
 
 ## 四、Path 3 — SWPC Codex Work
 
