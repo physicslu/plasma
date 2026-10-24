@@ -460,7 +460,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertNotEqual(before, next_minute)
             self.assertIn("NOW: 2026-10-21T16:10+08:00", before)
             self.assertIn("NOW: 2026-10-21T16:11+08:00", next_minute)
-            self.assertNotIn("NOW:", mon.render_snapshot(
+            self.assertIn("NOW: 2026-10-21T16:10+08:00", mon.render_snapshot(
                 directory, "path2", now=FIXED_NOW))
 
     def test_path3_view_redraws_once_at_minute_boundary(self):
