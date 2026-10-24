@@ -264,7 +264,8 @@ def parse_dynamic_work_order(event: object) -> dict:
         # path parameters, model or hardware under this one main-only route.
         require(path == "path2-cli" and scope == "host-only" and
                 order["native_preflight"] == NATIVE_PREFLIGHT and
-                set(order) == base | optional_ref | {"native_preflight"} and
+                set(order) == base | optional_ref | {"native_preflight"} |
+                 ({"monitor_summary"} if "monitor_summary" in order else set()) and
                 order.get("pr_number") == 0 and
                 type(order.get("pr_number")) is int and
                 type(order.get("source_sha")) is str,
@@ -273,7 +274,7 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(scope == "host-only" and
                 {"script", "argv", "expected_stdout_sha256"} <= set(order)
                 and set(order) <= base | optional_ref |
-                {"script", "argv", "expected_stdout_sha256"},
+                {"script", "argv", "expected_stdout_sha256", "monitor_summary"},
                 "WORK_ORDER_PATH2_FIELDS_DENIED")
         task_by_id({"schema_version": VERSION, "mode": "development",
                     "tasks": {"work-order-fixture": {
@@ -286,7 +287,7 @@ def parse_dynamic_work_order(event: object) -> dict:
     elif capability == "path2-stage-contract":
         require(scope == "guarded-hardware" and
                 {"project", "stage"} <= set(order) and
-                set(order) <= base | optional_ref | {"project", "stage"} and
+                set(order) <= base | optional_ref | {"project", "stage", "monitor_summary"} and
                 order["project"] == "pl/projects/z2-fixed-unified-site1" and
                 type(order["stage"]) is str and
                 order["stage"] in ("download", "test", "restore"),
@@ -512,8 +513,25 @@ def authorize(event: object, context: dict, registry: object,
             (req["pr_number"] > 0 and
              req["source_sha"] != req["trusted_sha"]),
             "HOST_BUILD_SOURCE_BINDING_DENIED")
+    # Display-only category derived from the validated task capability/stage.
+    # No freeform Work Order command, stdout or candidate data enters the pane.
+    monitor_stage = ""
+    if task["execution_path"] == "path2-cli":
+        if task.get("capability") == "path2-stage-contract":
+            monitor_stage = {
+                "download": "Guarded Download",
+                "test": "Guarded Test",
+                "restore": "Guarded Restore",
+            }[task["stage"]]
+        elif task.get("native_preflight") == NATIVE_PREFLIGHT:
+            monitor_stage = "Native preflight"
+        elif task.get("capability") == "vivado-host-build":
+            monitor_stage = "Vivado host build"
+        else:
+            monitor_stage = "CPU-only CLI"
     return {
         "status": "AUTHORIZED_DEV_TASK",
+        "monitor_stage": monitor_stage,
         "authorized_stage": (task["stage"] if
                              req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
                              task.get("capability") == "path2-stage-contract"
@@ -527,7 +545,7 @@ def authorize(event: object, context: dict, registry: object,
                  if task["execution_path"] == "path2-cli"
             else "codex-workspace"
         ),
-        # Only explicit, checksum-bound, operator-public Path 3 metadata.
+        # Only explicit, checksum-bound, operator-public Path 2/3 metadata.
         # No objective, acceptance, prompt, or Work Order JSON in this field.
         "monitor_summary": task.get("monitor_summary", ""),
         **a2_claim,
