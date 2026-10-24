@@ -866,6 +866,80 @@ if op in ("new-session", "new-window"):
                 if started:
                     tmux("kill-server", check=False)
 
+    @unittest.skipUnless(shutil.which("tmux"), "tmux executable not installed")
+    def test_real_tmux_launcher_only_adds_missing_path3_on_private_socket(self):
+        """Exercise the actual launcher; PATH 2 is preserved; PATH 3 fails visibly."""
+        with tempfile.TemporaryDirectory(prefix="plasma-tmux-launcher-") as td:
+            d = Path(td)
+            sock = str(d / "private.sock")
+            tmux_binary = shutil.which("tmux")
+            bin_dir = d / "bin"
+            bin_dir.mkdir()
+            # Every tmux command made by the real launcher is redirected
+            # into this private socket; interception of attach is deliberate.
+            wrapper = bin_dir / "tmux"
+            wrapper.write_text(
+                '#!/bin/bash\n'
+                'if [[ "$1" == attach-session ]]; then exit 0; fi\n'
+                'exec "$TEST_REAL_TMUX" -S "$TEST_SOCKET" '
+                '-f /dev/null "$@"\n')
+            wrapper.chmod(0o755)
+            for name, body in (
+                ("id", '[[ "$1" == "-un" ]] && { echo operator; exit; }\n'
+                 '[[ "$1" == "-nG" ]] && { echo "operator plasma-monitor"; exit; }\n'
+                 'exit 2\n'),
+                ("getent", '[[ "$1" == group && "$2" == plasma-monitor ]]\n'),
+                ("sg", 'echo "STUB_PATH3_SG_FAILURE" >&2\nexit 7\n'),
+            ):
+                stub = bin_dir / name
+                stub.write_text("#!/bin/bash\n" + body)
+                stub.chmod(0o755)
+            env = dict(os.environ, TEST_REAL_TMUX=tmux_binary,
+                       TEST_SOCKET=sock)
+            env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
+
+            def tmux(*args, check=True):
+                return subprocess.run(
+                    [tmux_binary, "-S", sock, "-f", "/dev/null", *args],
+                    capture_output=True, text=True, timeout=8, check=check)
+
+            started = False
+            try:
+                tmux("new-session", "-d", "-s", "plasma-monitor",
+                     "-x", "80", "-y", "24", "-n", "path2",
+                     "sleep", "30")
+                started = True
+                tmux("move-window", "-d",
+                     "-s", "plasma-monitor:0", "-t", "plasma-monitor:1")
+                original = tmux(
+                    "display-message", "-p", "-t", "plasma-monitor:1",
+                    "#{pane_id}").stdout.strip()
+                launch = subprocess.run(
+                    ["bash", str(ROOT / "scripts/plasma-engineering-monitor.sh")],
+                    env=env, capture_output=True, text=True, timeout=12)
+                self.assertEqual(launch.returncode, 0, launch.stderr)
+                last = ""
+                for _ in range(30):
+                    cap = tmux("capture-pane", "-p",
+                               "-t", "plasma-monitor:2", check=False)
+                    if cap.returncode == 0:
+                        last = cap.stdout
+                    if "MONITOR_VIEWER_EXIT path=path3 exit=7" in last:
+                        break
+                    time.sleep(0.1)
+                self.assertIn("STUB_PATH3_SG_FAILURE", last)
+                self.assertIn("MONITOR_VIEWER_EXIT path=path3 exit=7", last)
+                self.assertEqual(tmux(
+                    "display-message", "-p", "-t", "plasma-monitor:1",
+                    "#{pane_id}").stdout.strip(), original)
+                windows = tmux("list-windows", "-t", "plasma-monitor",
+                               "-F", "#{window_index}:#{window_name}").stdout
+                self.assertIn("1:path2", windows)
+                self.assertIn("2:path3", windows)
+            finally:
+                if started:
+                    tmux("kill-server", check=False)
+
     def test_one_shared_workflow_and_two_paths(self):
         workflow = WORKFLOW.read_text()
         self.assertIn("plasma_engineering_monitor.py run path2 --", workflow)
