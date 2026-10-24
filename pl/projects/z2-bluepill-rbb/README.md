@@ -1,7 +1,13 @@
 # Blue Pill OpenOCD remote-bitbang → Z2 AXI / PMODB (Gate 1 Path 1)
 
-**Status: independent Draft source-only candidate.** No BIT/HWH has been
-built by this PR; no Vivado, FPGA load, physical target, SWD or Flash HIL PASS.
+**Status: independent Draft offline-image candidate.** The owner-approved
+SWPC Path 3 Vivado 2026.1 offline build on source HEAD
+`6feaa8842f0a92e34030e281f4455a9447fe46b2` passed on Run
+[#40087670192](https://github.com/physicslu/plasma/actions/runs/40087670192),
+producing BIT/HWH/BIN with independently checked SHA256 and internal 100 MHz
+timing. This is historical evidence for **that exact source revision** only.
+A source change requires a fresh build and new artifact identities.
+No FPGA load, physical target, SWD or Flash HIL PASS exists.
 This branch starts from main `0c1cf9b434b96d7ade530e31344196cb8b86437e`
 and selectively reuses only the direct SWD bridge, OpenOCD source
 build, RTL, protocol tests and low-level configuration from Draft PR #1126.
@@ -44,13 +50,23 @@ fixed PPU production ABI.
 
 - Board: `xc7z020clg400-1`, pinned PYNQ-Z2 board files SHA
   `e02d6a3866b5465218f777168cdc51344ac94e07`.
-- PS7: actual board preset, PS clock 50 MHz, FCLK0 100 MHz, GP0 only.
+- PS7: board preset crystal 50 MHz, FCLK0 100 MHz, M_AXI_GP0_ACLK on
+  FCLK0 and PS7 `PCW_M_AXI_GP0_FREQMHZ=100`, GP0 only. The first
+  offline build's HWH had 10 MHz GP0 parameter metadata despite a routed
+  100 MHz ACLK; the reviewed source now rejects that mismatch. A new
+  Vivado build must verify the corrected HWH before this revision is admissible.
 - Candidate AXI: `swd_0`, base `0x40008000`, 4 KiB;
   `0x00` ID/RO, `0x04` ABI/RO, `0x08` DRIVE/WO,
   `0x0C` SAMPLE/RO. Mapping must be checked against the **built HWH**.
 - JB[0] W14 = SWCLK driven low after AXI reset; JB[1] Y14 = SWDIO
   via genuine IOBUF, where T=NOT(OE), Hi-Z on AXI reset.
   **NRST is absent and must not be assumed connected.**
+- The first offline timing report has three TIMING-18 methodology warnings:
+  missing external SWDIO input delay and SWCLK/SWDIO output delays. Internal
+  100 MHz timing PASS does not qualify external SWD edges or turnaround.
+  Do not invent timing exceptions, virtual clocks or board delay values to
+  silence warnings; qualify external edge timing and target setup/turnaround
+  when the physical target/wiring is actually measured.
 - XDC is LVCMOS33 only. No voltage sensing, target power, level shifting,
   isolation, contention measurement or automatic power-off; never infer
   target safety from nominal 3.3V labels.
@@ -97,9 +113,10 @@ This source-only PR never runs recovery or changes FPGA configuration.
 ### Evidence separation
 
 - Host source/python/RTL tests = eligible for GitHub-hosted PASS.
-- Vivado synth/impl/timing, generated BIT/HWH, ARMv7 actual store
-  width and PS7→PL transactions = **NOT_RUN / pending artifacts**.
-- SWPC, Z2 target voltage, LA SWCLK/SWDIO, target DPIDR, Flash
+- Vivado synth/impl/timing, BIT/HWH/BIN = **historical offline PASS at
+  exact source 6feaa884**; revised GP0-clock-metadata source build PENDING.
+  ARMv7 actual store width and PS7→PL transactions = **NOT_RUN**.
+- SWPC offline Build = **historical PASS**; Z2 target voltage, LA SWCLK/SWDIO, target DPIDR, Flash
   Erase/Program/Readback Verify, CDC post-flash = **NOT_RUN**.
 - Until all required real hardware and restoration evidence exists,
   Gate 2 readiness is **NO-GO**, the default runtime remains off, and
