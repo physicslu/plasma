@@ -586,6 +586,40 @@ class EngineeringMonitorTests(unittest.TestCase):
         self.assertIsNone(activity.parse_public_line(
             activity.PREFIX + json.dumps(raw)))
 
+    def test_observed_activity_rejects_forged_kind_and_exit_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            source = activity.Path3Activity(Path(td))
+            raw_command = source.project({
+                "type": "item.started",
+                "item": {"id": "cmd", "type": "command_execution",
+                         "command": "rg -n phrase scripts"}})
+            good = json.loads(raw_command.decode().split(" ", 1)[1])
+            self.assertEqual(good["kind"], "READ")
+            self.assertIsNotNone(activity.parse_public_line(
+                raw_command.decode().strip()))
+            for changes in (
+                {"kind": "BUILD"},
+                {"state": "DONE", "exit_code": None},
+                {"state": "FAIL", "exit_code": None},
+                {"detail": "git status", "kind": "READ"},
+            ):
+                with self.subTest(changes=changes):
+                    forged = dict(good, **changes)
+                    self.assertIsNone(activity.parse_public_line(
+                        activity.PREFIX + json.dumps(forged)))
+            file_item = {
+                "id": "file", "type": "file_change",
+                "changes": [{"kind": "update",
+                             "path": "scripts/plasma_engineering_activity.py"}]}
+            file_done = source.project({
+                "type": "item.started", "item": file_item})
+            self.assertTrue(file_done)
+            completed = source.project({
+                "type": "item.completed", "item": file_item})
+            self.assertEqual(
+                activity.parse_public_line(completed.decode().strip())["state"],
+                "DONE")
+
     def test_last_failure_survives_later_completed_commands(self):
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)
