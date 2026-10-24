@@ -24,24 +24,25 @@ fi
 
 # Each viewer switches group INSIDE its tmux pane, even if the tmux server was
 # created before the operator joined plasma-monitor.
-# Do not make sg/Python the pane's final process. If either exits during
-# startup, tmux otherwise removes the window before the layout check and
-# reports "can't find window: 2", hiding the actual failure. Keep an
-# operator-owned shell with a visible exit code instead. No automatic retries.
-viewer_command() {
+# Explicitly pass bash -c plus its script as separate tmux arguments.
+# A single quoted shell-command makes tmux add its own shell parser and can
+# close the window before the layout check if that launcher exits. Do not
+# make sg/Python the pane's final process: on failure keep a diagnostic shell
+# with the viewer exit code. No automatic retries or global tmux changes.
+viewer_script() {
   local inner grouped_command launcher
   printf -v inner 'exec python3 -u %q view %s' "$viewer" "$1"
   printf -v grouped_command 'sg %q -c %q' "$group" "$inner"
-  printf -v launcher '%s; rc=$?; printf "MONITOR_VIEWER_EXIT path=%s exit=%%s\\n" "$rc" >&2; exec bash' "$grouped_command" "$1"
-  printf 'bash -c %q' "$launcher"
+  printf -v launcher '%s; rc=$?; printf "MONITOR_VIEWER_EXIT path=%s exit=%%s\\n" "$rc" >&2; exec bash -i' "$grouped_command" "$1"
+  printf '%s' "$launcher"
 }
 
 # Owned by the logged-in operator. Never change global tmux settings or
 # touch another session. Force 1/2 even when the operator's base-index is 0.
 # Retain existing viewers and their monitor state when migrating overview.
 if ! tmux has-session -t "=$session" 2>/dev/null; then
-  left="$(viewer_command path2)"
-  tmux new-session -d -s "$session" -n path2 -c "$repo" "$left"
+  left="$(viewer_script path2)"
+  tmux new-session -d -s "$session" -n path2 -c "$repo" bash -c "$left"
 fi
 
 windows="$(tmux list-windows -t "=$session" -F '#{window_name}' | paste -sd ' ' -)"
@@ -79,8 +80,8 @@ if [ "$path2_panes" -ne 1 ]; then
 fi
 
 if ! tmux display-message -p -t "$session:path3" '#{window_index}' >/dev/null 2>&1; then
-  right="$(viewer_command path3)"
-  tmux new-window -d -t "$session:2" -n path3 -c "$repo" "$right"
+  right="$(viewer_script path3)"
+  tmux new-window -d -t "$session:2" -n path3 -c "$repo" bash -c "$right"
 fi
 
 path3_index="$(tmux display-message -p -t "$session:path3" '#{window_index}')"
