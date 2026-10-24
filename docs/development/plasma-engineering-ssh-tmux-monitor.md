@@ -28,8 +28,12 @@ running on that path. When a task runs the pane shows its Run ID, task ID,
 elapsed time, and recent output. When it finishes, the pane returns to IDLE
 and retains LAST: PASS or LAST: FAIL and process exit code.
 
-Both panes use the same operator layout: status, Run, Task, PR, GOAL,
-the active-stage category (when applicable), elapsed time or
+Both panes use the same compact operator layout: `STATUS` and `RUN` on
+one row; `TASK` and optional `PR` on one row; `GOAL` and `NOW`,
+a single `DOING` activity row and `RECENT ACTIVITY`. PATH 2 currently
+has only legacy heartbeats/Stage labels; PATH 3 can display filtered Codex
+command/file activities. The active-stage category (when applicable),
+elapsed time or
 LAST/EXIT, SWPC host-local NOW (`YYYY-MM-DD HH:MM` without the ISO `T`
 separator or numeric UTC offset), and recent output. The input clock remains
 timezone-aware internally and changes the visible minute only once per minute. Rows are clipped
@@ -95,10 +99,28 @@ The wrapper updates status to RUNNING and records an active process.
 Path 2 sends a periodic heartbeat; detailed subprocess output remains
 governed by task/build evidence policy. Path 3 uses `codex exec --json`.
 Its persisted `.plasma-path3-evidence/codex.log` remains **event type
-names only**; the transient operator observer log additionally identifies
-fixed allowlisted item category / lifecycle labels. JSON event bodies
-(including commands, prompt content, model text and potential credentials)
-and unstructured stderr are not copied into these logs. The dispatcher
+names only**. The transient operator observer log additionally contains
+`@PLASMA_ACTIVITY_V1` records for recognized, well-ordered Codex
+`command_execution` and `file_change` item events. Only strictly
+allowlisted whole commands (selected Python tests and read-only Git status
+commands), validated repository-relative file names, their reported
+lifecycle states, and (for completed commands only) the Codex-reported
+integer exit code may be shown. The exit code is **observed**, not a trusted
+Runner or test Receipt. Unapproved commands become
+`(command hidden)`; unsafe file names become `(file paths hidden)`.
+Neither raw JSON bodies nor stderr, prompts, tool arguments, model text,
+source code or execution output are copied into these logs.
+
+The `[C]` marker means observed **Codex JSON event**, NOT independently
+verified execution evidence or a trusted testing receipt. `[V]` is
+reserved for a future verified-Receipt adapter and is not emitted by
+Phase A. An `item.started` without a matching completed event is never
+shown as a verified success. Unknown fields, missing IDs, duplicate start
+and out-of-order completion fail closed. The activity collector tracks at
+most 64 unfinished items; any further orphaned starts are ignored until
+capacity becomes available. The Viewer drops replayed/decreasing sequence
+numbers and never prints malformed structured records verbatim. No command text is executed by
+this projection or taken as approval for hardware work. The dispatcher
 extracts only `thread.started.thread_id` as the Codex Session ID and the
 non-negative token counters from `turn.completed.usage` into
 `.plasma-path3-evidence/codex-token-usage.json` and the hashed JSON receipt:
