@@ -34,8 +34,10 @@ LAST/EXIT, local timezone-aware NOW and recent output. Rows are clipped
 by display **cells** (CJK full-width characters consume two cells),
 not by Python character count. The content uses at most 100 display columns
 and reserves the terminal's last physical column to avoid autowrap;
-smaller terminals clip rather than wrap. This affects only the viewer,
-not stored monitor files, Source, Work Order or Evidence.
+smaller terminals clip rather than wrap. On short panes the viewer
+omits decorative separators or the secondary detach hint before losing
+the latest log row. This affects only the viewer, not stored monitor files,
+Source, Work Order or Evidence.
 
 PATH 2 additionally shows `STAGE`: a fixed label from the already-authorized
 execution capability: `CPU-only CLI`, `Native preflight`,
