@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
+import sys
 import unittest
 
-from plasma_web.stm32f103_low_density_candidate import (
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts" / "ci"))
+from stm32f103_low_density_candidate import (
     ROOT, EXPECTED, EXCLUDED, LowDensityEvidenceError,
     audit_candidate, load_snapshot, verify_snapshot,
 )
