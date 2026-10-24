@@ -135,7 +135,7 @@ def test_image_bundle_actual_bytes_must_match(bad_blob):
     ("consumers_quiesced", False, "OWNER_ISOLATION_OR_RECOVERY_UNPROVEN"),
     ("axi_isolation_proved", False, "OWNER_ISOLATION_OR_RECOVERY_UNPROVEN"),
     ("rollback_available", False, "OWNER_ISOLATION_OR_RECOVERY_UNPROVEN"),
-    ("pmod_disconnected", False, "OWNER_ISOLATION_OR_RECOVERY_UNPROVEN"),
+    ("external_io_isolated", False, "OWNER_ISOLATION_OR_RECOVERY_UNPROVEN"),
     ("active_image_attested", False, "OWNER_ISOLATION_OR_RECOVERY_UNPROVEN"),
 ])
 def test_all_preconditions_fail_closed(key, value, reason):
