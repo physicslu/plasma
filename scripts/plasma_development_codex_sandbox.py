@@ -13,6 +13,7 @@ from pathlib import Path
 import pwd
 import re
 import shutil
+import stat
 
 
 class CodexSandboxDenied(ValueError):
@@ -94,7 +95,26 @@ def codex_command(
         argv += ["--dev-bind", str(node), "/dev/" + node.name]
 
     argv += ["--bind", str(workspace), str(workspace)]
-    # Preserve only Codex's API login; hide unrelated private credential dirs.
+    # Keep only the enrolled Z2 login sources visible, read-only. Do not expose
+    # the whole SSH directory, agent socket or unrelated Plasma credentials.
+    plasma = home / ".config/plasma"
+    z2_sources = []
+    if plasma.exists() or plasma.is_symlink():
+        meta = plasma.lstat()
+        require(stat.S_ISDIR(meta.st_mode) and meta.st_uid == os.geteuid()
+                and stat.S_IMODE(meta.st_mode) == 0o700,
+                "CODEX_SANDBOX_Z2_DIRECTORY_DENIED")
+        for name in ("z2-dev-credentials.json", "z2-login-smoke.json",
+                     "z2-login-known_hosts"):
+            source = plasma / name
+            if not source.exists() and not source.is_symlink():
+                continue
+            meta = source.lstat()
+            require(stat.S_ISREG(meta.st_mode) and meta.st_uid == os.geteuid()
+                    and stat.S_IMODE(meta.st_mode) == 0o600,
+                    "CODEX_SANDBOX_Z2_SOURCE_DENIED")
+            z2_sources.append(source)
+    # Hide private directories before restoring the selected file mounts.
     for name in (".ssh", ".aws", ".gnupg", ".kube", ".config/plasma",
                  ".config/gh"):
         private = home / name
@@ -102,6 +122,8 @@ def codex_command(
             require(private.is_dir() and not private.is_symlink(),
                     "CODEX_SANDBOX_PRIVATE_PATH_DENIED")
             argv += ["--tmpfs", str(private)]
+    for source in z2_sources:
+        argv += ["--ro-bind", str(source), str(source)]
     argv += ["--bind", str(auth), str(auth)]
     for key in ("GH_TOKEN", "GITHUB_TOKEN", "GITHUB_PAT", "SSH_AUTH_SOCK",
                 "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
