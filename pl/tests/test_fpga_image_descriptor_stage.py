@@ -271,6 +271,8 @@ def test_real_historical_image_descriptor_is_not_runtime_admitted():
 @pytest.mark.parametrize("field,value,reason", [
     ("site_count", 9, "IMAGE_DESCRIPTOR_IDENTITY_INVALID"),
     ("runtime_admitted", True, "IMAGE_DESCRIPTOR_PROVENANCE_INVALID"),
+    ("external_io_timing", "QUALIFIED", "IMAGE_DESCRIPTOR_EXTERNAL_IO_UNQUALIFIED"),
+    ("external_io_timing", "", "IMAGE_DESCRIPTOR_EXTERNAL_IO_UNQUALIFIED"),
     ("axi_base", 0x40008001, "IMAGE_DESCRIPTOR_AXI_INVALID"),
     ("axi_bytes", 0, "IMAGE_DESCRIPTOR_AXI_INVALID"),
     ("fclk_hz", 0, "IMAGE_DESCRIPTOR_AXI_INVALID"),
