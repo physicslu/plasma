@@ -188,8 +188,20 @@ def test_one_shot_owner_private_socket_and_cleanup(tmp_path):
     while not path.exists() and time.monotonic() < deadline:
         time.sleep(0.01)
     assert path.is_socket()
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as cli:
-        cli.connect(str(path))
+    # A bound UNIX socket path can exist before the server calls listen().
+    # Retry ONLY the short readiness race; other connection failures must fail.
+    # Use a fresh socket for every attempt after a refused connect.
+    while True:
+        cli = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            cli.connect(str(path))
+            break
+        except ConnectionRefusedError:
+            cli.close()
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
+    with cli:
         cli.settimeout(2)
         cli.sendall(b"Odc")
         assert cli.recv(1) == b"1"
