@@ -379,7 +379,9 @@ def render_snapshot(directory: Path, path: str, *,
     if height is not None:
         # Preserve at least one latest log row plus a spare bottom row.
         # Sacrifice decoration before truncating trusted status/goal/stage.
-        for decoration in ("-" * 35, "", "      %s D Detach" % prefix):
+        for decoration in (
+                "-" * 35, "", "      %s D Detach" % prefix,
+                "KEYS: C Clear | %s 1/2 Switch" % prefix):
             if height > len(lines) + 1:
                 break
             if decoration in lines:
