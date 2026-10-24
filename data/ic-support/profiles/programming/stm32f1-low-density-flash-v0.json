@@ -17,10 +17,6 @@
         "2.3 Main Flash memory programming",
         "2.3 Main Flash memory erase"
       ]
-    },
-    {
-      "source_id": "openocd-0.12.0-stm32f1-source-lock-v1",
-      "flash_driver": "stm32f1x"
     }
   ],
   "data": {
@@ -58,5 +54,6 @@
     "software_state": "UNKNOWN",
     "physical_programming_qualified": false,
     "runtime_execution_authorized": false
-  }
+  },
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1"
 }
