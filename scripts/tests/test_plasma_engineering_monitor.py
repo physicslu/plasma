@@ -398,6 +398,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                 "python3 -m pytest /home/plasma-codex",
                 "git status\nINJECTED", "git status \x1b[2J",
                 "python3 -m pytest scripts/tests/ --token=abc",
+                "python3 scripts/tests/test_secret_token.py",
                 "git status \u202ePRIVATE",
             ]
             for command in commands:
@@ -501,6 +502,17 @@ class EngineeringMonitorTests(unittest.TestCase):
             finally:
                 if started:
                     tmux("kill-server", check=False)
+
+    def test_malformed_activity_record_never_echoes_untrusted_raw_text(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            bad = activity.PREFIX + '{"secret":"DO_NOT_SHOW","kind":[]}'
+            (directory / "path3.log").write_text(
+                "[codex turn.started]\n" + bad + "\n")
+            frame = mon.render_snapshot(directory, "path3")
+            self.assertNotIn("DO_NOT_SHOW", frame)
+            self.assertNotIn(activity.PREFIX, frame)
+            self.assertIn("[codex turn.started]", frame)
 
     def test_activity_is_observer_only_evidence_keeps_type_names(self):
         with tempfile.TemporaryDirectory() as td:
