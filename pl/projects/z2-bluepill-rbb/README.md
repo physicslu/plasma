@@ -121,3 +121,28 @@ This source-only PR never runs recovery or changes FPGA configuration.
 - Until all required real hardware and restoration evidence exists,
   Gate 2 readiness is **NO-GO**, the default runtime remains off, and
   this Draft must never be merged or deployed as qualified production SWD.
+
+## 2026-10-24 SWPC clock propagation diagnosis (Run #40089418642)
+
+[Run #40089418642](https://github.com/physicslu/plasma/actions/runs/40089418642)
+completed its dispatcher / Codex process, but its **exact input source SHA
+`37a5c112e862ff99fb307f1061330597628d4bbe` was FAIL / NO-GO**:
+Vivado `BD 41-737` rejected writing read-only PS7
+`PCW_M_AXI_GP0_FREQMHZ` as a user value; synthesis was NOT_RUN for that exact
+source.
+
+The isolated, **uncommitted repair snapshot** used
+`CONFIG.PCW_M_AXI_GP0_FREQMHZ.VALUE_SRC PROPAGATED` before
+`validate_bd_design` and then asserted the derived value was 100 MHz.
+Real isolated Vivado Synthesis / Implementation / BIT-HWH / Bootgen BIN passed.
+That HWH reported both FCLK0 and M_AXI_GP0_ACLK at 100000000 Hz; internal
+WNS +3.070 ns, WHS +0.072 ns, blocking DRC 0. The generated revised-snapshot
+BIT/HWH/BIN are bound by the Run's artifact manifest, **not** admitted as
+bitstreams built from any subsequently committed source SHA.
+
+The repaired Tcl and source tests were then committed to this Draft. A new
+SWPC image build against the precise resulting PR HEAD is still required for
+formal image-source binding. Three `TIMING-18` external SWD timing warnings
+remain **NOT_QUALIFIED**: without measured board/target timing, no guessed
+I/O delays or false-path exceptions may be introduced. Z2 FPGA load,
+protected Restore, PMODB connection, Blue Pill DPIDR and Flash stay NOT_RUN.
