@@ -60,7 +60,7 @@ already consumed that activation and failed. Merely merging this PR must
 the repo as historical provenance logic, but **no active Workflow calls it**.
 
 The fixed SW task uses the **same explicit Issue comment admission pattern**
-as the existing Z2 and LA workflows:
+as the retained LA workflow (the old Z2 SWD-05 owner command is retired):
 
 1. After an independent Gate 2 merge, the sole trusted owner
    `physicslu` may make a **separate** deliberate `created` comment,
