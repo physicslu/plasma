@@ -371,8 +371,10 @@ def render_snapshot(directory: Path, path: str, *,
         clock = dt.datetime.now().astimezone() if now is None else now
         if clock.tzinfo is None or clock.utcoffset() is None:
             raise ValueError("status clock requires a timezone-aware timestamp")
-        # Minute precision keeps the fixed clock legible without 1 Hz redraw.
-        lines.append("NOW: " + clock.isoformat(timespec="minutes"))
+        # Show the SWPC host-local wall clock. Do not render ISO's "T"
+        # separator or UTC offset; keep minute cadence and timestamp inputs
+        # timezone-aware. Evidence and monitor time marks are unchanged.
+        lines.append("NOW: " + clock.strftime("%Y-%m-%d %H:%M"))
     lines.extend(["", "RECENT OUTPUT", "-" * 35])
     if height is not None:
         # Preserve at least one latest log row plus a spare bottom row.
