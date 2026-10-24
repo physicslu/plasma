@@ -90,7 +90,7 @@ class ImageDescriptor:
              "schema", "project", "purpose", "site_count", "board",
              "axi_base", "axi_bytes", "fclk_hz", "pin_map",
              "read_only_identity", "offline_image",
-             "recovery_sha256", "runtime_admitted", "external_swd_timing"},
+             "recovery_sha256", "runtime_admitted", "external_io_timing"},
              "IMAGE_DESCRIPTOR_SCHEMA_INVALID")
         need(type(raw["offline_image"]) is dict and
              set(raw["offline_image"]) == {
@@ -107,7 +107,8 @@ class ImageDescriptor:
         im = raw["offline_image"]
         need(type(im["github_run_id"]) is int and im["github_run_id"] > 0 and
              type(im["github_artifact_id"]) is int and im["github_artifact_id"] > 0
-             and im["evidence"] == "SWPC_VIVADO_2026_1_OFFLINE_ONLY",
+             and type(im["evidence"]) is str and
+             re.fullmatch(r"[A-Z0-9_]{8,80}", im["evidence"]) is not None,
              "IMAGE_DESCRIPTOR_PROVENANCE_INVALID")
         obj = cls(
             schema=raw["schema"], project=raw["project"],
@@ -297,7 +298,7 @@ class Observed:
     consumers_quiesced: bool
     axi_isolation_proved: bool
     rollback_available: bool
-    pmod_disconnected: bool
+    external_io_isolated: bool
     active_image_attested: bool
 
 
@@ -339,7 +340,7 @@ def _observe(lock: ImageLock, facts: Observed) -> None:
     need(all(type(x) is bool and x for x in (
          facts.source_manifest_verified, facts.exclusive_fpga_owner,
          facts.consumers_quiesced, facts.axi_isolation_proved,
-         facts.rollback_available, facts.pmod_disconnected,
+         facts.rollback_available, facts.external_io_isolated,
          facts.active_image_attested)), "OWNER_ISOLATION_OR_RECOVERY_UNPROVEN")
 
 
