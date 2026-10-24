@@ -26,7 +26,6 @@ COMMANDS = (
     (re.compile(r"git status(?: --short| --porcelain)?\Z"), "COMMAND"),
     (re.compile(r"git diff --check\Z"), "COMMAND"),
 )
-)
 # Classifications expose only a fixed label; no shell arguments or paths.
 # These describe Codex-reported commands, not verified execution receipts.
 SEMANTIC_COMMANDS = (
