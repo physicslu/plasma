@@ -490,7 +490,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_microchip_phase1_identity_rejected_from_job_batch_target(self) -> None:
         catalog = get_default_device_catalog()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
-        self.assertEqual(len(rows), 1015)
+        self.assertEqual(len(rows), 1907)
         for row in rows:
             with self.subTest(icpn=row.identifier):
                 with self.assertRaisesRegex(ValueError, "no executable programming mapping"):
@@ -580,7 +580,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(q["execution_authorized"])
                 self.assertFalse(q["physical_programming_qualified"])
         # Verify actual customer-facing gateway and L2 isolation for a bounded
-        # sample. Job rejection of all 1015 Microchip codes is a separate test.
+        # sample. Job rejection of all 1907 Microchip codes is a separate test.
         for code in (rows[0].identifier, rows[len(rows) // 2].identifier,
                      rows[-1].identifier):
             status, payload = self.request(
@@ -594,6 +594,42 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 f"/api/devices/search?q={quote(code, safe='')}&levels=2&limit=100")
             self.assertEqual(status, 200)
             self.assertEqual(l2["total_count"], 0)
+
+    def test_microchip_sam_phase2_892_exact_customer_selector_without_job_permission(self) -> None:
+        catalog = get_default_device_catalog()
+        registry = get_default_programming_qualification_registry()
+        rows = [r for r in catalog.records
+                if r.vendor == "Microchip" and r.family in {"SAMDCRL0", "SAMD5E5"}]
+        self.assertEqual(len(rows), 892)
+        for record in rows:
+            with self.subTest(icpn=record.identifier):
+                self.assertEqual(record.mapping_status, "no_mapping")
+                self.assertFalse(record.target_config)
+                q = registry.describe(record.vendor, record.identifier)
+                self.assertEqual(q["catalog_level"], 1)
+                self.assertEqual(q["state"], "CANDIDATE")
+                self.assertTrue(q["selector_visible"])
+                self.assertFalse(q["job_selectable"])
+                self.assertFalse(q["execution_authorized"])
+        for family in ("SAMDCRL0", "SAMD5E5"):
+            group = [r for r in rows if r.family == family]
+            for record in (group[0], group[len(group) // 2], group[-1]):
+                encoded = quote(record.identifier, safe="")
+                status, payload = self.request(
+                    f"/api/devices/search?q={encoded}&limit=100")
+                self.assertEqual(status, 200, payload)
+                matches = [x for x in payload["results"] if x["icpn"] == record.identifier]
+                self.assertEqual(len(matches), 1)
+                self.assertEqual(matches[0]["catalog_level"], 1)
+                self.assertFalse(matches[0]["job_selectable"])
+                info = matches[0]["microchip_ic_information"]
+                self.assertEqual(info["field_states"]["pin_count"], "UNKNOWN")
+                self.assertEqual(info["field_states"]["flash"], "UNKNOWN")
+                self.assertEqual(info["software_supported"], False)
+                status, l2_only = self.request(
+                    f"/api/devices/search?q={encoded}&levels=2&limit=100")
+                self.assertEqual(status, 200)
+                self.assertEqual(l2_only["total_count"], 0)
 
     def test_customer_selector_filters_l1_and_l2_server_side(self) -> None:
         status, l1 = self.request("/api/devices/search?q=STM32F103T8U6&levels=1&limit=5")
