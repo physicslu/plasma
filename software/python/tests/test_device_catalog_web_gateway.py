@@ -160,12 +160,12 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             64,
         )
 
-    def test_same_medium_density_base_with_unreviewed_bga_package_remains_unknown(self) -> None:
-        status, payload = self.request("/api/devices/search?q=STM32F103V8H6&limit=1")
+    def test_unreviewed_vfqfpn36_source_mismatch_remains_unknown(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103T8U6&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
-        self.assertEqual(result["icpn"], "STM32F103V8H6")
+        self.assertEqual(result["icpn"], "STM32F103T8U6")
         self.assertEqual(result["backend"]["mapping_status"], "mapped")
         qualification = result["programming_qualification"]
         self.assertEqual(qualification["state"], "UNKNOWN")
@@ -596,17 +596,17 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             self.assertEqual(l2["total_count"], 0)
 
     def test_customer_selector_filters_l1_and_l2_server_side(self) -> None:
-        status, l1 = self.request("/api/devices/search?q=STM32F103V8H6&levels=1&limit=5")
+        status, l1 = self.request("/api/devices/search?q=STM32F103T8U6&levels=1&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(l1["levels"], [1])
         self.assertGreaterEqual(l1["count"], 1)
-        self.assertEqual(l1["results"][0]["icpn"], "STM32F103V8H6")
+        self.assertEqual(l1["results"][0]["icpn"], "STM32F103T8U6")
         self.assertEqual(l1["results"][0]["catalog_level"], 1)
         self.assertEqual(l1["results"][0]["catalog_level_state"], "PROGRAMMING_CANDIDATE")
         self.assertFalse(l1["results"][0]["job_selectable"])
         self.assertTrue(l1["results"][0]["programming_qualification"]["selector_visible"])
 
-        status, l1_as_l2 = self.request("/api/devices/search?q=STM32F103V8H6&levels=2&limit=5")
+        status, l1_as_l2 = self.request("/api/devices/search?q=STM32F103T8U6&levels=2&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(l1_as_l2["count"], 0)
         self.assertEqual(l1_as_l2["total_count"], 0)
