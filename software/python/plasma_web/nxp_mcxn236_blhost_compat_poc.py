@@ -100,7 +100,7 @@ def _checked_range(start: int, length: int) -> None:
 
 def plan_mock_operation(operation: str, start: int, length: int) -> MockPlan:
     """Conservative *mock-only* planning; cannot be dispatched to a real blhost CLI."""
-    _require(operation in {"erase", "program", "read", "verify"}, "forbidden operation")
+    _require(isinstance(operation, str) and operation in {"erase", "program", "read", "verify"}, "forbidden operation")
     _checked_range(start, length)
     if operation == "erase":
         _require(start % ERASE_SECTOR_BYTES == 0
@@ -149,3 +149,23 @@ def qualification_gap() -> dict[str, Any]:
         "installed_runtime_attested": False,
         "physical_programming_qualified": False,
     }
+
+
+class InMemoryMockTransport:
+    """Scripted no-I/O transport; there is no serial, USB, subprocess or runtime hook."""
+
+    def __init__(self, replies: tuple[dict[str, Any], ...]) -> None:
+        _require(type(replies) is tuple, "mock replies must be an immutable tuple")
+        self._replies = replies
+        self._offset = 0
+        self.sent: list[MockPlan] = []
+
+    def exchange(self, plan: MockPlan) -> None:
+        _require(type(plan) is MockPlan and plan.mock_only is True,
+                 "only immutable mock plans may be exchanged")
+        _require(self._offset < len(self._replies), "mock transport timeout / missing reply")
+        # The scripted reply is consumed once. A failure is not automatically retried.
+        reply = self._replies[self._offset]
+        self._offset += 1
+        self.sent.append(plan)
+        validate_mock_reply(plan.operation, reply)
