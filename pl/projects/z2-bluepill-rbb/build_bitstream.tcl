@@ -29,7 +29,16 @@ set report_dir [file join $pl_dir build z2-bluepill-rbb reports]
 file mkdir $report_dir
 report_timing_summary -file [file join $report_dir timing_summary.rpt]
 report_drc -file [file join $report_dir drc.rpt]
+report_methodology -file [file join $report_dir methodology.rpt]
+check_timing -verbose -file [file join $report_dir check_timing.rpt]
 report_utilization -file [file join $report_dir utilization.rpt]
+# A report file is not DRC acceptance: fail before artifact emission when
+# any implementation DRC error or critical warning remains.
+foreach violation [get_drc_violations -quiet] {
+    if {[get_property SEVERITY $violation] in {Error {Critical Warning}}} {
+        error "BLUEPILL_Z2_BLOCKING_DRC: $violation"
+    }
+}
 
 # The output is NEVER considered acceptable unless the implemented BIT and
 # exported HWH BOTH exist and the hardware handoff matches our exact PS7,
