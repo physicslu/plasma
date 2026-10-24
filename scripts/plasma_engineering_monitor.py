@@ -594,6 +594,14 @@ def render_snapshot(directory: Path, path: str, *,
                 lines.remove("")
             elif "-" * 35 in lines:
                 lines.remove("-" * 35)
+            elif any(line.startswith("RECEIPT:") for line in lines):
+                # Keep the fixed denial hint and the newest activity on short panes.
+                clock_index = next((i for i, line in enumerate(lines)
+                                    if line.startswith("NOW:")), None)
+                if clock_index is not None:
+                    lines.pop(clock_index)
+                else:
+                    break
             elif any(line.startswith("LAST ERROR:") for line in lines):
                 # Prefer the observed failure + recent output to a clock line.
                 clock_index = next((i for i, line in enumerate(lines)
