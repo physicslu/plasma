@@ -40,9 +40,9 @@ class STM32F103LowDensityCandidateGate1Test(unittest.TestCase):
         registry = get_default_openocd_software_qualification_registry()
         self.assertEqual(len(registry.supported_exact_icpns("STMicroelectronics")), 77)
         for row in self.original["app"]["records"]:
-            self.assertEqual(registry.state("STMicroelectronics", row["icpn"]), "UNKNOWN")
+            self.assertEqual(registry.state_for("STMicroelectronics", row["icpn"]), "UNKNOWN")
         for icpn in EXCLUDED:
-            self.assertEqual(registry.state("STMicroelectronics", icpn), "UNKNOWN")
+            self.assertEqual(registry.state_for("STMicroelectronics", icpn), "UNKNOWN")
 
     def test_source_hash_unavailable_must_fail_closed(self):
         self.mutated(["source", "evidence", "official_datasheet"], "original_bytes_attested", True)
