@@ -216,6 +216,7 @@ jobs:
       execution_path: ${{ steps.approve.outputs.execution_path }}
       execution_capability: ${{ steps.approve.outputs.execution_capability }}
       task_id: ${{ steps.approve.outputs.task_id }}
+      monitor_summary: ${{ steps.approve.outputs.monitor_summary }}
       comment_id: ${{ steps.approve.outputs.comment_id }}
       claim_ref: ${{ steps.approve.outputs.claim_ref }}
       work_order_sha256: ${{ steps.approve.outputs.work_order_sha256 }}
@@ -288,7 +289,8 @@ jobs:
               for k in ("pinned_sha","trusted_sha","pr_number",
                         "registry_sha256","execution_path","execution_capability","task_id"):
                   f.write(f"{k}={data[k]}\n")
-              for k in ("comment_id","claim_ref","work_order_sha256","session_resume"):
+              for k in ("comment_id","claim_ref","work_order_sha256","session_resume",
+                        "monitor_summary"):
                   f.write(f"{k}={data.get(k,'')}\n")
               # Pass only the minimal, already-verified PR identity snapshot.
               # No second PR API client or runner is required on SWPC.
@@ -565,6 +567,7 @@ jobs:
         shell: bash
         env:
           PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
+          PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}
           GH_TOKEN: ${{ github.token }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
@@ -736,6 +739,7 @@ jobs:
         shell: bash
         env:
           PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
+          PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}
           GH_TOKEN: ${{ github.token }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
