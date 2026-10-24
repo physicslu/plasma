@@ -255,7 +255,7 @@ def test_real_historical_image_descriptor_is_not_runtime_admitted():
     assert historic.hwh_sha256 == (
         "84894ae5791a65ec16bd6146779faec4496d47833fd0ad294149d5c46571b510")
     assert historic.bin_sha256 == (
-        "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6b927d6c779e13fe9ec1a1")
+        "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1")
     assert historic.recovery_sha256 is None
     assert historic.runtime_admitted is False
     assert historic.site_count == 1
