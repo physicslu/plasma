@@ -860,7 +860,8 @@ if op in ("new-session", "new-window"):
                 result = tmux("list-windows", "-t", "test-monitor",
                               "-F", "#{window_index}:#{window_name}")
                 self.assertIn("2:path3", result.stdout)
-                self.assertIn("1:path2", result.stdout)
+                # Private tmux inherits its own base-index (0 or 1).
+                self.assertRegex(result.stdout, r"(?m)^[01]:path2$")
             finally:
                 if started:
                     tmux("kill-server", check=False)
