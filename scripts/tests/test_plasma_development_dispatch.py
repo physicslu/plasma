@@ -844,6 +844,34 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertNotIn(b'X', safe)
         self.assertIsNone(collector.snapshot()["input_tokens"])
 
+    def test_codex_monitor_category_allowlist_preserves_evidence_bytes(self):
+        events = [
+            {"type": "item.started", "item": {
+                "type": "command_execution", "command": "TOP_SECRET"}},
+            {"type": "item.updated", "item": {
+                "type": "agent_message", "text": "PRIVATE_MESSAGE"}},
+            {"type": "item.completed", "item": {
+                "type": "file_change", "changes": "PRIVATE_DIFF"}},
+            {"type": "item.started", "item": {
+                "type": "custom_EXFILTRATE", "command": "TOP_SECRET"}},
+            {"type": "item.started", "item": {
+                "type": "command_execution\nINJECTED", "command": "TOP_SECRET"}},
+        ]
+        stream = (b"\n".join(json.dumps(e).encode() for e in events) + b"\n")
+        evidence = dev.CodexUsageCollector()
+        monitor = dev.CodexUsageCollector(monitor_only=True)
+        recorded = evidence.feed(stream) + evidence.finish()
+        visible = monitor.feed(stream[:11]) + monitor.feed(stream[11:]) + monitor.finish()
+        self.assertIn(b"[codex item.started]", recorded)
+        self.assertNotIn(b"command_execution", recorded)
+        self.assertIn(b"[codex command_execution.started]", visible)
+        self.assertIn(b"[codex agent_message.updated]", visible)
+        self.assertIn(b"[codex file_change.completed]", visible)
+        self.assertIn(b"[codex item.started]", visible)
+        for secret in (b"TOP_SECRET", b"PRIVATE_MESSAGE", b"PRIVATE_DIFF",
+                       b"custom_EXFILTRATE", b"INJECTED"):
+            self.assertNotIn(secret, visible + recorded)
+
     def test_codex_failure_preserves_session_log(self):
         with tempfile.TemporaryDirectory() as td:
             work=Path(td)
