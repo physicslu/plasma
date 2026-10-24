@@ -33,7 +33,7 @@ class FailureCodes(unittest.TestCase):
             with self.subTest(code=code), patch.object(t, 'execute', side_effect=t.Blocked(code)) as call:
                 with self.assertRaises(r.RuntimeDenied):
                     r.registered_hardware_stage(TASK, APPROVAL)
-                call.assert_called_once_with('test', SHA)
+                call.assert_called_once_with('test', SHA, TASK['project'])
 
     def test_hostile_exception_text_is_never_exported(self):
         for exc in (t.Blocked('SOURCE_SHA_INVALID\nsecret'), t.Blocked('10.0.0.1 password'),
@@ -48,7 +48,7 @@ class FailureCodes(unittest.TestCase):
         for exc in (FileNotFoundError('secret'), ValueError('bad json'), KeyError('account')):
             with patch.object(t,'enrollment',side_effect=exc), patch.object(t.subprocess,'Popen') as launch:
                 with self.assertRaisesRegex(t.Blocked,'LOCAL_ENROLLMENT_DENIED'):
-                    t.execute('test',SHA)
+                    t.execute('test',SHA,TASK['project'])
                 launch.assert_not_called()
 
     def test_bad_hostname_never_launches(self):
@@ -58,7 +58,7 @@ class FailureCodes(unittest.TestCase):
                  patch.object(t,'private_json',side_effect=[{'ssh_host':host,'ssh_username':'xilinx','ssh_password':'fake'}, {'sudo_password':'fake'}]), \
                  patch.object(t.subprocess,'Popen') as launch:
                 with self.assertRaisesRegex(t.Blocked,'SSH_OR_SUDO_ROUTE_NOT_ENROLLED'):
-                    t.execute('test',SHA)
+                    t.execute('test',SHA,TASK['project'])
                 launch.assert_not_called()
 
     def test_transport_diagnostic_categories_are_bounded(self):
@@ -86,7 +86,7 @@ class FailureCodes(unittest.TestCase):
             self.assertEqual(t.remote_failure(2,(code+' secret\n').encode()),
                              'REMOTE_EXIT_OR_PRIVILEGE_FAILED')
         code=b'LiveStageDenied: F1B_IMAGE_NOT_LOADED\n'
-        self.assertEqual(t.remote_failure(1,code),'F1B_IMAGE_NOT_LOADED')
+        self.assertEqual(t.remote_failure(1,code),'REMOTE_EXIT_OR_PRIVILEGE_FAILED')
         self.assertEqual(t.remote_failure(1,code*2),'REMOTE_EXIT_OR_PRIVILEGE_FAILED')
         self.assertEqual(t.remote_failure(255,code),'REMOTE_EXIT_OR_PRIVILEGE_FAILED')
         harness=harness_module.BridgeContracts()
@@ -95,14 +95,14 @@ class FailureCodes(unittest.TestCase):
                 harness._fake_ssh([output,harness._receipt()],exit_code=rc)
 
     def test_malformed_and_hostile_receipts_fail_closed(self):
-        good = {'stage':'test','boot_id':'fake-test-boot','result':'IDENTITY_PASS'}
+        good = {'stage':'test','project':TASK['project'],'boot_id':'fake-test-boot','result':'IDENTITY_PASS'}
         for output in (b'hostile password 10.0.0.1',
                        (t.MARK+'{broken}\n').encode(),
                        (t.MARK+json.dumps(good)+'\n') .encode()*2,
                        (t.MARK+json.dumps(good | {'boot_id':'secret\naddress'})+'\n').encode(),
                        (t.MARK+json.dumps(good | {'result':'FAILED_RECOVERY'})+'\n').encode()):
             with self.assertRaises(t.Blocked) as caught:
-                t.parse_receipt('test',SHA,output)
+                t.parse_receipt('test',SHA,output,TASK['project'])
             self.assertIn(str(caught.exception),t.SAFE_FAILURE_CODES)
 
     def test_nonzero_and_sigbus_never_accept_success(self):
@@ -127,7 +127,7 @@ class FailureCodes(unittest.TestCase):
              patch.object(t.time,'monotonic',side_effect=[0,200]), \
              patch.object(t.os,'killpg',side_effect=PermissionError('secret')) as kill:
             with self.assertRaisesRegex(t.Blocked,'CHILD_OWNERSHIP_UNCERTAIN'):
-                t.execute('test',SHA)
+                t.execute('test',SHA,TASK['project'])
             kill.assert_called_once()
             self.assertEqual(close.call_count,2)
 
@@ -142,7 +142,7 @@ class FailureCodes(unittest.TestCase):
              patch.object(t.time,'monotonic',side_effect=[0,200]), \
              patch.object(t.os,'killpg'):
             with self.assertRaisesRegex(t.Blocked,'CHILD_OWNERSHIP_UNCERTAIN'):
-                t.execute('test',SHA)
+                t.execute('test',SHA,TASK['project'])
             self.assertEqual(proc.wait.call_count,2)
             self.assertEqual(close.call_count,2)
 
