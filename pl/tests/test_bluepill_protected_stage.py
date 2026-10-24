@@ -193,6 +193,22 @@ def test_post_download_image_and_boot_mismatch_never_qualifies():
                                       boot_id="another-boot-after-load"))
 
 
+@pytest.mark.parametrize("modifications", [
+    {"stage": "test"},
+    {"action": "PLAN_RESTORED_NOOP"},
+    {"expected_image_sha256": sha(BASE)},
+    {"current": bp.StageState("another-boot", SOURCE, "BASE", sha(BASE))},
+    {"current": bp.StageState("boot-20261024-abcdef", SOURCE,
+                              "UNKNOWN", sha(BASE))},
+])
+def test_directly_forged_stage_plan_must_fail(modifications):
+    lock = pinned()
+    plan = bp.prepare("download", lock, observed(), None)
+    with pytest.raises(bp.StageDenied, match="STAGE_PLAN_"):
+        bp.confirm(replace(plan, **modifications),
+                   lock, observed(image="candidate"))
+
+
 def test_no_real_stage_entrypoint_or_accidental_f1b_waiver():
     # Calling it as an installed root-entry module must fail before ANY action.
     script = Path(bp.__file__)
