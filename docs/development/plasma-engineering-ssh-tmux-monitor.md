@@ -4,6 +4,65 @@
 two switchable windows (Path 2 and Path 3). This is not another dispatcher,
 workflow, runner, approval gate, HIL test or production service.
 
+## V3 operator layout and result semantics
+
+The path label and all three shortcuts occupy **one header row**:
+`PATH 3 | SWPC Codex | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach`
+(with the actual tmux prefix). Both paths show STATUS, RUN, TASK, GOAL,
+STAGE, DOING and RECENT ACTIVITY. Path 3 shows a pinned-work-order
+capability category `STAGE: Codex workspace` when available; this does
+**not** mean Vivado synthesis/implementation/bitstream generation was observed.
+Path 2 retains its authorized fixed-stage category.
+
+`WRAPPER: PASS EXIT: 0` is the result of the monitored top-level process,
+**not** acceptance of the Work Order, a verified test receipt, PR readiness
+or an indication that every Codex command succeeded.
+`LAST STEP` is the most recently completed sanitized Codex item, whereas
+`LAST ERROR` retains the most recent Codex-reported failing item from a
+bounded 512 KiB scan of the transient log. The latter can fall outside
+retention on a long run; a new run truncates prior monitor history.
+These events have trust class `[C]`, never independently verified `[V]`.
+Their exit codes are observed Codex values, and neither stderr nor root-cause
+details are available to this monitor. Do not infer a failure cause from the
+exit code alone; inspect authorized task evidence when necessary.
+
+A small set of whole-command patterns produce fixed semantic labels such
+as `Inspect source files (arguments redacted)`, `Run Python tests` or
+`Run Vivado batch build` (also redacted). Command arguments, absolute paths,
+shell control operators, stderr, prompt/model text and credentials are not
+copied into public events. Commands that cannot be safely classified remain
+`(command hidden)`. No classification authorizes execution or proves that
+the named tool actually achieved its intended operation.
+
+### Path 2 native preflight denial receipts (V3)
+
+The trusted Runner already redirects the Path 2 Dispatcher JSON receipt to
+`$RUNNER_TEMP/plasma-path2-receipt.json`. After the wrapped process exits,
+the Monitor may **read but never modify** that fixed file. The projection is
+limited to the existing native Codex preflight permission denial with exact
+`github_run_id`, `task_id`, `work_order_sha256`, nonzero exit code,
+permission-safe file ownership/type, and bounded JSON size.
+The Monitor copies **only** the fixed category values `NATIVE_PATH_PERMISSIONS_DENIED`,
+`CLI_WRAPPER/CLI_MANIFEST/PLATFORM_MANIFEST/NATIVE_BINARY`,
+`OWNER_MISMATCH/PEER_WRITABLE` and the component index (1..24).
+Other statuses, arbitrary errors, paths, raw stdout/stderr and sensitive
+JSON fields are never rendered. Rejected or unavailable receipts omit the
+hint without changing the authorized job outcome.
+
+The additional line looks like:
+
+```text
+WRAPPER: FAIL  EXIT: 2
+RECEIPT: NATIVE_PATH_PERMISSIONS_DENIED | CLI_WRAPPER | PEER_WRITABLE | #1
+```
+
+This is a **sanitized Runner receipt hint**, **not** a new verified `[V]`
+source. A matching source identity and fixed enum do not prove electrical
+or execution safety, and this preflight denial states no model or hardware
+work was run. The index is not a host pathname. The line is available only
+for future runs after the new trusted main implementation is activated;
+an old transient V2 snapshot is not retroactively enriched.
+
 ## Operator workflow (SWPC)
 
 After this change is merged to trusted main and an already authorized SWPC
@@ -26,7 +85,7 @@ detected and displayed in the header. Clearing never truncates a monitor
 log, removes Codex evidence, changes job state or affects the other window. IDLE means no observed worker wrapper is currently
 running on that path. When a task runs the pane shows its Run ID, task ID,
 elapsed time, and recent output. When it finishes, the pane returns to IDLE
-and retains LAST: PASS or LAST: FAIL and process exit code.
+and retains WRAPPER: PASS/FAIL with the top-level process exit code.
 
 Both panes use the same compact operator layout: `STATUS` and `RUN` on
 one row; `TASK` and optional `PR` on one row; `GOAL` and `NOW`,

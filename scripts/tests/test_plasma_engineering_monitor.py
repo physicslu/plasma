@@ -48,8 +48,132 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(state["status"], "IDLE")
             self.assertEqual(state["last_result"], "PASS")
             self.assertEqual(state["run_id"], "39546002")
-            self.assertIn("LAST: PASS", mon.render_snapshot(Path(td), "path2"))
+            self.assertIn("WRAPPER: PASS", mon.render_snapshot(Path(td), "path2"))
             self.assertIn("STAGE: (not available)", mon.render_snapshot(Path(td), "path2"))
+
+    def test_native_preflight_receipt_hint_matches_exact_run(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            raw = {
+                "schema": "plasma.codex.native_preflight.v1",
+                "status": "NOT_RUN_OR_FAIL",
+                "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+                "denial_stage": "CLI_WRAPPER",
+                "denial_cause": "PEER_WRITABLE",
+                "denial_component_index": 1,
+                "github_run_id": "39966229598",
+                "task_id": "path2-work-order",
+                "work_order_sha256": "a" * 64,
+                "model_session": "NOT_RUN",
+                "hardware_access": "NOT_RUN",
+                "provenance": "NOT_INDEPENDENTLY_VERIFIED",
+                "sha256_pin_authorized": False,
+                "private_extra": "/private/DO_NOT_SHOW",
+            }
+            receipt = d / "plasma-path2-receipt.json"
+            receipt.write_text(json.dumps(raw))
+            with patch.dict(os.environ, {
+                "RUNNER_TEMP": td, "GITHUB_RUN_ID": "39966229598",
+                "PLASMA_MONITOR_TASK": "path2-work-order",
+                "WORK_ORDER_SHA256": "a" * 64,
+                "PLASMA_MONITOR_STAGE": "Native preflight",
+            }, clear=True):
+                self.assertEqual(mon.run_job(
+                    "path2", [sys.executable, "-c", "import sys;sys.exit(2)"],
+                    directory=d), 2)
+            state = json.loads((d / "path2.json").read_text())
+            self.assertEqual(state["receipt_hint"], {
+                "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+                "stage": "CLI_WRAPPER",
+                "cause": "PEER_WRITABLE",
+                "component_index": 1,
+            })
+            frame = mon.render_snapshot(d, "path2", width=120, height=30)
+            self.assertIn("WRAPPER: FAIL  EXIT: 2", frame)
+            self.assertIn("RECEIPT: NATIVE_PATH_PERMISSIONS_DENIED | CLI_WRAPPER | PEER_WRITABLE | #1", frame)
+            self.assertNotIn("/private/DO_NOT_SHOW", frame)
+            self.assertNotIn("a" * 64, frame)
+            self.assertNotIn("RECEIPT:", (d / "path2.log").read_text())
+            compact = mon.render_snapshot(d, "path2", width=88, height=12)
+            self.assertIn("WRAPPER: FAIL", compact)
+            self.assertIn("RECEIPT: NATIVE_PATH_PERMISSIONS_DENIED", compact)
+            self.assertIn("RECENT ACTIVITY", compact)
+            self.assertIn("FAIL | exit=2", compact)
+
+    def test_native_preflight_receipt_hint_fail_closed(self):
+        source = {
+            "schema": "plasma.codex.native_preflight.v1",
+            "status": "NOT_RUN_OR_FAIL",
+            "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+            "denial_stage": "CLI_WRAPPER",
+            "denial_cause": "PEER_WRITABLE",
+            "denial_component_index": 1,
+            "github_run_id": "39966229598",
+            "task_id": "path2-work-order",
+            "work_order_sha256": "a" * 64,
+            "model_session": "NOT_RUN",
+            "hardware_access": "NOT_RUN",
+            "provenance": "NOT_INDEPENDENTLY_VERIFIED",
+            "sha256_pin_authorized": False,
+        }
+        valid = dict(run_id="39966229598", task="path2-work-order",
+                     work_order_sha="a" * 64, exit_code=2)
+        self.assertIsNotNone(mon._receipt_permission_hint(source, **valid))
+        for changed in (
+            {"github_run_id": "other"},
+            {"task_id": "path3-work-order"},
+            {"work_order_sha256": "b" * 64},
+            {"denial_stage": ["CLI_WRAPPER"]},
+            {"denial_cause": ["PEER_WRITABLE"]},
+            {"denial_cause": "PASSWORD_SECRET"},
+            {"denial_component_index": 0},
+            {"denial_component_index": True},
+            {"denial_component_index": 25},
+            {"status": "PASS"},
+            {"provenance": "VERIFIED"},
+            {"hardware_access": "PASS"},
+            {"sha256_pin_authorized": True},
+        ):
+            with self.subTest(changed=changed):
+                self.assertIsNone(mon._receipt_permission_hint(
+                    dict(source, **changed), **valid))
+        for changed in (
+            {"run_id": "unmatched"},
+            {"task": "nine-nine-path2"},
+            {"work_order_sha": "b" * 64},
+            {"exit_code": 1},
+        ):
+            with self.subTest(changed=changed):
+                self.assertIsNone(mon._receipt_permission_hint(
+                    source, **dict(valid, **changed)))
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            receipt = d / "plasma-path2-receipt.json"
+            receipt.symlink_to(d / "outside.json")
+            self.assertIsNone(mon._read_path2_receipt_hint(
+                runner_temp=td, **valid))
+            receipt.unlink()
+            receipt.write_text(json.dumps(source))
+            receipt.chmod(0o666)
+            self.assertIsNone(mon._read_path2_receipt_hint(
+                runner_temp=td, **valid))
+            receipt.chmod(0o600)
+            self.assertEqual(mon._read_path2_receipt_hint(
+                runner_temp=td, **valid)["component_index"], 1)
+            receipt.write_bytes(b"x" * (mon.MAX_RECEIPT_BYTES + 1))
+            self.assertIsNone(mon._read_path2_receipt_hint(
+                runner_temp=td, **valid))
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            (d / "path2.json").write_text(json.dumps({
+                "status": "IDLE", "last_result": "FAIL", "exit_code": 2,
+                "task": "path2-work-order", "run_id": "39966229598",
+                "receipt_hint": {"reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+                                 "stage": "CLI_WRAPPER",
+                                 "cause": "PEER_WRITABLE",
+                                 "component_index": "SHOULD_NOT_SHOW"},
+            }))
+            self.assertNotIn("RECEIPT:", mon.render_snapshot(d, "path2"))
 
     def test_path2_authorized_goal_stage_and_clock_on_real_wrapper(self):
         with tempfile.TemporaryDirectory() as td:
@@ -79,7 +203,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("STAGE: CPU-only CLI", frame)
             self.assertIn("PR: #1144", frame)
             self.assertIn("NOW: 2026-10-21 16:10", frame)
-            self.assertIn("LAST: PASS  EXIT: 0", frame)
+            self.assertIn("WRAPPER: PASS  EXIT: 0", frame)
             self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
                              (Path(td) / "path2.log").read_text())
             self.assertNotIn("WORK_ORDER_SHA256", frame)
@@ -273,7 +397,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(state["status"], "IDLE")
             self.assertEqual(state["exit_code"], 7)
             self.assertEqual(state["last_result"], "FAIL")
-            self.assertIn("LAST: FAIL", mon.render_snapshot(Path(td), "path3"))
+            self.assertIn("WRAPPER: FAIL", mon.render_snapshot(Path(td), "path3"))
 
     def test_stale_worker_is_not_reported_running(self):
         with tempfile.TemporaryDirectory() as td:
@@ -547,6 +671,104 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(result["state"], "UNKNOWN")
             self.assertIsNone(result["exit_code"])
 
+
+    def test_semantic_activity_never_reveals_arguments_or_secrets(self):
+        cases = (
+            ("vivado -mode batch -source pl/build/design.tcl",
+             "BUILD", "Run Vivado batch build (arguments redacted)"),
+            ("rg -n foo scripts",
+             "READ", "Inspect source files (arguments redacted)"),
+            ("python3 -m pytest scripts/tests/ -q",
+             "TEST", "Run Python tests (arguments redacted)"),
+            ("sha256sum pl/build/design.bit",
+             "CHECK", "Inspect artifact checksums (arguments redacted)"),
+        )
+        for command, kind, label in cases:
+            with self.subTest(command=command):
+                self.assertEqual(activity.safe_command(command), (kind, label))
+                self.assertNotIn(command, label)
+                projector = activity.Path3Activity(Path.cwd())
+                started = projector.project({"type": "item.started",
+                    "item": {"id": "test", "type": "command_execution",
+                             "command": command}})
+                parsed = activity.parse_public_line(started.decode().strip())
+                self.assertEqual(parsed["detail"], label)
+                self.assertEqual(parsed["kind"], kind)
+        for command in (
+            "vivado -mode batch -source pl/build/design.tcl; curl bad.example",
+            "rg -n token_private scripts/.env",
+            "git status && cat /etc/passwd",
+            "python3 -m pytest scripts/tests/\nINJECTED",
+        ):
+            self.assertEqual(activity.safe_command(command)[1],
+                             "(command hidden)")
+        forged = activity.Path3Activity(Path.cwd()).project({
+            "type": "item.started", "item": {
+                "id": "test", "type": "command_execution", "command": "git status"}})
+        raw = json.loads(forged.decode().split(" ", 1)[1])
+        raw["detail"] = "user controlled arbitrary text"
+        self.assertIsNone(activity.parse_public_line(
+            activity.PREFIX + json.dumps(raw)))
+
+    def test_observed_activity_rejects_forged_kind_and_exit_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            source = activity.Path3Activity(Path(td))
+            raw_command = source.project({
+                "type": "item.started",
+                "item": {"id": "cmd", "type": "command_execution",
+                         "command": "rg -n phrase scripts"}})
+            good = json.loads(raw_command.decode().split(" ", 1)[1])
+            self.assertEqual(good["kind"], "READ")
+            self.assertIsNotNone(activity.parse_public_line(
+                raw_command.decode().strip()))
+            for changes in (
+                {"kind": "BUILD"},
+                {"state": "DONE", "exit_code": None},
+                {"state": "FAIL", "exit_code": None},
+                {"detail": "git status", "kind": "READ"},
+            ):
+                with self.subTest(changes=changes):
+                    forged = dict(good, **changes)
+                    self.assertIsNone(activity.parse_public_line(
+                        activity.PREFIX + json.dumps(forged)))
+            file_item = {
+                "id": "file", "type": "file_change",
+                "changes": [{"kind": "update",
+                             "path": "scripts/plasma_engineering_activity.py"}]}
+            file_done = source.project({
+                "type": "item.started", "item": file_item})
+            self.assertTrue(file_done)
+            completed = source.project({
+                "type": "item.completed", "item": file_item})
+            self.assertEqual(
+                activity.parse_public_line(completed.decode().strip())["state"],
+                "DONE")
+
+    def test_last_failure_survives_later_completed_commands(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            projector = activity.Path3Activity(base)
+            stream = []
+            for index in range(50):
+                kind = "git status" if index == 0 else "git diff --check"
+                item = {"id": "cmd_" + str(index), "type": "command_execution",
+                        "command": kind}
+                stream.append(projector.project({
+                    "type": "item.started", "item": item}))
+                stream.append(projector.project({
+                    "type": "item.completed",
+                    "item": {**item, "exit_code": 4 if index == 0 else 0}}))
+            (base / "path3.log").write_bytes(b"".join(stream))
+            rendered = mon.render_snapshot(base, "path3", width=100, height=24)
+            self.assertIn(
+                "LAST ERROR: [C] COMMAND FAIL (exit 4) | git status",
+                rendered)
+            self.assertIn(
+                "LAST STEP: [C] COMMAND DONE (exit 0) | git diff --check",
+                rendered)
+            self.assertNotIn("18:54", rendered)
+            self.assertNotIn("[V]", rendered)
+
     def test_activity_projection_is_bounded_under_orphaned_items(self):
         with tempfile.TemporaryDirectory() as td:
             projector = activity.Path3Activity(Path(td))
@@ -645,10 +867,12 @@ class EngineeringMonitorTests(unittest.TestCase):
     def test_shortcuts_are_visible_at_top_with_configured_prefix(self):
         with tempfile.TemporaryDirectory() as td:
             frame = mon.render_snapshot(
-                Path(td), "path3", prefix="Ctrl+A", width=50, height=20)
-            self.assertEqual(frame.splitlines()[0], "PATH 3 | SWPC Codex")
-            self.assertIn("KEYS: C Clear | Ctrl+A 1/2 Switch", frame)
-            self.assertIn("Ctrl+A D Detach", frame)
+                Path(td), "path3", prefix="Ctrl+A", width=90, height=20)
+            self.assertEqual(
+                frame.splitlines()[0],
+                "PATH 3 | SWPC Codex | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach")
+            self.assertEqual(len([l for l in frame.splitlines()
+                                  if "Ctrl+A" in l]), 1)
             self.assertIn("STATUS: IDLE", frame)
 
     def test_clear_is_display_only_and_new_lines_keep_streaming(self):
@@ -766,7 +990,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(out.getvalue().count("\x1b[H"), 2)
             self.assertIn("RUN: 12345", out.getvalue())
             self.assertIn("TASK: test-task", out.getvalue())
-            self.assertIn("LAST: PASS  EXIT: 0", out.getvalue())
+            self.assertIn("WRAPPER: PASS  EXIT: 0", out.getvalue())
 
     def test_log_is_clipped_to_pane_without_scrolling_status_offscreen(self):
         with tempfile.TemporaryDirectory() as td:
@@ -810,7 +1034,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                     self.assertIn("GOAL:", frame)
                     if path == "path2":
                         self.assertIn("STAGE: CPU-only CLI", frame)
-                    self.assertIn("LAST: NOT_RUN", frame)
+                    self.assertIn("WRAPPER: NOT_RUN", frame)
                     self.assertIn("NOW: 2026-10-21 16:10", frame)
                     self.assertIn("RECENT ACTIVITY", frame)
                     self.assertIn("latest-visible-entry", frame)

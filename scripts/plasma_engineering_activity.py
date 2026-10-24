@@ -26,23 +26,47 @@ COMMANDS = (
     (re.compile(r"git status(?: --short| --porcelain)?\Z"), "COMMAND"),
     (re.compile(r"git diff --check\Z"), "COMMAND"),
 )
+# Classifications expose only a fixed label; no shell arguments or paths.
+# These describe Codex-reported commands, not verified execution receipts.
+SEMANTIC_COMMANDS = (
+    (re.compile(r"git (?:status|diff|log|show|rev-parse|ls-files)(?: [A-Za-z0-9_./=:+, '()-]{1,160})?\Z"),
+     "COMMAND", "Inspect Git repository (arguments redacted)"),
+    (re.compile(r"(?:rg|grep|sed|head|tail|cat|find) [A-Za-z0-9_./=:+, '()*?-]{1,160}\Z"),
+     "READ", "Inspect source files (arguments redacted)"),
+    (re.compile(r"python3 -m (?:pytest|unittest)(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
+     "TEST", "Run Python tests (arguments redacted)"),
+    (re.compile(r"(?:/opt/Xilinx/Vivado/[0-9.]+/bin/)?vivado -mode batch(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
+     "BUILD", "Run Vivado batch build (arguments redacted)"),
+    (re.compile(r"(?:make|ninja|cmake)(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
+     "BUILD", "Run build tool (arguments redacted)"),
+    (re.compile(r"(?:sha256sum|shasum)(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
+     "CHECK", "Inspect artifact checksums (arguments redacted)"),
+)
+SEMANTIC_KIND_BY_LABEL = {label: kind for _, kind, label in SEMANTIC_COMMANDS}
 REPO_TOP = frozenset({
     "scripts", "software", "pl", "firmware", "docs", "specs", "packaging",
     "data", "handover", "release",
 })
 STATES = frozenset({"RUNNING", "DONE", "FAIL", "UNKNOWN"})
-KINDS = frozenset({"TEST", "COMMAND", "FILE"})
+KINDS = frozenset({"TEST", "COMMAND", "FILE", "READ", "BUILD", "CHECK"})
 MAX_EVENT_BYTES = 640
 MAX_ACTIVE_ITEMS = 64
 MAX_SEQUENCE = 10000000
 
 
 def safe_command(value: object) -> tuple[str, str]:
-    if (type(value) is str and len(value) <= 125 and value.isascii() and
+    if (type(value) is str and len(value) <= 256 and value.isascii() and
             SENSITIVE.search(value) is None):
-        for grammar, kind in COMMANDS:
-            if grammar.fullmatch(value) is not None:
-                return kind, value
+        if len(value) <= 125:
+            for grammar, kind in COMMANDS:
+                if grammar.fullmatch(value) is not None:
+                    return kind, value
+        # Classify relative, single-command forms only. An absolute argument
+        # or a shell control operator falls back to the opaque safe marker.
+        if re.search(r"\s/[A-Za-z]", value) is None:
+            for grammar, kind, label in SEMANTIC_COMMANDS:
+                if grammar.fullmatch(value) is not None:
+                    return kind, label
     return "COMMAND", "(command hidden)"
 
 
@@ -183,8 +207,9 @@ def parse_public_line(line: str) -> dict | None:
             obj["kind"] == "FILE" or
             obj["state"] != ("DONE" if code == 0 else "FAIL"))):
         return None
-    if (code is None and obj["state"] == "FAIL") or (
-            obj["kind"] == "FILE" and obj["state"] == "UNKNOWN"):
+    if (code is None and obj["state"] in ("FAIL", "DONE") and
+            obj["kind"] != "FILE") or (
+            obj["kind"] == "FILE" and obj["state"] in ("FAIL", "UNKNOWN")):
         return None
     # Reject forged display records, even if the log was accidentally
     # modified; do not make viewer parse a second arbitrary text channel.
@@ -201,6 +226,15 @@ def parse_public_line(line: str) -> dict | None:
                     any(p in ("", ".", "..") or p.startswith(".") for p in parts)
                     or SENSITIVE.search(name) is not None):
                 return None
-    elif obj["detail"] != "(command hidden)" and safe_command(obj["detail"])[1] != obj["detail"]:
-        return None
+    elif obj["detail"] == "(command hidden)":
+        if obj["kind"] != "COMMAND":
+            return None
+    elif obj["detail"] in SEMANTIC_KIND_BY_LABEL:
+        if obj["kind"] != SEMANTIC_KIND_BY_LABEL[obj["detail"]]:
+            return None
+    elif obj["detail"] != "(command hidden)":
+        # Legacy explicitly allowlisted commands must retain their original
+        # category. Arbitrary sanitized-looking strings cannot forge kinds.
+        if safe_command(obj["detail"]) != (obj["kind"], obj["detail"]):
+            return None
     return obj
