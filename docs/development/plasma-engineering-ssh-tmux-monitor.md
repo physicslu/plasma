@@ -61,16 +61,16 @@ raw `objective`, `acceptance`, prompt or command arguments.
 
 ### Viewer startup failure and recovery
 
-The launcher passes `bash -c SCRIPT` as **three direct tmux arguments**,
-avoiding an additional implicit tmux `default-shell -c` quoting layer.
-It preserves a Path 2/3 tmux window if its `sg` or Python viewer
-terminates immediately. The pane shows `MONITOR_VIEWER_EXIT path=... exit=...`
-along with the original error, then falls back to an operator-owned
-interactive shell instead of disappearing and misleadingly reporting
-`can't find window: 2`. This fixes the unsupported single-string launch
-pattern; the historical SWPC PATH 3 startup failure's exact exit cause
-remains unverified because its error output was not captured. The launcher
-does not automatically retry or restart the Codex worker.
+The launcher now starts each newly created tmux pane with a persistent
+operator-owned `bash -i` **before** sending its fixed, shell-escaped
+`sg plasma-monitor` Viewer command as literal keys to that *new pane only*.
+This follows the successful SWPC manual-start pattern and prevents an
+immediately exiting `sg` or Python process from destroying the window.
+A failure remains visible as `MONITOR_VIEWER_EXIT path=... exit=...`
+alongside its original error; the shell stays available for diagnosis.
+Existing Path 2/3 panes are not sent keys or replaced. The historical
+SWPC PATH 3 process exit reason is still unverified because its original
+stderr was not retained. The launcher never retries or restarts Codex.
 
 If the viewer exited, inspect the error in that window first. After resolving
 the cause, close **only that diagnostic pane's shell** (for example with
