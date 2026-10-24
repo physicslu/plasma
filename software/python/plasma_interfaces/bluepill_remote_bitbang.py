@@ -117,9 +117,11 @@ class RemoteBitbangSWD:
         if type(commands) is not bytes:
             raise TypeError("Wire protocol requires bytes")
         responses = bytearray()
-        for cmd in commands:
+        for index, cmd in enumerate(commands):
             if cmd == ord("Q"):
                 self.close()
+                if index != len(commands) - 1:
+                    raise SWDBitbangError("Trailing bytes after quit are prohibited")
                 break
             if cmd == ord("O"):
                 self._oe = True
@@ -148,8 +150,6 @@ class RemoteBitbangSWD:
             else:
                 self.close()
                 raise SWDBitbangError("Unsupported reset/JTAG/delay/wire command")
-        if self.closed and commands[-1:] != b"Q":
-            raise SWDBitbangError("Trailing bytes after quit are prohibited")
         return bytes(responses)
 
 
