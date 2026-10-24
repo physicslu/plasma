@@ -1665,6 +1665,41 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["objective"], order["objective"])
             self.assertEqual(task["acceptance"], order["acceptance"])
 
+    def test_dynamic_path2_stage_project_is_generic_but_still_pinned(self):
+        import plasma_path2_runtime_integration as runtime
+
+        def stage_order(project):
+            order = self._order(
+                "path2-cli", capability="path2-stage-contract",
+                scope="guarded-hardware", project=project, stage="test")
+            for key in ("script", "argv", "expected_stdout_sha256"):
+                order.pop(key, None)
+            return order
+
+        # Only the dynamic owner Work Order route is generic; older fixed
+        # F1-B task identities remain unchanged for regression safety.
+        project = "pl/projects/z2-swd-bluepill"
+        order = stage_order(project)
+        event = self._event(order)
+        request = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, request, event)
+        self.assertEqual(task["project"], project)
+        self.assertEqual(runtime.stage_contract(task, approval), "test")
+        for bad in ("../module", "pl/projects/F1B", "pl/projects/a",
+                    "pl/projects/z2-project;id", "", None,
+                    "pl/projects/" + "a" * 71):
+            with self.subTest(project=bad):
+                with self.assertRaisesRegex(
+                        dev.Denied, "WORK_ORDER_STAGE_CAPABILITY_DENIED"):
+                    dev.request(self._event(stage_order(bad)),
+                                self._context())
+        with self.assertRaisesRegex(
+                runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
+            runtime.stage_contract(
+                task | {"project": "pl/projects/z2-another"},
+                approval | {"work_order_sha256": "0" * 64})
+
     def test_path3_explicit_monitor_summary_is_authorized_and_digest_bound(self):
         # The objective and acceptance are free-form and must never be copied
         # into the public monitor metadata or GitHub step output.

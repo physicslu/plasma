@@ -288,7 +288,9 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(scope == "guarded-hardware" and
                 {"project", "stage"} <= set(order) and
                 set(order) <= base | optional_ref | {"project", "stage", "monitor_summary"} and
-                order["project"] == "pl/projects/z2-fixed-unified-site1" and
+                type(order["project"]) is str and
+                re.fullmatch(r"pl/projects/[a-z0-9][a-z0-9-]{2,69}",
+                             order["project"]) is not None and
                 type(order["stage"]) is str and
                 order["stage"] in ("download", "test", "restore"),
                 "WORK_ORDER_STAGE_CAPABILITY_DENIED")

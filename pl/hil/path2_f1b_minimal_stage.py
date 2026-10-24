@@ -287,7 +287,9 @@ def main(argv: list[str] | None = None) -> int:
     if argv[0] == "--identity-child":
         return child_main()
     result = run(argv[0])
-    print("PLASMA_F1B_PATH2_DEV=" + json.dumps(
+    result["project"] = "pl/projects/z2-fixed-unified-site1"
+    result["profile_id"] = "f1b-site1-v1"
+    print("PLASMA_PATH2_STAGE=" + json.dumps(
           result, sort_keys=True, separators=(",", ":")), flush=True)
     return 0
 
