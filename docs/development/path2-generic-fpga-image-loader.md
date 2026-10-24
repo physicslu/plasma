@@ -2,11 +2,12 @@
 
 **Gate 1 implementation Draft; no root installation or hardware activation.**
 
-The shared existing Work Order, trusted-main Dispatcher, SWPC Runner and
-Stage Transport remain unchanged in purpose. Path 2 runs a pinned fixed
-CLI; Path 3 lets Codex choose commands under the same Gate 1 and OS
-permissions. For privileged Z2 operations both must use the existing
-protected Root execution boundary and preserve B1/B2/B3.
+The existing Work Order, trusted-main Dispatcher, SWPC Runner and Stage
+Transport remain the Path 2 fixed-CLI execution route. Path 3 lets Codex
+choose commands under the same Gate 1 and OS permissions, but **generic
+privileged Z2 Stage delegation from Path 3 is not yet installed**. Both
+paths must use the existing protected Root authority and preserve
+B1/B2/B3 for any privileged Z2 operation. No new Path 3 route is added.
 
 The protected Root Entry source is now
 `scripts/z2/plasma-path2-root-entry`, installed path
@@ -27,8 +28,11 @@ pl.hil.path2_f1b_minimal_stage
 ```
 
 The example is **not an installed profile**. The authenticated source
-manifest must enumerate the profile, selected Python module, existing
-FPGA safeguards and Linux MMIO driver. Caller-provided paths, modules
+manifest must enumerate the profile, selected Python module, **every**
+installed Python source, existing FPGA safeguards and Linux MMIO driver.
+The entry refuses unpinned Python dependencies, import-tree symlinks or
+non-root-owned/writable directories, preserving the old F1-B dependency
+pinning without hardcoding F1-B in the execution framework. Caller-provided paths, modules
 and shell commands are rejected. This is a single per-Z2 installed
 project selection, not another registry, service or Root Executor.
 

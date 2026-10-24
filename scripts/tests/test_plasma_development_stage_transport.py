@@ -144,6 +144,10 @@ class Contracts(unittest.TestCase):
         self.assertIn('.plasma-path2-profile', code)
         self.assertIn('PATH2_APPROVED_PROFILE_MISMATCH', code)
         self.assertIn('sha256sum --check --status', code)
+        self.assertIn("find \"$root\" -type f -name '*.py'", code)
+        self.assertIn("PATH2_REQUIRED_SOURCE_NOT_PINNED", code)
+        self.assertIn('find "$root" -type l', code)
+        self.assertIn('find "$root" -type d', code)
         self.assertIn('exec /usr/bin/env -i', code)
         subprocess.run(['/usr/bin/bash', '-n', str(path)], check=True)
         for args in [[], ['download'], ['test', '../escape', SHA],
