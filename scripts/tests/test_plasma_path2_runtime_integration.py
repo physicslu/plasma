@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
@@ -17,6 +18,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import plasma_development_dispatch as dispatch
 import plasma_path2_runtime_integration as runtime
 import plasma_path2_build_qualification as qualifier
+from pl.hil import fpga_configuration_policy as image_policy
 
 REGISTRY = ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
 WORKFLOW = ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml"
@@ -51,6 +53,82 @@ def context():
             "GITHUB_REPOSITORY": "physicslu/plasma",
             "GITHUB_REF": "refs/heads/main",
             "GITHUB_SHA": SHA, "GITHUB_RUN_ATTEMPT": "1"}
+
+
+class GenericConfigurationAdapter(unittest.TestCase):
+    """Synthetic bytes + mocked transport; never hardware acceptance."""
+
+    def setUp(self):
+        self.bundle = {"bit": b"bit", "hwh": b"hwh", "binary": b"bin",
+                       "original": b"original"}
+        h = lambda key: hashlib.sha256(self.bundle[key]).hexdigest()
+        self.historical = image_policy.load_descriptor(
+            ROOT / "pl/projects/z2-bluepill-rbb/image-descriptor.json")
+        descriptor = replace(self.historical, image_build_source_sha=SHA,
+                             bit_sha256=h("bit"), hwh_sha256=h("hwh"),
+                             bin_sha256=h("binary"), recovery_sha256=h("original"))
+        self.lock = image_policy.ImageLock(
+            descriptor.project, descriptor, SHA, SHA, SHA,
+            h("bit"), h("hwh"), h("binary"), h("original"))
+        self.task = {"capability": "path2-stage-contract", "stage": "download",
+                     "project": descriptor.project}
+        self.approved = approval("z2-path2-download")
+
+    def run_adapter(self, **changes):
+        return runtime.generic_configuration_stage(
+            self.task, self.approved, image_lock=changes.get("lock", self.lock),
+            bundle=changes.get("bundle", self.bundle))
+
+    def test_independent_stages_use_only_existing_transport(self):
+        with patch.object(runtime.transport, "execute") as execute:
+            for task_id, stage, result in (
+                ("z2-path2-download", "download", "LOADED_AND_HELD"),
+                ("z2-path2-testing", "test", "IDENTITY_PASS"),
+                ("z2-path2-restore", "restore", "RESTORED_VERIFIED")):
+                self.task["stage"] = stage
+                self.approved = approval(task_id)
+                execute.return_value = dict(stage=stage, source_sha=SHA,
+                    project=self.lock.project, real_z2=True,
+                    boot_id="synthetic-boot", result=result)
+                execute.reset_mock()
+                receipt = self.run_adapter()
+                execute.assert_called_once_with(stage, SHA, self.lock.project)
+                self.assertFalse(receipt["auto_next_stage"])
+
+    def test_bad_locks_and_bytes_never_reach_transport(self):
+        cases = [dict(lock=None),
+                 dict(lock=replace(self.lock, installed_source_sha="b" * 40)),
+                 dict(lock=replace(self.lock, reviewed_source_sha="b" * 40)),
+                 dict(lock=replace(self.lock, descriptor=self.historical)),
+                 dict(bundle={**self.bundle, "binary": b"tampered"}),
+                 dict(bundle={**self.bundle, "original": b"wrong-original"}),
+                 dict(bundle={"binary": b"bin"})]
+        with patch.object(runtime.transport, "execute") as execute:
+            for change in cases:
+                with self.subTest(change=change), self.assertRaises(runtime.RuntimeDenied):
+                    self.run_adapter(**change)
+            execute.assert_not_called()
+
+    def test_authorization_and_transport_denial_propagate_without_retry(self):
+        with patch.object(runtime.transport, "execute") as execute:
+            self.approved["pinned_sha"] = "invalid"
+            with self.assertRaises(runtime.RuntimeDenied):
+                self.run_adapter()
+            execute.assert_not_called()
+            self.approved = approval("z2-path2-download")
+            execute.side_effect = runtime.transport.Blocked("Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED")
+            with self.assertRaisesRegex(runtime.RuntimeDenied, "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"):
+                self.run_adapter()
+            execute.assert_called_once()
+
+    def test_dpidr_cannot_substitute_for_pl_identity(self):
+        self.task["stage"] = "test"
+        self.approved = approval("z2-path2-testing")
+        with patch.object(runtime.transport, "execute", return_value=dict(
+                stage="test", source_sha=SHA, project=self.lock.project,
+                real_z2=True, boot_id="synthetic-boot", result="DPIDR_PASS")):
+            with self.assertRaisesRegex(runtime.RuntimeDenied, "CONFIGURATION_IDENTITY_REQUIRED"):
+                self.run_adapter()
 
 
 class RouteContracts(unittest.TestCase):

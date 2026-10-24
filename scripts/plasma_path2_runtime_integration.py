@@ -177,6 +177,43 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
     }
 
 
+def generic_configuration_stage(task: dict, approval: dict, *,
+                                image_lock, bundle: dict) -> dict:
+    """Bind the one generic image policy to the existing protected transport.
+
+    Called only by an authenticated trusted-main dispatcher. This adapter
+    adds source/byte admission; it supplies no B2/B3 observations and never
+    installs a backend or replaces the root-owned profile/manifest checks.
+    Each invocation requests exactly one stage. In particular, a failed
+    download is not permission to blindly retry or issue MMIO.
+
+    This candidate API is not wired into the installed dispatcher. Offline
+    callers may mock transport for regression; those results are not root
+    evidence. Runtime admission still requires a reviewed installed backend.
+    """
+    from pl.hil import fpga_configuration_policy as policy
+
+    stage = stage_contract(task, approval)
+    require(isinstance(image_lock, policy.ImageLock),
+            "GENERIC_IMAGE_LOCK_REQUIRED")
+    require(image_lock.project == task["project"] and
+            image_lock.reviewed_source_sha == approval["pinned_sha"],
+            "GENERIC_IMAGE_REQUEST_MISMATCH")
+    require(type(bundle) is dict and
+            set(bundle) == {"bit", "hwh", "binary", "original"},
+            "GENERIC_IMAGE_BUNDLE_REQUIRED")
+    try:
+        image_lock.check_bundle(**bundle)
+    except policy.StageDenied as exc:
+        raise RuntimeDenied(str(exc)) from None
+    result = registered_hardware_stage(task, approval)
+    # Configuration identity is deliberately separate from external SWD.
+    # A DPIDR result alone cannot satisfy this stage's read-only PL identity.
+    require(stage != "test" or result["result"] == "IDENTITY_PASS",
+            "GENERIC_CONFIGURATION_IDENTITY_REQUIRED")
+    return result
+
+
 
 def full_hil_sequence(task: dict, approval: dict) -> dict:
     """Explicit opt-in: one SWPC trigger performs three real *separate* stages.
