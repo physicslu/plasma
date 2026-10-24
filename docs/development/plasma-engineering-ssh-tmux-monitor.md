@@ -103,8 +103,10 @@ names only**. The transient operator observer log additionally contains
 `@PLASMA_ACTIVITY_V1` records for recognized, well-ordered Codex
 `command_execution` and `file_change` item events. Only strictly
 allowlisted whole commands (selected Python tests and read-only Git status
-commands), validated repository-relative file names and their reported
-lifecycle states may be shown. Unapproved commands become
+commands), validated repository-relative file names, their reported
+lifecycle states, and (for completed commands only) the Codex-reported
+integer exit code may be shown. The exit code is **observed**, not a trusted
+Runner or test Receipt. Unapproved commands become
 `(command hidden)`; unsafe file names become `(file paths hidden)`.
 Neither raw JSON bodies nor stderr, prompts, tool arguments, model text,
 source code or execution output are copied into these logs.
@@ -114,7 +116,10 @@ verified execution evidence or a trusted testing receipt. `[V]` is
 reserved for a future verified-Receipt adapter and is not emitted by
 Phase A. An `item.started` without a matching completed event is never
 shown as a verified success. Unknown fields, missing IDs, duplicate start
-and out-of-order completion fail closed. No command text is executed by
+and out-of-order completion fail closed. The activity collector tracks at
+most 64 unfinished items; any further orphaned starts are ignored until
+capacity becomes available. The Viewer drops replayed/decreasing sequence
+numbers and never prints malformed structured records verbatim. No command text is executed by
 this projection or taken as approval for hardware work. The dispatcher
 extracts only `thread.started.thread_id` as the Codex Session ID and the
 non-negative token counters from `turn.completed.usage` into
