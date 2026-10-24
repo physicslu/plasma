@@ -909,6 +909,9 @@ if op in ("new-session", "new-window"):
                      "-x", "80", "-y", "24", "-n", "path2",
                      "sleep", "30")
                 started = True
+                # Capture dead panes during diagnosis; assert they are alive
+                # rather than accepting a retained-but-terminated window.
+                tmux("set-option", "-g", "remain-on-exit", "on")
                 tmux("move-window", "-d",
                      "-s", "plasma-monitor:0", "-t", "plasma-monitor:1")
                 original = tmux(
@@ -917,7 +920,17 @@ if op in ("new-session", "new-window"):
                 launch = subprocess.run(
                     ["bash", str(ROOT / "scripts/plasma-engineering-monitor.sh")],
                     env=env, capture_output=True, text=True, timeout=12)
-                self.assertEqual(launch.returncode, 0, launch.stderr)
+                windows_snapshot = tmux(
+                    "list-windows", "-t", "plasma-monitor",
+                    "-F", "#{window_index}:#{window_name}", check=False)
+                diagnostic = tmux(
+                    "capture-pane", "-p", "-S", "-50",
+                    "-t", "plasma-monitor:2", check=False)
+                self.assertEqual(
+                    launch.returncode, 0,
+                    "Launcher stderr=" + launch.stderr +
+                    " windows=" + windows_snapshot.stdout +
+                    " pane=" + diagnostic.stdout + diagnostic.stderr)
                 last = ""
                 for _ in range(30):
                     cap = tmux("capture-pane", "-p",
@@ -929,6 +942,10 @@ if op in ("new-session", "new-window"):
                     time.sleep(0.1)
                 self.assertIn("STUB_PATH3_SG_FAILURE", last)
                 self.assertIn("MONITOR_VIEWER_EXIT path=path3 exit=7", last)
+                self.assertEqual(tmux(
+                    "display-message", "-p", "-t", "plasma-monitor:2",
+                    "#{pane_dead}").stdout.strip(), "0",
+                    "Diagnostic shell exited after viewer failure")
                 self.assertEqual(tmux(
                     "display-message", "-p", "-t", "plasma-monitor:1",
                     "#{pane_id}").stdout.strip(), original)
