@@ -456,6 +456,7 @@ jobs:
       - name: Execute candidate CLI using trusted dispatcher
         shell: bash
         env:
+          PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
@@ -563,6 +564,7 @@ jobs:
       - name: Codex develops, builds and tests candidate; preserve real evidence
         shell: bash
         env:
+          PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
           GH_TOKEN: ${{ github.token }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
@@ -733,6 +735,7 @@ jobs:
       - name: Worker readmission and real isolated Codex RESUME
         shell: bash
         env:
+          PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
           GH_TOKEN: ${{ github.token }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
