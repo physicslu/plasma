@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "source_lock_id": "stm32f103-low-density-ds5936-source-lock-v1",
+  "status": "INCOMPLETE_FAIL_CLOSED",
+  "manufacturer": "STMicroelectronics",
+  "evidence": {
+    "official_datasheet": {
+      "source_id": "st_ds5936_rev7",
+      "document_number": "DS5936",
+      "document_id": "DocID15060",
+      "revision": "7",
+      "published": "2015-06",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f103c6.pdf",
+      "sha256": null,
+      "byte_length": null,
+      "original_bytes_attested": false,
+      "attestation_blocker": "OFFICIAL_PDF_ORIGINAL_BYTES_NOT_ACQUIRED_FOR_SHA256"
+    },
+    "programming_manual": {
+      "source_id": "st_pm0075_rev2",
+      "source_lock": "data/ic-support/benchmarks/stm32f103c/source-lock.json",
+      "sha256": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a",
+      "byte_length": 302996
+    },
+    "openocd": {
+      "source_lock": "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
+      "version": "0.12.0",
+      "commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+      "target_blob_sha1": "53e81a59f6b479cb503e7b73ba32bfbe9c685313",
+      "driver_blob_sha1": "ab1ef2aefef0642d831a088a8c915f6ea9021f00",
+      "device_id": "0x412",
+      "page_size_bytes": 1024,
+      "max_family_flash_kib": 32,
+      "write_alignment_bytes": 2
+    }
+  },
+  "not_authorized": [
+    "L2_SUPPORTED",
+    "catalog_promotion",
+    "deployed_runtime",
+    "hardware_programming"
+  ]
+}
