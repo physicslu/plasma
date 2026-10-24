@@ -211,3 +211,61 @@ no PMOD 3.3 V feed, NRST remains unconnected and passive LA/electrical
 checks precede real DPIDR. Nothing in this Gate 1 operates SWPC, Z2,
 ST-LINK, LA2016, FPGA Manager, MMIO, Blue Pill, USB or DUT; PR remains
 Draft, unmerged, Gate 2/HIL **NO-GO**.
+
+## First-generation universal architecture alignment (Gate 1, Host-only)
+
+**Status: generic source policy only; NO physical Universal Image qualification.**
+The [ADR-0003 first-generation fixed-image amendment](../../../docs/adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)
+is **Proposed / M1 NO-GO**, not Accepted. It aims for **one fixed
+Universal FPGA Image** during normal multi-Site programming (eventual
+eight-Site SWD/SPI capacity), with IC/profile/algorithm/provider selection
+performed in the PS/software data plane. The normal Programming Job
+`Probe / Erase / Program / Read / Verify` **must not** write FPGA
+Manager firmware or trigger a new FPGA image.
+
+The established generic protected Root Entry and project-aware Stage
+Transport live on the **latest main**, from merged PR #1143. Do not
+recreate them in this branch. Because the #1142 branch forked before
+that merge, its old F1-B-only transport must **never** be used as
+Blue Pill production authority; first synchronize with latest main in
+a separately reviewed, non-force step.
+
+The new `pl/hil/fpga_configuration_policy.py` is the **shared,
+hardware-inert** maintenance/provisioning image-source lock, SHA256
+bundle validator and independent `download → read-only identity test →
+restore` state policy. It is not an IC-specific engine, a root-capable
+backend or a normal Job workflow; live CLI invocation fails with exit
+2 and no trusted root receipt. `bluepill_protected_stage.py` is
+only the Site 1 PYNQ-Z2 PS/PL SWD GPIO *PoC adapter* using this shared
+policy; its `W14/Y14`, `0x40008000`/4KiB, GPIO identity and safe
+IOBUF reset state are **evidence for this one FPGA image**, not the
+canonical Universal Image or product eight-Site ABI.
+
+The common SWD Provider is target-agnostic; Blue Pill STM32F103C8T6
+is only the first physical DUT and its expected SWD DPIDR is not
+hardcoded as a general provider qualification. Later ST, NXP,
+Microchip and other ICs use per-exact-part applicability, target probe,
+Flash geometry and algorithms, not separate FPGA configuration Stages.
+No target family can inherit a historical F1-B risk waiver.
+
+Source-only regressions:
+`pl/tests/test_fpga_configuration_policy.py` covers multiple Projects,
+exact source and original-image hashes, invalid transitions and
+**rejects normal IC Job operations as FPGA reload triggers**.
+The existing `pl/tests/test_bluepill_protected_stage.py` continues
+to test the PoC-specific GPIO/IOBUF preflight and fail-closed
+simulated stage results. Host-only booleans and image hashes do
+**not** prove root permissions, AXI isolation/drain, image attestation,
+real MMIO readback or successful restoration.
+
+The last physically synthesized BIT/HWH/BIN belong *only* to source
+SHA `65555410f171e425e61d87ebd42dc4709755f389`,
+SWPC Run #40090390292. These policy/document/test changes make a
+**newer PR HEAD, without an exact-source Vivado rebuild**. Preserve the
+old evidence without promoting it to latest-head Image PASS.
+
+The prototype remains **one Site** and is not electrically or
+functionally a qualified eight-Site Universal Image. Hardware
+configuration/load/rollback and external SWD remain NOT_RUN; current
+Pmod BB J1 remains disconnected from Z2, and no owner-approved real
+FPGA Manager, Z2, MMIO, SWPC or DUT work occurs in this change.
