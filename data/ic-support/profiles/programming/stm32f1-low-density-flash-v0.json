@@ -48,6 +48,49 @@
       "program",
       "read",
       "verify"
+    ],
+    "control_bits": {
+      "PG": "0x00000001",
+      "PER": "0x00000002",
+      "MER": "0x00000004",
+      "OPTPG": "0x00000010",
+      "OPTER": "0x00000020",
+      "STRT": "0x00000040",
+      "LOCK": "0x00000080",
+      "OPTWRE": "0x00000200"
+    },
+    "operation_mode_bits": [
+      "PG",
+      "PER",
+      "MER",
+      "OPTPG",
+      "OPTER"
+    ],
+    "operation_mode_mask": "0x00000037",
+    "registers": {
+      "FLASH_ACR": "0x40022000",
+      "FLASH_KEYR": "0x40022004",
+      "FLASH_OPTKEYR": "0x40022008",
+      "FLASH_SR": "0x4002200C",
+      "FLASH_CR": "0x40022010",
+      "FLASH_AR": "0x40022014",
+      "FLASH_OBR": "0x4002201C",
+      "FLASH_WRPR": "0x40022020"
+    },
+    "status_bits": {
+      "BSY": "0x00000001",
+      "PGERR": "0x00000004",
+      "WRPRTERR": "0x00000010",
+      "EOP": "0x00000020"
+    },
+    "w1c_status_flags": [
+      "PGERR",
+      "WRPRTERR",
+      "EOP"
+    ],
+    "unlock_keys": [
+      "0x45670123",
+      "0xCDEF89AB"
     ]
   },
   "acceptance_boundary": {
