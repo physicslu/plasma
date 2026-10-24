@@ -34,6 +34,16 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
                                              usb_root=usb, dev_root=dev)
                 mask = next(i for i in range(len(args)-1)
                             if args[i:i+2] == ['--tmpfs', str(plasma)])
+                # The mounted Z2 credential directory must satisfy the same
+                # 0700 parent requirement as Path 2 enrollment().
+                self.assertEqual(args[mask-2:mask], ['--perms', '0700'])
+                self.assertEqual(args.count('--perms'), 1)
+                self.assertEqual(plasma.stat().st_mode & 0o777, 0o700)
+                # Only this private mask changes; other directories retain
+                # their existing tmpfs operations and isolation.
+                ssh = home / '.ssh'
+                self.assertIn(['--tmpfs', str(ssh)],
+                              [args[j:j+2] for j in range(len(args)-1)])
                 for source in sources:
                     mount = next(i for i in range(len(args)-2)
                                  if args[i:i+3] == ['--ro-bind', str(source), str(source)])
