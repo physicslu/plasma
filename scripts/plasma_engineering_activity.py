@@ -33,6 +33,8 @@ REPO_TOP = frozenset({
 STATES = frozenset({"RUNNING", "DONE", "FAIL", "UNKNOWN"})
 KINDS = frozenset({"TEST", "COMMAND", "FILE"})
 MAX_EVENT_BYTES = 640
+MAX_ACTIVE_ITEMS = 64
+MAX_SEQUENCE = 10000000
 
 
 def safe_command(value: object) -> tuple[str, str]:
@@ -98,22 +100,25 @@ class Path3Activity:
         if category not in ("command_execution", "file_change"):
             return b""
         identity = item.get("id")
-        if type(identity) is not str or ITEM_ID.fullmatch(identity) is None:
+        if (type(identity) is not str or ITEM_ID.fullmatch(identity) is None or
+                self.next_seq >= MAX_SEQUENCE):
             return b""
         if phase == "item.started":
-            if identity in self.active:
+            if identity in self.active or len(self.active) >= MAX_ACTIVE_ITEMS:
                 return b""
             self.active[identity] = category
         elif self.active.get(identity) != category:
             # An orphan completion cannot turn into a verified result.
             return b""
+        exit_code = None
         if category == "command_execution":
             kind, detail = safe_command(item.get("command"))
             if phase == "item.completed":
                 code = item.get("exit_code")
-                state = ("DONE" if type(code) is int and code == 0 else
-                         "FAIL" if type(code) is int and -255 <= code <= 255 else
-                         "UNKNOWN")
+                if type(code) is int and -255 <= code <= 255:
+                    exit_code = code
+                state = ("DONE" if exit_code == 0 else
+                         "FAIL" if exit_code is not None else "UNKNOWN")
             else:
                 state = "RUNNING"
         else:
@@ -141,7 +146,7 @@ class Path3Activity:
         record = {
             "schema": 1, "seq": self.next_seq, "id": identity,
             "kind": kind, "detail": detail, "state": state,
-            "source": "C",
+            "exit_code": exit_code, "source": "C",
             "time": dt.datetime.now().astimezone().strftime("%H:%M"),
         }
         wire = (PREFIX + json.dumps(record, ensure_ascii=True,
@@ -157,19 +162,29 @@ def parse_public_line(line: str) -> dict | None:
     except (ValueError, TypeError):
         return None
     if type(obj) is not dict or set(obj) != {
-            "schema", "seq", "id", "kind", "detail", "state", "source", "time"}:
+            "schema", "seq", "id", "kind", "detail", "state",
+            "exit_code", "source", "time"}:
         return None
     if (type(obj["schema"]) is not int or obj["schema"] != 1 or
             type(obj["seq"]) is not int or
-            not 0 < obj["seq"] <= 10000000 or
+            not 0 < obj["seq"] <= MAX_SEQUENCE or
             type(obj["id"]) is not str or ITEM_ID.fullmatch(obj["id"]) is None or
             type(obj["kind"]) is not str or obj["kind"] not in KINDS or
             type(obj["state"]) is not str or obj["state"] not in STATES or
             type(obj["source"]) is not str or obj["source"] != "C" or
             type(obj["time"]) is not str or
-            re.fullmatch(r"[0-2][0-9]:[0-5][0-9]", obj["time"]) is None or
+            re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", obj["time"]) is None or
             type(obj["detail"]) is not str or len(obj["detail"]) > 150 or
             any(ord(c) < 32 or ord(c) > 126 for c in obj["detail"])):
+        return None
+    code = obj["exit_code"]
+    if (code is not None and (
+            type(code) is not int or not -255 <= code <= 255 or
+            obj["kind"] == "FILE" or
+            obj["state"] != ("DONE" if code == 0 else "FAIL"))):
+        return None
+    if (code is None and obj["state"] == "FAIL") or (
+            obj["kind"] == "FILE" and obj["state"] == "UNKNOWN"):
         return None
     # Reject forged display records, even if the log was accidentally
     # modified; do not make viewer parse a second arbitrary text channel.
