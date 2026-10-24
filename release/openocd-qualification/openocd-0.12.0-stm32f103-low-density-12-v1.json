@@ -13,7 +13,7 @@
   },
   "applicability": {
     "path": "release/openocd-qualification/stm32f103-low-density-exact-12-applicability-v1.json",
-    "git_blob_sha1": "20147090a47b0fc8d4f099b6ebb36848cbe89aad"
+    "git_blob_sha1": "9c7adbb251d44fafd63a5b9787cd657c36c398d1"
   },
   "source_lock": {
     "path": "release/openocd-qualification/stm32f103-low-density-ds5936-source-lock-v1.json",
@@ -21,7 +21,7 @@
   },
   "programming_profile": {
     "path": "data/ic-support/profiles/programming/stm32f1-low-density-flash-v0.json",
-    "git_blob_sha1": "81e62d5a6603837975e0aaf98a0561d72ca2d039",
+    "git_blob_sha1": "c16f07c1cff7ec1fe442bac0a41347e932c85c5e",
     "profile_id": "stm32f1-low-density-flash-v0"
   },
   "records": [
