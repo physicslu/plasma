@@ -486,6 +486,14 @@ class EngineeringMonitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
             for path in ("path2", "path3"):
+                (directory / (path + ".json")).write_text(json.dumps({
+                    "status": "IDLE",
+                    "run_id": "12345",
+                    "task": path + "-work-order",
+                    "pr_number": "1144",
+                    "monitor_summary": "STM32F103 Low-density provider audit",
+                    "monitor_stage": "CPU-only CLI",
+                }))
                 (directory / (path + ".log")).write_text(
                     "".join(f"old-{i:03d}\n" for i in range(20)) +
                     "latest-visible-entry\n")
@@ -494,6 +502,11 @@ class EngineeringMonitorTests(unittest.TestCase):
                 with self.subTest(path=path):
                     self.assertLessEqual(len(frame.splitlines()), 11)
                     self.assertIn("STATUS: IDLE", frame)
+                    self.assertIn("RUN: 12345", frame)
+                    self.assertIn("PR: #1144", frame)
+                    self.assertIn("GOAL:", frame)
+                    if path == "path2":
+                        self.assertIn("STAGE: CPU-only CLI", frame)
                     self.assertIn("LAST: NOT_RUN", frame)
                     self.assertIn("NOW: 2026-10-21 16:10", frame)
                     self.assertIn("RECENT OUTPUT", frame)
