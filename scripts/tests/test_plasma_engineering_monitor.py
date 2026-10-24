@@ -514,6 +514,90 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertNotIn(activity.PREFIX, frame)
             self.assertIn("[codex turn.started]", frame)
 
+    def test_activity_exit_code_is_codex_reported_not_verified(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            projector = activity.Path3Activity(d)
+            start = {"type": "item.started", "item": {
+                "id": "test_1", "type": "command_execution",
+                "command": "python3 -m pytest scripts/tests/"}}
+            complete = {"type": "item.completed", "item": {
+                **start["item"], "exit_code": 3}}
+            events = [projector.project(start), projector.project(complete)]
+            parsed = [activity.parse_public_line(x.decode().strip())
+                      for x in events]
+            self.assertEqual(parsed[0]["state"], "RUNNING")
+            self.assertIsNone(parsed[0]["exit_code"])
+            self.assertEqual(parsed[1]["state"], "FAIL")
+            self.assertEqual(parsed[1]["exit_code"], 3)
+            (d / "path3.log").write_bytes(b"".join(events))
+            frame = mon.render_snapshot(d, "path3", width=100)
+            self.assertIn("[C] TEST FAIL (exit 3)", frame)
+            self.assertNotIn("[V]", frame)
+
+            # Unknown and boolean exit codes must never fabricate PASS/FAIL.
+            missing = {"type": "item.started", "item": {
+                "id": "unknown", "type": "command_execution",
+                "command": "git status"}}
+            projector.project(missing)
+            unknown = projector.project({"type": "item.completed",
+                                         "item": {**missing["item"],
+                                                  "exit_code": True}})
+            result = activity.parse_public_line(unknown.decode().strip())
+            self.assertEqual(result["state"], "UNKNOWN")
+            self.assertIsNone(result["exit_code"])
+
+    def test_activity_projection_is_bounded_under_orphaned_items(self):
+        with tempfile.TemporaryDirectory() as td:
+            projector = activity.Path3Activity(Path(td))
+            for n in range(activity.MAX_ACTIVE_ITEMS):
+                event = {"type": "item.started", "item": {
+                    "id": "task_" + str(n),
+                    "type": "command_execution",
+                    "command": "git status"}}
+                self.assertTrue(projector.project(event))
+            self.assertEqual(len(projector.active), activity.MAX_ACTIVE_ITEMS)
+            overflow = {"type": "item.started", "item": {
+                "id": "overflow", "type": "command_execution",
+                "command": "git status"}}
+            self.assertEqual(projector.project(overflow), b"")
+            self.assertEqual(len(projector.active), activity.MAX_ACTIVE_ITEMS)
+            # A completed Item frees capacity without reauthorizing execution.
+            self.assertTrue(projector.project({
+                "type": "item.completed", "item": {
+                    "id": "task_0", "type": "command_execution",
+                    "exit_code": 0, "command": "git status"}}))
+            self.assertTrue(projector.project(overflow))
+            self.assertLessEqual(len(projector.active),
+                                 activity.MAX_ACTIVE_ITEMS)
+
+    def test_activity_viewer_drops_replayed_or_reordered_sequences(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            emitter = activity.Path3Activity(d)
+            first = emitter.project({"type": "item.started", "item": {
+                "id": "first", "type": "command_execution",
+                "command": "git diff --check"}})
+            second = emitter.project({"type": "item.started", "item": {
+                "id": "second", "type": "command_execution",
+                "command": "git status"}})
+            (d / "path3.log").write_bytes(second + first + second)
+            frame = mon.render_snapshot(d, "path3", width=100)
+            self.assertIn("[C] COMMAND RUNNING | git status", frame)
+            self.assertNotIn("git diff --check", frame)
+            self.assertEqual(frame.count("git status"), 1)
+            base = json.loads(second.decode().split(" ", 1)[1])
+            for code, state in ((True, "DONE"), (1.2, "FAIL"),
+                                (999, "FAIL"), (-999, "FAIL")):
+                with self.subTest(code=code):
+                    invalid = dict(base, exit_code=code, state=state)
+                    line = activity.PREFIX + json.dumps(invalid)
+                    self.assertIsNone(activity.parse_public_line(line))
+            for time_value in ("24:00", "29:50", "99:00"):
+                line = activity.PREFIX + json.dumps(
+                    dict(base, time=time_value))
+                self.assertIsNone(activity.parse_public_line(line))
+
     def test_activity_is_observer_only_evidence_keeps_type_names(self):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
