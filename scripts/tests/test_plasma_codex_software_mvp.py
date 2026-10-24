@@ -67,7 +67,7 @@ class MVPTests(unittest.TestCase):
         self.assertEqual(r["comment_id"],123)
         self.assertEqual(r["executor"],"codex")
 
-    def test_all_automatic_push_events_denied_even_old_one_shot(self):
+    def test_all_automatic_push_events_denied(self):
         sha="b"*40
         env=self.env(sha)
         env["GITHUB_EVENT_NAME"]="push"
@@ -197,7 +197,7 @@ class MVPTests(unittest.TestCase):
         self.assertIn("GH_TOKEN:",publisher)
         self.assertNotIn("codex --",publisher)
         self.assertIn("runs-on: ubuntu-24.04",authorize)
-        # SW uses the SAME one-operator Issue dispatch pattern as LA and Z2.
+        # Historical SW uses the SAME one-operator Issue dispatch pattern as LA.
         self.assertIn("issue_comment:",wf)
         self.assertIn("types: [created]",wf)
         self.assertIn(mvp.COMMAND,wf)
@@ -213,13 +213,11 @@ class MVPTests(unittest.TestCase):
         self.assertNotIn("workflow_dispatch:",wf)
         self.assertNotIn("codex --dangerously-bypass",wf)
 
-    def test_unified_hil_reuses_existing_runner_for_sw_z2_and_la(self):
+    def test_retained_hil_reuses_existing_runner_for_sw_and_la(self):
         sw = (ROOT/".github/workflows/plasma-codex-software-mvp.yml").read_text()
         cases = (
             (".github/workflows/plasma-codex-software-mvp.yml",
              "/plasma-codex hello-c 981", "codex"),
-            (".github/workflows/plasma-codex-z2-swd05.yml",
-             "/plasma-codex z2-swd05 981", "oneshot"),
             (".github/workflows/plasma-codex-la2016-direct.yml",
              "/plasma-codex la2016-direct 981", "loopback"),
         )
@@ -247,7 +245,6 @@ class MVPTests(unittest.TestCase):
     def test_unified_hil_does_not_authorize_hardware_from_pr_or_main_push(self):
         for path in (
             ".github/workflows/plasma-codex-software-mvp.yml",
-            ".github/workflows/plasma-codex-z2-swd05.yml",
             ".github/workflows/plasma-codex-la2016-direct.yml",
         ):
             with self.subTest(path=path):
