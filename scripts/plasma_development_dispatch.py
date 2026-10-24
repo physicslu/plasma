@@ -29,6 +29,19 @@ COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
+# Explicit operator-public metadata; never derived from objective/acceptance.
+# Single-line restricted vocabulary prevents control sequences, URLs, quotes,
+# shell syntax and raw JSON from crossing the GitHub output/monitor boundary.
+MONITOR_SUMMARY = re.compile(
+    r"[A-Za-z0-9\u4e00-\u9fff]"
+    r"[A-Za-z0-9\u4e00-\u9fff ._()/+-]{6,78}"
+    r"[A-Za-z0-9\u4e00-\u9fff)]\Z"
+)
+MONITOR_SENSITIVE = re.compile(
+    r"\b(?:password|passwd|secret|credential|token|bearer|"
+    r"private.key|api.key|authorization)\b|[a-fA-F0-9]{32,}",
+    re.IGNORECASE,
+)
 # Fixed trusted-main Path 2 observation; NOT an arbitrary-script capability.
 NATIVE_PREFLIGHT = "codex-native-install-v1"
 EXPECTED_RUNNER = "SWPC-plasma-codex"
@@ -205,7 +218,8 @@ def parse_dynamic_work_order(event: object) -> dict:
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
                                "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
-                               "expected_stdout_sha256", "project", "stage"},
+                               "expected_stdout_sha256", "project", "stage",
+                                "monitor_summary"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -216,6 +230,12 @@ def parse_dynamic_work_order(event: object) -> dict:
                             for ch in val), "WORK_ORDER_TEXT_DENIED")
     require(len(order["objective"]) + len(order["acceptance"]) <= 10000,
             "WORK_ORDER_TOO_LARGE")
+    if "monitor_summary" in order:
+        summary = order["monitor_summary"]
+        require(type(summary) is str and
+                MONITOR_SUMMARY.fullmatch(summary) is not None and
+                MONITOR_SENSITIVE.search(summary) is None,
+                "WORK_ORDER_MONITOR_SUMMARY_DENIED")
     path, capability, scope = (order["execution_path"],
                                order["capability"], order.get("scope"))
     require(type(path) is str and path in DYNAMIC_TASKS and
@@ -228,14 +248,14 @@ def parse_dynamic_work_order(event: object) -> dict:
         if "session_resume" in order:
             require(order["session_resume"] == "page-boundary-off-by-one"
                     and scope == "host-only"
-                    and set(order) <= base | optional_ref | {"session_resume"}
+                    and set(order) <= base | optional_ref | {"session_resume", "monitor_summary"}
                     and type(order.get("pr_number")) is int
                     and order["pr_number"] >= 0
                     and "source_sha" in order,
                     "WORK_ORDER_RESUME_SCOPE_DENIED")
         else:
             require(capability == "codex-workspace" and
-                    set(order) <= (base - {"scope"}) | optional_ref,
+                    set(order) <= (base - {"scope"}) | optional_ref | {"monitor_summary"},
                     "WORK_ORDER_PATH3_FIELDS_DENIED")
         require(capability == "codex-workspace",
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
@@ -325,6 +345,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         "acceptance": order["acceptance"],
         "work_order_sha256": req["work_order_sha256"],
     }
+    if "monitor_summary" in order:
+        task["monitor_summary"] = order["monitor_summary"]
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order["scope"]
     if "session_resume" in order:
@@ -505,6 +527,9 @@ def authorize(event: object, context: dict, registry: object,
                  if task["execution_path"] == "path2-cli"
             else "codex-workspace"
         ),
+        # Only explicit, checksum-bound, operator-public Path 3 metadata.
+        # No objective, acceptance, prompt, or Work Order JSON in this field.
+        "monitor_summary": task.get("monitor_summary", ""),
         **a2_claim,
     }
 
