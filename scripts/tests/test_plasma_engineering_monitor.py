@@ -618,7 +618,11 @@ else:
     sys.exit(2)
 with open(p, "w") as f: json.dump(state, f)
 if op in ("new-session", "new-window"):
-    subprocess.run(["bash", "-c", args[-1]], check=True)
+    # Real tmux detaches its pane from the launcher. Never inherit the
+    # interactive SWPC terminal: the intentional exec-bash failure fallback
+    # would otherwise wait for keyboard input and hang the mock launcher.
+    subprocess.run(["bash", "-c", args[-1]], check=True,
+                   stdin=subprocess.DEVNULL, timeout=5)
 ''', python=True)
             env = dict(os.environ)
             env.update({
