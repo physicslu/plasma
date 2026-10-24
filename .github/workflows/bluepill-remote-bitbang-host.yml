@@ -17,8 +17,8 @@ on:
       - 'software/python/plasma_interfaces/bluepill_z2_word_port.py'
       - 'software/python/tests/test_bluepill_z2_word_port_host.py'
       - 'pl/tests/test_bluepill_z2_source.py'
-      - 'pl/hil/bluepill_protected_stage.py'
-      - 'pl/tests/test_bluepill_protected_stage.py'
+      - 'pl/projects/z2-bluepill-rbb/image-descriptor.json'
+      - 'pl/tests/test_fpga_image_descriptor_stage.py'
       - 'pl/hil/fpga_configuration_policy.py'
       - 'pl/tests/test_fpga_configuration_policy.py'
       - 'pl/verification/test_bluepill_pmod_rtl.py'
@@ -50,7 +50,7 @@ jobs:
         run: |
           python -m pytest -q software/python/tests/test_bluepill_z2_word_port_host.py
           python -m pytest -q pl/tests/test_bluepill_z2_source.py
-          python -m pytest -q pl/tests/test_bluepill_protected_stage.py
+          python -m pytest -q pl/tests/test_fpga_image_descriptor_stage.py
           python -m pytest -q pl/tests/test_fpga_configuration_policy.py
       - name: Real AXI-Lite RTL Cocotb simulation
         run: python -m pytest -q pl/verification/test_bluepill_remote_bitbang_rtl.py
