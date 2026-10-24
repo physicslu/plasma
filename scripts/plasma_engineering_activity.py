@@ -226,6 +226,9 @@ def parse_public_line(line: str) -> dict | None:
                     any(p in ("", ".", "..") or p.startswith(".") for p in parts)
                     or SENSITIVE.search(name) is not None):
                 return None
+    elif obj["detail"] == "(command hidden)":
+        if obj["kind"] != "COMMAND":
+            return None
     elif obj["detail"] in SEMANTIC_KIND_BY_LABEL:
         if obj["kind"] != SEMANTIC_KIND_BY_LABEL[obj["detail"]]:
             return None
