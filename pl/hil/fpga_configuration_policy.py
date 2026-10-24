@@ -165,7 +165,7 @@ class ImageDescriptor:
 
 def load_descriptor(path: Path) -> ImageDescriptor:
     """Read checked-in metadata only; it does not grant root/image authority."""
-    need(type(path) is Path and path.is_file() and not path.is_symlink() and
+    need(isinstance(path, Path) and path.is_file() and not path.is_symlink() and
          path.stat().st_size <= 16384, "IMAGE_DESCRIPTOR_FILE_INVALID")
     try:
         return ImageDescriptor.from_mapping(json.loads(path.read_text()))
@@ -238,6 +238,7 @@ def validate_stage_plan(*, stage: str, phase: str, action: str,
 
 @dataclass(frozen=True)
 class ImageLock:
+    project: str                      # independent root-profile project claim
     descriptor: ImageDescriptor
     reviewed_source_sha: str
     installed_source_sha: str
@@ -253,7 +254,7 @@ class ImageLock:
         d = self.descriptor
         d.validate()
         validate_source_lock(
-            project=d.project, expected_project=d.project,
+            project=self.project, expected_project=d.project,
             reviewed_sha=self.reviewed_source_sha,
             installed_sha=self.installed_source_sha,
             build_sha=self.image_build_source_sha,
