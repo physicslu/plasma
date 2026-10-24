@@ -1,0 +1,5 @@
+# inspected derivative; source SHA256 2775206c3cb6c07354709f1a5088c64e3600994ef58fe838d6a5637c73b3041f
+st-flash 1.7.0
+2026-10-23T20:14:01 INFO usb.c: Unable to match requested speed 100 kHz, using 50 kHz
+2026-10-23T20:14:01 INFO common.c: F1xx Medium-density: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.
+2026-10-23T20:14:01 WARN common.c: NRST is not connected

@@ -29,6 +29,8 @@ COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
+# Fixed trusted-main Path 2 observation; NOT an arbitrary-script capability.
+NATIVE_PREFLIGHT = "codex-native-install-v1"
 EXPECTED_RUNNER = "SWPC-plasma-codex"
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
@@ -202,7 +204,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                            "execution_path", "capability"}
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
-                               "pr_number", "source_sha", "script", "argv",
+                               "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
                                "expected_stdout_sha256", "project", "stage"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
@@ -223,9 +225,30 @@ def parse_dynamic_work_order(event: object) -> dict:
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
-        require(capability == "codex-workspace" and
-                set(order) <= (base - {"scope"}) | optional_ref,
+        if "session_resume" in order:
+            require(order["session_resume"] == "page-boundary-off-by-one"
+                    and scope == "host-only"
+                    and set(order) <= base | optional_ref | {"session_resume"}
+                    and type(order.get("pr_number")) is int
+                    and order["pr_number"] >= 0
+                    and "source_sha" in order,
+                    "WORK_ORDER_RESUME_SCOPE_DENIED")
+        else:
+            require(capability == "codex-workspace" and
+                    set(order) <= (base - {"scope"}) | optional_ref,
+                    "WORK_ORDER_PATH3_FIELDS_DENIED")
+        require(capability == "codex-workspace",
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
+    elif capability == "cpu-only" and "native_preflight" in order:
+        # Existing Path 2 task_id and Runner. No candidate scripts, shell,
+        # path parameters, model or hardware under this one main-only route.
+        require(path == "path2-cli" and scope == "host-only" and
+                order["native_preflight"] == NATIVE_PREFLIGHT and
+                set(order) == base | optional_ref | {"native_preflight"} and
+                order.get("pr_number") == 0 and
+                type(order.get("pr_number")) is int and
+                type(order.get("source_sha")) is str,
+                "WORK_ORDER_NATIVE_PREFLIGHT_SCOPE_DENIED")
     elif capability == "cpu-only":
         require(scope == "host-only" and
                 {"script", "argv", "expected_stdout_sha256"} <= set(order)
@@ -257,6 +280,17 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(type(order.get("source_sha")) is str and
                 SHA40.fullmatch(order["source_sha"]) is not None,
                 "WORK_ORDER_SOURCE_DENIED")
+    elif order.get("native_preflight") == NATIVE_PREFLIGHT:
+        # Separate owner-scoped bootstrap: exact event main, Path 2 only.
+        require(type(order.get("source_sha")) is str and
+                SHA40.fullmatch(order["source_sha"]) is not None,
+                "WORK_ORDER_NATIVE_MAIN_SHA_REQUIRED")
+    elif order.get("session_resume") == "page-boundary-off-by-one":
+        # Exception for this exact CPU-only post-merge diagnostic only.
+        # Main pinning is checked against trusted GITHUB_SHA by request().
+        require(type(order.get("source_sha")) is str and
+                SHA40.fullmatch(order["source_sha"]) is not None,
+                "WORK_ORDER_RESUME_MAIN_SHA_REQUIRED")
     else:
         require("source_sha" not in order,
                 "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED")
@@ -293,6 +327,10 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
     }
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order["scope"]
+    if "session_resume" in order:
+        task["session_resume"] = order["session_resume"]
+    if "native_preflight" in order:
+        task["native_preflight"] = order["native_preflight"]
     for key in ("script", "argv", "expected_stdout_sha256",
                 "project", "stage"):
         if key in order:
@@ -333,6 +371,15 @@ def request(event: object, context: dict) -> dict:
             "COMMAND_DENIED")
     if body.startswith(WORK_ORDER_PREFIX):
         order = parse_dynamic_work_order(event)
+        if (order.get("native_preflight") == NATIVE_PREFLIGHT and
+                order["pr_number"] == 0):
+            require(order["source_sha"] == sha,
+                    "WORK_ORDER_NATIVE_MAIN_SHA_MISMATCH")
+        if (order.get("session_resume") == "page-boundary-off-by-one" and
+                order["pr_number"] == 0):
+            # Never admit a different main commit, branch or omitted pin.
+            require(order["source_sha"] == sha,
+                    "WORK_ORDER_RESUME_MAIN_SHA_MISMATCH")
         return {
             "task_id": DYNAMIC_TASKS[order["execution_path"]],
             "auto_download_after_build_success": False,
@@ -343,6 +390,8 @@ def request(event: object, context: dict) -> dict:
             "comment_id": comment["id"],
             "issue_number": ISSUE,
             "work_order_sha256": work_order_digest(order),
+            **({"session_resume": order["session_resume"]}
+               if "session_resume" in order else {}),
         }
     require(len(body) <= 200, "COMMAND_DENIED")
     branch_match = BRANCH_COMMAND.fullmatch(body)
@@ -906,32 +955,24 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         ".txt" if task.get("output_format") == "text" else ".csv"
     ) if source is not None else None)
     test_log = source.with_suffix(".test.log") if source is not None else None
+    # Codex loads the concise root AGENTS.md as the normative entrypoint.
+    # Keep task details in reviewed repository Work Orders and read large
+    # detailed clauses only when relevant to the approved engineering goal.
     prompt = (
-        "PLASMA Development Mode Path 3: you are the autonomous engineer. "
-        "Prioritize completing the user-approved engineering goal quickly. "
-        "Run tools, diagnose failures, edit RTL/Tcl/Python/build scripts/docs, "
-        "repeat tests and host builds as needed within this SAME Codex job "
-        "and existing Gate 1 scope, without another user approval. "
-        "Retry recoverable software/test failures only after diagnosing them; "
-        "do not repeat unsafe hardware writes or bypass denied permissions. "
-        "Stop on missing authorization, physical ownership conflict, SIGBUS, "
-        "unreaped child or uncertain FPGA restoration. "
-        "Do not stop at an offline "
-        "mock when an actual Vivado build is needed.\n"
+        "PLASMA Path 3 Development Mode. Follow root AGENTS.md and the "
+        "owner-approved Work Order at its pinned source SHA. Read only "
+        "task-relevant detailed clauses linked from AGENTS.md, including "
+        "nested AGENTS.md when affected. Do not preload unrelated runbooks. "
+        "Within the existing Gate 1, diagnose, edit RTL/Tcl/Python, run "
+        "required builds/tests and fix/retest without another user approval. "
+        "Vivado 2026.1 is available only for work within approved scope. "
+        "Do not retry unsafe hardware writes; respect live ownership, "
+        "root-executor, electrical and rollback guards. Report inaccessible "
+        "SWPC/Z2 operations as NOT_RUN, never PASS. "
+        "Record actual commands, exits, results and hashes in "
+        ".plasma-path3-evidence/engineering-report.md. Do not commit, push "
+        "or change Git refs.\n"
         "Goal:\n" + task["objective"] + "\n"
-        "You may edit files inside this candidate workspace and run "
-        "commands required for development, including Vivado 2026.1 "
-        "synthesis/implementation/timing/DRC and BIT/HWH generation. "
-        "A successful Vivado build does not authorize FPGA loading or other "
-        "physical hardware operations.\n"
-        "Record actual commands, exit codes, observed errors, proven versus "
-        "hypothesized root causes, minimal fixes, retries, final build "
-        "stage results and hashes in .plasma-path3-evidence/engineering-report.md. "
-        "Include a chronological problem/solution ledger. Do not fabricate "
-        "PASS or claim BIT/HWH if not produced. Preserve relevant raw build "
-        "logs/reports/artifacts under the workspace. The workflow captures "
-        "your complete tracked-source Git diff, newly created files and "
-        "this report for review; do not commit, push or change Git refs.\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
         prompt += (
@@ -955,12 +996,15 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "plasma-fpga-build-diagnostics.json and preserve the first failure.\n"
         )
     prompt += (
-        "Choose engineering tools and build commands as needed for the owner goal. "
-        "Physical effects require owner authorization and the existing trusted "
-        "root executor. Do not call sudo, SSH, FPGA Manager, /dev/mem or UIO "
-        "from this sandbox. Never claim delegated hardware acceptance without "
-        "an authentic real Z2 receipt. Report an unavailable protected execution "
-        "route as NOT_RUN.\n"
+        "In Development Mode, the existing Path 3 engineer may use accessible "
+        "SWPC USB and TTY tools for hardware operations explicitly covered "
+        "by the Owner's Gate 1 objective. Linux DAC/ACL still applies. "
+        "Use the minimum sufficient experiment: stop after one genuine PASS; "
+        "after FAIL diagnose and make a targeted retest. No Program, Readback "
+        "or Verify quota applies. Privileged Z2 FPGA Manager/MMIO and protected "
+        "stages still require the existing trusted root executor; no sudo, "
+        "root, /dev/mem or UIO access is granted to Codex. "
+        "Never claim a physical PASS without actual evidence.\n"
     )
     if output_path:
         prompt += (
@@ -974,6 +1018,12 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "-c", "sandbox_workspace_write.network_access=false",
         "exec", "--json", "--sandbox", "workspace-write", "-",
     ]
+    if executor is subprocess.run:
+        # Production Path 3: one rootless OS-level device-visible namespace.
+        # The inner Codex sandbox cannot access the real host's other /dev.
+        # Offline tests inject an inert executor and retain the legacy argv.
+        import plasma_development_codex_sandbox as codex_sandbox
+        command = codex_sandbox.codex_command(root)
     usage = CodexUsageCollector()
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.
@@ -1020,6 +1070,22 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         return hashlib.sha256(p.read_bytes()).hexdigest()
     usage_path = evidence / "codex-token-usage.json"
     usage_snapshot = usage.snapshot()
+    # Bounded numeric-only context diagnostics. The size of a repo file is
+    # NOT proof of actual Codex instruction loading or a model request count.
+    root_agents = root / "AGENTS.md"
+    agents_size = None
+    if root_agents.is_file() and not root_agents.is_symlink():
+        candidate_size = root_agents.stat().st_size
+        if 0 <= candidate_size <= 1024 * 1024:
+            agents_size = candidate_size
+    context_audit = {
+        "schema_version": 1,
+        "repo_root_agents_bytes": agents_size,
+        "dispatched_prompt_bytes": len(prompt.encode("utf-8")),
+        "model_request_count": None,
+        "model_request_count_status": "NOT_AVAILABLE",
+        "actual_instruction_load_status": "NOT_VERIFIED",
+    }
     usage_path.write_text(json.dumps(usage_snapshot, indent=2, sort_keys=True) + "\n")
     receipt = {
         "status": "EVIDENCE_READY_REVIEW_REQUIRED",
@@ -1029,6 +1095,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_log_path": str(codex_log.relative_to(root)),
         "codex_log_sha256": digest(codex_log),
         "codex_usage": usage_snapshot,
+        "codex_context_audit": context_audit,
         "codex_model_selection": codex_requested_model_settings(command),
         "codex_usage_path": str(usage_path.relative_to(root)),
         "codex_usage_sha256": digest(usage_path),
@@ -1133,6 +1200,10 @@ def safe_error_reason(exc: Exception) -> str:
     if isinstance(exc, Denied):
         return str(exc)
     detail = str(exc)
+    if (type(exc).__name__ == "CodexSandboxDenied" and
+            re.fullmatch(r"CODEX_SANDBOX_[A-Z0-9_]{3,80}", detail) is not None):
+        # Auditable fixed category, not the host path or exception traceback.
+        return detail
     if type(exc).__name__ in ("RuntimeDenied", "QualificationDenied"):
         if re.fullmatch(r"PATH2_[A-Z0-9_]{3,80}|BUILD_[A-Z0-9_]{3,80}", detail):
             return detail
@@ -1173,6 +1244,7 @@ def main() -> int:
     parser.add_argument("--registry-sha256")
     parser.add_argument("--work-order-sha256")
     parser.add_argument("--execution-capability")
+    parser.add_argument("--resume-phase", choices=("new", "resume"))
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args()
@@ -1198,18 +1270,74 @@ def main() -> int:
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
                                  else None)
-                receipt = (
-                    (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
-                     if req["task_id"] == "f1b-path3-codex-vivado-build"
-                     else run_codex_task(task, workspace=args.workspace,
-                                   task_id=req["task_id"])
+                # One fixed main-only Path 2 observation. Executed by
+                # trusted main, not candidate code and NEVER by Codex.
+                if task.get("native_preflight") == NATIVE_PREFLIGHT:
+                    require(args.action == "execute" and
+                            req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
+                            req["pr_number"] == 0 and
+                            req["source_sha"] == req["trusted_sha"] ==
+                                os.environ.get("GITHUB_SHA") and
+                            os.environ.get("GITHUB_JOB") == "development-execute" and
+                            os.environ.get("GITHUB_RUN_ATTEMPT") == "1" and
+                            os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER and
+                            os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted" and
+                            task["capability"] == "cpu-only" and
+                            task["work_order_scope"] == "host-only" and
+                            args.resume_phase is None,
+                            "NATIVE_PREFLIGHT_WORKER_DENIED")
+                    import plasma_codex_native_preflight as native
+                    try:
+                        receipt = native.inspect()
+                    except native.PreflightDenied as exc:
+                        if str(exc) != "NATIVE_PATH_PERMISSIONS_DENIED":
+                            raise Denied(str(exc)) from None
+                        # Only static, separately validated category fields.
+                        # Never include any observed host path or uid/gid.
+                        require(exc.stage in native.SAFE_PERMISSION_STAGES and
+                                exc.cause in native.SAFE_PERMISSION_CAUSES and
+                                type(exc.component_index) is int and
+                                1 <= exc.component_index <= 24,
+                                "NATIVE_DIAGNOSTIC_FIELDS_DENIED")
+                        receipt = {
+                            "schema": "plasma.codex.native_preflight.v1",
+                            "status": "NOT_RUN_OR_FAIL",
+                            "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+                            "denial_stage": exc.stage,
+                            "denial_cause": exc.cause,
+                            "denial_component_index": exc.component_index,
+                            "model_session": "NOT_RUN",
+                            "hardware_access": "NOT_RUN",
+                            "provenance": "NOT_INDEPENDENTLY_VERIFIED",
+                            "sha256_pin_authorized": False,
+                        }
+                # This exact CPU-only fixture is the ONLY cross-Job route.
+                # Unflagged Path 3 retains its existing single-exec behavior.
+                elif task.get("session_resume") or args.resume_phase:
+                    require(args.action == "execute-codex" and
+                            task.get("session_resume") == "page-boundary-off-by-one"
+                            and args.resume_phase in ("new", "resume"),
+                            "RESUME_EXPLICIT_PHASE_DENIED")
+                    import plasma_path3_cross_job_resume as crossjob
+                    try:
+                        receipt = crossjob.execute(
+                            args.resume_phase,
+                            {**req, "execution_path": task["execution_path"]},
+                            args.workspace)
+                    except crossjob.ResumeDenied as exc:
+                        raise Denied(str(exc)) from None
+                else:
+                    receipt = (
+                        (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
+                         if req["task_id"] == "f1b-path3-codex-vivado-build"
+                         else run_codex_task(task, workspace=args.workspace,
+                                             task_id=req["task_id"]))
+                        if args.action == "execute-codex"
+                        else run_task(task, workspace=args.workspace,
+                                      evidence_dir=args.evidence_dir,
+                                      approval=task_approval,
+                                      sandbox=task.get("capability", "cpu-only") == "cpu-only")
                     )
-                    if args.action == "execute-codex"
-                    else run_task(task, workspace=args.workspace,
-                                  evidence_dir=args.evidence_dir,
-                                  approval=task_approval,
-                                  sandbox=task.get("capability", "cpu-only") == "cpu-only")
-                )
                 plan = {
                     **receipt, **req,
                     "task_id": req["task_id"],
@@ -1219,8 +1347,13 @@ def main() -> int:
                     "worker_admission": admission,
                 }
                 task_failed = (
-                    args.action == "execute-codex"
-                    and receipt.get("status") != "EVIDENCE_READY_REVIEW_REQUIRED"
+                    (args.action == "execute-codex"
+                     and receipt.get("status") != (
+                         "NEW_EXPECTED_TEST_FAIL" if args.resume_phase == "new"
+                         else "RESUME_FIX_PASS" if args.resume_phase == "resume"
+                         else "EVIDENCE_READY_REVIEW_REQUIRED"))
+                    or (task.get("native_preflight") == NATIVE_PREFLIGHT
+                        and receipt.get("status") != "OBSERVED")
                 )
             else:
                 plan = authorize(event, os.environ, registry, pr)
@@ -1228,7 +1361,7 @@ def main() -> int:
                     args.registry.read_bytes()
                 ).hexdigest()
         print(json.dumps(plan, sort_keys=True))
-        return 2 if args.action == "execute-codex" and task_failed else 0
+        return 2 if args.action in ("execute", "execute-codex") and task_failed else 0
     except (Denied, OSError, UnicodeError, json.JSONDecodeError,
             subprocess.SubprocessError, ValueError) as exc:
         print(json.dumps({

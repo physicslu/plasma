@@ -1,0 +1,5 @@
+# sanitized derivative; source SHA256 8f8e53a1c6cae0e3a6a442c5037c75df961d164d9921b7edb10c7355ce8dc646
+st-flash 1.7.0
+2026-10-23T20:29:06 INFO usb.c: Unable to match requested speed 100 kHz, using 50 kHz
+2026-10-23T20:29:06 INFO common.c: F1xx Medium-density: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.
+2026-10-23T20:29:06 INFO common.c: read from address 0x08000000 size 18768

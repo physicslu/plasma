@@ -1,0 +1,13 @@
+{
+  "cdc_port_reopen_after_independent_reset": "NOT_RUN",
+  "firmware_id_after_independent_reset": "NOT_RUN",
+  "heartbeat_after_independent_reset": "NOT_RUN",
+  "last_preserved_acl_snapshot": "root:dialout 0660; no temporary operator ACL",
+  "pc13_led_physical_observation": "NOT_RUN",
+  "physical_usb_replug": "NOT_RUN",
+  "source_acl_snapshot_sha256": "d3b37e5fcfbb1086dfe146b7159be02cb820148fcd642c1d11070d6fd46cfaf0",
+  "source_reset_log_sha256": "a51358902198381bc48027c8fdf35d052e656fd8cdf095d7d648899bc3b1f1fb",
+  "stlink_nrst_warning": true,
+  "stlink_reset_exit_code": 0,
+  "usb_reenumeration": "OBSERVED_IN_ORIGINAL_HIL_REPORT"
+}
