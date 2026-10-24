@@ -87,8 +87,10 @@ def _receipt_permission_hint(raw: object, *, run_id: str, task: str,
         raw.get("github_run_id") == run_id and
         raw.get("task_id") == task and
         raw.get("work_order_sha256") == work_order_sha and
-        raw.get("denial_stage") in RECEIPT_PERMISSION_STAGES and
-        raw.get("denial_cause") in RECEIPT_PERMISSION_CAUSES and
+        type(raw.get("denial_stage")) is str and
+        raw["denial_stage"] in RECEIPT_PERMISSION_STAGES and
+        type(raw.get("denial_cause")) is str and
+        raw["denial_cause"] in RECEIPT_PERMISSION_CAUSES and
         raw.get("model_session") == "NOT_RUN" and
         raw.get("hardware_access") == "NOT_RUN" and
         raw.get("provenance") == "NOT_INDEPENDENTLY_VERIFIED" and
@@ -104,6 +106,22 @@ def _receipt_permission_hint(raw: object, *, run_id: str, task: str,
         "cause": raw["denial_cause"],
         "component_index": index,
     }
+
+
+def _safe_stored_receipt_hint(value: object) -> dict | None:
+    """Validate the monitor snapshot again; it is group-readable metadata."""
+    if type(value) is not dict or set(value) != {
+            "reason", "stage", "cause", "component_index"}:
+        return None
+    if (value["reason"] != "NATIVE_PATH_PERMISSIONS_DENIED" or
+            type(value["stage"]) is not str or
+            value["stage"] not in RECEIPT_PERMISSION_STAGES or
+            type(value["cause"]) is not str or
+            value["cause"] not in RECEIPT_PERMISSION_CAUSES or
+            type(value["component_index"]) is not int or
+            not 1 <= value["component_index"] <= 24):
+        return None
+    return value
 
 
 def _read_path2_receipt_hint(*, runner_temp: object, run_id: str,
@@ -464,25 +482,12 @@ def render_snapshot(directory: Path, path: str, *,
         # The monitor wrapper's return code is NOT a verification receipt.
         lines.append("WRAPPER: %s  EXIT: %s" %
                      (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
-        hint = state.get("receipt_hint")
+        hint = _safe_stored_receipt_hint(state.get("receipt_hint"))
         if (path == "path2" and state.get("last_result") == "FAIL" and
                 type(state.get("exit_code")) is int and
-                _receipt_permission_hint({
-                    "schema": "plasma.codex.native_preflight.v1",
-                    "status": "NOT_RUN_OR_FAIL",
-                    "reason": (hint or {}).get("reason") if type(hint) is dict else None,
-                    "github_run_id": state.get("run_id"),
-                    "task_id": state.get("task"),
-                    "work_order_sha256": "a" * 64,
-                    "denial_stage": (hint or {}).get("stage") if type(hint) is dict else None,
-                    "denial_cause": (hint or {}).get("cause") if type(hint) is dict else None,
-                    "denial_component_index": (hint or {}).get("component_index") if type(hint) is dict else None,
-                    "model_session": "NOT_RUN", "hardware_access": "NOT_RUN",
-                    "provenance": "NOT_INDEPENDENTLY_VERIFIED",
-                    "sha256_pin_authorized": False,
-                }, run_id=state.get("run_id"), task=state.get("task"),
-                work_order_sha="a" * 64, exit_code=state.get("exit_code"))
-                is not None):
+                state["exit_code"] == 2 and
+                state.get("task") == "path2-work-order" and
+                hint is not None):
             lines.append("RECEIPT: %s | %s | %s | #%d" % (
                 hint["reason"], hint["stage"], hint["cause"],
                 hint["component_index"]))
