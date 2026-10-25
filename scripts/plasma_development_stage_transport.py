@@ -73,8 +73,8 @@ ROOT_MANIFEST_DIAGNOSTICS = frozenset({
     "PATH2_PINNED_PYTHON_NOT_INSTALLED", "PATH2_SOURCE_NOT_ROOT_OWNED",
     "PATH2_SOURCE_WRITABLE_BY_OTHERS", "PATH2_REQUIRED_SOURCE_NOT_PINNED",
     "PATH2_APPROVED_SOURCE_HASH_MISMATCH",
-    "PATH2_APPROVED_PROFILE_INVALID", "PATH2_APPROVED_PROFILE_MISMATCH",
-    "PATH2_REQUEST_NOT_PINNED",
+    "PATH2_APPROVED_COMMIT_PIN_INVALID", "PATH2_APPROVED_SOURCE_SHA_MISMATCH",
+    "PATH2_REQUEST_NOT_PINNED", "PATH2_LEGACY_PROJECT_DENIED",
 })
 
 
@@ -193,13 +193,23 @@ def enrollment() -> tuple[str, str, str]:
     return ssh["ssh_host"], ssh["ssh_password"], sudo_password
 
 
-def execute(stage: str, source_sha: str, project: str) -> dict:
+def execute(stage: str, source_sha: str, project: str | None = None) -> dict:
+    """Execute an exact reviewed operation through the existing Z2 Root Entry.
+
+    project=None is the direct CLI contract: no runtime Project/Profile/Stage
+    selection; the Root Entry chooses its reviewed implementation. An explicit
+    project is legacy-only and remains bounded until the old route is deleted.
+    """
     need(type(stage) is str and STAGE_NAME.fullmatch(stage) is not None,
          "STAGE_INVALID")
     need(bool(re.fullmatch(r"[a-f0-9]{40}", source_sha)), "SOURCE_SHA_INVALID")
-    need(type(project) is str and re.fullmatch(
-        r"pl/projects/[a-z0-9][a-z0-9-]{2,69}", project) is not None,
-        "PROJECT_NOT_ALLOWLISTED")
+    direct = project is None
+    if direct:
+        project = "pl/projects/z2-fixed-unified-site1"  # existing reviewed Z2 handler
+    else:
+        need(type(project) is str and re.fullmatch(
+            r"pl/projects/[a-z0-9][a-z0-9-]{2,69}", project) is not None,
+            "PROJECT_NOT_ALLOWLISTED")
     try:
         host, password, sudo_password = enrollment()
     except Blocked:
@@ -209,7 +219,7 @@ def execute(stage: str, source_sha: str, project: str) -> dict:
     # Remote command is fixed; only the three bounded stage tokens vary.
     # Root-side executable itself checks protected code/firmware manifest.
     remote = ("sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " +
-              stage + " " + project + " " + source_sha)
+              stage + " " + (source_sha if direct else project + " " + source_sha))
     argv = [
         "/usr/bin/ssh", "-F", "/dev/null", "-T",
         "-o", "StrictHostKeyChecking=yes",
@@ -304,3 +314,10 @@ def execute(stage: str, source_sha: str, project: str) -> dict:
             if slave != -1:
                 os.close(slave)
             os.close(master)
+
+
+def execute_operation(operation: str, source_sha: str) -> dict:
+    """Path 2 direct operation, with no Stage or Project Profile admission."""
+    need(type(operation) is str and operation in ("download", "test", "restore"),
+         "STAGE_NOT_ALLOWLISTED")
+    return execute(operation, source_sha)

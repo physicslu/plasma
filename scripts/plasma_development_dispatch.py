@@ -109,19 +109,6 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
                 "A2_TASK_BINDING_DENIED")
         return task
-    if task_id in ("z2-path2-download", "z2-path2-testing",
-                    "z2-path2-restore", "z2-path2-full-hil"):
-        expected = {"z2-path2-download": "download",
-                    "z2-path2-testing": "test",
-                    "z2-path2-restore": "restore",
-                    "z2-path2-full-hil": "full"}
-        require(execution_path == "path2-cli" and set(task) == {
-            "execution_path", "capability", "project", "stage",
-        } and task["capability"] == "path2-stage-contract"
-                and task["project"] == "pl/projects/z2-fixed-unified-site1"
-                and task["stage"] == expected[task_id],
-                "PATH2_STAGE_TASK_FIELDS_DENIED")
-        return task
     if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
         require(task_id in ("fixed-site1-vivado-host-build", "z2-path2-build"),
                 "PATH2_BUILD_TASK_ID_DENIED")
@@ -221,7 +208,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "execution_path", "capability",
                                "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
                                "expected_stdout_sha256", "verification",
-                               "timeout_seconds", "project", "stage",
+                               "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
                                 "monitor_summary"},
             "WORK_ORDER_FIELDS_DENIED")
@@ -321,16 +308,13 @@ def parse_dynamic_work_order(event: object) -> dict:
                 and type(order["board_repo_sha"]) is str
                 and SHA40.fullmatch(order["board_repo_sha"]) is not None,
                 "WORK_ORDER_VIVADO_HOST_BUILD_DENIED")
-    elif capability == "path2-stage-contract":
-        require(scope == "guarded-hardware" and
-                {"project", "stage"} <= set(order) and
-                set(order) <= base | optional_ref | {"project", "stage", "monitor_summary"} and
-                type(order["project"]) is str and
-                re.fullmatch(r"pl/projects/[a-z0-9][a-z0-9-]{2,69}",
-                             order["project"]) is not None and
-                type(order["stage"]) is str and
-                order["stage"] in ("download", "test", "restore"),
-                "WORK_ORDER_STAGE_CAPABILITY_DENIED")
+    elif capability == "z2-root-operation":
+        # Direct, bounded operation. No Stage ID, Profile, Project or shell.
+        require(path == "path2-cli" and scope == "guarded-hardware" and
+                set(order) <= base | optional_ref | {"operation", "monitor_summary"} and
+                type(order.get("operation")) is str and
+                order["operation"] in ("download", "test", "restore"),
+                "WORK_ORDER_ROOT_OPERATION_DENIED")
     else:
         raise Denied("WORK_ORDER_CAPABILITY_DENIED")
     number = order.get("pr_number", 0)
@@ -397,7 +381,7 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
     if "native_preflight" in order:
         task["native_preflight"] = order["native_preflight"]
     for key in ("script", "argv", "expected_stdout_sha256",
-                "project", "stage", "toolchain", "board_repo_sha"):
+                "project", "operation", "toolchain", "board_repo_sha"):
         if key in order:
             task[key] = order[key]
     return task
@@ -470,8 +454,7 @@ def request(event: object, context: dict) -> dict:
     auto_testing = " --auto-testing" in flags
     require(not auto_download or task_id == "z2-path2-build",
             "PATH2_AUTO_DOWNLOAD_TASK_DENIED")
-    require(not auto_testing or task_id in (
-        "z2-path2-build", "z2-path2-download"),
+    require(not auto_testing or task_id == "z2-path2-build",
         "PATH2_AUTO_TEST_TASK_DENIED")
     return {
         "task_id": task_id,
@@ -545,7 +528,7 @@ def authorize(event: object, context: dict, registry: object,
             "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
-    if task.get("capability") in ("vivado-host-build", "path2-stage-contract"):
+    if task.get("capability") in ("vivado-host-build", "z2-root-operation"):
         # Owner-approved immutable PR SHA is admissible before merge.
         # verify_pr() above has already checked the live same-repo owner PR,
         # exact current HEAD and main base; do not equate merge with trust.
@@ -559,13 +542,12 @@ def authorize(event: object, context: dict, registry: object,
     # No freeform Work Order command, stdout or candidate data enters the pane.
     monitor_stage = ""
     if task["execution_path"] == "path2-cli":
-        if task.get("capability") == "path2-stage-contract":
+        if task.get("capability") == "z2-root-operation":
             monitor_stage = {
                 "download": "Guarded Download",
                 "test": "Guarded Test",
                 "restore": "Guarded Restore",
-                "full": "Guarded Full HIL",  # Existing exact registry task.
-            }[task["stage"]]
+            }[task["operation"]]
         elif task.get("native_preflight") == NATIVE_PREFLIGHT:
             monitor_stage = "Native preflight"
         elif task.get("capability") == "vivado-host-build":
@@ -575,10 +557,10 @@ def authorize(event: object, context: dict, registry: object,
     return {
         "status": "AUTHORIZED_DEV_TASK",
         "monitor_stage": monitor_stage,
-        "authorized_stage": (task["stage"] if
-                             req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
-                             task.get("capability") == "path2-stage-contract"
-                             else None),
+        "authorized_operation": (task["operation"] if
+                                 req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
+                                 task.get("capability") == "z2-root-operation"
+                                 else None),
         **req,
         "pinned_sha": req["source_sha"],
         "execution_path": task["execution_path"],
@@ -686,11 +668,9 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                     evidence_dir=evidence_dir, executor=executor))
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
-    if task.get("capability") == "path2-stage-contract":
+    if task.get("capability") == "z2-root-operation":
         import plasma_path2_runtime_integration as integration
-        if approval is not None and approval.get("task_id") == "z2-path2-full-hil":
-            return integration.full_hil_sequence(task, approval)
-        return integration.registered_hardware_stage(task, approval)
+        return integration.direct_root_operation(task, approval)
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -1382,7 +1362,7 @@ def main() -> int:
                 task = task_for_request(registry, req, event)
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
-                                    ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
+                                    ("z2-cpu-only", "vivado-host-build", "z2-root-operation")
                                  else None)
                 # One fixed main-only Path 2 observation. Executed by
                 # trusted main, not candidate code and NEVER by Codex.

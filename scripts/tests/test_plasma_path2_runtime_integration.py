@@ -28,8 +28,7 @@ EVIDENCE = "d" * 64
 
 def approval(task_id="z2-path2-build", **changes):
     val = {"task_id": task_id, "execution_path": "path2-cli",
-           "execution_capability": "vivado-host-build" if
-           task_id == "z2-path2-build" else "path2-stage-contract",
+           "execution_capability": "vivado-host-build",
            "pinned_sha": SHA, "trusted_sha": SHA, "pr_number": 0,
            "auto_download_after_build_success": False,
            "auto_test_after_download_success": False}
@@ -58,96 +57,6 @@ class RouteContracts(unittest.TestCase):
     def setUpClass(cls):
         cls.registry = json.loads(REGISTRY.read_text())
 
-    def test_three_independent_task_identities(self):
-        for name, cap in (("z2-path2-build", "vivado-host-build"),
-                          ("z2-path2-download", "path2-stage-contract"),
-                          ("z2-path2-testing", "path2-stage-contract"),
-                           ("z2-path2-restore", "path2-stage-contract"),
-                          ("z2-path2-full-hil", "path2-stage-contract")):
-            self.assertEqual(dispatch.task_by_id(self.registry, name)["capability"], cap)
-            result = dispatch.authorize(event(name), context(), self.registry)
-            self.assertEqual(result["task_id"], name)
-            self.assertFalse(result["auto_download_after_build_success"])
-            self.assertFalse(result["auto_test_after_download_success"])
-
-    def test_flags_are_owner_selected_and_independent(self):
-        cases = (("z2-path2-build", "", False, False),
-                 ("z2-path2-build", " --auto-download", True, False),
-                 ("z2-path2-build", " --auto-testing", False, True),
-                 ("z2-path2-build", " --auto-download --auto-testing", True, True),
-                 ("z2-path2-download", "", False, False),
-                 ("z2-path2-download", " --auto-testing", False, True),
-                 ("z2-path2-testing", "", False, False),
-                  ("z2-path2-restore", "", False, False),
-                 ("z2-path2-full-hil", "", False, False))
-        for name, flags, ad, at in cases:
-            with self.subTest(name=name, flags=flags):
-                p = dispatch.authorize(event(name, flags), context(), self.registry)
-                self.assertEqual((p["auto_download_after_build_success"],
-                                  p["auto_test_after_download_success"]), (ad, at))
-
-    def test_untrusted_flags_and_changed_scope_denied(self):
-        for name, flags in (
-            ("nine-nine-path2", " --auto-download"),
-            ("fixed-site1-vivado-host-build", " --auto-download"),
-            ("z2-path2-download", " --auto-download"),
-            ("z2-path2-testing", " --auto-testing"),
-            ("z2-path2-restore", " --auto-download"),
-            ("z2-path2-restore", " --auto-testing"),
-            ("z2-path2-full-hil", " --auto-download"),
-            ("z2-path2-full-hil", " --auto-testing"),
-            ("z2-path2-build", " --auto-testing --auto-download"),
-            ("z2-path2-build", " --auto-download --auto-download"),
-            ("z2-path2-build", " --help"),
-            ("z2-path2-build", " --auto-testing\\n"),
-        ):
-            with self.subTest(name=name, flags=flags):
-                with self.assertRaises(dispatch.Denied):
-                    dispatch.authorize(event(name, flags), context(), self.registry)
-        for key, value in (("GITHUB_ACTOR", "attacker"),):
-            ctx = context()
-            ctx[key] = value
-            with self.assertRaises(dispatch.Denied):
-                dispatch.authorize(event("z2-path2-download"), ctx, self.registry)
-        for key, value in (("stage", "build"),
-                           ("project", "scripts/evil"),
-                           ("capability", "z2-cpu-only"),
-                           ("argv", ["python", "/dev/mem"])):
-            reg = copy.deepcopy(self.registry)
-            reg["tasks"]["z2-path2-download"][key] = value
-            with self.assertRaises(dispatch.Denied):
-                dispatch.task_by_id(reg, "z2-path2-download")
-
-    def test_stage_never_uses_hardware_even_when_flagged(self):
-        for name in ("z2-path2-download", "z2-path2-testing",
-                     "z2-path2-restore"):
-            with self.subTest(name=name), self.assertRaisesRegex(
-                    runtime.RuntimeDenied, "PATH2_TRUSTED_BRIDGE_NOT_INSTALLED"):
-                runtime.disabled_hardware_stage(
-                    self.registry["tasks"][name], approval(name))
-        build = Mock()
-        with tempfile.TemporaryDirectory() as td:
-            with self.assertRaisesRegex(
-                    runtime.RuntimeDenied, "PATH2_LIVE_DOWNLOAD_PROVIDER_NOT_REGISTERED"):
-                runtime.host_build(
-                    self.registry["tasks"]["z2-path2-build"],
-                    workspace=Path(td), approval=approval(
-                        auto_download_after_build_success=True),
-                    evidence_dir=Path(td), build_driver=build)
-            build.assert_not_called()
-
-    def test_bad_source_pin_blocks_stage_before_transport(self):
-        task = self.registry["tasks"]["z2-path2-download"]
-        remote = Mock()
-        for bad_pin in ("not-a-sha", "f" * 40):
-            bad = approval("z2-path2-download", pinned_sha=bad_pin)
-            with self.subTest(pin=bad_pin), patch.object(
-                    runtime.transport, "execute", remote):
-                with self.assertRaisesRegex(
-                        runtime.RuntimeDenied, "PATH2_STAGE_APPROVAL_DENIED"):
-                    runtime.registered_hardware_stage(task, bad)
-        remote.assert_not_called()
-
     def test_host_build_receipt_is_qualified_once(self):
         build = Mock(return_value={
             "status": "HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED",
@@ -167,10 +76,11 @@ class RouteContracts(unittest.TestCase):
                 workspace=Path(td), approval=approval(),
                 evidence_dir=Path(td), build_driver=build,
                 qualify=decision)
-        self.assertEqual(result["completed"], ["build"])
-        self.assertEqual(result["scope"], "ADAPTER_RECEIPTS_ONLY")
-        self.assertEqual(result["receipts"]["build"]["artifact_sha256"], BIT)
-        self.assertEqual(result["transitions"], [])
+        self.assertEqual(result["status"], "HOST_BUILD_QUALIFIED_NO_HARDWARE")
+        self.assertEqual(result["bit_sha256"], BIT)
+        self.assertEqual(result["hwh_sha256"], HWH)
+        self.assertEqual(result["qualification_evidence_sha256"], EVIDENCE)
+        self.assertEqual(result["physical_load"], "NOT_RUN")
         build.assert_called_once()
         decision.assert_called_once()
 
@@ -188,19 +98,11 @@ class RouteContracts(unittest.TestCase):
         wf = WORKFLOW.read_text()
         self.assertIn("github.event_name == 'pull_request' || github.event_name == 'push'", wf)
         self.assertIn("runs-on: ubuntu-24.04", wf)
-        self.assertIn("path2-stage-contract", wf)
+        self.assertIn("z2-root-operation", wf)
         self.assertIn("github.run_attempt == 1", wf)
         self.assertIn("scripts/tests/test_plasma_path2_runtime_integration.py", wf)
         self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
 
-
-    def test_shared_stage_contract_ignores_inert_flags(self):
-        for name in ("z2-path2-download", "z2-path2-testing", "z2-path2-restore"):
-            task = self.registry["tasks"][name]
-            for flag in ("auto_download_after_build_success", "auto_test_after_download_success"):
-                with self.subTest(name=name, flag=flag):
-                    self.assertEqual(runtime.stage_contract(
-                        task, approval(name, **{flag: True})), task["stage"])
 
     def evidence(self, td):
         root = Path(td)

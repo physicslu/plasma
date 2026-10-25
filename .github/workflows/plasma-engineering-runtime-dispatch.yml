@@ -35,8 +35,6 @@ on:
       - "scripts/plasma_path2_build_qualification.py"
       - "scripts/plasma_path2_runtime_integration.py"
       - "scripts/tests/test_plasma_path2_runtime_integration.py"
-      - "scripts/plasma_path2_stage_orchestrator.py"
-      - "scripts/plasma_path2_f1b_adapters.py"
       - "scripts/plasma_path2_persistent_lease.py"
       - "scripts/plasma_path2_bin_provenance.py"
       - "scripts/plasma_path2_held_provider.py"
@@ -48,6 +46,10 @@ on:
       - "pl/hil/path2_f1b_minimal_stage.py"
       - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
       - "scripts/plasma_development_stage_transport.py"
+      - "scripts/tests/test_plasma_path2_root_direct.py"
+      - "scripts/plasma-z2-smoke.sh"
+      - "scripts/z2/plasma-z2-ssh-smoke-target.sh"
+      - "scripts/tests/test_plasma_z2_ssh_smoke.py"
       - "scripts/z2/plasma-path2-f1b-root-entry"
       - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "scripts/tests/test_plasma_development_stage_transport.py"
@@ -78,8 +80,6 @@ on:
       - "scripts/plasma_path2_build_qualification.py"
       - "scripts/plasma_path2_runtime_integration.py"
       - "scripts/tests/test_plasma_path2_runtime_integration.py"
-      - "scripts/plasma_path2_stage_orchestrator.py"
-      - "scripts/plasma_path2_f1b_adapters.py"
       - "scripts/plasma_path2_persistent_lease.py"
       - "scripts/plasma_path2_bin_provenance.py"
       - "scripts/plasma_path2_held_provider.py"
@@ -91,6 +91,10 @@ on:
       - "pl/hil/path2_f1b_minimal_stage.py"
       - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
       - "scripts/plasma_development_stage_transport.py"
+      - "scripts/tests/test_plasma_path2_root_direct.py"
+      - "scripts/plasma-z2-smoke.sh"
+      - "scripts/z2/plasma-z2-ssh-smoke-target.sh"
+      - "scripts/tests/test_plasma_z2_ssh_smoke.py"
       - "scripts/z2/plasma-path2-f1b-root-entry"
       - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "scripts/tests/test_plasma_development_stage_transport.py"
@@ -148,6 +152,9 @@ jobs:
           python3 -m py_compile scripts/plasma_development_stage_transport.py scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_development_stage_transport.py
+          python3 scripts/tests/test_plasma_path2_root_direct.py
+          python3 scripts/tests/test_plasma_z2_ssh_smoke.py
+          bash scripts/plasma-z2-smoke.sh --target z2-ci-offline --plan
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
@@ -399,7 +406,7 @@ jobs:
           retention-days: 14
 
   development-execute:
-    # Path 2 retains its trusted provider; no automatic post-Codex stages.
+    # Path 2 invokes its trusted Root operation provider; no automatic chaining.
     # Hardware-capable A2 retains its existing one-shot claim gate.
     needs: [development-authorize, development-claim]
     if: >-
@@ -408,7 +415,7 @@ jobs:
       (
         (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
          (
-          contains(fromJSON('["cpu-only","vivado-host-build","path2-stage-contract"]'),
+          contains(fromJSON('["cpu-only","vivado-host-build","z2-root-operation"]'),
                    needs.development-authorize.outputs.execution_capability) ||
           (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
            needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
@@ -420,7 +427,7 @@ jobs:
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || 5 }}
     permissions:
       contents: read
       actions: read

@@ -294,11 +294,11 @@ class LifecycleTests(unittest.TestCase):
                                       request=bad, bit_sha256=BIT)
             self.assertNotIn("test", port.actions)
 
-    def test_no_live_target_adapter_or_cli_registered(self):
+    def test_held_provider_is_not_the_direct_root_dispatch_backend(self):
         code = (ROOT / "scripts/plasma_path2_runtime_integration.py").read_text()
         dispatch = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
-        self.assertIn("PATH2_TRUSTED_BRIDGE_NOT_INSTALLED", code)
-        self.assertIn("return integration.registered_hardware_stage", dispatch)
+        self.assertIn("def direct_root_operation(", code)
+        self.assertIn("return integration.direct_root_operation", dispatch)
         prov = (ROOT / "scripts/plasma_path2_held_provider.py").read_text()
         self.assertNotIn("if __name__ == \"__main__\"", prov)
         self.assertNotIn("subprocess", prov)
@@ -322,42 +322,6 @@ class ExistingF1BAdapterIntegrationTests(unittest.TestCase):
                     "build_receipt": tampered})
             self.assertEqual(port.actions, [])
             self.assertFalse(store.path.exists())
-
-    def test_exact_adapter_abi_with_two_separate_triggers_and_restore(self):
-        import plasma_path2_f1b_adapters as f1b_adapter
-        import plasma_path2_stage_orchestrator as stages
-        tmp, store, port = setup()
-        with tmp:
-            callbacks = provider.bind_injected_stage_callbacks(
-                store=store, port=port,
-                intent=lease_intent(), provenance=provenance_data())
-            bound = f1b_adapter.bind_f1b_adapters(**callbacks)
-            build_receipt = {
-                "stage": "build", "status": "PASS",
-                "source_sha": SRC, "profile_id": "f1b-site1-v1",
-                "artifact_sha256": BIT, "evidence_sha256": "8" * 64}
-            first = stages.run({
-                "stage": "download", "source_sha": SRC,
-                "profile_id": "f1b-site1-v1", "target_id": "z2-bench",
-                "artifact_sha256": BIT, "build_receipt": build_receipt},
-                adapters=bound)
-            self.assertEqual(first["completed"], ["download"])
-            self.assertEqual(first["status"], "RECEIPTS_VALIDATED")
-            self.assertEqual(port.image, BIN)
-            independent = stages.run({
-                "stage": "test", "source_sha": SRC,
-                "profile_id": "f1b-site1-v1", "target_id": "z2-bench",
-                "artifact_sha256": BIT,
-                "load_receipt": first["receipts"]["download"]},
-                adapters=bound)
-            self.assertEqual(independent["completed"], ["test"])
-            self.assertEqual(independent["status"], "RECEIPTS_VALIDATED")
-            self.assertEqual(port.image, BIN)
-            self.assertEqual(port.actions.count("load"), 1)
-            self.assertEqual(port.actions.count("test"), 1)
-            result = provider.restore_guarded(store=store, port=port)
-            self.assertEqual(result["result"], "RESTORED_VERIFIED")
-
 
 class BitBinProvenanceTests(unittest.TestCase):
     def test_actual_bytes_and_distinct_digests(self):
