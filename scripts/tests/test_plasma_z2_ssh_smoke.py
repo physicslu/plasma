@@ -78,17 +78,17 @@ class SSHDeploySmokeContracts(unittest.TestCase):
             if x.strip().startswith('[[ "$last" == ')
         )
         shell = (
-            'dmesg() { printf "%s\\n" "$MOCK_DMESG"; }\\n'
-            + selector + "\\n" + predicate
+            'dmesg() { printf "%s\\n" "$MOCK_DMESG"; }\n'
+            + selector + "\n" + predicate
         )
         intro = "[   40.229271] fpga_manager fpga0: Xilinx Zynq FPGA Manager registered"
         golden = "[13027.805055] fpga_manager fpga0: writing base.bin to Xilinx Zynq FPGA Manager"
         old_name = "[129.930197] fpga_manager fpga0: writing base.bin to Xilinx FPGA Manager"
         candidate = "[12979.051154] fpga_manager fpga0: writing plasma-f1b-owner-20261020-once.bin to Xilinx Zynq FPGA Manager"
         cases = [
-            ("actual Z2 last restored", "\\n".join([intro, old_name, candidate, golden]), True),
+            ("actual Z2 last restored", "\n".join([intro, old_name, candidate, golden]), True),
             ("older driver name", old_name, True),
-            ("candidate loaded last", "\\n".join([intro, golden, candidate]), False),
+            ("candidate loaded last", "\n".join([intro, golden, candidate]), False),
             ("no manager load", intro, False),
             ("unrelated manager writes", "[3.0] fpga_manager fpga1: writing base.bin to Xilinx Zynq FPGA Manager", False),
             ("empty dmesg", "", False),
