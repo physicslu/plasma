@@ -81,10 +81,10 @@ class SSHDeploySmokeContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             manifest = Path(td) / "sha256"
             for name, content, allowed in (
-                ("valid", "a" * 64 + "  " + file + "\\n", True),
-                ("omitted", "a" * 64 + "  pl/hil/f1b.py\\n", False),
-                ("wrong hash", "not-sha256  " + file + "\\n", False),
-                ("different file", "a" * 64 + "  " + file + ".bak\\n", False),
+                ("valid", "a" * 64 + "  " + file + "\n", True),
+                ("omitted", "a" * 64 + "  pl/hil/f1b.py\n", False),
+                ("wrong hash", "not-sha256  " + file + "\n", False),
+                ("different file", "a" * 64 + "  " + file + ".bak\n", False),
             ):
                 with self.subTest(name=name):
                     manifest.write_text(content)
