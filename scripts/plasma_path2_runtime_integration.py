@@ -28,22 +28,21 @@ def require(ok: bool, code: str) -> None:
         raise RuntimeDenied(code)
 
 
+def _sha(value: object, length: int) -> bool:
+    return (type(value) is str and len(value) == length and
+            re.fullmatch("[0-9a-f]+", value) is not None)
+
+
 def host_build(task: dict, *, workspace: Path, approval: dict,
                evidence_dir: Path, executor=None,
                build_driver=None, qualify=None) -> dict:
-    """One reviewed host-side Vivado build, then real file qualification.
-
-    Host-side Build is not a global Path 2 Host-only restriction, and does
-    not itself confer FPGA programming or any target-device authority.
-    The optional injected hooks exist solely for offline test coverage;
-    the trusted Dispatcher calls with no hooks and no device backend.
-    """
+    """Reviewed host build -> qualification. No Stage, Profile or Z2 Root call."""
     require(type(approval) is dict
             and approval.get("task_id") == "z2-path2-build"
             and approval.get("execution_capability") == "vivado-host-build"
             and approval.get("execution_path") == "path2-cli"
-            and coordinator._sha(approval.get("pinned_sha"), 40)
-            and coordinator._sha(approval.get("trusted_sha"), 40)
+            and _sha(approval.get("pinned_sha"), 40)
+            and _sha(approval.get("trusted_sha"), 40)
             and type(approval.get("pr_number")) is int
             and ((approval["pr_number"] == 0 and approval["pinned_sha"] ==
                   approval["trusted_sha"]) or
@@ -53,8 +52,6 @@ def host_build(task: dict, *, workspace: Path, approval: dict,
             and task.get("capability") == "vivado-host-build"
             and task.get("project") == "pl/projects/z2-fixed-unified-site1",
             "PATH2_BUILD_TASK_DENIED")
-    # One stage's per-request option never elevates hardware privileges.
-    # Reject any route requiring Download BEFORE running Vivado.
     auto_download = approval.get("auto_download_after_build_success", False)
     auto_testing = approval.get("auto_test_after_download_success", False)
     require(type(auto_download) is bool and type(auto_testing) is bool,
@@ -62,35 +59,52 @@ def host_build(task: dict, *, workspace: Path, approval: dict,
     require(not auto_download, "PATH2_LIVE_DOWNLOAD_PROVIDER_NOT_REGISTERED")
     require(evidence_dir is not None and evidence_dir.is_dir()
             and not evidence_dir.is_symlink(), "PATH2_EVIDENCE_DIR_DENIED")
-
-    def perform(context: dict) -> dict:
-        if build_driver is not None:
-            return build_driver(context)
+    if build_driver is not None:
+        raw = build_driver({"source_sha": approval["pinned_sha"]})
+    else:
         kwargs = dict(task=task, workspace=workspace, approval=approval,
                       evidence_dir=evidence_dir)
         if executor is not None:
             kwargs["executor"] = executor
-        return f1b.existing_host_build(**kwargs)
-
-    def qualify_result(raw: dict) -> dict:
-        if qualify is not None:
-            return qualify(raw)
-        return qualifier.qualify_host_build(
-            raw, workspace=workspace, pinned_sha=approval["pinned_sha"])
-
-    handlers = f1b.bind_f1b_adapters(
-        build_driver=perform, build_qualification=qualify_result)
-    request = {
-        "stage": "build", "source_sha": approval["pinned_sha"],
-        "profile_id": f1b.PROFILE_ID, "target_id": "z2-development",
-        "options": {"auto_download_after_build_success": auto_download,
-                    "auto_test_after_download_success": auto_testing}
+        import plasma_vivado_host_build as build
+        raw = build.run(**kwargs)
+    require(type(raw) is dict and
+            raw.get("status") == "HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED" and
+            raw.get("execution_capability") == "vivado-host-build" and
+            raw.get("source_sha") == approval["pinned_sha"] and
+            raw.get("physical_load") == "NOT_RUN" and
+            raw.get("z2_hil") == "NOT_RUN" and
+            raw.get("m1") == "NO_GO" and
+            _sha(raw.get("bit_sha256"), 64) and
+            _sha(raw.get("hwh_sha256"), 64) and
+            type(raw.get("report_sha256")) is dict and
+            bool(raw["report_sha256"]) and
+            all(_sha(x, 64) for x in raw["report_sha256"].values()),
+            "VIVADO_BUILD_EVIDENCE_NOT_QUALIFIED")
+    decision = (qualify(raw) if qualify is not None else
+                qualifier.qualify_host_build(
+                    raw, workspace=workspace,
+                    pinned_sha=approval["pinned_sha"]))
+    require(type(decision) is dict and set(decision) == {
+                "decision", "source_sha", "bit_sha256", "hwh_sha256",
+                "qualification_evidence_sha256"} and
+            decision["decision"] == "APPROVED" and
+            decision["source_sha"] == approval["pinned_sha"] and
+            decision["bit_sha256"] == raw["bit_sha256"] and
+            decision["hwh_sha256"] == raw["hwh_sha256"] and
+            _sha(decision["qualification_evidence_sha256"], 64),
+            "BUILD_QUALIFICATION_REQUIRED")
+    return {
+        "status": "HOST_BUILD_QUALIFIED_NO_HARDWARE",
+        "source_sha": approval["pinned_sha"],
+        "bit_sha256": raw["bit_sha256"],
+        "hwh_sha256": raw["hwh_sha256"],
+        "qualification_evidence_sha256":
+            decision["qualification_evidence_sha256"],
+        "physical_load": "NOT_RUN", "z2_hil": "NOT_RUN",
+        "auto_download": False, "auto_test": False,
     }
-    result = coordinator.run(request, adapters=handlers)
-    require(result["status"] == "RECEIPTS_VALIDATED"
-            and result["completed"] == ["build"],
-            "PATH2_BUILD_STAGE_NOT_QUALIFIED")
-    return result
+
 
 
 STAGE_TASKS = {
@@ -105,8 +119,8 @@ def stage_contract(task: dict, approval: dict) -> str:
     require(type(approval) is dict
             and approval.get("execution_path") == "path2-cli"
             and approval.get("execution_capability") == "path2-stage-contract"
-            and coordinator._sha(approval.get("pinned_sha"), 40)
-            and coordinator._sha(approval.get("trusted_sha"), 40)
+            and _sha(approval.get("pinned_sha"), 40)
+            and _sha(approval.get("trusted_sha"), 40)
             and type(approval.get("pr_number")) is int
             and ((approval["pr_number"] == 0 and
                   approval["pinned_sha"] == approval["trusted_sha"]) or
@@ -260,8 +274,8 @@ def direct_root_operation(task: dict, approval: dict) -> dict:
             approval.get("execution_capability") == "z2-root-operation" and
             approval.get("authorized_operation") == operation and
             approval.get("work_order_sha256") == task["work_order_sha256"] and
-            coordinator._sha(approval.get("pinned_sha"), 40) and
-            coordinator._sha(approval.get("trusted_sha"), 40) and
+            _sha(approval.get("pinned_sha"), 40) and
+            _sha(approval.get("trusted_sha"), 40) and
             type(approval.get("pr_number")) is int and
             ((approval["pr_number"] == 0 and
               approval["pinned_sha"] == approval["trusted_sha"]) or
