@@ -19,6 +19,19 @@ class SSHDeploySmokeContracts(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_git_archive_lists_only_existing_reviewed_files(self):
+        import shlex
+        content = HOST.read_text()
+        segment = content.split("sources=(", 1)[1].split(")", 1)[0]
+        paths = shlex.split(segment)
+        self.assertTrue(paths)
+        self.assertEqual(len(paths), len(set(paths)))
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertFalse(path.startswith("/"))
+                self.assertNotIn("..", Path(path).parts)
+                self.assertTrue((ROOT / path).is_file(), path)
+
     def test_host_rejects_missing_or_injected_target_without_ssh(self):
         for argv in ([], ["--target", "bad;id"], ["--target", "../escape"],
                      ["--target", "-oProxyCommand=bad"], ["--unexpected"]):
