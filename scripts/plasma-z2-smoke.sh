@@ -49,7 +49,7 @@ sources=(
   scripts/z2/plasma-path2-root-entry
   scripts/z2/plasma-z2-ssh-smoke-target.sh
 )
-git archive --format=tar "$sha" -- "\${sources[@]}" | tar -xf - -C "$work/src"
+git archive --format=tar "$sha" -- "${sources[@]}" | tar -xf - -C "$work/src"
 printf '%s\n' "$sha" > "$work/src/.plasma-path2-source-commit"
 (
   cd "$work/src"
