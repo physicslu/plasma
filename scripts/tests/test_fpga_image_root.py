@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import ExitStack, nullcontext
 from dataclasses import replace
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -28,7 +29,7 @@ class FakePort:
     def exclusive(self):
         return nullcontext()
 
-    def report(self, port, release, image):
+    def report(self, port, release, image, *, previous_image=None):
         if image != self.image:
             raise stage.ImageDeploymentDenied("MANAGER_PROVENANCE_MISMATCH")
         return {"target_boot_id": self.boot, "image_id": release.image_id,
@@ -52,14 +53,15 @@ class GenericImageRootTests(unittest.TestCase):
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
         self.folder = Path(td.name)
-        self.release_data = json.loads(stage.RELEASE_FILE.read_text())
+        self.release_data = json.loads((
+            ROOT / "pl/projects/z2-bluepill-rbb/image-manifest.json").read_text())
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
         self.stack.enter_context(patch.object(guard, "protected"))
-        self.stack.enter_context(patch.object(stage, "RELEASE_FILE",
-                                             self.folder / "approved.json"))
+        self.stack.enter_context(patch.object(stage, "MANIFEST_FILE",
+                                             self.folder / "plasma-image-manifest.json"))
         self.write_manifest(self.release_data)
-        self.release = stage.read_approved_release()
+        self.release = stage.read_image_manifest()
         self.port = FakePort(self.release)
         self.stack.enter_context(patch.object(stage, "STATE", self.folder / "state.json"))
         self.stack.enter_context(patch.object(stage, "CHILD", self.folder / "child.json"))
@@ -76,16 +78,17 @@ class GenericImageRootTests(unittest.TestCase):
 
     def write_manifest(self, source):
         if type(source) is str:
-            self.folder.joinpath("approved.json").write_text(source)
+            self.folder.joinpath("plasma-image-manifest.json").write_text(source)
         else:
-            self.folder.joinpath("approved.json").write_text(json.dumps(source))
+            self.folder.joinpath("plasma-image-manifest.json").write_text(json.dumps(source))
 
     def test_root_entry_does_not_name_any_single_image_handler(self):
         shell = (ROOT / "scripts/z2/plasma-path2-root-entry").read_text()
         self.assertIn('module="pl.hil.fpga_image_root"', shell)
         self.assertIn('pl/hil/fpga_image_guard.py', shell)
         self.assertIn('pl/hil/fpga_image_admission.py', shell)
-        self.assertIn('pl/hil/approved-fpga-image.json', shell)
+        self.assertNotIn('pl/hil/approved-fpga-image.json', shell)
+        self.assertIn("plasma-image-manifest.json", (ROOT / "pl/hil/fpga_image_root.py").read_text())
         self.assertIn('download|test|restore', shell)
         self.assertNotIn('path2_f1b', shell.lower())
         self.assertNotIn('f1b', shell.lower())
@@ -110,37 +113,90 @@ class GenericImageRootTests(unittest.TestCase):
         self.assertEqual(guard.GLOBAL_LOCK,
                          Path("/run/plasma-z2-swd05/supervisor.lock"))
 
-    def test_swd_release_candidate_is_explicitly_non_admitted(self):
-        """An offline BIT/BIN record is not an authorized live Root release."""
-        file = ROOT / "pl/hil/bluepill-swd-image-release.candidate.json"
-        candidate = json.loads(file.read_text())
-        self.assertEqual(set(candidate), set(self.release_data))
-        self.assertEqual(candidate["schema"], "plasma.fpga.image-release.v2")
-        self.assertEqual(candidate["firmware_sha256"],
-                         "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1")
-        self.assertEqual(candidate["recovery_sha256"],
-                         "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c")
-        self.assertEqual(candidate["axi_base"], 0x40008000)
-        self.assertEqual(candidate["axi_bytes"], 4096)
-        self.assertIsNone(candidate["site_bitmap_offset"])
-        self.assertEqual(candidate["identity_words"],
+    def test_swd_companion_manifest_has_no_release_authorization(self):
+        """Provided BIN companion is not a source-code allowlist entry."""
+        sample = json.loads((ROOT / "pl/projects/z2-bluepill-rbb/image-manifest.json").read_text())
+        self.assertEqual(sample["schema"], "plasma.fpga.image.v1")
+        self.assertNotIn("authorization", sample)
+        self.assertNotIn("runtime_admitted", sample)
+        self.assertEqual(sample["firmware_sha256"],
+                         "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6b927d6c779e13fe9ec1a1")
+        self.assertEqual(sample["axi_base"], 0x40008000)
+        self.assertEqual(sample["axi_bytes"], 4096)
+        self.assertIsNone(sample["site_bitmap_offset"])
+        self.assertEqual(sample["identity_words"],
                          [[0, 1346523991, 0xFFFFFFFF],
                           [4, 65536, 0xFFFFFFFF],
                           [12, 8, 0xFFFFFFFE]])
-        for variant in (candidate,
-                        candidate | {"runtime_admitted": True},
-                        candidate | {"authorization": "SOURCE_PINNED_ROOT_APPROVAL"}):
-            with self.subTest(authorized=variant["authorization"],
-                              admitted=variant["runtime_admitted"]):
-                self.write_manifest(variant)
+        other = stage.read_image_manifest()
+        self.assertEqual(other.firmware_sha256, sample["firmware_sha256"])
+
+    def test_direct_image_a_to_b_without_golden(self):
+        self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+        different = dict(self.release_data)
+        different.update(image_id="image-b", firmware_name="second-image.bin",
+                         firmware_sha256="a" * 64)
+        self.write_manifest(different)
+        boot_path = self.folder / "sys/kernel/random/boot_id"
+        boot_path.parent.mkdir(parents=True)
+        boot_path.write_text(self.port.boot)
+        self.stack.enter_context(patch.object(guard, "PROC", self.folder))
+        with patch.object(guard, "sha_file", return_value=self.release.firmware_sha256) as sha:
+            result = stage.run("download")
+        self.assertEqual(result["result"], "LOADED_AND_HELD")
+        self.assertEqual(self.port.writes,
+                         [self.release.firmware_name, "second-image.bin"])
+        sha.assert_called_once_with(guard.FIRMWARE / self.release.firmware_name,
+                                    self.release.firmware_sha256)
+        new = stage.read_image_manifest()
+        self.assertEqual(stage.read_state(new)["image_id"], "image-b")
+        self.assertEqual(stage.read_state(new)["status"], "IMAGE")
+
+    def test_direct_switch_requires_same_boot_and_previous_hash(self):
+        stage.run("download")
+        different = dict(self.release_data)
+        different.update(image_id="image-b", firmware_name="second-image.bin",
+                         firmware_sha256="a" * 64)
+        self.write_manifest(different)
+        boot_path = self.folder / "sys/kernel/random/boot_id"
+        boot_path.parent.mkdir(parents=True)
+        boot_path.write_text("wrong-boot-123456")
+        self.stack.enter_context(patch.object(guard, "PROC", self.folder))
+        with patch.object(guard, "sha_file") as sha:
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "PREVIOUS_IMAGE_BOOT_CHANGED"):
+                stage.run("download")
+            sha.assert_not_called()
+        self.assertEqual(self.port.writes, [self.release.firmware_name])
+
+    def test_unknown_image_rejects_switch_without_recovery(self):
+        self.port.fail = True
+        with self.assertRaises(RuntimeError):
+            stage.run("download")
+        self.port.fail = False
+        different = dict(self.release_data)
+        different.update(image_id="image-b", firmware_name="second-image.bin",
+                         firmware_sha256="a" * 64)
+        self.write_manifest(different)
+        with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                    "UNCERTAIN_PRIOR_OPERATION_MANUAL_RECOVERY"):
+            stage.run("download")
+        self.assertEqual(self.port.writes, [self.release.firmware_name])
+
+    def test_manifest_legacy_approval_fields_rejected(self):
+        for field, value in (("authorization", "SOURCE_PINNED_ROOT_APPROVAL"),
+                             ("runtime_admitted", True)):
+            with self.subTest(field=field):
+                self.write_manifest(self.release_data | {field: value})
                 with self.assertRaisesRegex(stage.ImageDeploymentDenied,
-                                            "IMAGE_RELEASE_NOT_AUTHORIZED"):
+                                            "IMAGE_MANIFEST_SCHEMA_DENIED"):
                     stage.run("download")
                 self.assertEqual(self.port.writes, [])
 
+
     def test_manifest_has_geometry_and_true_source_authority(self):
         image = self.release
-        self.assertEqual(image.axi_bytes, 65536)
+        self.assertEqual(image.axi_bytes, 4096)
         self.assertEqual(image.site_bitmap, 1)
         self.assertEqual(len(image.identity_words), 3)
         self.assertEqual(image.expected_uio["maps"], [
@@ -148,7 +204,7 @@ class GenericImageRootTests(unittest.TestCase):
         self.assertEqual(self.port.writes, [])
 
     def test_manifest_accepts_other_image_metadata_as_a_contract(self):
-        """Simulate a *different source-pinned release*, never live admission."""
+        """Independent Image metadata follows the same generic runtime parser."""
         alt = dict(self.release_data)
         alt.update(image_id="candidate-independent-ip",
                    firmware_name="reviewed-other-image.bin",
@@ -158,7 +214,7 @@ class GenericImageRootTests(unittest.TestCase):
                                    [4, 0x10000, 0xFFFFFFFF],
                                    [12, 8, 0xFFFFFFFE]])
         self.write_manifest(alt)
-        other = stage.read_approved_release()
+        other = stage.read_image_manifest()
         self.assertEqual(other.firmware_name, "reviewed-other-image.bin")
         self.assertEqual(other.axi_base, 0x40008000)
         self.assertEqual(other.identity_words[2][2], 0xFFFFFFFE)
@@ -169,13 +225,13 @@ class GenericImageRootTests(unittest.TestCase):
                   in other.identity_words}
         actual[other.axi_base + 12] = 9
         self.assertEqual(stage.read_identity(lambda a: actual[a], other)[12], 9)
-        # Source hash/owner authorization are still enforced by Root Entry;
-        # this mocked Host test does not grant this image permission on Z2.
+        # Source-code integrity is separate from this paired Image data.
 
     def test_bad_manifest_never_opens_manager(self):
         variants = (
-            {"runtime_admitted": False},
-            {"authorization": "SHA_ONLY"},
+            {"schema": "plasma.fpga.image-release.v2"},
+            {"board_id": "wrong-board"},
+            {"fpga_part": "wrong-part"},
             {"firmware_name": "../untrusted.bin"},
             {"firmware_sha256": "0"},
             {"recovery_sha256": "0"},
@@ -251,12 +307,17 @@ class GenericImageRootTests(unittest.TestCase):
                 stage.run(command)
         self.assertEqual(self.port.writes, [])
 
-    def test_state_binds_release_identity(self):
+    def test_no_switch_while_prior_image_is_held_for_test_or_restore(self):
         stage.run("download")
-        foreign = replace(self.release, image_id="different-image")
-        with self.assertRaisesRegex(stage.ImageDeploymentDenied,
-                                    "STATE_IMAGE_OR_IDENTITY_INVALID"):
-            stage.read_state(foreign)
+        other = dict(self.release_data)
+        other.update(image_id="image-b", firmware_name="other.bin",
+                     firmware_sha256="a" * 64)
+        self.write_manifest(other)
+        for operation in ("test", "restore"):
+            with self.subTest(operation=operation), self.assertRaisesRegex(
+                    stage.ImageDeploymentDenied,
+                    "NEW_MANIFEST_DOWNLOAD_REQUIRED"):
+                stage.run(operation)
         self.assertEqual(self.port.writes, [self.release.firmware_name])
 
 
