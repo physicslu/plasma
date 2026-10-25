@@ -338,8 +338,9 @@ def _confirm_current(port, release: ImageManifest, record: dict | None,
              "PREVIOUS_IMAGE_BOOT_CHANGED")
         need(record["image"] not in (release.recovery_name, release.firmware_name),
              "PREVIOUS_IMAGE_AMBIGUOUS")
-        guard.sha_file(guard.FIRMWARE / record["image"],
-                       record["firmware_sha256"])
+        # Previous firmware bytes need not remain on disk after Image A was
+        # loaded. The protected journal + current-boot Manager record anchor
+        # the held Image; only the incoming B BIN and Golden are rehashed.
         report = live_report(port, release, expected,
                              previous_image=expected)
     else:
