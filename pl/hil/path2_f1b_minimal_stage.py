@@ -7,6 +7,7 @@ UNPROVEN under the explicitly accepted Development-only UIO exception.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import importlib.util
 import json
@@ -39,6 +40,72 @@ class LiveStageDenied(ValueError):
 def need(test: bool, reason: str) -> None:
     if not test:
         raise LiveStageDenied(reason)
+
+
+# This record is compiled into the reviewed root-owned source closure. It is
+# release authorization, not a runtime Project/Profile or a caller JSON claim.
+@dataclass(frozen=True)
+class ApprovedImage:
+    image_id: str
+    board_id: str
+    fpga_part: str
+    firmware_name: str
+    firmware_sha256: str
+    recovery_name: str
+    recovery_sha256: str
+    abi_version: int
+    identity_words: tuple[tuple[int, int], ...]
+    site_bitmap: int
+
+
+F1B_APPROVED_IMAGE = ApprovedImage(
+    image_id="f1b-site1-20261020",
+    board_id="pynq-z2",
+    fpga_part="xc7z020clg400-1",
+    firmware_name=CANDIDATE.name,
+    firmware_sha256=f1b.BIN_SHA,
+    recovery_name=RECOVERY.name,
+    recovery_sha256=f1b.BASE_SHA,
+    abi_version=f1b.IDENTITY[0x0004],
+    identity_words=tuple(sorted(f1b.IDENTITY.items())),
+    site_bitmap=1,
+)
+AUTHORIZED_IMAGES = (F1B_APPROVED_IMAGE,)
+
+
+def approved_image(image: object) -> ApprovedImage:
+    """Only source-approved images, never arbitrary caller-provided manifests."""
+    need(type(image) is ApprovedImage and image in AUTHORIZED_IMAGES,
+         "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED")
+    need(image.board_id == "pynq-z2" and
+         image.fpga_part == "xc7z020clg400-1" and
+         image.firmware_name == CANDIDATE.name and
+         image.recovery_name == RECOVERY.name and
+         image.firmware_sha256 == f1b.BIN_SHA and
+         image.recovery_sha256 == f1b.BASE_SHA and
+         image.abi_version == f1b.IDENTITY[0x0004] and
+         image.identity_words == tuple(sorted(f1b.IDENTITY.items())) and
+         image.site_bitmap == 1,
+         "IMAGE_RELEASE_SOURCE_LOCK_MISMATCH")
+    return image
+
+
+def verify_image_metadata(image: ApprovedImage, *, board_id: str,
+                          fpga_part: str, abi_version: int,
+                          identity_words: dict[int, int]) -> None:
+    """Pure comparison, not independent PS/PL attestation.
+
+    A qualified provider must collect authentic live board and PL facts
+    before this can be used to admit any future non-F1-B release.
+    """
+    image = approved_image(image)
+    need(type(board_id) is str and board_id == image.board_id and
+         type(fpga_part) is str and fpga_part == image.fpga_part,
+         "IMAGE_BOARD_OR_FPGA_PART_MISMATCH")
+    need(type(abi_version) is int and abi_version == image.abi_version and
+         type(identity_words) is dict and
+         identity_words == dict(image.identity_words),
+         "IMAGE_ABI_OR_IDENTITY_MISMATCH")
 
 
 def digest(data: object) -> str:
@@ -128,13 +195,15 @@ def write_state(record: dict) -> None:
 
 
 def live_report(port: guard.RootZ2TargetPort, image: str) -> dict:
-    need(image in ("base.bin", CANDIDATE.name), "IMAGE_NOT_PINNED")
+    release = approved_image(F1B_APPROVED_IMAGE)
+    need(image in (release.recovery_name, release.firmware_name),
+         "IMAGE_NOT_PINNED")
     report = risk.collect_live(root_port=port, approval=risk.WAIVER,
                                scope=risk.ALLOWED[0],
                                expected_firmware=image)
     need(report["site"] == 1 and report["expected_manager_firmware"] == image
-         and port.image_sha256("candidate") == f1b.BIN_SHA
-         and port.image_sha256("recovery") == f1b.BASE_SHA,
+         and port.image_sha256("candidate") == release.firmware_sha256
+         and port.image_sha256("recovery") == release.recovery_sha256,
          "CURRENT_IMAGE_OR_RECOVERY_CHANGED")
     return report
 
@@ -175,6 +244,7 @@ def confirm_current(port, record: dict | None, stage: str) -> tuple[dict, dict]:
 def run(stage: str) -> dict:
     need(stage in ("download", "test", "restore"), "STAGE_NOT_ALLOWLISTED")
     trusted_local()
+    release = approved_image(F1B_APPROVED_IMAGE)
     # The shared FPGA owner serializes all cooperating configuration users.
     port = guard.RootZ2TargetPort(candidate=CANDIDATE, recovery=RECOVERY,
                                   ledger=one_shot.OWNER_DIR / "path2-f1b-site1.json")
@@ -185,7 +255,7 @@ def run(stage: str) -> dict:
             record.update(status="DOWNLOAD_IN_FLIGHT", last_error="")
             write_state(record)  # persists recovery obligation first
             try:
-                one_shot.manager_write(CANDIDATE.name)
+                one_shot.manager_write(release.firmware_name)
                 after = live_report(port, CANDIDATE.name)
                 record.update(status="F1B", image=CANDIDATE.name,
                               download_count=record["download_count"] + 1,
@@ -236,7 +306,7 @@ def run(stage: str) -> dict:
         record.update(status="RESTORE_IN_FLIGHT", last_error="")
         write_state(record)
         try:
-            one_shot.manager_write(RECOVERY.name)
+            one_shot.manager_write(release.recovery_name)
             after = live_report(port, "base.bin")
             record.update(status="BASE", image="base.bin",
                           restore_count=record["restore_count"] + 1,
@@ -255,6 +325,7 @@ def child_main() -> int:
     # Read-only native subprocess: does not acquire the parent FPGA lock and
     # cannot invoke an FPGA Manager writer.
     trusted_local()
+    release = approved_image(F1B_APPROVED_IMAGE)
     state = read_state()
     need(state is not None and state["status"] == "TEST_IN_FLIGHT" and
          state["image"] == CANDIDATE.name and not CHILD.exists(),
@@ -271,11 +342,14 @@ def child_main() -> int:
     driver = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = driver
     spec.loader.exec_module(driver)
-    aperture = driver.MMIOAperture(f1b.BASE, frozenset(f1b.IDENTITY),
+    aperture = driver.MMIOAperture(f1b.BASE, frozenset(dict(release.identity_words)),
                                    frozenset(), f1b.LENGTH)
     with driver.LinuxMMIO((aperture,), readonly=True) as mmio:
         observed = f1b.read_identity(mmio.read32)
-        need(mmio.stats().read32 == 3 and mmio.stats().write32 == 0,
+        need(observed == dict(release.identity_words),
+             "IMAGE_IDENTITY_NOT_APPROVED")
+        need(mmio.stats().read32 == len(release.identity_words) == 3 and
+             mmio.stats().write32 == 0,
              "NATIVE_MMIO_ACCESS_COUNT_CHANGED")
     one_shot.record_json(CHILD, {"observed": observed})
     return 0
