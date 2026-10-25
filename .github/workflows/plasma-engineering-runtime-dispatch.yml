@@ -154,6 +154,7 @@ jobs:
           python3 scripts/tests/test_plasma_development_stage_transport.py
           python3 scripts/tests/test_plasma_path2_root_direct.py
           python3 scripts/tests/test_plasma_z2_ssh_smoke.py
+          bash scripts/plasma-z2-smoke.sh --target z2-ci-offline --plan
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
