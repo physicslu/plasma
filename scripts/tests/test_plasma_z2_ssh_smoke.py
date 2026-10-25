@@ -66,14 +66,15 @@ class SSHDeploySmokeContracts(unittest.TestCase):
         self.assertIn("read32_count", target)
         self.assertIn("write32_count", target)
 
-    def test_root_fails_closed_without_release_in_sha256_manifest(self):
+    def test_root_fails_closed_without_core_module_in_sha256_manifest(self):
         """Exercise the Root Entry's real required-source awk predicate offline."""
         import tempfile
 
         source = (ROOT / "scripts/z2/plasma-path2-root-entry").read_text()
         required = source.split("for required in", 1)[1].split("; do", 1)[0]
-        file = "pl/hil/approved-fpga-image.json"
+        file = "pl/hil/fpga_image_guard.py"
         self.assertIn(file, required)
+        self.assertNotIn("pl/hil/approved-fpga-image.json", required)
         self.assertIn("PATH2_REQUIRED_SOURCE_NOT_PINNED", source)
         self.assertIn("sha256sum --check --status .plasma-path2-source-sha256", source)
         awk = source.split('/usr/bin/awk -v path="$required" ' + chr(39), 1)[1]
@@ -82,7 +83,7 @@ class SSHDeploySmokeContracts(unittest.TestCase):
             manifest = Path(td) / "sha256"
             for name, content, allowed in (
                 ("valid", "a" * 64 + "  " + file + "\n", True),
-                ("omitted", "a" * 64 + "  pl/hil/f1b.py\n", False),
+                ("omitted", "a" * 64 + "  pl/hil/old-helper.py\n", False),
                 ("wrong hash", "not-sha256  " + file + "\n", False),
                 ("different file", "a" * 64 + "  " + file + ".bak\n", False),
             ):

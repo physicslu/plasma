@@ -1,4 +1,4 @@
-"""Trusted FPGA Image Deployment: source-approved download, identity, restore.
+"""FPGA Image + companion Manifest: hash-matched download, identity, restore.
 
 No protocol/IP-specific handler, runtime Project/Profile selector or Flash write.
 Production operations retain the existing two-argument protected Root Entry.
@@ -20,10 +20,11 @@ from pl.hil import fpga_image_guard as guard
 from pl.hil import fpga_image_admission as admission
 
 ROOT = Path(__file__).resolve().parents[2]
-RELEASE_FILE = ROOT / "pl/hil/approved-fpga-image.json"
+MANIFEST_FILE = guard.FIRMWARE / "plasma-image-manifest.json"
 STATE = ROOT / ".plasma-fpga-image-deployment-state.json"
 CHILD = guard.OWNER_DIR / "fpga-image-identity.json"
-SCHEMA = "plasma.fpga.image-deployment.v1"
+SCHEMA = "plasma.fpga.image-deployment.v3"
+LEGACY_SCHEMA = "plasma.fpga.image-deployment.v1"
 STATUS = ("RECOVERY", "IMAGE", "DOWNLOAD_IN_FLIGHT", "TEST_IN_FLIGHT",
           "RESTORE_IN_FLIGHT", "UNKNOWN")
 
@@ -38,7 +39,7 @@ def need(ok: bool, code: str) -> None:
 
 
 @dataclass(frozen=True)
-class ApprovedImage:
+class ImageManifest:
     image_id: str
     board_id: str
     fpga_part: str
@@ -72,31 +73,38 @@ def _basename(name: object) -> bool:
     return type(name) is str and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", name) is not None
 
 
-def read_approved_release() -> ApprovedImage:
-    """Release is protected by exact Root commit pin and full SHA256 manifest.
+def manifest_sha256() -> str:
+    """Fingerprint the runtime Manifest independently from executable code."""
+    guard.protected(MANIFEST_FILE)
+    need(MANIFEST_FILE.is_file() and 0 < MANIFEST_FILE.stat().st_size <= 8192,
+         "IMAGE_MANIFEST_FILE_DENIED")
+    return hashlib.sha256(MANIFEST_FILE.read_bytes()).hexdigest()
 
-    JSON merely describes the publisher-approved release; it cannot authorize
-    itself or override the protected source closure.
-    """
-    guard.protected(RELEASE_FILE)
-    need(RELEASE_FILE.is_file() and 0 < RELEASE_FILE.stat().st_size <= 8192,
-         "IMAGE_RELEASE_FILE_DENIED")
+
+def read_image_manifest() -> ImageManifest:
+    """Parse the paired Image Manifest, never a per-Image approval record."""
+    guard.protected(MANIFEST_FILE)
+    need(MANIFEST_FILE.is_file() and 0 < MANIFEST_FILE.stat().st_size <= 8192,
+         "IMAGE_MANIFEST_FILE_DENIED")
     try:
-        data = json.loads(RELEASE_FILE.read_text(encoding="utf-8"),
+        data = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"),
                           object_pairs_hook=_pairs,
-                          parse_constant=lambda _: need(False, "IMAGE_RELEASE_NONFINITE"))
+                          parse_constant=lambda _: need(False, "IMAGE_MANIFEST_NONFINITE"))
     except (UnicodeError, json.JSONDecodeError) as e:
-        raise ImageDeploymentDenied("IMAGE_RELEASE_JSON_DENIED") from e
-    fields = {"schema", "authorization", "runtime_admitted", "image_id",
-              "board_id", "fpga_part", "soc_compatible", "firmware_name",
-              "firmware_sha256", "recovery_name", "recovery_sha256",
-              "abi_version", "abi_offset", "identity_words", "site_bitmap",
+        raise ImageDeploymentDenied("IMAGE_MANIFEST_JSON_DENIED") from e
+    fields = {"schema", "image_id", "board_id", "fpga_part",
+              "soc_compatible", "firmware_name", "firmware_sha256",
+              "recovery_name", "recovery_sha256", "abi_version",
+              "abi_offset", "identity_words", "site_bitmap",
               "site_bitmap_offset", "axi_base", "axi_bytes", "owner_base",
               "owner_bytes", "uio_name", "expected_uio"}
     need(type(data) is dict and set(data) == fields and
-         data["schema"] == "plasma.fpga.image-release.v2" and
-         data["authorization"] == "SOURCE_PINNED_ROOT_APPROVAL" and
-         data["runtime_admitted"] is True, "IMAGE_RELEASE_NOT_AUTHORIZED")
+         data["schema"] == "plasma.fpga.image.v1",
+         "IMAGE_MANIFEST_SCHEMA_DENIED")
+    # This is the Z2 prototype Root. Manifest claims cannot change its board.
+    need(data["board_id"] == "pynq-z2" and
+         data["fpga_part"] == "xc7z020clg400-1",
+         "IMAGE_BOARD_PART_MISMATCH")
     for key in ("image_id", "board_id", "fpga_part", "soc_compatible", "uio_name"):
         need(type(data[key]) is str and 0 < len(data[key]) <= 128,
              "IMAGE_RELEASE_VALUE_DENIED")
@@ -151,7 +159,7 @@ def read_approved_release() -> ApprovedImage:
          len(uio["irq_counts"]) == 2 and
          all(type(n) is int and 0 <= n <= 0xFFFFFFFF
              for n in uio["irq_counts"]), "IMAGE_RELEASE_UIO_DENIED")
-    return ApprovedImage(
+    return ImageManifest(
         image_id=data["image_id"], board_id=data["board_id"],
         fpga_part=data["fpga_part"], soc_compatible=data["soc_compatible"],
         firmware_name=data["firmware_name"],
@@ -167,7 +175,7 @@ def read_approved_release() -> ApprovedImage:
         uio_name=data["uio_name"], expected_uio=uio)
 
 
-def read_identity(read32, release: ApprovedImage) -> dict[int, int]:
+def read_identity(read32, release: ImageManifest) -> dict[int, int]:
     observed = {}
     for offset, expected, mask in release.identity_words:
         value = read32(release.axi_base + offset)
@@ -196,7 +204,7 @@ def native_runtime_preflight(*, version=None, machine=None,
 def trusted_local() -> None:
     need(os.geteuid() == 0, "ROOT_REQUIRED")
     native_runtime_preflight()
-    for path in (ROOT, Path(__file__).resolve(), RELEASE_FILE,
+    for path in (ROOT, Path(__file__).resolve(),
                  ROOT / "pl/hil/fpga_image_guard.py",
                  ROOT / "pl/hil/fpga_image_admission.py",
                  ROOT / "software/python/plasma_interfaces/linux_mmio.py"):
@@ -211,27 +219,39 @@ def _state_file_trusted() -> None:
          "STATE_FILE_NOT_PRIVATE")
 
 
-def read_state(release: ApprovedImage) -> dict | None:
+def read_state(release: ImageManifest) -> dict | None:
     if not STATE.exists():
         need(not STATE.is_symlink(), "STATE_SYMLINK_DENIED")
         return None
     _state_file_trusted()
     data = json.loads(STATE.read_text())
-    need(type(data) is dict and set(data) == {
-        "schema", "session_id", "boot_id", "status", "image", "image_id",
-        "download_count", "test_count", "restore_count",
-        "evidence_sha256", "last_error"}, "STATE_SCHEMA_INVALID")
-    need(data["schema"] == SCHEMA and
-         data["image_id"] == release.image_id and
-         data["status"] in STATUS and
-         data["image"] in (release.recovery_name, release.firmware_name) and
+    fields = {"schema", "session_id", "boot_id", "status", "image", "image_id",
+              "download_count", "test_count", "restore_count",
+              "evidence_sha256", "last_error"}
+    new_fields = fields | {"manifest_sha256", "firmware_sha256"}
+    need(type(data) is dict and
+         (set(data) == new_fields and data.get("schema") == SCHEMA or
+          set(data) == fields and data.get("schema") == LEGACY_SCHEMA),
+         "STATE_SCHEMA_INVALID")
+    need(data["status"] in STATUS and
          type(data["session_id"]) is str and len(data["session_id"]) >= 8 and
          type(data["boot_id"]) is str and len(data["boot_id"]) >= 8 and
+         type(data["image_id"]) is str and bool(data["image_id"]) and
+         _basename(data["image"]) and
          all(type(data[k]) is int and data[k] >= 0 for k in
              ("download_count", "test_count", "restore_count")),
          "STATE_IMAGE_OR_IDENTITY_INVALID")
+    if data["schema"] == SCHEMA:
+        need(all(type(data[k]) is str and
+                 re.fullmatch(r"[a-f0-9]{64}", data[k]) is not None
+                 for k in ("manifest_sha256", "firmware_sha256")),
+             "STATE_MANIFEST_HASH_INVALID")
+    else:
+        # v1 state may be retired only from a known-Golden checkpoint.
+        need(data["status"] == "RECOVERY", "LEGACY_ACTIVE_IMAGE_DENIED")
+    if data["status"] == "RECOVERY":
+        need(data["image"] == release.recovery_name, "STATE_RECOVERY_MISMATCH")
     return data
-
 
 def write_state(data: dict) -> None:
     raw = (json.dumps(data, sort_keys=True, separators=(",", ":")) + "\n").encode()
@@ -262,12 +282,14 @@ def _digest(data: object) -> str:
                           separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 
-def live_report(port: guard.RootZ2TargetPort, release: ApprovedImage,
-                image: str) -> dict:
-    need(image in (release.recovery_name, release.firmware_name),
-         "IMAGE_NOT_SOURCE_PINNED")
+def live_report(port: guard.RootZ2TargetPort, release: ImageManifest,
+                image: str, *, previous_image: str | None = None) -> dict:
+    need(image in (release.recovery_name, release.firmware_name) or
+         (previous_image is not None and image == previous_image),
+         "IMAGE_NOT_IN_MANIFEST")
     report = admission.collect_live(root_port=port, release=release,
-                                    expected_firmware=image)
+                                    expected_firmware=image,
+                                    previous_firmware=previous_image)
     need(report["expected_manager_firmware"] == image and
          port.image_sha256("candidate") == release.firmware_sha256 and
          port.image_sha256("recovery") == release.recovery_sha256,
@@ -275,40 +297,73 @@ def live_report(port: guard.RootZ2TargetPort, release: ApprovedImage,
     return report
 
 
-def _initial_state(report: dict, release: ApprovedImage) -> dict:
+def _initial_state(report: dict, release: ImageManifest) -> dict:
     return {"schema": SCHEMA, "session_id": "fpga-" + uuid.uuid4().hex,
             "boot_id": report["target_boot_id"], "status": "RECOVERY",
             "image": release.recovery_name, "image_id": release.image_id,
+            "manifest_sha256": manifest_sha256(),
+            "firmware_sha256": release.firmware_sha256,
             "download_count": 0, "test_count": 0, "restore_count": 0,
             "evidence_sha256": _digest(report), "last_error": ""}
 
 
-def _confirm_current(port, release: ApprovedImage, record: dict | None,
+def _confirm_current(port, release: ImageManifest, record: dict | None,
                      operation: str) -> tuple[dict, dict]:
+    current_manifest = manifest_sha256()
+    different = (record is not None and
+                 (record.get("manifest_sha256") != current_manifest or
+                  record["image_id"] != release.image_id or
+                  record.get("firmware_sha256") != release.firmware_sha256))
     if record is not None:
         need(record["status"] in ("RECOVERY", "IMAGE"),
              "UNCERTAIN_PRIOR_OPERATION_MANUAL_RECOVERY")
+        if different:
+            need(operation == "download", "NEW_MANIFEST_DOWNLOAD_REQUIRED")
         if operation == "test":
             need(record["status"] == "IMAGE" and
                  record["image"] == release.firmware_name,
-                 "APPROVED_IMAGE_NOT_LOADED")
+                 "IMAGE_NOT_LOADED")
         expected = record["image"]
     else:
         need(operation == "download", "DOWNLOAD_REQUIRED_BEFORE_TEST_OR_RESTORE")
         expected = release.recovery_name
-    report = live_report(port, release, expected)
-    if record is None:
-        record = _initial_state(report, release)
+    if different and record["status"] == "IMAGE":
+        # Direct Image A -> B transition, with no intermediate Golden reload.
+        # Before overwriting PL, verify that A is still the current image,
+        # its root-owned BIN matches the recorded digest, and owner/boot
+        # evidence remains valid. Never accept UNKNOWN or stale in-flight state.
+        need(record["schema"] == SCHEMA and
+             record["boot_id"] ==
+             (guard.PROC / "sys/kernel/random/boot_id").read_text().strip(),
+             "PREVIOUS_IMAGE_BOOT_CHANGED")
+        need(record["image"] not in (release.recovery_name, release.firmware_name),
+             "PREVIOUS_IMAGE_AMBIGUOUS")
+        # Previous firmware bytes need not remain on disk after Image A was
+        # loaded. The protected journal + current-boot Manager record anchor
+        # the held Image; only the incoming B BIN and Golden are rehashed.
+        report = live_report(port, release, expected,
+                             previous_image=expected)
+    else:
+        report = live_report(port, release, expected)
+    if record is None or different:
+        fresh = _initial_state(report, release)
+        if record is not None and record["status"] == "IMAGE":
+            # Represent the old held Image until the new Download begins;
+            # any interrupted transition is persisted as in-flight/UNKNOWN.
+            fresh["status"] = "IMAGE"
+            fresh["image"] = expected
+        record = fresh
     else:
         need(record["boot_id"] == report["target_boot_id"],
              "BOOT_CHANGED_MANUAL_REVIEW")
+    need(record["manifest_sha256"] == current_manifest,
+         "MANIFEST_CHANGED_IN_FLIGHT")
     return record, report
-
 
 def run(operation: str) -> dict:
     need(operation in ("download", "test", "restore"), "OPERATION_NOT_ALLOWLISTED")
     trusted_local()
-    release = read_approved_release()
+    release = read_image_manifest()
     port = guard.RootZ2TargetPort(release=release)
     with port.exclusive():
         record, current = _confirm_current(port, release,
@@ -317,6 +372,8 @@ def run(operation: str) -> dict:
             record.update(status="DOWNLOAD_IN_FLIGHT", last_error="")
             write_state(record)
             try:
+                need(manifest_sha256() == record["manifest_sha256"],
+                     "MANIFEST_CHANGED_IN_FLIGHT")
                 guard.manager_write(release.firmware_name)
                 after = live_report(port, release, release.firmware_name)
                 record.update(status="IMAGE", image=release.firmware_name,
@@ -338,6 +395,8 @@ def run(operation: str) -> dict:
             record.update(status="TEST_IN_FLIGHT", last_error="")
             write_state(record)
             try:
+                need(manifest_sha256() == record["manifest_sha256"],
+                     "MANIFEST_CHANGED_IN_FLIGHT")
                 guard.run_child([sys.executable, "-m",
                                     "pl.hil.fpga_image_root", "--identity-child"])
                 result = json.loads(CHILD.read_text())
@@ -357,6 +416,8 @@ def run(operation: str) -> dict:
                 if release.site_bitmap_offset is not None:
                     need(result["observed"][str(release.site_bitmap_offset)] ==
                          release.site_bitmap, "IDENTITY_CHILD_SITE_MISMATCH")
+                need(manifest_sha256() == record["manifest_sha256"],
+                     "MANIFEST_CHANGED_IN_FLIGHT")
                 after = live_report(port, release, release.firmware_name)
                 record.update(status="IMAGE", test_count=record["test_count"] + 1,
                               evidence_sha256=_digest({"target": after,
@@ -378,6 +439,8 @@ def run(operation: str) -> dict:
         record.update(status="RESTORE_IN_FLIGHT", last_error="")
         write_state(record)
         try:
+            need(manifest_sha256() == record["manifest_sha256"],
+                 "MANIFEST_CHANGED_IN_FLIGHT")
             guard.manager_write(release.recovery_name)
             after = live_report(port, release, release.recovery_name)
             record.update(status="RECOVERY", image=release.recovery_name,
@@ -393,16 +456,17 @@ def run(operation: str) -> dict:
                 "lease_id": record["session_id"], "boot_id": record["boot_id"]}
 
 
-def _expected_identity(release: ApprovedImage) -> dict[int, int]:
+def _expected_identity(release: ImageManifest) -> dict[int, int]:
     return {offset: expected for offset, expected, mask in release.identity_words}
 
 
 def identity_child() -> int:
     trusted_local()
-    release = read_approved_release()
+    release = read_image_manifest()
     state = read_state(release)
     need(state is not None and state["status"] == "TEST_IN_FLIGHT" and
-         state["image"] == release.firmware_name and not CHILD.exists(),
+         state["image"] == release.firmware_name and
+         state["manifest_sha256"] == manifest_sha256() and not CHILD.exists(),
          "IDENTITY_CHILD_NOT_CLAIMED")
     need(state["boot_id"] ==
          (guard.PROC / "sys/kernel/random/boot_id").read_text().strip() and

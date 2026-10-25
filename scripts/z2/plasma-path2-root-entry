@@ -51,7 +51,6 @@ done
 for required in \
   .plasma-path2-source-commit \
   "$module_file" \
-  pl/hil/approved-fpga-image.json \
   pl/hil/fpga_image_guard.py \
   pl/hil/fpga_image_admission.py \
   software/python/plasma_interfaces/linux_mmio.py; do
@@ -96,8 +95,10 @@ done < <(/usr/bin/find "$root" -type f -print0)
 (cd "$root" && /usr/bin/sha256sum --check --status .plasma-path2-source-sha256) ||
   { echo 'PATH2_APPROVED_SOURCE_HASH_MISMATCH' >&2; exit 2; }
 
-# The reviewed generic Image lifecycle retains B2/B3, owner lock, exact
-# source authorization and recovery checks. No runtime IP Handler or Profile.
+# The pinned *code* remains protected independently of runtime Image data.
+# The companion Manifest lives beside its BIN in the root-owned firmware area;
+# it is checked by the generic Root, not added to the code SHA allowlist.
+# B2/B3, Golden recovery and the FPGA owner lock remain mandatory.
 cd "$root"
 exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
   PYTHONPATH="$root" PYTHONDONTWRITEBYTECODE=1 \
