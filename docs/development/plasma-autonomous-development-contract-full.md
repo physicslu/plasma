@@ -192,10 +192,13 @@ the actual command and physical effect, not the technology label `SW` or
   This intentionally has no per-DUT or VID/PID visibility filter: the owner
   operates a prototype laboratory and authorizes the work in Gate 1.
   Device visibility is not an authorization to actuate outside that task.
-  Privileged Z2 FPGA Manager/MMIO/power and protected root stages continue to
-  use existing trusted-main stage adapters with live ownership/recovery checks,
-  not Codex sudo or an unchecked remote shell. An unavailable physical
-  route or actual DAC denial is NOT_RUN, not permission to bypass safeguards.
+  Path 2 protected Z2 stages continue through the existing trusted-main
+  stage adapters and Root Executor. After Gate 1 owner approval, Path 3
+  may use the enrolled Z2 SSH/sudo development route to install reviewed
+  code and operate FPGA Manager/MMIO within the authorized hardware goal.
+  Actual OS privilege, electrical/device ownership, image identity and
+  Golden Restore remain mandatory; no unrestricted remote shell or sudoers
+  modification is implied. An unavailable route or DAC denial is NOT_RUN.
 - **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3
   (Codex CLI) may share the existing `SWPC-plasma-codex` self-hosted Runner
   and Linux account when the reviewed task and actual current permissions

@@ -738,7 +738,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertLess(len(root), 32768)
         brief = root.decode("utf-8")
         for required in ("Gate 1", "Gate 2", "Path 3", "NOT_RUN",
-                         "trusted root executor", "Merge Approval",
+                         "Root Executor", "Merge Approval",
                          "electrical", "B1", "rollback",
                          "Credential", "AGENTS.md"):
             with self.subTest(required=required):
@@ -1089,6 +1089,25 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertNotIn("continue-on-error: true",job)
         self.assertNotIn("|| true",job)
 
+    def test_path3_publisher_is_pr_pinned_and_keeps_token_out_of_codex(self):
+        workflow = WORKFLOW.read_text()
+        job = workflow.split("  development-codex:", 1)[1].split(
+            "\n  development-codex-resume:", 1)[0]
+        self.assertIn("contents: write  # trusted publisher", job)
+        self.assertIn("Publish successful Path 3 edits to the exact authorized PR", job)
+        self.assertIn("git -C candidate diff --cached --check", job)
+        self.assertIn("p[\"head\"][\"sha\"]==sys.argv[1]", job)
+        self.assertIn("git -C candidate push origin", job)
+        self.assertIn("GIT_ASKPASS=", job)
+        self.assertIn("persist-credentials: false", job)
+        self.assertLess(job.index("Collect Path 3 evidence even when"),
+                        job.index("Publish successful Path 3 edits"))
+        self.assertLess(job.index("Publish successful Path 3 edits"),
+                        job.index("actions/upload-artifact@"))
+        self.assertIn("os.environ.pop(\"GH_TOKEN\", None)",
+                      (ROOT / "scripts/plasma_development_dispatch.py").read_text())
+        self.assertIn('"GH_TOKEN", "GITHUB_TOKEN"',
+                      (ROOT / "scripts/plasma_development_codex_sandbox.py").read_text())
     def test_development_path3_supports_vivado_and_full_source_edits(self):
         # Stub-only contract: no Vivado or physical device is invoked by CI.
         task={
@@ -1991,7 +2010,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 task_id="path3-work-order")
             self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(len(calls), 1)
-            self.assertIn("existing trusted root executor", calls[0])
+            self.assertIn("enrolled Z2 SSH/sudo route", calls[0])
+            self.assertIn("trusted worker publishes verified", calls[0])
             self.assertNotIn("Authorized Z2 stages in order", calls[0])
             self.assertNotIn("Authorized scope:", calls[0])
             self.assertIn("sandbox_workspace_write.network_access=false", captured_commands[0])
