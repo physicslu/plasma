@@ -1,8 +1,6 @@
-# Path 3 Cross-Job Resume — Gate 1 Candidate (CPU-only)
+# Path 3 Cross-Job Resume — CPU-only special fixture (historical Gate 1)
 
-**Status: UNMERGED Draft candidate / real SWPC two-Job acceptance DEFERRED, NOT_RUN.**
-The owner approved a one-time Gate 1 sequencing revision on 2026-10-23 for this PR only.
-This does not change the general AGENTS.md rule. Gate 2 has NOT been granted.
+**Historical status (as written 2026-10-23):** The original proposal was an unmerged Draft with real SWPC two-Job acceptance deferred/NOT_RUN and a one-time Gate 1 sequencing exception. **Do not treat that historical PR state as the current `main` status.** The current trusted Workflow contains a conditional `development-codex-resume` Job and `scripts/plasma_path3_cross_job_resume.py`, but this opt-in is restricted to the `page-boundary-off-by-one` CPU-only fixture; it is **not** a generic restriction, mandatory two-Job workflow, or qualification of any current hardware operation. The existence of code is not a real SWPC E2E PASS. Consult live GitHub runs for actual acceptance.
 
 This change reuses Issue #981, the existing reusable runtime-dispatch Workflow,
 the existing SWPC-plasma-codex Runner, trusted main dispatcher, and dynamic
@@ -63,22 +61,23 @@ Power, DUT, real programming or physical hardware is authorized.
 
 ## Owner-approved deferred-acceptance exception (PR #1134 only)
 
-The trusted Issue #981 Dispatcher and second Job cannot run the candidate
-cross-Job behavior from unmerged main. Hosted fake-Codex tests cannot prove
-SWPC Session Resume. Normally real Path 3 SWPC acceptance belongs to Gate 1
+The trusted Issue #981 Dispatcher and optional second Job are now present
+in current `main` for the exact CPU-only fixture. An unmerged candidate
+cannot replace the trusted `main` controller. Hosted fake-Codex tests cannot
+prove real SWPC Session Resume. Normally real Path 3 SWPC acceptance belongs to Gate 1
 **before Gate 2**. The owner explicitly approved a one-time deferral on
 2026-10-23 for this fixed CPU-only fixture, not generic Resume support.
 
-1. **Gate 1 before merge:** Hosted positive/negative tests, all relevant CI,
+1. **Historical Gate 1 before merge (not a current gating requirement):** Hosted positive/negative tests, all relevant CI,
    isolation and code review, Rulesets/Reviews/Threads and exact HEAD checks.
    Keep explicit `SWPC_E2E=DEFERRED_NOT_RUN`; do not invent Run IDs, real
    Runner evidence, Usage or continuity proof. Maintain Draft until ready.
-2. **Gate 2 — separate owner decision:** The owner must explicitly accept
+2. **Historical Gate 2 decision:** The owner must explicitly accept
    the specific reviewed HEAD and the missing SWPC evidence. Recheck main,
    HEAD, CI, Reviews, Threads, Rulesets, dependencies and mergeability.
    If a merge is explicitly authorized, verify merge SHA, both parents and
    Git tree. Gate 1 revision alone authorizes no merge.
-3. **Post-merge owner Work Order:** A separate explicit owner Issue #981
+3. **Optional CPU-only post-merge Work Order:** A separate explicit owner Issue #981
    command pins `pr_number=0`, `source_sha=<actual main merge SHA>` and
    `session_resume=page-boundary-off-by-one`. The event's trusted main
    GITHUB_SHA must equal source_sha. This is existing Dispatcher/Workflow/
