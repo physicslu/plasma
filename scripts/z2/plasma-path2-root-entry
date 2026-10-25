@@ -39,7 +39,7 @@ module_file="pl/hil/fpga_image_root.py"
 # swap a checked Python module or a package directory between verification
 # and interpreter startup.
 for file in /root "$root" "$root/pl" "$root/pl/hil" \
-  "$root/pl/hil/swd04" "$root/software" "$root/software/python" \
+  "$root/software" "$root/software/python" \
   "$root/software/python/plasma_interfaces" \
   "$manifest" "$commit_pin" "$root/$module_file"; do
   [[ -e "$file" && ! -L "$file" && "$(stat -c '%u' "$file")" == '0' ]] ||
@@ -54,9 +54,6 @@ for required in \
   pl/hil/approved-fpga-image.json \
   pl/hil/fpga_image_guard.py \
   pl/hil/fpga_image_admission.py \
-  pl/hil/swd04/one_shot.py \
-  pl/hil/swd04/development.py \
-  pl/hil/swd04/contract.py \
   software/python/plasma_interfaces/linux_mmio.py; do
   /usr/bin/awk -v path="$required" '$2 == path && length($1) == 64 && $1 ~ /^[0-9a-f]+$/ {found = 1} END {exit !found}' "$manifest" ||
     { echo 'PATH2_REQUIRED_SOURCE_NOT_PINNED' >&2; exit 2; }
