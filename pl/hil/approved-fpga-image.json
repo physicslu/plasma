@@ -23,5 +23,6 @@
       1
     ]
   ],
-  "site_bitmap": 1
+  "site_bitmap": 1,
+  "soc_compatible": "xlnx,zynq-7000"
 }
