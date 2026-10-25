@@ -1,0 +1,27 @@
+{
+  "schema": "plasma.fpga.image-release.v1",
+  "authorization": "SOURCE_PINNED_ROOT_APPROVAL",
+  "image_id": "f1b-site1-20261020",
+  "board_id": "pynq-z2",
+  "fpga_part": "xc7z020clg400-1",
+  "firmware_name": "plasma-f1b-owner-20261020-once.bin",
+  "firmware_sha256": "c351f668094a2b841426c64681d44c76cb8c14b61766d90a0e10adcf3a22a3c3",
+  "recovery_name": "base.bin",
+  "recovery_sha256": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+  "abi_version": 65536,
+  "identity_words": [
+    [
+      0,
+      1297304656
+    ],
+    [
+      4,
+      65536
+    ],
+    [
+      16384,
+      1
+    ]
+  ],
+  "site_bitmap": 1
+}
