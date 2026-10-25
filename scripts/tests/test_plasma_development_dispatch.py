@@ -1692,7 +1692,6 @@ class GenericWorkOrderContracts(unittest.TestCase):
             {"board_repo_sha": "invalid"},
             {"scope": "guarded-hardware"},
             {"scope": "hardware"},
-            {"stage": "download"},
             {"argv": ["--program"]},
             {"script": "scripts/experiments/plasma_dynamic.py"},
             {"expected_stdout_sha256": "0" * 64},
@@ -1701,6 +1700,9 @@ class GenericWorkOrderContracts(unittest.TestCase):
             with self.subTest(change=change), self.assertRaisesRegex(
                     dev.Denied, "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
                 dev.request(self._event(order | change), self._context())
+        # Stage field was retired at the Work Order schema boundary.
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_FIELDS_DENIED"):
+            dev.request(self._event(order | {"stage": "download"}), self._context())
         missing = dict(order)
         missing.pop("board_repo_sha")
         with self.assertRaisesRegex(
