@@ -402,7 +402,7 @@ jobs:
           retention-days: 14
 
   development-execute:
-    # Path 2 retains its trusted provider; no automatic post-Codex stages.
+    # Path 2 invokes its trusted Root operation provider; no automatic chaining.
     # Hardware-capable A2 retains its existing one-shot claim gate.
     needs: [development-authorize, development-claim]
     if: >-
@@ -411,7 +411,7 @@ jobs:
       (
         (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
          (
-          contains(fromJSON('["cpu-only","vivado-host-build","path2-stage-contract","z2-root-operation"]'),
+          contains(fromJSON('["cpu-only","vivado-host-build","z2-root-operation"]'),
                    needs.development-authorize.outputs.execution_capability) ||
           (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
            needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
