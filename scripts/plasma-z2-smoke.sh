@@ -48,14 +48,21 @@ sources=(
   software/python/plasma_interfaces/linux_mmio.py
   scripts/z2/plasma-path2-root-entry
   scripts/z2/plasma-z2-ssh-smoke-target.sh
-)
+) 
+# Historical PR #1167 did not have a release JSON. Preserve its existing
+# smoke source pin without synthesizing an unreviewed descriptor. For later
+# explicitly authorized commits carrying the descriptor, include its bytes
+# in the same protected source closure and manifest.
+if git cat-file -e "$sha:pl/hil/approved-fpga-image.json" 2>/dev/null; then
+  sources+=(pl/hil/approved-fpga-image.json)
+fi
 git archive --format=tar "$sha" -- "${sources[@]}" | tar -xf - -C "$work/src"
 printf '%s\n' "$sha" > "$work/src/.plasma-path2-source-commit"
 (
   cd "$work/src"
   while IFS= read -r -d '' f; do
     sha256sum "$f" | sed 's@  ./@  @'
-  done < <(find . -type f \( -name '*.py' -o -name '.plasma-path2-source-commit' \) -print0 | sort -z)
+  done < <(find . -type f \( -name '*.py' -o -name 'approved-fpga-image.json' -o -name '.plasma-path2-source-commit' \) -print0 | sort -z)
 ) > "$work/src/.plasma-path2-source-sha256"
 (cd "$work/src" && sha256sum -c --status .plasma-path2-source-sha256) ||
   { echo 'DENIED: local bundle verification failed'; exit 2; }

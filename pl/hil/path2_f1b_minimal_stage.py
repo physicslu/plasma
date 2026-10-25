@@ -7,6 +7,7 @@ UNPROVEN under the explicitly accepted Development-only UIO exception.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import importlib.util
 import json
@@ -27,6 +28,7 @@ STATE = ROOT / ".plasma-f1b-site1-development-state.json"
 CHILD = one_shot.OWNER_DIR / "path2-f1b-identity.json"
 CANDIDATE = guard.FIRMWARE / "plasma-f1b-owner-20261020-once.bin"
 RECOVERY = guard.FIRMWARE / "base.bin"
+RELEASE_FILE = ROOT / "pl/hil/approved-fpga-image.json"
 SCHEMA = "plasma.f1b.site1.development.v2"
 STATUS = ("BASE", "F1B", "DOWNLOAD_IN_FLIGHT", "TEST_IN_FLIGHT",
           "RESTORE_IN_FLIGHT", "UNKNOWN")
@@ -39,6 +41,171 @@ class LiveStageDenied(ValueError):
 def need(test: bool, reason: str) -> None:
     if not test:
         raise LiveStageDenied(reason)
+
+
+# This record is compiled into the reviewed root-owned source closure. It is
+# release authorization, not a runtime Project/Profile or a caller JSON claim.
+@dataclass(frozen=True)
+class ApprovedImage:
+    image_id: str
+    board_id: str
+    fpga_part: str
+    soc_compatible: str
+    firmware_name: str
+    firmware_sha256: str
+    recovery_name: str
+    recovery_sha256: str
+    abi_version: int
+    identity_words: tuple[tuple[int, int], ...]
+    site_bitmap: int
+
+
+F1B_APPROVED_IMAGE = ApprovedImage(
+    image_id="f1b-site1-20261020",
+    board_id="pynq-z2",
+    fpga_part="xc7z020clg400-1",
+    soc_compatible="xlnx,zynq-7000",
+    firmware_name=CANDIDATE.name,
+    firmware_sha256=f1b.BIN_SHA,
+    recovery_name=RECOVERY.name,
+    recovery_sha256=f1b.BASE_SHA,
+    abi_version=f1b.IDENTITY[0x0004],
+    identity_words=tuple(sorted(f1b.IDENTITY.items())),
+    site_bitmap=1,
+)
+AUTHORIZED_IMAGES = (F1B_APPROVED_IMAGE,)
+
+
+def approved_image(image: object) -> ApprovedImage:
+    """Only source-approved images, never arbitrary caller-provided manifests."""
+    need(type(image) is ApprovedImage and image in AUTHORIZED_IMAGES,
+         "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED")
+    need(image.board_id == "pynq-z2" and
+         image.fpga_part == "xc7z020clg400-1" and
+         image.soc_compatible == "xlnx,zynq-7000" and
+         image.firmware_name == CANDIDATE.name and
+         image.recovery_name == RECOVERY.name and
+         image.firmware_sha256 == f1b.BIN_SHA and
+         image.recovery_sha256 == f1b.BASE_SHA and
+         image.abi_version == f1b.IDENTITY[0x0004] and
+         image.identity_words == tuple(sorted(f1b.IDENTITY.items())) and
+         image.site_bitmap == 1,
+         "IMAGE_RELEASE_SOURCE_LOCK_MISMATCH")
+    return image
+
+
+def _release_pairs(pairs: list[tuple[str, object]]) -> dict:
+    """Reject duplicate keys rather than silently overriding AP policy."""
+    out = {}
+    for key, value in pairs:
+        need(key not in out, "IMAGE_RELEASE_DUPLICATE_FIELD")
+        out[key] = value
+    return out
+
+
+def read_approved_release() -> ApprovedImage:
+    """Read the reviewed, Root-owned + complete-source-SHA-pinned release.
+
+    This file is included in the SSH source bundle and its SHA256 manifest.
+    The existing Root Entry validates the full manifest and exact source Git
+    pin before calling this code. No caller can choose a file or Python IP.
+    """
+    one_shot.protected(RELEASE_FILE)
+    need(RELEASE_FILE.is_file() and 0 < RELEASE_FILE.stat().st_size <= 4096,
+         "IMAGE_RELEASE_FILE_DENIED")
+    try:
+        raw = json.loads(RELEASE_FILE.read_text(encoding="utf-8"),
+                         object_pairs_hook=_release_pairs,
+                         parse_constant=lambda _: need(False,
+                             "IMAGE_RELEASE_NONFINITE_NUMBER_DENIED"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise LiveStageDenied("IMAGE_RELEASE_JSON_DENIED") from exc
+    fields = {"schema", "authorization", "image_id", "board_id",
+              "fpga_part", "soc_compatible", "firmware_name", "firmware_sha256",
+              "recovery_name", "recovery_sha256", "abi_version",
+              "identity_words", "site_bitmap"}
+    need(type(raw) is dict and set(raw) == fields and
+         raw["schema"] == "plasma.fpga.image-release.v1" and
+         raw["authorization"] == "SOURCE_PINNED_ROOT_APPROVAL",
+         "IMAGE_RELEASE_SCHEMA_DENIED")
+    names = ("image_id", "board_id", "fpga_part", "soc_compatible", "firmware_name",
+             "firmware_sha256", "recovery_name", "recovery_sha256")
+    need(all(type(raw[n]) is str and bool(raw[n]) for n in names) and
+         type(raw["abi_version"]) is int and
+         type(raw["site_bitmap"]) is int and
+         type(raw["identity_words"]) is list and
+         len(raw["identity_words"]) == 3 and
+         all(type(pair) is list and len(pair) == 2 and
+             all(type(word) is int and 0 <= word <= 0xFFFFFFFF
+                 for word in pair)
+             for pair in raw["identity_words"]),
+         "IMAGE_RELEASE_VALUE_DENIED")
+    image = ApprovedImage(
+        image_id=raw["image_id"],
+        board_id=raw["board_id"],
+        fpga_part=raw["fpga_part"],
+        soc_compatible=raw["soc_compatible"],
+        firmware_name=raw["firmware_name"],
+        firmware_sha256=raw["firmware_sha256"],
+        recovery_name=raw["recovery_name"],
+        recovery_sha256=raw["recovery_sha256"],
+        abi_version=raw["abi_version"],
+        identity_words=tuple(tuple(pair) for pair in raw["identity_words"]),
+        site_bitmap=raw["site_bitmap"],
+    )
+    return approved_image(image)
+
+
+def verify_image_metadata(image: ApprovedImage, *, board_id: str,
+                          fpga_part: str, abi_version: int,
+                          identity_words: dict[int, int]) -> None:
+    """Pure comparison, not independent PS/PL attestation.
+
+    A qualified provider must collect authentic live board and PL facts
+    before this can be used to admit any future non-F1-B release.
+    """
+    image = approved_image(image)
+    need(type(board_id) is str and board_id == image.board_id and
+         type(fpga_part) is str and fpga_part == image.fpga_part,
+         "IMAGE_BOARD_OR_FPGA_PART_MISMATCH")
+    need(type(abi_version) is int and abi_version == image.abi_version and
+         type(identity_words) is dict and
+         identity_words == dict(image.identity_words),
+         "IMAGE_ABI_OR_IDENTITY_MISMATCH")
+
+
+def verify_live_ps_compatible(image: ApprovedImage, *, raw_compatible: bytes) -> None:
+    """Match observed PS Device Tree family against the trusted release.
+
+    This is SoC-family evidence, NOT physical PYNQ-Z2 board/part attestation.
+    """
+    image = approved_image(image)
+    need(type(raw_compatible) is bytes and
+         0 < len(raw_compatible) <= 4096 and
+         raw_compatible.endswith(b"\0") and
+         image.soc_compatible.encode("ascii") in
+         raw_compatible.split(b"\0")[:-1],
+         "IMAGE_PS_SOC_COMPATIBLE_MISMATCH")
+
+
+def verify_observed_pl_identity(image: ApprovedImage, *, observed: dict,
+                                read32_count: int,
+                                write32_count: int) -> None:
+    """Pure check on actual native MMIO child readback, not AP-supplied data."""
+    image = approved_image(image)
+    need(type(observed) is dict and
+         all(type(k) is int and type(v) is int and
+             0 <= k <= 0xFFFFFFFF and 0 <= v <= 0xFFFFFFFF
+             for k, v in observed.items()) and
+         observed == dict(image.identity_words),
+         "IMAGE_PL_IDENTITY_MISMATCH")
+    need(observed.get(0x0004) == image.abi_version and
+         observed.get(0x4000) == image.site_bitmap,
+         "IMAGE_PL_ABI_OR_SITE_MISMATCH")
+    need(type(read32_count) is int and type(write32_count) is int and
+         read32_count == len(image.identity_words) == 3 and
+         write32_count == 0,
+         "NATIVE_MMIO_ACCESS_COUNT_CHANGED")
 
 
 def digest(data: object) -> str:
@@ -128,13 +295,18 @@ def write_state(record: dict) -> None:
 
 
 def live_report(port: guard.RootZ2TargetPort, image: str) -> dict:
-    need(image in ("base.bin", CANDIDATE.name), "IMAGE_NOT_PINNED")
+    release = read_approved_release()
+    need(image in (release.recovery_name, release.firmware_name),
+         "IMAGE_NOT_PINNED")
     report = risk.collect_live(root_port=port, approval=risk.WAIVER,
                                scope=risk.ALLOWED[0],
                                expected_firmware=image)
+    # Read the real kernel Device Tree bytes; never echo the release as proof.
+    verify_live_ps_compatible(
+        release, raw_compatible=(guard.PROC / "device-tree/compatible").read_bytes())
     need(report["site"] == 1 and report["expected_manager_firmware"] == image
-         and port.image_sha256("candidate") == f1b.BIN_SHA
-         and port.image_sha256("recovery") == f1b.BASE_SHA,
+         and port.image_sha256("candidate") == release.firmware_sha256
+         and port.image_sha256("recovery") == release.recovery_sha256,
          "CURRENT_IMAGE_OR_RECOVERY_CHANGED")
     return report
 
@@ -175,6 +347,7 @@ def confirm_current(port, record: dict | None, stage: str) -> tuple[dict, dict]:
 def run(stage: str) -> dict:
     need(stage in ("download", "test", "restore"), "STAGE_NOT_ALLOWLISTED")
     trusted_local()
+    release = read_approved_release()
     # The shared FPGA owner serializes all cooperating configuration users.
     port = guard.RootZ2TargetPort(candidate=CANDIDATE, recovery=RECOVERY,
                                   ledger=one_shot.OWNER_DIR / "path2-f1b-site1.json")
@@ -185,7 +358,7 @@ def run(stage: str) -> dict:
             record.update(status="DOWNLOAD_IN_FLIGHT", last_error="")
             write_state(record)  # persists recovery obligation first
             try:
-                one_shot.manager_write(CANDIDATE.name)
+                one_shot.manager_write(release.firmware_name)
                 after = live_report(port, CANDIDATE.name)
                 record.update(status="F1B", image=CANDIDATE.name,
                               download_count=record["download_count"] + 1,
@@ -212,7 +385,7 @@ def run(stage: str) -> dict:
                                     "--identity-child"])
                 result = json.loads(CHILD.read_text())
                 need(result == {"observed": {str(k): v for k, v in
-                                             f1b.IDENTITY.items()}},
+                                             release.identity_words}},
                      "THREE_READ_IDENTITY_MISMATCH")
                 after = live_report(port, CANDIDATE.name)
                 record.update(status="F1B", test_count=record["test_count"] + 1,
@@ -236,7 +409,7 @@ def run(stage: str) -> dict:
         record.update(status="RESTORE_IN_FLIGHT", last_error="")
         write_state(record)
         try:
-            one_shot.manager_write(RECOVERY.name)
+            one_shot.manager_write(release.recovery_name)
             after = live_report(port, "base.bin")
             record.update(status="BASE", image="base.bin",
                           restore_count=record["restore_count"] + 1,
@@ -255,6 +428,7 @@ def child_main() -> int:
     # Read-only native subprocess: does not acquire the parent FPGA lock and
     # cannot invoke an FPGA Manager writer.
     trusted_local()
+    release = read_approved_release()
     state = read_state()
     need(state is not None and state["status"] == "TEST_IN_FLIGHT" and
          state["image"] == CANDIDATE.name and not CHILD.exists(),
@@ -271,12 +445,15 @@ def child_main() -> int:
     driver = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = driver
     spec.loader.exec_module(driver)
-    aperture = driver.MMIOAperture(f1b.BASE, frozenset(f1b.IDENTITY),
+    aperture = driver.MMIOAperture(f1b.BASE, frozenset(dict(release.identity_words)),
                                    frozenset(), f1b.LENGTH)
     with driver.LinuxMMIO((aperture,), readonly=True) as mmio:
         observed = f1b.read_identity(mmio.read32)
-        need(mmio.stats().read32 == 3 and mmio.stats().write32 == 0,
-             "NATIVE_MMIO_ACCESS_COUNT_CHANGED")
+        stats = mmio.stats()
+        # Actual LinuxMMIO result, not a synthesized manifest-side assertion.
+        verify_observed_pl_identity(
+            release, observed=observed,
+            read32_count=stats.read32, write32_count=stats.write32)
     one_shot.record_json(CHILD, {"observed": observed})
     return 0
 

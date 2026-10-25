@@ -40,7 +40,9 @@ src="$work/src"
 [[ -f "$src/.plasma-path2-source-commit" &&
    "$(cat "$src/.plasma-path2-source-commit")" == "$sha" &&
    -f "$src/scripts/z2/plasma-path2-root-entry" &&
-   -f "$src/pl/hil/path2_f1b_minimal_stage.py" ]] || { echo 'DENIED: incomplete bundle'; exit 2; }
+   -f "$src/pl/hil/path2_f1b_minimal_stage.py" &&
+   -f "$src/pl/hil/approved-fpga-image.json" ]] ||
+   { echo 'DENIED: incomplete bundle'; exit 2; }
 (cd "$src" && sha256sum --check --status .plasma-path2-source-sha256) ||
   { echo 'DENIED: source Manifest mismatch'; exit 2; }
 
