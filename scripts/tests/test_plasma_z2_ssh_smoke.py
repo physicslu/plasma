@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Host-only Bash contracts. Never SSH, sudo, deploy, or touch FPGA."""
 from pathlib import Path
+import os
 import subprocess
 import unittest
 
@@ -60,6 +61,46 @@ class SSHDeploySmokeContracts(unittest.TestCase):
         self.assertIn("run_op restore RESTORED_VERIFIED,ALREADY_RESTORED", target)
         self.assertIn("read32_count", target)
         self.assertIn("write32_count", target)
+
+    def test_golden_check_real_zynq_dmesg_and_latest_load(self):
+        """Execute production dmesg filter and predicate with simulated output.
+
+        Actual 2026-10-25 Z2 log includes 'Xilinx Zynq FPGA Manager';
+        avoid a false NO_GO without accepting an earlier base image.
+        """
+        lines = TARGET.read_text().splitlines()
+        selector = next(
+            x.strip() for x in lines
+            if x.strip().startswith('last="$(dmesg --color=never ')
+        )
+        predicate = next(
+            x.strip().split(" ||", 1)[0] for x in lines
+            if x.strip().startswith('[[ "$last" == ')
+        )
+        shell = (
+            'dmesg() { printf "%s\\n" "$MOCK_DMESG"; }\\n'
+            + selector + "\\n" + predicate
+        )
+        intro = "[   40.229271] fpga_manager fpga0: Xilinx Zynq FPGA Manager registered"
+        golden = "[13027.805055] fpga_manager fpga0: writing base.bin to Xilinx Zynq FPGA Manager"
+        old_name = "[129.930197] fpga_manager fpga0: writing base.bin to Xilinx FPGA Manager"
+        candidate = "[12979.051154] fpga_manager fpga0: writing plasma-f1b-owner-20261020-once.bin to Xilinx Zynq FPGA Manager"
+        cases = [
+            ("actual Z2 last restored", "\\n".join([intro, old_name, candidate, golden]), True),
+            ("older driver name", old_name, True),
+            ("candidate loaded last", "\\n".join([intro, golden, candidate]), False),
+            ("no manager load", intro, False),
+            ("unrelated manager writes", "[3.0] fpga_manager fpga1: writing base.bin to Xilinx Zynq FPGA Manager", False),
+            ("empty dmesg", "", False),
+        ]
+        for description, dmesg_output, expected in cases:
+            with self.subTest(case=description):
+                proc = subprocess.run(
+                    ["bash", "-c", shell],
+                    env={**os.environ, "MOCK_DMESG": dmesg_output},
+                    capture_output=True, text=True, timeout=5, check=False,
+                )
+                self.assertEqual(proc.returncode == 0, expected, proc.stderr)
 
     def test_never_autorun_hardware_from_ci_or_deploy_without_golden(self):
         src = HOST.read_text() + TARGET.read_text()
