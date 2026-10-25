@@ -1631,6 +1631,151 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["objective"], order["objective"])
             self.assertEqual(task["acceptance"], order["acceptance"])
 
+    def test_dynamic_vivado_host_build_uses_existing_exact_engine(self):
+        import plasma_vivado_host_build as build
+        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        order = self._order("path2-cli",
+                            capability="vivado-host-build",
+                            project=fixed["project"],
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"])
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertNotIn("path2-work-order", self.registry["tasks"])
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["board_repo_sha"], fixed["board_repo_sha"])
+        self.assertEqual(approval["execution_capability"], "vivado-host-build")
+        self.assertEqual(approval["task_id"], "path2-work-order")
+        self.assertIsNone(approval["authorized_stage"])
+        self.assertFalse(approval["auto_download_after_build_success"])
+        self.assertFalse(approval["auto_test_after_download_success"])
+        projected = {k: task[k] for k in (
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha")}
+        self.assertEqual(set(projected), {
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha"})
+        plan = build.preflight(
+            projected, workspace=ROOT, approval=approval,
+            env={"GITHUB_SHA": approval["trusted_sha"]})
+        self.assertEqual(plan["board_sha"], fixed["board_repo_sha"])
+        with patch.object(build, "run", return_value={"status": "MOCK_HOST_BUILD"}) as runner:
+            result = dev.run_task(task, workspace=ROOT, approval=approval)
+            self.assertEqual(result["status"], "MOCK_HOST_BUILD")
+            runner.assert_called_once()
+            self.assertEqual(runner.call_args.args[0], projected)
+
+        # The fixed legacy Build identity still has its original adapter.
+        static_event = DevelopmentVivadoHostBuildContracts().event()
+        static_approval = dev.authorize(
+            static_event, self._context(), self.registry)
+        self.assertEqual(static_approval["task_id"],
+                         "fixed-site1-vivado-host-build")
+
+    def test_dynamic_vivado_host_build_negative_contracts(self):
+        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        order = self._order("path2-cli",
+                            capability="vivado-host-build",
+                            project=fixed["project"],
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"])
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
+        for change in (
+            {"project": "pl/projects/other-platform"},
+            {"project": "../danger"},
+            {"toolchain": "2025.2"},
+            {"board_repo_sha": "invalid"},
+            {"scope": "guarded-hardware"},
+            {"scope": "hardware"},
+            {"stage": "download"},
+            {"argv": ["--program"]},
+            {"script": "scripts/experiments/plasma_dynamic.py"},
+            {"expected_stdout_sha256": "0" * 64},
+            {"timeout_seconds": 120},
+        ):
+            with self.subTest(change=change), self.assertRaisesRegex(
+                    dev.Denied, "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
+                dev.request(self._event(order | change), self._context())
+        missing = dict(order)
+        missing.pop("board_repo_sha")
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
+            dev.request(self._event(missing), self._context())
+
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        approval = dev.authorize(event, self._context(), self.registry)
+        import plasma_vivado_host_build as build
+        for change in (
+            {"work_order_sha256": "0" * 64},
+            {"authorized_stage": "download"},
+            {"auto_download_after_build_success": True},
+            {"auto_test_after_download_success": True},
+        ):
+            with self.subTest(change=change), patch.object(
+                    build, "run") as builder:
+                with self.assertRaisesRegex(
+                        dev.Denied, "HOST_BUILD_DYNAMIC_WORK_ORDER_DENIED"):
+                    dev.run_task(task, workspace=ROOT,
+                                 approval=approval | change)
+                builder.assert_not_called()
+        with patch.object(build, "run") as builder:
+            with self.assertRaisesRegex(dev.Denied,
+                                        "HOST_BUILD_APPROVAL_REQUIRED"):
+                dev.run_task(task, workspace=ROOT, approval=None)
+            builder.assert_not_called()
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, self._event(
+                order | {"acceptance": "A different unauthorized requirement."}))
+
+    def test_dynamic_vivado_candidate_head_requires_exact_pr_and_driver(self):
+        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        order = self._order("path2-cli", capability="vivado-host-build",
+                            project=fixed["project"],
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"],
+                            pr_number=1100, source_sha="b" * 40)
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
+        event = self._event(order)
+        fixture = DevelopmentBranchDispatchContracts()
+        pr = fixture.valid_pr()
+        approval = dev.authorize(
+            event, self._context(), self.registry, pr_info=pr)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(approval["pinned_sha"], "b" * 40)
+        self.assertEqual(approval["trusted_sha"], "a" * 40)
+        for tamper in ("sha", "repo", "owner", "base", "state"):
+            altered = copy.deepcopy(pr)
+            if tamper == "sha":
+                altered["head"]["sha"] = "c" * 40
+            elif tamper == "repo":
+                altered["head"]["repo"]["full_name"] = "untrusted/repo"
+            elif tamper == "owner":
+                altered["user"]["login"] = "attacker"
+            elif tamper == "base":
+                altered["base"]["ref"] = "another"
+            else:
+                altered["state"] = "closed"
+            with self.subTest(tamper=tamper), self.assertRaises(dev.Denied):
+                dev.authorize(event, self._context(), self.registry,
+                              pr_info=altered)
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            with patch("plasma_vivado_host_build.run") as builder:
+                with self.assertRaisesRegex(
+                        dev.Denied, "HOST_BUILD_CANDIDATE_DRIVER_DENIED"):
+                    dev.run_task(task, workspace=work, approval=approval)
+                builder.assert_not_called()
+
     def test_dynamic_cpu_optional_scope_modes_utf8_and_timeout(self):
         order = self._order("path2-cli")
         order.pop("scope")
