@@ -713,6 +713,15 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(evidence_dir.is_dir(), "EVIDENCE_DIR_DENIED")
         (evidence_dir / "plasma-path2-stdout.txt").write_bytes(proc.stdout)
         (evidence_dir / "plasma-path2-stderr.txt").write_bytes(proc.stderr)
+        # Keep the actual process status even when CLI validation fails.
+        # This is a small supplement to existing stdout/stderr evidence.
+        (evidence_dir / "plasma-path2-process.json").write_text(
+            json.dumps({
+                "exit_code": proc.returncode,
+                "stdout_sha256": hashlib.sha256(proc.stdout).hexdigest(),
+                "stderr_sha256": hashlib.sha256(proc.stderr).hexdigest(),
+                "verification": mode,
+            }, sort_keys=True) + "\n", encoding="utf-8")
     digest = hashlib.sha256(proc.stdout).hexdigest()
     try:
         lines = proc.stdout.decode("utf-8").splitlines()
