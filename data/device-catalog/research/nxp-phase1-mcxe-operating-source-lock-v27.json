@@ -1,0 +1,58 @@
+{
+  "schema_version": 27,
+  "adr": "ADR-0002",
+  "phase": "IC_INFORMATION",
+  "manufacturer": "NXP",
+  "source_15_git_blob": "46c02c0f92f77f30a14d630bdca16d278db368f3",
+  "baseline_501_v26_git_blob": "5156324546f9f5ffc19a2a785ef0560e39799a65",
+  "prior_54_exact_v21_git_blob": "2a37d0f60085bdb1ca3021313039ebde39bf5857",
+  "expected_501": 501,
+  "expected_admitted": 224,
+  "expected_research": 277,
+  "expected_15": {
+    "MCXE24": 8,
+    "MCXE31": 7
+  },
+  "new_identities": 0,
+  "ram_conflict_exact": [
+    "MCXE315MLF",
+    "MCXE315MPA"
+  ],
+  "documents": {
+    "MCXE24": {
+      "id": "MCXEP144M112F70",
+      "rev": "Rev 2 — 14 July 2025",
+      "url": "https://www.nxp.com/docs/en/data-sheet/MCXEP144M112F70.pdf",
+      "normal": "Table 3, PDF physical page 11/75, §4.2 normal operating",
+      "range": "2.7 to 5.5"
+    },
+    "MCXE31": {
+      "id": "MCXEP172M160FB0",
+      "rev": "Rev 4 — 6 April 2026",
+      "url": "https://www.nxp.com/docs/en/data-sheet/MCXEP172M160FB0.pdf",
+      "normal": "Table 4, PDF physical page 8/81, §5.2 normal operating",
+      "range": "2.97 to 5.5"
+    }
+  },
+  "mode_restriction": "MCXE247 uses FIRC for minimum 2.7V, PLL needs 2.97V minimum",
+  "e24_vdda": "VDD and VDDA tied to same PCB source, differential ±0.1V RF-AC only",
+  "e31_analog": "Main analog supplied via VDD_HV_A; VREFH is ADC reference; independent VDDA pin is NOT evidenced",
+  "allowed_changes": [
+    "working_vdd",
+    "working_vdd_unit",
+    "working_vdd_state",
+    "io_supply",
+    "io_supply_state",
+    "vdda",
+    "vdda_state",
+    "ram_state"
+  ],
+  "ram_conflict_old": "MCXE31FS Rev 1 2025-10-23 RAM 64 KB",
+  "ram_conflict_new": "MCXEP172M160FB0 Rev 4 2026-04-06 RAM 112 KB",
+  "vendor_original_pdf_bytes_archived": false,
+  "vendor_original_pdf_sha256": null,
+  "source_byte_replay_verified": false,
+  "production_catalog_changed": false,
+  "software_programming_qualified": false,
+  "physical_hil_verified": false
+}
