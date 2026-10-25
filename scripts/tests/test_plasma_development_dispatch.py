@@ -1659,7 +1659,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             script = work / task["script"]
             script.parent.mkdir(parents=True)
             script.write_text(
-                "import sys\nprint('診斷：正常', sys.argv[1])\n",
+                "import sys\nprint('header')\nprint('診斷：正常', sys.argv[1])\n",
                 encoding="utf-8")
             result = dev.run_task(task, workspace=work, evidence_dir=work)
             self.assertEqual(result["status"], "PASS")
@@ -1668,7 +1668,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertIn("診斷：正常", result["first_row"])
             self.assertEqual(
                 (work / "plasma-path2-stdout.txt").read_text(encoding="utf-8"),
-                "診斷：正常 --mode=diagnostic\n")
+                "header\n診斷：正常 --mode=diagnostic\n")
             observed = {}
             def stub(command, **kwargs):
                 observed["timeout"] = kwargs["timeout"]
