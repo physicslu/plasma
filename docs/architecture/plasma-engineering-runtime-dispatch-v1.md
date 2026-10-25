@@ -1,4 +1,6 @@
-# PLASMA Engineering Runtime Dispatcher v1 — current state and Development Mode gate
+# PLASMA Engineering Runtime Dispatcher v1 — Development Mode and Qualification history
+
+> **Current routing (2026-10-25):** The active Development Mode route is the owner-only Issue #981 `issue_comment` entry in `.github/workflows/plasma-engineering-runtime-dispatch.yml`, using trusted `main` for authorization, Path 2 fixed CLI or Path 3 SWPC Codex and its trusted PR publisher. Path 3 Codex chooses its own engineering method after Gate 1; it is not limited to one generated file. Bubblewrap, private credentials and PR publisher remain separate execution boundaries. The `workflow_dispatch` Qualification route described later is **inactive** and must not be confused with Development Mode. Historical implementation snapshots below are not live admission rules; consult executable workflow and `AGENTS.md`.
 
 **Status:** Qualification `workflow_dispatch` Runtime remains **DISABLED**.
 Its separate `software-pr` Path 3 mapping is a dormant Qualification isolation
@@ -45,18 +47,22 @@ the **main** dispatcher, not by dispatcher Python from the PR.
    stdout/stderr and the receipt. There is NO `nine-nine-path2` routing
    exception or `nine-nine-table-v1` validation policy; multiplication tests
    are only ordinary test fixtures. Path 3 delegates the objective to Codex,
-   supports creating or repairing the approved Python file, and collects
-   the source, text or CSV output (`output_format: text|csv`), self-test and
-   Codex session logs. Its reference SHA256 is optional for new unknown-output
-   objectives. Only the approved source file may be changed, and its
-   tracked diff is preserved in a source patch artifact for review;
-   **ChatGPT** reviews evidence, not AST shape or fixed CSV column labels.
+   receives the approved objective and acceptance criteria, and may modify
+   relevant RTL, Tcl, Python, tests and docs within Gate 1 scope. The trusted
+   worker captures source changes and evidence and (for an authorized open PR)
+   publishes successful edits to that PR through the existing Publisher.
+   Text/CSV outputs are legacy fixture options, **not** limits on general
+   Path 3 work. ChatGPT reviews actual evidence, not a fixed source shape.
 5. Both use the *existing* `SWPC-plasma-codex` self-hosted Runner, with
    no new task-specific Workflow. PR/push checks are GitHub-hosted offline
    only. The formal qualification `workflow_dispatch` Runtime stays OFF.
 
 This is **not** blanket trust of PR code: only the owner-authorized exact
 same-repository candidate commit enters the existing development workers.
+Path 3 work is self-directed inside that authorization; Path 2's fixed Stage
+allowlist and single-project Root Profile are not generic Path 3 procedures.
+Actual Z2 OS permissions, electrical safety, image identity and restoration
+still govern any real hardware effect.
 The shared SWPC Linux account is hardware-capable, and prompt restrictions
 do not substitute for OS isolation; no hardware operation is authorized by
 this feature. PR metadata is checked at hosted authorization time; changes
@@ -269,9 +275,11 @@ activation and operational test plan**):
    effective rules or exhausted repository permissions. Do not enable
    `workflow_dispatch` without a verified trusted Gate 1 provenance broker.
 4. Supply secure, job-bound Codex authentication and workspace write guards.
-   The current worker implementation deliberately does not publish PRs.
-   Design a separate trusted, isolated publisher and guarantee new PR CI
-   really triggers (default `GITHUB_TOKEN` events may be suppressed).
+   This **dormant Qualification worker** deliberately does not publish PRs.
+   A future qualification activation requires its own reviewed publisher and
+   CI trigger. This is not a statement about the active Development Mode
+   Path 3, which already has a trusted publisher; default `GITHUB_TOKEN`
+   pushes may still not trigger new `pull_request` CI.
 5. Test liveness/cancellation/timeout behavior, audit evidence retention,
    source path symlink and TOCTOU attacks, network exfiltration guards, and
    worker cleanup. Never use a repository PR to provision a runner.
