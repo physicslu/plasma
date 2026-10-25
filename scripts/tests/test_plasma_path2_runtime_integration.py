@@ -79,21 +79,19 @@ class GenericConfigurationAdapter(unittest.TestCase):
             self.task, self.approved, image_lock=changes.get("lock", self.lock),
             bundle=changes.get("bundle", self.bundle))
 
-    def test_independent_stages_use_only_existing_transport(self):
+    def test_all_stages_deny_even_matching_synthetic_source_and_bytes(self):
         with patch.object(runtime.transport, "execute") as execute:
-            for task_id, stage, result in (
-                ("z2-path2-download", "download", "LOADED_AND_HELD"),
-                ("z2-path2-testing", "test", "IDENTITY_PASS"),
-                ("z2-path2-restore", "restore", "RESTORED_VERIFIED")):
+            for task_id, stage in (
+                ("z2-path2-download", "download"),
+                ("z2-path2-testing", "test"),
+                ("z2-path2-restore", "restore")):
                 self.task["stage"] = stage
                 self.approved = approval(task_id)
-                execute.return_value = dict(stage=stage, source_sha=SHA,
-                    project=self.lock.project, real_z2=True,
-                    boot_id="synthetic-boot", result=result)
-                execute.reset_mock()
-                receipt = self.run_adapter()
-                execute.assert_called_once_with(stage, SHA, self.lock.project)
-                self.assertFalse(receipt["auto_next_stage"])
+                with self.subTest(stage=stage), self.assertRaisesRegex(
+                        runtime.RuntimeDenied,
+                        "GENERIC_CONFIGURATION_ROOT_PPU_HOLD_NOT_QUALIFIED"):
+                    self.run_adapter()
+            execute.assert_not_called()
 
     def test_bad_locks_and_bytes_never_reach_transport(self):
         cases = [dict(lock=None),
@@ -109,26 +107,22 @@ class GenericConfigurationAdapter(unittest.TestCase):
                     self.run_adapter(**change)
             execute.assert_not_called()
 
-    def test_authorization_and_transport_denial_propagate_without_retry(self):
+    def test_caller_flags_and_quiesce_tokens_cannot_enable_transport(self):
         with patch.object(runtime.transport, "execute") as execute:
-            self.approved["pinned_sha"] = "invalid"
-            with self.assertRaises(runtime.RuntimeDenied):
+            for flag in ("all_sites_idle", "axi_isolated", "source_manifest_verified",
+                         "external_io_isolated", "golden_restored", "runtime_quiesced"):
+                self.approved[flag] = True
+            self.approved["quiesce_token"] = "forged-or-expired-token"
+            with self.assertRaisesRegex(runtime.RuntimeDenied, "ROOT_PPU_HOLD_NOT_QUALIFIED"):
                 self.run_adapter()
             execute.assert_not_called()
-            self.approved = approval("z2-path2-download")
-            execute.side_effect = runtime.transport.Blocked("Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED")
-            with self.assertRaisesRegex(runtime.RuntimeDenied, "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"):
-                self.run_adapter()
-            execute.assert_called_once()
 
-    def test_dpidr_cannot_substitute_for_pl_identity(self):
-        self.task["stage"] = "test"
-        self.approved = approval("z2-path2-testing")
-        with patch.object(runtime.transport, "execute", return_value=dict(
-                stage="test", source_sha=SHA, project=self.lock.project,
-                real_z2=True, boot_id="synthetic-boot", result="DPIDR_PASS")):
-            with self.assertRaisesRegex(runtime.RuntimeDenied, "CONFIGURATION_IDENTITY_REQUIRED"):
+    def test_authorization_denial_precedes_transport(self):
+        with patch.object(runtime.transport, "execute") as execute:
+            self.approved["pinned_sha"] = "invalid"
+            with self.assertRaisesRegex(runtime.RuntimeDenied, "PATH2_STAGE_APPROVAL_DENIED"):
                 self.run_adapter()
+            execute.assert_not_called()
 
 
 class RouteContracts(unittest.TestCase):

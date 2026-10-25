@@ -105,15 +105,31 @@ def classify_passive_facts(facts: object) -> dict:
 def scan_kernel_owners(*, sysroot: Path) -> tuple[list[str], list[str]]:
     """Any overlapping bound UIO/platform driver remains a hardware blocker."""
     uio, platform = [], []
-    for item in sorted((sysroot / "class/uio").glob("uio*")):
+    uio_root = sysroot / "class/uio"
+    platform_root = sysroot / "bus/platform/devices"
+    # Glob silently accepts a missing directory: missing kernel ownership
+    # visibility must never appear to be a clean FPGA configuration.
+    need(uio_root.is_dir() and platform_root.is_dir(),
+         "KERNEL_OWNER_VISIBILITY_UNPROVEN")
+    for item in sorted(uio_root.iterdir()):
+        if not re.fullmatch(r"uio[0-9]+", item.name):
+            continue
         mapped = False
-        for resource in sorted((item / "maps").glob("map*")):
+        maps = item / "maps"
+        need(maps.is_dir(), "UIO_MAP_VISIBILITY_UNPROVEN")
+        resources = sorted(maps.iterdir())
+        need(bool(resources), "UIO_MAP_VISIBILITY_UNPROVEN")
+        for resource in resources:
+            need(re.fullmatch(r"map[0-9]+", resource.name) is not None,
+                 "UIO_MAP_FORMAT_DENIED")
             address = int((resource / "addr").read_text().strip(), 0)
             length = int((resource / "size").read_text().strip(), 0)
+            need(0 <= address < 2**32 and 0 < length <= 2**32 - address,
+                 "UIO_MAP_RANGE_DENIED")
             mapped |= _overlap(address, length)
         if mapped and (item / "device/driver").exists():
             uio.append(item.name)
-    for item in sorted((sysroot / "bus/platform/devices").iterdir()):
+    for item in sorted(platform_root.iterdir()):
         if not (item / "driver").exists():
             continue
         name = re.match(r"^([0-9a-fA-F]+)\.", item.name)
@@ -125,6 +141,8 @@ def scan_kernel_owners(*, sysroot: Path) -> tuple[list[str], list[str]]:
                 need(len(parts) == 3, "PLATFORM_RESOURCE_FORMAT_DENIED")
                 lo, hi, flags = (int(x, 16) for x in parts)
                 if flags & 0x200:
+                    need(0 <= lo <= hi < 2**32,
+                         "PLATFORM_RESOURCE_RANGE_DENIED")
                     conflict |= _overlap(lo, hi + 1 - lo)
         if conflict:
             platform.append(item.name)
@@ -144,7 +162,8 @@ def scan_proc_consumers(*, procroot: Path) -> tuple[bool, list[str]]:
                 try:
                     targets.append(os.readlink(fd))
                 except FileNotFoundError:
-                    continue
+                    # A disappearing FD may have retained an MMIO mapping.
+                    return False, [*conflicts, item.name]
             maps = (item / "maps").read_text()
             observed += 1
             # Parse only after full per-process fd/maps collection. A

@@ -179,7 +179,7 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
 
 def generic_configuration_stage(task: dict, approval: dict, *,
                                 image_lock, bundle: dict) -> dict:
-    """Bind the one generic image policy to the existing protected transport.
+    """Validate image bytes; deny until protected Root/PPU integration exists.
 
     Called only by an authenticated trusted-main dispatcher. This adapter
     adds source/byte admission; it supplies no B2/B3 observations and never
@@ -193,7 +193,7 @@ def generic_configuration_stage(task: dict, approval: dict, *,
     """
     from pl.hil import fpga_configuration_policy as policy
 
-    stage = stage_contract(task, approval)
+    stage_contract(task, approval)
     require(isinstance(image_lock, policy.ImageLock),
             "GENERIC_IMAGE_LOCK_REQUIRED")
     require(image_lock.project == task["project"] and
@@ -206,12 +206,14 @@ def generic_configuration_stage(task: dict, approval: dict, *,
         image_lock.check_bundle(**bundle)
     except policy.StageDenied as exc:
         raise RuntimeDenied(str(exc)) from None
-    result = registered_hardware_stage(task, approval)
-    # Configuration identity is deliberately separate from external SWD.
-    # A DPIDR result alone cannot satisfy this stage's read-only PL identity.
-    require(stage != "test" or result["result"] == "IDENTITY_PASS",
-            "GENERIC_CONFIGURATION_IDENTITY_REQUIRED")
-    return result
+    # Synthetic ImageLock and the bundle cannot attest Root/PPU ownership.
+    # Existing transport selects a reviewed project module, but does not yet
+    # carry a persistent cross-process all-Site hold, independent AXI/image
+    # proof and a qualified current-boot recovery context. Never invoke a
+    # historical F1-B stage and inspect the result only after a hardware write.
+    # A stale maintenance token, forged caller Boolean or good Image SHA alone
+    # must not enable firmware reconfiguration, including unsafe restore.
+    raise RuntimeDenied("GENERIC_CONFIGURATION_ROOT_PPU_HOLD_NOT_QUALIFIED")
 
 
 
