@@ -48,6 +48,10 @@ class SSHDeploySmokeContracts(unittest.TestCase):
         target = TARGET.read_text()
         self.assertIn("refs/pull/1167/head", host)
         self.assertIn("git archive --format=tar", host)
+        self.assertIn("pl/hil/approved-fpga-image.json", host)
+        self.assertIn("-name 'approved-fpga-image.json'", host)
+        self.assertIn('"$src/pl/hil/approved-fpga-image.json"', target)
+
         self.assertIn(".plasma-path2-source-commit", host)
         self.assertIn("StrictHostKeyChecking=yes", host)
         self.assertIn("ssh -tt", host)
