@@ -68,6 +68,19 @@ class RepeatableStageTests(unittest.TestCase):
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
         root = Path(self.t.name)
+        # Historical offline contract stays executable after the production
+        # Root has moved to the source-authorized generic v2 release schema.
+        # This fixture is NOT a deployable authorized release.
+        old = json.loads((ROOT / "pl/hil/approved-fpga-image.json").read_text())
+        old["schema"] = "plasma.fpga.image-release.v1"
+        old["identity_words"] = [pair[:2] for pair in old["identity_words"]]
+        for key in ("runtime_admitted", "abi_offset", "site_bitmap_offset",
+                    "axi_base", "axi_bytes", "owner_base", "owner_bytes",
+                    "uio_name", "expected_uio"):
+            old.pop(key)
+        legacy = root / "legacy-release.json"
+        legacy.write_text(json.dumps(old), encoding="utf-8")
+        self.stack.enter_context(patch.object(stage, "RELEASE_FILE", legacy))
         self.stack.enter_context(patch.object(stage, "STATE", root / "state.json"))
         self.stack.enter_context(patch.object(stage, "CHILD", root / "child.json"))
         self.stack.enter_context(patch.object(stage, "trusted_local"))

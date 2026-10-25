@@ -1,5 +1,5 @@
 {
-  "schema": "plasma.fpga.image-release.v1",
+  "schema": "plasma.fpga.image-release.v2",
   "authorization": "SOURCE_PINNED_ROOT_APPROVAL",
   "image_id": "f1b-site1-20261020",
   "board_id": "pynq-z2",
@@ -12,17 +12,43 @@
   "identity_words": [
     [
       0,
-      1297304656
+      1297304656,
+      4294967295
     ],
     [
       4,
-      65536
+      65536,
+      4294967295
     ],
     [
       16384,
-      1
+      1,
+      4294967295
     ]
   ],
   "site_bitmap": 1,
-  "soc_compatible": "xlnx,zynq-7000"
+  "soc_compatible": "xlnx,zynq-7000",
+  "runtime_admitted": true,
+  "abi_offset": 4,
+  "site_bitmap_offset": 16384,
+  "axi_base": 1073741824,
+  "axi_bytes": 65536,
+  "owner_base": 1073741824,
+  "owner_bytes": 65536,
+  "uio_name": "uio1",
+  "expected_uio": {
+    "uio": "uio1",
+    "driver": "uio_pdrv_genirq",
+    "maps": [
+      [
+        1073741824,
+        65536
+      ]
+    ],
+    "runtime": "suspended",
+    "irq_counts": [
+      0,
+      0
+    ]
+  }
 }

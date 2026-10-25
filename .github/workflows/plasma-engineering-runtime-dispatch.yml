@@ -43,6 +43,11 @@ on:
       - "scripts/tests/test_plasma_path2_z2_target_guard.py"
       - "pl/hil/path2_f1b_dev_risk.py"
       - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
+      - "pl/hil/fpga_image_root.py"
+      - "pl/hil/fpga_image_guard.py"
+      - "pl/hil/fpga_image_admission.py"
+      - "pl/hil/approved-fpga-image.json"
+      - "scripts/tests/test_fpga_image_root.py"
       - "pl/hil/path2_f1b_minimal_stage.py"
       - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
       - "scripts/plasma_development_stage_transport.py"
@@ -88,6 +93,11 @@ on:
       - "scripts/tests/test_plasma_path2_z2_target_guard.py"
       - "pl/hil/path2_f1b_dev_risk.py"
       - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
+      - "pl/hil/fpga_image_root.py"
+      - "pl/hil/fpga_image_guard.py"
+      - "pl/hil/fpga_image_admission.py"
+      - "pl/hil/approved-fpga-image.json"
+      - "scripts/tests/test_fpga_image_root.py"
       - "pl/hil/path2_f1b_minimal_stage.py"
       - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
       - "scripts/plasma_development_stage_transport.py"
@@ -148,6 +158,8 @@ jobs:
           python3 -m py_compile pl/hil/path2_f1b_dev_risk.py scripts/tests/test_plasma_path2_f1b_dev_risk.py
           python3 scripts/tests/test_plasma_path2_f1b_dev_risk.py
           python3 -m py_compile pl/hil/path2_f1b_minimal_stage.py scripts/tests/test_plasma_path2_f1b_minimal_stage.py
+          python3 -m py_compile pl/hil/fpga_image_root.py pl/hil/fpga_image_guard.py pl/hil/fpga_image_admission.py scripts/tests/test_fpga_image_root.py
+          python3 scripts/tests/test_fpga_image_root.py
           python3 scripts/tests/test_plasma_path2_f1b_minimal_stage.py
           python3 -m py_compile scripts/plasma_development_stage_transport.py scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_path2_swpc_bridge.py

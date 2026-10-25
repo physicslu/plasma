@@ -1,0 +1,91 @@
+"""Source-bound prototype Z2 image admission; no independent write authority.
+
+Only existing, observed platform conditions are checked. A source-owned release
+contains the expected UIO exception; no request or environment input can waive
+unknown FPGA/AXI or recovery states.
+"""
+from __future__ import annotations
+
+import os
+import re
+
+from pl.hil import fpga_image_guard as guard
+from pl.hil.swd04 import one_shot
+
+
+class AdmissionDenied(ValueError):
+    pass
+
+
+def need(ok: bool, code: str) -> None:
+    if not ok:
+        raise AdmissionDenied(code)
+
+
+def check_exact(*, release, passive: dict, uio: dict,
+                original_manager_load: str, expected_firmware: str) -> dict:
+    need(type(passive) is dict and
+         passive.get("observation_kind") == "LIVE_ROOT_READ_ONLY" and
+         passive.get("root") is True and bool(passive.get("boot_id")) and
+         passive.get("manager_state") == "operating" and
+         passive.get("recovery_sha256") == release.recovery_sha256 and
+         passive.get("candidate_sha256") == release.firmware_sha256 and
+         passive.get("proc_complete") is True and
+         passive.get("proc_conflicts") == [], "INCOMPLETE_ROOT_OR_PROCESS_FACTS")
+    need(type(uio) is dict and uio == release.expected_uio,
+         "BOUND_UIO_EXACT_FACTS_CHANGED")
+    need(passive.get("uio_overlaps") == [release.uio_name],
+         "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
+    need(type(passive.get("platform_overlaps")) is list and
+         len(passive["platform_overlaps"]) == 1 and
+         bool(re.fullmatch(r"[0-9a-fA-F]+\.[A-Za-z0-9_.-]+",
+                           passive["platform_overlaps"][0])),
+         "BOUND_PLATFORM_EXCEPTION_NOT_ISOLATED")
+    need(expected_firmware in (release.recovery_name, release.firmware_name),
+         "MANAGER_FIRMWARE_NOT_ALLOWLISTED")
+    need(type(original_manager_load) is str and
+         ": writing " + expected_firmware + " to " in original_manager_load,
+         "MANAGER_LOAD_PROVENANCE_UNPROVEN")
+    return {
+        "site": release.site_bitmap,
+        "target_boot_id": passive["boot_id"],
+        "image_id": release.image_id,
+        "bin_sha256": release.firmware_sha256,
+        "recovery_sha256": release.recovery_sha256,
+        "current_uio": uio,
+        "axi_isolation": "UNPROVEN_ACCEPTED_FOR_SOURCE_BOUND_DEVELOPMENT",
+        "production_qualification": False,
+        "manual_recovery_on_timeout_or_unknown": True,
+        "expected_manager_firmware": expected_firmware,
+    }
+
+
+def collect_live(*, root_port: guard.RootZ2TargetPort, release,
+                 expected_firmware: str) -> dict:
+    root_port._require_locked()
+    need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
+    need(root_port.release == release, "ROOT_RELEASE_BINDING_CHANGED")
+    passive = root_port.current_facts()
+    uio_root = guard.SYS / "class/uio" / release.uio_name
+    device = (uio_root / "device").resolve(strict=True)
+    driver = (device / "driver").resolve(strict=True).name
+    maps = [[int((p / "addr").read_text().strip(), 0),
+             int((p / "size").read_text().strip(), 0)]
+            for p in sorted((uio_root / "maps").glob("map*"))]
+    irq = [line for line in (guard.PROC / "interrupts").read_text().splitlines()
+           if line.split() and line.split()[-1] == "fabric"]
+    need(len(irq) == 1, "FABRIC_IRQ_TOPOLOGY_CHANGED")
+    counters = [int(x) for x in irq[0].split()[1:3]]
+    need(len(counters) == 2, "FABRIC_IRQ_CPU_COUNT_CHANGED")
+    uio = dict(uio=uio_root.name, driver=driver, maps=maps,
+               runtime=(device / "power/runtime_status").read_text().strip(),
+               irq_counts=counters)
+    need(passive["platform_overlaps"] == [device.name],
+         "UIO_PLATFORM_OWNER_MISMATCH")
+    report = check_exact(
+        release=release, passive=passive, uio=uio,
+        original_manager_load=one_shot.manager_last_load(),
+        expected_firmware=expected_firmware)
+    need((guard.PROC / "sys/kernel/random/boot_id").read_text().strip()
+         == report["target_boot_id"], "BOOT_CHANGED_AFTER_RISK_SCAN")
+    return report
