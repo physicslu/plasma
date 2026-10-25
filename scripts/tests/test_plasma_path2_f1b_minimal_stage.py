@@ -18,6 +18,7 @@ from pl.hil import path2_f1b_dev_risk as risk
 from pl.hil.swd04 import one_shot
 
 REAL_RUN_CHILD = one_shot.run_child
+REAL_LIVE_REPORT = stage.live_report
 
 
 class FakeTarget:
@@ -243,7 +244,7 @@ class RepeatableStageTests(unittest.TestCase):
 
     def test_live_report_reads_real_kernel_compatible_bytes_not_ap_claim(self):
         """Root's live observation reads PS Device Tree via existing guard."""
-        actual = stage.live_report
+        actual = REAL_LIVE_REPORT
         release = stage.read_approved_release()
         with tempfile.TemporaryDirectory() as td:
             proc = Path(td)
