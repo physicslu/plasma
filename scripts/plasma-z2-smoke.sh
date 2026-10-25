@@ -61,7 +61,8 @@ printf '%s\n' "$sha" > "$work/src/.plasma-path2-source-commit"
   { echo 'DENIED: local bundle verification failed'; exit 2; }
 tar -cf "$work/bundle.tar" -C "$work/src" .
 echo "SOURCE_PIN=$sha"
-echo "BUNDLE_SHA256=$(sha256sum "$work/bundle.tar" | cut -d' ' -f1)"
+bundle_sha="$(sha256sum "$work/bundle.tar" | cut -d' ' -f1)"
+echo "BUNDLE_SHA256=$bundle_sha"
 if [[ "$plan" == 1 ]]; then
   echo 'RESULT=NOT_RUN PLAN_ONLY; no SSH, Z2 deployment, FPGA or DUT operation'
   exit 0
@@ -86,5 +87,5 @@ log="$log_dir/z2-smoke-$(date -u +%Y%m%dT%H%M%SZ)-$sha.log"
 echo "LOG=$log"
 echo 'DEPLOY_START: SWPC SSH -> Z2 sudo; sudo may prompt interactively'
 ssh -tt -o StrictHostKeyChecking=yes -- "$target" \
-  "sudo /bin/bash '$remote/target.sh' '$remote/bundle.tar' '$sha'" |
+  "sudo /bin/bash '$remote/target.sh' '$remote/bundle.tar' '$sha' '$bundle_sha'" |
   tee "$log"
