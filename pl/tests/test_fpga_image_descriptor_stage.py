@@ -246,14 +246,14 @@ def test_no_real_generic_stage_entrypoint_or_accidental_f1b_waiver():
     assert "subprocess.Popen(" not in source
 
 
-def test_real_historical_image_descriptor_is_not_runtime_admitted():
+def test_verified_offline_image_descriptor_is_not_runtime_admitted():
     historic = bp.load_descriptor(DESCRIPTOR_PATH)
     assert historic.image_build_source_sha == (
-        "65555410f171e425e61d87ebd42dc4709755f389")
+        "65dca783f51be36d4783ef0ff0e6d8cfbf6c8dc1")
     assert historic.bit_sha256 == (
-        "f2e59f31bacf6e8ab0ee9325a07125bc155647a261db3f84e67ba71bb0105891")
+        "81a27a46407aa0ad8b21c93c0416509ac36cfd4c89ae2baa04f79c4ce8dd9ec4")
     assert historic.hwh_sha256 == (
-        "84894ae5791a65ec16bd6146779faec4496d47833fd0ad294149d5c46571b510")
+        "6f0d252e12834ae4274619c2d21f0b61bd11d354ea1017cdd1771eb39671d40c")
     assert historic.bin_sha256 == (
         "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1")
     assert historic.recovery_sha256 is None
