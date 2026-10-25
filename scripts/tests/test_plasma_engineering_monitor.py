@@ -240,39 +240,23 @@ class EngineeringMonitorTests(unittest.TestCase):
                         self.assertEqual(state["monitor_stage"], "")
                         self.assertIn("STAGE: (not available)", frame)
 
-    def test_exact_registered_path2_static_hil_label_and_denial(self):
-        for task, stage in (
-            ("z2-path2-download", "Guarded Download"),
-            ("z2-path2-testing", "Guarded Test"),
-            ("z2-path2-restore", "Guarded Restore"),
-            ("z2-path2-full-hil", "Guarded Full HIL"),
-        ):
-            with self.subTest(task=task):
-                with tempfile.TemporaryDirectory() as td:
-                    with patch.dict(os.environ, {
-                        "GITHUB_RUN_ID": "40056557048",
-                        "PLASMA_MONITOR_TASK": task,
-                        "PLASMA_MONITOR_STAGE": stage,
-                    }, clear=True):
-                        self.assertEqual(mon.run_job(
-                            "path2", [sys.executable, "-c", "pass"],
-                            directory=Path(td)), 0)
-                    state = json.loads((Path(td) / "path2.json").read_text())
-                    self.assertEqual(state["monitor_stage"], stage)
-                    frame = mon.render_snapshot(Path(td), "path2")
-                    self.assertIn("STAGE: " + stage, frame)
-                    self.assertIn("GOAL: (operator summary not provided)", frame)
-        # The same label must not be accepted for an unrelated static task.
-        with tempfile.TemporaryDirectory() as td:
-            with patch.dict(os.environ, {
-                "PLASMA_MONITOR_TASK": "nine-nine-path2",
-                "PLASMA_MONITOR_STAGE": "Guarded Full HIL",
-            }, clear=True):
-                self.assertEqual(mon.run_job(
-                    "path2", [sys.executable, "-c", "pass"],
-                    directory=Path(td)), 0)
-            self.assertIn("STAGE: (not available)",
-                          mon.render_snapshot(Path(td), "path2"))
+    def test_retired_stage_tasks_cannot_publish_guarded_operation(self):
+        for task in ("z2-path2-download", "z2-path2-testing",
+                     "z2-path2-restore", "z2-path2-full-hil",
+                     "nine-nine-path2"):
+            with self.subTest(task=task), tempfile.TemporaryDirectory() as td:
+                with patch.dict(os.environ, {
+                    "GITHUB_RUN_ID": "40056557048",
+                    "PLASMA_MONITOR_TASK": task,
+                    "PLASMA_MONITOR_STAGE": "Guarded Download",
+                }, clear=True):
+                    self.assertEqual(mon.run_job(
+                        "path2", [sys.executable, "-c", "pass"],
+                        directory=Path(td)), 0)
+                state = json.loads((Path(td) / "path2.json").read_text())
+                self.assertEqual(state["monitor_stage"], "")
+                self.assertIn("STAGE: (not available)",
+                              mon.render_snapshot(Path(td), "path2"))
 
     def test_shared_100_column_terminal_cap_with_cjk(self):
         with tempfile.TemporaryDirectory() as td:
