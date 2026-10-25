@@ -186,8 +186,7 @@ def serve_local_unix_once(path: str | Path, bridge: RemoteBitbangSWD,
 
     Does not construct a real MMIO port, perform FPGA reconfiguration, or
     assert target power/reset. The invoking trusted supervisor must supply
-    an independently admitted Site. A successful session leaves the FPGA Image
-    loaded; Golden Restore is an optional, separate protected Root operation.
+    an independently admitted Site and restore policy.
     """
     location = Path(path)
     if not location.is_absolute() or location.is_symlink() or location.exists():
