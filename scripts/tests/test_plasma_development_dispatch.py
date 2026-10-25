@@ -1965,7 +1965,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
     def test_reject_arbitrary_shell_and_path3_unbounded_hardware(self):
         bad_orders = [
             self._order("path2-cli", script="/bin/sh"),
-            self._order("path2-cli", argv=["-c", "rm"]),
+            self._order("path2-cli", argv=["-c", "rm;sudo"]),
             self._order("path2-cli", capability="vivado-host-build"),
             self._order("path3-codex", scope="guarded-hardware"),
             self._order("path3-codex", capability="path2-stage-contract"),
