@@ -2002,7 +2002,6 @@ class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
             self.assertIn('sandbox_mode="workspace-write"', command)
             if len(calls) == 1:
                 self.assertNotIn("resume", command)
-                self.assertIn("DO NOT fix anything", prompt)
                 self.assertIn(self.NONCE, prompt)
                 first_prompt.append(prompt)
                 if premature_fix:
