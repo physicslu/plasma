@@ -39,7 +39,6 @@ cleanup() {
 trap cleanup EXIT
 mkdir -p "$work/src"
 sources=(
-  pl/hil/approved-fpga-image.json
   pl/hil/f1b.py
   pl/hil/path2_f1b_minimal_stage.py
   pl/hil/path2_f1b_dev_risk.py pl/hil/path2_z2_target_guard.py
@@ -49,7 +48,14 @@ sources=(
   software/python/plasma_interfaces/linux_mmio.py
   scripts/z2/plasma-path2-root-entry
   scripts/z2/plasma-z2-ssh-smoke-target.sh
-)
+) 
+# Historical PR #1167 did not have a release JSON. Preserve its existing
+# smoke source pin without synthesizing an unreviewed descriptor. For later
+# explicitly authorized commits carrying the descriptor, include its bytes
+# in the same protected source closure and manifest.
+if git cat-file -e "$sha:pl/hil/approved-fpga-image.json" 2>/dev/null; then
+  sources+=(pl/hil/approved-fpga-image.json)
+fi
 git archive --format=tar "$sha" -- "${sources[@]}" | tar -xf - -C "$work/src"
 printf '%s\n' "$sha" > "$work/src/.plasma-path2-source-commit"
 (
