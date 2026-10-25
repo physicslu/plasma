@@ -333,9 +333,21 @@ def run(operation: str) -> dict:
                                     "pl.hil.fpga_image_root", "--identity-child"])
                 result = json.loads(CHILD.read_text())
                 need(type(result) is dict and
-                     result == {"observed": {str(k): v for k, v in
-                                             sorted(_expected_identity(release).items())}},
+                     set(result) == {"observed"} and
+                     type(result["observed"]) is dict and
+                     set(result["observed"]) ==
+                     {str(offset) for offset, _, _ in release.identity_words},
                      "IDENTITY_CHILD_RECEIPT_DENIED")
+                for offset, expected, mask in release.identity_words:
+                    value = result["observed"][str(offset)]
+                    need(type(value) is int and 0 <= value <= 0xFFFFFFFF and
+                         value & mask == expected & mask,
+                         "IDENTITY_CHILD_VALUE_MISMATCH")
+                need(result["observed"][str(release.abi_offset)] ==
+                     release.abi_version and
+                     result["observed"][str(release.site_bitmap_offset)] ==
+                     release.site_bitmap,
+                     "IDENTITY_CHILD_ABI_MISMATCH")
                 after = live_report(port, release, release.firmware_name)
                 record.update(status="IMAGE", test_count=record["test_count"] + 1,
                               evidence_sha256=_digest({"target": after,
