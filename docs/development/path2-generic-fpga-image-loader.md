@@ -55,19 +55,28 @@ or Root framework. It runs only when an operator explicitly invokes it on
 SWPC from a trusted interactive SSH terminal. **No command has been run on
 the actual Z2 by this PR.**
 
-One-time preparation: make the PR #1167 working branch or the reviewed script
-available in a dedicated SWPC checkout (do not change the checkout of a
-running shared Runner), and verify the existing SWPC-to-Z2 SSH alias,
-operator's pinned SSH host key, and working interactive `sudo`.
+One-time preparation: use your existing `~/plasma` Git clone on SWPC,
+with verified SWPC-to-Z2 SSH alias, pinned SSH host key, and working
+interactive `sudo`. No branch checkout and no Runner change are needed.
 
 ```bash
-# On SWPC, in the reviewed PR #1167 checkout:
+# After SSH login to SWPC, in the existing repo (without switching branches):
 cd ~/plasma
-bash scripts/plasma-z2-smoke.sh --target xilinx@<verified-z2-ssh-name> --plan
 
-# Deliberate physical deployment and HIL (no Blue Pill operations):
-bash scripts/plasma-z2-smoke.sh --target xilinx@<verified-z2-ssh-name>
+# Host-only package verification; NO SSH to Z2 and no FPGA operation:
+git fetch origin refs/pull/1167/head &&
+  bash <(git show FETCH_HEAD:scripts/plasma-z2-smoke.sh) --target xilinx@YOUR_Z2 --plan
+
+# One command for the explicit live deployment and full MMIO smoke:
+git fetch origin refs/pull/1167/head &&
+  bash <(git show FETCH_HEAD:scripts/plasma-z2-smoke.sh) --target xilinx@YOUR_Z2
 ```
+
+Replace `xilinx@YOUR_Z2` with the operator's **already working** SSH
+destination or SSH config alias. Do not post passwords or private host
+information in GitHub or chat. Bash process substitution reads the fixed PR
+file without modifying the shared checkout and preserves interactive stdin
+for SSH/sudo.
 
 The `--plan` option fetches the current exact GitHub PR #1167 HEAD and
 constructs/verifies a minimal source bundle **without SSH or hardware**.
