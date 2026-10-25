@@ -1,15 +1,15 @@
 # PLASMA Path 3 — Controlled Codex Session Resume Host-only PoC
 
-**Gate 1 / Path 1, Host-only.** This document and the associated CPU-only probe **do not enable cross-Job resume in the trusted Path 3 Dispatcher**. Production Path 3 still launches exactly one fresh `codex exec` invocation per authorized Job. No SWPC Runner, Z2, DUT, FPGA, USB, power, deployment, model credential or real programming access is added.
+**Historical Gate 1 / Path 1, Host-only PoC.** This standalone CPU-only probe did **not itself** install a trusted Path 3 Cross-Job Resume route. A later, narrowly scoped `page-boundary-off-by-one` conditional `development-codex-resume` Job now exists in `main`; it is an optional fixture, not general Path 3 behavior or hardware authorization. Ordinary Path 3 still runs one autonomous `codex exec` Job. This historical PoC granted no SWPC Runner, Z2, DUT, FPGA, USB, power or deployment privileges.
 
 ## Engineering decision
 
 There are two distinct kinds of debug continuity:
 
 1. **Within one Path 3 Job (already supported):** Codex independently iterates Code → Test → Fix → Retest within the same `exec` process. Its context is continuous for that process; no extra Dispatcher retry job is created.
-2. **Across two independent Codex processes / Jobs (not yet production-supported):** `codex exec resume <thread-id>` may restore the same dialogue. Simply recording the first `thread.started.thread_id` does not prove resume succeeded. Git source pin, task/owner binding, sandbox policy and working files must remain valid.
+2. **Across two independent Codex processes / Jobs (special CPU-only opt-in only):** `codex exec resume <thread-id>` may restore the same dialogue. Simply recording the first `thread.started.thread_id` does not prove resume succeeded. Git source pin, task/owner binding, sandbox policy and working files must remain valid.
 
-**This Gate 1 demonstrates the host-side probe contract** using deterministic offline fake-CLI tests and, after the Owner's explicit SWPC-specific Gate 1 scope revision, **one real SWPC interactive-user Codex CLI NEW → FAIL → RESUME → PASS execution** (Owner-provided output; see evidence below). This real test verifies two consecutive Codex processes inside one manual wrapper, **not** resumption across GitHub Actions Jobs. Production Path 3 cross-Job Session Resume remains **NOT_IMPLEMENTED / NOT_RUN**; CI fake-CLI tests alone are not evidence of actual context restoration.
+**This Gate 1 demonstrates the host-side probe contract** using deterministic offline fake-CLI tests and, after the Owner's explicit SWPC-specific Gate 1 scope revision, **one real SWPC interactive-user Codex CLI NEW → FAIL → RESUME → PASS execution** (Owner-provided output; see evidence below). This real test verifies two consecutive Codex processes inside one manual wrapper, **not** resumption across GitHub Actions Jobs. The separate exact CPU-only Cross-Job fixture is implemented in the trusted Workflow, but its existence is **not** evidence of successful SWPC two-Job resumption; check live run receipts. General-purpose Path 3 Cross-Job Resume is not enabled.
 
 ## Continuous debugging example: Page-boundary off-by-one
 
@@ -86,6 +86,6 @@ Running it creates a fresh untracked `.plasma-path3-resume-probe/` directory and
 
 ## Future production-admission prerequisites (not implemented here)
 
-An independently approved Gate 1 would be required for wiring Resume into the trusted Dispatcher across GitHub Jobs. It must verify session provenance and storage availability **for the exact Worker owner**, task/work-order digest, Git source SHA/PR HEAD, Git tree/working-diff identity, consistent sandbox/permissions, lease/ownership and timeout/failure semantics. Persistent Runner may erase or relocate original Session rollouts; an ID without matching stored context cannot be trusted. Never load the private session rollout into GitHub Artifacts or put credentials/prompts into receipts. Even with valid Resume, any new hardware stage needs its existing effective owner/guard authorization.
+A separate Gate 1 applied to the subsequent exact CPU-only Cross-Job fixture; a *general-purpose* Resume route would still require separate authorization and implementation. It must verify session provenance and storage availability **for the exact Worker owner**, task/work-order digest, Git source SHA/PR HEAD, Git tree/working-diff identity, consistent sandbox/permissions, lease/ownership and timeout/failure semantics. Persistent Runner may erase or relocate original Session rollouts; an ID without matching stored context cannot be trusted. Never load the private session rollout into GitHub Artifacts or put credentials/prompts into receipts. Even with valid Resume, any new hardware stage needs its existing effective owner/guard authorization.
 
 Suggested policy: resume only an **unfinished, still-approved Work Order** whose exact immutable source, task and owner match; start fresh on unrelated tasks or after a closed/merged work item. Maintain bounded numeric total/cached/noncached/output Token telemetry to understand context growth. No third owner approval gate.

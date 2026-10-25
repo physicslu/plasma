@@ -1,4 +1,6 @@
-# Canonical Codex command: PYNQ-Z2 PSPL-02 / SWD-00 development HIL
+# Historical scenario command: PYNQ-Z2 PSPL-02 / SWD-00 development HIL
+
+> **Only for the PSPL-02／SWD-00 internal-loopback experiment.** The fixed `IDENTITY → PSPL02 → SWD00` sequence and its no-external-DUT scope are **scenario-specific**, not the execution instructions for all Path 3 Codex Work Orders. Current general Path 3 is the owner Gate 1 assignment passed by `scripts/plasma_development_dispatch.py` under `AGENTS.md`, with Codex free to choose in-scope engineering steps. Existing OS permissions, image/ownership and Golden Restore safeguards remain effective. This historic assignment is not evidence of today's Z2 state.
 
 This is the **single reusable assignment** for a Codex agent operating on
 the owner's real integration host. It inherits the root `AGENTS.md`;

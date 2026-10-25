@@ -1,5 +1,7 @@
 # PLASMA Path 2 — Z2 Site 1 F1-B minimal live HIL handoff
 
+> **歷史交接紀錄（2026-10-21），不是現行 Path 3 的執行規格。** 文內早期 F1-B Root Entry 路徑、Stage 順序與已核准測試範圍只適用當時的 Path 2／F1-B 實驗。現行通用 Root Entry 原始碼為 `scripts/z2/plasma-path2-root-entry`，實際 Z2 是否安裝仍需現場驗證。Path 3 可在 Owner Gate 1 範圍內自行規劃 SSH／sudo、FPGA 與 DUT 工程操作；不強制經此歷史 F1-B Stage 路徑，仍須遵守真實 Linux 權限、硬體資源所有權與恢復安全。以根目錄 `AGENTS.md`、現行可信 Dispatcher 及 [三路徑模型](plasma-three-path-execution-model.md) 為準。
+
 **Scope:** historical 2026-10-21 handoff for one owner-authorized Development
 HIL using the exact F1-B candidate and `base.bin`. AXI isolation was
 **UNPROVEN** under the original bound-passive UIO risk acceptance; no DUT,
@@ -89,7 +91,7 @@ blindly retry after uncertainty; preserve the root checkpoint for an
 informed physical recovery decision. A verified `base.bin` allows an
 idempotent `ALREADY_RESTORED` no-op.
 
-## Current protected execution prerequisites (historical run not replayed)
+## Historical protected execution prerequisites (historical run not replayed)
 
 - SWPC trusted-main **Stage Transport**:
   `scripts/plasma_development_stage_transport.py` is called by the

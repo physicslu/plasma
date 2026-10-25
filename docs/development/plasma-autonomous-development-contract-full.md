@@ -749,14 +749,14 @@ is not acceptance. No extra owner `continue` or approval is required for
 fix/retest steps already covered by Gate 1.
 
 **Never merge an untested development change merely to unlock its test
-trigger.** The reviewed development branch/commit SHA must be executable
-by the actual authorized development workflow *before merging*. If a
-current dispatcher only loads work from `main` (as the existing owner-only
-Issue #981 development entry currently does), treat this as a concrete
-implementation blocker, not as a reason to invert the gates. Make the
-minimum separately reviewed Gate-1-scoped dispatcher/branch-SHA change,
-or disclose the blocker and mark the real test `NOT_RUN`; do **not** claim
-that branch execution is already implemented or bypass an active guard.
+trigger.** The active owner-only Issue #981 Development Dispatcher loads
+trusted dispatcher code from `main` but **supports the exact HEAD of an
+open, owner-created, same-repository candidate PR** for Path 2/3 execution.
+The trusted entry code itself is not replaced by unmerged candidate code;
+changes to the dispatcher require separate hosted Candidate Dispatcher
+pre-merge tests and subsequent controlled integration. If a requested
+capability still cannot run before merge, report that actual limitation as
+`NOT_RUN` rather than claiming that Gate 2 makes its tests unnecessary.
 A Gate 2 exception for deferred development acceptance requires the
 owner's explicit understanding of the missing evidence; it is not the
 normal Development Mode path.
@@ -887,9 +887,11 @@ Gate 1 proposal and recommendation are **mandatory for PLASMA tasks**:
    Path 3 delegates development/self-test to Codex; ChatGPT owns independent
    evidence review and the final PASS/FAIL judgment. Do not require SWPC to
    duplicate Codex's task-specific calculations simply to satisfy a smoke
-   test. A `main`-only Issue Comment dispatcher does not yet implement
-   pre-merge branch/commit routing; do not confuse this policy with a
-   delivered capability.
+   test. The current Issue #981 Development Dispatcher admits an exact,
+   live same-repository PR HEAD while keeping the authorizer/worker adapter
+   pinned to trusted `main`; this is not arbitrary candidate control-plane
+   execution. The separate Qualification `workflow_dispatch` Runtime
+   remains inactive.
 7. In Path 3, producing a PR with `GITHUB_TOKEN` alone does not guarantee
    `pull_request` CI will trigger. Ensure an authorized GitHub App token,
    dedicated dispatch or other reviewed CI trigger **actually** runs the
@@ -1211,10 +1213,15 @@ This policy is not an OS sandbox. Editor/agent permissions should still enforce 
 
 ### Development F1-B transport boundary
 
-Path 2 and Path 3 share the trusted-main stage transport in
-`scripts/plasma_development_stage_transport.py`. The SWPC installed bridge
-and approved-sha PIN are no longer runtime dependencies; leave existing
-root-owned files untouched. No deployment flag or admin install is required.
+Path 2 uses the trusted-main stage transport in
+`scripts/plasma_development_stage_transport.py` for its protected stages.
+Path 3 may choose the same transport when it fits the approved task, but
+**Path 2's fixed Stage Allowlist and one installed Project Profile are not
+a universal Path 3 execution plan**. Path 3 is authorized to use enrolled
+Z2 SSH/sudo in Gate 1 scope, subject to real OS permissions and safety;
+this documentation does not claim a new generic privileged Stage delegate
+is installed on Z2. The old SWPC Bridge and approved-SHA PIN are no longer
+general Development Mode prerequisites; leave existing root-owned files untouched.
 The trusted GitHub event SHA, live owner PR metadata, exact checkout and
 owner-approved stage/Work Order digest establish B1 authorization, not a
 user-supplied SHA alone. Z2 root-owned entry/source manifest, image identity,

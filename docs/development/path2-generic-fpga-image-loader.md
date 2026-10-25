@@ -1,13 +1,17 @@
 # Path 2 / Path 3 — existing Z2 trusted Root Entry
 
-**Gate 1 implementation Draft; no root installation or hardware activation.**
+**Historical Gate 1 implementation record (originally Draft); no Z2 installation or hardware activation is proven by this document.** Source being on `main` does not attest to which Root files are currently installed on Z2.
 
 The existing Work Order, trusted-main Dispatcher, SWPC Runner and Stage
-Transport remain the Path 2 fixed-CLI execution route. Path 3 lets Codex
-choose commands under the same Gate 1 and OS permissions, but **generic
-privileged Z2 Stage delegation from Path 3 is not yet installed**. Both
-paths must use the existing protected Root authority and preserve
-B1/B2/B3 for any privileged Z2 operation. No new Path 3 route is added.
+Transport remain the **Path 2 fixed-CLI Stage execution route**. In Path 3,
+Codex selects the engineering method under the owner-approved Gate 1 and
+real OS permissions; **Path 2's fixed Stage, Project Profile and this Root
+Entry are not universal Path 3 prerequisites**. Codex may use enrolled Z2
+SSH/sudo and existing tools within approved scope. If it elects to use this
+Root Entry, its installed source/profile/manifest validations apply as
+implemented. There is still **no verified generic Path 3 dynamic privileged
+Stage delegate** installed by this historical change; preserve B1/B2/B3,
+image identity, hardware ownership and recovery for any real operation.
 
 The protected Root Entry source is now
 `scripts/z2/plasma-path2-root-entry`, installed path
@@ -60,7 +64,8 @@ independently enforce hardware ownership, AXI isolation, reliable
 current-boot image and recovery evidence, process/FPGA lock and electrical
 limits. A root-owned file manifest and CI green check cannot prove
 physical safety. Root installation and Z2 hardware operation remain
-**NOT_RUN**. This Draft must not be merged until Gate 2.
+**NOT_RUN** in the historical experiment. This sentence records its original
+pre-merge status, **not** a current unmerged PR or new Gate 2 requirement.
 
 ## Scope reduction
 
