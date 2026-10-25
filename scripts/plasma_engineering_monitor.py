@@ -56,14 +56,8 @@ MAX_DISPLAY_COLUMNS = 100
 MONITOR_STAGES = frozenset({
     "CPU-only CLI", "Native preflight", "Vivado host build",
     "Guarded Download", "Guarded Test", "Guarded Restore",
-    "Guarded Full HIL", "Codex workspace",
+    "Codex workspace",
 })
-STATIC_GUARDED_STAGES = {
-    "z2-path2-download": "Guarded Download",
-    "z2-path2-testing": "Guarded Test",
-    "z2-path2-restore": "Guarded Restore",
-    "z2-path2-full-hil": "Guarded Full HIL",
-}
 # Narrow receipt projection; a filesystem JSON file is NOT an independently
 # authenticated verification receipt. Project known categorical DENIAL only.
 RECEIPT_PERMISSION_STAGES = frozenset({
@@ -273,11 +267,9 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     )
     stage = os.environ.get("PLASMA_MONITOR_STAGE", "")
     guarded = stage.startswith("Guarded ") if type(stage) is str else False
-    guarded_verified = (
-        (task == "path2-work-order" and
-         WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None) or
-        STATIC_GUARDED_STAGES.get(task) == stage
-    )
+    # Only the digest-bound dynamic operation may publish guarded metadata.
+    guarded_verified = (task == "path2-work-order" and
+                        WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None)
     if path == "path3":
         # Validated Work Order category, NOT an inferred Vivado/build phase.
         stage = ("Codex workspace" if task == "path3-work-order" and
