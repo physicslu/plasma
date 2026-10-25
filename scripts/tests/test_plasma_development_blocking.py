@@ -106,7 +106,7 @@ class BlockingPolicy(unittest.TestCase):
                 'contains': lambda items, item: item in items,
                 'fromJSON': json.loads,
             })
-        for capability in ('cpu-only', 'vivado-host-build', 'path2-stage-contract'):
+        for capability in ('cpu-only', 'vivado-host-build', 'z2-root-operation'):
             self.assertTrue(admitted('path2-cli', capability))
             self.assertTrue(admitted('path2-cli', capability, **{
                 'needs.development-claim.result': 'failure'}))
