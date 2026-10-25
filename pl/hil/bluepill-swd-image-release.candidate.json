@@ -1,0 +1,54 @@
+{
+  "schema": "plasma.fpga.image-release.v2",
+  "authorization": "CANDIDATE_NOT_AUTHORIZED",
+  "runtime_admitted": false,
+  "image_id": "z2-bluepill-swd-gpio-65dca783-offline",
+  "board_id": "pynq-z2",
+  "fpga_part": "xc7z020clg400-1",
+  "soc_compatible": "xlnx,zynq-7000",
+  "firmware_name": "plasma-bluepill-swd-65dca783.bin",
+  "firmware_sha256": "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1",
+  "recovery_name": "base.bin",
+  "recovery_sha256": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+  "abi_version": 65536,
+  "abi_offset": 4,
+  "identity_words": [
+    [
+      0,
+      1346523991,
+      4294967295
+    ],
+    [
+      4,
+      65536,
+      4294967295
+    ],
+    [
+      12,
+      8,
+      4294967294
+    ]
+  ],
+  "site_bitmap": 1,
+  "site_bitmap_offset": null,
+  "axi_base": 1073774592,
+  "axi_bytes": 4096,
+  "owner_base": 1073741824,
+  "owner_bytes": 65536,
+  "uio_name": "uio1",
+  "expected_uio": {
+    "uio": "uio1",
+    "driver": "uio_pdrv_genirq",
+    "maps": [
+      [
+        1073741824,
+        65536
+      ]
+    ],
+    "runtime": "suspended",
+    "irq_counts": [
+      0,
+      0
+    ]
+  }
+}

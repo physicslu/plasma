@@ -110,6 +110,34 @@ class GenericImageRootTests(unittest.TestCase):
         self.assertEqual(guard.GLOBAL_LOCK,
                          Path("/run/plasma-z2-swd05/supervisor.lock"))
 
+    def test_swd_release_candidate_is_explicitly_non_admitted(self):
+        """An offline BIT/BIN record is not an authorized live Root release."""
+        file = ROOT / "pl/hil/bluepill-swd-image-release.candidate.json"
+        candidate = json.loads(file.read_text())
+        self.assertEqual(set(candidate), set(self.release_data))
+        self.assertEqual(candidate["schema"], "plasma.fpga.image-release.v2")
+        self.assertEqual(candidate["firmware_sha256"],
+                         "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1")
+        self.assertEqual(candidate["recovery_sha256"],
+                         "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c")
+        self.assertEqual(candidate["axi_base"], 0x40008000)
+        self.assertEqual(candidate["axi_bytes"], 4096)
+        self.assertIsNone(candidate["site_bitmap_offset"])
+        self.assertEqual(candidate["identity_words"],
+                         [[0, 1346523991, 0xFFFFFFFF],
+                          [4, 65536, 0xFFFFFFFF],
+                          [12, 8, 0xFFFFFFFE]])
+        for variant in (candidate,
+                        candidate | {"runtime_admitted": True},
+                        candidate | {"authorization": "SOURCE_PINNED_ROOT_APPROVAL"}):
+            with self.subTest(authorized=variant["authorization"],
+                              admitted=variant["runtime_admitted"]):
+                self.write_manifest(variant)
+                with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                            "IMAGE_RELEASE_NOT_AUTHORIZED"):
+                    stage.run("download")
+                self.assertEqual(self.port.writes, [])
+
     def test_manifest_has_geometry_and_true_source_authority(self):
         image = self.release
         self.assertEqual(image.axi_bytes, 65536)
