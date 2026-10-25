@@ -738,7 +738,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertLess(len(root), 32768)
         brief = root.decode("utf-8")
         for required in ("Gate 1", "Gate 2", "Path 3", "NOT_RUN",
-                         "trusted root executor", "Merge Approval",
+                         "Root Executor", "Merge Approval",
                          "electrical", "B1", "rollback",
                          "Credential", "AGENTS.md"):
             with self.subTest(required=required):
