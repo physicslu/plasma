@@ -22,6 +22,10 @@
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
 
+## SWD PS/PL FPGA configuration PoC
+
+- **Gate 1 / Draft / Host-only policy; SWPC offline image evidence** — [Generic FPGA Configuration Stage + Z2 SWD Image Descriptor](../pl/projects/z2-bluepill-rbb/README.md)：目前為單 Site 的 SWD GPIO PoC，已取得限定於來源 SHA 的 Vivado BIT／HWH／BIN 離線建置證據。通用配置 Stage、來源／恢復驗證與負向測試僅 Host-only PASS；Z2 FPGA 載入、AXI 安全隔離、原始映像恢復與實體 SWD 皆未驗收。不是已完成的八 Site Universal Image。
+
 ## Engineering governance and execution paths
 
 - **Gate 1 / Draft / 未部署** — [Path 2／3 共用 Z2 Protected Root Entry](development/path2-generic-fpga-image-loader.md)：沿用既有 Stage Transport／Root 執行路徑，將 F1-B 專用入口改為 Root-owned Project＋Source SHA 綁定；不另建 Executor／Loader，SWPC／Z2 實機驗收仍 NOT_RUN。

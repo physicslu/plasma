@@ -27,10 +27,15 @@ SHA, image/recovery and B1/B2/B3 guards must still match. Historical fixed
 F1-B Task IDs remain restricted to their original project; Path 3's
 privileged dynamic delegation is not added here.
 
-The new entry binds exactly three fixed arguments:
-`download|test|restore`, authorized project name and pinned Git SHA.
-It reads one **root-owned, SHA256-manifest-pinned active project**
-from `/root/plasma-path2-approved/.plasma-path2-profile` with
+The entry binds exactly three fixed arguments: a bounded stage token,
+authorized project name and pinned Git SHA. The root-installed project
+module decides which stage tokens it implements. The existing F1-B module
+still admits only `download|test|restore`.
+
+The entry reads a **root-owned, SHA256-manifest-pinned project profile**
+from `/root/plasma-path2-approved/pl/projects/<project>/.plasma-path2-profile`
+when that file is installed. Otherwise it retains the legacy
+`/root/plasma-path2-approved/.plasma-path2-profile`. Each profile has
 exactly three newline-terminated lines:
 
 ```text
@@ -39,7 +44,9 @@ pl.hil.path2_f1b_minimal_stage
 <reviewed 40-hex Git source SHA>
 ```
 
-The example is **not an installed profile**. The authenticated source
+The example is **not an installed profile**. A project profile is part of
+the same installed root-owned source closure; it does not replace the F1-B
+profile or create a second executor. The authenticated source
 manifest must enumerate the profile, selected Python module, **every**
 installed Python source, existing FPGA safeguards and Linux MMIO driver.
 The entry refuses unpinned Python dependencies, import-tree symlinks or
@@ -48,8 +55,8 @@ pinning without hardcoding F1-B in the execution framework.
 Every installed regular source file must also be root-owned and not writable
 by other accounts. Cached Python bytecode (`.pyc`/`.pyo`) is rejected and
 bytecode generation is disabled for the stage and its child processes. Caller-provided paths, modules
-and shell commands are rejected. This is a single per-Z2 installed
-project selection, not another registry, service or Root Executor.
+and shell commands are rejected. The requested project is passed to the
+installed module through `PLASMA_ROOT_PROJECT`; it does not select code.
 
 The existing F1-B Python module remains only as project-specific HIL
 implementation; it emits the now-shared receipt marker
@@ -58,6 +65,14 @@ validates that Project along with the stage, current-boot identifier
 and allowlisted stage result. A prospective Blue Pill SWD DPIDR
 backend must implement its own independently verified target safety;
 it cannot inherit F1-B's Development-only risk exception.
+
+The candidate `pl.hil.fpga_configuration_policy` module supports a
+read-only `audit` request for any manifest-pinned project descriptor. Its
+receipt is `READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION` and explicitly denies
+hardware-write authority. Its `download`, `test` and `restore` live backend
+remains unavailable until current ownership, image identity and recovery
+admission are independently established. An audit receipt must not be
+reported as an FPGA load or programming result.
 
 **Non-negotiable:** the installed Root Entry and Project module must
 independently enforce hardware ownership, AXI isolation, reliable

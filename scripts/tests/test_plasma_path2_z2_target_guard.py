@@ -113,6 +113,43 @@ class PassiveSafety(unittest.TestCase):
             self.assertTrue(clean)
             self.assertEqual(conflicts, ["1000"])
 
+    def test_missing_kernel_or_uio_maps_cannot_be_clean_snapshot(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with self.assertRaisesRegex(target.TargetSafetyDenied, "KERNEL_OWNER_VISIBILITY"):
+                target.scan_kernel_owners(sysroot=root)
+            (root / "bus/platform/devices").mkdir(parents=True)
+            uio = root / "class/uio/uio1"
+            uio.mkdir(parents=True)
+            for create_empty_maps in (False, True):
+                if create_empty_maps:
+                    (uio / "maps").mkdir()
+                with self.assertRaisesRegex(target.TargetSafetyDenied, "UIO_MAP_VISIBILITY"):
+                    target.scan_kernel_owners(sysroot=root)
+
+    def test_invalid_uio_range_never_looks_nonoverlapping(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "bus/platform/devices").mkdir(parents=True)
+            mapping = root / "class/uio/uio1/maps/map0"
+            mapping.mkdir(parents=True)
+            for address, size in (("0x40000000", "0"), ("-1", "4096"),
+                                  ("0xffffffff", "4096")):
+                (mapping / "addr").write_text(address)
+                (mapping / "size").write_text(size)
+                with self.assertRaisesRegex(target.TargetSafetyDenied, "UIO_MAP_RANGE"):
+                    target.scan_kernel_owners(sysroot=root)
+
+    def test_fd_disappearing_during_scan_is_incomplete(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            fd = root / "1000/fd"
+            fd.mkdir(parents=True)
+            (fd / "3").symlink_to("/dev/mem")
+            (fd.parent / "maps").write_text("")
+            with patch.object(target.os, "readlink", side_effect=FileNotFoundError):
+                self.assertEqual(target.scan_proc_consumers(procroot=root), (False, ["1000"]))
+
     def test_disappearing_process_does_not_claim_complete_snapshot(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

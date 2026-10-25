@@ -32,7 +32,9 @@ MARK = "PLASMA_PATH2_STAGE="
 PROMPT = "PLASMA_PATH2_SUDO_PROMPT:"
 TIMEOUT = 105
 MAX_OUTPUT = 8192
-STAGES = ("download", "test", "restore")
+# Transport accepts bounded stage tokens; Dispatcher authorizes a request
+# and the installed root-owned entry independently enforces its allowed verbs.
+STAGE_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}\Z")
 
 
 class Blocked(ValueError):
@@ -108,7 +110,14 @@ def remote_failure(returncode: int, output: bytes) -> str:
     # Reject mixed/duplicate root diagnostic claims and all arbitrary stderr.
     # Do not interpret diagnostics on SSH's own failure exit (255).
     lines = text.splitlines()
-    root_codes = [line for line in lines
+    # sudo's password prompt has no trailing newline. With a raw PTY the
+    # diagnostic can immediately follow it, even after successful auth.
+    # Strip only our exact prompt marker, and still require a whole exact
+    # diagnostic suffix. This is classification, never a root receipt.
+    diagnostic_lines = [line.split(PROMPT, 1)[1]
+                        if line.count(PROMPT) == 1 else line
+                        for line in lines]
+    root_codes = [line for line in diagnostic_lines
                   if line in ROOT_MANIFEST_DIAGNOSTICS]
     if returncode == 2 and len(root_codes) == 1:
         return "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"
@@ -130,11 +139,16 @@ def parse_receipt(stage: str, source_sha: str, output: bytes,
          and data.get("project") == project
          and type(data.get("boot_id")) is str
          and re.fullmatch(r"[a-zA-Z0-9-]{8,64}", data["boot_id"]) is not None
-         and data.get("result") in {
-             "download": ("LOADED_AND_HELD",),
-             "test": ("IDENTITY_PASS", "DPIDR_PASS"),
-             "restore": ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
-         }[stage], "REMOTE_RESULT_NOT_VERIFIED")
+         and (
+             data.get("result") in {
+                 "download": ("LOADED_AND_HELD",),
+                 "test": ("IDENTITY_PASS", "DPIDR_PASS"),
+                 "restore": ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
+             }[stage] if stage in ("download", "test", "restore")
+             else (data.get("result") ==
+                   "READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION"
+                   and data.get("hardware_write_authorized") is False)
+         ), "REMOTE_RESULT_NOT_VERIFIED")
     return {"stage": stage, "source_sha": source_sha,
             "project": project, "real_z2": True, "boot_id": data["boot_id"],
             "result": data["result"]}
@@ -187,7 +201,8 @@ def enrollment() -> tuple[str, str, str]:
 
 
 def execute(stage: str, source_sha: str, project: str) -> dict:
-    need(stage in STAGES, "STAGE_NOT_ALLOWLISTED")
+    need(type(stage) is str and STAGE_NAME.fullmatch(stage) is not None,
+         "STAGE_INVALID")
     need(bool(re.fullmatch(r"[a-f0-9]{40}", source_sha)), "SOURCE_SHA_INVALID")
     need(type(project) is str and re.fullmatch(
         r"pl/projects/[a-z0-9][a-z0-9-]{2,69}", project) is not None,

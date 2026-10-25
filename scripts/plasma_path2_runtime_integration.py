@@ -177,6 +177,45 @@ def registered_hardware_stage(task: dict, approval: dict) -> dict:
     }
 
 
+def generic_configuration_stage(task: dict, approval: dict, *,
+                                image_lock, bundle: dict) -> dict:
+    """Validate image bytes; deny until protected Root/PPU integration exists.
+
+    Called only by an authenticated trusted-main dispatcher. This adapter
+    adds source/byte admission; it supplies no B2/B3 observations and never
+    installs a backend or replaces the root-owned profile/manifest checks.
+    Each invocation requests exactly one stage. In particular, a failed
+    download is not permission to blindly retry or issue MMIO.
+
+    This candidate API is not wired into the installed dispatcher. Offline
+    callers may mock transport for regression; those results are not root
+    evidence. Runtime admission still requires a reviewed installed backend.
+    """
+    from pl.hil import fpga_configuration_policy as policy
+
+    stage_contract(task, approval)
+    require(isinstance(image_lock, policy.ImageLock),
+            "GENERIC_IMAGE_LOCK_REQUIRED")
+    require(image_lock.project == task["project"] and
+            image_lock.reviewed_source_sha == approval["pinned_sha"],
+            "GENERIC_IMAGE_REQUEST_MISMATCH")
+    require(type(bundle) is dict and
+            set(bundle) == {"bit", "hwh", "binary", "original"},
+            "GENERIC_IMAGE_BUNDLE_REQUIRED")
+    try:
+        image_lock.check_bundle(**bundle)
+    except policy.StageDenied as exc:
+        raise RuntimeDenied(str(exc)) from None
+    # Synthetic ImageLock and the bundle cannot attest Root/PPU ownership.
+    # Existing transport selects a reviewed project module, but does not yet
+    # carry a persistent cross-process all-Site hold, independent AXI/image
+    # proof and a qualified current-boot recovery context. Never invoke a
+    # historical F1-B stage and inspect the result only after a hardware write.
+    # A stale maintenance token, forged caller Boolean or good Image SHA alone
+    # must not enable firmware reconfiguration, including unsafe restore.
+    raise RuntimeDenied("GENERIC_CONFIGURATION_ROOT_PPU_HOLD_NOT_QUALIFIED")
+
+
 
 def full_hil_sequence(task: dict, approval: dict) -> dict:
     """Explicit opt-in: one SWPC trigger performs three real *separate* stages.

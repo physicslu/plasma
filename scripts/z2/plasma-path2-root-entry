@@ -3,10 +3,9 @@
 # No dynamic shell, Work Order supplied module, SSH helper or new service.
 set -euo pipefail
 [[ $# -eq 3 ]] || { echo 'PATH2_STAGE_ARGUMENT_REQUIRED' >&2; exit 2; }
-case "$1" in
-  download|test|restore) stage="$1" ;;
-  *) echo 'PATH2_STAGE_NOT_ALLOWLISTED' >&2; exit 2 ;;
-esac
+[[ "$1" =~ ^[a-z][a-z0-9_-]{0,31}$ ]] ||
+  { echo 'PATH2_STAGE_NOT_ALLOWLISTED' >&2; exit 2; }
+stage="$1"
 project="$2"
 source_sha="$3"
 [[ "$project" =~ ^pl/projects/[a-z0-9][a-z0-9-]{2,69}$ &&
@@ -18,14 +17,22 @@ root=/root/plasma-path2-approved
 python=/opt/plasma/python/3.12.13/bin/python3
 manifest="$root/.plasma-path2-source-sha256"
 profile="$root/.plasma-path2-profile"
+project_profile="$root/$project/.plasma-path2-profile"
+# A reviewed project may carry its own root-owned profile in the same
+# manifest-pinned source tree. The legacy top-level F1-B profile remains
+# available without switching a global active project.
+if [[ -e "$project_profile" || -L "$project_profile" ]]; then
+  profile="$project_profile"
+fi
+profile_rel="${profile#"$root/"}"
 [[ -d "$root" && ! -L "$root" && -f "$manifest" && ! -L "$manifest" &&
    -f "$profile" && ! -L "$profile" ]] ||
   { echo 'PATH2_APPROVED_ROOT_SOURCE_NOT_INSTALLED' >&2; exit 2; }
 [[ -f "$python" && -x "$python" ]] ||
   { echo 'PATH2_PINNED_PYTHON_NOT_INSTALLED' >&2; exit 2; }
 
-# Three exact lines: reviewed Project, project test/stage Python module,
-# reviewed source SHA. One protected active project, no dynamic registry.
+# Three exact lines: reviewed Project, root-installed stage Python module,
+# reviewed source SHA. Profiles share one protected source tree and manifest.
 [[ "$(wc -l < "$profile")" -eq 3 ]] ||
   { echo 'PATH2_APPROVED_PROFILE_INVALID' >&2; exit 2; }
 installed_project="$(sed -n '1p' "$profile")"
@@ -37,6 +44,17 @@ installed_sha="$(sed -n '3p' "$profile")"
   { echo 'PATH2_APPROVED_PROFILE_MISMATCH' >&2; exit 2; }
 module_leaf="$(printf '%s' "$module" | sed -n 's/^pl\.hil\.//p')"
 module_file="pl/hil/$module_leaf.py"
+extra_sources=()
+if [[ "$module" == 'pl.hil.fpga_configuration_policy' ]]; then
+  descriptor="$root/$project/image-descriptor.json"
+  [[ -f "$descriptor" && ! -L "$descriptor" ]] ||
+    { echo 'PATH2_REQUIRED_SOURCE_NOT_PINNED' >&2; exit 2; }
+  /usr/bin/awk -v path="$project/image-descriptor.json" \
+    '$2 == path && length($1) == 64 && $1 ~ /^[0-9a-f]+$/ {found = 1} END {exit !found}' \
+    "$manifest" ||
+    { echo 'PATH2_REQUIRED_SOURCE_NOT_PINNED' >&2; exit 2; }
+  extra_sources+=("$descriptor")
+fi
 
 # Only root-installed, hash-checked source may run under sudo.
 # Every import-path ancestor is root-owned, so a non-root account cannot
@@ -45,7 +63,8 @@ module_file="pl/hil/$module_leaf.py"
 for file in /root "$root" "$root/pl" "$root/pl/hil" \
   "$root/pl/hil/swd04" "$root/software" "$root/software/python" \
   "$root/software/python/plasma_interfaces" \
-  "$manifest" "$profile" "$root/$module_file"; do
+  "$manifest" "$profile" "$root/$module_file" \
+  "${extra_sources[@]}"; do
   [[ -e "$file" && ! -L "$file" && "$(stat -c '%u' "$file")" == '0' ]] ||
     { echo 'PATH2_SOURCE_NOT_ROOT_OWNED' >&2; exit 2; }
   perm="$(stat -c '%a' "$file")"
@@ -54,6 +73,7 @@ for file in /root "$root" "$root/pl" "$root/pl/hil" \
 done
 for required in \
   .plasma-path2-profile \
+  "$profile_rel" \
   "$module_file" \
   pl/hil/path2_z2_target_guard.py \
   pl/hil/swd04/one_shot.py \
@@ -101,9 +121,11 @@ done < <(/usr/bin/find "$root" -type f -print0)
 (cd "$root" && /usr/bin/sha256sum --check --status .plasma-path2-source-sha256) ||
   { echo 'PATH2_APPROVED_SOURCE_HASH_MISMATCH' >&2; exit 2; }
 
-# A candidate module is responsible for exact B2/B3 image, AXI, electrical
-# and recovery guards; the caller never selects an uninstalled module.
+# The root-installed module owns the stage-specific action allowlist and
+# exact B2/B3 image, AXI, electrical and recovery guards. The caller never
+# selects an uninstalled module or shell command.
 cd "$root"
 exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
   PYTHONPATH="$root" PYTHONDONTWRITEBYTECODE=1 \
+  PLASMA_ROOT_PROJECT="$project" \
   "$python" -B -m "$module" "$stage"

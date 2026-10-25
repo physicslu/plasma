@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
@@ -17,6 +18,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import plasma_development_dispatch as dispatch
 import plasma_path2_runtime_integration as runtime
 import plasma_path2_build_qualification as qualifier
+from pl.hil import fpga_configuration_policy as image_policy
 
 REGISTRY = ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
 WORKFLOW = ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml"
@@ -51,6 +53,76 @@ def context():
             "GITHUB_REPOSITORY": "physicslu/plasma",
             "GITHUB_REF": "refs/heads/main",
             "GITHUB_SHA": SHA, "GITHUB_RUN_ATTEMPT": "1"}
+
+
+class GenericConfigurationAdapter(unittest.TestCase):
+    """Synthetic bytes + mocked transport; never hardware acceptance."""
+
+    def setUp(self):
+        self.bundle = {"bit": b"bit", "hwh": b"hwh", "binary": b"bin",
+                       "original": b"original"}
+        h = lambda key: hashlib.sha256(self.bundle[key]).hexdigest()
+        self.historical = image_policy.load_descriptor(
+            ROOT / "pl/projects/z2-bluepill-rbb/image-descriptor.json")
+        descriptor = replace(self.historical, image_build_source_sha=SHA,
+                             bit_sha256=h("bit"), hwh_sha256=h("hwh"),
+                             bin_sha256=h("binary"), recovery_sha256=h("original"))
+        self.lock = image_policy.ImageLock(
+            descriptor.project, descriptor, SHA, SHA, SHA,
+            h("bit"), h("hwh"), h("binary"), h("original"))
+        self.task = {"capability": "path2-stage-contract", "stage": "download",
+                     "project": descriptor.project}
+        self.approved = approval("z2-path2-download")
+
+    def run_adapter(self, **changes):
+        return runtime.generic_configuration_stage(
+            self.task, self.approved, image_lock=changes.get("lock", self.lock),
+            bundle=changes.get("bundle", self.bundle))
+
+    def test_all_stages_deny_even_matching_synthetic_source_and_bytes(self):
+        with patch.object(runtime.transport, "execute") as execute:
+            for task_id, stage in (
+                ("z2-path2-download", "download"),
+                ("z2-path2-testing", "test"),
+                ("z2-path2-restore", "restore")):
+                self.task["stage"] = stage
+                self.approved = approval(task_id)
+                with self.subTest(stage=stage), self.assertRaisesRegex(
+                        runtime.RuntimeDenied,
+                        "GENERIC_CONFIGURATION_ROOT_PPU_HOLD_NOT_QUALIFIED"):
+                    self.run_adapter()
+            execute.assert_not_called()
+
+    def test_bad_locks_and_bytes_never_reach_transport(self):
+        cases = [dict(lock=None),
+                 dict(lock=replace(self.lock, installed_source_sha="b" * 40)),
+                 dict(lock=replace(self.lock, reviewed_source_sha="b" * 40)),
+                 dict(lock=replace(self.lock, descriptor=self.historical)),
+                 dict(bundle={**self.bundle, "binary": b"tampered"}),
+                 dict(bundle={**self.bundle, "original": b"wrong-original"}),
+                 dict(bundle={"binary": b"bin"})]
+        with patch.object(runtime.transport, "execute") as execute:
+            for change in cases:
+                with self.subTest(change=change), self.assertRaises(runtime.RuntimeDenied):
+                    self.run_adapter(**change)
+            execute.assert_not_called()
+
+    def test_caller_flags_and_quiesce_tokens_cannot_enable_transport(self):
+        with patch.object(runtime.transport, "execute") as execute:
+            for flag in ("all_sites_idle", "axi_isolated", "source_manifest_verified",
+                         "external_io_isolated", "golden_restored", "runtime_quiesced"):
+                self.approved[flag] = True
+            self.approved["quiesce_token"] = "forged-or-expired-token"
+            with self.assertRaisesRegex(runtime.RuntimeDenied, "ROOT_PPU_HOLD_NOT_QUALIFIED"):
+                self.run_adapter()
+            execute.assert_not_called()
+
+    def test_authorization_denial_precedes_transport(self):
+        with patch.object(runtime.transport, "execute") as execute:
+            self.approved["pinned_sha"] = "invalid"
+            with self.assertRaisesRegex(runtime.RuntimeDenied, "PATH2_STAGE_APPROVAL_DENIED"):
+                self.run_adapter()
+            execute.assert_not_called()
 
 
 class RouteContracts(unittest.TestCase):
