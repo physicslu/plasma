@@ -221,15 +221,16 @@ class Contracts(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / 'z2/plasma-path2-root-entry'
         code = path.read_text()
         self.assertNotIn('plasma-path2-f1b-site1-approved', code)
-        self.assertNotIn('pl.hil.path2_f1b_minimal_stage', code)
+        self.assertIn('module="pl.hil.path2_f1b_minimal_stage"', code)
         self.assertNotIn('PLASMA_DEV_RISK_ACK', code)
-        self.assertIn('.plasma-path2-profile', code)
-        self.assertIn('PATH2_APPROVED_PROFILE_MISMATCH', code)
+        self.assertNotIn('.plasma-path2-profile', code)
+        self.assertIn('.plasma-path2-source-commit', code)
+        self.assertIn('PATH2_APPROVED_SOURCE_SHA_MISMATCH', code)
         self.assertIn('sha256sum --check --status', code)
         self.assertIn('find "$root" -type f -print0', code)
         self.assertIn('PATH2_UNPINNED_BYTECODE_DENIED', code)
         self.assertIn('PYTHONDONTWRITEBYTECODE=1', code)
-        self.assertIn('"$python" -B -m "$module" "$stage"', code)
+        self.assertIn('"$python" -B -m "$module" "$operation"', code)
         self.assertIn('PATH2_SOURCE_WRITABLE_BY_OTHERS', code)
         self.assertIn("PATH2_REQUIRED_SOURCE_NOT_PINNED", code)
         self.assertIn('find "$root" -type l', code)
@@ -237,7 +238,8 @@ class Contracts(unittest.TestCase):
         self.assertIn('exec /usr/bin/env -i', code)
         subprocess.run(['/usr/bin/bash', '-n', str(path)], check=True)
         for args in [[], ['download'], ['test', '../escape', SHA],
-                     ['test', PROJECT, 'bad'], ['arbitrary', PROJECT, SHA]]:
+                     ['test', PROJECT, 'bad'], ['arbitrary', PROJECT, SHA],
+                     ['test', 'bad'], ['test', '../escape']]:
             result = subprocess.run(['/usr/bin/bash', str(path), *args],
                                     capture_output=True, check=False)
             self.assertEqual(result.returncode, 2)
