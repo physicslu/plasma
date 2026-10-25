@@ -150,6 +150,57 @@ class RepeatableStageTests(unittest.TestCase):
             writer.assert_not_called()
         self.assertFalse(stage.STATE.exists())
 
+    def test_installed_source_pinned_release_matches_reviewed_f1b(self):
+        record = stage.read_approved_release()
+        self.assertEqual(record, stage.F1B_APPROVED_IMAGE)
+        self.assertEqual(dict(record.identity_words), f1b.IDENTITY)
+        self.assertEqual(self.target.writes, [])
+
+    def test_source_release_rejects_invalid_or_forged_metadata(self):
+        """A changed JSON file does not create another authorized Image."""
+        original = json.loads(stage.RELEASE_FILE.read_text(encoding="utf-8"))
+        variants = (
+            {"image_id": "unreviewed-fpga-image"},
+            {"board_id": "wrong-board"},
+            {"fpga_part": "xc7z010clg400-1"},
+            {"firmware_sha256": "0" * 64},
+            {"recovery_sha256": "0" * 64},
+            {"firmware_name": "../arbitrary.bin"},
+            {"abi_version": 2},
+            {"identity_words": [[0, 0], [4, 65536], [16384, 1]]},
+            {"site_bitmap": 3},
+            {"authorization": "SHA_ONLY"},
+            {"schema": "unknown-schema"},
+            {"unexpected": True},
+        )
+        with tempfile.TemporaryDirectory() as td:
+            candidate = Path(td) / "image-release.json"
+            for changed in variants:
+                with self.subTest(change=changed):
+                    candidate.write_text(json.dumps(original | changed))
+                    with patch.object(stage, "RELEASE_FILE", candidate):
+                        with self.assertRaises(stage.LiveStageDenied):
+                            stage.read_approved_release()
+            for malformed in (
+                "",
+                "{",
+                "[]",
+                "null",
+                '{"schema":"old","schema":"new"}',
+                '{"schema": NaN}',
+            ):
+                with self.subTest(malformed=malformed):
+                    candidate.write_text(malformed)
+                    with patch.object(stage, "RELEASE_FILE", candidate):
+                        with self.assertRaises((stage.LiveStageDenied,
+                                                ValueError)):
+                            stage.read_approved_release()
+            candidate.unlink()
+            with patch.object(stage, "RELEASE_FILE", candidate):
+                with self.assertRaises(stage.LiveStageDenied):
+                    stage.read_approved_release()
+        self.assertEqual(self.target.writes, [])
+
     def test_independently_triggered_repeatable_full_lifecycle(self):
         first = stage.run("download")
         self.assertEqual(first["result"], "LOADED_AND_HELD")
