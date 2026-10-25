@@ -182,9 +182,9 @@ def verify_live_ps_compatible(image: ApprovedImage, *, raw_compatible: bytes) ->
     image = approved_image(image)
     need(type(raw_compatible) is bytes and
          0 < len(raw_compatible) <= 4096 and
-         raw_compatible.endswith(b"\\0") and
+         raw_compatible.endswith(b"\0") and
          image.soc_compatible.encode("ascii") in
-         raw_compatible.split(b"\\0")[:-1],
+         raw_compatible.split(b"\0")[:-1],
          "IMAGE_PS_SOC_COMPATIBLE_MISMATCH")
 
 
