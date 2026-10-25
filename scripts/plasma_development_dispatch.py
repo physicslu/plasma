@@ -220,7 +220,8 @@ def parse_dynamic_work_order(event: object) -> dict:
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
                                "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
-                               "expected_stdout_sha256", "project", "stage",
+                               "expected_stdout_sha256", "verification",
+                               "timeout_seconds", "project", "stage",
                                 "monitor_summary"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
@@ -273,19 +274,40 @@ def parse_dynamic_work_order(event: object) -> dict:
                 type(order.get("source_sha")) is str,
                 "WORK_ORDER_NATIVE_PREFLIGHT_SCOPE_DENIED")
     elif capability == "cpu-only":
-        require(scope == "host-only" and
-                {"script", "argv", "expected_stdout_sha256"} <= set(order)
+        # The generic CPU-only route is not a fixed experiment registry.
+        # Scope defaults to host-only; the existing Bubblewrap sandbox is
+        # mandatory at execution regardless of this optional metadata.
+        require(path == "path2-cli" and scope in (None, "host-only") and
+                {"script", "argv"} <= set(order)
                 and set(order) <= base | optional_ref |
-                {"script", "argv", "expected_stdout_sha256", "monitor_summary"},
+                {"script", "argv", "expected_stdout_sha256", "verification",
+                 "timeout_seconds", "monitor_summary"},
                 "WORK_ORDER_PATH2_FIELDS_DENIED")
-        task_by_id({"schema_version": VERSION, "mode": "development",
-                    "tasks": {"work-order-fixture": {
-                        "execution_path": "path2-cli",
-                        "capability": "cpu-only",
-                        "script": order["script"], "argv": order["argv"],
-                        "expected_stdout_sha256":
-                            order["expected_stdout_sha256"]}}},
-                   "work-order-fixture")
+        mode = order.get("verification", "stdout-sha256")
+        require(type(mode) is str and
+                mode in ("stdout-sha256", "exit-code"),
+                "WORK_ORDER_VERIFICATION_DENIED")
+        if mode == "stdout-sha256":
+            require("expected_stdout_sha256" in order and
+                    type(order["expected_stdout_sha256"]) is str and
+                    SHA256.fullmatch(order["expected_stdout_sha256"]) is not None,
+                    "WORK_ORDER_OUTPUT_DIGEST_DENIED")
+        else:
+            require("expected_stdout_sha256" not in order,
+                    "WORK_ORDER_EXIT_CODE_DIGEST_CONFLICT")
+        script = order["script"]
+        require(type(script) is str and re.fullmatch(
+            r"scripts/experiments/[a-zA-Z0-9_-]+\.py", script
+        ) is not None, "SCRIPT_PATH_DENIED")
+        argv = order["argv"]
+        require(type(argv) is list and len(argv) <= 16 and all(
+            type(x) is str and re.fullmatch(
+                r"[A-Za-z0-9._=/,:@+%~-]{1,256}", x
+            ) is not None and ".." not in x for x in argv
+        ), "TASK_ARGS_DENIED")
+        timeout_seconds = order.get("timeout_seconds", 120)
+        require(type(timeout_seconds) is int and
+                1 <= timeout_seconds <= 180, "WORK_ORDER_TIMEOUT_DENIED")
     elif capability == "path2-stage-contract":
         require(scope == "guarded-hardware" and
                 {"project", "stage"} <= set(order) and
@@ -353,7 +375,10 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
     if "monitor_summary" in order:
         task["monitor_summary"] = order["monitor_summary"]
     if order["execution_path"] == "path2-cli":
-        task["work_order_scope"] = order["scope"]
+        task["work_order_scope"] = order.get("scope", "host-only")
+        if order["capability"] == "cpu-only":
+            task["verification"] = order.get("verification", "stdout-sha256")
+            task["timeout_seconds"] = order.get("timeout_seconds", 120)
     if "session_resume" in order:
         task["session_resume"] = order["session_resume"]
     if "native_preflight" in order:
@@ -672,9 +697,15 @@ def run_task(task: dict, *, workspace: Path = ROOT,
             sys.executable, "-I", "-S",
             str(Path("/work") / task["script"]), *task["argv"],
         ]
+    timeout_seconds = task.get("timeout_seconds", 40)
+    require(type(timeout_seconds) is int and
+            1 <= timeout_seconds <= 180, "PATH2_TIMEOUT_DENIED")
+    mode = task.get("verification", "sha256-only")
+    require(mode in ("sha256-only", "stdout-sha256", "exit-code"),
+            "TASK_VERIFICATION_DENIED")
     proc = executor(
         command, cwd=workspace_root, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, timeout=40, check=False,
+        stderr=subprocess.PIPE, timeout=timeout_seconds, check=False,
     )
     require(len(proc.stdout) <= 65536 and len(proc.stderr) <= 65536,
             "OUTPUT_EXCEEDS_LIMIT")
@@ -683,14 +714,20 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         (evidence_dir / "plasma-path2-stdout.txt").write_bytes(proc.stdout)
         (evidence_dir / "plasma-path2-stderr.txt").write_bytes(proc.stderr)
     digest = hashlib.sha256(proc.stdout).hexdigest()
-    lines = proc.stdout.decode("ascii").splitlines()
+    try:
+        lines = proc.stdout.decode("utf-8").splitlines()
+    except UnicodeDecodeError:
+        raise Denied("OUTPUT_NOT_UTF8") from None
     require(proc.returncode == 0, "COMMAND_FAILED")
-    require(digest == task["expected_stdout_sha256"], "OUTPUT_SHA256_MISMATCH")
+    if mode != "exit-code":
+        require(digest == task["expected_stdout_sha256"],
+                "OUTPUT_SHA256_MISMATCH")
     return {
         "status": "PASS",
         "execution_path": "path2-cli",
         "runner": os.environ.get("RUNNER_NAME", "offline-stub"),
         "exit_code": proc.returncode,
+        "verification": mode,
         "rows": max(0, len(lines) - 1),
         "stdout_bytes": len(proc.stdout),
         "stdout_sha256": digest,
