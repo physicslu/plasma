@@ -28,13 +28,12 @@ loader.exec_module(bridge)
 
 
 class BridgeContracts(unittest.TestCase):
-    def test_stage_allowlist_blocks_any_remote_call(self):
-        for stage in ("full", "build", "reset", "deploy", "install",
-                      "update-pin", "download;id", "", "--help"):
+    def test_invalid_stage_syntax_blocks_before_remote_call(self):
+        for stage in ("download;id", "", "--help", "../test", "Audit",
+                      "a" * 33):
             with self.subTest(stage=stage), patch.object(
                     bridge, "enrollment") as creds:
-                with self.assertRaisesRegex(bridge.Blocked,
-                                            "STAGE_NOT_ALLOWLISTED"):
+                with self.assertRaisesRegex(bridge.Blocked, "STAGE_INVALID"):
                     bridge.execute(stage, "a" * 40, PROJECT)
                 creds.assert_not_called()
 
@@ -46,7 +45,7 @@ class BridgeContracts(unittest.TestCase):
 
     def test_transport_has_only_fixed_target_and_root_stage_command(self):
         s = FILE.read_text()
-        self.assertIn('STAGES = ("download", "test", "restore")', s)
+        self.assertIn('STAGE_NAME = re.compile(', s)
         self.assertIn('ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-root-entry"', s)
         self.assertIn('"StrictHostKeyChecking=yes"', s)
         self.assertIn('"SOURCE_SHA_INVALID"', s)
