@@ -1,20 +1,13 @@
 #!/usr/bin/env bash
-# Protected Z2 operation entry. No Stage orchestration or runtime Profile.
-# Temporary bounded three-argument compatibility keeps the installed
-# trusted-main transport fail closed until its direct-CLI migration.
+# Protected Z2 operation entry: exact operation + SHA, no Stage/Profile.
+# The caller cannot select a Python module, Project or shell executable.
 set -euo pipefail
-[[ $# -eq 2 || $# -eq 3 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
+[[ $# -eq 2 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
 case "$1" in
   download|test|restore) operation="$1" ;;
   *) echo 'PATH2_OPERATION_NOT_ALLOWLISTED' >&2; exit 2 ;;
 esac
-if [[ $# -eq 3 ]]; then
-  [[ "$2" == 'pl/projects/z2-fixed-unified-site1' ]] ||
-    { echo 'PATH2_LEGACY_PROJECT_DENIED' >&2; exit 2; }
-  source_sha="$3"
-else
-  source_sha="$2"
-fi
+source_sha="$2"
 [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] ||
   { echo 'PATH2_REQUEST_NOT_PINNED' >&2; exit 2; }
 [[ "$(id -u)" == '0' ]] || { echo 'PATH2_ROOT_REQUIRED' >&2; exit 2; }
