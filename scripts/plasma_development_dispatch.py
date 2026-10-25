@@ -1038,8 +1038,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "root-executor, electrical and rollback guards. Report inaccessible "
         "SWPC/Z2 operations as NOT_RUN, never PASS. "
         "Record actual commands, exits, results and hashes in "
-        ".plasma-path3-evidence/engineering-report.md. Do not commit, push "
-        "or change Git refs.\n"
+        ".plasma-path3-evidence/engineering-report.md. Edit and test freely "
+        "within the approved Work Order. The trusted worker publishes verified "
+        "changes to the exact authorized PR after this run, so do not change "
+        "Git refs or expose GitHub tokens from inside Codex.\n"
         "Goal:\n" + task["objective"] + "\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
@@ -1069,9 +1071,13 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "by the Owner's Gate 1 objective. Linux DAC/ACL still applies. "
         "Use the minimum sufficient experiment: stop after one genuine PASS; "
         "after FAIL diagnose and make a targeted retest. No Program, Readback "
-        "or Verify quota applies. Privileged Z2 FPGA Manager/MMIO and protected "
-        "stages still require the existing trusted root executor; no sudo, "
-        "root, /dev/mem or UIO access is granted to Codex. "
+        "or Verify quota applies. Within owner-approved Path 3 scope, use the "
+        "enrolled Z2 SSH/sudo route for development deployment and privileged "
+        "FPGA Manager/MMIO tasks when real permissions permit. Do not inherit "
+        "Path 2-only Project/Stage restrictions as Path 3 business policy. "
+        "Keep live voltage, device ownership, image identity, and Golden "
+        "Restore protections; do not bypass an OS permission denial or "
+        "change sudoers. SWPC Codex remains non-root. "
         "Never claim a physical PASS without actual evidence.\n"
     )
     if output_path:
