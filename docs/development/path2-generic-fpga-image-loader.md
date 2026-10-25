@@ -156,47 +156,61 @@ the read/write counters. No physical Blue Pill DPIDR, Erase, Program,
 Verify, Readback, eight-Site HIL or additional IP admission is claimed.
 No new Root executor, Runner, Workflow or privilege grant.
 
-## Programmer IP extension boundary (source reviewed ≠ hardware admitted)
+## Generic FPGA Image Deployment — AP / PS / PL boundary
 
-The existing F1-B handler `pl.hil.path2_f1b_minimal_stage` is a
-**protected FPGA image + identity/Golden recovery fixture**, not a universal
-IC programmer. The two-argument Root Entry and its `download|test|restore`
-allowlist deliberately govern the **FPGA configuration lifecycle**.
-They must not become a freeform `module`, `project`, `script`, `image`
-or arbitrary peripheral-IP selector. Programming an MCU is a separate
-reviewed **protocol/target operation** requiring actual site admission,
-electrical/DUT identity and target-specific qualification.
+**First principle:** the protected PS deployer is an image verifier and
+loader, **not** a repository of per-IC or per-Programmer-IP handlers.
+The currently verified F1-B handler is a migration baseline, not the
+intended universal handler architecture.
 
-| Existing reviewed code | Verified level | Permitted Root execution today |
+| Layer | Responsibility | Does *not* establish |
 | --- | --- | --- |
-| `pl.hil.path2_f1b_minimal_stage` / Site 1 F1-B image | **Real Z2 HIL PASS**: Image Download, 3-read/0-write Identity, Golden Restore (#1168) | **YES**, existing fixed handler only |
-| `FixedABIHardwareDriver` + `FixedABISWDController` / Fixed ABI SWD Site 1 | Source and Host/RTL integration; physical PYNQ-Z2 image/ARMv7 MMIO/barrier, DUT electrical and Flash HIL **NOT_RUN** | **NO**: no reviewed, installed, root-authorized hardware provider |
-| Dual-Site Fixed ABI SWD RTL (Site 1 / Site 2) | Host-only Cocotb/virtual SWD qualification; no Site 2 physical Z2 image **NOT_RUN** | **NO** |
-| `pl.hil.swd04` / earlier SWD transaction pipeline | Source/offline candidate and isolated verification; its image/protocol evidence is **not** the F1-B #1168 physical image | **NO** |
-| [PR #1142](https://github.com/physicslu/plasma/pull/1142) Blue Pill Remote Bitbang candidate | Unmerged Draft; old Root 3-argument/Profile contract conflicts with merged #1167; real Blue Pill DPIDR/Flash **NOT_RUN** | **NO** |
+| AP / release pipeline | Qualify build, supported board/FPGA part, image/ABI/IP capability matrix and release authorization. Provide a reviewable, immutable authorized manifest | Its assertion alone is not trustworthy unless authenticated |
+| PS / existing Protected Root | Authenticate an explicitly trusted, approved manifest (e.g. protected root-owned allowlist or cryptographically verified publisher); check exact BIN SHA256, Board/FPGA part, ABI/identity expectation, current exclusive ownership and recoverable Golden; use the **existing Linux FPGA Manager** | SHA256 alone is not authorization; PS does not implement every IP's programming algorithm |
+| PL / loaded Image | Expose deterministic Identity, ABI, Build/Image ID, Site Bitmap and capability words; PS compares values to the **pre-authorized expectation** after load | Self-reported registers are not cryptographic image authentication |
+| Programming Engine | Use the selected, already-admitted Site and protocol controller to execute SWD/SPI/JTAG target operations with independently qualified target algorithm and electrical conditions | Target DPIDR/Erase/Program/Verify/Readback is not an FPGA Manager download stage |
 
-**Minimum qualified extension path, without another Framework or Stage/Profile:**
+**Normal operation:** when one approved integrated/Universal Image is loaded,
+individual IC programming Jobs must **not** reload the FPGA. Reconfiguration
+is an explicit boot/update/maintenance lifecycle operation, not a per-Site
+job. Image metadata is a small fixed record per approved release, not an
+enumeration of every device, manufacturer or programming operation.
 
-1. Reuse the existing protocol-neutral `FixedABIHardwareDriver` and
-   `FixedABISWDController` (or another already-reviewed controller) above
-   an explicitly admitted native MMIO port; do **not** duplicate protocol
-   engines inside Root.
-2. Bind an immutable reviewed FPGA image, actual on-PS image/ABI identity,
-   registers and Site ID to the same installed root-owned source SHA +
-   manifest/ownership/lock controls, with verified Golden recovery. Confirm
-   voltage, isolation, DUT ownership and target-specific operation
-   qualification **before allowing any physical command**.
-3. Only after a real qualified Programmer IP exists, implement the **smallest
-   fixed, reviewed code binding** from protected hardware ownership to that
-   existing provider. Its target/verb authorization must be explicit and
-   fail-closed; no caller-supplied Python module or runtime Profile. Preserve
-   the working F1-B entry, operation ABI and #1168 regression.
-4. Prove physical Probe/DPIDR, Erase, Program, Verify, independent Readback
-   and Golden recovery for the specific IP/DUT and Source SHA. Only then
-   mark that additional IP **HIL PASS**; Host CI/virtual SWD does not qualify it.
+### Evidence-based current compatibility
 
-**Current outcome:** #1168 proves only the F1-B Root. No additional
-Programmer IP is authorized for privileged live execution by this
-documentation/qualification inventory alone. Implementing a live non-F1-B
-provider without the missing hardware/image/electrical facts would defeat
-the reviewed B1/B2/B3 safety and false-label an unqualified IP.
+| Source / Image | Qualification | Runtime status |
+| --- | --- | --- |
+| F1-B Site 1 fixed Image | Real Z2 Download, 3 read32 / 0 write32 Identity, verified Golden Restore in [#1168](https://github.com/physicslu/plasma/issues/1168) | **Qualified for its existing protected F1-B path only** |
+| `FixedABIHardwareDriver` / `FixedABISWDController` Site 1 | Reviewed source plus host/RTL tests; native Z2 ARMv7, exact compatible configured Image, DUT electric and physical Flash tests **NOT_RUN** | **Not admitted**; existing controllers are reusable *outside* FPGA deployment |
+| Fixed ABI dual-Site RTL | Host Cocotb and virtual-SWD coverage; no qualified physical Site 2 image | **Not admitted** |
+| `pl.hil.swd04` and [PR #1142](https://github.com/physicslu/plasma/pull/1142) Blue Pill remote bitbang | Offline/HIL-read-only evidence; physical Blue Pill Flash **NOT_RUN**; #1142 old 3-arg Root/Profile conflicts with merged 2-arg Root | **Not admitted** |
+
+### Smallest implementation, without a second framework
+
+1. Retain the existing **two-argument** Root Entry:
+   `download|test|restore + reviewed Git SHA`, all root-owned source
+   pin/manifest, Lock, current-boot and Golden recovery checks.
+2. In the **existing** Root implementation separate hardcoded F1-B Image
+   filename/hash and identity expectation from shared operations using a
+   **small fixed, root-owned, reviewed Image record**. Verify manifest
+   authenticity/authorization independently of checksum, then verify exact
+   files and Board/FPGA part *before* Manager write.
+3. After Manager download, compare loaded PL Identity/ABI/Build/Capability
+   against that approved record. Keep known F1-B identity coverage and
+   independently verify Golden recovery. Reject missing metadata,
+   unsupported/unknown Image, source mismatch, wrong ABI/part, unqualified
+   mapping or missing recovery; no automatic arbitrary-image fallback.
+4. **Do not** add an IP-specific Python Root handler or runtime
+   `module/project/image` selector. A new Programmer IP needs its
+   own admitted protocol controller and physical evidence, but does not
+   require a second FPGA loader.
+5. Do not label a new image or Site as real **HIL PASS** before a separate
+   approved physical image/ABI/electrical/target qualification. Host-only
+   contracts and #1168's F1-B receipts cannot grant new privileges.
+
+**Source-lock warning:** merging even this documentation-only PR advances
+the exact trusted-main Git SHA, so any later Path 2 `main` Work Order must
+have a separately verified matching protected Z2 Source Pin/Manifest. A
+Git Tree match is evidence of identical contents, but **does not** bypass
+the currently enforced exact commit pin. Do not roll the Z2 back to a
+historical #1167 PR HEAD.
