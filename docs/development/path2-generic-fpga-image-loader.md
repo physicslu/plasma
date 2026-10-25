@@ -1,8 +1,18 @@
-# Path 2 — Direct CLI to existing Protected Z2 Root Entry (PR #1167)
+# Path 2 — Direct CLI to existing Protected Z2 Root Entry (merged PR #1167)
 
-**Gate 1 source refactor; GitHub-hosted offline evidence only.** The source
-on a Draft PR is not installed on SWPC or PYNQ-Z2. Z2 install, FPGA Manager,
-MMIO, OpenOCD, DUT execution and Golden Restore remain **NOT_RUN**.
+**Verified status as of 2026-10-25:** PR #1167 is merged into `main`.
+Operator SSH deployment and its F1-B Download → 3-read MMIO Test →
+Golden Restore all passed on the real PYNQ-Z2. The *independent*, trusted
+Path 2 Dispatcher → SWPC Runner → Z2 Root sequence then passed in
+[Issue #1168](https://github.com/physicslu/plasma/issues/1168):
+[Download Run 40206257358](https://github.com/physicslu/plasma/actions/runs/40206257358),
+[Test Run 40206377161](https://github.com/physicslu/plasma/actions/runs/40206377161),
+[Restore Run 40206484938](https://github.com/physicslu/plasma/actions/runs/40206484938).
+All three actual Root receipts shared Boot ID
+`4cefdc0c-f586-4d19-b126-1d8e1108c8f1` and exact trusted source SHA
+`b807f1ac727209cfe1d09e9d2d31a302039e523a`. These are **F1-B
+physical results only**. They do not qualify OpenOCD, Blue Pill flash,
+new FPGA Programmer IPs, or a general eight-Site product image.
 
 ## Execution boundary
 
@@ -52,38 +62,27 @@ selector or new runtime Profile.
 
 This is **not GitHub Actions**, and it does **not** introduce a Stage/Profile
 or Root framework. It runs only when an operator explicitly invokes it on
-SWPC from a trusted interactive SSH terminal. **No command has been run on
-the actual Z2 by this PR.**
+SWPC from a trusted interactive SSH terminal. The historical operator
+run passed on real Z2 on 2026-10-25, **before the separate Path 2 HIL**.
 
-One-time preparation: use your existing `~/plasma` Git clone on SWPC,
-with verified SWPC-to-Z2 SSH alias, pinned SSH host key, and working
-interactive `sudo`. No branch checkout and no Runner change are needed.
+The original operator one-command SSH script was exercised with the
+**exact reviewed PR HEAD** `b1aa93f8487952188613d349211c0e2a4dfaa621`
+and returned `DEPLOY_PASS`, Download PASS, Test PASS (3 MMIO reads,
+0 writes) and Restore PASS. After the merge, the source-pinned installed
+Root tree was separately aligned and read-only verified against the
+**merge SHA** `b807f1ac727209cfe1d09e9d2d31a302039e523a`
+(`PIN_VERIFY_PASS`). The original PR-head checkout command is **historical
+evidence, not a repeatable current-main deployment procedure**. Do **not**
+rerun it to overwrite the installed trusted-main Root or silently roll its
+pin backward.
 
-```bash
-# After SSH login to SWPC, in the existing repo (without switching branches):
-cd ~/plasma
-
-# Host-only package verification; NO SSH to Z2 and no FPGA operation:
-git fetch origin refs/pull/1167/head &&
-  bash <(git show FETCH_HEAD:scripts/plasma-z2-smoke.sh) --target xilinx@YOUR_Z2 --plan
-
-# One command for the explicit live deployment and full MMIO smoke:
-git fetch origin refs/pull/1167/head &&
-  bash <(git show FETCH_HEAD:scripts/plasma-z2-smoke.sh) --target xilinx@YOUR_Z2
-```
-
-Replace `xilinx@YOUR_Z2` with the operator's **already working** SSH
-destination or SSH config alias. Do not post passwords or private host
-information in GitHub or chat. Bash process substitution reads the fixed PR
-file without modifying the shared checkout and preserves interactive stdin
-for SSH/sudo.
-
-The `--plan` option fetches the current exact GitHub PR #1167 HEAD and
-constructs/verifies a minimal source bundle **without SSH or hardware**.
-The real command also performs preflight and transfers the verified bundle.
-Both commands fetch `refs/pull/1167/head` from the canonical
-`physicslu/plasma` origin. A Git SHA is printed; it is **not** taken from
-whatever files happen to be locally edited or checked out.
+For any subsequent deployment, independently verify the then-current
+trusted-main Git Tree, exact root source pin and complete SHA256 manifest,
+root ownership, active FPGA Manager image/recovery, exclusive device
+ownership and the current Boot ID. A new `main` commit (even docs-only)
+changes the exact SHA requested by a post-merge Path 2 Work Order: perform
+a separately authorized, safely checked source-pin migration rather than
+bypassing the Root Entry SHA match.
 
 The Z2 installer requires root, ARMv7 Python 3.12.13, FPGA Manager
 `operating`, the **observed last Manager firmware load of `base.bin`**,
@@ -125,8 +124,9 @@ for removing the original blocking architecture.
   the current FPGA recovery conditions.
 - GitHub-hosted CI only checks syntax and fail-closed source contracts.
   Running the above commands is necessary for real SWPC/Z2 evidence.
-- This command deliberately does not change `main`, merge PR #1167, or
-  activate the GitHub Runner; keep PR #1167 Draft until Gate 2 approval.
+- The historical SSH command did not itself merge #1167 or activate the
+  GitHub Runner. #1167 was subsequently merged at Gate 2 and separate
+  authentic Path 2 Runner HIL passed as recorded in #1168.
 
 ### Migration / deployment boundary
 
@@ -147,7 +147,70 @@ and socket profiles are unrelated and retained.
 
 GitHub-hosted tests check Work Order fail-closed parsing, exact SHA and owner
 authorization, Root syntax, SSH/sudo failure categories, safety receipts and
-host-only build qualification. They do not prove any installed Z2 version,
-live hardware state, voltage, bitstream compatibility or physical IC
-programming. In particular **no actual F1-B, OpenOCD or Blue Pill PASS**
-is claimed. No new Root executor, Runner, Workflow or privilege grant.
+host-only build qualification. **Actual F1-B** Z2 Download/MMIO/Restore was
+separately proved by the three Issue #1168 real self-hosted Runner receipts,
+not those host-only checks. The test Root code checks `read32_count == 3`
+and `write32_count == 0` before returning `IDENTITY_PASS`; the *sanitized
+GitHub receipt* contains `IDENTITY_PASS` but does **not** directly include
+the read/write counters. No physical Blue Pill DPIDR, Erase, Program,
+Verify, Readback, eight-Site HIL or additional IP admission is claimed.
+No new Root executor, Runner, Workflow or privilege grant.
+
+## Generic FPGA Image Deployment — AP / PS / PL boundary
+
+**First principle:** the protected PS deployer is an image verifier and
+loader, **not** a repository of per-IC or per-Programmer-IP handlers.
+The currently verified F1-B handler is a migration baseline, not the
+intended universal handler architecture.
+
+| Layer | Responsibility | Does *not* establish |
+| --- | --- | --- |
+| AP / release pipeline | Qualify build, supported board/FPGA part, image/ABI/IP capability matrix and release authorization. Provide a reviewable, immutable authorized manifest | Its assertion alone is not trustworthy unless authenticated |
+| PS / existing Protected Root | Authenticate an explicitly trusted, approved manifest (e.g. protected root-owned allowlist or cryptographically verified publisher); check exact BIN SHA256, Board/FPGA part, ABI/identity expectation, current exclusive ownership and recoverable Golden; use the **existing Linux FPGA Manager** | SHA256 alone is not authorization; PS does not implement every IP's programming algorithm |
+| PL / loaded Image | Expose deterministic Identity, ABI, Build/Image ID, Site Bitmap and capability words; PS compares values to the **pre-authorized expectation** after load | Self-reported registers are not cryptographic image authentication |
+| Programming Engine | Use the selected, already-admitted Site and protocol controller to execute SWD/SPI/JTAG target operations with independently qualified target algorithm and electrical conditions | Target DPIDR/Erase/Program/Verify/Readback is not an FPGA Manager download stage |
+
+**Normal operation:** when one approved integrated/Universal Image is loaded,
+individual IC programming Jobs must **not** reload the FPGA. Reconfiguration
+is an explicit boot/update/maintenance lifecycle operation, not a per-Site
+job. Image metadata is a small fixed record per approved release, not an
+enumeration of every device, manufacturer or programming operation.
+
+### Evidence-based current compatibility
+
+| Source / Image | Qualification | Runtime status |
+| --- | --- | --- |
+| F1-B Site 1 fixed Image | Real Z2 Download, 3 read32 / 0 write32 Identity, verified Golden Restore in [#1168](https://github.com/physicslu/plasma/issues/1168) | **Qualified for its existing protected F1-B path only** |
+| `FixedABIHardwareDriver` / `FixedABISWDController` Site 1 | Reviewed source plus host/RTL tests; native Z2 ARMv7, exact compatible configured Image, DUT electric and physical Flash tests **NOT_RUN** | **Not admitted**; existing controllers are reusable *outside* FPGA deployment |
+| Fixed ABI dual-Site RTL | Host Cocotb and virtual-SWD coverage; no qualified physical Site 2 image | **Not admitted** |
+| `pl.hil.swd04` and [PR #1142](https://github.com/physicslu/plasma/pull/1142) Blue Pill remote bitbang | Offline/HIL-read-only evidence; physical Blue Pill Flash **NOT_RUN**; #1142 old 3-arg Root/Profile conflicts with merged 2-arg Root | **Not admitted** |
+
+### Smallest implementation, without a second framework
+
+1. Retain the existing **two-argument** Root Entry:
+   `download|test|restore + reviewed Git SHA`, all root-owned source
+   pin/manifest, Lock, current-boot and Golden recovery checks.
+2. In the **existing** Root implementation separate hardcoded F1-B Image
+   filename/hash and identity expectation from shared operations using a
+   **small fixed, root-owned, reviewed Image record**. Verify manifest
+   authenticity/authorization independently of checksum, then verify exact
+   files and Board/FPGA part *before* Manager write.
+3. After Manager download, compare loaded PL Identity/ABI/Build/Capability
+   against that approved record. Keep known F1-B identity coverage and
+   independently verify Golden recovery. Reject missing metadata,
+   unsupported/unknown Image, source mismatch, wrong ABI/part, unqualified
+   mapping or missing recovery; no automatic arbitrary-image fallback.
+4. **Do not** add an IP-specific Python Root handler or runtime
+   `module/project/image` selector. A new Programmer IP needs its
+   own admitted protocol controller and physical evidence, but does not
+   require a second FPGA loader.
+5. Do not label a new image or Site as real **HIL PASS** before a separate
+   approved physical image/ABI/electrical/target qualification. Host-only
+   contracts and #1168's F1-B receipts cannot grant new privileges.
+
+**Source-lock warning:** merging even this documentation-only PR advances
+the exact trusted-main Git SHA, so any later Path 2 `main` Work Order must
+have a separately verified matching protected Z2 Source Pin/Manifest. A
+Git Tree match is evidence of identical contents, but **does not** bypass
+the currently enforced exact commit pin. Do not roll the Z2 back to a
+historical #1167 PR HEAD.
