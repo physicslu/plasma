@@ -4,9 +4,32 @@
 >
 > **範圍：開發、CI、SWPC 工程工作調度，不是產品 PPU 的八 Site 燒錄排程器。**
 >
-> **注意：這份文件定義路徑與授權，不代表已部署通用 Dispatcher、觸發任何 Codex Job 或完成硬體驗收。**
+> **注意：Path 3 的既有 Development Mode owner-only Dispatcher 已完成指定的軟體驗收（見下方紀錄）；這不代表通用 Qualification Dispatcher 已啟用，或已完成任何實體硬體驗收。**
 
 本文件與根目錄 [AGENTS.md](../../AGENTS.md) §11.1～11.1B 同步。執行能力和目前已實作的 Workflow 以實際 repository／GitHub runner 狀態為準，不得把架構提議當作實機執行成果。
+
+## Path 3 Core Development Workflow — Completion Record (2026-10-21)
+
+| 欄位 | 正式紀錄 |
+| --- | --- |
+| 工作項目 | Path 3 Core Development Workflow（SWPC Codex Work） |
+| 狀態 | **COMPLETED — Development Mode core software workflow** |
+| 完成日期 | 2026-10-21（Asia/Taipei） |
+| 對應 PR | [#1083 — Development Mode gating simplification](https://github.com/physicslu/plasma/pull/1083)，已合併 |
+| Merge SHA | `51a42c1314de8e2164dcfe0f106160bf301be13c` |
+| Merge Parents | `50f80b96d8947f00df05fd6efc31107728c3d2d0`（main）；`d5c230fd3e6bf57d0069b5a85a72fad4a2b9ea6c`（PR HEAD） |
+| 實測執行 | [Issue #981 Post-merge Run #39544912173](https://github.com/physicslu/plasma/actions/runs/39544912173)：`development-authorize` SUCCESS、`development-codex` SUCCESS；SWPC `SWPC-plasma-codex` Runner；真實 Codex exit 0 |
+| 驗收證據 | [Artifact #12320947537](https://github.com/physicslu/plasma/actions/runs/39544912173/artifacts/12320947537)；ZIP SHA256 `1a4ba800c824b3af0cb7760e2a079995601a54daf4c28378507eb66c4b14075d`；已記錄 12/12 三角數獨立驗證及內部 manifest 10/10 項一致 |
+| Gating 結論 | Gate 1 執行／證據與 PR #1083 Gate 2 合併已完成；後續工作仍個別遵守 Gate 1／Gate 2 授權，不因本完成標記自動獲得 SWPC 或硬體操作許可 |
+
+**完成範圍：** 既有 owner-only Issue #981 → trusted `main` Dispatcher → SWPC `development-codex` → 真實 Codex CLI 的 Development Mode 軟體派工、工作來源／Runner／Registry Admission、完成或失敗 Receipt、證據保留及獨立驗收流程。Path 3 可在適用的已授權任務契約與目前已實作的 Trigger 下使用；本紀錄不是對任意工作自動派工的授權。
+
+**明確保留的例外與未完成範圍：**
+
+- PR #1083 **合併前 Candidate Dispatcher + real Codex 完整 E2E = NOT_RUN**，為 Owner 明確接受的 Gate 2 例外；合併後新 `main` Dispatcher + real Codex 軟體 E2E = PASS。兩者不得混稱。
+- 此 CPU-only Smoke **不證明**通用 RTL/Vivado 多模組開發、Z2／PS→PL／FPGA Manager／SWD／DUT 實體 HIL，亦不證明完整 OS 級硬體隔離。需依每項已批准 Gate 1 的實際操作與證據個別驗收。
+- 通用 Qualification `workflow_dispatch` Runtime 未因本紀錄啟用；不得宣稱 Production Ready，也不變更 Runner、權限、憑證、部署或硬體狀態。
+- 遵守 Development Mode **兩個人工 Gate**：Gate 1（Plan/Path/Scope/Acceptance）、Gate 2（僅在 PR 需要 Merge 時）。Worker Admission、CI、Evidence Review 不是額外人工 Gate。
 
 ## 一、第一性原理：用執行邊界，而不是 UI 介面分類
 
