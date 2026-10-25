@@ -226,7 +226,10 @@ class Contracts(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / 'z2/plasma-path2-root-entry'
         code = path.read_text()
         self.assertNotIn('plasma-path2-f1b-site1-approved', code)
-        self.assertIn('module="pl.hil.path2_f1b_minimal_stage"', code)
+        self.assertIn('module="pl.hil.fpga_image_root"', code)
+        self.assertIn('pl/hil/fpga_image_guard.py', code)
+        self.assertIn('pl/hil/fpga_image_admission.py', code)
+        self.assertNotIn('path2_f1b', code.lower())
         self.assertNotIn('PLASMA_DEV_RISK_ACK', code)
         self.assertNotIn('.plasma-path2-profile', code)
         self.assertIn('.plasma-path2-source-commit', code)
