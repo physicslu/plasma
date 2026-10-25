@@ -109,32 +109,6 @@ class GenericImageRootTests(unittest.TestCase):
                 self.assertNotIn("pl/hil/swd04", content)
         self.assertEqual(guard.GLOBAL_LOCK,
                          Path("/run/plasma-z2-swd05/supervisor.lock"))
-        self.assertEqual(stage.CHILD,
-                         guard.OWNER_DIR / "fpga-image-identity.json")
-
-    def test_common_guard_rejects_unapproved_manager_name(self):
-        for name in ("../unauthorized.bin", "/tmp/unauthorized.bin",
-                     "image with spaces.bin", ""):
-            with self.subTest(name=name), self.assertRaises(
-                    guard.TargetSafetyDenied):
-                guard.manager_write(name)
-
-    def test_common_guard_supervisor_rejects_failed_child(self):
-        class FailedChild:
-            def wait(self, timeout):
-                return 7
-        with patch.object(guard.subprocess, "Popen", return_value=FailedChild()):
-            with self.assertRaisesRegex(guard.TargetSafetyDenied,
-                                        "MMIO child failed"):
-                guard.run_child(["true"])
-
-    def test_common_guard_load_record_must_be_observed(self):
-        from subprocess import CompletedProcess
-        with patch.object(guard.subprocess, "run",
-                          return_value=CompletedProcess([], 0, "no FPGA load")):
-            with self.assertRaisesRegex(guard.TargetSafetyDenied,
-                                        "No current-boot FPGA Manager"):
-                guard.manager_last_load()
 
     def test_manifest_has_geometry_and_true_source_authority(self):
         image = self.release
@@ -256,6 +230,40 @@ class GenericImageRootTests(unittest.TestCase):
                                     "STATE_IMAGE_OR_IDENTITY_INVALID"):
             stage.read_state(foreign)
         self.assertEqual(self.port.writes, [self.release.firmware_name])
+
+
+class GenericGuardSafetyTests(unittest.TestCase):
+    """Exercise the real common guard, without GenericImageRootTests mocks."""
+
+    def test_runtime_child_path_matches_shared_owner(self):
+        self.assertEqual(stage.CHILD,
+                         guard.OWNER_DIR / "fpga-image-identity.json")
+
+    def test_common_guard_rejects_unapproved_manager_name(self):
+        for name in ("../unauthorized.bin", "/tmp/unauthorized.bin",
+                     "image with spaces.bin", ""):
+            with self.subTest(name=name), self.assertRaises(
+                    guard.TargetSafetyDenied):
+                guard.manager_write(name)
+
+    def test_common_guard_supervisor_rejects_failed_child(self):
+        class FailedChild:
+            def wait(self, timeout):
+                return 7
+        with patch.object(guard.subprocess, "Popen", return_value=FailedChild()):
+            with self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                        "MMIO child failed"):
+                guard.run_child(["true"])
+
+    def test_common_guard_load_record_must_be_observed(self):
+        from subprocess import CompletedProcess
+        with patch.object(guard.subprocess, "run",
+                          return_value=CompletedProcess([], 0, "no FPGA load")):
+            with self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                        "No current-boot FPGA Manager"):
+                guard.manager_last_load()
+
+
 
 
 if __name__ == "__main__":
