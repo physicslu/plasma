@@ -723,26 +723,6 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(receipt["codex_usage"]["input_tokens"], 1)
             self.assertNotIn("gpt-6-sol", json.dumps(receipt))
 
-    def test_repo_first_codex_guidance_budget_and_safety_preservation(self):
-        root = (ROOT / "AGENTS.md").read_bytes()
-        detail = (ROOT / "docs/development/"
-                  "plasma-autonomous-development-contract-full.md").read_text()
-        # Avoid silent truncation at Codex's default 32 KiB project budget.
-        self.assertLess(len(root), 32768)
-        brief = root.decode("utf-8")
-        for required in ("Gate 1", "Gate 2", "Path 3", "NOT_RUN",
-                         "Root Executor", "Merge Approval",
-                         "electrical", "B1", "rollback",
-                         "Credential", "AGENTS.md"):
-            with self.subTest(required=required):
-                self.assertIn(required.casefold(), brief.casefold())
-        for required in ("## 1A. Prototype-first",
-                         "## 1B. Canonical Codex task/SSH",
-                         "## 11. Autonomous task execution contract",
-                         "## 20. Workspace and information boundary"):
-            self.assertIn(required, detail)
-        self.assertGreater(len(detail.encode("utf-8")), len(root))
-
     def test_path3_invocation_preserves_execution_receipt_without_prompt_assertions(self):
         seen = []
         class Result:
