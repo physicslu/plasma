@@ -95,17 +95,19 @@ flowchart TD
 
 **Path 3 不預設 Host-only，也不強制人工分流。** 通用 Path 3 Work Order 不要求事先逐一列出 `hardware_stages`，或因單一 Gate 1 工作的建置、部署、修復、重測而重複人工批准。PR #1160 之後，可信 Dispatcher 只傳遞核准的 Objective、Acceptance 及來源識別；Codex 自行選擇工程方法，**不由 Prompt 強制固定工具、Vivado 步驟或 Root Stage 順序**。
 
+**目前 Work Order 欄位契約（已實作）：** 一般 `execution_path: path3-codex`、`capability: codex-workspace` 的動態工作單**不可提供 `scope` 欄位**，也不要求 `hardware_stages`；授權範圍由 Owner 核准的工作目標及驗收條件界定。唯一的 `session_resume: page-boundary-off-by-one` 特例必須明確帶 `scope: host-only`、指定 `source_sha`，僅供 CPU-only 的兩個 GitHub Jobs 延續實驗；**不是**一般 Path 3 的 Host-only Gate，也不授權 Z2／FPGA／DUT。若新增其他 Work Order Schema 或控制平面能力，才需要審核並更新可信 `main` 的 Dispatcher。
+
 **實際的權限邊界仍存在。** Path 3 使用非 Root Bubblewrap，並保留 GitHub Token 隔離與 Trusted Publisher；普通 USB／TTY 依實際 Linux DAC／ACL 可用。對已核准的 Z2 部署／FPGA Manager／MMIO／SWD／DUT 作業，Codex 可選擇已登錄的 SSH／sudo 路徑及適合的現有工具；**Path 2 專屬 `download/test/restore` Stage Allowlist 與單一 Project Profile 不是所有 Path 3 任務的必經步驟**。但若選用既有 Stage Transport／Root Entry，就必須通過該程式的實際檢查，且其通用 Path 3 特權動態委派尚未完成安裝／驗證。安全要求仍為 B1 授權與可信來源、B2 當前裝置所有權／電壓／Image／Golden Restore、B3 實際結果與失敗停止。權限不足或恢復未知必須回報 `NOT_RUN`／`FAIL`，不能聲稱 PASS。實驗一次完整有效 PASS 即停止，失敗才針對性診斷。
 
 **執行者：** 既有 SWPC `SWPC-plasma-codex` Runner 與 Codex CLI；GitHub Actions 負責派工與收集 Code／Output／Log，Codex 負責自行開發、自行執行、自行測試與修正，**ChatGPT 審閱真實證據並判定 PASS/FAIL**。不要讓 SWPC Dispatcher 額外實作一個驗證 Codex 寫法的 AST/特定輸出格式檢查器。Job `SUCCESS`、Codex 自稱 `PASS`、有 Artifact，均不能直接代替獨立驗收。已知限制：
 
 1. **批准 Gate 1 ≠ GitHub Workflow 自動發生。** ChatGPT／授權工具必須確實呼叫可用 Trigger，並以 GitHub Job 證據核對是否執行。若無法觸發，報告 `NOT_RUN`；不要求已批准事項再重複授權。
-2. 現有共用 `plasma-engineering-runtime-dispatch.yml` 提供 **Development Mode owner-only Issue #981 入口**。可信 Dispatcher 仍來自 `main`，但已支援在 Owner 核准後讀取同儲存庫未合併 PR 的精確 HEAD SHA 與候選任務 Registry／工作樹；該路徑適用 Path 2/3。新的 Path 3 開發契約仍須先合併到 `main` 的可信 Dispatcher 後，才可能在既有 Runner 生效。正式 qualification `workflow_dispatch` Runtime 仍停用。
+2. 現有共用 `plasma-engineering-runtime-dispatch.yml` 提供 **Development Mode owner-only Issue #981 入口**。可信 Dispatcher 仍來自 `main`，但已支援在 Owner 核准後讀取同儲存庫未合併 PR 的精確 HEAD SHA 與候選任務 Registry／工作樹；該路徑適用 Path 2/3。**只有變更可信 Dispatcher／Workflow／Work Order Parser 的執行能力時**，才需先合併該控制平面程式至 `main` 才能生效；一般 Path 3 任務沿用現有動態 Work Order 契約，可直接由 Owner Issue #981 指令指定未合併 PR 的精確 HEAD，**不需要先把任務或候選程式合併進 `main`**。正式 qualification `workflow_dispatch` Runtime 仍停用。
 3. Codex 建 PR 時，若使用預設 `GITHUB_TOKEN`，**通常不會觸發新的 `pull_request` workflows**。須確保使用核准的 GitHub App token 或其他受控事件機制，讓必要 CI 真正開始。PR 建立成功不能代替 CI PASS。
 4. SWPC Codex 帳號可能已有部分硬體存取權；「軟體專用 Prompt」不是 OS 層隔離。Z2／USB／LA／Power／FPGA／DUT 必須依 Gate 1 和安全契約明確允許才操作。
 5. **Gate 1 完成 Path 3 真實 E2E 與證據審查，Gate 2 僅批准 Merge**。合併後的 `main` push 可啟動一般 CI，但**不能重新派發同一項 Codex 開發任務**。
 
-### Path 3 Admission 與失敗證據最小化（歷史 Gate 1 設計；現行以程式為準）
+### Path 3 Admission、執行結果與證據收集（現行實作）
 
 **安全檢查數量不等於人工 Gate 數量。** 使用者 Gate 1 一次授權
 Codex 在既定工作樹／Objective 內自主進行 Code → Test → Fix → Retest，
@@ -127,7 +129,7 @@ Codex 在既定工作樹／Objective 內自主進行 Code → Test → Fix → R
   造成初始工作失敗時跳過所有證據。Runner 異常中斷、磁碟／網路故障、
   Job 硬超時仍可能讓資料採集不完整，不能宣稱絕對保證。
 
-**本段落原屬歷史 Gate 1 Draft 的驗證紀錄**：當時僅執行 GitHub-hosted 離線負向／回歸測試，未執行 Issue #981 實測。該紀錄不構成現在的 Path 3 停用宣告，也不會授權這次文件清理去操作 SWPC／Z2。GitHub-hosted CI PASS 仍不能替代真正 SWPC Path 3 E2E PASS。
+**驗證邊界：** 以上 Admission、Receipt 與失敗證據收集已有對應程式及 GitHub Workflow；GitHub-hosted 離線測試驗證的是契約，不等於 SWPC Runner、Codex、Z2 或 DUT 的實際端到端測試。任何未取得實際收據的硬體或 Publisher E2E 結果都必須維持 `NOT_RUN`，不得由 CI PASS 推論。
 
 ### Candidate Dispatcher 合併前測試入口（PR #1083）
 
