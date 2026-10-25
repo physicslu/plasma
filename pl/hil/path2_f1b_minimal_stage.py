@@ -50,6 +50,7 @@ class ApprovedImage:
     image_id: str
     board_id: str
     fpga_part: str
+    soc_compatible: str
     firmware_name: str
     firmware_sha256: str
     recovery_name: str
@@ -63,6 +64,7 @@ F1B_APPROVED_IMAGE = ApprovedImage(
     image_id="f1b-site1-20261020",
     board_id="pynq-z2",
     fpga_part="xc7z020clg400-1",
+    soc_compatible="xlnx,zynq-7000",
     firmware_name=CANDIDATE.name,
     firmware_sha256=f1b.BIN_SHA,
     recovery_name=RECOVERY.name,
@@ -80,6 +82,7 @@ def approved_image(image: object) -> ApprovedImage:
          "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED")
     need(image.board_id == "pynq-z2" and
          image.fpga_part == "xc7z020clg400-1" and
+         image.soc_compatible == "xlnx,zynq-7000" and
          image.firmware_name == CANDIDATE.name and
          image.recovery_name == RECOVERY.name and
          image.firmware_sha256 == f1b.BIN_SHA and
@@ -118,14 +121,14 @@ def read_approved_release() -> ApprovedImage:
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise LiveStageDenied("IMAGE_RELEASE_JSON_DENIED") from exc
     fields = {"schema", "authorization", "image_id", "board_id",
-              "fpga_part", "firmware_name", "firmware_sha256",
+              "fpga_part", "soc_compatible", "firmware_name", "firmware_sha256",
               "recovery_name", "recovery_sha256", "abi_version",
               "identity_words", "site_bitmap"}
     need(type(raw) is dict and set(raw) == fields and
          raw["schema"] == "plasma.fpga.image-release.v1" and
          raw["authorization"] == "SOURCE_PINNED_ROOT_APPROVAL",
          "IMAGE_RELEASE_SCHEMA_DENIED")
-    names = ("image_id", "board_id", "fpga_part", "firmware_name",
+    names = ("image_id", "board_id", "fpga_part", "soc_compatible", "firmware_name",
              "firmware_sha256", "recovery_name", "recovery_sha256")
     need(all(type(raw[n]) is str and bool(raw[n]) for n in names) and
          type(raw["abi_version"]) is int and
@@ -141,6 +144,7 @@ def read_approved_release() -> ApprovedImage:
         image_id=raw["image_id"],
         board_id=raw["board_id"],
         fpga_part=raw["fpga_part"],
+        soc_compatible=raw["soc_compatible"],
         firmware_name=raw["firmware_name"],
         firmware_sha256=raw["firmware_sha256"],
         recovery_name=raw["recovery_name"],
@@ -168,6 +172,40 @@ def verify_image_metadata(image: ApprovedImage, *, board_id: str,
          type(identity_words) is dict and
          identity_words == dict(image.identity_words),
          "IMAGE_ABI_OR_IDENTITY_MISMATCH")
+
+
+def verify_live_ps_compatible(image: ApprovedImage, *, raw_compatible: bytes) -> None:
+    """Match observed PS Device Tree family against the trusted release.
+
+    This is SoC-family evidence, NOT physical PYNQ-Z2 board/part attestation.
+    """
+    image = approved_image(image)
+    need(type(raw_compatible) is bytes and
+         0 < len(raw_compatible) <= 4096 and
+         raw_compatible.endswith(b"\\0") and
+         image.soc_compatible.encode("ascii") in
+         raw_compatible.split(b"\\0")[:-1],
+         "IMAGE_PS_SOC_COMPATIBLE_MISMATCH")
+
+
+def verify_observed_pl_identity(image: ApprovedImage, *, observed: dict,
+                                read32_count: int,
+                                write32_count: int) -> None:
+    """Pure check on actual native MMIO child readback, not AP-supplied data."""
+    image = approved_image(image)
+    need(type(observed) is dict and
+         all(type(k) is int and type(v) is int and
+             0 <= k <= 0xFFFFFFFF and 0 <= v <= 0xFFFFFFFF
+             for k, v in observed.items()) and
+         observed == dict(image.identity_words),
+         "IMAGE_PL_IDENTITY_MISMATCH")
+    need(observed.get(0x0004) == image.abi_version and
+         observed.get(0x4000) == image.site_bitmap,
+         "IMAGE_PL_ABI_OR_SITE_MISMATCH")
+    need(type(read32_count) is int and type(write32_count) is int and
+         read32_count == len(image.identity_words) == 3 and
+         write32_count == 0,
+         "NATIVE_MMIO_ACCESS_COUNT_CHANGED")
 
 
 def digest(data: object) -> str:
@@ -263,6 +301,9 @@ def live_report(port: guard.RootZ2TargetPort, image: str) -> dict:
     report = risk.collect_live(root_port=port, approval=risk.WAIVER,
                                scope=risk.ALLOWED[0],
                                expected_firmware=image)
+    # Read the real kernel Device Tree bytes; never echo the release as proof.
+    verify_live_ps_compatible(
+        release, raw_compatible=(guard.PROC / "device-tree/compatible").read_bytes())
     need(report["site"] == 1 and report["expected_manager_firmware"] == image
          and port.image_sha256("candidate") == release.firmware_sha256
          and port.image_sha256("recovery") == release.recovery_sha256,
@@ -344,7 +385,7 @@ def run(stage: str) -> dict:
                                     "--identity-child"])
                 result = json.loads(CHILD.read_text())
                 need(result == {"observed": {str(k): v for k, v in
-                                             f1b.IDENTITY.items()}},
+                                             release.identity_words}},
                      "THREE_READ_IDENTITY_MISMATCH")
                 after = live_report(port, CANDIDATE.name)
                 record.update(status="F1B", test_count=record["test_count"] + 1,
@@ -408,11 +449,11 @@ def child_main() -> int:
                                    frozenset(), f1b.LENGTH)
     with driver.LinuxMMIO((aperture,), readonly=True) as mmio:
         observed = f1b.read_identity(mmio.read32)
-        need(observed == dict(release.identity_words),
-             "IMAGE_IDENTITY_NOT_APPROVED")
-        need(mmio.stats().read32 == len(release.identity_words) == 3 and
-             mmio.stats().write32 == 0,
-             "NATIVE_MMIO_ACCESS_COUNT_CHANGED")
+        stats = mmio.stats()
+        # Actual LinuxMMIO result, not a synthesized manifest-side assertion.
+        verify_observed_pl_identity(
+            release, observed=observed,
+            read32_count=stats.read32, write32_count=stats.write32)
     one_shot.record_json(CHILD, {"observed": observed})
     return 0
 
