@@ -110,7 +110,14 @@ def remote_failure(returncode: int, output: bytes) -> str:
     # Reject mixed/duplicate root diagnostic claims and all arbitrary stderr.
     # Do not interpret diagnostics on SSH's own failure exit (255).
     lines = text.splitlines()
-    root_codes = [line for line in lines
+    # sudo's password prompt has no trailing newline. With a raw PTY the
+    # diagnostic can immediately follow it, even after successful auth.
+    # Strip only our exact prompt marker, and still require a whole exact
+    # diagnostic suffix. This is classification, never a root receipt.
+    diagnostic_lines = [line.split(PROMPT, 1)[1]
+                        if line.count(PROMPT) == 1 else line
+                        for line in lines]
+    root_codes = [line for line in diagnostic_lines
                   if line in ROOT_MANIFEST_DIAGNOSTICS]
     if returncode == 2 and len(root_codes) == 1:
         return "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"

@@ -17,6 +17,20 @@ SHA = 'a' * 40
 PROJECT = 'pl/projects/z2-fixed-unified-site1'
 
 class Contracts(unittest.TestCase):
+    def test_root_diagnostic_after_sudo_prompt_is_classified_not_a_receipt(self):
+        code = 'PATH2_APPROVED_PROFILE_MISMATCH'
+        output = ("xilinx@z2.example's password: " + t.PROMPT + code + '\r\n').encode()
+        self.assertEqual(t.remote_failure(2, output),
+                         'Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED')
+        with self.assertRaises(t.Blocked):
+            t.parse_receipt('test', SHA, output, PROJECT)
+        for rc, failed in ((255, output), (0, output),
+                           (2, output + (code + '\n').encode()),
+                           (2, (t.PROMPT + code + ' extra\n').encode()),
+                           (2, ('arbitrary ' + code + '\n').encode())):
+            self.assertEqual(t.remote_failure(rc, failed),
+                             'REMOTE_EXIT_OR_PRIVILEGE_FAILED')
+
     def test_no_installed_host_dependency_or_candidate_import(self):
         source = Path(t.__file__).read_text() + Path(r.__file__).read_text()
         for forbidden in ('/usr/local/libexec/plasma/z2-path2-f1b-bridge',
