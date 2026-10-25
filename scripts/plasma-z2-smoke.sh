@@ -39,10 +39,10 @@ cleanup() {
 trap cleanup EXIT
 mkdir -p "$work/src"
 sources=(
-  pl/__init__.py pl/hil/__init__.py pl/hil/f1b.py
+  pl/hil/f1b.py
   pl/hil/path2_f1b_minimal_stage.py
   pl/hil/path2_f1b_dev_risk.py pl/hil/path2_z2_target_guard.py
-  pl/hil/swd04/__init__.py pl/hil/swd04/one_shot.py
+  pl/hil/swd04/one_shot.py
   pl/hil/swd04/development.py pl/hil/swd04/contract.py
   pl/hil/swd04/collect.py pl/hil/swd04/staging.py
   software/python/plasma_interfaces/linux_mmio.py
