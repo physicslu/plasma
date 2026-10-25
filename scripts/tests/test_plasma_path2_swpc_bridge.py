@@ -133,7 +133,7 @@ class BridgeContracts(unittest.TestCase):
                 "stage": stage, "result": result, "project": PROJECT,
                 "boot_id": "fe723a58-621e-444a-9171-0c81d35a3b0a",
                 "hardware_write_authorized": write,
-            }) + "\\n").encode()
+            }) + "\n").encode()
 
         receipt = payload("READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION")
         observed = bridge.parse_receipt("audit", "a" * 40, receipt, PROJECT)
