@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_FILE = guard.FIRMWARE / "plasma-image-manifest.json"
 STATE = ROOT / ".plasma-fpga-image-deployment-state.json"
 CHILD = guard.OWNER_DIR / "fpga-image-identity.json"
-SCHEMA = "plasma.fpga.image-deployment.v2"
+SCHEMA = "plasma.fpga.image-deployment.v3"
 LEGACY_SCHEMA = "plasma.fpga.image-deployment.v1"
 STATUS = ("RECOVERY", "IMAGE", "DOWNLOAD_IN_FLIGHT", "TEST_IN_FLIGHT",
           "RESTORE_IN_FLIGHT", "UNKNOWN")
@@ -228,32 +228,29 @@ def read_state(release: ImageManifest) -> dict | None:
     fields = {"schema", "session_id", "boot_id", "status", "image", "image_id",
               "download_count", "test_count", "restore_count",
               "evidence_sha256", "last_error"}
+    new_fields = fields | {"manifest_sha256", "firmware_sha256"}
     need(type(data) is dict and
-         (set(data) == fields | {"manifest_sha256"} or
-          (set(data) == fields and data.get("schema") == LEGACY_SCHEMA)),
+         (set(data) == new_fields and data.get("schema") == SCHEMA or
+          set(data) == fields and data.get("schema") == LEGACY_SCHEMA),
          "STATE_SCHEMA_INVALID")
-    need(data["schema"] in (SCHEMA, LEGACY_SCHEMA) and
-         data["status"] in STATUS and
+    need(data["status"] in STATUS and
          type(data["session_id"]) is str and len(data["session_id"]) >= 8 and
          type(data["boot_id"]) is str and len(data["boot_id"]) >= 8 and
+         type(data["image_id"]) is str and bool(data["image_id"]) and
+         _basename(data["image"]) and
          all(type(data[k]) is int and data[k] >= 0 for k in
              ("download_count", "test_count", "restore_count")),
          "STATE_IMAGE_OR_IDENTITY_INVALID")
-    if data["status"] == "RECOVERY":
-        need(data["image"] == release.recovery_name,
-             "STATE_RECOVERY_MISMATCH")
-    else:
-        need(data["schema"] == SCHEMA and
-             data["image_id"] == release.image_id and
-             data["image"] == release.firmware_name and
-             data.get("manifest_sha256") == manifest_sha256(),
-             "STATE_IMAGE_OR_IDENTITY_INVALID")
     if data["schema"] == SCHEMA:
-        need(type(data["manifest_sha256"]) is str and
-             re.fullmatch(r"[a-f0-9]{64}", data["manifest_sha256"]) is not None,
+        need(all(type(data[k]) is str and
+                 re.fullmatch(r"[a-f0-9]{64}", data[k]) is not None
+                 for k in ("manifest_sha256", "firmware_sha256")),
              "STATE_MANIFEST_HASH_INVALID")
     else:
+        # v1 state may be retired only from a known-Golden checkpoint.
         need(data["status"] == "RECOVERY", "LEGACY_ACTIVE_IMAGE_DENIED")
+    if data["status"] == "RECOVERY":
+        need(data["image"] == release.recovery_name, "STATE_RECOVERY_MISMATCH")
     return data
 
 def write_state(data: dict) -> None:
@@ -286,11 +283,13 @@ def _digest(data: object) -> str:
 
 
 def live_report(port: guard.RootZ2TargetPort, release: ImageManifest,
-                image: str) -> dict:
-    need(image in (release.recovery_name, release.firmware_name),
+                image: str, *, previous_image: str | None = None) -> dict:
+    need(image in (release.recovery_name, release.firmware_name) or
+         (previous_image is not None and image == previous_image),
          "IMAGE_NOT_IN_MANIFEST")
     report = admission.collect_live(root_port=port, release=release,
-                                    expected_firmware=image)
+                                    expected_firmware=image,
+                                    previous_firmware=previous_image)
     need(report["expected_manager_firmware"] == image and
          port.image_sha256("candidate") == release.firmware_sha256 and
          port.image_sha256("recovery") == release.recovery_sha256,
@@ -302,19 +301,23 @@ def _initial_state(report: dict, release: ImageManifest) -> dict:
     return {"schema": SCHEMA, "session_id": "fpga-" + uuid.uuid4().hex,
             "boot_id": report["target_boot_id"], "status": "RECOVERY",
             "image": release.recovery_name, "image_id": release.image_id,
-            "manifest_sha256": manifest_sha256(), "download_count": 0, "test_count": 0, "restore_count": 0,
+            "manifest_sha256": manifest_sha256(),
+            "firmware_sha256": release.firmware_sha256,
+            "download_count": 0, "test_count": 0, "restore_count": 0,
             "evidence_sha256": _digest(report), "last_error": ""}
 
 
 def _confirm_current(port, release: ImageManifest, record: dict | None,
                      operation: str) -> tuple[dict, dict]:
     current_manifest = manifest_sha256()
-    replacing = (record is not None and record["status"] == "RECOVERY" and
-                 record.get("manifest_sha256") != current_manifest)
+    different = (record is not None and
+                 (record.get("manifest_sha256") != current_manifest or
+                  record["image_id"] != release.image_id or
+                  record.get("firmware_sha256") != release.firmware_sha256))
     if record is not None:
         need(record["status"] in ("RECOVERY", "IMAGE"),
              "UNCERTAIN_PRIOR_OPERATION_MANUAL_RECOVERY")
-        if replacing:
+        if different:
             need(operation == "download", "NEW_MANIFEST_DOWNLOAD_REQUIRED")
         if operation == "test":
             need(record["status"] == "IMAGE" and
@@ -324,9 +327,31 @@ def _confirm_current(port, release: ImageManifest, record: dict | None,
     else:
         need(operation == "download", "DOWNLOAD_REQUIRED_BEFORE_TEST_OR_RESTORE")
         expected = release.recovery_name
-    report = live_report(port, release, expected)
-    if record is None or replacing:
-        record = _initial_state(report, release)
+    if different and record["status"] == "IMAGE":
+        # Direct Image A -> B transition, with no intermediate Golden reload.
+        # Before overwriting PL, verify that A is still the current image,
+        # its root-owned BIN matches the recorded digest, and owner/boot
+        # evidence remains valid. Never accept UNKNOWN or stale in-flight state.
+        need(record["schema"] == SCHEMA and
+             record["boot_id"] ==
+             (guard.PROC / "sys/kernel/random/boot_id").read_text().strip(),
+             "PREVIOUS_IMAGE_BOOT_CHANGED")
+        need(record["image"] not in (release.recovery_name, release.firmware_name),
+             "PREVIOUS_IMAGE_AMBIGUOUS")
+        guard.sha_file(guard.FIRMWARE / record["image"],
+                       record["firmware_sha256"])
+        report = live_report(port, release, expected,
+                             previous_image=expected)
+    else:
+        report = live_report(port, release, expected)
+    if record is None or different:
+        fresh = _initial_state(report, release)
+        if record is not None and record["status"] == "IMAGE":
+            # Represent the old held Image until the new Download begins;
+            # any interrupted transition is persisted as in-flight/UNKNOWN.
+            fresh["status"] = "IMAGE"
+            fresh["image"] = expected
+        record = fresh
     else:
         need(record["boot_id"] == report["target_boot_id"],
              "BOOT_CHANGED_MANUAL_REVIEW")
