@@ -541,8 +541,8 @@ jobs:
     # Long RTL/Vivado implementation is expected in Development Mode.
     timeout-minutes: 360
     permissions:
-      contents: read
-      pull-requests: read  # trusted worker verifies the live exact PR HEAD
+      contents: write  # trusted publisher can update only the verified PR ref
+      pull-requests: read  # resolve and verify live owner PR and pinned HEAD
     steps:
       - name: Check SWPC identity and trusted dispatcher SHA
         shell: bash
@@ -662,6 +662,67 @@ jobs:
             sha256sum "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz" \
               > "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz.sha256"
           fi
+      - name: Publish successful Path 3 edits to the exact authorized PR
+        if: ${{ success() && needs.development-authorize.outputs.pr_number != '0' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+          PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          # Keep GitHub write credentials outside the model namespace.
+          python3 - "$RUNNER_TEMP/plasma-path3-receipt.json" "$PINNED_SHA" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as handle:
+              receipt = json.load(handle)
+          assert receipt['codex_exit_code'] == 0
+          assert receipt['status'] == 'EVIDENCE_READY_REVIEW_REQUIRED'
+          assert receipt['pinned_sha'] == sys.argv[2]
+          PY
+          test "$(git -C candidate rev-parse HEAD)" = "$PINNED_SHA"
+          git -C candidate diff --check
+          pr_json="$(gh api "repos/physicslu/plasma/pulls/$PR_NUMBER")"
+          PR_HEAD_REF="$(printf '%s' "$pr_json" | python3 -c '
+          import json,sys,re
+          p=json.load(sys.stdin)
+          ref=p["head"]["ref"]
+          assert p["state"]=="open" and p["merged_at"] is None
+          assert p["user"]["login"]=="physicslu"
+          assert p["head"]["repo"]["full_name"]=="physicslu/plasma"
+          assert p["base"]["repo"]["full_name"]=="physicslu/plasma"
+          assert p["base"]["ref"]=="main"
+          assert p["head"]["sha"]==sys.argv[1]
+          assert ref!="main" and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9/_-]{1,120}",ref)
+          print(ref)
+          ' "$PINNED_SHA")"
+          # Do not publish private Codex logs or generated Vivado outputs.
+          git -C candidate add -A -- . ':(exclude).plasma-path3-evidence' ':(exclude)pl/build'
+          git -C candidate diff --cached --check
+          if git -C candidate diff --cached --quiet; then
+            echo PATH3_NO_SOURCE_CHANGES
+            exit 0
+          fi
+          git -C candidate config user.name 'github-actions[bot]'
+          git -C candidate config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C candidate commit -m "Path 3: autonomous fixes for PR #$PR_NUMBER"
+          # Normal non-force push fails if the authorized branch moved.
+          actual_sha="$(gh api "repos/physicslu/plasma/pulls/$PR_NUMBER" --jq '.head.sha')"
+          test "$actual_sha" = "$PINNED_SHA"
+          askpass="$RUNNER_TEMP/plasma-path3-askpass"
+          cat > "$askpass" <<'SH'
+          #!/bin/sh
+          case "$1" in
+            *Username*) printf '%s\n' x-access-token ;;
+            *Password*) printf '%s\n' "$GH_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          SH
+          chmod 700 "$askpass"
+          trap 'rm -f "$askpass"' EXIT
+          GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+            git -C candidate push origin "HEAD:refs/heads/$PR_HEAD_REF"
+          echo PATH3_AUTHORIZED_PR_PUBLISHED
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ always() && needs.development-authorize.outputs.session_resume != 'page-boundary-off-by-one' }}
         with:
