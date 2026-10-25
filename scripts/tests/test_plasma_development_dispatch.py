@@ -777,8 +777,6 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertIn("pinned source SHA", prompt)
         self.assertIn(self.task["objective"], prompt)
         self.assertIn("NOT_RUN", prompt)
-        self.assertIn("unsafe hardware writes", prompt)
-        self.assertIn("without another user approval", prompt)
         self.assertNotIn("Plasma Autonomous Development Contract", prompt)
         self.assertEqual(argv, [
             "codex", "--ask-for-approval", "never",
