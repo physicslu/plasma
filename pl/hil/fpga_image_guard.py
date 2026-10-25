@@ -8,18 +8,23 @@ from __future__ import annotations
 from contextlib import contextmanager
 import fcntl
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
+import signal
 import stat
+import subprocess
 import threading
-
-from pl.hil.swd04 import one_shot
 
 SYS = Path("/sys")
 PROC = Path("/proc")
 FIRMWARE = Path("/lib/firmware")
-GLOBAL_LOCK = one_shot.OWNER_LOCK
+# Retain the historic on-disk lock path so legacy SWD04 and this generic
+# executor cannot both own/configure the same FPGA at once.
+OWNER_DIR = Path("/run/plasma-z2-swd05")
+GLOBAL_LOCK = OWNER_DIR / "supervisor.lock"
+MANAGER = SYS / "class/fpga_manager/fpga0"
 
 
 class TargetSafetyDenied(ValueError):
@@ -31,10 +36,90 @@ def need(ok: bool, code: str) -> None:
         raise TargetSafetyDenied(code)
 
 
+def protected(path: Path, *, file: bool = True) -> None:
+    """Enforce the same root ownership/path contract as the legacy supervisor."""
+    need(path.is_absolute() and not path.is_symlink(), "Untrusted path")
+    info = path.stat()
+    need(info.st_uid == 0 and info.st_mode & 0o022 == 0, "Unprotected owner/mode")
+    need(path.is_file() if file else path.is_dir(), "Unexpected object kind")
+    parent = path.parent.stat()
+    need(parent.st_uid == 0 and parent.st_mode & 0o022 == 0,
+         "Unprotected parent")
+
+
+def manager_last_load() -> str:
+    """Read the most recent current-boot Linux FPGA Manager load record."""
+    log = subprocess.run(["dmesg", "--color=never"], text=True, check=True,
+                         capture_output=True, timeout=10).stdout
+    loads = [line for line in log.splitlines()
+             if "fpga_manager fpga0: writing " in line]
+    need(bool(loads), "No current-boot FPGA Manager loading evidence")
+    return loads[-1]
+
+
+def manager_write(name: str) -> None:
+    """Write a reviewed firmware basename; verify operating and load record."""
+    need(bool(re.fullmatch(r"[A-Za-z0-9_.-]+", name)), "Illegal firmware name")
+    with (MANAGER / "firmware").open("w") as stream:
+        stream.write(name)
+    need((MANAGER / "state").read_text().strip() == "operating",
+         "FPGA Manager firmware load did not reach operating")
+    need(f": writing {name} to " in manager_last_load(),
+         "Firmware manager load provenance not observed")
+
+
+def record_json(path: Path, data: dict) -> None:
+    """Write exclusive result file and durably fsync it and parent directory."""
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(data, stream, sort_keys=True, indent=2)
+        stream.write(chr(10))
+        stream.flush()
+        os.fsync(stream.fileno())
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
+def run_child(args: list[str]) -> None:
+    """Bound the MMIO subprocess and do not reload PL with an unreaped child."""
+    proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True)
+    try:
+        status = proc.wait(timeout=35)
+    except subprocess.TimeoutExpired as exc:
+        os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                raise TargetSafetyDenied("MMIO_CHILD_UNREAPED_NO_RELOAD") from exc
+        raise TargetSafetyDenied("MMIO_CHILD_TIMEOUT") from exc
+    except BaseException:
+        if proc.poll() is None:
+            os.killpg(proc.pid, signal.SIGTERM)
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, signal.SIGKILL)
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    raise TargetSafetyDenied("MMIO_CHILD_UNREAPED_NO_RELOAD")
+        raise
+    need(status == 0, "MMIO child failed or SIGBUS")
+
+
 def sha_file(path: Path, expected: str) -> str:
     need(type(expected) is str and re.fullmatch(r"[0-9a-f]{64}", expected) is not None,
          "PINNED_IMAGE_HASH_DENIED")
-    one_shot.protected(path)
+    protected(path)
     need(path.parent == FIRMWARE and path.is_file() and
          0 < path.stat().st_size <= 16_000_000, "FIRMWARE_LOCATION_DENIED")
     digest = hashlib.sha256()
@@ -163,8 +248,8 @@ class RootZ2TargetPort:
     def exclusive(self):
         need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
         need(not self._locked, "REENTRANT_TARGET_LOCK_DENIED")
-        one_shot.OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
-        one_shot.protected(GLOBAL_LOCK.parent, file=False)
+        OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
+        protected(GLOBAL_LOCK.parent, file=False)
         fd = os.open(GLOBAL_LOCK, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
         try:
             st = os.fstat(fd)

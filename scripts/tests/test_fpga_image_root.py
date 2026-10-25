@@ -14,7 +14,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from pl.hil import fpga_image_root as stage
-from pl.hil.swd04 import one_shot
+from pl.hil import fpga_image_guard as guard
 
 
 class FakePort:
@@ -43,7 +43,7 @@ class FakePort:
     def child(self, argv):
         assert argv[-3:] == ["pl.hil.fpga_image_root", "--identity-child"] or (
             argv[-3:] == ["-m", "pl.hil.fpga_image_root", "--identity-child"])
-        one_shot.record_json(stage.CHILD, {"observed": {
+        guard.record_json(stage.CHILD, {"observed": {
             str(off): expected for off, expected, mask in self.release.identity_words}})
 
 
@@ -55,7 +55,7 @@ class GenericImageRootTests(unittest.TestCase):
         self.release_data = json.loads(stage.RELEASE_FILE.read_text())
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
-        self.stack.enter_context(patch.object(one_shot, "protected"))
+        self.stack.enter_context(patch.object(guard, "protected"))
         self.stack.enter_context(patch.object(stage, "RELEASE_FILE",
                                              self.folder / "approved.json"))
         self.write_manifest(self.release_data)
@@ -69,9 +69,9 @@ class GenericImageRootTests(unittest.TestCase):
                                              return_value=self.port))
         self.stack.enter_context(patch.object(stage, "live_report",
                                              side_effect=self.port.report))
-        self.stack.enter_context(patch.object(one_shot, "manager_write",
+        self.stack.enter_context(patch.object(guard, "manager_write",
                                              side_effect=self.port.write))
-        self.stack.enter_context(patch.object(one_shot, "run_child",
+        self.stack.enter_context(patch.object(guard, "run_child",
                                              side_effect=self.port.child))
 
     def write_manifest(self, source):
@@ -96,6 +96,19 @@ class GenericImageRootTests(unittest.TestCase):
             self.assertNotIn("path2_f1b", code)
             self.assertNotIn("from pl.hil import f1b", code)
             self.assertNotIn("f1-b", code)
+
+    def test_runtime_closure_no_longer_depends_on_swd04(self):
+        for relative in ("pl/hil/fpga_image_root.py",
+                         "pl/hil/fpga_image_guard.py",
+                         "pl/hil/fpga_image_admission.py",
+                         "scripts/z2/plasma-path2-root-entry"):
+            with self.subTest(relative=relative):
+                content = (ROOT / relative).read_text()
+                self.assertNotIn("pl.hil.swd04", content)
+                self.assertNotIn("one_shot", content)
+                self.assertNotIn("pl/hil/swd04", content)
+        self.assertEqual(guard.GLOBAL_LOCK,
+                         Path("/run/plasma-z2-swd05/supervisor.lock"))
 
     def test_manifest_has_geometry_and_true_source_authority(self):
         image = self.release
@@ -217,6 +230,40 @@ class GenericImageRootTests(unittest.TestCase):
                                     "STATE_IMAGE_OR_IDENTITY_INVALID"):
             stage.read_state(foreign)
         self.assertEqual(self.port.writes, [self.release.firmware_name])
+
+
+class GenericGuardSafetyTests(unittest.TestCase):
+    """Exercise the real common guard, without GenericImageRootTests mocks."""
+
+    def test_runtime_child_path_matches_shared_owner(self):
+        self.assertEqual(stage.CHILD,
+                         guard.OWNER_DIR / "fpga-image-identity.json")
+
+    def test_common_guard_rejects_unapproved_manager_name(self):
+        for name in ("../unauthorized.bin", "/tmp/unauthorized.bin",
+                     "image with spaces.bin", ""):
+            with self.subTest(name=name), self.assertRaises(
+                    guard.TargetSafetyDenied):
+                guard.manager_write(name)
+
+    def test_common_guard_supervisor_rejects_failed_child(self):
+        class FailedChild:
+            def wait(self, timeout):
+                return 7
+        with patch.object(guard.subprocess, "Popen", return_value=FailedChild()):
+            with self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                        "MMIO child failed"):
+                guard.run_child(["true"])
+
+    def test_common_guard_load_record_must_be_observed(self):
+        from subprocess import CompletedProcess
+        with patch.object(guard.subprocess, "run",
+                          return_value=CompletedProcess([], 0, "no FPGA load")):
+            with self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                        "No current-boot FPGA Manager"):
+                guard.manager_last_load()
+
+
 
 
 if __name__ == "__main__":
