@@ -117,7 +117,7 @@ class GenericImageRootTests(unittest.TestCase):
         self.assertEqual(set(candidate), set(self.release_data))
         self.assertEqual(candidate["schema"], "plasma.fpga.image-release.v2")
         self.assertEqual(candidate["firmware_sha256"],
-                         "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6b927d6c779e13fe9ec1a1")
+                         "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1")
         self.assertEqual(candidate["recovery_sha256"],
                          "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c")
         self.assertEqual(candidate["axi_base"], 0x40008000)
