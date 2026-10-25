@@ -31,8 +31,8 @@ installed_sha="$(cat "$commit_pin")"
 [[ "$installed_sha" =~ ^[0-9a-f]{40}$ &&
    "$installed_sha" == "$source_sha" ]] ||
   { echo 'PATH2_APPROVED_SOURCE_SHA_MISMATCH' >&2; exit 2; }
-module="pl.hil.path2_f1b_minimal_stage"
-module_file="pl/hil/path2_f1b_minimal_stage.py"
+module="pl.hil.fpga_image_root"
+module_file="pl/hil/fpga_image_root.py"
 
 # Only root-installed, hash-checked source may run under sudo.
 # Every import-path ancestor is root-owned, so a non-root account cannot
@@ -52,7 +52,8 @@ for required in \
   .plasma-path2-source-commit \
   "$module_file" \
   pl/hil/approved-fpga-image.json \
-  pl/hil/path2_z2_target_guard.py \
+  pl/hil/fpga_image_guard.py \
+  pl/hil/fpga_image_admission.py \
   pl/hil/swd04/one_shot.py \
   pl/hil/swd04/development.py \
   pl/hil/swd04/contract.py \
@@ -98,9 +99,8 @@ done < <(/usr/bin/find "$root" -type f -print0)
 (cd "$root" && /usr/bin/sha256sum --check --status .plasma-path2-source-sha256) ||
   { echo 'PATH2_APPROVED_SOURCE_HASH_MISMATCH' >&2; exit 2; }
 
-# The reviewed, fixed F1-B handler retains B2/B3 image, AXI, electrical,
-# ownership, lock and recovery checks. Other targets require reviewed code,
-# never a user-selected runtime Profile.
+# The reviewed generic Image lifecycle retains B2/B3, owner lock, exact
+# source authorization and recovery checks. No runtime IP Handler or Profile.
 cd "$root"
 exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
   PYTHONPATH="$root" PYTHONDONTWRITEBYTECODE=1 \
