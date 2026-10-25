@@ -62,6 +62,14 @@ and allowlisted stage result. A prospective Blue Pill SWD DPIDR
 backend must implement its own independently verified target safety;
 it cannot inherit F1-B's Development-only risk exception.
 
+The candidate `pl.hil.fpga_configuration_policy` module supports a
+read-only `audit` request for any manifest-pinned project descriptor. Its
+receipt is `READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION` and explicitly denies
+hardware-write authority. Its `download`, `test` and `restore` live backend
+remains unavailable until current ownership, image identity and recovery
+admission are independently established. An audit receipt must not be
+reported as an FPGA load or programming result.
+
 **Non-negotiable:** the installed Root Entry and Project module must
 independently enforce hardware ownership, AXI isolation, reliable
 current-boot image and recovery evidence, process/FPGA lock and electrical

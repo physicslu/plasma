@@ -7,14 +7,16 @@ download / read-only identity test / restore. Ordinary IC Programming Jobs
 Image Descriptor supplies board, AXI, clock, pin map, read-only identity
 mask/value and historic offline artifact hashes. The policy may reject an
 unqualified descriptor, but can NEVER grant root authority or prove live
-AXI isolation, physical I/O or FPGA restoration. No Z2, FPGA Manager, MMIO,
-network, USB, SWD or target access exists in this module.
+AXI isolation, physical I/O or FPGA restoration. The optional protected
+`audit` command reads Z2 boot/Manager identity only. It never authorizes a
+hardware write or opens MMIO, USB, SWD or a target.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -510,11 +512,46 @@ LIVE_BACKEND_BLOCKERS = (
 )
 
 
+def audit_root_target(*, project: str, source_root: Path,
+                      proc_root: Path = Path("/proc"),
+                      sys_root: Path = Path("/sys")) -> dict:
+    """Read only; a successful audit is explicitly not hardware admission."""
+    need(os.geteuid() == 0 and type(project) is str and
+         PROJECT.fullmatch(project) is not None,
+         "GENERIC_AUDIT_ROOT_OR_PROJECT_DENIED")
+    descriptor = load_descriptor(source_root / project / "image-descriptor.json")
+    need(descriptor.project == project, "GENERIC_AUDIT_PROJECT_MISMATCH")
+    try:
+        boot_before = (proc_root / "sys/kernel/random/boot_id").read_text().strip()
+        manager = (sys_root / "class/fpga_manager/fpga0/state").read_text().strip()
+        boot_after = (proc_root / "sys/kernel/random/boot_id").read_text().strip()
+    except (OSError, UnicodeError) as exc:
+        raise StageDenied("GENERIC_AUDIT_TARGET_UNREADABLE") from exc
+    need(bool(re.fullmatch(r"[a-zA-Z0-9-]{8,64}", boot_before)) and
+         boot_before == boot_after and manager == "operating",
+         "GENERIC_AUDIT_TARGET_UNPROVEN")
+    return {
+        "stage": "audit", "project": project, "boot_id": boot_before,
+        "result": "READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION",
+        "hardware_write_authorized": False,
+    }
+
+
 def main() -> int:
-    # Even a protected Root Entry invocation must stop here. Do not connect
-    # host Observed booleans to one_shot.manager_write or reuse F1B's waiver.
-    # Once trusted admission exists, reuse that writer and supervisor lock;
-    # never introduce a second sysfs writer or auto-restore on uncertain AXI.
+    if sys.argv[1:] == ["audit"]:
+        try:
+            project = os.environ.get("PLASMA_ROOT_PROJECT")
+            source_root = Path(__file__).resolve().parents[2]
+            receipt = audit_root_target(project=project, source_root=source_root)
+        except StageDenied as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print("PLASMA_PATH2_STAGE=" + json.dumps(receipt, sort_keys=True))
+        return 0
+    # Physical stages still stop here. Do not connect host Observed booleans
+    # to one_shot.manager_write or reuse F1B's waiver. Once trusted admission
+    # exists, reuse that writer and supervisor lock; never introduce a second
+    # sysfs writer or auto-restore on uncertain AXI.
     print("GENERIC_FPGA_CONFIGURATION_LIVE_BACKEND_NOT_IMPLEMENTED",
           file=sys.stderr)
     print("MISSING_TRUSTED_SOURCE=" + ",".join(LIVE_BACKEND_BLOCKERS),

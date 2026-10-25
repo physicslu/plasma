@@ -12,11 +12,49 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import plasma_development_stage_transport as t
 import plasma_path2_runtime_integration as r
 import plasma_development_dispatch as d
+from pl.hil import fpga_configuration_policy as cfg
 
 SHA = 'a' * 40
 PROJECT = 'pl/projects/z2-fixed-unified-site1'
 
 class Contracts(unittest.TestCase):
+    def test_generic_root_audit_is_read_only_and_transport_keeps_that_boundary(self):
+        project = 'pl/projects/z2-bluepill-rbb'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            descriptor = root / project / 'image-descriptor.json'
+            descriptor.parent.mkdir(parents=True)
+            descriptor.write_bytes((Path(__file__).resolve().parents[2] /
+                                    project / 'image-descriptor.json').read_bytes())
+            boot = root / 'proc/sys/kernel/random/boot_id'
+            boot.parent.mkdir(parents=True)
+            boot.write_text('test-boot-12345678\n')
+            manager = root / 'sys/class/fpga_manager/fpga0/state'
+            manager.parent.mkdir(parents=True)
+            manager.write_text('operating\n')
+            with patch.object(cfg.os, 'geteuid', return_value=0):
+                receipt = cfg.audit_root_target(
+                    project=project, source_root=root,
+                    proc_root=root / 'proc', sys_root=root / 'sys')
+            self.assertIs(receipt['hardware_write_authorized'], False)
+            self.assertEqual(receipt['result'],
+                             'READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION')
+            encoded = (t.MARK + json.dumps(receipt) + '\n').encode()
+            parsed = t.parse_receipt('audit', SHA, encoded, project)
+            self.assertEqual(parsed['result'], receipt['result'])
+            forged = dict(receipt, hardware_write_authorized=True)
+            with self.assertRaisesRegex(t.Blocked, 'REMOTE_RESULT_NOT_VERIFIED'):
+                t.parse_receipt('audit', SHA,
+                                (t.MARK + json.dumps(forged) + '\n').encode(),
+                                project)
+            manager.write_text('unknown\n')
+            with patch.object(cfg.os, 'geteuid', return_value=0), \
+                 self.assertRaisesRegex(cfg.StageDenied,
+                                        'GENERIC_AUDIT_TARGET_UNPROVEN'):
+                cfg.audit_root_target(project=project, source_root=root,
+                                      proc_root=root / 'proc',
+                                      sys_root=root / 'sys')
+
     def test_root_diagnostic_after_sudo_prompt_is_classified_not_a_receipt(self):
         code = 'PATH2_APPROVED_PROFILE_MISMATCH'
         output = ("xilinx@z2.example's password: " + t.PROMPT + code + '\r\n').encode()
