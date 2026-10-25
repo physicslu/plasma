@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""One local Blue Pill WordPort session; no FPGA load, reset or restore.
+"""One local Blue Pill WordPort session; no FPGA load, reset or auto-restore.
 
 Development-only Z2 programmer-engine glue. The supervisor must qualify the
 pinned OpenOCD on SWPC, perform protected Download/Identity, forward the private
-UNIX socket over enrolled SSH and reap this process before protected Restore.
+UNIX socket over enrolled SSH and reap this process after the DPIDR attempt.
+On normal success the SWD FPGA Image remains loaded after socket/MMIO cleanup.
+Golden Restore is a separate, explicitly selected protected Root operation;
+uncertain hardware state still requires guarded recovery decisions.
 This script never installs or extends the protected Root executor. Electrical
 conditions are owner-attested, not measured by this program.
 """
