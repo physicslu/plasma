@@ -1631,6 +1631,106 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["objective"], order["objective"])
             self.assertEqual(task["acceptance"], order["acceptance"])
 
+    def test_dynamic_cpu_optional_scope_modes_utf8_and_timeout(self):
+        order = self._order("path2-cli")
+        order.pop("scope")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["verification"], "stdout-sha256")
+        self.assertEqual(task["timeout_seconds"], 120)
+        self.assertEqual(dev.authorize(
+            event, self._context(), self.registry)["execution_capability"],
+            "cpu-only")
+        # The old SHA256 contract remains the default if verification is omitted.
+        self.assertEqual(dev.run_task(task)["verification"], "stdout-sha256")
+
+        order.pop("expected_stdout_sha256")
+        order.update(verification="exit-code", timeout_seconds=180,
+                     argv=["--mode=diagnostic", "z2-site1"])
+        event = self._event(order)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        self.assertEqual(task["timeout_seconds"], 180)
+        self.assertNotIn("expected_stdout_sha256", task)
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            script = work / task["script"]
+            script.parent.mkdir(parents=True)
+            script.write_text(
+                "import sys\nprint('header')\nprint('診斷：正常', sys.argv[1])\n",
+                encoding="utf-8")
+            result = dev.run_task(task, workspace=work, evidence_dir=work)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["verification"], "exit-code")
+            self.assertEqual(result["exit_code"], 0)
+            self.assertIn("診斷：正常", result["first_row"])
+            self.assertEqual(
+                (work / "plasma-path2-stdout.txt").read_text(encoding="utf-8"),
+                "header\n診斷：正常 --mode=diagnostic\n")
+            observed = {}
+            def stub(command, **kwargs):
+                observed["timeout"] = kwargs["timeout"]
+                return subprocess.CompletedProcess(command, 0, "通過\n".encode(), b"")
+            receipt = dev.run_task(task, workspace=work, executor=stub)
+            self.assertEqual(observed["timeout"], 180)
+            self.assertEqual(receipt["verification"], "exit-code")
+
+    def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):
+        base = self._order("path2-cli")
+        base.pop("scope")
+        for change, error in [
+            ({"scope": "guarded-hardware"}, "WORK_ORDER_PATH2_FIELDS_DENIED"),
+            ({"verification": "unchecked"}, "WORK_ORDER_VERIFICATION_DENIED"),
+            ({"verification": "exit-code"}, "WORK_ORDER_EXIT_CODE_DIGEST_CONFLICT"),
+            ({"timeout_seconds": 0}, "WORK_ORDER_TIMEOUT_DENIED"),
+            ({"timeout_seconds": 181}, "WORK_ORDER_TIMEOUT_DENIED"),
+            ({"timeout_seconds": True}, "WORK_ORDER_TIMEOUT_DENIED"),
+            ({"argv": ["../secrets"]}, "TASK_ARGS_DENIED"),
+            ({"argv": ["bad;command"]}, "TASK_ARGS_DENIED"),
+            ({"argv": ["x"] * 17}, "TASK_ARGS_DENIED"),
+            ({"script": "../../path.py"}, "SCRIPT_PATH_DENIED"),
+        ]:
+            with self.subTest(change=change), self.assertRaisesRegex(
+                    dev.Denied, error):
+                dev.request(self._event(base | change), self._context())
+        no_digest = dict(base)
+        no_digest.pop("expected_stdout_sha256")
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_OUTPUT_DIGEST_DENIED"):
+            dev.request(self._event(no_digest), self._context())
+
+        # Path 3 remains unchanged; scope cannot be smuggled into normal Codex.
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_PATH3_FIELDS_DENIED"):
+            dev.request(self._event(self._order("path3-codex",
+                                             scope="host-only")), self._context())
+
+    def test_dynamic_exit_code_cannot_hide_failed_process(self):
+        order = self._order("path2-cli", verification="exit-code")
+        order.pop("expected_stdout_sha256")
+        event = self._event(order)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            script = work / task["script"]
+            script.parent.mkdir(parents=True)
+            script.write_text("import sys\nsys.exit(7)\n", encoding="utf-8")
+            with self.assertRaisesRegex(dev.Denied, "COMMAND_FAILED"):
+                dev.run_task(task, workspace=work, evidence_dir=work)
+            observed = json.loads(
+                (work / "plasma-path2-process.json").read_text(encoding="utf-8"))
+            self.assertEqual(observed["exit_code"], 7)
+            self.assertEqual(observed["verification"], "exit-code")
+            self.assertTrue((work / "plasma-path2-stdout.txt").is_file())
+            self.assertTrue((work / "plasma-path2-stderr.txt").is_file())
+            with patch.object(dev.shutil, "which", return_value=None):
+                with self.assertRaisesRegex(
+                        dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
+                    dev.run_task(task, workspace=work, sandbox=True)
+
     def test_dynamic_path2_stage_project_is_generic_but_still_pinned(self):
         import plasma_path2_runtime_integration as runtime
 
@@ -1871,7 +1971,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
     def test_reject_arbitrary_shell_and_path3_unbounded_hardware(self):
         bad_orders = [
             self._order("path2-cli", script="/bin/sh"),
-            self._order("path2-cli", argv=["-c", "rm"]),
+            self._order("path2-cli", argv=["-c", "rm;sudo"]),
             self._order("path2-cli", capability="vivado-host-build"),
             self._order("path3-codex", scope="guarded-hardware"),
             self._order("path3-codex", capability="path2-stage-contract"),

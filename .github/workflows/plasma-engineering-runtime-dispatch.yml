@@ -521,6 +521,7 @@ jobs:
             ${{ runner.temp }}/plasma-path2-receipt.json.sha256
             ${{ runner.temp }}/plasma-path2-stdout.txt
             ${{ runner.temp }}/plasma-path2-stderr.txt
+            ${{ runner.temp }}/plasma-path2-process.json
             ${{ runner.temp }}/plasma-fpga-build-diagnostics.json
             ${{ runner.temp }}/plasma-fpga-build-diagnostics.json.sha256
             ${{ runner.temp }}/plasma-path2-vivado-host-receipt.json
