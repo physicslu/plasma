@@ -28,15 +28,26 @@ loader.exec_module(bridge)
 
 
 class BridgeContracts(unittest.TestCase):
-    def test_stage_allowlist_blocks_any_remote_call(self):
-        for stage in ("full", "build", "reset", "deploy", "install",
-                      "update-pin", "download;id", "", "--help"):
+    def test_invalid_stage_name_blocks_before_enrollment(self):
+        # Transport checks syntax, not the business-specific stage catalogue.
+        for stage in ("", "--help", "download;id", "audit && id",
+                      "../audit", "Audit", "a" * 33, None, 7):
             with self.subTest(stage=stage), patch.object(
                     bridge, "enrollment") as creds:
-                with self.assertRaisesRegex(bridge.Blocked,
-                                            "STAGE_NOT_ALLOWLISTED"):
+                with self.assertRaisesRegex(bridge.Blocked, "STAGE_INVALID"):
                     bridge.execute(stage, "a" * 40, PROJECT)
                 creds.assert_not_called()
+
+    def test_valid_new_stage_name_passes_transport_format_check(self):
+        # Reaching enrollment does not authorize a remote root operation.
+        for stage in ("audit", "probe", "diagnostics", "download"):
+            with self.subTest(stage=stage), patch.object(
+                    bridge, "enrollment",
+                    side_effect=bridge.Blocked("LOCAL_ENROLLMENT_DENIED")) as creds:
+                with self.assertRaisesRegex(bridge.Blocked,
+                                            "LOCAL_ENROLLMENT_DENIED"):
+                    bridge.execute(stage, "a" * 40, PROJECT)
+                creds.assert_called_once()
 
     def test_invalid_sha_before_secrets(self):
         with patch.object(bridge, "enrollment") as credentials:
@@ -46,7 +57,8 @@ class BridgeContracts(unittest.TestCase):
 
     def test_transport_has_only_fixed_target_and_root_stage_command(self):
         s = FILE.read_text()
-        self.assertIn('STAGES = ("download", "test", "restore")', s)
+        self.assertIn('STAGE_NAME = re.compile(', s)
+        self.assertNotIn('STAGES = ("download", "test", "restore")', s)
         self.assertIn('ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-root-entry"', s)
         self.assertIn('"StrictHostKeyChecking=yes"', s)
         self.assertIn('"SOURCE_SHA_INVALID"', s)
@@ -112,6 +124,32 @@ class BridgeContracts(unittest.TestCase):
                 self.assertIn("StrictHostKeyChecking=yes", args)
                 self.assertIn("xilinx@z2.example", args)
         return outcome, writes
+
+    def test_new_audit_receipt_is_explicitly_not_hardware_authority(self):
+        # Root still controls which verbs exist. Transport must never
+        # interpret an unfamiliar verb's receipt as FPGA load/restore PASS.
+        def payload(result, write=False, stage="audit"):
+            return (bridge.MARK + json.dumps({
+                "stage": stage, "result": result, "project": PROJECT,
+                "boot_id": "fe723a58-621e-444a-9171-0c81d35a3b0a",
+                "hardware_write_authorized": write,
+            }) + "\\n").encode()
+
+        receipt = payload("READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION")
+        observed = bridge.parse_receipt("audit", "a" * 40, receipt, PROJECT)
+        self.assertEqual(observed["stage"], "audit")
+        self.assertEqual(observed["result"],
+                         "READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION")
+        for denied in (
+                payload("LOADED_AND_HELD"),
+                payload("IDENTITY_PASS"),
+                payload("READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION", True),
+                payload("READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION",
+                        False, stage="download"),
+        ):
+            with self.subTest(denied=denied[:75]), self.assertRaises(
+                    bridge.Blocked):
+                bridge.parse_receipt("audit", "a" * 40, denied, PROJECT)
 
     def test_prompt_and_receipt_same_line_after_ssh_exit(self):
         # Exact failure shape: sudo -p omits newline; the receipt follows
