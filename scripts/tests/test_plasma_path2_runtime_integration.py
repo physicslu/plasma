@@ -28,8 +28,7 @@ EVIDENCE = "d" * 64
 
 def approval(task_id="z2-path2-build", **changes):
     val = {"task_id": task_id, "execution_path": "path2-cli",
-           "execution_capability": "vivado-host-build" if
-           task_id == "z2-path2-build" else "path2-stage-contract",
+           "execution_capability": "vivado-host-build",
            "pinned_sha": SHA, "trusted_sha": SHA, "pr_number": 0,
            "auto_download_after_build_success": False,
            "auto_test_after_download_success": False}
@@ -77,10 +76,11 @@ class RouteContracts(unittest.TestCase):
                 workspace=Path(td), approval=approval(),
                 evidence_dir=Path(td), build_driver=build,
                 qualify=decision)
-        self.assertEqual(result["completed"], ["build"])
-        self.assertEqual(result["scope"], "ADAPTER_RECEIPTS_ONLY")
-        self.assertEqual(result["receipts"]["build"]["artifact_sha256"], BIT)
-        self.assertEqual(result["transitions"], [])
+        self.assertEqual(result["status"], "HOST_BUILD_QUALIFIED_NO_HARDWARE")
+        self.assertEqual(result["bit_sha256"], BIT)
+        self.assertEqual(result["hwh_sha256"], HWH)
+        self.assertEqual(result["qualification_evidence_sha256"], EVIDENCE)
+        self.assertEqual(result["physical_load"], "NOT_RUN")
         build.assert_called_once()
         decision.assert_called_once()
 
