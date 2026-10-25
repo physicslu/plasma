@@ -55,7 +55,7 @@ class GenericImageRootTests(unittest.TestCase):
         self.release_data = json.loads(stage.RELEASE_FILE.read_text())
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
-        self.stack.enter_context(patch.object(one_shot, "protected"))
+        self.stack.enter_context(patch.object(guard, "protected"))
         self.stack.enter_context(patch.object(stage, "RELEASE_FILE",
                                              self.folder / "approved.json"))
         self.write_manifest(self.release_data)
@@ -69,9 +69,9 @@ class GenericImageRootTests(unittest.TestCase):
                                              return_value=self.port))
         self.stack.enter_context(patch.object(stage, "live_report",
                                              side_effect=self.port.report))
-        self.stack.enter_context(patch.object(one_shot, "manager_write",
+        self.stack.enter_context(patch.object(guard, "manager_write",
                                              side_effect=self.port.write))
-        self.stack.enter_context(patch.object(one_shot, "run_child",
+        self.stack.enter_context(patch.object(guard, "run_child",
                                              side_effect=self.port.child))
 
     def write_manifest(self, source):
