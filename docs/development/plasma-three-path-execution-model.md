@@ -67,6 +67,8 @@ flowchart TD
 
 **執行者：** SWPC Runner 執行已審查的固定 CLI 命令；不是讓 Codex 推理與改碼。CLI 任務不可偷偷轉為 Path 3。沒有符合 Gate 1 條件的已啟用 Trigger／Runner 時，必須回報 `NOT_RUN` 和具體阻礙，不能把批准訊息當作 GitHub Job 已經啟動。
 
+**Path 2 動態 CPU-only Work Order（PR A；待合併啟用）：** 使用既有 `plasma.development.work_order.v1`，`execution_path: path2-cli`、`capability: cpu-only`，並指定既有 `scripts/experiments/<name>.py` 與 `argv`。省略 `scope` 時視為 `host-only`；明示時只能是 `host-only`。預設 `verification: stdout-sha256`，要求合法的 `expected_stdout_sha256` 並核對 Exit Code 0；明示 `verification: exit-code` 時不得提供 `expected_stdout_sha256`，仍保留實際 Stdout、Stderr、Exit Code 及觀測的 Stdout SHA256，且 **Exit Code 0 不代表功能或硬體驗收 PASS**。動態 CPU-only `timeout_seconds` 預設 120 秒、允許 1–180 秒；`argv` 最多 16 個、每個最長 256 字元，保留安全字元／路徑檢查。Stdout 依 UTF-8 解碼。原 Registry 固定任務仍使用既有 SHA-only 驗證與 40 秒預設值；CPU-only 一律保留 Bubblewrap、Worker Admission 及無裝置／網路命名空間，**本階段不增加任何硬體權限**。
+
 **Development Mode Z2 SSH／sudo 單一憑證原則：** Path 2 與 Path 3 均使用同一 `plasma-codex` 帳號的 `~/.config/plasma/z2-login-smoke.json`，含 `ssh_host`、`ssh_username`、`ssh_password`，以及僅在 sudo 密碼不同時需要的 `sudo_password`。不得讀取或回退至歷史 `z2-dev-credentials.json`；舊的 SWD-05 專用 Route 檔已不屬於 Path 2／3 SSH 憑證契約；兩條 Path 都不得依賴它。`z2-login-known_hosts` 是供兩條 Path 共用的公開 Host Key Pin，**不是第二份憑證**，仍必須保留。舊有憑證須在比對 Host/身分與 sudo 密碼、完成單一憑證及路徑配置寫入／讀回確認後，才由 SWPC worker 本機安全刪除，衝突則停止。此簡化不移除真實 SSH／sudo 驗證、Trusted Main Dispatcher、Root Entry、來源 SHA、B1/B2/B3 與 Restore 保護。
 
 ## 四、Path 3 — SWPC Codex Work
