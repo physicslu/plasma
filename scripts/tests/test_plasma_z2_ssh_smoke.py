@@ -38,7 +38,7 @@ class SSHDeploySmokeContracts(unittest.TestCase):
         self.assertIn("StrictHostKeyChecking=yes", host)
         self.assertIn("ssh -tt", host)
         self.assertIn("--plan", host)
-        self.assertIn("sha256sum -c --status .plasma-path2-source-sha256",
+        self.assertIn("sha256sum --check --status .plasma-path2-source-sha256",
                       target)
         self.assertIn("plasma-path2-approved", target)
         self.assertIn("z2-path2-root-entry", target)
