@@ -2,9 +2,12 @@
 # Z2 installer and live smoke; invoked explicitly over operator SSH.
 set -Eeuo pipefail
 export LC_ALL=C
-[[ $# == 2 && $(id -u) == 0 ]] || { echo 'DENIED: root plus bundle and SHA required'; exit 2; }
-bundle="$1"; sha="$2"
+[[ $# == 3 && $(id -u) == 0 ]] || { echo 'DENIED: root plus bundle, Git SHA, bundle SHA required'; exit 2; }
+bundle="$1"; sha="$2"; bundle_sha="$3"
 [[ "$sha" =~ ^[0-9a-f]{40}$ && -f "$bundle" && ! -L "$bundle" ]] || exit 2
+[[ "$bundle_sha" =~ ^[0-9a-f]{64}$ &&
+   "$(sha256sum "$bundle" | cut -d' ' -f1)" == "$bundle_sha" ]] ||
+  { echo 'DENIED: bundle bytes changed'; exit 2; }
 [[ "$(uname -m)" == armv7l && -x /opt/plasma/python/3.12.13/bin/python3 ]] ||
   { echo 'DENIED: Z2 ARMv7 native Python not installed'; exit 2; }
 root=/root/plasma-path2-approved
