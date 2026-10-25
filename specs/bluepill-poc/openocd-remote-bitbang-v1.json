@@ -1,0 +1,24 @@
+{
+  "schema": "plasma.bluepill.remote_bitbang_poc.v1",
+  "status": "HOST_ONLY_CANDIDATE",
+  "source_repository": "https://github.com/openocd-org/openocd.git",
+  "source_commit": "5088db4c9154ca833c6d558381074b33672e127a",
+  "version": "0.12.0+dev",
+  "required_adapter": "remote_bitbang",
+  "required_transport": "swd",
+  "remote_bitbang_commands": {
+    "direction_out": "O",
+    "direction_in": "o",
+    "swd_clock_data": "d..g",
+    "swd_read": "c",
+    "quit": "Q"
+  },
+  "target": "STM32F103C8T6",
+  "site_id": 1,
+  "hardware_runtime_ready": false,
+  "production_backend_unchanged": "release/openocd.json",
+  "stages": {
+    "github_hosted": "PENDING",
+    "swpc_z2_bluepill": "NOT_RUN"
+  }
+}
