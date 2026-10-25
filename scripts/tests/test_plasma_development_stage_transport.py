@@ -211,6 +211,10 @@ class Contracts(unittest.TestCase):
         self.assertNotIn('pl.hil.path2_f1b_minimal_stage', code)
         self.assertNotIn('PLASMA_DEV_RISK_ACK', code)
         self.assertIn('.plasma-path2-profile', code)
+        self.assertIn('project_profile="$root/$project/.plasma-path2-profile"', code)
+        self.assertIn('"$profile_rel"', code)
+        self.assertIn('PLASMA_ROOT_PROJECT="$project"', code)
+        self.assertIn('^[a-z][a-z0-9_-]{0,31}$', code)
         self.assertIn('PATH2_APPROVED_PROFILE_MISMATCH', code)
         self.assertIn('sha256sum --check --status', code)
         self.assertIn('find "$root" -type f -print0', code)
@@ -228,6 +232,12 @@ class Contracts(unittest.TestCase):
             result = subprocess.run(['/usr/bin/bash', str(path), *args],
                                     capture_output=True, check=False)
             self.assertEqual(result.returncode, 2)
+
+    def test_f1b_module_still_denies_unknown_stage(self):
+        from pl.hil import path2_f1b_minimal_stage as f1b_stage
+        with self.assertRaisesRegex(f1b_stage.LiveStageDenied,
+                                    'STAGE_NOT_ALLOWLISTED'):
+            f1b_stage.run('audit')
 
     def test_project_pinned_receipt_and_no_duplicate(self):
         receipt = {'stage': 'test', 'project': PROJECT,
