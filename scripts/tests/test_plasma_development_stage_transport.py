@@ -17,6 +17,33 @@ SHA = 'a' * 40
 PROJECT = 'pl/projects/z2-fixed-unified-site1'
 
 class Contracts(unittest.TestCase):
+    def test_bounded_audit_stage_reaches_enrollment_without_remote_launch(self):
+        with patch.object(t, 'enrollment', side_effect=t.Blocked('LOCAL_ENROLLMENT_DENIED')) as enrollment, \
+             patch.object(t.subprocess, 'Popen') as launch:
+            with self.assertRaisesRegex(t.Blocked, 'LOCAL_ENROLLMENT_DENIED'):
+                t.execute('audit', SHA, 'pl/projects/z2-bluepill-rbb')
+            enrollment.assert_called_once_with()
+            launch.assert_not_called()
+        for stage in ('', 'Audit', 'audit;id', '../audit', 'a' * 33):
+            with patch.object(t, 'enrollment') as enrollment:
+                with self.assertRaisesRegex(t.Blocked, 'STAGE_INVALID'):
+                    t.execute(stage, SHA, PROJECT)
+                enrollment.assert_not_called()
+
+    def test_audit_receipt_cannot_claim_hardware_authority(self):
+        project = 'pl/projects/z2-bluepill-rbb'
+        receipt = {'stage': 'audit', 'project': project,
+                   'boot_id': 'test-boot-id',
+                   'result': 'READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION',
+                   'hardware_write_authorized': False}
+        encoded = (t.MARK + json.dumps(receipt) + '\n').encode()
+        self.assertEqual(t.parse_receipt('audit', SHA, encoded, project)['result'],
+                         receipt['result'])
+        receipt['hardware_write_authorized'] = True
+        forged = (t.MARK + json.dumps(receipt) + '\n').encode()
+        with self.assertRaisesRegex(t.Blocked, 'REMOTE_RESULT_NOT_VERIFIED'):
+            t.parse_receipt('audit', SHA, forged, project)
+
     def test_no_installed_host_dependency_or_candidate_import(self):
         source = Path(t.__file__).read_text() + Path(r.__file__).read_text()
         for forbidden in ('/usr/local/libexec/plasma/z2-path2-f1b-bridge',
