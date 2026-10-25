@@ -294,11 +294,11 @@ class LifecycleTests(unittest.TestCase):
                                       request=bad, bit_sha256=BIT)
             self.assertNotIn("test", port.actions)
 
-    def test_no_live_target_adapter_or_cli_registered(self):
+    def test_held_provider_is_not_the_direct_root_dispatch_backend(self):
         code = (ROOT / "scripts/plasma_path2_runtime_integration.py").read_text()
         dispatch = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
-        self.assertIn("PATH2_TRUSTED_BRIDGE_NOT_INSTALLED", code)
-        self.assertIn("return integration.registered_hardware_stage", dispatch)
+        self.assertIn("def direct_root_operation(", code)
+        self.assertIn("return integration.direct_root_operation", dispatch)
         prov = (ROOT / "scripts/plasma_path2_held_provider.py").read_text()
         self.assertNotIn("if __name__ == \"__main__\"", prov)
         self.assertNotIn("subprocess", prov)
