@@ -18,12 +18,11 @@ import uuid
 
 from pl.hil import fpga_image_guard as guard
 from pl.hil import fpga_image_admission as admission
-from pl.hil.swd04 import one_shot
 
 ROOT = Path(__file__).resolve().parents[2]
 RELEASE_FILE = ROOT / "pl/hil/approved-fpga-image.json"
 STATE = ROOT / ".plasma-fpga-image-deployment-state.json"
-CHILD = one_shot.OWNER_DIR / "fpga-image-identity.json"
+CHILD = guard.OWNER_DIR / "fpga-image-identity.json"
 SCHEMA = "plasma.fpga.image-deployment.v1"
 STATUS = ("RECOVERY", "IMAGE", "DOWNLOAD_IN_FLIGHT", "TEST_IN_FLIGHT",
           "RESTORE_IN_FLIGHT", "UNKNOWN")
@@ -79,7 +78,7 @@ def read_approved_release() -> ApprovedImage:
     JSON merely describes the publisher-approved release; it cannot authorize
     itself or override the protected source closure.
     """
-    one_shot.protected(RELEASE_FILE)
+    guard.protected(RELEASE_FILE)
     need(RELEASE_FILE.is_file() and 0 < RELEASE_FILE.stat().st_size <= 8192,
          "IMAGE_RELEASE_FILE_DENIED")
     try:
@@ -201,13 +200,13 @@ def trusted_local() -> None:
                  ROOT / "pl/hil/fpga_image_guard.py",
                  ROOT / "pl/hil/fpga_image_admission.py",
                  ROOT / "software/python/plasma_interfaces/linux_mmio.py"):
-        one_shot.protected(path, file=path != ROOT)
-    one_shot.OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
-    one_shot.protected(one_shot.OWNER_DIR, file=False)
+        guard.protected(path, file=path != ROOT)
+    guard.OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
+    guard.protected(guard.OWNER_DIR, file=False)
 
 
 def _state_file_trusted() -> None:
-    one_shot.protected(STATE)
+    guard.protected(STATE)
     need(STATE.stat().st_mode & 0o077 == 0 and STATE.stat().st_size <= 4096,
          "STATE_FILE_NOT_PRIVATE")
 
@@ -318,7 +317,7 @@ def run(operation: str) -> dict:
             record.update(status="DOWNLOAD_IN_FLIGHT", last_error="")
             write_state(record)
             try:
-                one_shot.manager_write(release.firmware_name)
+                guard.manager_write(release.firmware_name)
                 after = live_report(port, release, release.firmware_name)
                 record.update(status="IMAGE", image=release.firmware_name,
                               download_count=record["download_count"] + 1,
@@ -334,12 +333,12 @@ def run(operation: str) -> dict:
                     "auto_test": False}
         if operation == "test":
             if CHILD.exists():
-                one_shot.protected(CHILD)
+                guard.protected(CHILD)
                 CHILD.unlink()
             record.update(status="TEST_IN_FLIGHT", last_error="")
             write_state(record)
             try:
-                one_shot.run_child([sys.executable, "-m",
+                guard.run_child([sys.executable, "-m",
                                     "pl.hil.fpga_image_root", "--identity-child"])
                 result = json.loads(CHILD.read_text())
                 need(type(result) is dict and
@@ -379,7 +378,7 @@ def run(operation: str) -> dict:
         record.update(status="RESTORE_IN_FLIGHT", last_error="")
         write_state(record)
         try:
-            one_shot.manager_write(release.recovery_name)
+            guard.manager_write(release.recovery_name)
             after = live_report(port, release, release.recovery_name)
             record.update(status="RECOVERY", image=release.recovery_name,
                           restore_count=record["restore_count"] + 1,
@@ -408,7 +407,7 @@ def identity_child() -> int:
     need(state["boot_id"] ==
          (guard.PROC / "sys/kernel/random/boot_id").read_text().strip() and
          ": writing " + release.firmware_name + " to " in
-         one_shot.manager_last_load(), "IDENTITY_IMAGE_NOT_CURRENT")
+         guard.manager_last_load(), "IDENTITY_IMAGE_NOT_CURRENT")
     reviewed = ROOT / "software/python/plasma_interfaces/linux_mmio.py"
     spec = importlib.util.spec_from_file_location("fpga_image_native_mmio", reviewed)
     need(spec is not None and spec.loader is not None,
@@ -424,7 +423,7 @@ def identity_child() -> int:
         stats = mmio.stats()
         need(stats.read32 == len(release.identity_words) and stats.write32 == 0,
              "NATIVE_MMIO_ACCESS_COUNT_CHANGED")
-    one_shot.record_json(CHILD, {"observed": observed})
+    guard.record_json(CHILD, {"observed": observed})
     return 0
 
 
