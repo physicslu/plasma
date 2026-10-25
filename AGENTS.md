@@ -18,6 +18,12 @@ Prototype outcomes require the smallest authentic build/test/HIL result. Hosted 
 
 For healthy normal development aim for at most 180 seconds of pre-experiment checks; this is an objective, **not** permission to omit real safeguards. Preserve legal voltages, current PL/MMIO ownership, artifact identity, rollback image and recovery. Stop on actual SIGBUS, conflicting drivers, dangerous power/voltage, missing root authority or uncertain restoration. Never equate a file hash or CI green check with physical safety.
 
+### FPGA PS/PL Image pairing (normative)
+
+A new FPGA Image is delivered to PS **with its companion Manifest**; the generic protected Root validates the actual BIN SHA256 against that Manifest, applicable Z2 board/FPGA part, ABI/identity, runtime ownership and recovery preconditions. Do **not** reintroduce a per-Image approval token, fixed `approved-fpga-image.json` release allowlist, `runtime_admitted` flag or Root source-commit change per new Image. Source Pin protects **Root executable code**, not the Image data. A valid paired Manifest is consistency evidence, not a cryptographic assertion of publisher authenticity.
+
+**Image A → Image B must support direct FPGA Manager replacement without loading Golden between them**, provided the previous same-boot state and current FPGA Manager provenance are known and the actual FPGA owner/lock and new BIN/Manifest checks pass. Golden remains a recovery resource, not a normal switching gate. Never bypass hardware conflicts, failed loads or UNKNOWN/unsafe in-flight state.
+
 ### 1A.1 Development Mode — single-owner, shared-runner, efficiency-first (normative)
 
 - **No overengineering.** Prefer the current Work Order, generic Dispatcher, trusted-main stage adapter, existing scripts and Runner. Do not introduce a per-task Workflow, Registry ID, Runner, security platform, evidence system or third approval gate for ordinary development. A genuinely new mechanism with new consequences needs explicit approval in Gate 1.
