@@ -120,7 +120,7 @@ class GenericImageRootTests(unittest.TestCase):
         self.assertNotIn("authorization", sample)
         self.assertNotIn("runtime_admitted", sample)
         self.assertEqual(sample["firmware_sha256"],
-                         "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6b927d6c779e13fe9ec1a1")
+                         "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1")
         self.assertEqual(sample["axi_base"], 0x40008000)
         self.assertEqual(sample["axi_bytes"], 4096)
         self.assertIsNone(sample["site_bitmap_offset"])
