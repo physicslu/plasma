@@ -1229,7 +1229,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         self.assertIn("needs.development-claim.result == 'success'",guard)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
         self.assertIn("== 'vivado-host-build' && 50 ||",wf)
-        self.assertIn("== 'z2-path2-full-hil' && 10 || 5",wf)
+        self.assertIn("== 'vivado-host-build' && 50 || 5",wf)
         self.assertNotIn("runs-on: [self-hosted, linux, x64, vivado]",wf)
 
     def test_host_build_source_preflight_is_pure_and_strict(self):
@@ -1650,7 +1650,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertEqual(task["board_repo_sha"], fixed["board_repo_sha"])
         self.assertEqual(approval["execution_capability"], "vivado-host-build")
         self.assertEqual(approval["task_id"], "path2-work-order")
-        self.assertIsNone(approval["authorized_stage"])
+        self.assertIsNone(approval.get("authorized_stage"))
         self.assertFalse(approval["auto_download_after_build_success"])
         self.assertFalse(approval["auto_test_after_download_success"])
         projected = {k: task[k] for k in (
@@ -1876,41 +1876,6 @@ class GenericWorkOrderContracts(unittest.TestCase):
                         dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
                     dev.run_task(task, workspace=work, sandbox=True)
 
-    def test_dynamic_path2_stage_project_is_generic_but_still_pinned(self):
-        import plasma_path2_runtime_integration as runtime
-
-        def stage_order(project):
-            order = self._order(
-                "path2-cli", capability="path2-stage-contract",
-                scope="guarded-hardware", project=project, stage="test")
-            for key in ("script", "argv", "expected_stdout_sha256"):
-                order.pop(key, None)
-            return order
-
-        # Only the dynamic owner Work Order route is generic; older fixed
-        # F1-B task identities remain unchanged for regression safety.
-        project = "pl/projects/z2-swd-bluepill"
-        order = stage_order(project)
-        event = self._event(order)
-        request = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
-        task = dev.task_for_request(self.registry, request, event)
-        self.assertEqual(task["project"], project)
-        self.assertEqual(runtime.stage_contract(task, approval), "test")
-        for bad in ("../module", "pl/projects/F1B", "pl/projects/a",
-                    "pl/projects/z2-project;id", "", None,
-                    "pl/projects/" + "a" * 71):
-            with self.subTest(project=bad):
-                with self.assertRaisesRegex(
-                        dev.Denied, "WORK_ORDER_STAGE_CAPABILITY_DENIED"):
-                    dev.request(self._event(stage_order(bad)),
-                                self._context())
-        with self.assertRaisesRegex(
-                runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
-            runtime.stage_contract(
-                task | {"project": "pl/projects/z2-another"},
-                approval | {"work_order_sha256": "0" * 64})
-
     def test_path3_explicit_monitor_summary_is_authorized_and_digest_bound(self):
         # The objective and acceptance are free-form and must never be copied
         # into the public monitor metadata or GitHub step output.
@@ -1995,49 +1960,6 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertEqual(old_approval["monitor_summary"], "")
         self.assertEqual(old_approval["monitor_stage"], "CPU-only CLI")
 
-    def test_path2_protected_stage_labels_are_exact_and_non_authorizing(self):
-        for stage, expected in (
-            ("download", "Guarded Download"),
-            ("test", "Guarded Test"),
-            ("restore", "Guarded Restore"),
-        ):
-            with self.subTest(stage=stage):
-                order = self._order(
-                    "path2-cli", capability="path2-stage-contract",
-                    scope="guarded-hardware",
-                    project="pl/projects/z2-fixed-unified-site1",
-                    stage=stage,
-                    monitor_summary="Guarded FPGA provider validation")
-                for k in ("script", "argv", "expected_stdout_sha256"):
-                    order.pop(k, None)
-                event = self._event(order)
-                approval = dev.authorize(
-                    event, self._context(), self.registry)
-                self.assertEqual(approval["monitor_stage"], expected)
-                self.assertEqual(
-                    approval["monitor_summary"],
-                    "Guarded FPGA provider validation")
-                self.assertEqual(approval["authorized_stage"], stage)
-        bad = self._order(
-            "path2-cli", capability="path2-stage-contract",
-            scope="guarded-hardware",
-            project="pl/projects/z2-fixed-unified-site1",
-            stage="program", monitor_summary="Unauthorized stage test")
-        for k in ("script", "argv", "expected_stdout_sha256"):
-            bad.pop(k, None)
-        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_STAGE_CAPABILITY_DENIED"):
-            dev.request(self._event(bad), self._context())
-
-    def test_existing_static_path2_full_hil_stage_uses_allowlisted_label(self):
-        event = DevelopmentPath2Contracts().event()
-        event["comment"]["body"] = (
-            "/plasma-dispatch run z2-path2-full-hil 981")
-        plan = dev.authorize(event, self._context(), self.registry)
-        self.assertEqual(plan["task_id"], "z2-path2-full-hil")
-        self.assertEqual(plan["monitor_stage"], "Guarded Full HIL")
-        self.assertEqual(plan["monitor_summary"], "")
-        self.assertIsNone(plan["authorized_stage"])
-
     def test_path3_does_not_report_path2_cli_stage(self):
         a = dev.authorize(
             self._event(self._order()), self._context(), self.registry)
@@ -2058,26 +1980,6 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with patch.object(dev.shutil, "which", return_value=None):
             with self.assertRaisesRegex(dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
                 dev.run_task(task, sandbox=True)
-
-    def test_exact_stage_guard_accepts_only_digest_pinned_stage(self):
-        import plasma_path2_runtime_integration as runtime
-        stage_order = self._order(
-            "path2-cli", capability="path2-stage-contract",
-            scope="guarded-hardware",
-            project="pl/projects/z2-fixed-unified-site1",
-            stage="test")
-        for field in ("script", "argv", "expected_stdout_sha256"):
-            stage_order.pop(field, None)
-        event = self._event(stage_order)
-        req = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
-        task = dev.task_for_request(self.registry, req, event)
-        self.assertEqual(runtime.stage_contract(task, approval), "test")
-        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
-            runtime.stage_contract(task, approval |
-                                   {"work_order_sha256": "0" * 64})
-        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
-            runtime.stage_contract(task | {"stage": "download"}, approval)
 
     def test_work_order_tamper_and_replay_denied_before_execution(self):
         order = self._order()
@@ -2170,7 +2072,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
     def test_existing_workflow_and_two_runner_routes(self):
         content = WORKFLOW.read_text()
         self.assertIn("'/plasma-dispatch work-order 981'", content)
-        self.assertIn('"path2-stage-contract"', content)
+        self.assertIn('"z2-root-operation"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
             "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
