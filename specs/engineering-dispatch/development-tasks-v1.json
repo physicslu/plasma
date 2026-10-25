@@ -58,30 +58,6 @@
       "toolchain": "2026.1",
       "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"
     },
-    "z2-path2-download": {
-      "execution_path": "path2-cli",
-      "capability": "path2-stage-contract",
-      "project": "pl/projects/z2-fixed-unified-site1",
-      "stage": "download"
-    },
-    "z2-path2-testing": {
-      "execution_path": "path2-cli",
-      "capability": "path2-stage-contract",
-      "project": "pl/projects/z2-fixed-unified-site1",
-      "stage": "test"
-    },
-    "z2-path2-restore": {
-      "execution_path": "path2-cli",
-      "capability": "path2-stage-contract",
-      "project": "pl/projects/z2-fixed-unified-site1",
-      "stage": "restore"
-    },
-    "z2-path2-full-hil": {
-      "execution_path": "path2-cli",
-      "capability": "path2-stage-contract",
-      "project": "pl/projects/z2-fixed-unified-site1",
-      "stage": "full"
-    },
     "candidate-dispatcher-e2e-1083": {
       "execution_path": "path3-codex",
       "output_path": "scripts/experiments/plasma_auto4_branch_codex_generated.py",
