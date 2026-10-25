@@ -1,17 +1,18 @@
-# Historical scenario command: PYNQ-Z2 PSPL-02 / SWD-00 development HIL
+# HISTORICAL / SCENARIO-SPECIFIC — PYNQ-Z2 PSPL-02 / SWD-00 HIL
 
 > **Only for the PSPL-02／SWD-00 internal-loopback experiment.** The fixed `IDENTITY → PSPL02 → SWD00` sequence and its no-external-DUT scope are **scenario-specific**, not the execution instructions for all Path 3 Codex Work Orders. Current general Path 3 is the owner Gate 1 assignment passed by `scripts/plasma_development_dispatch.py` under `AGENTS.md`, with Codex free to choose in-scope engineering steps. Existing OS permissions, image/ownership and Golden Restore safeguards remain effective. This historic assignment is not evidence of today's Z2 state.
 
-This is the **single reusable assignment** for a Codex agent operating on
-the owner's real integration host. It inherits the root `AGENTS.md`;
-it is **not** a claim that the present `pl.hil.pspl02.runner` loads firmware
-or restores the FPGA. The current runner supplies preflight and allowlisted
-MMIO stages, while supervised load/recovery must be orchestrated.
+This is a **historical, scenario-specific example assignment**, **not the
+canonical or reusable template for new Path 3 tasks**. It inherits the root
+`AGENTS.md`. References to the PSPL-02 runner, preflight, allowlisted MMIO
+stages and load/recovery describe the original experiment; inspect the
+current implementation before relying on them. This document grants no new
+hardware authorization or runtime capability.
 
 ## Invocation
 
-With an existing Codex desktop/terminal session that has authorized access
-to SWPC and the PYNQ-Z2, **send this task**:
+**Historical invocation example only:** for the original explicitly approved
+PSPL-02／SWD-00 experiment, the assignment text was:
 
 ```text
 PLASMA / Z2 / HIL-PSPL-02 + SWD-00 / EXECUTE
