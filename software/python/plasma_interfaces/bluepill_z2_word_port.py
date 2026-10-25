@@ -2,7 +2,8 @@
 
 Reuses PLASMA's existing LinuxMMIO/SiteMMIO and SHA-pinned ARMv7 DMB.
 The hardware owner must independently qualify BIT/HWH, bus aperture,
-electrical safety, exclusive access, and original-image restoration.
+electrical safety, exclusive access, and Golden recovery availability.
+Successful sessions leave the SWD Image loaded; Restore is separately selected.
 A regular-file test barrier never grants hardware admission.
 """
 from __future__ import annotations
