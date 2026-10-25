@@ -24,6 +24,8 @@ A new FPGA Image is delivered to PS **with its companion Manifest**; the generic
 
 **Image A → Image B must support direct FPGA Manager replacement without loading Golden between them**, provided the previous same-boot state and current FPGA Manager provenance are known and the actual FPGA owner/lock and new BIN/Manifest checks pass. Golden remains a recovery resource, not a normal switching gate. Never bypass hardware conflicts, failed loads or UNKNOWN/unsafe in-flight state.
 
+**Normal SWD PoC completion is Keep Loaded, not Restore.** After Download → Identity → DPIDR, cleanly close OpenOCD, the WordPort session and MMIO lease, release the owner lock and leave the verified SWD FPGA Image loaded. Invoke the existing protected Golden Restore only when explicitly selected or when a documented fault-recovery decision requires it; never auto-restore solely because a successful experiment ended. Keep UNKNOWN/in-flight state handling fail-closed.
+
 ### 1A.1 Development Mode — single-owner, shared-runner, efficiency-first (normative)
 
 - **No overengineering.** Prefer the current Work Order, generic Dispatcher, trusted-main stage adapter, existing scripts and Runner. Do not introduce a per-task Workflow, Registry ID, Runner, security platform, evidence system or third approval gate for ordinary development. A genuinely new mechanism with new consequences needs explicit approval in Gate 1.
