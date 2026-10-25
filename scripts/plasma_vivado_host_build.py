@@ -228,10 +228,15 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
             approval.get("execution_capability") == "vivado-host-build" and
             approval.get("execution_path") == execution_path and
             approval.get("task_id") in (
-                ("fixed-site1-vivado-host-build", "z2-path2-build")
+                ("fixed-site1-vivado-host-build", "z2-path2-build",
+                 "path2-work-order")
                 if execution_path == "path2-cli"
                 else ("f1b-path3-codex-vivado-build",)
             ) and
+            (approval.get("task_id") != "path2-work-order" or
+             (type(approval.get("work_order_sha256")) is str and
+              re.fullmatch(r"[0-9a-f]{64}",
+                           approval["work_order_sha256"]) is not None)) and
             type(approval.get("pinned_sha")) is str and
             BOARD_SHA40.fullmatch(approval["pinned_sha"]) is not None and
             type(approval.get("trusted_sha")) is str and

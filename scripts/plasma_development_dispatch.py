@@ -222,6 +222,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
                                "expected_stdout_sha256", "verification",
                                "timeout_seconds", "project", "stage",
+                               "toolchain", "board_repo_sha",
                                 "monitor_summary"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
@@ -308,6 +309,18 @@ def parse_dynamic_work_order(event: object) -> dict:
         timeout_seconds = order.get("timeout_seconds", 120)
         require(type(timeout_seconds) is int and
                 1 <= timeout_seconds <= 180, "WORK_ORDER_TIMEOUT_DENIED")
+    elif capability == "vivado-host-build":
+        # Development Mode uses the same fixed Site 1 host-only build engine.
+        # No arbitrary project, shell, Tcl driver, stage or hardware authority.
+        require(path == "path2-cli" and scope in (None, "host-only")
+                and {"project", "toolchain", "board_repo_sha"} <= set(order)
+                and set(order) <= base | optional_ref |
+                {"project", "toolchain", "board_repo_sha", "monitor_summary"}
+                and order["project"] == "pl/projects/z2-fixed-unified-site1"
+                and order["toolchain"] == "2026.1"
+                and type(order["board_repo_sha"]) is str
+                and SHA40.fullmatch(order["board_repo_sha"]) is not None,
+                "WORK_ORDER_VIVADO_HOST_BUILD_DENIED")
     elif capability == "path2-stage-contract":
         require(scope == "guarded-hardware" and
                 {"project", "stage"} <= set(order) and
@@ -384,7 +397,7 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
     if "native_preflight" in order:
         task["native_preflight"] = order["native_preflight"]
     for key in ("script", "argv", "expected_stdout_sha256",
-                "project", "stage"):
+                "project", "stage", "toolchain", "board_repo_sha"):
         if key in order:
             task[key] = order[key]
     return task
@@ -614,7 +627,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                 approval.get("execution_capability") == "vivado-host-build" and
                 approval.get("execution_path") == "path2-cli" and
                 approval.get("task_id") in (
-                    "fixed-site1-vivado-host-build", "z2-path2-build") and
+                    "fixed-site1-vivado-host-build", "z2-path2-build",
+                    DYNAMIC_TASKS["path2-cli"]) and
                 type(approval.get("pinned_sha")) is str and
                 SHA40.fullmatch(approval["pinned_sha"]) is not None and
                 type(approval.get("trusted_sha")) is str and
@@ -625,6 +639,36 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                   approval["pr_number"] > 0 and
                   approval["pinned_sha"] != approval["trusted_sha"])),
                 "HOST_BUILD_APPROVAL_REQUIRED")
+        if approval["task_id"] == DYNAMIC_TASKS["path2-cli"]:
+            # Project the authenticated Work Order to the existing fixed
+            # five-field Build Engine contract; do not relax its preflight.
+            require(type(task) is dict and
+                    set(task) >= {"execution_path", "capability", "objective",
+                                  "acceptance", "work_order_sha256",
+                                  "work_order_scope", "project", "toolchain",
+                                  "board_repo_sha"} and
+                    set(task) <= {"execution_path", "capability", "objective",
+                                  "acceptance", "work_order_sha256",
+                                  "work_order_scope", "project", "toolchain",
+                                  "board_repo_sha", "monitor_summary"} and
+                    task["execution_path"] == "path2-cli" and
+                    task["capability"] == "vivado-host-build" and
+                    task["work_order_scope"] == "host-only" and
+                    task["project"] == "pl/projects/z2-fixed-unified-site1" and
+                    task["toolchain"] == "2026.1" and
+                    type(task["board_repo_sha"]) is str and
+                    SHA40.fullmatch(task["board_repo_sha"]) is not None and
+                    type(task["work_order_sha256"]) is str and
+                    SHA256.fullmatch(task["work_order_sha256"]) is not None and
+                    approval.get("work_order_sha256") ==
+                    task["work_order_sha256"] and
+                    approval.get("authorized_stage") is None and
+                    approval.get("auto_download_after_build_success") is False and
+                    approval.get("auto_test_after_download_success") is False,
+                    "HOST_BUILD_DYNAMIC_WORK_ORDER_DENIED")
+            task = {key: task[key] for key in (
+                "execution_path", "capability", "project", "toolchain",
+                "board_repo_sha")}
         # A request requiring an unregistered live Download provider must
         # fail before importing candidate Build code or starting Vivado.
         if (approval["task_id"] == "z2-path2-build" and
