@@ -232,3 +232,66 @@ def disabled_hardware_stage(task: dict, approval: dict) -> dict:
     """
     stage_contract(task, approval)
     raise RuntimeDenied("PATH2_TRUSTED_BRIDGE_NOT_INSTALLED")
+
+
+def direct_root_operation(task: dict, approval: dict) -> dict:
+    """Path 2 direct CLI-to-existing-Root; bypass legacy Stage/Profile gates.
+
+    Only authenticated, digest-pinned owner Work Orders reach this code.
+    Hardware evidence still comes solely from the protected Root transport.
+    """
+    require(type(task) is dict and type(approval) is dict and
+            set(task) >= {"execution_path", "capability", "objective",
+                          "acceptance", "work_order_sha256",
+                          "work_order_scope", "operation"} and
+            set(task) <= {"execution_path", "capability", "objective",
+                          "acceptance", "work_order_sha256",
+                          "work_order_scope", "operation", "monitor_summary"} and
+            task["execution_path"] == "path2-cli" and
+            task["capability"] == "z2-root-operation" and
+            task["work_order_scope"] == "guarded-hardware" and
+            task["operation"] in ("download", "test", "restore") and
+            type(task["work_order_sha256"]) is str and
+            re.fullmatch("[0-9a-f]{64}", task["work_order_sha256"]) is not None,
+            "PATH2_ROOT_OPERATION_TASK_DENIED")
+    operation = task["operation"]
+    require(approval.get("task_id") == "path2-work-order" and
+            approval.get("execution_path") == "path2-cli" and
+            approval.get("execution_capability") == "z2-root-operation" and
+            approval.get("authorized_operation") == operation and
+            approval.get("work_order_sha256") == task["work_order_sha256"] and
+            coordinator._sha(approval.get("pinned_sha"), 40) and
+            coordinator._sha(approval.get("trusted_sha"), 40) and
+            type(approval.get("pr_number")) is int and
+            ((approval["pr_number"] == 0 and
+              approval["pinned_sha"] == approval["trusted_sha"]) or
+             (approval["pr_number"] > 0 and
+              approval["pinned_sha"] != approval["trusted_sha"])) and
+            approval.get("auto_download_after_build_success") is False and
+            approval.get("auto_test_after_download_success") is False,
+            "PATH2_ROOT_OPERATION_APPROVAL_DENIED")
+    try:
+        receipt = transport.execute_operation(operation, approval["pinned_sha"])
+    except transport.Blocked as exc:
+        raise RuntimeDenied(transport.failure_code(exc)) from None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        raise RuntimeDenied("UNKNOWN") from None
+    require(type(receipt) is dict and
+            receipt.get("stage") == operation and
+            receipt.get("source_sha") == approval["pinned_sha"] and
+            receipt.get("project") == "pl/projects/z2-fixed-unified-site1" and
+            receipt.get("real_z2") is True and
+            type(receipt.get("boot_id")) is str and
+            len(receipt["boot_id"]) >= 8 and
+            receipt.get("result") in {
+                "download": {"LOADED_AND_HELD"},
+                "test": {"IDENTITY_PASS", "DPIDR_PASS"},
+                "restore": {"RESTORED_VERIFIED", "ALREADY_RESTORED"},
+            }[operation],
+            "PATH2_ROOT_OPERATION_RECEIPT_DENIED")
+    return {
+        "status": "REAL_Z2_ROOT_OPERATION_EVIDENCE_REVIEW_REQUIRED",
+        "operation": operation, "source_sha": approval["pinned_sha"],
+        "boot_id": receipt["boot_id"], "result": receipt["result"],
+        "real_z2": True, "auto_next_operation": False,
+    }
