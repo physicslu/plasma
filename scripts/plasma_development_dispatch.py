@@ -29,6 +29,15 @@ MANIFEST = ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
 VERSION = "plasma.engineering.development_tasks.v1"
 COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
+# Legacy fixed Task ID bindings only. Dynamic Stage Work Orders keep their
+# separate owner/SHA/stage admission and never inherit a "full" capability.
+LEGACY_PATH2_STAGE_TASKS = {
+    "z2-path2-download": "download",
+    "z2-path2-testing": "test",
+    "z2-path2-restore": "restore",
+    "z2-path2-full-hil": "full",
+}
+LEGACY_PATH2_STAGE_PROJECT = "pl/projects/z2-fixed-unified-site1"
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
 # Explicit operator-public metadata; never derived from objective/acceptance.
@@ -109,17 +118,12 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
                 "A2_TASK_BINDING_DENIED")
         return task
-    if task_id in ("z2-path2-download", "z2-path2-testing",
-                    "z2-path2-restore", "z2-path2-full-hil"):
-        expected = {"z2-path2-download": "download",
-                    "z2-path2-testing": "test",
-                    "z2-path2-restore": "restore",
-                    "z2-path2-full-hil": "full"}
+    if task_id in LEGACY_PATH2_STAGE_TASKS:
         require(execution_path == "path2-cli" and set(task) == {
             "execution_path", "capability", "project", "stage",
         } and task["capability"] == "path2-stage-contract"
-                and task["project"] == "pl/projects/z2-fixed-unified-site1"
-                and task["stage"] == expected[task_id],
+                and task["project"] == LEGACY_PATH2_STAGE_PROJECT
+                and task["stage"] == LEGACY_PATH2_STAGE_TASKS[task_id],
                 "PATH2_STAGE_TASK_FIELDS_DENIED")
         return task
     if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
@@ -470,9 +474,9 @@ def request(event: object, context: dict) -> dict:
     auto_testing = " --auto-testing" in flags
     require(not auto_download or task_id == "z2-path2-build",
             "PATH2_AUTO_DOWNLOAD_TASK_DENIED")
-    require(not auto_testing or task_id in (
-        "z2-path2-build", "z2-path2-download"),
-        "PATH2_AUTO_TEST_TASK_DENIED")
+    require(not auto_testing or task_id == "z2-path2-build"
+            or LEGACY_PATH2_STAGE_TASKS.get(task_id) == "download",
+            "PATH2_AUTO_TEST_TASK_DENIED")
     return {
         "task_id": task_id,
         "auto_download_after_build_success": auto_download,
@@ -688,7 +692,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                          evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "path2-stage-contract":
         import plasma_path2_runtime_integration as integration
-        if approval is not None and approval.get("task_id") == "z2-path2-full-hil":
+        if (approval is not None and
+                LEGACY_PATH2_STAGE_TASKS.get(approval.get("task_id")) == "full"):
             return integration.full_hil_sequence(task, approval)
         return integration.registered_hardware_stage(task, approval)
     if task.get("capability") == "z2-cpu-only":
