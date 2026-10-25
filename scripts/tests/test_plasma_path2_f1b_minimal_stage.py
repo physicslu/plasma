@@ -84,6 +84,72 @@ class RepeatableStageTests(unittest.TestCase):
     def state(self):
         return stage.read_state()
 
+    def test_source_owned_image_release_is_the_only_admitted_candidate(self):
+        """Source-pinned release, not an AP-supplied image/module selector."""
+        from dataclasses import replace
+        release = stage.approved_image(stage.F1B_APPROVED_IMAGE)
+        self.assertEqual(release.firmware_name, stage.CANDIDATE.name)
+        self.assertEqual(release.recovery_name, "base.bin")
+        self.assertEqual(release.firmware_sha256, f1b.BIN_SHA)
+        self.assertEqual(release.recovery_sha256, f1b.BASE_SHA)
+        self.assertEqual(release.abi_version, f1b.IDENTITY[4])
+        for change in (
+            {"image_id": "user-chosen-unreviewed"},
+            {"firmware_name": "unreviewed.bin"},
+            {"firmware_sha256": "0" * 64},
+            {"recovery_sha256": "0" * 64},
+            {"board_id": "different-board"},
+            {"fpga_part": "another-fpga"},
+            {"abi_version": 2},
+            {"site_bitmap": 255},
+            {"identity_words": ((0, 0),)},
+        ):
+            with self.subTest(change=change), self.assertRaisesRegex(
+                    stage.LiveStageDenied, "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED"):
+                stage.approved_image(replace(release, **change))
+        with self.assertRaisesRegex(stage.LiveStageDenied,
+                                    "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED"):
+            stage.approved_image({"image_id": release.image_id})
+        self.assertEqual(self.target.writes, [])
+
+    def test_ap_metadata_claim_is_comparison_not_image_authority(self):
+        release = stage.F1B_APPROVED_IMAGE
+        metadata = dict(board_id=release.board_id,
+                        fpga_part=release.fpga_part,
+                        abi_version=release.abi_version,
+                        identity_words=dict(release.identity_words))
+        stage.verify_image_metadata(release, **metadata)
+        for changed in (
+            {"board_id": "other-board"},
+            {"fpga_part": "xc7z010clg400-1"},
+            {"abi_version": 0},
+            {"identity_words": {0: f1b.IDENTITY[0]}},
+        ):
+            with self.subTest(changed=changed), self.assertRaises(
+                    stage.LiveStageDenied):
+                stage.verify_image_metadata(release, **(metadata | changed))
+        from dataclasses import replace
+        with self.assertRaisesRegex(stage.LiveStageDenied,
+                                    "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED"):
+            stage.verify_image_metadata(
+                replace(release, image_id="unreviewed"), **metadata)
+        self.assertEqual(self.target.writes, [])
+
+    def test_root_image_authorization_runs_before_hardware_manager(self):
+        """Guard injected denial: no Root port or FPGA write may start."""
+        with patch.object(stage, "approved_image",
+                          side_effect=stage.LiveStageDenied(
+                              "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED")) as gate, \\
+             patch.object(stage.guard, "RootZ2TargetPort") as target_port, \\
+             patch.object(one_shot, "manager_write") as writer:
+            with self.assertRaisesRegex(stage.LiveStageDenied,
+                                        "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED"):
+                stage.run("download")
+            gate.assert_called_once()
+            target_port.assert_not_called()
+            writer.assert_not_called()
+        self.assertFalse(stage.STATE.exists())
+
     def test_independently_triggered_repeatable_full_lifecycle(self):
         first = stage.run("download")
         self.assertEqual(first["result"], "LOADED_AND_HELD")
