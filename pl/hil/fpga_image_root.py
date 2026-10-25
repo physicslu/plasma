@@ -52,7 +52,7 @@ class ApprovedImage:
     identity_words: tuple[tuple[int, int, int], ...]
     abi_offset: int
     site_bitmap: int
-    site_bitmap_offset: int
+    site_bitmap_offset: int | None
     axi_base: int
     axi_bytes: int
     owner_base: int
@@ -107,10 +107,14 @@ def read_approved_release() -> ApprovedImage:
              re.fullmatch(r"[a-f0-9]{64}", data[k]) is not None
              for k in ("firmware_sha256", "recovery_sha256")),
          "IMAGE_RELEASE_FIRMWARE_DENIED")
-    for key in ("abi_version", "abi_offset", "site_bitmap", "site_bitmap_offset",
+    for key in ("abi_version", "abi_offset", "site_bitmap",
                 "axi_base", "axi_bytes", "owner_base", "owner_bytes"):
         need(type(data[key]) is int and 0 <= data[key] <= 0xFFFFFFFF,
              "IMAGE_RELEASE_INTEGER_DENIED")
+    need(data["site_bitmap_offset"] is None or
+         (type(data["site_bitmap_offset"]) is int and
+          0 <= data["site_bitmap_offset"] <= 0xFFFFFFFF),
+         "IMAGE_RELEASE_SITE_OFFSET_DENIED")
     need(data["axi_bytes"] >= 16 and data["axi_bytes"] <= 0x100000 and
          data["owner_bytes"] >= data["axi_bytes"] and
          data["owner_bytes"] <= 0x100000 and
@@ -128,11 +132,15 @@ def read_approved_release() -> ApprovedImage:
     offsets = [w[0] for w in words]
     need(len(offsets) == len(set(offsets)) and
          data["abi_offset"] in offsets and
-         data["site_bitmap_offset"] in offsets and
          next(w for w in words if w[0] == data["abi_offset"])[1] ==
-         data["abi_version"] and
-         next(w for w in words if w[0] == data["site_bitmap_offset"])[1] ==
-         data["site_bitmap"], "IMAGE_RELEASE_ABI_DENIED")
+         data["abi_version"], "IMAGE_RELEASE_ABI_DENIED")
+    # Some legitimate FPGA IPs expose only ABI/Identity, not a Site-bitmap
+    # register. Never mislabel a dynamic SAMPLE bit as hardware Site proof.
+    if data["site_bitmap_offset"] is not None:
+        need(data["site_bitmap_offset"] in offsets and
+             any(w[0] == data["site_bitmap_offset"] and
+                 w[1] == data["site_bitmap"] and w[2] == 0xFFFFFFFF
+                 for w in words), "IMAGE_RELEASE_SITE_IDENTITY_DENIED")
     uio = data["expected_uio"]
     need(type(uio) is dict and set(uio) ==
          {"uio", "driver", "maps", "runtime", "irq_counts"} and
@@ -167,9 +175,11 @@ def read_identity(read32, release: ApprovedImage) -> dict[int, int]:
         need(type(value) is int and 0 <= value <= 0xFFFFFFFF and
              value & mask == expected & mask, "PL_IDENTITY_MISMATCH")
         observed[offset] = value
-    need(observed[release.abi_offset] == release.abi_version and
-         observed[release.site_bitmap_offset] == release.site_bitmap,
-         "PL_ABI_OR_SITE_MISMATCH")
+    need(observed[release.abi_offset] == release.abi_version,
+         "PL_ABI_MISMATCH")
+    if release.site_bitmap_offset is not None:
+        need(observed[release.site_bitmap_offset] == release.site_bitmap,
+             "PL_SITE_BITMAP_MISMATCH")
     return observed
 
 
@@ -344,10 +354,10 @@ def run(operation: str) -> dict:
                          value & mask == expected & mask,
                          "IDENTITY_CHILD_VALUE_MISMATCH")
                 need(result["observed"][str(release.abi_offset)] ==
-                     release.abi_version and
-                     result["observed"][str(release.site_bitmap_offset)] ==
-                     release.site_bitmap,
-                     "IDENTITY_CHILD_ABI_MISMATCH")
+                     release.abi_version, "IDENTITY_CHILD_ABI_MISMATCH")
+                if release.site_bitmap_offset is not None:
+                    need(result["observed"][str(release.site_bitmap_offset)] ==
+                         release.site_bitmap, "IDENTITY_CHILD_SITE_MISMATCH")
                 after = live_report(port, release, release.firmware_name)
                 record.update(status="IMAGE", test_count=record["test_count"] + 1,
                               evidence_sha256=_digest({"target": after,
