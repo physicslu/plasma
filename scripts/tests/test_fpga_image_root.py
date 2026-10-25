@@ -141,18 +141,17 @@ class GenericImageRootTests(unittest.TestCase):
         boot_path.parent.mkdir(parents=True)
         boot_path.write_text(self.port.boot)
         self.stack.enter_context(patch.object(guard, "PROC", self.folder))
-        with patch.object(guard, "sha_file", return_value=self.release.firmware_sha256) as sha:
+        with patch.object(guard, "sha_file") as prior_sha:
             result = stage.run("download")
+            prior_sha.assert_not_called()
         self.assertEqual(result["result"], "LOADED_AND_HELD")
         self.assertEqual(self.port.writes,
                          [self.release.firmware_name, "second-image.bin"])
-        sha.assert_called_once_with(guard.FIRMWARE / self.release.firmware_name,
-                                    self.release.firmware_sha256)
         new = stage.read_image_manifest()
         self.assertEqual(stage.read_state(new)["image_id"], "image-b")
         self.assertEqual(stage.read_state(new)["status"], "IMAGE")
 
-    def test_direct_switch_requires_same_boot_and_previous_hash(self):
+    def test_direct_switch_requires_same_boot_without_golden(self):
         stage.run("download")
         different = dict(self.release_data)
         different.update(image_id="image-b", firmware_name="second-image.bin",
