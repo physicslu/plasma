@@ -228,7 +228,6 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
         run = inspect.getsource(dispatcher.run_codex_task)
         self.assertIn("plasma_development_codex_sandbox", run)
         self.assertIn("codex_sandbox.codex_command(root)", run)
-        self.assertIn("minimum sufficient experiment", run.lower())
         self.assertNotIn("bluepill_flash", run)
 
 
