@@ -149,21 +149,23 @@ class Contracts(unittest.TestCase):
                 with self.assertRaises(t.Blocked): t.execute('test',SHA,PROJECT)
                 remote.assert_not_called()
 
-    def test_candidate_python_is_not_loaded_for_stage(self):
+    def test_candidate_python_is_not_loaded_for_direct_root(self):
+        from test_plasma_path2_root_direct import make_event, context
         with tempfile.TemporaryDirectory() as td:
             root = Path(td); (root/'scripts').mkdir()
             (root/'scripts/plasma_development_stage_transport.py').write_text(
                 'raise AssertionError("CANDIDATE_EXECUTED")')
-            approval = {'task_id':'z2-path2-testing','execution_path':'path2-cli',
-                        'execution_capability':'path2-stage-contract',
-                        'pinned_sha':SHA,'trusted_sha':SHA,'pr_number':0}
-            task = {'capability':'path2-stage-contract','stage':'test',
-                    'project':'pl/projects/z2-fixed-unified-site1'}
+            event = make_event('test')
+            registry = d.parse_json(d.MANIFEST)
+            req = d.request(event, context())
+            approval = d.authorize(event, context(), registry)
+            task = d.task_for_request(registry, req, event)
             payload = {'stage':'test','source_sha':SHA,'project':PROJECT,'real_z2':True,
                        'boot_id':'fake-test-boot','result':'IDENTITY_PASS'}
-            with patch.object(t,'execute',return_value=payload) as call:
-                d.run_task(task, workspace=root, approval=approval)
-                call.assert_called_once_with('test', SHA, PROJECT)
+            with patch.object(t,'execute_operation',return_value=payload) as call:
+                result = d.run_task(task, workspace=root, approval=approval)
+                self.assertEqual(result['operation'], 'test')
+                call.assert_called_once_with('test', SHA)
 
     def test_live_pr_changed_head_owner_repo_base_rejected(self):
         req = {'pr_number':123, 'source_sha':SHA}
@@ -182,24 +184,27 @@ class Contracts(unittest.TestCase):
             self.assertIsNone(d.live_pr_metadata({'pr_number':0}))
             call.assert_not_called()
 
-    def test_single_path2_test_has_no_implicit_download_restore(self):
-        approval = {'task_id':'z2-path2-testing','execution_path':'path2-cli',
-                    'execution_capability':'path2-stage-contract','pinned_sha':SHA,
-                    'trusted_sha':SHA,'pr_number':0,
-                    'auto_download_after_build_success':True,
-                    'auto_test_after_download_success':True}
-        task = {'capability':'path2-stage-contract','stage':'test',
-                'project':'pl/projects/z2-fixed-unified-site1'}
+    def test_single_path2_operation_has_no_implicit_download_restore(self):
+        from test_plasma_path2_root_direct import make_event, context
+        event = make_event('test')
+        registry = d.parse_json(d.MANIFEST)
+        req = d.request(event, context())
+        approval = d.authorize(event, context(), registry)
+        task = d.task_for_request(registry, req, event)
         receipt = {'stage':'test','source_sha':SHA,'project':PROJECT,'real_z2':True,
                    'boot_id':'fake-test-boot','result':'IDENTITY_PASS'}
-        with patch.object(t,'execute',return_value=receipt) as call:
-            result = r.registered_hardware_stage(task,approval)
-            self.assertFalse(result['auto_next_stage'])
-            call.assert_called_once_with('test',SHA,PROJECT)
-        with patch.object(t,'execute') as call:
-            with self.assertRaises(r.RuntimeDenied):
-                r.registered_hardware_stage(task | {'stage':'restore'},approval)
-            call.assert_not_called()
+        with patch.object(t,'execute_operation',return_value=receipt) as call:
+            result = r.direct_root_operation(task, approval)
+            self.assertFalse(result['auto_next_operation'])
+            call.assert_called_once_with('test', SHA)
+        for invalid in ({'operation':'restore'},
+                        {'auto_download_after_build_success':True},
+                        {'auto_test_after_download_success':True}):
+            with self.subTest(change=invalid), patch.object(t,'execute_operation') as call:
+                with self.assertRaises(r.RuntimeDenied):
+                    r.direct_root_operation(task | invalid if 'operation' in invalid else task,
+                                            approval if 'operation' in invalid else approval | invalid)
+                call.assert_not_called()
 
     def test_timeout_kills_and_reaps(self):
         proc = Mock(pid=999999)
