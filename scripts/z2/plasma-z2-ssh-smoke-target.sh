@@ -19,9 +19,12 @@ if [[ -e "$state_file" ]]; then
   [[ "$old_state" == BASE ]] || { echo 'DENIED: prior FPGA image not BASE'; exit 2; }
 fi
 [[ "$(cat /sys/class/fpga_manager/fpga0/state)" == operating ]] || { echo 'DENIED: Manager state'; exit 2; }
-# "operating" alone does not identify a Golden FPGA image.
-last="$(dmesg 2>/dev/null | grep -E 'fpga_manager.*: writing .* to Xilinx FPGA Manager' | tail -n 1 || true)"
-[[ "$last" == *'writing base.bin to Xilinx FPGA Manager'* ]] ||
+# Match the existing pl.hil.swd04.development.last_load() contract:
+# examine the LAST fpga0 write in current-boot dmesg, regardless of whether
+# the driver spells itself "Xilinx FPGA Manager" or "Xilinx Zynq FPGA Manager".
+# Never accept an earlier base.bin load if a newer candidate was loaded.
+last="$(dmesg --color=never 2>/dev/null | grep -F 'fpga_manager fpga0: writing ' | tail -n 1 || true)"
+[[ "$last" == *'fpga_manager fpga0: writing base.bin to '* ]] ||
   { echo 'DENIED: Golden Image not positively observed'; exit 2; }
 
 work="$(mktemp -d /root/.plasma-z2-smoke.XXXXXXXX)"
