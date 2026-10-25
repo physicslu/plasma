@@ -1719,7 +1719,13 @@ class GenericWorkOrderContracts(unittest.TestCase):
             script.parent.mkdir(parents=True)
             script.write_text("import sys\nsys.exit(7)\n", encoding="utf-8")
             with self.assertRaisesRegex(dev.Denied, "COMMAND_FAILED"):
-                dev.run_task(task, workspace=work)
+                dev.run_task(task, workspace=work, evidence_dir=work)
+            observed = json.loads(
+                (work / "plasma-path2-process.json").read_text(encoding="utf-8"))
+            self.assertEqual(observed["exit_code"], 7)
+            self.assertEqual(observed["verification"], "exit-code")
+            self.assertTrue((work / "plasma-path2-stdout.txt").is_file())
+            self.assertTrue((work / "plasma-path2-stderr.txt").is_file())
             with patch.object(dev.shutil, "which", return_value=None):
                 with self.assertRaisesRegex(
                         dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
