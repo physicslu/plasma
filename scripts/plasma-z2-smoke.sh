@@ -39,6 +39,7 @@ cleanup() {
 trap cleanup EXIT
 mkdir -p "$work/src"
 sources=(
+  pl/hil/approved-fpga-image.json
   pl/hil/f1b.py
   pl/hil/path2_f1b_minimal_stage.py
   pl/hil/path2_f1b_dev_risk.py pl/hil/path2_z2_target_guard.py
@@ -55,7 +56,7 @@ printf '%s\n' "$sha" > "$work/src/.plasma-path2-source-commit"
   cd "$work/src"
   while IFS= read -r -d '' f; do
     sha256sum "$f" | sed 's@  ./@  @'
-  done < <(find . -type f \( -name '*.py' -o -name '.plasma-path2-source-commit' \) -print0 | sort -z)
+  done < <(find . -type f \( -name '*.py' -o -name 'approved-fpga-image.json' -o -name '.plasma-path2-source-commit' \) -print0 | sort -z)
 ) > "$work/src/.plasma-path2-source-sha256"
 (cd "$work/src" && sha256sum -c --status .plasma-path2-source-sha256) ||
   { echo 'DENIED: local bundle verification failed'; exit 2; }
