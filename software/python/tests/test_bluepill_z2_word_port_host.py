@@ -162,7 +162,8 @@ def test_one_shot_unix_startup_with_linux_word_port(port_fixture, tmp_path):
                     try:
                         connection.connect(str(location))
                         break
-                    except FileNotFoundError:
+                    except (FileNotFoundError, ConnectionRefusedError):
+                        # bind() precedes listen(): retry this normal UNIX startup race.
                         time.sleep(0.01)
                 else:
                     raise RuntimeError("listener did not start")
