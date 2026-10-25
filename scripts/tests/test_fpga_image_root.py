@@ -89,6 +89,13 @@ class GenericImageRootTests(unittest.TestCase):
         self.assertIn('download|test|restore', shell)
         self.assertNotIn('path2_f1b', shell.lower())
         self.assertNotIn('f1b', shell.lower())
+        for relative in ("pl/hil/fpga_image_root.py",
+                         "pl/hil/fpga_image_guard.py",
+                         "pl/hil/fpga_image_admission.py"):
+            code = (ROOT / relative).read_text().lower()
+            self.assertNotIn("path2_f1b", code)
+            self.assertNotIn("from pl.hil import f1b", code)
+            self.assertNotIn("f1-b", code)
 
     def test_manifest_has_geometry_and_true_source_authority(self):
         image = self.release
@@ -105,7 +112,7 @@ class GenericImageRootTests(unittest.TestCase):
         alt.update(image_id="candidate-independent-ip",
                    firmware_name="reviewed-other-image.bin",
                    firmware_sha256="a" * 64, axi_base=0x40008000,
-                   axi_bytes=4096, site_bitmap_offset=12, site_bitmap=8,
+                   axi_bytes=4096, site_bitmap_offset=None, site_bitmap=1,
                    identity_words=[[0, 0x504C5357, 0xFFFFFFFF],
                                    [4, 0x10000, 0xFFFFFFFF],
                                    [12, 8, 0xFFFFFFFE]])
@@ -114,6 +121,13 @@ class GenericImageRootTests(unittest.TestCase):
         self.assertEqual(other.firmware_name, "reviewed-other-image.bin")
         self.assertEqual(other.axi_base, 0x40008000)
         self.assertEqual(other.identity_words[2][2], 0xFFFFFFFE)
+        self.assertIsNone(other.site_bitmap_offset)
+        self.assertEqual(other.site_bitmap, 1)
+        # Sample bit is not a hardware Site Bitmap register.
+        actual = {other.axi_base + off: expected for off, expected, mask
+                  in other.identity_words}
+        actual[other.axi_base + 12] = 9
+        self.assertEqual(stage.read_identity(lambda a: actual[a], other)[12], 9)
         # Source hash/owner authorization are still enforced by Root Entry;
         # this mocked Host test does not grant this image permission on Z2.
 
@@ -129,6 +143,7 @@ class GenericImageRootTests(unittest.TestCase):
             {"axi_bytes": 0},
             {"owner_base": 0x50000000},
             {"site_bitmap_offset": 8},
+            {"site_bitmap_offset": 12},  # masked SAMPLE must not claim Site identity
             {"extra": True},
         )
         for change in variants:
