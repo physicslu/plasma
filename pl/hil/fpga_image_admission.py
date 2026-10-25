@@ -1,7 +1,7 @@
 """Source-bound prototype Z2 image admission; no independent write authority.
 
-Only existing, observed platform conditions are checked. A source-owned release
-contains the expected UIO exception; no request or environment input can waive
+Only existing, observed platform conditions are checked. A paired Manifest
+contains the expected UIO mapping; no runtime input can waive
 unknown FPGA/AXI or recovery states.
 """
 from __future__ import annotations
@@ -22,7 +22,8 @@ def need(ok: bool, code: str) -> None:
 
 
 def check_exact(*, release, passive: dict, uio: dict,
-                original_manager_load: str, expected_firmware: str) -> dict:
+                original_manager_load: str, expected_firmware: str,
+                previous_firmware: str | None = None) -> dict:
     need(type(passive) is dict and
          passive.get("observation_kind") == "LIVE_ROOT_READ_ONLY" and
          passive.get("root") is True and bool(passive.get("boot_id")) and
@@ -40,7 +41,8 @@ def check_exact(*, release, passive: dict, uio: dict,
          bool(re.fullmatch(r"[0-9a-fA-F]+\.[A-Za-z0-9_.-]+",
                            passive["platform_overlaps"][0])),
          "BOUND_PLATFORM_EXCEPTION_NOT_ISOLATED")
-    need(expected_firmware in (release.recovery_name, release.firmware_name),
+    need(expected_firmware in (release.recovery_name, release.firmware_name) or
+         (previous_firmware is not None and expected_firmware == previous_firmware),
          "MANAGER_FIRMWARE_NOT_ALLOWLISTED")
     need(type(original_manager_load) is str and
          ": writing " + expected_firmware + " to " in original_manager_load,
@@ -60,7 +62,7 @@ def check_exact(*, release, passive: dict, uio: dict,
 
 
 def collect_live(*, root_port: guard.RootZ2TargetPort, release,
-                 expected_firmware: str) -> dict:
+                 expected_firmware: str, previous_firmware: str | None = None) -> dict:
     root_port._require_locked()
     need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
     need(root_port.release == release, "ROOT_RELEASE_BINDING_CHANGED")
@@ -84,7 +86,8 @@ def collect_live(*, root_port: guard.RootZ2TargetPort, release,
     report = check_exact(
         release=release, passive=passive, uio=uio,
         original_manager_load=guard.manager_last_load(),
-        expected_firmware=expected_firmware)
+        expected_firmware=expected_firmware,
+        previous_firmware=previous_firmware)
     need((guard.PROC / "sys/kernel/random/boot_id").read_text().strip()
          == report["target_boot_id"], "BOOT_CHANGED_AFTER_RISK_SCAN")
     return report
