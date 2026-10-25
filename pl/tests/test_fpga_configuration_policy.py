@@ -44,9 +44,8 @@ def test_exact_source_hashes_and_recovery_are_independent_of_ic():
 
 
 @pytest.mark.parametrize("reviewed,installed,build,reason", [
-    (SOURCE, SOURCE, "b" * 40, "IMAGE_SOURCE_REBUILD_REQUIRED"),
-    (SOURCE, "b" * 40, SOURCE, "IMAGE_SOURCE_REBUILD_REQUIRED"),
-    ("b" * 40, SOURCE, SOURCE, "IMAGE_SOURCE_REBUILD_REQUIRED"),
+    (SOURCE, "b" * 40, SOURCE, "EXECUTOR_SOURCE_PIN_MISMATCH"),
+    ("b" * 40, SOURCE, SOURCE, "EXECUTOR_SOURCE_PIN_MISMATCH"),
     ("z" * 40, SOURCE, SOURCE, "SOURCE_SHA_INVALID"),
     (SOURCE, "0" * 40, SOURCE, "SOURCE_SHA_INVALID"),
 ])
@@ -194,3 +193,64 @@ def test_candidate_malformed_descriptor_denied(field, value):
     args["descriptor"] = replace(args["descriptor"], **{field: value})
     with pytest.raises(cfg.StageDenied):
         cfg.validate_candidate(**args)
+
+def test_image_build_provenance_is_independent_of_executor_pin():
+    cfg.validate_source_lock(
+        project="pl/projects/z2-bluepill-rbb",
+        expected_project="pl/projects/z2-bluepill-rbb",
+        reviewed_sha=SOURCE, installed_sha=SOURCE, build_sha="b" * 40,
+        bit_sha=sha(BIT), hwh_sha=sha(HWH), bin_sha=sha(BIN),
+        original_sha=sha(RECOVERY))
+
+
+@pytest.mark.parametrize("stage", ["download", "test", "restore"])
+def test_missing_trusted_admission_never_calls_existing_loader(stage, monkeypatch, capsys):
+    from pl.hil.swd04 import one_shot
+    def forbidden(*args, **kwargs):
+        pytest.fail("hardware loader called without trusted admission")
+    monkeypatch.setattr(one_shot, "manager_write", forbidden)
+    monkeypatch.setattr(sys, "argv", [cfg.__file__, stage])
+    assert cfg.main() == 2
+    captured = capsys.readouterr()
+    assert "PLASMA_PATH2_STAGE=" not in captured.out
+    for blocker in cfg.LIVE_BACKEND_BLOCKERS:
+        assert blocker in captured.err
+
+
+@pytest.mark.parametrize("name", ["candidate-test.bin", "base.bin"])
+def test_existing_manager_primitive_with_fake_sysfs(name, tmp_path, monkeypatch):
+    from pl.hil.swd04 import one_shot
+    (tmp_path / "state").write_text("operating\n")
+    (tmp_path / "firmware").write_text("")
+    monkeypatch.setattr(one_shot, "MANAGER", tmp_path)
+    monkeypatch.setattr(one_shot, "manager_last_load",
+                        lambda: f"fpga_manager fpga0: writing {name} to device")
+    one_shot.manager_write(name)
+    assert (tmp_path / "firmware").read_text() == name
+
+
+@pytest.mark.parametrize("name", ["../base.bin", "/lib/firmware/base.bin", "x;reboot", ""])
+def test_existing_writer_rejects_non_basename_before_write(name, tmp_path, monkeypatch):
+    from pl.hil.swd04 import one_shot
+    from pl.hil.swd04.contract import SafetyError
+    firmware = tmp_path / "firmware"
+    firmware.write_text("untouched")
+    monkeypatch.setattr(one_shot, "MANAGER", tmp_path)
+    with pytest.raises(SafetyError, match="Illegal firmware name"):
+        one_shot.manager_write(name)
+    assert firmware.read_text() == "untouched"
+
+
+@pytest.mark.parametrize("state,line", [
+    ("unknown", "fpga_manager fpga0: writing base.bin to device"),
+    ("operating", "fpga_manager fpga0: writing wrong.bin to device"),
+])
+def test_existing_writer_does_not_claim_restore_after_bad_state_or_load_provenance(
+        state, line, tmp_path, monkeypatch):
+    from pl.hil.swd04 import one_shot
+    from pl.hil.swd04.contract import SafetyError
+    (tmp_path / "state").write_text(state)
+    monkeypatch.setattr(one_shot, "MANAGER", tmp_path)
+    monkeypatch.setattr(one_shot, "manager_last_load", lambda: line)
+    with pytest.raises(SafetyError):
+        one_shot.manager_write("base.bin")

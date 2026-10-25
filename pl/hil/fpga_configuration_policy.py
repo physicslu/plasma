@@ -232,8 +232,8 @@ def validate_candidate(*, image: bytes, image_sha256: str,
     Inputs must be derived by the existing owner under its shared admission
     lock. Success is compatibility/integrity only, never runtime admission.
     Protected executable source pins remain enforced by the existing root entry.
-    Historical ImageLock below retains its legacy build/executor coupling until
-    explicitly migrated; this function is not wired to that privileged path.
+    Image build provenance is independent of the protected executor source pin;
+    this function is not wired to that privileged path.
     """
     need(type(descriptor) is CandidateHardware and
          type(measured) is CandidateHardware, "CANDIDATE_DESCRIPTOR_REQUIRED")
@@ -262,8 +262,9 @@ def validate_source_lock(*, project: str, expected_project: str,
          "PROJECT_MISMATCH")
     need(all(hex_pin(x, 40) for x in
              (reviewed_sha, installed_sha, build_sha)), "SOURCE_SHA_INVALID")
-    need(reviewed_sha == installed_sha == build_sha,
-         "IMAGE_SOURCE_REBUILD_REQUIRED")
+    # Pin executable code independently of candidate build provenance.
+    # Hash/descriptor checks bind the image; Git equality cannot prove safety.
+    need(reviewed_sha == installed_sha, "EXECUTOR_SOURCE_PIN_MISMATCH")
     need(all(hex_pin(x, 64) for x in
              (bit_sha, hwh_sha, bin_sha, original_sha)), "IMAGE_SHA_INVALID")
     need(original_sha != bin_sha, "CANDIDATE_IS_RECOVERY")
@@ -499,8 +500,24 @@ def confirm(plan: StagePlan, lock: ImageLock, after: Observed,
     return state, receipt
 
 
+# No trusted source currently supplies all of these under the shared PPU
+# admission lock. This is a diagnostic boundary, never caller-set permission.
+LIVE_BACKEND_BLOCKERS = (
+    "CURRENT_BOOT_BOARD_PART_ABI_AND_ACTIVE_IMAGE_ATTESTATION",
+    "SHARED_PPU_JOB_ADMISSION_AND_ALL_SITE_EXCLUSION",
+    "KERNEL_PROCESS_OWNERSHIP_AND_AXI_ISOLATION",
+    "EXTERNAL_IO_ISOLATION_AND_CURRENT_RECOVERY_BYTES",
+)
+
+
 def main() -> int:
+    # Even a protected Root Entry invocation must stop here. Do not connect
+    # host Observed booleans to one_shot.manager_write or reuse F1B's waiver.
+    # Once trusted admission exists, reuse that writer and supervisor lock;
+    # never introduce a second sysfs writer or auto-restore on uncertain AXI.
     print("GENERIC_FPGA_CONFIGURATION_LIVE_BACKEND_NOT_IMPLEMENTED",
+          file=sys.stderr)
+    print("MISSING_TRUSTED_SOURCE=" + ",".join(LIVE_BACKEND_BLOCKERS),
           file=sys.stderr)
     return 2
 

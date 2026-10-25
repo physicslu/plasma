@@ -95,9 +95,9 @@ def test_synthetic_download_test_restore_and_explicit_noop():
 @pytest.mark.parametrize("bad_lock,reason", [
     ({"project": "pl/projects/z2-fixed-unified-site1"}, "PROJECT_MISMATCH"),
     ({"reviewed_source_sha": "bad"}, "SOURCE_SHA_INVALID"),
-    ({"reviewed_source_sha": OLD_SOURCE}, "IMAGE_SOURCE_REBUILD_REQUIRED"),
-    ({"installed_source_sha": OLD_SOURCE}, "IMAGE_SOURCE_REBUILD_REQUIRED"),
-    ({"image_build_source_sha": OLD_SOURCE}, "IMAGE_SOURCE_REBUILD_REQUIRED"),
+    ({"reviewed_source_sha": OLD_SOURCE}, "EXECUTOR_SOURCE_PIN_MISMATCH"),
+    ({"installed_source_sha": OLD_SOURCE}, "EXECUTOR_SOURCE_PIN_MISMATCH"),
+    ({"image_build_source_sha": OLD_SOURCE}, "IMAGE_DESCRIPTOR_HASH_OR_SOURCE_MISMATCH"),
     ({"bit_sha256": "bad"}, "IMAGE_SHA_INVALID"),
     ({"hwh_sha256": "bad"}, "IMAGE_SHA_INVALID"),
     ({"bin_sha256": "bad"}, "IMAGE_SHA_INVALID"),
@@ -301,11 +301,23 @@ def test_descriptor_rejects_unknown_fields_and_malformed_json(tmp_path):
         bp.load_descriptor(file)
 
 
-def test_real_descriptor_cannot_be_promoted_to_latest_source():
+def test_new_executor_pin_does_not_promote_historical_recovery():
     historic = bp.load_descriptor(DESCRIPTOR_PATH)
     changed_sha = "c48c0a014ff9642242a9c107b5624ba97a387235"
-    with pytest.raises(bp.StageDenied, match="IMAGE_SOURCE_REBUILD_REQUIRED"):
+    with pytest.raises(bp.StageDenied, match="RECOVERY_IMAGE_NOT_QUALIFIED"):
         bp.ImageLock(historic.project, historic, changed_sha, changed_sha,
                      historic.image_build_source_sha, historic.bit_sha256,
                      historic.hwh_sha256, historic.bin_sha256,
                      sha(BASE)).validate()
+
+def test_generic_prepare_confirm_accepts_independent_image_build_provenance():
+    lock = pinned()
+    lock = replace(lock, descriptor=replace(
+        lock.descriptor, image_build_source_sha=OLD_SOURCE),
+        image_build_source_sha=OLD_SOURCE)
+    lock.check_bundle(bit=BIT, hwh=HWH, binary=BIN, original=BASE)
+    plan = bp.prepare("download", lock, observed(lock), None)
+    state, receipt = bp.confirm(plan, lock, observed(lock, image="candidate"))
+    assert state.phase == "HELD"
+    assert receipt["runtime_admitted"] is False
+    assert receipt["real_z2"] is False

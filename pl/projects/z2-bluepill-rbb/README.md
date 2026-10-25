@@ -307,3 +307,44 @@ unqualified. Offline build success grants no runtime or physical admission.
 Full commands, failures/retests, artifacts and per-stage outcomes are in the
 Path 3 evidence `engineering-report.md`; GitHub PR CI is not claimed for this
 uncommitted patch. PR #1142 remains Draft; no publish/merge/deployment occurred.
+
+### Prior physical FPGA manager and generic reuse
+
+**The FPGA download primitive already exists.** The current
+`pl/hil/swd04/one_shot.py` function `manager_write` validates a firmware
+basename, asks Linux FPGA Manager to load it, and checks current-boot manager
+status and firmware provenance. The existing Root Entry and Stage Transport
+enforce protected executable source, and `path2_f1b_minimal_stage.py` already
+uses the same primitive for independent `download / test / restore`. None of
+these should be duplicated for Blue Pill. Project-specific SWD04/F1B admission
+and historical risk waivers are **not transferable** to external SWD pins.
+
+Historical real FPGA candidate load, 3 Identity MMIO reads, and original-image
+restore PASSED in [F1-B Run 39395142726](https://github.com/physicslu/plasma/actions/runs/39395142726).
+Historical original `base.bin` SHA256 is
+`c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c`,
+and `base.hwh` SHA256 is
+`222898ef2c0ccc4a0c47608e99d8dc7c9c6cdfed5130964884ff35005827ef3a`.
+These are file identities and historical evidence, **not** a current-boot
+recovery/PL/AXI/ownership attestation. This candidate's
+`recovery_sha256: null` and `runtime_admitted: false` remain deliberate.
+The `fabric` UIO aperture `0x40000000–0x4000ffff` overlaps the Blue Pill
+GPIO `0x40008000`; a cooperative lock or UIO unbind is not hardware proof.
+
+The only missing live integration is a trusted current-boot B2/B3 provider
+inside actual PPU Job admission/all-Site exclusion; it must prove board/part/
+ABI, active identity, current recovery bytes, kernel and process ownership,
+AXI safety, and external I/O isolation. Host `Observed` booleans and old
+F1-B acknowledgments cannot substitute. Until this exists,
+`fpga_configuration_policy.main()` emits exact missing-evidence blockers and
+fails closed, without calling the existing loader. No new sysfs writer,
+executor, Root Profile, workflow, uploader or automatic unsafe restore is
+added. Build Git provenance is independent of the installed protected
+executable source pin. Maintenance image load is separate from normal
+fixed-universal-image Programming Jobs.
+
+Path 3 [Run 40157160040](https://github.com/physicslu/plasma/actions/runs/40157160040)
+source audit / mock-regression: 1048 host tests plus 104 subtests PASS;
+this is not a real Blue Pill image download. Its Gate 1 source changes were
+reviewed for integration in this Draft PR; physical loading and
+current-boot recovery are still NOT_RUN.
