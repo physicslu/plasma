@@ -28,6 +28,7 @@ STATE = ROOT / ".plasma-f1b-site1-development-state.json"
 CHILD = one_shot.OWNER_DIR / "path2-f1b-identity.json"
 CANDIDATE = guard.FIRMWARE / "plasma-f1b-owner-20261020-once.bin"
 RECOVERY = guard.FIRMWARE / "base.bin"
+RELEASE_FILE = ROOT / "pl/hil/approved-fpga-image.json"
 SCHEMA = "plasma.f1b.site1.development.v2"
 STATUS = ("BASE", "F1B", "DOWNLOAD_IN_FLIGHT", "TEST_IN_FLIGHT",
           "RESTORE_IN_FLIGHT", "UNKNOWN")
@@ -88,6 +89,67 @@ def approved_image(image: object) -> ApprovedImage:
          image.site_bitmap == 1,
          "IMAGE_RELEASE_SOURCE_LOCK_MISMATCH")
     return image
+
+
+def _release_pairs(pairs: list[tuple[str, object]]) -> dict:
+    """Reject duplicate keys rather than silently overriding AP policy."""
+    out = {}
+    for key, value in pairs:
+        need(key not in out, "IMAGE_RELEASE_DUPLICATE_FIELD")
+        out[key] = value
+    return out
+
+
+def read_approved_release() -> ApprovedImage:
+    """Read the reviewed, Root-owned + complete-source-SHA-pinned release.
+
+    This file is included in the SSH source bundle and its SHA256 manifest.
+    The existing Root Entry validates the full manifest and exact source Git
+    pin before calling this code. No caller can choose a file or Python IP.
+    """
+    one_shot.protected(RELEASE_FILE)
+    need(RELEASE_FILE.is_file() and 0 < RELEASE_FILE.stat().st_size <= 4096,
+         "IMAGE_RELEASE_FILE_DENIED")
+    try:
+        raw = json.loads(RELEASE_FILE.read_text(encoding="utf-8"),
+                         object_pairs_hook=_release_pairs,
+                         parse_constant=lambda _: need(False,
+                             "IMAGE_RELEASE_NONFINITE_NUMBER_DENIED"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise LiveStageDenied("IMAGE_RELEASE_JSON_DENIED") from exc
+    fields = {"schema", "authorization", "image_id", "board_id",
+              "fpga_part", "firmware_name", "firmware_sha256",
+              "recovery_name", "recovery_sha256", "abi_version",
+              "identity_words", "site_bitmap"}
+    need(type(raw) is dict and set(raw) == fields and
+         raw["schema"] == "plasma.fpga.image-release.v1" and
+         raw["authorization"] == "SOURCE_PINNED_ROOT_APPROVAL",
+         "IMAGE_RELEASE_SCHEMA_DENIED")
+    names = ("image_id", "board_id", "fpga_part", "firmware_name",
+             "firmware_sha256", "recovery_name", "recovery_sha256")
+    need(all(type(raw[n]) is str and bool(raw[n]) for n in names) and
+         type(raw["abi_version"]) is int and
+         type(raw["site_bitmap"]) is int and
+         type(raw["identity_words"]) is list and
+         len(raw["identity_words"]) == 3 and
+         all(type(pair) is list and len(pair) == 2 and
+             all(type(word) is int and 0 <= word <= 0xFFFFFFFF
+                 for word in pair)
+             for pair in raw["identity_words"]),
+         "IMAGE_RELEASE_VALUE_DENIED")
+    image = ApprovedImage(
+        image_id=raw["image_id"],
+        board_id=raw["board_id"],
+        fpga_part=raw["fpga_part"],
+        firmware_name=raw["firmware_name"],
+        firmware_sha256=raw["firmware_sha256"],
+        recovery_name=raw["recovery_name"],
+        recovery_sha256=raw["recovery_sha256"],
+        abi_version=raw["abi_version"],
+        identity_words=tuple(tuple(pair) for pair in raw["identity_words"]),
+        site_bitmap=raw["site_bitmap"],
+    )
+    return approved_image(image)
 
 
 def verify_image_metadata(image: ApprovedImage, *, board_id: str,
@@ -195,7 +257,7 @@ def write_state(record: dict) -> None:
 
 
 def live_report(port: guard.RootZ2TargetPort, image: str) -> dict:
-    release = approved_image(F1B_APPROVED_IMAGE)
+    release = read_approved_release()
     need(image in (release.recovery_name, release.firmware_name),
          "IMAGE_NOT_PINNED")
     report = risk.collect_live(root_port=port, approval=risk.WAIVER,
@@ -244,7 +306,7 @@ def confirm_current(port, record: dict | None, stage: str) -> tuple[dict, dict]:
 def run(stage: str) -> dict:
     need(stage in ("download", "test", "restore"), "STAGE_NOT_ALLOWLISTED")
     trusted_local()
-    release = approved_image(F1B_APPROVED_IMAGE)
+    release = read_approved_release()
     # The shared FPGA owner serializes all cooperating configuration users.
     port = guard.RootZ2TargetPort(candidate=CANDIDATE, recovery=RECOVERY,
                                   ledger=one_shot.OWNER_DIR / "path2-f1b-site1.json")
@@ -325,7 +387,7 @@ def child_main() -> int:
     # Read-only native subprocess: does not acquire the parent FPGA lock and
     # cannot invoke an FPGA Manager writer.
     trusted_local()
-    release = approved_image(F1B_APPROVED_IMAGE)
+    release = read_approved_release()
     state = read_state()
     need(state is not None and state["status"] == "TEST_IN_FLIGHT" and
          state["image"] == CANDIDATE.name and not CHILD.exists(),
