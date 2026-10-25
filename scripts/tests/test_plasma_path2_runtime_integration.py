@@ -104,8 +104,8 @@ class RouteContracts(unittest.TestCase):
     def test_fixed_full_and_dynamic_single_route_are_still_separate(self):
         registered = Mock(return_value={"status": "MOCK_SINGLE_STAGE"})
         full = Mock(return_value={"status": "MOCK_FULL_HIL"})
-        with patch.object(runtime, "registered_hardware_stage", registered), (
-                patch.object(runtime, "full_hil_sequence", full)):
+        with patch.object(runtime, "registered_hardware_stage", registered), \
+             patch.object(runtime, "full_hil_sequence", full):
             for task_id, stage in dispatch.LEGACY_PATH2_STAGE_TASKS.items():
                 registered.reset_mock()
                 full.reset_mock()
