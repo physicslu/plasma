@@ -10,7 +10,6 @@ import os
 import re
 
 from pl.hil import fpga_image_guard as guard
-from pl.hil.swd04 import one_shot
 
 
 class AdmissionDenied(ValueError):
@@ -84,7 +83,7 @@ def collect_live(*, root_port: guard.RootZ2TargetPort, release,
          "UIO_PLATFORM_OWNER_MISMATCH")
     report = check_exact(
         release=release, passive=passive, uio=uio,
-        original_manager_load=one_shot.manager_last_load(),
+        original_manager_load=guard.manager_last_load(),
         expected_firmware=expected_firmware)
     need((guard.PROC / "sys/kernel/random/boot_id").read_text().strip()
          == report["target_boot_id"], "BOOT_CHANGED_AFTER_RISK_SCAN")
