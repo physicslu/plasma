@@ -1023,69 +1023,19 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         ".txt" if task.get("output_format") == "text" else ".csv"
     ) if source is not None else None)
     test_log = source.with_suffix(".test.log") if source is not None else None
-    # Codex loads the concise root AGENTS.md as the normative entrypoint.
-    # Keep task details in reviewed repository Work Orders and read large
-    # detailed clauses only when relevant to the approved engineering goal.
+    # Path 3 is a handoff, not a plan for the model's individual steps.
     prompt = (
-        "PLASMA Path 3 Development Mode. Follow root AGENTS.md and the "
-        "owner-approved Work Order at its pinned source SHA. Read only "
-        "task-relevant detailed clauses linked from AGENTS.md, including "
-        "nested AGENTS.md when affected. Do not preload unrelated runbooks. "
-        "Within the existing Gate 1, diagnose, edit RTL/Tcl/Python, run "
-        "required builds/tests and fix/retest without another user approval. "
-        "Vivado 2026.1 is available only for work within approved scope. "
-        "Do not retry unsafe hardware writes; respect live ownership, "
-        "root-executor, electrical and rollback guards. Report inaccessible "
-        "SWPC/Z2 operations as NOT_RUN, never PASS. "
-        "Record actual commands, exits, results and hashes in "
-        ".plasma-path3-evidence/engineering-report.md. Edit and test freely "
-        "within the approved Work Order. The trusted worker publishes verified "
-        "changes to the exact authorized PR after this run, so do not change "
-        "Git refs or expose GitHub tokens from inside Codex.\n"
+        "PLASMA Path 3 engineering assignment. Follow the repository AGENTS.md "
+        "and the owner-approved Gate 1 Work Order at its pinned source SHA. "
+        "Choose the implementation, tools, tests, and in-scope engineering "
+        "sequence autonomously. Report observed results and remaining blockers "
+        "accurately, including NOT_RUN when appropriate.\n"
         "Goal:\n" + task["objective"] + "\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
         prompt += (
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
-        )
-    if task_id == "f1b-path3-codex-vivado-build":
-        prompt += (
-            "For this F1-B task the trusted dispatcher will execute the SAME "
-            "fixed Python Build Engine as Path 2 on the licensed runner AFTER "
-            "you exit, twice in fresh output directories. Inspect "
-            ".plasma-path3-evidence/runner-license-diagnostic.json and record "
-            "a category-only sandbox comparison. Do not escape the sandbox. "
-            "Host execution accepts only byte-authenticated PL inputs at the "
-            "owner-reviewed pinned SHA. Diagnose/edit/test candidate source "
-            "here, but changed PL inputs require a reviewed new source pin "
-            "before host execution; report that blocker honestly. No candidate "
-            "driver or arbitrary command is executed outside the sandbox. "
-            "Host results will be appended to your report; do not claim them "
-            "in advance. On host failure inspect each run's "
-            "plasma-fpga-build-diagnostics.json and preserve the first failure.\n"
-        )
-    prompt += (
-        "In Development Mode, the existing Path 3 engineer may use accessible "
-        "SWPC USB and TTY tools for hardware operations explicitly covered "
-        "by the Owner's Gate 1 objective. Linux DAC/ACL still applies. "
-        "Use the minimum sufficient experiment: stop after one genuine PASS; "
-        "after FAIL diagnose and make a targeted retest. No Program, Readback "
-        "or Verify quota applies. Within owner-approved Path 3 scope, use the "
-        "enrolled Z2 SSH/sudo route for development deployment and privileged "
-        "FPGA Manager/MMIO tasks when real permissions permit. Do not inherit "
-        "Path 2-only Project/Stage restrictions as Path 3 business policy. "
-        "Keep live voltage, device ownership, image identity, and Golden "
-        "Restore protections; do not bypass an OS permission denial or "
-        "change sudoers. SWPC Codex remains non-root. "
-        "Never claim a physical PASS without actual evidence.\n"
-    )
-    if output_path:
-        prompt += (
-            "For this legacy task, also update " + output_path +
-            " when useful and record its ACTUAL complete output as text "
-            "plus a short .test.log, but do not restrict other engineering "
-            "edits merely to satisfy the old generated-file convention.\n"
         )
     command = [
         "codex", "--ask-for-approval", "never",
