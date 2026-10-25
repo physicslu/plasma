@@ -51,6 +51,7 @@ done
 for required in \
   .plasma-path2-source-commit \
   "$module_file" \
+  pl/hil/approved-fpga-image.json \
   pl/hil/path2_z2_target_guard.py \
   pl/hil/swd04/one_shot.py \
   pl/hil/swd04/development.py \
