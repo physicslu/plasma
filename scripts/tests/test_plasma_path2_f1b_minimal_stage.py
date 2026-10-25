@@ -139,8 +139,8 @@ class RepeatableStageTests(unittest.TestCase):
         """Guard injected denial: no Root port or FPGA write may start."""
         with patch.object(stage, "approved_image",
                           side_effect=stage.LiveStageDenied(
-                              "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED")) as gate, \\
-             patch.object(stage.guard, "RootZ2TargetPort") as target_port, \\
+                              "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED")) as gate, \
+             patch.object(stage.guard, "RootZ2TargetPort") as target_port, \
              patch.object(one_shot, "manager_write") as writer:
             with self.assertRaisesRegex(stage.LiveStageDenied,
                                         "IMAGE_RELEASE_NOT_ROOT_AUTHORIZED"):
