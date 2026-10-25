@@ -70,6 +70,72 @@ class RouteContracts(unittest.TestCase):
             self.assertFalse(result["auto_download_after_build_success"])
             self.assertFalse(result["auto_test_after_download_success"])
 
+    def test_legacy_stage_bindings_preserve_identity_and_fail_closed(self):
+        expected = {
+            "z2-path2-download": "download",
+            "z2-path2-testing": "test",
+            "z2-path2-restore": "restore",
+            "z2-path2-full-hil": "full",
+        }
+        self.assertEqual(dispatch.LEGACY_PATH2_STAGE_TASKS, expected)
+        self.assertEqual(dispatch.LEGACY_PATH2_STAGE_PROJECT,
+                         "pl/projects/z2-fixed-unified-site1")
+        for task_id, stage in expected.items():
+            task = dispatch.task_by_id(self.registry, task_id)
+            self.assertEqual(task["stage"], stage)
+            approved = dispatch.authorize(event(task_id), context(), self.registry)
+            self.assertEqual(approved["task_id"], task_id)
+            self.assertEqual(approved["execution_capability"], "path2-stage-contract")
+            for change in (
+                {"stage": "restore" if stage != "restore" else "test"},
+                {"stage": "build"},
+                {"project": "pl/projects/z2-swd-bluepill"},
+                {"capability": "cpu-only"},
+                {"execution_path": "path3-codex"},
+                {"argv": ["--load"]},
+            ):
+                reg = copy.deepcopy(self.registry)
+                reg["tasks"][task_id].update(change)
+                with self.subTest(task_id=task_id, change=change):
+                    with self.assertRaisesRegex(
+                            dispatch.Denied, "PATH2_STAGE_TASK_FIELDS_DENIED"):
+                        dispatch.task_by_id(reg, task_id)
+
+    def test_fixed_full_and_dynamic_single_route_are_still_separate(self):
+        registered = Mock(return_value={"status": "MOCK_SINGLE_STAGE"})
+        full = Mock(return_value={"status": "MOCK_FULL_HIL"})
+        with patch.object(runtime, "registered_hardware_stage", registered), (
+                patch.object(runtime, "full_hil_sequence", full)):
+            for task_id, stage in dispatch.LEGACY_PATH2_STAGE_TASKS.items():
+                registered.reset_mock()
+                full.reset_mock()
+                task = dispatch.task_by_id(self.registry, task_id)
+                result = dispatch.run_task(task, approval=approval(task_id))
+                if stage == "full":
+                    self.assertEqual(result["status"], "MOCK_FULL_HIL")
+                    full.assert_called_once()
+                    registered.assert_not_called()
+                else:
+                    self.assertEqual(result["status"], "MOCK_SINGLE_STAGE")
+                    registered.assert_called_once()
+                    full.assert_not_called()
+            registered.reset_mock()
+            full.reset_mock()
+            dynamic = {
+                "execution_path": "path2-cli",
+                "capability": "path2-stage-contract",
+                "project": "pl/projects/z2-fixed-unified-site1",
+                "stage": "download",
+                "work_order_sha256": "b" * 64,
+            }
+            result = dispatch.run_task(dynamic, approval={
+                **approval("z2-path2-download"), "task_id": "path2-work-order",
+                "work_order_sha256": "b" * 64, "authorized_stage": "download"
+            })
+            self.assertEqual(result["status"], "MOCK_SINGLE_STAGE")
+            registered.assert_called_once()
+            full.assert_not_called()
+
     def test_flags_are_owner_selected_and_independent(self):
         cases = (("z2-path2-build", "", False, False),
                  ("z2-path2-build", " --auto-download", True, False),
