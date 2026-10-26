@@ -187,10 +187,10 @@ the actual command and physical effect, not the technology label `SW` or
 - **Path 3 is not Host-only.** The existing SWPC Codex Path 3, without
   another mode, session or Work Order capability, can use owner-approved
   USB/TTY engineering instruments through the worker's existing Linux
-  DAC/ACL rights. The rootless outer Codex device namespace presents
-  /dev/bus/usb and current /dev/ttyACM* and /dev/ttyUSB* device nodes.
-  This intentionally has no per-DUT or VID/PID visibility filter: the owner
-  operates a prototype laboratory and authorizes the work in Gate 1.
+  DAC/ACL rights. The Dispatcher and launcher must not override Codex
+  Approval, Sandbox, networking or impose a per-device mount allowlist;
+  Codex inherits the operator's effective configuration and the worker's
+  actual Linux privileges. The owner authorizes physical work in Gate 1.
   Device visibility is not an authorization to actuate outside that task.
   Path 2 protected Z2 operations use the existing trusted-main
   Dispatcher, SSH/sudo operation transport and Protected Root Entry.

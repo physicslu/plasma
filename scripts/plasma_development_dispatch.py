@@ -1107,17 +1107,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
         )
-    command = [
-        "codex", "--ask-for-approval", "never",
-        "-c", "sandbox_workspace_write.network_access=false",
-        "exec", "--json", "--sandbox", "workspace-write", "-",
-    ]
-    if executor is subprocess.run:
-        # Production Path 3: one rootless OS-level device-visible namespace.
-        # The inner Codex sandbox cannot access the real host's other /dev.
-        # Offline tests inject an inert executor and retain the legacy argv.
-        import plasma_development_codex_sandbox as codex_sandbox
-        command = codex_sandbox.codex_command(root)
+    # No Dispatcher override of Codex approval, sandbox, network or devices.
+    # Operator configuration, OS DAC/ACL and protected hardware guards apply.
+    command = ["codex", "exec", "--json", "-"]
     usage = CodexUsageCollector()
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.

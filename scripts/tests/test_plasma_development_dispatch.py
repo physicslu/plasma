@@ -642,7 +642,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
             self.assertIn("--json",calls[0][0])
-            self.assertIn("workspace-write",calls[0][0])
+            self.assertEqual(calls[0][0], ["codex", "exec", "--json", "-"])
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
             self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
             self.assertIsNone(receipt["codex_usage"]["input_tokens"])
@@ -742,11 +742,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertIsNone(audit["repo_root_agents_bytes"])
         self.assertEqual(audit["actual_instruction_load_status"], "NOT_VERIFIED")
         argv = seen[0][0]
-        self.assertEqual(argv, [
-            "codex", "--ask-for-approval", "never",
-            "-c", "sandbox_workspace_write.network_access=false",
-            "exec", "--json", "--sandbox", "workspace-write", "-",
-        ])
+        self.assertEqual(argv, ["codex", "exec", "--json", "-"])
 
     def test_jsonl_usage_receipt_and_secret_redaction(self):
         secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"
@@ -1105,8 +1101,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertIn("module host_fixture",rtl.read_text())
             args,kwargs=calls[0]
             self.assertEqual(kwargs["timeout"],None)
-            self.assertIn("workspace-write",args)
-            self.assertIn("sandbox_workspace_write.network_access=false",args)
+            self.assertEqual(args, ["codex", "exec", "--json", "-"])
         workflow=WORKFLOW.read_text()
         codex_job=workflow.split("  development-codex:",1)[1]
         self.assertIn("timeout-minutes: 360",codex_job)
@@ -1824,6 +1819,18 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(observed["timeout"], 180)
             self.assertEqual(receipt["verification"], "exit-code")
 
+    def test_path2_cpu_sandbox_does_not_wrap_authorized_root_route(self):
+        # This mock verifies route isolation without touching any hardware.
+        with patch("plasma_path2_runtime_integration.direct_root_operation",
+                   return_value={"status": "MOCK_ONLY"}) as protected:
+            result = dev.run_task(
+                {"capability": "z2-root-operation", "operation": "download"},
+                approval={"execution_capability": "z2-root-operation"},
+                sandbox=True,
+            )
+        self.assertEqual(result["status"], "MOCK_ONLY")
+        protected.assert_called_once()
+
     def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):
         base = self._order("path2-cli")
         base.pop("scope")
@@ -2106,7 +2113,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 task_id="path3-work-order")
             self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(len(calls), 1)
-            self.assertIn("sandbox_workspace_write.network_access=false", captured_commands[0])
+            self.assertEqual(captured_commands[0],
+                             ["codex", "exec", "--json", "-"])
 
 
 class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
@@ -2146,9 +2154,10 @@ class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
             self.assertTrue(kwargs["capture_output"])
             self.assertTrue(kwargs["text"])
             self.assertEqual(kwargs["timeout"], 240)
-            self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
-            self.assertIn("sandbox_workspace_write.network_access=false", command)
-            self.assertIn('sandbox_mode="workspace-write"', command)
+            self.assertEqual(command[:3], ["codex", "exec", "--json"])
+            self.assertNotIn("--ask-for-approval", command)
+            self.assertNotIn("--sandbox", command)
+            self.assertNotIn("sandbox_workspace_write.network_access=false", command)
             if len(calls) == 1:
                 self.assertNotIn("resume", command)
                 self.assertIn(self.NONCE, prompt)

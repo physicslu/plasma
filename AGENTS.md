@@ -60,7 +60,7 @@ When statements disagree: (1) executable code/check-in config, (2) scripts/plasm
 ## 4. Execution zones
 
 - **Cloud / GitHub-hosted:** source changes, deterministic host-only tests, PR/CI. Never claim real SWPC, FPGA, voltage, Z2 or DUT success from these.
-- **SWPC / integration host:** licensed builds, scoped host validation and owner-authorized USB/TTY experiments by existing Path 3 Codex. The rootless Codex device namespace exposes /dev/bus/usb and current /dev/ttyACM* and /dev/ttyUSB* nodes without per-VID/PID core allowlists; real Linux DAC/ACL continues to apply. Check workspace branch/state before changes; never overwrite unrelated work.
+- **SWPC / integration host:** licensed builds, scoped host validation and owner-authorized USB/TTY experiments by existing Path 3 Codex. Path 3 inherits operator Codex Approval/Sandbox/network settings and the runner's real Linux DAC/ACL device access; no Dispatcher-enforced hardware device allowlist is applied. Check workspace branch/state before changes; never overwrite unrelated work.
 - **Z2 / hardware:** real FPGA/PS/PL/DUT operations only with explicit Gate 1 and effective guard/ownership/recovery checks. Hardware observations are not inherited from software success.
 - Default workspace is the PLASMA repository. Do not inspect unrelated personal files, system settings, credential stores or external repos except already-authorized task-specific resources.
 

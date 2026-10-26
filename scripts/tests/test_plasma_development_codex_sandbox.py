@@ -99,9 +99,8 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
         self.assertIn("--ro-bind", args)
         self.assertEqual(args[args.index("--tmpfs") + 1], "/run")
         self.assertIn("--unsetenv", args)
-        self.assertIn("--sandbox", args)
-        self.assertEqual(args[args.index("--sandbox") + 1],
-                         "danger-full-access")
+        self.assertNotIn("--sandbox", args)
+        self.assertNotIn("--ask-for-approval", args)
         self.assertIn(str(home / ".ssh"), args)
         self.assertEqual(args.count("--dev-bind"), 3)
         self.assertEqual(args[-1], "-")
@@ -144,9 +143,7 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
                     sandbox.codex_command(work, home=home,
                                           usb_root=usb, dev_root=dev)
 
-    def test_real_runner_launch_calls_outer_namespace_not_raw_codex(self):
-        # Production path selection is selected by the actual subprocess.run
-        # identity, not by a prompt or a new Work Order/Session field.
+    def test_real_runner_launch_inherits_codex_config(self):
         class Result:
             returncode = 0
             stdout = b""
@@ -156,13 +153,13 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
             with patch.object(dispatcher.subprocess, "run",
                               return_value=Result()) as run, \
                  patch.object(sandbox, "codex_command",
-                              return_value=["bwrap", "--", "codex", "-"]) as outer:
+                              side_effect=AssertionError("unexpected sandbox")) as outer:
                 receipt = dispatcher.run_codex_task(
                     {"objective": "Owner approved development work."},
                     workspace=work, executor=run)
-            outer.assert_called_once_with(work)
+            outer.assert_not_called()
             self.assertEqual(run.call_args.args[0],
-                             ["bwrap", "--", "codex", "-"])
+                             ["codex", "exec", "--json", "-"])
             self.assertEqual(receipt["codex_exit_code"], 0)
 
     def test_sandbox_error_receipt_is_constant_not_a_host_path(self):
@@ -226,8 +223,8 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
         self.assertNotIn("lab-session", source)
         self.assertNotIn("program_limit", source)
         run = inspect.getsource(dispatcher.run_codex_task)
-        self.assertIn("plasma_development_codex_sandbox", run)
-        self.assertIn("codex_sandbox.codex_command(root)", run)
+        self.assertNotIn("plasma_development_codex_sandbox", run)
+        self.assertIn('["codex", "exec", "--json", "-"]', run)
         self.assertNotIn("bluepill_flash", run)
 
 
