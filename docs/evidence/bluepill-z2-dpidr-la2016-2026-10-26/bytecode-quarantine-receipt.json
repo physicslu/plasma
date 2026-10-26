@@ -1,0 +1,28 @@
+{
+  "schema": "plasma.z2.protected-root.bytecode-quarantine.v1",
+  "observation_source": "direct Z2 terminal output; no raw file existed at execution time",
+  "root_error_before_quarantine": "PATH2_UNPINNED_BYTECODE_DENIED",
+  "source_root": "/root/plasma-path2-approved",
+  "quarantine_root": "/root/plasma-path2-bytecode-quarantine-20261026",
+  "result": "QUARANTINED",
+  "files": [
+    {
+      "relative_path": "pl/hil/__pycache__/fpga_image_root.cpython-310.pyc",
+      "mtime_utc": "2026-10-26T05:14:37Z",
+      "bytes": 18143,
+      "sha256": "2a77f9dd0872739a870c0fdeda4150babcd7e0c9eacd98fc6c4f9f2a8c8de22b"
+    },
+    {
+      "relative_path": "pl/hil/__pycache__/fpga_image_guard.cpython-310.pyc",
+      "mtime_utc": "2026-10-26T05:14:37Z",
+      "bytes": 11171,
+      "sha256": "1bea02d8497ef20355f06fdf6c9dcdcf085c22e6d8ef9eeff299676e4c4cd2ec"
+    },
+    {
+      "relative_path": "pl/hil/__pycache__/fpga_image_admission.cpython-310.pyc",
+      "mtime_utc": "2026-10-26T05:14:37Z",
+      "bytes": 4142,
+      "sha256": "962afe905e2f5b6fd6478682b91eb53775bafe41dea9851e6a1b51f30cde479b"
+    }
+  ]
+}
