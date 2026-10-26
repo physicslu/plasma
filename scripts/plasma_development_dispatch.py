@@ -1195,10 +1195,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
         )
-    # Ordinary work inherits the operator's Codex sandbox policy.
-    # Explicit Owner hardware mode changes ONLY this one child invocation;
-    # Linux DAC/ACL, Root Guard, device locks and recovery remain mandatory.
-    command = ["codex", "exec", "--json", "-"]
+    # Pin ordinary Path 3 inside a sandbox even if operator defaults change.
+    # Only the Owner-bound hardware Work Order can request unsandboxed Codex
+    # for this single child invocation; Root Guard and OS locks still apply.
+    command = ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"]
     if non_sandbox:
         command = ["codex", "exec", "--json",
                    "--sandbox", "danger-full-access", "-"]
@@ -1276,7 +1276,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_context_audit": context_audit,
         "codex_model_selection": codex_requested_model_settings(command),
         "codex_sandbox_request": ("danger-full-access" if non_sandbox
-                                  else "operator-inherited"),
+                                  else "workspace-write"),
         "codex_usage_path": str(usage_path.relative_to(root)),
         "codex_usage_sha256": digest(usage_path),
         "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",

@@ -143,7 +143,7 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
                     sandbox.codex_command(work, home=home,
                                           usb_root=usb, dev_root=dev)
 
-    def test_real_runner_launch_inherits_codex_config(self):
+    def test_real_runner_launch_pins_workspace_write(self):
         class Result:
             returncode = 0
             stdout = b""
@@ -159,7 +159,7 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
                     workspace=work, executor=run)
             outer.assert_not_called()
             self.assertEqual(run.call_args.args[0],
-                             ["codex", "exec", "--json", "-"])
+                             ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
             self.assertEqual(receipt["codex_exit_code"], 0)
 
     def test_sandbox_error_receipt_is_constant_not_a_host_path(self):
@@ -224,7 +224,7 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
         self.assertNotIn("program_limit", source)
         run = inspect.getsource(dispatcher.run_codex_task)
         self.assertNotIn("plasma_development_codex_sandbox", run)
-        self.assertIn('["codex", "exec", "--json", "-"]', run)
+        self.assertIn('["codex", "exec", "--json", "--sandbox", "workspace-write", "-"]', run)
         self.assertNotIn("bluepill_flash", run)
 
 

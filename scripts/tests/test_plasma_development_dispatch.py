@@ -642,7 +642,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
             self.assertIn("--json",calls[0][0])
-            self.assertEqual(calls[0][0], ["codex", "exec", "--json", "-"])
+            self.assertEqual(calls[0][0], ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
             self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
             self.assertIsNone(receipt["codex_usage"]["input_tokens"])
@@ -742,7 +742,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertIsNone(audit["repo_root_agents_bytes"])
         self.assertEqual(audit["actual_instruction_load_status"], "NOT_VERIFIED")
         argv = seen[0][0]
-        self.assertEqual(argv, ["codex", "exec", "--json", "-"])
+        self.assertEqual(argv, ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
 
     def test_jsonl_usage_receipt_and_secret_redaction(self):
         secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"
@@ -1101,7 +1101,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertIn("module host_fixture",rtl.read_text())
             args,kwargs=calls[0]
             self.assertEqual(kwargs["timeout"],None)
-            self.assertEqual(args, ["codex", "exec", "--json", "-"])
+            self.assertEqual(args, ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
         workflow=WORKFLOW.read_text()
         codex_job=workflow.split("  development-codex:",1)[1]
         self.assertIn("timeout-minutes: 360",codex_job)
@@ -2239,7 +2239,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(len(calls), 1)
             self.assertEqual(captured_commands[0],
-                             ["codex", "exec", "--json", "-"])
+                             ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
 
 
 class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
