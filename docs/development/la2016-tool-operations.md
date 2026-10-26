@@ -58,13 +58,17 @@ root = pathlib.Path('/sys/bus/usb/devices')
 found = []
 for entry in root.iterdir():
     try:
-        if (entry.joinpath('idVendor').read_text().strip().lower(),
-            entry.joinpath('idProduct').read_text().strip().lower()) != ('77a1', '01a2'):
-            continue
+        vid = entry.joinpath('idVendor').read_text().strip().lower()
+        pid = entry.joinpath('idProduct').read_text().strip().lower()
+    except (OSError, ValueError):
+        continue  # 其他 USB 介面節點並非獨立 USB Device
+    if (vid, pid) != ('77a1', '01a2'):
+        continue
+    try:
         bus = int(entry.joinpath('busnum').read_text())
         dev = int(entry.joinpath('devnum').read_text())
         if not 1 <= bus <= 999 or not 1 <= dev <= 999:
-            continue
+            raise RuntimeError('LA_USB_BUS_DEVICE_INVALID')
         node = pathlib.Path(f'/dev/bus/usb/{bus:03}/{dev:03}')
         if not stat.S_ISCHR(node.stat().st_mode) or not os.access(node, os.R_OK | os.W_OK):
             raise RuntimeError('LA_USB_DAC_DENIED')
