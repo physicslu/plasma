@@ -54,12 +54,14 @@ cmp -s plasma-blue-pill-cdc.bin round-02-readback.bin
 # 設定為先前已驗證的 AppImage 絕對路徑
 SIGROK_APPIMAGE=/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage
 
-# 指向 SWPC 已存在且經驗證、內含 kingst-la-01a2.fw 的韌體資源路徑
-# 此值是本機受管控資訊：不得硬編造、提交私有路徑或透過任意下載補齊。
-export SIGROK_FIRMWARE_PATH="<verified existing firmware resource directory>"
+# 先執行 la2016-tool-operations.md 的受控初始化：
+# Codex 已動態查明 LA_CONN 和現有可讀的韌體資源路徑，不要手動填或覆蓋。
+: "${LA_CONN:?Run LA2016 live USB discovery first}"
+: "${SIGROK_FIRMWARE_PATH:?Run LA2016 firmware discovery first}"
+: "${OUT:?Set a fresh output .sr path first}"
 
 sha256sum "$SIGROK_APPIMAGE"
-# LA_CONN 由 LA2016 手冊的動態 USB 偵測程式提供；OUT 為本次新的檔名。
+# LA_CONN 由當次 sysfs 偵測產生，絕不使用上次成功的 bus.device。
 "$SIGROK_APPIMAGE" --appimage-extract-and-run --loglevel 3 \
   --driver "kingst-la2016:conn=$LA_CONN" \
   --config samplerate=5m \
