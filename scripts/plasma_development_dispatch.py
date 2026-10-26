@@ -1198,9 +1198,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     # Ordinary work inherits the operator's Codex sandbox policy.
     # Explicit Owner hardware mode changes ONLY this one child invocation;
     # Linux DAC/ACL, Root Guard, device locks and recovery remain mandatory.
-    command = (["codex", "exec", "--json"] +
-               (["--sandbox", "danger-full-access"] if non_sandbox else []) +
-               ["-"])
+    command = ["codex", "exec", "--json", "-"]
+    if non_sandbox:
+        command = ["codex", "exec", "--json",
+                   "--sandbox", "danger-full-access", "-"]
     usage = CodexUsageCollector()
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.
