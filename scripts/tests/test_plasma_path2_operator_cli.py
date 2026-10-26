@@ -98,7 +98,7 @@ class Path2OperatorCLI(unittest.TestCase):
         self.assertEqual(kwargs["timeout"], 600)
         self.assertFalse(kwargs.get("shell", False))
         self.assertEqual(result["status"],
-                         "REAL_HARDWARE_CLI_EVIDENCE_REVIEW_REQUIRED")
+                         "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED")
         self.assertEqual(result["physical_hil"], "NOT_VERIFIED")
         self.assertEqual(result["exit_code"], 0)
 
