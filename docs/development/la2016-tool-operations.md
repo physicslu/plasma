@@ -15,6 +15,8 @@
 | 2026-10-23 被動 SWD | CH0 = Blue Pill PA14/SWCLK、CH1 = PA13/SWDIO、CH2 = 3.3V 邏輯狀態；共地 |
 | 2026-10-16 獨立 Loopback | KINGST PWM1 → **同一台** KINGST CH0；與 Blue Pill SWD 測試是完全不同接線 |
 
+**動態辨識：** 本手冊只固定 USB VID:PID `77a1:01a2` 作為識別條件，不固定 `busnum`、`devnum`、`/dev/bus/usb/...` 路徑；Codex／Supervisor 必須在每一次工作執行時查詢並檢查唯一設備、存取權限及佔用狀態。
+
 **相容性注意：** 系統內建 `sigrok-cli` 不必然包含 `kingst-la2016` 驅動，不能因為 PATH 有 sigrok 就替代上述指定 AppImage。歷史證據沒有要求在每次採樣時重新上傳 LA FPGA Firmware；不應額外加入未知初始化步驟。
 
 ### 受控初始化（兩種模式共用）
@@ -24,13 +26,68 @@ SIGROK_APPIMAGE=/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage
 sha256sum "$SIGROK_APPIMAGE"
 # 比對上方已釘選的完整 SHA256；不符合就停止。
 
-# 必須使用 SWPC 上「已存在、已驗證」的 kingst-la-01a2.fw 資源目錄。
-# 這不是預設的公開固定路徑；不能抄錄其他機器的私有路徑或任意下載取代。
-export SIGROK_FIRMWARE_PATH="<existing verified firmware directory>"
+# 先沿用既有受控工作環境所設定的 SIGROK_FIRMWARE_PATH。
+# 若未設定，Codex 要在現場查找「既有」kingst-la-01a2.fw，
+# 只搜尋既有受控工具／韌體／工作目錄，選定單一來源；不可猜路徑或下載。
+if [ -z "${SIGROK_FIRMWARE_PATH:-}" ]; then
+  mapfile -t FW_FILES < <(
+    for root in /opt/plasma /usr/share/sigrok-firmware /usr/local/share/sigrok-firmware "$PWD/.work"; do
+      [ -d "$root" ] || continue
+      find "$root" -type f -name kingst-la-01a2.fw -print 2>/dev/null
+    done | sort -u
+  )
+  [ "${#FW_FILES[@]}" -eq 1 ] || {
+    echo "LA_FIRMWARE_MISSING_OR_AMBIGUOUS (search previous verified SWPC context)" >&2
+    exit 1
+  }
+  export SIGROK_FIRMWARE_PATH="$(dirname "${FW_FILES[0]}")"
+fi
+[ -r "$SIGROK_FIRMWARE_PATH/kingst-la-01a2.fw" ] || {
+  echo "LA_FIRMWARE_RESOURCE_NOT_READABLE" >&2
+  exit 1
+}
+# 在實際啟動前核對既有資源來源與 SHA（若歷史紀錄有其 digest）。
+# 不把本機私有資源位置或未公開的 USB 詳細識別碼寫入 Git。
 
-# 操作員透過當下 USB/sysfs 列舉取得實際的 KINGST 連線編號。
-# 只允許指向目前這一台 77a1:01a2，而非猜測歷史 bus.device。
-LA_CONN="<current kingst-la2016 connection>"
+# 動態查找 USB 77a1:01a2；每次執行時從 sysfs 重新取得 busnum/devnum。
+# 沿用 scripts/plasma-codex-la2016.py 的唯一裝置、權限、fuser 策略。
+# 不寫死 /dev/bus/usb/001/030 等歷史節點，也不輸出 USB 序號。
+LA_CONN="$(python3 - <<'PY'
+import os, pathlib, stat, subprocess, sys
+root = pathlib.Path('/sys/bus/usb/devices')
+found = []
+for entry in root.iterdir():
+    try:
+        if (entry.joinpath('idVendor').read_text().strip().lower(),
+            entry.joinpath('idProduct').read_text().strip().lower()) != ('77a1', '01a2'):
+            continue
+        bus = int(entry.joinpath('busnum').read_text())
+        dev = int(entry.joinpath('devnum').read_text())
+        if not 1 <= bus <= 999 or not 1 <= dev <= 999:
+            continue
+        node = pathlib.Path(f'/dev/bus/usb/{bus:03}/{dev:03}')
+        if not stat.S_ISCHR(node.stat().st_mode) or not os.access(node, os.R_OK | os.W_OK):
+            raise RuntimeError('LA_USB_DAC_DENIED')
+        found.append((f'{bus}.{dev}', node))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError('LA_USB_SYSFS_OR_NODE_ERROR') from exc
+if len(found) != 1:
+    raise SystemExit(f'LA2016_UNIQUE_USB_MAPPING_FAILED: {len(found)} candidates')
+try:
+    check = subprocess.run(['fuser', '-s', str(found[0][1])], timeout=3,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+except (OSError, subprocess.TimeoutExpired) as exc:
+    raise SystemExit('LA_USB_OWNER_CHECK_UNAVAILABLE') from exc
+if check.returncode != 1:  # 0=busy, 1=free, other=uncertain
+    raise SystemExit('LA_USB_BUSY_OR_OWNER_UNCERTAIN')
+print(found[0][0])
+PY
+)" || exit 1
+test -n "$LA_CONN" || exit 1
+export LA_CONN
+
+# 若要同時比較 ST-LINK，從當前 USB 列舉查詢，不用歷史 Bus/Device 值：
+# lsusb -d 0483:  # 只作盤點；實際 ST-LINK 身分使用 st-info --probe 確認
 
 # 下列命令是輸入採樣；沒有 PWM1 enable / generator 輸出。
 "$SIGROK_APPIMAGE" --appimage-extract-and-run --loglevel 3 \
