@@ -70,13 +70,12 @@ pl/
 
 目前 `btled` 只是開發流程驗證範例；正式 Plasma RTL 將依功能放在 `rtl/site/`、`rtl/bus/`、`rtl/top/`，並依 SWD/SPI/I2C 等實際介面需求建立 protocol-specific modules。
 
-## 首個 FPGA SWD EMIO / Identity 建置候選
+## 現行 Blue Pill SWD PoC 與退休路徑
 
-- [PYNQ-Z2 SWD EMIO GPIO + PL Identity 工程](projects/z2-swd-gpio/README.md)：Site 1 的 SWD GPIO proof-of-path、AXI4-Lite Identity ABI v1、Bitstream + HWH + Manifest、SWPC 一鍵 Vivado Build；尚未完成 Vivado/HIL 實證。
-- `rtl/site/swd_emio_bridge.sv` 是 PS EMIO GPIO 的 PL 腳位橋接；**不是**高速 FPGA SWD Master。
-- `rtl/bus/pl_identity_axi_lite.sv` 是首個 PS 可讀的 PL Identity register block。
-- [LT02 five-aperture PS↔PL MMIO Loopback Vivado candidate](projects/z2-lt02-axi/README.md)：保留原四個內部 Fixture Apertures，新增獨立 2 KiB AXI Scratchpad；僅建立 source、HWH 驗證與 SWPC Build，未宣稱新 Bitstream 或 Z2 HIL PASS。
-- [LT02-05 實體 Z2 Native MMIO HIL](hil/lt02/README.md)：使用正式 Python Driver 與 5 Aperture FPGA candidate，具備自動化前置安全檢查及資料測試；目前僅來源與 Host CI 驗證，實體 HIL 尚未執行。\n- `btled` 仍保留獨立教學範例，不作 Production IC programming qualification。
+- **Current Path 3:** Z2 **PS-local ARMv7 OpenOCD → UNIX WordPort/RemoteBitbang → PL SWD Image → PMOD → Blue Pill**；實際載入/DPIDR 必須有本次 HIL 收據。請見根目錄 `AGENTS.md`、[`bluepill-wordport-session.py`](../scripts/bluepill-wordport-session.py) 及 [Blue Pill Image Manifest](projects/z2-bluepill-rbb/image-manifest.json)。
+- **RETIRED:** [`z2-swd-gpio`](projects/z2-swd-gpio/README.md) 是舊 PS EMIO GPIO software bit-bang；舊建置入口已停用。
+- **RETIRED:** [`z2-swd03-axi`](projects/z2-swd03-axi/README.md) 是 FPGA 內部合成 DPIDR，沒有對 Blue Pill 的 PMOD SWD 外部訊號。
+- [相依盤點／舊文件判讀與防誤用準則](../docs/development/swd-legacy-path-retirement.md)。保留的共用 Identity、Board Files、RTL、LT02 合成測試不能替代實體 SWD PASS。
 
 ## 快速測試
 
