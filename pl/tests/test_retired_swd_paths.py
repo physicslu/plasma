@@ -45,3 +45,26 @@ def test_current_contract_and_shared_dependencies():
     for symbol in ("swd03_dpidr_responder.sv", "plasma_vivado_host_build.py",
                    "bluepill-wordport-session.py", "pl/hil/swd04/"):
         assert symbol in inventory
+
+
+@pytest.mark.parametrize("module,tag", [
+    ("pl.hil.swd04.one_shot", "RETIRED_SWD05_INTERNAL_IMAGE_CLI"),
+    ("pl.hil.swd04.native_qualify", "RETIRED_SWD04_SYNTHETIC_MMIO_CLI"),
+])
+def test_legacy_internal_hil_command_line_rejects_execution(module, tag):
+    """Static fail-closed CLI check; no USB, FPGA Manager or /dev/mem."""
+    source = (ROOT / (module.replace(".", "/") + ".py")).read_text()
+    assert source.count('if __name__ == "__main__":') == 1
+    code = source.split('if __name__ == "__main__":', 1)[1]
+    assert tag in code
+    assert "raise SystemExit(2)" in code
+
+
+def test_loopback_and_fixed_abi_are_not_external_swd():
+    inventory = (ROOT / "docs/development/swd-legacy-path-retirement.md").read_text()
+    for name in ("pl.hil.pspl02.runner", "pl.hil.lt02.native",
+                 "z2-fixed-unified-site1", "scripts/plasma-z2-smoke.sh"):
+        assert name in inventory
+    for name in ("pl/hil/fpga_image_root.py", "pl/hil/path2_z2_target_guard.py",
+                 "pl/hil/swd04/one_shot.py", "scripts/bluepill-wordport-session.py"):
+        assert (ROOT / name).is_file()
