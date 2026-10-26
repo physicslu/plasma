@@ -238,6 +238,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # Permit non-executing --help introspection needed by offline CI.
+    if len(sys.argv) == 2 and sys.argv[1] in ("-h", "--help"):
+        raise SystemExit(main())
     # Retire only the direct legacy hardware CLI; preserve imported Root,
     # FPGA safety, ownership and source-level test helpers.
     print("RETIRED_SWD04_SYNTHETIC_MMIO_CLI: historical internal-fixture CLI retired; "
