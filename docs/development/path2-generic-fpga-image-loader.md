@@ -1,4 +1,13 @@
-# Path 2 — Direct CLI to existing Protected Z2 Root Entry (merged PR #1167)
+# Historical Path 2 Protected Root Entry — image lifecycle and recovery (merged PR #1167)
+
+> **2026-10-26 retirement note:** The former `z2-root-operation` Work Order
+> with `download|test|restore` is no longer admitted by the current Path 2
+> Dispatcher. The independent protected FPGA image Root Entry and tested Golden
+> recovery code remain installed/available subject to actual OS authorization.
+> Current general Path 2 Work Orders use `capability: operator-cli` without a
+> fixed operation list or F1-B Project binding. All F1-B PASS data below are
+> *historical*, not evidence of Blue Pill SWD or current hardware readiness.
+
 
 **Verified status as of 2026-10-25:** PR #1167 is merged into `main`.
 Operator SSH deployment and its F1-B Download → 3-read MMIO Test →

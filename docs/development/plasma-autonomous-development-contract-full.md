@@ -192,9 +192,16 @@ the actual command and physical effect, not the technology label `SW` or
   Codex inherits the operator's effective configuration and the worker's
   actual Linux privileges. The owner authorizes physical work in Gate 1.
   Device visibility is not an authorization to actuate outside that task.
-  Path 2 protected Z2 operations use the existing trusted-main
-  Dispatcher, SSH/sudo operation transport and Protected Root Entry.
-  No Stage Adapter or Stage/Profile selector is part of the current path. After Gate 1 owner approval, Path 3
+  Legacy protected Z2 FPGA Image lifecycle operations use the existing
+  trusted-main Dispatcher, SSH/sudo operation transport and Protected Root
+  Entry. The general Path 2 `operator-cli` capability instead executes
+  an exact owner-approved, source-pinned Python script in the existing
+  non-root SWPC Runner, without a fixed operation or F1-B project selector.
+  It grants no new OS/Root privilege; scripts handling real hardware must
+  enforce B1/B2/B3, device ownership, safe output state and recovery. Neither
+  ordinary process exit 0 nor a hosted mock establishes SWD/Flash PASS.
+  No Stage Adapter or Stage/Profile selector is part of the current path.
+  After Gate 1 owner approval, Path 3
   may use the enrolled Z2 SSH/sudo development route to install reviewed
   code and operate FPGA Manager/MMIO within the authorized hardware goal.
   Actual OS privilege, electrical/device ownership, image identity and
@@ -1224,16 +1231,19 @@ This policy is not an OS sandbox. Editor/agent permissions should still enforce 
 
 ### Development Z2 Root operation boundary
 
-Current Path 2 protected Z2 operations use an owner-authorized Work Order
-with `capability: z2-root-operation`, `scope: guarded-hardware` and one
-`operation: download|test|restore`. The existing trusted-main Dispatcher
-and SWPC SSH/sudo transport call the installed two-argument Protected Root
-Entry (`operation + source_sha`). That Bash entry validates effective root,
-root-owned source commit/SHA256 manifest and allowed operation; it then
-executes the reviewed Python Root implementation `pl.hil.fpga_image_root`.
-There is no runtime Stage Adapter, Project Profile, selectable module or
-independent second Root Executor. Historical transport function/receipt
-names containing `stage` are compatibility details, not operation admission.
+The former Path 2 `z2-root-operation` fixed Work Order was retired from
+the trusted Dispatcher on 2026-10-26; new owner Work Orders must use the
+generic `operator-cli` for permitted, source-pinned non-root SWPC execution.
+This is **not** an implicit grant of sudo, SSH, MMIO or target programming.
+
+The independent protected FPGA Image lifecycle/recovery interface remains
+the installed two-argument Root Entry (`operation + source_sha`). That
+entry validates effective root, a root-owned source SHA256 manifest and
+the executable source pin; its reviewed `pl.hil.fpga_image_root` handles
+FPGA image/Golden operations. Its internal fixed lifecycle vocabulary
+must not be generalized into an arbitrary root shell or driver selector.
+Historical transport function/receipt names containing `stage` are
+compatibility details, not new Dispatcher admission.
 
 Path 3 may use its separately enrolled SSH/sudo development route within
 owner-approved Gate 1 scope and actual OS/device safety boundaries; it does

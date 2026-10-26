@@ -138,13 +138,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
+          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py scripts/tests/test_plasma_path2_operator_cli.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 -m py_compile scripts/plasma_development_codex_sandbox.py scripts/tests/test_plasma_development_codex_sandbox.py
           python3 scripts/tests/test_plasma_development_codex_sandbox.py
           python3 -m py_compile scripts/plasma-codex-hardware-parity.py scripts/tests/test-plasma-codex-hardware-parity.py
           python3 scripts/tests/test-plasma-codex-hardware-parity.py
           python3 scripts/tests/test_plasma_development_dispatch.py
+          python3 scripts/tests/test_plasma_path2_operator_cli.py
           python3 scripts/tests/test_plasma_path3_cross_job_resume.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
@@ -429,7 +430,7 @@ jobs:
       (
         (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
          (
-          contains(fromJSON('["cpu-only","vivado-host-build","z2-root-operation"]'),
+          contains(fromJSON('["cpu-only","vivado-host-build","operator-cli"]'),
                    needs.development-authorize.outputs.execution_capability) ||
           (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
            needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
@@ -441,7 +442,7 @@ jobs:
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || 5 }}
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.execution_capability == 'operator-cli' && 35 || 5 }}
     permissions:
       contents: read
       actions: read
