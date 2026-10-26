@@ -1,5 +1,7 @@
 """Retired Z2 SWD project guards; does not access Vivado, USB or Z2."""
 import subprocess
+import sys
+import os
 from pathlib import Path
 import pytest
 
@@ -68,3 +70,22 @@ def test_loopback_and_fixed_abi_are_not_external_swd():
     for name in ("pl/hil/fpga_image_root.py", "pl/hil/path2_z2_target_guard.py",
                  "pl/hil/swd04/one_shot.py", "scripts/bluepill-wordport-session.py"):
         assert (ROOT / name).is_file()
+
+
+@pytest.mark.parametrize("module,tag", [
+    ("pl.hil.swd04.one_shot", "RETIRED_SWD05_INTERNAL_IMAGE_CLI"),
+    ("pl.hil.swd04.native_qualify", "RETIRED_SWD04_SYNTHETIC_MMIO_CLI"),
+])
+def test_direct_legacy_cli_runtime_rejects_without_devices(module, tag):
+    """Actually execute only the retired module gate; never pass live flags or paths."""
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join((str(ROOT), str(ROOT / "software/python")))
+    proc = subprocess.run([sys.executable, "-m", module], cwd=ROOT, env=env,
+                          capture_output=True, text=True, timeout=10)
+    assert proc.returncode == 2, proc.stderr
+    assert tag in proc.stderr
+    help_proc = subprocess.run([sys.executable, "-m", module, "--help"],
+                               cwd=ROOT, env=env, capture_output=True, text=True,
+                               timeout=10)
+    assert help_proc.returncode == 0, help_proc.stderr
+    assert "usage:" in help_proc.stdout.lower()
