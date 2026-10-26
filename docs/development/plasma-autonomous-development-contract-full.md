@@ -516,7 +516,7 @@ Never overwrite unrelated user changes.
 
 ### 4.3 Z2 target / hardware validation
 
-Z2 owns embedded runtime, PS/PL integration, FPGA loading, target-interface behavior, electrical behavior, and hardware validation.
+Z2 owns embedded runtime, PS/PL integration, FPGA loading, target-interface behavior, electrical behavior, and hardware validation. In the deployed PLASMA architecture, SWPC owns **Web / Controller / BFF**; Z2 PS owns the **OpenOCD process and PS-local WordPort/Remote Bitbang bridge**; Z2 PL owns the hardware SWD/SPI interface. SWPC may build and test OpenOCD offline, but must not host live OpenOCD or forward bit-level SWD transactions to Z2. See the normative [OpenOCD PS architecture](../architecture/ic-support-openocd-plan-executor.md); existing architecture-contract CI must reject placement drift.
 
 A passing Cloud, CI, or Mock test must never be reported as a passing Z2 or real-target test.
 

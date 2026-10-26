@@ -9,12 +9,15 @@ on:
       - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
+      - "scripts/tests/test-openocd-ps-architecture.py"
       - "scripts/tests/test-adr0002-cross-vendor-discovery.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
       - "scripts/ci/ppu-network-trigger.py"
       - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
+      - "scripts/bluepill-wordport-session.py"
       - "software/python/**"
       - "software/web/**"
       - ".github/workflows/python-tests.yml"
@@ -33,12 +36,15 @@ on:
       - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
+      - "scripts/tests/test-openocd-ps-architecture.py"
       - "scripts/tests/test-adr0002-cross-vendor-discovery.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
       - "scripts/ci/ppu-network-trigger.py"
       - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
+      - "scripts/bluepill-wordport-session.py"
       - "software/python/**"
       - "software/web/**"
       - ".github/workflows/python-tests.yml"
@@ -112,6 +118,9 @@ jobs:
           documentation_exact = {
               "scripts/tests/test-public-doc-sanitization.sh",
               "scripts/tests/test-documentation-integrity.py",
+              "scripts/tests/test-openocd-ps-architecture.py",
+              "scripts/plasmactl-z2-ps",
+              "scripts/bluepill-wordport-session.py",
               "scripts/tests/test-adr0002-cross-vendor-discovery.py",
               "scripts/plasmactl",
               "software/python/plasma_web/gateway_settings.py",
@@ -179,6 +188,8 @@ jobs:
         run: bash scripts/tests/test-public-doc-sanitization.sh
       - name: Test documentation integrity
         run: python scripts/tests/test-documentation-integrity.py
+      - name: Enforce Z2 PS OpenOCD architecture against implementation
+        run: python scripts/tests/test-openocd-ps-architecture.py --self-test
       - name: Enforce ADR-0002 single cross-vendor Phase policy
         run: python scripts/tests/test-adr0002-cross-vendor-discovery.py
 
