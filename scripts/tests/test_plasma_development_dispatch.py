@@ -1838,7 +1838,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             def stub(command, **kwargs):
                 observed["argv"] = command
                 return subprocess.CompletedProcess(command, 0, b"safe\\n", b"")
-            with patch.object(dev.shutil, "which", return_value="/usr/bin/bwrap"):
+            with patch.object(dev.shutil, "which", return_value=sys.executable):
                 result = dev.run_task(task, workspace=root, sandbox=True,
                                       executor=stub)
             self.assertEqual(result["status"], "PASS")
