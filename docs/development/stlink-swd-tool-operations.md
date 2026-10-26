@@ -22,7 +22,12 @@
 以下為 **2026-10-23 成功紀錄中的命令形式**。此處僅作文件保存；執行前仍須由具權限的操作流程確認單一 SWD Owner、供電電壓、USB 狀態、目標身分、Flash 位址、韌體來源與備份／回復計畫。
 
 ```bash
-# 1. 探測身份：先核對 target chip/flash，不寫入
+# 0. Codex/Operator 每次從當前 USB 裝置列舉確認 ST-LINK；不使用固定 Bus/Device 路徑。
+#    lsusb 僅協助盤點，不代表已取得 ST-LINK 排他操作權。
+lsusb -d 0483:
+
+# 1. 由 ST-LINK 工具動態選取已連接的裝置，探測 target chip/flash，不寫入。
+#    若有多個 ST-LINK，先明確識別唯一 DUT/Probe，禁止默認選第一個。
 st-info --probe
 
 # 2. 實際執行過的 ST-LINK 寫入命令，具有破壞性；
@@ -43,7 +48,7 @@ cmp -s plasma-blue-pill-cdc.bin round-02-readback.bin
 
 ## 3. LA2016 搭配 ST-LINK 的被動抓波形
 
-參考已成功保存的 [三輪 Golden Reference](../evidence/stlink-stm32f103-swd-reference/2026-10-23/README.md)，其原始 `.sr` 不可覆寫。先從即時 USB 列舉取得目前 `LA_CONN`（格式為 sigrok `kingst-la2016:conn=<current connection>`）；**不可重用歷史 USB Bus/Device 位址**。
+參考已成功保存的 [三輪 Golden Reference](../evidence/stlink-stm32f103-swd-reference/2026-10-23/README.md)，其原始 `.sr` 不可覆寫。執行本段前，**先直接執行 [LA2016 工具手冊](la2016-tool-operations.md)「受控初始化」內的 Python/sysfs 動態偵測命令**，由 Codex 產生當次 `LA_CONN`；不要手動提供 USB Path、Bus/Device 編號或複製歷史值。若非唯一裝置、權限不足或裝置遭占用，必須停止而不是任選。
 
 ```bash
 # 設定為先前已驗證的 AppImage 絕對路徑
@@ -54,7 +59,7 @@ SIGROK_APPIMAGE=/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage
 export SIGROK_FIRMWARE_PATH="<verified existing firmware resource directory>"
 
 sha256sum "$SIGROK_APPIMAGE"
-# LA_CONN 應來自最新 USB 列舉，OUT 為本次新的檔名。
+# LA_CONN 由 LA2016 手冊的動態 USB 偵測程式提供；OUT 為本次新的檔名。
 "$SIGROK_APPIMAGE" --appimage-extract-and-run --loglevel 3 \
   --driver "kingst-la2016:conn=$LA_CONN" \
   --config samplerate=5m \
