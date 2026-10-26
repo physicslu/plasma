@@ -149,23 +149,19 @@ class Contracts(unittest.TestCase):
                 with self.assertRaises(t.Blocked): t.execute('test',SHA,PROJECT)
                 remote.assert_not_called()
 
-    def test_candidate_python_is_not_loaded_for_direct_root(self):
+    def test_candidate_python_is_not_loaded_for_retired_root_route(self):
         from test_plasma_path2_root_direct import make_event, context
         with tempfile.TemporaryDirectory() as td:
-            root = Path(td); (root/'scripts').mkdir()
-            (root/'scripts/plasma_development_stage_transport.py').write_text(
+            root = Path(td); (root / 'scripts').mkdir()
+            (root / 'scripts/plasma_development_stage_transport.py').write_text(
                 'raise AssertionError("CANDIDATE_EXECUTED")')
             event = make_event('test')
-            registry = d.parse_json(d.MANIFEST)
-            req = d.request(event, context())
-            approval = d.authorize(event, context(), registry)
-            task = d.task_for_request(registry, req, event)
-            payload = {'stage':'test','source_sha':SHA,'project':PROJECT,'real_z2':True,
-                       'boot_id':'fake-test-boot','result':'IDENTITY_PASS'}
-            with patch.object(t,'execute_operation',return_value=payload) as call:
-                result = d.run_task(task, workspace=root, approval=approval)
-                self.assertEqual(result['operation'], 'test')
-                call.assert_called_once_with('test', SHA)
+            with patch.object(t, 'execute_operation') as remote:
+                with self.assertRaisesRegex(d.Denied, 'WORK_ORDER_CAPABILITY_DENIED'):
+                    d.request(event, context())
+                with self.assertRaisesRegex(d.Denied, 'WORK_ORDER_CAPABILITY_DENIED'):
+                    d.authorize(event, context(), d.parse_json(d.MANIFEST))
+                remote.assert_not_called()
 
     def test_live_pr_changed_head_owner_repo_base_rejected(self):
         req = {'pr_number':123, 'source_sha':SHA}
@@ -184,23 +180,31 @@ class Contracts(unittest.TestCase):
             self.assertIsNone(d.live_pr_metadata({'pr_number':0}))
             call.assert_not_called()
 
-    def test_single_path2_operation_has_no_implicit_download_restore(self):
-        from test_plasma_path2_root_direct import make_event, context
-        event = make_event('test')
-        registry = d.parse_json(d.MANIFEST)
-        req = d.request(event, context())
-        approval = d.authorize(event, context(), registry)
-        task = d.task_for_request(registry, req, event)
-        receipt = {'stage':'test','source_sha':SHA,'project':PROJECT,'real_z2':True,
-                   'boot_id':'fake-test-boot','result':'IDENTITY_PASS'}
-        with patch.object(t,'execute_operation',return_value=receipt) as call:
+    def test_separate_recovery_adapter_has_no_implicit_download_restore(self):
+        # Legacy protected transport is independently testable but no longer
+        # admitted as a general Path 2 Dispatcher Work Order.
+        task = {'execution_path': 'path2-cli', 'capability': 'z2-root-operation',
+                'objective': 'Validate protected lifecycle in offline tests',
+                'acceptance': 'Require exact source/receipt without side effects',
+                'operation': 'test', 'work_order_scope': 'guarded-hardware',
+                'work_order_sha256': 'b' * 64}
+        approval = {'task_id': 'path2-work-order', 'execution_path': 'path2-cli',
+                    'execution_capability': 'z2-root-operation',
+                    'authorized_operation': 'test', 'work_order_sha256': 'b' * 64,
+                    'pinned_sha': SHA, 'trusted_sha': SHA, 'pr_number': 0,
+                    'auto_download_after_build_success': False,
+                    'auto_test_after_download_success': False}
+        receipt = {'stage': 'test', 'source_sha': SHA, 'project': PROJECT,
+                   'real_z2': True, 'boot_id': 'fake-test-boot',
+                   'result': 'IDENTITY_PASS'}
+        with patch.object(t, 'execute_operation', return_value=receipt) as call:
             result = r.direct_root_operation(task, approval)
             self.assertFalse(result['auto_next_operation'])
             call.assert_called_once_with('test', SHA)
-        for invalid in ({'operation':'restore'},
-                        {'auto_download_after_build_success':True},
-                        {'auto_test_after_download_success':True}):
-            with self.subTest(change=invalid), patch.object(t,'execute_operation') as call:
+        for invalid in ({'operation': 'restore'},
+                        {'auto_download_after_build_success': True},
+                        {'auto_test_after_download_success': True}):
+            with self.subTest(change=invalid), patch.object(t, 'execute_operation') as call:
                 with self.assertRaises(r.RuntimeDenied):
                     r.direct_root_operation(task | invalid if 'operation' in invalid else task,
                                             approval if 'operation' in invalid else approval | invalid)
