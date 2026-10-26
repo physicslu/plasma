@@ -263,7 +263,7 @@ class RootTargetPortContracts(unittest.TestCase):
         self.assertNotIn("ssh ", content)
         self.assertNotIn("if __name__ ==", content)
         main = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
-        self.assertIn("return integration.direct_root_operation", main)
+        self.assertNotIn("return integration.direct_root_operation", main)
 
 
 if __name__ == "__main__":
