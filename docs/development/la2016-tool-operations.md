@@ -114,6 +114,38 @@ No devices found.
 
 先確認**當前程式環境**的 `SIGROK_FIRMWARE_PATH` 是否有值，以及該路徑是否包含可讀取的、來源可驗證的 `kingst-la-01a2.fw`；再確認 AppImage SHA256、目前 USB device/permission，與未被其他程式占用。**當前故障的最終根因仍須以新的實際 Driver 初始化 PASS 證明**，不能把「曾經成功」視為本次已成功。不得從任意網站下載未知韌體，不得為此修改 FPGA SWD RTL。
 
+### 缺少原廠韌體時的恢復程序（來源已核對，現場仍需實證）
+
+若已確認韌體資源不存在，不要一直重試 `--scan`、`--show` 或 SWD DPIDR。根據 [sigrok 官方 Kingst LA Series](https://sigrok.org/wiki/Kingst_LA_Series) 與 [KINGST 原廠 Linux 下載頁](https://www.qdkingst.com/en/download)，須由原廠 **Linux KingstVIS** 程式提取 **MCU Firmware 與對應 FPGA Bitstream**，才能讓 `kingst-la2016` 初始化。先找既有經驗證的原廠套件，若不存在才取用官方下載，保存整個壓縮包 SHA256 供稽核。
+
+由 Codex 在受控暫存工作目錄使用以下操作契約，不寫死 USB 路徑，不將二進位韌體提交至 Git。首次裝置開啟可能發生 USB 重新列舉，所以需重新執行前述動態 USB 偵測，不得重用原本的 `LA_CONN`。
+
+```bash
+# 準備已確認的原廠 Linux KingstVIS 套件（優先重用 SWPC 已存在的檔案）。
+# 原廠入口：https://www.qdkingst.com/en/download  (for Linux)
+# 解開套件後，由 Codex 確認 KingstVIS 的執行檔；下列程式是示例形式。
+sha256sum "$KINGSTVIS_ARCHIVE"
+tar -tzf "$KINGSTVIS_ARCHIVE" | head
+tar -xzf "$KINGSTVIS_ARCHIVE" -C "$STAGING"
+
+# 只用受信任且固定的 sigrok-util 來源修訂，不使用未核對的社群修補版。
+# 提取腳本位於 sigrokproject/sigrok-util/firmware/kingst-la/
+git clone https://github.com/sigrokproject/sigrok-util.git "$STAGING/sigrok-util"
+git -C "$STAGING/sigrok-util" checkout --detach 249b79d0a94e9ac4ec96533bf3108e2a50e6b38d
+
+cd "$STAGING/firmware-out"
+python3 "$STAGING/sigrok-util/firmware/kingst-la/sigrok-fwextract-kingst-la2016" \
+  "$KINGSTVIS_BINARY"
+
+sha256sum kingst-la-01a2.fw kingst-la2016*-fpga.bitstream
+# 將 SIGROK_FIRMWARE_PATH 指向此受控輸出目錄；確認檔案存在後再啟動 pinned AppImage。
+export SIGROK_FIRMWARE_PATH="$STAGING/firmware-out"
+```
+
+上方 `KINGSTVIS_ARCHIVE`、`STAGING`、`KINGSTVIS_BINARY` 均由 Codex 根據**當次實際檔案**決定，不是需使用者手動填入或寫死的路徑。此操作契約只說明來源恢復方法，尚不代表 2026-10-26 已完成恢復。必須先核對壓縮包來源、解析是否匹配現有版本；不要執行未知安裝腳本或直接覆寫全系統 Firmware。成功擷取後應保留精確版本及 SHA256 的私有 Manifest，供日後重現。
+
+sigrok 官網列出的舊版示例輸出：`kingst-la-01a2.fw` **5430 bytes / CRC32 `720551a9`**，另含 `kingst-la2016-fpga.bitstream` **178542 bytes**，與 `kingst-la2016a1-fpga.bitstream` **178362 bytes**；這是**舊版示例值**，不是新下載版本的保證值。必須以當次實際檔案計算 Hash，並讓驅動依設備辨識選擇對應 Bitstream。<cite>參考 sigrok 官方文件，不直接散佈原廠韌體。</cite>
+
 ## 2. 模式 A：被動 SWD 邏輯波形（PLASMA 當前用途）
 
 **電氣約束：** LA2016 僅連接共地與輸入通道，不得在這個模式啟用 PWM1。**ST-LINK 與 Z2 PL 是兩個不同的 SWD 主控，不得同時驅動 Blue Pill。** 目前比較用的成功基準來自 2026-10-23 STLINK-V3SET；Z2 失敗測試則只能由 Z2 單獨驅動。
