@@ -77,7 +77,7 @@ class LegacyPathRetirementTests(unittest.TestCase):
         """The retired default sequence must never reach artifacts or hardware."""
         with patch.object(one_shot, "verify_inputs",
                           side_effect=AssertionError("must not touch preflight")):
-            with self.assertRaisesRegex(ValueError,
+            with self.assertRaisesRegex(one_shot.c.SafetyError,
                                         "RETIRED_SWD05_INTERNAL_SEQUENCE_NO_CALLBACK"):
                 one_shot.run_live(object())
 
