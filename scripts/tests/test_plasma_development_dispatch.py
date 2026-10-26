@@ -1626,6 +1626,92 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["objective"], order["objective"])
             self.assertEqual(task["acceptance"], order["acceptance"])
 
+
+    def test_path3_owner_hardware_no_sandbox_is_one_invocation(self):
+        """Host-only stub; no Codex process, USB, Z2, FPGA or DUT."""
+        ordinary = self._order("path3-codex")
+        order = self._order("path3-codex",
+                            codex_execution="guarded-hardware-no-sandbox")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approved = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(approved["execution_capability"], "codex-workspace")
+        self.assertEqual(task["codex_execution"],
+                         "guarded-hardware-no-sandbox")
+        ordinary_event = self._event(ordinary)
+        ordinary_req = dev.request(ordinary_event, self._context())
+        self.assertNotIn("codex_execution", dev.task_for_request(
+            self.registry, ordinary_req, ordinary_event))
+        self.assertNotEqual(req["work_order_sha256"],
+                            dev.work_order_digest(ordinary))
+        commands = []
+
+        def stub(argv, **kw):
+            commands.append(argv)
+            (Path(kw["cwd"]) / ".plasma-path3-evidence" /
+             "engineering-report.md").write_text(
+                "Offline stub; no physical execution.\n", encoding="utf-8")
+            return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+        with tempfile.TemporaryDirectory() as td:
+            receipt = dev.run_codex_task(
+                task, workspace=Path(td), executor=stub,
+                task_id="path3-work-order")
+        self.assertEqual(commands, [[
+            "codex", "exec", "--json", "--sandbox", "danger-full-access", "-"]])
+        self.assertEqual(receipt["codex_sandbox_request"], "danger-full-access")
+        self.assertTrue(receipt["evidence_complete"])
+        self.assertEqual(receipt["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+
+    def test_path3_non_sandbox_admission_fail_closed(self):
+        approved = self._order("path3-codex",
+                               codex_execution="guarded-hardware-no-sandbox")
+        for value in ("danger-full-access", "unsandboxed", "host-only",
+                      None, False, True, [], {}, 1):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                    dev.Denied, "WORK_ORDER_PATH3_FIELDS_DENIED"):
+                dev.request(self._event(approved | {"codex_execution": value}),
+                            self._context())
+        for order in (
+            self._order("path2-cli",
+                        codex_execution="guarded-hardware-no-sandbox"),
+            self._order("path3-codex", scope="guarded-hardware",
+                        codex_execution="guarded-hardware-no-sandbox"),
+            self._order("path3-codex",
+                        session_resume="page-boundary-off-by-one",
+                        scope="host-only", pr_number=123,
+                        source_sha="b" * 40,
+                        codex_execution="guarded-hardware-no-sandbox"),
+        ):
+            with self.subTest(order=order), self.assertRaises(dev.Denied):
+                dev.request(self._event(order), self._context())
+        forged = self._event(approved)
+        forged["sender"]["login"] = "not-owner"
+        with self.assertRaisesRegex(dev.Denied, "EVENT_OWNER_DENIED"):
+            dev.request(forged, self._context())
+        event = self._event(approved)
+        req = dev.request(event, self._context())
+        tampered = self._event(approved | {
+            "objective": "Changed after Work Order Digest pin; no launch."})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, tampered)
+        task = dev.task_for_request(self.registry, req, event)
+        for altered, task_id in (
+            (task, None),
+            (task, "nine-nine-path3"),
+            (task | {"capability": "other"}, "path3-work-order"),
+            (task | {"work_order_sha256": "invalid"}, "path3-work-order"),
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                with self.subTest(task_id=task_id, altered=altered):
+                    with self.assertRaisesRegex(
+                            dev.Denied, "CODEX_NON_SANDBOX_ADMISSION_DENIED"):
+                        dev.run_codex_task(
+                            altered, workspace=Path(td),
+                            executor=lambda *_a, **_kw: self.fail("Codex launched"),
+                            task_id=task_id)
+
     def test_dynamic_vivado_host_build_uses_existing_exact_engine(self):
         import plasma_vivado_host_build as build
         fixed = dev.task_by_id(self.registry, "z2-path2-build")

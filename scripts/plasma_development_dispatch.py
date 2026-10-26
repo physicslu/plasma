@@ -210,7 +210,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "expected_stdout_sha256", "verification",
                                "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
-                                "monitor_summary"},
+                                "monitor_summary", "codex_execution"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -246,7 +246,10 @@ def parse_dynamic_work_order(event: object) -> dict:
                     "WORK_ORDER_RESUME_SCOPE_DENIED")
         else:
             require(capability == "codex-workspace" and
-                    set(order) <= (base - {"scope"}) | optional_ref | {"monitor_summary"},
+                    set(order) <= (base - {"scope"}) | optional_ref |
+                    {"monitor_summary", "codex_execution"} and
+                    ("codex_execution" not in order or
+                     order["codex_execution"] == "guarded-hardware-no-sandbox"),
                     "WORK_ORDER_PATH3_FIELDS_DENIED")
         require(capability == "codex-workspace",
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
@@ -389,6 +392,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
     }
     if "monitor_summary" in order:
         task["monitor_summary"] = order["monitor_summary"]
+    if "codex_execution" in order:
+        task["codex_execution"] = order["codex_execution"]
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order.get("scope", "host-only")
         if order["capability"] == "cpu-only":
@@ -1148,6 +1153,18 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     grant physical device access. The fixed PR SHA remains the INPUT identity;
     the candidate Git diff and evidence are captured before review/commit.
     """
+    # Only the authenticated dynamic Path 3 Owner Work Order can request
+    # a single non-sandboxed Codex invocation. Worker admission revalidates
+    # the owner event, SHA-pinned candidate and full Work Order digest.
+    non_sandbox = task.get("codex_execution") is not None
+    if non_sandbox:
+        require(task_id == DYNAMIC_TASKS["path3-codex"] and
+                task.get("execution_path") == "path3-codex" and
+                task.get("capability") == "codex-workspace" and
+                task["codex_execution"] == "guarded-hardware-no-sandbox" and
+                type(task.get("work_order_sha256")) is str and
+                SHA256.fullmatch(task["work_order_sha256"]) is not None,
+                "CODEX_NON_SANDBOX_ADMISSION_DENIED")
     root = workspace.resolve(strict=True)
     evidence = root / ".plasma-path3-evidence"
     require(not evidence.exists() and not evidence.is_symlink(),
@@ -1178,9 +1195,12 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
         )
-    # No Dispatcher override of Codex approval, sandbox, network or devices.
-    # Operator configuration, OS DAC/ACL and protected hardware guards apply.
-    command = ["codex", "exec", "--json", "-"]
+    # Ordinary work inherits the operator's Codex sandbox policy.
+    # Explicit Owner hardware mode changes ONLY this one child invocation;
+    # Linux DAC/ACL, Root Guard, device locks and recovery remain mandatory.
+    command = (["codex", "exec", "--json"] +
+               (["--sandbox", "danger-full-access"] if non_sandbox else []) +
+               ["-"])
     usage = CodexUsageCollector()
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.
@@ -1254,6 +1274,8 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_usage": usage_snapshot,
         "codex_context_audit": context_audit,
         "codex_model_selection": codex_requested_model_settings(command),
+        "codex_sandbox_request": ("danger-full-access" if non_sandbox
+                                  else "operator-inherited"),
         "codex_usage_path": str(usage_path.relative_to(root)),
         "codex_usage_sha256": digest(usage_path),
         "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
