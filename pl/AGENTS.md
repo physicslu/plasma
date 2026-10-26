@@ -10,6 +10,10 @@ Read these documents before changing FPGA/PL behavior:
 - `docs/development/fpga-verification-guide.md`
 - `docs/development/fpga-systemverilog-style.md` (new RTL and substantive RTL changes)
 
+## Physical SWD path selection
+
+The retired `z2-swd-gpio` and `z2-swd03-axi` image builds must never be selected for Blue Pill PoC or interpreted as real target DPIDR. Retained shared Identity/Board Files helpers and synthetic RTL are for dependent host-only tests. Follow root `AGENTS.md` and `docs/development/swd-legacy-path-retirement.md` for current Z2 PS-local OpenOCD + WordPort + PL SWD.
+
 ## 1. RTL language and coding policy
 
 New synthesizable RTL shall use SystemVerilog (`.sv`).

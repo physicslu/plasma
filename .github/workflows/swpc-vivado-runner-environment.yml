@@ -51,6 +51,8 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      # Generic Vivado/Board Files probe is stored under a retired image project.
+      # This step does NOT build or authorize a legacy SWD FPGA image.
       - name: Probe Vivado / PYNQ-Z2 installed board definition (read-only)
         shell: bash
         env:

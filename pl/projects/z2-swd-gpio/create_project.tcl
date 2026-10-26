@@ -1,3 +1,5 @@
+# RETIRED: historical Tcl retained for offline code/tests only.
+error "RETIRED_Z2_SWD_GPIO: retired FPGA image build entrypoint"
 # Entry point for source-controlled FPGA project generation.
 set script_dir [file dirname [file normalize [info script]]]
 set pl_dir [file normalize [file join $script_dir ../..]]

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# RETIRED: source retained for historical tests only; no image builds.
+printf '%s\n' 'RETIRED_Z2_SWD_GPIO: legacy project retired; use Z2 PS-local WordPort/PL SWD' >&2
+exit 2
 # One-command SWPC build of Z2 EMIO + versioned PL identity. No Z2 access.
 set -Eeuo pipefail
 

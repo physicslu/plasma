@@ -1,3 +1,5 @@
+> **HISTORICAL / INTERNAL-FIXTURE ONLY — NOT a Blue Pill Path 3 operator runbook.** The `z2-swd03-axi` synthetic responder is retired for external SWD; its DPIDR is not from Blue Pill. Follow root `AGENTS.md` and [retired path inventory](swd-legacy-path-retirement.md) for current PS-local OpenOCD → WordPort → PL SWD. This document remains only for referenced host-only/legacy testing, not hardware authorization.
+
 # PLASMA Linux MMIO Backend v1 — prototype engineering contract
 
 **Scope:** production Python module, host-only acceptance and SWD-05 adapter
