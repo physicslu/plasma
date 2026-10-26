@@ -296,6 +296,28 @@ def parse_dynamic_work_order(event: object) -> dict:
         timeout_seconds = order.get("timeout_seconds", 120)
         require(type(timeout_seconds) is int and
                 1 <= timeout_seconds <= 180, "WORK_ORDER_TIMEOUT_DENIED")
+    elif capability == "operator-cli":
+        # Owner-reviewed deterministic CLI. No operation/Project/F1-B allowlist.
+        # The exact pinned repo script runs as the existing NON-root SWPC worker;
+        # any Z2/DUT authority remains subject to actual OS and hardware guards.
+        require(path == "path2-cli" and scope == "guarded-hardware" and
+                {"script", "argv"} <= set(order) and
+                set(order) <= base | optional_ref |
+                {"script", "argv", "timeout_seconds", "monitor_summary"},
+                "WORK_ORDER_OPERATOR_CLI_FIELDS_DENIED")
+        script = order["script"]
+        require(type(script) is str and re.fullmatch(
+            r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\\.py",
+            script) is not None, "WORK_ORDER_OPERATOR_CLI_SCRIPT_DENIED")
+        argv = order["argv"]
+        require(type(argv) is list and len(argv) <= 32 and all(
+            type(arg) is str and len(arg) <= 2048 and
+            not any(ord(ch) < 32 or ord(ch) == 127 for ch in arg)
+            for arg in argv), "WORK_ORDER_OPERATOR_CLI_ARGS_DENIED")
+        timeout_seconds = order.get("timeout_seconds", 600)
+        require(type(timeout_seconds) is int and
+                1 <= timeout_seconds <= 1800,
+                "WORK_ORDER_OPERATOR_CLI_TIMEOUT_DENIED")
     elif capability == "vivado-host-build":
         # Development Mode uses the same fixed Site 1 host-only build engine.
         # No arbitrary project, shell, Tcl driver, stage or hardware authority.
@@ -376,6 +398,9 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         if order["capability"] == "cpu-only":
             task["verification"] = order.get("verification", "stdout-sha256")
             task["timeout_seconds"] = order.get("timeout_seconds", 120)
+        elif order["capability"] == "operator-cli":
+            task["verification"] = "exit-code"
+            task["timeout_seconds"] = order.get("timeout_seconds", 600)
     if "session_resume" in order:
         task["session_resume"] = order["session_resume"]
     if "native_preflight" in order:
@@ -528,7 +553,8 @@ def authorize(event: object, context: dict, registry: object,
             "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
-    if task.get("capability") in ("vivado-host-build", "z2-root-operation"):
+    if task.get("capability") in ("vivado-host-build", "z2-root-operation",
+                                  "operator-cli"):
         # Owner-approved immutable PR SHA is admissible before merge.
         # verify_pr() above has already checked the live same-repo owner PR,
         # exact current HEAD and main base; do not equate merge with trust.
@@ -550,6 +576,8 @@ def authorize(event: object, context: dict, registry: object,
             }[task["operation"]]
         elif task.get("native_preflight") == NATIVE_PREFLIGHT:
             monitor_stage = "Native preflight"
+        elif task.get("capability") == "operator-cli":
+            monitor_stage = "Guarded CLI"
         elif task.get("capability") == "vivado-host-build":
             monitor_stage = "Vivado host build"
         else:
@@ -671,6 +699,35 @@ def run_task(task: dict, *, workspace: Path = ROOT,
     if task.get("capability") == "z2-root-operation":
         import plasma_path2_runtime_integration as integration
         return integration.direct_root_operation(task, approval)
+    if task.get("capability") == "operator-cli":
+        # This is an approved, source-pinned SWPC user-space process, NOT a
+        # privileged Root Entry or an assertion of actual DUT/LA/FPGA success.
+        require(type(approval) is dict and type(task) is dict and
+                task.get("execution_path") == "path2-cli" and
+                task.get("work_order_scope") == "guarded-hardware" and
+                task.get("verification") == "exit-code" and
+                type(task.get("argv")) is list and
+                type(task.get("script")) is str and
+                type(task.get("work_order_sha256")) is str and
+                SHA256.fullmatch(task["work_order_sha256"]) is not None and
+                approval.get("task_id") == DYNAMIC_TASKS["path2-cli"] and
+                approval.get("execution_path") == "path2-cli" and
+                approval.get("execution_capability") == "operator-cli" and
+                approval.get("work_order_sha256") == task["work_order_sha256"] and
+                approval.get("pinned_sha") is not None and
+                approval.get("source_sha") == approval.get("pinned_sha") and
+                type(approval.get("trusted_sha")) is str and
+                SHA40.fullmatch(approval["trusted_sha"]) is not None and
+                type(approval.get("pinned_sha")) is str and
+                SHA40.fullmatch(approval["pinned_sha"]) is not None and
+                type(approval.get("pr_number")) is int and
+                ((approval["pr_number"] == 0 and
+                  approval["pinned_sha"] == approval["trusted_sha"]) or
+                 (approval["pr_number"] > 0 and
+                  approval["pinned_sha"] != approval["trusted_sha"])) and
+                approval.get("auto_download_after_build_success") is False and
+                approval.get("auto_test_after_download_success") is False,
+                "OPERATOR_CLI_APPROVAL_DENIED")
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -723,7 +780,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         ]
     timeout_seconds = task.get("timeout_seconds", 40)
     require(type(timeout_seconds) is int and
-            1 <= timeout_seconds <= 180, "PATH2_TIMEOUT_DENIED")
+            1 <= timeout_seconds <= (1800 if task.get("capability") == "operator-cli"
+                                     else 180), "PATH2_TIMEOUT_DENIED")
     mode = task.get("verification", "sha256-only")
     require(mode in ("sha256-only", "stdout-sha256", "exit-code"),
             "TASK_VERIFICATION_DENIED")
@@ -756,7 +814,10 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(digest == task["expected_stdout_sha256"],
                 "OUTPUT_SHA256_MISMATCH")
     return {
-        "status": "PASS",
+        "status": ("REAL_HARDWARE_CLI_EVIDENCE_REVIEW_REQUIRED"
+                   if task.get("capability") == "operator-cli" else "PASS"),
+        "physical_hil": ("NOT_VERIFIED" if task.get("capability") == "operator-cli"
+                         else "NOT_APPLICABLE"),
         "execution_path": "path2-cli",
         "runner": os.environ.get("RUNNER_NAME", "offline-stub"),
         "exit_code": proc.returncode,
@@ -1354,7 +1415,8 @@ def main() -> int:
                 task = task_for_request(registry, req, event)
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
-                                    ("z2-cpu-only", "vivado-host-build", "z2-root-operation")
+                                    ("z2-cpu-only", "vivado-host-build",
+                                     "z2-root-operation", "operator-cli")
                                  else None)
                 # One fixed main-only Path 2 observation. Executed by
                 # trusted main, not candidate code and NEVER by Codex.
