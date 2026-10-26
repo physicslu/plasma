@@ -17,6 +17,19 @@
 | `.github/workflows/swpc-vivado-bitstream-build.yml` | **REMOVED** | Manual persistent-runner action targeting old GPIO Image should not be offered. |
 | `.github/workflows/pl-z2-swd-gpio.yml`, `pl-swd03-axi.yml` | Offline regression only | Keep hosted PR/main tests for shared/fixture source; remove manual dispatch. No physical target qualification. |
 
+## Remaining legacy HIL entrypoints and live safety dependencies
+
+| Source / entrypoint | Scope and actual capability | Current decision |
+| --- | --- | --- |
+| `python -m pl.hil.swd04.one_shot` | Historical SWD-05 internal FPGA synthetic fixture load/MMIO/recovery | **DIRECT CLI RETIRED** (`RETIRED_SWD05_INTERNAL_IMAGE_CLI`). Retain importable `run_sequence`, `run_live`, `manager_write`, `OWNER_LOCK` and Root safety helpers for F1-B and existing protected recovery. |
+| `python -m pl.hil.swd04.native_qualify` | Historical SWD-04 `/dev/mem` native AXI synthetic DPIDR HIL | **DIRECT CLI RETIRED** (`RETIRED_SWD04_SYNTHETIC_MMIO_CLI`). Retain injected `run_stage` and `check_runtime` for host-only tests and F1-B imports. |
+| `pl.hil.swd04.development` | Historical ownership/current loaded-image receipt helpers | **RETAIN guarded helpers**; not an alternate external Blue Pill SWD controller. |
+| `pl.hil.pspl02.runner` and `pl.hil.lt02.native` | Separate PS→PL internal loopback/AXI MMIO HIL; NO external SWD pins | **RETAIN for independent internal validation only** with existing safety gates; not a Blue Pill programmer. |
+| `pl/projects/z2-fixed-unified-site1/`, `SWDTransactionDriver`, `swd_transaction_master.sv` | Fixed ABI/internal synthetic fixture and future RTL/controller candidates | **RETAIN offline tests/build dependencies**; no automatic live PMOD/DUT qualification. Do not substitute for current WordPort image. |
+| `scripts/plasma-z2-smoke.sh` | Separate protected Z2 SSH smoke/diagnostic development utility | **RETAIN guarded maintenance workflow**; not a real SWD programming backend and may not load retired FPGA images. |
+
+The direct legacy Python CLI guards prevent ordinary `python -m ...` execution, but **are not an OS privilege boundary**; imported shared functions remain callable and protected by independent Root/ownership/lock controls. Their continued presence does not authorize them as an external target interface. Synthetic DPIDR `0x2BA01477` must never be confused with ST-LINK-observed STM32F103 `0x1BA01477`.
+
 ## Operator / Codex selection rule
 
 1. Confirm the actual current Git worktree, SHA and owner-approved Gate 1 hardware scope. Old Worktrees and historical README search hits do not define current architecture.
