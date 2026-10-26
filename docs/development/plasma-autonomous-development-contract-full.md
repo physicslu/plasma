@@ -1231,16 +1231,19 @@ This policy is not an OS sandbox. Editor/agent permissions should still enforce 
 
 ### Development Z2 Root operation boundary
 
-Current Path 2 protected Z2 operations use an owner-authorized Work Order
-with `capability: z2-root-operation`, `scope: guarded-hardware` and one
-`operation: download|test|restore`. The existing trusted-main Dispatcher
-and SWPC SSH/sudo transport call the installed two-argument Protected Root
-Entry (`operation + source_sha`). That Bash entry validates effective root,
-root-owned source commit/SHA256 manifest and allowed operation; it then
-executes the reviewed Python Root implementation `pl.hil.fpga_image_root`.
-There is no runtime Stage Adapter, Project Profile, selectable module or
-independent second Root Executor. Historical transport function/receipt
-names containing `stage` are compatibility details, not operation admission.
+The former Path 2 `z2-root-operation` fixed Work Order was retired from
+the trusted Dispatcher on 2026-10-26; new owner Work Orders must use the
+generic `operator-cli` for permitted, source-pinned non-root SWPC execution.
+This is **not** an implicit grant of sudo, SSH, MMIO or target programming.
+
+The independent protected FPGA Image lifecycle/recovery interface remains
+the installed two-argument Root Entry (`operation + source_sha`). That
+entry validates effective root, a root-owned source SHA256 manifest and
+the executable source pin; its reviewed `pl.hil.fpga_image_root` handles
+FPGA image/Golden operations. Its internal fixed lifecycle vocabulary
+must not be generalized into an arbitrary root shell or driver selector.
+Historical transport function/receipt names containing `stage` are
+compatibility details, not new Dispatcher admission.
 
 Path 3 may use its separately enrolled SSH/sudo development route within
 owner-approved Gate 1 scope and actual OS/device safety boundaries; it does
