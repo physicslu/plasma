@@ -53,7 +53,7 @@ Z2 PL: FPGA SWD engine -> SWCLK/SWDIO -> target DUT
 ```
 
 **SWPC OpenOCD is permitted for offline build, QEMU/mock, CI or lab-tool
-qualification only; it is not the execution host for physical programming.**
+qualification only; SWPC must not host live OpenOCD for physical programming.**
 Do not tunnel the live Remote Bitbang socket or per-bit SWD traffic from SWPC
 into Z2. A local UNIX socket is an internal Z2 PS process boundary, not an
 Ethernet/API boundary. Path 2/3 SWPC development workers may deploy and
