@@ -51,8 +51,7 @@ def validate(architecture: str, agents: str, bridge: str,
     except SyntaxError as exc:
         reject("invalid PS bridge Python: " + str(exc))
     docstring = ast.get_docstring(module) or ""
-    if ("OpenOCD must execute on" not in docstring or
-            "Z2 PS" not in docstring or
+    if ("OpenOCD must execute on\nZ2 PS" not in docstring or
             "PS-local UNIX socket" not in docstring):
         reject("WordPort bridge no longer declares PS-local OpenOCD")
     if ("pinned OpenOCD on SWPC" in docstring or
@@ -94,7 +93,7 @@ def validate(architecture: str, agents: str, bridge: str,
     # Z2 installer provisioned ARMv7 OpenOCD process.
     required_installer = (
         '--openocd-artifact PATH',
-        'install_or_reuse_openocd()',
+        'install_or_reuse_openocd() {',
         'installing verified Plasma-owned ARMv7 OpenOCD runtime',
         'programming-engines/openocd/*/bin/openocd',
     )
