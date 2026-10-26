@@ -1819,17 +1819,16 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(observed["timeout"], 180)
             self.assertEqual(receipt["verification"], "exit-code")
 
-    def test_path2_cpu_sandbox_does_not_wrap_authorized_root_route(self):
-        # This mock verifies route isolation without touching any hardware.
-        with patch("plasma_path2_runtime_integration.direct_root_operation",
-                   return_value={"status": "MOCK_ONLY"}) as protected:
-            result = dev.run_task(
-                {"capability": "z2-root-operation", "operation": "download"},
-                approval={"execution_capability": "z2-root-operation"},
-                sandbox=True,
-            )
-        self.assertEqual(result["status"], "MOCK_ONLY")
-        protected.assert_called_once()
+    def test_retired_root_route_never_reaches_transport(self):
+        # Old fixed operation is not an authorized Path 2 Work Order.
+        with patch("plasma_path2_runtime_integration.direct_root_operation") as protected:
+            with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_ROOT_OPERATION"):
+                dev.run_task(
+                    {"capability": "z2-root-operation", "operation": "download"},
+                    approval={"execution_capability": "z2-root-operation"},
+                    sandbox=True,
+                )
+        protected.assert_not_called()
 
     def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):
         base = self._order("path2-cli")
@@ -2081,7 +2080,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
     def test_existing_workflow_and_two_runner_routes(self):
         content = WORKFLOW.read_text()
         self.assertIn("'/plasma-dispatch work-order 981'", content)
-        self.assertIn('"z2-root-operation"', content)
+        self.assertNotIn('"z2-root-operation"', content)
+        self.assertIn('"operator-cli"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
             "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
