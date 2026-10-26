@@ -307,7 +307,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                 "WORK_ORDER_OPERATOR_CLI_FIELDS_DENIED")
         script = order["script"]
         require(type(script) is str and re.fullmatch(
-            r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\\.py",
+            r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
             script) is not None, "WORK_ORDER_OPERATOR_CLI_SCRIPT_DENIED")
         argv = order["argv"]
         require(type(argv) is list and len(argv) <= 32 and all(
@@ -707,7 +707,14 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                 task.get("work_order_scope") == "guarded-hardware" and
                 task.get("verification") == "exit-code" and
                 type(task.get("argv")) is list and
+                len(task["argv"]) <= 32 and all(
+                    type(a) is str and len(a) <= 2048 and
+                    not any(ord(c) < 32 or ord(c) == 127 for c in a)
+                    for a in task["argv"]) and
                 type(task.get("script")) is str and
+                re.fullmatch(
+                    r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
+                    task["script"]) is not None and
                 type(task.get("work_order_sha256")) is str and
                 SHA256.fullmatch(task["work_order_sha256"]) is not None and
                 approval.get("task_id") == DYNAMIC_TASKS["path2-cli"] and
