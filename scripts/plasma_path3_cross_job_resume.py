@@ -78,8 +78,8 @@ def runner_binding(phase, req, workspace, env):
 def isolated_command(workspace, private_root, session):
     """Explicit bwrap mounts: no host hardware /dev, /sys, /run, or home.
 
-    Network is needed by Codex for its model connection. This is NOT an
-    egress firewall; the CLI sandbox independently disables tool networking.
+    Network is needed by Codex for its model connection. This CPU-only
+    fixture's outer OS isolation remains; Codex CLI policy is inherited.
     """
     wrap, codex = shutil.which("bwrap"), shutil.which("codex")
     require(bool(wrap and codex), "RESUME_BWRAP_OR_CODEX_UNAVAILABLE")
@@ -118,12 +118,9 @@ def isolated_command(workspace, private_root, session):
             "--setenv", "HOME", "/home/plasma",
             "--setenv", "CODEX_HOME", "/home/plasma/.codex",
             "--chdir", "/work/" + probe.ROOT_FOLDER,
-            "--", codex_binary, "--ask-for-approval", "never",
-            "-c", 'sandbox_mode="workspace-write"',
-            "-c", "sandbox_workspace_write.network_access=false",
-            "exec", "--json"]
+            "--", codex_binary, "exec", "--json"]
     if session is None:
-        args += ["--sandbox", "workspace-write", "-"]
+        args += ["-"]
     else:
         args += ["resume", session, "-"]
     return args

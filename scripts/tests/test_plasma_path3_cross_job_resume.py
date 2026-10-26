@@ -231,7 +231,10 @@ class ResumeTwoJobOffline(unittest.TestCase):
         self.assertIn("--dev", command)
         self.assertIn("/usr/bin/codex", command)
         self.assertNotIn("--unshare-net", command)  # Real Codex model API
-        self.assertEqual(command[-2:], ["workspace-write", "-"])
+        self.assertEqual(command[-3:], ["exec", "--json", "-"])
+        self.assertNotIn("--sandbox", command)
+        self.assertNotIn("--ask-for-approval", command)
+        self.assertNotIn("sandbox_workspace_write.network_access=false", command)
         with patch.object(flow.Path, "home", return_value=auth_home), \
              patch.object(flow.shutil, "which",
                           side_effect=lambda name: "/usr/bin/" + name):

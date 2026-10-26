@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Device-visible rootless Codex sandbox for the existing Development Path 3.
 
-No new execution mode, session type, Work Order field or Runner. Every
-existing Path 3 Codex run uses this outer OS namespace. The owner authorizes
-physical effects through the existing Gate 1 Work Order, not through a new
-hardware-capability field. The lab worker's normal DAC/ACL still applies.
+Legacy opt-in namespace probe; normal Path 3 execution no longer uses this
+outer mount/device filter. The owner authorizes physical effects through the
+existing Gate 1 Work Order; Linux DAC/ACL and hardware guards still apply.
 """
 from __future__ import annotations
 
@@ -133,10 +132,10 @@ def codex_command(
                 "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
                 "AWS_SESSION_TOKEN", "PLASMA_Z2_AUTH"):
         argv += ["--unsetenv", key]
+    # This optional probe also inherits Codex CLI policy.
     argv += [
         "--chdir", str(workspace), "--",
-        "codex", "--ask-for-approval", "never", "exec", "--json",
-        "--sandbox", "danger-full-access", "-",
+        "codex", "exec", "--json", "-",
     ]
     return argv
 
