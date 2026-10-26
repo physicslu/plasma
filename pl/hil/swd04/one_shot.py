@@ -255,8 +255,11 @@ def run_child(args: list[str]) -> None:
 def run_live(i: Inputs, *, profile=development.SWD04_PROFILE,
              test_callback: TestCallback | None = None,
              admission_check: Callable[[], None] | None = None) -> dict[str, str]:
-    require(test_callback is not None or profile == development.SWD04_PROFILE,
-            "Nonlegacy profile requires explicit test callback")
+    # The no-callback SWD-04/05 synthetic HIL sequence is retired. Deny it
+    # BEFORE FPGA Manager load, owner-lock mutation or preflight side effects.
+    # F1-B reuses this protected lifecycle with an explicit Identity callback.
+    require(test_callback is not None,
+            "RETIRED_SWD05_INTERNAL_SEQUENCE_NO_CALLBACK")
     require(profile == development.SWD04_PROFILE or admission_check is not None,
             "Nonlegacy profile requires current ownership/AXI admission")
     verify_inputs(i, profile)  # All hashes and paths before any physical action.

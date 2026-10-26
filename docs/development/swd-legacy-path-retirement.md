@@ -28,6 +28,8 @@
 | `pl/projects/z2-fixed-unified-site1/`, `SWDTransactionDriver`, `swd_transaction_master.sv` | Fixed ABI/internal synthetic fixture and future RTL/controller candidates | **RETAIN offline tests/build dependencies**; no automatic live PMOD/DUT qualification. Do not substitute for current WordPort image. |
 | `scripts/plasma-z2-smoke.sh` | Separate protected Z2 SSH smoke/diagnostic development utility | **RETAIN guarded maintenance workflow**; not a real SWD programming backend and may not load retired FPGA images. |
 
+The SWD-05 historical no-callback `one_shot.run_live()` execution mode additionally fails **before image preflight/FPGA load**, so retiring its CLI cannot leave an already-loaded synthetic Image when the child CLI is unavailable. F1-B passes an explicit Identity callback and retains protected Root/ownership/recovery admission. Host-only regression verifies both the negative gate and F1-B callback injection.
+
 The direct legacy Python CLI guards prevent ordinary `python -m ...` execution, but **are not an OS privilege boundary**; imported shared functions remain callable and protected by independent Root/ownership/lock controls. Their continued presence does not authorize them as an external target interface. Synthetic DPIDR `0x2BA01477` must never be confused with ST-LINK-observed STM32F103 `0x1BA01477`.
 
 ## Operator / Codex selection rule
