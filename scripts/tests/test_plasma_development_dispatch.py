@@ -642,7 +642,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
             self.assertIn("--json",calls[0][0])
-            self.assertIn("workspace-write",calls[0][0])
+            self.assertEqual(calls[0][0], ["codex", "exec", "--json", "-"])
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
             self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
             self.assertIsNone(receipt["codex_usage"]["input_tokens"])
