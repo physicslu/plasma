@@ -192,8 +192,9 @@ the actual command and physical effect, not the technology label `SW` or
   This intentionally has no per-DUT or VID/PID visibility filter: the owner
   operates a prototype laboratory and authorizes the work in Gate 1.
   Device visibility is not an authorization to actuate outside that task.
-  Path 2 protected Z2 stages continue through the existing trusted-main
-  stage adapters and Root Executor. After Gate 1 owner approval, Path 3
+  Path 2 protected Z2 operations use the existing trusted-main
+  Dispatcher, SSH/sudo operation transport and Protected Root Entry.
+  No Stage Adapter or Stage/Profile selector is part of the current path. After Gate 1 owner approval, Path 3
   may use the enrolled Z2 SSH/sudo development route to install reviewed
   code and operate FPGA Manager/MMIO within the authorized hardware goal.
   Actual OS privilege, electrical/device ownership, image identity and
@@ -1221,20 +1222,26 @@ Treat `$PLASMA_REPO` as the normal workspace boundary for AI-assisted developmen
 
 This policy is not an OS sandbox. Editor/agent permissions should still enforce project-scoped access where possible.
 
-### Development F1-B transport boundary
+### Development Z2 Root operation boundary
 
-Path 2 uses the trusted-main stage transport in
-`scripts/plasma_development_stage_transport.py` for its protected stages.
-Path 3 may choose the same transport when it fits the approved task, but
-**Path 2's fixed Stage Allowlist and one installed Project Profile are not
-a universal Path 3 execution plan**. Path 3 is authorized to use enrolled
-Z2 SSH/sudo in Gate 1 scope, subject to real OS permissions and safety;
-this documentation does not claim a new generic privileged Stage delegate
-is installed on Z2. The old SWPC Bridge and approved-SHA PIN are no longer
-general Development Mode prerequisites; leave existing root-owned files untouched.
-The trusted GitHub event SHA, live owner PR metadata, exact checkout and
-owner-approved stage/Work Order digest establish B1 authorization, not a
-user-supplied SHA alone. Z2 root-owned entry/source manifest, image identity,
-ownership/recovery and authentic root receipts continue to enforce B2/B3.
-This contract grants neither root access nor permission to run hardware in a
-host-only Work Order.
+Current Path 2 protected Z2 operations use an owner-authorized Work Order
+with `capability: z2-root-operation`, `scope: guarded-hardware` and one
+`operation: download|test|restore`. The existing trusted-main Dispatcher
+and SWPC SSH/sudo transport call the installed two-argument Protected Root
+Entry (`operation + source_sha`). That Bash entry validates effective root,
+root-owned source commit/SHA256 manifest and allowed operation; it then
+executes the reviewed Python Root implementation `pl.hil.fpga_image_root`.
+There is no runtime Stage Adapter, Project Profile, selectable module or
+independent second Root Executor. Historical transport function/receipt
+names containing `stage` are compatibility details, not operation admission.
+
+Path 3 may use its separately enrolled SSH/sudo development route within
+owner-approved Gate 1 scope and actual OS/device safety boundaries; it does
+not inherit Path 2 hardware authority or need a Path 2 Stage/Profile gate.
+The old SWPC Bridge and approved-SHA PIN are no longer general Development
+Mode prerequisites; leave existing root-owned files untouched. The trusted
+GitHub event SHA, live owner PR metadata, exact checkout and digest-pinned
+Work Order establish B1 authorization, not a user-supplied SHA alone.
+Z2 root-owned entry/source checks, image identity, ownership/recovery and
+authentic Root receipts continue to enforce B2/B3. This contract grants
+neither root access nor hardware permission to a host-only Work Order.

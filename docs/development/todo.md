@@ -159,13 +159,38 @@ Closure evidence must include a rebuilt/installed macOS package and real browser
 
 ## Deferred architecture evolution
 
+### Path 2 Operation Transport Naming / Receipt Compatibility Cleanup
+
+**Status:** TODO / deferred; no runtime code or receipt schema changes in this documentation PR.
+
+**Current finding:** `scripts/plasma_development_stage_transport.py` still exposes `execute(stage, source_sha, project=None)`, `STAGE_NAME` and historical `PLASMA_PATH2_STAGE=` / `stage` receipt vocabulary. The active direct path already calls `execute_operation(operation, source_sha)`; these old names are **not** authorization to reintroduce Stage/Profile admission.
+
+**Follow-up:** Inventory callers and tests, then consider a minimal operation-oriented naming/receipt migration with a compatibility strategy. Preserve SSH/sudo identity, B1/B2/B3, current hardware receipts and Issue #1168 acceptance. Do not rename protocol fields or transport functions without verifying all consumers and installed-Z2 compatibility.
+
+### Path 2 Legacy Project Argument Retirement
+
+**Status:** TODO / deferred; caller inventory and regression tests required before code deletion.
+
+**Current finding:** `execute(stage, source_sha, project=None)` still has a legacy explicit `project` branch that formats a three-argument remote command. The installed two-argument Root Entry accepts only `operation + source_sha`, so this legacy branch is not a supported live Path 2 Root contract.
+
+**Follow-up:** Locate all reachable callers and test dependencies, delete the unused three-argument branch only after proving no active path depends on it, and retain negative tests for project/profile injection and source-SHA binding. No new Root entrypoint or hardware grant.
+
+### Root Entry / Root Implementation Documentation and Historical-Path Audit
+
+**Status:** TODO / follow-up across remaining documentation and archived interfaces; the current contract/index corrections are included in this draft PR but are not a whole-repository audit.
+
+**Current finding:** `scripts/z2/plasma-path2-root-entry` executes `pl.hil.fpga_image_root`, while older documents still describe `pl.hil.path2_f1b_minimal_stage` or legacy Stage Transport as the active Root handler. Root Entry (Bash validation) and Root Implementation (Python operation execution) are distinct components of **one** protected execution chain, not two interchangeable Root executors.
+
+**Follow-up:** Audit remaining operator instructions, archived deployment handoffs, inbound links, code comments and tests. Correct current claims; explicitly mark historical snapshots rather than rewriting forensic evidence. Never infer that new FPGA Images, programmer IPs or DUT flashing are qualified from F1-B Root operation receipts.
+
+
 ### F1-B Legacy Retirement — P1, after Path 2 Main Cutover
 
 **Status:** TODO / not started; documentation of backlog only, no retirement or hardware changes authorized by this entry.
 
 **Layer:** Z2 Path 2/3 FPGA Provider / generic runtime boundaries / engineering dispatch / CI and documentation.
 
-**Prerequisite (P0):** Complete and verify the post-PR #1143 **main-based Path 2 Cutover** first: align the Z2 root-owned Source/Manifest/Profile pin with the reviewed `main` source using an independently approved, protected deployment; then demonstrate the actual trusted Dispatcher → SWPC Stage Transport → Z2 Generic Root Entry → Download/Test/Restore and confirmed `base.bin` recovery. PR #1143 pre-merge Development-only F1-B HIL PASS is **not** this post-merge end-to-end acceptance. Do not change installed Z2 source or trigger FPGA/DUT operations as part of this TODO update.
+**Prerequisite (P0):** The main-based Path 2 two-argument cutover was merged in PR #1167 and its bounded real-Z2 Download/Test/Restore acceptance was recorded in Issue #1168. Before retiring historical F1-B components, independently verify active callers, protected source closure, FPGA lock/ownership and Golden recovery compatibility. That F1-B acceptance does **not** qualify another Programmer IP or Blue Pill Flash. Do not change installed Z2 source or trigger FPGA/DUT operations as part of this TODO update.
 
 **P1 retirement and decoupling scope:**
 

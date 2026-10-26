@@ -48,15 +48,15 @@ Order source SHA exactly equals this installed pin. It rejects unpinned
 files, symlinks, `.pyc`, unsafe ownership/permissions and any manifest
 mismatch before executing the code-selected handler.
 
-The current bounded proof-of-concept Root handler remains
-`pl.hil.path2_f1b_minimal_stage` for Site 1 F1-B operations. Its
-historical module name does **not** mean a Stage Orchestrator or Profile is
-in the execution path. Its existing image identity, FPGA ownership/lock,
-B1/B2/B3 scope checks, in-flight state, MMIO child checks and recovery
-obligations must remain intact. This refactor does **not** turn that handler
-into a generic Blue Pill SWD backend; such functionality requires a separate
-reviewed implementation and actual HIL validation, not a freeform module
-selector or new runtime Profile.
+The current two-argument Root Entry directly selects
+`pl.hil.fpga_image_root` (with `fpga_image_guard` and
+`fpga_image_admission`), not the historical
+`pl.hil.path2_f1b_minimal_stage` module. This implementation verifies the
+companion FPGA Image Manifest, source provenance, exclusive ownership,
+current-boot state, Identity/MMIO checks and guarded recovery. Existing
+physical acceptance evidence remains limited to Site 1 F1-B; it is not
+Blue Pill Flash qualification or a general Programmer-IP execution grant.
+Neither Stage nor Project/Profile selection is part of the live Root interface.
 
 ## Operator SSH one-command Deploy + Smoke Test (PR #1167)
 
@@ -107,11 +107,11 @@ line explicitly states `RESULT=PASS`.
 
 This is a current **F1-B Site 1** programming-image smoke, not SWD flashing:
 no OpenOCD, Blue Pill erase/program/readback, or DUT power commands.
-The existing internal handler file still has historical `minimal_stage`
-naming and receipt field `stage`; it directly implements FPGA Manager,
-MMIO and recovery. These historical names **do not** authorize an external
-Stage Orchestrator or Project Profile. Renaming them is not a prerequisite
-for removing the original blocking architecture.
+The active Root implementation is `pl.hil.fpga_image_root`; the historical
+`path2_f1b_minimal_stage.py` remains in the repository but is not selected by
+the two-argument Root Entry. The receipt key `stage` is retained for
+compatibility with existing receipt validation; it is **not** Stage/Profile
+admission. Renaming the compatibility key requires a separate caller/test audit.
 
 ### Explicit limitations
 
@@ -190,16 +190,17 @@ enumeration of every device, manufacturer or programming operation.
 1. Retain the existing **two-argument** Root Entry:
    `download|test|restore + reviewed Git SHA`, all root-owned source
    pin/manifest, Lock, current-boot and Golden recovery checks.
-2. In the **existing** Root implementation separate hardcoded F1-B Image
-   filename/hash and identity expectation from shared operations using a
-   **small fixed, root-owned, reviewed Image record**. Verify manifest
-   authenticity/authorization independently of checksum, then verify exact
-   files and Board/FPGA part *before* Manager write.
-3. After Manager download, compare loaded PL Identity/ABI/Build/Capability
-   against that approved record. Keep known F1-B identity coverage and
-   independently verify Golden recovery. Reject missing metadata,
-   unsupported/unknown Image, source mismatch, wrong ABI/part, unqualified
-   mapping or missing recovery; no automatic arbitrary-image fallback.
+2. The active `pl.hil.fpga_image_root` consumes a companion FPGA Image
+   Manifest, verifies the BIN SHA256 and applicable Board/FPGA requirements
+   before the protected load, and keeps Root executable source pinning
+   separate from Image data. Do not revive a per-Image approval token,
+   fixed release allowlist or new Root code pin for each Image.
+3. After Manager download, compare observed PL Identity/ABI against the
+   companion Manifest and enforce current-boot ownership/recovery checks.
+   Preserve F1-B identity acceptance without claiming untested capability
+   words, Blue Pill Flash or other Image HIL qualification. A valid SHA256
+   demonstrates consistency, not publisher authorization; a safe functional
+   test failure alone does not mandate Golden Restore.
 4. **Do not** add an IP-specific Python Root handler or runtime
    `module/project/image` selector. A new Programmer IP needs its
    own admitted protocol controller and physical evidence, but does not
