@@ -197,8 +197,10 @@ the actual command and physical effect, not the technology label `SW` or
   may use the enrolled Z2 SSH/sudo development route to install reviewed
   code and operate FPGA Manager/MMIO within the authorized hardware goal.
   Actual OS privilege, electrical/device ownership, image identity and
-  Golden Restore remain mandatory; no unrestricted remote shell or sudoers
-  modification is implied. An unavailable route or DAC denial is NOT_RUN.
+  availability of verified, protected Golden recovery remain mandatory;
+  automatic Golden Restore after a safe FPGA load or functional test is not
+  mandatory. No unrestricted remote shell or sudoers modification is implied.
+  An unavailable route or DAC denial is NOT_RUN.
 - **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3
   (Codex CLI) may share the existing `SWPC-plasma-codex` self-hosted Runner
   and Linux account when the reviewed task and actual current permissions
@@ -387,14 +389,22 @@ criteria; do not invent hardware stages.
 within the approved task:** safely synchronize code, identify actual board
 and known-good candidate/recovery artifacts, perform one bounded
 Development Mode preflight, obtain the authorized root channel, perform
-supervised candidate load, check its new-build identity, execute PSPL-02
-Control/Status and SWD-00 internal loopback, **always attempt original FPGA
-recovery even on test failure**, verify restored board state, and publish
-the observed results with evidence paths. If current tooling stops at
-preflight or live-MMIO primitives, the agent must implement/stage a minimal
-bounded orchestration path in the approved scope rather than misrepresent
-those tools as a one-command hardware runner. Never claim a promised
-automation is already implemented.
+supervised candidate load, and check its new-build identity. For the approved
+internal-loopback milestone, execute PSPL-02 Control/Status and SWD-00 internal
+loopback. After a genuine successful FPGA Download receipt and confirmed
+same-boot ownership and safe PL/electrical state, **Keep Loaded is the normal
+default**; later Identity/ABI or DPIDR PASS, FAIL or NOT_RUN is a separate test
+outcome and is not a Restore trigger. On functional failure stop further DUT
+operations, close/reap active tools and retain the Image for debugging only
+while electrical state and hardware ownership remain safe and known. Retain
+qualified Golden recovery before load; invoke protected Restore only on an
+explicit selection or documented fault-recovery need. UNKNOWN, failed load,
+unsafe/in-flight state or unreaped owner must fail closed without blind retry.
+Publish actual load, test and optional recovery receipts; never claim a
+promised automation is already implemented. If current tooling stops at
+preflight or live-MMIO primitives, implement/stage only the minimal bounded
+orchestration path already in the approved scope; do not misrepresent those
+tools as a one-command hardware runner.
 
 For this internal-loopback development milestone, do **not** run the
 intentional AXI-fault `ERROR`/`RESET` stages or external SWD/DUT operations.
