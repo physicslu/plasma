@@ -330,13 +330,6 @@ def parse_dynamic_work_order(event: object) -> dict:
                 and type(order["board_repo_sha"]) is str
                 and SHA40.fullmatch(order["board_repo_sha"]) is not None,
                 "WORK_ORDER_VIVADO_HOST_BUILD_DENIED")
-    elif capability == "z2-root-operation":
-        # Direct, bounded operation. No Stage ID, Profile, Project or shell.
-        require(path == "path2-cli" and scope == "guarded-hardware" and
-                set(order) <= base | optional_ref | {"operation", "monitor_summary"} and
-                type(order.get("operation")) is str and
-                order["operation"] in ("download", "test", "restore"),
-                "WORK_ORDER_ROOT_OPERATION_DENIED")
     else:
         raise Denied("WORK_ORDER_CAPABILITY_DENIED")
     number = order.get("pr_number", 0)
@@ -553,8 +546,7 @@ def authorize(event: object, context: dict, registry: object,
             "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
-    if task.get("capability") in ("vivado-host-build", "z2-root-operation",
-                                  "operator-cli"):
+    if task.get("capability") in ("vivado-host-build", "operator-cli"):
         # Owner-approved immutable PR SHA is admissible before merge.
         # verify_pr() above has already checked the live same-repo owner PR,
         # exact current HEAD and main base; do not equate merge with trust.
@@ -568,13 +560,7 @@ def authorize(event: object, context: dict, registry: object,
     # No freeform Work Order command, stdout or candidate data enters the pane.
     monitor_stage = ""
     if task["execution_path"] == "path2-cli":
-        if task.get("capability") == "z2-root-operation":
-            monitor_stage = {
-                "download": "Guarded Download",
-                "test": "Guarded Test",
-                "restore": "Guarded Restore",
-            }[task["operation"]]
-        elif task.get("native_preflight") == NATIVE_PREFLIGHT:
+        if task.get("native_preflight") == NATIVE_PREFLIGHT:
             monitor_stage = "Native preflight"
         elif task.get("capability") == "operator-cli":
             monitor_stage = "Guarded CLI"
@@ -585,10 +571,7 @@ def authorize(event: object, context: dict, registry: object,
     return {
         "status": "AUTHORIZED_DEV_TASK",
         "monitor_stage": monitor_stage,
-        "authorized_operation": (task["operation"] if
-                                 req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
-                                 task.get("capability") == "z2-root-operation"
-                                 else None),
+        "authorized_operation": None,
         **req,
         "pinned_sha": req["source_sha"],
         "execution_path": task["execution_path"],
@@ -697,8 +680,9 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "z2-root-operation":
-        import plasma_path2_runtime_integration as integration
-        return integration.direct_root_operation(task, approval)
+        # Legacy fixed operations are no longer a Dispatcher capability.
+        # Preserve separately installed root recovery code; no implicit route.
+        raise Denied("RETIRED_PATH2_ROOT_OPERATION")
     if task.get("capability") == "operator-cli":
         # This is an approved, source-pinned SWPC user-space process, NOT a
         # privileged Root Entry or an assertion of actual DUT/LA/FPGA success.
@@ -1423,7 +1407,7 @@ def main() -> int:
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
                                     ("z2-cpu-only", "vivado-host-build",
-                                     "z2-root-operation", "operator-cli")
+                                     "operator-cli")
                                  else None)
                 # One fixed main-only Path 2 observation. Executed by
                 # trusted main, not candidate code and NEVER by Codex.
