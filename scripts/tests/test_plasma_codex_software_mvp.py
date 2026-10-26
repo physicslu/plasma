@@ -213,64 +213,49 @@ class MVPTests(unittest.TestCase):
         self.assertNotIn("workflow_dispatch:",wf)
         self.assertNotIn("codex --dangerously-bypass",wf)
 
-    def test_retained_hil_reuses_existing_runner_for_sw_and_la(self):
-        sw = (ROOT/".github/workflows/plasma-codex-software-mvp.yml").read_text()
-        cases = (
-            (".github/workflows/plasma-codex-software-mvp.yml",
-             "/plasma-codex hello-c 981", "codex"),
-            (".github/workflows/plasma-codex-la2016-direct.yml",
-             "/plasma-codex la2016-direct 981", "loopback"),
+    def test_retired_la_supervisor_absent_and_path3_direct(self):
+        old = (
+            ".github/workflows/plasma-codex-la2016.yml",
+            ".github/workflows/plasma-codex-la2016-direct.yml",
+            ".github/workflows/plasma-codex-la2016-diagnose.yml",
+            "scripts/plasma-codex-la2016.py",
+            "scripts/plasma-codex-la2016.sh",
+            "scripts/plasma-codex-la2016-inner.sh",
+            "scripts/plasma-codex-la2016-contract.py",
+            "scripts/plasma-codex-la2016-direct.py",
+            "scripts/plasma-codex-la2016-diagnose.py",
         )
-        for path, exact_owner_command, job in cases:
-            with self.subTest(path=path):
-                wf=(ROOT/path).read_text()
-                self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"),1)
-                worker=wf.split("\n  "+job+":\n",1)[1]
-                self.assertIn("    needs: authorize\n",wf)
-                self.assertTrue(
-                    "needs.authorize.result == 'success'" in worker or
-                    "needs.authorize.outputs.approved_sha == github.sha" in worker
-                )
-                self.assertIn("test \"$(id -un)\" = plasma-codex",worker)
-                self.assertIn("test \"$RUNNER_NAME\" = SWPC-plasma-codex",worker)
-                self.assertIn("github.actor == 'physicslu'",wf)
-                self.assertIn("github.event.issue.number == 981",wf)
-                self.assertIn("github.event.comment.body == '"+exact_owner_command+"'",wf)
-                self.assertIn("!github.event.issue.pull_request",wf)
-                self.assertIn("persist-credentials: false",worker)
-        self.assertNotIn("gh pr merge",sw)
-        self.assertNotIn("sudo bash",sw)
-        self.assertNotIn("uhubctl ",sw)
+        for file in old:
+            with self.subTest(file=file):
+                self.assertFalse((ROOT / file).exists())
+        dispatch=(ROOT/"scripts/plasma_development_dispatch.py").read_text()
+        self.assertIn('"codex", "exec", "--json", "-"',dispatch)
+        self.assertNotIn("validate_agent_request(",dispatch)
+        contract=(ROOT/"AGENTS.md").read_text()
+        self.assertIn("Path 3 direct hardware tools",contract)
+        self.assertTrue((ROOT/"docs/development/plasma-path3-direct-hardware-tools.md").is_file())
+        self.assertTrue((ROOT/"docs/evidence/la2016-pwm-loopback/2026-10-16/verify.py").is_file())
 
-    def test_all_nine_legacy_codex_issue_dispatch_triggers_retired(self):
-        # Archived worker guards remain; the GitHub event entry must not.
-        names = (
+    def test_remaining_legacy_issue_triggers_retired(self):
+        names=(
             "plasma-codex-pilot.yml",
             "plasma-codex-software-mvp.yml",
-            "plasma-codex-la2016.yml",
-            "plasma-codex-la2016-direct.yml",
-            "plasma-codex-la2016-diagnose.yml",
             "plasma-codex-z2-login.yml",
             "plasma-codex-z2-readiness.yml",
             "plasma-codex-swpc-preflight.yml",
             "plasma-codex-hil-tool-inventory.yml",
         )
-        self.assertEqual(len(names), 9)
         for name in names:
             with self.subTest(workflow=name):
-                wf = (ROOT / ".github/workflows" / name).read_text()
-                self.assertNotIn("\n  issue_comment:\n", wf)
-                self.assertNotIn("\n  workflow_dispatch:\n", wf)
-                self.assertNotIn("\n  workflow_call:\n", wf)
-                self.assertIn("\n  pull_request:\n", wf)
-                self.assertIn("\n  push:\n", wf)
-                self.assertIn("github.event_name == 'issue_comment'", wf)
+                wf=(ROOT/".github/workflows"/name).read_text()
+                self.assertNotIn("\n  issue_comment:\n",wf)
+                self.assertNotIn("\n  workflow_dispatch:\n",wf)
+                self.assertNotIn("\n  workflow_call:\n",wf)
+                self.assertIn("\n  pull_request:\n",wf)
+                self.assertIn("\n  push:\n",wf)
 
     def test_unified_hil_does_not_authorize_hardware_from_pr_or_main_push(self):
-        for path in (
-            ".github/workflows/plasma-codex-software-mvp.yml",
-            ".github/workflows/plasma-codex-la2016-direct.yml",
-        ):
+        for path in (".github/workflows/plasma-codex-software-mvp.yml",):
             with self.subTest(path=path):
                 wf=(ROOT/path).read_text()
                 self.assertIn("  pull_request:\n",wf)

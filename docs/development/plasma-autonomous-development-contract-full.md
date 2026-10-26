@@ -184,6 +184,7 @@ the actual command and physical effect, not the technology label `SW` or
   privilege, ownership, rollback and electrical guards; these are runtime
   checks, not new human approval Gates. Report PASS, FAIL or NOT_RUN from
   execution evidence, never from documentation or hosted mocks alone.
+- **Path 3 hardware CLI:** Codex directly executes the verified SWPC LA2016 sigrok CLI and the existing PYNQ-Z2 SSH route under its approved Work Order. Z2 PS executes OpenOCD and the PS-local UNIX WordPort/Remote Bitbang bridge. The historical fixed JSON Host Supervisor and LA-only Issue #981 workflows are retired; do not reinstate an Agent JSON-to-hardware-command translator or special per-device execution path. See `docs/development/plasma-path3-direct-hardware-tools.md`. Retain locks, device provenance, protected Root/Manifest and fault recovery.
 - **Path 3 is not Host-only.** The existing SWPC Codex Path 3, without
   another mode, session or Work Order capability, can use owner-approved
   USB/TTY engineering instruments through the worker's existing Linux
