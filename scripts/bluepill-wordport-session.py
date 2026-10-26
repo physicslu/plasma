@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """One local Blue Pill WordPort session; no FPGA load, reset or auto-restore.
 
-Development-only Z2 programmer-engine glue. The supervisor must qualify the
-pinned OpenOCD on SWPC, perform protected Download/Identity, forward the private
-UNIX socket over enrolled SSH and reap this process after the DPIDR attempt.
+Development-only Z2 PS programmer-engine glue. OpenOCD must execute on
+Z2 PS and connect to this process through a PS-local UNIX socket; SWPC is
+only the Web/Controller/BFF control station and development/CI host.
+The supervisor must qualify the pinned Z2 ARMv7 OpenOCD, perform protected
+Download/Identity, and reap local OpenOCD and this bridge after DPIDR.
+No cross-host Remote Bitbang forwarding or SWPC OpenOCD live execution.
 On normal success the SWD FPGA Image remains loaded after socket/MMIO cleanup.
 Golden Restore is a separate, explicitly selected protected Root operation;
 uncertain hardware state still requires guarded recovery decisions.
