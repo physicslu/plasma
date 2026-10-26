@@ -37,7 +37,36 @@ Plasma PS runtime
   -> target IC
 ```
 
-The FPGA PL is **not** part of this OpenOCD path. No current executor acceptance criterion depends on PL logic, PL registers, a PL programming engine, or PS-to-PL command transport.
+The FPGA PL is **not** part of this *software-only compiled-plan executor acceptance*. No current executor acceptance criterion depends on PL logic, PL registers, a PL programming engine, or PS-to-PL command transport.
+
+### Mandatory deployment boundary: Z2 PS owns live OpenOCD
+
+For PLASMA's **physical Z2 SWD PoC**, the OpenOCD programming process belongs to
+**Z2 PS (embedded Linux)**, not the SWPC integration workstation:
+
+```text
+SWPC: Web / Controller / BFF
+  -> Ethernet: high-level Job commands, progress and receipts
+Z2 PS: OpenOCD -> PS-local UNIX WordPort/Remote Bitbang bridge -> MMIO
+  -> AXI4-Lite
+Z2 PL: FPGA SWD engine -> SWCLK/SWDIO -> target DUT
+```
+
+**SWPC OpenOCD is permitted for offline build, QEMU/mock, CI or lab-tool
+qualification only; it is not the execution host for physical programming.**
+Do not tunnel the live Remote Bitbang socket or per-bit SWD traffic from SWPC
+into Z2. A local UNIX socket is an internal Z2 PS process boundary, not an
+Ethernet/API boundary. Path 2/3 SWPC development workers may deploy and
+observe Z2, but they do not inherit ownership of its programmer backend.
+
+This is a *placement/ownership invariant*, not a claim that the physical
+Z2/PL/DUT path has passed HIL. The existing ARMv7 Z2 PS OpenOCD package must
+independently qualify SWD-capable remote_bitbang before real DPIDR; do not
+substitute a successful x86_64 SWPC build. The repository-contract CI tests
+cross-check this architecture with the actual WordPort bridge and Z2 runtime
+installation path. Architecture drift requires a revised Gate 1, aligned
+implementation and CI; a normal feature PR must fail rather than silently
+relocating OpenOCD.
 
 A future Plasma-native PPU path may later be:
 
