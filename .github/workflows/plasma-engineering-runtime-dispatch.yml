@@ -430,7 +430,7 @@ jobs:
       (
         (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
          (
-          contains(fromJSON('["cpu-only","vivado-host-build","z2-root-operation","operator-cli"]'),
+          contains(fromJSON('["cpu-only","vivado-host-build","operator-cli"]'),
                    needs.development-authorize.outputs.execution_capability) ||
           (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
            needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
