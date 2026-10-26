@@ -821,7 +821,7 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(digest == task["expected_stdout_sha256"],
                 "OUTPUT_SHA256_MISMATCH")
     return {
-        "status": ("REAL_HARDWARE_CLI_EVIDENCE_REVIEW_REQUIRED"
+        "status": ("OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED"
                    if task.get("capability") == "operator-cli" else "PASS"),
         "physical_hil": ("NOT_VERIFIED" if task.get("capability") == "operator-cli"
                          else "NOT_APPLICABLE"),
