@@ -284,8 +284,11 @@ def parse_dynamic_work_order(event: object) -> dict:
             require("expected_stdout_sha256" not in order,
                     "WORK_ORDER_EXIT_CODE_DIGEST_CONFLICT")
         script = order["script"]
+        # Host-only Bubblewrap still prevents network/device access, so
+        # source-pinned CLI scripts can live anywhere under scripts/.
+        # No path traversal, dot component, absolute path or shell entry.
         require(type(script) is str and re.fullmatch(
-            r"scripts/experiments/[a-zA-Z0-9_-]+\.py", script
+            r"scripts/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py", script
         ) is not None, "SCRIPT_PATH_DENIED")
         argv = order["argv"]
         require(type(argv) is list and len(argv) <= 16 and all(
@@ -794,12 +797,28 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                 "stdout_sha256": hashlib.sha256(proc.stdout).hexdigest(),
                 "stderr_sha256": hashlib.sha256(proc.stderr).hexdigest(),
                 "verification": mode,
+                "execution_classification": (
+                    "NOT_RUN_RESOURCE_UNAVAILABLE"
+                    if task.get("capability") == "operator-cli" and proc.returncode == 69
+                    else "NOT_RUN_PERMISSION_DENIED"
+                    if task.get("capability") == "operator-cli" and proc.returncode == 77
+                    else "EXIT_ZERO" if proc.returncode == 0
+                    else "COMMAND_FAILED"),
             }, sort_keys=True) + "\n", encoding="utf-8")
     digest = hashlib.sha256(proc.stdout).hexdigest()
     try:
         lines = proc.stdout.decode("utf-8").splitlines()
     except UnicodeDecodeError:
         raise Denied("OUTPUT_NOT_UTF8") from None
+    # Reviewed operator scripts may explicitly use standard sysexits codes:
+    # EX_UNAVAILABLE=69 (missing authorized resource or enrollment),
+    # EX_NOPERM=77 (real OS/credential permission denial).
+    # A classified NOT_RUN remains a FAILED job, never an implicit PASS.
+    if task.get("capability") == "operator-cli":
+        if proc.returncode == 69:
+            raise Denied("OPERATOR_CLI_NOT_RUN_RESOURCE_UNAVAILABLE")
+        if proc.returncode == 77:
+            raise Denied("OPERATOR_CLI_NOT_RUN_PERMISSION_DENIED")
     require(proc.returncode == 0, "COMMAND_FAILED")
     if mode != "exit-code":
         require(digest == task["expected_stdout_sha256"],

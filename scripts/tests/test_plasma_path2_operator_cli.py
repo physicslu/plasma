@@ -170,6 +170,49 @@ class Path2OperatorCLI(unittest.TestCase):
                     task, workspace=Path(td), approval=approval,
                     executor=executor)
 
+    def test_operator_permission_and_missing_resource_are_explicit_not_run(self):
+        task, approval = admitted(work_order())
+        for code, reason in (
+            (69, "OPERATOR_CLI_NOT_RUN_RESOURCE_UNAVAILABLE"),
+            (77, "OPERATOR_CLI_NOT_RUN_PERMISSION_DENIED"),
+        ):
+            with self.subTest(exit_code=code), tempfile.TemporaryDirectory() as td:
+                root = Path(td)
+                script = root / task["script"]
+                script.parent.mkdir(parents=True)
+                script.write_text("print('offline')\\n")
+                executor = Mock(return_value=subprocess.CompletedProcess(
+                    args=[], returncode=code, stdout=b"", stderr=b"private diagnostics"))
+                with self.assertRaisesRegex(dispatch.Denied, reason):
+                    dispatch.run_task(task, workspace=root, approval=approval,
+                                      executor=executor, evidence_dir=root)
+                receipt = json.loads(
+                    (root / "plasma-path2-process.json").read_text())
+                self.assertEqual(receipt["exit_code"], code)
+                self.assertEqual(
+                    receipt["execution_classification"],
+                    "NOT_RUN_RESOURCE_UNAVAILABLE" if code == 69
+                    else "NOT_RUN_PERMISSION_DENIED")
+                self.assertEqual((root / "plasma-path2-stderr.txt").read_bytes(),
+                                 b"private diagnostics")
+                executor.assert_called_once()
+
+    def test_generic_cli_other_nonzero_codes_remain_failures(self):
+        task, approval = admitted(work_order())
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            script = root / task["script"]
+            script.parent.mkdir(parents=True)
+            script.write_text("print('offline')\\n")
+            executor = Mock(return_value=subprocess.CompletedProcess(
+                args=[], returncode=1, stdout=b"", stderr=b""))
+            with self.assertRaisesRegex(dispatch.Denied, "COMMAND_FAILED"):
+                dispatch.run_task(task, workspace=root, approval=approval,
+                                  executor=executor, evidence_dir=root)
+            receipt = json.loads(
+                (root / "plasma-path2-process.json").read_text())
+            self.assertEqual(receipt["execution_classification"], "COMMAND_FAILED")
+
     def test_candidate_source_sha_binding_is_preserved(self):
         task, approval = admitted(work_order())
         approval = dict(approval)

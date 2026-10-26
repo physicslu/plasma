@@ -1819,6 +1819,45 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(observed["timeout"], 180)
             self.assertEqual(receipt["verification"], "exit-code")
 
+    def test_cpu_only_accepts_nested_reviewed_scripts_without_device_access(self):
+        order = self._order("path2-cli",
+                            script="scripts/tools/offline_probe.py",
+                            verification="exit-code")
+        order.pop("expected_stdout_sha256")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["script"], "scripts/tools/offline_probe.py")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / task["script"]
+            source.parent.mkdir(parents=True)
+            source.write_text("print('safe')\\n", encoding="utf-8")
+            observed = {}
+            def stub(command, **kwargs):
+                observed["argv"] = command
+                return subprocess.CompletedProcess(command, 0, b"safe\\n", b"")
+            with patch.object(dev.shutil, "which", return_value=sys.executable):
+                result = dev.run_task(task, workspace=root, sandbox=True,
+                                      executor=stub)
+            self.assertEqual(result["status"], "PASS")
+            self.assertIn("--unshare-all", observed["argv"])
+            self.assertIn("--ro-bind", observed["argv"])
+            self.assertIn("--clearenv", observed["argv"])
+            self.assertIn("scripts/tools/offline_probe.py",
+                          " ".join(observed["argv"]))
+        for script in (
+            "scripts/../offline.py", "scripts/.private/run.py",
+            "scripts/tools/../offline.py", "/tmp/offline.py",
+            "pl/hil/one_shot.py", "scripts/tools/probe.sh",
+            "scripts/tools//probe.py", "scripts/tools/hidden.name.py",
+        ):
+            with self.subTest(script=script), self.assertRaisesRegex(
+                    dev.Denied, "SCRIPT_PATH_DENIED"):
+                dev.request(self._event(order | {"script": script}),
+                            self._context())
+
     def test_retired_root_route_never_reaches_transport(self):
         # Old fixed operation is not an authorized Path 2 Work Order.
         with patch("plasma_path2_runtime_integration.direct_root_operation") as protected:
