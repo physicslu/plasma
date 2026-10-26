@@ -1,4 +1,4 @@
-name: PL SWD-03 AXI transaction RTL
+name: PL retired SWD-03 synthetic fixture offline regressions
 
 on:
   pull_request:
@@ -34,7 +34,6 @@ on:
       - "pl/projects/z2-swd03-axi/**"
       - "pl/tests/test_z2_swd03_axi_build.py"
       - ".github/workflows/pl-swd03-axi.yml"
-  workflow_dispatch:
 
 permissions:
   contents: read
