@@ -192,9 +192,16 @@ the actual command and physical effect, not the technology label `SW` or
   Codex inherits the operator's effective configuration and the worker's
   actual Linux privileges. The owner authorizes physical work in Gate 1.
   Device visibility is not an authorization to actuate outside that task.
-  Path 2 protected Z2 operations use the existing trusted-main
-  Dispatcher, SSH/sudo operation transport and Protected Root Entry.
-  No Stage Adapter or Stage/Profile selector is part of the current path. After Gate 1 owner approval, Path 3
+  Legacy protected Z2 FPGA Image lifecycle operations use the existing
+  trusted-main Dispatcher, SSH/sudo operation transport and Protected Root
+  Entry. The general Path 2 `operator-cli` capability instead executes
+  an exact owner-approved, source-pinned Python script in the existing
+  non-root SWPC Runner, without a fixed operation or F1-B project selector.
+  It grants no new OS/Root privilege; scripts handling real hardware must
+  enforce B1/B2/B3, device ownership, safe output state and recovery. Neither
+  ordinary process exit 0 nor a hosted mock establishes SWD/Flash PASS.
+  No Stage Adapter or Stage/Profile selector is part of the current path.
+  After Gate 1 owner approval, Path 3
   may use the enrolled Z2 SSH/sudo development route to install reviewed
   code and operate FPGA Manager/MMIO within the authorized hardware goal.
   Actual OS privilege, electrical/device ownership, image identity and
