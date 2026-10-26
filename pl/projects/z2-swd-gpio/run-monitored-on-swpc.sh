@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# RETIRED: source retained for historical tests only; no image builds.
+printf '%s\n' 'RETIRED_Z2_SWD_GPIO: legacy project retired; use Z2 PS-local WordPort/PL SWD' >&2
+exit 2
 # Detached SWPC Vivado build supervisor. Fail/timeout stops this build only.
 # No FPGA load, no IC access, no Git writes or PR merge.
 set -Eeuo pipefail

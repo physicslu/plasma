@@ -3,6 +3,11 @@ from __future__ import annotations
 
 import unittest
 from pl.hil.swd04.one_shot import run_protected
+from pl.hil.swd04 import one_shot
+from unittest.mock import patch
+from pathlib import Path
+from types import SimpleNamespace
+from pl.hil import f1b
 
 
 class OneShotSupervisorTests(unittest.TestCase):
@@ -65,6 +70,31 @@ class OneShotSupervisorTests(unittest.TestCase):
         self.assertEqual(events, ["preflight", "load", "hil01", "hil02", "restore", "verify"])
         self.assertEqual(state["restoration_verified"], "FAIL_OR_UNKNOWN")
         self.assertEqual(state["overall"], "NO_GO")
+
+
+class LegacyPathRetirementTests(unittest.TestCase):
+    def test_retired_default_swd05_sequence_denied_before_physical_preflight(self):
+        """The retired default sequence must never reach artifacts or hardware."""
+        with patch.object(one_shot, "verify_inputs",
+                          side_effect=AssertionError("must not touch preflight")):
+            with self.assertRaisesRegex(one_shot.c.SafetyError,
+                                        "RETIRED_SWD05_INTERNAL_SEQUENCE_NO_CALLBACK"):
+                one_shot.run_live(object())
+
+    def test_f1b_passes_explicit_identity_callback_into_protected_lifecycle(self):
+        """F1-B can still reuse the protected lifecycle, with no live calls here."""
+        args = SimpleNamespace(output=Path("/nonexistent/host-only-evidence"))
+        observed = {}
+        def fake_one_shot(inputs, **kwargs):
+            observed.update(kwargs)
+            self.assertIs(inputs, args)
+            return {"overall": "OFFLINE_STUB"}
+        with patch.object(one_shot, "run_live", side_effect=fake_one_shot):
+            result = f1b.run_live(args, observe=lambda: None)
+        self.assertEqual(result, {"overall": "OFFLINE_STUB"})
+        self.assertIs(observed["profile"], f1b.PROFILE)
+        self.assertTrue(callable(observed["test_callback"]))
+        self.assertTrue(callable(observed["admission_check"]))
 
 
 if __name__ == "__main__":

@@ -11,6 +11,11 @@
 | **Plan** | 尚未全部實作的核准方向；不能宣稱為現有能力。 |
 | **Historical** | 僅供遷移背景；不是相容性或執行契約。 |
 
+## Current external SWD PoC vs retired internal fixtures
+
+- **Current** — Z2 PS-local OpenOCD + WordPort/RemoteBitbang + paired PL SWD Image for Blue Pill: see root `AGENTS.md`, [PS OpenOCD architecture](architecture/ic-support-openocd-plan-executor.md), [retirement map](development/swd-legacy-path-retirement.md).
+- **Historical / retired for real Blue Pill:** `z2-swd-gpio` PS EMIO GPIO and `z2-swd03-axi` internal synthetic DPIDR. SWD-04/05 archived fixtures are not current external target operations.
+
 ## Architecture Decision Records
 
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。

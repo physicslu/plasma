@@ -1,3 +1,5 @@
+> **INTERNAL PS-PL LOOPBACK ONLY, NOT EXTERNAL SWD.** Real Blue Pill programming uses Z2 PS-local ARMv7 OpenOCD → UNIX WordPort/RemoteBitbang → reviewed PL SWD Image → PMOD. Follow [retirement inventory](swd-legacy-path-retirement.md); old internal loops and synthetic ACK/DPIDR cannot establish physical MCU success.
+
 # PSPL-02 / SWD-00 internal waveform HIL
 
 This procedure is limited to the **three-aperture** `control_waveform_loopback`

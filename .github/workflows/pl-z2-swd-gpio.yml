@@ -1,4 +1,4 @@
-name: PL Z2 SWD GPIO source contracts
+name: PL shared Identity and retired SWD GPIO host-only contracts
 
 on:
   pull_request:
@@ -10,7 +10,6 @@ on:
     paths:
       - "pl/**"
       - ".github/workflows/pl-z2-swd-gpio.yml"
-  workflow_dispatch:
 
 permissions:
   contents: read
