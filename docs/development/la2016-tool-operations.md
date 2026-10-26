@@ -51,7 +51,7 @@ fi
 
 # 動態查找 USB 77a1:01a2；每次執行時從 sysfs 重新取得 busnum/devnum。
 # 沿用 scripts/plasma-codex-la2016.py 的唯一裝置、權限、fuser 策略。
-# 不寫死 /dev/bus/usb/001/030 等歷史節點，也不輸出 USB 序號。
+# 不使用歷史 USB 節點值，也不輸出 USB 序號。
 LA_CONN="$(python3 - <<'PY'
 import os, pathlib, stat, subprocess, sys
 root = pathlib.Path('/sys/bus/usb/devices')
