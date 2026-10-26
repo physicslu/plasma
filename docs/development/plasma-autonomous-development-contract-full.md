@@ -209,6 +209,21 @@ the actual command and physical effect, not the technology label `SW` or
   automatic Golden Restore after a safe FPGA load or functional test is not
   mandatory. No unrestricted remote shell or sudoers modification is implied.
   An unavailable route or DAC denial is NOT_RUN.
+- **Capability routing (Path 2):** `cpu-only` is intentionally OS-sandboxed
+  with no network or hardware and supports source-pinned Python scripts under
+  `scripts/`, not just `scripts/experiments/`. Use `operator-cli` with
+  `scope: guarded-hardware` for approved device/network workflows; it runs
+  under existing non-root Linux rights. An operator script may explicitly
+  use exit code 69 for unavailable prerequisites or 77 for permission
+  denial *before actual operation*, causing a failed job with a classified
+  `NOT_RUN` reason and preserved process evidence. An operation already
+  attempted must not be reclassified as `NOT_RUN`. Keep the FPGA image Root
+  Entry restricted to image lifecycle and Golden recovery, not arbitrary
+  shell commands. Existing F1-B Vivado host-build internals are not a generic
+  project driver; do not whitelist more Project IDs without actual build/
+  artifact contract evidence. New tasks use the dynamic owner Work Order, not
+  a new legacy Registry task_id. Z2 Root source/manifest pin mismatches
+  never authorize implicit redeployment or privilege escalation.
 - **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3
   (Codex CLI) may share the existing `SWPC-plasma-codex` self-hosted Runner
   and Linux account when the reviewed task and actual current permissions
