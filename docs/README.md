@@ -191,6 +191,8 @@
 - **Reference / Operator-observed / HARDWARE NO-GO** — [2026-10-15 PYNQ-Z2 HIL Hardware Inventory](development/hil-hardware-inventory.md)：記錄 Transcend Hub Port 2／3／4、Z2 JTAG／UART 與 5V 供電主張、AX88179、KINGST LA2016、PL 執行環境及復原驗收缺口；不含操作端識別資料，也不取代即時安全預檢。
 - **Observed / LA-only functional PASS** — [2026-10-16 KINGST PWM1 → CH0 Loopback Evidence](evidence/la2016-pwm-loopback/2026-10-16/README.md)：保存 1 kHz／50% 與 2 kHz／25% 實測波形、OFF 對照、SHA256 與離線重算工具；不代表 Z2 或類比電壓驗收。
 - **Observed / ST-LINK SWD reference** — [2026-10-23 STM32F103 Blue Pill Golden Reference](evidence/stlink-stm32f103-swd-reference/2026-10-23/README.md)：保存三輪 ST-LINK Flash／讀回、六份 LA2016 原始 SWD 波形與離線驗證；CDC 首次 ID 與 SWCLK 時序差異仍未結案，不代表 Z2 燒錄能力。
+- **Reference / Operator-observed Tool Runbook** — [ST-LINK SWD 工具操作手冊](development/stlink-swd-tool-operations.md)：整理已驗證的 st-info/st-flash 操作、ST-LINK 排他接線、VTref、Flash Write + 獨立 Readback／SHA256，以及 Reset/NRST 未驗證限制；文件本身不授權實機操作。
+- **Reference / Operator-observed Tool Runbook** — [KINGST LA2016 工具操作手冊](development/la2016-tool-operations.md)：實測 sigrok AppImage 與 firmware resource 初始化、被動 SWD 抓波形、成功 Golden Reference、PWM1→CH0 Loopback、PWM OFF 波形驗證；區分歷史成功與當次裝置狀態。
 - **Host-only / HARDWARE NO-GO** — [PSPL-02 / SWD-00 Internal Waveform HIL](development/pspl02-swd00-hil-runbook.md)：三區段 baseline 專用的產物校驗、預檢、受限 MMIO 與原映像復原程序；現場獨立復原及 privileged ownership 尚待確認。
 - **Plan / Accepted Policy** — [SWD-04 Z2 PS/PL HIL Runbook](development/swd04-z2-hil-runbook.md)：以獨立 Preflight、白名單 AXI MMIO、DPIDR、ABORT 與恢復原 PYNQ 系統的 Host-only 安全契約，實機驗證尚未執行。
 - **Host-only / Execution Preparation** — [SWD-04 Offline Execution Checklist](development/swd04-offline-execution-checklist.md)：真實 Artifact、BIN 格式、離線工具包、服務隔離與 HIL／Recovery 操作單；缺少復原檔案時禁止載入。
