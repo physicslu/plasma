@@ -24,7 +24,7 @@
 
 ## Engineering governance and execution paths
 
-- **Gate 1 / Draft / 未部署** — [Path 2／3 共用 Z2 Protected Root Entry](development/path2-generic-fpga-image-loader.md)：沿用既有 Stage Transport／Root 執行路徑，將 F1-B 專用入口改為 Root-owned Project＋Source SHA 綁定；不另建 Executor／Loader，SWPC／Z2 實機驗收仍 NOT_RUN。
+- **Current / PR #1167 merged, Issue #1168 F1-B HIL PASS** — [Path 2 受保護 Z2 Root Entry](development/path2-generic-fpga-image-loader.md)：沿用可信 Dispatcher、SWPC SSH／sudo Transport 與既有兩參數 `operation + source_sha` Root Entry；Entry 固定呼叫 `pl.hil.fpga_image_root`，不再使用 Stage/Profile。實機驗收僅涵蓋 Site 1 F1-B Download／Identity Test／Golden Restore，不代表 Blue Pill Flash 或其他 Programmer IP 通過。
 
 - **Historical Gate 1 offline test / current guarded route separate** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；當前受控執行路徑改由已註冊的可信 Stage Transport 與 Z2 Root SHA256 Manifest 保護。每次實機操作仍須獨立核對授權、映像 Hash、AXI 與 Recovery 證據。\n
 
