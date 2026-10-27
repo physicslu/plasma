@@ -50,7 +50,8 @@ def test_build_is_host_only_does_not_auto_load_fpga():
     build = (PROJECT / "build_bitstream.tcl").read_text()
     for required in ("launch_runs synth_1", "launch_runs impl_1",
                      "report_timing_summary", "report_drc",
-                     "report_methodology", "check_timing", "system.hwh",
+                     "report_methodology", "report_datasheet",
+                     "report_io", "check_timing", "system.hwh",
                      "system_wrapper.bit", "SWD_NO_AUTOMATIC_DOWNLOAD"):
         assert required in build
     for banned in ("fpga_manager", "ssh ", "sudo ", "scp ", "open_hw_target",
@@ -80,3 +81,19 @@ def test_mode_and_debug_registers_have_separate_site_ownership():
     for banned in ("plasma_mpe_", "z2-swd03-axi", "fixed-site1-vivado-host-build",
                    "swd_transaction_master", "bluepill_remote_bitbang"):
         assert banned not in r
+
+
+def test_offchip_swd_timing_signoff_cannot_be_inferred_from_internal_wns():
+    verifier = (PROJECT / "verify_hwh.py").read_text()
+    wrapper = (PL.parent / "scripts/plasma_swd_host_build.py").read_text()
+    assert 'external_swd_io_timing' in verifier
+    assert 'external_io_timing_qualified": False' in verifier
+    assert 'external_swd_io_timing' in wrapper
+    assert "datasheet_io.rpt" in verifier
+    assert "io_pad_configuration.rpt" in verifier
+    xdc = (PL / "constraints/pynq-z2/z2-swd-independent.xdc").read_text()
+    assert "set_false_path" not in xdc
+    assert "set_clock_groups -asynchronous" not in xdc
+    assert "set_input_delay 0" not in xdc
+    assert "set_output_delay 0" not in xdc
+    assert (PROJECT / "external-timing-audit.md").is_file()
