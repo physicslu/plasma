@@ -13,8 +13,7 @@ def test_mpe_two_independent_site_swd_engines():
     run(
         simulator="icarus",
         verilog_sources=[str(PL / path) for path in (
-            "rtl/site/swd_waveform_engine.sv",
-            "rtl/site/swd_transaction_master.sv",
+            "rtl/mpe/plasma_mpe_swd_engine.sv",
             "rtl/mpe/plasma_mpe_dual_swd_core.sv",
             "sim/IOBUF.sv",
             "sim/mpe_obuf_stub.sv",
