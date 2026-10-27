@@ -1,6 +1,6 @@
 # PLASMA MPE — independent two-Site SWD architecture (Gate 1, clean-sheet v1)
 
-**Status:** architecture/design and host-only contract only. No synthesizable MPE RTL, BIT/HWH/BIN, actual OpenOCD MPE adapter, FPGA reconfiguration, Z2 MMIO or physical DPIDR qualification exists from this document. **NOT_DEPLOYED / NOT_HIL_QUALIFIED**.
+**Status:** Gate 1 architecture plus an **unverified synthesizable two-engine RTL slice**, without AXI/FIFO/IRQ integration or a physical top-level Image. Cocotb/Icarus tests are authored but not yet executed. No BIT/HWH/BIN, actual OpenOCD MPE adapter, FPGA reconfiguration, Z2 MMIO or physical DPIDR qualification exists from this document. **SOURCE_ONLY / NOT_DEPLOYED / NOT_HIL_QUALIFIED**.
 
 **Owner intent (2026-10-27):** replace, rather than preserve, the single-Site PS-driven remote-bitbang PoC. First product-facing prototype implements **two truly independent Sites** on PYNQ-Z2 PMODA/PMODB; final architecture scales to eight without one global SWD bit engine. Neither the previous Site 1=PMODB assignment nor the retired synthetic internal DPIDR route is an ABI requirement. This is a new Image family: do not alter or remove current protected Image/Golden recovery.
 
@@ -96,7 +96,7 @@ For Gate 1 implementation, first establish a testable injected WordPort / emulat
 
 ## 6. Verification and hardware acceptance
 
-**Host-only Gate 1 engineering:** design reviews against root `AGENTS.md`, `pl/AGENTS.md`, current Board XDC and existing SWD semantics references (not retired deployed engines); write new RTL and a separate Cocotb reference model. Exercise: two simultaneously active engines with intentionally different dividers; independent ACK OK/WAIT/FAULT; bad ACK and parity; SWDIO turnaround contention-free; ordered 16-deep FIFO and overflow; precise tag matching and abort races; per-Site timeout/fault confinement; AXI AW/W independent arrival, WSTRB, SLVERR and backpressure; output Hi-Z and no unrequested drive.
+**Host-only Gate 1 engineering:** the initial `pl/rtl/mpe/plasma_mpe_dual_swd_core.sv` instantiates two independently controlled transaction FSMs with separate output buffers and SWDIO IOBUF, using the existing `swd_transaction_master.sv` as a previously exercised reference primitive. This is **not a new MMIO-controlled full IP**: command FIFO, register fabric and hardened electrical pad admission remain to be implemented, and the accompanying Cocotb test has **NOT_RUN** status. Design reviews against root `AGENTS.md`, `pl/AGENTS.md`, current Board XDC and existing SWD semantics references (not retired deployed engines); write new RTL and a separate Cocotb reference model. Exercise: two simultaneously active engines with intentionally different dividers; independent ACK OK/WAIT/FAULT; bad ACK and parity; SWDIO turnaround contention-free; ordered 16-deep FIFO and overflow; precise tag matching and abort races; per-Site timeout/fault confinement; AXI AW/W independent arrival, WSTRB, SLVERR and backpressure; output Hi-Z and no unrequested drive.
 
 **SWPC Vivado build:** verify both JA and JB pin assignments, IOSTANDARD LVCMOS33, timing and DRC/methodology, HWH two-site address map, BIT/HWH/BIN hashes and paired Manifest; no unreviewed retired project source. Synthesis and timing are **NOT_RUN** at this architecture-only baseline.
 
@@ -107,7 +107,7 @@ For Gate 1 implementation, first establish a testable injected WordPort / emulat
 ## 7. Implementation sequence under this direction
 
 1. New machine-readable board/ABI schema and validation; separate from prior PoC.
-2. Isolated synthesizable per-Site SWD clock+turnaround+transaction FSM, Cocotb tests against known SWD golden vectors.
+2. Initial independent two-engine RTL + SWD pad wrapper and authored Cocotb tests (**source exists, simulation NOT_RUN**); complete review, run Cocotb against known golden vectors, harden reset/abort/output isolation and add independent site command buffering.
 3. One AXI4-Lite register/FIFO fabric with two truly concurrent site instances, independent completion and fault.
 4. Vivado XDC/PS7/HWH/implementation and image-descriptor acceptance; check resource/timing scaling with N=2 then N=8.
 5. PS Hardware Broker and native OpenOCD SWD adapter with protected Image admission.
