@@ -222,24 +222,26 @@ def fpga_only_swd_rx_ideal_budget(reports: Path) -> dict:
         require(len(rows) == 1, "SWD_FPGA_DATASHEET_PORT_ABSENT_OR_DUPLICATE")
         return rows[0]
 
-    # 1 MHz provisional max: 100MHz FCLK, >=50 10ns cycles per half.
-    half_ns = 500.0
+    # Design candidate max 12.5MHz: FCLK 100MHz, N=4, half cycle=40ns.
+    # Only an FPGA-side necessary condition. No target/cable closure is implied.
+    half_ns = 40.0
     per_site = {}
     for idx in (1, 2):
         tclk = slow_max(tx, f"swclk_site{idx}")
         tsetup = slow_max(rx, f"swdio_site{idx}")
         minimum = tclk + tsetup
         margin = half_ns - minimum
-        require(margin > 0, "SWD_FPGA_RX_BRINGUP_CEILING_EXCEEDED")
+        require(margin > 0, "SWD_FPGA_RX_12_5MHZ_CANDIDATE_INFEASIBLE")
         per_site[f"site{idx}"] = {
             "clock_to_swclk_pad_slow_max_ns": round(tclk, 3),
             "swdio_input_setup_slow_ns": round(tsetup, 3),
             "necessary_fpga_only_halfcycle_ns": round(minimum, 3),
             "unqualified_25mhz_ideal_margin_ns": round(20.0 - minimum, 3),
-            "provisional_1mhz_ideal_margin_ns": round(margin, 3),
+            "candidate_12_5mhz_fpga_only_margin_ns": round(margin, 3),
             "target_tco_and_cable_accounted": False,
         }
-    return {"fclk_hz": 100000000, "provisional_normal_swd_limit_hz": 1000000,
+    return {"fclk_hz": 100000000, "candidate_hw_max_swd_hz": 12500000,
+            "candidate_max_half_period_ns": 40.0,
             "estimated_ideal_fpga_only": per_site,
             "external_timing_qualified": False,
             "warning": "FPGA-only necessary condition; not a DUT timing proof"}
