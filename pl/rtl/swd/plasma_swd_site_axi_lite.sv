@@ -9,11 +9,14 @@
 //
 // Candidate Normal SWD HW ceiling 12.5MHz (N>=4 @100MHz); NOT HIL qualified.
 // Software must independently qualify the DUT/Profile's usable SWD clock.
-// Single in-flight command + one retained completion, NOT a 16-deep FIFO.
+// Each IP has its own 16-entry command and completion FIFOs. Commands latch
+// all parameters at acceptance; completion tags/data remain immutable until
+// a matching tagged POP. Neither queue is shared across Sites.
 // Registers (relative to this Site's own independent 4-KiB AXI address):
 // 00 SITE_ID_CAP 04 STATUS 08 HALF_PERIOD 0C TIMEOUT 10 TX_DATA
 // 14 CMD_PUSH 18 COMPLETION_META 1C DATA 20 TAGGED_POP 24 LEVELS
-// 28 NORMAL_CONTROL 2C ERROR_LATCH 30 IRQ_ENABLE 34 IRQ_LEVEL
+// 28 NORMAL_CONTROL (bit2 fault-only pending-command discard)
+// 2C ERROR_LATCH (RW1C) 30 IRQ_ENABLE 34 IRQ_PENDING (RW1C)
 // 38 MODE (0 disabled,1 normal,2 debug) 3C DEBUG_DRIVE (bit0 CLK,
 // bit1 DOUT, bit2 OE), 40 DEBUG_SAMPLE (bit0 DIN, debug-only).
 // All writes full word WSTRB=F; invalid/forbidden reads/writes -> SLVERR.
@@ -92,11 +95,60 @@ module plasma_swd_site_axi_lite #(
     assign s_axi_arready = s_axi_aresetn && !s_axi_rvalid;
 
     logic [1:0] mode_q;
-    logic normal_enable_q, launch_q, abort_q, consume_q, fault_q, irq_enable_q;
+    logic normal_enable_q, abort_q, consume_q, fault_q, irq_enable_q;
+    logic irq_pending_q;
     logic debug_clk_q, debug_out_q, debug_oe_q;
     logic [15:0] half_q, active_tag;
     logic [31:0] timeout_q, data_q;
-    logic [8:0] command_q;
+
+    localparam integer FIFO_DEPTH = 16;
+    typedef struct packed {
+        logic [15:0] tag;
+        logic [8:0] command;
+        logic [31:0] data;
+        logic [15:0] half_period;
+        logic [31:0] timeout;
+    } command_entry_t;
+    typedef struct packed {
+        logic [15:0] tag;
+        logic [3:0] status;
+        logic [2:0] ack;
+        logic [31:0] data;
+        logic data_valid;
+        logic [8:0] attempts;
+        logic [1:0] link;
+    } response_entry_t;
+    command_entry_t cmd_fifo [0:FIFO_DEPTH-1];
+    response_entry_t resp_fifo [0:FIFO_DEPTH-1];
+    // Icarus and Vivado both support packed records; select the memory word
+    // first, then select struct fields (not a dynamic memory field select).
+    command_entry_t cmd_head;
+    response_entry_t resp_head;
+    assign cmd_head = cmd_fifo[cmd_rd_q];
+    assign resp_head = resp_fifo[resp_rd_q];
+    logic [3:0] cmd_wr_q, cmd_rd_q, resp_wr_q, resp_rd_q;
+    logic [4:0] cmd_level_q, resp_level_q;
+    wire cmd_full = (cmd_level_q == 5'd16);
+    wire resp_full = (resp_level_q == 5'd16);
+    wire cmd_empty = (cmd_level_q == 5'd0);
+    wire resp_empty = (resp_level_q == 5'd0);
+    wire cmd_enqueue = commit && strb_w == 4'hF && in_window(addr_w) &&
+        addr_w[7:0] == 8'h14 && mode_q == MODE_NORMAL &&
+        normal_enable_q && !fault_q && !cmd_full &&
+        data_w[31:16] != 0 && data_w[15:9] == 0 &&
+        ((data_w[8] == 0 && data_w[7:4] == 0) ||
+         (data_w[8] == 1 && data_w[7:0] <= 8'd32));
+    wire cmd_dequeue = !cmd_empty && !resp_full &&
+        mode_q == MODE_NORMAL && normal_enable_q && !fault_q && cmd_ready;
+    // Fault recovery must never replay queued writes. Explicit discard leaves
+    // retained completions intact, and callers must reconcile dropped tags.
+    wire cmd_flush = commit && strb_w == 4'hF && in_window(addr_w) &&
+        addr_w[7:0] == 8'h28 && data_w == 32'd4 &&
+        mode_q == MODE_NORMAL && fault_q && !busy && !resp_valid;
+    wire resp_enqueue = resp_valid && !consume_q && !resp_full;
+    wire resp_dequeue = commit && strb_w == 4'hF && in_window(addr_w) &&
+        addr_w[7:0] == 8'h20 && mode_q == MODE_NORMAL &&
+        !resp_empty && data_w == {16'd0,resp_head.tag};
 
     wire cmd_ready, busy, resp_valid, resp_data_valid;
     wire [3:0] resp_status;
@@ -117,18 +169,23 @@ module plasma_swd_site_axi_lite #(
     OBUF u_swclk (.I(drive_clk), .O(swclk_io));
     IOBUF u_swdio (.I(drive_out), .T(!drive_oe), .O(swdio_in),
                     .IO(swdio_io));
-    assign site_irq = (mode_q == MODE_NORMAL) && irq_enable_q && resp_valid;
+    assign site_irq = (mode_q == MODE_NORMAL) && irq_enable_q && irq_pending_q;
 
     plasma_swd_transaction_engine u_transaction (
         .clk(s_axi_aclk), .rst_n(s_axi_aresetn),
         .cmd_abort(abort_q || !normal_enable_q || mode_q != MODE_NORMAL),
-        .cmd_valid(launch_q), .cmd_ready(cmd_ready),
-        .cmd_op(command_q[8]), .cmd_ap(command_q[0]),
-        .cmd_read(command_q[1]),
-        .cmd_addr({command_q[3:2],2'b00}), .cmd_wdata(data_q),
-        .cmd_half_period(half_q), .cmd_turnaround(3'd1),
+        .cmd_valid(cmd_dequeue), .cmd_ready(cmd_ready),
+        .cmd_op(cmd_head.command[8]),
+        .cmd_sequence_bits(cmd_head.command[7:0]),
+        .cmd_ap(cmd_head.command[0]),
+        .cmd_read(cmd_head.command[1]),
+        .cmd_addr({cmd_head.command[3:2],2'b00}),
+        .cmd_wdata(cmd_head.data),
+        .cmd_half_period(cmd_head.half_period),
+        .cmd_turnaround(3'd1),
         .cmd_idle_cycles(8'd8), .cmd_max_retries(8'd0),
-        .cmd_error_data_phase(1'b0), .cmd_timeout_cycles(timeout_q),
+        .cmd_error_data_phase(1'b0),
+        .cmd_timeout_cycles(cmd_head.timeout),
         .busy(busy), .link_state(link_state),
         .resp_valid(resp_valid), .resp_ready(consume_q),
         .resp_status(resp_status), .resp_ack(resp_ack),
@@ -152,14 +209,55 @@ module plasma_swd_site_axi_lite #(
             s_axi_rdata <= 32'd0;
             mode_q <= MODE_OFF;
             normal_enable_q <= 1'b0;
-            launch_q <= 1'b0; abort_q <= 1'b0; consume_q <= 1'b0;
+            abort_q <= 1'b0; consume_q <= 1'b0;
             fault_q <= 1'b0; irq_enable_q <= 1'b0;
+            irq_pending_q <= 1'b0;
+            cmd_wr_q <= 4'd0; cmd_rd_q <= 4'd0;
+            resp_wr_q <= 4'd0; resp_rd_q <= 4'd0;
+            cmd_level_q <= 5'd0; resp_level_q <= 5'd0;
             debug_clk_q <= 1'b0; debug_out_q <= 1'b0;
             debug_oe_q <= 1'b0;
             half_q <= 16'd500; timeout_q <= 32'd1000000;
-            data_q <= 32'd0; command_q <= 9'd0; active_tag <= 16'd0;
+            data_q <= 32'd0; active_tag <= 16'd0;
         end else begin
-            launch_q <= 1'b0; abort_q <= 1'b0; consume_q <= 1'b0;
+            abort_q <= 1'b0; consume_q <= 1'b0;
+            // A completion is copied into a separate retained response FIFO
+            // before the engine is released. Backpressure halts dispatch when
+            // the response FIFO is full; no result or write is replayed.
+            if (cmd_enqueue) begin
+                cmd_fifo[cmd_wr_q] <= {data_w[31:16],data_w[8:0],
+                    data_q,half_q,timeout_q};
+                cmd_wr_q <= cmd_wr_q + 4'd1;
+            end
+            if (cmd_dequeue) begin
+                active_tag <= cmd_head.tag;
+                cmd_rd_q <= cmd_rd_q + 4'd1;
+            end
+            if (cmd_flush) begin
+                cmd_rd_q <= cmd_wr_q;
+                cmd_level_q <= 5'd0;
+            end else begin
+                case ({cmd_enqueue,cmd_dequeue})
+                    2'b10: cmd_level_q <= cmd_level_q + 5'd1;
+                    2'b01: cmd_level_q <= cmd_level_q - 5'd1;
+                    default: ;
+                endcase
+            end
+            if (resp_enqueue) begin
+                resp_fifo[resp_wr_q] <= {active_tag,resp_status,resp_ack,
+                    resp_data,resp_data_valid,resp_attempts,link_state};
+                resp_wr_q <= resp_wr_q + 4'd1;
+                consume_q <= 1'b1;
+                irq_pending_q <= 1'b1;
+            end else begin
+                consume_q <= 1'b0;
+            end
+            if (resp_dequeue) resp_rd_q <= resp_rd_q + 4'd1;
+            case ({resp_enqueue,resp_dequeue})
+                2'b10: resp_level_q <= resp_level_q + 5'd1;
+                2'b01: resp_level_q <= resp_level_q - 5'd1;
+                default: ;
+            endcase
             if (s_axi_bvalid && s_axi_bready) s_axi_bvalid <= 1'b0;
             if (s_axi_rvalid && s_axi_rready) s_axi_rvalid <= 1'b0;
             if (take_aw) begin
@@ -168,7 +266,7 @@ module plasma_swd_site_axi_lite #(
             if (take_w) begin
                 w_hold <= 1'b1; wd_q <= s_axi_wdata; strobe_q <= s_axi_wstrb;
             end
-            if (resp_valid &&
+            if (resp_enqueue &&
                 (resp_status == 4'd6 || resp_status == 4'd7 ||
                  resp_status == 4'd8))
                 fault_q <= 1'b1;
@@ -177,46 +275,49 @@ module plasma_swd_site_axi_lite #(
                 s_axi_bvalid <= 1'b1; s_axi_bresp <= SLVERR;
                 if (strb_w == 4'hF && in_window(addr_w)) begin
                     case (addr_w[7:0])
-                        8'h08: if (mode_q == MODE_NORMAL && !busy &&
-                                   !resp_valid && !launch_q &&
+                        8'h08: if (mode_q == MODE_NORMAL &&
                                    data_w[31:16] == 0 && data_w[15:0] >= MIN_HALF_PERIOD) begin
                             half_q <= data_w[15:0]; s_axi_bresp <= OKAY;
                         end
-                        8'h0C: if (mode_q == MODE_NORMAL && !busy &&
-                                   !resp_valid && !launch_q && data_w != 0) begin
+                        8'h0C: if (mode_q == MODE_NORMAL && data_w != 0) begin
                             timeout_q <= data_w; s_axi_bresp <= OKAY;
                         end
-                        8'h10: if (mode_q == MODE_NORMAL && !busy &&
-                                   !resp_valid && !launch_q) begin
+                        8'h10: if (mode_q == MODE_NORMAL) begin
                             data_q <= data_w; s_axi_bresp <= OKAY;
                         end
-                        8'h14: if (mode_q == MODE_NORMAL && normal_enable_q &&
-                                   !fault_q && cmd_ready && !launch_q &&
-                                   data_w[31:16] != 0 &&
-                                   data_w[15:9] == 0 && data_w[7:4] == 0 &&
-                                   (data_w[8] == 0 || data_w[7:0] == 0)) begin
-                            active_tag <= data_w[31:16];
-                            command_q <= {data_w[8],data_w[7:0]};
-                            launch_q <= 1'b1; s_axi_bresp <= OKAY;
-                        end
-                        8'h20: if (mode_q == MODE_NORMAL && resp_valid &&
-                                   data_w == {16'd0,active_tag} &&
-                                   !consume_q) begin
-                            consume_q <= 1'b1; s_axi_bresp <= OKAY;
-                        end
-                        8'h28: if (mode_q == MODE_NORMAL &&
+                        8'h14: if (cmd_enqueue) s_axi_bresp <= OKAY;
+                        8'h20: if (resp_dequeue) s_axi_bresp <= OKAY;
+                        8'h28: if (cmd_flush) begin
+                            s_axi_bresp <= OKAY;
+                        end else if (mode_q == MODE_NORMAL &&
                                    data_w[31:2] == 0 &&
-                                   !(data_w[1] && !busy)) begin
+                                   !(data_w[1] && !busy) &&
+                                   (data_w[0] ||
+                                    (!busy && cmd_empty && resp_empty &&
+                                     !resp_valid))) begin
                             normal_enable_q <= data_w[0];
                             abort_q <= data_w[1]; s_axi_bresp <= OKAY;
+                        end
+                        // ERROR_LATCH is RW1C. Do not clear a fault with
+                        // pending commands: prevent accidental write replay.
+                        8'h2C: if (mode_q == MODE_NORMAL && data_w == 1 &&
+                                   !busy && cmd_empty && !resp_valid) begin
+                            fault_q <= 1'b0; s_axi_bresp <= OKAY;
                         end
                         8'h30: if (mode_q == MODE_NORMAL &&
                                    data_w[31:1] == 0) begin
                             irq_enable_q <= data_w[0]; s_axi_bresp <= OKAY;
                         end
+                        // IRQ_PENDING is sticky completion-event RW1C;
+                        // clearing it does not pop or erase any response.
+                        8'h34: if (mode_q == MODE_NORMAL && data_w == 1) begin
+                            if (!resp_enqueue) irq_pending_q <= 1'b0;
+                            s_axi_bresp <= OKAY;
+                        end
                         8'h38: if (data_w[31:2] == 0 &&
                                    data_w[1:0] != 2'd3 &&
-                                   !busy && !resp_valid && !launch_q &&
+                                   !busy && !resp_valid &&
+                                   cmd_empty && resp_empty &&
                                    !normal_enable_q &&
                                    !debug_oe_q && !debug_clk_q) begin
                             mode_q <= data_w[1:0]; s_axi_bresp <= OKAY;
@@ -245,12 +346,12 @@ module plasma_swd_site_axi_lite #(
                 if (in_window(s_axi_araddr)) begin
                     case (s_axi_araddr[7:0])
                         8'h00: begin
-                            s_axi_rdata <= 32'h00020000 | SITE_ID;
+                            s_axi_rdata <= 32'h00030000 | SITE_ID;
                             s_axi_rresp <= OKAY;
                         end
                         8'h04: begin
                             s_axi_rdata <= {26'd0,mode_q, fault_q,
-                                            resp_valid,busy,normal_enable_q};
+                                            !resp_empty,busy,normal_enable_q};
                             s_axi_rresp <= OKAY;
                         end
                         8'h08: begin
@@ -259,17 +360,20 @@ module plasma_swd_site_axi_lite #(
                         8'h0C: begin
                             s_axi_rdata <= timeout_q; s_axi_rresp <= OKAY;
                         end
-                        8'h18: if (mode_q == MODE_NORMAL) begin
-                            s_axi_rdata <= {active_tag,2'd0,link_state,
-                                resp_attempts[3:0],resp_data_valid,
-                                resp_ack,resp_status};
+                        8'h18: if (mode_q == MODE_NORMAL && !resp_empty) begin
+                            s_axi_rdata <= {resp_head.tag,2'd0,
+                                resp_head.link,resp_head.attempts[3:0],
+                                resp_head.data_valid,resp_head.ack,
+                                resp_head.status};
                             s_axi_rresp <= OKAY;
                         end
-                        8'h1C: if (mode_q == MODE_NORMAL) begin
-                            s_axi_rdata <= resp_data; s_axi_rresp <= OKAY;
+                        8'h1C: if (mode_q == MODE_NORMAL && !resp_empty) begin
+                            s_axi_rdata <= resp_head.data;
+                            s_axi_rresp <= OKAY;
                         end
                         8'h24: begin
-                            s_axi_rdata <= {30'd0,resp_valid,1'b0};
+                            s_axi_rdata <= {10'd0,resp_level_q,3'd0,
+                                cmd_level_q,7'd0,!resp_empty,!cmd_empty};
                             s_axi_rresp <= OKAY;
                         end
                         8'h28: begin
@@ -284,7 +388,8 @@ module plasma_swd_site_axi_lite #(
                             s_axi_rresp <= OKAY;
                         end
                         8'h34: begin
-                            s_axi_rdata <= {31'd0,site_irq}; s_axi_rresp <= OKAY;
+                            s_axi_rdata <= {31'd0,irq_pending_q};
+                            s_axi_rresp <= OKAY;
                         end
                         8'h38: begin
                             s_axi_rdata <= {30'd0,mode_q}; s_axi_rresp <= OKAY;

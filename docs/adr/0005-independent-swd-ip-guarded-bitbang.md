@@ -41,6 +41,12 @@ Upstream newer revisions implement SWD `remote_bitbang`, with ASCII commands `O/
 
 **Release gate:** before enabling the new Debug Bridge, pin a specific OpenOCD source/build version (or explicitly reviewed backport), prove `remote_bitbang` SWD support by source inspection and actual host-side protocol tests, lock its CLI/transport behavior, test SWDIO direction/turnaround/no-contention, errors, disconnect and Mode lease safety, then run separately approved physical HIL. Do not silently upgrade the existing qualified OpenOCD 0.12.0 production Provider stack merely to enable diagnostics. Until verified, `DEBUG_REMOTE_BITBANG_SWD=BLOCKED_VERSION_UNQUALIFIED`.
 
+### Gate 1 Host-only protocol reference (not release admission)
+
+- Read-only source comparison pinned upstream OpenOCD `v0.12.0` tag `9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c` (`remote_bitbang.c` blob `36bcbe19cac2c3d0c4c7c1f906a5db695a091478`): driver is `jtag_only`, no `.swd_ops`.
+- Read-only newer upstream **commit reference**, not an installed release: `cb0c224e936091156ecf3025ba05657408ed64c8` (`remote_bitbang.c` blob `f3a107312531ddfd14d3f0906ad745d4cb5f4eca`) advertises `TRANSPORT_JTAG | TRANSPORT_SWD` and `.swd_ops = &bitbang_swd`. Protocol document blob `8316cb0dd53a8fcb5ca0d036d4821b751b1b1e87` defines `O/o` drive, `c` sample, `d/e/f/g` write, `Q` close and optional `Z/z` sleeps.
+- The new `software/python/plasma_interfaces/swd_debug_bitbang.py` exercises only a **byte-level, injected-MMIO protocol core** against Host-only tests; it rejects JTAG/reset commands and unsupported sleeps, guards clock/data turnaround and has no socket listener, authenticated lease implementation or OpenOCD process. It **does not** qualify the newer binary, its build options, a real UNIX Bridge, or physical SWD. The existing OpenOCD 0.12.0 production Providers remain unchanged. `DEBUG_REMOTE_BITBANG_SWD=BLOCKED_VERSION_UNQUALIFIED` remains binding.
+
 ## Retire unnecessary MPE/legacy while retaining useful tests
 
 - Draft PR #1189's `plasma_mpe_*` RTL and `pl/projects/z2-mpe-dual-site/` Tcl are **not** the final IP integration. Refactor into a **reusable single-Site AXI SWD IP** instantiated twice through a standard AXI Interconnect, with each Site independently qualified. Migrate XDC, ABI, PS Driver, OpenOCD adapter, Cocotb and build contracts. Prior MPE simulations remain regression evidence for the old candidate only; **rerun against the new RTL** and do not reuse PASS results as new-IP sign-off.

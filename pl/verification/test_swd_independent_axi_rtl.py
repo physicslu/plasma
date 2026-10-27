@@ -23,6 +23,7 @@ def test_two_independent_swd_axi_ips_normal_and_debug():
         module="test_swd_independent_axi",
         compile_args=["-g2012"],
         timescale="1ns/1ps",
-        python_search=[str(PL / "verification/cocotb")],
+        python_search=[str(PL / "verification/cocotb"),
+                       str(PL.parent / "software/python")],
         sim_build=str(PL / "build/swd-independent-two-site/axi-sim"),
     )

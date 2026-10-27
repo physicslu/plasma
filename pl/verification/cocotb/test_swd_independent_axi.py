@@ -6,6 +6,7 @@ This does NOT validate the eventual Vivado AXI Interconnect/HWH or PS ARMv7.
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge, Timer
+from plasma_interfaces.swd_site import encode_swj
 
 BASE = [0x43C01000, 0x43C02000]
 
@@ -126,7 +127,7 @@ async def expect(d, site, off, value):
 async def independent_mode_admission_and_bitbang_pads(d):
     await start(d)
     for s in (0, 1):
-        await expect(d, s, 0, 0x20001 + s)
+        await expect(d, s, 0, 0x30001 + s)
         await expect(d, s, 0x38, 0)
         assert await write(d, s, 0x3C, 7) == 2   # DEBUG locked off
         assert await write(d, s, 0x14, (3 << 16) | 0x100) == 2
@@ -190,8 +191,8 @@ async def two_independent_normal_engines_and_immutable_responses(d):
                     observed_full_periods[s].append(cycle - last_rise[s])
                 last_rise[s] = cycle
             last[s] = level
-        if int(d.g_sites[0].u_site.resp_valid.value) and int(
-                d.g_sites[1].u_site.resp_valid.value):
+        if int(d.g_sites[0].u_site.resp_level_q.value) and int(
+                d.g_sites[1].u_site.resp_level_q.value):
             break
     else:
         raise AssertionError("both independent normal SWD commands timed out")
@@ -200,7 +201,7 @@ async def two_independent_normal_engines_and_immutable_responses(d):
     assert observed_full_periods[1] == [120] * 5, observed_full_periods[1]
     assert int(d.swclk_io.value) == 0
     for s in (0, 1):
-        await expect(d, s, 0x24, 2)
+        await expect(d, s, 0x24, (1 << 17) | 2)
         meta = (await read(d, s, 0x18))[1]
         assert (meta >> 16) == s + 1 and (meta & 0xF) == 0
         assert await write(d, s, 0x38, 2) == 2   # response still owned
@@ -208,6 +209,9 @@ async def two_independent_normal_engines_and_immutable_responses(d):
         assert await write(d, s, 0x20, s + 1) == 0
         await FallingEdge(d.clk)
         await expect(d, s, 0x24, 0)
+        await expect(d, s, 0x34, 1)  # sticky event, independent of POP
+        assert await write(d, s, 0x34, 1) == 0  # RW1C
+        await expect(d, s, 0x34, 0)
         assert await write(d, s, 0x28, 0) == 0
         assert await write(d, s, 0x38, 0) == 0
     assert int(d.swclk_io.value) == 0
@@ -238,3 +242,151 @@ async def debug_site_one_does_not_stop_normal_site_two(d):
     code, meta = await read(d, 1, 0x18)
     assert code == 0 and meta >> 16 == 9 and (meta & 0xF) == 0
     await expect(d, 0, 0x38, 0)
+
+
+@cocotb.test()
+async def sixteen_deep_independent_fifos_backpressure_and_irq(d):
+    await start(d)
+    for s in (0, 1):
+        assert await write(d, s, 0x38, 1) == 0
+        assert await write(d, s, 0x08, 4) == 0
+        assert await write(d, s, 0x30, 1) == 0
+        assert await write(d, s, 0x28, 1) == 0
+
+    # Site 1 begins an autonomous line reset while command entries fill.
+    # Site 2 remains a separate address/FIFO/IRQ domain.
+    for tag in range(1, 18):
+        assert await write(d, 0, 0x14, (tag << 16) | 0x100) == 0
+    assert await write(d, 0, 0x14, (18 << 16) | 0x100) == 2
+    assert await write(d, 1, 0x14, (71 << 16) | 0x100) == 0
+
+    for _ in range(12500):
+        await RisingEdge(d.clk)
+        if ((await read(d, 0, 0x24))[1] >> 17) & 31 == 16:
+            break
+    else:
+        raise AssertionError("Site 1 response FIFO did not reach full")
+
+    levels = (await read(d, 0, 0x24))[1]
+    assert ((levels >> 17) & 31) == 16
+    assert ((levels >> 7) & 31) >= 1  # no dispatch at full response FIFO
+    assert (await read(d, 1, 0x24))[1] & 2  # other Site completed independently
+    await expect(d, 0, 0x34, 1)
+    assert field(d.g_sites[0].u_site.site_irq, 0, 1) == 1
+    assert await write(d, 0, 0x34, 1) == 0
+    await expect(d, 0, 0x34, 0)
+    assert await write(d, 0, 0x20, 2) == 2  # wrong head tag, no dequeue
+    await expect(d, 0, 0x24, levels)
+    for tag in range(1, 18):
+        for _ in range(1400):
+            status, now = await read(d, 0, 0x24)
+            if status == 0 and now & 2:
+                break
+        else:
+            raise AssertionError("queued response did not become visible")
+        meta = (await read(d, 0, 0x18))[1]
+        assert meta >> 16 == tag and (meta & 15) == 0
+        assert await write(d, 0, 0x20, tag) == 0
+    await expect(d, 0, 0x24, 0)
+    assert await write(d, 1, 0x20, 71) == 0
+    await expect(d, 1, 0x24, 0)
+
+
+@cocotb.test()
+async def swj_sequence_bits_are_lsb_first_and_not_a_dpidr_read(d):
+    await start(d)
+    assert await write(d, 0, 0x38, 1) == 0
+    assert await write(d, 0, 0x08, 4) == 0
+    assert await write(d, 0, 0x28, 1) == 0
+    assert await write(d, 0, 0x10, 0x0000E79E) == 0
+    assert await write(d, 0, 0x14, (9 << 16) | 0x121) == 2  # 33 bits denied
+
+    observed = []
+
+    async def watch_sequence():
+        while len(observed) < 24:
+            await RisingEdge(d.g_sites[0].u_site.engine_clk)
+            await Timer(1, units="ns")
+            observed.append((int(d.g_sites[0].u_site.engine_out.value),
+                             int(d.g_sites[0].u_site.engine_oe.value)))
+
+    watcher = cocotb.start_soon(watch_sequence())
+    assert await write(d, 0, 0x14, (9 << 16) | encode_swj(16)) == 0
+    await watcher
+    assert [b for b, oe in observed[:16]] == [
+        (0xE79E >> index) & 1 for index in range(16)
+    ]
+    assert all(oe == 1 for _, oe in observed)
+    assert [b for b, _ in observed[16:]] == [0] * 8
+    for _ in range(100):
+        if (await read(d, 0, 0x24))[1] & 2:
+            break
+    else:
+        raise AssertionError("SWJ completion not retained")
+    meta = (await read(d, 0, 0x18))[1]
+    assert meta >> 16 == 9 and (meta & 15) == 0
+    assert ((meta >> 12) & 3) == 0  # SWJ sequence requires a fresh line reset
+    assert await write(d, 0, 0x20, 9) == 0
+
+
+@cocotb.test()
+async def queued_dividers_are_snapshots_and_fault_requires_explicit_flush(d):
+    await start(d)
+    assert await write(d, 0, 0x38, 1) == 0
+    assert await write(d, 0, 0x08, 4) == 0
+    assert await write(d, 0, 0x28, 1) == 0
+    observed_rises = []
+
+    async def watch():
+        last = 0
+        for cycle in range(6500):
+            await RisingEdge(d.clk)
+            await Timer(1, units="ns")
+            now = int(d.swclk_io.value) & 1
+            if now and not last:
+                observed_rises.append(cycle)
+                if len(observed_rises) == 216:
+                    break
+            last = now
+
+    watcher = cocotb.start_soon(watch())
+    assert await write(d, 0, 0x14, (1 << 16) | 0x100) == 0
+    assert await write(d, 0, 0x08, 16) == 0
+    assert await write(d, 0, 0x14, (2 << 16) | 0x100) == 0
+    assert await write(d, 0, 0x08, 4) == 0
+    assert await write(d, 0, 0x14, (3 << 16) | 0x100) == 0
+    await watcher
+    assert len(observed_rises) == 216
+    for start_index, expected_period in ((0, 8), (72, 32), (144, 8)):
+        periods = [observed_rises[i + 1] - observed_rises[i]
+                   for i in range(start_index, start_index + 5)]
+        assert periods == [expected_period] * 5
+    for tag in (1, 2, 3):
+        for _ in range(50):
+            if (await read(d, 0, 0x24))[1] & 2:
+                break
+        else:
+            raise AssertionError("queued response not retained")
+        meta = (await read(d, 0, 0x18))[1]
+        assert meta >> 16 == tag and (meta & 15) == 0
+        assert await write(d, 0, 0x20, tag) == 0
+
+    # Abort is a real terminal response; a waiting command must not replay.
+    assert await write(d, 0, 0x14, (4 << 16) | 0x100) == 0
+    assert await write(d, 0, 0x14, (5 << 16) | 0x100) == 0
+    assert await write(d, 0, 0x28, 3) == 0  # enable + abort pulse
+    for _ in range(100):
+        if (await read(d, 0, 0x24))[1] & 2:
+            break
+    else:
+        raise AssertionError("ABORTED completion not retained")
+    meta = (await read(d, 0, 0x18))[1]
+    assert meta >> 16 == 4 and (meta & 15) == 8
+    await expect(d, 0, 0x2C, 1)
+    assert await write(d, 0, 0x2C, 1) == 2  # pending queue blocks clearing fault
+    assert await write(d, 0, 0x28, 4) == 0  # discard unexecuted tag 5
+    assert ((await read(d, 0, 0x24))[1] >> 7) & 31 == 0
+    assert await write(d, 0, 0x20, 4) == 0
+    assert await write(d, 0, 0x2C, 1) == 0
+    await expect(d, 0, 0x2C, 0)
+    assert await write(d, 0, 0x28, 0) == 0
