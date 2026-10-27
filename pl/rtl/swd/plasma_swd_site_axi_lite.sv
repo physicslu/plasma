@@ -19,6 +19,9 @@
 // 2C ERROR_LATCH (RW1C) 30 IRQ_ENABLE 34 IRQ_PENDING (RW1C)
 // 38 MODE (0 disabled,1 normal,2 debug) 3C DEBUG_DRIVE (bit0 CLK,
 // bit1 DOUT, bit2 OE), 40 DEBUG_SAMPLE (bit0 DIN, debug-only).
+// 44..60 SWJ_DATA0..7 (8 x 32-bit staging), 64 SWJ_LENGTH (0 or 33..256).
+// SWJ_LENGTH=0 uses the old <=32-bit TX_DATA / 64-clock line-reset encoding.
+// Extended SWJ snapshots all 256 bits on CMD_PUSH and disarms staging.
 // All writes full word WSTRB=F; invalid/forbidden reads/writes -> SLVERR.
 // No live DUT/HIL or Vivado results asserted by synthesizable source.
 module plasma_swd_site_axi_lite #(
@@ -100,12 +103,16 @@ module plasma_swd_site_axi_lite #(
     logic debug_clk_q, debug_out_q, debug_oe_q;
     logic [15:0] half_q, active_tag;
     logic [31:0] timeout_q, data_q;
+    logic [255:0] swj_stage_q;
+    logic [8:0] swj_length_q;
 
     localparam integer FIFO_DEPTH = 16;
     typedef struct packed {
         logic [15:0] tag;
         logic [8:0] command;
         logic [31:0] data;
+        logic [255:0] sequence_data;
+        logic [8:0] sequence_bits;
         logic [15:0] half_period;
         logic [31:0] timeout;
     } command_entry_t;
@@ -137,7 +144,10 @@ module plasma_swd_site_axi_lite #(
         normal_enable_q && !fault_q && !cmd_full &&
         data_w[31:16] != 0 && data_w[15:9] == 0 &&
         ((data_w[8] == 0 && data_w[7:4] == 0) ||
-         (data_w[8] == 1 && data_w[7:0] <= 8'd32));
+         (data_w[8] == 1 &&
+          ((swj_length_q == 0 && data_w[7:0] <= 8'd32) ||
+           (swj_length_q >= 9'd33 && swj_length_q <= 9'd256 &&
+            data_w[7:0] == swj_length_q[7:0]))));
     wire cmd_dequeue = !cmd_empty && !resp_full &&
         mode_q == MODE_NORMAL && normal_enable_q && !fault_q && cmd_ready;
     // Fault recovery must never replay queued writes. Explicit discard leaves
@@ -176,7 +186,8 @@ module plasma_swd_site_axi_lite #(
         .cmd_abort(abort_q || !normal_enable_q || mode_q != MODE_NORMAL),
         .cmd_valid(cmd_dequeue), .cmd_ready(cmd_ready),
         .cmd_op(cmd_head.command[8]),
-        .cmd_sequence_bits(cmd_head.command[7:0]),
+        .cmd_sequence_bits(cmd_head.sequence_bits),
+        .cmd_sequence_data(cmd_head.sequence_data),
         .cmd_ap(cmd_head.command[0]),
         .cmd_read(cmd_head.command[1]),
         .cmd_addr({cmd_head.command[3:2],2'b00}),
@@ -219,6 +230,7 @@ module plasma_swd_site_axi_lite #(
             debug_oe_q <= 1'b0;
             half_q <= 16'd500; timeout_q <= 32'd1000000;
             data_q <= 32'd0; active_tag <= 16'd0;
+            swj_stage_q <= 256'd0; swj_length_q <= 9'd0;
         end else begin
             abort_q <= 1'b0; consume_q <= 1'b0;
             // A completion is copied into a separate retained response FIFO
@@ -226,8 +238,12 @@ module plasma_swd_site_axi_lite #(
             // the response FIFO is full; no result or write is replayed.
             if (cmd_enqueue) begin
                 cmd_fifo[cmd_wr_q] <= {data_w[31:16],data_w[8:0],
-                    data_q,half_q,timeout_q};
+                    data_q,
+                    (swj_length_q != 0 ? swj_stage_q : {224'd0,data_q}),
+                    (swj_length_q != 0 ? swj_length_q : {1'b0,data_w[7:0]}),
+                    half_q,timeout_q};
                 cmd_wr_q <= cmd_wr_q + 4'd1;
+                if (data_w[8]) swj_length_q <= 9'd0;
             end
             if (cmd_dequeue) begin
                 active_tag <= cmd_head.tag;
@@ -284,6 +300,53 @@ module plasma_swd_site_axi_lite #(
                         end
                         8'h10: if (mode_q == MODE_NORMAL) begin
                             data_q <= data_w; s_axi_bresp <= OKAY;
+                        end
+                        8'h44: if (mode_q == MODE_NORMAL) begin
+                            swj_stage_q[31:0] <= data_w;
+                            swj_length_q <= 9'd0;
+                            s_axi_bresp <= OKAY;
+                        end
+                        8'h48: if (mode_q == MODE_NORMAL) begin
+                            swj_stage_q[63:32] <= data_w;
+                            swj_length_q <= 9'd0;
+                            s_axi_bresp <= OKAY;
+                        end
+                        8'h4C: if (mode_q == MODE_NORMAL) begin
+                            swj_stage_q[95:64] <= data_w;
+                            swj_length_q <= 9'd0;
+                            s_axi_bresp <= OKAY;
+                        end
+                        8'h50: if (mode_q == MODE_NORMAL) begin
+                            swj_stage_q[127:96] <= data_w;
+                            swj_length_q <= 9'd0;
+                            s_axi_bresp <= OKAY;
+                        end
+                        8'h54: if (mode_q == MODE_NORMAL) begin
+                            swj_stage_q[159:128] <= data_w;
+                            swj_length_q <= 9'd0;
+                            s_axi_bresp <= OKAY;
+                        end
+                        8'h58: if (mode_q == MODE_NORMAL) begin
+                            swj_stage_q[191:160] <= data_w;
+                            swj_length_q <= 9'd0;
+                            s_axi_bresp <= OKAY;
+                        end
+                        8'h5C: if (mode_q == MODE_NORMAL) begin
+                            swj_stage_q[223:192] <= data_w;
+                            swj_length_q <= 9'd0;
+                            s_axi_bresp <= OKAY;
+                        end
+                        8'h60: if (mode_q == MODE_NORMAL) begin
+                            swj_stage_q[255:224] <= data_w;
+                            swj_length_q <= 9'd0;
+                            s_axi_bresp <= OKAY;
+                        end
+                        8'h64: if (mode_q == MODE_NORMAL &&
+                                    data_w[31:9] == 0 &&
+                                    (data_w == 0 ||
+                                     (data_w >= 33 && data_w <= 256))) begin
+                            swj_length_q <= data_w[8:0];
+                            s_axi_bresp <= OKAY;
                         end
                         8'h14: if (cmd_enqueue) s_axi_bresp <= OKAY;
                         8'h20: if (resp_dequeue) s_axi_bresp <= OKAY;
@@ -346,7 +409,7 @@ module plasma_swd_site_axi_lite #(
                 if (in_window(s_axi_araddr)) begin
                     case (s_axi_araddr[7:0])
                         8'h00: begin
-                            s_axi_rdata <= 32'h00030000 | SITE_ID;
+                            s_axi_rdata <= 32'h00040000 | SITE_ID;
                             s_axi_rresp <= OKAY;
                         end
                         8'h04: begin

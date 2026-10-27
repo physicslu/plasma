@@ -17,7 +17,7 @@ class VirtualSites:
         self.barriers = 0
         self.fail_write = False
         for site, base in SITE_BASES.items():
-            self.regs[base] = 0x30000 | site
+            self.regs[base] = 0x40000 | site
             self.regs[base + 0x38] = 0
             self.regs[base + 0x08] = 500
             self.regs[base + 0x24] = 0
@@ -104,7 +104,7 @@ def test_reset_then_dp_read_encoding_and_single_tagged_consumption():
 
 
 def test_invalid_command_and_unknown_results_fail_closed():
-    for bad in (-1, 33, 256, True):
+    for bad in (-1, 257, 1000, True):
         with pytest.raises(ValueError):
             encode_swj(bad)
     with pytest.raises(ValueError):
@@ -149,3 +149,34 @@ def test_bounded_completion_timeout_poison_prevents_new_writes():
     with pytest.raises(SiteAccessError, match="uncertain"):
         driver.enqueue(tag=7, command=encode_swj(0))
     assert len(port.writes) == prior
+
+
+def test_256bit_swj_is_one_tagged_command_and_all_words_staged_in_order():
+    port = VirtualSites()
+    driver = SwdSiteController(port, site_id=2)
+    driver.probe()
+    driver.enter_normal()
+    bits = int.from_bytes(bytes(range(32)), "little")
+    driver.enqueue_swj(tag=77, bit_count=256, bits=bits)
+    relevant = [(addr-driver.base, val) for addr, val in port.writes
+                if driver.base + 0x44 <= addr <= driver.base + 0x64 or addr == driver.base + 0x14]
+    assert relevant == [(0x44 + 4*i, (bits >> (32*i)) & 0xFFFFFFFF)
+                        for i in range(8)] + [(0x64, 256), (0x14, (77 << 16) | 0x100)]
+    assert driver.next_completion().tag == 77
+    with pytest.raises(ValueError):
+        driver.enqueue_swj(tag=78, bit_count=256, bits=1 << 256)
+    assert encode_swj(33) == 0x121
+    assert encode_swj(256) == 0x100
+
+
+def test_extended_swj_uncertain_staging_write_poison_prevents_replay():
+    port = VirtualSites()
+    driver = SwdSiteController(port, site_id=1)
+    driver.enter_normal()
+    port.fail_write = True
+    with pytest.raises(SiteAccessError, match="no replay"):
+        driver.enqueue_swj(tag=10, bit_count=256, bits=1)
+    count = len(port.writes)
+    with pytest.raises(SiteAccessError, match="uncertain"):
+        driver.enqueue_swj(tag=10, bit_count=256, bits=1)
+    assert len(port.writes) == count

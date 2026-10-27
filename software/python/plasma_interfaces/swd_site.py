@@ -65,10 +65,10 @@ def encode_transfer(*, ap: bool, read: bool, address: int) -> int:
 
 
 def encode_swj(bit_count: int) -> int:
-    """0 means 64 ones for line reset; 1..32 means TX_DATA LSB-first."""
-    if type(bit_count) is not int or not 0 <= bit_count <= 32:
-        raise ValueError("Only atomic 1..32-bit SWJ or line reset supported")
-    return 0x100 | bit_count
+    """0 is line reset; 1..256 are atomic LSB-first SWJ sequences."""
+    if type(bit_count) is not int or not 0 <= bit_count <= 256:
+        raise ValueError("Only atomic 1..256-bit SWJ or line reset supported")
+    return 0x100 | (bit_count & 0xFF)
 
 
 def decode_completion(meta: int, data: int) -> SiteCompletion:
@@ -108,6 +108,8 @@ class SwdSiteController:
     MODE = 0x38
     DEBUG_DRIVE = 0x3C
     DEBUG_SAMPLE = 0x40
+    SWJ_WORD0 = 0x44
+    SWJ_LENGTH = 0x64
 
     def __init__(self, port: SiteWordAccess, *, site_id: int,
                  max_polls: int = 100_000) -> None:
@@ -156,7 +158,7 @@ class SwdSiteController:
     def probe(self) -> None:
         """Identity check only, NOT FPGA Image/electrical authorization."""
         with self._lock:
-            if self._read(self.ID) != (0x00030000 | self.site_id):
+            if self._read(self.ID) != (0x00040000 | self.site_id):
                 self.poisoned = True
                 raise SiteAccessError("Incorrect independent SWD Site identity")
 
@@ -194,7 +196,7 @@ class SwdSiteController:
             raise ValueError("Invalid command bits")
         if command & 0x100:
             if (command & 255) > 32:
-                raise ValueError("Unsupported atomic SWJ length")
+                raise ValueError("Use enqueue_swj for SWJ longer than 32 bits")
         elif command & 0xF0:
             raise ValueError("Reserved DP/AP command bits")
         if type(data) is not int or not 0 <= data <= 0xFFFFFFFF:
@@ -210,6 +212,35 @@ class SwdSiteController:
             self._write(self.TX, data)
             self._write(self.PUSH, (tag << 16) | command)
             # Acknowledged device write is not proof of DUT execution.
+            self._tags.add(tag)
+            self._in_order.append(tag)
+
+    def enqueue_swj(self, *, tag: int, bit_count: int, bits: int = 0) -> None:
+        """Stage one atomic <=256-bit SWJ command, never fragmenting it.
+
+        Host-only injected port; actual ARMv7 MMIO/lease/OpenOCD are NOT qualified.
+        """
+        command = encode_swj(bit_count)
+        if type(bits) is not int or bits < 0 or (bits >> bit_count):
+            raise ValueError("SWJ data exceeds requested number of bits")
+        if bit_count <= 32:
+            self.enqueue(tag=tag, command=command, data=bits)
+            return
+        if type(tag) is not int or not 1 <= tag <= 0xFFFF:
+            raise ValueError("Nonzero 16-bit SWJ tag required")
+        with self._lock:
+            if tag in self._tags:
+                raise ValueError("Reusing command tag could replay/alias a write")
+            levels = self._read(self.LEVELS)
+            if ((levels >> 7) & 31) == 16 or self._read(self.MODE) != 1:
+                raise SiteAccessError("Site not in normal mode or FIFO full")
+            if self._read(self.ERROR) & 1:
+                raise SiteAccessError("Fault latched; no SWJ enqueue")
+            for i in range(8):
+                self._write(self.SWJ_WORD0 + 4*i,
+                            (bits >> (32*i)) & 0xFFFFFFFF)
+            self._write(self.SWJ_LENGTH, bit_count)
+            self._write(self.PUSH, (tag << 16) | command)
             self._tags.add(tag)
             self._in_order.append(tag)
 

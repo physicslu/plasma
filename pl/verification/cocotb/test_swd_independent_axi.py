@@ -403,3 +403,48 @@ async def queued_dividers_are_snapshots_and_fault_requires_explicit_flush(d):
     assert await write(d, 0, 0x2C, 1) == 0
     await expect(d, 0, 0x2C, 0)
     assert await write(d, 0, 0x28, 0) == 0
+
+
+@cocotb.test()
+async def atomic_256bit_swj_lsb_first_and_staging_snapshot(d):
+    await start(d)
+    assert await write(d, 0, 0x38, 1) == 0
+    assert await write(d, 0, 0x08, 4) == 0
+    assert await write(d, 0, 0x28, 1) == 0
+    bits = int.from_bytes(bytes(range(32)), "little")
+    assert await write(d, 0, 0x14, (41 << 16) | 0x121) == 2
+    for i in range(8):
+        assert await write(d, 0, 0x44 + 4*i, (bits >> (32*i)) & 0xFFFFFFFF) == 0
+    assert await write(d, 0, 0x64, 257) == 2
+    assert await write(d, 0, 0x64, 256) == 0
+    observed = []
+
+    async def watch():
+        while len(observed) < 264:
+            await RisingEdge(d.g_sites[0].u_site.engine_clk)
+            await Timer(1, units="ns")
+            observed.append((int(d.g_sites[0].u_site.engine_out.value),
+                             int(d.g_sites[0].u_site.engine_oe.value)))
+
+    watcher = cocotb.start_soon(watch())
+    assert await write(d, 0, 0x14, (41 << 16) | 0x100) == 0
+    assert await write(d, 0, 0x44, 0xFFFFFFFF) == 0  # cannot alter accepted sequence
+    await watcher
+    assert [b for b, _ in observed[:256]] == [(bits >> i) & 1 for i in range(256)]
+    assert all(oe == 1 for _, oe in observed)
+    assert [b for b, _ in observed[256:]] == [0]*8
+    for _ in range(100):
+        if (await read(d, 0, 0x24))[1] & 2:
+            break
+    else:
+        raise AssertionError("Atomic SWJ completion absent")
+    meta = (await read(d, 0, 0x18))[1]
+    assert meta >> 16 == 41 and (meta & 15) == 0
+    assert await write(d, 0, 0x20, 41) == 0
+    assert await write(d, 0, 0x14, (42 << 16) | 0x100) == 0  # line reset again
+    for _ in range(1300):
+        if (await read(d, 0, 0x24))[1] & 2:
+            break
+    else:
+        raise AssertionError("Line reset completion absent")
+    assert await write(d, 0, 0x20, 42) == 0

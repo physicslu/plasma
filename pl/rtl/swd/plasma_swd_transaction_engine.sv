@@ -5,9 +5,8 @@
 //
 // Command contract (private to SWD IP RTL; NOT the old RemoteBitbang ABI):
 // cmd_op=1, cmd_sequence_bits=0 => 64 SWCLK high bits (line reset).
-// cmd_op=1, cmd_sequence_bits=1..32 => TX_DATA LSB-first SWJ bit sequence.
-// Both terminate with eight idle clocks. Wider atomic SWJ sequences are not
-// implemented, so callers must not silently split timing-sensitive sequences.
+// cmd_op=1, cmd_sequence_bits=1..256 => captured 256-bit SWJ data, LSB-first.
+// Both terminate with eight idle clocks; no implicit sequence fragmentation.
 // cmd_op=0  => one SWD DP/AP register read/write at cmd_addr[3:2].
 // Currently cmd_turnaround must be 1, cmd_idle_cycles>=8, retries must
 // be 0; unsupported features fail as BAD_CONFIG instead of being ignored.
@@ -26,7 +25,8 @@ module plasma_swd_transaction_engine (
     input  logic        cmd_valid,
     output wire         cmd_ready,
     input  logic        cmd_op,
-    input  logic [7:0]  cmd_sequence_bits,
+    input  logic [8:0]  cmd_sequence_bits,
+    input  logic [255:0] cmd_sequence_data,
     input  logic        cmd_ap,
     input  logic        cmd_read,
     input  logic [3:0]  cmd_addr,
@@ -67,10 +67,12 @@ module plasma_swd_transaction_engine (
     } phase_t;
 
     phase_t phase;
-    logic [7:0] bit_index, phase_bits;
+    logic [8:0] bit_index, phase_bits;
     logic [15:0] half_q, timer;
     logic [31:0] elapsed, timeout_q, write_q, read_q;
-    logic [7:0] request_q, idle_q, sequence_bits_q;
+    logic [255:0] sequence_q;
+    logic [7:0] request_q, idle_q;
+    logic [8:0] sequence_bits_q;
     logic op_q, ap_q, read_direction_q;
     logic [3:0] address_q, result_q;
     logic [2:0] ack_shift;
@@ -92,13 +94,14 @@ module plasma_swd_transaction_engine (
         endcase
     endfunction
 
-    function automatic logic tx_bit(input phase_t ph, input logic [7:0] idx,
+    function automatic logic tx_bit(input phase_t ph, input logic [8:0] idx,
                                      input logic [7:0] request_byte,
-                                     input logic [31:0] payload);
+                                     input logic [31:0] payload,
+                                     input logic [255:0] sequence_data);
         case (ph)
             PH_RESET_HIGH: tx_bit = 1'b1;
             PH_REQUEST: tx_bit = request_byte[idx[2:0]];
-            PH_SEQUENCE: tx_bit = payload[idx[4:0]];
+            PH_SEQUENCE: tx_bit = sequence_data[idx[7:0]];
             PH_DATA: tx_bit = payload[idx[4:0]];
             PH_PARITY: tx_bit = ^payload;
             default: tx_bit = 1'b0;
@@ -108,12 +111,12 @@ module plasma_swd_transaction_engine (
     // Fastest allowed candidate SWCLK is 12.5MHz, not yet DUT/board qualified.
     // Only called in the synchronous process; SWCLK is already falling or
     // held low when the next bit/ownership takes effect.
-    task automatic enter_phase(input phase_t next_phase, input logic [7:0] cycles);
+    task automatic enter_phase(input phase_t next_phase, input logic [8:0] cycles);
         phase <= next_phase;
         phase_bits <= cycles;
-        bit_index <= 8'd0;
+        bit_index <= 9'd0;
         swdio_oe <= owned(next_phase, read_direction_q);
-        swdio_out <= tx_bit(next_phase, 8'd0, request_q, write_q);
+        swdio_out <= tx_bit(next_phase, 9'd0, request_q, write_q, sequence_q);
     endtask
 
     task automatic finish_cmd(input logic [3:0] result);
@@ -151,17 +154,18 @@ module plasma_swd_transaction_engine (
             swdio_out <= 1'b0;
             swdio_oe <= 1'b0;
             phase <= PH_RESET_HIGH;
-            bit_index <= 8'd0;
-            phase_bits <= 8'd0;
+            bit_index <= 9'd0;
+            phase_bits <= 9'd0;
             half_q <= 16'd2;
             timer <= 16'd0;
             elapsed <= 32'd0;
             timeout_q <= 32'd0;
             write_q <= 32'd0;
+            sequence_q <= 256'd0;
             read_q <= 32'd0;
             request_q <= 8'd0;
             idle_q <= 8'd8;
-            sequence_bits_q <= 8'd0;
+            sequence_bits_q <= 9'd0;
             op_q <= 1'b0;
             ap_q <= 1'b0;
             read_direction_q <= 1'b0;
@@ -175,6 +179,7 @@ module plasma_swd_transaction_engine (
             if (cmd_valid && cmd_ready) begin
                 op_q <= cmd_op;
                 sequence_bits_q <= cmd_sequence_bits;
+                sequence_q <= cmd_sequence_data;
                 ap_q <= cmd_ap;
                 read_direction_q <= cmd_read;
                 address_q <= cmd_addr;
@@ -201,7 +206,7 @@ module plasma_swd_transaction_engine (
                     cmd_error_data_phase ||
                     cmd_timeout_cycles == 0 ||
                     cmd_addr[1:0] != 2'b00 ||
-                    (cmd_op && cmd_sequence_bits > 8'd32)) begin
+                    (cmd_op && cmd_sequence_bits > 9'd256)) begin
                     busy <= 1'b0;
                     swdio_oe <= 1'b0;
                     resp_valid <= 1'b1;
@@ -222,15 +227,15 @@ module plasma_swd_transaction_engine (
                         phase <= (cmd_sequence_bits == 0) ?
                             PH_RESET_HIGH : PH_SEQUENCE;
                         phase_bits <= (cmd_sequence_bits == 0) ?
-                            8'd64 : cmd_sequence_bits;
-                        bit_index <= 8'd0;
+                            9'd64 : cmd_sequence_bits;
+                        bit_index <= 9'd0;
                         swdio_oe <= 1'b1;
                         swdio_out <= (cmd_sequence_bits == 0) ?
-                            1'b1 : cmd_wdata[0];
+                            1'b1 : cmd_sequence_data[0];
                     end else begin
                         phase <= PH_REQUEST;
                         phase_bits <= 8'd8;
-                        bit_index <= 8'd0;
+                        bit_index <= 9'd0;
                         swdio_oe <= 1'b1;
                         swdio_out <= 1'b1; // request bit zero is START=1
                     end
@@ -255,10 +260,10 @@ module plasma_swd_transaction_engine (
                         ack_shift[bit_index[1:0]] <= swdio_in;
                     if (phase == PH_DATA && read_direction_q)
                         read_q[bit_index[4:0]] <= swdio_in;
-                    if (bit_index + 8'd1 < phase_bits) begin
-                        bit_index <= bit_index + 8'd1;
-                        swdio_out <= tx_bit(phase, bit_index + 8'd1,
-                                            request_q, write_q);
+                    if (bit_index + 9'd1 < phase_bits) begin
+                        bit_index <= bit_index + 9'd1;
+                        swdio_out <= tx_bit(phase, bit_index + 9'd1,
+                                            request_q, write_q, sequence_q);
                     end else begin
                         case (phase)
                             PH_RESET_HIGH:
