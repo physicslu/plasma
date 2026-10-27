@@ -1,0 +1,101 @@
+"""Host-only MPE architecture proof: documents/address/pin/ownership, NOT RTL."""
+from __future__ import annotations
+
+from copy import deepcopy
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+
+PL = Path(__file__).resolve().parents[1]
+DESIGN = PL / "projects/z2-mpe-dual-site"
+ARCH = json.loads((DESIGN / "architecture.json").read_text(encoding="utf-8"))
+spec = importlib.util.spec_from_file_location("mpe_architecture", DESIGN / "validate_architecture.py")
+assert spec and spec.loader
+mpe = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mpe)
+
+
+def test_clean_sheet_has_two_different_real_pmods_and_no_hil_claim():
+    result = mpe.validate(ARCH)
+    assert result["status"] == "ARCHITECTURE_CONTRACT_PASS_HOST_ONLY"
+    assert result["site_1"] == {"connector": "JA", "base": "0x43C01000"}
+    assert result["site_2"] == {"connector": "JB", "base": "0x43C02000"}
+    assert result["dpidr"] == "NOT_RUN"
+    assert result["synthesis"] == "NOT_RUN"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("site_count", 8),
+    ("site_ids_one_based", False),
+    ("host_execution", "SWPC_REMOTE_BITBANG"),
+    ("ps_to_pl", "PER_EDGE_MMIO_BITBANG"),
+    ("engine_per_site", "ONE_GLOBAL_SWCLK_MIRROR"),
+    ("status", "DEPLOYED"),
+])
+def test_reject_incorrect_scope_and_mirrored_engines(field, value):
+    item = deepcopy(ARCH)
+    item[field] = value
+    with pytest.raises(mpe.ArchitectureRejected):
+        mpe.validate(item)
+
+
+@pytest.mark.parametrize("index,field,bad", [
+    (0, "pmod", "JB"),
+    (1, "pmod", "JA"),
+    (0, "swclk", {"pmod_pin": 1, "fpga_pin": "W14"}),
+    (1, "swdio", {"pmod_pin": 2, "fpga_pin": "Y19"}),
+    (0, "ground_pins", [6, 12]),
+])
+def test_reject_wrong_pmod_and_power_pin_confusion(index, field, bad):
+    item = deepcopy(ARCH)
+    item["sites"][index][field] = bad
+    with pytest.raises(mpe.ArchitectureRejected):
+        mpe.validate(item)
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("target_io_voltage", 5),
+    ("target_io_voltage", 1.8),
+    ("io_standard", "LVCMOS18"),
+    ("no_power_control", False),
+    ("no_external_reset", False),
+    ("pmoda_shared_raspberry_pi_header", False),
+    ("other_data_pins", "MIRROR_SWCLK"),
+])
+def test_reject_unqualified_electrical_assumptions(field, bad):
+    item = deepcopy(ARCH)
+    item["physical"][field] = bad
+    with pytest.raises(mpe.ArchitectureRejected):
+        mpe.validate(item)
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("base", "0x40008000"),
+    ("span", "0x2000"),
+    ("site_stride", "0x800"),
+    ("site_bank_index_origin", 0),
+    ("fclk_hz", 50_000_000),
+    ("full_word_write_required", False),
+])
+def test_reject_old_or_aliasing_memory_map(field, bad):
+    item = deepcopy(ARCH)
+    item["axi"][field] = bad
+    with pytest.raises(mpe.ArchitectureRejected):
+        mpe.validate(item)
+
+
+def test_reject_duplicate_or_unaligned_registers():
+    for changed in ({"offset": "0x15"}, {"offset": "0x14", "name": "TX_DATA"}):
+        item = deepcopy(ARCH)
+        item["site_registers"][4].update(changed)
+        with pytest.raises(mpe.ArchitectureRejected):
+            mpe.validate(item)
+
+
+def test_no_virtual_or_hil_pass_in_architecture_only_evidence():
+    item = deepcopy(ARCH)
+    item["proof"]["dpidr"] = "PASS"
+    with pytest.raises(mpe.ArchitectureRejected, match="FALSE_HARDWARE_OR_SIMULATION_PASS"):
+        mpe.validate(item)
