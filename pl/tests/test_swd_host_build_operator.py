@@ -27,6 +27,16 @@ swd = load(PROJECT / "verify_hwh.py", "swd_hwh")
 script = load(ROOT / "scripts/plasma_swd_host_build.py", "swd_host_build")
 
 
+# Host-only excerpt shaped like the actual routed Vivado datasheet; NOT live HW.
+ROUTED_FPGA_IO_DATASHEET_FIXTURE = """Input Ports Setup/Hold
+clk_fpga_0 | swdio_site1 | FDRE | - | 5.329 (r) | SLOW | -0.699 (r) | SLOW |
+clk_fpga_0 | swdio_site2 | FDRE | - | 6.276 (r) | SLOW | -1.348 (r) | SLOW |
+Output Ports Clock-to-out
+clk_fpga_0 | swclk_site1 | FDRE | - | 13.070 (r) | SLOW | 10.585 (r) | SLOW |
+clk_fpga_0 | swclk_site2 | FDRE | - | 14.118 (r) | SLOW | 10.833 (r) | SLOW |
+Setup between Clocks
+"""
+
 def fixture_hwh() -> ET.Element:
     root = ET.Element("SYSTEM")
     external = ET.SubElement(root, "EXTERNALPORTS")
@@ -126,6 +136,8 @@ def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
         "6. checking no_output_delay (4)\\n")
     (reports / "methodology.rpt").write_text(
         "| TIMING-18 | Warning | Missing input or output delay | 6 |\\n")
+    (reports / "datasheet_io.rpt").write_text(
+        ROUTED_FPGA_IO_DATASHEET_FIXTURE, encoding="utf-8")
     xdc = ROOT / "pl/constraints/pynq-z2/z2-swd-independent.xdc"
     sha = "a" * 40
     with pytest.raises(swd.SWDBuildDenied, match="SWD_BUILD_TCL_SIGNOFF_MARKER_MISSING"):
@@ -174,6 +186,36 @@ def test_inconsistent_timing_report_is_rejected(tmp_path):
         "| TIMING-18 | Warning | Missing input or output delay | 5 |\\n")
     with pytest.raises(swd.SWDBuildDenied, match="SWD_IO_TIMING_REPORTS_DISAGREE"):
         swd.audit_external_io_timing(tmp_path)
+
+
+def test_routed_fpga_only_rx_budget_fails_fast_before_target_tco(tmp_path):
+    (tmp_path / "datasheet_io.rpt").write_text(
+        ROUTED_FPGA_IO_DATASHEET_FIXTURE, encoding="utf-8")
+    result = swd.fpga_only_swd_rx_ideal_budget(tmp_path)
+    assert result["fclk_hz"] == 100000000
+    assert result["provisional_normal_swd_limit_hz"] == 1000000
+    site1 = result["estimated_ideal_fpga_only"]["site1"]
+    site2 = result["estimated_ideal_fpga_only"]["site2"]
+    assert site1["necessary_fpga_only_halfcycle_ns"] == 18.399
+    assert site1["unqualified_25mhz_ideal_margin_ns"] == 1.601
+    assert site2["necessary_fpga_only_halfcycle_ns"] == 20.394
+    assert site2["unqualified_25mhz_ideal_margin_ns"] == -0.394
+    assert site2["provisional_1mhz_ideal_margin_ns"] == 479.606
+    assert result["external_timing_qualified"] is False
+
+
+def test_fpga_rx_budget_fails_closed_on_missing_pad_or_bad_value(tmp_path):
+    path = tmp_path / "datasheet_io.rpt"
+    path.write_text(ROUTED_FPGA_IO_DATASHEET_FIXTURE.replace(
+        "swclk_site2", "SWCLK_UNKNOWN"), encoding="utf-8")
+    with pytest.raises(swd.SWDBuildDenied,
+                       match="SWD_FPGA_DATASHEET_PORT_ABSENT_OR_DUPLICATE"):
+        swd.fpga_only_swd_rx_ideal_budget(tmp_path)
+    path.write_text(ROUTED_FPGA_IO_DATASHEET_FIXTURE.replace(
+        "14.118 (r)", "INVALID"), encoding="utf-8")
+    with pytest.raises(swd.SWDBuildDenied,
+                       match="SWD_FPGA_DATASHEET_BAD_NUMBER"):
+        swd.fpga_only_swd_rx_ideal_budget(tmp_path)
 
 
 def test_operator_entry_is_exact_source_pinned_and_no_root_workflow():
