@@ -185,6 +185,19 @@ XDC is part of the design contract.
 
 A generated bitstream that violates timing is not considered validated.
 
+## 8A. 新 FPGA Image 建置標準 — 獨立 Project + Path 2 operator-cli（ADR-0004）
+
+**Owner Accepted，2026-10-27；PR #1189 未合併前仍屬候選分支契約。**
+
+- 新 FPGA Image family 與 Board target 必須有獨立 `pl/projects/<project-name>/` Vivado Project，明確固定 RTL、IP/BD、XDC、PS7/AXI、Clock/Reset、Build Tcl、Board Files、Image Manifest 與專屬 HWH／BIT／BIN 驗證；允許共用通用 RTL／工具，不允許借用 **F1-B Site 1 專屬 Build Driver**。
+- SWPC 的**正式可重現 Host Build** 使用 **Path 2 `operator-cli`** + 經 Owner 授權的 SHA-pinned Work Order + 已受審查且入版控的 Python 入口。入口呼叫該 Project 的 Vivado Tcl，不能透過固定 `vivado-host-build` F1-B Project allowlist／Registry／Stage 捷徑。Path 3 仍可在已核准的工程範圍做實驗性 Vivado Build，但不是正式 Path 2 建置回執。
+- Host-only Build 證據須有 exact Source/Tool/Board hashes、Vivado log/exit、Synthesis、Implementation、Timing、DRC/Methodology、HWH 地址／實際 Pin／Clock、BIT/HWH/BIN（如適用）及 SHA256。缺任何必要證據不可標示 Qualified。
+- **Build != Deploy。** 不授予 Z2 FPGA Manager／MMIO／DUT 供電／燒錄權限，也不可建置後自動 Download。
+- `F1B_BUILD_ENGINE_RETIREMENT_PENDING`：既有 F1-B 專屬路徑只可供已受控的歷史/遷移用途；新 Project 不得新增對其相依。須先通過 MPE 獨立 Project operator-cli 實機 SWPC Build、遷移所有使用者、留住 Root/Golden Recovery，另取得 Owner Gate 2 核准才能實際移除。
+- 未完成的新 Project 腳本、Vivado Build、或 F1-B Retirement，均標示 `NOT_RUN`／`PENDING`，不得拿 FPGA 模擬 PASS 冒充 SWPC Build PASS。
+
+以 [ADR-0004](../adr/0004-project-isolated-fpga-build-path2-operator-cli.md) 作為此標準的原始決策與退役 Gate。
+
 ## 9. Generated Vivado files
 
 Vivado project output is generated state. Keep checked-in source focused on RTL, XDC, reproducible Tcl, intentional IP/block-design configuration, documentation, and explicitly selected deliverable artifacts.
