@@ -29,11 +29,12 @@
 
 ## Engineering governance and execution paths
 
-- **Current / PR #1167 merged, Issue #1168 F1-B HIL PASS** — [Path 2 受保護 Z2 Root Entry](development/path2-generic-fpga-image-loader.md)：沿用可信 Dispatcher、SWPC SSH／sudo Transport 與既有兩參數 `operation + source_sha` Root Entry；Entry 固定呼叫 `pl.hil.fpga_image_root`，不再使用 Stage/Profile。實機驗收僅涵蓋 Site 1 F1-B Download／Identity Test／Golden Restore，不代表 Blue Pill Flash 或其他 Programmer IP 通過。
+- **Current / Path 2 guarded-hardware operator-cli** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：現行 Path 2 通用硬體 Work Order 使用 `capability: operator-cli`、`scope: guarded-hardware`、來源 SHA 綁定的 Python `script`、`argv` 與受限 `timeout_seconds`；在非 Root SWPC Runner 執行，不自動取得 sudo／Root 權限。Exit 69／77 是失敗的 NOT_RUN，Exit 0 僅為待審證據。CPU-only／Vivado Host Build 為各自獨立能力。
+- **Historical / retired z2-root-operation Work Order; F1-B #1168 evidence** — [Path 2 受保護 Z2 Root Entry 歷史契約](development/path2-generic-fpga-image-loader.md)：舊 Dispatcher 固定 `download|test|restore` Work Order 已退役，現行 Dispatcher 明確拒絕；獨立兩參數 Protected Root Entry／底層 Transport 與來源、互斥、復原守衛仍保留。#1168 實機 PASS 僅涵蓋當時 Site 1 F1-B，不能推導 Blue Pill／其他 Programmer IP／八 Site 資格。
 
-- **Historical Gate 1 offline test / current guarded route separate** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；當前受控執行路徑改由已註冊的可信 Stage Transport 與 Z2 Root SHA256 Manifest 保護。每次實機操作仍須獨立核對授權、映像 Hash、AXI 與 Recovery 證據。\n
+- **Historical Gate 1 offline provider integration** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；Stage Transport／Protected Root Entry 為保留的底層受保護工具，不是現行 Path 2 Dispatcher 的 `z2-root-operation` Capability。實際硬體使用 `operator-cli` 時仍須逐次核對授權、映像 Hash、所有權及 Recovery 證據。
 
-- **Historical offline coordinator contract** — [Path 2 Three-Stage Build / Download / Testing Coordinator](architecture/plasma-path2-three-stage-gate1.md)：記錄 Build、Download、Testing 獨立 Trigger、兩段預設關閉的自動銜接與離線 Adapter／Receipt 測試；當前硬體權限取決於獨立受控 Dispatcher／Stage Transport 與 Work Order 授權，不由 Orchestrator 測試授予。
+- **Historical offline coordinator contract** — [Path 2 Three-Stage Build / Download / Testing Coordinator](architecture/plasma-path2-three-stage-gate1.md)：記錄舊 Build／Download／Testing 獨立 Trigger、自動銜接與離線 Adapter／Receipt 測試；現行通用 Path 2 硬體入口為 `operator-cli`，不會自動進入舊 Coordinator／Stage Transport。底層 Protected Root 權限與復原條件仍須獨立成立。
 
 - **Current after Gate 2 / Owner-approved Gate 1 design** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：Gate 1 由 ChatGPT 推薦並讓使用者選擇 Path 1（ChatGPT Direct Work）、Path 2（SWPC CLI Work）或 Path 3（SWPC Codex Work）；批准後在明確授權內自動執行，PR 準備妥當才請求 Gate 2 合併。包含三套流程圖、角色分工、Github Actions Dispatch 前提、證據／資安邊界與不需 PR 的純驗證任務。**這是規範，不代表通用 SWPC Dispatcher 已啟用或授權硬體操作。**
 
