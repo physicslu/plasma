@@ -4,6 +4,8 @@
 >
 > **Scope:** 所有後續 PLASMA 新增或重大改版的可交付 FPGA Image／Board 目標；新 MPE 為首個採用者。僅定義建置與驗收標準，不擴張硬體／Root 權限。
 
+> **Architecture update (2026-10-27):** [ADR-0005](0005-independent-swd-ip-guarded-bitbang.md) replaces the composite-MPE naming and top-level structure. Where this ADR mentions an MPE Vivado Project, read it as the **successor independent dual SWD IP Project**. The Path 2 `operator-cli` Build standard and F1-B retirement gates are **unchanged**. Existing `z2-mpe-dual-site/` Tcl is a historical unqualified candidate, not a deployable artifact.
+
 ## Decision
 
 1. **每個 Image family × Board target 有獨立的可重現 Vivado Project。** 將來源 RTL、必要 IP/BD、pin/XDC、時脈／Reset、PS7/AXI 整合、建置 Tcl、板卡版本與 HWH/Bitstream 驗證器歸在 `pl/projects/<project-name>/`。共用 RTL 或共用工具可以重用，但不得把特定 Project 的 Tcl、ABI、XDC、Artifact 檢查硬編碼成全系統入口。獨立 Project 並不代表每個 SWD/SPI Engine 都要有獨立 Bitstream；產品可在單一 Universal Image 中整合多個 Engine。
