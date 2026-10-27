@@ -16,6 +16,12 @@ SPEC.loader.exec_module(tool)
 
 
 class StageATest(unittest.TestCase):
+    def test_remote_wrapper_is_valid_and_checks_installed_source(self):
+        code = tool.remote_code("a" * 64)
+        compile(code, "<z2-wrapper>", "exec")
+        self.assertIn("PS_SCRIPT_SHA_MISMATCH", code)
+        self.assertIn("PS_SCRIPT_OWNER_OR_TYPE", code)
+
     def test_no_attestation_stops_before_devices(self):
         result = subprocess.run([sys.executable, str(SCRIPT), "stage-a"],
                                 capture_output=True, text=True, timeout=5)

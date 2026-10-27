@@ -98,8 +98,11 @@ def la_device() -> tuple[str, Path]:
 
 def remote_code(source_sha: str) -> str:
     # The installed PS script must be byte-for-byte equal to the reviewed repo source.
-    return ("import hashlib,json,os,platform,runpy,sys\n"
+    return ("import hashlib,json,os,platform,runpy,stat,sys\n"
             f"path={PS_INSTALLED!r}\nexpected={source_sha!r}\n"
+            "file_stat=os.lstat(path)\n"
+            "if not stat.S_ISREG(file_stat.st_mode) or file_stat.st_uid != 0: "
+            "raise RuntimeError('PS_SCRIPT_OWNER_OR_TYPE')\n"
             "actual=hashlib.sha256(open(path,'rb').read()).hexdigest()\n"
             "if actual != expected: raise RuntimeError('PS_SCRIPT_SHA_MISMATCH')\n"
             "print(json.dumps({'kind':'ps_environment','machine':platform.machine(),"
@@ -252,7 +255,9 @@ def stage_a(out: Path) -> int:
             record["la_exit"] = capture.wait(timeout=40)
             reader.join(timeout=2)
     except Exception as exc:
-        record["failure"] = type(exc).__name__ + ":" + str(exc)
+        # TimeoutExpired embeds the SSH argv, including the private target address.
+        record["failure"] = (type(exc).__name__ if isinstance(exc, subprocess.TimeoutExpired)
+                             else type(exc).__name__ + ":" + str(exc))
     finally:
         if capture is not None:
             stop_capture(capture)
