@@ -140,7 +140,7 @@ async def expect(d, site, off, value):
 async def independent_mode_admission_and_bitbang_pads(d):
     await start(d)
     for s in (0, 1):
-        await expect(d, s, 0, 0x30001 + s)
+        await expect(d, s, 0, 0x40001 + s)
         await expect(d, s, 0x38, 0)
         assert await write(d, s, 0x3C, 7) == 2   # DEBUG locked off
         assert await write(d, s, 0x14, (3 << 16) | 0x100) == 2
