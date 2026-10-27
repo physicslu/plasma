@@ -24,6 +24,18 @@ AMD Vivado 2026.1 XDC min/max guides:
 https://docs.amd.com/r/en-US/ug903-vivado-using-constraints/Use-of-set_input_delay-Command-Options
 https://docs.amd.com/r/en-US/ug903-vivado-using-constraints/Use-of-set_output_delay-Command-Options
 
+## Routed FPGA-only half-cycle budget (new measured evidence)
+
+Real Vivado 2026.1 [run #40487489843](https://github.com/physicslu/plasma/actions/runs/40487489843), [archive #12726195560](https://github.com/physicslu/plasma/actions/runs/40487489843/artifacts/12726195560) generated **report_datasheet -show_all_corners -show_oe_timing** and **report_io**.
+
+At the SLOW process corner, `clk_fpga_0` launch-to-SWCLK-pad maximum is Site 1 **13.070 ns**, Site 2 **14.118 ns**. SWDIO Input Setup to the same 100 MHz FCLK capture register is Site 1 **5.329 ns**, Site 2 **6.276 ns**. Summed FPGA-only RX minimum half-cycle bounds (assuming **zero target tCO, zero cable delay, zero skew/uncertainty**, which are nonphysical optimistic assumptions) are **18.399 ns** and **20.394 ns**, respectively.
+
+At the historical `half_period=2` (20 ns / 25 MHz), illustrative FPGA-only margin: Site 1 **+1.601 ns**, Site 2 **−0.394 ns**. Thus the historical 25 MHz register setting could **not** be qualified even before any real target or wire delay. These derived numbers are a **path feasibility audit**, not a formal STA max/min SWD interface sign-off; target/board and IOBUF turnaround are still missing.
+
+New Gate 1 source-only guard in both per-Site AXI register and engine rejects `half_period <50`. At 100 MHz fabric clock the **provisional Normal SWD ceiling is 1 MHz** (500 ns half-cycle), with default `half_period=500` (100 kHz) unchanged. The guard reduces accidental exposure; it is **not evidence that 1 MHz is electrically supported across DUTs**. Debug Bitbang remains separately gated by mode/host MMIO and does not inherit a deterministic SWCLK frequency. Larger operating range may be enabled only in a *separate measured/timed qualification change*.
+
+The actual `report_io` confirms Site1 SWCLK Y18/SWDIO Y19 and Site2 SWCLK W14/SWDIO Y14, IO Bank 34, `LVCMOS33`, current implemented SLEW=`SLOW`, DRIVE=`12 mA`. These are **observed current implementation values**, not board-level signal-quality validation or deliberate final electrical selection.
+
 ## Gate to replace the six warnings with real coverage
 
 1. Lock target-device supported SWD timing: tCO(min/max), tSU/tH, frequency, VDD/VIO across target PVT. Do not imply Blue Pill-only figures qualify all PLASMA ICs.
