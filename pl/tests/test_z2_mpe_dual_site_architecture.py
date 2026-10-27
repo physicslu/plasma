@@ -4,7 +4,6 @@ from __future__ import annotations
 from copy import deepcopy
 import importlib.util
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -104,14 +103,11 @@ def test_no_virtual_or_hil_pass_in_architecture_only_evidence():
 def test_both_pmods_have_exact_distinct_xdc_and_no_unexpected_pin_drive():
     xdc = (PL / "constraints/pynq-z2/z2-mpe-dual-swd.xdc").read_text()
     active = [line for line in xdc.splitlines() if line.startswith("set_property ")]
-    pattern = r"PACKAGE_PIN ([A-Z0-9]+) IOSTANDARD (LVCMOS33)\\} \\[get_ports \\{([^}]+)\\}\\]"
-    found = [re.search(pattern, line) for line in active]
-    assert len(found) == 4 and all(match is not None for match in found)
-    assert [(m.group(1), m.group(3)) for m in found] == [
-        ("Y18", "swclk_io[0]"),
-        ("Y19", "swdio_io[0]"),
-        ("W14", "swclk_io[1]"),
-        ("Y14", "swdio_io[1]"),
+    assert active == [
+        "set_property -dict {PACKAGE_PIN Y18 IOSTANDARD LVCMOS33} [get_ports {swclk_io[0]}]",
+        "set_property -dict {PACKAGE_PIN Y19 IOSTANDARD LVCMOS33} [get_ports {swdio_io[0]}]",
+        "set_property -dict {PACKAGE_PIN W14 IOSTANDARD LVCMOS33} [get_ports {swclk_io[1]}]",
+        "set_property -dict {PACKAGE_PIN Y14 IOSTANDARD LVCMOS33} [get_ports {swdio_io[1]}]",
     ]
     # No invented PMOD power/NRST/5V permission.
     assert all("LVCMOS33" in line for line in active)
