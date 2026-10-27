@@ -66,21 +66,21 @@ def test_build_is_host_only_does_not_auto_load_fpga():
         assert "swd_site1" in content and "swd_site2" in content
 
 
-def test_mode_and_debug_registers_have_separate_site_ownership():
+def test_only_off_normal_modes_and_no_debug_registers_or_pin_drivers():
     r = (PL / "rtl/swd/plasma_swd_site_axi_lite.sv").read_text()
     assert "parameter integer SITE_ID = 1" in r
     assert "SITE_BASE_ADDRESS" in r
     assert "plasma_swd_transaction_engine u_transaction" in r
     assert "mode_q == MODE_NORMAL" in r
-    assert "mode_q == MODE_DEBUG" in r
-    assert "debug_oe_q" in r
-    assert "debug_clk_q" in r
-    assert "debug_out_q" in r
-    assert "(!debug_clk_q && !data_w[0])" in r
-    assert "8'h38:" in r and "8'h3C:" in r and "8'h40:" in r
-    for banned in ("plasma_mpe_", "z2-swd03-axi", "fixed-site1-vivado-host-build",
-                   "swd_transaction_master", "bluepill_remote_bitbang"):
-        assert banned not in r
+    assert "MODE_OFF=2'd0, MODE_NORMAL=2'd1" in r
+    assert "data_w[31:1] == 0" in r
+    assert "32'h00050000 | SITE_ID" in r
+    assert "8'h38:" in r  # OFF/NORMAL hardware guard retained
+    for forbidden in ("MODE_DEBUG", "debug_pad", "debug_oe_q",
+                      "debug_clk_q", "debug_out_q", "8'h3C:", "8'h40:",
+                      "plasma_mpe_", "z2-swd03-axi", "swd_transaction_master",
+                      "bluepill_remote_bitbang"):
+        assert forbidden not in r, forbidden
 
 
 def test_offchip_swd_timing_signoff_cannot_be_inferred_from_internal_wns():

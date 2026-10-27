@@ -1,60 +1,46 @@
-"""ADR-0005 host-only decision and negative-claim guard.
+"""Host-only owner decision guard: final SWD IP is NORMAL-only.
 
-This guards an accepted *architecture direction*, not nonexistent RTL modes.
-The composite MPE prototype must not masquerade as final SWD IP or a
-version-qualified OpenOCD remote_bitbang SWD transport.
+ADR-0005 remains historical; ADR-0006 supersedes its SWD-specific Debug.
 """
 from pathlib import Path
-import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-ADR = ROOT / "docs/adr/0005-independent-swd-ip-guarded-bitbang.md"
+OLD = ROOT / "docs/adr/0005-independent-swd-ip-guarded-bitbang.md"
+NEW = ROOT / "docs/adr/0006-independent-swd-engine-and-future-gpio-bus.md"
+SOURCE = ROOT / "pl/rtl/swd/plasma_swd_site_axi_lite.sv"
 DOC = ROOT / "docs/architecture/plasma-mpe-dual-site-gate1.md"
 
 
-def test_owner_selected_independent_swd_ip_and_no_mpe_manager():
-    decision = ADR.read_text(encoding="utf-8")
-    for required in (
-        "Status: Accepted",
-        "No MPE central Site Manager",
-        "AXI Interconnect",
-        "SWD IP Site 1",
-        "SWD IP Site 2",
-        "0x43C01000",
-        "0x43C02000",
-        "mutually exclusive",
-        "no",
-        "Path 2",
-        "operator-cli",
-        "VIVADO_BUILD_NOT_RUN",
-        "PHYSICAL_HIL_NOT_RUN",
-    ):
-        assert required in decision, required
+def test_adopted_independent_swd_and_future_gpio_without_mpe_manager():
+    a = NEW.read_text(encoding="utf-8")
+    for word in ("Status: Accepted", "Supersedes ADR-0005", "AXI Interconnect",
+                 "0x43C01000", "0x43C02000", "OFF=0", "NORMAL=1",
+                 "0x00050001/0x00050002", "GPIO Bus", "I²C",
+                 "JTAG", "SPI", "UART", "Gate 1",
+                 "no hardware access", "no merge"):
+        assert word.lower() in a.lower(), word
+    assert "Status: Superseded" in OLD.read_text(encoding="utf-8")
 
 
-def test_opencd_012_is_explicitly_blocked_for_swd_remote_bitbang():
-    decision = ADR.read_text(encoding="utf-8")
-    assert "v0.12.0" in decision
-    assert "jtag_only" in decision
-    assert "lacks `swd_ops`" in decision
-    assert "DEBUG_REMOTE_BITBANG_SWD=BLOCKED_VERSION_UNQUALIFIED" in decision
-    assert "O/o" in decision and "d/e/f/g" in decision
+def test_removed_swd_debug_is_impossible_via_rtl_or_host_controller():
+    rtl = SOURCE.read_text(encoding="utf-8")
+    driver = (ROOT / "software/python/plasma_interfaces/swd_site.py").read_text()
+    assert "data_w[31:1] == 0" in rtl
+    assert "32'h00050000 | SITE_ID" in rtl
+    assert "0x00050000 | self.site_id" in driver
+    for forbidden in ("MODE_DEBUG", "debug_pad", "debug_oe_q",
+                      "debug_clk_q", "debug_out_q", "8'h3C:", "8'h40:"):
+        assert forbidden not in rtl, forbidden
+    for forbidden in ("DEBUG_DRIVE =", "DEBUG_SAMPLE ="):
+        assert forbidden not in driver, forbidden
+    for name in ("swd_debug_bitbang.py", "swd_debug_socket.py"):
+        assert not (ROOT / "software/python/plasma_interfaces" / name).exists()
+    for name in ("test_swd_debug_bitbang_host.py", "test_swd_debug_socket_host.py"):
+        assert not (ROOT / "software/python/tests" / name).exists()
 
 
-def test_legacy_mpe_project_is_explicitly_nonproduction():
+def test_historical_composite_mpe_remains_nonproduction():
     historical = DOC.read_text(encoding="utf-8")
     assert "SUPERSEDED IMPLEMENTATION DIRECTION" in historical
-    assert "not" in historical
     assert "new independent-IP topology" in historical
     assert "does not support SWD" in historical
-
-
-@pytest.mark.parametrize("unsafe_claim", [
-    "OPENOCD_012_SWDBB_SUPPORTED",
-    "DEBUG_SWDBB_HIL_PASS",
-    "MPE_FINAL_IMAGE_QUALIFIED",
-    "BITBANG_AUTO_FALLBACK_ALLOWED",
-])
-def test_policy_rejects_known_false_qualification_claims(unsafe_claim):
-    decision = ADR.read_text(encoding="utf-8")
-    assert unsafe_claim not in decision

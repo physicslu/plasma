@@ -41,33 +41,36 @@ single-Site SWD source dependency; CI must test this fail-closed boundary.
 Host Build != FPGA Manager Load, DUT power, PS MMIO, Flash or HIL authorization.
 See `docs/adr/0004-project-isolated-fpga-build-path2-operator-cli.md`.
 
-## Independent SWD IP + guarded Debug Bitbang (ADR-0005)
+## Independent SWD NORMAL-only IP (ADR-0006)
 
-**Owner-approved next architecture (2026-10-27; draft PR, not yet implemented):**
-Use two separately addressable SWD AXI4-Lite slave IP instances connected
-via the normal AXI Interconnect. **Do not add an MPE manager/scheduler or
-reuse the old composite MPE AXI bank as the production architecture.**
-Site 1 = Pmod A, Site 2 = Pmod B. Each IP owns its own registers, command/
-response FIFO, SWD FSM/clock, SWDIO IOBUF, error status and guarded mode.
+**Owner-approved current Draft architecture (2026-10-27):** use two
+separately addressable AXI4-Lite SWD slave IPs behind the conventional
+AXI Interconnect. Site 1 is Pmod A; Site 2 is Pmod B. Both have independent
+command/response FIFOs, FSM/clock, SWDIO IOBUF, IRQ and error control.
+Do not add an MPE manager or shared cross-Site SWD scheduler.
 
-Each Site supports **mutually exclusive** hardware transaction NORMAL and
-optional diagnostic DEBUG controlled Bitbang. Debug is for an explicitly
-admitted PS-local OpenOCD SWD remote_bitbang Bridge only; **no automatic
-fallback**, no simultaneous pad driver, no reused WordPort/GPIO/legacy IP.
-Mode changes require a quiescent Site and safe SWDIO Hi-Z; interlocks are
-verified per Site. Do not conflate Build/Simulation PASS with physical HIL.
+**Remove SWD-specific Debug Bitbang outright:** no MODE_DEBUG, Debug Drive,
+Debug Sample, debug pin multiplexing, Python SWD debug socket/codec, nor
+OpenOCD remote_bitbang fallback in the *new* independent-SWD-IP project.
+Retain OFF=0 / NORMAL=1 with idle/quiescent admission and SWDIO Hi-Z when
+disabled. Removed offsets 0x3C/0x40 and mode value 2 must fail closed,
+not map to another function. Candidate register ABI is v5 (0x00050001/2).
+Do not alter the historical installed single-Site Blue Pill image or
+its archived PR #1196 proof.
 
-**Version gate:** upstream OpenOCD **v0.12.0** remote_bitbang only registers
-JTAG (`jtag_only`); it does not contain SWD remote_bitbang operations.
-Do not document it as working SWD Debug transport. A separately reviewed,
-SHA/version-pinned OpenOCD build or backport with proven SWD support and
-negative Bridge tests is mandatory. Do **not** silently replace the
-qualified OpenOCD 0.12.0 Provider stack. See
-`docs/adr/0005-independent-swd-ip-guarded-bitbang.md`.
+The **future general-purpose GPIO Bus**, protocol-specific JTAG, SPI, UART
+and I2C engines and any shared Site Pin Mux are separately planned work,
+NOT instantiated or qualified by this SWD-only PR. GPIO must handle
+open-drain/Hi-Z and safe exclusive pin ownership before I2C use.
+Owner-specified future GPIO architecture does not grant current hardware
+access or substitute for Root Guard, Golden Recovery, Image/Manifest,
+MMIO Site leases, safe voltage or a real Z2 HIL test.
 
-Current `plasma_mpe_*` RTL/Tcl remains a non-final migration prototype.
-Do not select, load or certify it as the accepted dual SWD IP Image.
-Historical tests can serve as reference vectors; retest the new design.
+Historical MPE RTL/Tcl remains non-final; never select it as the new IP.
+Do not conflate Host-only RTL or Vivado success with physical HIL.
+Follow [ADR-0006](../docs/adr/0006-independent-swd-engine-and-future-gpio-bus.md);
+[ADR-0005](../docs/adr/0005-independent-swd-ip-guarded-bitbang.md) is
+superseded and retained solely for decision history.
 
 ## 1. RTL language and coding policy
 

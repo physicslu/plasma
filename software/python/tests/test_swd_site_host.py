@@ -17,7 +17,7 @@ class VirtualSites:
         self.barriers = 0
         self.fail_write = False
         for site, base in SITE_BASES.items():
-            self.regs[base] = 0x40000 | site
+            self.regs[base] = 0x50000 | site
             self.regs[base + 0x38] = 0
             self.regs[base + 0x08] = 500
             self.regs[base + 0x24] = 0

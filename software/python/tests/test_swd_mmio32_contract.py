@@ -7,7 +7,7 @@ from plasma_interfaces.swd_site import SwdSiteController, SITE_BASES, SiteAccess
 
 class FakeWordMemory:
     def __init__(self, site):
-        self.data = {0: 0x40000 | site, 0x04: 0, 0x24: 0,
+        self.data = {0: 0x50000 | site, 0x04: 0, 0x24: 0,
                      0x2C: 0, 0x38: 0}
         self.calls = []
         self.fail = False

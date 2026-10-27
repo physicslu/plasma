@@ -1,6 +1,7 @@
 # ADR-0005 — Direct-addressed independent SWD IP, optional guarded OpenOCD Bitbang debug
 
-> **Status: Accepted (owner architecture direction, 2026-10-27); implementation pending.**
+> **Status: Superseded by [ADR-0006](0006-independent-swd-engine-and-future-gpio-bus.md) (owner decision, 2026-10-27).**
+> Historical decision retained for audit. Optional SWD Debug Bitbang is **NOT** the current implementation direction.
 > This ADR is recorded on draft PR #1189; until merged, it is not an active main/deployed contract. The old MPE wrapper, RTL, AXI candidate and standalone MPE Vivado Tcl in that PR are **experimental migration source**, not approved final architecture or a qualified bitstream.
 >
 > **Design objective:** eliminate an unnecessary FPGA multi-Site management layer. Make each Site a separately addressable independent SWD AXI IP, while retaining an explicitly gated OpenOCD diagnostic Bitbang capability inside each IP.

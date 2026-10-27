@@ -1,11 +1,10 @@
 // PLASMA reusable ONE-SITE SWD AXI4-Lite IP, Gate 1 RTL candidate.
 // Each instance owns one independent AXI slave, SWD FSM, registers and pads.
 // No MPE-wide register decoder, no Site manager, no legacy WordPort transport.
-// NORMAL (mode=1): FPGA autonomous SWD transaction.
-// DEBUG (mode=2): guarded per-bit pad writes for a *version-qualified*
-// OpenOCD SWD remote_bitbang Bridge. OpenOCD 0.12.0 is JTAG-only: NOT qualified.
-// DISABLED (mode=0): SWCLK low, SWDIO Hi-Z. NORMAL and DEBUG never drive
-// simultaneously. Does not control target power or reset.
+// NORMAL (mode=1): FPGA autonomous SWD transactions.
+// DISABLED (mode=0): SWCLK low, SWDIO Hi-Z; no SWD Debug Bitbang path.
+// A future multi-protocol GPIO Bus is a separate proposed IP, NOT instantiated.
+// No target power or reset control.
 //
 // Candidate Normal SWD HW ceiling 12.5MHz (N>=4 @100MHz); NOT HIL qualified.
 // Software must independently qualify the DUT/Profile's usable SWD clock.
@@ -17,8 +16,8 @@
 // 14 CMD_PUSH 18 COMPLETION_META 1C DATA 20 TAGGED_POP 24 LEVELS
 // 28 NORMAL_CONTROL (bit2 fault-only pending-command discard)
 // 2C ERROR_LATCH (RW1C) 30 IRQ_ENABLE 34 IRQ_PENDING (RW1C)
-// 38 MODE (0 disabled,1 normal,2 debug) 3C DEBUG_DRIVE (bit0 CLK,
-// bit1 DOUT, bit2 OE), 40 DEBUG_SAMPLE (bit0 DIN, debug-only).
+// 38 MODE (0 disabled, 1 normal; all other values invalid).
+// 3C/40 retired diagnostic offsets; reads/writes always SLVERR.
 // 44..60 SWJ_DATA0..7 (8 x 32-bit staging), 64 SWJ_LENGTH (0 or 33..256).
 // SWJ_LENGTH=0 uses the old <=32-bit TX_DATA / 64-clock line-reset encoding.
 // Extended SWJ snapshots all 256 bits on CMD_PUSH and disarms staging.
@@ -81,8 +80,7 @@ module plasma_swd_site_axi_lite #(
     // Per-Site dynamic divider: N >= 4 => 12.5MHz candidate hardware max.
     // Target-qualified working speed is a separate PS/Programming Profile gate.
     localparam logic [15:0] MIN_HALF_PERIOD = 16'd4;
-    localparam logic [1:0] MODE_OFF=2'd0, MODE_NORMAL=2'd1,
-                           MODE_DEBUG=2'd2;
+    localparam logic [1:0] MODE_OFF=2'd0, MODE_NORMAL=2'd1;
     logic aw_hold, w_hold;
     logic [31:0] aw_q, wd_q;
     logic [3:0] strobe_q;
@@ -100,7 +98,6 @@ module plasma_swd_site_axi_lite #(
     logic [1:0] mode_q;
     logic normal_enable_q, abort_q, consume_q, fault_q, irq_enable_q;
     logic irq_pending_q;
-    logic debug_clk_q, debug_out_q, debug_oe_q;
     logic [15:0] half_q, active_tag;
     logic [31:0] timeout_q, data_q;
     logic [255:0] swj_stage_q;
@@ -169,12 +166,9 @@ module plasma_swd_site_axi_lite #(
     wire engine_clk, engine_out, engine_oe, swdio_in;
     wire normal_pad = s_axi_aresetn && (mode_q == MODE_NORMAL) &&
                       normal_enable_q;
-    wire debug_pad = s_axi_aresetn && (mode_q == MODE_DEBUG);
-    wire drive_oe = (normal_pad && engine_oe) ||
-                    (debug_pad && debug_oe_q);
-    wire drive_out = debug_pad ? debug_out_q : engine_out;
-    wire drive_clk = (normal_pad && engine_clk) ||
-                     (debug_pad && debug_clk_q);
+    wire drive_oe = normal_pad && engine_oe;
+    wire drive_out = engine_out;
+    wire drive_clk = normal_pad && engine_clk;
 
     OBUF u_swclk (.I(drive_clk), .O(swclk_io));
     IOBUF u_swdio (.I(drive_out), .T(!drive_oe), .O(swdio_in),
@@ -226,8 +220,6 @@ module plasma_swd_site_axi_lite #(
             cmd_wr_q <= 4'd0; cmd_rd_q <= 4'd0;
             resp_wr_q <= 4'd0; resp_rd_q <= 4'd0;
             cmd_level_q <= 5'd0; resp_level_q <= 5'd0;
-            debug_clk_q <= 1'b0; debug_out_q <= 1'b0;
-            debug_oe_q <= 1'b0;
             half_q <= 16'd500; timeout_q <= 32'd1000000;
             data_q <= 32'd0; active_tag <= 16'd0;
             swj_stage_q <= 256'd0; swj_length_q <= 9'd0;
@@ -377,26 +369,11 @@ module plasma_swd_site_axi_lite #(
                             if (!resp_enqueue) irq_pending_q <= 1'b0;
                             s_axi_bresp <= OKAY;
                         end
-                        8'h38: if (data_w[31:2] == 0 &&
-                                   data_w[1:0] != 2'd3 &&
+                        8'h38: if (data_w[31:1] == 0 &&
                                    !busy && !resp_valid &&
                                    cmd_empty && resp_empty &&
-                                   !normal_enable_q &&
-                                   !debug_oe_q && !debug_clk_q) begin
-                            mode_q <= data_w[1:0]; s_axi_bresp <= OKAY;
-                        end
-                        8'h3C: if (mode_q == MODE_DEBUG &&
-                                   data_w[31:3] == 0 &&
-                                   // SWDIO data/OE may only change while
-                                   // SWCLK is low both before and after
-                                   // the MMIO write, avoiding simultaneous
-                                   // rising-clock/data-direction updates.
-                                   ((!debug_clk_q && !data_w[0]) ||
-                                    data_w[2:1] ==
-                                        {debug_oe_q,debug_out_q})) begin
-                            debug_clk_q <= data_w[0];
-                            debug_out_q <= data_w[1];
-                            debug_oe_q <= data_w[2];
+                                   !normal_enable_q) begin
+                            mode_q <= data_w[0] ? MODE_NORMAL : MODE_OFF;
                             s_axi_bresp <= OKAY;
                         end
                         default: s_axi_bresp <= SLVERR;
@@ -409,7 +386,7 @@ module plasma_swd_site_axi_lite #(
                 if (in_window(s_axi_araddr)) begin
                     case (s_axi_araddr[7:0])
                         8'h00: begin
-                            s_axi_rdata <= 32'h00040000 | SITE_ID;
+                            s_axi_rdata <= 32'h00050000 | SITE_ID;
                             s_axi_rresp <= OKAY;
                         end
                         8'h04: begin
@@ -456,15 +433,6 @@ module plasma_swd_site_axi_lite #(
                         end
                         8'h38: begin
                             s_axi_rdata <= {30'd0,mode_q}; s_axi_rresp <= OKAY;
-                        end
-                        8'h3C: if (mode_q == MODE_DEBUG) begin
-                            s_axi_rdata <= {29'd0,debug_oe_q,
-                                debug_out_q,debug_clk_q};
-                            s_axi_rresp <= OKAY;
-                        end
-                        8'h40: if (mode_q == MODE_DEBUG) begin
-                            s_axi_rdata <= {31'd0,swdio_in};
-                            s_axi_rresp <= OKAY;
                         end
                         default: s_axi_rresp <= SLVERR;
                     endcase

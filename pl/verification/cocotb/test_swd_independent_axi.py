@@ -137,37 +137,32 @@ async def expect(d, site, off, value):
 
 
 @cocotb.test()
-async def independent_mode_admission_and_bitbang_pads(d):
+async def normal_only_mode_and_no_legacy_debug_registers(d):
     await start(d)
-    for s in (0, 1):
-        await expect(d, s, 0, 0x40001 + s)
-        await expect(d, s, 0x38, 0)
-        assert await write(d, s, 0x3C, 7) == 2   # DEBUG locked off
-        assert await write(d, s, 0x14, (3 << 16) | 0x100) == 2
-    assert await write(d, 0, 0x38, 3) == 2        # reserved mode
-    assert await write(d, 0, 0x38, 2, strb=1) == 2
-    assert await write(d, 0, 0x38, 2) == 0
-    await expect(d, 0, 0x38, 2)
-    assert await write(d, 0, 0x14, (4 << 16) | 0x100) == 2
-    assert await write(d, 0, 0x3C, 8) == 2      # unknown debug bits
-    assert await write(d, 0, 0x3C, 6) == 0      # DATA/OE settle at clock low
-    assert await write(d, 0, 0x3C, 7) == 0      # then CLK high
-    await expect(d, 0, 0x3C, 7)
-    assert (await read(d, 0, 0x40)) == (0, 1)   # sampled data bit, 0x40 valid
-    assert int(d.swclk_io.value) & 1
-    assert d.swdio_io.value.binstr[-1] == "1"
-    assert await write(d, 0, 0x3C, 1) == 2     # cannot change direction high
-    assert await write(d, 0, 0x38, 1) == 2     # driven pads cannot change owner
-    assert await write(d, 0, 0x3C, 6) == 0     # lower CLK without changing data
-    assert await write(d, 0, 0x3C, 0) == 0     # release SWDIO at low CLK
-    await FallingEdge(d.clk)
-    assert (int(d.swclk_io.value) & 1) == 0
+    for site in (0, 1):
+        await expect(d, site, 0, 0x50001 + site)
+        await expect(d, site, 0x38, 0)
+        for offset in (0x3C, 0x40):
+            assert await write(d, site, offset, 7) == 2
+            assert (await read(d, site, offset))[0] == 2
+        assert await write(d, site, 0x14, (3 << 16) | 0x100) == 2
+    for forbidden in (2, 3, 4, 0x100):
+        assert await write(d, 0, 0x38, forbidden) == 2
+        await expect(d, 0, 0x38, 0)
+    assert await write(d, 0, 0x38, 1, strb=1) == 2
     assert await write(d, 0, 0x38, 1) == 0
     await expect(d, 0, 0x38, 1)
-    assert await write(d, 0, 0x3C, 7) == 2    # debug writes now forbidden
-    await expect(d, 1, 0x38, 0)               # Site 2 untouched
-    assert (await read(d, 0, 0x40))[0] == 2   # sample debug-only
-    assert (await read(d, 0, 0x44))[0] == 2   # reserved offset
+    assert await write(d, 0, 0x3C, 7) == 2
+    assert await write(d, 0, 0x40, 7) == 2
+    assert (await read(d, 0, 0x3C))[0] == 2
+    assert (await read(d, 0, 0x40))[0] == 2
+    assert await write(d, 0, 0x28, 1) == 0
+    assert await write(d, 0, 0x38, 0) == 2  # active normal must quiesce
+    assert await write(d, 0, 0x28, 0) == 0
+    assert await write(d, 0, 0x38, 0) == 0
+    assert int(d.swclk_io.value) == 0
+    await expect(d, 1, 0x38, 0)
+    assert (await read(d, 0, 0x44))[0] == 2  # SWJ staging is write-only
     assert (await read(d, 0, 0, address=BASE[1]))[0] == 2
     assert (await read(d, 1, 0, address=BASE[0]))[0] == 2
 
@@ -217,7 +212,7 @@ async def two_independent_normal_engines_and_immutable_responses(d):
         await expect(d, s, 0x24, (1 << 17) | 2)
         meta = (await read(d, s, 0x18))[1]
         assert (meta >> 16) == s + 1 and (meta & 0xF) == 0
-        assert await write(d, s, 0x38, 2) == 2   # response still owned
+        assert await write(d, s, 0x38, 0) == 2   # response still owned
         assert await write(d, s, 0x20, s + 100) == 2  # wrong tagged POP
         assert await write(d, s, 0x20, s + 1) == 0
         await FallingEdge(d.clk)
@@ -231,20 +226,20 @@ async def two_independent_normal_engines_and_immutable_responses(d):
 
 
 @cocotb.test()
-async def debug_site_one_does_not_stop_normal_site_two(d):
+async def parked_site_one_cannot_drive_or_interrupt_normal_site_two(d):
     await start(d)
-    assert await write(d, 0, 0x38, 2) == 0  # debug Site 1
-    assert await write(d, 1, 0x38, 1) == 0  # normal Site 2
+    assert await write(d, 1, 0x38, 1) == 0
     assert await write(d, 1, 0x08, 4) == 0
     assert await write(d, 1, 0x28, 1) == 0
     assert await write(d, 1, 0x14, (9 << 16) | 0x100) == 0
     for _ in range(20):
         await RisingEdge(d.clk)
     assert int(d.g_sites[1].u_site.busy.value)
-    assert await write(d, 0, 0x3C, 1) == 0   # Site 1 debug clock high
-    assert int(d.swclk_io.value) & 1
-    assert await write(d, 0, 0x3C, 0) == 0   # independent debug clock low
-    assert await write(d, 0, 0x38, 0) == 0
+    assert await write(d, 0, 0x38, 2) == 2  # removed debug mode
+    assert await write(d, 0, 0x3C, 1) == 2  # retired GPIO write
+    assert await write(d, 0, 0x40, 1) == 2
+    assert int(d.swclk_io.value) & 1 == 0
+    await expect(d, 0, 0x38, 0)
     assert int(d.g_sites[1].u_site.busy.value), "Site 2 must not be cancelled"
     for _ in range(3500):
         await RisingEdge(d.clk)
@@ -254,7 +249,6 @@ async def debug_site_one_does_not_stop_normal_site_two(d):
         raise AssertionError("Site 2 normal transaction stalled by Site 1")
     code, meta = await read(d, 1, 0x18)
     assert code == 0 and meta >> 16 == 9 and (meta & 0xF) == 0
-    await expect(d, 0, 0x38, 0)
 
 
 @cocotb.test()

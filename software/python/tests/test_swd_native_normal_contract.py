@@ -15,7 +15,7 @@ class FakeSites:
         self.fail = False
         for site, base in SITE_BASES.items():
             self.regs.update({
-                base: 0x40000 | site, base + 0x38: 0,
+                base: 0x50000 | site, base + 0x38: 0,
                 base + 0x04: 0, base + 0x24: 0, base + 0x2C: 0,
             })
 

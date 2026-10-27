@@ -11,7 +11,7 @@ the proposed OpenOCD SWD adapter callbacks `read_reg`, `write_reg`,
 the **single source of register sequencing and command encoding**.
 
 - Caller must already own and verify exact Image/Manifest, exclusive Site
-  lease, ABI v4 identity, qualified voltage and NORMAL mode. The module
+  lease, ABI v5 identity, qualified voltage and NORMAL mode. The module
   neither grants privileges nor opens any device.
 - 16 entries is the bounded host queue, separate from the FPGA's 16-entry
   per-Site command/response FIFO. This prototype executes the queued
@@ -43,7 +43,7 @@ MMIO width and ordering evidence.
 Still blocking: target-specific 32-bit native accessor implementation,
 ARMv7 disassembly (LDR/STR, DMB) and Device mapping attributes; PS7 AXI
 error/interrupt admission; fresh exact-HEAD Vivado Timing/DRC/BIT/HWH;
-actual Z2 HIL; version-qualified OpenOCD Native and Debug adapters.
+actual Z2 HIL; version-qualified OpenOCD Native C adapter.
 
 **Status:** HOST_ONLY_CONTRACT_CANDIDATE, ARMV7_NATIVE_WIDTH_NOT_RUN,
 OPENOCD_NATIVE_C_ADAPTER_NOT_RUN, EXTERNAL_IO_TIMING_BLOCKED,

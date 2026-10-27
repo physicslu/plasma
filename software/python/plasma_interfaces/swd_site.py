@@ -5,8 +5,8 @@ caller must first own a verified Image/Manifest and exclusive Site lease, and
 inject an ARMv7-qualified aligned 32-bit MMIO backend with write barriers.
 Host tests cannot qualify the access width, actual Z2 PS7 bus, pads or DUT.
 
-OpenOCD 0.12.0 remote_bitbang is JTAG-only. This is NOT an OpenOCD adapter,
-and no legacy WordPort/GPIO fallback is present.
+This is NOT an OpenOCD C adapter; no bitbang, Debug Mode, or legacy
+WordPort/GPIO fallback exists. The candidate ABI uses only OFF/NORMAL.
 """
 from __future__ import annotations
 
@@ -106,8 +106,6 @@ class SwdSiteController:
     IRQ_ENABLE = 0x30
     IRQ_PENDING = 0x34
     MODE = 0x38
-    DEBUG_DRIVE = 0x3C
-    DEBUG_SAMPLE = 0x40
     SWJ_WORD0 = 0x44
     SWJ_LENGTH = 0x64
 
@@ -158,7 +156,7 @@ class SwdSiteController:
     def probe(self) -> None:
         """Identity check only, NOT FPGA Image/electrical authorization."""
         with self._lock:
-            if self._read(self.ID) != (0x00040000 | self.site_id):
+            if self._read(self.ID) != (0x00050000 | self.site_id):
                 self.poisoned = True
                 raise SiteAccessError("Incorrect independent SWD Site identity")
 
