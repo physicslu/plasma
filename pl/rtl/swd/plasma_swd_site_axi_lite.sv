@@ -134,7 +134,7 @@ module plasma_swd_site_axi_lite #(
 
     function automatic logic in_window(input logic [31:0] addr);
         in_window = addr[31:12] == SITE_BASE_ADDRESS[31:12] &&
-                    addr[11:8] == 4'd0 && addr[7:6] == 2'b00 &&
+                    addr[11:8] == 4'd0 && addr[7:6] <= 2'b01 &&
                     addr[1:0] == 2'b00;
     endfunction
 
@@ -217,7 +217,14 @@ module plasma_swd_site_axi_lite #(
                             mode_q <= data_w[1:0]; s_axi_bresp <= OKAY;
                         end
                         8'h3C: if (mode_q == MODE_DEBUG &&
-                                   data_w[31:3] == 0) begin
+                                   data_w[31:3] == 0 &&
+                                   // SWDIO data/OE may only change while
+                                   // SWCLK is low both before and after
+                                   // the MMIO write, avoiding simultaneous
+                                   // rising-clock/data-direction updates.
+                                   ((!debug_clk_q && !data_w[0]) ||
+                                    data_w[2:1] ==
+                                        {debug_oe_q,debug_out_q})) begin
                             debug_clk_q <= data_w[0];
                             debug_out_q <= data_w[1];
                             debug_oe_q <= data_w[2];
