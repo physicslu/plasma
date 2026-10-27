@@ -169,16 +169,25 @@ class Contracts(unittest.TestCase):
                 'user':{'login':'physicslu'},
                 'head':{'sha':SHA,'ref':'agent/change','repo':{'full_name':d.REPO}},
                 'base':{'ref':'main','repo':{'full_name':d.REPO}}}
-        with patch.object(d.subprocess, 'run', return_value=Mock(stdout=json.dumps(good).encode())):
+        with patch.object(d, 'urlopen') as opener:
+            opener.return_value.__enter__.return_value.status = 200
+            opener.return_value.__enter__.return_value.read.return_value = json.dumps(good).encode()
             self.assertEqual(d.live_pr_metadata(req), good)
+            args, kwargs = opener.call_args
+            self.assertEqual(args[0].full_url,
+                             'https://api.github.com/repos/physicslu/plasma/pulls/123')
+            self.assertEqual(kwargs['timeout'], 15)
+            self.assertNotIn('authorization', {k.lower() for k in args[0].headers})
         for section, key, value in [('head','sha','b'*40), ('user','login','other'),
                                      ('base','ref','dev'), ('head','repo',{'full_name':'fork/repo'})]:
             bad = copy.deepcopy(good); bad[section][key] = value
-            with patch.object(d.subprocess, 'run', return_value=Mock(stdout=json.dumps(bad).encode())):
+            with patch.object(d, 'urlopen') as opener:
+                opener.return_value.__enter__.return_value.status = 200
+                opener.return_value.__enter__.return_value.read.return_value = json.dumps(bad).encode()
                 with self.assertRaises(d.Denied): d.live_pr_metadata(req)
-        with patch.object(d.subprocess, 'run') as call:
+        with patch.object(d, 'urlopen') as opener:
             self.assertIsNone(d.live_pr_metadata({'pr_number':0}))
-            call.assert_not_called()
+            opener.assert_not_called()
 
     def test_separate_recovery_adapter_has_no_implicit_download_restore(self):
         # Legacy protected transport is independently testable but no longer
