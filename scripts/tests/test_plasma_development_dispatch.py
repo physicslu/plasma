@@ -496,7 +496,7 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             from io import StringIO
             from contextlib import redirect_stdout
             with patch.dict(os.environ,env):
-                with patch.object(dev,"live_pr_metadata", return_value=None), patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock:
+                with patch.object(dev,"live_pr_metadata", return_value=None), patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock, patch.object(dev.os,"geteuid",return_value=1000):
                     with redirect_stdout(StringIO()) as out:
                         self.assertEqual(self._call_main(args),0)
                     self.assertEqual(json.loads(out.getvalue())["pinned_sha"],"b"*40)
@@ -642,7 +642,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
             self.assertIn("--json",calls[0][0])
-            self.assertEqual(calls[0][0], ["codex", "exec", "--json", "-"])
+            self.assertEqual(calls[0][0], ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
             self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
             self.assertIsNone(receipt["codex_usage"]["input_tokens"])
@@ -742,7 +742,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertIsNone(audit["repo_root_agents_bytes"])
         self.assertEqual(audit["actual_instruction_load_status"], "NOT_VERIFIED")
         argv = seen[0][0]
-        self.assertEqual(argv, ["codex", "exec", "--json", "-"])
+        self.assertEqual(argv, ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
 
     def test_jsonl_usage_receipt_and_secret_redaction(self):
         secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"
@@ -1032,7 +1032,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
-        job=wf.split("  development-codex:",1)[1].split("\n  development-codex-resume:",1)[0]
+        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
         self.assertIn("Collect Path 3 evidence even when Codex",job)
         self.assertIn("if: always()",job)
         self.assertIn("git -C candidate diff --binary HEAD",job)
@@ -1047,7 +1047,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
     def test_path3_publisher_is_pr_pinned_and_keeps_token_out_of_codex(self):
         workflow = WORKFLOW.read_text()
         job = workflow.split("  development-codex:", 1)[1].split(
-            "\n  development-codex-resume:", 1)[0]
+            "\n  authorize:", 1)[0]
         self.assertIn("contents: write  # trusted publisher", job)
         self.assertIn("Publish successful Path 3 edits to the exact authorized PR", job)
         self.assertIn("git -C candidate diff --cached --check", job)
@@ -1101,7 +1101,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertIn("module host_fixture",rtl.read_text())
             args,kwargs=calls[0]
             self.assertEqual(kwargs["timeout"],None)
-            self.assertEqual(args, ["codex", "exec", "--json", "-"])
+            self.assertEqual(args, ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
         workflow=WORKFLOW.read_text()
         codex_job=workflow.split("  development-codex:",1)[1]
         self.assertIn("timeout-minutes: 360",codex_job)
@@ -1224,7 +1224,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         self.assertIn("needs.development-claim.result == 'success'",guard)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
         self.assertIn("== 'vivado-host-build' && 50 ||",wf)
-        self.assertIn("== 'vivado-host-build' && 50 || 5",wf)
+        self.assertIn("== 'operator-cli' && 35 || 5",wf)
         self.assertNotIn("runs-on: [self-hosted, linux, x64, vivado]",wf)
 
     def test_host_build_source_preflight_is_pure_and_strict(self):
@@ -1626,6 +1626,92 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["objective"], order["objective"])
             self.assertEqual(task["acceptance"], order["acceptance"])
 
+
+    def test_path3_owner_hardware_no_sandbox_is_one_invocation(self):
+        """Host-only stub; no Codex process, USB, Z2, FPGA or DUT."""
+        ordinary = self._order("path3-codex")
+        order = self._order("path3-codex",
+                            codex_execution="guarded-hardware-no-sandbox")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approved = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(approved["execution_capability"], "codex-workspace")
+        self.assertEqual(task["codex_execution"],
+                         "guarded-hardware-no-sandbox")
+        ordinary_event = self._event(ordinary)
+        ordinary_req = dev.request(ordinary_event, self._context())
+        self.assertNotIn("codex_execution", dev.task_for_request(
+            self.registry, ordinary_req, ordinary_event))
+        self.assertNotEqual(req["work_order_sha256"],
+                            dev.work_order_digest(ordinary))
+        commands = []
+
+        def stub(argv, **kw):
+            commands.append(argv)
+            (Path(kw["cwd"]) / ".plasma-path3-evidence" /
+             "engineering-report.md").write_text(
+                "Offline stub; no physical execution.\n", encoding="utf-8")
+            return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+        with tempfile.TemporaryDirectory() as td:
+            receipt = dev.run_codex_task(
+                task, workspace=Path(td), executor=stub,
+                task_id="path3-work-order")
+        self.assertEqual(commands, [[
+            "codex", "exec", "--json", "--sandbox", "danger-full-access", "-"]])
+        self.assertEqual(receipt["codex_sandbox_request"], "danger-full-access")
+        self.assertTrue(receipt["evidence_complete"])
+        self.assertEqual(receipt["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+
+    def test_path3_non_sandbox_admission_fail_closed(self):
+        approved = self._order("path3-codex",
+                               codex_execution="guarded-hardware-no-sandbox")
+        for value in ("danger-full-access", "unsandboxed", "host-only",
+                      None, False, True, [], {}, 1):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                    dev.Denied, "WORK_ORDER_PATH3_FIELDS_DENIED"):
+                dev.request(self._event(approved | {"codex_execution": value}),
+                            self._context())
+        for order in (
+            self._order("path2-cli",
+                        codex_execution="guarded-hardware-no-sandbox"),
+            self._order("path3-codex", scope="guarded-hardware",
+                        codex_execution="guarded-hardware-no-sandbox"),
+            self._order("path3-codex",
+                        session_resume="page-boundary-off-by-one",
+                        scope="host-only", pr_number=123,
+                        source_sha="b" * 40,
+                        codex_execution="guarded-hardware-no-sandbox"),
+        ):
+            with self.subTest(order=order), self.assertRaises(dev.Denied):
+                dev.request(self._event(order), self._context())
+        forged = self._event(approved)
+        forged["sender"]["login"] = "not-owner"
+        with self.assertRaisesRegex(dev.Denied, "EVENT_OWNER_DENIED"):
+            dev.request(forged, self._context())
+        event = self._event(approved)
+        req = dev.request(event, self._context())
+        tampered = self._event(approved | {
+            "objective": "Changed after Work Order Digest pin; no launch."})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, tampered)
+        task = dev.task_for_request(self.registry, req, event)
+        for altered, task_id in (
+            (task, None),
+            (task, "nine-nine-path3"),
+            (task | {"capability": "other"}, "path3-work-order"),
+            (task | {"work_order_sha256": "invalid"}, "path3-work-order"),
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                with self.subTest(task_id=task_id, altered=altered):
+                    with self.assertRaisesRegex(
+                            dev.Denied, "CODEX_NON_SANDBOX_ADMISSION_DENIED"):
+                        dev.run_codex_task(
+                            altered, workspace=Path(td),
+                            executor=lambda *_a, **_kw: self.fail("Codex launched"),
+                            task_id=task_id)
+
     def test_dynamic_vivado_host_build_uses_existing_exact_engine(self):
         import plasma_vivado_host_build as build
         fixed = dev.task_by_id(self.registry, "z2-path2-build")
@@ -1819,17 +1905,55 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(observed["timeout"], 180)
             self.assertEqual(receipt["verification"], "exit-code")
 
-    def test_path2_cpu_sandbox_does_not_wrap_authorized_root_route(self):
-        # This mock verifies route isolation without touching any hardware.
-        with patch("plasma_path2_runtime_integration.direct_root_operation",
-                   return_value={"status": "MOCK_ONLY"}) as protected:
-            result = dev.run_task(
-                {"capability": "z2-root-operation", "operation": "download"},
-                approval={"execution_capability": "z2-root-operation"},
-                sandbox=True,
-            )
-        self.assertEqual(result["status"], "MOCK_ONLY")
-        protected.assert_called_once()
+    def test_cpu_only_accepts_nested_reviewed_scripts_without_device_access(self):
+        order = self._order("path2-cli",
+                            script="scripts/tools/offline_probe.py",
+                            verification="exit-code")
+        order.pop("expected_stdout_sha256")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["script"], "scripts/tools/offline_probe.py")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / task["script"]
+            source.parent.mkdir(parents=True)
+            source.write_text("print('safe')\\n", encoding="utf-8")
+            observed = {}
+            def stub(command, **kwargs):
+                observed["argv"] = command
+                return subprocess.CompletedProcess(command, 0, b"safe\\n", b"")
+            with patch.object(dev.shutil, "which", return_value=sys.executable):
+                result = dev.run_task(task, workspace=root, sandbox=True,
+                                      executor=stub)
+            self.assertEqual(result["status"], "PASS")
+            self.assertIn("--unshare-all", observed["argv"])
+            self.assertIn("--ro-bind", observed["argv"])
+            self.assertIn("--clearenv", observed["argv"])
+            self.assertIn("scripts/tools/offline_probe.py",
+                          " ".join(observed["argv"]))
+        for script in (
+            "scripts/../offline.py", "scripts/.private/run.py",
+            "scripts/tools/../offline.py", "/tmp/offline.py",
+            "pl/hil/one_shot.py", "scripts/tools/probe.sh",
+            "scripts/tools//probe.py", "scripts/tools/hidden.name.py",
+        ):
+            with self.subTest(script=script), self.assertRaisesRegex(
+                    dev.Denied, "SCRIPT_PATH_DENIED"):
+                dev.request(self._event(order | {"script": script}),
+                            self._context())
+
+    def test_retired_root_route_never_reaches_transport(self):
+        # Old fixed operation is not an authorized Path 2 Work Order.
+        with patch("plasma_path2_runtime_integration.direct_root_operation") as protected:
+            with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_ROOT_OPERATION"):
+                dev.run_task(
+                    {"capability": "z2-root-operation", "operation": "download"},
+                    approval={"execution_capability": "z2-root-operation"},
+                    sandbox=True,
+                )
+        protected.assert_not_called()
 
     def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):
         base = self._order("path2-cli")
@@ -1948,6 +2072,15 @@ class GenericWorkOrderContracts(unittest.TestCase):
             dev.authorize(
                 self._event(order), self._context(),
                 self.registry)["monitor_summary"], order["monitor_summary"])
+
+    def test_path3_monitor_summary_allows_benign_comma_without_commands(self):
+        # Run 40468107474 was rejected solely by the former punctuation
+        # whitelist, before an otherwise authorized Path 3 job could start.
+        summary = "LA2016 CH3 confirmed, 10ms passive capture"
+        event = self._event(self._order(monitor_summary=summary))
+        self.assertEqual(
+            dev.authorize(event, self._context(), self.registry)["monitor_summary"],
+            summary)
 
     def test_path2_public_goal_and_safe_stage_from_authorized_contract(self):
         summary = "PATH2 Host-only CLI regression"
@@ -2081,13 +2214,37 @@ class GenericWorkOrderContracts(unittest.TestCase):
     def test_existing_workflow_and_two_runner_routes(self):
         content = WORKFLOW.read_text()
         self.assertIn("'/plasma-dispatch work-order 981'", content)
-        self.assertIn('"z2-root-operation"', content)
+        self.assertNotIn('"z2-root-operation"', content)
+        self.assertIn('"operator-cli"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
+
+    def test_path3_has_single_generic_runner_and_no_special_probe_adapter(self):
+        workflow = WORKFLOW.read_text()
+        dispatcher = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
+        self.assertIn("  development-codex:", workflow)
+        self.assertNotIn("  development-codex-resume:", workflow)
+        self.assertNotIn("SESSION_RESUME", workflow)
+        self.assertNotIn("--resume-phase", workflow)
+        self.assertNotIn("session_resume", dispatcher)
+        self.assertNotIn("plasma_path3_cross_job_resume", dispatcher)
+        self.assertNotIn("hardware_stages", dispatcher)
+        self.assertNotIn("agent-request.json", dispatcher)
+        self.assertNotIn("plasma_development_stage_transport", dispatcher)
+        # Legacy and arbitrary fixed adapter/probe routes are denied on the
+        # live Owner/SHA Work Order path, regardless of device model.
+        for name, value in (("session_resume", "page-boundary-off-by-one"),
+                            ("hardware_stages", ["read"]),
+                            ("profile", "la2016"),
+                            ("adapter", "z2-ssh"),
+                            ("probe", "preflight")):
+            with self.subTest(name=name), self.assertRaises(dev.Denied):
+                dev.request(self._event(self._order("path3-codex", **{name: value})),
+                            self._context())
 
     def test_path3_invokes_once_and_records_result(self):
         order = self._order()
@@ -2114,7 +2271,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(len(calls), 1)
             self.assertEqual(captured_commands[0],
-                             ["codex", "exec", "--json", "-"])
+                             ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
 
 
 class Path3SessionResumeHostOnlyProbe(unittest.TestCase):

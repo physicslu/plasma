@@ -1,3 +1,5 @@
+# RETIRED: historical Tcl retained for offline code/tests only.
+error "RETIRED_Z2_SWD03_AXI: retired FPGA image build entrypoint"
 # Isolated Z2 host-only SWD-03 AXI4-Lite + internal DPIDR test fixture.
 # Never modifies the retained z2-control-waveform baseline project.
 set script_dir [file dirname [file normalize [info script]]]

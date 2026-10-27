@@ -38,19 +38,15 @@ class BlockingPolicy(unittest.TestCase):
                 dispatch.run_task(CPU.task, executor=lambda *a, **k:
                                   subprocess.CompletedProcess(a[0], 7, expected, b''))
 
-    def test_direct_root_does_not_admit_stage_or_implicit_sequences(self):
+    def test_retired_root_route_cannot_authorize_any_fixed_operation(self):
         from test_plasma_path2_root_direct import make_event, context
-        for change in ({"stage": "download"}, {"profile_id": "f1b-site1-v1"},
-                       {"operation": "full"}, {"operation": "build"},
-                       {"project": "pl/projects/z2-fixed-unified-site1"}):
-            with self.subTest(change=change), self.assertRaises(dispatch.Denied):
-                dispatch.request(make_event(**change), context())
-        order = make_event("download")
         registry = dispatch.parse_json(dispatch.MANIFEST)
-        approval = dispatch.authorize(order, context(), registry)
-        self.assertEqual(approval["authorized_operation"], "download")
-        self.assertFalse(approval["auto_download_after_build_success"])
-        self.assertFalse(approval["auto_test_after_download_success"])
+        for operation in ("download", "test", "restore", "full", "build"):
+            with self.subTest(operation=operation):
+                event = make_event(operation)
+                with self.assertRaisesRegex(
+                        dispatch.Denied, "WORK_ORDER_CAPABILITY_DENIED"):
+                    dispatch.authorize(event, context(), registry)
 
     def test_both_paths_can_reauthorize_same_host_order_but_not_tamper(self):
         fixtures.GenericWorkOrderContracts.setUpClass()
@@ -89,7 +85,7 @@ class BlockingPolicy(unittest.TestCase):
                 'contains': lambda items, item: item in items,
                 'fromJSON': json.loads,
             })
-        for capability in ('cpu-only', 'vivado-host-build', 'z2-root-operation'):
+        for capability in ('cpu-only', 'vivado-host-build', 'operator-cli'):
             self.assertTrue(admitted('path2-cli', capability))
             self.assertTrue(admitted('path2-cli', capability, **{
                 'needs.development-claim.result': 'failure'}))
@@ -100,6 +96,7 @@ class BlockingPolicy(unittest.TestCase):
             'needs.development-codex.result': 'success'}))
         self.assertFalse(admitted('path2-cli', 'z2-cpu-only'))
         self.assertFalse(admitted('path2-cli', 'arbitrary-shell'))
+        self.assertFalse(admitted('path2-cli', 'z2-root-operation'))
 
 
 class NativePreflightWorkOrder(unittest.TestCase):

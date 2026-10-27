@@ -98,10 +98,11 @@ class RouteContracts(unittest.TestCase):
         wf = WORKFLOW.read_text()
         self.assertIn("github.event_name == 'pull_request' || github.event_name == 'push'", wf)
         self.assertIn("runs-on: ubuntu-24.04", wf)
-        self.assertIn("z2-root-operation", wf)
+        self.assertNotIn('"z2-root-operation"', wf)
+        self.assertIn('"operator-cli"', wf)
         self.assertIn("github.run_attempt == 1", wf)
         self.assertIn("scripts/tests/test_plasma_path2_runtime_integration.py", wf)
-        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
 
 
     def evidence(self, td):

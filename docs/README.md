@@ -11,6 +11,11 @@
 | **Plan** | 尚未全部實作的核准方向；不能宣稱為現有能力。 |
 | **Historical** | 僅供遷移背景；不是相容性或執行契約。 |
 
+## Current external SWD PoC vs retired internal fixtures
+
+- **Current** — Z2 PS-local OpenOCD + WordPort/RemoteBitbang + paired PL SWD Image for Blue Pill: see root `AGENTS.md`, [PS OpenOCD architecture](architecture/ic-support-openocd-plan-executor.md), [retirement map](development/swd-legacy-path-retirement.md).
+- **Historical / retired for real Blue Pill:** `z2-swd-gpio` PS EMIO GPIO and `z2-swd03-axi` internal synthetic DPIDR. SWD-04/05 archived fixtures are not current external target operations.
+
 ## Architecture Decision Records
 
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
@@ -188,6 +193,7 @@
 - **Reference / Operator-observed / HARDWARE NO-GO** — [2026-10-15 PYNQ-Z2 HIL Hardware Inventory](development/hil-hardware-inventory.md)：記錄 Transcend Hub Port 2／3／4、Z2 JTAG／UART 與 5V 供電主張、AX88179、KINGST LA2016、PL 執行環境及復原驗收缺口；不含操作端識別資料，也不取代即時安全預檢。
 - **Observed / LA-only functional PASS** — [2026-10-16 KINGST PWM1 → CH0 Loopback Evidence](evidence/la2016-pwm-loopback/2026-10-16/README.md)：保存 1 kHz／50% 與 2 kHz／25% 實測波形、OFF 對照、SHA256 與離線重算工具；不代表 Z2 或類比電壓驗收。
 - **Observed / ST-LINK SWD reference** — [2026-10-23 STM32F103 Blue Pill Golden Reference](evidence/stlink-stm32f103-swd-reference/2026-10-23/README.md)：保存三輪 ST-LINK Flash／讀回、六份 LA2016 原始 SWD 波形與離線驗證；CDC 首次 ID 與 SWCLK 時序差異仍未結案，不代表 Z2 燒錄能力。
+- **Observed / Z2 DPIDR FAIL** — [2026-10-26 Z2 PS OpenOCD + LA2016 Blue Pill Evidence](evidence/bluepill-z2-dpidr-la2016-2026-10-26/README.md)：保存已載入 FPGA 映像的 Identity PASS、兩份原始 LA2016 波形、PS-local Bridge／OpenOCD 失敗收據與測後狀態；第二次擷取的 CH0／SWCLK 全程無邊緣，根因未定。
 - **Reference / Operator-observed Tool Runbook** — [ST-LINK SWD 工具操作手冊](development/stlink-swd-tool-operations.md)：整理已驗證的 st-info/st-flash 操作、ST-LINK 排他接線、VTref、Flash Write + 獨立 Readback／SHA256，以及 Reset/NRST 未驗證限制；文件本身不授權實機操作。
 - **Current / Path 3 direct tools** — [Path 3 Codex 直接操作 LA2016／Z2 PS](development/plasma-path3-direct-hardware-tools.md)：不透過固定 JSON Host Supervisor，沿用 sigrok CLI、既有 SSH、Z2 PS OpenOCD／WordPort，保留實體互斥、電氣、Manifest 與 Root Guard。原 Issue #981 LA-only workflow 已退役；本次無實機執行。
 - **Reference / Operator-observed Tool Runbook** — [KINGST LA2016 工具操作手冊](development/la2016-tool-operations.md)：實測 sigrok AppImage 與 firmware resource 初始化、被動 SWD 抓波形、成功 Golden Reference、PWM1→CH0 Loopback、PWM OFF 波形驗證；區分歷史成功與當次裝置狀態。

@@ -1,0 +1,96 @@
+{
+  "schema": "plasma.bluepill.z2.dpidr.la2016.execution.v1",
+  "observed_at": "2026-10-26",
+  "repository_head": "0c11e3420272bed09e778182e9d6422c115f75d0",
+  "execution_route": "direct Codex on SWPC; no Path 2 or Path 3 Dispatcher",
+  "board_boot_id": "4cefdc0c-f586-4d19-b126-1d8e1108c8f1",
+  "protected_root_source_pin": "55f6db3bc5fa866135e5a9070175928d044e53ce",
+  "image_before_test": {
+    "result": "ALREADY_LOADED",
+    "checkpoint_status": "IMAGE",
+    "firmware_name": "plasma-bluepill-swd-65dca783.bin",
+    "firmware_sha256": "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1",
+    "manifest_sha256": "5f5fa580e9b437ce3a9377313bdfb4fc6012031270e1544c12034ccf3ca0fb98",
+    "golden_base_bin_sha256": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+    "manager_state": "operating",
+    "manager_last_load": "fpga_manager fpga0: writing plasma-bluepill-swd-65dca783.bin to Xilinx Zynq FPGA Manager",
+    "new_download_this_session": false
+  },
+  "protected_identity": {
+    "first_exit": 2,
+    "first_error": "PATH2_UNPINNED_BYTECODE_DENIED",
+    "preexisting_python_310_bytecode_quarantined": 3,
+    "quarantine_path": "/root/plasma-path2-bytecode-quarantine-20261026",
+    "second_exit": 0,
+    "second_receipt": {
+      "auto_restore": false,
+      "boot_id": "4cefdc0c-f586-4d19-b126-1d8e1108c8f1",
+      "lease_id": "fpga-bba6ef6827374286a54b13b7623229cd",
+      "project": "pl/projects/z2-fixed-unified-site1",
+      "read32_count": 3,
+      "result": "IDENTITY_PASS",
+      "stage": "test",
+      "test_count": 3,
+      "write32_count": 0
+    }
+  },
+  "ps_bridge": {
+    "bundle_sha256": "87ff32c79360d57bc9abd7c9ecaf67a68be3cc6b7464cadfb43db589b8c9a8ff",
+    "installed_under": "/opt/plasma/bluepill-direct-20261026",
+    "native_barrier_sha256": "260d17d87e2edc5a6c97757b47a6ede78fa024d9ac19fbb9020ac257600a6555",
+    "armv7_dmb_disassembly_count": 1,
+    "modules_imported": true
+  },
+  "openocd": {
+    "ps_binary_version": "0.12.0+dev-02767-g5088db4c9",
+    "remote_bitbang_swd_parse_exit": 0,
+    "live_process_location": "Z2 PS",
+    "remote_bitbang_socket_location": "Z2 PS local UNIX socket",
+    "target_operation": "DPIDR only; no Flash erase, program or readback"
+  },
+  "la2016": {
+    "unique_usb_device": true,
+    "appimage_sha256": "b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475",
+    "firmware_present": true,
+    "driver_show_exit": 0,
+    "mode": "passive CH0/CH1/CH2 capture; no PWM output"
+  },
+  "capture_01": {
+    "receipt": "capture-01-sanitized.json",
+    "waveform": "capture-01.sr",
+    "la_result": "PASS",
+    "z2_swd_result": "NOT_RUN",
+    "reason": "Local expected BIN digest was mistyped; IMAGE_CHANGED assertion before Bridge startup"
+  },
+  "capture_02": {
+    "receipt": "capture-02-sanitized.json",
+    "waveform": "capture-02.sr",
+    "la_result": "PASS",
+    "z2_swd_result": "FAIL",
+    "openocd_exit": 1,
+    "openocd_error": "Error connecting DP: cannot read IDR",
+    "bridge_exit": 0,
+    "bridge_wire_bytes": 3415,
+    "bridge_read32": 231,
+    "bridge_write32": 3141,
+    "dpidr_value_observed": null,
+    "socket_left": false
+  },
+  "postrun": {
+    "receipt": "postrun-preflight.json",
+    "same_boot_id": true,
+    "manager_state": "operating",
+    "checkpoint_status": "IMAGE",
+    "candidate_and_golden_sha256_unchanged": true,
+    "dev_mem_busy": false,
+    "dev_uio1_busy": false,
+    "la2016_usb_busy": false,
+    "restored_golden": false,
+    "image_kept_loaded": true
+  },
+  "limitations": [
+    "Identity Root receipt was observed in the direct session; a separate raw receipt file was not generated at execution time.",
+    "LA CH2 was digital HIGH at the instrument threshold; no analog voltage measurement was captured.",
+    "The first absent SWCLK edge is measured at LA CH0; the underlying root cause is unresolved."
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "bundle_members": {
+    "scripts/bluepill-wordport-session.py": "cae723fc1027ef9a43f106aed70134ef0638dce78d9e56977c8b8e233712f0b9",
+    "software/python/native/armv7_mmio_barrier.c": "6e44d47990d9bc4f8d27c954cd2342ab82c4c35e48913f68f94b4329c4266fe0",
+    "software/python/plasma_interfaces/__init__.py": "7f8c3452a28080ecaf11b3ab5712d3eef041c54b2098c374c16860e59209c24d",
+    "software/python/plasma_interfaces/bluepill_remote_bitbang.py": "3870c6c74779d57a14c6e09769e3bad8e669a55ef2bd2b261227df1178128ef5",
+    "software/python/plasma_interfaces/bluepill_z2_word_port.py": "a40a474c1ed0f8d1797ced09bbe408364bbc21664722ff508eb312f92bd4d7c0",
+    "software/python/plasma_interfaces/fixed_abi_mmio_port.py": "0f6b819377a99b773838371d32e9dc47bb033dc4f1f7ba39ba062904f4a452c1",
+    "software/python/plasma_interfaces/linux_mmio.py": "0c9275e171bb83aa084802046ebca07495eba90d9815789ec95b2e26f66c6582"
+  },
+  "execution_scripts": {
+    "bytecode_inventory.py": {
+      "original_sha256": "bdd7da374a52e58c4f0f0346aa01a4f7f3c6cd7fb2cb253a9eb732b4a0928880",
+      "published_sha256": "bdd7da374a52e58c4f0f0346aa01a4f7f3c6cd7fb2cb253a9eb732b4a0928880",
+      "redaction": "none"
+    },
+    "capture_dpidr.py": {
+      "original_sha256": "82e914d91f943b6abbbb847845ea5a6d9527f05c47cabe461b8dd52ee6766857",
+      "published_sha256": "a24a8c0ced61bab2aaa07881fbf2bee1a9d955dd33d0b99e2671b8f4ace63807",
+      "redaction": "operator home path replaced by <SWPC_HOME>"
+    },
+    "identity_test.py": {
+      "original_sha256": "24efaf5e0f64b4eab6124f542b68804a6df5afbd735418cded4a37fac319f9d9",
+      "published_sha256": "24efaf5e0f64b4eab6124f542b68804a6df5afbd735418cded4a37fac319f9d9",
+      "redaction": "none"
+    },
+    "install_bridge.py": {
+      "original_sha256": "5196fe70acf11fc68faf3cacba76fce9d203ad7ad54f56e2c9ea921739b9a696",
+      "published_sha256": "5196fe70acf11fc68faf3cacba76fce9d203ad7ad54f56e2c9ea921739b9a696",
+      "redaction": "none"
+    },
+    "la_preflight.py": {
+      "original_sha256": "af0e1601960f0a26a5e26937fb593da3e05c0221d40535f9c85f73169f5858db",
+      "published_sha256": "fd5b3ba08b178c48cfb0c7f33c31abbd0848885e73f524b746afecca4003d23b",
+      "redaction": "operator home path replaced by <SWPC_HOME>"
+    },
+    "make_bundle.py": {
+      "original_sha256": "c4e4f9987f33a7fcd4e2d1a58131fc751f0f5a1ace7941661f37e0097b40169f",
+      "published_sha256": "c4e4f9987f33a7fcd4e2d1a58131fc751f0f5a1ace7941661f37e0097b40169f",
+      "redaction": "none"
+    },
+    "openocd_parse.py": {
+      "original_sha256": "b1f7faf05dbf73f4c913fba885ab2d998c61dd55b80dfad9f3b8317ca5542aa5",
+      "published_sha256": "b1f7faf05dbf73f4c913fba885ab2d998c61dd55b80dfad9f3b8317ca5542aa5",
+      "redaction": "none"
+    },
+    "preflight.py": {
+      "original_sha256": "bc972fbf740c00b582e40840a95bda761a9722cdc63221cc03d6dcff89951f6b",
+      "published_sha256": "bc972fbf740c00b582e40840a95bda761a9722cdc63221cc03d6dcff89951f6b",
+      "redaction": "none"
+    },
+    "quarantine_bytecode.py": {
+      "original_sha256": "8ab613f2433d99c8a8b4216b9c5f78575d8dca8e89a956962bf051a70a3b018a",
+      "published_sha256": "8ab613f2433d99c8a8b4216b9c5f78575d8dca8e89a956962bf051a70a3b018a",
+      "redaction": "none"
+    },
+    "remote.py": {
+      "original_sha256": "c5466d3fcedf6575c4dadaa717161f11364942bfebc391b762b9fab3d70a4e5e",
+      "published_sha256": "c5466d3fcedf6575c4dadaa717161f11364942bfebc391b762b9fab3d70a4e5e",
+      "redaction": "none"
+    },
+    "run_dpidr.py": {
+      "original_sha256": "913bdaaefe8806c25ee6e61efc5ef26b08e41f8cf6cf1593ffc25ef6ebd68497",
+      "published_sha256": "913bdaaefe8806c25ee6e61efc5ef26b08e41f8cf6cf1593ffc25ef6ebd68497",
+      "redaction": "none"
+    },
+    "runtime_inventory.py": {
+      "original_sha256": "2fb595febb784a45085e55e24d45b25f4702aae3e46f8b5cc98d6608f9fa281a",
+      "published_sha256": "2fb595febb784a45085e55e24d45b25f4702aae3e46f8b5cc98d6608f9fa281a",
+      "redaction": "none"
+    },
+    "send_bundle.py": {
+      "original_sha256": "dd70ff7cf7be66c70f3702bca68c01cb22213fe02c59b66d4b737b9ce2df9a00",
+      "published_sha256": "dd70ff7cf7be66c70f3702bca68c01cb22213fe02c59b66d4b737b9ce2df9a00",
+      "redaction": "none"
+    },
+    "tool_capabilities.py": {
+      "original_sha256": "23f1a45885065bb59a376f79499fb6988612cfe43d47df5f0132a5aa0c25cc96",
+      "published_sha256": "23f1a45885065bb59a376f79499fb6988612cfe43d47df5f0132a5aa0c25cc96",
+      "redaction": "none"
+    }
+  },
+  "execution_scripts_archive_sha256": "8ea5cf5f04e0dd1e7f182788dd318dcccb04ea41530dd44e07b57d1e3dddb7f2",
+  "original_files": {
+    "bridge-bundle.tar": {
+      "bytes": 51200,
+      "sha256": "87ff32c79360d57bc9abd7c9ecaf67a68be3cc6b7464cadfb43db589b8c9a8ff",
+      "source_file": "bridge-bundle.tar"
+    },
+    "capture-01.sr": {
+      "bytes": 99955,
+      "sha256": "d477bcb119e14971eed3a94d611e441347c808c935b405ed372c35d48a64c57f",
+      "source_file": "bluepill-z2-dpidr.sr"
+    },
+    "capture-02.sr": {
+      "bytes": 99955,
+      "sha256": "8e5f55b45b9abb71580563792b36f8fa9e57faf1328c9eaedb95660adaa98d0b",
+      "source_file": "bluepill-z2-dpidr-02.sr"
+    }
+  },
+  "postrun_source_sha256": "f2bb8c63f1fdb27535ba6d264413fb21d4348f4d53ea165052c98bec2fb9db0a",
+  "redacted_reports": {
+    "capture-01-sanitized.json": {
+      "published_sha256": "5b7626fdb8b1b52e385953b29bc95f131cf0163ad006cad92dafacfed796dc54",
+      "source_file": "capture-report.json",
+      "source_sha256": "0f380fa6ad326dd1d382e20dad67306a3d15c51b42d26dbacc944e0bc9baf6c2",
+      "transformation": "Dynamic LA2016 USB bus/device address redacted"
+    },
+    "capture-02-sanitized.json": {
+      "published_sha256": "ff07992ac4b192fac8bfa26a28c25cdc7bb9c986e7290ddd45a595c0d419afdf",
+      "source_file": "capture-report-02.json",
+      "source_sha256": "77ec979ced848d8b3d5a5babb72759ff2ee3415b9da5a8158a3b266c21ba7306",
+      "transformation": "Dynamic LA2016 USB bus/device address redacted"
+    }
+  }
+}
