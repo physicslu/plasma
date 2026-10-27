@@ -136,12 +136,16 @@ async def independent_mode_admission_and_bitbang_pads(d):
     await expect(d, 0, 0x38, 2)
     assert await write(d, 0, 0x14, (4 << 16) | 0x100) == 2
     assert await write(d, 0, 0x3C, 8) == 2      # unknown debug bits
-    assert await write(d, 0, 0x3C, 7) == 0      # CLK=1, DATA=1, OE=1
+    assert await write(d, 0, 0x3C, 6) == 0      # DATA/OE settle at clock low
+    assert await write(d, 0, 0x3C, 7) == 0      # then CLK high
     await expect(d, 0, 0x3C, 7)
+    assert (await read(d, 0, 0x40)) == (0, 1)   # sampled data bit, 0x40 valid
     assert int(d.swclk_io.value) & 1
     assert d.swdio_io.value.binstr[-1] == "1"
+    assert await write(d, 0, 0x3C, 1) == 2     # cannot change direction high
     assert await write(d, 0, 0x38, 1) == 2     # driven pads cannot change owner
-    assert await write(d, 0, 0x3C, 0) == 0     # outputs quiesce first
+    assert await write(d, 0, 0x3C, 6) == 0     # lower CLK without changing data
+    assert await write(d, 0, 0x3C, 0) == 0     # release SWDIO at low CLK
     await FallingEdge(d.clk)
     assert (int(d.swclk_io.value) & 1) == 0
     assert await write(d, 0, 0x38, 1) == 0
