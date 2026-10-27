@@ -54,7 +54,7 @@ EXPECTED_REGISTERS = (
 def validate(obj: dict) -> dict:
     need(isinstance(obj, dict), "MANIFEST_OBJECT_REQUIRED")
     need(obj.get("schema") == "plasma.mpe.architecture.v1", "SCHEMA_MISMATCH")
-    need(obj.get("status") == "ARCHITECTURE_ONLY_NOT_IMPLEMENTED",
+    need(obj.get("status") == "RTL_SLICE_SOURCE_ONLY_UNVERIFIED",
          "FALSE_IMPLEMENTATION_CLAIM")
     need(obj.get("image_family") == "plasma.mpe.swd.v1", "FAMILY_MISMATCH")
     need(obj.get("board") == "pynq-z2" and
