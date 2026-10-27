@@ -6,7 +6,20 @@ This does NOT validate the eventual Vivado AXI Interconnect/HWH or PS ARMv7.
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge, Timer
-from plasma_interfaces.swd_site import encode_swj
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+import sys
+
+# Load the exact production codec module without importing the unrelated
+# plasma_interfaces package initializer (which needs full PPU/PyYAML deps).
+# The dedicated hosted RTL job intentionally installs only Cocotb/Icarus.
+_codec_path = (Path(__file__).resolve().parents[3] / "software/python" /
+               "plasma_interfaces/swd_site.py")
+_codec_spec = spec_from_file_location("plasma_swd_site_codec", _codec_path)
+_codec_module = module_from_spec(_codec_spec)
+sys.modules[_codec_spec.name] = _codec_module
+_codec_spec.loader.exec_module(_codec_module)
+encode_swj = _codec_module.encode_swj
 
 BASE = [0x43C01000, 0x43C02000]
 
