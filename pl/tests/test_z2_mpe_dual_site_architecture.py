@@ -118,7 +118,7 @@ def test_rtl_physically_instantiates_independent_swd_engines_and_io_guards():
     for required in (
         "parameter integer SITE_COUNT = 2",
         "for (genvar s = 0; s < SITE_COUNT; s = s + 1)",
-        "swd_transaction_master u_transaction",
+        "plasma_mpe_swd_engine u_transaction",
         ".cmd_abort(cmd_abort[s] || !site_enable[s])",
         "assign cmd_ready[s] = allowed && cmd_ready_internal",
         "OBUF u_swclk_pad",
