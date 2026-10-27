@@ -53,7 +53,7 @@ class La2016NativeAccessContracts(unittest.TestCase):
             self.assertNotIn("subprocess.run(['fuser'", content)
             self.assertNotIn("LA_USB_BUSY_OR_OWNER_UNCERTAIN", content)
         self.assertIn("native Driver Open/Claim", direct)
-        self.assertIn("no Host Supervisor", direct)
+        self.assertIn("No intermediary hardware JSON command translation", direct)
         self.assertNotIn("and existing `SIGROK_FIRMWARE_PATH`/firmware resources", direct)
 
     def test_usb_identity_acl_and_safe_close_are_still_required(self):
