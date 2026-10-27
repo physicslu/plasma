@@ -1618,5 +1618,107 @@ if op in ("new-session", "new-window"):
 
 
 
+    def test_execution_detail_fail_closed_sanitizer_and_spoofing(self):
+        safe = activity.detail_wire(
+            "cmd_1", "COMBINED", "Device: kingst-la2016", "C")
+        self.assertIn(b"Device: kingst-la2016", safe)
+        self.assertEqual(activity.parse_detail_line(
+            safe.decode().strip())["stream"], "COMBINED")
+        for unsafe in (
+            "api_token=" + "ABCD" * 16,
+            "Authorization: Bearer abc123",
+            "found /home/operator/data",
+            "SAVED\x1b[2JINJECTED",
+            "https://internal.example/path",
+            "X" * 300,
+        ):
+            with self.subTest(unsafe=unsafe[:24]):
+                payload = activity.detail_wire(
+                    "cmd_1", "COMBINED", unsafe, "C")
+                self.assertNotIn(unsafe.encode("utf-8")[:10], payload)
+                self.assertIsNotNone(activity.parse_detail_line(
+                    payload.decode().strip()))
+        for source, channel in (
+            ("C", "STDOUT"), ("P", "COMBINED"),
+            ("C", "COMMAND\tmalformed"),
+        ):
+            self.assertEqual(
+                activity.detail_wire("cmd_1", channel, "okay", source),
+                b"")
+        forged = json.loads(safe.decode().split(" ", 1)[1])
+        forged["text"] = "token_abc123"
+        self.assertIsNone(activity.parse_detail_line(
+            activity.DETAIL_PREFIX + json.dumps(forged)))
+        forged["text"] = "\x1b[2J"
+        self.assertIsNone(activity.parse_detail_line(
+            activity.DETAIL_PREFIX + json.dumps(forged)))
+
+    def test_path3_incremental_combined_output_not_fake_stderr(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            projector = activity.Path3Activity(d)
+            item = {"id": "cmd_1", "type": "command_execution",
+                    "command": "sigrok-cli --scan"}
+            started = projector.project({"type": "item.started", "item": item})
+            update = projector.project({"type": "item.updated", "item": {
+                **item, "aggregated_output": "Device: kingst-la2016\n"
+                                             "api_token=TOPSE"} })
+            self.assertIn(b"Device: kingst-la2016", update)
+            self.assertNotIn(b"TOPSE", update)
+            self.assertIn(b"sigrok-cli --scan", update)
+            self.assertEqual(projector.project({"type": "item.updated", "item": {
+                **item, "aggregated_output": "Device: kingst-la2016\n"
+                                             "api_token=TOPSE"}}), b"")
+            done = projector.project({"type": "item.completed", "item": {
+                **item, "exit_code": 0,
+                "aggregated_output": "Device: kingst-la2016\n"
+                                     "api_token=TOPSECRET\nDone\n"}})
+            payload = started + update + done
+            self.assertNotIn(b"TOPSECRET", payload)
+            self.assertIn(b"(line redacted)", payload)
+            self.assertIn(b"COMBINED", payload)
+            self.assertNotIn(b"STDERR", payload)
+            (d / "path3.log").write_bytes(payload)
+            frame = mon.render_snapshot(
+                d, "path3", width=120, height=30,
+                expanded_activity=True)
+            self.assertIn("[C] COMBINED | Device: kingst-la2016", frame)
+            self.assertNotIn("TOPSECRET", frame)
+            self.assertIn("sigrok-cli --scan", frame)
+
+    def test_path2_live_stdout_stderr_are_separate_and_redacted(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            cmd = [
+                sys.executable, "-c",
+                "import sys\n"
+                "sys.stdout.write('sample count=100\\napi_')\n"
+                "sys.stdout.flush()\n"
+                "sys.stdout.write('token=TOPSECRET\\n')\n"
+                "sys.stderr.write('ERROR: expected device missing\\n')\n",
+            ]
+            with patch.dict(os.environ, {
+                "GITHUB_RUN_ID": "40112233",
+                "PLASMA_MONITOR_TASK": "path2-work-order",
+            }):
+                self.assertEqual(mon.run_job("path2", cmd, directory=d), 0)
+            contents = (d / "path2.log").read_text()
+            self.assertIn('"stream":"STDOUT"', contents)
+            self.assertIn('"stream":"STDERR"', contents)
+            self.assertIn("sample count=100", contents)
+            self.assertIn("ERROR: expected device missing", contents)
+            self.assertNotIn("TOPSECRET", contents)
+            self.assertIn("(line redacted)", contents)
+            frame = mon.render_snapshot(
+                d, "path2", width=120, height=36,
+                expanded_activity=True)
+            self.assertIn("[P] STDOUT | sample count=100", frame)
+            self.assertIn("[P] STDERR | ERROR: expected device missing", frame)
+            self.assertNotIn("TOPSECRET", frame)
+            concise = mon.render_snapshot(d, "path2", width=120)
+            self.assertNotIn("@PLASMA_DETAIL_V1", concise)
+
+
+
 if __name__ == "__main__":
     unittest.main()

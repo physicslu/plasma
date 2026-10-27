@@ -4,6 +4,31 @@
 two switchable windows (Path 2 and Path 3). This is not another dispatcher,
 workflow, runner, approval gate, HIL test or production service.
 
+## Gate 1 Execution Detail (candidate PR #1195)
+
+Operator-only `L` opens a bounded execution detail view; `J` and `K` scroll
+older/newer history. Summary remains the default. For Path 2, the existing
+wrapper forwards original subprocess stdout and stderr **unchanged** to the
+GitHub Actions evidence sink, while projecting only *completed, validated*
+lines to the monitor as distinct `[P] STDOUT` and `[P] STDERR` observations.
+Path 3 projects Codex-reported incremental `aggregated_output` as
+`[C] COMBINED`, **not** independent stdout/stderr. Simple accepted native
+CLI commands can be shown with validated arguments; shell constructs,
+unknown commands, addresses, credentials, long lines, ANSI controls, URLs,
+and suspected secrets are not mirrored. Detail lines have bounded length,
+count and a second parser-side validation. Missing/incomplete details remain
+an explicitly restricted observation, not proof of execution or acceptance.
+
+This is **not** a lossless terminal mirror or an evidence authority. Line-based
+redaction cannot prove that an arbitrary unknown secret is safe. Secrets in
+unlabelled benign-looking output are residual risk; operators must keep raw
+session evidence private and should not print credentials to CLI stdout.
+Monitor still does not execute, authorize, retry or change hardware operations.
+The actual stdout/stderr and physical PASS remain authenticated by existing
+Runner/Work Order evidence and separate acceptance. Real SWPC/tmux acceptance
+is `NOT_RUN` until separately authorized activation. No deployment/hardware
+operation is included in this PR.
+
 ## V3 operator layout and result semantics
 
 The path label and all shortcuts occupy **one header row**:

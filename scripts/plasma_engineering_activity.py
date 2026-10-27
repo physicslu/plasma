@@ -133,6 +133,117 @@ def safe_command(value: object) -> tuple[str, str]:
     return "COMMAND", "(command hidden)"
 
 
+
+# V2 monitor detail is a *sanitized, lossy observation*, never raw evidence.
+# The operator's existing group-readable log is NOT a safe place for unknown
+# secrets. Refuse whole lines instead of masking substrings or partial chunks.
+DETAIL_PREFIX = "@PLASMA_DETAIL_V1 "
+MAX_DETAIL_BYTES = 768
+DETAIL_MARKERS = frozenset({
+    "(line redacted)", "(nonprintable line omitted)",
+    "(overlong line omitted)", "(output truncated)",
+})
+DETAIL_SENSITIVE = re.compile(
+    r"(?i)(?:secret|token|passwd|password|credential|private|"
+    r"authorization|bearer|api[_-]?key|session[_-]?key|id_rsa|"
+    r"\.env|\.pem|\.key|/home/|/root/|/run/secrets|"
+    r"https?://|ssh-rsa|BEGIN [A-Z ]*KEY|"
+    r"\b[a-f0-9]{32,}\b|\b[A-Za-z0-9+/]{40,}={0,2}\b)"
+)
+DETAIL_PRINTABLE = re.compile(r"[\x20-\x7e]{1,220}\Z")
+DETAIL_COMMAND = re.compile(r"[A-Za-z0-9_./:=+,@%-]+(?: [A-Za-z0-9_./:=+,@%-]+)*\Z")
+
+
+def safe_detail_text(value: object) -> str:
+    if type(value) is not str:
+        return "(nonprintable line omitted)"
+    if value in DETAIL_MARKERS:
+        return value
+    if len(value) > 220:
+        return "(overlong line omitted)"
+    if DETAIL_PRINTABLE.fullmatch(value) is None:
+        return "(nonprintable line omitted)"
+    if DETAIL_SENSITIVE.search(value) is not None:
+        return "(line redacted)"
+    return value
+
+
+def safe_cli_detail(command: object) -> str | None:
+    """Show parameters only for simple native CLI; never shell expressions.
+
+    CLI command strings may themselves contain secrets. This is deliberately
+    narrower than tool classification and does not promise a terminal mirror.
+    """
+    if type(command) is not str or len(command) > 180:
+        return None
+    if DETAIL_COMMAND.fullmatch(command) is None or SENSITIVE.search(command):
+        return None
+    if re.search(r"(?i)(?:--config(?:=| )|-c |--password|--token|--key)", command):
+        return None
+    if safe_command(command)[1] == "(command hidden)":
+        return None
+    words = command.split()
+    executable = words[0]
+    if executable in ("/usr/bin/ssh", "ssh", "/usr/bin/bash", "bash",
+                      "/usr/bin/sh", "sh"):
+        return None
+    if any(p.startswith("/") for p in words[1:]):
+        return None
+    allowed = ("sigrok-cli", "/usr/bin/sigrok-cli", "openocd",
+               "/usr/bin/openocd", "lsusb", "/usr/bin/lsusb", "udevadm",
+               "/usr/bin/udevadm", "git", "/usr/bin/git", "python3",
+               "/usr/bin/python3", "make", "ninja", "cmake",
+               "/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage")
+    if executable not in allowed:
+        return None
+    if executable.endswith(".AppImage"):
+        return "sigrok-cli (pinned AppImage) " + " ".join(words[1:])
+    return command
+
+
+def detail_wire(identity: str, stream: str, value: object, source: str) -> bytes:
+    if (type(identity) is not str or ITEM_ID.fullmatch(identity) is None or
+            (source == "C" and stream not in ("COMMAND", "COMBINED")) or
+            (source == "P" and stream not in ("STDOUT", "STDERR"))):
+        return b""
+    record = {
+        "schema": 1, "id": identity, "stream": stream,
+        "text": safe_detail_text(value), "source": source,
+        "time": dt.datetime.now().astimezone().strftime("%H:%M:%S"),
+    }
+    wire = (DETAIL_PREFIX + json.dumps(
+        record, ensure_ascii=True, separators=(",", ":")) + "\n").encode("ascii")
+    return wire if len(wire) <= MAX_DETAIL_BYTES else b""
+
+
+def parse_detail_line(line: str) -> dict | None:
+    if not line.startswith(DETAIL_PREFIX) or len(line) > MAX_DETAIL_BYTES:
+        return None
+    try:
+        record = json.loads(line[len(DETAIL_PREFIX):])
+    except (TypeError, ValueError):
+        return None
+    if type(record) is not dict or set(record) != {
+            "schema", "id", "stream", "text", "source", "time"}:
+        return None
+    if (type(record["schema"]) is not int or record["schema"] != 1 or
+            type(record["id"]) is not str or
+            ITEM_ID.fullmatch(record["id"]) is None or
+            type(record["source"]) is not str or
+            type(record["stream"]) is not str or
+            ((record["source"] == "C" and record["stream"] not in
+              ("COMMAND", "COMBINED")) or
+             (record["source"] == "P" and record["stream"] not in
+              ("STDOUT", "STDERR")) or
+             record["source"] not in ("C", "P")) or
+            type(record["time"]) is not str or
+            re.fullmatch(r"\d\d:\d\d:\d\d", record["time"]) is None or
+            type(record["text"]) is not str or
+            safe_detail_text(record["text"]) != record["text"]):
+        return None
+    return record
+
+
 def safe_repo_path(value: object, workspace: Path) -> str | None:
     if type(value) is not str or not value or len(value) > 256:
         return None
@@ -175,12 +286,53 @@ class Path3Activity:
         self.workspace = workspace
         self.next_seq = 0
         self.active: dict[str, str] = {}
+        self.output_previous: dict[str, str] = {}
+        self.output_pending: dict[str, str] = {}
+        self.output_count: dict[str, int] = {}
+        self.command_detail_sent: set[str] = set()
+
+    def _output_details(self, identity: str, item: dict,
+                        complete: bool) -> bytes:
+        aggregate = item.get("aggregated_output")
+        if type(aggregate) is not str or len(aggregate) > 65536:
+            return b""
+        previous = self.output_previous.get(identity, "")
+        if not aggregate.startswith(previous):
+            # A non-append-only update is not a trustworthy byte delta.
+            return b""
+        delta = aggregate[len(previous):]
+        self.output_previous[identity] = aggregate
+        if not delta and not complete:
+            return b""
+        pending = self.output_pending.get(identity, "") + delta
+        lines = pending.split("\n")
+        self.output_pending[identity] = "" if complete else lines.pop()
+        if complete and self.output_pending[identity]:
+            lines.append(self.output_pending.pop(identity))
+        elif complete and not pending.endswith("\n"):
+            # split() includes the incomplete final line in this case.
+            pass
+        if complete and lines and lines[-1] == "":
+            lines.pop()
+        out = bytearray()
+        command = safe_cli_detail(item.get("command"))
+        if (command and identity not in self.command_detail_sent and
+                lines):
+            out.extend(detail_wire(identity, "COMMAND", command, "C"))
+            self.command_detail_sent.add(identity)
+        for line in lines:
+            count = self.output_count.get(identity, 0)
+            if count >= 32:
+                break
+            out.extend(detail_wire(identity, "COMBINED", line, "C"))
+            self.output_count[identity] = count + 1
+        return bytes(out)
 
     def project(self, event: dict) -> bytes:
         phase = event.get("type")
         # Item updates often repeat the unchanged command many times. Keep
         # just start and completion so each operation has one bounded pair.
-        if phase not in ("item.started", "item.completed"):
+        if phase not in ("item.started", "item.updated", "item.completed"):
             return b""
         item = event.get("item")
         if type(item) is not dict:
@@ -192,6 +344,10 @@ class Path3Activity:
         if (type(identity) is not str or ITEM_ID.fullmatch(identity) is None or
                 self.next_seq >= MAX_SEQUENCE):
             return b""
+        if phase == "item.updated":
+            return (self._output_details(identity, item, False)
+                    if category == "command_execution" and
+                    self.active.get(identity) == category else b"")
         if phase == "item.started":
             if identity in self.active or len(self.active) >= MAX_ACTIVE_ITEMS:
                 return b""
@@ -229,8 +385,15 @@ class Path3Activity:
                 names[0] + " (+" + str(len(names)-1) + " files)"
                 if names else "(file paths hidden)")
             state = "DONE" if phase == "item.completed" else "RUNNING"
+        detail = (self._output_details(identity, item, True)
+                  if phase == "item.completed" and
+                  category == "command_execution" else b"")
         if phase == "item.completed":
             self.active.pop(identity, None)
+            self.output_previous.pop(identity, None)
+            self.output_pending.pop(identity, None)
+            self.output_count.pop(identity, None)
+            self.command_detail_sent.discard(identity)
         self.next_seq += 1
         record = {
             "schema": 1, "seq": self.next_seq, "id": identity,
@@ -240,7 +403,7 @@ class Path3Activity:
         }
         wire = (PREFIX + json.dumps(record, ensure_ascii=True,
                                    separators=(",", ":")) + "\n").encode("ascii")
-        return wire if len(wire) <= MAX_EVENT_BYTES else b""
+        return (wire + detail) if len(wire) <= MAX_EVENT_BYTES else detail
 
 
 def parse_public_line(line: str) -> dict | None:

@@ -16,6 +16,7 @@ from pathlib import Path
 import pwd
 import re
 import select
+import selectors
 import shutil
 import socket
 import stat
@@ -322,26 +323,63 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     try:
         # No shell or task-specific workflow. Child keeps the exact trusted
         # command, permission boundary, worktree, receipt and exit status.
-        proc = subprocess.Popen(command, env=env)
+        mirror = live and path == "path2"
+        proc = subprocess.Popen(
+            command, env=env,
+            stdout=subprocess.PIPE if mirror else None,
+            stderr=subprocess.PIPE if mirror else None)
+        selector = selectors.DefaultSelector() if mirror else None
+        pending = {"STDOUT": b"", "STDERR": b""}
+        detail_counts = {"STDOUT": 0, "STDERR": 0}
+        if selector is not None:
+            selector.register(proc.stdout, selectors.EVENT_READ, ("STDOUT", 1))
+            selector.register(proc.stderr, selectors.EVENT_READ, ("STDERR", 2))
         last_heartbeat = time.monotonic()
         last_time_mark = last_heartbeat
-        while proc.poll() is None:
-            time.sleep(1)
-            now_monotonic = time.monotonic()
-            if live and now_monotonic - last_heartbeat >= 15:
-                _append(log, "RUNNING | elapsed %ds | Run %s" %
-                        (int(now_monotonic - last_heartbeat), run_id))
-                last_heartbeat = now_monotonic
-            if live and path == "path3" and now_monotonic - last_time_mark >= 60:
-                # A synthetic marker goes ONLY to the disposable monitor log.
-                # This must not appear in Codex stdout/stderr or GitHub evidence.
-                try:
-                    _append(log, "\n" + _monitor_time_mark())
-                except OSError as exc:
-                    print("MONITOR_TIME_MARK_FAILED: %s" %
-                          type(exc).__name__, file=sys.stderr)
-                last_time_mark = now_monotonic
-        rc = proc.wait()
+        exited_at = None
+        try:
+            while (proc.poll() is None or
+                   (selector is not None and selector.get_map())):
+                if selector is None:
+                    time.sleep(1)
+                else:
+                    for key, _ in selector.select(timeout=1):
+                        chunk = os.read(key.fileobj.fileno(), 4096)
+                        if not chunk:
+                            selector.unregister(key.fileobj)
+                            key.fileobj.close()
+                            continue
+                        stream, destination = key.data
+                        _preserve_output(destination, chunk)
+                        _path2_detail(log, stream, chunk, pending, detail_counts)
+                now_monotonic = time.monotonic()
+                if proc.poll() is not None:
+                    if exited_at is None:
+                        exited_at = now_monotonic
+                    elif selector is not None and now_monotonic - exited_at > 3:
+                        # Do not wait indefinitely for unrelated grandchildren
+                        # that accidentally retained a stdout/stderr descriptor.
+                        break
+                if live and now_monotonic - last_heartbeat >= 15:
+                    _append(log, "RUNNING | elapsed %ds | Run %s" %
+                            (int(now_monotonic - last_heartbeat), run_id))
+                    last_heartbeat = now_monotonic
+                if live and path == "path3" and now_monotonic - last_time_mark >= 60:
+                    try:
+                        _append(log, "\n" + _monitor_time_mark())
+                    except OSError as exc:
+                        print("MONITOR_TIME_MARK_FAILED: %s" %
+                              type(exc).__name__, file=sys.stderr)
+                    last_time_mark = now_monotonic
+            if selector is not None:
+                for stream, tail in pending.items():
+                    if tail and detail_counts[stream] < 64:
+                        # Incomplete lines are NOT projected to the group log.
+                        _path2_detail(log, stream, b"\n", pending, detail_counts)
+            rc = proc.wait()
+        finally:
+            if selector is not None:
+                selector.close()
         result = "PASS" if rc == 0 else "FAIL"
         return rc
     finally:
@@ -363,6 +401,50 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
                 })
             except OSError as exc:
                 print("MONITOR_WRITE_FAILED: %s" % type(exc).__name__, file=sys.stderr)
+
+
+
+def _path2_detail(log: Path, stream: str, data: bytes,
+                  buffers: dict[str, bytes], counts: dict[str, int]) -> None:
+    """Project *whole* output lines only; never leak partial secret fragments."""
+    pending = buffers[stream] + data
+    rows = pending.split(b"\n")
+    buffers[stream] = rows.pop()
+    for row in rows:
+        if counts[stream] >= 64:
+            continue
+        counts[stream] += 1
+        if len(row) > 8192:
+            text = "(overlong line omitted)"
+        else:
+            try:
+                text = row.decode("utf-8")
+            except UnicodeDecodeError:
+                text = "(nonprintable line omitted)"
+        record = engineering_activity.detail_wire(
+            "path2_output", stream, text, "P")
+        if record:
+            try:
+                fd = os.open(log, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+                try:
+                    os.write(fd, record)
+                finally:
+                    os.close(fd)
+            except OSError:
+                # Monitor failure must not change the authorized CLI outcome.
+                pass
+    if len(buffers[stream]) > 8192:
+        buffers[stream] = b"\x00" * 8193  # remain blocked until newline
+
+
+def _preserve_output(fd: int, data: bytes) -> None:
+    """Restore child stdout/stderr byte-for-byte to the original CI sinks."""
+    view = memoryview(data)
+    while view:
+        written = os.write(fd, view)
+        if written <= 0:
+            raise OSError("CI output channel closed")
+        view = view[written:]
 
 
 def _clip_columns(line: str, width: int) -> str:
@@ -441,7 +523,8 @@ def render_snapshot(directory: Path, path: str, *,
                     now: dt.datetime | None = None,
                     clear_from: tuple[int, int, int, str | None] | None = None,
                     prefix: str = "Ctrl+B",
-                    expanded_activity: bool = False) -> str:
+                    expanded_activity: bool = False,
+                    history_offset: int = 0) -> str:
     if path not in PATHS:
         raise ValueError("unknown path")
     name = "PATH 2 | SWPC CLI" if path == "path2" else "PATH 3 | SWPC Codex"
@@ -452,7 +535,7 @@ def render_snapshot(directory: Path, path: str, *,
         status = "IDLE (interrupted/unknown)"
     if status not in ("IDLE", "RUNNING", "IDLE (interrupted/unknown)"):
         status = "UNKNOWN"
-    mode_hint = "L Summary" if expanded_activity else "L Activity"
+    mode_hint = ("L Summary J/K History" if expanded_activity else "L Activity")
     lines = ["%s | %s | C Clear | %s 1/2 Switch | %s D Detach" %
              (name, mode_hint, prefix, prefix),
              "=" * 35,
@@ -527,7 +610,7 @@ def render_snapshot(directory: Path, path: str, *,
         lines.append("DOING: Awaiting Codex tool activity")
     else:
         lines.append("DOING: —")
-    activity_title = ("ACTIVITY TRACE [C] (sanitized)" if expanded_activity
+    activity_title = ("ACTIVITY TRACE [C] + EXECUTION DETAILS (redacted)" if expanded_activity
                       else "RECENT ACTIVITY")
     lines.extend(["", activity_title, "-" * 35])
     if height is not None:
@@ -550,13 +633,17 @@ def render_snapshot(directory: Path, path: str, *,
             scan_start = max(0, st.st_size - 524288)
             f.seek(scan_start)
             history_lines = f.read().decode("utf-8", errors="replace").splitlines()
-            log_lines = history_lines[-30:]
+            offset = max(0, min(1000, history_offset)) if expanded_activity else 0
+            log_lines = history_lines[max(0, len(history_lines)-30-offset):
+                                      len(history_lines)-offset or None]
             if clear_from is not None:
                 dev, ino, offset, run_start = clear_from
                 if ((st.st_dev, st.st_ino, state.get("started")) ==
                         (dev, ino, run_start) and st.st_size >= offset):
                     f.seek(max(scan_start, offset))
-                    log_lines = f.read().decode("utf-8", errors="replace").splitlines()[-30:]
+                    tail = f.read().decode("utf-8", errors="replace").splitlines()
+                    log_lines = tail[max(0, len(tail)-30-offset):
+                                     len(tail)-offset or None]
     except OSError:
         log_lines = ["(no local output yet)"]
     active_items = {}
@@ -591,22 +678,38 @@ def render_snapshot(directory: Path, path: str, *,
             continue
         visible_sequence = event["seq"]
         observed.append(event)
-    if observed:
-        if not expanded_activity:
-            # The overview needs useful completed actions, not duplicate
-            # RUNNING/DONE pairs for every tiny Codex command. An unmatched
-            # start remains visible while the item is still in progress.
-            completed_ids = {e["id"] for e in observed
-                             if e["state"] != "RUNNING"}
-            observed = [e for e in observed if e["state"] != "RUNNING"
-                        or e["id"] not in completed_ids]
+    if expanded_activity:
+        details = []
+        for original in log_lines:
+            event = engineering_activity.parse_public_line(original)
+            detail = engineering_activity.parse_detail_line(original)
+            if event is not None:
+                details.append("%s %s" % (event["time"], _step_label(event)))
+            elif detail is not None and detail["source"] == (
+                    "P" if path == "path2" else "C"):
+                details.append("%s [%s] %s | %s" % (
+                    detail["time"], detail["source"], detail["stream"],
+                    detail["text"]))
+            elif not original.startswith("@PLASMA_"):
+                # Existing wrapper control lines only, never opaque JSONL.
+                if (len(original) <= 160 and
+                        re.fullmatch(r"[A-Za-z0-9 |()=_.:+-]{1,160}",
+                                     original) is not None and
+                        MONITOR_SENSITIVE.search(original) is None):
+                    details.append(original)
+        log_lines = details
+    elif observed:
+        # Overview is only a bounded, de-duplicated activity summary.
+        completed_ids = {e["id"] for e in observed
+                         if e["state"] != "RUNNING"}
+        observed = [e for e in observed if e["state"] != "RUNNING"
+                    or e["id"] not in completed_ids]
         log_lines = ["%s %s" % (e["time"], _step_label(e))
                      for e in observed[-30:]]
     else:
-        # Invalid structured records are never echoed as raw terminal lines.
+        # Never echo unknown machine-record prefixes verbatim.
         log_lines = [
-            line for line in log_lines
-            if not line.startswith(engineering_activity.PREFIX)]
+            line for line in log_lines if not line.startswith("@PLASMA_")]
     if status == "RUNNING" and active_items:
         last = next(reversed(active_items.values()))
         doing = next(i for i, line in enumerate(lines)
@@ -696,6 +799,7 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
     previous_size = None
     clear_from = None
     expanded_activity = False
+    history_offset = 0
     try:
         while True:
             key = get_key()
@@ -704,6 +808,13 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
                 previous = None  # Force repaint, even if status is unchanged.
             elif key in ("l", "L"):
                 expanded_activity = not expanded_activity
+                history_offset = 0
+                previous = None
+            elif expanded_activity and key in ("j", "J"):
+                history_offset = min(1000, history_offset + 10)
+                previous = None
+            elif expanded_activity and key in ("k", "K"):
+                history_offset = max(0, history_offset - 10)
                 previous = None
             width, height = get_size()
             size = (width, height)
@@ -711,7 +822,8 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
                 directory, path, width=width, height=height,
                 now=get_now() if path == "path3" else None,
                 clear_from=clear_from, prefix=prefix,
-                expanded_activity=expanded_activity)
+                expanded_activity=expanded_activity,
+                history_offset=history_offset)
             if frame != previous or size != previous_size:
                 # Only repaint this tmux pane, not global terminal scrollback.
                 # Clear old cells BEFORE painting shorter replacement lines.
