@@ -189,6 +189,37 @@ class Contracts(unittest.TestCase):
             self.assertIsNone(d.live_pr_metadata({'pr_number':0}))
             opener.assert_not_called()
 
+    def test_live_pr_public_tls_rejects_network_http_oversize_and_wrong_type(self):
+        from urllib.error import HTTPError, URLError
+        req = {'pr_number': 123, 'source_sha': SHA}
+        cases = [
+            (URLError("network unavailable"), "LIVE_PR_VERIFICATION_FAILED"),
+            (HTTPError("https://api.github.com/", 403, "rate limit", {}, None),
+             "LIVE_PR_VERIFICATION_FAILED"),
+        ]
+        for failure, expected in cases:
+            with patch.object(d, 'urlopen', side_effect=failure):
+                with self.assertRaisesRegex(d.Denied, expected):
+                    d.live_pr_metadata(req)
+        with patch.object(d, 'urlopen') as opener:
+            response = opener.return_value.__enter__.return_value
+            response.status = 200
+            response.read.return_value = b"x" * 262145
+            with self.assertRaisesRegex(d.Denied, "LIVE_PR_RESPONSE_TOO_LARGE"):
+                d.live_pr_metadata(req)
+            response.read.assert_called_once_with(262145)
+        with patch.object(d, 'urlopen') as opener:
+            response = opener.return_value.__enter__.return_value
+            response.status = 200
+            response.read.return_value = b'{"number":123, "state":"open"}'
+            with self.assertRaises(d.Denied):
+                d.live_pr_metadata(req)
+        # Never copy GH_TOKEN/GITHUB_TOKEN into PR candidate execution step.
+        workflow = (d.ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
+        step = workflow.split("- name: Execute candidate CLI using trusted dispatcher", 1)[1].split("        run: |", 1)[0]
+        self.assertNotIn("GH_TOKEN:", step)
+        self.assertNotIn("GITHUB_TOKEN:", step)
+
     def test_separate_recovery_adapter_has_no_implicit_download_restore(self):
         # Legacy protected transport is independently testable but no longer
         # admitted as a general Path 2 Dispatcher Work Order.
