@@ -1,0 +1,34 @@
+name: Z2 toolbox Stage A host contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/z2-toolbox-stage-a.yml"
+      - "scripts/z2-toolbox.py"
+      - "scripts/z2/bluepill-stage-a-ps.py"
+      - "scripts/tests/test_z2_toolbox_stage_a.py"
+      - "docs/development/z2-toolbox-stage-a.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/z2-toolbox-stage-a.yml"
+      - "scripts/z2-toolbox.py"
+      - "scripts/z2/bluepill-stage-a-ps.py"
+      - "scripts/tests/test_z2_toolbox_stage_a.py"
+      - "docs/development/z2-toolbox-stage-a.md"
+
+permissions:
+  contents: read
+
+jobs:
+  host-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check syntax and fail-closed host behavior
+        run: |
+          python3 -m py_compile scripts/z2-toolbox.py scripts/z2/bluepill-stage-a-ps.py
+          python3 scripts/tests/test_z2_toolbox_stage_a.py
