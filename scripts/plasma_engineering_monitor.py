@@ -635,17 +635,17 @@ def render_snapshot(directory: Path, path: str, *,
             scan_start = max(0, st.st_size - 524288)
             f.seek(scan_start)
             history_lines = f.read().decode("utf-8", errors="replace").splitlines()
-            offset = max(0, min(1000, history_offset)) if expanded_activity else 0
-            log_lines = history_lines[max(0, len(history_lines)-30-offset):
-                                      len(history_lines)-offset or None]
+            scroll_offset = max(0, min(1000, history_offset)) if expanded_activity else 0
+            log_lines = history_lines[max(0, len(history_lines)-30-scroll_offset):
+                                      len(history_lines)-scroll_offset or None]
             if clear_from is not None:
                 dev, ino, offset, run_start = clear_from
                 if ((st.st_dev, st.st_ino, state.get("started")) ==
                         (dev, ino, run_start) and st.st_size >= offset):
                     f.seek(max(scan_start, offset))
                     tail = f.read().decode("utf-8", errors="replace").splitlines()
-                    log_lines = tail[max(0, len(tail)-30-offset):
-                                     len(tail)-offset or None]
+                    log_lines = tail[max(0, len(tail)-30-scroll_offset):
+                                     len(tail)-scroll_offset or None]
     except OSError:
         log_lines = ["(no local output yet)"]
     active_items = {}
