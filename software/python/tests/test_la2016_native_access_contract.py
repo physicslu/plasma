@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """Document-level LA2016 direct Sigrok access contract (host-only; no USB)."""
-import fcntl
-import os
 from pathlib import Path
-import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -44,33 +41,31 @@ class La2016NativeAccessContracts(unittest.TestCase):
         self.assertIn("Root Guard", doc)
         self.assertIn("Z2 FPGA Image/Manifest", doc)
 
-    def test_direct_codex_lock_uses_read_only_fd_without_acl_change(self):
+    def test_direct_codex_uses_native_busy_without_extra_probe(self):
         runbook = LA.read_text(encoding="utf-8")
         direct = DIRECT.read_text(encoding="utf-8")
-        for text in ('exec {LA_LOCK_FD}< "$LA_LOCK_PATH"',
-                     'flock -x -n "$LA_LOCK_FD"',
-                     'exec {LA_LOCK_FD}<&-'):
-            self.assertIn(text, runbook)
-        self.assertIn("read-only file descriptor", direct)
-        self.assertIn("native USB/fuser checks", direct)
+        for content in (runbook, direct):
+            self.assertIn("DEVICE_BUSY", content)
+            self.assertIn("RUNTIME_FAIL", content)
+            self.assertNotIn("LA_LOCK_PATH=", content)
+            self.assertNotIn("LA_LOCK_FD", content)
+            self.assertNotIn("flock -x -n", content)
+            self.assertNotIn("subprocess.run(['fuser'", content)
+            self.assertNotIn("LA_USB_BUSY_OR_OWNER_UNCERTAIN", content)
+        self.assertIn("native Driver Open/Claim", direct)
         self.assertIn("no Host Supervisor", direct)
         self.assertNotIn("and existing `SIGROK_FIRMWARE_PATH`/firmware resources", direct)
 
-    @unittest.skipUnless(os.name == "posix", "Linux flock semantics")
-    def test_exclusive_flock_can_be_held_on_read_only_descriptor(self):
-        # Host-only Linux semantics; no LA/USB and no /run/lock access.
-        with tempfile.TemporaryDirectory() as tmp:
-            lock = Path(tmp) / "la.lock"
-            lock.write_bytes(b"")
-            lock.chmod(0o444)
-            with lock.open("rb") as holder:
-                fcntl.flock(holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                with lock.open("rb") as contender:
-                    with self.assertRaises(BlockingIOError):
-                        fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            with lock.open("rb") as new_holder:
-                fcntl.flock(new_holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            self.assertEqual(lock.stat().st_mode & 0o777, 0o444)
+    def test_usb_identity_acl_and_safe_close_are_still_required(self):
+        runbook = LA.read_text(encoding="utf-8")
+        direct = DIRECT.read_text(encoding="utf-8")
+        for text in ("77a1", "01a2", "LA_USB_DAC_DENIED",
+                     "os.access(node, os.R_OK | os.W_OK)"):
+            self.assertIn(text, runbook)
+        self.assertIn("SHA256", direct)
+        self.assertIn("RW DAC/ACL", direct)
+        self.assertIn("normal USB close", direct)
+        self.assertIn("Native concurrency rejection has **not** been physically requalified", direct)
 
 
 if __name__ == "__main__":
