@@ -102,7 +102,7 @@ class RouteContracts(unittest.TestCase):
         self.assertIn('"operator-cli"', wf)
         self.assertIn("github.run_attempt == 1", wf)
         self.assertIn("scripts/tests/test_plasma_path2_runtime_integration.py", wf)
-        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
 
 
     def evidence(self, td):

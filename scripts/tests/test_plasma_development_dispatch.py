@@ -496,7 +496,7 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             from io import StringIO
             from contextlib import redirect_stdout
             with patch.dict(os.environ,env):
-                with patch.object(dev,"live_pr_metadata", return_value=None), patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock:
+                with patch.object(dev,"live_pr_metadata", return_value=None), patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock, patch.object(dev.os,"geteuid",return_value=1000):
                     with redirect_stdout(StringIO()) as out:
                         self.assertEqual(self._call_main(args),0)
                     self.assertEqual(json.loads(out.getvalue())["pinned_sha"],"b"*40)
@@ -1032,7 +1032,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
-        job=wf.split("  development-codex:",1)[1].split("\n  development-codex-resume:",1)[0]
+        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
         self.assertIn("Collect Path 3 evidence even when Codex",job)
         self.assertIn("if: always()",job)
         self.assertIn("git -C candidate diff --binary HEAD",job)
@@ -1047,7 +1047,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
     def test_path3_publisher_is_pr_pinned_and_keeps_token_out_of_codex(self):
         workflow = WORKFLOW.read_text()
         job = workflow.split("  development-codex:", 1)[1].split(
-            "\n  development-codex-resume:", 1)[0]
+            "\n  authorize:", 1)[0]
         self.assertIn("contents: write  # trusted publisher", job)
         self.assertIn("Publish successful Path 3 edits to the exact authorized PR", job)
         self.assertIn("git -C candidate diff --cached --check", job)
@@ -2073,6 +2073,15 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 self._event(order), self._context(),
                 self.registry)["monitor_summary"], order["monitor_summary"])
 
+    def test_path3_monitor_summary_allows_benign_comma_without_commands(self):
+        # Run 40468107474 was rejected solely by the former punctuation
+        # whitelist, before an otherwise authorized Path 3 job could start.
+        summary = "LA2016 CH3 confirmed, 10ms passive capture"
+        event = self._event(self._order(monitor_summary=summary))
+        self.assertEqual(
+            dev.authorize(event, self._context(), self.registry)["monitor_summary"],
+            summary)
+
     def test_path2_public_goal_and_safe_stage_from_authorized_contract(self):
         summary = "PATH2 Host-only CLI regression"
         case = self._order("path2-cli", monitor_summary=summary)
@@ -2209,10 +2218,42 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn('"operator-cli"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
+
+    def test_path3_has_single_generic_runner_and_no_special_probe_adapter(self):
+        workflow = WORKFLOW.read_text()
+        dispatcher = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
+        self.assertIn("  development-codex:", workflow)
+        self.assertNotIn("  development-codex-resume:", workflow)
+        self.assertNotIn("SESSION_RESUME", workflow)
+        self.assertNotIn("--resume-phase", workflow)
+        self.assertNotIn("session_resume", dispatcher)
+        self.assertNotIn("plasma_path3_cross_job_resume", dispatcher)
+        self.assertNotIn("hardware_stages", dispatcher)
+        self.assertNotIn("agent-request.json", dispatcher)
+        self.assertNotIn("plasma_development_stage_transport", dispatcher)
+        self.assertNotIn("plasma_development_codex_sandbox", dispatcher)
+        contract = (ROOT / "AGENTS.md").read_text()
+        self.assertIn("Ordinary Path 3 explicitly pins `--sandbox workspace-write`", contract)
+        self.assertIn("SHA/digest-bound Owner hardware Work Order", contract)
+        self.assertNotIn("Path 3 inherits operator Codex Approval/Sandbox", contract)
+        full_contract = (ROOT / "docs/development/plasma-autonomous-development-contract-full.md").read_text()
+        self.assertIn("Ordinary Codex execution explicitly pins `--sandbox workspace-write`", full_contract)
+        self.assertIn("`codex_execution: guarded-hardware-no-sandbox`", full_contract)
+        self.assertNotIn("Codex inherits the operator's effective configuration", full_contract)
+        # Legacy and arbitrary fixed adapter/probe routes are denied on the
+        # live Owner/SHA Work Order path, regardless of device model.
+        for name, value in (("session_resume", "page-boundary-off-by-one"),
+                            ("hardware_stages", ["read"]),
+                            ("profile", "la2016"),
+                            ("adapter", "z2-ssh"),
+                            ("probe", "preflight")):
+            with self.subTest(name=name), self.assertRaises(dev.Denied):
+                dev.request(self._event(self._order("path3-codex", **{name: value})),
+                            self._context())
 
     def test_path3_invokes_once_and_records_result(self):
         order = self._order()

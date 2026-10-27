@@ -1436,7 +1436,7 @@ if op in ("new-session", "new-window"):
         workflow = WORKFLOW.read_text()
         self.assertIn("plasma_engineering_monitor.py run path2 --", workflow)
         self.assertIn("plasma_engineering_monitor.py run path3 --", workflow)
-        self.assertEqual(workflow.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+        self.assertEqual(workflow.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
         shell = ROOT / "scripts/plasma-engineering-monitor.sh"
         self.assertEqual(subprocess.run(["bash", "-n", str(shell)],
                                         check=False).returncode, 0)
@@ -1447,9 +1447,9 @@ if op in ("new-session", "new-window"):
         self.assertIn("tmux move-window -d", script)
         self.assertIn('tmux select-window -t "$session:1"', script)
         self.assertEqual(workflow.count(
-            "PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}"), 3)
+            "PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}"), 2)
         self.assertEqual(workflow.count(
-            "PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}"), 3)
+            "PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}"), 2)
         self.assertEqual(workflow.count(
             "PLASMA_MONITOR_STAGE: ${{ needs.development-authorize.outputs.monitor_stage }}"), 1)
         self.assertIn(

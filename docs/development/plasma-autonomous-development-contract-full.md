@@ -184,13 +184,18 @@ the actual command and physical effect, not the technology label `SW` or
   privilege, ownership, rollback and electrical guards; these are runtime
   checks, not new human approval Gates. Report PASS, FAIL or NOT_RUN from
   execution evidence, never from documentation or hosted mocks alone.
+- **Path 3 hardware CLI:** Codex directly chooses native SWPC CLI/USB/TTY/Sigrok tools and enrolled SSH access for any device within its Owner-approved Work Order; LA2016 and PYNQ-Z2 are examples, not an allowlist. Z2 PS executes live target OpenOCD and the PS-local UNIX WordPort/Remote Bitbang bridge. The historical fixed JSON Host Supervisor, LA-only launchers and extra Cross-Job Resume runtime branch are retired; do not reinstate Agent JSON-to-hardware-command translators, fixed operation Adapters or special per-device Stage/Profile/Probe execution paths. See `docs/development/plasma-path3-direct-hardware-tools.md`. Retain locks, device provenance, protected Root/Manifest and fault recovery.
 - **Path 3 is not Host-only.** The existing SWPC Codex Path 3, without
-  another mode, session or Work Order capability, can use owner-approved
-  USB/TTY engineering instruments through the worker's existing Linux
-  DAC/ACL rights. The Dispatcher and launcher must not override Codex
-  Approval, Sandbox, networking or impose a per-device mount allowlist;
-  Codex inherits the operator's effective configuration and the worker's
-  actual Linux privileges. The owner authorizes physical work in Gate 1.
+  another Runner or per-device session, can use owner-approved USB/TTY
+  engineering instruments through the worker's existing Linux DAC/ACL rights.
+  Ordinary Codex execution explicitly pins `--sandbox workspace-write`;
+  only an Owner-authenticated, SHA/digest-pinned dynamic hardware Work Order
+  with `codex_execution: guarded-hardware-no-sandbox` selects one-shot
+  `--sandbox danger-full-access`. This is a single existing Work Order field,
+  not an extra hardware approval stage or OS privilege grant. The Dispatcher
+  must not impose a per-device mount/command allowlist. Both modes retain
+  the worker's actual non-root Linux privileges. The owner authorizes physical
+  work in Gate 1.
   Device visibility is not an authorization to actuate outside that task.
   Legacy protected Z2 FPGA Image lifecycle operations use the existing
   trusted-main Dispatcher, SSH/sudo operation transport and Protected Root

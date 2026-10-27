@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Document-level LA2016 direct Sigrok access contract (host-only; no USB)."""
+import fcntl
+import os
 from pathlib import Path
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 LA = ROOT / "docs/development/la2016-tool-operations.md"
 ST = ROOT / "docs/development/stlink-swd-tool-operations.md"
 AGENTS = ROOT / "AGENTS.md"
+DIRECT = ROOT / "docs/development/plasma-path3-direct-hardware-tools.md"
 PIN = "b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475"
 
 
@@ -39,6 +43,34 @@ class La2016NativeAccessContracts(unittest.TestCase):
         self.assertIn("kingst-la2016a2-fpga.bitstream", doc)
         self.assertIn("Root Guard", doc)
         self.assertIn("Z2 FPGA Image/Manifest", doc)
+
+    def test_direct_codex_lock_uses_read_only_fd_without_acl_change(self):
+        runbook = LA.read_text(encoding="utf-8")
+        direct = DIRECT.read_text(encoding="utf-8")
+        for text in ('exec {LA_LOCK_FD}< "$LA_LOCK_PATH"',
+                     'flock -x -n "$LA_LOCK_FD"',
+                     'exec {LA_LOCK_FD}<&-'):
+            self.assertIn(text, runbook)
+        self.assertIn("read-only file descriptor", direct)
+        self.assertIn("native USB/fuser checks", direct)
+        self.assertIn("no Host Supervisor", direct)
+        self.assertNotIn("and existing `SIGROK_FIRMWARE_PATH`/firmware resources", direct)
+
+    @unittest.skipUnless(os.name == "posix", "Linux flock semantics")
+    def test_exclusive_flock_can_be_held_on_read_only_descriptor(self):
+        # Host-only Linux semantics; no LA/USB and no /run/lock access.
+        with tempfile.TemporaryDirectory() as tmp:
+            lock = Path(tmp) / "la.lock"
+            lock.write_bytes(b"")
+            lock.chmod(0o444)
+            with lock.open("rb") as holder:
+                fcntl.flock(holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                with lock.open("rb") as contender:
+                    with self.assertRaises(BlockingIOError):
+                        fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with lock.open("rb") as new_holder:
+                fcntl.flock(new_holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(lock.stat().st_mode & 0o777, 0o444)
 
 
 if __name__ == "__main__":

@@ -13,11 +13,11 @@
 | AppImage | `/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage` |
 | AppImage SHA256 | `b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475` |
 | 執行方式 | AppImage **必須**使用 `--appimage-extract-and-run`；沿用已存在的環境，**不要求、搜尋或驗證** `SIGROK_FIRMWARE_PATH` |
-| Device Lock | SWPC `/run/lock/plasma-la2016.lock`，同時確認 USB 沒有別的程式占用；單靠 advisory lock 不夠 |
+| Device Lock | SWPC `/run/lock/plasma-la2016.lock`，以**唯讀 FD 取得排他 `flock`**，並確認 USB 沒有其他程式占用；單靠 advisory lock 不夠 |
 | 2026-10-23 被動 SWD | CH0 = Blue Pill PA14/SWCLK、CH1 = PA13/SWDIO、CH2 = 3.3V 邏輯狀態；共地 |
 | 2026-10-16 獨立 Loopback | KINGST PWM1 → **同一台** KINGST CH0；與 Blue Pill SWD 測試是完全不同接線 |
 
-**動態辨識：** 本手冊只固定 USB VID:PID `77a1:01a2` 作為識別條件，不固定 `busnum`、`devnum`、`/dev/bus/usb/...` 路徑；當次授權的 Codex／操作程序須確認唯一設備、存取權限及實際佔用狀態。
+**動態辨識：** 本手冊只固定 USB VID:PID `77a1:01a2` 作為識別條件，不固定 `busnum`、`devnum`、`/dev/bus/usb/...` 路徑；Path 3 Codex 必須在每次工作中直接查詢並檢查唯一設備、存取權限及佔用狀態；無需 Host Supervisor 或固定 JSON Request。
 
 **相容性注意：** 系統內建 `sigrok-cli` 不必然包含 `kingst-la2016` 驅動，不能因為 PATH 有 sigrok 就替代上述指定 AppImage。歷史證據沒有要求在每次採樣時重新上傳 LA FPGA Firmware；不應額外加入未知初始化步驟。
 
@@ -28,13 +28,24 @@ SIGROK_APPIMAGE=/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage
 sha256sum "$SIGROK_APPIMAGE"
 # 比對上方已釘選的完整 SHA256；不符合就停止。
 
+# Linux flock 的排他鎖不要求 FD 具備寫入權限。此檔已存在時只須可讀，
+# 不得以 open(..., 'a') / >> 開啟，亦不可 chmod/chown、刪除或重建 Lock。
+# 2026-10-27 Run 40468233613 因 append-open 遭 DAC 拒絕，實際擷取 NOT_RUN。
+LA_LOCK_PATH=/run/lock/plasma-la2016.lock
+test -f "$LA_LOCK_PATH" && test ! -L "$LA_LOCK_PATH" || exit 77
+command -v flock >/dev/null || exit 69
+exec {LA_LOCK_FD}< "$LA_LOCK_PATH" || exit 77
+flock -x -n "$LA_LOCK_FD" || exit 69
+# 保持這個 Bash FD 開啟，直到 USB 查核與原生 Sigrok 擷取全部結束。
+# 如果 Lock 被占用，立刻停止；不可跳過鎖、另造獨立鎖或強行開啟 USB。
+
 # Owner-approved LA2016 access: NO separate MCU/FPGA firmware file or SHA preflight.
 # SIGROK_FIRMWARE_PATH is optional; preserve the inherited environment unchanged.
 # Let the native sigrok driver report any actual resource or initialization error.
 # No manual LA firmware upload, update, extraction or download in normal capture.
 
 # 動態查找 USB 77a1:01a2；每次執行時從 sysfs 重新取得 busnum/devnum。
-# 沿用 scripts/plasma-codex-la2016.py 的唯一裝置、權限、fuser 策略。
+# 直接使用下方已驗證的 sysfs、權限與 fuser 檢查；不依賴已退役 Host Supervisor。
 # 不使用歷史 USB 節點值，也不輸出 USB 序號。
 LA_CONN="$(python3 - <<'PY'
 import os, pathlib, stat, subprocess, sys
@@ -82,9 +93,12 @@ export LA_CONN
   --driver "kingst-la2016:conn=$LA_CONN" \
   --config samplerate=5m --channels CH0,CH1,CH2 \
   --samples 50000000 --output-file "$OUT"
+capture_status=$?
+exec {LA_LOCK_FD}<&-
+test "$capture_status" -eq 0
 ```
 
-`OUT` 應事先指定為本次唯一且新的 `.sr` 輸出檔。上述命令並非每次都會成功：USB 存取權限、資源路徑、採樣通道／接線及設備占用狀態都要在現場確認。**在實際的 SWD 嘗試開始之前，應先啟動 LA 採樣並保持重疊時間窗**；否則不能稱為該失敗事件的波形。
+`OUT` 應事先指定為本次唯一且新的 `.sr` 輸出檔。上述是歷史 SWD 範例，當次 Owner Work Order 的通道與時間參數由 Codex 依目標自行選擇。Lock 的唯讀開啟不放寬 Linux DAC/ACL；若不存在、不可讀、被占用或 USB ownership 不明，報 `NOT_RUN`，不修改主機權限。此處以 `flock` 搭配原生 Driver/USB 佔用檢查，不新增 Host Supervisor。Shell 若提前退出，作業系統會關閉 FD 釋放鎖。上述命令並非每次都會成功：USB 存取權限、資源路徑、採樣通道／接線及設備占用狀態都要在現場確認。**在實際的 SWD 嘗試開始之前，應先啟動 LA 採樣並保持重疊時間窗**；否則不能稱為該失敗事件的波形。
 
 ### 原生 Driver 韌體錯誤：只在實際發生時處理
 
@@ -118,7 +132,7 @@ python3 docs/evidence/stlink-stm32f103-swd-reference/2026-10-23/verify.py
 
 **警告：PWM1 是實際電氣輸出。** 只在已確認的「PWM1 → 同一台 LA2016 CH0」獨立回路下，且本次明確授權時使用。**Blue Pill / Z2 SWD 接線時絕對不能執行以下 PWM Enable 命令。**
 
-以下命令形式是 2026-10-16 **真正實測 PASS** 的兩組設定（實測 1 kHz 50% 與 2 kHz 25%，各 1 MHz 採樣）。必須在整個 Supervisor 工作中持續佔有 LA lock，並在包括錯誤和中斷在內的所有退出分支關閉 PWM：
+以下命令形式是 2026-10-16 **真正實測 PASS** 的兩組設定（實測 1 kHz 50% 與 2 kHz 25%，各 1 MHz 採樣）。必須在整個 Codex 實體工作中持有 LA lock，並在包括錯誤、中斷在內的所有退出分支關閉 PWM；如無獨立且經驗證的限時 OFF 保護，Codex 不得啟用 PWM 輸出：
 
 ```bash
 # 先確認已改成 OWNER 授權的同機 PWM1->CH0 Loopback 接線與工具環境
@@ -136,7 +150,7 @@ OUT="<new loopback waveform filename>"
 **必備安全清理（不可省略）：**
 
 ```bash
-# Supervisor 的 finally/error/termination 路徑都必須執行這個關閉命令
+# 由 Codex 直接執行 OFF，且必須有獨立限時 OFF 保護與實際波形查核（不是 JSON Supervisor）
 "$SIGROK_APPIMAGE" --appimage-extract-and-run --loglevel 4 \
   --driver "kingst-la2016:conn=$LA_CONN" \
   --config channel_group=PWM1:enabled=off --set
@@ -167,5 +181,7 @@ python3 docs/evidence/la2016-pwm-loopback/2026-10-16/verify.py
 3. 原始 `.sr`、命令 Exit Code、帶時間戳記的控制程式／OpenOCD 操作收據、原始檔案 SHA256、decoder output、導出比較報告。
 4. 如曾使用 PWM，保留關閉命令 Exit Code 與**另外擷取**的 OFF 驗證波形。
 5. 成功參考與失敗波形分別註明證據來源與日期；沒有新擷取就填 `NOT_RUN`，不可用舊波形冒充本次 Z2 PASS。
+
+本文件為直接 CLI 操作參考；現行模式參見 [Path 3 Direct Hardware Tools](plasma-path3-direct-hardware-tools.md)。歷史 Issue #981 JSON Supervisor / LA-only A/B 執行入口已退役，不得用舊命令啟動。
 
 本文件不更動系統 sigrok、udev、Kernel、FPGA image、DUT Flash、ST-LINK 配線或電源控制。實際執行仍以當次 Owner 授權與硬體 Owner/Lock 為準。

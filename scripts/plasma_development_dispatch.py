@@ -38,7 +38,7 @@ WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
 # shell syntax and raw JSON from crossing the GitHub output/monitor boundary.
 MONITOR_SUMMARY = re.compile(
     r"[A-Za-z0-9\u4e00-\u9fff]"
-    r"[A-Za-z0-9\u4e00-\u9fff ._()/+-]{6,78}"
+    r"[A-Za-z0-9\u4e00-\u9fff ,._()/+-]{6,78}"
     r"[A-Za-z0-9\u4e00-\u9fff)]\Z"
 )
 MONITOR_SENSITIVE = re.compile(
@@ -208,7 +208,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                            "execution_path", "capability"}
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
-                               "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
+                               "pr_number", "source_sha", "native_preflight", "script", "argv",
                                "expected_stdout_sha256", "verification",
                                "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
@@ -238,22 +238,11 @@ def parse_dynamic_work_order(event: object) -> dict:
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
-        if "session_resume" in order:
-            require(order["session_resume"] == "page-boundary-off-by-one"
-                    and scope == "host-only"
-                    and set(order) <= base | optional_ref | {"session_resume", "monitor_summary"}
-                    and type(order.get("pr_number")) is int
-                    and order["pr_number"] >= 0
-                    and "source_sha" in order,
-                    "WORK_ORDER_RESUME_SCOPE_DENIED")
-        else:
-            require(capability == "codex-workspace" and
-                    set(order) <= (base - {"scope"}) | optional_ref |
-                    {"monitor_summary", "codex_execution"} and
-                    ("codex_execution" not in order or
-                     order["codex_execution"] == "guarded-hardware-no-sandbox"),
-                    "WORK_ORDER_PATH3_FIELDS_DENIED")
-        require(capability == "codex-workspace",
+        require(capability == "codex-workspace" and
+                set(order) <= (base - {"scope"}) | optional_ref |
+                {"monitor_summary", "codex_execution"} and
+                ("codex_execution" not in order or
+                 order["codex_execution"] == "guarded-hardware-no-sandbox"),
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
     elif capability == "cpu-only" and "native_preflight" in order:
         # Existing Path 2 task_id and Runner. No candidate scripts, shell,
@@ -352,12 +341,6 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(type(order.get("source_sha")) is str and
                 SHA40.fullmatch(order["source_sha"]) is not None,
                 "WORK_ORDER_NATIVE_MAIN_SHA_REQUIRED")
-    elif order.get("session_resume") == "page-boundary-off-by-one":
-        # Exception for this exact CPU-only post-merge diagnostic only.
-        # Main pinning is checked against trusted GITHUB_SHA by request().
-        require(type(order.get("source_sha")) is str and
-                SHA40.fullmatch(order["source_sha"]) is not None,
-                "WORK_ORDER_RESUME_MAIN_SHA_REQUIRED")
     else:
         require("source_sha" not in order,
                 "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED")
@@ -404,8 +387,6 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         elif order["capability"] == "operator-cli":
             task["verification"] = "exit-code"
             task["timeout_seconds"] = order.get("timeout_seconds", 600)
-    if "session_resume" in order:
-        task["session_resume"] = order["session_resume"]
     if "native_preflight" in order:
         task["native_preflight"] = order["native_preflight"]
     for key in ("script", "argv", "expected_stdout_sha256",
@@ -452,11 +433,6 @@ def request(event: object, context: dict) -> dict:
                 order["pr_number"] == 0):
             require(order["source_sha"] == sha,
                     "WORK_ORDER_NATIVE_MAIN_SHA_MISMATCH")
-        if (order.get("session_resume") == "page-boundary-off-by-one" and
-                order["pr_number"] == 0):
-            # Never admit a different main commit, branch or omitted pin.
-            require(order["source_sha"] == sha,
-                    "WORK_ORDER_RESUME_MAIN_SHA_MISMATCH")
         return {
             "task_id": DYNAMIC_TASKS[order["execution_path"]],
             "auto_download_after_build_success": False,
@@ -467,8 +443,6 @@ def request(event: object, context: dict) -> dict:
             "comment_id": comment["id"],
             "issue_number": ISSUE,
             "work_order_sha256": work_order_digest(order),
-            **({"session_resume": order["session_resume"]}
-               if "session_resume" in order else {}),
         }
     require(len(body) <= 200, "COMMAND_DENIED")
     branch_match = BRANCH_COMMAND.fullmatch(body)
@@ -1438,7 +1412,6 @@ def main() -> int:
     parser.add_argument("--registry-sha256")
     parser.add_argument("--work-order-sha256")
     parser.add_argument("--execution-capability")
-    parser.add_argument("--resume-phase", choices=("new", "resume"))
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args()
@@ -1478,8 +1451,7 @@ def main() -> int:
                             os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER and
                             os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted" and
                             task["capability"] == "cpu-only" and
-                            task["work_order_scope"] == "host-only" and
-                            args.resume_phase is None,
+                            task["work_order_scope"] == "host-only",
                             "NATIVE_PREFLIGHT_WORKER_DENIED")
                     import plasma_codex_native_preflight as native
                     try:
@@ -1506,21 +1478,6 @@ def main() -> int:
                             "provenance": "NOT_INDEPENDENTLY_VERIFIED",
                             "sha256_pin_authorized": False,
                         }
-                # This exact CPU-only fixture is the ONLY cross-Job route.
-                # Unflagged Path 3 retains its existing single-exec behavior.
-                elif task.get("session_resume") or args.resume_phase:
-                    require(args.action == "execute-codex" and
-                            task.get("session_resume") == "page-boundary-off-by-one"
-                            and args.resume_phase in ("new", "resume"),
-                            "RESUME_EXPLICIT_PHASE_DENIED")
-                    import plasma_path3_cross_job_resume as crossjob
-                    try:
-                        receipt = crossjob.execute(
-                            args.resume_phase,
-                            {**req, "execution_path": task["execution_path"]},
-                            args.workspace)
-                    except crossjob.ResumeDenied as exc:
-                        raise Denied(str(exc)) from None
                 else:
                     receipt = (
                         (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
@@ -1543,10 +1500,7 @@ def main() -> int:
                 }
                 task_failed = (
                     (args.action == "execute-codex"
-                     and receipt.get("status") != (
-                         "NEW_EXPECTED_TEST_FAIL" if args.resume_phase == "new"
-                         else "RESUME_FIX_PASS" if args.resume_phase == "resume"
-                         else "EVIDENCE_READY_REVIEW_REQUIRED"))
+                     and receipt.get("status") != "EVIDENCE_READY_REVIEW_REQUIRED")
                     or (task.get("native_preflight") == NATIVE_PREFLIGHT
                         and receipt.get("status") != "OBSERVED")
                 )

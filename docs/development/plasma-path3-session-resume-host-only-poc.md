@@ -1,6 +1,6 @@
 # PLASMA Path 3 — Controlled Codex Session Resume Host-only PoC
 
-**Historical Gate 1 / Path 1, Host-only PoC.** This standalone CPU-only probe did **not itself** install a trusted Path 3 Cross-Job Resume route. A later, narrowly scoped `page-boundary-off-by-one` conditional `development-codex-resume` Job now exists in `main`; it is an optional fixture, not general Path 3 behavior or hardware authorization. Ordinary Path 3 still runs one autonomous `codex exec` Job. This historical PoC granted no SWPC Runner, Z2, DUT, FPGA, USB, power or deployment privileges.
+**Historical Gate 1 / Path 1, Host-only PoC.** This standalone CPU-only probe did **not itself** authorize a hardware run. A later `page-boundary-off-by-one` conditional `development-codex-resume` Job was installed on `main`, but is **retired by the 2026-10-27 Path 3 simplification PR**. Only the standalone offline research fixture is retained. Ordinary Path 3 uses one owner-authenticated `codex exec` Job. This historical PoC grants no SWPC Runner, Z2, DUT, FPGA, USB, power or deployment privileges.
 
 ## Engineering decision
 

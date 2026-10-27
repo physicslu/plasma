@@ -1,27 +1,8 @@
-# PLASMA — Historical shared SWPC Codex worker for SW and LA2016
+# PLASMA — Historical SWPC Codex software-only MVP
 
-## Scope and operational model
+**Historical reference, not the active Path 3 hardware path.** The original Issue #981 C11 pilot and LA2016 experiment shared the `SWPC-plasma-codex` worker. The LA-only Supervisor, Direct A/B, and diagnosis workflows/scripts were retired in the 2026-10-26 Path 3 direct hardware CLI consolidation. The old LA Issue commands cannot dispatch hardware.
 
-**Gate 1 only: source changes and GitHub-hosted offline tests.** No software Codex
-execution, device opening, Z2 SSH, LA PWM, USB Hub power action, host provisioning,
-deployment or merge is approved by this change. A later separate Gate 2 is
-required for merge. **Merge alone is not live-execution authorization.**
-
-Use the existing, separately registered `SWPC-plasma-codex` GitHub runner and
-non-root `plasma-codex` Linux user, with its existing `plasma-codex-io`
-and `plasma-monitor` groups. Do not create another account, worker or
-hardware-control service. The two retained historical fixed **workloads** are:
-
-| Workload | Workflow | One exact owner command on Issue #981 |
-| --- | --- | --- |
-| C11 SW example | `.github/workflows/plasma-codex-software-mvp.yml` | `/plasma-codex hello-c 981` |
-| LA2016 Direct PWM / capture | `.github/workflows/plasma-codex-la2016-direct.yml` | `/plasma-codex la2016-direct 981` |
-
-Both retained workflows schedule the same `[self-hosted, linux, x64, plasma-codex]`
-runner. They are **not** interchangeable authorization scopes. The former dedicated Z2 SWD-05 dispatch has been retired; the existing LA
-workflow retains its OFF controls. Shared Path 2/3 Z2 execution and SSH
-credentials are governed by their current Development Mode contracts, not
-by this historical MVP workflow. Live readiness is not certified by hosted CI.
+The C11 workflow `.github/workflows/plasma-codex-software-mvp.yml` remains dormant for its historical offline tests. It is not an authorization to use LA2016 or PYNQ-Z2. Current hardware work uses [Path 3 Direct Hardware Tools](plasma-path3-direct-hardware-tools.md) via the shared Dispatcher and approved Work Order.
 
 ## Reason for the change (evidence, not speculation)
 
