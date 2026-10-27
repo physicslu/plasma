@@ -1,6 +1,6 @@
 {
   "schema": "plasma.mpe.architecture.v1",
-  "status": "ARCHITECTURE_ONLY_NOT_IMPLEMENTED",
+  "status": "RTL_SLICE_SOURCE_ONLY_UNVERIFIED",
   "image_family": "plasma.mpe.swd.v1",
   "board": "pynq-z2",
   "fpga_part": "xc7z020clg400-1",
