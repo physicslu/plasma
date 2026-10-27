@@ -121,6 +121,11 @@ def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
     reports.mkdir()
     for name in swd.REPORT_NAMES:
         (reports / name).write_text("Synthetic regression fixture ONLY\n")
+    (reports / "check_timing.rpt").write_text(
+        "5. checking no_input_delay (2)\\n"
+        "6. checking no_output_delay (4)\\n")
+    (reports / "methodology.rpt").write_text(
+        "| TIMING-18 | Warning | Missing input or output delay | 6 |\\n")
     xdc = ROOT / "pl/constraints/pynq-z2/z2-swd-independent.xdc"
     sha = "a" * 40
     with pytest.raises(swd.SWDBuildDenied, match="SWD_BUILD_TCL_SIGNOFF_MARKER_MISSING"):
@@ -133,6 +138,42 @@ def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
     assert result["host_build_status"] == "SUPERVISOR_REVIEW_REQUIRED"
     assert result["z2_hil"] == "NOT_RUN"
     assert result["openocd_swd"] == "NOT_QUALIFIED"
+
+
+def test_real_swd_timing18_report_fixture_is_blocked(tmp_path):
+    # Exact counts, severity, and Tcl report headline from real SWPC run.
+    (tmp_path / "check_timing.rpt").write_text(
+        "5. checking no_input_delay (2)\\n"
+        "6. checking no_output_delay (4)\\n"
+        "There are 2 input ports with no input delay specified. (HIGH)\\n"
+        "swdio_site1\\nswdio_site2\\n"
+        "swdclk_site1\\nswdclk_site2\\n")
+    (tmp_path / "methodology.rpt").write_text(
+        "| TIMING-18 | Warning | Missing input or output delay | 6 |\\n")
+    x = swd.audit_external_io_timing(tmp_path)
+    assert x["timing18_warnings"] == 6
+    assert x["unconstrained_input_ports"] == 2
+    assert x["unconstrained_output_ports"] == 4
+    assert x["gate"] == "BLOCKED_MISSING_OFFCHIP_TIMING"
+    assert x["external_io_timing_qualified"] is False
+
+
+def test_zero_warnings_still_requires_real_timing_profile(tmp_path):
+    (tmp_path / "check_timing.rpt").write_text(
+        "5. checking no_input_delay (0)\\n6. checking no_output_delay (0)\\n")
+    (tmp_path / "methodology.rpt").write_text("No timing methodology violations\\n")
+    x = swd.audit_external_io_timing(tmp_path)
+    assert x["gate"] == "PENDING_SOURCE_REVIEWED_TARGET_BOARD_BUDGET"
+    assert x["external_io_timing_qualified"] is False
+
+
+def test_inconsistent_timing_report_is_rejected(tmp_path):
+    (tmp_path / "check_timing.rpt").write_text(
+        "5. checking no_input_delay (2)\\n6. checking no_output_delay (4)\\n")
+    (tmp_path / "methodology.rpt").write_text(
+        "| TIMING-18 | Warning | Missing input or output delay | 5 |\\n")
+    with pytest.raises(swd.SWDBuildDenied, match="SWD_IO_TIMING_REPORTS_DISAGREE"):
+        swd.audit_external_io_timing(tmp_path)
 
 
 def test_operator_entry_is_exact_source_pinned_and_no_root_workflow():
