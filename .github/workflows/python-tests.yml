@@ -18,6 +18,8 @@ on:
       - "pl/verification/cocotb/test_mpe_dual_swd_core.py"
       - "pl/verification/test_mpe_swd_axi_rtl.py"
       - "pl/verification/cocotb/test_mpe_swd_axi.py"
+      - "pl/verification/test_mpe_swd_virtual_target_rtl.py"
+      - "pl/verification/cocotb/test_mpe_swd_virtual_target.py"
       - "pl/sim/mpe_obuf_stub.sv"
       - "scripts/plasmactl"
       - "scripts/render-start.sh"
@@ -44,6 +46,8 @@ on:
       - "pl/verification/cocotb/test_mpe_dual_swd_core.py"
       - "pl/verification/test_mpe_swd_axi_rtl.py"
       - "pl/verification/cocotb/test_mpe_swd_axi.py"
+      - "pl/verification/test_mpe_swd_virtual_target_rtl.py"
+      - "pl/verification/cocotb/test_mpe_swd_virtual_target.py"
       - "pl/sim/mpe_obuf_stub.sv"
       - "scripts/plasmactl"
       - "scripts/render-start.sh"
@@ -111,4 +115,4 @@ jobs:
           sudo apt-get install -y --no-install-recommends iverilog
           python -m pip install 'pytest==8.4.2' 'cocotb==1.9.2' 'cocotb-test==0.2.6'
       - name: Simulate real two-Site MPE RTL, no legacy dependencies
-        run: python -m pytest -vv -s pl/verification/test_mpe_dual_swd_core_rtl.py pl/verification/test_mpe_swd_axi_rtl.py
+        run: python -m pytest -vv -s pl/verification/test_mpe_dual_swd_core_rtl.py pl/verification/test_mpe_swd_axi_rtl.py pl/verification/test_mpe_swd_virtual_target_rtl.py
