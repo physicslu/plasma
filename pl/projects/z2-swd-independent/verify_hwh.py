@@ -162,12 +162,12 @@ def audit_external_io_timing(reports: Path) -> dict:
     meth = (reports / "methodology.rpt").read_text(encoding="utf-8")
     found = {}
     for kind in ("no_input_delay", "no_output_delay"):
-        counts = re.findall(r"checking " + kind + r" \\((\\d+)\\)", ct)
+        counts = re.findall(r"checking " + kind + r" \((\d+)\)", ct)
         require(len(counts) >= 1 and len(set(counts)) == 1,
                 "SWD_IO_CHECK_TIMING_COUNTS_MISSING")
         found[kind] = int(counts[0])
     match = re.search(
-        r"TIMING-18\\s*\\|\\s*Warning\\s*\\|[^\\n]*?\\|\\s*(\\d+)\\s*\\|",
+        r"TIMING-18\s*\|\s*Warning\s*\|[^\n]*?\|\s*(\d+)\s*\|",
         meth)
     timing18 = int(match.group(1)) if match else 0
     # An absent TIMING-18 row is valid only if there are no unmodelled ports.
