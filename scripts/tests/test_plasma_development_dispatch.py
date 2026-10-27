@@ -2232,6 +2232,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertNotIn("--resume-phase", workflow)
         self.assertNotIn("session_resume", dispatcher)
         self.assertNotIn("plasma_path3_cross_job_resume", dispatcher)
+        self.assertNotIn("plasma_path3_session_resume_probe", dispatcher)
+        self.assertNotIn("plasma_path3_session_resume_probe", workflow)
         self.assertNotIn("hardware_stages", dispatcher)
         self.assertNotIn("agent-request.json", dispatcher)
         self.assertNotIn("plasma_development_stage_transport", dispatcher)

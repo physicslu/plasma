@@ -1,15 +1,22 @@
-# PLASMA Path 3 — Controlled Codex Session Resume Host-only PoC
+# PLASMA Path 3 — historical offline Codex Session Resume PoC
 
-**Historical Gate 1 / Path 1, Host-only PoC.** This standalone CPU-only probe did **not itself** authorize a hardware run. A later `page-boundary-off-by-one` conditional `development-codex-resume` Job was installed on `main`, but is **retired by the 2026-10-27 Path 3 simplification PR**. Only the standalone offline research fixture is retained. Ordinary Path 3 uses one owner-authenticated `codex exec` Job. This historical PoC grants no SWPC Runner, Z2, DUT, FPGA, USB, power or deployment privileges.
+> **RETIRED FROM PATH 3 RUNTIME — OFFLINE RESEARCH FIXTURE ONLY (#1181).**
+> **Do not use this document or `plasma_path3_session_resume_probe.py` as a
+> Path 3 middleware, Dispatcher/Work Order contract, CI runtime entrypoint,
+> or hardware operating procedure.** The probe is manual, CPU-only research;
+> its synthetic tests do not authorize SWPC Runner, Z2, DUT, FPGA, USB, power
+> or deployment access.
+
+**Historical Gate 1 / Path 1, host-only PoC.** A later `page-boundary-off-by-one` conditional `development-codex-resume` Job was installed on `main`, then removed by [PR #1181](https://github.com/physicslu/plasma/pull/1181) on 2026-10-27. Only the standalone offline research fixture and its fake-Codex unit tests remain. Ordinary Path 3 uses one owner-authenticated Codex Job with native tools; [the current contract](plasma-path3-direct-hardware-tools.md) is authoritative.
 
 ## Engineering decision
 
 There are two distinct kinds of debug continuity:
 
 1. **Within one Path 3 Job (already supported):** Codex independently iterates Code → Test → Fix → Retest within the same `exec` process. Its context is continuous for that process; no extra Dispatcher retry job is created.
-2. **Across two independent Codex processes / Jobs (special CPU-only opt-in only):** `codex exec resume <thread-id>` may restore the same dialogue. Simply recording the first `thread.started.thread_id` does not prove resume succeeded. Git source pin, task/owner binding, sandbox policy and working files must remain valid.
+2. **Across two independent Codex processes / Jobs (historical CPU-only experiment, now retired from Runtime):** `codex exec resume <thread-id>` may restore the same dialogue. Simply recording the first `thread.started.thread_id` does not prove resume succeeded. Git source pin, task/owner binding, sandbox policy and working files must remain valid in any separate research experiment.
 
-**This Gate 1 demonstrates the host-side probe contract** using deterministic offline fake-CLI tests and, after the Owner's explicit SWPC-specific Gate 1 scope revision, **one real SWPC interactive-user Codex CLI NEW → FAIL → RESUME → PASS execution** (Owner-provided output; see evidence below). This real test verifies two consecutive Codex processes inside one manual wrapper, **not** resumption across GitHub Actions Jobs. The separate exact CPU-only Cross-Job fixture is implemented in the trusted Workflow, but its existence is **not** evidence of successful SWPC two-Job resumption; check live run receipts. General-purpose Path 3 Cross-Job Resume is not enabled.
+**This historical Gate 1 demonstrated the host-side probe contract** using deterministic offline fake-CLI tests and, after the Owner's explicit SWPC-specific Gate 1 scope revision, **one real SWPC interactive-user Codex CLI NEW → FAIL → RESUME → PASS execution** (Owner-provided output; see evidence below). That reported test covered two consecutive Codex processes in one manual wrapper, **not** resumption across GitHub Actions Jobs. The later exact CPU-only Cross-Job workflow fixture was removed by #1181; neither it nor general-purpose Cross-Job Resume is a current Path 3 Runtime capability.
 
 ## Continuous debugging example: Page-boundary off-by-one
 
@@ -24,8 +31,8 @@ Expected test flow:
 | Stage | Command / action | Expected evidence |
 | --- | --- | --- |
 | Preflight | exact pinned Git HEAD, clean isolated checkout, fixture baseline unittest | baseline **FAIL**, no preexisting probe directory |
-| NEW (turn 1) | `codex exec --json --sandbox workspace-write`, review bug **without editing files** | valid UUID `thread.started`, `turn.completed` usage, code still FAIL, challenge not written to files |
-| RESUME (turn 2) | `codex exec --json resume <exact UUID>`, same cwd; explicit sandbox and network restrictions | **same** `thread.started` UUID; source fixes off-by-one; original `unittest` PASS; proof contains exact first-turn challenge |
+| NEW (turn 1) | `codex exec --json -` under the separately checked historical operator isolation; review bug **without editing files** | valid UUID `thread.started`, `turn.completed` usage, code still FAIL, challenge not written to files |
+| RESUME (turn 2) | `codex exec --json resume <exact UUID> -`, same cwd; operator must independently verify sandbox/network restrictions | **same** `thread.started` UUID; source fixes off-by-one; original `unittest` PASS; proof contains exact first-turn challenge |
 | Admission verdict | independent subprocess/unit tests + challenge check + Git status | **PASS only if all above succeed**, otherwise FAIL; raw prompts/transcripts are never saved |
 
 Strict negatives: new thread after resume → `RESUMED_THREAD_MISMATCH`; fixed code but challenge missing → `CHALLENGE_NOT_RECOVERED`; altered test → `TEST_MODIFIED`; first turn unexpectedly fixes issue → `FIRST_TURN_PREMATURE_FIX`; changed Git ref or edits outside scratch directory → `UNAUTHORIZED_WORKSPACE_CHANGE`; expired/missing ID/usage → explicit failure. No automatic retries, new Session fallback, or hardware/privilege escalation.
@@ -36,9 +43,9 @@ A second **fresh** agent could simply inspect the file and repair a trivial bug.
 
 ## Offline test and real Host-only invocation
 
-The existing GitHub-hosted `plasma-engineering-runtime-dispatch.yml` PR contract job runs `scripts/tests/test_plasma_development_dispatch.py`; its new `Path3SessionResumeHostOnlyProbe` suite injects a **fake Codex subprocess**. It asserts NEW → FAIL → RESUME → PASS, UUID mismatch, challenge missing, premature success, first-turn failure, dirty source and missing telemetry. **No model is called during CI**. Host-only CI success must be labeled `SIMULATED_PASS`, not `SWPC_RESUME_PASS`.
+The retained `Path3SessionResumeHostOnlyProbe` suite in `scripts/tests/test_plasma_development_dispatch.py` injects a **fake Codex subprocess**. It checks NEW → FAIL → RESUME → PASS and negative cases including UUID mismatch, missing challenge, premature success, first-turn failure, dirty source and missing telemetry. **No model is called by these unit tests**, and the probe is not a workflow or Dispatcher entrypoint. Host-only CI success is synthetic evidence, **not** `SWPC_RESUME_PASS`.
 
-**Manual standalone invocation contract:** The Owner executed this once on SWPC as an unprivileged interactive user inside a restricted Bubblewrap mount namespace with an isolated clean Git Worktree, rather than as the SWPC GitHub Actions Runner. Do **not** run the raw CLI example below on a privileged or unisolated SWPC host; the actual Owner-approved SWPC run used a separate outer Bubblewrap launcher and a dedicated Codex session store. This command is only the underlying inner probe:
+**Historical manual invocation example (not a current Path 3 procedure):** The Owner executed this once on SWPC as an unprivileged interactive user inside a restricted Bubblewrap mount namespace with an isolated clean Git Worktree, rather than as the SWPC GitHub Actions Runner. Do **not** run the raw CLI example below on a privileged or unisolated SWPC host; the actual Owner-approved SWPC run used a separate outer Bubblewrap launcher and a dedicated Codex session store. This command is only the underlying inner probe:
 
 ~~~bash
 # Only in an explicitly authorized disposable local checkout, after reviewing the CLI version:
@@ -50,7 +57,7 @@ python3 scripts/plasma_path3_session_resume_probe.py \
 
 Running it creates a fresh untracked `.plasma-path3-resume-probe/` directory and owner-only `receipt.json`, does not commit or push, and refuses to overwrite an existing probe. The caller must review the local source, stdout hashes and receipt; never commit raw Codex rollout data. A failed attempt remains auditable rather than triggering a hidden retry. A nonzero exit or missing real `thread.started` is FAIL, not automatically recovered with `--last`.
 
-**Sandbox caution:** Some Codex releases do not accept `--sandbox` on `exec resume` and may not preserve the original explicit policy when resuming. The probe sets `sandbox_mode="workspace-write"` **again for both processes**, keeps `sandbox_workspace_write.network_access=false`, and never requests full access. The Owner additionally checked Bubblewrap OS-level mount isolation on SWPC (`bubblewrap 0.6.1`), with no real device nodes or primary project tree visible in the probe namespace. These checks do **not** prove a complete host or network security boundary: model connections remain possible and a read-only model authentication file was available to the isolated process. No privileged SWPC GitHub Runner/HIL worker was invoked.
+**Sandbox caution:** Some Codex releases do not accept `--sandbox` on `exec resume` and may not preserve the original explicit policy when resuming. **The retained probe does not set `--sandbox` or network policy in either Codex command**; its effective policy depends on the invoking operator's configuration and any separate outer isolation. For the reported historical SWPC run, the Owner separately checked Bubblewrap OS-level mount isolation (`bubblewrap 0.6.1`), with no real device nodes or primary project tree visible in that namespace. These checks do **not** prove a complete host or network security boundary: model connections remained possible and a read-only model authentication file was available to the isolated process. No privileged SWPC GitHub Runner/HIL worker was invoked. The current Path 3 Runtime instead explicitly pins its own Codex sandbox policy per the [current contract](plasma-path3-direct-hardware-tools.md).
 
 ## Real SWPC Codex Direct evidence — Owner-reported 2026-10-23 (Asia/Taipei)
 
@@ -82,10 +89,10 @@ Running it creates a fresh untracked `.plasma-path3-resume-probe/` directory and
 
 **Acceptance rationale:** The probe's own checks require the same `thread.started` UUID in both processes, no premature repair, an unchanged test file, no out-of-probe Git edits, a failing test before and after the diagnosis-only turn, a repaired test after Resume, and byte-for-byte recovery of a 128-bit challenge that appears only in the first prompt. A **fresh second Session that merely fixes the obvious bug would not satisfy the challenge**. It is concrete evidence of reported cross-process conversation continuity, but not a controlled measure of context/cache causality and not evidence of resumption across separate GitHub Jobs. Second-turn cumulative input exceeded first-turn input; the 177,200 total is a two-turn cost, not a claim of savings versus an independent fresh-session repair.
 
-**Source and evidence boundaries:** The sanitized JSON remains in the Owner's **isolated local Worktree** under `.plasma-path3-resume-probe/receipt.json`, with a separate Owner-local result log; neither is uploaded or independently verified. Do not publish operator-specific absolute paths or private hostnames. Do not archive actual UUID, secret challenge, `auth.json`, rollout JSONL, raw prompt or token. **SWPC Path 3 across-Jobs integration remains NOT_IMPLEMENTED / NOT_RUN; the trusted production Dispatcher was not modified.** The documentation-only evidence addendum does not authorize more model runs or automatic retries.
+**Source and evidence boundaries:** The sanitized JSON remains in the Owner's **isolated local Worktree** under `.plasma-path3-resume-probe/receipt.json`, with a separate Owner-local result log; neither is uploaded or independently verified. Do not publish operator-specific absolute paths or private hostnames. Do not archive actual UUID, secret challenge, `auth.json`, rollout JSONL, raw prompt or token. **Historical SWPC two-Job acceptance was NOT_RUN; that integration is now RETIRED from the trusted Dispatcher and workflow (#1181).** This historical evidence does not authorize more model runs or automatic retries.
 
-## Future production-admission prerequisites (not implemented here)
+## Historical considerations for any new proposal (not implemented or authorized here)
 
-A separate Gate 1 applied to the subsequent exact CPU-only Cross-Job fixture; a *general-purpose* Resume route would still require separate authorization and implementation. It must verify session provenance and storage availability **for the exact Worker owner**, task/work-order digest, Git source SHA/PR HEAD, Git tree/working-diff identity, consistent sandbox/permissions, lease/ownership and timeout/failure semantics. Persistent Runner may erase or relocate original Session rollouts; an ID without matching stored context cannot be trusted. Never load the private session rollout into GitHub Artifacts or put credentials/prompts into receipts. Even with valid Resume, any new hardware stage needs its existing effective owner/guard authorization.
+A separate historical Gate 1 applied to the subsequently retired exact CPU-only Cross-Job fixture. Any *new* general-purpose Resume proposal would require new owner authorization and implementation. It would need session provenance and storage checks **for the exact Worker owner**, task/work-order digest, Git source SHA/PR HEAD, Git tree/working-diff identity, consistent sandbox/permissions, lease/ownership and timeout/failure semantics. Persistent Runner may erase or relocate original Session rollouts; an ID without matching stored context cannot be trusted. Never load a private session rollout into GitHub Artifacts or put credentials/prompts into receipts. No historical Resume experiment supplies new hardware authority.
 
 Suggested policy: resume only an **unfinished, still-approved Work Order** whose exact immutable source, task and owner match; start fresh on unrelated tasks or after a closed/merged work item. Maintain bounded numeric total/cached/noncached/output Token telemetry to understand context growth. No third owner approval gate.

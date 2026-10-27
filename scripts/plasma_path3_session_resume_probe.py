@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Manual CPU-only Path 3 NEW -> FAIL -> RESUME -> PASS probe.
 
+RETIRED FROM PATH 3 RUNTIME — offline research only (#1181).
 No GitHub dispatch, SWPC use, hardware operations or private rollout reads.
 Not a production dispatcher: invoking this script requires an explicit manual
 flag and a clean, isolated checkout of an exact source commit.
