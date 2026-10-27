@@ -1135,7 +1135,7 @@ class EngineeringMonitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
             (directory / "path3.log").write_text(
-                "".join(f"line-{i:03d}: " + ("A" * 100) + "\n"
+                "".join(f"line-{i:03d}: " + ("A-" * 50) + "\n"
                         for i in range(60)))
             frame = mon.render_snapshot(directory, "path3", width=38, height=12)
             lines = frame.splitlines()
