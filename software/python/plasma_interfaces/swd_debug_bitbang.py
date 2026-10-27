@@ -81,7 +81,7 @@ class SwdDebugBitbangCore:
             if self.open or self.poisoned:
                 raise BitbangProtocolError("Debug session already owned or poisoned")
             self._lease()
-            if self._read(0) != (0x30000 | self.site_id):
+            if self._read(0) != (0x40000 | self.site_id):
                 self.poisoned = True
                 raise BitbangProtocolError("Wrong independent Site ABI")
             if self._read(self.MODE) != 0:

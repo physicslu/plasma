@@ -13,7 +13,7 @@ class FakeDevice:
         self.writes = []
         self.fail = False
         for site, base in SITE_BASES.items():
-            self.regs[base] = 0x30000 | site
+            self.regs[base] = 0x40000 | site
             self.regs[base + 0x38] = 0
             self.regs[base + 0x40] = site - 1
 
@@ -97,9 +97,10 @@ def test_no_mode_fallback_or_device_retry_on_lost_lease_and_write_failure():
     assert len(port2.writes) == original_count
 
 
-def test_incorrect_site_abi_rejected_before_debug_drive():
+@pytest.mark.parametrize("old_identity", [0x20001, 0x30001])
+def test_incorrect_site_abi_rejected_before_debug_drive(old_identity):
     port = FakeDevice()
-    port.regs[SITE_BASES[1]] = 0x20001  # transitional old single-response ABI
+    port.regs[SITE_BASES[1]] = old_identity  # superseded independent/legacy ABI
     session = SwdDebugBitbangCore(port, site_id=1, lease_check=lambda: None)
     with pytest.raises(BitbangProtocolError, match="ABI"):
         session.begin()
