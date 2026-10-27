@@ -45,6 +45,8 @@
 
 ## Architecture and contracts
 
+- **Gate 1 Draft / Host-only / NOT_DEPLOYED** — [SWD NORMAL OpenOCD/ARMv7 Boundary](architecture/swd-normal-openocd-armv7-gate1.md)：新增獨立 Site NORMAL 的交易轉接契約與注入式 32-bit MMIO Window、負向測試；未實作真正 OpenOCD C Adapter／ARMv7 LDR/STR，也沒有新 Vivado／Z2／DUT 驗收。
+
 - **Gate 1 / Clean-sheet dual-Site SWD / source-and-RTL simulation only / NOT_DEPLOYED** — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA Y18/Y19、Site 2 = PMODB W14/Y14，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO、可擴充 8-Site 的新 ABI 候選；目前僅有初步雙 Site RTL core Source，尚無 RTL 模擬 PASS、AXI-Lite/FIFO 整合、Bitstream、OpenOCD Native Adapter 或實機 HIL PASS，舊單 Site Remote Bitbang 保留歷史診斷用途，不因本文件被更改或部署。
 
 - **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
