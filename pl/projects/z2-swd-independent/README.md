@@ -10,6 +10,7 @@ Architecture:
 - SWD Site 1 module `plasma_swd_site_axi_lite` at proposed `0x43C01000`; physical JA SWCLK Y18, SWDIO Y19.
 - SWD Site 2 same **independent AXI slave IP** at proposed `0x43C02000`; physical JB SWCLK W14, SWDIO Y14.
 - Each Site has its own transaction FSM, SWCLK divider, per-Site pending command/response, fault, and **exclusive** Normal and guarded Bitbang Debug modes; disabled mode drives SWCLK low and SWDIO Hi-Z.
+- **Gate 1 unqualified-frequency protection:** Normal SWD divider half-period must be at least 50 FCLK cycles (100 MHz FCLK => ≤1 MHz); the default 500 cycles is 100 kHz. Both the AXI register guard and transaction FSM reject faster configuration, after real SWPC datasheet evidence showed the historical 25 MHz setting lacks FPGA-only RX timing budget on Site 2. This 1 MHz ceiling is a conservative development limit, **not a proof of external target/cable timing**.
 - Current prototype is **one command in flight + one retained completion, not the planned 16-deep FIFOs**. IRQ is not wired to PS7; per-Site output remains diagnostic. No SWJ_SEQUENCE, OpenOCD adapter or qualified PS MMIO implementation yet.
 
 New files:
