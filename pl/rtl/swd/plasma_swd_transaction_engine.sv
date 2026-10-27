@@ -97,7 +97,7 @@ module plasma_swd_transaction_engine (
         endcase
     endfunction
 
-    // Only called in the synchronous process; SWCLK is already falling or
+    // Unqualified bring-up gate: MAX 1 MHz at 100 MHz FCLK (half >=50).\n    // Not a device/cable timing signoff; owner must explicitly requalify.\n    // Only called in the synchronous process; SWCLK is already falling or
     // held low when the next bit/ownership takes effect.
     task automatic enter_phase(input phase_t next_phase, input logic [7:0] cycles);
         phase <= next_phase;
@@ -183,7 +183,7 @@ module plasma_swd_transaction_engine (
                 resp_data_valid <= 1'b0;
                 ack_shift <= 3'd0;
                 swclk <= 1'b0;
-                if (cmd_half_period < 16'd2 ||
+                if (cmd_half_period < 16'd50 ||
                     cmd_turnaround != 3'd1 ||
                     cmd_idle_cycles < 8'd8 ||
                     cmd_max_retries != 8'd0 ||
