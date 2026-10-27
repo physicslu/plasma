@@ -3,7 +3,7 @@
 Source: OpenOCD 0.12.0+dev commit
 5088db4c9154ca833c6d558381074b33672e127a, src/jtag/swd.h.
 This is a restricted software compatibility CONTRACT, NOT the actual C
-adapter, loaded firmware, /dev/mem driver or SWD programming qualification.
+adapter, loaded FPGA Image, /dev/mem driver or SWD programming qualification.
 
 OpenOCD SWD_CMD_* bits [1..5] differ from PLASMA's private 9-bit command.
 This module never clocks a pin, guesses AP posted-read values, retries a
