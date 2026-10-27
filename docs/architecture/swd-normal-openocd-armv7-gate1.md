@@ -74,7 +74,24 @@ correctly handle AP delay hints, DPv2 TARGETSEL/no-ACK special behavior,
 WAIT/FAULT/uncertain write semantics, and real SWJ sequence enumeration.
 A Python method name match is **not** source-level API compatibility.
 
-Neither this document nor the new Host-only `LinuxMMIO` port
+A pinned source-level Host-only bridge now exists as
+`swd_opencd_5088_command_contract.py`. It validates OpenOCD `swd_cmd()`
+parity, APnDP, RnW and DP/AP register offsets, translates command bytes into
+the **different** PLASMA private 9-bit command through the shared
+`SwdNativeNormalContract`, and supports explicit 1..256-bit LSB-first SWJ
+payloads. Cross-layer tests assert that OpenOCD DP IDCODE read `0x24`
+becomes FPGA private `0x02`, while OpenOCD AP write `0x3A` becomes
+private `0x0D`. They also test 64/136/224-bit atomic sequences and negative
+callback direction/parity/length cases.
+
+**Important fail-closed scope gaps:** OpenOCD's `ap_delay_hint > 0` is
+rejected rather than guessed as the FPGA's hardcoded 8 idle cycles; DPv2
+no-ACK TARGETSEL is rejected rather than falsely claiming an ACK. The real
+`enum swd_special_seq` mapping, OpenOCD queue result-pointer lifetime,
+AP posted-read ordering/RDBUFF, error-code conversion, C driver integration
+and native cross-compilation are still **NOT_IMPLEMENTED**.
+
+Neither this document nor the two Host-only integration contracts
 implements or compiles a native OpenOCD C adapter.
 
 ## ARMv7 MMIO word width contract

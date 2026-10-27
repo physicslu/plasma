@@ -154,3 +154,24 @@ def test_bounded_queue_strict_validation_and_256bit_atomic_staging():
     assert (SITE_BASES[1] + 0x64, 256) in [
         (addr, value) for item in fake.calls if len(item) == 3
         for _, addr, value in [item]]
+
+
+def test_pinned_opencd_command_codec_to_real_host_normal_queue():
+    from plasma_interfaces.swd_opencd_5088_command_contract import (
+        OpenOcd5088HostContract,
+    )
+    fake = FakeSites()
+    normal_contract = normal(fake)
+    bridge = OpenOcd5088HostContract(normal_contract)
+    # OpenOCD swd_cmd(read DP IDCODE)=0x24, private FPGA CMD is 0x02.
+    bridge.read_reg(0x24)
+    # OpenOCD swd_cmd(write AP A[3:2]=3)=0x3A; private CMD is 0x0D.
+    bridge.write_reg(0x3A, 0xCAFEBABE)
+    results = bridge.run()
+    assert [(r.tag, r.kind, r.ack) for r in results] == [
+        (1, OperationKind.READ, 1), (2, OperationKind.WRITE, 1)]
+    assert pushes(fake) == [
+        (SITE_BASES[1] + 0x14, (1 << 16) | 0x02),
+        (SITE_BASES[1] + 0x14, (2 << 16) | 0x0D),
+    ]
+    assert normal_contract.run() == ()
