@@ -27,6 +27,56 @@ the **single source of register sequencing and command encoding**.
   build, binary and target tests = NOT_RUN. Existing production OpenOCD
   0.12.0 remains untouched.
 
+## ABI v5 native LinuxMMIO / Site Lease integration (Host-only)
+
+The project now supplies `swd_native_linux_mmio.py` with
+`swd_site_aperture(site_id)` and `SwdNativeLinuxMMIOPort`. These reuse
+the existing `LinuxMMIO` and `SiteMMIO` ownership/mapping APIs, plus
+the existing SHA-pinned `ARMv7DMBBarrier`, rather than opening an alternate
+driver/backend or resurrecting the old bitbang WordPort.
+
+- The independently leased Site 1/2 bases are **candidates**
+  `0x43C01000` and `0x43C02000`; they still require exact-HWH verification.
+- Readable registers: `00 04 08 0C 18 1C 24 28 2C 30 34 38`.
+  Writable registers: `08 0C 10 14 20 28 2C 30 34 38 44 48 4C
+  50 54 58 5C 60 64` (hexadecimal byte offsets). Any other offset,
+  including retired SWD Debug offsets `0x3C/0x40`, is denied locally
+  without MMIO. The hardware additionally returns SLVERR for them.
+- The adapter requires an **already-open** `LinuxMMIO`, an exclusive
+  correctly numbered `SiteMMIO` lease and its exact per-Site access policy.
+  No FPGA download, Root authorization, voltage authorization or OS
+  privilege is acquired by construction.
+- ARMv7 hardware access requires `ARMv7DMBBarrier`; an injected fake
+  barrier is allowed ONLY on a non-symlink REGULAR FILE under Host-only CI.
+  Barrier uncertainty poisons the **entire shared LinuxMMIO mapping**, not
+  merely one Site. The associated Source/Test cases cover 2-Site ownership,
+  v5 identities, wrong Site/ABI, retired offsets, invalid width, symlink,
+  stale lease and cross-Site fail closed.
+- `LinuxMMIO` currently implements native CPython
+  `memoryview(...).cast("I")` word reads/writes. These tests **do not
+  prove ARMv7 LDR/STR instructions, Device memory page attributes,
+  posted AXI completion or physical bus abort recovery**. ARMv7 ELF/
+  disassembly and real PS7/PL/MMIO qualification remain NOT_RUN.
+
+## Exact OpenOCD 5088db4c source API mismatch (C Adapter still pending)
+
+PR #1196 used OpenOCD `0.12.0+dev` source
+`5088db4c9154ca833c6d558381074b33672e127a`, **not** the
+`v0.12.0` release. Its
+`src/jtag/swd.h` `struct swd_driver` has
+`init(void)`, `switch_seq(enum swd_special_seq)`,
+`read_reg(uint8_t cmd, uint32_t *value, uint32_t ap_delay_hint)`,
+`write_reg(uint8_t cmd, uint32_t value, uint32_t ap_delay_hint)` and
+`run(void)`. OpenOCD's command-byte bit layout is **not** the private
+9-bit FPGA `encode_transfer` layout. A real C adapter must decode
+SWD APnDP, RnW, address and parity, preserve queued result-pointer lifetime,
+correctly handle AP delay hints, DPv2 TARGETSEL/no-ACK special behavior,
+WAIT/FAULT/uncertain write semantics, and real SWJ sequence enumeration.
+A Python method name match is **not** source-level API compatibility.
+
+Neither this document nor the new Host-only `LinuxMMIO` port
+implements or compiles a native OpenOCD C adapter.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks
@@ -40,7 +90,7 @@ do not prove that CPython emits ARMv7 LDR/STR instead of byte stores.
 `struct.pack_into("<I", ...)` cannot be substituted for architectural
 MMIO width and ordering evidence.
 
-Still blocking: target-specific 32-bit native accessor implementation,
+Still blocking: target-specific native 32-bit access width qualification,
 ARMv7 disassembly (LDR/STR, DMB) and Device mapping attributes; PS7 AXI
 error/interrupt admission; fresh exact-HEAD Vivado Timing/DRC/BIT/HWH;
 actual Z2 HIL; version-qualified OpenOCD Native C adapter.

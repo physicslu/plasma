@@ -49,7 +49,7 @@ class NormalResult:
 class SwdNativeNormalContract:
     """Inert read_reg/write_reg/switch_seq/run contract for ONE leased Site.
 
-    The caller must verify Image/Manifest, exclusive lease, v4 identity and
+    The caller must verify Image/Manifest, exclusive lease, v5 identity and
     NORMAL mode independently. The current host-only implementation submits
     at most one transaction at a time, even though FPGA FIFO depth is 16.
     """
