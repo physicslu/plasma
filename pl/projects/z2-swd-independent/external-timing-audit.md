@@ -32,9 +32,15 @@ At the SLOW process corner, `clk_fpga_0` launch-to-SWCLK-pad maximum is Site 1 *
 
 At the historical `half_period=2` (20 ns / 25 MHz), illustrative FPGA-only margin: Site 1 **+1.601 ns**, Site 2 **−0.394 ns**. Thus the historical 25 MHz register setting could **not** be qualified even before any real target or wire delay. These derived numbers are a **path feasibility audit**, not a formal STA max/min SWD interface sign-off; target/board and IOBUF turnaround are still missing.
 
-New Gate 1 source-only guard in both per-Site AXI register and engine rejects `half_period <50`. At 100 MHz fabric clock the **provisional Normal SWD ceiling is 1 MHz** (500 ns half-cycle), with default `half_period=500` (100 kHz) unchanged. The guard reduces accidental exposure; it is **not evidence that 1 MHz is electrically supported across DUTs**. Debug Bitbang remains separately gated by mode/host MMIO and does not inherit a deterministic SWCLK frequency. Larger operating range may be enabled only in a *separate measured/timed qualification change*.
+**Owner-approved Gate 1 revision:** both per-Site AXI register and engine now reject `half_period <4`, while the independent Site register reset `half_period=500` (100 kHz) remains unchanged. `N=4` is a **12.5 MHz design maximum candidate**, *not* the DUT-qualified operating frequency. Upper-layer PS/OpenOCD/IC Programming Profile requests each Site's divider dynamically while idle; `N=2`/`N=3` remain denied. Debug Bitbang remains an independent host-driven mode without a fixed-rate SWCLK. `12.5 MHz` must undergo new routed Vivado internal timing, FPGA-only 40 ns half-cycle feasibility check, and later external DUT/cable min/max timing plus separate authorized HIL before marked supported. Do not unconditionally release a 12.5 MHz host setting to devices.
 
 The actual `report_io` confirms Site1 SWCLK Y18/SWDIO Y19 and Site2 SWCLK W14/SWDIO Y14, IO Bank 34, `LVCMOS33`, current implemented SLEW=`SLOW`, DRIVE=`12 mA`. These are **observed current implementation values**, not board-level signal-quality validation or deliberate final electrical selection.
+
+## 12.5 MHz engineering sign-off distinction (Owner Gate 1)
+
+At 100 MHz FCLK, the design candidate N=4 produces 12.5 MHz (40 ns half-cycle), N=500 produces the unchanged 100 kHz default, N=3 would exceed the candidate max (16.67 MHz) and must be rejected. Independent Site 1/2 dynamic dividers permit different speeds simultaneously. Current routed **previous 1 MHz-image** FPGA-only SLOW corner worst bound Site1 14.159 + 6.461 = 20.620 ns, so the illustrative nominal FPGA-only 12.5 MHz headroom would be 19.380 ns; **these numbers must be recomputed from the new exact 12.5 MHz-capable BIT** and do not include target tCO/cable/electrical margins. Positive nominal headroom is a *necessary but not sufficient* interface condition.
+
+This gate intentionally does **not** change external timing qualification merely because the candidate 12.5 MHz divider is accepted or internal WNS is positive. Maintain `no_input_delay=2`, `no_output_delay=4` and `TIMING-18=6` as BLOCKED until defensible target/board reference-clock timing model, both -min/-max constraints (or separately reviewed justified STA model), and permitted HIL prove the actual SWD interface.
 
 ## Gate to replace the six warnings with real coverage
 
