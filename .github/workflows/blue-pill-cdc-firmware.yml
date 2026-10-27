@@ -15,28 +15,13 @@ permissions:
   contents: read
 
 jobs:
-  host-only-stm32-cross-build:
+  host-only-tests:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Install pinned-distro host-only ARM toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cmake ninja-build gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libnewlib-dev
-      - name: Obtain STM32CubeF1 locked dependency tree
-        shell: bash
-        env:
-          CUBE_DIR: ${{ runner.temp }}/stm32cubef1
-        run: |
-          set -euo pipefail
-          git clone https://github.com/STMicroelectronics/STM32CubeF1.git "$CUBE_DIR"
-          git -C "$CUBE_DIR" checkout c7656f1fee178058be2f8ebfc8df9eaf91dc565e
-          git -C "$CUBE_DIR" submodule update --init Drivers/CMSIS/Device/ST/STM32F1xx Drivers/STM32F1xx_HAL_Driver Middlewares/ST/STM32_USB_Device_Library
       - name: Check v0.1 regression and v0.2 Host-only logic
         shell: bash
         run: |
@@ -53,6 +38,36 @@ jobs:
             -o "$RUNNER_TEMP/blue-pill-v02-host-test"
           "$RUNNER_TEMP/blue-pill-v02-host-test"
           python3 -m unittest discover -s firmware/blue-pill-usb-cdc/host -p 'test_*.py' -v
+
+  host-only-stm32-cross-build:
+    needs: host-only-tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install pinned-distro host-only ARM toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The first run timed out downloading ARM GCC from Azure mirror.
+          sudo sed -i 's#azure.archive.ubuntu.com#archive.ubuntu.com#g' /etc/apt/apt-mirrors.txt
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=45 -y install --no-install-recommends \
+            gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libnewlib-dev
+          cmake --version
+          ninja --version
+      - name: Obtain STM32CubeF1 locked dependency tree
+        shell: bash
+        env:
+          CUBE_DIR: ${{ runner.temp }}/stm32cubef1
+        run: |
+          set -euo pipefail
+          git clone https://github.com/STMicroelectronics/STM32CubeF1.git "$CUBE_DIR"
+          git -C "$CUBE_DIR" checkout c7656f1fee178058be2f8ebfc8df9eaf91dc565e
+          git -C "$CUBE_DIR" submodule update --init Drivers/CMSIS/Device/ST/STM32F1xx Drivers/STM32F1xx_HAL_Driver Middlewares/ST/STM32_USB_Device_Library
       - name: Cross-compile both firmware variants, validate true loadable Flash sizes
         shell: bash
         env:
