@@ -1955,6 +1955,24 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 )
         protected.assert_not_called()
 
+    def test_path2_documentation_does_not_restore_retired_root_work_order(self):
+        import plasma_path2_runtime_integration as integration
+        dispatcher = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
+        loader = (ROOT / "docs/development/path2-generic-fpga-image-loader.md").read_text()
+        policy = (ROOT / "docs/development/development-blocking-policy.md").read_text()
+        index = (ROOT / "docs/README.md").read_text()
+        self.assertNotIn("direct_root_operation(", dispatcher)
+        self.assertIn('raise Denied("RETIRED_PATH2_ROOT_OPERATION")', dispatcher)
+        self.assertIn("HISTORICAL WORK ORDER ONLY", loader)
+        self.assertIn("**Current Path 2:**", loader)
+        self.assertNotIn("admission accept Path 2 hardware requests", loader)
+        self.assertIn("**Retired Path 2 Work Order:**", policy)
+        self.assertIn("**Current Path 3:**", policy)
+        self.assertNotIn("Both Paths use the same fixed\nstage allowlist", policy)
+        self.assertIn("Current / Path 2 guarded-hardware operator-cli", index)
+        self.assertIn("Historical / retired z2-root-operation Work Order", index)
+        self.assertIn("RETIRED FROM LIVE WORK ORDERS", integration.direct_root_operation.__doc__)
+
     def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):
         base = self._order("path2-cli")
         base.pop("scope")
@@ -2232,6 +2250,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertNotIn("--resume-phase", workflow)
         self.assertNotIn("session_resume", dispatcher)
         self.assertNotIn("plasma_path3_cross_job_resume", dispatcher)
+        self.assertNotIn("plasma_path3_session_resume_probe", dispatcher)
+        self.assertNotIn("plasma_path3_session_resume_probe", workflow)
         self.assertNotIn("hardware_stages", dispatcher)
         self.assertNotIn("agent-request.json", dispatcher)
         self.assertNotIn("plasma_development_stage_transport", dispatcher)

@@ -52,3 +52,11 @@ The inventory distinguishes dead standalone programs from a live mandatory inter
 ## Retired code and evidence
 
 The old Issue #981 LA2016 JSON Supervisor, LA-only Direct A/B and diagnosis Workflow/scripts/tests/docs are removed. Their three exact Issue commands no longer have working entrypoints; none are remapped. Existing 2026-10-16/23 evidence and offline verifiers remain. Return authentic command exits, SHA256, device/runner provenance and failure reports. Host-only CI is not proof of live USB/SSH/FPGA/DUT acceptance.
+
+## LA2016 passive input — reuse Owner electrical attestation
+
+**`OWNER_ELECTRICAL_ATTESTATION_REUSE`：** Path 3 Codex 對既有、未改變的 LA2016 被動輸入接線，沿用仍有效的 Owner 電壓及共地確認；**不要求每次量測重新索取 Owner 聲明、類比電壓讀值、照片或增加 Stage／批准 Gate**。Codex 不得因單一 Work Order 未再次列出已確認的電壓／共地，而將數位 LA 無法自行驗證的類比事實當作新的 `NOT_RUN` 阻擋。既有查核以確認配置是否改變為限，不額外建立每次擷取的電氣重新證明流程。
+
+此條不取消**真實電氣危險**停止條件：如果配置已改變、Owner 表示不確定，或有可信的超額電壓、缺少共地、輸出衝突等新證據，必須停止並指出具體原因。保留 Owner Gate 1 操作範圍、原生 Sigrok/USB、Linux DAC/ACL、有效的設備互斥／占用判定、錯誤關閉與證據。PWM1 輸出是另一個電氣範圍；Z2／FPGA／Root Guard 與其他設備保護不變。
+
+此修訂針對 [Run #40495187390](https://github.com/physicslu/plasma/actions/runs/40495187390) 的 Work Order 額外確認造成的零次擷取 `NOT_RUN`。它只修正**未來派工指令／操作文件**，不修改共用 Dispatcher 或自動啟動硬體，也不將任何 hosted test 當成實際 LA 擷取 `PASS`。開放中的 PR #1192 另行處理 LA2016 專用鎖與原生 Driver Busy/Error；本文件修訂不採納或覆寫該 PR 的未合併實作。

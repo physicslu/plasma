@@ -68,5 +68,18 @@ class La2016NativeAccessContracts(unittest.TestCase):
         self.assertIn("Native concurrency rejection has **not** been physically requalified", direct)
 
 
+    def test_native_busy_coexists_with_reusable_owner_electrical_evidence(self):
+        """PR #1192 must preserve PR #1194's passive-input safety contract."""
+        for path in (LA, DIRECT):
+            with self.subTest(path=path.name):
+                doc = path.read_text(encoding="utf-8")
+                self.assertIn("DEVICE_BUSY", doc)
+                self.assertIn("OWNER_ELECTRICAL_ATTESTATION_REUSE", doc)
+                self.assertIn("不要求每次", doc)
+                self.assertIn("Linux DAC/ACL", doc)
+                self.assertNotIn("LA_LOCK_PATH=", doc)
+                self.assertNotIn("flock -x -n", doc)
+        self.assertIn("真實電氣危險", DIRECT.read_text(encoding="utf-8"))
+
 if __name__ == "__main__":
     unittest.main()
