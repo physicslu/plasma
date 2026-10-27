@@ -57,7 +57,7 @@ module plasma_mpe_dual_swd_core #(
             // it does not affect the other Site's engine.
             wire allowed = rst_n && site_enable[s];
 
-            swd_transaction_master u_transaction (
+            plasma_mpe_swd_engine u_transaction (
                 .clk(clk),
                 .rst_n(rst_n),
                 .cmd_abort(cmd_abort[s] || !site_enable[s]),
