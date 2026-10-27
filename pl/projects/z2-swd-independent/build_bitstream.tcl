@@ -29,6 +29,11 @@ open_run impl_1
 set reports [file join $build_dir reports]
 file mkdir $reports
 report_timing_summary -file [file join $reports timing_summary.rpt]
+# Routed die/package I/O electrical and interface path details. These reports
+# provide real FPGA-side evidence; the off-board target/cable envelope still
+# needs a separately verified source-controlled timing profile.
+report_datasheet -file [file join $reports datasheet_io.rpt]
+report_io -file [file join $reports io_pad_configuration.rpt]
 report_drc -file [file join $reports drc.rpt]
 report_methodology -file [file join $reports methodology.rpt]
 report_utilization -file [file join $reports utilization.rpt]
