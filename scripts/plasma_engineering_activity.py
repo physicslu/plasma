@@ -282,8 +282,9 @@ class Path3Activity:
     proves test PASS or authenticates physical operations.
     """
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, *, emit_start_detail: bool = False):
         self.workspace = workspace
+        self.emit_start_detail = emit_start_detail
         self.next_seq = 0
         self.active: dict[str, str] = {}
         self.output_previous: dict[str, str] = {}
@@ -388,6 +389,14 @@ class Path3Activity:
         extra_detail = (self._output_details(identity, item, True)
                   if phase == "item.completed" and
                   category == "command_execution" else b"")
+        start_detail = b""
+        if (phase == "item.started" and category == "command_execution" and
+                self.emit_start_detail):
+            command_detail = safe_cli_detail(item.get("command"))
+            if command_detail is not None:
+                start_detail = detail_wire(identity, "COMMAND", command_detail, "C")
+                if start_detail:
+                    self.command_detail_sent.add(identity)
         if phase == "item.completed":
             self.active.pop(identity, None)
             self.output_previous.pop(identity, None)
@@ -403,7 +412,7 @@ class Path3Activity:
         }
         wire = (PREFIX + json.dumps(record, ensure_ascii=True,
                                    separators=(",", ":")) + "\n").encode("ascii")
-        return (wire + extra_detail) if len(wire) <= MAX_EVENT_BYTES else extra_detail
+        return (wire + start_detail + extra_detail) if len(wire) <= MAX_EVENT_BYTES else (start_detail + extra_detail)
 
 
 def parse_public_line(line: str) -> dict | None:

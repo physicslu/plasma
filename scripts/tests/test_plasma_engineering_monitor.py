@@ -1618,6 +1618,38 @@ if op in ("new-session", "new-window"):
 
 
 
+    def test_live_path3_shows_safe_cli_arguments_at_item_start(self):
+        with tempfile.TemporaryDirectory() as td:
+            source = activity.Path3Activity(
+                Path(td), emit_start_detail=True)
+            item = {"id": "cmd0", "type": "command_execution",
+                    "command": "sigrok-cli --scan"}
+            wire = source.project({"type": "item.started", "item": item})
+            lines = wire.decode().splitlines()
+            self.assertEqual(len(lines), 2)
+            self.assertEqual(activity.parse_public_line(lines[0])["state"],
+                             "RUNNING")
+            detail = activity.parse_detail_line(lines[1])
+            self.assertEqual(detail["stream"], "COMMAND")
+            self.assertEqual(detail["text"], "sigrok-cli --scan")
+            next_wire = source.project({"type": "item.updated", "item": {
+                **item, "aggregated_output": "Device: kingst-la2016\n"}})
+            self.assertNotIn(b'"stream":"COMMAND"', next_wire)
+            self.assertIn(b'"stream":"COMBINED"', next_wire)
+            for n, command in enumerate((
+                "ssh root@private-host hostname",
+                "sigrok-cli --scan; echo PASSWORD=secret",
+                "sigrok-cli -o /home/operator/secret.sr",
+                "bash -lc 'echo hello'",
+            )):
+                unsafe = activity.Path3Activity(
+                    Path(td), emit_start_detail=True).project({
+                        "type": "item.started", "item": {
+                            "id": "unsafe" + str(n),
+                            "type": "command_execution", "command": command}})
+                self.assertEqual(unsafe.count(activity.PREFIX.encode()), 1)
+                self.assertNotIn(activity.DETAIL_PREFIX.encode(), unsafe)
+
     def test_execution_detail_fail_closed_sanitizer_and_spoofing(self):
         safe = activity.detail_wire(
             "cmd_1", "COMBINED", "Device: kingst-la2016", "C")
