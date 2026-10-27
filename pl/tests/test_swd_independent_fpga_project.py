@@ -97,3 +97,12 @@ def test_offchip_swd_timing_signoff_cannot_be_inferred_from_internal_wns():
     assert "set_input_delay 0" not in xdc
     assert "set_output_delay 0" not in xdc
     assert (PROJECT / "external-timing-audit.md").is_file()
+
+def test_unqualified_fast_swd_frequency_is_denied_at_both_layers():
+    site = (PL / "rtl/swd/plasma_swd_site_axi_lite.sv").read_text()
+    engine = (PL / "rtl/swd/plasma_swd_transaction_engine.sv").read_text()
+    # 100 MHz FCLK; 50 half-period cycles = 1 MHz SWCLK ceiling.
+    assert "data_w[15:0] >= 50" in site
+    assert "cmd_half_period < 16'd50" in engine
+    assert "half_q <= 16'd500" in site  # 100 kHz reset default
+    assert "DATA/OE" not in (PL / "constraints/pynq-z2/z2-swd-independent.xdc").read_text()
