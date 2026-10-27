@@ -55,9 +55,8 @@ cmp -s plasma-blue-pill-cdc.bin round-02-readback.bin
 SIGROK_APPIMAGE=/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage
 
 # 先執行 la2016-tool-operations.md 的受控初始化：
-# Codex 已動態查明 LA_CONN 和現有可讀的韌體資源路徑，不要手動填或覆蓋。
+# Codex 已動態查明 LA_CONN；LA2016 內部 firmware/FPGA 資源檢查不再是擷取的前置條件。
 : "${LA_CONN:?Run LA2016 live USB discovery first}"
-: "${SIGROK_FIRMWARE_PATH:?Run LA2016 firmware discovery first}"
 : "${OUT:?Set a fresh output .sr path first}"
 
 sha256sum "$SIGROK_APPIMAGE"
@@ -72,7 +71,7 @@ sha256sum "$SIGROK_APPIMAGE"
 
 此命令來源是 2026-10-23 三輪 Program／Verify 的受控 `*-sanitized.json` 紀錄。抓取窗口長度 50,000,000 samples / 5 MHz = **10 seconds**；需與實際 ST-LINK 命令時間重疊才可聲稱抓到該操作的訊號。**不要**在這個實驗中開啟 LA2016 PWM1，且不可同時讓 Z2 與 ST-LINK 驅動目標。
 
-如果發生 `Failed to open resource 'kingst-la-01a2.fw'`，先核對成功的 `SIGROK_FIRMWARE_PATH`、受控資源檔案、AppImage SHA、可讀權限與 Driver 啟動環境；不能直接歸因於 LA2016 損壞或 FPGA SWD IP。可參考 [2026-10-16 實測 LA2016 啟動環境](../evidence/la2016-pwm-loopback/2026-10-16/README.md)。修復未驗證前禁止報告 `CAPTURE_PASS`。
+**不執行 LA2016 內部 MCU／FPGA 韌體檔案、路徑、來源或 SHA 的額外 Preflight。** 若原生 Sigrok 本次實際回報 `Failed to open resource 'kingst-la-01a2.fw'`，以真實 Runtime FAIL 記錄並停止，不自動搜尋、安裝或更新韌體，也不能直接歸因於 LA2016 硬體損壞或 Z2 FPGA。工具來源 SHA 與真正 `.sr` 波形驗證仍須執行，參見 [LA2016 現行存取契約](la2016-tool-operations.md)。
 
 ## 4. 可比對的 SWD 成功基準與驗收邊界
 
