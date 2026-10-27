@@ -101,8 +101,12 @@ def test_offchip_swd_timing_signoff_cannot_be_inferred_from_internal_wns():
 def test_unqualified_fast_swd_frequency_is_denied_at_both_layers():
     site = (PL / "rtl/swd/plasma_swd_site_axi_lite.sv").read_text()
     engine = (PL / "rtl/swd/plasma_swd_transaction_engine.sv").read_text()
-    # 100 MHz FCLK; 50 half-period cycles = 1 MHz SWCLK ceiling.
-    assert "data_w[15:0] >= 50" in site
-    assert "cmd_half_period < 16'd50" in engine
+    # Candidate design maximum: 100 MHz / (2*4) = 12.5 MHz.
+    # Do not conflate this RTL admission with any target's HIL-qualified max.
+    assert "MIN_HALF_PERIOD = 16'd4" in site
+    assert "MIN_HALF_PERIOD = 16'd4" in engine
+    assert "data_w[15:0] >= MIN_HALF_PERIOD" in site
+    assert "cmd_half_period < MIN_HALF_PERIOD" in engine
     assert "half_q <= 16'd500" in site  # 100 kHz reset default
+    assert "12.5MHz" in site and "12.5MHz" in engine
     assert "DATA/OE" not in (PL / "constraints/pynq-z2/z2-swd-independent.xdc").read_text()
