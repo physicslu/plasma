@@ -2,6 +2,8 @@
 
 **狀態：Reference / 2026-10-16 與 2026-10-23 實際驗證。** 本文件整理 PLASMA 已經成功執行的 LA2016 操作，而非新硬體能力或普遍授權。真實量測必須另有 Owner 授權，排他使用 USB Device，且不得讓 LA2016 產生未授權電氣輸出。
 
+**存取契約（2026-10-27，Owner 核准）：** 正式使用 `plasma-codex → 已釘選 Sigrok AppImage → 原生 kingst-la2016 driver → LA2016`。取消 LA2016 儀器本身 `kingst-la-01a2.fw` 與 `kingst-la2016a2-fpga.bitstream` 的檔案搜尋、存在、來源及 SHA **前置阻擋**；不要求 `SIGROK_FIRMWARE_PATH` 已設定，也不清除原有值。原生 Driver 若在開啟或擷取時實際回報韌體資源錯誤，應記錄為 `RUNTIME_FAIL`，停止該次實驗，不能宣稱成功或擅自安裝韌體。仍核對 AppImage SHA、當次 USB 裝置身分、接線與授權範圍；**不適用於 Z2 FPGA、Blue Pill 韌體或 Flash 資產。** 本契約來自 [實際成功開啟 Run #40435331668](https://github.com/physicslu/plasma/actions/runs/40435331668) 與 [實際 CH3 擷取 Run #40437737552](https://github.com/physicslu/plasma/actions/runs/40437737552)；後者 CH3 訊號未通過預期 HIGH 驗收，不能寫成電氣 PASS。
+
 ## 1. 工具版本、設備與先決條件
 
 | 項目 | 曾成功的組態 |
@@ -10,12 +12,12 @@
 | sigrok CLI | `0.8.0-git-f44dd91` / libsigrok `0.6.0-git-883c2ac` / `kingst-la2016` Driver |
 | AppImage | `/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage` |
 | AppImage SHA256 | `b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475` |
-| 執行方式 | AppImage **必須**使用 `--appimage-extract-and-run`；先恢復原本 `SIGROK_FIRMWARE_PATH` |
+| 執行方式 | AppImage **必須**使用 `--appimage-extract-and-run`；沿用已存在的環境，**不要求、搜尋或驗證** `SIGROK_FIRMWARE_PATH` |
 | Device Lock | SWPC `/run/lock/plasma-la2016.lock`，同時確認 USB 沒有別的程式占用；單靠 advisory lock 不夠 |
 | 2026-10-23 被動 SWD | CH0 = Blue Pill PA14/SWCLK、CH1 = PA13/SWDIO、CH2 = 3.3V 邏輯狀態；共地 |
 | 2026-10-16 獨立 Loopback | KINGST PWM1 → **同一台** KINGST CH0；與 Blue Pill SWD 測試是完全不同接線 |
 
-**動態辨識：** 本手冊只固定 USB VID:PID `77a1:01a2` 作為識別條件，不固定 `busnum`、`devnum`、`/dev/bus/usb/...` 路徑；Codex／Supervisor 必須在每一次工作執行時查詢並檢查唯一設備、存取權限及佔用狀態。
+**動態辨識：** 本手冊只固定 USB VID:PID `77a1:01a2` 作為識別條件，不固定 `busnum`、`devnum`、`/dev/bus/usb/...` 路徑；當次授權的 Codex／操作程序須確認唯一設備、存取權限及實際佔用狀態。
 
 **相容性注意：** 系統內建 `sigrok-cli` 不必然包含 `kingst-la2016` 驅動，不能因為 PATH 有 sigrok 就替代上述指定 AppImage。歷史證據沒有要求在每次採樣時重新上傳 LA FPGA Firmware；不應額外加入未知初始化步驟。
 
@@ -26,28 +28,10 @@ SIGROK_APPIMAGE=/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage
 sha256sum "$SIGROK_APPIMAGE"
 # 比對上方已釘選的完整 SHA256；不符合就停止。
 
-# 先沿用既有受控工作環境所設定的 SIGROK_FIRMWARE_PATH。
-# 若未設定，Codex 要在現場查找「既有」kingst-la-01a2.fw，
-# 只搜尋既有受控工具／韌體／工作目錄，選定單一來源；不可猜路徑或下載。
-if [ -z "${SIGROK_FIRMWARE_PATH:-}" ]; then
-  mapfile -t FW_FILES < <(
-    for root in /opt/plasma /usr/share/sigrok-firmware /usr/local/share/sigrok-firmware "$PWD/.work"; do
-      [ -d "$root" ] || continue
-      find "$root" -type f -name kingst-la-01a2.fw -print 2>/dev/null
-    done | sort -u
-  )
-  [ "${#FW_FILES[@]}" -eq 1 ] || {
-    echo "LA_FIRMWARE_MISSING_OR_AMBIGUOUS (search previous verified SWPC context)" >&2
-    exit 1
-  }
-  export SIGROK_FIRMWARE_PATH="$(dirname "${FW_FILES[0]}")"
-fi
-[ -r "$SIGROK_FIRMWARE_PATH/kingst-la-01a2.fw" ] || {
-  echo "LA_FIRMWARE_RESOURCE_NOT_READABLE" >&2
-  exit 1
-}
-# 在實際啟動前核對既有資源來源與 SHA（若歷史紀錄有其 digest）。
-# 不把本機私有資源位置或未公開的 USB 詳細識別碼寫入 Git。
+# Owner-approved LA2016 access: NO separate MCU/FPGA firmware file or SHA preflight.
+# SIGROK_FIRMWARE_PATH is optional; preserve the inherited environment unchanged.
+# Let the native sigrok driver report any actual resource or initialization error.
+# No manual LA firmware upload, update, extraction or download in normal capture.
 
 # 動態查找 USB 77a1:01a2；每次執行時從 sysfs 重新取得 busnum/devnum。
 # 沿用 scripts/plasma-codex-la2016.py 的唯一裝置、權限、fuser 策略。
@@ -102,49 +86,11 @@ export LA_CONN
 
 `OUT` 應事先指定為本次唯一且新的 `.sr` 輸出檔。上述命令並非每次都會成功：USB 存取權限、資源路徑、採樣通道／接線及設備占用狀態都要在現場確認。**在實際的 SWD 嘗試開始之前，應先啟動 LA 採樣並保持重疊時間窗**；否則不能稱為該失敗事件的波形。
 
-### 韌體資源問題的已知案例（2026-10-26）
+### 原生 Driver 韌體錯誤：只在實際發生時處理
 
-當 `SIGROK_FIRMWARE_PATH` 未設定／指錯位置，驅動曾顯示：
+歷史上曾觀察到 `Failed to open resource 'kingst-la-01a2.fw'`、`MCU firmware upload failed` 與 `No devices found`。這些是**原生 Sigrok 的執行時錯誤**，不是每次運作前都要預先搜尋、驗證或重新上傳儀器 MCU／FPGA 韌體的依據。自 2026-10-27 起，正常 `--show` 與被動採樣**直接使用已釘選的 AppImage**；不在前置階段要求韌體原始檔、`SIGROK_FIRMWARE_PATH` 或其 SHA256。
 
-```text
-Failed to open resource 'kingst-la-01a2.fw'
-kingst-la2016: MCU firmware upload failed.
-No devices found.
-```
-
-先確認**當前程式環境**的 `SIGROK_FIRMWARE_PATH` 是否有值，以及該路徑是否包含可讀取的、來源可驗證的 `kingst-la-01a2.fw`；再確認 AppImage SHA256、目前 USB device/permission，與未被其他程式占用。**當前故障的最終根因仍須以新的實際 Driver 初始化 PASS 證明**，不能把「曾經成功」視為本次已成功。不得從任意網站下載未知韌體，不得為此修改 FPGA SWD RTL。
-
-### 缺少原廠韌體時的恢復程序（來源已核對，現場仍需實證）
-
-若已確認韌體資源不存在，不要一直重試 `--scan`、`--show` 或 SWD DPIDR。根據 [sigrok 官方 Kingst LA Series](https://sigrok.org/wiki/Kingst_LA_Series) 與 [KINGST 原廠 Linux 下載頁](https://www.qdkingst.com/en/download)，須由原廠 **Linux KingstVIS** 程式提取 **MCU Firmware 與對應 FPGA Bitstream**，才能讓 `kingst-la2016` 初始化。先找既有經驗證的原廠套件，若不存在才取用官方下載，保存整個壓縮包 SHA256 供稽核。
-
-由 Codex 在受控暫存工作目錄使用以下操作契約，不寫死 USB 路徑，不將二進位韌體提交至 Git。首次裝置開啟可能發生 USB 重新列舉，所以需重新執行前述動態 USB 偵測，不得重用原本的 `LA_CONN`。
-
-```bash
-# 準備已確認的原廠 Linux KingstVIS 套件（優先重用 SWPC 已存在的檔案）。
-# 原廠入口：https://www.qdkingst.com/en/download  (for Linux)
-# 解開套件後，由 Codex 確認 KingstVIS 的執行檔；下列程式是示例形式。
-sha256sum "$KINGSTVIS_ARCHIVE"
-tar -tzf "$KINGSTVIS_ARCHIVE" | head
-tar -xzf "$KINGSTVIS_ARCHIVE" -C "$STAGING"
-
-# 只用受信任且固定的 sigrok-util 來源修訂，不使用未核對的社群修補版。
-# 提取腳本位於 sigrokproject/sigrok-util/firmware/kingst-la/
-git clone https://github.com/sigrokproject/sigrok-util.git "$STAGING/sigrok-util"
-git -C "$STAGING/sigrok-util" checkout --detach 249b79d0a94e9ac4ec96533bf3108e2a50e6b38d
-
-cd "$STAGING/firmware-out"
-python3 "$STAGING/sigrok-util/firmware/kingst-la/sigrok-fwextract-kingst-la2016" \
-  "$KINGSTVIS_BINARY"
-
-sha256sum kingst-la-01a2.fw kingst-la2016*-fpga.bitstream
-# 將 SIGROK_FIRMWARE_PATH 指向此受控輸出目錄；確認檔案存在後再啟動 pinned AppImage。
-export SIGROK_FIRMWARE_PATH="$STAGING/firmware-out"
-```
-
-上方 `KINGSTVIS_ARCHIVE`、`STAGING`、`KINGSTVIS_BINARY` 均由 Codex 根據**當次實際檔案**決定，不是需使用者手動填入或寫死的路徑。此操作契約只說明來源恢復方法，尚不代表 2026-10-26 已完成恢復。必須先核對壓縮包來源、解析是否匹配現有版本；不要執行未知安裝腳本或直接覆寫全系統 Firmware。成功擷取後應保留精確版本及 SHA256 的私有 Manifest，供日後重現。
-
-sigrok 官網列出的舊版示例輸出：`kingst-la-01a2.fw` **5430 bytes / CRC32 `720551a9`**，另含 `kingst-la2016-fpga.bitstream` **178542 bytes**，與 `kingst-la2016a1-fpga.bitstream` **178362 bytes**；這是**舊版示例值**，不是新下載版本的保證值。必須以當次實際檔案計算 Hash，並讓驅動依設備辨識選擇對應 Bitstream。<cite>參考 sigrok 官方文件，不直接散佈原廠韌體。</cite>
+若 Driver **本次**真正因缺少資源而失敗：記錄 Driver 輸出的第一個錯誤及 Exit Code，停止；不得把 `RUNNER_SUCCESS` 說成 `DEVICE_PASS`。**恢復或更新 LA2016 內部 MCU／FPGA 韌體是獨立維護工作，只有 Owner 明確要求時才另行調查原廠來源**；不可在波形擷取派工中自行下載、解壓、更新、重載或改寫。舊的成功擷取檔可供診斷，但不是當次成功證明。這項取消僅限 **LA2016 儀器內部資源的額外 preflight**，與 Z2／DUT 的韌體／FPGA Image SHA 守衛無關。
 
 ## 2. 模式 A：被動 SWD 邏輯波形（PLASMA 當前用途）
 
@@ -216,7 +162,7 @@ python3 docs/evidence/la2016-pwm-loopback/2026-10-16/verify.py
 
 每一次真正的 LA 工作都應保存：
 
-1. LA 裝置身分（不公開獨特序號／即時 bus address）、AppImage SHA256、韌體資源的存在與來源校驗狀態、操作員及 Device Lock 狀態。
+1. LA 裝置身分（不公開獨特序號／即時 bus address）、**AppImage SHA256**、原生 Driver 開啟／初始化結果、操作員及適用的 Device Lock 狀態。LA2016 內部 MCU／FPGA 韌體的獨立來源、存在或 SHA 前置檢查標記為 `NOT_REQUIRED_BY_OWNER`；若原生 Driver 報出資源錯誤才記錄 `RUNTIME_FAIL`。
 2. 模式是 **Passive Input** 還是 **PWM Loopback**、實際連線與通道配置、採樣率、Requested／Actual samples、threshold 與捕捉期間。
 3. 原始 `.sr`、命令 Exit Code、帶時間戳記的控制程式／OpenOCD 操作收據、原始檔案 SHA256、decoder output、導出比較報告。
 4. 如曾使用 PWM，保留關閉命令 Exit Code 與**另外擷取**的 OFF 驗證波形。
