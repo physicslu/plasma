@@ -229,7 +229,9 @@ class MVPTests(unittest.TestCase):
             with self.subTest(file=file):
                 self.assertFalse((ROOT / file).exists())
         dispatch=(ROOT/"scripts/plasma_development_dispatch.py").read_text()
-        self.assertIn('"codex", "exec", "--json", "-"',dispatch)
+        self.assertIn('"codex", "exec", "--json", "--sandbox", "workspace-write", "-"',dispatch)
+        self.assertIn('"--sandbox", "danger-full-access", "-"',dispatch)
+        self.assertNotIn('"session_resume"',dispatch)
         self.assertNotIn("validate_agent_request(",dispatch)
         contract=(ROOT/"AGENTS.md").read_text()
         self.assertIn("Path 3 direct hardware tools",contract)
