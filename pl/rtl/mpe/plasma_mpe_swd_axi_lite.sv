@@ -266,8 +266,8 @@ module plasma_mpe_swd_axi_lite #(
                         end
                         8'h18: begin
                             // Completion is immutable until matching POP.
-                            s_axi_rdata <= {active_tag[n][15:0], 3'd0,
-                                link_state[n],resp_attempts[n][4:0],
+                            s_axi_rdata <= {active_tag[n][15:0], 2'd0,
+                                link_state[n],resp_attempts[n][3:0],
                                 resp_data_valid[n],resp_ack[n],resp_status[n]};
                             s_axi_rresp <= OKAY;
                         end
