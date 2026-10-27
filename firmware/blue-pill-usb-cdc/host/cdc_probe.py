@@ -7,15 +7,16 @@ import re
 import time
 
 FIRMWARE_ID = "PLASMA_BLUE_PILL_CDC/0.1"
-HEARTBEAT = re.compile(r"^HB version=(0\.1) seq=(\d+) uptime_ms=(\d+)$")
+HEARTBEAT = re.compile(r"^HB version=(0\.[12]) seq=(\d+) uptime_ms=(\d+)$")
 
 
-def is_firmware_id(line):
-    return line == f"ID {FIRMWARE_ID}"
+def is_firmware_id(line, version="0.1"):
+    return line == f"ID PLASMA_BLUE_PILL_CDC/{version}"
 
 
 class HeartbeatMonitor:
-    def __init__(self, period=0.5, tolerance=0.2):
+    def __init__(self, period=0.5, tolerance=0.2, version="0.1"):
+        self.version = version
         self.period = period
         self.tolerance = tolerance
         self.previous = None
@@ -27,7 +28,8 @@ class HeartbeatMonitor:
         if not match:
             return False
         version, sequence, uptime = match.groups()
-        assert version == "0.1"
+        if version != self.version:
+            return False
         sequence, uptime = int(sequence), int(uptime)
         if self.previous:
             previous_seq, previous_uptime, previous_at = self.previous
@@ -56,7 +58,8 @@ class ReceptionWindow:
     max_silence = 1.5
     coverage = 0.9
 
-    def __init__(self, started_at, duration):
+    def __init__(self, started_at, duration, period=0.5):
+        self.period = period
         self.started_at = started_at
         self.duration = duration
         self.last_at = None
@@ -85,20 +88,21 @@ class ReceptionWindow:
     def finish(self, now, samples):
         self.check(now)
         active = max(0.0, self.duration - self.startup_grace - self.excluded)
-        minimum = max(3, math.floor(active / 0.5 * self.coverage))
+        minimum = max(3, math.floor(active / self.period * self.coverage))
         assert samples >= minimum, f"insufficient heartbeat coverage: {samples} < {minimum}"
 
 
-def run_live(port, duration, tolerance, host_port_pause_seconds=0):
+def run_live(port, duration, tolerance, host_port_pause_seconds=0, version="0.1"):
     if not __debug__:
         raise RuntimeError("probe requires assertions; run Python without -O")
     import serial  # pyserial is needed only for a future physical test.
 
-    monitor = HeartbeatMonitor(tolerance=tolerance)
+    period = 0.5 if version == "0.1" else 1.0
+    monitor = HeartbeatMonitor(period=period, tolerance=tolerance, version=version)
     with serial.Serial(port, 115200, timeout=0.1) as device:
         started_at = time.monotonic()
         deadline = started_at + duration
-        window = ReceptionWindow(started_at, duration)
+        window = ReceptionWindow(started_at, duration, period=period)
         sent_id = False
         got_id = False
         pause_performed = False
@@ -117,7 +121,7 @@ def run_live(port, duration, tolerance, host_port_pause_seconds=0):
                 if pending_host_port_gap:
                     resumed_after_pause = True
                     pending_host_port_gap = False
-            elif is_firmware_id(line):
+            elif is_firmware_id(line, version):
                 got_id = True
             elif line:
                 print(line)
@@ -150,6 +154,8 @@ def run_live(port, duration, tolerance, host_port_pause_seconds=0):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", required=True)
+    parser.add_argument("--version", choices=("0.1", "0.2"), default="0.1",
+                        help="expected Flash image variant (default: v0.1)")
     parser.add_argument("--duration", type=float, default=60.0)
     parser.add_argument("--tolerance", type=float, default=0.2)
     parser.add_argument("--host-port-pause-seconds", type=float, default=0.0,
@@ -164,7 +170,7 @@ def parse_args(argv=None):
 
 def main():
     args = parse_args()
-    run_live(args.port, args.duration, args.tolerance, args.host_port_pause_seconds)
+    run_live(args.port, args.duration, args.tolerance, args.host_port_pause_seconds, version=args.version)
 
 
 if __name__ == "__main__":
