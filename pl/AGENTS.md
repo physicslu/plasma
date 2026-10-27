@@ -14,6 +14,33 @@ Read these documents before changing FPGA/PL behavior:
 
 The retired `z2-swd-gpio` and `z2-swd03-axi` image builds must never be selected for Blue Pill PoC or interpreted as real target DPIDR. Retained shared Identity/Board Files helpers and synthetic RTL are for dependent host-only tests. Follow root `AGENTS.md` and `docs/development/swd-legacy-path-retirement.md` for current Z2 PS-local OpenOCD + WordPort + PL SWD.
 
+## New FPGA Project and SWPC build standard (ADR-0004)
+
+For each **new deliverable FPGA Image family × Board target**, create a
+separately reproducible Vivado Project under `pl/projects/<project-name>/`,
+owning its explicit RTL/IP/BD/XDC sources, source/board pins, Vivado Tcl,
+target-specific HWH/Bitstream verifier and Image Manifest. Common reviewed
+RTL/tooling may be reused, but **new projects MUST NOT inherit the fixed
+F1-B Site 1 build engine or its project-specific verification**.
+
+The **canonical repeatable SWPC Host Build route** for new FPGA Images is the
+trusted **Path 2 `operator-cli`** with an Owner-authorized SHA-pinned Work Order
+and a reviewed, version-controlled Python build entrypoint. That script invokes
+the new Project's Vivado Tcl and records toolchain, timing, DRC/methodology,
+BIT/HWH/BIN (when applicable), full reports and SHA256. Path 3 owner-approved
+engineering experiments remain separate and are not substitutes for a
+qualified Path 2 product build.
+
+`vivado-host-build` is F1-B-specific and **not a general new-Project route**.
+Its retirement is `F1B_BUILD_ENGINE_RETIREMENT_PENDING`: do not expand its
+project allowlist; do not delete its existing historical/recovery dependencies
+until a new MPE operator-cli build is qualified, consumers migrated, safety
+retained and a separate owner-approved Gate 2 retirement PR is accepted.
+New MPE/new product projects shall have no F1-B build-engine or legacy
+single-Site SWD source dependency; CI must test this fail-closed boundary.
+Host Build != FPGA Manager Load, DUT power, PS MMIO, Flash or HIL authorization.
+See `docs/adr/0004-project-isolated-fpga-build-path2-operator-cli.md`.
+
 ## 1. RTL language and coding policy
 
 New synthesizable RTL shall use SystemVerilog (`.sv`).
