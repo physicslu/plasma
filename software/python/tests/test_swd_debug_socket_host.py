@@ -1,5 +1,16 @@
 """Socketpair-only tests, never an OpenOCD process, listener, or DUT."""
 import socket
+from contextlib import contextmanager
+
+
+@contextmanager
+def local_socketpair():
+    client, server = socket.socketpair()
+    try:
+        yield client, server
+    finally:
+        client.close()
+        server.close()
 
 import pytest
 
@@ -37,7 +48,7 @@ def make_core(port, site_id=1, lease=lambda: None):
 def test_connected_unix_socketpair_single_byte_swd_roundtrip_and_clean_q():
     port = FakePort()
     core = make_core(port)
-    with socket.socketpair() as (client, server):
+    with local_socketpair() as (client, server):
         client.sendall(b"OedgcQ")
         assert serve_connected_unix(core, server, max_commands=16) == 6
         assert client.recv(1) == b"1"
@@ -51,7 +62,7 @@ def test_connected_unix_socketpair_single_byte_swd_roundtrip_and_clean_q():
 def test_unsupported_jtag_reset_or_sleep_byte_quiesces_mode(payload):
     port = FakePort()
     core = make_core(port)
-    with socket.socketpair() as (client, server):
+    with local_socketpair() as (client, server):
         client.sendall(payload)
         with pytest.raises(BitbangProtocolError, match="Unsupported"):
             serve_connected_unix(core, server)
@@ -77,7 +88,7 @@ def test_eof_without_q_fails_closed_and_quiesces():
 def test_request_limit_rejects_nonterminating_protocol():
     port = FakePort()
     core = make_core(port)
-    with socket.socketpair() as (client, server):
+    with local_socketpair() as (client, server):
         client.sendall(b"OOQ")
         with pytest.raises(BitbangProtocolError, match="limit"):
             serve_connected_unix(core, server, max_commands=1)
@@ -90,7 +101,7 @@ def test_tcp_socket_and_bad_resource_limits_rejected_before_mode_or_mmio():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcp:
         with pytest.raises(BitbangProtocolError, match="TCP forbidden"):
             serve_connected_unix(core, tcp)
-    with socket.socketpair() as (_, server):
+    with local_socketpair() as (_, server):
         with pytest.raises(ValueError, match="limit"):
             serve_connected_unix(core, server, max_commands=0)
         with pytest.raises(ValueError, match="timeout"):
@@ -101,7 +112,7 @@ def test_tcp_socket_and_bad_resource_limits_rejected_before_mode_or_mmio():
 def test_lease_denial_does_not_start_debug_transport():
     port = FakePort()
     core = make_core(port, lease=lambda: (_ for _ in ()).throw(PermissionError()))
-    with socket.socketpair() as (_, server):
+    with local_socketpair() as (_, server):
         with pytest.raises(BitbangProtocolError, match="lease"):
             serve_connected_unix(core, server)
     assert core.poisoned and not port.writes
