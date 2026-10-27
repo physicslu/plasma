@@ -25,6 +25,8 @@
 
 - **Accepted / Owner architectural policy, PR #1189 pending merge** — [ADR-0004: 新 FPGA Project 與 Path 2 operator-cli 標準](adr/0004-project-isolated-fpga-build-path2-operator-cli.md)：新 FPGA Image 與 Board target 必須各自擁有獨立、可重現的 Vivado Project；SWPC 正式 Host Build 透過 SHA-pinned Path 2 `operator-cli`；F1-B 專屬 Build Engine 標記 `F1B_BUILD_ENGINE_RETIREMENT_PENDING`，完整驗收及獨立 Gate 2 才真正退休，Build 不是部署。
 
+- **Accepted / Owner architectural decision, PR #1189 pending merge** — [ADR-0005: 獨立 SWD AXI IP + Guarded Debug Bitbang](adr/0005-independent-swd-ip-guarded-bitbang.md)：不設額外 FPGA MPE Manager；每個 Site 獨立 AXI Registers/FIFO/Normal FSM，Debug Controlled Bitbang 互斥且預設禁用。**OpenOCD 0.12.0 remote_bitbang 僅支援 JTAG，SWD Debug 尚待新版或受控 Backport 驗證**。歷史 MPE Composite RTL／Project 不得當成正式 Build 或 HIL PASS。
+
 ## Operator
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
