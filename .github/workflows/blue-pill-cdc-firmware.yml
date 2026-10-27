@@ -1,0 +1,79 @@
+name: Blue Pill USB CDC firmware (v0.1 and v0.2)
+
+on:
+  pull_request:
+    paths:
+      - "firmware/blue-pill-usb-cdc/**"
+      - ".github/workflows/blue-pill-cdc-firmware.yml"
+  push:
+    branches: [main]
+    paths:
+      - "firmware/blue-pill-usb-cdc/**"
+      - ".github/workflows/blue-pill-cdc-firmware.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  host-only-stm32-cross-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install pinned-distro host-only ARM toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cmake ninja-build gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libnewlib-dev
+      - name: Obtain STM32CubeF1 locked dependency tree
+        shell: bash
+        env:
+          CUBE_DIR: ${{ runner.temp }}/stm32cubef1
+        run: |
+          set -euo pipefail
+          git clone https://github.com/STMicroelectronics/STM32CubeF1.git "$CUBE_DIR"
+          git -C "$CUBE_DIR" checkout c7656f1fee178058be2f8ebfc8df9eaf91dc565e
+          git -C "$CUBE_DIR" submodule update --init Drivers/CMSIS/Device/ST/STM32F1xx Drivers/STM32F1xx_HAL_Driver Middlewares/ST/STM32_USB_Device_Library
+      - name: Check v0.1 regression and v0.2 Host-only logic
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcc -std=c11 -Wall -Wextra -Werror -fsanitize=undefined \
+            -Ifirmware/blue-pill-usb-cdc/include \
+            firmware/blue-pill-usb-cdc/src/app.c firmware/blue-pill-usb-cdc/tests/test_app.c \
+            -o "$RUNNER_TEMP/blue-pill-v01-host-test"
+          "$RUNNER_TEMP/blue-pill-v01-host-test"
+          gcc -std=c11 -Wall -Wextra -Werror -fsanitize=undefined \
+            -Ifirmware/blue-pill-usb-cdc/include \
+            '-DAPP_VERSION="0.2"' -DAPP_LED_PERIOD_MS=1000u -DAPP_HEARTBEAT_PERIOD_MS=1000u \
+            firmware/blue-pill-usb-cdc/src/app.c firmware/blue-pill-usb-cdc/tests/test_app_v02.c \
+            -o "$RUNNER_TEMP/blue-pill-v02-host-test"
+          "$RUNNER_TEMP/blue-pill-v02-host-test"
+          python3 -m unittest discover -s firmware/blue-pill-usb-cdc/host -p 'test_*.py' -v
+      - name: Cross-compile both firmware variants, validate true loadable Flash sizes
+        shell: bash
+        env:
+          CUBE_DIR: ${{ runner.temp }}/stm32cubef1
+          BUILD_DIR: ${{ runner.temp }}/plasma-blue-pill-build
+        run: |
+          set -euo pipefail
+          cmake -S firmware/blue-pill-usb-cdc -B "$BUILD_DIR" -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$PWD/firmware/blue-pill-usb-cdc/cmake/arm-none-eabi.cmake" \
+            -DARM_GCC_ROOT=/ -DSTM32CUBE_F1_ROOT="$CUBE_DIR"
+          cmake --build "$BUILD_DIR" --verbose
+          python3 firmware/blue-pill-usb-cdc/host/check_artifacts.py "$BUILD_DIR" /usr/bin --variant v0.1
+          python3 firmware/blue-pill-usb-cdc/host/check_artifacts.py "$BUILD_DIR" /usr/bin --variant v0.2
+          (cd "$BUILD_DIR" && sha256sum plasma-blue-pill-cdc.bin plasma-blue-pill-cdc-v0.2.bin > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - name: Archive A/B Flash images and maps (no deployment)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: blue-pill-cdc-ab-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/plasma-blue-pill-build/plasma-blue-pill-cdc.*
+            ${{ runner.temp }}/plasma-blue-pill-build/plasma-blue-pill-cdc-v0.2.*
+            ${{ runner.temp }}/plasma-blue-pill-build/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
