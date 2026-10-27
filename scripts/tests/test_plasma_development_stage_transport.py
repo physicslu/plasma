@@ -205,7 +205,7 @@ class Contracts(unittest.TestCase):
             response = opener.return_value.__enter__.return_value
             response.status = 200
             response.read.return_value = b"x" * 262145
-            with self.assertRaisesRegex(d.Denied, "LIVE_PR_RESPONSE_TOO_LARGE"):
+            with self.assertRaisesRegex(d.Denied, "LIVE_PR_VERIFICATION_FAILED"):
                 d.live_pr_metadata(req)
             response.read.assert_called_once_with(262145)
         with patch.object(d, 'urlopen') as opener:
