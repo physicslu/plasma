@@ -429,7 +429,8 @@ class EngineeringMonitorTests(unittest.TestCase):
             result = mon.render_snapshot(directory, "path3")
             self.assertNotIn("\x1b", result)
             self.assertNotIn("\x07", result)
-            self.assertIn("BAD", result)
+            self.assertNotIn("BAD", result)
+            self.assertIn("(nonprintable line omitted)", result)
 
     def test_real_codex_stream_redacts_event_payload_in_both_sinks(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1134,7 +1135,7 @@ class EngineeringMonitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
             (directory / "path3.log").write_text(
-                "".join(f"line-{i:03d}: " + ("中" * 60) + "\n"
+                "".join(f"line-{i:03d}: " + ("A" * 100) + "\n"
                         for i in range(60)))
             frame = mon.render_snapshot(directory, "path3", width=38, height=12)
             lines = frame.splitlines()
@@ -1146,6 +1147,8 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("RECENT ACTIVITY", frame)
             self.assertIn("line-059:", frame)
             self.assertNotIn("line-001:", frame)
+            # CJK width handling is separate from projection of unknown text.
+            self.assertEqual(mon._clip_columns("中文中文", 5), "中文")
 
     def test_both_paths_keep_latest_log_in_short_12_row_pane(self):
         with tempfile.TemporaryDirectory() as td:
