@@ -328,7 +328,9 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
             command, env=env,
             stdout=subprocess.PIPE if mirror else None,
             stderr=subprocess.PIPE if mirror else None)
-        selector = selectors.DefaultSelector() if mirror else None
+        selector = (selectors.DefaultSelector() if mirror and
+                    getattr(proc, "stdout", None) is not None and
+                    getattr(proc, "stderr", None) is not None else None)
         pending = {"STDOUT": b"", "STDERR": b""}
         detail_counts = {"STDOUT": 0, "STDERR": 0}
         if selector is not None:
@@ -353,7 +355,7 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
                         _preserve_output(destination, chunk)
                         _path2_detail(log, stream, chunk, pending, detail_counts)
                 now_monotonic = time.monotonic()
-                if proc.poll() is not None:
+                if selector is not None and proc.poll() is not None:
                     if exited_at is None:
                         exited_at = now_monotonic
                     elif selector is not None and now_monotonic - exited_at > 3:

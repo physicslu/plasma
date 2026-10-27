@@ -385,7 +385,7 @@ class Path3Activity:
                 names[0] + " (+" + str(len(names)-1) + " files)"
                 if names else "(file paths hidden)")
             state = "DONE" if phase == "item.completed" else "RUNNING"
-        detail = (self._output_details(identity, item, True)
+        extra_detail = (self._output_details(identity, item, True)
                   if phase == "item.completed" and
                   category == "command_execution" else b"")
         if phase == "item.completed":
@@ -403,7 +403,7 @@ class Path3Activity:
         }
         wire = (PREFIX + json.dumps(record, ensure_ascii=True,
                                    separators=(",", ":")) + "\n").encode("ascii")
-        return (wire + detail) if len(wire) <= MAX_EVENT_BYTES else detail
+        return (wire + extra_detail) if len(wire) <= MAX_EVENT_BYTES else extra_detail
 
 
 def parse_public_line(line: str) -> dict | None:
