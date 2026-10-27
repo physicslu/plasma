@@ -187,6 +187,7 @@ def run_build(*, source_sha: str, preflight_only: bool = False) -> dict:
             "hwh_sha256": evidence["hwh_sha256"],
             "vivado_log_sha256": evidence["vivado_log_sha256"],
             "z2_hil": "NOT_RUN", "dut_programming": "NOT_RUN",
+            "external_swd_io_timing": evidence["external_swd_io_timing"],
             "evidence_relpath": str(receipt.relative_to(REPO))}
 
 
