@@ -150,6 +150,8 @@ def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
     assert result["host_build_status"] == "SUPERVISOR_REVIEW_REQUIRED"
     assert result["z2_hil"] == "NOT_RUN"
     assert result["openocd_swd"] == "NOT_QUALIFIED"
+    assert result["fpga_only_swd_rx_ideal_budget"]["candidate_hw_max_swd_hz"] == 12500000
+    assert result["external_swd_io_timing"]["timing18_warnings"] == 6
 
 
 def test_real_swd_timing18_report_fixture_is_blocked(tmp_path):
@@ -193,14 +195,16 @@ def test_routed_fpga_only_rx_budget_fails_fast_before_target_tco(tmp_path):
         ROUTED_FPGA_IO_DATASHEET_FIXTURE, encoding="utf-8")
     result = swd.fpga_only_swd_rx_ideal_budget(tmp_path)
     assert result["fclk_hz"] == 100000000
-    assert result["provisional_normal_swd_limit_hz"] == 1000000
+    assert result["candidate_hw_max_swd_hz"] == 12500000
+    assert result["candidate_max_half_period_ns"] == 40.0
     site1 = result["estimated_ideal_fpga_only"]["site1"]
     site2 = result["estimated_ideal_fpga_only"]["site2"]
     assert site1["necessary_fpga_only_halfcycle_ns"] == 18.399
     assert site1["unqualified_25mhz_ideal_margin_ns"] == 1.601
     assert site2["necessary_fpga_only_halfcycle_ns"] == 20.394
     assert site2["unqualified_25mhz_ideal_margin_ns"] == -0.394
-    assert site2["provisional_1mhz_ideal_margin_ns"] == 479.606
+    assert site1["candidate_12_5mhz_fpga_only_margin_ns"] == 21.601
+    assert site2["candidate_12_5mhz_fpga_only_margin_ns"] == 19.606
     assert result["external_timing_qualified"] is False
 
 
