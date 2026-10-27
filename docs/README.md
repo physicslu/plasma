@@ -23,6 +23,8 @@
 - **Current / Accepted Policy** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 是 Internal Research Registry、一般 IC Selector 對客戶顯示 L1–L3 並提供 Level Filter、Job Picker 維持 L2/L3，L3 表示至少一組版本化 PLASMA configuration 已 HIL PASS。Active API/runtime 不保留 `phase1_*`／`phase2_*`／`phase3_*` 欄位。
 - **Proposed** — [ADR-0003: Runtime FPGA Driver 與動態重新配置責任邊界](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)：UIO-first Driver 選型候選、單一 PPU FPGA Configuration Owner、Linux 無須 Reboot 的 Bitstream 切換；尚待 Z2 Kernel／UIO／Bridge 證據，不是 Accepted Contract。
 
+- **Accepted / Owner architectural policy, PR #1189 pending merge** — [ADR-0004: 新 FPGA Project 與 Path 2 operator-cli 標準](adr/0004-project-isolated-fpga-build-path2-operator-cli.md)：新 FPGA Image 與 Board target 必須各自擁有獨立、可重現的 Vivado Project；SWPC 正式 Host Build 透過 SHA-pinned Path 2 `operator-cli`；F1-B 專屬 Build Engine 標記 `F1B_BUILD_ENGINE_RETIREMENT_PENDING`，完整驗收及獨立 Gate 2 才真正退休，Build 不是部署。
+
 ## Operator
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
@@ -41,7 +43,7 @@
 
 ## Architecture and contracts
 
-- **Gate 1 / Clean-sheet dual-Site SWD / architecture-only / NOT_DEPLOYED** — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA Y18/Y19、Site 2 = PMODB W14/Y14，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO、可擴充 8-Site 的新 ABI 候選；目前僅有初步雙 Site RTL core Source，尚無 RTL 模擬 PASS、AXI-Lite/FIFO 整合、Bitstream、OpenOCD Native Adapter 或實機 HIL PASS，舊單 Site Remote Bitbang 保留歷史診斷用途，不因本文件被更改或部署。
+- **Gate 1 / Clean-sheet dual-Site SWD / source-and-RTL simulation only / NOT_DEPLOYED** — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA Y18/Y19、Site 2 = PMODB W14/Y14，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO、可擴充 8-Site 的新 ABI 候選；目前僅有初步雙 Site RTL core Source，尚無 RTL 模擬 PASS、AXI-Lite/FIFO 整合、Bitstream、OpenOCD Native Adapter 或實機 HIL PASS，舊單 Site Remote Bitbang 保留歷史診斷用途，不因本文件被更改或部署。
 
 - **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
 
