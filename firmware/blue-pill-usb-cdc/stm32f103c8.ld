@@ -14,6 +14,14 @@ SECTIONS {
   .preinit_array : { PROVIDE_HIDDEN(__preinit_array_start = .); KEEP(*(.preinit_array*)) PROVIDE_HIDDEN(__preinit_array_end = .); } >FLASH
   .init_array : { PROVIDE_HIDDEN(__init_array_start = .); KEEP(*(.init_array*)) PROVIDE_HIDDEN(__init_array_end = .); } >FLASH
   .fini_array : { PROVIDE_HIDDEN(__fini_array_start = .); KEEP(*(.fini_array*)) PROVIDE_HIDDEN(__fini_array_end = .); } >FLASH
+  /* Diagnostic data must be real flash LOAD bytes; --gc-sections cannot discard it. */
+  .flash_test_payload : {
+    . = ALIGN(4);
+    __flash_test_payload_start = .;
+    KEEP(*(.flash_test_payload))
+    . = ALIGN(4);
+    __flash_test_payload_end = .;
+  } >FLASH
   _sidata = LOADADDR(.data);
   .data : { . = ALIGN(4); _sdata = .; *(.data*) . = ALIGN(4); _edata = .; } >RAM AT>FLASH
   .bss (NOLOAD) : { . = ALIGN(4); _sbss = .; *(.bss*) *(COMMON) . = ALIGN(4); _ebss = .; end = .; _end = .; } >RAM
