@@ -6,7 +6,7 @@ on a host with iverilog and cocotb_test available.
 """
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, Timer
+from cocotb.triggers import RisingEdge, FallingEdge, Timer
 
 
 def init(d):
@@ -29,13 +29,16 @@ def init(d):
 
 
 async def start_pair(d):
-    await RisingEdge(d.clk)
+    # Drive at falling edges to avoid driver/DUT races at posedge sampling.
+    await FallingEdge(d.clk)
     d.rst_n.value = 1
     d.site_enable.value = 3
     await RisingEdge(d.clk)
+    await Timer(1, units="ns")
     assert int(d.cmd_ready.value) == 3
+    await FallingEdge(d.clk)
     d.cmd_valid.value = 3
-    await RisingEdge(d.clk)
+    await FallingEdge(d.clk)
     d.cmd_valid.value = 0
 
 
@@ -73,6 +76,7 @@ async def two_sites_clock_independently_with_distinct_dividers(d):
     assert int(d.link_state.value) == 0b0101  # each Site waiting for real DPIDR
     assert int(d.swclk_io.value) == 0
 
+    await FallingEdge(d.clk)
     d.resp_ready.value = 3
     await RisingEdge(d.clk)
     await RisingEdge(d.clk)
@@ -89,6 +93,7 @@ async def disabling_one_site_does_not_abort_the_other(d):
     assert int(d.busy.value) == 3
 
     # Quiesce Site 1 after its line-reset start. Site 2 is unaffected.
+    await FallingEdge(d.clk)
     d.site_enable.value = 2
     await RisingEdge(d.clk)
     await Timer(1, units="ns")
