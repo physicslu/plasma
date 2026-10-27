@@ -43,6 +43,40 @@ SEMANTIC_COMMANDS = (
      "CHECK", "Inspect artifact checksums (arguments redacted)"),
 )
 SEMANTIC_KIND_BY_LABEL = {label: kind for _, kind, label in SEMANTIC_COMMANDS}
+# Native CLI activity is identified only by an exact executable prefix. The
+# remaining command line is never copied into the monitor. This is an
+# observation of a Codex item, not a tool permission or an operation receipt.
+NATIVE_TOOLS = (
+    (re.compile(r"(?:/opt/plasma/hil-tools/kingst-la2016-sigrok\.AppImage|"
+                r"(?:/usr/bin/)?sigrok-cli)(?:\s|\Z)"), "CHECK",
+     "Run Sigrok CLI (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?openocd(?:\s|\Z)"), "COMMAND",
+     "Run OpenOCD (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?ssh(?:\s|\Z)"), "COMMAND",
+     "Run SSH client (destination redacted)"),
+    (re.compile(r"(?:/usr/bin/)?lsusb(?:\s|\Z)"), "CHECK",
+     "Inspect USB devices (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?udevadm(?:\s|\Z)"), "CHECK",
+     "Inspect udev devices (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?python3?(?:\s|\Z)"), "COMMAND",
+     "Run Python command (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?git(?:\s|\Z)"), "COMMAND",
+     "Run Git operation (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?(?:bash|sh)(?:\s|\Z)"), "COMMAND",
+     "Run shell task (details restricted)"),
+)
+SIGROK_LABELS = {
+    "scan": "Probe Sigrok devices (arguments redacted)",
+    "show": "Inspect Sigrok device (arguments redacted)",
+    "capture": "Acquire Sigrok samples (arguments redacted)",
+}
+NATIVE_KIND_BY_LABEL = {
+    **{label: kind for _, kind, label in NATIVE_TOOLS},
+    **{label: "CHECK" for label in SIGROK_LABELS.values()},
+}
+# Shell metacharacters mean that an executable prefix may be only one part of
+# a larger operation. Never infer a simple native action from those strings.
+UNSAFE_SHELL = re.compile(r"[\x00-\x1f\x7f;&|<>`$\\]")
 REPO_TOP = frozenset({
     "scripts", "software", "pl", "firmware", "docs", "specs", "packaging",
     "data", "handover", "release",
@@ -55,7 +89,10 @@ MAX_SEQUENCE = 10000000
 
 
 def safe_command(value: object) -> tuple[str, str]:
-    if (type(value) is str and len(value) <= 256 and value.isascii() and
+    # Native tool invocations may be longer than the legacy 256-byte exact
+    # patterns. Their arguments are NEVER rendered, so accept a bounded
+    # longer input solely to classify an exact executable prefix.
+    if (type(value) is str and len(value) <= 2048 and value.isascii() and
             SENSITIVE.search(value) is None):
         if len(value) <= 125:
             for grammar, kind in COMMANDS:
@@ -63,10 +100,36 @@ def safe_command(value: object) -> tuple[str, str]:
                     return kind, value
         # Classify relative, single-command forms only. An absolute argument
         # or a shell control operator falls back to the opaque safe marker.
-        if re.search(r"\s/[A-Za-z]", value) is None:
+        if (len(value) <= 256 and
+                re.search(r"\s/[A-Za-z]", value) is None):
             for grammar, kind, label in SEMANTIC_COMMANDS:
                 if grammar.fullmatch(value) is not None:
                     return kind, label
+        if UNSAFE_SHELL.search(value) is None:
+            for grammar, kind, label in NATIVE_TOOLS:
+                if grammar.match(value) is None:
+                    continue
+                # Preserve the old conservative policy for generic repo,
+                # shell and Python commands with absolute arguments. Named
+                # native instrument/remote tools still expose ONLY fixed
+                # labels, never paths, remote hosts or arguments.
+                if (re.search(r"\s/[A-Za-z]", value) is not None and
+                        label not in {
+                            "Run Sigrok CLI (arguments redacted)",
+                            "Run OpenOCD (arguments redacted)",
+                            "Run SSH client (destination redacted)",
+                        }):
+                    continue
+                if label.startswith("Run Sigrok"):
+                    if re.search(r"(?:^|\s)--scan(?:\s|\Z)", value):
+                        label = SIGROK_LABELS["scan"]
+                    elif re.search(r"(?:^|\s)--show(?:\s|\Z)", value):
+                        label = SIGROK_LABELS["show"]
+                    elif re.search(r"(?:^|\s)(?:-o|--output-file|"
+                                   r"--samples|--time|--channels)"
+                                   r"(?:=|\s|\Z)", value):
+                        label = SIGROK_LABELS["capture"]
+                return kind, label
     return "COMMAND", "(command hidden)"
 
 
@@ -115,7 +178,9 @@ class Path3Activity:
 
     def project(self, event: dict) -> bytes:
         phase = event.get("type")
-        if phase not in ("item.started", "item.updated", "item.completed"):
+        # Item updates often repeat the unchanged command many times. Keep
+        # just start and completion so each operation has one bounded pair.
+        if phase not in ("item.started", "item.completed"):
             return b""
         item = event.get("item")
         if type(item) is not dict:
@@ -171,7 +236,7 @@ class Path3Activity:
             "schema": 1, "seq": self.next_seq, "id": identity,
             "kind": kind, "detail": detail, "state": state,
             "exit_code": exit_code, "source": "C",
-            "time": dt.datetime.now().astimezone().strftime("%H:%M"),
+            "time": dt.datetime.now().astimezone().strftime("%H:%M:%S"),
         }
         wire = (PREFIX + json.dumps(record, ensure_ascii=True,
                                    separators=(",", ":")) + "\n").encode("ascii")
@@ -197,7 +262,8 @@ def parse_public_line(line: str) -> dict | None:
             type(obj["state"]) is not str or obj["state"] not in STATES or
             type(obj["source"]) is not str or obj["source"] != "C" or
             type(obj["time"]) is not str or
-            re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", obj["time"]) is None or
+            re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]"
+                         r"(?::[0-5][0-9])?", obj["time"]) is None or
             type(obj["detail"]) is not str or len(obj["detail"]) > 150 or
             any(ord(c) < 32 or ord(c) > 126 for c in obj["detail"])):
         return None
@@ -229,8 +295,10 @@ def parse_public_line(line: str) -> dict | None:
     elif obj["detail"] == "(command hidden)":
         if obj["kind"] != "COMMAND":
             return None
-    elif obj["detail"] in SEMANTIC_KIND_BY_LABEL:
-        if obj["kind"] != SEMANTIC_KIND_BY_LABEL[obj["detail"]]:
+    elif obj["detail"] in {**SEMANTIC_KIND_BY_LABEL, **NATIVE_KIND_BY_LABEL}:
+        if obj["kind"] != {
+                **SEMANTIC_KIND_BY_LABEL,
+                **NATIVE_KIND_BY_LABEL}[obj["detail"]]:
             return None
     elif obj["detail"] != "(command hidden)":
         # Legacy explicitly allowlisted commands must retain their original

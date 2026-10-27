@@ -56,8 +56,12 @@ MAX_DISPLAY_COLUMNS = 100
 MONITOR_STAGES = frozenset({
     "CPU-only CLI", "Native preflight", "Vivado host build",
     "Guarded Download", "Guarded Test", "Guarded Restore",
-    "Codex workspace",
+    "Guarded CLI", "Codex workspace",
 })
+MONITOR_ACTION = re.compile(
+    r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*"
+    r"[A-Za-z0-9_-]+\.py\Z"
+)
 # Narrow receipt projection; a filesystem JSON file is NOT an independently
 # authenticated verification receipt. Project known categorical DENIAL only.
 RECEIPT_PERMISSION_STAGES = frozenset({
@@ -266,6 +270,7 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
         and MONITOR_SENSITIVE.search(summary) is None
     )
     stage = os.environ.get("PLASMA_MONITOR_STAGE", "")
+    action = os.environ.get("PLASMA_MONITOR_ACTION", "")
     guarded = stage.startswith("Guarded ") if type(stage) is str else False
     # Only the digest-bound dynamic operation may publish guarded metadata.
     guarded_verified = (task == "path2-work-order" and
@@ -279,11 +284,17 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
           stage == "Codex workspace" or
           (guarded and not guarded_verified)):
         stage = ""
+    action = (action if path == "path2" and
+              task == "path2-work-order" and
+              WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None and
+              type(action) is str and len(action) <= 96 and
+              MONITOR_ACTION.fullmatch(action) is not None and
+              MONITOR_SENSITIVE.search(action) is None else "")
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
         "task": task, "pr_number": pr_number,
         "monitor_summary": summary if summary_valid else "",
-        "monitor_stage": stage,
+        "monitor_stage": stage, "monitor_action": action,
         "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
         "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
@@ -301,6 +312,7 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     # Operator-only metadata never enters the engineering/Codex process env.
     env.pop("PLASMA_MONITOR_SUMMARY", None)
     env.pop("PLASMA_MONITOR_STAGE", None)
+    env.pop("PLASMA_MONITOR_ACTION", None)
     if live and path == "path3":
         env["PLASMA_ENGINEERING_MONITOR_LIVE_LOG"] = str(log)
     else:
@@ -428,7 +440,8 @@ def render_snapshot(directory: Path, path: str, *,
                     height: int | None = None,
                     now: dt.datetime | None = None,
                     clear_from: tuple[int, int, int, str | None] | None = None,
-                    prefix: str = "Ctrl+B") -> str:
+                    prefix: str = "Ctrl+B",
+                    expanded_activity: bool = False) -> str:
     if path not in PATHS:
         raise ValueError("unknown path")
     name = "PATH 2 | SWPC CLI" if path == "path2" else "PATH 3 | SWPC Codex"
@@ -439,8 +452,9 @@ def render_snapshot(directory: Path, path: str, *,
         status = "IDLE (interrupted/unknown)"
     if status not in ("IDLE", "RUNNING", "IDLE (interrupted/unknown)"):
         status = "UNKNOWN"
-    lines = ["%s | C Clear | %s 1/2 Switch | %s D Detach" %
-             (name, prefix, prefix),
+    mode_hint = "L Summary" if expanded_activity else "L Activity"
+    lines = ["%s | %s | C Clear | %s 1/2 Switch | %s D Detach" %
+             (name, mode_hint, prefix, prefix),
              "=" * 35,
              "STATUS: %s    RUN: %s" % (status, state.get("run_id", "-")),
              "TASK: %s" % state.get("task", "-")]
@@ -462,6 +476,12 @@ def render_snapshot(directory: Path, path: str, *,
         (path == "path2" and stage == "Codex workspace")):
         stage = ""
     lines.append("STAGE: " + (stage or "(not available)"))
+    action = state.get("monitor_action")
+    if (path == "path2" and (height is None or height >= 17) and
+            type(action) is str and len(action) <= 96 and
+            MONITOR_ACTION.fullmatch(action) is not None and
+            MONITOR_SENSITIVE.search(action) is None):
+        lines.append("AUTHORIZED SCRIPT: " + action)
     if status == "RUNNING":
         started = state.get("started", "")
         try:
@@ -474,6 +494,8 @@ def render_snapshot(directory: Path, path: str, *,
         # The monitor wrapper's return code is NOT a verification receipt.
         lines.append("WRAPPER: %s  EXIT: %s" %
                      (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
+        if height is None or height >= 17:
+            lines.append("ACCEPTANCE: UNVERIFIED BY MONITOR (inspect Run evidence)")
         hint = _safe_stored_receipt_hint(state.get("receipt_hint"))
         if (path == "path2" and state.get("last_result") == "FAIL" and
                 type(state.get("exit_code")) is int and
@@ -491,10 +513,23 @@ def render_snapshot(directory: Path, path: str, *,
         # separator or UTC offset; keep minute cadence and timestamp inputs
         # timezone-aware. Evidence and monitor time marks are unchanged.
         lines.append("NOW: " + clock.strftime("%Y-%m-%d %H:%M"))
+    run_id = state.get("run_id")
+    if (type(run_id) is str and RUN_ID.fullmatch(run_id) and
+            (height is None or height >= 17)):
+        # A copyable run-specific evidence entrypoint, not a claim that the
+        # task passed. Artifacts and authentic exit/output remain on GitHub.
+        lines.append("RUN LOG: https://github.com/physicslu/plasma/actions/runs/" + run_id)
     # Activity is recomputed from the already sanitized, bounded log tail.
     # It never becomes a new job authorizer or a trusted result receipt.
-    lines.append("DOING: —")
-    lines.extend(["", "RECENT ACTIVITY", "-" * 35])
+    if status == "RUNNING" and path == "path2":
+        lines.append("DOING: Trusted Path 2 dispatcher (no live step telemetry)")
+    elif status == "RUNNING" and path == "path3":
+        lines.append("DOING: Awaiting Codex tool activity")
+    else:
+        lines.append("DOING: —")
+    activity_title = ("ACTIVITY TRACE [C] (sanitized)" if expanded_activity
+                      else "RECENT ACTIVITY")
+    lines.extend(["", activity_title, "-" * 35])
     if height is not None:
         # Preserve at least one latest log row plus a spare bottom row.
         # Sacrifice decoration before truncating trusted status/goal/stage.
@@ -548,16 +583,25 @@ def render_snapshot(directory: Path, path: str, *,
         return "[%s] %s %s | %s" % (
             event["source"], event["kind"], result, event["detail"])
 
-    activity_rows = []
+    observed = []
     visible_sequence = 0
     for original in log_lines:
         event = engineering_activity.parse_public_line(original)
         if event is None or event["seq"] <= visible_sequence:
             continue
         visible_sequence = event["seq"]
-        activity_rows.append("%s %s" % (event["time"], _step_label(event)))
-    if activity_rows:
-        log_lines = activity_rows[-30:]
+        observed.append(event)
+    if observed:
+        if not expanded_activity:
+            # The overview needs useful completed actions, not duplicate
+            # RUNNING/DONE pairs for every tiny Codex command. An unmatched
+            # start remains visible while the item is still in progress.
+            completed_ids = {e["id"] for e in observed
+                             if e["state"] != "RUNNING"}
+            observed = [e for e in observed if e["state"] != "RUNNING"
+                        or e["id"] not in completed_ids]
+        log_lines = ["%s %s" % (e["time"], _step_label(e))
+                     for e in observed[-30:]]
     else:
         # Invalid structured records are never echoed as raw terminal lines.
         log_lines = [
@@ -565,8 +609,12 @@ def render_snapshot(directory: Path, path: str, *,
             if not line.startswith(engineering_activity.PREFIX)]
     if status == "RUNNING" and active_items:
         last = next(reversed(active_items.values()))
-        lines[lines.index("DOING: —")] = (
-            "DOING: %s | %s" % (last["kind"], last["detail"]))
+        doing = next(i for i, line in enumerate(lines)
+                     if line.startswith("DOING:"))
+        suffix = (" (+%d active)" % (len(active_items) - 1)
+                  if len(active_items) > 1 else "")
+        lines[doing] = "DOING: %s | %s%s" % (
+            last["kind"], last["detail"], suffix)
     insert_at = lines.index("DOING: —") + 1 if "DOING: —" in lines else (
         next(i for i, line in enumerate(lines) if line.startswith("DOING:")) + 1)
     if last_step is not None:
@@ -647,17 +695,23 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
     previous = None
     previous_size = None
     clear_from = None
+    expanded_activity = False
     try:
         while True:
-            if get_key() in ("c", "C"):
+            key = get_key()
+            if key in ("c", "C"):
                 clear_from = _clear_point(directory, path)
                 previous = None  # Force repaint, even if status is unchanged.
+            elif key in ("l", "L"):
+                expanded_activity = not expanded_activity
+                previous = None
             width, height = get_size()
             size = (width, height)
             frame = render_snapshot(
                 directory, path, width=width, height=height,
                 now=get_now() if path == "path3" else None,
-                clear_from=clear_from, prefix=prefix)
+                clear_from=clear_from, prefix=prefix,
+                expanded_activity=expanded_activity)
             if frame != previous or size != previous_size:
                 # Only repaint this tmux pane, not global terminal scrollback.
                 # Clear old cells BEFORE painting shorter replacement lines.

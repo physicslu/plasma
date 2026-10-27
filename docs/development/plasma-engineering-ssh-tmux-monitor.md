@@ -6,8 +6,8 @@ workflow, runner, approval gate, HIL test or production service.
 
 ## V3 operator layout and result semantics
 
-The path label and all three shortcuts occupy **one header row**:
-`PATH 3 | SWPC Codex | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach`
+The path label and all shortcuts occupy **one header row**:
+`PATH 3 | SWPC Codex | L Activity | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach`
 (with the actual tmux prefix). Both paths show STATUS, RUN, TASK, GOAL,
 STAGE, DOING and RECENT ACTIVITY. Path 3 shows a pinned-work-order
 capability category `STAGE: Codex workspace` when available; this does
@@ -17,6 +17,8 @@ Path 2 retains its authorized fixed-stage category.
 `WRAPPER: PASS EXIT: 0` is the result of the monitored top-level process,
 **not** acceptance of the Work Order, a verified test receipt, PR readiness
 or an indication that every Codex command succeeded.
+On adequately tall panes `ACCEPTANCE: UNVERIFIED BY MONITOR` makes this
+distinction visible next to the Wrapper result, even for exit 0.
 `LAST STEP` is the most recently completed sanitized Codex item, whereas
 `LAST ERROR` retains the most recent Codex-reported failing item from a
 bounded 512 KiB scan of the transient log. The latter can fall outside
@@ -28,11 +30,14 @@ exit code alone; inspect authorized task evidence when necessary.
 
 A small set of whole-command patterns produce fixed semantic labels such
 as `Inspect source files (arguments redacted)`, `Run Python tests` or
-`Run Vivado batch build` (also redacted). Command arguments, absolute paths,
-shell control operators, stderr, prompt/model text and credentials are not
-copied into public events. Commands that cannot be safely classified remain
-`(command hidden)`. No classification authorizes execution or proves that
-the named tool actually achieved its intended operation.
+`Run Vivado batch build` (also redacted). Path 3 additionally recognizes
+native executable prefixes for Sigrok (scan, device inspection, acquisition),
+OpenOCD, SSH, USB/udev inspection, Python, Git and shell commands.
+Arguments, absolute paths, remote destinations, shell operators, stderr,
+prompt/model text and credentials are never copied into public events.
+Commands containing unsafe shell syntax or which cannot be classified remain
+`(command hidden)`. These fixed labels describe only **Codex-reported
+attempts**, not permission, actual device response or successful acquisition.
 
 ### Path 2 native preflight denial receipts (V3)
 
@@ -80,6 +85,14 @@ press **C** (no prefix) to clear only the current window's displayed output,
 while continuing to show new messages. Press **tmux prefix, then 1** to
 switch to Path 2 (fixed CLI), **prefix, then 2** for Path 3 (Codex),
 or **prefix, then D** to detach without stopping a GitHub Actions job.
+Press **L** without the prefix to switch between a concise activity overview
+and an expanded sanitized start/completion trace; press it again to return.
+Repeated `item.updated` events are dropped, and the overview collapses
+completed RUNNING/DONE pairs. The trace has seconds-resolution timestamps
+for new events, but is **not** a raw command-output viewer.
+When a valid GitHub Run ID is available and the pane is tall enough,
+`RUN LOG: https://github.com/physicslu/plasma/actions/runs/<id>` gives
+a copyable evidence entrypoint; it does not certify task success.
 The default prefix is Ctrl+B; custom configurations such as Ctrl+A are
 detected and displayed in the header. Clearing never truncates a monitor
 log, removes Codex evidence, changes job state or affects the other window. IDLE means no observed worker wrapper is currently
@@ -90,8 +103,9 @@ and retains WRAPPER: PASS/FAIL with the top-level process exit code.
 Both panes use the same compact operator layout: `STATUS` and `RUN` on
 one row; `TASK` and optional `PR` on one row; `GOAL` and `NOW`,
 a single `DOING` activity row and `RECENT ACTIVITY`. PATH 2 currently
-has only legacy heartbeats/Stage labels; PATH 3 can display filtered Codex
-command/file activities. The active-stage category (when applicable),
+has only legacy heartbeats/Stage labels; its `DOING` line explicitly says
+per-step telemetry is unavailable while the dispatcher is running. PATH 3
+can display filtered Codex command/file activities. The active-stage category (when applicable),
 elapsed time or
 LAST/EXIT, SWPC host-local NOW (`YYYY-MM-DD HH:MM` without the ISO `T`
 separator or numeric UTC offset), and recent output. The input clock remains
@@ -110,8 +124,17 @@ execution capability: `CPU-only CLI`, `Native preflight`,
 `Vivado host build`, or `Guarded Download/Test/Restore/Full HIL` for a
 previously authorized exact stage or existing fixed Registry task. This describes the **approved CLI
 category**, not confirmed physical progress. It never reveals a shell
-command, argv, raw stdout or hidden script arguments. If there is no
-recognized category, the pane shows `STAGE: (not available)`.
+command, argv, raw stdout or hidden script arguments. Detailed Path 2
+subprocess evidence stays in existing GitHub artifacts, not the monitor.
+For an SHA-bound dynamic CPU-only or operator-cli Work Order, the existing
+Authorizer also exposes its validated, repository-relative Python entrypoint
+as `AUTHORIZED SCRIPT` (display-only). It is an approved **target** script,
+not proof that its body has started or any subprocess step has completed.
+`Guarded CLI` is the current operator-cli category; it is not a new Root
+capability. Paths, argv and commands not explicitly covered by this bounded
+metadata are not inferred or displayed.
+If there is no recognized category, the pane shows
+`STAGE: (not available)`.
 
 A dynamic Path 2 or Path 3 owner Work Order may explicitly include an
 optional `monitor_summary` string: 8–80 simple display-safe characters.
@@ -171,13 +194,21 @@ names only**. The transient operator observer log additionally contains
 `@PLASMA_ACTIVITY_V1` records for recognized, well-ordered Codex
 `command_execution` and `file_change` item events. Only strictly
 allowlisted whole commands (selected Python tests and read-only Git status
-commands), validated repository-relative file names, their reported
+commands and recognized native executable classes), validated
+repository-relative file names, their reported
 lifecycle states, and (for completed commands only) the Codex-reported
 integer exit code may be shown. The exit code is **observed**, not a trusted
 Runner or test Receipt. Unapproved commands become
 `(command hidden)`; unsafe file names become `(file paths hidden)`.
 Neither raw JSON bodies nor stderr, prompts, tool arguments, model text,
 source code or execution output are copied into these logs.
+
+**Visibility limit:** The Monitor reports recognized native tool actions,
+their Codex-observed start/completion, exit code and the GitHub Run link.
+It cannot infer hardware success, sample counts, physical results or error
+causes without safe structured receipts. Streaming arbitrary native stdout,
+stderr or raw Codex transcripts would change the information-disclosure
+boundary and is intentionally outside this lightweight observer update.
 
 The `[C]` marker means observed **Codex JSON event**, NOT independently
 verified execution evidence or a trusted testing receipt. `[V]` is

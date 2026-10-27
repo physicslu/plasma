@@ -552,9 +552,24 @@ def authorize(event: object, context: dict, registry: object,
             monitor_stage = "Vivado host build"
         else:
             monitor_stage = "CPU-only CLI"
+    # Path 2 deterministic Work Orders have a reviewed, SHA-bound Python
+    # entrypoint. Publish that repository-relative path as display-only
+    # metadata, never its argv, objective, acceptance or subprocess output.
+    monitor_action = ""
+    if (req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
+            task["execution_path"] == "path2-cli" and
+            task.get("capability") in ("cpu-only", "operator-cli")):
+        script = task.get("script")
+        if (type(script) is str and len(script) <= 96 and
+                re.fullmatch(r"(?:scripts|pl|software)/"
+                             r"(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
+                             script) is not None and
+                MONITOR_SENSITIVE.search(script) is None):
+            monitor_action = script
     return {
         "status": "AUTHORIZED_DEV_TASK",
         "monitor_stage": monitor_stage,
+        "monitor_action": monitor_action,
         "authorized_operation": None,
         **req,
         "pinned_sha": req["source_sha"],

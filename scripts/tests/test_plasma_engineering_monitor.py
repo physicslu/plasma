@@ -184,26 +184,31 @@ class EngineeringMonitorTests(unittest.TestCase):
                 "WORK_ORDER_SHA256": "a" * 64,
                 "PLASMA_MONITOR_SUMMARY": "PATH2 Host-only CLI regression",
                 "PLASMA_MONITOR_STAGE": "CPU-only CLI",
+                "PLASMA_MONITOR_ACTION": "scripts/tests/run_host_check.py",
             }
             probe = Path(td) / "child-env.txt"
             code = ("import os,sys,pathlib;pathlib.Path(sys.argv[1]).write_text("
                     "str('PLASMA_MONITOR_SUMMARY' in os.environ)+' '+"
-                    "str('PLASMA_MONITOR_STAGE' in os.environ))")
+                    "str('PLASMA_MONITOR_STAGE' in os.environ)+' '+"
+                    "str('PLASMA_MONITOR_ACTION' in os.environ))")
             with patch.dict(os.environ, data, clear=True):
                 self.assertEqual(mon.run_job(
                     "path2", [sys.executable, "-c", code, str(probe)],
                     directory=Path(td)), 0)
-            self.assertEqual(probe.read_text(), "False False")
+            self.assertEqual(probe.read_text(), "False False False")
             state = json.loads((Path(td) / "path2.json").read_text())
             self.assertEqual(state["monitor_summary"], data["PLASMA_MONITOR_SUMMARY"])
             self.assertEqual(state["monitor_stage"], "CPU-only CLI")
+            self.assertEqual(state["monitor_action"], data["PLASMA_MONITOR_ACTION"])
             frame = mon.render_snapshot(
                 Path(td), "path2", width=120, height=24, now=FIXED_NOW)
             self.assertIn("GOAL: PATH2 Host-only CLI regression", frame)
             self.assertIn("STAGE: CPU-only CLI", frame)
+            self.assertIn("AUTHORIZED SCRIPT: scripts/tests/run_host_check.py", frame)
             self.assertIn("PR: #1144", frame)
             self.assertIn("NOW: 2026-10-21 16:10", frame)
             self.assertIn("WRAPPER: PASS  EXIT: 0", frame)
+            self.assertIn("ACCEPTANCE: UNVERIFIED BY MONITOR", frame)
             self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
                              (Path(td) / "path2.log").read_text())
             self.assertNotIn("WORK_ORDER_SHA256", frame)
@@ -224,6 +229,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                         "WORK_ORDER_SHA256": sha,
                         "PLASMA_MONITOR_SUMMARY": summary,
                         "PLASMA_MONITOR_STAGE": stage,
+                        "PLASMA_MONITOR_ACTION": "scripts/checked.py",
                     }, clear=True):
                         self.assertEqual(mon.run_job(
                             "path2", [sys.executable, "-c", "pass"],
@@ -239,6 +245,28 @@ class EngineeringMonitorTests(unittest.TestCase):
                     if stage == "Erase entire DUT" or sha == "bad-hash":
                         self.assertEqual(state["monitor_stage"], "")
                         self.assertIn("STAGE: (not available)", frame)
+                    if not sha or sha == "bad-hash":
+                        self.assertEqual(state["monitor_action"], "")
+
+    def test_path2_action_and_guarded_cli_label_are_strictly_scoped(self):
+        for action in ("../outside.py", "/tmp/secret.py",
+                       "scripts/private_key.py", "scripts/tool.sh",
+                       "scripts/.hidden.py", "scripts/tool.py\nINJECTED"):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as td:
+                with patch.dict(os.environ, {
+                    "GITHUB_RUN_ID": "40056557048",
+                    "PLASMA_MONITOR_TASK": "path2-work-order",
+                    "WORK_ORDER_SHA256": "a" * 64,
+                    "PLASMA_MONITOR_STAGE": "Guarded CLI",
+                    "PLASMA_MONITOR_ACTION": action,
+                }, clear=True):
+                    self.assertEqual(mon.run_job("path2", [sys.executable, "-c", "pass"],
+                                                 directory=Path(td)), 0)
+                state = json.loads((Path(td) / "path2.json").read_text())
+                self.assertEqual(state["monitor_stage"], "Guarded CLI")
+                self.assertEqual(state["monitor_action"], "")
+                self.assertIn("STAGE: Guarded CLI", mon.render_snapshot(
+                    Path(td), "path2"))
 
     def test_retired_stage_tasks_cannot_publish_guarded_operation(self):
         for task in ("z2-path2-download", "z2-path2-testing",
@@ -694,6 +722,69 @@ class EngineeringMonitorTests(unittest.TestCase):
         self.assertIsNone(activity.parse_public_line(
             activity.PREFIX + json.dumps(raw)))
 
+    def test_native_cli_activity_is_actionable_but_never_exposes_parameters(self):
+        cases = (
+            ("sigrok-cli --scan", "CHECK", "Probe Sigrok devices"),
+            ("/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage "
+             "--appimage-extract-and-run --show -d kingst-la2016",
+             "CHECK", "Inspect Sigrok device"),
+            ("sigrok-cli -d kingst-la2016 --samples 5000 "
+             "-o /tmp/capture-data.sr", "CHECK", "Acquire Sigrok samples"),
+            ("ssh -o BatchMode=yes remote-lab-host uname -a",
+             "COMMAND", "Run SSH client"),
+            ("openocd -f /tmp/target.cfg",
+             "COMMAND", "Run OpenOCD"),
+            ("lsusb", "CHECK", "Inspect USB devices"),
+            ("bash -lc 'git status'", "COMMAND", "Run shell task"),
+            ("sigrok-cli --samples 10 --config " + "a" * 400,
+             "CHECK", "Acquire Sigrok samples"),
+        )
+        for command, kind, label in cases:
+            with self.subTest(command=command):
+                result_kind, detail = activity.safe_command(command)
+                self.assertEqual(result_kind, kind)
+                self.assertIn(label, detail)
+                self.assertNotIn("private", detail)
+                self.assertNotIn("/tmp/", detail)
+                source = activity.Path3Activity(Path.cwd())
+                event = source.project({"type": "item.started", "item": {
+                    "id": "one", "type": "command_execution", "command": command}})
+                self.assertEqual(
+                    activity.parse_public_line(event.decode().strip())["detail"],
+                    detail)
+        for command in (
+            "sigrok-cli --scan; cat /tmp/secret",
+            "sigrok-cli --show && echo token",
+            "ssh remote-private-host\nINJECTED",
+            "openocd -c 'init | unexpected'",
+            "python3 scripts/example.py /home/plasma-codex",
+            "sigrok-cli --samples 10 -o /tmp/private-key.sr",
+            "ssh remote-private-host uname -a",
+            "sigrok-cli --scan " + "a" * 2100,
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(activity.safe_command(command)[1],
+                                 "(command hidden)")
+
+    def test_activity_updates_are_deduplicated_and_seconds_are_observed(self):
+        source = activity.Path3Activity(Path.cwd())
+        item = {"id": "cmd", "type": "command_execution",
+                "command": "sigrok-cli --scan"}
+        started = source.project({"type": "item.started", "item": item})
+        self.assertEqual(source.project({"type": "item.updated", "item": item}),
+                         b"")
+        completed = source.project({
+            "type": "item.completed", "item": {**item, "exit_code": 0}})
+        self.assertEqual(source.next_seq, 2)
+        for raw in (started, completed):
+            event = activity.parse_public_line(raw.decode().strip())
+            self.assertRegex(event["time"], r"^\d\d:\d\d:\d\d$")
+        # Existing minute-only monitor history remains backwards compatible.
+        legacy = json.loads(started.decode().split(" ", 1)[1])
+        legacy["time"] = "19:20"
+        self.assertIsNotNone(activity.parse_public_line(
+            activity.PREFIX + json.dumps(legacy)))
+
     def test_observed_activity_rejects_forged_kind_and_exit_state(self):
         with tempfile.TemporaryDirectory() as td:
             source = activity.Path3Activity(Path(td))
@@ -854,10 +945,73 @@ class EngineeringMonitorTests(unittest.TestCase):
                 Path(td), "path3", prefix="Ctrl+A", width=90, height=20)
             self.assertEqual(
                 frame.splitlines()[0],
-                "PATH 3 | SWPC Codex | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach")
+                "PATH 3 | SWPC Codex | L Activity | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach")
             self.assertEqual(len([l for l in frame.splitlines()
                                   if "Ctrl+A" in l]), 1)
             self.assertIn("STATUS: IDLE", frame)
+
+    def test_overview_collapses_start_done_and_l_toggles_activity_trace(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            source = activity.Path3Activity(directory)
+            item = {"id": "one", "type": "command_execution",
+                    "command": "sigrok-cli --scan"}
+            first = source.project({"type": "item.started", "item": item})
+            final = source.project({"type": "item.completed", "item": {
+                **item, "exit_code": 0}})
+            (directory / "path3.log").write_bytes(first + final)
+            (directory / "path3.json").write_text(json.dumps({
+                "status": "IDLE", "run_id": "123456",
+                "task": "path3-work-order", "last_result": "PASS",
+                "exit_code": 0}))
+            summary = mon.render_snapshot(directory, "path3", width=100,
+                                          height=28, now=FIXED_NOW)
+            expanded = mon.render_snapshot(directory, "path3", width=100,
+                                           height=28, now=FIXED_NOW,
+                                           expanded_activity=True)
+            self.assertIn("RUN LOG: https://github.com/physicslu/plasma/actions/runs/123456",
+                          summary)
+            self.assertIn("RECENT ACTIVITY", summary)
+            self.assertNotIn("CHECK RUNNING | Probe Sigrok", summary)
+            self.assertIn("CHECK DONE (exit 0) | Probe Sigrok", summary)
+            self.assertIn("ACTIVITY TRACE [C]", expanded)
+            self.assertIn("CHECK RUNNING | Probe Sigrok", expanded)
+            self.assertIn("CHECK DONE (exit 0) | Probe Sigrok", expanded)
+            self.assertEqual((directory / "path3.log").read_bytes(),
+                             first + final)
+
+            output = io.StringIO()
+            keys = iter([None, "L", "L"])
+            polls = [0]
+
+            def fake_sleep(_seconds):
+                polls[0] += 1
+                if polls[0] >= 3:
+                    raise StopIteration
+
+            with self.assertRaises(StopIteration):
+                mon.view_loop("path3", directory=directory, output=output,
+                              get_size=lambda: os.terminal_size((100, 28)),
+                              sleep=fake_sleep, get_now=lambda: FIXED_NOW,
+                              get_key=lambda: next(keys))
+            self.assertIn("ACTIVITY TRACE [C]", output.getvalue())
+            self.assertIn("L Summary", output.getvalue())
+            self.assertIn("L Activity", output.getvalue())
+
+    def test_path2_current_action_does_not_fake_subprocess_progress(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "path2.json").write_text(json.dumps({
+                "status": "RUNNING", "run_id": "123456", "pid": os.getpid(),
+                "proc_start": mon._proc_start(os.getpid()),
+                "task": "path2-work-order", "monitor_stage": "CPU-only CLI"}))
+            frame = mon.render_snapshot(directory, "path2", width=100,
+                                        height=28, now=FIXED_NOW)
+            self.assertIn("DOING: Trusted Path 2 dispatcher (no live step telemetry)",
+                          frame)
+            self.assertIn("RUN LOG: https://github.com/physicslu/plasma/actions/runs/123456",
+                          frame)
+            self.assertNotIn("verified", frame.lower())
 
     def test_clear_is_display_only_and_new_lines_keep_streaming(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1452,6 +1606,8 @@ if op in ("new-session", "new-window"):
             "PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}"), 2)
         self.assertEqual(workflow.count(
             "PLASMA_MONITOR_STAGE: ${{ needs.development-authorize.outputs.monitor_stage }}"), 1)
+        self.assertEqual(workflow.count(
+            "PLASMA_MONITOR_ACTION: ${{ needs.development-authorize.outputs.monitor_action }}"), 1)
         self.assertIn(
             'monitor_summary: ${{ steps.approve.outputs.monitor_summary }}',
             workflow)
