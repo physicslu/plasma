@@ -59,5 +59,18 @@ set artifact_dir [file join $build_dir artifacts]
 file mkdir $artifact_dir
 file copy -force [lindex $bitfiles 0] [file join $artifact_dir system_wrapper.bit]
 file copy -force [lindex $hwhfiles 0] [file join $artifact_dir system.hwh]
+# No blocking Methodology findings. Never waive design violations to force PASS.
+set blocking_methodology {}
+foreach issue [get_methodology_violations -quiet] {
+    if {[get_property SEVERITY $issue] in {Error {Critical Warning}}} {
+        lappend blocking_methodology $issue
+    }
+}
+if {[llength $blocking_methodology] > 0} {
+    error "SWD_IMPLEMENTATION_BLOCKING_METHODOLOGY"
+}
+# Report 'check_timing' explicitly; any timing category with violations must
+# be reviewed. This source has not been validated by actual Vivado yet.
+puts "SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS setup=$setup_slack hold=$hold_slack"
 puts "SWD_HOST_BUILD_SOURCE_ONLY_REVIEW_REQUIRED setup=$setup_slack hold=$hold_slack"
 puts "SWD_NO_AUTOMATIC_DOWNLOAD_OR_DUT_OPERATION"
