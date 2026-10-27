@@ -71,7 +71,7 @@ def test_new_build_guard_rejects_f1b_and_retired_single_site_sources(obsolete):
 def test_no_false_claim_about_new_build_or_retirement():
     doc = ADR.read_text(encoding="utf-8")
     assert "F1B_BUILD_ENGINE_RETIREMENT_PENDING" in doc
-    assert "SWPC Build" in doc
+    assert "Host Build NOT_RUN" in doc
     assert "NOT_RUN" in doc
     # As implementation progresses, a new Project Tcl is expected to appear.
     # Never make the contract itself reject a correct future implementation.
