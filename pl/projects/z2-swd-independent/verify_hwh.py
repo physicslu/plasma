@@ -20,7 +20,8 @@ LENGTH = 0x1000
 PINS = {"swclk_site1": "Y18", "swdio_site1": "Y19",
         "swclk_site2": "W14", "swdio_site2": "Y14"}
 REPORT_NAMES = ("timing_summary.rpt", "drc.rpt", "methodology.rpt",
-                "utilization.rpt", "check_timing.rpt")
+                "utilization.rpt", "check_timing.rpt", "datasheet_io.rpt",
+                "io_pad_configuration.rpt")
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
 
 
