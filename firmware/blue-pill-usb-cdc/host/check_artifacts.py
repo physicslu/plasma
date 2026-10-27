@@ -64,7 +64,7 @@ def check(build, binutils, variant="v0.1"):
         assert 60 * 1024 <= len(binary) <= 64 * 1024, len(binary)
         sections = output(tool("objdump"), "-h", elf)
         match = re.search(
-            r"^\\s*\\d+\\s+\\.flash_test_payload\\s+([0-9a-fA-F]+)\\s+([0-9a-fA-F]+)\\s+",
+            r"^\s*\d+\s+\.flash_test_payload\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+",
             sections, re.MULTILINE)
         assert match is not None, "v0.2 Flash section missing"
         section_size, section_addr = (int(value, 16) for value in match.groups())
