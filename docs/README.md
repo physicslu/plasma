@@ -41,6 +41,8 @@
 
 ## Architecture and contracts
 
+- **Gate 1 / Clean-sheet dual-Site SWD / architecture-only / NOT_DEPLOYED** — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA Y18/Y19、Site 2 = PMODB W14/Y14，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO、可擴充 8-Site 的新 ABI 候選；目前沒有新 RTL／Bitstream／OpenOCD Native Adapter 或實機 HIL PASS，舊單 Site Remote Bitbang 保留歷史診斷用途，不因本文件被更改或部署。
+
 - **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
 
 - **Gate 1 Draft / GitHub-hosted only** — [Unified FPGA Build & Diagnostic Engine v1.0](architecture/plasma-unified-fpga-build-diagnostics-v1.md)：Path 2／Path 3 共用 Vivado Driver、階段式錯誤診斷、License／目錄前置檢查、SHA256 Artifact；本次僅驗證離線測試，未在 SWPC 重新建置，硬體 M1 NO-GO。
