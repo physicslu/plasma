@@ -188,6 +188,63 @@ def audit_external_io_timing(reports: Path) -> dict:
     }
 
 
+def fpga_only_swd_rx_ideal_budget(reports: Path) -> dict:
+    """Use real routed Vivado pad times; external target/cable delay is UNKNOWN.
+
+    SWD target changes outgoing SWDIO on SWCLK rising, host samples on
+    subsequent falling. Both source and sample edges use 100MHz FCLK.
+    The measured clock-to-SWCLK-pad and SWDIO-pad-to-register setup time
+    form a necessary, never sufficient, one-half-period condition.
+    """
+    report = (reports / "datasheet_io.rpt").read_text(encoding="utf-8")
+    require("Input Ports Setup/Hold" in report and
+            "Output Ports Clock-to-out" in report and
+            "Setup between Clocks" in report,
+            "SWD_FPGA_DATASHEET_REQUIRED_SECTIONS_MISSING")
+    rx = report.split("Input Ports Setup/Hold", 1)[1].split(
+        "Output Ports Clock-to-out", 1)[0]
+    tx = report.split("Output Ports Clock-to-out", 1)[1].split(
+        "Setup between Clocks", 1)[0]
+
+    def slow_max(table: str, port: str) -> float:
+        rows = []
+        for line in table.splitlines():
+            fields = [v.strip() for v in line.strip().strip("|").split("|")]
+            if len(fields) > 5 and fields[0] == "clk_fpga_0" and (
+                    fields[1] == port) and fields[5] == "SLOW":
+                try:
+                    value = float(fields[4].split()[0])
+                except (ValueError, IndexError) as exc:
+                    raise SWDBuildDenied("SWD_FPGA_DATASHEET_BAD_NUMBER") from exc
+                require(math.isfinite(value) and value > 0,
+                        "SWD_FPGA_DATASHEET_BAD_NUMBER")
+                rows.append(value)
+        require(len(rows) == 1, "SWD_FPGA_DATASHEET_PORT_ABSENT_OR_DUPLICATE")
+        return rows[0]
+
+    # 1 MHz provisional max: 100MHz FCLK, >=50 10ns cycles per half.
+    half_ns = 500.0
+    per_site = {}
+    for idx in (1, 2):
+        tclk = slow_max(tx, f"swclk_site{idx}")
+        tsetup = slow_max(rx, f"swdio_site{idx}")
+        minimum = tclk + tsetup
+        margin = half_ns - minimum
+        require(margin > 0, "SWD_FPGA_RX_BRINGUP_CEILING_EXCEEDED")
+        per_site[f"site{idx}"] = {
+            "clock_to_swclk_pad_slow_max_ns": round(tclk, 3),
+            "swdio_input_setup_slow_ns": round(tsetup, 3),
+            "necessary_fpga_only_halfcycle_ns": round(minimum, 3),
+            "unqualified_25mhz_ideal_margin_ns": round(20.0 - minimum, 3),
+            "provisional_1mhz_ideal_margin_ns": round(margin, 3),
+            "target_tco_and_cable_accounted": False,
+        }
+    return {"fclk_hz": 100000000, "provisional_normal_swd_limit_hz": 1000000,
+            "estimated_ideal_fpga_only": per_site,
+            "external_timing_qualified": False,
+            "warning": "FPGA-only necessary condition; not a DUT timing proof"}
+
+
 def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
                      xdc: Path, source_sha: str, build_stdout: str = "") -> dict:
     require(isinstance(source_sha, str) and SHA40.fullmatch(source_sha) is not None,
@@ -209,6 +266,7 @@ def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
                 "SWD_IMPLEMENTATION_REPORT_MISSING_OR_UNSAFE")
         report_hashes[name] = sha256(path)
     io_timing = audit_external_io_timing(reports)
+    fpga_budget = fpga_only_swd_rx_ideal_budget(reports)
     # Real Vivado Tcl must fail on slack/DRC/errors; reports are immutable
     # evidence for reviewer. A positive exit alone does NOT qualify timing.
     require("SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS" in build_stdout,
@@ -222,6 +280,7 @@ def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
         "xdc_sha256": check_xdc(xdc),
         "report_sha256": report_hashes, "hwh": hw,
         "external_swd_io_timing": io_timing,
+        "fpga_only_swd_rx_ideal_budget": fpga_budget,
         "host_build_status": "SUPERVISOR_REVIEW_REQUIRED",
         "physical_image_loaded": "NOT_RUN", "z2_hil": "NOT_RUN",
         "openocd_swd": "NOT_QUALIFIED", "real_dut": "NOT_RUN",
