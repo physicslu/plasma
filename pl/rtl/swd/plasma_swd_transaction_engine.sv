@@ -51,6 +51,8 @@ module plasma_swd_transaction_engine (
         ST_NEED_RESET=4'd2, ST_WAIT=4'd3, ST_FAULT=4'd4,
         ST_BAD_ACK=4'd5, ST_PARITY=4'd6,
         ST_TIMEOUT=4'd7, ST_ABORT=4'd8;
+    // 100MHz FCLK / (2 * 4) = 12.5MHz design maximum (NOT HIL qualified).
+    localparam logic [15:0] MIN_HALF_PERIOD = 16'd4;
     localparam logic [2:0] ACK_OK=3'b001, ACK_WAIT=3'b010,
         ACK_FAULT=3'b100;
 
@@ -97,7 +99,8 @@ module plasma_swd_transaction_engine (
         endcase
     endfunction
 
-    // Unqualified bring-up gate: MAX 1 MHz at 100 MHz FCLK (half >=50).\n    // Not a device/cable timing signoff; owner must explicitly requalify.\n    // Only called in the synchronous process; SWCLK is already falling or
+    // Fastest allowed candidate SWCLK is 12.5MHz, not yet DUT/board qualified.
+    // Only called in the synchronous process; SWCLK is already falling or
     // held low when the next bit/ownership takes effect.
     task automatic enter_phase(input phase_t next_phase, input logic [7:0] cycles);
         phase <= next_phase;
@@ -183,7 +186,7 @@ module plasma_swd_transaction_engine (
                 resp_data_valid <= 1'b0;
                 ack_shift <= 3'd0;
                 swclk <= 1'b0;
-                if (cmd_half_period < 16'd50 ||
+                if (cmd_half_period < MIN_HALF_PERIOD ||
                     cmd_turnaround != 3'd1 ||
                     cmd_idle_cycles < 8'd8 ||
                     cmd_max_retries != 8'd0 ||
