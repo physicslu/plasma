@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -40,7 +41,13 @@ def number(value: str | None) -> int:
             return int(raw, 2)
         if raw in ("true", "false"):
             return int(raw == "true")
-        return int(raw, 0)
+        try:
+            return int(raw, 0)
+        except ValueError:
+            numeric = float(raw)
+            require(math.isfinite(numeric) and numeric.is_integer(),
+                    "SWD_HWH_NONINTEGER_NUMBER")
+            return int(numeric)
     except ValueError as exc:
         raise SWDBuildDenied("SWD_HWH_INTEGER_INVALID") from exc
 
@@ -189,12 +196,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reports", type=Path, required=True)
     parser.add_argument("--xdc", type=Path, required=True)
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--build-log", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     result = verify_artifacts(hwh=args.hwh, bit=args.bit,
                               reports=args.reports, xdc=args.xdc,
                               source_sha=args.source_sha,
-                              build_stdout="SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS")
+                              build_stdout=args.build_log.read_text(encoding="utf-8"))
     require(not args.output.exists(), "SWD_EVIDENCE_OUTPUT_ALREADY_EXISTS")
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")
