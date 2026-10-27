@@ -127,3 +127,34 @@ def test_rtl_physically_instantiates_independent_swd_engines_and_io_guards():
         ".T(!(allowed && swdio_oe_internal))",
     ):
         assert required in rtl
+
+
+def test_production_mpe_rtl_and_sim_never_import_legacy_swd_modules():
+    """Guard new MPE source graph, not historical files needed for rollback."""
+    core = (PL / "rtl/mpe/plasma_mpe_dual_swd_core.sv").read_text()
+    engine = (PL / "rtl/mpe/plasma_mpe_swd_engine.sv").read_text()
+    runner = (PL / "verification/test_mpe_dual_swd_core_rtl.py").read_text()
+    for source in (core, engine, runner):
+        for obsolete in (
+            "swd_transaction_master",
+            "swd_waveform_engine",
+            "swd_emio_bridge",
+            "plasma_poc_swd_gpio_axi_lite",
+            "bluepill_remote_bitbang",
+            "bluepill_z2_word_port",
+            "z2-swd03-axi",
+            "z2-swd-gpio",
+            "z2-bluepill-rbb",
+        ):
+            assert obsolete not in source
+    assert "plasma_mpe_swd_engine u_transaction (" in core
+    assert '"rtl/mpe/plasma_mpe_swd_engine.sv"' in runner
+
+
+def test_mpe_axi_and_openocd_replacement_are_not_falsely_claimed():
+    """Implementation remains source slice until new bus/driver are qualified."""
+    document = (PL.parent /
+        "docs/architecture/plasma-mpe-dual-site-gate1.md").read_text()
+    assert "AXI/FIFO/IRQ integration" in document
+    assert "OpenOCD MPE adapter" in document
+    assert "NOT_DEPLOYED" in document
