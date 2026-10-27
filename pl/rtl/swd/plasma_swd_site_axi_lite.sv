@@ -7,7 +7,7 @@
 // DISABLED (mode=0): SWCLK low, SWDIO Hi-Z. NORMAL and DEBUG never drive
 // simultaneously. Does not control target power or reset.
 //
-// Single in-flight command + one retained completion, NOT a 16-deep FIFO.
+// Bring-up-only Normal SWD rate gate: HALF_PERIOD >=50 @100MHz (<=1MHz).\n// This is a temporary conservative ceiling, NOT external I/O timing closure.\n// Single in-flight command + one retained completion, NOT a 16-deep FIFO.
 // Registers (relative to this Site's own independent 4-KiB AXI address):
 // 00 SITE_ID_CAP 04 STATUS 08 HALF_PERIOD 0C TIMEOUT 10 TX_DATA
 // 14 CMD_PUSH 18 COMPLETION_META 1C DATA 20 TAGGED_POP 24 LEVELS
@@ -174,7 +174,7 @@ module plasma_swd_site_axi_lite #(
                     case (addr_w[7:0])
                         8'h08: if (mode_q == MODE_NORMAL && !busy &&
                                    !resp_valid && !launch_q &&
-                                   data_w[31:16] == 0 && data_w[15:0] >= 2) begin
+                                   data_w[31:16] == 0 && data_w[15:0] >= 50) begin
                             half_q <= data_w[15:0]; s_axi_bresp <= OKAY;
                         end
                         8'h0C: if (mode_q == MODE_NORMAL && !busy &&
