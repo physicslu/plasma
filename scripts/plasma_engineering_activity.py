@@ -146,6 +146,13 @@ DETAIL_MARKERS = frozenset({
 DETAIL_SENSITIVE = re.compile(
     r"(?i)(?:secret|token|passwd|password|credential|private|"
     r"authorization|bearer|api[_-]?key|session[_-]?key|id_rsa|"
+    r"aws[_-]?(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key)|"
+    r"github[_-]?pat|access[_-]?key|client[_-]?secret|"
+    r"private[_-]?key|connection[_-]?string|x[_-]?api[_-]?key|"
+    r"(?<![a-z])(?:AKIA|ASIA)[A-Z0-9]{16}\b|"
+    r"\bgh[pousr]_[a-zA-Z0-9]{12,}\b|"
+    r"\bgithub_pat_[a-zA-Z0-9_]{12,}\b|"
+    r"\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp|ftp|ssh)://|"
     r"\.env|\.pem|\.key|/home/|/root/|/run/secrets|"
     r"https?://|ssh-rsa|BEGIN [A-Z ]*KEY|"
     r"\b[a-f0-9]{32,}\b|\b[A-Za-z0-9+/]{40,}={0,2}\b)"

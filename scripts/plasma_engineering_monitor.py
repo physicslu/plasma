@@ -711,7 +711,8 @@ def render_snapshot(directory: Path, path: str, *,
     else:
         # Never echo unknown machine-record prefixes verbatim.
         log_lines = [
-            line for line in log_lines if not line.startswith("@PLASMA_")]
+            engineering_activity.safe_detail_text(line)
+            for line in log_lines if not line.startswith("@PLASMA_")]
     if status == "RUNNING" and active_items:
         last = next(reversed(active_items.values()))
         doing = next(i for i, line in enumerate(lines)

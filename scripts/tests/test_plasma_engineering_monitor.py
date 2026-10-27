@@ -1650,6 +1650,24 @@ if op in ("new-session", "new-window"):
                 self.assertEqual(unsafe.count(activity.PREFIX.encode()), 1)
                 self.assertNotIn(activity.DETAIL_PREFIX.encode(), unsafe)
 
+    def test_sensitive_unstructured_legacy_output_not_echoed(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            (d / "path2.log").write_text(
+                "normal diagnostics\nAWS_ACCESS_KEY_ID=AKIA" + "A" * 16 + "\n"
+                "url=postgres://user:password@localhost/db\n")
+            frame = mon.render_snapshot(d, "path2", width=120, height=30)
+            self.assertIn("normal diagnostics", frame)
+            self.assertIn("(line redacted)", frame)
+            self.assertNotIn("AKIA", frame)
+            self.assertNotIn("postgres://", frame)
+            for text in ("GITHUB_PAT=github_pat_" + "A" * 30,
+                         "aws_access_key_id=AKIA" + "B" * 16,
+                         "db=redis://admin:password@localhost",
+                         "x-api-key: testkey123"):
+                self.assertEqual(activity.safe_detail_text(text),
+                                 "(line redacted)")
+
     def test_execution_detail_fail_closed_sanitizer_and_spoofing(self):
         safe = activity.detail_wire(
             "cmd_1", "COMBINED", "Device: kingst-la2016", "C")
