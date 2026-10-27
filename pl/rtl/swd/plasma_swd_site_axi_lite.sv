@@ -7,7 +7,9 @@
 // DISABLED (mode=0): SWCLK low, SWDIO Hi-Z. NORMAL and DEBUG never drive
 // simultaneously. Does not control target power or reset.
 //
-// Bring-up-only Normal SWD rate gate: HALF_PERIOD >=50 @100MHz (<=1MHz).\n// This is a temporary conservative ceiling, NOT external I/O timing closure.\n// Single in-flight command + one retained completion, NOT a 16-deep FIFO.
+// Candidate Normal SWD HW ceiling 12.5MHz (N>=4 @100MHz); NOT HIL qualified.
+// Software must independently qualify the DUT/Profile's usable SWD clock.
+// Single in-flight command + one retained completion, NOT a 16-deep FIFO.
 // Registers (relative to this Site's own independent 4-KiB AXI address):
 // 00 SITE_ID_CAP 04 STATUS 08 HALF_PERIOD 0C TIMEOUT 10 TX_DATA
 // 14 CMD_PUSH 18 COMPLETION_META 1C DATA 20 TAGGED_POP 24 LEVELS
@@ -70,6 +72,9 @@ module plasma_swd_site_axi_lite #(
     output wire site_irq
 );
     localparam logic [1:0] OKAY=2'b00, SLVERR=2'b10;
+    // Per-Site dynamic divider: N >= 4 => 12.5MHz candidate hardware max.
+    // Target-qualified working speed is a separate PS/Programming Profile gate.
+    localparam logic [15:0] MIN_HALF_PERIOD = 16'd4;
     localparam logic [1:0] MODE_OFF=2'd0, MODE_NORMAL=2'd1,
                            MODE_DEBUG=2'd2;
     logic aw_hold, w_hold;
@@ -174,7 +179,7 @@ module plasma_swd_site_axi_lite #(
                     case (addr_w[7:0])
                         8'h08: if (mode_q == MODE_NORMAL && !busy &&
                                    !resp_valid && !launch_q &&
-                                   data_w[31:16] == 0 && data_w[15:0] >= 50) begin
+                                   data_w[31:16] == 0 && data_w[15:0] >= MIN_HALF_PERIOD) begin
                             half_q <= data_w[15:0]; s_axi_bresp <= OKAY;
                         end
                         8'h0C: if (mode_q == MODE_NORMAL && !busy &&
