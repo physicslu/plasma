@@ -161,19 +161,21 @@ async def independent_mode_admission_and_bitbang_pads(d):
 @cocotb.test()
 async def two_independent_normal_engines_and_immutable_responses(d):
     await start(d)
-    for s, half in ((0, 50), (1, 60)):
+    for s, half in ((0, 4), (1, 60)):
         assert await write(d, s, 0x38, 1) == 0
         assert await write(d, s, 0x08, 2) == 2  # old 25MHz denied
-        assert await write(d, s, 0x08, 49) == 2  # >1MHz denied
+        assert await write(d, s, 0x08, 3) == 2  # 16.67MHz >12.5MHz denied
         await expect(d, s, 0x08, 500)           # no mutation on reject
-        assert await write(d, s, 0x08, half) == 0
+        assert await write(d, s, 0x08, half) == 0  # 12.5MHz or 833.3kHz admitted
         assert await write(d, s, 0x28, 1) == 0
     for s in (0, 1):
         assert await write(d, s, 0x14, ((s + 1) << 16) | 0x100) == 0
     both_running = False
     edges = [0, 0]
     last = [0, 0]
-    for _ in range(13500):
+    last_rise = [None, None]
+    observed_full_periods = [[], []]
+    for cycle in range(13500):
         await RisingEdge(d.clk)
         await Timer(1, units="ns")
         clock = int(d.swclk_io.value)
@@ -184,6 +186,9 @@ async def two_independent_normal_engines_and_immutable_responses(d):
             level = (clock >> s) & 1
             if level and not last[s]:
                 edges[s] += 1
+                if last_rise[s] is not None and len(observed_full_periods[s]) < 5:
+                    observed_full_periods[s].append(cycle - last_rise[s])
+                last_rise[s] = cycle
             last[s] = level
         if int(d.g_sites[0].u_site.resp_valid.value) and int(
                 d.g_sites[1].u_site.resp_valid.value):
@@ -191,6 +196,8 @@ async def two_independent_normal_engines_and_immutable_responses(d):
     else:
         raise AssertionError("both independent normal SWD commands timed out")
     assert both_running and min(edges) >= 64, edges
+    assert observed_full_periods[0] == [8] * 5, observed_full_periods[0]
+    assert observed_full_periods[1] == [120] * 5, observed_full_periods[1]
     assert int(d.swclk_io.value) == 0
     for s in (0, 1):
         await expect(d, s, 0x24, 2)
@@ -211,7 +218,7 @@ async def debug_site_one_does_not_stop_normal_site_two(d):
     await start(d)
     assert await write(d, 0, 0x38, 2) == 0  # debug Site 1
     assert await write(d, 1, 0x38, 1) == 0  # normal Site 2
-    assert await write(d, 1, 0x08, 50) == 0
+    assert await write(d, 1, 0x08, 4) == 0
     assert await write(d, 1, 0x28, 1) == 0
     assert await write(d, 1, 0x14, (9 << 16) | 0x100) == 0
     for _ in range(20):
@@ -222,7 +229,7 @@ async def debug_site_one_does_not_stop_normal_site_two(d):
     assert await write(d, 0, 0x3C, 0) == 0   # independent debug clock low
     assert await write(d, 0, 0x38, 0) == 0
     assert int(d.g_sites[1].u_site.busy.value), "Site 2 must not be cancelled"
-    for _ in range(9500):
+    for _ in range(3500):
         await RisingEdge(d.clk)
         if int(d.g_sites[1].u_site.resp_valid.value):
             break
