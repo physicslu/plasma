@@ -73,7 +73,8 @@ def test_no_false_claim_about_new_build_or_retirement():
     assert "F1B_BUILD_ENGINE_RETIREMENT_PENDING" in doc
     assert "SWPC Build" in doc
     assert "NOT_RUN" in doc
-    assert not (PROJECT / "build_bitstream.tcl").exists(), (
-        "If the new project Build Tcl has been added, expand this Gate 1 "
-        "regression to verify its source ownership and new output contract."
-    )
+    # As implementation progresses, a new Project Tcl is expected to appear.
+    # Never make the contract itself reject a correct future implementation.
+    build_tcl = PROJECT / "build_bitstream.tcl"
+    if build_tcl.exists():
+        inspect_new_build_source(build_tcl, build_tcl.read_text(encoding="utf-8"))
