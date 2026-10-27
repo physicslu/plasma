@@ -1,0 +1,134 @@
+{
+  "erase_program_verify": {
+    "duration_s": 40.0004852,
+    "edges_CH0_CH1_CH2_CH3": [
+      74458,
+      8874,
+      0,
+      0
+    ],
+    "la_exit": 0,
+    "la_started_before_remote_trigger": true,
+    "logic_chunks": 96,
+    "remote_exit": 0,
+    "sample_count": 200002426,
+    "sample_rate_hz": 5000000,
+    "states_ch3_ch2_ch1_ch0": {
+      "4": 36459638,
+      "5": 20742843,
+      "6": 135366708,
+      "7": 7433237
+    },
+    "wave_sha256": "cd2eb4410d666862747602e29837ea1671be836298da93dab7a352654ff368b2"
+  },
+  "probe": {
+    "duration_s": 20.0003352,
+    "edges_CH0_CH1_CH2_CH3": [
+      15586,
+      1602,
+      0,
+      0
+    ],
+    "la_exit": 0,
+    "la_started_before_remote_trigger": true,
+    "logic_chunks": 48,
+    "remote_exit": 0,
+    "sample_count": 100001676,
+    "sample_rate_hz": 5000000,
+    "states_ch3_ch2_ch1_ch0": {
+      "4": 6620407,
+      "5": 4165861,
+      "6": 87495902,
+      "7": 1719506
+    },
+    "wave_sha256": "c4ca96acf74489bdaa78610cdbf26fa21236a6458548dcfe88b3b6bc9664c950"
+  },
+  "read_last_page": {
+    "duration_s": 40.0003532,
+    "edges_CH0_CH1_CH2_CH3": [
+      42570,
+      7202,
+      0,
+      0
+    ],
+    "la_exit": 0,
+    "la_started_before_remote_trigger": true,
+    "logic_chunks": 96,
+    "remote_exit": 0,
+    "sample_count": 200001766,
+    "sample_rate_hz": 5000000,
+    "states_ch3_ch2_ch1_ch0": {
+      "4": 19540255,
+      "5": 9747661,
+      "6": 163840778,
+      "7": 6873072
+    },
+    "wave_sha256": "93ba903a2f1a733a4d7e68ff502d035aa6b68f4ee0e218238d3669aa1ac9bbf8"
+  },
+  "read_page18": {
+    "duration_s": 40.0003512,
+    "edges_CH0_CH1_CH2_CH3": [
+      42570,
+      3912,
+      0,
+      0
+    ],
+    "la_exit": 0,
+    "la_started_before_remote_trigger": true,
+    "logic_chunks": 96,
+    "remote_exit": 0,
+    "sample_count": 200001756,
+    "sample_rate_hz": 5000000,
+    "states_ch3_ch2_ch1_ch0": {
+      "4": 15598235,
+      "5": 8431205,
+      "6": 168028848,
+      "7": 7943468
+    },
+    "wave_sha256": "cda599abba80b20d8091557f963a90056655be1a039b0944cdee00ee43483787"
+  },
+  "readback_page18": {
+    "duration_s": 40.0004732,
+    "edges_CH0_CH1_CH2_CH3": [
+      42570,
+      3914,
+      0,
+      0
+    ],
+    "la_exit": 0,
+    "la_started_before_remote_trigger": true,
+    "logic_chunks": 96,
+    "remote_exit": 0,
+    "sample_count": 200002366,
+    "sample_rate_hz": 5000000,
+    "states_ch3_ch2_ch1_ch0": {
+      "4": 15908091,
+      "5": 8529520,
+      "6": 167580978,
+      "7": 7983777
+    },
+    "wave_sha256": "9a8339a85367164eeb4481a97e2225aff68f97bb9d982eac5f17f28735daf818"
+  },
+  "reset_run": {
+    "duration_s": 20.0004132,
+    "edges_CH0_CH1_CH2_CH3": [
+      21994,
+      2232,
+      0,
+      0
+    ],
+    "la_exit": 0,
+    "la_started_before_remote_trigger": true,
+    "logic_chunks": 48,
+    "remote_exit": 0,
+    "sample_count": 100002066,
+    "sample_rate_hz": 5000000,
+    "states_ch3_ch2_ch1_ch0": {
+      "4": 9543909,
+      "5": 6467082,
+      "6": 81785577,
+      "7": 2205498
+    },
+    "wave_sha256": "c9ebb54811f5309e90dd969bb126dcd712e5a053cfa4f89bded2ba6d2365332c"
+  }
+}
