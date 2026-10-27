@@ -1,5 +1,9 @@
 # PLASMA MPE — independent two-Site SWD architecture (Gate 1, clean-sheet v1)
 
+> **SUPERSEDED IMPLEMENTATION DIRECTION — ADR-0005 accepted 2026-10-27 (PR #1189 pending merge).**
+> This document preserves the *historical composite MPE prototype* and earlier tests; it is **not** the target production PL topology. The approved direction is **two separately addressable AXI4-Lite SWD IP instances behind ordinary AXI Interconnect, with optional per-Site gated Debug Bitbang** and no additional FPGA MPE manager. OpenOCD v0.12.0 `remote_bitbang` **does not support SWD**; the new Debug Bridge is BLOCKED pending version-qualified source/protocol testing. See [ADR-0005](../adr/0005-independent-swd-ip-guarded-bitbang.md).
+> Existing `plasma_mpe_*` RTL/Cocotb passes apply **only to the historical prototype**, not to the new independent-IP topology. Do not use this document for a final Vivado build, production image selection, Z2 load or SWD Debug claim.
+
 **Status:** Gate 1 architecture plus an **unverified synthesizable two-engine RTL slice**, without AXI/FIFO/IRQ integration or a physical top-level Image. Cocotb/Icarus tests are authored but not yet executed. No BIT/HWH/BIN, actual OpenOCD MPE adapter, FPGA reconfiguration, Z2 MMIO or physical DPIDR qualification exists from this document. **SOURCE_ONLY / NOT_DEPLOYED / NOT_HIL_QUALIFIED**.
 
 **Owner intent (2026-10-27):** replace, rather than preserve, the single-Site PS-driven remote-bitbang PoC. First product-facing prototype implements **two truly independent Sites** on PYNQ-Z2 PMODA/PMODB; final architecture scales to eight without one global SWD bit engine. Neither the previous Site 1=PMODB assignment nor the retired synthetic internal DPIDR route is an ABI requirement. This is a new Image family: do not alter or remove current protected Image/Golden recovery.
