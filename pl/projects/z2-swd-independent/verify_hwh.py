@@ -151,6 +151,42 @@ def check_xdc(xdc: Path) -> str:
     return sha256(xdc)
 
 
+def audit_external_io_timing(reports: Path) -> dict:
+    """Parse real Vivado reports; never infer SWD I/O qualification from WNS.
+
+    This gate is intentionally NOT auto-approved even when all 6 TIMING-18
+    warnings disappear: a source-controlled target/board min+max timing
+    budget must first be justified and audited.
+    """
+    ct = (reports / "check_timing.rpt").read_text(encoding="utf-8")
+    meth = (reports / "methodology.rpt").read_text(encoding="utf-8")
+    found = {}
+    for kind in ("no_input_delay", "no_output_delay"):
+        counts = re.findall(r"checking " + kind + r" \\((\\d+)\\)", ct)
+        require(len(counts) >= 1 and len(set(counts)) == 1,
+                "SWD_IO_CHECK_TIMING_COUNTS_MISSING")
+        found[kind] = int(counts[0])
+    match = re.search(
+        r"TIMING-18\\s*\\|\\s*Warning\\s*\\|[^\\n]*?\\|\\s*(\\d+)\\s*\\|",
+        meth)
+    timing18 = int(match.group(1)) if match else 0
+    # An absent TIMING-18 row is valid only if there are no unmodelled ports.
+    require(timing18 == found["no_input_delay"] + found["no_output_delay"],
+            "SWD_IO_TIMING_REPORTS_DISAGREE")
+    if timing18:
+        disposition = "BLOCKED_MISSING_OFFCHIP_TIMING"
+    else:
+        disposition = "PENDING_SOURCE_REVIEWED_TARGET_BOARD_BUDGET"
+    return {
+        "gate": disposition,
+        "timing18_warnings": timing18,
+        "unconstrained_input_ports": found["no_input_delay"],
+        "unconstrained_output_ports": found["no_output_delay"],
+        "external_io_timing_qualified": False,
+        "scope": "Vivado IO constraint completeness, NOT SWD target HIL",
+    }
+
+
 def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
                      xdc: Path, source_sha: str, build_stdout: str = "") -> dict:
     require(isinstance(source_sha, str) and SHA40.fullmatch(source_sha) is not None,
@@ -171,6 +207,7 @@ def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
                 0 < path.stat().st_size < 8 * 1024 * 1024,
                 "SWD_IMPLEMENTATION_REPORT_MISSING_OR_UNSAFE")
         report_hashes[name] = sha256(path)
+    io_timing = audit_external_io_timing(reports)
     # Real Vivado Tcl must fail on slack/DRC/errors; reports are immutable
     # evidence for reviewer. A positive exit alone does NOT qualify timing.
     require("SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS" in build_stdout,
@@ -183,6 +220,7 @@ def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
         "bit_sha256": sha256(bit), "hwh_sha256": sha256(hwh),
         "xdc_sha256": check_xdc(xdc),
         "report_sha256": report_hashes, "hwh": hw,
+        "external_swd_io_timing": io_timing,
         "host_build_status": "SUPERVISOR_REVIEW_REQUIRED",
         "physical_image_loaded": "NOT_RUN", "z2_hil": "NOT_RUN",
         "openocd_swd": "NOT_QUALIFIED", "real_dut": "NOT_RUN",
