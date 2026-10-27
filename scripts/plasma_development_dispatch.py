@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import sys
 import uuid
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import plasma_engineering_activity as engineering_activity
 
@@ -1368,19 +1370,31 @@ def safe_error_reason(exc: Exception) -> str:
 
 
 def live_pr_metadata(req: dict) -> dict | None:
-    """Worker independently queries GitHub; never trust a cached admission snapshot."""
+    """Worker independently rechecks public GitHub PR over authenticated TLS.
+
+    Do NOT add GH_TOKEN/GITHUB_TOKEN to the SWPC candidate execution job:
+    candidate PR Python runs as the same non-root user and must not inherit or
+    recover GitHub credentials through parent-process environment or /proc.
+    This repository's PR metadata is public. A 403/404/network/rate-limit
+    denial fails closed; the earlier hosted authorization is NOT a fallback.
+    """
     if not req["pr_number"]:
         return None
     try:
-        result = subprocess.run(
-            ["gh", "api", f"repos/{REPO}/pulls/{req['pr_number']}"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            check=True, timeout=15)
-        require(len(result.stdout) <= 262144, "LIVE_PR_RESPONSE_TOO_LARGE")
-        pr = json.loads(result.stdout)
+        url = f"https://api.github.com/repos/{REPO}/pulls/{req['pr_number']}"
+        request = Request(url, headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "PLASMA-SWPC-PR-Admission",
+            "X-GitHub-Api-Version": "2022-11-28",
+        })
+        with urlopen(request, timeout=15) as response:
+            require(response.status == 200, "LIVE_PR_HTTP_STATUS_DENIED")
+            body = response.read(262145)
+        require(len(body) <= 262144, "LIVE_PR_RESPONSE_TOO_LARGE")
+        pr = json.loads(body)
         verify_pr(pr, req)
         return pr
-    except (OSError, ValueError, subprocess.SubprocessError):
+    except (OSError, HTTPError, URLError, TimeoutError, ValueError):
         raise Denied("LIVE_PR_VERIFICATION_FAILED") from None
 
 
