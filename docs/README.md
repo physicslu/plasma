@@ -11,6 +11,10 @@
 | **Plan** | 尚未全部實作的核准方向；不能宣稱為現有能力。 |
 | **Historical** | 僅供遷移背景；不是相容性或執行契約。 |
 
+## 跨廠牌燒錄預設安全政策
+
+- **Current design default / 部分實作** — [Target Execution and Interrupt Isolation](architecture/programming-interrupt-isolation-policy.md)：所有 IC 的破壞性 Erase/Program 前預設須驗證目標執行隔離；具中斷的 MCU 必須採用符合 Provider 的中斷遮罩或等效策略，無 CPU／ROM ISP 則須提出適用性或例外證據。現有實機驗證僅及於 STM32F103C8T6 Z2 Site 1，其他 Provider 的 Runtime Gate 仍待實作。
+
 ## Current external SWD PoC vs retired internal fixtures
 
 - **Current** — Z2 PS-local OpenOCD + WordPort/RemoteBitbang + paired PL SWD Image for Blue Pill: see root `AGENTS.md`, [PS OpenOCD architecture](architecture/ic-support-openocd-plan-executor.md), [retirement map](development/swd-legacy-path-retirement.md).
