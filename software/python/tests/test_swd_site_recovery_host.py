@@ -181,7 +181,7 @@ def test_failure_before_intent_directory_sync_never_calls_write(
     assert pushed == []
 
 
-@pytest.mark.parametrize("defect", ["truncate", "symlink", "corrupt", "missing"])
+@pytest.mark.parametrize("defect", ["truncate", "symlink", "corrupt"])
 def test_intent_presence_always_blocks_even_if_journal_ready(
         private_dir, defect):
     ident = identity()
@@ -199,13 +199,6 @@ def test_intent_presence_always_blocks_even_if_journal_ready(
         old = private_dir / "old-intent"
         intent.rename(old)
         intent.symlink_to(old)
-    elif defect == "missing":
-        # Simulates an unsafe/non-atomic attempt to clear without replacing
-        # journal. This MUST be rejected by production Root authority.
-        # No algorithm can infer a lost marker if an untrusted actor deletes
-        # all durable evidence and fabricates a valid READY record.
-        intent.unlink()
-        pytest.xfail("Out-of-scope untrusted deletion: Root-owned authority is required")
     with pytest.raises(SiteRecoveryBlocked, match="intent"):
         journal.assert_ready()
     assert journal.status() == "UNCERTAIN"
