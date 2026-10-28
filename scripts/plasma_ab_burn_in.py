@@ -112,7 +112,7 @@ def verify_cdc(port: str, version: str, period_ms: int, frames: int, timeout_s: 
                 if owner.returncode != 1:
                     return {"result": "FAIL", "reason": "SERIAL_BUSY_OR_UNKNOWN"}
                 try:
-                    fd = os.open(port, os.O_RDONLY | os.O_NOCTTY | os.O_NONBLOCK)
+                    fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
                     fcntl.ioctl(fd, termios.TIOCEXCL)
                     tty.setraw(fd)
                     attrs = termios.tcgetattr(fd)
