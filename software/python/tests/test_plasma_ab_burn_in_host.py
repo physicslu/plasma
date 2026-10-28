@@ -199,6 +199,104 @@ class ABOrchestrationTests(unittest.TestCase):
 
 
 
+
+class CDCFrameBudgetTests(unittest.TestCase):
+    """Simulated CDC TTY transactions: no connected serial device or hardware."""
+
+    def replay(self, lines, *, version="0.1", period_ms=500, frames=60):
+        payload = "".join(lines).encode("ascii")
+        chunks = [payload[i:i + 4096] for i in range(0, len(payload), 4096)]
+        now = 0.0
+
+        def clock():
+            nonlocal now
+            now += 0.25
+            return now
+
+        def readable(*_):
+            return ([77], [], []) if chunks else ([], [], [])
+
+        def read_chunk(*_):
+            return chunks.pop(0)
+
+        with patch.object(app.Path, "exists", return_value=True), \
+             patch.object(app.Path, "is_char_device", return_value=True), \
+             patch.object(app.subprocess, "run", return_value=SimpleNamespace(returncode=1)), \
+             patch.object(app.os, "open", return_value=77), \
+             patch.object(app.os, "read", side_effect=read_chunk), \
+             patch.object(app.os, "close"), \
+             patch.object(app.fcntl, "ioctl"), \
+             patch.object(app.tty, "setraw"), \
+             patch.object(app.termios, "tcgetattr", return_value=[0, 0, 0, 0, 0, 0, []]), \
+             patch.object(app.termios, "tcsetattr"), \
+             patch.object(app.select, "select", side_effect=readable), \
+             patch.object(app.time, "monotonic", side_effect=clock):
+            return app.verify_cdc("/dev/ttyACM0", version, period_ms, frames, 25.0)
+
+    @staticmethod
+    def heartbeats(n, *, version="0.1", period_ms=500, skip_seq_at=None):
+        lines = []
+        for i in range(1, n + 1):
+            seq = i + (1 if skip_seq_at is not None and i >= skip_seq_at else 0)
+            lines.append(f"HB version={version} seq={seq} uptime_ms={i * period_ms}\\r\\n")
+        return lines
+
+    def test_sixty_consecutive_frames_pass(self):
+        result = self.replay(self.heartbeats(60))
+        self.assertEqual(result["result"], "PASS")
+        self.assertEqual(len(result["frames"]), 60)
+        self.assertEqual(result["frames"][-1]["seq"], 60)
+
+    def test_fifty_nine_frames_do_not_pass(self):
+        result = self.replay(self.heartbeats(59))
+        self.assertEqual(result["result"], "FAIL")
+        self.assertEqual(len(result["last_consecutive_samples"]), 59)
+
+    def test_thousand_frame_upper_boundary(self):
+        result = self.replay(self.heartbeats(1000, version="0.2", period_ms=1000),
+                             version="0.2", period_ms=1000, frames=1000)
+        self.assertEqual(result["result"], "PASS")
+        self.assertEqual(len(result["frames"]), 1000)
+
+    def test_wrong_version_and_sequence_gap_never_false_pass(self):
+        wrong = self.replay(self.heartbeats(60, version="0.2"))
+        self.assertEqual(wrong["result"], "FAIL")
+        self.assertTrue(wrong["seen_versions"])
+        gap = self.replay(self.heartbeats(60, skip_seq_at=31))
+        self.assertEqual(gap["result"], "FAIL")
+        self.assertLess(len(gap["last_consecutive_samples"]), 60)
+
+    def test_adaptive_timeout_and_explicit_minimum(self):
+        self.assertGreater(app.cdc_timeout_for(60, 500, None), 30)
+        self.assertGreater(app.cdc_timeout_for(60, 1000, None), 60)
+        self.assertGreater(app.cdc_timeout_for(1000, 1000, None), 1000)
+        self.assertLessEqual(app.cdc_timeout_for(1000, 1000, None), 1800)
+        self.assertEqual(app.cdc_timeout_for(60, 1000, 120.0), 120.0)
+        with self.assertRaisesRegex(ValueError, "too short"):
+            app.cdc_timeout_for(1000, 1000, 120.0)
+
+    def test_cli_accepts_1000_defaults_to_60_and_rejects_invalid_before_hardware(self):
+        with patch.object(app, "BurnIn") as runner, patch.object(app.os, "umask"):
+            runner.return_value.run.return_value = 0
+            self.assertEqual(app.main(["--cycles", "1"]), 0)
+            self.assertEqual(runner.call_args.args[0].frames, 60)
+            self.assertIsNone(runner.call_args.args[0].cdc_timeout)
+            self.assertEqual(app.main(["--cycles", "1", "--frames", "1000"]), 0)
+            self.assertEqual(runner.call_args.args[0].frames, 1000)
+        for flags in (
+            ["--frames", "1001"],
+            ["--frames", "2"],
+            ["--frames", "1000", "--cdc-timeout", "120"],
+            ["--frames", "60", "--cdc-timeout", "1801"],
+        ):
+            with self.subTest(flags=flags), redirect_stdout(io.StringIO()), \
+                 patch("sys.stderr", new_callable=io.StringIO), \
+                 self.assertRaises(SystemExit) as caught:
+                app.main(["--cycles", "1", *flags])
+            self.assertEqual(caught.exception.code, 2)
+
+
+
 class ForegroundStopAndEvidenceTests(unittest.TestCase):
     """Host-only pseudo-TTY tests: no actual SWPC, Z2 or serial device."""
 
