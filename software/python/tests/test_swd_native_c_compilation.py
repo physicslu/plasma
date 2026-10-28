@@ -385,3 +385,46 @@ def test_root_guard_reload_fence_blocks_site_without_loading_fpga(tmp_path, monk
                         raise AssertionError("Site started during Root operation")
         with site(1), site(2):
             pass
+
+
+def test_native_v5_word_access_c_compilation_and_owner_fail_closed(tmp_path):
+    """C word MMIO driver from PR #1199 technique, v5/2-Site synthetic only.
+
+    No /dev/mem open, real mapping, Root privilege, SWCLK pin or DUT.
+    """
+    cc = shutil.which("cc")
+    assert cc, "GitHub-hosted C compiler required"
+    exe = tmp_path / "native-v5-words-host-only"
+    args = [
+        cc, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+        "-pedantic", "-DPLASMA_SWD_HOST_TEST=1", "-I", str(SRC),
+        str(SRC / "plasma_swd_fifo_core.c"),
+        str(SRC / "plasma_swd_native_words.c"),
+        str(SRC / "plasma_swd_lease_word_port.c"),
+        str(SRC / "plasma_swd_owner_lock.c"),
+        str(SRC / "tests/test_plasma_swd_native_words.c"),
+        "-o", str(exe),
+    ]
+    built = subprocess.run(args, capture_output=True, text=True,
+                           timeout=30, check=False)
+    assert built.returncode == 0, built.stdout + built.stderr
+    verified = subprocess.run([str(exe)], capture_output=True, text=True,
+                              timeout=15, check=False)
+    assert verified.returncode == 0, verified.stdout + verified.stderr
+    assert "PLASMA_NATIVE_V5_WORDS_HOST_ONLY_PASS" in verified.stdout
+
+
+def test_native_v5_mmio_is_volatile_words_not_legacy_bitbang():
+    c = (SRC / "plasma_swd_native_words.c").read_text()
+    h = (SRC / "plasma_swd_native_words.h").read_text()
+    assert "volatile uint32_t" in h
+    assert "__ARM_ARCH_7A__" in c and '"dmb sy"' in c
+    assert "atomic_signal_fence" in c
+    assert "plasma_swd_owner_lock_valid" in c
+    assert "lease_generation" in c
+    assert "authorize(n->authority_ctx" in c
+    for forbidden in (
+        "/dev/mem\"", "mmap(", "open(", "socket(", "remote_bitbang",
+        "plasma_rbb_exchange", "bluepill_wordport_bridge", "MODE_DEBUG",
+    ):
+        assert forbidden not in c

@@ -139,7 +139,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool pkg-config make gcc git \
-            libusb-1.0-0-dev libftdi1-dev libhidapi-dev
+            libusb-1.0-0-dev libftdi1-dev libhidapi-dev \
+            gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf libc6-dev-armhf-cross
       - name: Fetch exact original OpenOCD and inject reviewed PLASMA files
         if: steps.scope.outputs.required == 'true'
         env:
@@ -162,6 +163,25 @@ jobs:
           ./configure --disable-werror --enable-internal-jimtcl --disable-internal-libjaylink
           make -j2
           test -x src/openocd
+      - name: ARMv7 native v5 MMIO word width and DMB inspection
+        if: steps.scope.outputs.required == 'true'
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/plasma-v5-native-words.o"
+          arm-linux-gnueabihf-gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -march=armv7-a -marm -mfloat-abi=hard -mfpu=vfpv3 \
+            -I software/native/swd \
+            -c software/native/swd/plasma_swd_native_words.c -o "${out}"
+          arm-linux-gnueabihf-readelf -h "${out}" > "${RUNNER_TEMP}/plasma-native-v5-elf.txt"
+          arm-linux-gnueabihf-objdump -d "${out}" > "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          grep -Eq 'Class:[[:space:]]+ELF32' "${RUNNER_TEMP}/plasma-native-v5-elf.txt"
+          grep -Eq 'Machine:[[:space:]]+ARM' "${RUNNER_TEMP}/plasma-native-v5-elf.txt"
+          grep -Eq '\\bdmb[[:space:]]+sy\\b' "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          grep -Eq '\\bldr([[:space:]]|[a-z]*[[:space:]])' "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          grep -Eq '\\bstr([[:space:]]|[a-z]*[[:space:]])' "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          sha256sum "${out}" "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          echo "ARMv7 native ABI-v5 word LDR/STR and DMB SY: HOST BUILD PASS" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Device mapping attributes / AXI completion / HIL: NOT_RUN" >> "${GITHUB_STEP_SUMMARY}"
       - name: Verify selectable SWD adapter but no unowned device admission
         if: steps.scope.outputs.required == 'true'
         run: |

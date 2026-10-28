@@ -276,6 +276,54 @@ if each process owns a distinct Site lock; it is not evidence of
 full multi-DUT throughput. Do not deploy solely on mock CI.
 
 
+## PR #1199 Native C evidence reused — ABI v5 word accessor (Host-only)
+
+Merged [PR #1199](https://github.com/physicslu/plasma/pull/1199),
+head `e6dfb727cc687353fde3649e5e7775e3ffa37a46`, is a
+**physical Z2 prototype proof for the OLD single-Site Remote Bitbang
+Image**, not an ABI-v5 SWD FIFO qualification. The merged Native C
+bridge performed ARMv7 volatile `uint32_t` MMIO accesses and
+`DMB SY` under the **already authorized** Python process mapping,
+with the actual DPIDR `0x1ba01477`, 18,768-byte Flash readback
+SHA256 `8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d`
+and a successful 600-second bounded session / 60-second socket idle
+revision. None of those physical receipts apply to the v5 Image, the
+v5 FPGA FIFO or two concurrent DUTs; the old Remote Bitbang protocol,
+clock toggling and Python per-bit route must NOT be reintroduced.
+
+For v5, new `software/native/swd/plasma_swd_native_words.[ch]`
+uses only the **reusable native access technique**: externally
+provided aligned, exactly 4096-byte existing mapped
+`volatile uint32_t *`, ARMv7-A `DMB SY` on real ARMv7 and a
+compiler fence for non-ARM Host-only tests. It is a C
+`plasma_swd_lease_provider` for the existing C Lease Word Port,
+not a separately privileged device opener, Python per-bit callback
+or Bitbang SWD engine. Every access independently checks
+current process/lock epoch, exact Site ID/base/generation and
+a required trusted, same-process **native C authorization callback**
+for Root source/Boot/Image+Manifest/Site lease/voltage. Wrong ABI,
+forbidden register offset (including retired 0x3C/0x40), missing
+authority and revoked/uncertain ownership deny. Failures poison the
+shared owner domain via `revoke_all`.
+
+Host-only C tests use two synthetic 4-KiB pages and an injected
+attestation function to exercise the real native read/write interface,
+per-Site isolation and fail-closed behavior. GitHub-hosted ARMv7
+cross-build inspects **ELF32 ARM, word LDR/STR and DMB SY**, following
+the proven #1199 source/build evidence pattern. These proofs mean
+**C code was compiled with target instructions**; they do **not**
+establish Device memory attributes, AXI write completion, physical
+atomicity, SIGBUS containment, mapping provenance or Image approval.
+
+The crucial still-missing connection is a **trusted Z2 PS-local
+process** that obtains the guarded device mapping and supplies the
+real native C authorization callback/Root+Manifest state to this
+provider and binds an admitted FIFO to the OpenOCD
+`plasma_swd_openocd5088_bind()` entry point. The new driver is
+not auto-bound and OpenOCD must continue to reject unowned `init`.
+The 600/60 timeout revision in #1199 was specific to its old
+PS-local Socket bridge, **not** a v5 FIFO/OpenOCD timeout selection.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks
