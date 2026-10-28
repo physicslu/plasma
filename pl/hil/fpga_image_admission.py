@@ -29,9 +29,13 @@ def check_exact(*, release, passive: dict, uio: dict,
          passive.get("root") is True and bool(passive.get("boot_id")) and
          passive.get("manager_state") == "operating" and
          passive.get("recovery_sha256") == release.recovery_sha256 and
-         passive.get("candidate_sha256") == release.firmware_sha256 and
-         passive.get("proc_complete") is True and
-         passive.get("proc_conflicts") == [], "INCOMPLETE_ROOT_OR_PROCESS_FACTS")
+         passive.get("candidate_sha256") == release.firmware_sha256,
+         "INCOMPLETE_ROOT_OR_PROCESS_FACTS")
+    scan = passive.get("proc_scan_diagnostic")
+    scan_status = scan.get("status", "UNKNOWN") if type(scan) is dict else "UNKNOWN"
+    need(passive.get("proc_complete") is True,
+         "PROC_SCAN_INCOMPLETE:" + str(scan_status)[:60])
+    need(passive.get("proc_conflicts") == [], "PROC_RESOURCE_OWNER_CONFLICT")
     need(type(uio) is dict and uio == release.expected_uio,
          "BOUND_UIO_EXACT_FACTS_CHANGED")
     need(passive.get("uio_overlaps") == [release.uio_name],
