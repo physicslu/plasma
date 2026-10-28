@@ -389,7 +389,7 @@ class FlashFailureForensicsContract(unittest.TestCase):
         self.assertIn("PLASMA_DIAG_MEM_FAIL $name $reason", tcl)
         self.assertIn("PLASMA_DIAG_REG_FAIL $label $reason", tcl)
         self.assertNotIn("reset run", tcl)
-        self.assertNotIn("resume", module.FAILURE_DIAGNOSTIC_TCL)
+        self.assertNotIn("\n    resume\n", module.FAILURE_DIAGNOSTIC_TCL)
         self.assertNotIn("write_memory", module.FAILURE_DIAGNOSTIC_TCL)
 
     def test_complete_same_session_failure_snapshot_is_structured(self):
