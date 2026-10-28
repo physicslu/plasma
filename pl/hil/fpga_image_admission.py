@@ -32,10 +32,15 @@ def check_exact(*, release, passive: dict, uio: dict,
          passive.get("candidate_sha256") == release.firmware_sha256,
          "INCOMPLETE_ROOT_OR_PROCESS_FACTS")
     scan = passive.get("proc_scan_diagnostic")
-    scan_status = scan.get("status", "UNKNOWN") if type(scan) is dict else "UNKNOWN"
+    scan = scan if type(scan) is dict else {}
+    # No free-form command lines or environment values; only the root census
+    # status, numeric PID, FD/MAPS phase and exception type are reported.
+    detail = ":".join(str(scan.get(key, "UNKNOWN"))[:40]
+                      for key in ("status", "pid", "phase", "error"))
     need(passive.get("proc_complete") is True,
-         "PROC_SCAN_INCOMPLETE:" + str(scan_status)[:60])
-    need(passive.get("proc_conflicts") == [], "PROC_RESOURCE_OWNER_CONFLICT")
+         "PROC_SCAN_INCOMPLETE:" + detail)
+    need(passive.get("proc_conflicts") == [],
+         "PROC_RESOURCE_OWNER_CONFLICT")
     need(type(uio) is dict and uio == release.expected_uio,
          "BOUND_UIO_EXACT_FACTS_CHANGED")
     need(passive.get("uio_overlaps") == [release.uio_name],
