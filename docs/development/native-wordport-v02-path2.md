@@ -89,7 +89,7 @@ Or from SWPC, substitute `--role swpc` with the same exact script,
 firmware and source SHA. SWPC's enrolled SSH/host-key/sudo rights remain
 a requirement; no new sudo privilege is provided.
 
-The *program-v02* and *diagnose-after* operations always repeat this
+The *program-v02*, *diagnose-after* and *reset-run* operations always repeat this
 preflight, and still require `--owner-attested` for physical operations.
 A successful read-only preflight is **not** authorization to erase Flash.
 
@@ -126,6 +126,42 @@ install code or grant sudo/SSH rights.
 
 Never run both paths concurrently, and do not paste these commands into a
 hardware terminal until wiring, recovery and the approved operation are checked.
+
+## Explicit one-shot OpenOCD reset (v0.2 boot qualification)
+
+After independently verifying the preceding v0.2 Flash erase/write/verify
+and **full independent readback SHA match**, an owner may explicitly restart
+the target with the native SWD Bridge. This operation does not flash again.
+It uses the same preflight and one protected FPGA/MMIO/Site-1 owner as the
+program flow. It **changes target CPU execution state** and is NOT read-only.
+
+On the reviewed, SHA-pinned Z2 entrypoint:
+
+    S="<Z2_NATIVE_BUNDLE>/scripts/plasma_native_wordport_v02.py"
+    SCRIPTSHA="$(sha256sum "$S" | cut -d' ' -f1)"
+    sudo /opt/plasma/python/3.12.13/bin/python3 -I -B "$S" \
+      --role z2 --operation reset-run \
+      --firmware <Z2_V02_BIN> \
+      --source-sha256 "$SCRIPTSHA" --owner-attested
+
+OpenOCD performs `init; reset run; shutdown` through the Z2 native
+WordPort session, with no program, erase, dump, verify, additional
+reset, or auto retry. Normal close of the Bridge is bounded and required
+for a PASS. A failed `reset run` is reported as FAIL and does not trigger
+a second reset. The OpenOCD success marker is
+`PLASMA_RESET_RUN_OK`, and the receipt has `operation=reset-run`,
+`no_flash_write=true`, `no_auto_retry=true` and
+`no_reset_no_retry=false`.
+
+STM32 SWD reset through OpenOCD is not an electrical USB power-cycle;
+if USB CDC does not re-enumerate after reset, do not reinterpret
+`reset-run PASS` as CDC qualification. Validate on the host independently
+using the v0.2 firmware ID, 1-second heartbeat and PC13 LED behavior.
+A second reset or a power-cycle is a separate physical action.
+
+This operation uses the same owner approval, 3.3 V, common-ground and
+single-device-owner requirements. It is not an automatic post-flash reset.
+No new detached Bridge, root executor, rights or FPGA reload are introduced.
 
 ## Evidence and acceptance
 
