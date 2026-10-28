@@ -201,6 +201,31 @@ fixture does not require repeated manual electrical or socket checks.
 The Gate 1 source/Host-only tests alone are **not** a real register HIL
 PASS; run on approved SWPC/Z2 hardware and retain actual receipts.
 
+## SWPC → Z2 password SSH compatibility (Gate 1, Draft)
+
+The SWPC `plasma_wordport_program.py` client uses the same enrolled
+Development Mode worker login as existing Path 3:
+`~/.config/plasma/z2-login-smoke.json` (private mode 0600) and
+`~/.config/plasma/z2-login-known_hosts` (pinned public host-key entry).
+The worker-local private-key file `~/.ssh/plasma_z2_ed25519` is **not**
+required or created. Only the local dedicated account owning the private
+enrollment may run this route; no cross-user home or credential fallback.
+
+OpenSSH is run with strict host-key checking, one password attempt, no
+public-key fallback and an isolated controlling PTY with echo disabled.
+The implementation recognizes the SSH login password prompt and the
+separate fixed sudo prompt; it uses `sudo_password` only if explicitly
+configured, otherwise reuses the enrolled SSH password. Secrets are
+never placed into argv, environment variables or artifacts. A missing,
+malformed or incorrectly owned credential/host-key enrollment blocks
+before starting a network session. Existing Z2 program/FPGA Root Guard,
+source hash and Site ownership checks remain unchanged.
+
+Host-only CI verifies the actual client command contract with simulated
+credentials and PTY responses. A real SSH/sudo preflight is still required
+after deploying the same reviewed Python bytes to SWPC and Z2; PASS
+in hosted CI is NOT equivalent to actual device operation.
+
 ## Same-session Flash failure forensic capture (Gate 1, Draft)
 
 The Z2 PS-local OpenOCD `program` Tcl runs `plasma_diag` **before**
