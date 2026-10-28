@@ -524,6 +524,7 @@ def test_native_owner_evidence_never_treats_root_journal_as_loaded_image_proof()
     assert "active_image_attested" in owner
     assert "axi_isolation_proven" in owner
     assert "root_source_pinned" in owner
+    assert "root_source_commit" in owner
     assert "loaded_image_sha256" in owner
     assert "image_manifest_sha256" in owner
     assert "voltage_qualified" in owner

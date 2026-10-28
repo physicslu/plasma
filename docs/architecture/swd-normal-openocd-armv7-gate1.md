@@ -419,7 +419,7 @@ features that a Mock or saved JSON file can mark PASS.
 a new attestation issuer, per-Image token, registration record or
 additional approval Gate. Its expected reference includes the
 existing Root journal `fpga-<32 hex>` session ID, Boot UUID,
-source-pinned Root executable SHA256, paired Manifest SHA256,
+source-pinned Root Git commit SHA40, paired Manifest SHA256,
 actually *loaded* Image SHA256, Image ID, ABI version 5 and Site mask.
 An independent trusted same-process observer must remeasure those
 values **during each Native C MMIO operation**, including current

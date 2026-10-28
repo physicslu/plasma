@@ -17,7 +17,7 @@
 
 struct plasma_swd_observed_identity {
     char boot_id[37];                /* exact Linux boot UUID */
-    char root_source_sha256[65];     /* protected Root executable pin */
+    char root_source_commit[41];     /* protected Root Git SHA40 source pin */
     char image_manifest_sha256[65];  /* paired Manifest content hash */
     char loaded_image_sha256[65];    /* physically attested current PL Image */
     char image_id[32];              /* ABI-v5 FPGA Image identity */

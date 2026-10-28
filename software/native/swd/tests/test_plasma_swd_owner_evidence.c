@@ -30,12 +30,18 @@ static void fill(char dst[65], char c)
     memset(dst, c, 64u);
     dst[64] = '\0';
 }
+static void fill40(char dst[41], char c)
+{
+    memset(dst, c, 40u);
+    dst[40] = '\0';
+}
+
 static struct plasma_swd_observed_identity identity(void)
 {
     struct plasma_swd_observed_identity e = {0};
     strcpy(e.boot_id, "123e4567-e89b-12d3-a456-426614174000");
     strcpy(e.image_id, "SWD_V5");
-    fill(e.root_source_sha256, 'a');
+    fill40(e.root_source_commit, 'a');
     fill(e.image_manifest_sha256, 'b');
     fill(e.loaded_image_sha256, 'c');
     strcpy(e.root_image_session_id, "fpga-0123456789abcdef0123456789abcdef");
@@ -150,7 +156,7 @@ static void negative_live_claims(void)
     f.live = e;
     assert(plasma_swd_owner_evidence_init(
         &owner, 1, 11, &e, &f, live_read) == 0);
-    f.live.root_source_sha256[0] = '0';
+    f.live.root_source_commit[0] = '0';
     assert(plasma_swd_owner_evidence_authorize(&owner, 1, 11) != 0);
     memset(&owner, 0, sizeof(owner));
     f.live = e;
