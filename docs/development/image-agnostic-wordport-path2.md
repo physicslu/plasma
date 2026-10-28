@@ -221,6 +221,14 @@ malformed or incorrectly owned credential/host-key enrollment blocks
 before starting a network session. Existing Z2 program/FPGA Root Guard,
 source hash and Site ownership checks remain unchanged.
 
+The local PTY removes SSH/sudo prompts and places the remote JSON receipt on
+its own line. This is required because sudo may print its prompt immediately
+before valid JSON, which previously made SWPC Burn-in report
+`MISSING_JSON_RECEIPT` even though Z2 Preflight returned PASS. A Host-only
+regression reproduces the genuine observed prompt-framing failure and checks
+compatibility with the existing Burn-in parser. A failed or absent remote
+receipt must still remain FAIL/NOT_RUN; do not fabricate a PASS.
+
 Host-only CI verifies the actual client command contract with simulated
 credentials and PTY responses. A real SSH/sudo preflight is still required
 after deploying the same reviewed Python bytes to SWPC and Z2; PASS
