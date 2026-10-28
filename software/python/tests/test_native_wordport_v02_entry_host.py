@@ -289,5 +289,75 @@ class NativeV02DynamicSession(unittest.TestCase):
             self.assertEqual(log.count("MOCK_FLASH write_image"), 1)
 
 
+class NativeV02PreflightHostOnly(unittest.TestCase):
+    """Exercise the preflight routing without hardware, subprocesses, or sockets."""
+
+    def test_preflight_only_reports_checked_facts_and_does_not_start_bridge(self):
+        args = SimpleNamespace(operation="preflight", owner_attested=False)
+        captured = io.StringIO()
+        with patch.object(module, "z2_preflight", return_value=(
+                Path("/fake/verified-image.bin"), Path("/fake/native.so"),
+                Path("/fake/barrier.so"), "mock-current-boot", "a" * 40)), \
+             patch.object(module.subprocess, "Popen", side_effect=AssertionError(
+                "preflight must never spawn bridge")), \
+             patch.object(module.subprocess, "run", side_effect=AssertionError(
+                "preflight must never run OpenOCD")), \
+             redirect_stdout(captured):
+            status = module.on_z2(args)
+        self.assertEqual(status, 0)
+        report = json.loads(captured.getvalue())
+        self.assertEqual(report["result"], "PASS")
+        self.assertEqual(report["operation"], "preflight")
+        self.assertEqual(report["hw_action"], "NONE")
+        self.assertTrue(report["no_erase_program_halt_reset"])
+        self.assertEqual(report["electrical"], "NOT_VERIFIED_OWNER_MUST_CHECK")
+        for check in ("openocd_executable_and_scripts", "mmio_devices_idle",
+                      "openocd_and_swd_owner_idle",
+                      "held_tested_image_manifest_and_golden_sha256",
+                      "reviewed_script_sha256"):
+            self.assertEqual(report["checks"][check], "PASS")
+
+    def test_preflight_error_is_fail_closed_no_subprocess_or_false_pass(self):
+        args = SimpleNamespace(operation="preflight", owner_attested=False)
+        with patch.object(module, "z2_preflight",
+                          side_effect=module.NotRun(69, "MMIO_BUSY_OR_UNKNOWN")), \
+             patch.object(module.subprocess, "Popen", side_effect=AssertionError(
+                "blocked preflight must never spawn bridge")), \
+             self.assertRaises(module.NotRun) as error:
+            module.on_z2(args)
+        self.assertEqual(error.exception.status, 69)
+        self.assertEqual(str(error.exception), "MMIO_BUSY_OR_UNKNOWN")
+
+    def test_cli_preflight_does_not_require_electrical_attestation(self):
+        args = ["program", "--role", "z2", "--operation", "preflight",
+                "--firmware", "/fake/fw-v02.bin", "--source-sha256", "a" * 64]
+        with patch("sys.argv", args), \
+             patch.object(module, "on_z2", return_value=0) as on_z2:
+            self.assertEqual(module.main(), 0)
+            self.assertEqual(on_z2.call_args.args[0].operation, "preflight")
+            self.assertFalse(on_z2.call_args.args[0].owner_attested)
+
+    def test_hardware_modes_still_require_owner_attestation(self):
+        with patch.object(module.os, "geteuid", return_value=0), \
+             patch.object(module, "check_source"), \
+             patch.object(module.Z2_ENTRY, "resolve",
+                          return_value=SCRIPT.resolve()):
+            for op in ("program-v02", "diagnose-after"):
+                args = SimpleNamespace(operation=op, owner_attested=False)
+                with self.subTest(operation=op), self.assertRaises(module.NotRun) as raised:
+                    module.z2_preflight(args)
+                self.assertEqual(raised.exception.status, 77)
+                self.assertEqual(str(raised.exception), "OWNER_ATTESTATION_REQUIRED_FOR_HARDWARE")
+
+    def test_source_contract_explicit_preflight_and_no_program_tcl(self):
+        text = SCRIPT.read_text()
+        self.assertIn('"preflight", "program-v02", "diagnose-after"', text)
+        self.assertIn('if args.operation == "preflight":', text)
+        self.assertIn('"hw_action": "NONE"', text)
+        self.assertIn('"no_erase_program_halt_reset": True', text)
+        self.assertIn('if args.operation != "preflight" and not args.owner_attested', text)
+        self.assertIn('if args.owner_attested:\n        command.append("--owner-attested")', text)
+
+
 if __name__ == "__main__":
     unittest.main()
