@@ -20,6 +20,8 @@ NATIVE = Path("software/native/swd")
 COPIES = (
     "plasma_swd_fifo_core.h",
     "plasma_swd_fifo_core.c",
+    "plasma_swd_lease_word_port.h",
+    "plasma_swd_lease_word_port.c",
     "plasma_swd_openocd5088_callbacks.c",
     "plasma_swd_openocd5088_driver.c",
 )
@@ -85,6 +87,7 @@ def main() -> None:
         "DRIVERFILES += %D%/driver.c",
         "DRIVERFILES += %D%/driver.c\n"
         "DRIVERFILES += %D%/plasma_swd_fifo_core.c\n"
+        "DRIVERFILES += %D%/plasma_swd_lease_word_port.c\n"
         "DRIVERFILES += %D%/plasma_swd_openocd5088_callbacks.c\n"
         "DRIVERFILES += %D%/plasma_swd_openocd5088_driver.c",
     )

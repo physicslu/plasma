@@ -166,6 +166,46 @@ authorized admitted Site. Do not interpret a successful build or
 negative admission test as target SWD, AP posted-read, Flash or HIL PASS.
 Production packaging and live execution remain excluded from this PR.
 
+## Native C Site Lease word-access seam (Host-only; PS owner still pending)
+
+`software/native/swd/plasma_swd_lease_word_port.[ch]` now exposes a
+C-only, **inert** lease-qualified `struct plasma_swd_word_io` adapter.
+It is a thin ownership/ABI guard around a provider that the future
+PS-local runtime must supply. It does **not** open `/dev/mem`, mmap a
+physical window, duplicate the LinuxMMIO device mapper, obtain a new
+Site lease, embed Python in OpenOCD or introduce a socket/middleware.
+
+- Explicit `site_id` (1/2), candidate AXI base and nonzero
+  `lease_generation` identify each independent Site. Constructing it
+  touches no device; the explicit `admit` calls the owner's trusted
+  qualification hook. Revoked, stale or fork-inherited leases reject.
+- Each `read_owned/write_owned/barrier_owned` provider callback
+  **must atomically revalidate** Image/Manifest, Boot/Root and electrical
+  qualification plus current Site ownership under the existing shared
+  device/owner lock **together with** the 32-bit MMIO operation.
+  A one-time `qualify` flag is never sufficient for hardware safety.
+  If the privileged provider cannot guarantee this, it must fail closed.
+- Exact ABI-v5 32-bit offset allowlists are duplicated *only as contract
+  constants* at the Python/C seam and covered by Host-only tests.
+  Cross-Site, unaligned, write-only/read-only confusion and the retired
+  `0x3C/0x40` SWD Debug offsets are rejected **before** calling provider I/O.
+- A failed owned I/O or Barrier marks the port unusable and invokes
+  `invalidate_all` on its central owner domain so peer Site accesses are
+  rejected until explicit safe requalification. The C wrapper cannot
+  recover kernel SIGBUS, AXI hangs or unknown write completion.
+- The GitHub-hosted C tests use a deterministic **synthetic owner** with
+  two Site generations, authorization flags and register responses; they
+  demonstrate the C FIFO working through the new guard as well as fail-
+  closed stale lease, missing voltage, retired offsets and uncertainty.
+
+**Remaining blocker:** this repo has **not** yet supplied a trusted
+PS-local, device-backed provider, ARMv7 MMIO load/store/Barrier HIL,
+LinuxMMIO cross-process owner-lock enforcement evidence or a real
+OpenOCD `plasma_swd_openocd5088_bind` call wired through this guarded
+port. A mock success is not Image/Manifest authenticity, electrical
+qualification or permission to access hardware. C/Python both describing
+the Site contract is not the same as sharing one live object or lock.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks

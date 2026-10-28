@@ -79,3 +79,37 @@ def test_native_callback_is_source_locked_and_no_product_adapter_registered():
         assert name in src
     assert "struct adapter_driver" in (SRC / "plasma_swd_openocd5088_driver.c").read_text()
     assert "remote_bitbang_adapter_driver" not in src
+
+
+def test_native_leased_word_port_host_only_owner_revocation(tmp_path):
+    """Real C lease-guarded word-port compilation and synthetic owner tests."""
+    cc = shutil.which("cc")
+    assert cc, "GitHub-hosted C compiler required"
+    executable = tmp_path / "host-only-swd-leased"
+    cmd = [
+        cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-O2", "-I", str(SRC),
+        str(SRC / "plasma_swd_fifo_core.c"),
+        str(SRC / "plasma_swd_lease_word_port.c"),
+        str(SRC / "tests/test_plasma_swd_lease_word_port.c"),
+        "-o", str(executable),
+    ]
+    compiled = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=30, check=False)
+    assert compiled.returncode == 0, compiled.stdout + compiled.stderr
+    result = subprocess.run([str(executable)], capture_output=True,
+                            text=True, timeout=10, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PLASMA_NATIVE_SWD_LEASE_PORT_HOST_ONLY_PASS" in result.stdout
+
+
+def test_native_lease_boundary_has_no_direct_device_or_bitbang_path():
+    source = (SRC / "plasma_swd_lease_word_port.c").read_text()
+    header = (SRC / "plasma_swd_lease_word_port.h").read_text()
+    assert "invalidate_all" in source and "invalidate_all" in header
+    assert "read_owned" in source and "write_owned" in source
+    assert "barrier_owned" in source and "generation" in source
+    for forbidden in ("open(", "mmap(", "ioctl(", "socket(",
+                      "MODE_DEBUG", "remote_bitbang", "system("):
+        assert forbidden not in source
+    assert "0x3c" not in source and "0x40" not in source
