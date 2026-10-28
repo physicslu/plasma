@@ -71,7 +71,7 @@ def test_durable_uncertain_before_push_and_never_auto_clear(private_dir):
     assert journal.guard_write("job-A-write-01", fake_push) == 9
     assert observed == ["PUSH"]
     assert journal.status() == "UNCERTAIN"
-    with pytest.raises(SiteRecoveryBlocked, match="uncertain"):
+    with pytest.raises(SiteRecoveryBlocked, match="intent"):
         journal.guard_write("job-A-write-02", lambda: observed.append("REPLAY"))
     assert observed == ["PUSH"]
 
@@ -116,7 +116,7 @@ def test_injected_power_loss_before_rename_never_calls_push(
         journal.guard_write("job-power-loss", lambda: dispatched.append("PUSH"))
     assert dispatched == []
     assert list(private_dir.glob("site-1.json.pending-*"))
-    with pytest.raises(SiteRecoveryBlocked, match="Incomplete"):
+    with pytest.raises(SiteRecoveryBlocked, match="intent"):
         journal.assert_ready()
 
 
@@ -226,14 +226,20 @@ def test_fifo_pending_and_reload_do_not_erase_uncertainty(private_dir):
     ident = identity()
     provision_test_only(private_dir, ident)
     journal = SiteRecoveryJournal(private_dir, ident)
-    journal.guard_write("fifo-pending", lambda: None)
-    assert journal.status() == "UNCERTAIN"
+    # A still-READY record must reject stale Boot/Image identity.
     with pytest.raises(SiteRecoveryBlocked, match="stale"):
         SiteRecoveryJournal(private_dir, identity(boot="boot-b")).assert_ready()
     with pytest.raises(SiteRecoveryBlocked, match="stale"):
         SiteRecoveryJournal(private_dir, identity(image="f")).assert_ready()
+    journal.guard_write("fifo-pending", lambda: None)
+    assert journal.status() == "UNCERTAIN"
+    # Changing the boot or image after an in-flight write never erases intent.
+    with pytest.raises(SiteRecoveryBlocked, match="intent"):
+        SiteRecoveryJournal(private_dir, identity(boot="boot-b")).assert_ready()
+    with pytest.raises(SiteRecoveryBlocked, match="intent"):
+        SiteRecoveryJournal(private_dir, identity(image="f")).assert_ready()
     # A read-only status inspection cannot authorize a write.
-    with pytest.raises(SiteRecoveryBlocked, match="uncertain"):
+    with pytest.raises(SiteRecoveryBlocked, match="intent"):
         journal.assert_ready()
 
 
