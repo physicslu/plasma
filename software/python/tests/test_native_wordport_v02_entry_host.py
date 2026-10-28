@@ -207,6 +207,100 @@ class NativeV02DynamicSession(unittest.TestCase):
     def test_hard_timeout_reaps_bridge_and_preserves_partial_logs(self):
         self._check_process_failure(timeout=True)
 
+    def test_successful_readback_awaits_graceful_bridge_close(self):
+        self._check_successful_openocd_bridge_lifecycle(bridge_hangs=False)
+
+    def test_good_readback_with_hung_bridge_remains_fail_closed(self):
+        self._check_successful_openocd_bridge_lifecycle(bridge_hangs=True)
+
+    def _check_successful_openocd_bridge_lifecycle(self, bridge_hangs):
+        # Host-only regression for Z2 receipt: OpenOCD success and exact
+        # independent readback, followed by a Bridge still live at OpenOCD exit.
+        # A healthy Bridge must be allowed to exit normally, not be killed.
+        payload = b"host-only-mock-v02-readback"
+        expected_hash = module.hashlib.sha256(payload).hexdigest()
+        opened = []
+
+        class FakeBridge:
+            def __init__(self, argv):
+                self.location = Path(argv[argv.index("--socket") + 1])
+                self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self.listener.bind(str(self.location))
+                self.returncode = None
+                self.terminated = False
+                self.graceful_waits = 0
+
+            def poll(self):
+                return self.returncode
+
+            def terminate(self):
+                self.terminated = True
+
+            def communicate(self, timeout):
+                if not self.terminated:
+                    self.graceful_waits += 1
+                    if bridge_hangs:
+                        raise subprocess.TimeoutExpired("mock-bridge", timeout)
+                self.listener.close()
+                self.location.unlink()
+                self.returncode = -15 if self.terminated else 0
+                return ('{"result":"BRIDGE_CLOSED"}', "")
+
+        def fake_popen(argv, **kwargs):
+            bridge = FakeBridge(argv)
+            opened.append(bridge)
+            return bridge
+
+        def fake_run(argv, **kwargs):
+            self.assertEqual(argv[0], module.OPENOCD)
+            readback = next(self.bundle.glob(
+                ".work/native-v02-path2/run-*")) / "readback-v02.bin"
+            readback.write_bytes(payload)
+            return subprocess.CompletedProcess(
+                argv, 0,
+                stdout="PLASMA_ERASE_OK\nPLASMA_PROGRAM_OK\n"
+                       "PLASMA_VERIFY_OK\nPLASMA_READBACK_OK\n"
+                       "PLASMA_V02_COMPLETED_NO_RESET\n",
+                stderr="",
+            )
+
+        args = SimpleNamespace(operation="program-v02")
+        out = io.StringIO()
+        with patch.object(module, "BUNDLE", self.bundle), \
+             patch.object(module, "V02_BYTES", len(payload)), \
+             patch.object(module, "V02_SHA", expected_hash), \
+             patch.object(module, "z2_preflight", return_value=(
+                 self.directory / "v02.bin", self.directory / "native.so",
+                 self.barrier, "mock-boot", "0" * 40)), \
+             patch.object(module.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(module.subprocess, "run", side_effect=fake_run), \
+             redirect_stdout(out):
+            exit_code = module.on_z2(args, socket_base=self.sockets)
+        self.assertEqual(len(opened), 1, "must never retry")
+        bridge = opened[0]
+        self.assertEqual(bridge.graceful_waits, 1)
+        self.assertFalse(bridge.location.exists())
+        self.assertEqual(list(self.sockets.iterdir()), [])
+        receipt_file = next(self.bundle.glob(
+            ".work/native-v02-path2/run-*/receipt.json"))
+        receipt = json.loads(receipt_file.read_text())
+        self.assertEqual(receipt["openocd_exit"], 0)
+        self.assertEqual(receipt["readback_sha256"], expected_hash)
+        self.assertTrue(receipt["socket_released"])
+        self.assertTrue(receipt["no_reset_no_retry"])
+        if bridge_hangs:
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(receipt["result"], "FAIL")
+            self.assertEqual(receipt["bridge_exit"], -15)
+            self.assertEqual(receipt["error"], "BRIDGE_GRACEFUL_CLOSE_TIMEOUT")
+            self.assertTrue(bridge.terminated)
+        else:
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(receipt["result"], "PASS")
+            self.assertEqual(receipt["bridge_exit"], 0)
+            self.assertIsNone(receipt["error"])
+            self.assertFalse(bridge.terminated)
+
     def _check_process_failure(self, timeout):
         opened = []
         real_run = subprocess.run
