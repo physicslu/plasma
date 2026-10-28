@@ -550,6 +550,45 @@ class PasswordSSHContractHostOnly(unittest.TestCase):
              redirect_stdout(io.StringIO()):
             self.assertEqual(module.on_swpc(args), 255)
 
+    def test_real_pty_sudo_prefix_is_framed_for_burnin_parser(self):
+        # Reproduces authentic Z2 Preflight failure in Run 40688058663:
+        # remote valid JSON followed local sudo marker without a newline.
+        receipt = {
+            "operation": "preflight", "result": "PASS", "hw_action": "NONE",
+            "icpn": "STM32F103C8T6", "site_id": 1,
+        }
+        raw = (
+            "\n" + self.record["ssh_username"] + "@" +
+            self.record["ssh_host"] + "'s password: \n" +
+            "PLASMA_SUDO_PROMPT:" + json.dumps(receipt) + "\r\n"
+        ).encode()
+        clean = module.sanitize_ssh_transcript(raw, self.record)
+        self.assertNotIn(self.record["ssh_host"], clean)
+        self.assertNotIn("PLASMA_SUDO_PROMPT:", clean)
+        self.assertNotIn("'s password:", clean)
+        self.assertEqual(json.loads(clean.splitlines()[-1]), receipt)
+        # Demonstrate compatibility with the unmodified A/B parse_receipt().
+        import importlib.util
+        ab_path = SCRIPT.with_name("plasma_ab_burn_in.py")
+        spec = importlib.util.spec_from_file_location("ab_for_ssh_regression", ab_path)
+        ab_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ab_module)
+        self.assertEqual(ab_module.parse_receipt(clean), receipt)
+        self.assertEqual(ab_module.parse_receipt(raw.decode())["reason"],
+                         "MISSING_JSON_RECEIPT")
+
+    def test_ssh_password_equal_to_username_never_leaks_private_host(self):
+        record = dict(self.record)
+        record["ssh_password"] = "xilinx"
+        transcript = (
+            f"xilinx@{record['ssh_host']}'s password:\n"
+            'PLASMA_SUDO_PROMPT:{"operation":"preflight","result":"PASS"}\n'
+        ).encode()
+        output = module.sanitize_ssh_transcript(transcript, record)
+        self.assertNotIn(record["ssh_host"], output)
+        self.assertNotIn("[REDACTED]@", output)
+        self.assertEqual(json.loads(output.splitlines()[-1])["result"], "PASS")
+
     def test_password_ssh_never_passes_secrets_in_argv_or_env(self):
         # Mock OpenSSH response on a real local synthetic PTY, not on a network.
         import os
