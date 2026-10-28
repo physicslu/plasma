@@ -252,6 +252,13 @@ class GenericSessionHostOnly(unittest.TestCase):
             self.assertIn("proc plasma_register_probe", tcl)
             self.assertIn("proc plasma_core_probe", tcl)
             self.assertIn("PLASMA_CORE_STATE_BEFORE", tcl)
+            self.assertIn("PLASMA_CORE_INITIAL_POLL_FAIL", tcl)
+            self.assertIn('if {[catch {poll} reason]}', tcl)
+            self.assertLess(tcl.index('if {[catch {poll} reason]}'),
+                            tcl.index('set before [stm32f1x.cpu curstate]'))
+            self.assertLess(tcl.index('set before [stm32f1x.cpu curstate]'),
+                            tcl.index('if {$before eq "running"'))
+            self.assertIn('error "CORE_INITIAL_STATE_NOT_ADMITTED"', tcl)
             self.assertIn('if {$before eq "running"', tcl)
             self.assertIn('if {[catch {resume} reason]}', tcl)
             self.assertIn('if {$after ne $before}', tcl)
