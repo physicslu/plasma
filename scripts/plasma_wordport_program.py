@@ -97,6 +97,146 @@ def admit_image(operation: str, path: str | None, expected_sha: str | None):
     return source, size, expected_sha, erase
 
 
+# Runs ONLY when a Flash Erase/Program/Verify/Readback call raises an error.
+# This is same-session forensic capture, not a subsequent fresh SWD attach.
+# Read every individual address independently: a locked-up Cortex-M may reject
+# some reads while still allowing useful FLASH_SR and SCB fault registers.
+# Never clear W1C fault flags, reset, retry or resume a partially written image.
+FAILURE_DIAGNOSTIC_TCL = r"""
+proc plasma_diag {stage cause} {
+    echo "PLASMA_DIAG_BEGIN $stage"
+    echo "PLASMA_DIAG_CAUSE $cause"
+    echo "PLASMA_DIAG_SNAPSHOT_IN_SESSION"
+    foreach spec {
+        {DHCSR 0xE000EDF0}
+        {DBGMCU_IDCODE 0xE0042000}
+        {SCB_CPUID 0xE000ED00}
+        {ICSR 0xE000ED04}
+        {SHCSR 0xE000ED24}
+        {CFSR 0xE000ED28}
+        {HFSR 0xE000ED2C}
+        {DFSR 0xE000ED30}
+        {MMFAR 0xE000ED34}
+        {BFAR 0xE000ED38}
+        {FLASH_SR 0x4002200C}
+        {FLASH_CR 0x40022010}
+        {FLASH_AR 0x40022014}
+    } {
+        set name [lindex $spec 0]
+        set address [lindex $spec 1]
+        if {[catch {set values [read_memory $address 32 1]} reason]} {
+            echo "PLASMA_DIAG_MEM_FAIL $name $reason"
+            continue
+        }
+        if {[llength $values] != 1 || ![string is integer -strict [lindex $values 0]]} {
+            echo "PLASMA_DIAG_MEM_FAIL $name INVALID_READ_VALUE"
+            continue
+        }
+        echo "PLASMA_DIAG_MEM_PASS $name [format 0x%08X [expr {[lindex $values 0] & 0xFFFFFFFF}]]"
+    }
+    # Capture memory-mapped fault registers BEFORE poll/halt, which can alter
+    # the target fault context. Never resume after a failed Flash operation.
+    if {[catch {poll} reason]} {
+        echo "PLASMA_DIAG_POLL_FAIL $reason"
+        echo "PLASMA_DIAG_CORE_SKIP POLL_FAILED"
+    } else {
+        set before [stm32f1x.cpu curstate]
+        echo "PLASMA_DIAG_STATE_BEFORE $before"
+        if {$before eq "running"} {
+            echo "PLASMA_DIAG_HALT_REQUESTED"
+            if {[catch {halt} reason]} {
+                echo "PLASMA_DIAG_HALT_FAIL $reason"
+            }
+        }
+        set after [stm32f1x.cpu curstate]
+        echo "PLASMA_DIAG_STATE_AFTER $after"
+        if {$after ne "halted"} {
+            echo "PLASMA_DIAG_CORE_SKIP TARGET_NOT_HALTED"
+        } else {
+            # OpenOCD uses the lowercase register key 'xpsr' (NOT 'xPSR').
+            foreach spec {{pc pc} {sp sp} {lr lr} {xpsr xPSR}} {
+                set key [lindex $spec 0]
+                set label [lindex $spec 1]
+                if {[catch {set values [get_reg -force [list $key]]} reason]} {
+                    echo "PLASMA_DIAG_REG_FAIL $label $reason"
+                    continue
+                }
+                if {![dict exists $values $key] || ![string is integer -strict [dict get $values $key]]} {
+                    echo "PLASMA_DIAG_REG_FAIL $label INVALID_READ_VALUE"
+                    continue
+                }
+                echo "PLASMA_DIAG_REG_PASS $label [format 0x%08X [expr {[dict get $values $key] & 0xFFFFFFFF}]]"
+            }
+        }
+    }
+    echo "PLASMA_DIAG_END $stage"
+}
+"""
+
+
+FAILURE_MEMORY_REGISTERS = (
+    "DHCSR", "DBGMCU_IDCODE", "SCB_CPUID", "ICSR", "SHCSR",
+    "CFSR", "HFSR", "DFSR", "MMFAR", "BFAR",
+    "FLASH_SR", "FLASH_CR", "FLASH_AR",
+)
+FAILURE_CORE_REGISTERS = ("pc", "sp", "lr", "xPSR")
+
+
+def read_failure_diagnostics(log: str) -> dict:
+    """Extract partial REAL same-session values, never infer missing registers.
+
+    Flash timeout may prevent even the best-effort diagnostic; each missing
+    register is an explicit failure/absence, not a synthetic zero or PASS.
+    """
+    begin = re.findall(r"(?m)^PLASMA_DIAG_BEGIN (ERASE|PROGRAM|VERIFY|READBACK)$", log)
+    end = re.findall(r"(?m)^PLASMA_DIAG_END (ERASE|PROGRAM|VERIFY|READBACK)$", log)
+    if not begin:
+        return {"status": "NOT_CAPTURED", "source": "SAME_OPENOCD_SESSION",
+                "stage": None, "memory_registers": {}, "core_registers": {},
+                "missing_memory": list(FAILURE_MEMORY_REGISTERS),
+                "missing_core": list(FAILURE_CORE_REGISTERS), "read_errors": {}}
+    stage = begin[0] if len(begin) == 1 else None
+    errors: dict[str, str] = {}
+    def extract(group: str, names: tuple[str, ...]) -> dict[str, str]:
+        values = {}
+        for name in names:
+            found = re.findall(
+                rf"(?m)^PLASMA_DIAG_{group}_PASS {re.escape(name)} (0x[0-9A-Fa-f]{{8}})$", log)
+            rejected = re.findall(
+                rf"(?m)^PLASMA_DIAG_{group}_FAIL {re.escape(name)}(?: (.*))?$", log)
+            if len(found) == 1 and not rejected:
+                values[name] = found[0]
+            else:
+                if rejected:
+                    errors[name] = (rejected[0] or "READ_FAILED")[:200]
+                elif len(found) > 1:
+                    errors[name] = "DUPLICATE_REGISTER_VALUE"
+        return values
+    memory = extract("MEM", FAILURE_MEMORY_REGISTERS)
+    core = extract("REG", FAILURE_CORE_REGISTERS)
+    missing_memory = [k for k in FAILURE_MEMORY_REGISTERS if k not in memory]
+    missing_core = [k for k in FAILURE_CORE_REGISTERS if k not in core]
+    complete = stage is not None and end == begin and not missing_memory and not missing_core
+    state_before = re.findall(r"(?m)^PLASMA_DIAG_STATE_BEFORE (\w+)$", log)
+    state_after = re.findall(r"(?m)^PLASMA_DIAG_STATE_AFTER (\w+)$", log)
+    skip = re.findall(r"(?m)^PLASMA_DIAG_CORE_SKIP ([^\r\n]+)$", log)
+    cause = re.findall(r"(?m)^PLASMA_DIAG_CAUSE (.*)$", log)
+    return {
+        "status": "COMPLETE" if complete else "PARTIAL",
+        "source": "SAME_OPENOCD_SESSION", "stage": stage,
+        "cause": cause[0][:500] if len(cause) == 1 else None,
+        "memory_registers": memory, "core_registers": core,
+        "missing_memory": missing_memory, "missing_core": missing_core,
+        "read_errors": errors,
+        "core_state_before": state_before[0] if len(state_before) == 1 else None,
+        "core_state_after": state_after[0] if len(state_after) == 1 else None,
+        "core_skip": skip[0] if len(skip) == 1 else None,
+        "halt_attempted": "PLASMA_DIAG_HALT_REQUESTED" in log,
+        "reset_or_resume_in_diagnostic": False,
+        "end_marker_present": len(begin) == 1 and end == begin,
+    }
+
+
 def make_tcl(socket: Path, firmware: Path | None, readback: Path, operation: str,
              *, image_bytes: int = 0, erase_bytes: int = 0) -> str:
     """Compile a bounded OpenOCD command for a verified target profile."""
@@ -116,29 +256,7 @@ remote_bitbang port 0
 transport select swd
 adapter speed 100
 source [find {PROFILE["target_cfg"]}]
-proc plasma_diag {{stage cause}} {{
-    echo "PLASMA_DIAG_BEGIN $stage"
-    echo "PLASMA_DIAG_CAUSE $cause"
-    foreach command {{
-        {{mdw 0xE000EDF0 1}}
-        {{mdw 0x2000003C 2}}
-        {{mdw 0x20000040 8}}
-        {{mdw 0x4002200C 1}}
-        {{mdw 0x40022010 1}}
-        {{mdw 0xE000ED28 1}}
-        {{mdw 0xE000ED2C 1}}
-    }} {{
-        echo "PLASMA_DIAG_PREHALT $command"
-        if {{[catch {{eval $command}} failure]}} {{echo "PLASMA_DIAG_READ_FAIL $failure"}}
-    }}
-    echo "PLASMA_DIAG_NOW_HALT"
-    if {{[catch {{halt}} failure]}} {{echo "PLASMA_DIAG_HALT_FAIL $failure"}}
-    foreach command {{{{reg pc}} {{reg lr}} {{reg sp}} {{reg xPSR}} {{reg primask}} {{debug_reason}}}} {{
-        echo "PLASMA_DIAG_POSTHALT $command"
-        if {{[catch {{eval $command}} failure]}} {{echo "PLASMA_DIAG_REG_FAIL $failure"}}
-    }}
-    echo "PLASMA_DIAG_END $stage"
-}}
+""" + FAILURE_DIAGNOSTIC_TCL + """
 init
 """
     # Read-only register qualification (no Flash operations and no reset).
@@ -514,7 +632,9 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         success = (eligible and "PLASMA_PROGRAM_COMPLETED_NO_RESET" in log and
                    readback.is_file() and readback.stat().st_size == image_bytes and
                    sha(readback) == image_sha)
-        diagnostic = "POST_ERROR_SAME_SESSION" if "PLASMA_DIAG_BEGIN" in log else "NOT_CAPTURED"
+        failure_diagnostics = read_failure_diagnostics(log)
+        diagnostic = ("POST_ERROR_SAME_SESSION" if failure_diagnostics["status"] != "NOT_CAPTURED"
+                      else "NOT_CAPTURED")
     elif args.operation in ("register-read", "core-register-read", "diagnose-after"):
         peripheral_ok, peripheral_values = read_register_evidence(log)
         core_ok, core_values, core_before, core_after = read_core_evidence(log)
@@ -546,6 +666,8 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         "no_auto_retry": True,
         "no_flash_write": args.operation != "program",
     }
+    if args.operation == "program":
+        receipt["failure_diagnostics"] = failure_diagnostics
     if args.operation in ("register-read", "core-register-read", "diagnose-after"):
         receipt["peripheral_registers"] = peripheral_values if required_peripheral else None
         receipt["core_registers"] = core_values if required_core else None
