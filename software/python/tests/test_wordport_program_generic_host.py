@@ -346,5 +346,108 @@ class GenericSessionHostOnly(unittest.TestCase):
                 self.assertFalse(module.read_core_evidence(log)[0])
 
 
+
+class FlashFailureForensicsContract(unittest.TestCase):
+    """No target hardware: compile Tcl and parse deliberately partial logs."""
+
+    def setUp(self):
+        self.base = Path("/tmp/plasma-forensics-host-only")
+
+    def program_tcl(self):
+        return module.make_tcl(
+            self.base / "swd.sock", self.base / "image.bin",
+            self.base / "readback.bin", "program",
+            image_bytes=2048, erase_bytes=2048,
+        )
+
+    def test_flash_failure_capture_before_poll_and_halt(self):
+        tcl = self.program_tcl()
+        # Every Flash stage uses the same in-session diagnostics before exit.
+        for stage in ("ERASE", "PROGRAM", "VERIFY", "READBACK"):
+            self.assertIn(f"plasma_diag {stage} \"$failure\"", tcl)
+        self.assertEqual(tcl.count("plasma_diag "), 4)
+        self.assertIn("proc plasma_diag {stage cause}", tcl)
+        for name, address in {
+            "DHCSR": "0xE000EDF0",
+            "CFSR": "0xE000ED28",
+            "HFSR": "0xE000ED2C",
+            "DFSR": "0xE000ED30",
+            "MMFAR": "0xE000ED34",
+            "BFAR": "0xE000ED38",
+            "FLASH_SR": "0x4002200C",
+            "FLASH_CR": "0x40022010",
+            "FLASH_AR": "0x40022014",
+        }.items():
+            self.assertIn(f"{{{name} {address}}}", tcl)
+        self.assertLess(tcl.index("PLASMA_DIAG_MEM_PASS"),
+                        tcl.index("if {[catch {poll} reason]}"))
+        self.assertLess(tcl.index("if {[catch {poll} reason]}"),
+                        tcl.index("PLASMA_DIAG_HALT_REQUESTED"))
+        self.assertIn("foreach spec {{pc pc} {sp sp} {lr lr} {xpsr xPSR}}", tcl)
+        self.assertIn("get_reg -force [list $key]", tcl)
+        self.assertIn("PLASMA_DIAG_CORE_SKIP POLL_FAILED", tcl)
+        self.assertIn("PLASMA_DIAG_MEM_FAIL $name $reason", tcl)
+        self.assertIn("PLASMA_DIAG_REG_FAIL $label $reason", tcl)
+        self.assertNotIn("reset run", tcl)
+        self.assertNotIn("resume", module.FAILURE_DIAGNOSTIC_TCL)
+        self.assertNotIn("write_memory", module.FAILURE_DIAGNOSTIC_TCL)
+
+    def test_complete_same_session_failure_snapshot_is_structured(self):
+        log = ("PLASMA_ERASE_OK\nPLASMA_PROGRAM_BEGIN\n"
+               "PLASMA_DIAG_BEGIN PROGRAM\n"
+               "PLASMA_DIAG_CAUSE timeout waiting for algorithm\n"
+               "PLASMA_DIAG_SNAPSHOT_IN_SESSION\n")
+        for name in module.FAILURE_MEMORY_REGISTERS:
+            log += f"PLASMA_DIAG_MEM_PASS {name} 0x00000020\n"
+        log += "PLASMA_DIAG_STATE_BEFORE halted\n"
+        log += "PLASMA_DIAG_STATE_AFTER halted\n"
+        for name in module.FAILURE_CORE_REGISTERS:
+            log += f"PLASMA_DIAG_REG_PASS {name} 0x08000400\n"
+        log += "PLASMA_DIAG_END PROGRAM\n"
+        d = module.read_failure_diagnostics(log)
+        self.assertEqual(d["status"], "COMPLETE")
+        self.assertEqual(d["stage"], "PROGRAM")
+        self.assertEqual(d["cause"], "timeout waiting for algorithm")
+        self.assertEqual(d["memory_registers"]["CFSR"], "0x00000020")
+        self.assertEqual(d["core_registers"]["xPSR"], "0x08000400")
+        self.assertTrue(d["end_marker_present"])
+        self.assertFalse(d["halt_attempted"])
+        self.assertTrue(d["reset_or_resume_in_diagnostic"] is False)
+
+    def test_partial_snapshot_retains_genuine_values_and_error_reasons(self):
+        log = ("PLASMA_DIAG_BEGIN PROGRAM\n"
+               "PLASMA_DIAG_CAUSE failed writing flash\n"
+               "PLASMA_DIAG_MEM_PASS FLASH_SR 0x00000020\n"
+               "PLASMA_DIAG_MEM_FAIL CFSR TARGET_LOCKUP\n"
+               "PLASMA_DIAG_POLL_FAIL cannot access target\n"
+               "PLASMA_DIAG_CORE_SKIP POLL_FAILED\n"
+               "PLASMA_DIAG_END PROGRAM\n")
+        d = module.read_failure_diagnostics(log)
+        self.assertEqual(d["status"], "PARTIAL")
+        self.assertEqual(d["memory_registers"], {"FLASH_SR": "0x00000020"})
+        self.assertEqual(d["core_registers"], {})
+        self.assertEqual(d["read_errors"]["CFSR"], "TARGET_LOCKUP")
+        self.assertIn("CFSR", d["missing_memory"])
+        self.assertIn("pc", d["missing_core"])
+        self.assertEqual(d["core_skip"], "POLL_FAILED")
+        self.assertTrue(d["end_marker_present"])
+
+    def test_missing_duplicate_and_truncated_markers_never_claim_complete(self):
+        absent = module.read_failure_diagnostics("PLASMA_PROGRAM_BEGIN\n")
+        self.assertEqual(absent["status"], "NOT_CAPTURED")
+        self.assertIsNone(absent["stage"])
+        malformed = ("PLASMA_DIAG_BEGIN PROGRAM\n"
+                     "PLASMA_DIAG_MEM_PASS FLASH_SR 0x00000020\n"
+                     "PLASMA_DIAG_MEM_PASS FLASH_SR 0x00000020\n"
+                     "PLASMA_DIAG_REG_PASS pc 0x08000400\n")
+        d = module.read_failure_diagnostics(malformed)
+        self.assertEqual(d["status"], "PARTIAL")
+        self.assertNotIn("FLASH_SR", d["memory_registers"])
+        self.assertEqual(d["read_errors"]["FLASH_SR"], "DUPLICATE_REGISTER_VALUE")
+        self.assertFalse(d["end_marker_present"])
+        self.assertEqual(module.read_failure_diagnostics(
+            "PLASMA_DIAG_BEGIN NOT_A_FLASH_STAGE\n")["status"], "NOT_CAPTURED")
+
+
 if __name__ == "__main__":
     unittest.main()
