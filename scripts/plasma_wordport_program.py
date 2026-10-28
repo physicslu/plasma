@@ -65,6 +65,33 @@ def check_source(expected: str) -> None:
         raise NotRun(77, "REVIEWED_SOURCE_SHA_MISMATCH")
 
 
+def admit_image(operation: str, path: str | None, expected_sha: str | None):
+    """Admit any caller-selected BIN by expected SHA and target geometry.
+
+    SHA must originate from the independent owner-approved Work Order / Asset,
+    not from trusting a digest recomputed from the device file at invocation.
+    """
+    if bool(path) != bool(expected_sha):
+        raise NotRun(77, "IMAGE_PATH_AND_SHA_REQUIRED_TOGETHER")
+    if operation == "program" and not path:
+        raise NotRun(77, "PROGRAM_IMAGE_REQUIRED")
+    if not path:
+        return None, 0, None, 0
+    source = file_at(path)
+    size = source.stat().st_size
+    if not HEX64.fullmatch(expected_sha) or sha(source) != expected_sha:
+        raise NotRun(77, "IMAGE_SHA256_MISMATCH")
+    if not 0 < size <= PROFILE["main_flash_bytes"]:
+        raise NotRun(77, "IMAGE_OUTSIDE_TARGET_FLASH")
+    if size % PROFILE["program_granularity_bytes"]:
+        raise NotRun(77, "IMAGE_PROGRAM_ALIGNMENT_UNSUPPORTED")
+    gran = PROFILE["erase_granularity_bytes"]
+    erase = (size + gran - 1) // gran * gran
+    if erase > PROFILE["main_flash_bytes"]:
+        raise NotRun(77, "ERASE_OUTSIDE_TARGET_FLASH")
+    return source, size, expected_sha, erase
+
+
 def make_tcl(socket: Path, firmware: Path | None, readback: Path, operation: str,
              *, image_bytes: int = 0, erase_bytes: int = 0) -> str:
     """Compile a bounded OpenOCD command for a verified target profile."""
@@ -161,22 +188,8 @@ def z2_preflight(args):
         raise NotRun(77, "OWNER_ATTESTATION_REQUIRED_FOR_HARDWARE")
     if args.icpn != PROFILE["icpn"] or args.site_id != PROFILE["site_id"]:
         raise NotRun(77, "UNQUALIFIED_TARGET_OR_SITE")
-    if bool(args.firmware) != bool(args.image_sha256):
-        raise NotRun(77, "IMAGE_PATH_AND_SHA_REQUIRED_TOGETHER")
-    if args.operation == "program" and not args.firmware:
-        raise NotRun(77, "PROGRAM_IMAGE_REQUIRED")
-    firmware = file_at(args.firmware) if args.firmware else None
-    image_bytes, image_sha, erase_bytes = 0, None, 0
-    if firmware is not None:
-        image_bytes = firmware.stat().st_size
-        image_sha = args.image_sha256
-        if not HEX64.fullmatch(image_sha) or sha(firmware) != image_sha:
-            raise NotRun(77, "IMAGE_SHA256_MISMATCH")
-        if not 0 < image_bytes <= PROFILE["main_flash_bytes"]:
-            raise NotRun(77, "IMAGE_OUTSIDE_TARGET_FLASH")
-        erase_bytes = ((image_bytes + PROFILE["erase_granularity_bytes"] - 1)
-                       // PROFILE["erase_granularity_bytes"]
-                       * PROFILE["erase_granularity_bytes"])
+    firmware, image_bytes, image_sha, erase_bytes = admit_image(
+        args.operation, args.firmware, args.image_sha256)
     native = file_at(str(BUNDLE / "libplasma_wordport_armv7.so"))
     if sha(native) != NATIVE_SHA:
         raise NotRun(77, "PINNED_NATIVE_LIBRARY_MISMATCH")
