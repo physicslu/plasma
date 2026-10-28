@@ -120,6 +120,97 @@ def test_injected_power_loss_before_rename_never_calls_push(
         journal.assert_ready()
 
 
+def test_intent_survives_rollback_of_unfsynced_rename(private_dir, monkeypatch):
+    """After rename but before dir fsync, power loss may resurrect old READY.
+
+    The independently fsynced intent must still deny any replay.
+    This is an explicit host-model of filesystem crash recovery, not
+    a physical disk power-cut qualification.
+    """
+    ident = identity()
+    provision_test_only(private_dir, ident)
+    original = (private_dir / "site-1.json").read_bytes()
+    original_replace = recovery.os.replace
+    original_fsync = recovery.os.fsync
+    renamed = []
+    pushed = []
+
+    def observe_rename(*args, **kwargs):
+        result = original_replace(*args, **kwargs)
+        renamed.append(True)
+        return result
+
+    def interrupt_final_directory_sync(fd):
+        if renamed and stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError("simulated crash before final rename fsync")
+        return original_fsync(fd)
+
+    monkeypatch.setattr(recovery.os, "replace", observe_rename)
+    monkeypatch.setattr(recovery.os, "fsync", interrupt_final_directory_sync)
+    journal = SiteRecoveryJournal(private_dir, ident)
+    with pytest.raises(SiteRecoveryBlocked, match="durably"):
+        journal.guard_write("power-fail-rename", lambda: pushed.append("PUSH"))
+    assert renamed == [True]
+    assert pushed == []
+    assert (private_dir / "site-1.intent").is_file()
+
+    # Model the admissible crash outcome: final journal rename did not last.
+    # The earlier fsync of the *independent* intent did.
+    (private_dir / "site-1.json").write_bytes(original)
+    with pytest.raises(SiteRecoveryBlocked, match="intent"):
+        journal.assert_ready()
+    assert journal.status() == "UNCERTAIN"
+
+
+def test_failure_before_intent_directory_sync_never_calls_write(
+        private_dir, monkeypatch):
+    ident = identity()
+    provision_test_only(private_dir, ident)
+    original_fsync = recovery.os.fsync
+    pushed = []
+
+    def before_intent_directory_sync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError("crash before intent directory fsync")
+        return original_fsync(fd)
+
+    monkeypatch.setattr(recovery.os, "fsync", before_intent_directory_sync)
+    journal = SiteRecoveryJournal(private_dir, ident)
+    with pytest.raises(SiteRecoveryBlocked, match="durably"):
+        journal.guard_write("intent-not-published", lambda: pushed.append("PUSH"))
+    assert pushed == []
+
+
+@pytest.mark.parametrize("defect", ["truncate", "symlink", "corrupt", "missing"])
+def test_intent_presence_always_blocks_even_if_journal_ready(
+        private_dir, defect):
+    ident = identity()
+    provision_test_only(private_dir, ident)
+    journal = SiteRecoveryJournal(private_dir, ident)
+    journal.guard_write("completed-or-not", lambda: None)
+    # Simulate un-fsynced journal replacement being rolled back to READY.
+    provision_test_only(private_dir, ident)
+    intent = private_dir / "site-1.intent"
+    if defect == "truncate":
+        intent.write_bytes(b"")
+    elif defect == "corrupt":
+        intent.write_text("{bad")
+    elif defect == "symlink":
+        old = private_dir / "old-intent"
+        intent.rename(old)
+        intent.symlink_to(old)
+    elif defect == "missing":
+        # Simulates an unsafe/non-atomic attempt to clear without replacing
+        # journal. This MUST be rejected by production Root authority.
+        # No algorithm can infer a lost marker if an untrusted actor deletes
+        # all durable evidence and fabricates a valid READY record.
+        intent.unlink()
+        pytest.xfail("Out-of-scope untrusted deletion: Root-owned authority is required")
+    with pytest.raises(SiteRecoveryBlocked, match="intent"):
+        journal.assert_ready()
+    assert journal.status() == "UNCERTAIN"
+
+
 def test_unknown_completion_and_exception_never_retry(private_dir):
     ident = identity()
     provision_test_only(private_dir, ident)
