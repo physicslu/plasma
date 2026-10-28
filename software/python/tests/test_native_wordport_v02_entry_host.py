@@ -340,8 +340,7 @@ class NativeV02PreflightHostOnly(unittest.TestCase):
     def test_hardware_modes_still_require_owner_attestation(self):
         with patch.object(module.os, "geteuid", return_value=0), \
              patch.object(module, "check_source"), \
-             patch.object(module.Z2_ENTRY, "resolve",
-                          return_value=SCRIPT.resolve()):
+             patch.object(module, "Z2_ENTRY", SCRIPT):
             for op in ("program-v02", "diagnose-after"):
                 args = SimpleNamespace(operation=op, owner_attested=False)
                 with self.subTest(operation=op), self.assertRaises(module.NotRun) as raised:
