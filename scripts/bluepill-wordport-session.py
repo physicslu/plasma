@@ -103,7 +103,9 @@ def run(args) -> dict:
         need(isinstance(record, dict), 'IMAGE_CHECKPOINT_REQUIRED')
         validate_checkpoint(record, release, boot_id=args.boot_id,
                             manifest_sha=root.manifest_sha256())
-        facts = root.live_report(port, release, release.firmware_name)
+        # Program-only admission: maintain Root/Image/Boot/UIO/IRQ checks,
+        # but do not require a census of every short-lived Linux process.
+        facts = root.live_program_session_report(port, release)
         need(facts['target_boot_id'] == args.boot_id, 'BOOT_CHANGED')
         # The same global FPGA lock spans admission, MMIO, socket and close.
         with ExitStack() as stack:
