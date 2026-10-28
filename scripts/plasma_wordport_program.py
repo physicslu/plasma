@@ -176,6 +176,14 @@ proc plasma_register_probe {} {
     echo "PLASMA_REGISTER_SUMMARY PASS"
 }
 proc plasma_core_probe {} {
+    # OpenOCD init can leave its cached target state 'unknown'. Poll the
+    # actual target before deciding whether a Halt/Resume would be safe.
+    # A failed poll never grants permission to halt an unknown-state core.
+    if {[catch {poll} reason]} {
+        echo "PLASMA_CORE_INITIAL_POLL_FAIL $reason"
+        echo "PLASMA_CORE_SUMMARY FAIL"
+        error "CORE_INITIAL_POLL_FAILED"
+    }
     set before [stm32f1x.cpu curstate]
     echo "PLASMA_CORE_STATE_BEFORE $before"
     if {$before ne "running" && $before ne "halted"} {
