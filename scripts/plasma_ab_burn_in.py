@@ -260,7 +260,11 @@ class BurnIn:
         # The programming engine already runs same-session best-effort
         # register diagnostics on Flash failure; its Z2 openocd.log is
         # preserved in the receipt evidence_directory.
-        if receipt.get("result") == "NOT_RUN" or receipt.get("socket_released") is not True:
+        # CDC_FAIL follows a verified program + reset with the SWD socket
+        # already released; no engine receipt exists for the USB-only error.
+        safe_released = (stage == "CDC_FAIL" or
+                         receipt.get("socket_released") is True)
+        if receipt.get("result") == "NOT_RUN" or not safe_released:
             self.report("DIAG_NOT_RUN", "owner/socket state not safely released")
             return
         self.report("DIAG", "attempting one READ-ONLY peripheral register acquisition")
