@@ -243,7 +243,7 @@ proc plasma_core_probe {} {
         if operation == "diagnose-after":
             commands.append('echo "PLASMA_DIAG_END POST_SESSION"')
         commands.append("shutdown")
-        return config + register_tcl + "\\n".join(commands) + "\\n"
+        return config + register_tcl + "\n".join(commands) + "\n"
     if operation == "reset-run":
         # No flash probe, erase, program, verify, dump, or preparatory halt.
         return config + ('echo "PLASMA_RESET_RUN_BEGIN"\n'
