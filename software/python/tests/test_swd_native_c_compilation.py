@@ -215,6 +215,56 @@ def test_c_owner_flock_excludes_existing_python_linuxmmio(tmp_path):
     assert call_cli("try", link).returncode == 8
 
 
+def test_sigkill_releases_site_lock_but_does_not_resolve_pending_write(tmp_path):
+    """A killed owner loses flock; lock acquisition is not recovery proof.
+
+    The pending marker is a Host-only stand-in for an accepted SWD command.
+    It is deliberately outside the C owner's memory, so this test cannot
+    mistake a new process or a new lock epoch for command completion.
+    """
+    cc = shutil.which("cc")
+    assert cc, "Host C compiler required"
+    binary = tmp_path / "site-lock-cli"
+    built = subprocess.run(
+        [cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+         "-O2", "-DPLASMA_SWD_HOST_TEST=1", "-I", str(SRC),
+         str(SRC / "plasma_swd_owner_lock.c"),
+         str(SRC / "tests/test_plasma_swd_owner_lock_cli.c"),
+         "-o", str(binary)],
+        capture_output=True, text=True, timeout=30, check=False)
+    assert built.returncode == 0, built.stdout + built.stderr
+    fence = tmp_path / "plasma-mmio.lock"
+    pending = tmp_path / "synthetic-unknown-completion"
+    owner = subprocess.Popen(
+        [str(binary), "hold", str(fence), "1"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True)
+    try:
+        assert owner.stdout is not None
+        assert owner.stdout.readline().strip() == "LOCK_HELD"
+        pending.write_text("site=1;dut-write=possibly-accepted;completion=unknown\n")
+        denied = subprocess.run(
+            [str(binary), "try", str(fence), "1"],
+            capture_output=True, text=True, timeout=5, check=False)
+        assert denied.returncode == 8
+        owner.kill()  # SIGKILL: no C cleanup, unbind, FIFO drain or lease retire.
+        assert owner.wait(timeout=5) < 0
+        acquired = subprocess.run(
+            [str(binary), "try", str(fence), "1"],
+            capture_output=True, text=True, timeout=5, check=False)
+        assert acquired.returncode == 0, acquired.stdout + acquired.stderr
+        assert pending.read_text().endswith("completion=unknown\n")
+        # A production owner must not infer a safe DUT write replay from
+        # acquired.returncode == 0. No persistent admission protocol exists.
+    finally:
+        if owner.poll() is None:
+            owner.kill()
+            owner.wait(timeout=5)
+        for stream in (owner.stdin, owner.stdout, owner.stderr):
+            if stream is not None:
+                stream.close()
+
+
 def test_c_lock_bound_lease_is_non_optional():
     header = (SRC / "plasma_swd_lease_word_port.h").read_text()
     impl = (SRC / "plasma_swd_lease_word_port.c").read_text()

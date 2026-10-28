@@ -194,12 +194,37 @@ static void test_fifo_queue_bounds_and_tags(void)
     assert(f.push_count == before);
 }
 
+static void test_new_fifo_rejects_prior_normal_mode_and_unknown_completion(void)
+{
+    /* A fresh FIFO instance may follow an Owner killed by SIGKILL. The
+     * prior process's FIFO state is gone, while synthetic PL still reports
+     * NORMAL with an unconsumed completion. Admission must not clear it or
+     * permit a write. This is not persistent recovery evidence. */
+    struct fake_bus f = {0};
+    struct plasma_swd_fifo new_owner;
+    f.base = PLASMA_SWD_SITE1_BASE;
+    f.mode = 1u;
+    f.status = 1u;
+    f.levels = 2u;
+    const struct plasma_swd_word_io io = {
+        .ctx = &f, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(&new_owner, &io, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_admit(&new_owner) == PLASMA_SWD_NOT_READY);
+    assert(new_owner.blocked && !new_owner.admitted);
+    assert(f.word_writes == 0u && f.push_count == 0u);
+    assert(plasma_swd_fifo_queue_write(&new_owner, 0x3Au, 0x1234u, 0u)
+           == PLASMA_SWD_NOT_READY);
+}
+
 int main(void)
 {
     test_two_sites_ordered_reads_and_writes();
     test_exact_atomic_swj_and_negative_inputs();
     test_wait_fault_no_replay_and_pointer_safety();
     test_fifo_queue_bounds_and_tags();
+    test_new_fifo_rejects_prior_normal_mode_and_unknown_completion();
     puts("PLASMA_NATIVE_SWD_C_HOST_ONLY_PASS");
     return 0;
 }
