@@ -201,6 +201,62 @@ fixture does not require repeated manual electrical or socket checks.
 The Gate 1 source/Host-only tests alone are **not** a real register HIL
 PASS; run on approved SWPC/Z2 hardware and retain actual receipts.
 
+## SWPC Site 1 v0.1 ↔ v0.2 burn-in — bounded operator CLI
+
+Use the reviewed new script, not an independent OpenOCD instance on SWPC:
+
+~~~bash
+cd /storage/projects/plasma
+# One cycle is v0.1 then v0.2, i.e. 2 complete programming attempts.
+# Ensure picocom/minicom is closed before starting.
+python3 scripts/plasma_ab_burn_in.py --cycles 5 --port /dev/ttyACM0
+~~~
+
+This is **10** explicit attempts: per-image engine preflight, then for each
+attempt one SHA-guarded Program → independent Readback SHA → explicit
+Reset Run → fresh USB CDC Heartbeat verification. It admits only Site 1
+STM32F103C8T6, known immutable v0.1/v0.2 CI asset hashes and firmware
+versions 0.1/0.2. Heartbeats require four consecutive sequence values,
+500 ms v0.1 / 1,000 ms v0.2 uptime increments (100 ms tolerance).
+The actual SWPC device is **/dev/ttyACM0**, not /dev/ttyCAM0. The
+Script uses Linux standard library, does not depend on pyserial, and
+refuses to take over a busy CDC device.
+
+The foreground terminal shows attempt index/total, PASS/FAIL and stage.
+A parallel SWPC terminal can monitor:
+
+~~~bash
+tail -f "$(ls -td ~/plasma-ab-runs/20*/ | head -n1)/progress.log"
+~~~
+
+To **request safe stop** from any SWPC terminal, run:
+
+~~~bash
+touch /tmp/plasma-ab-stop
+~~~
+
+Or press **Ctrl+C** in the foreground run. Neither mechanism interrupts
+an in-flight Erase/Program/Verify/Readback or kills the remote OpenOCD.
+A stop request is honored after the currently selected complete
+Program/Reset/CDC attempt, before the next Flash operation. The stop
+file is intentionally not unlinked automatically; remove it explicitly
+before starting a new run.
+
+Each run keeps an owner-private progress.log, status.json, events.jsonl,
+and bounded CLI receipts in ~/plasma-ab-runs/<UTC timestamp-PID>/.
+On any program/reset/CDC FAIL, the runner captures the first failure,
+performs at most one additional read-only peripheral-register inspection
+when the owner/socket state permits and **stops**, with no automatic
+retry or proceeding to later images. A Flash failure already invokes the
+engine's same-session best-effort registers; no automatic second
+core Halt/Resume occurs with potentially erased Flash.
+
+Development mode fixed fixture: no per-attempt manual wiring/voltage
+checklist. The engine still checks current Root Guard/FPGA image,
+per-Site owner/MMIO exclusivity, reviewed source SHA, and immutable
+programming asset hashes. This host-only implementation alone is NOT
+a hardware burn-in acceptance result; use actual per-attempt receipts.
+
 ## Evidence, failure and limits
 
 New per-run records are isolated from the historical v0.2 results:
