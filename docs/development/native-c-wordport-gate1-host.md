@@ -12,6 +12,9 @@ ARMv7 barrier SHA preflight, held/tested same-boot Image checkpoint, validated
 Manifest and live Root report, global FPGA `port.exclusive()`, `LinuxMMIO`
 owner lock, Site 1 `claim_site()`, one owner-private PS-local UNIX socket,
 bounded session/idle budget, cleanup and separate guarded Golden recovery.
+Under the later owner-approved hardware scope, the total session alarm is
+600 seconds and the socket idle timeout is 60 seconds. Both remain bounds on
+the guarded owner process.
 It now requires an additional **explicit absolute** `--native` ELF path and
 `--native-sha256`; missing, replaced, malformed or wrong-architecture native
 libraries fail closed. There is no Python fallback to per-bit operations.
@@ -78,6 +81,26 @@ The caller must pin the *exact* ARMv7 artifact SHA before any real session.
   Root `restore` remain intact. A functional failure stops socket activity;
   poisoned/unknown bus or electrical state requires operator-governed
   recovery, not blind MMIO retries or automatic Golden Restore.
-- ARMv7 cross-compile and Host-only PASS do not qualify real Z2 runtime,
+- ARMv7 cross-compile and Host-only PASS alone do not qualify real Z2 runtime,
   actual native MMIO access ordering, OpenOCD DPIDR, Flash or readback.
-  Hardware execution, deployment and merge are expressly **NOT_RUN**.
+  Hardware execution, deployment and merge were **NOT_RUN** in the original
+  Host-only Gate 1.
+
+## Subsequent owner-approved Path 3 hardware scope
+
+At PR HEAD `87ea878fee717b598f0af2e408eb222c9543785b`, an isolated Z2
+deployment of the SHA-pinned ARMv7 library read Blue Pill DPIDR `0x1ba01477`
+through PS-local OpenOCD, with a simultaneous LA2016 capture. One v0.1
+18,768-byte erase/program session then exited 0 with a simultaneous LA capture;
+independent readback matched the firmware byte for byte and CDC heartbeat
+resumed after one `reset run`. The initial monolithic readback hit the old
+60-second Bridge alarm after 12,288 bytes; a separate read-only tail session
+completed the comparison. These observations cover the connected prototype,
+not general hardware qualification.
+
+The later owner-approved timeout revision sets the total alarm to 600 seconds
+and idle timeout to 60 seconds. On the same Z2, one 18,768-byte readback now
+completed in a single session with OpenOCD and Bridge exit 0, exact v0.1
+SHA256 `8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d`,
+and safe owner/MMIO release. No additional erase, program, reset, FPGA load or
+Golden restore was performed for this timeout revision.

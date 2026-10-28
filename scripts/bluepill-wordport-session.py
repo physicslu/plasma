@@ -112,7 +112,7 @@ def run(args) -> dict:
             bridge = NativeBluepillWordPort(
                 BluepillZ2WordPort(lease, barrier=barrier),
                 library=args.native, sha256=args.native_sha256)
-            count = serve_local_unix_once(args.socket, bridge, idle_timeout_s=30)
+            count = serve_local_unix_once(args.socket, bridge, idle_timeout_s=60)
             stats = mmio.stats()
         return {'result': 'BRIDGE_CLOSED', 'boot_id': args.boot_id,
                 'lease_id': record['session_id'], 'wire_bytes': count,
@@ -128,7 +128,7 @@ def main() -> int:
     args = parser().parse_args()
     signal.signal(signal.SIGTERM, deadline_expired)
     signal.signal(signal.SIGALRM, deadline_expired)
-    signal.alarm(60)
+    signal.alarm(600)
     try:
         result = run(args)
     finally:
