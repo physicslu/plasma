@@ -220,7 +220,16 @@ def scan_proc_consumers(*, procroot: Path, release,
                             conflicts.append(item.name)
             except (FileNotFoundError, PermissionError, OSError, ValueError) as exc:
                 # Never retry a known conflict even if another process vanished.
-                vanished = isinstance(exc, FileNotFoundError) and not item.exists()
+                # Check for ENOENT explicitly; an inaccessible PID is NOT
+                # a confirmed exit and must never qualify for a rescan.
+                vanished = False
+                if isinstance(exc, FileNotFoundError):
+                    try:
+                        item.stat()
+                    except FileNotFoundError:
+                        vanished = True
+                    except OSError:
+                        pass
                 if vanished and not conflicts and attempt < 3:
                     retry_pid = item.name
                     break
