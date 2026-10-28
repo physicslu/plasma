@@ -103,6 +103,12 @@ def run(args) -> dict:
         need(isinstance(record, dict), 'IMAGE_CHECKPOINT_REQUIRED')
         validate_checkpoint(record, release, boot_id=args.boot_id,
                             manifest_sha=root.manifest_sha256())
+        # An additional device-scoped check INSIDE the exclusive FPGA lock;
+        # this is not a global /proc census and cannot replace device ACLs.
+        for device in ('/dev/mem', '/dev/uio1'):
+            probe = subprocess.run(['fuser', '-s', device],
+                                   capture_output=True, timeout=5)
+            need(probe.returncode == 1, 'EXTERNAL_MMIO_CONSUMER_OR_UNKNOWN')
         # Program-only admission: maintain Root/Image/Boot/UIO/IRQ checks,
         # but do not require a census of every short-lived Linux process.
         facts = root.live_program_session_report(port, release)
