@@ -365,7 +365,7 @@ class FlashFailureForensicsContract(unittest.TestCase):
         # Every Flash stage uses the same in-session diagnostics before exit.
         for stage in ("ERASE", "PROGRAM", "VERIFY", "READBACK"):
             self.assertIn(f"plasma_diag {stage} \"$failure\"", tcl)
-        self.assertEqual(tcl.count("plasma_diag "), 4)
+        self.assertEqual(tcl.count("plasma_diag "), 5)  # 4 calls + 1 proc declaration
         self.assertIn("proc plasma_diag {stage cause}", tcl)
         for name, address in {
             "DHCSR": "0xE000EDF0",
