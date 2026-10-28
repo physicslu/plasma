@@ -552,6 +552,128 @@ class RootAdmissionFailureClassificationTests(unittest.TestCase):
             self.check(release, facts)
 
 
+class ProgramSessionProcScanSplitTests(unittest.TestCase):
+    """Strict Manager census stays; program admission records NOT_RUN honestly."""
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.work = Path(self.temp.name)
+        self.sys = self.work / "sys"
+        self.proc = self.work / "proc"
+        self.firmware = self.work / "firmware"
+        self.firmware.mkdir()
+        self.release = SimpleNamespace(
+            firmware_name="candidate.bin", recovery_name="golden.bin",
+            firmware_sha256="a" * 64, recovery_sha256="b" * 64,
+            soc_compatible="test,zynq", owner_base=0x40000000,
+            owner_bytes=0x10000, uio_name="uio1",
+            expected_uio={"uio": "uio1"},
+            site_bitmap=1, image_id="test")
+        boot = self.proc / "sys/kernel/random/boot_id"
+        boot.parent.mkdir(parents=True)
+        boot.write_text("test-boot-001")
+        compatible = self.proc / "device-tree/compatible"
+        compatible.parent.mkdir(parents=True)
+        compatible.write_bytes(b"test,zynq\x00")
+        state = self.sys / "class/fpga_manager/fpga0/state"
+        state.parent.mkdir(parents=True)
+        state.write_text("operating")
+
+    def facts(self, *, runtime, scan):
+        with patch.object(guard, "SYS", self.sys), \
+                patch.object(guard, "PROC", self.proc), \
+                patch.object(guard, "FIRMWARE", self.firmware), \
+                patch.object(guard.os, "geteuid", return_value=0), \
+                patch.object(guard, "sha_file", side_effect=lambda path, expected: expected), \
+                patch.object(guard, "scan_kernel_owners",
+                             return_value=(["uio1"], ["40000000.fabric"])), \
+                patch.object(guard, "scan_proc_consumers", side_effect=scan):
+            return guard.read_live_z2_facts(
+                release=self.release, runtime_program_session=runtime)
+
+    def test_runtime_never_enumerates_all_proc_pids(self):
+        def forbidden(**kwargs):
+            raise AssertionError("runtime must not census all Linux processes")
+        facts = self.facts(runtime=True, scan=forbidden)
+        self.assertIsNone(facts["proc_complete"])
+        self.assertIsNone(facts["proc_conflicts"])
+        self.assertEqual(facts["proc_scan_diagnostic"],
+                         {"status": "NOT_RUN_PROGRAM_SESSION"})
+        self.assertEqual(facts["manager_state"], "operating")
+        self.assertEqual(facts["uio_overlaps"], ["uio1"])
+
+    def test_manager_still_requires_complete_process_visibility(self):
+        diag = {}
+        def scanner(**kwargs):
+            kwargs["diagnostic"].update(status="PROC_VISIBILITY_DENIED",
+                                        pid="1234", phase="MAPS",
+                                        error="PermissionError")
+            return False, ["1234"]
+        facts = self.facts(runtime=False, scan=scanner)
+        self.assertIs(facts["proc_complete"], False)
+        self.assertEqual(facts["proc_conflicts"], ["1234"])
+        self.assertEqual(facts["proc_scan_diagnostic"]["pid"], "1234")
+
+    def test_manager_runtime_flag_does_not_forge_a_clean_scan(self):
+        from pl.hil import fpga_image_admission as admission
+        release = self.release
+        facts = self.facts(runtime=True, scan=AssertionError("not called"))
+        common = dict(
+            release=release, passive=facts, uio=release.expected_uio,
+            original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+            expected_firmware=release.firmware_name)
+        self.assertEqual(admission.check_exact(
+            **common, runtime_program_session=True)["image_id"], "test")
+        with self.assertRaisesRegex(ValueError, "PROC_SCAN_INCOMPLETE"):
+            admission.check_exact(**common)
+        for field, value in (
+                ("proc_complete", True),
+                ("proc_conflicts", []),
+                ("proc_scan_diagnostic", {"status": "COMPLETE"})):
+            with self.subTest(field=field):
+                malformed = dict(facts, **{field: value})
+                with self.assertRaisesRegex(ValueError,
+                                            "PROGRAM_SESSION_PROCESS_FACTS_INVALID"):
+                    admission.check_exact(
+                        **dict(common, passive=malformed),
+                        runtime_program_session=True)
+
+    def test_runtime_cannot_bypass_bad_image_or_manager_state(self):
+        from pl.hil import fpga_image_admission as admission
+        facts = self.facts(runtime=True, scan=AssertionError("not called"))
+        common = dict(
+            release=self.release, uio=self.release.expected_uio,
+            original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+            expected_firmware=self.release.firmware_name,
+            runtime_program_session=True)
+        for change in ({"manager_state": "unknown"},
+                       {"candidate_sha256": "c" * 64},
+                       {"boot_id": ""}):
+            with self.subTest(change=change), \
+                    self.assertRaisesRegex(ValueError, "INCOMPLETE_ROOT_OR_PROCESS_FACTS"):
+                admission.check_exact(
+                    **dict(common, passive=dict(facts, **change)))
+        with self.assertRaisesRegex(ValueError, "BOUND_UIO_EXACT_FACTS_CHANGED"):
+            admission.check_exact(**dict(common, passive=facts,
+                                         uio={"uio": "uio9"}))
+
+    def test_bridge_uses_narrow_entry_and_scoped_fuser_under_lock(self):
+        source = (ROOT / "scripts/bluepill-wordport-session.py").read_text()
+        begin = source.index("with port.exclusive():")
+        after = source[begin:]
+        self.assertIn("root.live_program_session_report(port, release)", after)
+        self.assertIn("['fuser', '-s', device]", after)
+        self.assertLess(after.index("['fuser', '-s', device]"),
+                        after.index("stack.enter_context(LinuxMMIO("))
+        self.assertNotIn("root.live_report(port, release, release.firmware_name)", after)
+        root_src = (ROOT / "pl/hil/fpga_image_root.py").read_text()
+        start = root_src.index("def run(operation: str)")
+        self.assertIn("live_report(port, release", root_src[start:])
+        self.assertNotIn("live_program_session_report(", root_src[start:])
+
+
 
 if __name__ == "__main__":
     unittest.main()
