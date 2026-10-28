@@ -449,5 +449,139 @@ class FlashFailureForensicsContract(unittest.TestCase):
             "PLASMA_DIAG_BEGIN NOT_A_FLASH_STAGE\n")["status"], "NOT_CAPTURED")
 
 
+
+class PasswordSSHContractHostOnly(unittest.TestCase):
+    """All SSH, credentials and target responses are synthetic Host-only mocks."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="plasma-wordport-ssh-host-")
+        self.addCleanup(self.tmp.cleanup)
+        self.home = Path(self.tmp.name)
+        self.cfg = self.home / ".config" / "plasma"
+        self.cfg.mkdir(parents=True, mode=0o700)
+        self.cfg.chmod(0o700)
+        self.login = self.cfg / "z2-login-smoke.json"
+        self.hosts = self.cfg / "z2-login-known_hosts"
+        self.record = {
+            "ssh_host": "pre-enrolled-z2.test",
+            "ssh_username": "xilinx",
+            "ssh_password": "MOCK_SSH_ONLY_NO_REAL_SECRET",
+        }
+        self.store()
+
+    def store(self):
+        self.login.write_text(json.dumps(self.record))
+        self.login.chmod(0o600)
+        self.hosts.write_text("pre-enrolled-z2.test ssh-ed25519 SYNTHETIC_PIN\n")
+        self.hosts.chmod(0o600)
+
+    def test_password_only_credential_and_pinned_host_key(self):
+        with patch.object(module.subprocess, "run",
+                          return_value=subprocess.CompletedProcess([], 0)) as check:
+            login, hosts = module.z2_login_credentials(self.home)
+        self.assertEqual(login, self.record)
+        self.assertEqual(hosts, self.hosts)
+        args = check.call_args.args[0]
+        self.assertEqual(args[:2], ["ssh-keygen", "-F"])
+        self.assertEqual(args[2], "pre-enrolled-z2.test")
+        self.assertEqual(args[-1], str(self.hosts))
+        self.assertNotIn("plasma_z2_ed25519", SCRIPT.read_text())
+
+    def test_optional_separate_sudo_password_is_admitted(self):
+        self.record["sudo_password"] = "MOCK_SUDO_ONLY_NO_REAL_SECRET"
+        self.store()
+        with patch.object(module.subprocess, "run",
+                          return_value=subprocess.CompletedProcess([], 0)):
+            record, _ = module.z2_login_credentials(self.home)
+        self.assertEqual(record["sudo_password"], "MOCK_SUDO_ONLY_NO_REAL_SECRET")
+
+    def test_denied_credential_and_host_key_inputs(self):
+        with patch.object(module.subprocess, "run",
+                          return_value=subprocess.CompletedProcess([], 0)):
+            self.login.chmod(0o644)
+            with self.assertRaises(module.NotRun) as bad:
+                module.z2_login_credentials(self.home)
+            self.assertEqual(str(bad.exception),
+                             "ENROLLED_Z2_CREDENTIAL_OWNER_OR_MODE_INVALID")
+            self.login.chmod(0o600)
+            self.record["ssh_username"] = "root"
+            self.store()
+            with self.assertRaises(module.NotRun) as bad:
+                module.z2_login_credentials(self.home)
+            self.assertEqual(str(bad.exception),
+                             "ENROLLED_Z2_CREDENTIAL_SCHEMA_INVALID")
+            self.record["ssh_username"] = "xilinx"
+            self.store()
+            self.cfg.chmod(0o755)
+            with self.assertRaises(module.NotRun):
+                module.z2_login_credentials(self.home)
+            self.cfg.chmod(0o700)
+        with patch.object(module.subprocess, "run",
+                          return_value=subprocess.CompletedProcess([], 1)):
+            with self.assertRaises(module.NotRun) as bad:
+                module.z2_login_credentials(self.home)
+            self.assertEqual(str(bad.exception), "Z2_HOST_KEY_NOT_PINNED")
+
+    def test_swpc_routes_exact_command_and_preserves_exit_and_output(self):
+        args = SimpleNamespace(operation="preflight", source_sha256="a" * 64,
+                               owner_attested=False, firmware=None, image_sha256=None,
+                               icpn="STM32F103C8T6", site_id=1)
+        reply = '{"operation":"preflight","result":"PASS","hw_action":"NONE"}\n'
+        printed = io.StringIO()
+        with patch.object(module, "check_source"), \
+             patch.object(module, "z2_login_credentials",
+                          return_value=(self.record, self.hosts)), \
+             patch.object(module, "password_ssh_z2",
+                          return_value=(0, reply)) as ssh, \
+             redirect_stdout(printed):
+            self.assertEqual(module.on_swpc(args), 0)
+        self.assertEqual(printed.getvalue(), reply)
+        argv = ssh.call_args.args[0]
+        self.assertEqual(argv[:4], [module.PYTHON, "-I", "-B",
+                                    str(module.Z2_ENTRY)])
+        self.assertEqual(argv[argv.index("--source-sha256")+1], "a"*64)
+        self.assertNotIn("--owner-attested", argv)
+        self.assertNotIn("MOCK_SSH_ONLY_NO_REAL_SECRET", argv)
+        with patch.object(module, "check_source"), \
+             patch.object(module, "z2_login_credentials",
+                          return_value=(self.record, self.hosts)), \
+             patch.object(module, "password_ssh_z2",
+                          return_value=(255, "SYNTHETIC_SSH_FAILURE\n")), \
+             redirect_stdout(io.StringIO()):
+            self.assertEqual(module.on_swpc(args), 255)
+
+    def test_password_ssh_never_passes_secrets_in_argv_or_env(self):
+        # Mock OpenSSH response on a real local synthetic PTY, not on a network.
+        import os
+        import pty
+        args_seen = []
+        original_popen = module.subprocess.Popen
+        class FakeSSH:
+            pid = -1
+            def poll(self):
+                return 0
+            def wait(self, timeout=None):
+                return 0
+        def fake_popen(argv, **kwargs):
+            args_seen.extend(argv)
+            self.assertEqual(kwargs["stdin"], kwargs["stdout"])
+            self.assertEqual(kwargs["stdout"], kwargs["stderr"])
+            os.write(kwargs["stdin"], b"Password:")
+            return FakeSSH()
+        creds = dict(self.record)
+        creds["sudo_password"] = "MOCK_SUDO_ONLY_NO_REAL_SECRET"
+        with patch.object(module.subprocess, "Popen", side_effect=fake_popen):
+            status, output = module.password_ssh_z2(
+                ["python3", "-I", "/path/with spaces/script.py"],
+                creds, self.hosts, timeout=2)
+        self.assertEqual(status, 0)
+        self.assertNotIn(creds["ssh_password"], " ".join(args_seen))
+        self.assertNotIn(creds["sudo_password"], " ".join(args_seen))
+        self.assertIn("StrictHostKeyChecking=yes", args_seen)
+        self.assertIn("PubkeyAuthentication=no", args_seen)
+        self.assertIn("PLASMA_SUDO_PROMPT:", args_seen[-1])
+        self.assertIn("'/path/with spaces/script.py'", args_seen[-1])
+        self.assertNotIn(creds["ssh_password"], output)
+
 if __name__ == "__main__":
     unittest.main()
