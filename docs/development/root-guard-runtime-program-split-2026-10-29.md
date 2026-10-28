@@ -24,8 +24,8 @@ failure did not record which aggregate predicate was false.
   uses `live_program_session_report()`. It keeps the exact held image,
   Golden digest, boot identity, FPGA Manager load provenance, UIO map,
   platform binding, and IRQ topology guards. It does **not** enumerate
-  all Linux PIDs via `scan_proc_consumers()`; the receipt explicitly
-  marks `proc_complete=null`, `proc_conflicts=null` and
+  all Linux PIDs via `scan_proc_consumers()`; its internal live-facts
+  snapshot explicitly records `proc_complete=null`, `proc_conflicts=null` and
   `proc_scan_diagnostic.status=NOT_RUN_PROGRAM_SESSION`, never a
   fabricated empty conflict set.
 - **Device-scoped MMIO owner admission:** the existing Z2 engine still
