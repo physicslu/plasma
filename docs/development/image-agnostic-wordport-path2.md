@@ -56,8 +56,9 @@ Current physical Provider admission is strictly:
   currently reviewed physical range policy, erase may cover **at most
   the first 62 pages** (0xF800 bytes); the last two pages stay untouched.
 - Already verified Z2 Boot ID/Root Guard, held tested FPGA image/Golden,
-  exact Native C bridge SHA, owner MMIO exclusivity, real operator
-  attestation of 3.3V/common ground/pins.
+  exact Native C bridge SHA and owner MMIO exclusivity.
+  Development mode does **not** require a repeated manual voltage, wiring,
+  common-ground or socket-presence checklist for each unchanged fixed fixture.
 - **No** alternative IC, bank, arbitrary CFG, higher Site ID, mass erase,
   raw Tcl injection or automatic image-format conversion is admitted.
   A new target requires a separately reviewed qualified Provider/profile.
@@ -85,6 +86,29 @@ silently expand the approved erase boundary. A separately reviewed
 profile/operation may later extend this range with explicit backup and
 recovery evidence. No assumption of preserved bytes *inside* the
 computed erase range is made.
+
+## Development-mode electrical observability
+
+The fixed Blue Pill prototype has no automated voltage/current sense,
+continuity measurement, or socket-presence sensor. These **three uninstrumented
+observations are not programming-admission gates and do not create a manual
+checklist at each Job**. Both read-only preflight and execution receipts
+identify them as `electrical=NOT_MEASURED_DEV_MODE_NON_BLOCKING`; that is
+explicitly **not** a measured electrical PASS.
+
+A confirmed unchanged development fixture may be reused for successive
+v0.1/v0.2 program/readback attempts. `--owner-attested` remains the
+existing explicit *hardware-operation authorization* and does not mean
+the operator remeasured voltage or checked the socket again. No extra
+approval prompt, hardware setup gate, sensor prerequisite or fixture state
+database is introduced. Real power/voltage hazards, changed wiring,
+unexpected reset/target faults, owner conflicts, or unknown recovery state
+still require stopping the run under the existing AGENTS.md development
+safety policy.
+
+SWD DPIDR and chip identification are observed at OpenOCD runtime, and
+their absence or mismatch is an ordinary measured operation FAIL, never
+a substitute for a physical voltage meter or proof of pin continuity.
 
 ## Example — owner-approved SWPC Path 2 CLI
 
