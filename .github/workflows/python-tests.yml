@@ -8,6 +8,8 @@ on:
       - ".gitignore"
       - ".clineignore"
       - "software/python/**"
+      - "software/native/swd/**"
+      - "scripts/ci/inject-plasma-openocd5088-native.py"
       - "data/ic-support/benchmarks/nxp-kl25/backend-implementation-lock.json"
       - "!software/python/docs/**"
       - "pl/rtl/**"
@@ -100,6 +102,81 @@ jobs:
         run: python -m pip install -e "./software/python[dev]"
       - name: Run pytest
         run: python -m pytest -q software/python/tests pl/tests
+
+
+  # Existing hosted source-test workflow; source-locked native OpenOCD
+  # adapter registration is tested without a self-hosted host or DUT.
+  swd-openocd-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scope native OpenOCD source build
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ -n "${BASE_SHA}" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            changed="$(git diff --name-only "${BASE_SHA}" HEAD)"
+          else
+            changed="$(git show --pretty= --name-only HEAD)"
+          fi
+          if echo "${changed}" | grep -Eq '^(software/native/swd/|scripts/ci/inject-plasma-openocd5088-native.py|software/python/tests/test_swd_native_c_compilation.py|[.]github/workflows/python-tests.yml)'; then
+            echo "required=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "required=false" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Install upstream OpenOCD build requirements
+        if: steps.scope.outputs.required == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool pkg-config make gcc git \
+            libusb-1.0-0-dev libftdi1-dev libhidapi-dev
+      - name: Fetch exact original OpenOCD and inject reviewed PLASMA files
+        if: steps.scope.outputs.required == 'true'
+        env:
+          OPENOCD_SHA: 5088db4c9154ca833c6d558381074b33672e127a
+        run: |
+          set -euo pipefail
+          git init "${RUNNER_TEMP}/openocd-pinned"
+          git -C "${RUNNER_TEMP}/openocd-pinned" remote add origin https://github.com/openocd-org/openocd.git
+          git -C "${RUNNER_TEMP}/openocd-pinned" fetch --no-tags --depth 1 origin "${OPENOCD_SHA}"
+          git -C "${RUNNER_TEMP}/openocd-pinned" checkout --detach FETCH_HEAD
+          git -C "${RUNNER_TEMP}/openocd-pinned" submodule update --init --depth 1 jimtcl
+          python scripts/ci/inject-plasma-openocd5088-native.py \
+            --openocd "${RUNNER_TEMP}/openocd-pinned" --plasma "${GITHUB_WORKSPACE}"
+      - name: Configure and build exact-source native OpenOCD
+        if: steps.scope.outputs.required == 'true'
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/openocd-pinned"
+          ./bootstrap
+          ./configure --disable-werror --enable-internal-jimtcl --disable-internal-libjaylink
+          make -j2
+          test -x src/openocd
+      - name: Verify selectable SWD adapter but no unowned device admission
+        if: steps.scope.outputs.required == 'true'
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/openocd-pinned"
+          src/openocd -c 'adapter driver plasma_swd' -c 'transport select swd' -c shutdown \
+            > "${RUNNER_TEMP}/plasma-openocd-select.log" 2>&1
+          cat "${RUNNER_TEMP}/plasma-openocd-select.log"
+          if src/openocd -c 'adapter driver plasma_swd' -c 'transport select swd' -c init -c shutdown \
+            > "${RUNNER_TEMP}/plasma-openocd-no-owner.log" 2>&1; then
+            echo 'FAIL: unleased native SWD adapter initialized' >&2
+            exit 1
+          fi
+          cat "${RUNNER_TEMP}/plasma-openocd-no-owner.log"
+          echo PLASMA_OPENOCD5088_EXACT_SOURCE_BUILD_AND_NO_OWNER_DENY_PASS
 
   mpe-rtl:
     # Permanent MPE domain verification in the existing host-only source

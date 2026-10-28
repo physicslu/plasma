@@ -131,6 +131,32 @@ or admitted in this Gate 1 increment.
   with `cc -std=c11 -Wall -Wextra -Werror` and fake MMIO. This validates
   real C execution and error handling without asserting physical acceptance.
 
+## Source-locked upstream OpenOCD adapter registration (Host-only CI)
+
+The dedicated `plasma_swd_openocd5088_driver.c` now provides
+`struct adapter_driver plasma_swd_adapter_driver` for the pinned
+OpenOCD `5088db4c9154ca833c6d558381074b33672e127a` tree. It is
+an SWD-only adapter with the existing `struct swd_driver` callbacks,
+no JTAG interface, no Debug Bitbang and no GPIO fallback.
+
+The source-lock injector `scripts/ci/inject-plasma-openocd5088-native.py`
+requires the exact pristine OpenOCD commit and then applies only four
+PLASMA C/header files and narrow upstream registration/Makefile changes
+to an **ephemeral GitHub-hosted checkout**, never to Production OpenOCD.
+The existing `Python and PL source tests` Workflow contains a
+separately routed, GitHub-hosted native-build job which compiles the
+real source and checks both selectable-adapter registration and
+**fail-closed initialization before any owner/lease binding**. The
+earlier test declaration shim cannot establish upstream source compatibility.
+
+**Deliberate access boundary:** the standalone adapter has no
+PS device-backed C word I/O, Image/Manifest/Root admission or
+Site lease binding. Even if a source-locked OpenOCD binary compiles and
+the `plasma_swd` name is selectable, `init` must fail without an
+authorized admitted Site. Do not interpret a successful build or
+negative admission test as target SWD, AP posted-read, Flash or HIL PASS.
+Production packaging and live execution remain excluded from this PR.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks
