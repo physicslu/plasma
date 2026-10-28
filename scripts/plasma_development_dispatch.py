@@ -552,9 +552,24 @@ def authorize(event: object, context: dict, registry: object,
             monitor_stage = "Vivado host build"
         else:
             monitor_stage = "CPU-only CLI"
+    # Path 2 deterministic Work Orders have a reviewed, SHA-bound Python
+    # entrypoint. Publish that repository-relative path as display-only
+    # metadata, never its argv, objective, acceptance or subprocess output.
+    monitor_action = ""
+    if (req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
+            task["execution_path"] == "path2-cli" and
+            task.get("capability") in ("cpu-only", "operator-cli")):
+        script = task.get("script")
+        if (type(script) is str and len(script) <= 96 and
+                re.fullmatch(r"(?:scripts|pl|software)/"
+                             r"(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
+                             script) is not None and
+                MONITOR_SENSITIVE.search(script) is None):
+            monitor_action = script
     return {
         "status": "AUTHORIZED_DEV_TASK",
         "monitor_stage": monitor_stage,
+        "monitor_action": monitor_action,
         "authorized_operation": None,
         **req,
         "pinned_sha": req["source_sha"],
@@ -952,10 +967,12 @@ class CodexUsageCollector:
     })
 
     def __init__(self, *, monitor_only: bool = False,
-                 workspace: Path | None = None):
+                 workspace: Path | None = None,
+                 emit_start_detail: bool = False):
         self.monitor_only = monitor_only
-        self.activity = (engineering_activity.Path3Activity(workspace)
-                         if monitor_only and workspace is not None else None)
+        self.activity = (engineering_activity.Path3Activity(
+            workspace, emit_start_detail=emit_start_detail)
+            if monitor_only and workspace is not None else None)
         self.pending = bytearray()
         self.dropping = False
         self.session_id = None
@@ -1072,7 +1089,8 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                 (info.st_mode & 0o170000) != 0o100000):
             raise LiveMonitorUnavailable("MONITOR_LOG_OWNERSHIP_DENIED")
         usage = usage if usage is not None else CodexUsageCollector()
-        monitor_events = CodexUsageCollector(monitor_only=True, workspace=cwd)
+        monitor_events = CodexUsageCollector(
+            monitor_only=True, workspace=cwd, emit_start_detail=True)
         with evidence.open("wb") as trace:
             trace.write(b"=== Codex JSONL event types (sensitive fields omitted) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,

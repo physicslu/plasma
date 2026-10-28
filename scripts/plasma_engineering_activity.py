@@ -43,6 +43,40 @@ SEMANTIC_COMMANDS = (
      "CHECK", "Inspect artifact checksums (arguments redacted)"),
 )
 SEMANTIC_KIND_BY_LABEL = {label: kind for _, kind, label in SEMANTIC_COMMANDS}
+# Native CLI activity is identified only by an exact executable prefix. The
+# remaining command line is never copied into the monitor. This is an
+# observation of a Codex item, not a tool permission or an operation receipt.
+NATIVE_TOOLS = (
+    (re.compile(r"(?:/opt/plasma/hil-tools/kingst-la2016-sigrok\.AppImage|"
+                r"(?:/usr/bin/)?sigrok-cli)(?:\s|\Z)"), "CHECK",
+     "Run Sigrok CLI (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?openocd(?:\s|\Z)"), "COMMAND",
+     "Run OpenOCD (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?ssh(?:\s|\Z)"), "COMMAND",
+     "Run SSH client (destination redacted)"),
+    (re.compile(r"(?:/usr/bin/)?lsusb(?:\s|\Z)"), "CHECK",
+     "Inspect USB devices (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?udevadm(?:\s|\Z)"), "CHECK",
+     "Inspect udev devices (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?python3?(?:\s|\Z)"), "COMMAND",
+     "Run Python command (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?git(?:\s|\Z)"), "COMMAND",
+     "Run Git operation (arguments redacted)"),
+    (re.compile(r"(?:/usr/bin/)?(?:bash|sh)(?:\s|\Z)"), "COMMAND",
+     "Run shell task (details restricted)"),
+)
+SIGROK_LABELS = {
+    "scan": "Probe Sigrok devices (arguments redacted)",
+    "show": "Inspect Sigrok device (arguments redacted)",
+    "capture": "Acquire Sigrok samples (arguments redacted)",
+}
+NATIVE_KIND_BY_LABEL = {
+    **{label: kind for _, kind, label in NATIVE_TOOLS},
+    **{label: "CHECK" for label in SIGROK_LABELS.values()},
+}
+# Shell metacharacters mean that an executable prefix may be only one part of
+# a larger operation. Never infer a simple native action from those strings.
+UNSAFE_SHELL = re.compile(r"[\x00-\x1f\x7f;&|<>`$\\]")
 REPO_TOP = frozenset({
     "scripts", "software", "pl", "firmware", "docs", "specs", "packaging",
     "data", "handover", "release",
@@ -55,7 +89,10 @@ MAX_SEQUENCE = 10000000
 
 
 def safe_command(value: object) -> tuple[str, str]:
-    if (type(value) is str and len(value) <= 256 and value.isascii() and
+    # Native tool invocations may be longer than the legacy 256-byte exact
+    # patterns. Their arguments are NEVER rendered, so accept a bounded
+    # longer input solely to classify an exact executable prefix.
+    if (type(value) is str and len(value) <= 2048 and value.isascii() and
             SENSITIVE.search(value) is None):
         if len(value) <= 125:
             for grammar, kind in COMMANDS:
@@ -63,11 +100,155 @@ def safe_command(value: object) -> tuple[str, str]:
                     return kind, value
         # Classify relative, single-command forms only. An absolute argument
         # or a shell control operator falls back to the opaque safe marker.
-        if re.search(r"\s/[A-Za-z]", value) is None:
+        if (len(value) <= 256 and
+                re.search(r"\s/[A-Za-z]", value) is None):
             for grammar, kind, label in SEMANTIC_COMMANDS:
                 if grammar.fullmatch(value) is not None:
                     return kind, label
+        if UNSAFE_SHELL.search(value) is None:
+            for grammar, kind, label in NATIVE_TOOLS:
+                if grammar.match(value) is None:
+                    continue
+                # Preserve the old conservative policy for generic repo,
+                # shell and Python commands with absolute arguments. Named
+                # native instrument/remote tools still expose ONLY fixed
+                # labels, never paths, remote hosts or arguments.
+                if (re.search(r"\s/[A-Za-z]", value) is not None and
+                        label not in {
+                            "Run Sigrok CLI (arguments redacted)",
+                            "Run OpenOCD (arguments redacted)",
+                            "Run SSH client (destination redacted)",
+                        }):
+                    continue
+                if label.startswith("Run Sigrok"):
+                    if re.search(r"(?:^|\s)--scan(?:\s|\Z)", value):
+                        label = SIGROK_LABELS["scan"]
+                    elif re.search(r"(?:^|\s)--show(?:\s|\Z)", value):
+                        label = SIGROK_LABELS["show"]
+                    elif re.search(r"(?:^|\s)(?:-o|--output-file|"
+                                   r"--samples|--time|--channels)"
+                                   r"(?:=|\s|\Z)", value):
+                        label = SIGROK_LABELS["capture"]
+                return kind, label
     return "COMMAND", "(command hidden)"
+
+
+
+# V2 monitor detail is a *sanitized, lossy observation*, never raw evidence.
+# The operator's existing group-readable log is NOT a safe place for unknown
+# secrets. Refuse whole lines instead of masking substrings or partial chunks.
+DETAIL_PREFIX = "@PLASMA_DETAIL_V1 "
+MAX_DETAIL_BYTES = 768
+DETAIL_MARKERS = frozenset({
+    "(line redacted)", "(nonprintable line omitted)",
+    "(overlong line omitted)", "(output truncated)",
+})
+DETAIL_SENSITIVE = re.compile(
+    r"(?i)(?:secret|token|passwd|password|credential|private|"
+    r"authorization|bearer|api[_-]?key|session[_-]?key|id_rsa|"
+    r"aws[_-]?(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key)|"
+    r"github[_-]?pat|access[_-]?key|client[_-]?secret|"
+    r"private[_-]?key|connection[_-]?string|x[_-]?api[_-]?key|"
+    r"(?<![a-z])(?:AKIA|ASIA)[A-Z0-9]{16}\b|"
+    r"\bgh[pousr]_[a-zA-Z0-9]{12,}\b|"
+    r"\bgithub_pat_[a-zA-Z0-9_]{12,}\b|"
+    r"\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp|ftp|ssh)://|"
+    r"\.env|\.pem|\.key|/home/|/root/|/run/secrets|"
+    r"https?://|ssh-rsa|BEGIN [A-Z ]*KEY|"
+    r"\b[a-f0-9]{32,}\b|\b[A-Za-z0-9+/]{40,}={0,2}\b)"
+)
+DETAIL_PRINTABLE = re.compile(r"[\x20-\x7e]{1,220}\Z")
+DETAIL_COMMAND = re.compile(r"[A-Za-z0-9_./:=+,@%-]+(?: [A-Za-z0-9_./:=+,@%-]+)*\Z")
+
+
+def safe_detail_text(value: object) -> str:
+    if type(value) is not str:
+        return "(nonprintable line omitted)"
+    if value in DETAIL_MARKERS:
+        return value
+    if len(value) > 220:
+        return "(overlong line omitted)"
+    if DETAIL_PRINTABLE.fullmatch(value) is None:
+        return "(nonprintable line omitted)"
+    if DETAIL_SENSITIVE.search(value) is not None:
+        return "(line redacted)"
+    return value
+
+
+def safe_cli_detail(command: object) -> str | None:
+    """Show parameters only for simple native CLI; never shell expressions.
+
+    CLI command strings may themselves contain secrets. This is deliberately
+    narrower than tool classification and does not promise a terminal mirror.
+    """
+    if type(command) is not str or len(command) > 180:
+        return None
+    if DETAIL_COMMAND.fullmatch(command) is None or SENSITIVE.search(command):
+        return None
+    if re.search(r"(?i)(?:--config(?:=| )|-c |--password|--token|--key)", command):
+        return None
+    if safe_command(command)[1] == "(command hidden)":
+        return None
+    words = command.split()
+    executable = words[0]
+    if executable in ("/usr/bin/ssh", "ssh", "/usr/bin/bash", "bash",
+                      "/usr/bin/sh", "sh"):
+        return None
+    if any(p.startswith("/") for p in words[1:]):
+        return None
+    allowed = ("sigrok-cli", "/usr/bin/sigrok-cli", "openocd",
+               "/usr/bin/openocd", "lsusb", "/usr/bin/lsusb", "udevadm",
+               "/usr/bin/udevadm", "git", "/usr/bin/git", "python3",
+               "/usr/bin/python3", "make", "ninja", "cmake",
+               "/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage")
+    if executable not in allowed:
+        return None
+    if executable.endswith(".AppImage"):
+        return "sigrok-cli (pinned AppImage) " + " ".join(words[1:])
+    return command
+
+
+def detail_wire(identity: str, stream: str, value: object, source: str) -> bytes:
+    if (type(identity) is not str or ITEM_ID.fullmatch(identity) is None or
+            (source == "C" and stream not in ("COMMAND", "COMBINED")) or
+            (source == "P" and stream not in ("STDOUT", "STDERR"))):
+        return b""
+    record = {
+        "schema": 1, "id": identity, "stream": stream,
+        "text": safe_detail_text(value), "source": source,
+        "time": dt.datetime.now().astimezone().strftime("%H:%M:%S"),
+    }
+    wire = (DETAIL_PREFIX + json.dumps(
+        record, ensure_ascii=True, separators=(",", ":")) + "\n").encode("ascii")
+    return wire if len(wire) <= MAX_DETAIL_BYTES else b""
+
+
+def parse_detail_line(line: str) -> dict | None:
+    if not line.startswith(DETAIL_PREFIX) or len(line) > MAX_DETAIL_BYTES:
+        return None
+    try:
+        record = json.loads(line[len(DETAIL_PREFIX):])
+    except (TypeError, ValueError):
+        return None
+    if type(record) is not dict or set(record) != {
+            "schema", "id", "stream", "text", "source", "time"}:
+        return None
+    if (type(record["schema"]) is not int or record["schema"] != 1 or
+            type(record["id"]) is not str or
+            ITEM_ID.fullmatch(record["id"]) is None or
+            type(record["source"]) is not str or
+            type(record["stream"]) is not str or
+            ((record["source"] == "C" and record["stream"] not in
+              ("COMMAND", "COMBINED")) or
+             (record["source"] == "P" and record["stream"] not in
+              ("STDOUT", "STDERR")) or
+             record["source"] not in ("C", "P")) or
+            type(record["time"]) is not str or
+            re.fullmatch(r"\d\d:\d\d:\d\d", record["time"]) is None or
+            type(record["text"]) is not str or
+            safe_detail_text(record["text"]) != record["text"]):
+        return None
+    return record
 
 
 def safe_repo_path(value: object, workspace: Path) -> str | None:
@@ -108,13 +289,57 @@ class Path3Activity:
     proves test PASS or authenticates physical operations.
     """
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, *, emit_start_detail: bool = False):
         self.workspace = workspace
+        self.emit_start_detail = emit_start_detail
         self.next_seq = 0
         self.active: dict[str, str] = {}
+        self.output_previous: dict[str, str] = {}
+        self.output_pending: dict[str, str] = {}
+        self.output_count: dict[str, int] = {}
+        self.command_detail_sent: set[str] = set()
+
+    def _output_details(self, identity: str, item: dict,
+                        complete: bool) -> bytes:
+        aggregate = item.get("aggregated_output")
+        if type(aggregate) is not str or len(aggregate) > 65536:
+            return b""
+        previous = self.output_previous.get(identity, "")
+        if not aggregate.startswith(previous):
+            # A non-append-only update is not a trustworthy byte delta.
+            return b""
+        delta = aggregate[len(previous):]
+        self.output_previous[identity] = aggregate
+        if not delta and not complete:
+            return b""
+        pending = self.output_pending.get(identity, "") + delta
+        lines = pending.split("\n")
+        self.output_pending[identity] = "" if complete else lines.pop()
+        if complete and self.output_pending[identity]:
+            lines.append(self.output_pending.pop(identity))
+        elif complete and not pending.endswith("\n"):
+            # split() includes the incomplete final line in this case.
+            pass
+        if complete and lines and lines[-1] == "":
+            lines.pop()
+        out = bytearray()
+        command = safe_cli_detail(item.get("command"))
+        if (command and identity not in self.command_detail_sent and
+                lines):
+            out.extend(detail_wire(identity, "COMMAND", command, "C"))
+            self.command_detail_sent.add(identity)
+        for line in lines:
+            count = self.output_count.get(identity, 0)
+            if count >= 32:
+                break
+            out.extend(detail_wire(identity, "COMBINED", line, "C"))
+            self.output_count[identity] = count + 1
+        return bytes(out)
 
     def project(self, event: dict) -> bytes:
         phase = event.get("type")
+        # Item updates often repeat the unchanged command many times. Keep
+        # just start and completion so each operation has one bounded pair.
         if phase not in ("item.started", "item.updated", "item.completed"):
             return b""
         item = event.get("item")
@@ -127,6 +352,10 @@ class Path3Activity:
         if (type(identity) is not str or ITEM_ID.fullmatch(identity) is None or
                 self.next_seq >= MAX_SEQUENCE):
             return b""
+        if phase == "item.updated":
+            return (self._output_details(identity, item, False)
+                    if category == "command_execution" and
+                    self.active.get(identity) == category else b"")
         if phase == "item.started":
             if identity in self.active or len(self.active) >= MAX_ACTIVE_ITEMS:
                 return b""
@@ -164,18 +393,33 @@ class Path3Activity:
                 names[0] + " (+" + str(len(names)-1) + " files)"
                 if names else "(file paths hidden)")
             state = "DONE" if phase == "item.completed" else "RUNNING"
+        extra_detail = (self._output_details(identity, item, True)
+                  if phase == "item.completed" and
+                  category == "command_execution" else b"")
+        start_detail = b""
+        if (phase == "item.started" and category == "command_execution" and
+                self.emit_start_detail):
+            command_detail = safe_cli_detail(item.get("command"))
+            if command_detail is not None:
+                start_detail = detail_wire(identity, "COMMAND", command_detail, "C")
+                if start_detail:
+                    self.command_detail_sent.add(identity)
         if phase == "item.completed":
             self.active.pop(identity, None)
+            self.output_previous.pop(identity, None)
+            self.output_pending.pop(identity, None)
+            self.output_count.pop(identity, None)
+            self.command_detail_sent.discard(identity)
         self.next_seq += 1
         record = {
             "schema": 1, "seq": self.next_seq, "id": identity,
             "kind": kind, "detail": detail, "state": state,
             "exit_code": exit_code, "source": "C",
-            "time": dt.datetime.now().astimezone().strftime("%H:%M"),
+            "time": dt.datetime.now().astimezone().strftime("%H:%M:%S"),
         }
         wire = (PREFIX + json.dumps(record, ensure_ascii=True,
                                    separators=(",", ":")) + "\n").encode("ascii")
-        return wire if len(wire) <= MAX_EVENT_BYTES else b""
+        return (wire + start_detail + extra_detail) if len(wire) <= MAX_EVENT_BYTES else (start_detail + extra_detail)
 
 
 def parse_public_line(line: str) -> dict | None:
@@ -197,7 +441,8 @@ def parse_public_line(line: str) -> dict | None:
             type(obj["state"]) is not str or obj["state"] not in STATES or
             type(obj["source"]) is not str or obj["source"] != "C" or
             type(obj["time"]) is not str or
-            re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", obj["time"]) is None or
+            re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]"
+                         r"(?::[0-5][0-9])?", obj["time"]) is None or
             type(obj["detail"]) is not str or len(obj["detail"]) > 150 or
             any(ord(c) < 32 or ord(c) > 126 for c in obj["detail"])):
         return None
@@ -229,8 +474,10 @@ def parse_public_line(line: str) -> dict | None:
     elif obj["detail"] == "(command hidden)":
         if obj["kind"] != "COMMAND":
             return None
-    elif obj["detail"] in SEMANTIC_KIND_BY_LABEL:
-        if obj["kind"] != SEMANTIC_KIND_BY_LABEL[obj["detail"]]:
+    elif obj["detail"] in {**SEMANTIC_KIND_BY_LABEL, **NATIVE_KIND_BY_LABEL}:
+        if obj["kind"] != {
+                **SEMANTIC_KIND_BY_LABEL,
+                **NATIVE_KIND_BY_LABEL}[obj["detail"]]:
             return None
     elif obj["detail"] != "(command hidden)":
         # Legacy explicitly allowlisted commands must retain their original

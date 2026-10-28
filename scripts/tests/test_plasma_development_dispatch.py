@@ -2108,6 +2108,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         approval = dev.authorize(event, self._context(), self.registry)
         self.assertEqual(approval["monitor_summary"], summary)
         self.assertEqual(approval["monitor_stage"], "CPU-only CLI")
+        self.assertEqual(approval["monitor_action"], case["script"])
         self.assertEqual(
             approval["work_order_sha256"], dev.work_order_digest(case))
         tampered = self._event(case | {
@@ -2119,15 +2120,18 @@ class GenericWorkOrderContracts(unittest.TestCase):
         old_approval = dev.authorize(old, self._context(), self.registry)
         self.assertEqual(old_approval["monitor_summary"], "")
         self.assertEqual(old_approval["monitor_stage"], "CPU-only CLI")
+        self.assertEqual(old_approval["monitor_action"], case["script"])
 
     def test_path3_does_not_report_path2_cli_stage(self):
         a = dev.authorize(
             self._event(self._order()), self._context(), self.registry)
         self.assertEqual(a["monitor_stage"], "")
+        self.assertEqual(a["monitor_action"], "")
         static = dev.authorize(
             DevelopmentPath2Contracts().event(),
             DevelopmentPath2Contracts().context(), self.registry)
         self.assertEqual(static["monitor_stage"], "CPU-only CLI")
+        self.assertEqual(static["monitor_action"], "")
 
     def test_path2_cpu_only_uses_existing_checked_script(self):
         event = self._event(self._order("path2-cli"))

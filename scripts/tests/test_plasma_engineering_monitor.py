@@ -184,26 +184,31 @@ class EngineeringMonitorTests(unittest.TestCase):
                 "WORK_ORDER_SHA256": "a" * 64,
                 "PLASMA_MONITOR_SUMMARY": "PATH2 Host-only CLI regression",
                 "PLASMA_MONITOR_STAGE": "CPU-only CLI",
+                "PLASMA_MONITOR_ACTION": "scripts/tests/run_host_check.py",
             }
             probe = Path(td) / "child-env.txt"
             code = ("import os,sys,pathlib;pathlib.Path(sys.argv[1]).write_text("
                     "str('PLASMA_MONITOR_SUMMARY' in os.environ)+' '+"
-                    "str('PLASMA_MONITOR_STAGE' in os.environ))")
+                    "str('PLASMA_MONITOR_STAGE' in os.environ)+' '+"
+                    "str('PLASMA_MONITOR_ACTION' in os.environ))")
             with patch.dict(os.environ, data, clear=True):
                 self.assertEqual(mon.run_job(
                     "path2", [sys.executable, "-c", code, str(probe)],
                     directory=Path(td)), 0)
-            self.assertEqual(probe.read_text(), "False False")
+            self.assertEqual(probe.read_text(), "False False False")
             state = json.loads((Path(td) / "path2.json").read_text())
             self.assertEqual(state["monitor_summary"], data["PLASMA_MONITOR_SUMMARY"])
             self.assertEqual(state["monitor_stage"], "CPU-only CLI")
+            self.assertEqual(state["monitor_action"], data["PLASMA_MONITOR_ACTION"])
             frame = mon.render_snapshot(
                 Path(td), "path2", width=120, height=24, now=FIXED_NOW)
             self.assertIn("GOAL: PATH2 Host-only CLI regression", frame)
             self.assertIn("STAGE: CPU-only CLI", frame)
+            self.assertIn("AUTHORIZED SCRIPT: scripts/tests/run_host_check.py", frame)
             self.assertIn("PR: #1144", frame)
             self.assertIn("NOW: 2026-10-21 16:10", frame)
             self.assertIn("WRAPPER: PASS  EXIT: 0", frame)
+            self.assertIn("ACCEPTANCE: UNVERIFIED BY MONITOR", frame)
             self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
                              (Path(td) / "path2.log").read_text())
             self.assertNotIn("WORK_ORDER_SHA256", frame)
@@ -224,6 +229,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                         "WORK_ORDER_SHA256": sha,
                         "PLASMA_MONITOR_SUMMARY": summary,
                         "PLASMA_MONITOR_STAGE": stage,
+                        "PLASMA_MONITOR_ACTION": "scripts/checked.py",
                     }, clear=True):
                         self.assertEqual(mon.run_job(
                             "path2", [sys.executable, "-c", "pass"],
@@ -239,6 +245,28 @@ class EngineeringMonitorTests(unittest.TestCase):
                     if stage == "Erase entire DUT" or sha == "bad-hash":
                         self.assertEqual(state["monitor_stage"], "")
                         self.assertIn("STAGE: (not available)", frame)
+                    if not sha or sha == "bad-hash":
+                        self.assertEqual(state["monitor_action"], "")
+
+    def test_path2_action_and_guarded_cli_label_are_strictly_scoped(self):
+        for action in ("../outside.py", "/tmp/secret.py",
+                       "scripts/private_key.py", "scripts/tool.sh",
+                       "scripts/.hidden.py", "scripts/tool.py\nINJECTED"):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as td:
+                with patch.dict(os.environ, {
+                    "GITHUB_RUN_ID": "40056557048",
+                    "PLASMA_MONITOR_TASK": "path2-work-order",
+                    "WORK_ORDER_SHA256": "a" * 64,
+                    "PLASMA_MONITOR_STAGE": "Guarded CLI",
+                    "PLASMA_MONITOR_ACTION": action,
+                }, clear=True):
+                    self.assertEqual(mon.run_job("path2", [sys.executable, "-c", "pass"],
+                                                 directory=Path(td)), 0)
+                state = json.loads((Path(td) / "path2.json").read_text())
+                self.assertEqual(state["monitor_stage"], "Guarded CLI")
+                self.assertEqual(state["monitor_action"], "")
+                self.assertIn("STAGE: Guarded CLI", mon.render_snapshot(
+                    Path(td), "path2"))
 
     def test_retired_stage_tasks_cannot_publish_guarded_operation(self):
         for task in ("z2-path2-download", "z2-path2-testing",
@@ -401,7 +429,8 @@ class EngineeringMonitorTests(unittest.TestCase):
             result = mon.render_snapshot(directory, "path3")
             self.assertNotIn("\x1b", result)
             self.assertNotIn("\x07", result)
-            self.assertIn("BAD", result)
+            self.assertNotIn("BAD", result)
+            self.assertIn("(nonprintable line omitted)", result)
 
     def test_real_codex_stream_redacts_event_payload_in_both_sinks(self):
         with tempfile.TemporaryDirectory() as td:
@@ -694,6 +723,69 @@ class EngineeringMonitorTests(unittest.TestCase):
         self.assertIsNone(activity.parse_public_line(
             activity.PREFIX + json.dumps(raw)))
 
+    def test_native_cli_activity_is_actionable_but_never_exposes_parameters(self):
+        cases = (
+            ("sigrok-cli --scan", "CHECK", "Probe Sigrok devices"),
+            ("/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage "
+             "--appimage-extract-and-run --show -d kingst-la2016",
+             "CHECK", "Inspect Sigrok device"),
+            ("sigrok-cli -d kingst-la2016 --samples 5000 "
+             "-o /tmp/capture-data.sr", "CHECK", "Acquire Sigrok samples"),
+            ("ssh -o BatchMode=yes remote-lab-host uname -a",
+             "COMMAND", "Run SSH client"),
+            ("openocd -f /tmp/target.cfg",
+             "COMMAND", "Run OpenOCD"),
+            ("lsusb", "CHECK", "Inspect USB devices"),
+            ("bash -lc 'git status'", "COMMAND", "Run shell task"),
+            ("sigrok-cli --samples 10 --config " + "a" * 400,
+             "CHECK", "Acquire Sigrok samples"),
+        )
+        for command, kind, label in cases:
+            with self.subTest(command=command):
+                result_kind, detail = activity.safe_command(command)
+                self.assertEqual(result_kind, kind)
+                self.assertIn(label, detail)
+                self.assertNotIn("private", detail)
+                self.assertNotIn("/tmp/", detail)
+                source = activity.Path3Activity(Path.cwd())
+                event = source.project({"type": "item.started", "item": {
+                    "id": "one", "type": "command_execution", "command": command}})
+                self.assertEqual(
+                    activity.parse_public_line(event.decode().strip())["detail"],
+                    detail)
+        for command in (
+            "sigrok-cli --scan; cat /tmp/secret",
+            "sigrok-cli --show && echo token",
+            "ssh remote-private-host\nINJECTED",
+            "openocd -c 'init | unexpected'",
+            "python3 scripts/example.py /home/plasma-codex",
+            "sigrok-cli --samples 10 -o /tmp/private-key.sr",
+            "ssh remote-private-host uname -a",
+            "sigrok-cli --scan " + "a" * 2100,
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(activity.safe_command(command)[1],
+                                 "(command hidden)")
+
+    def test_activity_updates_are_deduplicated_and_seconds_are_observed(self):
+        source = activity.Path3Activity(Path.cwd())
+        item = {"id": "cmd", "type": "command_execution",
+                "command": "sigrok-cli --scan"}
+        started = source.project({"type": "item.started", "item": item})
+        self.assertEqual(source.project({"type": "item.updated", "item": item}),
+                         b"")
+        completed = source.project({
+            "type": "item.completed", "item": {**item, "exit_code": 0}})
+        self.assertEqual(source.next_seq, 2)
+        for raw in (started, completed):
+            event = activity.parse_public_line(raw.decode().strip())
+            self.assertRegex(event["time"], r"^\d\d:\d\d:\d\d$")
+        # Existing minute-only monitor history remains backwards compatible.
+        legacy = json.loads(started.decode().split(" ", 1)[1])
+        legacy["time"] = "19:20"
+        self.assertIsNotNone(activity.parse_public_line(
+            activity.PREFIX + json.dumps(legacy)))
+
     def test_observed_activity_rejects_forged_kind_and_exit_state(self):
         with tempfile.TemporaryDirectory() as td:
             source = activity.Path3Activity(Path(td))
@@ -854,10 +946,73 @@ class EngineeringMonitorTests(unittest.TestCase):
                 Path(td), "path3", prefix="Ctrl+A", width=90, height=20)
             self.assertEqual(
                 frame.splitlines()[0],
-                "PATH 3 | SWPC Codex | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach")
+                "PATH 3 | SWPC Codex | L Activity | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach")
             self.assertEqual(len([l for l in frame.splitlines()
                                   if "Ctrl+A" in l]), 1)
             self.assertIn("STATUS: IDLE", frame)
+
+    def test_overview_collapses_start_done_and_l_toggles_activity_trace(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            source = activity.Path3Activity(directory)
+            item = {"id": "one", "type": "command_execution",
+                    "command": "sigrok-cli --scan"}
+            first = source.project({"type": "item.started", "item": item})
+            final = source.project({"type": "item.completed", "item": {
+                **item, "exit_code": 0}})
+            (directory / "path3.log").write_bytes(first + final)
+            (directory / "path3.json").write_text(json.dumps({
+                "status": "IDLE", "run_id": "123456",
+                "task": "path3-work-order", "last_result": "PASS",
+                "exit_code": 0}))
+            summary = mon.render_snapshot(directory, "path3", width=100,
+                                          height=28, now=FIXED_NOW)
+            expanded = mon.render_snapshot(directory, "path3", width=100,
+                                           height=28, now=FIXED_NOW,
+                                           expanded_activity=True)
+            self.assertIn("RUN LOG: https://github.com/physicslu/plasma/actions/runs/123456",
+                          summary)
+            self.assertIn("RECENT ACTIVITY", summary)
+            self.assertNotIn("CHECK RUNNING | Probe Sigrok", summary)
+            self.assertIn("CHECK DONE (exit 0) | Probe Sigrok", summary)
+            self.assertIn("ACTIVITY TRACE [C]", expanded)
+            self.assertIn("CHECK RUNNING | Probe Sigrok", expanded)
+            self.assertIn("CHECK DONE (exit 0) | Probe Sigrok", expanded)
+            self.assertEqual((directory / "path3.log").read_bytes(),
+                             first + final)
+
+            output = io.StringIO()
+            keys = iter([None, "L", "L"])
+            polls = [0]
+
+            def fake_sleep(_seconds):
+                polls[0] += 1
+                if polls[0] >= 3:
+                    raise StopIteration
+
+            with self.assertRaises(StopIteration):
+                mon.view_loop("path3", directory=directory, output=output,
+                              get_size=lambda: os.terminal_size((100, 28)),
+                              sleep=fake_sleep, get_now=lambda: FIXED_NOW,
+                              get_key=lambda: next(keys))
+            self.assertIn("ACTIVITY TRACE [C]", output.getvalue())
+            self.assertIn("L Summary", output.getvalue())
+            self.assertIn("L Activity", output.getvalue())
+
+    def test_path2_current_action_does_not_fake_subprocess_progress(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "path2.json").write_text(json.dumps({
+                "status": "RUNNING", "run_id": "123456", "pid": os.getpid(),
+                "proc_start": mon._proc_start(os.getpid()),
+                "task": "path2-work-order", "monitor_stage": "CPU-only CLI"}))
+            frame = mon.render_snapshot(directory, "path2", width=100,
+                                        height=28, now=FIXED_NOW)
+            self.assertIn("DOING: Trusted Path 2 dispatcher (no live step telemetry)",
+                          frame)
+            self.assertIn("RUN LOG: https://github.com/physicslu/plasma/actions/runs/123456",
+                          frame)
+            self.assertNotIn("verified", frame.lower())
 
     def test_clear_is_display_only_and_new_lines_keep_streaming(self):
         with tempfile.TemporaryDirectory() as td:
@@ -980,7 +1135,7 @@ class EngineeringMonitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
             (directory / "path3.log").write_text(
-                "".join(f"line-{i:03d}: " + ("中" * 60) + "\n"
+                "".join(f"line-{i:03d}: " + ("A-" * 50) + "\n"
                         for i in range(60)))
             frame = mon.render_snapshot(directory, "path3", width=38, height=12)
             lines = frame.splitlines()
@@ -992,6 +1147,8 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("RECENT ACTIVITY", frame)
             self.assertIn("line-059:", frame)
             self.assertNotIn("line-001:", frame)
+            # CJK width handling is separate from projection of unknown text.
+            self.assertEqual(mon._clip_columns("中文中文", 5), "中文")
 
     def test_both_paths_keep_latest_log_in_short_12_row_pane(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1452,6 +1609,8 @@ if op in ("new-session", "new-window"):
             "PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}"), 2)
         self.assertEqual(workflow.count(
             "PLASMA_MONITOR_STAGE: ${{ needs.development-authorize.outputs.monitor_stage }}"), 1)
+        self.assertEqual(workflow.count(
+            "PLASMA_MONITOR_ACTION: ${{ needs.development-authorize.outputs.monitor_action }}"), 1)
         self.assertIn(
             'monitor_summary: ${{ steps.approve.outputs.monitor_summary }}',
             workflow)
@@ -1459,6 +1618,158 @@ if op in ("new-session", "new-window"):
         self.assertNotIn("tmux kill-server", script)
         self.assertIn("MONITOR_VIEWER_EXIT", script)
         self.assertIn("exec bash", script)
+
+
+
+    def test_live_path3_shows_safe_cli_arguments_at_item_start(self):
+        with tempfile.TemporaryDirectory() as td:
+            source = activity.Path3Activity(
+                Path(td), emit_start_detail=True)
+            item = {"id": "cmd0", "type": "command_execution",
+                    "command": "sigrok-cli --scan"}
+            wire = source.project({"type": "item.started", "item": item})
+            lines = wire.decode().splitlines()
+            self.assertEqual(len(lines), 2)
+            self.assertEqual(activity.parse_public_line(lines[0])["state"],
+                             "RUNNING")
+            detail = activity.parse_detail_line(lines[1])
+            self.assertEqual(detail["stream"], "COMMAND")
+            self.assertEqual(detail["text"], "sigrok-cli --scan")
+            next_wire = source.project({"type": "item.updated", "item": {
+                **item, "aggregated_output": "Device: kingst-la2016\n"}})
+            self.assertNotIn(b'"stream":"COMMAND"', next_wire)
+            self.assertIn(b'"stream":"COMBINED"', next_wire)
+            for n, command in enumerate((
+                "ssh root@private-host hostname",
+                "sigrok-cli --scan; echo PASSWORD=secret",
+                "sigrok-cli -o /home/operator/secret.sr",
+                "bash -lc 'echo hello'",
+            )):
+                unsafe = activity.Path3Activity(
+                    Path(td), emit_start_detail=True).project({
+                        "type": "item.started", "item": {
+                            "id": "unsafe" + str(n),
+                            "type": "command_execution", "command": command}})
+                self.assertEqual(unsafe.count(activity.PREFIX.encode()), 1)
+                self.assertNotIn(activity.DETAIL_PREFIX.encode(), unsafe)
+
+    def test_sensitive_unstructured_legacy_output_not_echoed(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            (d / "path2.log").write_text(
+                "normal diagnostics\nAWS_ACCESS_KEY_ID=AKIA" + "A" * 16 + "\n"
+                "url=postgres://user:password@localhost/db\n")
+            frame = mon.render_snapshot(d, "path2", width=120, height=30)
+            self.assertIn("normal diagnostics", frame)
+            self.assertIn("(line redacted)", frame)
+            self.assertNotIn("AKIA", frame)
+            self.assertNotIn("postgres://", frame)
+            for text in ("GITHUB_PAT=github_pat_" + "A" * 30,
+                         "aws_access_key_id=AKIA" + "B" * 16,
+                         "db=redis://admin:password@localhost",
+                         "x-api-key: testkey123"):
+                self.assertEqual(activity.safe_detail_text(text),
+                                 "(line redacted)")
+
+    def test_execution_detail_fail_closed_sanitizer_and_spoofing(self):
+        safe = activity.detail_wire(
+            "cmd_1", "COMBINED", "Device: kingst-la2016", "C")
+        self.assertIn(b"Device: kingst-la2016", safe)
+        self.assertEqual(activity.parse_detail_line(
+            safe.decode().strip())["stream"], "COMBINED")
+        for unsafe in (
+            "api_token=" + "ABCD" * 16,
+            "Authorization: Bearer abc123",
+            "found /home/operator/data",
+            "SAVED\x1b[2JINJECTED",
+            "https://internal.example/path",
+            "X" * 300,
+        ):
+            with self.subTest(unsafe=unsafe[:24]):
+                payload = activity.detail_wire(
+                    "cmd_1", "COMBINED", unsafe, "C")
+                self.assertNotIn(unsafe.encode("utf-8")[:10], payload)
+                self.assertIsNotNone(activity.parse_detail_line(
+                    payload.decode().strip()))
+        for source, channel in (
+            ("C", "STDOUT"), ("P", "COMBINED"),
+            ("C", "COMMAND\tmalformed"),
+        ):
+            self.assertEqual(
+                activity.detail_wire("cmd_1", channel, "okay", source),
+                b"")
+        forged = json.loads(safe.decode().split(" ", 1)[1])
+        forged["text"] = "token_abc123"
+        self.assertIsNone(activity.parse_detail_line(
+            activity.DETAIL_PREFIX + json.dumps(forged)))
+        forged["text"] = "\x1b[2J"
+        self.assertIsNone(activity.parse_detail_line(
+            activity.DETAIL_PREFIX + json.dumps(forged)))
+
+    def test_path3_incremental_combined_output_not_fake_stderr(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            projector = activity.Path3Activity(d)
+            item = {"id": "cmd_1", "type": "command_execution",
+                    "command": "sigrok-cli --scan"}
+            started = projector.project({"type": "item.started", "item": item})
+            update = projector.project({"type": "item.updated", "item": {
+                **item, "aggregated_output": "Device: kingst-la2016\n"
+                                             "api_token=TOPSE"} })
+            self.assertIn(b"Device: kingst-la2016", update)
+            self.assertNotIn(b"TOPSE", update)
+            self.assertIn(b"sigrok-cli --scan", update)
+            self.assertEqual(projector.project({"type": "item.updated", "item": {
+                **item, "aggregated_output": "Device: kingst-la2016\n"
+                                             "api_token=TOPSE"}}), b"")
+            done = projector.project({"type": "item.completed", "item": {
+                **item, "exit_code": 0,
+                "aggregated_output": "Device: kingst-la2016\n"
+                                     "api_token=TOPSECRET\nDone\n"}})
+            payload = started + update + done
+            self.assertNotIn(b"TOPSECRET", payload)
+            self.assertIn(b"(line redacted)", payload)
+            self.assertIn(b"COMBINED", payload)
+            self.assertNotIn(b"STDERR", payload)
+            (d / "path3.log").write_bytes(payload)
+            frame = mon.render_snapshot(
+                d, "path3", width=120, height=30,
+                expanded_activity=True)
+            self.assertIn("[C] COMBINED | Device: kingst-la2016", frame)
+            self.assertNotIn("TOPSECRET", frame)
+            self.assertIn("sigrok-cli --scan", frame)
+
+    def test_path2_live_stdout_stderr_are_separate_and_redacted(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            cmd = [
+                sys.executable, "-c",
+                "import sys\n"
+                "sys.stdout.write('sample count=100\\napi_')\n"
+                "sys.stdout.flush()\n"
+                "sys.stdout.write('token=TOPSECRET\\n')\n"
+                "sys.stderr.write('ERROR: expected device missing\\n')\n",
+            ]
+            with patch.dict(os.environ, {
+                "GITHUB_RUN_ID": "40112233",
+                "PLASMA_MONITOR_TASK": "path2-work-order",
+            }):
+                self.assertEqual(mon.run_job("path2", cmd, directory=d), 0)
+            contents = (d / "path2.log").read_text()
+            self.assertIn('"stream":"STDOUT"', contents)
+            self.assertIn('"stream":"STDERR"', contents)
+            self.assertIn("sample count=100", contents)
+            self.assertIn("ERROR: expected device missing", contents)
+            self.assertNotIn("TOPSECRET", contents)
+            self.assertIn("(line redacted)", contents)
+            frame = mon.render_snapshot(
+                d, "path2", width=120, height=36,
+                expanded_activity=True)
+            self.assertIn("[P] STDOUT | sample count=100", frame)
+            self.assertIn("[P] STDERR | ERROR: expected device missing", frame)
+            self.assertNotIn("TOPSECRET", frame)
+            concise = mon.render_snapshot(d, "path2", width=120)
+            self.assertNotIn("@PLASMA_DETAIL_V1", concise)
 
 
 
