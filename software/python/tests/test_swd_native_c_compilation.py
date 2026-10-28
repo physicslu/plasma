@@ -436,3 +436,51 @@ def test_native_v5_mmio_is_volatile_words_not_legacy_bitbang():
         "plasma_rbb_exchange", "bluepill_wordport_bridge", "MODE_DEBUG",
     ):
         assert forbidden not in c
+
+
+def test_ps_native_fd_mapping_host_only_sparse_file_and_revocation(tmp_path):
+    """Real native C mmap/munmap and FIFO against regular-file fake AXI.
+
+    Does NOT touch /dev/mem, FPGA Manager, Z2 or DUT. The source is
+    compiled with a test-only macro that disallows character devices.
+    """
+    cc = shutil.which("cc")
+    assert cc, "Host compiler required"
+    exe = tmp_path / "ps-native-v5-fd-map"
+    cmd = [
+        cc, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+        "-pedantic", "-DPLASMA_SWD_HOST_TEST=1", "-I", str(SRC),
+        str(SRC / "plasma_swd_ps_mapping.c"),
+        str(SRC / "plasma_swd_fifo_core.c"),
+        str(SRC / "plasma_swd_native_words.c"),
+        str(SRC / "plasma_swd_lease_word_port.c"),
+        str(SRC / "plasma_swd_owner_lock.c"),
+        str(SRC / "tests/test_plasma_swd_ps_mapping.c"),
+        "-o", str(exe),
+    ]
+    compile_result = subprocess.run(cmd, text=True, capture_output=True,
+                                    timeout=30, check=False)
+    assert compile_result.returncode == 0, (
+        compile_result.stdout + compile_result.stderr)
+    run = subprocess.run([str(exe)], text=True, capture_output=True,
+                         timeout=30, check=False)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "PLASMA_PSNATIVE_MAPPED_FD_HOST_ONLY_PASS" in run.stdout
+
+
+def test_ps_mapping_requires_external_preopened_fd_and_production_char_device():
+    c = (SRC / "plasma_swd_ps_mapping.c").read_text()
+    h = (SRC / "plasma_swd_ps_mapping.h").read_text()
+    assert "mmap(" in c and "munmap(" in c
+    assert "S_ISCHR" in c and "major(st.st_rdev)" in c
+    assert "PLASMA_SWD_HOST_TEST" in c
+    assert "FD_CLOEXEC" in c and "O_SYNC" in c
+    assert "plasma_swd_native_words_ready" in c
+    assert "owner->site_id != site_id" in c
+    assert "authorize(authority_ctx, site_id, generation)" in c
+    assert "preopened_fd" in h
+    for forbidden in (
+        'open("/dev/mem"', "socket(", "remote_bitbang",
+        "MODE_DEBUG", "bluepill_wordport_bridge",
+    ):
+        assert forbidden not in c

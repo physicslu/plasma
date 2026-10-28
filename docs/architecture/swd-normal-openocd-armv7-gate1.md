@@ -355,6 +355,52 @@ still no privileged real PS device mapping owner, no startup command
 to bind an admitted v5 Site in production, and no Z2 HIL.
 A selectable OpenOCD Adapter must continue failing init when unbound.
 
+## PS-local preopened-FD mmap lifecycle (Host-only, no Root approval)
+
+`software/native/swd/plasma_swd_ps_mapping.[ch]` now adds an
+**explicit Native C Linux mmap/munmap lifecycle** for one ABI-v5 Site.
+The mapping function accepts a **borrowed already-opened FD** from a
+future trusted PS-local owner; it does not open `/dev/mem`, invoke
+Python per-bit callbacks, load an FPGA Image, or acquire Root privilege.
+
+Before mapping, it requires the ADR-0007 per-Site exclusive lock,
+canonical physical aperture, nonzero Site lease generation,
+`FD_CLOEXEC`, read/write access and a successful independent C
+authorization callback. Production accepts only the `/dev/mem`
+character device type (Linux major=1, minor=1) with `O_SYNC`;
+the separate `PLASMA_SWD_HOST_TEST` build instead **rejects device
+nodes** and maps only a large sparse regular file. `mmap(MAP_SHARED)`
+maps one precisely 4KiB aligned Site page and initializes the Native
+C 32-bit Word Port. A second authorization recheck follows the map
+before the page pointer is exposed. No read/write SWD transaction
+occurs merely by attaching a map.
+
+Host-only tests check both Site 1 and Site 2 map from a synthetic
+file, correct Site isolation, v5 identity, native FIFO admission,
+non-root fake authorization revocation, read-only FD refusal,
+wrong Site/lease refusal, double-attach refusal and borrowed FD
+ownership on detach. The `swd-openocd-native` GitHub-hosted job
+includes the C object in the exact-source OpenOCD link and
+cross-compiles the mapper for ELF32 ARM. The proven ARMv7 native
+word `LDR/STR/DMB SY` disassembly checks remain independent.
+
+**Trust boundary remains BLOCKED:** this is a device-backed *mapping
+mechanism*, not a trusted Root admission provider. The protected
+Root source currently handles Image download/test/restore but exposes
+no approved ongoing v5 Site/Manifest/voltage authorization API.
+A caller could supply an untrustworthy callback; **such a callback
+does not make hardware operation safe**. The actual Z2 OS permissions,
+Root Source Pin, current Boot ID, loaded Image/Manifest, board voltage,
+AXI Dev-memory attributes and error/UNKNOWN recovery cannot be
+asserted by this Host-only test. No deployed OpenOCD launcher calls
+`plasma_swd_ps_mapping_attach` and no hardware is operated.
+The correct sequence for a future trusted owner is: protected
+Root evidence and Site admission → acquire PPU SH + Site EX →
+obtain and hold valid MMIO FD → Native C map → Lease Port/FIFO
+admission → guarded OpenOCD bind → bounded operations → unbind →
+retire/unmap → close borrowed FD with owner → release Site then PPU.
+Any uncertain operation must remain blocked, never replayed.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks
