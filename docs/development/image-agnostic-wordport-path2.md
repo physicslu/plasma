@@ -172,7 +172,12 @@ done
   Cortex-M3 part number `0xC23`) and `FLASH_SR` (`0x4002200C`).
   **No CPU halt**, Flash erase/write or reset.
 - `core-register-read`: uses `get_reg -force` to read `pc`, `sp`,
-  `lr`, `xPSR`. A core already halted is left halted. A running core
+  `lr`, `xPSR`. OpenOCD 0.12.x uses the **case-sensitive internal
+  register name `xpsr`**, renamed upstream from `xPSR` in 2023;
+  the operator-facing receipt continues to label the returned value
+  `xPSR`. This fixes the actual Site 1 observation in which PC/SP/LR
+  read successfully but xPSR was absent and the combined gate correctly
+  returned FAIL. A core already halted is left halted. A running core
   is briefly halted, and the script always attempts to resume it after
   the register operations, **including on read failure**. An unknown
   initial state fails closed; an unsuccessful restore also FAILs.
