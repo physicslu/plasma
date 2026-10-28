@@ -63,6 +63,36 @@ OpenOCD installation intact. Do not silently change pin, sudoers or FPGA Image.
 Supply the **real Z2 path** to the v0.2 BIN after checking the size and SHA.
 Do not infer the v0.2 filename from the historical v0.1 scripts.
 
+### Automatic read-only preflight (run first, also enforced before programming)
+
+The same reviewed script now exposes `--operation preflight`; it never
+launches OpenOCD, a Bridge, or a DUT transaction. It checks the precise
+script/Firmware/Native/Bridge hashes, OpenOCD binary executable and scripts,
+Root source pin and checksum manifest, current Boot ID, FPGA Manager state,
+held/tested Image, Manifest and Golden checksums, MMIO owners and existing
+OpenOCD/Bridge processes. It reports one JSON receipt with explicit PASS or
+NOT_RUN/BLOCKED reason; no special `--owner-attested` flag is needed for
+this **read-only** mode. Z2 root is still required to read Root state and
+inspect the owner processes. It does **not** check electrical wiring,
+Vref, power or physical SWD signal quality; those require the operator.
+
+On Z2, using the newly installed **reviewed SHA-pinned** script:
+
+    S="<Z2_NATIVE_BUNDLE>/scripts/plasma_native_wordport_v02.py"
+    SCRIPTSHA="$(sha256sum "$S" | cut -d' ' -f1)"
+    sudo /opt/plasma/python/3.12.13/bin/python3 -I -B "$S" \
+      --role z2 --operation preflight \
+      --firmware <Z2_V02_BIN> \
+      --source-sha256 "$SCRIPTSHA"
+
+Or from SWPC, substitute `--role swpc` with the same exact script,
+firmware and source SHA. SWPC's enrolled SSH/host-key/sudo rights remain
+a requirement; no new sudo privilege is provided.
+
+The *program-v02* and *diagnose-after* operations always repeat this
+preflight, and still require `--owner-attested` for physical operations.
+A successful read-only preflight is **not** authorization to erase Flash.
+
 ### SWPC direct CLI (or identical argv under Path 2 operator-cli)
 
     SCRIPTSHA="$(sha256sum scripts/plasma_native_wordport_v02.py | cut -d' ' -f1)"
