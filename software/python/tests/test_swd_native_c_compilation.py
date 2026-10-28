@@ -247,12 +247,20 @@ def test_sigkill_releases_site_lock_but_does_not_resolve_pending_write(tmp_path)
             [str(binary), "try", str(fence), "1"],
             capture_output=True, text=True, timeout=5, check=False)
         assert denied.returncode == 8
+        reload_denied = subprocess.run(
+            [str(binary), "try", str(fence)],
+            capture_output=True, text=True, timeout=5, check=False)
+        assert reload_denied.returncode == 8
         owner.kill()  # SIGKILL: no C cleanup, unbind, FIFO drain or lease retire.
         assert owner.wait(timeout=5) < 0
         acquired = subprocess.run(
             [str(binary), "try", str(fence), "1"],
             capture_output=True, text=True, timeout=5, check=False)
         assert acquired.returncode == 0, acquired.stdout + acquired.stderr
+        reload_acquired = subprocess.run(
+            [str(binary), "try", str(fence)],
+            capture_output=True, text=True, timeout=5, check=False)
+        assert reload_acquired.returncode == 0
         assert pending.read_text().endswith("completion=unknown\n")
         # A production owner must not infer a safe DUT write replay from
         # acquired.returncode == 0. No persistent admission protocol exists.
