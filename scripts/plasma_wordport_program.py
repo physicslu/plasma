@@ -722,6 +722,25 @@ def z2_login_credentials(home: Path) -> tuple[dict[str, str], Path]:
     return credentials, hosts
 
 
+def sanitize_ssh_transcript(output: bytes, credentials: dict[str, str]) -> str:
+    """Strip local auth prompts, not the remote machine-readable JSON receipt.
+
+    The sudo marker can immediately precede remote stdout without a newline
+    (observed on SWPC HIL preflight); insert one before JSON so the existing
+    A/B receipt parser sees a clean JSON line. Do not publish private host,
+    username or password from the controlling PTY's login prompt.
+    """
+    clean = output.decode("utf-8", "replace")
+    user, host = credentials["ssh_username"], credentials["ssh_host"]
+    for prompt in (f"{user}@{host}'s password:", f"{user}'s password:"):
+        clean = clean.replace(prompt, "")
+    clean = clean.replace("PLASMA_SUDO_PROMPT:", "\n")
+    for secret in (credentials["ssh_password"],
+                   credentials.get("sudo_password", credentials["ssh_password"])):
+        clean = clean.replace(secret, "[REDACTED]")
+    return clean
+
+
 def password_ssh_z2(command: list[str], credentials: dict[str, str],
                     hosts: Path, *, timeout: int = 750) -> tuple[int, str]:
     """Run one pinned SSH + sudo command over a private local controlling PTY.
@@ -802,11 +821,8 @@ def password_ssh_z2(command: list[str], credentials: dict[str, str],
         if expired:
             return 124, "Z2_SSH_OPERATION_TIMEOUT"
         exit_code = child.wait(timeout=5)
-        # Scrub only, never echo the raw PTY transcript.
-        clean = output.decode("utf-8", "replace")
-        for secret in (credentials["ssh_password"], sudo_password):
-            clean = clean.replace(secret, "[REDACTED]")
-        return exit_code, clean
+        # Remove local authentication prompts before publishing remote output.
+        return exit_code, sanitize_ssh_transcript(bytes(output), credentials)
     finally:
         if child is not None and child.poll() is None:
             os.killpg(child.pid, signal.SIGTERM)
