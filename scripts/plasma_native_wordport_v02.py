@@ -184,7 +184,7 @@ def z2_preflight(args):
     return firmware, native, barrier, boot, root_sha
 
 
-def on_z2(args):
+def on_z2(args, *, socket_base: Path = Path("/run")):
     firmware, native, barrier, boot, root_sha = z2_preflight(args)
     base = BUNDLE / ".work/native-v02-path2"
     if base.is_symlink():
@@ -192,7 +192,7 @@ def on_z2(args):
     base.mkdir(mode=0o700, parents=True, exist_ok=True)
     evidence = base / f"run-{time.time_ns()}-{os.getpid()}"
     evidence.mkdir(mode=0o700)
-    socketdir = Path(f"/run/plasma-native-v02-{os.getpid()}")
+    socketdir = socket_base / f"plasma-native-v02-{os.getpid()}"
     socketdir.mkdir(mode=0o700)
     socket = socketdir / "swd.sock"
     readback = evidence / "readback-v02.bin"
