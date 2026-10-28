@@ -129,9 +129,11 @@ class SiteRecoveryJournal:
                               0o600, dir_fd=dir_fd)
             _check_fd(lock_fd, directory=False)
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            yield dir_fd
         except (OSError, ValueError) as exc:
             raise SiteRecoveryBlocked("Site journal ownership/lock unavailable") from exc
+        else:
+            # Do not reinterpret callback failures as a lock acquisition error.
+            yield dir_fd
         finally:
             if lock_fd >= 0:
                 os.close(lock_fd)
