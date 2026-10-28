@@ -218,6 +218,7 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.assertEqual(result["readback_sha256"], image_sha)
         self.assertEqual(result["image_bytes"], 8194)
         self.assertEqual(result["erase_bytes"], 0x2400)
+        self.assertEqual(result["electrical"], "NOT_MEASURED_DEV_MODE_NON_BLOCKING")
         self.assertTrue(result["socket_released"])
         self.assertTrue(result["no_auto_retry"])
 
@@ -230,6 +231,10 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.assertIn('staged.stat().st_size != image_bytes or sha(staged) != image_sha',
                       source)
         self.assertIn('if args.owner_attested:', source)
+        self.assertIn('"electrical": "NOT_MEASURED_DEV_MODE_NON_BLOCKING"', source)
+        self.assertNotIn("NOT_VERIFIED_OWNER_MUST_CHECK", source)
+        # Missing fixture sensors do not create physical PASS or a per-job
+        # checklist: the explicit owner-approved command remains independent.
         self.assertNotIn('subprocess.run(["git"', source)
 
 
