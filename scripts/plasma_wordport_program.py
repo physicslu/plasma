@@ -312,8 +312,8 @@ def read_register_evidence(log: str) -> tuple[bool, dict]:
 
 def read_core_evidence(log: str) -> tuple[bool, dict, str | None, str | None]:
     valid, observed = _observations(log, "PLASMA_CORE_REGISTER_PASS", CORE_NAMES)
-    before = re.findall(r"(?m)^PLASMA_CORE_STATE_BEFORE (\\w+)$", log)
-    after = re.findall(r"(?m)^PLASMA_CORE_STATE_AFTER (\\w+)$", log)
+    before = re.findall(r"(?m)^PLASMA_CORE_STATE_BEFORE (\w+)$", log)
+    after = re.findall(r"(?m)^PLASMA_CORE_STATE_AFTER (\w+)$", log)
     state_ok = (len(before) == len(after) == 1
                 and before[0] in ("running", "halted")
                 and after[0] == before[0]
