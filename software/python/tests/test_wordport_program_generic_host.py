@@ -9,6 +9,7 @@ import io
 import json
 from pathlib import Path
 import socket
+import shutil
 import subprocess
 import tempfile
 from types import SimpleNamespace
@@ -345,6 +346,82 @@ class GenericSessionHostOnly(unittest.TestCase):
             with self.subTest(log=log[-100:]):
                 self.assertFalse(module.read_core_evidence(log)[0])
 
+
+
+class InterruptMaskGateHostOnly(unittest.TestCase):
+    """Tcl qualification without a real OpenOCD, socket, target or Flash write."""
+
+    def setUp(self):
+        self.base = Path("/tmp/plasma-irq-mask-host-only")
+
+    def program(self):
+        return module.make_tcl(
+            self.base / "swd.sock", self.base / "image.bin",
+            self.base / "readback.bin", "program",
+            image_bytes=2048, erase_bytes=2048)
+
+    def test_program_requires_mask_before_erase_and_again_before_program(self):
+        tcl = self.program()
+        self.assertLess(tcl.index("\\nhalt\\n"), tcl.index("cortex_m maskisr on"))
+        self.assertLess(tcl.index("cortex_m maskisr on"), tcl.index("plasma_require_irq_mask PRE_ERASE"))
+        self.assertLess(tcl.index("plasma_require_irq_mask PRE_ERASE"),
+                        tcl.index("flash erase_address "))
+        self.assertLess(tcl.index("flash erase_address "),
+                        tcl.index("plasma_require_irq_mask PRE_PROGRAM"))
+        self.assertLess(tcl.index("plasma_require_irq_mask PRE_PROGRAM"),
+                        tcl.index("flash write_image "))
+        self.assertIn("0x0002000B", tcl)
+        self.assertIn("PLASMA_IRQ_MASK_GATE_FAIL PRE_ERASE", tcl)
+        self.assertIn("PLASMA_IRQ_MASK_GATE_FAIL PRE_PROGRAM", tcl)
+        self.assertNotIn("reset halt", tcl)
+        self.assertNotIn("reset run", tcl)
+
+    def test_preflight_reset_and_read_only_ops_never_enable_mask_or_flash(self):
+        for operation in ("reset-run", "register-read",
+                          "core-register-read", "diagnose-after"):
+            with self.subTest(operation=operation):
+                tcl = module.make_tcl(
+                    self.base / "swd.sock", None, self.base / "read.bin",
+                    operation)
+                self.assertNotIn("cortex_m maskisr on", tcl)
+                self.assertNotIn("plasma_require_irq_mask", tcl)
+                self.assertNotIn("flash write_image ", tcl)
+
+    @unittest.skipUnless(shutil.which("tclsh"), "tclsh not installed")
+    def test_mock_dhcsr_mask_readback_fail_closed(self):
+        # Real Tcl interpreter, but only a mocked DHCSR response:
+        # S_HALT + C_DEBUGEN + C_HALT + C_MASKINTS must all be set.
+        for name, value, should_pass in (
+            ("masked_halted", "0x0003000B", True),
+            ("previous_fault_snapshot", "0x00030003", False),
+            ("not_halted", "0x00010009", False),
+            ("debug_disabled", "0x0003000A", False),
+            ("malformed", "NOT_INTEGER", False),
+            ("read_error", "ERROR", False),
+        ):
+            with self.subTest(case=name):
+                script = (
+                    "proc echo {args} { puts [join $args { }] }\\n"
+                    f"set ::dhcsr {{{value}}}\\n"
+                    "proc read_memory {address width count} {\\n"
+                    "    if {$::dhcsr eq \\"ERROR\\"} {error \\"SYNTHETIC_DAP_FAULT\\"}\\n"
+                    "    return [list $::dhcsr]\\n"
+                    "}\\n"
+                    + module.IRQ_MASK_GATE_TCL
+                    + "\\nif {[catch {plasma_require_irq_mask PRE_PROGRAM} msg]} {\\n"
+                    "    puts \\"MOCK_GATE_REJECTED $msg\\"\\n"
+                    "} else { puts \\"MOCK_GATE_PASS\\" }\\n"
+                )
+                p = subprocess.run(["tclsh"], input=script, text=True,
+                                   capture_output=True, timeout=5)
+                self.assertEqual(p.returncode, 0, p.stderr)
+                if should_pass:
+                    self.assertIn("MOCK_GATE_PASS", p.stdout)
+                    self.assertIn("PLASMA_IRQ_MASK_PASS", p.stdout)
+                else:
+                    self.assertIn("MOCK_GATE_REJECTED", p.stdout)
+                    self.assertIn("PLASMA_IRQ_MASK_FAIL", p.stdout)
+                    self.assertNotIn("MOCK_GATE_PASS", p.stdout)
 
 
 class FlashFailureForensicsContract(unittest.TestCase):
