@@ -36,6 +36,9 @@ PROFILE = {
     "target_cfg": "target/stm32f1x.cfg", "main_flash_base": 0x08000000,
     "main_flash_bytes": 65536, "erase_granularity_bytes": 1024,
     "program_granularity_bytes": 2,
+    # Until independently qualified, leave the final two 1-KiB pages untouched.
+    # Prior physical backup showed non-erased content in the last page.
+    "max_erase_bytes": 0xF800,
 }
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 SAFE_PATH = re.compile(r"/[A-Za-z0-9_./-]+\Z")
@@ -89,6 +92,8 @@ def admit_image(operation: str, path: str | None, expected_sha: str | None):
     erase = (size + gran - 1) // gran * gran
     if erase > PROFILE["main_flash_bytes"]:
         raise NotRun(77, "ERASE_OUTSIDE_TARGET_FLASH")
+    if erase > PROFILE["max_erase_bytes"]:
+        raise NotRun(77, "ERASE_OUTSIDE_APPROVED_RANGE")
     return source, size, expected_sha, erase
 
 
@@ -98,7 +103,7 @@ def make_tcl(socket: Path, firmware: Path | None, readback: Path, operation: str
     if operation == "program" and (
         firmware is None or image_bytes < 1 or
         image_bytes > PROFILE["main_flash_bytes"] or
-        erase_bytes < image_bytes or erase_bytes > PROFILE["main_flash_bytes"] or
+        erase_bytes < image_bytes or erase_bytes > PROFILE["max_erase_bytes"] or
         erase_bytes % PROFILE["erase_granularity_bytes"]
     ):
         raise ValueError("INVALID_IMAGE_PLAN")
