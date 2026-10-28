@@ -210,6 +210,7 @@ class NativeV02DynamicSession(unittest.TestCase):
     def _check_process_failure(self, timeout):
         opened = []
         real_run = subprocess.run
+        real_popen = subprocess.Popen
 
         class FakeBridge:
             def __init__(self, argv):
@@ -244,9 +245,11 @@ class NativeV02DynamicSession(unittest.TestCase):
                                                 output=b"mock partial stdout\n",
                                                 stderr=b"mock partial stderr\n")
             config_path = Path(argv[argv.index("-f") + 1])
-            return real_run(["tclsh", str(self.runner.simulator), str(config_path)],
-                            env=dict(__import__("os").environ, INJECT_MDW_ERROR="1"),
-                            capture_output=True, text=True, timeout=10)
+            # The mock Bridge Popen must not intercept the real, local Tcl interpreter.
+            with patch.object(module.subprocess, "Popen", real_popen):
+                return real_run(["tclsh", str(self.runner.simulator), str(config_path)],
+                                env=dict(__import__("os").environ, INJECT_MDW_ERROR="1"),
+                                capture_output=True, text=True, timeout=10)
 
         a = SimpleNamespace(operation="program-v02")
         out = io.StringIO()
