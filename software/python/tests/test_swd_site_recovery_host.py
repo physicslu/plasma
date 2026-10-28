@@ -317,6 +317,82 @@ sys.exit(18)
         assert result.returncode == 17
 
 
+def test_competing_site_owners_only_one_new_write_after_restart(private_dir):
+    """Competing independent processes cannot both use one READY generation."""
+    ident = identity()
+    provision_test_only(private_dir, ident)
+    fake_push_log = private_dir / "synthetic-push.log"
+    script = """
+import os, pathlib, sys, time
+from plasma_interfaces.swd_site_recovery import SiteRecoveryIdentity, SiteRecoveryJournal, SiteRecoveryBlocked
+root = pathlib.Path(sys.argv[1])
+start = root / "start.signal"
+j = SiteRecoveryJournal(root, SiteRecoveryIdentity(1, "boot-a", "a"*64, "b"*64))
+for _ in range(400):
+    if start.exists(): break
+    time.sleep(0.005)
+else: sys.exit(33)
+def push():
+    with (root / "synthetic-push.log").open("a") as out:
+        out.write(str(os.getpid()) + "\\n")
+    time.sleep(0.03)
+try:
+    j.guard_write("competing-owner", push)
+except SiteRecoveryBlocked:
+    sys.exit(17)
+sys.exit(0)
+"""
+    processes = [
+        subprocess.Popen([sys.executable, "-c", script, str(private_dir)])
+        for _ in range(2)
+    ]
+    try:
+        (private_dir / "start.signal").write_text("start")
+        codes = [p.wait(timeout=12) for p in processes]
+        assert sorted(codes) == [0, 17], codes
+        assert len(fake_push_log.read_text().splitlines()) == 1
+        assert SiteRecoveryJournal(private_dir, ident).status() == "UNCERTAIN"
+    finally:
+        for proc in processes:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+
+
+def test_two_site_cross_process_writes_do_not_share_a_journal_lock(private_dir):
+    """Two different candidate Sites can hold independent journals together."""
+    for n in (1, 2):
+        provision_test_only(private_dir, identity(n))
+    script = """
+import pathlib, sys, time
+from plasma_interfaces.swd_site_recovery import SiteRecoveryIdentity, SiteRecoveryJournal
+root = pathlib.Path(sys.argv[1]); site = int(sys.argv[2])
+j = SiteRecoveryJournal(root, SiteRecoveryIdentity(site, "boot-a", "a"*64, "b"*64))
+def push():
+    (root / ("entered-" + str(site))).write_text("entered")
+    other = 1 if site == 2 else 2
+    for _ in range(800):
+        if (root / ("entered-" + str(other))).exists(): return
+        time.sleep(0.005)
+    raise RuntimeError("Different Site was serialized by unrelated journal")
+j.guard_write("job-" + str(site), push)
+"""
+    processes = [
+        subprocess.Popen([sys.executable, "-c", script, str(private_dir), str(n)])
+        for n in (1, 2)
+    ]
+    try:
+        codes = [p.wait(timeout=12) for p in processes]
+        assert codes == [0, 0], codes
+        for n in (1, 2):
+            assert SiteRecoveryJournal(private_dir, identity(n)).status() == "UNCERTAIN"
+    finally:
+        for proc in processes:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+
+
 def test_no_privileged_deployed_recovery_or_auto_replay_interface():
     module = Path(recovery.__file__).read_text(encoding="utf-8")
     for forbidden in ("subprocess.", "/dev/mem", "sudo ", "os.system(",
