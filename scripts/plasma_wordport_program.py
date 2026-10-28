@@ -514,7 +514,6 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
                     "PLASMA_DIAG_END POST_SESSION" in log))
         diagnostic = "REGISTER_ACCESS_OBSERVED" if success else "REGISTER_ACCESS_FAILED"
     else:  # Explicit one-shot reset-run, never implicit on program.
-    else:  # Explicit one-shot reset-run, never implicit on program.
         success = (eligible and "PLASMA_RESET_RUN_OK" in log and
                    "PLASMA_RESET_RUN_FAIL" not in log)
         diagnostic = "NOT_APPLICABLE_RESET_RUN"
