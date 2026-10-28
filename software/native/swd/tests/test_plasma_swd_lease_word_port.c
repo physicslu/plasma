@@ -179,6 +179,42 @@ static void test_bad_owner_and_barrier_fail_closed(void)
     plasma_swd_lease_word_port_retire(&a);
     assert(io_a.read32(io_a.ctx, PLASMA_SWD_SITE1_BASE, &d.mode[0]) != 0);
 }
+static void test_site_lock_never_authorizes_another_site(void)
+{
+    char name[] = "/tmp/plasma-site-lock-XXXXXX";
+    int fd = mkstemp(name);
+    assert(fd >= 0);
+    close(fd);
+    struct plasma_swd_owner_lock lock1 = {.fd = -1, .site_fd = -1};
+    struct plasma_swd_owner_lock lock2 = {.fd = -1, .site_fd = -1};
+    struct plasma_swd_owner_lock duplicate = {.fd = -1, .site_fd = -1};
+    assert(plasma_swd_owner_lock_acquire_site(&lock1, name, 1u) == 0);
+    assert(plasma_swd_owner_lock_acquire_site(&lock2, name, 2u) == 0);
+    assert(plasma_swd_owner_lock_acquire_site(&duplicate, name, 1u) != 0);
+    struct domain d;
+    setup(&d);
+    struct plasma_swd_lease_provider owner = provider(&d);
+    struct plasma_swd_lease_word_port wrong, good;
+    assert(plasma_swd_lease_word_port_init(
+        &wrong, &owner, &lock1, 2, 22) == PLASMA_SWD_BAD_ARG);
+    assert(plasma_swd_lease_word_port_init(
+        &good, &owner, &lock1, 1, 11) == 0);
+    assert(plasma_swd_lease_word_port_admit(&good) == 0);
+    assert(plasma_swd_lease_word_port_init(
+        &wrong, &owner, &lock2, 1, 11) == PLASMA_SWD_BAD_ARG);
+    plasma_swd_owner_lock_release(&lock1);
+    struct plasma_swd_word_io io;
+    assert(plasma_swd_lease_word_port_make_io(&good, &io)
+           == PLASMA_SWD_NOT_READY);
+    plasma_swd_owner_lock_release(&lock2);
+    assert(unlink(name) == 0);
+    char site_path[128];
+    assert(snprintf(site_path, sizeof(site_path), "%s.site-1", name) > 0);
+    assert(unlink(site_path) == 0);
+    assert(snprintf(site_path, sizeof(site_path), "%s.site-2", name) > 0);
+    assert(unlink(site_path) == 0);
+}
+
 int main(void)
 {
     char path[] = "/tmp/plasma-swd-owner-host-XXXXXX";
@@ -188,6 +224,7 @@ int main(void)
     assert(plasma_swd_owner_lock_acquire(&process_lock, path) == 0);
     test_guarded_c_fifo_two_sites();
     test_bad_owner_and_barrier_fail_closed();
+    test_site_lock_never_authorizes_another_site();
     /* Releasing and reacquiring the same cooperative lock is a NEW epoch.
      * A stale C Site token must never silently become active again. */
     struct domain d;

@@ -55,6 +55,7 @@ int plasma_swd_lease_word_port_init(struct plasma_swd_lease_word_port *p,
                                    unsigned int site, uint64_t generation)
 {
     if (!p || !owner || !plasma_swd_owner_lock_valid(process_lock) ||
+        (process_lock->site_id != 0u && process_lock->site_id != site) ||
         (site != 1 && site != 2) || generation == 0 ||
         !owner->qualify || !owner->read_owned || !owner->write_owned ||
         !owner->barrier_owned || !owner->invalidate_all)

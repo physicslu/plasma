@@ -13,6 +13,8 @@
 
 struct plasma_swd_owner_lock {
     int fd;
+    int site_fd;
+    unsigned int site_id; /* 0=legacy global-exclusive, 1/2=per-Site */
     pid_t owner_pid;
     uint64_t epoch; /* changes after every successful acquire */
     bool acquired;
@@ -23,6 +25,13 @@ struct plasma_swd_owner_lock {
  * Never opens a device or claims an FPGA Site. */
 int plasma_swd_owner_lock_acquire(struct plasma_swd_owner_lock *owner,
                                   const char *absolute_path);
+/* PPU shared reload fence, followed by exclusive per-Site lock.
+ * Legacy global-exclusive owner remains supported for old single-owner use.
+ * A Root FPGA Reload MUST acquire the same PPU lock exclusively.
+ */
+int plasma_swd_owner_lock_acquire_site(struct plasma_swd_owner_lock *owner,
+                                       const char *ppu_lock_path,
+                                       unsigned int site_id);
 bool plasma_swd_owner_lock_valid(const struct plasma_swd_owner_lock *owner);
 void plasma_swd_owner_lock_release(struct plasma_swd_owner_lock *owner);
 #endif

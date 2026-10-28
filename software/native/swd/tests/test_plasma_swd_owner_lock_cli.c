@@ -8,10 +8,19 @@
 
 int main(int argc, char **argv)
 {
-    if (argc != 3 || (strcmp(argv[1], "hold") && strcmp(argv[1], "try")))
+    if (argc != 3 && argc != 4)
+        return 2;
+    const bool site_mode = argc == 4;
+    if (site_mode && (strcmp(argv[3], "1") && strcmp(argv[3], "2")))
+        return 2;
+    if (strcmp(argv[1], "hold") && strcmp(argv[1], "try"))
         return 2;
     struct plasma_swd_owner_lock lock = {.fd = -1};
-    if (plasma_swd_owner_lock_acquire(&lock, argv[2]) != 0) {
+    int rc = site_mode
+        ? plasma_swd_owner_lock_acquire_site(&lock, argv[2],
+                                           (unsigned int)(argv[3][0] - '0'))
+        : plasma_swd_owner_lock_acquire(&lock, argv[2]);
+    if (rc != 0) {
         puts("LOCK_BUSY_OR_DENIED");
         return 8;
     }

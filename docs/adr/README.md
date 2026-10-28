@@ -20,6 +20,7 @@
 | [ADR-0004](0004-project-isolated-fpga-build-path2-operator-cli.md) | **Accepted (Owner decision; PR #1189 pending merge)** | 新 FPGA Image／Board 對應獨立可重現 Vivado Project，正式 SWPC Build 採 Path 2 `operator-cli`；F1-B 專屬 Build Engine 進入分階段退役，尚未關閉。 |
 
 | [ADR-0005](0005-independent-swd-ip-guarded-bitbang.md) | **Superseded by ADR-0006** | 歷史 SWD Debug Bitbang 候選架構；非目前實作方向。 |
+| [ADR-0007](0007-ppu-reload-fence-per-site-locking.md) | **Accepted (Owner decision; PR #1189 Draft)** | PPU Image/Reload 共享／獨占 Fence 與 per-Site 獨占鎖；保留 protected Root supervisor.lock，Host-only 驗證並行與 Reload 拒絕，不宣稱實機驗證。 |
 | [ADR-0006](0006-independent-swd-engine-and-future-gpio-bus.md) | **Accepted (Owner decision; PR #1189 Draft)** | 雙獨立 SWD NORMAL Engine，移除 SWD Debug Bitbang／0x3C／0x40；只保留 OFF/NORMAL，未來 GPIO Bus 與 JTAG/SPI/UART/I²C 為獨立周邊，尚未實作。 |
 
 ## Maintenance rule

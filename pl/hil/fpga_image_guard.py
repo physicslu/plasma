@@ -24,6 +24,9 @@ FIRMWARE = Path("/lib/firmware")
 # executor cannot both own/configure the same FPGA at once.
 OWNER_DIR = Path("/run/plasma-z2-swd05")
 GLOBAL_LOCK = OWNER_DIR / "supervisor.lock"
+# Additional additive fence: each SWD Site holds LOCK_SH, Root reload LOCK_EX.
+# Root Guard source-pin, provenance and supervisor.lock remain authoritative.
+PPU_RELOAD_FENCE = Path("/run/lock/plasma-mmio.lock")
 MANAGER = SYS / "class/fpga_manager/fpga0"
 
 
@@ -251,12 +254,24 @@ class RootZ2TargetPort:
         OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
         protected(GLOBAL_LOCK.parent, file=False)
         fd = os.open(GLOBAL_LOCK, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        fence_fd = None
         try:
             st = os.fstat(fd)
             need(stat.S_ISREG(st.st_mode) and st.st_uid == 0 and
                  st.st_nlink == 1 and st.st_mode & 0o077 == 0,
                  "GLOBAL_FPGA_LOCK_UNTRUSTED")
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # Existing exclusive Root Guard is held FIRST. The same PPU
+            # lock is held SH by all new per-Site SWD processes; reload
+            # cannot run until every cooperating Site releases. This is
+            # additive, not a substitute for provenance/Root checks.
+            fence_fd = os.open(PPU_RELOAD_FENCE,
+                               os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            st = os.fstat(fence_fd)
+            need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
+                 st.st_mode & 0o002 == 0,
+                 "PPU_RELOAD_FENCE_UNTRUSTED")
+            fcntl.flock(fence_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self._locked = True
             self._lock_owner_pid = os.getpid()
             self._lock_owner_thread = threading.get_ident()
@@ -265,6 +280,8 @@ class RootZ2TargetPort:
             self._locked = False
             self._lock_owner_pid = None
             self._lock_owner_thread = None
+            if fence_fd is not None:
+                os.close(fence_fd)
             os.close(fd)
 
     def current_facts(self) -> dict:

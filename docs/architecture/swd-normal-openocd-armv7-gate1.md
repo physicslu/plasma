@@ -243,28 +243,38 @@ real device-mapped provider, a C-to-Python memory sharing ABI, or a
 deployed OpenOCD startup admission mechanism. Never use Host-only
 regular-file evidence as HIL acceptance.
 
-## Unresolved concurrency constraint for independently programmed Sites
+## Two-level Site ownership — ADR-0007 (Host-only implementation)
 
-**BLOCKED / not a two-process parallel-programming proof:** current Python
-`LinuxMMIO.open()` and C `plasma_swd_owner_lock_acquire()` take one
-global **exclusive** PPU MMIO `flock`. This correctly prevents concurrent
-uncoordinated writers but allows only **one process** to own the
-memory-mapped PPU at a time. Separately the source-locked OpenOCD C
-callback slice currently stores one `active_site` global per
-OpenOCD process. The Host-only two-Site C FIFO tests instantiate
-two independent queues **inside one process**; they do not launch two
-independent selectable OpenOCD adapters or prove parallel SWD programming.
+The revised owner-approved Gate 1 implements the Host-only lock protocol
+documented in [ADR-0007](../adr/0007-ppu-reload-fence-per-site-locking.md).
+The existing global PPU file `/run/lock/plasma-mmio.lock` is now used
+as a **shared** programming fence when explicitly selecting one exact
+SWD Site. A separate `.site-1` or `.site-2` file is taken EX.
+The default, historic `LinuxMMIO` remains global EX and is unchanged
+for existing callers. C `plasma_swd_owner_lock_acquire_site()`
+follows exactly the same ordering; no alternate pathname may be used
+in the real build.
 
-PLASMA's target of eight simultaneously active Sites will require a
-reviewed two-level ownership design or equivalent proven mechanism:
-protect FPGA Image/reload as a PPU-wide shared/exclusive resource,
-and each Site as an independent exclusive programming resource,
-with Owner/Root/voltage validation and atomic MMIO accesses. This
-is a **candidate design constraint, not an approved lock protocol**.
-Do not silently weaken the current global lock or introduce a new
-middleware/scheduler as a workaround. A materially changed lock
-hierarchy requires the applicable revised Gate 1 and Host-only
-concurrency + adversarial owner/reload tests before hardware use.
+Protected `RootZ2TargetPort.exclusive()` keeps its original
+`supervisor.lock` EX and adds the **same PPU MMIO fence EX** before
+loading/changing/restoring any FPGA Image. The Root Source Pin,
+Image/Manifest hashes, existing protected owner checks and Golden
+recovery decisions are still independent mandatory conditions.
+No Site can enter while Root holds PPU EX; Root cannot take PPU EX
+while either Site holds SH. Different Sites can hold SH concurrently,
+but only one process can take each Site EX. Host-only tests exercise
+these conditions with actual separate local C/Python processes and
+file-backed MMIO; they are NOT a DUT, a physical FPGA Reload or HIL.
+
+**Remaining qualification blockers:** root-owned/service group file
+permissions on real Z2, exact-SHA protected Root source pin rollout,
+live FPGA Image/Boot/voltage attestation per Site, active OpenOCD C
+Owner binding, native ARMv7 width/Barrier, actual two OpenOCD
+processes executing FPGA SWD concurrently and the eight-Site physical
+product. One `active_site` per OpenOCD process is acceptable only
+if each process owns a distinct Site lock; it is not evidence of
+full multi-DUT throughput. Do not deploy solely on mock CI.
+
 
 ## ARMv7 MMIO word width contract
 

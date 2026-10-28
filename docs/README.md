@@ -27,6 +27,7 @@
 
 - **Superseded / Historical** — [ADR-0005: 獨立 SWD IP 與原 SWD Debug Bitbang 提案](adr/0005-independent-swd-ip-guarded-bitbang.md)：已由 ADR-0006 取代，僅供歷史決策追溯。
 - **Accepted / Owner architecture direction / PR #1189 Draft** — [ADR-0006: 專用 SWD Engine 與未來通用 GPIO Bus](adr/0006-independent-swd-engine-and-future-gpio-bus.md)：現在移除 SWD Debug Mode／Bitbang Bridge；SWD 只保留 OFF/NORMAL，未來 GPIO Bus、JTAG、SPI、UART、I²C 分別規劃，未宣稱實作或實機驗收。
+- **Plan / Gate 1 Draft** — [ADR-0007: PPU Image/Reload 與每 Site 並行所有權](adr/0007-ppu-reload-fence-per-site-locking.md)：保留 Root Guard，PPU Fence 共享／獨占及每 Site 獨占鎖；僅完成 Host-only 驗證，不宣稱 Z2 或 8-Site HIL。
 
 ## Operator
 

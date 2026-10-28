@@ -216,3 +216,114 @@ def test_c_lock_bound_lease_is_non_optional():
     assert "owner_lock_epoch" in header and "owner_lock_epoch" in impl
     assert "plasma_swd_owner_lock_acquire" in lock
     assert "plasma_swd_owner_lock_release" in lock
+
+
+def test_two_level_ppu_fence_and_per_site_exclusion_host_only(tmp_path):
+    """Actual Linux cross-process lock model; fake sparse regular file only."""
+    from plasma_interfaces.linux_mmio import LinuxMMIO, MMIOError
+    from plasma_interfaces.swd_native_linux_mmio import swd_site_aperture
+    from plasma_interfaces.swd_site import SITE_BASES
+
+    cc = shutil.which("cc")
+    binary = tmp_path / "site-lock-cli"
+    build = subprocess.run(
+        [cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+         "-O2", "-DPLASMA_SWD_HOST_TEST=1", "-I", str(SRC),
+         str(SRC / "plasma_swd_owner_lock.c"),
+         str(SRC / "tests/test_plasma_swd_owner_lock_cli.c"),
+         "-o", str(binary)],
+        capture_output=True, text=True, timeout=30, check=False)
+    assert build.returncode == 0, build.stdout + build.stderr
+    fence = tmp_path / "plasma-mmio.lock"
+    fake = tmp_path / "fake-sparse"
+    with fake.open("wb") as handle:
+        handle.truncate(SITE_BASES[2] + 4096)
+
+    def python_site(site):
+        return LinuxMMIO(
+            [swd_site_aperture(site)], device=str(fake),
+            owner_lock=str(fence), site_owner=site)
+
+    def c_call(mode, site=None):
+        argv = [str(binary), mode, str(fence)]
+        if site is not None:
+            argv.append(str(site))
+        return subprocess.run(argv, capture_output=True, text=True,
+                              timeout=5, check=False)
+
+    # Both Sites are active concurrently; Root/global EX must reject.
+    with python_site(1), python_site(2):
+        assert c_call("try", 1).returncode == 8
+        assert c_call("try", 2).returncode == 8
+        assert c_call("try").returncode == 8
+        with pytest.raises(MMIOError, match="Site owned"):
+            with python_site(1):
+                pass
+    assert c_call("try").returncode == 0
+
+    # C Site1 and Python Site2, in different real processes.
+    child = subprocess.Popen(
+        [str(binary), "hold", str(fence), "1"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True)
+    try:
+        assert child.stdout is not None
+        assert child.stdout.readline().strip() == "LOCK_HELD"
+        with python_site(2) as second:
+            with second.claim_site(2, SITE_BASES[2]) as lease:
+                assert lease.read32(SITE_BASES[2]) == 0
+                assert c_call("try", 2).returncode == 8
+                assert c_call("try").returncode == 8
+            with pytest.raises(MMIOError, match="Site owned"):
+                with python_site(1):
+                    pass
+    finally:
+        if child.stdin:
+            child.stdin.write("\n")
+            child.stdin.flush()
+            child.stdin.close()
+        assert child.wait(timeout=5) == 0
+        if child.stdout:
+            child.stdout.close()
+        if child.stderr:
+            child.stderr.close()
+
+    # A PPU exclusive Reload fence bars BOTH Sites; no admission ordering
+    # deadlock because lock acquisitions are always PPU then Site.
+    reload_owner = subprocess.Popen(
+        [str(binary), "hold", str(fence)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, text=True)
+    try:
+        assert reload_owner.stdout is not None
+        assert reload_owner.stdout.readline().strip() == "LOCK_HELD"
+        for site in (1, 2):
+            assert c_call("try", site).returncode == 8
+            with pytest.raises(MMIOError, match="MMIO owned"):
+                with python_site(site):
+                    pass
+    finally:
+        if reload_owner.stdin:
+            reload_owner.stdin.write("\n")
+            reload_owner.stdin.flush()
+            reload_owner.stdin.close()
+        assert reload_owner.wait(timeout=5) == 0
+        if reload_owner.stdout:
+            reload_owner.stdout.close()
+        if reload_owner.stderr:
+            reload_owner.stderr.close()
+    with python_site(1), python_site(2):
+        pass
+
+
+def test_additive_root_reload_fence_is_not_a_root_guard_replacement():
+    """Source guard only: physical Root provenance remains untested."""
+    from pl.hil import fpga_image_guard as guard
+    import inspect
+
+    root = inspect.getsource(guard.RootZ2TargetPort.exclusive)
+    assert "GLOBAL_LOCK" in root and "PPU_RELOAD_FENCE" in root
+    assert "fcntl.LOCK_EX | fcntl.LOCK_NB" in root
+    assert "GLOBAL_FPGA_LOCK_UNTRUSTED" in root
+    assert "PPU_RELOAD_FENCE_UNTRUSTED" in root
+    assert str(guard.PPU_RELOAD_FENCE) == "/run/lock/plasma-mmio.lock"
