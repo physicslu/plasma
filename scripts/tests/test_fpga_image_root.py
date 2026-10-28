@@ -451,6 +451,31 @@ class GuardProcessCensusRegressionTests(unittest.TestCase):
         self.assertEqual(detail["status"], "PROC_CONFLICT_AND_INCOMPLETE")
         self.assertEqual(detail["attempt"], 1)
 
+    def test_missing_maps_with_inaccessible_pid_is_not_exit(self):
+        active = self.pid(1000)
+        original_read = Path.read_text
+        original_stat = Path.stat
+
+        def missing_maps(path, *args, **kwargs):
+            if path == active / "maps":
+                raise FileNotFoundError("inaccessible live PID maps")
+            return original_read(path, *args, **kwargs)
+
+        def hidden_pid(path, *args, **kwargs):
+            if path == active:
+                raise PermissionError("cannot establish PID disappearance")
+            return original_stat(path, *args, **kwargs)
+
+        detail = {}
+        with patch.object(Path, "read_text", new=missing_maps), \
+                patch.object(Path, "stat", new=hidden_pid):
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release,
+                diagnostic=detail)
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["attempt"], 1)
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+
     def test_three_successive_disappearing_pids_fail_closed(self):
         import shutil
         for pid in (1000, 2000, 3000, 9000):
@@ -468,6 +493,63 @@ class GuardProcessCensusRegressionTests(unittest.TestCase):
         self.assertEqual(result, (False, ["3000"]))
         self.assertEqual(detail["status"], "VANISHED_PID_RESCAN_EXHAUSTED")
         self.assertEqual(detail["attempt"], 3)
+
+
+class RootAdmissionFailureClassificationTests(unittest.TestCase):
+    """An incomplete Root snapshot is not a known owner and never passes."""
+
+    def facts(self):
+        from types import SimpleNamespace
+        release = SimpleNamespace(
+            recovery_sha256="b" * 64,
+            firmware_sha256="a" * 64,
+            expected_uio={"uio": "uio1"},
+            uio_name="uio1", firmware_name="candidate.bin",
+            recovery_name="recovery.bin", site_bitmap=1, image_id="test")
+        passive = {
+            "observation_kind": "LIVE_ROOT_READ_ONLY", "root": True,
+            "boot_id": "fixed-test-boot", "manager_state": "operating",
+            "recovery_sha256": release.recovery_sha256,
+            "candidate_sha256": release.firmware_sha256,
+            "proc_complete": True, "proc_conflicts": [],
+            "proc_scan_diagnostic": {"status": "COMPLETE"},
+            "uio_overlaps": ["uio1"],
+            "platform_overlaps": ["40000000.fabric"],
+        }
+        return release, passive
+
+    def check(self, release, passive):
+        from pl.hil import fpga_image_admission as admission
+        return admission.check_exact(
+            release=release, passive=passive, uio=release.expected_uio,
+            original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+            expected_firmware=release.firmware_name)
+
+    def test_complete_nonconflicting_facts_pass(self):
+        release, facts = self.facts()
+        self.assertEqual(self.check(release, facts)["image_id"], "test")
+
+    def test_incomplete_scan_reports_precise_kind_and_blocks(self):
+        release, facts = self.facts()
+        facts["proc_complete"] = False
+        facts["proc_scan_diagnostic"] = {
+            "status": "PROC_VISIBILITY_DENIED", "pid": "1234",
+            "phase": "MAPS", "error": "PermissionError"}
+        with self.assertRaisesRegex(ValueError,
+                                    "PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:1234:MAPS:PermissionError"):
+            self.check(release, facts)
+
+    def test_owner_conflict_blocks_when_proc_snapshot_complete(self):
+        release, facts = self.facts()
+        facts["proc_conflicts"] = ["1234"]
+        with self.assertRaisesRegex(ValueError, "PROC_RESOURCE_OWNER_CONFLICT"):
+            self.check(release, facts)
+
+    def test_other_root_integrity_failure_remains_fail_closed(self):
+        release, facts = self.facts()
+        facts["manager_state"] = "unknown"
+        with self.assertRaisesRegex(ValueError, "INCOMPLETE_ROOT_OR_PROCESS_FACTS"):
+            self.check(release, facts)
 
 
 
