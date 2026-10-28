@@ -324,6 +324,37 @@ not auto-bound and OpenOCD must continue to reject unowned `init`.
 The 600/60 timeout revision in #1199 was specific to its old
 PS-local Socket bridge, **not** a v5 FIFO/OpenOCD timeout selection.
 
+## OpenOCD C Adapter owner-bound FIFO admission (Host-only)
+
+The former `plasma_swd_openocd5088_bind(fifo)` accepted only an
+`admitted` boolean and could not prove that the FIFO used the qualified
+C ABI-v5 word accessor. It is **removed**. The only C binding entry
+is `plasma_swd_openocd5088_bind_guarded(fifo, lease, native)`,
+declared by `plasma_swd_openocd5088_binding.h`. It rejects an arbitrary
+pre-admitted FIFO and enforces identical Site ID / base, lease
+generation, **exact separately locked Site ownership**,
+`plasma_swd_lease_word_port` I/O function pointers and the trusted
+Native Word provider context. A legacy global-exclusive lock is not
+accepted as evidence of an independent Site session.
+
+`plasma_swd_openocd5088_owner_ready()` reevaluates the same bound
+lease and the **trusted native C authority callback** before
+OpenOCD Adapter init, read, write, SWJ or run; failures block/clear
+the FIFO to prevent queued writes from being replayed after an
+Image/voltage/lease change. `adapter_driver.quit()` clears and
+invalidates the session without attempting uncertain MMIO cleanup.
+The underlying Native Word provider continues to check the authority
+at every volatile 32-bit transaction.
+
+**Security limit:** the authorization callback is an external
+trusted-PS integration requirement, *not an attestation mechanism
+implemented by this PR*. The Host-only mock callback can simulate
+Root/Image/Boot/Manifest/voltage revocation, but cannot establish
+real Z2 source pin authenticity or a safe FPGA Image. There is
+still no privileged real PS device mapping owner, no startup command
+to bind an admitted v5 Site in production, and no Z2 HIL.
+A selectable OpenOCD Adapter must continue failing init when unbound.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks

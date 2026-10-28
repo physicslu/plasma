@@ -71,6 +71,14 @@ static int qualified(struct plasma_swd_native_words *n,
     return 0;
 }
 
+int plasma_swd_native_words_ready(struct plasma_swd_native_words *n)
+{
+    if (!n)
+        return PLASMA_SWD_NOT_READY;
+    return qualified(n, n->site, n->base, n->lease_generation)
+        == 0 ? PLASMA_SWD_OK : PLASMA_SWD_NOT_READY;
+}
+
 static int native_qualify(void *ctx, unsigned int site, uint32_t base,
                           uint64_t generation)
 {

@@ -46,6 +46,8 @@ int plasma_swd_native_words_init(
 /* Produces the C provider consumed by existing Lease Word Port.
  * Call the Lease Port's admit() BEFORE any SWD FIFO activity.
  */
+/* Pure owner/Root/Boot/Image/voltage callback re-check; no MMIO I/O. */
+int plasma_swd_native_words_ready(struct plasma_swd_native_words *native);
 struct plasma_swd_lease_provider plasma_swd_native_words_provider(
     struct plasma_swd_native_words *native);
 bool plasma_swd_native_words_armv7_dmb(void);

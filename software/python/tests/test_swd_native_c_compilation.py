@@ -56,7 +56,11 @@ def test_c_opencd_5088_swd_callback_shapes_with_host_only_shim(tmp_path):
         cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
         "-O2", "-I", str(SRC),
         "-I", str(SRC / "tests/openocd_shim"),
+        "-DPLASMA_SWD_HOST_TEST=1",
         str(SRC / "plasma_swd_fifo_core.c"),
+        str(SRC / "plasma_swd_native_words.c"),
+        str(SRC / "plasma_swd_owner_lock.c"),
+        str(SRC / "plasma_swd_lease_word_port.c"),
         str(SRC / "plasma_swd_openocd5088_callbacks.c"),
         str(SRC / "plasma_swd_openocd5088_driver.c"),
         str(SRC / "tests/test_openocd5088_callbacks.c"),
@@ -79,6 +83,10 @@ def test_native_callback_is_source_locked_and_no_product_adapter_registered():
         assert name in src
     assert "struct adapter_driver" in (SRC / "plasma_swd_openocd5088_driver.c").read_text()
     assert "remote_bitbang_adapter_driver" not in src
+    assert "plasma_swd_openocd5088_bind_guarded" in src
+    assert "plasma_swd_native_words_ready" in src
+    assert "int plasma_swd_openocd5088_bind(" not in src
+    assert "plasma_swd_openocd5088_unbind" in src
 
 
 def test_native_leased_word_port_host_only_owner_revocation(tmp_path):

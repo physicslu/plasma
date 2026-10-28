@@ -8,6 +8,7 @@
  */
 #include <jtag/interface.h>
 #include <jtag/swd.h>
+#include "plasma_swd_openocd5088_binding.h"
 
 extern const struct swd_driver plasma_swd_openocd5088_ops;
 extern int plasma_swd_openocd5088_owner_ready(void);
@@ -23,6 +24,7 @@ static int plasma_swd_adapter_init(void)
 
 static int plasma_swd_adapter_quit(void)
 {
+    plasma_swd_openocd5088_unbind();
     return ERROR_OK;
 }
 

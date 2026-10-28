@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Candidate OpenOCD 5088db4c SWD callback binding to the PLASMA FIFO C core.
  * Must be compiled *inside* a source-locked OpenOCD tree: jtag/swd.h.
- * NO adapter_driver registration, Linux MMIO provider, FPGA Image admission,
- * executable build, or target hardware qualification is provided here.
+ * Adapter registration and ABI-v5 C word provider are built in pinned
+ * OpenOCD Host-only CI. A trusted physical PS-local Root/Image authority,
+ * mapping admission and target hardware qualification are NOT provided.
  */
 #include "plasma_swd_fifo_core.h"
+#include "plasma_swd_openocd5088_binding.h"
 
 #include <jtag/swd.h>
 
@@ -16,13 +18,56 @@
  * scheduler or automatic fallback to old remote-bitbang GPIO.
  */
 static struct plasma_swd_fifo *active_site;
+static struct plasma_swd_lease_word_port *active_lease;
+static struct plasma_swd_native_words *active_native;
 
-int plasma_swd_openocd5088_bind(struct plasma_swd_fifo *site)
+/* Never accept a naked 'admitted' FIFO: that flag is insufficient proof
+ * of a live owner. Assert the entire exact native-word/lease/IO chain.
+ */
+int plasma_swd_openocd5088_bind_guarded(
+    struct plasma_swd_fifo *site,
+    struct plasma_swd_lease_word_port *lease,
+    struct plasma_swd_native_words *native)
 {
-    if (!site || !site->admitted || site->blocked || active_site)
+    struct plasma_swd_word_io io = {0};
+    if (!site || !lease || !native || active_site ||
+        !site->admitted || site->blocked ||
+        !lease->admitted || lease->poisoned ||
+        native->poisoned || !native->words ||
+        !plasma_swd_owner_lock_valid(lease->process_lock) ||
+        lease->process_lock->site_id != lease->site_id ||
+        lease->process_lock != native->owner ||
+        lease->site_id != native->site ||
+        lease->generation != native->lease_generation ||
+        lease->base != native->base || site->base != lease->base ||
+        lease->owner_lock_epoch != native->owner_epoch ||
+        lease->provider.ctx != native ||
+        plasma_swd_native_words_ready(native) != PLASMA_SWD_OK ||
+        plasma_swd_lease_word_port_make_io(lease, &io) != PLASMA_SWD_OK ||
+        site->io.ctx != io.ctx || site->io.read32 != io.read32 ||
+        site->io.write32 != io.write32 ||
+        site->io.write_barrier != io.write_barrier)
         return ERROR_FAIL;
+
+    /* A callback that merely returns success is NOT a Root attestation.
+     * This is a wiring/safety boundary, not a source of device authority.
+     */
     active_site = site;
+    active_lease = lease;
+    active_native = native;
     return ERROR_OK;
+}
+
+void plasma_swd_openocd5088_unbind(void)
+{
+    if (active_site) {
+        active_site->admitted = false;
+        active_site->blocked = true;
+        active_site->count = 0; /* no replay after cleanup */
+    }
+    active_site = NULL;
+    active_lease = NULL;
+    active_native = NULL;
 }
 
 static int core_result(int code)
@@ -49,8 +94,29 @@ static int plasma_transport_select(void)
 
 int plasma_swd_openocd5088_owner_ready(void)
 {
-    return active_site && active_site->admitted && !active_site->blocked
-        ? ERROR_OK : ERROR_FAIL;
+    struct plasma_swd_word_io io = {0};
+    if (active_site && active_lease && active_native &&
+        active_site->admitted && !active_site->blocked &&
+        active_lease->admitted && !active_lease->poisoned &&
+        active_native->owner == active_lease->process_lock &&
+        active_native->site == active_lease->site_id &&
+        active_native->lease_generation == active_lease->generation &&
+        plasma_swd_native_words_ready(active_native) == PLASMA_SWD_OK &&
+        plasma_swd_lease_word_port_make_io(active_lease, &io) == PLASMA_SWD_OK &&
+        active_site->io.ctx == io.ctx &&
+        active_site->io.read32 == io.read32 &&
+        active_site->io.write32 == io.write32 &&
+        active_site->io.write_barrier == io.write_barrier)
+        return ERROR_OK;
+    if (active_site) {
+        /* Fail closed on any observed owner loss: pending writes are
+         * discarded, not delayed/replayed into a different FPGA Image.
+         */
+        active_site->admitted = false;
+        active_site->blocked = true;
+        active_site->count = 0;
+    }
+    return ERROR_FAIL;
 }
 
 static int plasma_read(uint8_t cmd, uint32_t *value, uint32_t ap_delay_hint)
@@ -106,8 +172,8 @@ static int plasma_run(void)
 }
 
 /* Source-locked OpenOCD 5088db4c struct swd_driver callback signatures.
- * Still requires reviewed OpenOCD adapter_driver init/quit/transport CLI
- * registration and explicit approved Linux owner/IO binding before use.
+ * Adapter init/quit/CLI are linked in the exact source-locked build.
+ * No live hardware owner or MMIO mapping is installed automatically.
  */
 const struct swd_driver plasma_swd_openocd5088_ops = {
     .init = plasma_transport_select,

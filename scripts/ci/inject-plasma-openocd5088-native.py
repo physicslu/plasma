@@ -26,6 +26,7 @@ COPIES = (
     "plasma_swd_owner_lock.c",
     "plasma_swd_native_words.h",
     "plasma_swd_native_words.c",
+    "plasma_swd_openocd5088_binding.h",
     "plasma_swd_openocd5088_callbacks.c",
     "plasma_swd_openocd5088_driver.c",
 )
