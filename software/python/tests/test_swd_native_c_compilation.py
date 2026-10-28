@@ -327,3 +327,61 @@ def test_additive_root_reload_fence_is_not_a_root_guard_replacement():
     assert "GLOBAL_FPGA_LOCK_UNTRUSTED" in root
     assert "PPU_RELOAD_FENCE_UNTRUSTED" in root
     assert str(guard.PPU_RELOAD_FENCE) == "/run/lock/plasma-mmio.lock"
+
+
+def test_root_guard_reload_fence_blocks_site_without_loading_fpga(tmp_path, monkeypatch):
+    """Actual RootZ2TargetPort.exclusive() flock protocol, Host-only Mock.
+
+    Root identity and path provenance are mocked ONLY in this test;
+    kernel flock behavior and competing Python Site lease are real.
+    Neither FPGA Manager nor real /dev/mem is ever opened.
+    """
+    import os
+    from types import SimpleNamespace
+    from pl.hil import fpga_image_guard as guard
+    from plasma_interfaces.linux_mmio import LinuxMMIO, MMIOError
+    from plasma_interfaces.swd_native_linux_mmio import swd_site_aperture
+    from plasma_interfaces.swd_site import SITE_BASES
+
+    owner_dir = tmp_path / "protected-root-fixture"
+    owner_dir.mkdir(mode=0o700)
+    fence = tmp_path / "plasma-mmio.lock"
+    mmio_fixture = tmp_path / "sparse-fake-image"
+    with mmio_fixture.open("wb") as handle:
+        handle.truncate(SITE_BASES[2] + 4096)
+
+    def site(site_id):
+        return LinuxMMIO(
+            (swd_site_aperture(site_id),), device=str(mmio_fixture),
+            owner_lock=str(fence), site_owner=site_id)
+
+    real_fstat = os.fstat
+
+    def mock_root_owner_stat(fd):
+        st = real_fstat(fd)
+        return SimpleNamespace(st_mode=st.st_mode, st_uid=0,
+                               st_nlink=st.st_nlink)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(guard, "OWNER_DIR", owner_dir)
+        patch.setattr(guard, "GLOBAL_LOCK", owner_dir / "supervisor.lock")
+        patch.setattr(guard, "PPU_RELOAD_FENCE", fence)
+        patch.setattr(guard, "protected", lambda *args, **kwargs: None)
+        patch.setattr(guard.os, "geteuid", lambda: 0)
+        patch.setattr(guard.os, "fstat", mock_root_owner_stat)
+        port = guard.RootZ2TargetPort(release=object())
+
+        with site(1):
+            # Real Root reload path MUST be denied by a Site SH fence.
+            with pytest.raises(BlockingIOError):
+                with port.exclusive():
+                    raise AssertionError("Root wrongly entered live reload")
+        with port.exclusive():
+            # Root is protected by old supervisor EX and the new PPU EX.
+            assert port._locked
+            for site_id in (1, 2):
+                with pytest.raises(MMIOError, match="MMIO owned"):
+                    with site(site_id):
+                        raise AssertionError("Site started during Root operation")
+        with site(1), site(2):
+            pass
