@@ -167,15 +167,33 @@ jobs:
         run: |
           set -euo pipefail
           cd "${RUNNER_TEMP}/openocd-pinned"
-          src/openocd -c 'adapter driver plasma_swd' -c 'transport select swd' -c shutdown \
+          set +e
+          src/openocd -s tcl -d2 -c 'adapter list' -c shutdown \
+            > "${RUNNER_TEMP}/plasma-openocd-list.log" 2>&1
+          list_status=$?
+          src/openocd -s tcl -d2 -c 'adapter driver plasma_swd' -c 'transport select swd' -c shutdown \
             > "${RUNNER_TEMP}/plasma-openocd-select.log" 2>&1
+          select_status=$?
+          src/openocd -s tcl -d2 -c 'adapter driver plasma_swd' -c 'transport select swd' -c init -c shutdown \
+            > "${RUNNER_TEMP}/plasma-openocd-no-owner.log" 2>&1
+          unowned_status=$?
+          set -e
+          echo "list_status=${list_status} select_status=${select_status} unowned_status=${unowned_status}"
+          cat "${RUNNER_TEMP}/plasma-openocd-list.log"
           cat "${RUNNER_TEMP}/plasma-openocd-select.log"
-          if src/openocd -c 'adapter driver plasma_swd' -c 'transport select swd' -c init -c shutdown \
-            > "${RUNNER_TEMP}/plasma-openocd-no-owner.log" 2>&1; then
+          cat "${RUNNER_TEMP}/plasma-openocd-no-owner.log"
+          if [ "${list_status}" -ne 0 ] || [ "${select_status}" -ne 0 ]; then
+            echo 'FAIL: source-locked selectable OpenOCD adapter CLI' >&2
+            exit 1
+          fi
+          if ! grep -q plasma_swd "${RUNNER_TEMP}/plasma-openocd-list.log"; then
+            echo 'FAIL: plasma_swd not listed as a native driver' >&2
+            exit 1
+          fi
+          if [ "${unowned_status}" -eq 0 ]; then
             echo 'FAIL: unleased native SWD adapter initialized' >&2
             exit 1
           fi
-          cat "${RUNNER_TEMP}/plasma-openocd-no-owner.log"
           echo PLASMA_OPENOCD5088_EXACT_SOURCE_BUILD_AND_NO_OWNER_DENY_PASS
 
   mpe-rtl:
