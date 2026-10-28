@@ -353,6 +353,123 @@ class GenericGuardSafetyTests(unittest.TestCase):
 
 
 
+class GuardProcessCensusRegressionTests(unittest.TestCase):
+    """Host-only races; fake /proc only; never touch Z2 or real MMIO."""
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.td = tempfile.TemporaryDirectory()
+        self.addCleanup(self.td.cleanup)
+        self.proc = Path(self.td.name)
+        self.release = SimpleNamespace(owner_base=0x40000000,
+                                       owner_bytes=0x10000)
+
+    def pid(self, number, *, mapped=None):
+        directory = self.proc / str(number)
+        (directory / "fd").mkdir(parents=True)
+        (directory / "maps").write_text(
+            mapped or "00100000-00101000 r--p 00000000 00:00 0 [anon]\n")
+        return directory
+
+    def test_clean_scan_and_real_fd_conflict_are_distinct(self):
+        active = self.pid(1000)
+        result = {}
+        self.assertEqual(guard.scan_proc_consumers(
+            procroot=self.proc, release=self.release, diagnostic=result),
+            (True, []))
+        self.assertEqual(result["status"], "COMPLETE")
+        (active / "fd/3").symlink_to("/dev/uio1")
+        result = {}
+        self.assertEqual(guard.scan_proc_consumers(
+            procroot=self.proc, release=self.release, diagnostic=result),
+            (True, ["1000"]))
+        self.assertEqual(result["status"], "PROC_CONFLICT")
+
+    def test_confirmed_pid_exit_restarts_full_scan(self):
+        import shutil
+        vanishing = self.pid(1000)
+        self.pid(2000)
+        original = Path.read_text
+        calls = []
+        def vanish_once(path, *args, **kwargs):
+            if path == vanishing / "maps":
+                calls.append("vanished")
+                shutil.rmtree(vanishing)
+                raise FileNotFoundError("synthetic terminated PID")
+            return original(path, *args, **kwargs)
+        detail = {}
+        with patch.object(Path, "read_text", new=vanish_once):
+            self.assertEqual(guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail),
+                (True, []))
+        self.assertEqual(calls, ["vanished"])
+        self.assertEqual(detail["status"], "COMPLETE")
+        self.assertEqual(detail["rescans"], 1)
+        self.assertEqual(detail["attempt"], 2)
+
+    def test_existing_pid_with_missing_maps_fails_closed(self):
+        (self.proc / "1000/fd").mkdir(parents=True)
+        self.pid(2000)
+        detail = {}
+        self.assertEqual(guard.scan_proc_consumers(
+            procroot=self.proc, release=self.release, diagnostic=detail),
+            (False, ["1000"]))
+        self.assertEqual(detail["attempt"], 1)
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+
+    def test_permission_denied_never_retries(self):
+        active = self.pid(1000)
+        original = Path.read_text
+        def denied(path, *args, **kwargs):
+            if path == active / "maps":
+                raise PermissionError("synthetic proc permission error")
+            return original(path, *args, **kwargs)
+        detail = {}
+        with patch.object(Path, "read_text", new=denied):
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail)
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+        self.assertEqual(detail["attempt"], 1)
+
+    def test_conflict_before_vanishing_process_cannot_be_skipped(self):
+        import shutil
+        owner = self.pid(1000)
+        (owner / "fd/1").symlink_to("/dev/uio1")
+        vanishing = self.pid(2000)
+        original = Path.read_text
+        def disappear(path, *args, **kwargs):
+            if path == vanishing / "maps":
+                shutil.rmtree(vanishing)
+                raise FileNotFoundError("synthetic terminated PID")
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=disappear):
+            detail = {}
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail)
+        self.assertEqual(result, (False, ["1000", "2000"]))
+        self.assertEqual(detail["status"], "PROC_CONFLICT_AND_INCOMPLETE")
+        self.assertEqual(detail["attempt"], 1)
+
+    def test_three_successive_disappearing_pids_fail_closed(self):
+        import shutil
+        for pid in (1000, 2000, 3000, 9000):
+            self.pid(pid)
+        original = Path.read_text
+        def disappear(path, *args, **kwargs):
+            if path.parent.name in ("1000", "2000", "3000") and path.name == "maps":
+                shutil.rmtree(path.parent)
+                raise FileNotFoundError("synthetic terminated PID")
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=disappear):
+            detail = {}
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail)
+        self.assertEqual(result, (False, ["3000"]))
+        self.assertEqual(detail["status"], "VANISHED_PID_RESCAN_EXHAUSTED")
+        self.assertEqual(detail["attempt"], 3)
+
+
 
 if __name__ == "__main__":
     unittest.main()
