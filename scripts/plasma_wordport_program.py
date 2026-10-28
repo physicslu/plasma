@@ -253,18 +253,27 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
             "no_erase_program_halt_reset": True,
         }, sort_keys=True), flush=True)
         return 0
-    base = BUNDLE / ".work/native-v02-path2"
+    base = BUNDLE / ".work/native-wordport-path2"
     if base.is_symlink():
         raise NotRun(77, "EVIDENCE_SYMLINK_DENIED")
     base.mkdir(mode=0o700, parents=True, exist_ok=True)
     evidence = base / f"run-{time.time_ns()}-{os.getpid()}"
     evidence.mkdir(mode=0o700)
-    socketdir = socket_base / f"plasma-native-v02-{os.getpid()}"
+    socketdir = socket_base / f"plasma-wordport-{os.getpid()}"
     socketdir.mkdir(mode=0o700)
     socket = socketdir / "swd.sock"
     readback = evidence / "readback-image.bin"
+    # Freeze the selected Image in a private, per-run immutable snapshot.
+    # Never let OpenOCD read a mutable operator-supplied path after admission.
+    staged = None
+    if args.operation == "program":
+        staged = evidence / "program-image.bin"
+        staged.write_bytes(firmware.read_bytes())
+        staged.chmod(0o400)
+        if staged.stat().st_size != image_bytes or sha(staged) != image_sha:
+            raise NotRun(77, "STAGED_IMAGE_CHANGED")
     tcl = evidence / "openocd.tcl"
-    tcl.write_text(make_tcl(socket, firmware, readback, args.operation,
+    tcl.write_text(make_tcl(socket, staged, readback, args.operation,
                             image_bytes=image_bytes, erase_bytes=erase_bytes))
     bridge_cmd = [
         PYTHON, "-I", "-B", str(BUNDLE / "scripts/bluepill-wordport-session.py"),
@@ -342,6 +351,7 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         "bridge_exit": bridge.returncode if bridge else None,
         "error": error, "icpn": args.icpn, "site_id": args.site_id,
         "image_bytes": image_bytes, "image_sha256": image_sha,
+        "target_cfg": PROFILE["target_cfg"],
         "erase_bytes": erase_bytes,
         "readback_sha256": sha(readback) if readback.is_file() else None,
         "openocd_log_sha256": sha(evidence / "openocd.log"),
