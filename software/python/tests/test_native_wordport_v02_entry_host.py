@@ -342,7 +342,7 @@ class NativeV02PreflightHostOnly(unittest.TestCase):
              patch.object(module, "check_source"), \
              patch.object(module, "Z2_ENTRY", SCRIPT):
             for op in ("program-v02", "diagnose-after"):
-                args = SimpleNamespace(operation=op, owner_attested=False)
+                args = SimpleNamespace(operation=op, owner_attested=False, source_sha256="a" * 64)
                 with self.subTest(operation=op), self.assertRaises(module.NotRun) as raised:
                     module.z2_preflight(args)
                 self.assertEqual(raised.exception.status, 77)
