@@ -193,6 +193,17 @@ jobs:
           grep -Eq 'Class:[[:space:]]+ELF32' "${RUNNER_TEMP}/plasma-v5-ps-mapping-elf.txt"
           grep -Eq 'Machine:[[:space:]]+ARM' "${RUNNER_TEMP}/plasma-v5-ps-mapping-elf.txt"
           sha256sum "${RUNNER_TEMP}/plasma-v5-ps-mapping.o"
+          arm-linux-gnueabihf-gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -march=armv7-a -marm -mfloat-abi=hard -mfpu=vfpv3 \
+            -I software/native/swd \
+            -c software/native/swd/plasma_swd_owner_evidence.c \
+            -o "${RUNNER_TEMP}/plasma-v5-owner-evidence.o"
+          arm-linux-gnueabihf-readelf -h "${RUNNER_TEMP}/plasma-v5-owner-evidence.o" \
+            > "${RUNNER_TEMP}/plasma-v5-owner-evidence-elf.txt"
+          grep -Eq 'Class:[[:space:]]+ELF32' "${RUNNER_TEMP}/plasma-v5-owner-evidence-elf.txt"
+          grep -Eq 'Machine:[[:space:]]+ARM' "${RUNNER_TEMP}/plasma-v5-owner-evidence-elf.txt"
+          sha256sum "${RUNNER_TEMP}/plasma-v5-owner-evidence.o"
+          echo "C Root identity comparison: compile PASS; current PL/AXI facts: UNPROVEN" >> "${GITHUB_STEP_SUMMARY}"
           echo "Device mapping attributes / AXI completion / HIL: NOT_RUN" >> "${GITHUB_STEP_SUMMARY}"
       - name: Verify selectable SWD adapter but no unowned device admission
         if: steps.scope.outputs.required == 'true'

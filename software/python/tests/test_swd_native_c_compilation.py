@@ -484,3 +484,52 @@ def test_ps_mapping_requires_external_preopened_fd_and_production_char_device():
         "MODE_DEBUG", "bluepill_wordport_bridge",
     ):
         assert forbidden not in c
+
+
+def test_native_root_observation_is_continuously_compared_host_only(tmp_path):
+    """Real C observer ↔ Native MMIO chain, deliberately synthetic Root.
+
+    Real protected Root currently reports active_image_attestation and
+    axi_isolation_evidence as UNPROVEN, so no physical admittance is claimed.
+    """
+    cc = shutil.which("cc")
+    assert cc, "GitHub-hosted C compiler required"
+    binary = tmp_path / "swd-ps-owner-evidence"
+    compile_args = [
+        cc, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-DPLASMA_SWD_HOST_TEST=1", "-I", str(SRC),
+        str(SRC / "plasma_swd_owner_evidence.c"),
+        str(SRC / "plasma_swd_fifo_core.c"),
+        str(SRC / "plasma_swd_native_words.c"),
+        str(SRC / "plasma_swd_lease_word_port.c"),
+        str(SRC / "plasma_swd_owner_lock.c"),
+        str(SRC / "tests/test_plasma_swd_owner_evidence.c"),
+        "-o", str(binary),
+    ]
+    build = subprocess.run(compile_args, capture_output=True, text=True,
+                           timeout=30, check=False)
+    assert build.returncode == 0, build.stdout + build.stderr
+    run = subprocess.run([str(binary)], capture_output=True, text=True,
+                         timeout=30, check=False)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "PLASMA_PSNATIVE_LIVE_EVIDENCE_HOST_ONLY_PASS" in run.stdout
+
+
+def test_native_owner_evidence_never_treats_root_journal_as_loaded_image_proof():
+    owner = (SRC / "plasma_swd_owner_evidence.c").read_text()
+    contract = (SRC / "plasma_swd_owner_evidence.h").read_text()
+    # Existing protected Root journal/session remains only a reference,
+    # never a per-Image approval token or independent proof of PL bits.
+    assert "root_image_session_id" in contract
+    assert "active_image_attested" in owner
+    assert "axi_isolation_proven" in owner
+    assert "root_source_pinned" in owner
+    assert "loaded_image_sha256" in owner
+    assert "image_manifest_sha256" in owner
+    assert "voltage_qualified" in owner
+    assert "plasma_swd_owner_evidence_authorize" in owner
+    for prohibited in (
+        "mmap(", 'open("/dev/mem"', "socket(", "remote_bitbang",
+        "runtime_admitted", "approved-fpga-image.json", "MODE_DEBUG",
+    ):
+        assert prohibited not in owner

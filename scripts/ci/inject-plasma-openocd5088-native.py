@@ -28,6 +28,8 @@ COPIES = (
     "plasma_swd_native_words.c",
     "plasma_swd_ps_mapping.h",
     "plasma_swd_ps_mapping.c",
+    "plasma_swd_owner_evidence.h",
+    "plasma_swd_owner_evidence.c",
     "plasma_swd_openocd5088_binding.h",
     "plasma_swd_openocd5088_callbacks.c",
     "plasma_swd_openocd5088_driver.c",
@@ -98,6 +100,7 @@ def main() -> None:
         "DRIVERFILES += %D%/plasma_swd_owner_lock.c\n"
         "DRIVERFILES += %D%/plasma_swd_native_words.c\n"
         "DRIVERFILES += %D%/plasma_swd_ps_mapping.c\n"
+        "DRIVERFILES += %D%/plasma_swd_owner_evidence.c\n"
         "DRIVERFILES += %D%/plasma_swd_openocd5088_callbacks.c\n"
         "DRIVERFILES += %D%/plasma_swd_openocd5088_driver.c",
     )

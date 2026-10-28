@@ -401,6 +401,55 @@ admission → guarded OpenOCD bind → bounded operations → unbind →
 retire/unmap → close borrowed FD with owner → release Site then PPU.
 Any uncertain operation must remain blocked, never replayed.
 
+## Live Root/Image evidence boundary — fail-closed C contract (Host-only)
+
+Inspection of the current protected code exposes a decisive limitation:
+`pl/hil/fpga_image_guard.py:read_live_z2_facts()` explicitly returns
+`active_image_attestation="UNPROVEN"` and
+`axi_isolation_evidence="UNPROVEN"`. Its persistent journal
+(`pl/hil/fpga_image_root.py:read_state()`) records a `session_id`,
+`boot_id`, Manifest and firmware hashes and an Image state, **but is
+not proof of loaded FPGA configuration bits**. The existing protected
+Root `download/test/restore` operations do not provide an ongoing
+native-OpenOCD Site admission API. These are **Gate 1 blockers**, not
+features that a Mock or saved JSON file can mark PASS.
+
+`software/native/swd/plasma_swd_owner_evidence.[ch]` adds a small
+**typed native C evidence comparison contract**, intentionally not
+a new attestation issuer, per-Image token, registration record or
+additional approval Gate. Its expected reference includes the
+existing Root journal `fpga-<32 hex>` session ID, Boot UUID,
+source-pinned Root executable SHA256, paired Manifest SHA256,
+actually *loaded* Image SHA256, Image ID, ABI version 5 and Site mask.
+An independent trusted same-process observer must remeasure those
+values **during each Native C MMIO operation**, including current
+Manager state, actual loaded-Image attestation, AXI isolation,
+complete other-owner scan, qualified voltage and available recovery.
+All claims must be complete, valid and identical to the frozen Root
+reference. Every missing, changed, unknown, revoked or failed read
+terminally blocks that C owner session and cannot automatically revive.
+The existing ABI-v5 `plasma_swd_native_words` callback accepts
+`plasma_swd_owner_evidence_authorize()` and
+`plasma_swd_owner_evidence_revoke_all()`.
+
+Positive tests deliberately use *synthetic* expected/live observations.
+Negative tests cover current Root's **UNPROVEN** Image and isolation
+claims, Boot/Root/Manifest/Image drift, Image session drift, manager
+state, Site mask, lease generation, missing voltage/recovery, failed
+observer and no replay after revocation. This establishes only C
+contract behavior, not any Root authentication or physical Image
+proof. The expected snapshot and observer are **not trust anchors** if
+supplied by the same unprivileged process; never deploy them that way.
+
+Before physical use a protected PS-local integration must **prove**
+the actual current-boot Image/Manifest/Root identity, AXI isolation,
+owner/lock/DAC and electrical preconditions, and must install a
+source-reviewed live measurement provider. Importantly, current Root
+source still says `UNPROVEN`, so this contract **cannot authorize
+the existing Z2 state**. Opening the Site MMIO FD, attaching C
+mapping or binding OpenOCD does not remedy that absence. No Z2,
+SWPC or DUT operation is performed by this change.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks
