@@ -53,6 +53,10 @@ class ABOrchestrationTests(unittest.TestCase):
     def test_cycle_count_is_pairs_not_program_attempts(self):
         self.assertEqual(app.plan(1), ["v0.1", "v0.2"])
         self.assertEqual(app.plan(3), ["v0.1", "v0.2"] * 3)
+        self.assertEqual(app.plan(1, "v02-first"), ["v0.2", "v0.1"])
+        self.assertEqual(app.plan(3, "v02-first"), ["v0.2", "v0.1"] * 3)
+        with self.assertRaisesRegex(ValueError, "order"):
+            app.plan(1, "unknown")
         for n in (0, -1, 1001):
             with self.assertRaises(ValueError):
                 app.plan(n)
@@ -113,6 +117,70 @@ class ABOrchestrationTests(unittest.TestCase):
         self.assertIn('"stage": "COMPLETE"', runner.status_file.read_text())
         events = [json.loads(v) for v in runner.record.read_text().splitlines()]
         self.assertEqual(sum(v["stage"] == "ATTEMPT_PASS" for v in events), 4)
+
+    def test_v02_first_respects_each_program_reset_cdc_gate(self):
+        self.args.cycles = 1
+        self.args.order = "v02-first"
+        self.args.frames = 60
+        self.args.cdc_timeout = None
+        ops = []
+        runner = app.BurnIn(self.args)
+
+        def engine(operation, image=None):
+            ops.append((operation, image["version"] if image else None))
+            return self.fake_engine(operation, image)
+
+        def cdc(port, version, period, frames, timeout):
+            ops.append(("cdc", version))
+            self.assertEqual(port, "/dev/ttyACM0")
+            self.assertEqual(frames, 60)
+            self.assertEqual(period, 1000 if version == "0.2" else 500)
+            self.assertGreater(timeout, 60 if version == "0.2" else 30)
+            return {"result": "PASS", "version": version}
+
+        with patch.object(runner, "run_engine", side_effect=engine), \
+             patch.object(app, "verify_cdc", side_effect=cdc), \
+             patch.object(app.signal, "signal"), \
+             redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.run(), 0)
+        self.assertEqual(ops, [
+            ("preflight", "0.2"), ("preflight", "0.1"),
+            ("program", "0.2"), ("reset-run", None), ("cdc", "0.2"),
+            ("program", "0.1"), ("reset-run", None), ("cdc", "0.1"),
+        ])
+        self.assertEqual(runner.passed, 2)
+        self.assertIn("order=v02-first", runner.log.read_text())
+
+    def test_v02_first_failure_never_attempts_v01(self):
+        self.args.cycles = 1
+        self.args.order = "v02-first"
+        runner = app.BurnIn(self.args)
+        ops = []
+
+        def engine(operation, image=None):
+            ops.append((operation, image["version"] if image else None))
+            if operation == "program":
+                return {"receipt": {"result": "FAIL",
+                                    "operation": "program",
+                                    "failure_diagnostics": {
+                                        "status": "COMPLETE",
+                                        "source": "SAME_OPENOCD_SESSION",
+                                        "stage": "PROGRAM"}},
+                        "exit_code": 1, "pass": False}
+            return self.fake_engine(operation, image)
+
+        with patch.object(runner, "run_engine", side_effect=engine), \
+             patch.object(app, "verify_cdc", side_effect=AssertionError("No CDC")), \
+             patch.object(app.signal, "signal"), \
+             redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.run(), 1)
+        self.assertEqual(ops, [
+            ("preflight", "0.2"), ("preflight", "0.1"),
+            ("program", "0.2"),
+        ])
+        self.assertEqual(runner.passed, 0)
+        self.assertEqual(runner.failed, 1)
+        self.assertIn("DIAG_SAME_SESSION", runner.log.read_text())
 
     def test_flash_failure_diagnoses_without_reset_or_retry(self):
         runner = app.BurnIn(self.args)
@@ -283,7 +351,10 @@ class CDCFrameBudgetTests(unittest.TestCase):
             self.assertIsNone(runner.call_args.args[0].cdc_timeout)
             self.assertEqual(app.main(["--cycles", "1", "--frames", "1000"]), 0)
             self.assertEqual(runner.call_args.args[0].frames, 1000)
+            self.assertEqual(app.main(["--cycles", "1", "--order", "v02-first"]), 0)
+            self.assertEqual(runner.call_args.args[0].order, "v02-first")
         for flags in (
+            ["--order", "v03-first"],
             ["--frames", "1001"],
             ["--frames", "2"],
             ["--frames", "1000", "--cdc-timeout", "120"],
