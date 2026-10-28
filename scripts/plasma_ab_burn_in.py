@@ -56,6 +56,21 @@ def plan(cycles: int) -> list[str]:
     return ["v0.1", "v0.2"] * cycles
 
 
+def cdc_timeout_for(frames: int, period_ms: int, requested: float | None) -> float:
+    """Bound a full contiguous heartbeat window; avoid unachievable CLI settings.
+
+    Automatic budgets cover all frames, initial enumeration and timing slack.
+    Explicit budgets are accepted only if they can fit the expected frames.
+    """
+    minimum = 5.0 + (frames - 1) * period_ms / 1000.0
+    if requested is not None:
+        if requested < minimum:
+            raise ValueError(f"CDC timeout {requested:g}s is too short for "
+                             f"{frames} frames at {period_ms}ms")
+        return requested
+    return max(25.0, 15.0 + 1.2 * frames * period_ms / 1000.0)
+
+
 def parse_receipt(output: str) -> dict:
     for line in reversed(output.splitlines()):
         try:
@@ -361,7 +376,9 @@ class BurnIn:
         signal.signal(signal.SIGINT, self.request_stop)
         signal.signal(signal.SIGTERM, self.request_stop)
         self.report("READY", f"cycles={self.args.cycles}, flash_attempts={len(self.sequence)} "
-                    f"port={self.args.port}; stop: Ctrl+Q / Ctrl+C / touch {stop_path}")
+                    f"port={self.args.port} frames={self.args.frames} "
+                     f"cdc_timeout={self.args.cdc_timeout if self.args.cdc_timeout is not None else 'auto'}; "
+                     f"stop: Ctrl+Q / Ctrl+C / touch {stop_path}")
         for version in ("v0.1", "v0.2"):
             self.report("PREFLIGHT", version)
             result = self.run_engine("preflight", IMAGES[version])
@@ -393,10 +410,12 @@ class BurnIn:
                 return 1
             self.report("RESET_PASS", f"{version}: reset-run completed",
                         {"reset_receipt": reset})
-            self.report("CDC", f"{version}: read {self.args.port} for {self.args.frames} frames")
+            timeout = cdc_timeout_for(self.args.frames, image["heartbeat_ms"],
+                                      self.args.cdc_timeout)
+            self.report("CDC", f"{version}: read {self.args.port} for "
+                       f"{self.args.frames} frames; timeout={timeout:.1f}s")
             observed = verify_cdc(self.args.port, image["version"],
-                                  image["heartbeat_ms"], self.args.frames,
-                                  self.args.cdc_timeout)
+                                  image["heartbeat_ms"], self.args.frames, timeout)
             if observed["result"] != "PASS":
                 self.failed += 1
                 self.capture_failure(version, "CDC_FAIL", {"receipt": observed})
@@ -414,13 +433,23 @@ def main(argv: list[str] | None = None) -> int:
                         help="one cycle = v0.1 then v0.2; each cycle has two Flash attempts")
     parser.add_argument("--port", default="/dev/ttyACM0",
                         help="SWPC Blue Pill USB CDC device; usually /dev/ttyACM0")
-    parser.add_argument("--frames", type=int, default=4)
-    parser.add_argument("--cdc-timeout", type=float, default=25.0)
+    parser.add_argument("--frames", type=int, default=60,
+                        help="consecutive valid USB CDC heartbeats per image (3..1000; default 60)")
+    parser.add_argument("--cdc-timeout", type=float, default=None,
+                        help="per-image CDC timeout in seconds (5..1800; default auto by frame count/version)")
     parser.add_argument("--stop-file", default="/tmp/plasma-ab-stop")
     parser.add_argument("--output", default="~/plasma-ab-runs")
     args = parser.parse_args(argv)
-    if not 1 <= args.cycles <= 1000 or not 3 <= args.frames <= 20 or not 5 <= args.cdc_timeout <= 120:
-        parser.error("cycles 1..1000, frames 3..20, cdc-timeout 5..120 required")
+    if (not 1 <= args.cycles <= 1000 or not 3 <= args.frames <= 1000
+            or (args.cdc_timeout is not None and not 5 <= args.cdc_timeout <= 1800)):
+        parser.error("cycles 1..1000, frames 3..1000, cdc-timeout 5..1800 required")
+    # Reject too-short budgets before preflight or any hardware operation.
+    if args.cdc_timeout is not None:
+        try:
+            cdc_timeout_for(args.frames, IMAGES["v0.2"]["heartbeat_ms"],
+                            args.cdc_timeout)
+        except ValueError as exc:
+            parser.error(str(exc))
     if args.port != "/dev/ttyACM0" and not args.port.startswith("/dev/serial/by-id/"):
         parser.error("use /dev/ttyACM0 or an explicit /dev/serial/by-id device")
     if not ENGINE.is_file():
