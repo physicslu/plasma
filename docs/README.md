@@ -29,6 +29,10 @@
 
 ## Engineering governance and execution paths
 
+- **Gate 1R Draft / Host-only only** — [SWD per-Site Crash Recovery Journal candidate](development/swd-site-crash-recovery-gate1r-host.md)：最小 durable UNCERTAIN 寫入前落盤、SIGKILL／重啟負向測試；未接 Native C SWD 或可信 Root，不具備部署與自動恢復資格。
+
+
+
 - **Current / Path 2 guarded-hardware operator-cli** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：現行 Path 2 通用硬體 Work Order 使用 `capability: operator-cli`、`scope: guarded-hardware`、來源 SHA 綁定的 Python `script`、`argv` 與受限 `timeout_seconds`；在非 Root SWPC Runner 執行，不自動取得 sudo／Root 權限。Exit 69／77 是失敗的 NOT_RUN，Exit 0 僅為待審證據。CPU-only／Vivado Host Build 為各自獨立能力。
 - **Historical / retired z2-root-operation Work Order; F1-B #1168 evidence** — [Path 2 受保護 Z2 Root Entry 歷史契約](development/path2-generic-fpga-image-loader.md)：舊 Dispatcher 固定 `download|test|restore` Work Order 已退役，現行 Dispatcher 明確拒絕；獨立兩參數 Protected Root Entry／底層 Transport 與來源、互斥、復原守衛仍保留。#1168 實機 PASS 僅涵蓋當時 Site 1 F1-B，不能推導 Blue Pill／其他 Programmer IP／八 Site 資格。
 
