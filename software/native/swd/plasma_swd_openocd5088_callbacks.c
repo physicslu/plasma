@@ -37,7 +37,17 @@ static int core_result(int code)
     }
 }
 
-static int plasma_init(void)
+/* OpenOCD swd_select() invokes swd_ops.init() *before*
+ * adapter_driver.init(). This callback is pure transport declaration and
+ * MUST NOT touch a PS device or require a Site lease. Real admission is
+ * enforced by adapter_driver.init() and every later I/O callback.
+ */
+static int plasma_transport_select(void)
+{
+    return ERROR_OK;
+}
+
+int plasma_swd_openocd5088_owner_ready(void)
 {
     return active_site && active_site->admitted && !active_site->blocked
         ? ERROR_OK : ERROR_FAIL;
@@ -45,7 +55,7 @@ static int plasma_init(void)
 
 static int plasma_read(uint8_t cmd, uint32_t *value, uint32_t ap_delay_hint)
 {
-    if (plasma_init() != ERROR_OK)
+    if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
     return core_result(plasma_swd_fifo_queue_read(
         active_site, cmd, value, ap_delay_hint));
@@ -53,7 +63,7 @@ static int plasma_read(uint8_t cmd, uint32_t *value, uint32_t ap_delay_hint)
 
 static int plasma_write(uint8_t cmd, uint32_t value, uint32_t ap_delay_hint)
 {
-    if (plasma_init() != ERROR_OK)
+    if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
     return core_result(plasma_swd_fifo_queue_write(
         active_site, cmd, value, ap_delay_hint));
@@ -63,7 +73,7 @@ static int plasma_swj(enum swd_special_seq seq)
 {
     const uint8_t *bits = NULL;
     unsigned int count = 0;
-    if (plasma_init() != ERROR_OK)
+    if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
     switch (seq) {
     case LINE_RESET: bits = swd_seq_line_reset;
@@ -90,7 +100,7 @@ static int plasma_swj(enum swd_special_seq seq)
 
 static int plasma_run(void)
 {
-    if (plasma_init() != ERROR_OK)
+    if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
     return core_result(plasma_swd_fifo_run(active_site));
 }
@@ -100,7 +110,7 @@ static int plasma_run(void)
  * registration and explicit approved Linux owner/IO binding before use.
  */
 const struct swd_driver plasma_swd_openocd5088_ops = {
-    .init = plasma_init,
+    .init = plasma_transport_select,
     .switch_seq = plasma_swj,
     .read_reg = plasma_read,
     .write_reg = plasma_write,

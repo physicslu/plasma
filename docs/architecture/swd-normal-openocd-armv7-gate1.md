@@ -133,6 +133,15 @@ or admitted in this Gate 1 increment.
 
 ## Source-locked upstream OpenOCD adapter registration (Host-only CI)
 
+OpenOCD `src/target/adi_v5_swd.c:swd_select()` invokes
+`swd_driver.init()` during *transport selection*, BEFORE
+`adapter_driver.init()`. This makes the two init callbacks fundamentally
+different: SWD transport-selection init must be inert; the actual
+`adapter_driver.init()` and each I/O callback enforce externally verified
+per-Site ownership/lease admission. Host-only tests now assert that SWD
+transport selection succeeds while device initialization without an
+explicit admitted Site **fails closed**, including after a terminal error.
+
 The dedicated `plasma_swd_openocd5088_driver.c` now provides
 `struct adapter_driver plasma_swd_adapter_driver` for the pinned
 OpenOCD `5088db4c9154ca833c6d558381074b33672e127a` tree. It is

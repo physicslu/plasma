@@ -4,6 +4,7 @@
  */
 #include "../plasma_swd_fifo_core.h"
 #include <jtag/swd.h>
+#include <jtag/interface.h>
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -11,6 +12,8 @@
 
 extern int plasma_swd_openocd5088_bind(struct plasma_swd_fifo *site);
 extern const struct swd_driver plasma_swd_openocd5088_ops;
+extern struct adapter_driver plasma_swd_adapter_driver;
+extern int plasma_swd_openocd5088_owner_ready(void);
 
 struct mock {
     uint32_t id, mode, enabled, meta, rx, levels, cmd, swj_len, calls;
@@ -78,7 +81,10 @@ int main(void)
     };
     assert(plasma_swd_fifo_init(&site, &ops, 1, 50u) == 0);
     assert(plasma_swd_fifo_admit(&site) == 0);
+    assert(plasma_swd_openocd5088_ops.init() == ERROR_OK); /* transport selection inert */
+    assert(plasma_swd_adapter_driver.init() == ERROR_FAIL); /* no lease bound */
     assert(plasma_swd_openocd5088_bind(&site) == ERROR_OK);
+    assert(plasma_swd_adapter_driver.init() == ERROR_OK);
     assert(plasma_swd_openocd5088_bind(&site) == ERROR_FAIL);
     assert(plasma_swd_openocd5088_ops.init() == ERROR_OK);
     uint32_t value = 0xCAFEBABEu;
@@ -97,7 +103,9 @@ int main(void)
     assert(plasma_swd_openocd5088_ops.run() == ERROR_WAIT);
     assert(value == 0x1BA01477u);
     assert(m.calls == 4u);
-    assert(plasma_swd_openocd5088_ops.init() == ERROR_FAIL);
+    assert(plasma_swd_openocd5088_owner_ready() == ERROR_FAIL);
+    assert(plasma_swd_adapter_driver.init() == ERROR_FAIL);
+    assert(plasma_swd_openocd5088_ops.init() == ERROR_OK);
     assert(m.write_count == m.barrier_count);
     puts("PLASMA_OPENOCD5088_CALLBACK_SHIM_HOST_ONLY_PASS");
     return 0;

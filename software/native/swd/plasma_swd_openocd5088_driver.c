@@ -10,10 +10,15 @@
 #include <jtag/swd.h>
 
 extern const struct swd_driver plasma_swd_openocd5088_ops;
+extern int plasma_swd_openocd5088_owner_ready(void);
 
+/* This is OpenOCD's adapter_driver init, distinct from the earlier
+ * swd_driver.init transport-selection callback. Hardware I/O admission
+ * occurs ONLY here after external authorization has bound an owned Site.
+ */
 static int plasma_swd_adapter_init(void)
 {
-    return plasma_swd_openocd5088_ops.init();
+    return plasma_swd_openocd5088_owner_ready();
 }
 
 static int plasma_swd_adapter_quit(void)

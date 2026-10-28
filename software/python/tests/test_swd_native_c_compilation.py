@@ -58,6 +58,7 @@ def test_c_opencd_5088_swd_callback_shapes_with_host_only_shim(tmp_path):
         "-I", str(SRC / "tests/openocd_shim"),
         str(SRC / "plasma_swd_fifo_core.c"),
         str(SRC / "plasma_swd_openocd5088_callbacks.c"),
+        str(SRC / "plasma_swd_openocd5088_driver.c"),
         str(SRC / "tests/test_openocd5088_callbacks.c"),
         "-o", str(executable),
     ]
@@ -76,5 +77,5 @@ def test_native_callback_is_source_locked_and_no_product_adapter_registered():
     assert "struct swd_driver plasma_swd_openocd5088_ops" in src
     for name in (".init", ".switch_seq", ".read_reg", ".write_reg", ".run"):
         assert name in src
-    assert "struct adapter_driver" not in src
+    assert "struct adapter_driver" in (SRC / "plasma_swd_openocd5088_driver.c").read_text()
     assert "remote_bitbang_adapter_driver" not in src
