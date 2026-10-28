@@ -36,6 +36,14 @@ static void revoke(void *ctx)
     a->revokes++;
 }
 
+static int unsafe_fake_write(void *ctx, unsigned int site, uint32_t base,
+                             uint64_t generation, uint32_t addr, uint32_t value)
+{
+    (void)ctx; (void)site; (void)base; (void)generation;
+    (void)addr; (void)value;
+    return 0; /* wrong provider cannot be admitted */
+}
+
 int main(void)
 {
     char path[] = "/tmp/plasma-bind-guarded-XXXXXX";
@@ -78,6 +86,10 @@ int main(void)
     struct plasma_swd_native_words alternate = native;
     assert(plasma_swd_openocd5088_bind_guarded(
         &site, &lease, &alternate) == ERROR_FAIL);
+    struct plasma_swd_lease_word_port forged = lease;
+    forged.provider.write_owned = unsafe_fake_write;
+    assert(plasma_swd_openocd5088_bind_guarded(
+        &site, &forged, &native) == ERROR_FAIL);
     assert(plasma_swd_openocd5088_bind_guarded(
         &site, &lease, &native) == ERROR_OK);
     assert(plasma_swd_openocd5088_bind_guarded(

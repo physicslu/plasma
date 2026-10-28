@@ -21,6 +21,25 @@ static struct plasma_swd_fifo *active_site;
 static struct plasma_swd_lease_word_port *active_lease;
 static struct plasma_swd_native_words *active_native;
 
+/* Verify the complete source-specific provider ABI, not merely a shared
+ * void* context that a caller could accidentally pair with wrong callbacks.
+ */
+static bool native_provider_matches(
+    const struct plasma_swd_lease_word_port *lease,
+    struct plasma_swd_native_words *native)
+{
+    if (!lease || !native)
+        return false;
+    const struct plasma_swd_lease_provider expected =
+        plasma_swd_native_words_provider(native);
+    return lease->provider.ctx == expected.ctx &&
+           lease->provider.qualify == expected.qualify &&
+           lease->provider.read_owned == expected.read_owned &&
+           lease->provider.write_owned == expected.write_owned &&
+           lease->provider.barrier_owned == expected.barrier_owned &&
+           lease->provider.invalidate_all == expected.invalidate_all;
+}
+
 /* Never accept a naked 'admitted' FIFO: that flag is insufficient proof
  * of a live owner. Assert the entire exact native-word/lease/IO chain.
  */
@@ -41,7 +60,7 @@ int plasma_swd_openocd5088_bind_guarded(
         lease->generation != native->lease_generation ||
         lease->base != native->base || site->base != lease->base ||
         lease->owner_lock_epoch != native->owner_epoch ||
-        lease->provider.ctx != native ||
+        !native_provider_matches(lease, native) ||
         plasma_swd_native_words_ready(native) != PLASMA_SWD_OK ||
         plasma_swd_lease_word_port_make_io(lease, &io) != PLASMA_SWD_OK ||
         site->io.ctx != io.ctx || site->io.read32 != io.read32 ||
@@ -99,6 +118,7 @@ int plasma_swd_openocd5088_owner_ready(void)
         active_site->admitted && !active_site->blocked &&
         active_lease->admitted && !active_lease->poisoned &&
         active_native->owner == active_lease->process_lock &&
+        native_provider_matches(active_lease, active_native) &&
         active_native->site == active_lease->site_id &&
         active_native->lease_generation == active_lease->generation &&
         plasma_swd_native_words_ready(active_native) == PLASMA_SWD_OK &&
