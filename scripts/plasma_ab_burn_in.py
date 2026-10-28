@@ -5,7 +5,8 @@ This is an operator-owned orchestration script, not a new programmer:
 OpenOCD/WordPort execute ONLY on Z2 via the existing SHA-guarded engine.
 One --cycle means v0.1 then v0.2 (two separate programming attempts).
 On first non-PASS, capture bounded read-only register evidence and STOP.
-SIGINT/SIGTERM or --stop-file stops at the next complete attempt boundary.
+Ctrl+Q (interactive TTY), SIGINT/SIGTERM or --stop-file requests a safe stop
+at the next complete attempt boundary. The foreground terminal is restored.
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ import signal
 import subprocess
 import sys
 import termios
+import threading
 import time
 import tty
 
@@ -170,6 +172,68 @@ def verify_cdc(port: str, version: str, period_ms: int, frames: int, timeout_s: 
             os.close(fd)
 
 
+class ForegroundStopHotkey:
+    """Receive Ctrl+Q in THIS terminal without sending it to OpenOCD.
+
+    Unix TTY normally reserves Ctrl+Q (0x11) for XON flow control, so disable
+    IXON/IXOFF while active, use noncanonical no-echo input, and restore the
+    exact original terminal attributes on exit. SIGINT still works via ISIG.
+    Noninteractive Runner executions retain signal/stop-file support.
+    """
+
+    def __init__(self, burn_in):
+        self.burn_in = burn_in
+        self.fd = None
+        self.saved = None
+        self.thread = None
+        self.done = threading.Event()
+
+    def __enter__(self):
+        if not sys.stdin.isatty():
+            return self
+        try:
+            self.fd = sys.stdin.fileno()
+            self.saved = termios.tcgetattr(self.fd)
+            mode = termios.tcgetattr(self.fd)
+            mode[0] &= ~(termios.IXON | termios.IXOFF)
+            mode[3] &= ~(termios.ICANON | termios.ECHO)
+            mode[6][termios.VMIN] = 0
+            mode[6][termios.VTIME] = 0
+            termios.tcsetattr(self.fd, termios.TCSANOW, mode)
+        except (OSError, ValueError, termios.error):
+            if self.fd is not None and self.saved is not None:
+                termios.tcsetattr(self.fd, termios.TCSANOW, self.saved)
+            self.fd = None
+            self.saved = None
+            return self
+        self.thread = threading.Thread(target=self._listen, daemon=True,
+                                       name="plasma-burn-in-ctrl-q")
+        self.thread.start()
+        return self
+
+    def _listen(self):
+        while not self.done.is_set():
+            try:
+                ready, _, _ = select.select([self.fd], [], [], 0.2)
+                if not ready:
+                    continue
+                data = os.read(self.fd, 32)
+            except (OSError, ValueError):
+                break
+            if b"\x11" in data:
+                self.burn_in.stop_requested = True
+                print("\nCtrl+Q: safe stop requested; finish current attempt first.",
+                      flush=True)
+                break
+
+    def __exit__(self, *_):
+        self.done.set()
+        if self.thread is not None:
+            self.thread.join(timeout=1.0)
+        if self.fd is not None and self.saved is not None:
+            termios.tcsetattr(self.fd, termios.TCSANOW, self.saved)
+
+
 class BurnIn:
     def __init__(self, args: argparse.Namespace):
         self.args = args
@@ -236,7 +300,8 @@ class BurnIn:
         started = time.monotonic()
         try:
             completed = subprocess.run(command, capture_output=True, text=True,
-                                       timeout=850, start_new_session=True)
+                                       stdin=subprocess.DEVNULL, timeout=850,
+                                       start_new_session=True)
             output = completed.stdout + "\n" + completed.stderr
             receipt = parse_receipt(output)
             exit_code = completed.returncode
@@ -257,6 +322,15 @@ class BurnIn:
         self.report("FAIL", f"{version} {stage}; stopping future programs",
                     {"receipt": failed})
         receipt = failed.get("receipt", {})
+        # Use the original Z2 same-session fault snapshot; do not overwrite
+        # a partially captured lockup with a misleading post-failure attach.
+        same_session = receipt.get("failure_diagnostics", {})
+        if (stage == "PROGRAM_FAIL" and isinstance(same_session, dict) and
+                same_session.get("status") in ("COMPLETE", "PARTIAL")):
+            self.report("DIAG_SAME_SESSION",
+                        "Fault/Core/Flash registers preserved in original program receipt",
+                        {"diagnostic_receipt": same_session})
+            return
         # The programming engine already runs same-session best-effort
         # register diagnostics on Flash failure; its Z2 openocd.log is
         # preserved in the receipt evidence_directory.
@@ -276,6 +350,10 @@ class BurnIn:
         # This is NOT a silent retry of Erase/Program.
 
     def run(self) -> int:
+        with ForegroundStopHotkey(self):
+            return self._run_sequence()
+
+    def _run_sequence(self) -> int:
         stop_path = Path(self.args.stop_file).expanduser()
         if stop_path.exists():
             self.report("BLOCKED", "stop file already exists; remove deliberately before starting")
@@ -283,7 +361,7 @@ class BurnIn:
         signal.signal(signal.SIGINT, self.request_stop)
         signal.signal(signal.SIGTERM, self.request_stop)
         self.report("READY", f"cycles={self.args.cycles}, flash_attempts={len(self.sequence)} "
-                    f"port={self.args.port}; stop: touch {stop_path}")
+                    f"port={self.args.port}; stop: Ctrl+Q / Ctrl+C / touch {stop_path}")
         for version in ("v0.1", "v0.2"):
             self.report("PREFLIGHT", version)
             result = self.run_engine("preflight", IMAGES[version])
