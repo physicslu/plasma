@@ -256,13 +256,25 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         error = f"{type(exc).__name__}: {exc}"[:500]
     finally:
         if bridge is not None:
-            if bridge.poll() is None:
-                bridge.terminate()
-            try:
-                bridge_stdout, bridge_stderr = bridge.communicate(timeout=8)
-            except subprocess.TimeoutExpired:
-                bridge.kill()
-                bridge_stdout, bridge_stderr = bridge.communicate(timeout=5)
+            bridge_joined = False
+            # OpenOCD can exit before the local WordPort socket service has
+            # finished its EOF/QUIT cleanup. Give a successful OpenOCD session
+            # a bounded chance to close the Bridge naturally; an immediate
+            # SIGTERM causes -15 and masks a verified readback as FAIL.
+            if completed is not None and completed.returncode == 0 and error is None:
+                try:
+                    bridge_stdout, bridge_stderr = bridge.communicate(timeout=8)
+                    bridge_joined = True
+                except subprocess.TimeoutExpired:
+                    error = "BRIDGE_GRACEFUL_CLOSE_TIMEOUT"
+            if not bridge_joined:
+                if bridge.poll() is None:
+                    bridge.terminate()
+                try:
+                    bridge_stdout, bridge_stderr = bridge.communicate(timeout=8)
+                except subprocess.TimeoutExpired:
+                    bridge.kill()
+                    bridge_stdout, bridge_stderr = bridge.communicate(timeout=5)
         if socketdir.exists() and not socket.exists():
             socketdir.rmdir()
     log = (completed.stdout + completed.stderr) if completed is not None else timeout_log
