@@ -243,6 +243,29 @@ real device-mapped provider, a C-to-Python memory sharing ABI, or a
 deployed OpenOCD startup admission mechanism. Never use Host-only
 regular-file evidence as HIL acceptance.
 
+## Unresolved concurrency constraint for independently programmed Sites
+
+**BLOCKED / not a two-process parallel-programming proof:** current Python
+`LinuxMMIO.open()` and C `plasma_swd_owner_lock_acquire()` take one
+global **exclusive** PPU MMIO `flock`. This correctly prevents concurrent
+uncoordinated writers but allows only **one process** to own the
+memory-mapped PPU at a time. Separately the source-locked OpenOCD C
+callback slice currently stores one `active_site` global per
+OpenOCD process. The Host-only two-Site C FIFO tests instantiate
+two independent queues **inside one process**; they do not launch two
+independent selectable OpenOCD adapters or prove parallel SWD programming.
+
+PLASMA's target of eight simultaneously active Sites will require a
+reviewed two-level ownership design or equivalent proven mechanism:
+protect FPGA Image/reload as a PPU-wide shared/exclusive resource,
+and each Site as an independent exclusive programming resource,
+with Owner/Root/voltage validation and atomic MMIO accesses. This
+is a **candidate design constraint, not an approved lock protocol**.
+Do not silently weaken the current global lock or introduce a new
+middleware/scheduler as a workaround. A materially changed lock
+hierarchy requires the applicable revised Gate 1 and Host-only
+concurrency + adversarial owner/reload tests before hardware use.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks
