@@ -141,8 +141,109 @@ proc plasma_diag {{stage cause}} {{
 }}
 init
 """
-    if operation == "diagnose-after":
-        return config + 'plasma_diag POST_SESSION "REATTACH_NOT_FAILURE_INSTANT"\nshutdown\n'
+    # Read-only register qualification (no Flash operations and no reset).
+    # OpenOCD read_memory/get_reg return actual Tcl values; exit/echo alone
+    # must never be confused with successful register acquisition.
+    register_tcl = r"""
+proc plasma_register_probe {} {
+    set failures 0
+    foreach spec {{DBGMCU_IDCODE 0xE0042000} {SCB_CPUID 0xE000ED00} {FLASH_SR 0x4002200C}} {
+        set name [lindex $spec 0]
+        set address [lindex $spec 1]
+        if {[catch {set values [read_memory $address 32 1]} reason]} {
+            echo "PLASMA_REGISTER_FAIL $name $reason"
+            incr failures
+            continue
+        }
+        if {[llength $values] != 1 || ![string is integer -strict [lindex $values 0]]} {
+            echo "PLASMA_REGISTER_FAIL $name INVALID_READ_VALUE"
+            incr failures
+            continue
+        }
+        set value [lindex $values 0]
+        if {($name eq "DBGMCU_IDCODE" && ($value & 0xFFF) != 0x410)
+            || ($name eq "SCB_CPUID" && ($value & 0xFFF0) != 0xC230)} {
+            echo "PLASMA_REGISTER_FAIL $name TARGET_IDENTITY_MISMATCH"
+            incr failures
+            continue
+        }
+        echo "PLASMA_REGISTER_PASS $name [format 0x%08X $value]"
+    }
+    if {$failures != 0} {
+        echo "PLASMA_REGISTER_SUMMARY FAIL"
+        error "REGISTER_READ_FAILED"
+    }
+    echo "PLASMA_REGISTER_SUMMARY PASS"
+}
+proc plasma_core_probe {} {
+    set before [stm32f1x.cpu curstate]
+    echo "PLASMA_CORE_STATE_BEFORE $before"
+    if {$before ne "running" && $before ne "halted"} {
+        echo "PLASMA_CORE_SUMMARY FAIL"
+        error "CORE_INITIAL_STATE_NOT_ADMITTED"
+    }
+    set failures 0
+    if {$before eq "running"} {
+        if {[catch {halt} reason]} {
+            echo "PLASMA_CORE_HALT_FAIL $reason"
+            incr failures
+        }
+    }
+    if {[stm32f1x.cpu curstate] ne "halted"} {
+        echo "PLASMA_CORE_HALT_FAIL TARGET_NOT_HALTED"
+        incr failures
+    } else {
+        foreach name {pc sp lr xPSR} {
+            if {[catch {set values [get_reg -force [list $name]]} reason]} {
+                echo "PLASMA_CORE_REGISTER_FAIL $name $reason"
+                incr failures
+                continue
+            }
+            if {![dict exists $values $name] || ![string is integer -strict [dict get $values $name]]} {
+                echo "PLASMA_CORE_REGISTER_FAIL $name INVALID_READ_VALUE"
+                incr failures
+                continue
+            }
+            echo "PLASMA_CORE_REGISTER_PASS $name [format 0x%08X [dict get $values $name]]"
+        }
+    }
+    # Always attempt to restore a formerly running core, even when a read
+    # failed. An initially halted core must remain halted.
+    if {$before eq "running" && [stm32f1x.cpu curstate] eq "halted"} {
+        if {[catch {resume} reason]} {
+            echo "PLASMA_CORE_RESUME_FAIL $reason"
+            incr failures
+        } else {
+            echo "PLASMA_CORE_RESUME_OK"
+        }
+    }
+    if {[catch {poll} reason]} {
+        echo "PLASMA_CORE_STATE_POLL_FAIL $reason"
+        incr failures
+    }
+    set after [stm32f1x.cpu curstate]
+    echo "PLASMA_CORE_STATE_AFTER $after"
+    if {$after ne $before} {
+        echo "PLASMA_CORE_STATE_RESTORE_FAIL"
+        incr failures
+    }
+    if {$failures != 0} {
+        echo "PLASMA_CORE_SUMMARY FAIL"
+        error "CORE_REGISTER_READ_OR_STATE_RESTORE_FAILED"
+    }
+    echo "PLASMA_CORE_SUMMARY PASS"
+}
+"""
+    if operation in ("register-read", "core-register-read", "diagnose-after"):
+        commands = []
+        if operation != "core-register-read":
+            commands.append('if {[catch {plasma_register_probe} reason]} { echo "PLASMA_REGISTER_OPERATION_FAIL $reason"; shutdown error }')
+        if operation != "register-read":
+            commands.append('if {[catch {plasma_core_probe} reason]} { echo "PLASMA_CORE_OPERATION_FAIL $reason"; shutdown error }')
+        if operation == "diagnose-after":
+            commands.append('echo "PLASMA_DIAG_END POST_SESSION"')
+        commands.append("shutdown")
+        return config + register_tcl + "\\n".join(commands) + "\\n"
     if operation == "reset-run":
         # No flash probe, erase, program, verify, dump, or preparatory halt.
         return config + ('echo "PLASMA_RESET_RUN_BEGIN"\n'
@@ -181,6 +282,48 @@ echo "PLASMA_READBACK_OK"
 echo "PLASMA_PROGRAM_COMPLETED_NO_RESET"
 shutdown
 """
+
+
+REGISTER_NAMES = ("DBGMCU_IDCODE", "SCB_CPUID", "FLASH_SR")
+CORE_NAMES = ("pc", "sp", "lr", "xPSR")
+
+
+def _observations(log: str, prefix: str, names: tuple[str, ...]) -> tuple[bool, dict]:
+    """Require exactly one real 32-bit value for every expected register."""
+    observed = {}
+    for name in names:
+        values = re.findall(
+            rf"(?m)^{re.escape(prefix)} {re.escape(name)} (0x[0-9A-Fa-f]{{8}})$", log)
+        if len(values) != 1:
+            return False, observed
+        observed[name] = values[0]
+    if observed.get("DBGMCU_IDCODE") and (int(observed["DBGMCU_IDCODE"], 16) & 0xFFF) != 0x410:
+        return False, observed
+    if observed.get("SCB_CPUID") and (int(observed["SCB_CPUID"], 16) & 0xFFF0) != 0xC230:
+        return False, observed
+    return True, observed
+
+
+def read_register_evidence(log: str) -> tuple[bool, dict]:
+    valid, observed = _observations(log, "PLASMA_REGISTER_PASS", REGISTER_NAMES)
+    return (valid and "PLASMA_REGISTER_SUMMARY PASS" in log
+            and "PLASMA_REGISTER_FAIL" not in log), observed
+
+
+def read_core_evidence(log: str) -> tuple[bool, dict, str | None, str | None]:
+    valid, observed = _observations(log, "PLASMA_CORE_REGISTER_PASS", CORE_NAMES)
+    before = re.findall(r"(?m)^PLASMA_CORE_STATE_BEFORE (\\w+)$", log)
+    after = re.findall(r"(?m)^PLASMA_CORE_STATE_AFTER (\\w+)$", log)
+    state_ok = (len(before) == len(after) == 1
+                and before[0] in ("running", "halted")
+                and after[0] == before[0]
+                and (before[0] != "running" or
+                     "PLASMA_CORE_RESUME_OK" in log))
+    return (valid and state_ok and "PLASMA_CORE_SUMMARY PASS" in log
+            and "PLASMA_CORE_REGISTER_FAIL" not in log
+            and "PLASMA_CORE_STATE_RESTORE_FAIL" not in log), observed, (
+                before[0] if len(before) == 1 else None), (
+                after[0] if len(after) == 1 else None)
 
 
 def z2_preflight(args):
@@ -359,9 +502,18 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
                    readback.is_file() and readback.stat().st_size == image_bytes and
                    sha(readback) == image_sha)
         diagnostic = "POST_ERROR_SAME_SESSION" if "PLASMA_DIAG_BEGIN" in log else "NOT_CAPTURED"
-    elif args.operation == "diagnose-after":
-        success = eligible and "PLASMA_DIAG_END POST_SESSION" in log
-        diagnostic = "POST_SESSION_REATTACH_NOT_FAILURE_INSTANT"
+    elif args.operation in ("register-read", "core-register-read", "diagnose-after"):
+        peripheral_ok, peripheral_values = read_register_evidence(log)
+        core_ok, core_values, core_before, core_after = read_core_evidence(log)
+        required_peripheral = args.operation != "core-register-read"
+        required_core = args.operation != "register-read"
+        success = (eligible and
+                   (not required_peripheral or peripheral_ok) and
+                   (not required_core or core_ok) and
+                   (args.operation != "diagnose-after" or
+                    "PLASMA_DIAG_END POST_SESSION" in log))
+        diagnostic = "REGISTER_ACCESS_OBSERVED" if success else "REGISTER_ACCESS_FAILED"
+    else:  # Explicit one-shot reset-run, never implicit on program.
     else:  # Explicit one-shot reset-run, never implicit on program.
         success = (eligible and "PLASMA_RESET_RUN_OK" in log and
                    "PLASMA_RESET_RUN_FAIL" not in log)
@@ -382,6 +534,11 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         "no_auto_retry": True,
         "no_flash_write": args.operation != "program",
     }
+    if args.operation in ("register-read", "core-register-read", "diagnose-after"):
+        receipt["peripheral_registers"] = peripheral_values if required_peripheral else None
+        receipt["core_registers"] = core_values if required_core else None
+        receipt["core_state_before"] = core_before if required_core else None
+        receipt["core_state_after"] = core_after if required_core else None
     (evidence / "receipt.json").write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
     print(json.dumps(receipt, sort_keys=True))
     return 0 if success else 1
@@ -434,7 +591,7 @@ def on_swpc(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", choices=("swpc", "z2"), required=True)
-    parser.add_argument("--operation", choices=("preflight", "program", "diagnose-after", "reset-run"), required=True)
+    parser.add_argument("--operation", choices=("preflight", "program", "register-read", "core-register-read", "diagnose-after", "reset-run"), required=True)
     parser.add_argument("--icpn", required=True, help="Exact ICPN to bind the target profile")
     parser.add_argument("--site-id", type=int, required=True, help="One-based physical Site")
     parser.add_argument("--firmware", help="Operator-selected absolute BIN path on Z2")
