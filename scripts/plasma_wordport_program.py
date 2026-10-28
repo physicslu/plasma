@@ -266,7 +266,10 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
             "image_bytes": image_bytes, "image_sha256": image_sha,
             "erase_bytes": erase_bytes, "boot_id": boot,
             "root_source_commit": root_sha,
-            "electrical": "NOT_VERIFIED_OWNER_MUST_CHECK",
+            # This development-mode prototype has no voltage, continuity or
+            # socket-presence sensors. Do not add per-program manual checklist
+            # gates or imply that unmeasured values passed physical validation.
+            "electrical": "NOT_MEASURED_DEV_MODE_NON_BLOCKING",
             "hw_action": "NONE",
             "no_erase_program_halt_reset": True,
         }, sort_keys=True), flush=True)
@@ -368,6 +371,7 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         "diagnostic": diagnostic, "openocd_exit": completed.returncode if completed else None,
         "bridge_exit": bridge.returncode if bridge else None,
         "error": error, "icpn": args.icpn, "site_id": args.site_id,
+        "electrical": "NOT_MEASURED_DEV_MODE_NON_BLOCKING",
         "image_bytes": image_bytes, "image_sha256": image_sha,
         "target_cfg": PROFILE["target_cfg"],
         "erase_bytes": erase_bytes,
@@ -437,7 +441,7 @@ def main():
     parser.add_argument("--image-sha256", help="Independent SHA256 from approved Programming Asset")
     parser.add_argument("--source-sha256", required=True)
     parser.add_argument("--owner-attested", action="store_true",
-                        help="Required for programming/diagnosis/reset; not needed for read-only preflight")
+                        help="Explicit owner-approved hardware command (not repeated sensor/fixture validation)")
     args = parser.parse_args()
     try:
         return on_swpc(args) if args.role == "swpc" else on_z2(args)
