@@ -1,6 +1,6 @@
 # Blue Pill v0.1/v0.2 整片 Flash 實驗失敗紀錄，2026-10-28
 
-**結果：v0.1 Flash 寫入 FAIL；v0.2 NOT_RUN。** 本紀錄保存實際觀測與未完成項目，不是 Flash 寫入路徑的資格證明。實驗使用 Gate 1 已核准的 Path 3：SWPC Codex 透過既有 SSH/sudo 路徑協調 Z2；即時 OpenOCD 和 UNIX WordPort/Remote Bitbang Bridge 均在 Z2 PS 執行，經已載入的 PL SWD Image 接到 Blue Pill。沒有 Dispatcher Run/Job ID。操作時倉庫 `main` 為 `bd06f4fec8ab8a721401811be3b4dc23d45211d7`。本次沿用 [2026-10-27 已實測的 Z2 路徑](../bluepill-z2-flash-2026-10-27/README.md)；未使用仍為草稿的 PR #1189 雙 Site IP。
+**結果：v0.1 Flash 寫入 FAIL；後續唯讀讀回確認前 19 頁已擦除；v0.2 NOT_RUN。** 本紀錄保存實際觀測與未完成項目，不是 Flash 寫入路徑的資格證明。實驗使用 Gate 1 已核准的 Path 3：SWPC Codex 透過既有 SSH/sudo 路徑協調 Z2；即時 OpenOCD 和 UNIX WordPort/Remote Bitbang Bridge 均在 Z2 PS 執行，經已載入的 PL SWD Image 接到 Blue Pill。沒有 Dispatcher Run/Job ID。操作時倉庫 `main` 為 `bd06f4fec8ab8a721401811be3b4dc23d45211d7`。本次沿用 [2026-10-27 已實測的 Z2 路徑](../bluepill-z2-flash-2026-10-27/README.md)；未使用仍為草稿的 PR #1189 雙 Site IP。
 
 ## 映像與寫入前狀態
 
@@ -28,13 +28,14 @@
    Error: error writing to flash at address 0x08000000 at offset 0x00000000
    ```
 
-   OpenOCD 退出碼 1；Bridge 退出碼 0，socket 已移除。`flash verify_image` 與 `reset run` 沒有成功回執。先前的擦除可能已改變 Flash，但沒有獨立擦除讀回，故不能宣稱實際改變範圍或目前韌體完整。
-4. **失敗後停止。** 沒有重試擦寫、讀 DUT Flash、reset DUT、燒 v0.2 或操作電源。Z2 唯讀核對顯示 OpenOCD/Bridge 無殘留，MMIO 無占用，FPGA Manager `operating`，Image/Manifest/Root pin/Golden 不變。依 Keep Loaded 規則保留 FPGA Image，沒有 Golden Restore。
+   OpenOCD 退出碼 1；Bridge 退出碼 0，socket 已移除。`flash verify_image` 與 `reset run` 沒有成功回執。當時沒有獨立擦除讀回，故尚不能判定實際改變範圍。
+4. **失敗後停寫。** 沒有重試擦寫、reset DUT、燒 v0.2 或操作電源。Z2 唯讀核對顯示 OpenOCD/Bridge 無殘留，MMIO 無占用，FPGA Manager `operating`，Image/Manifest/Root pin/Golden 不變。依 Keep Loaded 規則保留 FPGA Image，沒有 Golden Restore。
+5. **Owner 指示後獨立讀回 PASS。** 在同一 Boot ID 和安全前置條件下，另開 Z2 PS OpenOCD/Bridge session，僅執行 `init; halt; flash probe 0; dump_image <current-full.bin> 0x08000000 0x10000; shutdown`；沒有 erase、program、reset 或 resume。OpenOCD 與 Bridge 均退出 0，讀滿 65,536 bytes，DPIDR `0x1ba01477`、device ID `0x20036410`、Flash 64 KiB；Z2 與 SWPC SHA256 均為 `830c9eeffac617953f3a8a6095f946b4796baa054fd0e1e4e4b88419aab13f5e`。與寫入前備份逐位元組比較，**目前 Flash 恰等於「原始備份前 19 頁改為全 `0xFF`，後 45 頁不變」**。變動的 18,580 bytes 全部由非 `0xFF` 變成 `0xFF`，沒有觀測到寫入的新非 `0xFF` 資料。前 19 頁覆蓋 `0x08000000–0x08004BFF`；最後一頁及其 1,020 bytes 非 `0xFF` 資料逐位元組不變。此讀回不匹配 v0.1 或 v0.2 BIN。讀回後再次核對無 OpenOCD/Bridge/MMIO 占用，FPGA Image/Manifest/Root/Golden 不變。
 
 ## 判讀、缺口與恢復風險
 
 故障點是 **OpenOCD 的 STM32 Flash 寫入演算法未完成**。OpenOCD 上游[原始碼](https://www.openocd.org/doc/doxygen/html/target_8c_source.html)在非同步 Flash 寫入的 FIFO 無預期進展時會報相同逾時；這有助於理解訊息，**不足以證明**本次是 DUT RAM 演算法、Z2 WordPort/SWD 時序、電氣狀態或 Flash 控制器的哪一項造成。成功讀取 DPIDR 和完整備份不能證明寫入路徑可用。
 
-**本次未同步擷取 LA2016 波形**，沒有寫入當下的 SWCLK/SWDIO/ACK 證據；PR #1196 的歷史波形不能代替。v0.1 燒錄後獨立讀回和 heartbeat 均 **NOT_RUN**；v0.2 擦寫、讀回和 heartbeat 均 **NOT_RUN**。Blue Pill 目前 Flash 內容及 CDC 能否啟動屬 **UNKNOWN**。本次沒有改 repo 生產程式、沒有 FPGA load、沒有 PR merge 或部署。
+**本次未同步擷取 LA2016 波形**，沒有寫入當下的 SWCLK/SWDIO/ACK 證據；PR #1196 的歷史波形不能代替。v0.1 寫入後的全片唯讀讀回已執行，但 v0.1 燒錄驗證仍 **FAIL**；燒錄後 heartbeat **NOT_RUN**。v0.2 擦寫、讀回和 heartbeat 均 **NOT_RUN**。Flash 前 19 頁已知全 `0xFF`，CDC 實際執行狀態未另測。沒有改 repo 生產程式、沒有 FPGA load、沒有 PR merge 或部署。
 
-原始 64 KiB Flash 備份以私有檔保存於 SWPC `.work/bluepill-ab-20261028/original-full.bin` 及 Z2 暫存目錄，不包含在本 PR。恢復前應先確認單一 SWD 控制者、供電與裝置占用，並以受控唯讀讀回界定實際受影響頁；選定可靠的寫入路徑後才評估恢復。不得因有備份就盲目重跑同一段 erase/write。若要重現寫入錯誤，需同步、被動擷取 LA2016，並保存完整命令與退出回執。
+原始與目前兩份 64 KiB Flash 映像以私有檔保存於 SWPC `.work/bluepill-ab-20261028/` 及 Z2 暫存目錄，不包含在本 PR。恢復前應先確認單一 SWD 控制者、供電與裝置占用；選定可靠的寫入路徑後才評估恢復。不得因有備份就盲目重跑同一段 erase/write。若要重現寫入錯誤，需同步、被動擷取 LA2016，並保存完整命令與退出回執。
