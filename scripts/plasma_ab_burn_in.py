@@ -3,7 +3,7 @@
 
 This is an operator-owned orchestration script, not a new programmer:
 OpenOCD/WordPort execute ONLY on Z2 via the existing SHA-guarded engine.
-One --cycle means v0.1 then v0.2 (two separate programming attempts).
+One --cycle means two separate programming attempts, in the selected --order.
 On first non-PASS, capture bounded read-only register evidence and STOP.
 Ctrl+Q (interactive TTY), SIGINT/SIGTERM or --stop-file requests a safe stop
 at the next complete attempt boundary. The foreground terminal is restored.
@@ -50,10 +50,13 @@ IMAGES = {
 HB_RE = re.compile(rb"^HB version=(0\.[12]) seq=(\d+) uptime_ms=(\d+)$")
 
 
-def plan(cycles: int) -> list[str]:
+def plan(cycles: int, order: str = "v01-first") -> list[str]:
     if not 1 <= cycles <= 1000:
         raise ValueError("cycles must be 1..1000")
-    return ["v0.1", "v0.2"] * cycles
+    if order not in ("v01-first", "v02-first"):
+        raise ValueError("order must be v01-first or v02-first")
+    pair = ["v0.1", "v0.2"] if order == "v01-first" else ["v0.2", "v0.1"]
+    return pair * cycles
 
 
 def cdc_timeout_for(frames: int, period_ms: int, requested: float | None) -> float:
@@ -252,7 +255,7 @@ class ForegroundStopHotkey:
 class BurnIn:
     def __init__(self, args: argparse.Namespace):
         self.args = args
-        self.sequence = plan(args.cycles)
+        self.sequence = plan(args.cycles, getattr(args, "order", "v01-first"))
         self.stop_requested = False
         self.engine_sha = hashlib.sha256(ENGINE.read_bytes()).hexdigest()
         now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -376,10 +379,10 @@ class BurnIn:
         signal.signal(signal.SIGINT, self.request_stop)
         signal.signal(signal.SIGTERM, self.request_stop)
         self.report("READY", f"cycles={self.args.cycles}, flash_attempts={len(self.sequence)} "
-                    f"port={self.args.port} frames={self.args.frames} "
+                    f"order={getattr(self.args, 'order', 'v01-first')} port={self.args.port} frames={self.args.frames} "
                      f"cdc_timeout={self.args.cdc_timeout if self.args.cdc_timeout is not None else 'auto'}; "
                      f"stop: Ctrl+Q / Ctrl+C / touch {stop_path}")
-        for version in ("v0.1", "v0.2"):
+        for version in dict.fromkeys(self.sequence):
             self.report("PREFLIGHT", version)
             result = self.run_engine("preflight", IMAGES[version])
             if not result["pass"]:
@@ -430,7 +433,10 @@ class BurnIn:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cycles", type=int, required=True,
-                        help="one cycle = v0.1 then v0.2; each cycle has two Flash attempts")
+                        help="one cycle = both firmware versions; each cycle has two Flash attempts")
+    parser.add_argument("--order", choices=("v01-first", "v02-first"),
+                        default="v01-first",
+                        help="program order per cycle (default: v01-first)")
     parser.add_argument("--port", default="/dev/ttyACM0",
                         help="SWPC Blue Pill USB CDC device; usually /dev/ttyACM0")
     parser.add_argument("--frames", type=int, default=60,
