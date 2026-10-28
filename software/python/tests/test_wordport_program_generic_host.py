@@ -270,6 +270,31 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.assertIn("catch {plasma_register_probe}", combined_tcl)
         self.assertIn('PLASMA_DIAG_END POST_SESSION', combined_tcl)
 
+    def test_openocd_xpsr_case_sensitive_register_key_and_public_label(self):
+        # Upstream OpenOCD renamed Cortex-M 'xPSR' to lowercase 'xpsr'.
+        # get_reg and Tcl dict access must use the target's exact key.
+        tcl = module.make_tcl(self.directory / "bridge.sock", None,
+            self.directory / "unused.bin", "core-register-read")
+        self.assertIn("foreach spec {{pc pc} {sp sp} {lr lr} {xpsr xPSR}}", tcl)
+        self.assertIn("set name [lindex $spec 0]", tcl)
+        self.assertIn("set label [lindex $spec 1]", tcl)
+        self.assertIn("get_reg -force [list $name]", tcl)
+        self.assertIn("dict exists $values $name", tcl)
+        self.assertIn("PLASMA_CORE_REGISTER_PASS $label", tcl)
+        self.assertNotIn("foreach name {pc sp lr xPSR}", tcl)
+        # The evidence contract deliberately retains the public xPSR label.
+        log = ("PLASMA_CORE_STATE_BEFORE running\\n"
+               "PLASMA_CORE_REGISTER_PASS pc 0x0800040A\\n"
+               "PLASMA_CORE_REGISTER_PASS sp 0x20004F78\\n"
+               "PLASMA_CORE_REGISTER_PASS lr 0x08000401\\n"
+               "PLASMA_CORE_REGISTER_PASS xPSR 0x01000000\\n"
+               "PLASMA_CORE_RESUME_OK\\n"
+               "PLASMA_CORE_STATE_AFTER running\\n"
+               "PLASMA_CORE_SUMMARY PASS\\n")
+        self.assertTrue(module.read_core_evidence(log)[0])
+        self.assertFalse(module.read_core_evidence(
+            log.replace("PASS xPSR", "PASS xpsr"))[0])
+
     def test_register_read_requires_real_32_bit_values_and_identity(self):
         good = ("PLASMA_REGISTER_PASS DBGMCU_IDCODE 0x20036410\n"
                 "PLASMA_REGISTER_PASS SCB_CPUID 0x411FC231\n"
