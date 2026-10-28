@@ -160,7 +160,9 @@ software/python/tests/test_swd_site_recovery_host.py covers:
   rollback, and leftover intent/temp denial.
 - Synthetic unknown completion, no auto retry, FIFO pending proxy and
   Boot/Image change denial.
-- Site 1/2 separate journal state, cross-process journal lock contention.
+- Site 1/2 separate journal state, cross-process same-Site race (exactly one
+  admitted synthetic write), cross-process independent-Site simultaneous
+  callback execution, and journal lock contention.
 
 Tests intentionally use only temporary regular files and fake callbacks.
 They do **not** exercise the C FIFO, actual FPGA Reload, Root privileges or
