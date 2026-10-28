@@ -237,6 +237,31 @@ def read_failure_diagnostics(log: str) -> dict:
     }
 
 
+# Development-only STM32F103C8T6 program gate.  Halted debug is required
+# for OpenOCD's SRAM Flash algorithm; this is NOT disabling SWD/Core Debug.
+# Unlike Core Debug, IRQ masking is temporary and program-stage scoped.
+# No VCC/NRST assertion, global MCU qualification or automatic recovery.
+IRQ_MASK_GATE_TCL = r"""
+proc plasma_require_irq_mask {phase} {
+    if {[catch {set values [read_memory 0xE000EDF0 32 1]} reason]} {
+        echo "PLASMA_IRQ_MASK_FAIL $phase DHCSR_READ $reason"
+        error "IRQ_MASK_READ_FAILED"
+    }
+    if {[llength $values] != 1 || ![string is integer -strict [lindex $values 0]]} {
+        echo "PLASMA_IRQ_MASK_FAIL $phase DHCSR_INVALID"
+        error "IRQ_MASK_DHCSR_INVALID"
+    }
+    set dhcsr [lindex $values 0]
+    # S_HALT (17), C_MASKINTS (3), C_HALT (1), C_DEBUGEN (0).
+    # Require the CPU to be halted with mask active BEFORE any Flash operation.
+    if {($dhcsr & 0x0002000B) != 0x0002000B} {
+        echo "PLASMA_IRQ_MASK_FAIL $phase DHCSR_BITS [format 0x%08X $dhcsr]"
+        error "IRQ_MASK_NOT_ACTIVE_OR_CORE_NOT_HALTED"
+    }
+    echo "PLASMA_IRQ_MASK_PASS $phase [format 0x%08X $dhcsr]"
+}
+"""
+
 def make_tcl(socket: Path, firmware: Path | None, readback: Path, operation: str,
              *, image_bytes: int = 0, erase_bytes: int = 0) -> str:
     """Compile a bounded OpenOCD command for a verified target profile."""
@@ -386,7 +411,18 @@ proc plasma_core_probe {} {
                          'shutdown\n')
     if operation != "program":
         raise ValueError("UNKNOWN_OPERATION")
-    return config + f"""halt
+    return config + IRQ_MASK_GATE_TCL + f"""halt
+# Protect the next SRAM Flash algorithm from the previously running
+# application's maskable NVIC/SysTick interrupts.  Do not reset the MCU:
+# hardware-controlled NRST/VCC has not yet been qualified for this route.
+if {{[catch {{cortex_m maskisr on}} reason]}} {{
+    echo "PLASMA_IRQ_MASK_FAIL SET $reason"
+    shutdown error
+}}
+if {{[catch {{plasma_require_irq_mask PRE_ERASE}} reason]}} {{
+    echo "PLASMA_IRQ_MASK_GATE_FAIL PRE_ERASE $reason"
+    shutdown error
+}}
 flash probe 0
 echo "PLASMA_ERASE_BEGIN"
 if {{[catch {{flash erase_address 0x{PROFILE["main_flash_base"]:08X} 0x{erase_bytes:X}}} failure]}} {{
@@ -394,6 +430,12 @@ if {{[catch {{flash erase_address 0x{PROFILE["main_flash_base"]:08X} 0x{erase_by
     shutdown error
 }}
 echo "PLASMA_ERASE_OK"
+# Erase may use a target RAM algorithm: verify the mask remained set
+# before handing the target to the separate Flash Program algorithm.
+if {{[catch {{plasma_require_irq_mask PRE_PROGRAM}} reason]}} {{
+    echo "PLASMA_IRQ_MASK_GATE_FAIL PRE_PROGRAM $reason"
+    shutdown error
+}}
 echo "PLASMA_PROGRAM_BEGIN"
 if {{[catch {{flash write_image {firmware} 0x{PROFILE["main_flash_base"]:08X} bin}} failure]}} {{
     plasma_diag PROGRAM "$failure"
