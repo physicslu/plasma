@@ -238,5 +238,81 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.assertNotIn('subprocess.run(["git"', source)
 
 
+    def test_peripheral_register_and_core_qualification_are_separate(self):
+        peripheral_tcl = module.make_tcl(self.directory / "bridge.sock", None,
+            self.directory / "unused.bin", "register-read")
+        core_tcl = module.make_tcl(self.directory / "bridge.sock", None,
+            self.directory / "unused.bin", "core-register-read")
+        combined_tcl = module.make_tcl(self.directory / "bridge.sock", None,
+            self.directory / "unused.bin", "diagnose-after")
+        for tcl in (peripheral_tcl, core_tcl, combined_tcl):
+            self.assertNotIn("flash erase_address", tcl)
+            self.assertNotIn("flash write_image", tcl)
+            self.assertNotIn("reset run", tcl)
+            self.assertIn("proc plasma_register_probe", tcl)
+            self.assertIn("proc plasma_core_probe", tcl)
+            self.assertIn("PLASMA_CORE_STATE_BEFORE", tcl)
+            self.assertIn('if {$before eq "running"', tcl)
+            self.assertIn('if {[catch {resume} reason]}', tcl)
+            self.assertIn('if {$after ne $before}', tcl)
+        self.assertIn("catch {plasma_register_probe}", peripheral_tcl)
+        self.assertNotIn("catch {plasma_core_probe}", peripheral_tcl)
+        self.assertIn("catch {plasma_core_probe}", core_tcl)
+        self.assertNotIn("catch {plasma_register_probe}", core_tcl)
+        self.assertIn("catch {plasma_core_probe}", combined_tcl)
+        self.assertIn("catch {plasma_register_probe}", combined_tcl)
+        self.assertIn('PLASMA_DIAG_END POST_SESSION', combined_tcl)
+
+    def test_register_read_requires_real_32_bit_values_and_identity(self):
+        good = ("PLASMA_REGISTER_PASS DBGMCU_IDCODE 0x20036410\\n"
+                "PLASMA_REGISTER_PASS SCB_CPUID 0x411FC231\\n"
+                "PLASMA_REGISTER_PASS FLASH_SR 0x00000020\\n"
+                "PLASMA_REGISTER_SUMMARY PASS\\n")
+        result, values = module.read_register_evidence(good)
+        self.assertTrue(result)
+        self.assertEqual(values["DBGMCU_IDCODE"], "0x20036410")
+        self.assertEqual(values["FLASH_SR"], "0x00000020")
+        negatives = (
+            good.replace("PLASMA_REGISTER_PASS FLASH_SR 0x00000020\\n", ""),
+            good.replace("0x411FC231", "0x00000000"),
+            good.replace("0x20036410", "0x00000000"),
+            good.replace("0x00000020", "NOT_READ"),
+            good + "PLASMA_REGISTER_PASS FLASH_SR 0x00000020\\n",
+            good.replace("PLASMA_REGISTER_SUMMARY PASS", "PLASMA_REGISTER_SUMMARY FAIL"),
+            good + "PLASMA_REGISTER_FAIL FLASH_SR TARGET_IO_ERROR\\n",
+            "PLASMA_REGISTER_SUMMARY PASS\\n",
+        )
+        for log in negatives:
+            with self.subTest(log=log[-100:]):
+                self.assertFalse(module.read_register_evidence(log)[0])
+
+    def test_core_registers_require_values_and_original_running_state_restored(self):
+        regs = ("PLASMA_CORE_REGISTER_PASS pc 0x08000420\\n"
+                "PLASMA_CORE_REGISTER_PASS sp 0x20004FF0\\n"
+                "PLASMA_CORE_REGISTER_PASS lr 0x08000201\\n"
+                "PLASMA_CORE_REGISTER_PASS xPSR 0x01000000\\n")
+        running = ("PLASMA_CORE_STATE_BEFORE running\\n" + regs
+                   + "PLASMA_CORE_RESUME_OK\\n"
+                   + "PLASMA_CORE_STATE_AFTER running\\n"
+                   + "PLASMA_CORE_SUMMARY PASS\\n")
+        halted = ("PLASMA_CORE_STATE_BEFORE halted\\n" + regs
+                  + "PLASMA_CORE_STATE_AFTER halted\\n"
+                  + "PLASMA_CORE_SUMMARY PASS\\n")
+        for log in (running, halted):
+            self.assertTrue(module.read_core_evidence(log)[0])
+        negatives = (
+            running.replace("PLASMA_CORE_RESUME_OK\\n", ""),
+            running.replace("PLASMA_CORE_STATE_AFTER running", "PLASMA_CORE_STATE_AFTER halted"),
+            running.replace("PLASMA_CORE_REGISTER_PASS lr 0x08000201\\n", ""),
+            running.replace("0x20004FF0", "UNREADABLE"),
+            running.replace("PLASMA_CORE_SUMMARY PASS", "PLASMA_CORE_SUMMARY FAIL"),
+            running + "PLASMA_CORE_REGISTER_FAIL pc TARGET_TIMEOUT\\n",
+            "PLASMA_CORE_SUMMARY PASS\\n",
+        )
+        for log in negatives:
+            with self.subTest(log=log[-100:]):
+                self.assertFalse(module.read_core_evidence(log)[0])
+
+
 if __name__ == "__main__":
     unittest.main()
