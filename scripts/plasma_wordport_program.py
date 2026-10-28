@@ -201,18 +201,23 @@ proc plasma_core_probe {} {
         echo "PLASMA_CORE_HALT_FAIL TARGET_NOT_HALTED"
         incr failures
     } else {
-        foreach name {pc sp lr xPSR} {
+        # OpenOCD renamed the Cortex-M register from xPSR to xpsr.
+        # Keep the user-facing receipt label xPSR; use the actual
+        # case-sensitive OpenOCD register key for get_reg/dict lookup.
+        foreach spec {{pc pc} {sp sp} {lr lr} {xpsr xPSR}} {
+            set name [lindex $spec 0]
+            set label [lindex $spec 1]
             if {[catch {set values [get_reg -force [list $name]]} reason]} {
-                echo "PLASMA_CORE_REGISTER_FAIL $name $reason"
+                echo "PLASMA_CORE_REGISTER_FAIL $label $reason"
                 incr failures
                 continue
             }
             if {![dict exists $values $name] || ![string is integer -strict [dict get $values $name]]} {
-                echo "PLASMA_CORE_REGISTER_FAIL $name INVALID_READ_VALUE"
+                echo "PLASMA_CORE_REGISTER_FAIL $label INVALID_READ_VALUE"
                 incr failures
                 continue
             }
-            echo "PLASMA_CORE_REGISTER_PASS $name [format 0x%08X [dict get $values $name]]"
+            echo "PLASMA_CORE_REGISTER_PASS $label [format 0x%08X [dict get $values $name]]"
         }
     }
     # Always attempt to restore a formerly running core, even when a read
