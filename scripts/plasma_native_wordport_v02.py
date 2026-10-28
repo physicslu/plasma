@@ -25,6 +25,8 @@ PYTHON = "/opt/plasma/python/3.12.13/bin/python3"
 OPENOCD = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/bin/openocd"
 OPENOCD_SCRIPTS = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/share/openocd/scripts"
 NATIVE_SHA = "66261cef851c9777469b393b7539c5b0f8c2b039a032f1a5b4cbf9e93460e447"
+SESSION_SHA = "ce325d8c965f36208036158a2bce810f445f4ff053415f96e62fba156ff41650"
+PY_MODULE_SHA = "57dfad519993910ae04e1b05b1592b06d9db856b665a50bd81dd47dc6154b3ef"
 V02_SHA = "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c"
 V02_BYTES = 62800
 ERASE_BYTES = 0xF800  # 62 x 1-KiB pages, not a 64-KiB mass erase
@@ -138,7 +140,10 @@ def z2_preflight(args):
     if sha(native) != NATIVE_SHA:
         raise NotRun(77, "PINNED_NATIVE_LIBRARY_MISMATCH")
     barrier = file_at(str(BUNDLE / "software/python/native/libplasma_mmio_barrier.so"))
-    file_at(str(BUNDLE / "scripts/bluepill-wordport-session.py"))
+    if sha(file_at(str(BUNDLE / "scripts/bluepill-wordport-session.py"))) != SESSION_SHA:
+        raise NotRun(77, "PINNED_BRIDGE_SESSION_SHA_MISMATCH")
+    if sha(file_at(str(BUNDLE / "software/python/plasma_interfaces/native_bluepill_word_port.py"))) != PY_MODULE_SHA:
+        raise NotRun(77, "PINNED_NATIVE_MODULE_SHA_MISMATCH")
     file_at(OPENOCD)
     if not Path(OPENOCD_SCRIPTS).is_dir():
         raise NotRun(69, "OPENOCD_SCRIPTS_MISSING")
@@ -204,6 +209,7 @@ def on_z2(args):
     completed = None
     bridge_stdout = bridge_stderr = ""
     error = None
+    timeout_log = ""
     try:
         bridge = subprocess.Popen(bridge_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   text=True, start_new_session=True)
@@ -216,6 +222,10 @@ def on_z2(args):
             time.sleep(0.05)
         completed = subprocess.run([OPENOCD, "-s", OPENOCD_SCRIPTS, "-f", str(tcl)],
                                    capture_output=True, text=True, timeout=570)
+    except subprocess.TimeoutExpired as exc:
+        fragments = (exc.stdout, exc.stderr)
+        timeout_log = "".join(v.decode("utf-8", "replace") if isinstance(v, bytes) else (v or "") for v in fragments)
+        error = f"OPENOCD_570S_TIMEOUT: {exc}"[:500]
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"[:500]
     finally:
@@ -229,7 +239,7 @@ def on_z2(args):
                 bridge_stdout, bridge_stderr = bridge.communicate(timeout=5)
         if socketdir.exists() and not socket.exists():
             socketdir.rmdir()
-    log = (completed.stdout + completed.stderr) if completed is not None else ""
+    log = (completed.stdout + completed.stderr) if completed is not None else timeout_log
     (evidence / "openocd.log").write_text(log)
     (evidence / "bridge.log").write_text(bridge_stdout + bridge_stderr)
     eligible = (completed is not None and completed.returncode == 0 and
