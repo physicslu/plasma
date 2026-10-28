@@ -71,8 +71,12 @@ class GenericImageContract(unittest.TestCase):
                          SCRIPT.read_text())
 
     def test_exact_geometry_boundary_and_negative_image_inputs(self):
-        last, digest = self.image("full.bin", b"F" * 65536)
-        self.assertEqual(module.admit_image("program", str(last), digest)[3], 65536)
+        last, digest = self.image("approved-62pages.bin", b"F" * 63488)
+        self.assertEqual(module.admit_image("program", str(last), digest)[3], 63488)
+        full, full_sha = self.image("full-64k.bin", b"F" * 65536)
+        with self.assertRaises(module.NotRun) as blocked:
+            module.admit_image("program", str(full), full_sha)
+        self.assertEqual(str(blocked.exception), "ERASE_OUTSIDE_APPROVED_RANGE")
         cases = (
             ("empty", b"", None, "IMAGE_OUTSIDE_TARGET_FLASH"),
             ("oversize", b"A" * 65538, None, "IMAGE_OUTSIDE_TARGET_FLASH"),
@@ -124,7 +128,8 @@ class GenericImageContract(unittest.TestCase):
     def test_tcl_rejects_missing_or_unbounded_execution_plan(self):
         img = self.directory / "mock.bin"
         for size, erase in ((0, 1024), (65538, 66560), (1024, 999),
-                            (2048, 1024), (2048, 66560)):
+                            (2048, 1024), (2048, 66560),
+                            (65536, 65536)):
             with self.subTest(size=size, erase=erase):
                 with self.assertRaises(ValueError):
                     self.render(img, size, erase)
