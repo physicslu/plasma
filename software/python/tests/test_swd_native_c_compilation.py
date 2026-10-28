@@ -91,6 +91,7 @@ def test_native_leased_word_port_host_only_owner_revocation(tmp_path):
         "-O2", "-I", str(SRC),
         str(SRC / "plasma_swd_fifo_core.c"),
         str(SRC / "plasma_swd_lease_word_port.c"),
+        str(SRC / "plasma_swd_owner_lock.c"),
         str(SRC / "tests/test_plasma_swd_lease_word_port.c"),
         "-o", str(executable),
     ]
@@ -113,3 +114,88 @@ def test_native_lease_boundary_has_no_direct_device_or_bitbang_path():
                       "MODE_DEBUG", "remote_bitbang", "system("):
         assert forbidden not in source
     assert "0x3c" not in source and "0x40" not in source
+
+
+def test_c_owner_flock_excludes_existing_python_linuxmmio(tmp_path):
+    """Two separate processes use the exact same advisory lock protocol.
+
+    Tests only a temporary lock and synthetic regular file. No /dev/mem.
+    """
+    from plasma_interfaces.linux_mmio import LinuxMMIO, MMIOAperture, MMIOError
+
+    cc = shutil.which("cc")
+    assert cc, "Host C compiler required"
+    binary = tmp_path / "plasma-swd-flock-test"
+    compile_args = [
+        cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-O2", "-I", str(SRC),
+        str(SRC / "plasma_swd_owner_lock.c"),
+        str(SRC / "tests/test_plasma_swd_owner_lock_cli.c"),
+        "-o", str(binary),
+    ]
+    result = subprocess.run(compile_args, text=True, capture_output=True,
+                            timeout=30, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    lock_file = tmp_path / "plasma-mmio.lock"
+    fixture = tmp_path / "fake-mmio"
+    with fixture.open("wb") as f:
+        f.truncate(8192)
+
+    def linux_mmio():
+        return LinuxMMIO(
+            [MMIOAperture(4096, frozenset({0}), frozenset({4}))],
+            device=str(fixture), owner_lock=str(lock_file))
+
+    def call_cli(action, path=lock_file):
+        return subprocess.run([str(binary), action, str(path)],
+                              capture_output=True, text=True,
+                              timeout=5, check=False)
+
+    # Python owns the advisory lock; independent C process must fail.
+    with linux_mmio():
+        denied = call_cli("try")
+        assert denied.returncode == 8, denied.stdout + denied.stderr
+        assert "LOCK_BUSY_OR_DENIED" in denied.stdout
+    granted = call_cli("try")
+    assert granted.returncode == 0, granted.stdout + granted.stderr
+
+    # C process owns the exact same lock; Python must not open a backend.
+    holder = subprocess.Popen(
+        [str(binary), "hold", str(lock_file)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True)
+    try:
+        assert holder.stdout is not None
+        assert holder.stdout.readline().strip() == "LOCK_HELD"
+        with pytest.raises(MMIOError, match="owned by another"):
+            with linux_mmio():
+                pass
+    finally:
+        if holder.stdin:
+            holder.stdin.write("\n")
+            holder.stdin.flush()
+            holder.stdin.close()
+        assert holder.wait(timeout=5) == 0
+        if holder.stdout:
+            holder.stdout.close()
+        if holder.stderr:
+            holder.stderr.close()
+    with linux_mmio():
+        pass
+
+    # Symlinks never redirect the C owner lock, including to a fake file.
+    link = tmp_path / "redirected-lock"
+    link.symlink_to(lock_file)
+    assert call_cli("try", link).returncode == 8
+
+
+def test_c_lock_bound_lease_is_non_optional():
+    header = (SRC / "plasma_swd_lease_word_port.h").read_text()
+    impl = (SRC / "plasma_swd_lease_word_port.c").read_text()
+    lock = (SRC / "plasma_swd_owner_lock.h").read_text()
+    assert '"/run/lock/plasma-mmio.lock"' in lock
+    assert "plasma_swd_owner_lock_valid" in impl
+    assert "owner_lock_epoch" in header and "owner_lock_epoch" in impl
+    assert "plasma_swd_owner_lock_acquire" in lock
+    assert "plasma_swd_owner_lock_release" in lock

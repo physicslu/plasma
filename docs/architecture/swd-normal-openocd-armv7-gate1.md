@@ -206,6 +206,37 @@ port. A mock success is not Image/Manifest authenticity, electrical
 qualification or permission to access hardware. C/Python both describing
 the Site contract is not the same as sharing one live object or lock.
 
+## PS-local shared advisory MMIO owner lock (C ↔ Python, Host-only)
+
+The standalone C lock primitives in `plasma_swd_owner_lock.[ch]`
+use the **same** `/run/lock/plasma-mmio.lock`, `O_CREAT|O_RDWR|
+O_CLOEXEC|O_NOFOLLOW` and nonblocking exclusive `flock()`
+semantics as existing Python `LinuxMMIO.open()`. A non-hardware test
+compiles a C subprocess and checks **both directions**: while Python
+holds the test lock C cannot acquire it, and while C holds the lock
+Python LinuxMMIO cannot open its synthetic regular-file backend.
+Symlink lock paths are rejected. No live Z2 lock/device was touched.
+
+`plasma_swd_lease_word_port_init()` now **requires an already-held
+process-owner lock** (not merely a provider callback); all later Site
+admission, reads, writes and barriers check creator PID, live lock,
+and its acquisition epoch. Release/reacquire cannot revive a stale
+Site token. Both Sites within one PS-local process may use one common
+process lock, plus independent per-Site lease generation/authorization
+inside the trusted provider.
+
+**Limits:** `flock()` is an advisory cooperative process exclusion,
+not cryptographic trust, not proof of loaded Image/Manifest, not
+protection from kernel drivers or another privileged process that
+ignores the lock. `valid()` verifies process/descriptor bookkeeping
+only, not kernel owner provenance. A production C provider must
+still authenticate applicable Root/boot/board/electrical state and
+perform each native 32-bit MMIO operation under the same authoritative
+hardware-owner mutex and Site lease. This PR does not implement any
+real device-mapped provider, a C-to-Python memory sharing ABI, or a
+deployed OpenOCD startup admission mechanism. Never use Host-only
+regular-file evidence as HIL acceptance.
+
 ## ARMv7 MMIO word width contract
 
 `software/python/plasma_interfaces/swd_mmio32_contract.py` checks

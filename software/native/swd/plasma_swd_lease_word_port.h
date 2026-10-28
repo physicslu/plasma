@@ -5,6 +5,7 @@
 #ifndef PLASMA_SWD_LEASE_WORD_PORT_H
 #define PLASMA_SWD_LEASE_WORD_PORT_H
 #include "plasma_swd_fifo_core.h"
+#include "plasma_swd_owner_lock.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -33,6 +34,8 @@ struct plasma_swd_lease_word_port {
     unsigned int site_id;
     uint32_t base;
     uint64_t generation;
+    const struct plasma_swd_owner_lock *process_lock;
+    uint64_t owner_lock_epoch;
     pid_t creator_pid;
     bool admitted;
     bool poisoned;
@@ -40,6 +43,7 @@ struct plasma_swd_lease_word_port {
 /* Inert construction: validates shape only, does not qualify or touch MMIO. */
 int plasma_swd_lease_word_port_init(struct plasma_swd_lease_word_port *port,
                                    const struct plasma_swd_lease_provider *owner,
+                                   const struct plasma_swd_owner_lock *process_lock,
                                    unsigned int site, uint64_t generation);
 /* Single explicit qualification; provider has final authority. */
 int plasma_swd_lease_word_port_admit(struct plasma_swd_lease_word_port *port);

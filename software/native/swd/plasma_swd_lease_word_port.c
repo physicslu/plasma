@@ -10,7 +10,9 @@
 static bool can_access(const struct plasma_swd_lease_word_port *p)
 {
     return p && p->admitted && !p->poisoned &&
-           p->creator_pid == getpid();
+           p->creator_pid == getpid() &&
+           plasma_swd_owner_lock_valid(p->process_lock) &&
+           p->owner_lock_epoch == p->process_lock->epoch;
 }
 static void poison(struct plasma_swd_lease_word_port *p)
 {
@@ -49,9 +51,11 @@ static bool offset_ok(const struct plasma_swd_lease_word_port *p,
 
 int plasma_swd_lease_word_port_init(struct plasma_swd_lease_word_port *p,
                                    const struct plasma_swd_lease_provider *owner,
+                                   const struct plasma_swd_owner_lock *process_lock,
                                    unsigned int site, uint64_t generation)
 {
-    if (!p || !owner || (site != 1 && site != 2) || generation == 0 ||
+    if (!p || !owner || !plasma_swd_owner_lock_valid(process_lock) ||
+        (site != 1 && site != 2) || generation == 0 ||
         !owner->qualify || !owner->read_owned || !owner->write_owned ||
         !owner->barrier_owned || !owner->invalidate_all)
         return PLASMA_SWD_BAD_ARG;
@@ -60,12 +64,16 @@ int plasma_swd_lease_word_port_init(struct plasma_swd_lease_word_port *p,
     p->site_id = site;
     p->base = site == 1 ? PLASMA_SWD_SITE1_BASE : PLASMA_SWD_SITE2_BASE;
     p->generation = generation;
+    p->process_lock = process_lock;
+    p->owner_lock_epoch = process_lock->epoch;
     p->creator_pid = getpid();
     return PLASMA_SWD_OK;
 }
 int plasma_swd_lease_word_port_admit(struct plasma_swd_lease_word_port *p)
 {
-    if (!p || p->poisoned || p->admitted || p->creator_pid != getpid())
+    if (!p || p->poisoned || p->admitted || p->creator_pid != getpid() ||
+        !plasma_swd_owner_lock_valid(p->process_lock) ||
+        p->owner_lock_epoch != p->process_lock->epoch)
         return PLASMA_SWD_NOT_READY;
     if (p->provider.qualify(p->provider.ctx, p->site_id, p->base,
                             p->generation) != 0) {

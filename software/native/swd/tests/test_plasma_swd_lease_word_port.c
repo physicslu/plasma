@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Pure Host-only synthetic owner test: no device node, no mmap, no GPIO.
  * Provider must enforce authorization INSIDE each owned access callback.
@@ -7,6 +8,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+static struct plasma_swd_owner_lock process_lock = {.fd = -1};
 
 struct domain {
     uint64_t generations[2];
@@ -106,8 +111,8 @@ static void test_guarded_c_fifo_two_sites(void)
     setup(&d);
     struct plasma_swd_lease_word_port a, b;
     struct plasma_swd_lease_provider owner = provider(&d);
-    assert(plasma_swd_lease_word_port_init(&a, &owner, 1, 11) == 0);
-    assert(plasma_swd_lease_word_port_init(&b, &owner, 2, 22) == 0);
+    assert(plasma_swd_lease_word_port_init(&a, &owner, &process_lock, 1, 11) == 0);
+    assert(plasma_swd_lease_word_port_init(&b, &owner, &process_lock, 2, 22) == 0);
     assert(d.qualifications == 0 && d.reads == 0 && d.writes == 0);
     struct plasma_swd_word_io io_a, io_b;
     assert(plasma_swd_lease_word_port_make_io(&a, &io_a) == PLASMA_SWD_NOT_READY);
@@ -150,16 +155,16 @@ static void test_bad_owner_and_barrier_fail_closed(void)
     setup(&d);
     struct plasma_swd_lease_word_port a, b;
     struct plasma_swd_lease_provider owner = provider(&d);
-    assert(plasma_swd_lease_word_port_init(&a, &owner, 1, 0) == PLASMA_SWD_BAD_ARG);
-    assert(plasma_swd_lease_word_port_init(&a, &owner, 3, 11) == PLASMA_SWD_BAD_ARG);
+    assert(plasma_swd_lease_word_port_init(&a, &owner, &process_lock, 1, 0) == PLASMA_SWD_BAD_ARG);
+    assert(plasma_swd_lease_word_port_init(&a, &owner, &process_lock, 3, 11) == PLASMA_SWD_BAD_ARG);
     d.voltage_safe = 0;
-    assert(plasma_swd_lease_word_port_init(&a, &owner, 1, 11) == 0);
+    assert(plasma_swd_lease_word_port_init(&a, &owner, &process_lock, 1, 11) == 0);
     assert(plasma_swd_lease_word_port_admit(&a) == PLASMA_SWD_NOT_READY);
     assert(a.poisoned && d.writes == 0 && d.invalidations == 0);
     d.voltage_safe = 1;
     assert(plasma_swd_lease_word_port_admit(&a) == PLASMA_SWD_NOT_READY);
-    assert(plasma_swd_lease_word_port_init(&a, &owner, 1, 11) == 0);
-    assert(plasma_swd_lease_word_port_init(&b, &owner, 2, 22) == 0);
+    assert(plasma_swd_lease_word_port_init(&a, &owner, &process_lock, 1, 11) == 0);
+    assert(plasma_swd_lease_word_port_init(&b, &owner, &process_lock, 2, 22) == 0);
     assert(plasma_swd_lease_word_port_admit(&a) == 0);
     assert(plasma_swd_lease_word_port_admit(&b) == 0);
     struct plasma_swd_word_io io_a, io_b;
@@ -176,8 +181,34 @@ static void test_bad_owner_and_barrier_fail_closed(void)
 }
 int main(void)
 {
+    char path[] = "/tmp/plasma-swd-owner-host-XXXXXX";
+    int fd = mkstemp(path);
+    assert(fd >= 0);
+    close(fd);
+    assert(plasma_swd_owner_lock_acquire(&process_lock, path) == 0);
     test_guarded_c_fifo_two_sites();
     test_bad_owner_and_barrier_fail_closed();
+    /* Releasing and reacquiring the same cooperative lock is a NEW epoch.
+     * A stale C Site token must never silently become active again. */
+    struct domain d;
+    setup(&d);
+    struct plasma_swd_lease_word_port stale;
+    struct plasma_swd_lease_provider owner = provider(&d);
+    assert(plasma_swd_lease_word_port_init(
+        &stale, &owner, &process_lock, 1, 11) == 0);
+    assert(plasma_swd_lease_word_port_admit(&stale) == 0);
+    struct plasma_swd_word_io io;
+    assert(plasma_swd_lease_word_port_make_io(&stale, &io) == 0);
+    const uint64_t epoch = process_lock.epoch;
+    plasma_swd_owner_lock_release(&process_lock);
+    uint32_t value = 0;
+    assert(io.read32(io.ctx, PLASMA_SWD_SITE1_BASE, &value) != 0);
+    assert(plasma_swd_owner_lock_acquire(&process_lock, path) == 0);
+    assert(process_lock.epoch != epoch);
+    assert(io.read32(io.ctx, PLASMA_SWD_SITE1_BASE, &value) != 0);
+    assert(d.reads == 0);
+    plasma_swd_owner_lock_release(&process_lock);
+    assert(unlink(path) == 0);
     puts("PLASMA_NATIVE_SWD_LEASE_PORT_HOST_ONLY_PASS");
     return 0;
 }
