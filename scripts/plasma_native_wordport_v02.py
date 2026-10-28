@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-shot, owner-approved Blue Pill v0.2 SWD via existing Native C bridge.
+"""Read-only preflight or one-shot, owner-approved Blue Pill v0.2 SWD.
 
 Path 2 uses --role swpc (pinned SSH); standalone Z2 uses --role z2.
 Neither route installs software, loads an FPGA Image, retries, or resets DUT.
@@ -131,8 +131,10 @@ def z2_preflight(args):
     if os.geteuid() != 0:
         raise NotRun(77, "ROOT_REQUIRED_ON_Z2")
     check_source(args.source_sha256)
-    if not args.owner_attested or Path(__file__).resolve() != Z2_ENTRY.resolve():
-        raise NotRun(77, "OWNER_OR_Z2_INSTALL_PATH_DENIED")
+    if Path(__file__).resolve() != Z2_ENTRY.resolve():
+        raise NotRun(77, "Z2_REVIEWED_INSTALL_PATH_REQUIRED")
+    if args.operation != "preflight" and not args.owner_attested:
+        raise NotRun(77, "OWNER_ATTESTATION_REQUIRED_FOR_HARDWARE")
     firmware = file_at(args.firmware)
     if firmware.stat().st_size != V02_BYTES or sha(firmware) != V02_SHA:
         raise NotRun(77, "PINNED_V02_FIRMWARE_MISMATCH")
@@ -145,6 +147,8 @@ def z2_preflight(args):
     if sha(file_at(str(BUNDLE / "software/python/plasma_interfaces/native_bluepill_word_port.py"))) != PY_MODULE_SHA:
         raise NotRun(77, "PINNED_NATIVE_MODULE_SHA_MISMATCH")
     file_at(OPENOCD)
+    if not os.access(OPENOCD, os.X_OK):
+        raise NotRun(77, "OPENOCD_NOT_EXECUTABLE")
     if not Path(OPENOCD_SCRIPTS).is_dir():
         raise NotRun(69, "OPENOCD_SCRIPTS_MISSING")
     root_sha = (ROOT / ".plasma-path2-source-commit").read_text().strip()
@@ -186,6 +190,28 @@ def z2_preflight(args):
 
 def on_z2(args, *, socket_base: Path = Path("/run")):
     firmware, native, barrier, boot, root_sha = z2_preflight(args)
+    if args.operation == "preflight":
+        print(json.dumps({
+            "operation": "preflight", "result": "PASS",
+            "checks": {
+                "reviewed_script_sha256": "PASS",
+                "v02_firmware_size_sha256": "PASS",
+                "native_c_armv7_sha256": "PASS",
+                "bridge_session_and_native_python_sha256": "PASS",
+                "openocd_executable_and_scripts": "PASS",
+                "protected_root_source_pin_and_sha256_manifest": "PASS",
+                "fpga_manager": "operating",
+                "held_tested_image_manifest_and_golden_sha256": "PASS",
+                "mmio_devices_idle": "PASS",
+                "openocd_and_swd_owner_idle": "PASS",
+            },
+            "boot_id": boot,
+            "root_source_commit": root_sha,
+            "electrical": "NOT_VERIFIED_OWNER_MUST_CHECK",
+            "hw_action": "NONE",
+            "no_erase_program_halt_reset": True,
+        }, sort_keys=True), flush=True)
+        return 0
     base = BUNDLE / ".work/native-v02-path2"
     if base.is_symlink():
         raise NotRun(77, "EVIDENCE_SYMLINK_DENIED")
@@ -269,8 +295,8 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
 
 def on_swpc(args):
     check_source(args.source_sha256)
-    if not args.owner_attested:
-        raise NotRun(77, "OWNER_ATTESTATION_REQUIRED")
+    if args.operation != "preflight" and not args.owner_attested:
+        raise NotRun(77, "OWNER_ATTESTATION_REQUIRED_FOR_HARDWARE")
     home = Path.home()
     login = home / ".config/plasma/z2-login-smoke.json"
     key = home / ".ssh/plasma_z2_ed25519"
@@ -288,7 +314,9 @@ def on_swpc(args):
         raise NotRun(77, "Z2_HOST_KEY_NOT_PINNED")
     command = [PYTHON, "-I", "-B", str(Z2_ENTRY), "--role", "z2",
                "--operation", args.operation, "--firmware", args.firmware,
-               "--source-sha256", args.source_sha256, "--owner-attested"]
+               "--source-sha256", args.source_sha256]
+    if args.owner_attested:
+        command.append("--owner-attested")
     ssh = ["ssh", "-F", "/dev/null", "-i", str(key), "-o", "BatchMode=yes",
            "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=yes",
            "-o", "UserKnownHostsFile=" + str(hosts),
@@ -308,10 +336,11 @@ def on_swpc(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", choices=("swpc", "z2"), required=True)
-    parser.add_argument("--operation", choices=("program-v02", "diagnose-after"), required=True)
+    parser.add_argument("--operation", choices=("preflight", "program-v02", "diagnose-after"), required=True)
     parser.add_argument("--firmware", required=True, help="Absolute firmware path on Z2")
     parser.add_argument("--source-sha256", required=True)
-    parser.add_argument("--owner-attested", required=True, action="store_true")
+    parser.add_argument("--owner-attested", action="store_true",
+                        help="Required for programming/diagnosis; not needed for read-only preflight")
     args = parser.parse_args()
     try:
         return on_swpc(args) if args.role == "swpc" else on_z2(args)
