@@ -238,7 +238,7 @@ class CDCFrameBudgetTests(unittest.TestCase):
         lines = []
         for i in range(1, n + 1):
             seq = i + (1 if skip_seq_at is not None and i >= skip_seq_at else 0)
-            lines.append(f"HB version={version} seq={seq} uptime_ms={i * period_ms}\\r\\n")
+            lines.append(f"HB version={version} seq={seq} uptime_ms={i * period_ms}\r\n")
         return lines
 
     def test_sixty_consecutive_frames_pass(self):
