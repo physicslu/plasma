@@ -249,10 +249,13 @@ class NativeBridgeHost(unittest.TestCase):
         self.assertLess(script.index("validate_checkpoint(record"),
                         script.index("bridge = NativeBluepillWordPort("))
         for required in ("root.trusted_local()", "root.native_runtime_preflight()",
-                         "root.live_report(", "mmio.claim_site(1, BASE)",
+                         "root.live_program_session_report(", "mmio.claim_site(1, BASE)",
                          "serve_local_unix_once(args.socket, bridge, idle_timeout_s=60)",
                          "signal.alarm(600)"):
             self.assertIn(required, script)
+        self.assertIn("['fuser', '-s', device]", script)
+        self.assertLess(script.index("root.live_program_session_report("),
+                        script.index("bridge = NativeBluepillWordPort("))
         self.assertNotIn("bridge = RemoteBitbangSWD(", script)
 
     def test_bounded_native_throughput_smoke(self):
