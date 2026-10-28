@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * ABI-v5 native C 32-bit volatile MMIO engine, inspired by merged PR #1199
- * bluepill_wordport_bridge.c. Hardware admission remains external and is
+ * its 32-bit MMIO instruction technique. Hardware admission remains external and is
  * rechecked at each C operation. NO independent device owner is installed.
  *
  * On ARMv7 the compiler must emit word LDR/STR and DMB SY, separately
