@@ -1,0 +1,355 @@
+#!/usr/bin/env python3
+"""SWPC development-only, bounded STM32F103C8T6 Site 1 A/B Flash burn-in.
+
+This is an operator-owned orchestration script, not a new programmer:
+OpenOCD/WordPort execute ONLY on Z2 via the existing SHA-guarded engine.
+One --cycle means v0.1 then v0.2 (two separate programming attempts).
+On first non-PASS, capture bounded read-only register evidence and STOP.
+SIGINT/SIGTERM or --stop-file stops at the next complete attempt boundary.
+"""
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timezone
+import errno
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import select
+import signal
+import subprocess
+import sys
+import termios
+import time
+import tty
+
+ENGINE = Path(__file__).with_name("plasma_wordport_program.py")
+ICPN = "STM32F103C8T6"
+SITE = 1
+IMAGES = {
+    "v0.1": {
+        "path": "/home/xilinx/plasma-bluepill-ab-20261028/plasma-blue-pill-cdc-v0.1.bin",
+        "sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+        "size": 18768,
+        "heartbeat_ms": 500,
+        "version": "0.1",
+    },
+    "v0.2": {
+        "path": "/home/xilinx/plasma-bluepill-ab-20261028/plasma-blue-pill-cdc-v0.2.bin",
+        "sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+        "size": 62800,
+        "heartbeat_ms": 1000,
+        "version": "0.2",
+    },
+}
+HB_RE = re.compile(rb"^HB version=(0\.[12]) seq=(\d+) uptime_ms=(\d+)$")
+
+
+def plan(cycles: int) -> list[str]:
+    if not 1 <= cycles <= 1000:
+        raise ValueError("cycles must be 1..1000")
+    return ["v0.1", "v0.2"] * cycles
+
+
+def parse_receipt(output: str) -> dict:
+    for line in reversed(output.splitlines()):
+        try:
+            value = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(value, dict) and "result" in value:
+            return value
+    return {"result": "FAIL", "reason": "MISSING_JSON_RECEIPT"}
+
+
+def valid_receipt(operation: str, receipt: dict, image: dict | None = None) -> bool:
+    if receipt.get("result") != "PASS" or receipt.get("operation") != operation:
+        return False
+    if operation == "preflight":
+        return (receipt.get("hw_action") == "NONE"
+                and (image is None or
+                     (receipt.get("image_sha256") == image["sha256"]
+                      and receipt.get("image_bytes") == image["size"])))
+    if (receipt.get("openocd_exit") != 0 or receipt.get("bridge_exit") != 0
+            or receipt.get("socket_released") is not True
+            or receipt.get("no_auto_retry") is not True):
+        return False
+    if operation == "program":
+        return (image is not None and receipt.get("image_sha256") == image["sha256"]
+                and receipt.get("readback_sha256") == image["sha256"]
+                and receipt.get("image_bytes") == image["size"]
+                and receipt.get("no_reset_no_retry") is True)
+    if operation in ("reset-run", "register-read"):
+        return receipt.get("no_flash_write") is True
+    return False
+
+
+def verify_cdc(port: str, version: str, period_ms: int, frames: int, timeout_s: float) -> dict:
+    """Validate fresh live USB CDC frames without pyserial or subprocess shell."""
+    deadline = time.monotonic() + timeout_s
+    path = Path(port)
+    fd = None
+    samples: list[dict] = []
+    wrong_versions: list[str] = []
+    read_buffer = b""
+    try:
+        while time.monotonic() < deadline:
+            if fd is None:
+                if not path.exists():
+                    time.sleep(0.2)
+                    continue
+                if not path.is_char_device():
+                    return {"result": "FAIL", "reason": "NOT_A_CHARACTER_DEVICE"}
+                # Existing picocom/minicom owns the TTY: never kill or steal it.
+                try:
+                    owner = subprocess.run(["fuser", "-s", port],
+                                           capture_output=True, timeout=3)
+                except (FileNotFoundError, subprocess.TimeoutExpired):
+                    return {"result": "FAIL", "reason": "SERIAL_OWNER_UNKNOWN"}
+                if owner.returncode != 1:
+                    return {"result": "FAIL", "reason": "SERIAL_BUSY_OR_UNKNOWN"}
+                try:
+                    fd = os.open(port, os.O_RDONLY | os.O_NOCTTY | os.O_NONBLOCK)
+                    fcntl.ioctl(fd, termios.TIOCEXCL)
+                    tty.setraw(fd)
+                    attrs = termios.tcgetattr(fd)
+                    attrs[4] = termios.B115200
+                    attrs[5] = termios.B115200
+                    termios.tcsetattr(fd, termios.TCSANOW, attrs)
+                except OSError as exc:
+                    if fd is not None:
+                        os.close(fd)
+                        fd = None
+                    if exc.errno == errno.ENOENT:
+                        time.sleep(0.2)
+                        continue
+                    return {"result": "FAIL", "reason": "SERIAL_OPEN_ERROR",
+                            "detail": str(exc)[:200]}
+            try:
+                ready, _, _ = select.select([fd], [], [],
+                                            min(0.5, max(0.0, deadline - time.monotonic())))
+                if not ready:
+                    continue
+                chunk = os.read(fd, 4096)
+                if not chunk:
+                    return {"result": "FAIL", "reason": "SERIAL_DISCONNECTED"}
+            except OSError as exc:
+                return {"result": "FAIL", "reason": "SERIAL_IO_ERROR",
+                        "detail": str(exc)[:200]}
+            read_buffer = (read_buffer + chunk)[-16384:]
+            while b"\n" in read_buffer:
+                line, read_buffer = read_buffer.split(b"\n", 1)
+                match = HB_RE.fullmatch(line.strip())
+                if not match:
+                    continue
+                seen_version = match.group(1).decode()
+                if seen_version != version:
+                    wrong_versions.append(seen_version)
+                    samples.clear()
+                    continue
+                seq, uptime_ms = int(match.group(2)), int(match.group(3))
+                sample = {"seq": seq, "uptime_ms": uptime_ms}
+                if samples:
+                    prev = samples[-1]
+                    step = uptime_ms - prev["uptime_ms"]
+                    if seq != prev["seq"] + 1 or abs(step - period_ms) > 100:
+                        samples.clear()
+                samples.append(sample)
+                if len(samples) >= frames:
+                    return {"result": "PASS", "version": version, "port": port,
+                            "heartbeat_ms": period_ms, "frames": samples[:],
+                            "wrong_version_samples": len(wrong_versions)}
+        return {"result": "FAIL", "reason": "CDC_TIMEOUT_OR_WRONG_VERSION",
+                "expected_version": version, "seen_versions": wrong_versions[-10:],
+                "last_consecutive_samples": samples}
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+class BurnIn:
+    def __init__(self, args: argparse.Namespace):
+        self.args = args
+        self.sequence = plan(args.cycles)
+        self.stop_requested = False
+        self.engine_sha = hashlib.sha256(ENGINE.read_bytes()).hexdigest()
+        now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        self.root = Path(args.output).expanduser()
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.directory = self.root / (now + "-" + str(os.getpid()))
+        self.directory.mkdir(mode=0o700)
+        self.record = self.directory / "events.jsonl"
+        self.log = self.directory / "progress.log"
+        self.status_file = self.directory / "status.json"
+        self.current = 0
+        self.passed = 0
+        self.failed = 0
+        self.started = time.monotonic()
+        self.status = "INIT"
+        self._lock = open(self.root / ".site1-burnin.lock", "a+", encoding="utf-8")
+        try:
+            fcntl.flock(self._lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError("ANOTHER_SWPC_BURN_IN_OWNER_IS_ACTIVE") from exc
+
+    def report(self, stage: str, message: str, extra: dict | None = None):
+        stamp = datetime.now(timezone.utc).isoformat()
+        line = (f"[{stamp}] {self.current}/{len(self.sequence)}"
+                f" PASS={self.passed} FAIL={self.failed} [{stage}] {message}")
+        print(line, flush=True)
+        with self.log.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+        event = {"time": stamp, "stage": stage, "current": self.current,
+                 "total": len(self.sequence), "passed": self.passed,
+                 "failed": self.failed, "message": message}
+        if extra:
+            event.update(extra)
+        with self.record.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n")
+        state = {**event, "elapsed_s": round(time.monotonic() - self.started, 1),
+                 "stop_file": str(Path(self.args.stop_file).expanduser()),
+                 "evidence_directory": str(self.directory),
+                 "engine_sha256": self.engine_sha}
+        temporary = self.status_file.with_suffix(".tmp")
+        temporary.write_text(json.dumps(state, indent=2) + "\n")
+        temporary.replace(self.status_file)
+
+    def request_stop(self, signum, _frame):
+        self.stop_requested = True
+        print(f"\nSignal {signum}: graceful stop requested; current attempt will finish.", flush=True)
+
+    def should_stop(self) -> bool:
+        return self.stop_requested or Path(self.args.stop_file).expanduser().exists()
+
+    def run_engine(self, operation: str, image: dict | None = None) -> dict:
+        command = [sys.executable, str(ENGINE),
+                   "--role", "swpc", "--operation", operation,
+                   "--icpn", ICPN, "--site-id", str(SITE),
+                   "--source-sha256", self.engine_sha]
+        if image is not None:
+            command += ["--firmware", image["path"], "--image-sha256", image["sha256"]]
+        if operation != "preflight":
+            command.append("--owner-attested")
+        started = time.monotonic()
+        try:
+            completed = subprocess.run(command, capture_output=True, text=True,
+                                       timeout=850, start_new_session=True)
+            output = completed.stdout + "\n" + completed.stderr
+            receipt = parse_receipt(output)
+            exit_code = completed.returncode
+        except subprocess.TimeoutExpired as exc:
+            output = (str(exc.stdout or "") + "\n" + str(exc.stderr or ""))
+            receipt = {"result": "FAIL", "reason": "SWPC_OPERATION_TIMEOUT"}
+            exit_code = 124
+        name = f"{self.current:04d}-{operation}"
+        if image is not None:
+            name += "-" + image["version"].replace(".", "")
+        (self.directory / (name + ".log")).write_text(output, encoding="utf-8")
+        return {"receipt": receipt, "exit_code": exit_code,
+                "elapsed_s": round(time.monotonic() - started, 3),
+                "log": str(self.directory / (name + ".log")),
+                "pass": exit_code == 0 and valid_receipt(operation, receipt, image)}
+
+    def capture_failure(self, version: str, stage: str, failed: dict):
+        self.report("FAIL", f"{version} {stage}; stopping future programs",
+                    {"receipt": failed})
+        receipt = failed.get("receipt", {})
+        # The programming engine already runs same-session best-effort
+        # register diagnostics on Flash failure; its Z2 openocd.log is
+        # preserved in the receipt evidence_directory.
+        if receipt.get("result") == "NOT_RUN" or receipt.get("socket_released") is not True:
+            self.report("DIAG_NOT_RUN", "owner/socket state not safely released")
+            return
+        self.report("DIAG", "attempting one READ-ONLY peripheral register acquisition")
+        diag = self.run_engine("register-read")
+        self.report("DIAG_PASS" if diag["pass"] else "DIAG_FAIL",
+                    "DBGMCU_IDCODE/SCB_CPUID/FLASH_SR after failure",
+                    {"diagnostic_receipt": diag})
+        # Do NOT re-halt or resume a potentially half-erased MCU.
+        # This is NOT a silent retry of Erase/Program.
+
+    def run(self) -> int:
+        stop_path = Path(self.args.stop_file).expanduser()
+        if stop_path.exists():
+            self.report("BLOCKED", "stop file already exists; remove deliberately before starting")
+            return 2
+        signal.signal(signal.SIGINT, self.request_stop)
+        signal.signal(signal.SIGTERM, self.request_stop)
+        self.report("READY", f"cycles={self.args.cycles}, flash_attempts={len(self.sequence)} "
+                    f"port={self.args.port}; stop: touch {stop_path}")
+        for version in ("v0.1", "v0.2"):
+            self.report("PREFLIGHT", version)
+            result = self.run_engine("preflight", IMAGES[version])
+            if not result["pass"]:
+                self.failed += 1
+                self.report("PREFLIGHT_FAIL", version, {"receipt": result})
+                return 1
+        for index, version in enumerate(self.sequence, 1):
+            if self.should_stop():
+                self.report("STOPPED", "stop requested before next Flash operation")
+                return 130
+            self.current = index
+            image = IMAGES[version]
+            self.report("PROGRAM", f"{version}: erase/program/verify/readback begin")
+            program = self.run_engine("program", image)
+            if not program["pass"]:
+                self.failed += 1
+                self.capture_failure(version, "PROGRAM_FAIL", program)
+                return 1
+            self.report("PROGRAM_PASS", f"{version} readback SHA256 matched",
+                        {"program_receipt": program})
+            # Even after a stop request, finish this successful attempt by
+            # resetting and checking CDC; never leave an intentional halted core.
+            self.report("RESET", f"{version}: explicit reset-run")
+            reset = self.run_engine("reset-run")
+            if not reset["pass"]:
+                self.failed += 1
+                self.capture_failure(version, "RESET_FAIL", reset)
+                return 1
+            self.report("RESET_PASS", f"{version}: reset-run completed",
+                        {"reset_receipt": reset})
+            self.report("CDC", f"{version}: read {self.args.port} for {self.args.frames} frames")
+            observed = verify_cdc(self.args.port, image["version"],
+                                  image["heartbeat_ms"], self.args.frames,
+                                  self.args.cdc_timeout)
+            if observed["result"] != "PASS":
+                self.failed += 1
+                self.capture_failure(version, "CDC_FAIL", {"receipt": observed})
+                return 1
+            self.passed += 1
+            self.report("ATTEMPT_PASS", f"{version}: full Program/Reset/CDC PASS",
+                        {"cdc_receipt": observed, "program_elapsed_s": program["elapsed_s"]})
+        self.report("COMPLETE", f"all {len(self.sequence)} attempts PASS")
+        return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--cycles", type=int, required=True,
+                        help="one cycle = v0.1 then v0.2; each cycle has two Flash attempts")
+    parser.add_argument("--port", default="/dev/ttyACM0",
+                        help="SWPC Blue Pill USB CDC device; usually /dev/ttyACM0")
+    parser.add_argument("--frames", type=int, default=4)
+    parser.add_argument("--cdc-timeout", type=float, default=25.0)
+    parser.add_argument("--stop-file", default="/tmp/plasma-ab-stop")
+    parser.add_argument("--output", default="~/plasma-ab-runs")
+    args = parser.parse_args(argv)
+    if not 1 <= args.cycles <= 1000 or not 3 <= args.frames <= 20 or not 5 <= args.cdc_timeout <= 120:
+        parser.error("cycles 1..1000, frames 3..20, cdc-timeout 5..120 required")
+    if args.port != "/dev/ttyACM0" and not args.port.startswith("/dev/serial/by-id/"):
+        parser.error("use /dev/ttyACM0 or an explicit /dev/serial/by-id device")
+    if not ENGINE.is_file():
+        parser.error(f"reviewed engine missing: {ENGINE}")
+    os.umask(0o077)
+    try:
+        return BurnIn(args).run()
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(json.dumps({"result": "FAIL", "reason": str(exc)[:300]}), file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
