@@ -1,0 +1,457 @@
+{
+  "schema": "plasma.monitor.pr1195.acceptance.v1",
+  "captured_date": "2026-10-28T12:19:18.695235+00:00",
+  "path": 3,
+  "scope": "host-only evidence correction",
+  "overall_status": "NOT_RUN",
+  "evidence_complete": false,
+  "gate2_ready": false,
+  "candidate_sha": "d2fb3437ce46d8ec17ee974a0ed9bdd572275066",
+  "trusted_main_sha": "84db10582d17a1a8e46d6c835912418414099e1b",
+  "github_run_id": "40686561861",
+  "runner": "SWPC-plasma-codex",
+  "runner_environment": "self-hosted",
+  "swpc_identity": "SWPC",
+  "uid": 998,
+  "python_version": "Python 3.10.12",
+  "tmux_binary": "/usr/bin/tmux",
+  "tmux_version": "tmux 3.2a",
+  "work_order_sha256_owner_supplied": "4abba2e7ebd0acc488413c35c9921ede4730f3f00b60d989dee24c6d3fa4d9f4",
+  "work_order_digest_independently_verified": false,
+  "scenarios": [
+    {
+      "scenario": "candidate_identity",
+      "status": "PASS",
+      "command_category": "read-only Git HEAD and Runner identity",
+      "actual_exit": 0,
+      "observed_assertions": [
+        "HEAD equals approved candidate",
+        "hostname SWPC",
+        "non-root uid 998",
+        "Runner SWPC-plasma-codex, self-hosted",
+        "GITHUB_SHA equals trusted main"
+      ]
+    },
+    {
+      "scenario": "monitor_test_suite",
+      "status": "FAIL",
+      "command_category": "python3 scripts/tests/test_plasma_engineering_monitor.py -v",
+      "actual_exit": 1,
+      "tests_run": 55,
+      "passed": 53,
+      "errors": 2,
+      "skipped": 0,
+      "skip_labels": [],
+      "observed_assertions": [
+        "Ran 55 tests",
+        "FAILED (errors=2)",
+        "Private tmux tests attempted and errored during new-session; no capture proof"
+      ],
+      "test_results": [
+        {
+          "test": "test_activity_exit_code_is_codex_reported_not_verified",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_activity_is_observer_only_evidence_keeps_type_names",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_activity_projection_is_bounded_under_orphaned_items",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_activity_updates_are_deduplicated_and_seconds_are_observed",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_activity_viewer_drops_replayed_or_reordered_sequences",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_authorized_task_and_pr_are_visible_without_work_order_text",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_both_panes_idle_without_jobs",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_both_paths_keep_latest_log_in_short_12_row_pane",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_both_paths_use_local_clock_without_iso_offset",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_clear_does_not_hide_next_jobs_first_message",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_clear_is_display_only_and_new_lines_keep_streaming",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_codex_activity_v1_rejects_secrets_injection_and_escape",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_codex_activity_v1_uses_real_safe_command_and_file",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_execution_detail_fail_closed_sanitizer_and_spoofing",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_last_failure_survives_later_completed_commands",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_launcher_retains_window_on_immediate_viewer_exit",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_live_path3_shows_safe_cli_arguments_at_item_start",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_log_is_clipped_to_pane_without_scrolling_status_offscreen",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_log_render_does_not_interpret_control_characters",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_malformed_activity_record_never_echoes_untrusted_raw_text",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_monitor_setup_failure_is_only_pre_execution",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_native_cli_activity_is_actionable_but_never_exposes_parameters",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_native_preflight_receipt_hint_fail_closed",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_native_preflight_receipt_hint_matches_exact_run",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_observed_activity_rejects_forged_kind_and_exit_state",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_one_shared_workflow_and_two_paths",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_overview_collapses_start_done_and_l_toggles_activity_trace",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path2_action_and_guarded_cli_label_are_strictly_scoped",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path2_authorized_goal_stage_and_clock_on_real_wrapper",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path2_current_action_does_not_fake_subprocess_progress",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path2_does_not_emit_codex_time_mark",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path2_live_stdout_stderr_are_separate_and_redacted",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path2_rejects_untrusted_stage_or_summary",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path2_success_returns_idle_and_last_pass",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path3_failure_preserves_real_exit_and_idle",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path3_incremental_combined_output_not_fake_stderr",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path3_only_displays_digest_bound_public_summary",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path3_summary_fail_closed_without_authorization_binding",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path3_summary_fits_narrow_terminal",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path3_time_marks_only_after_60_elapsed_seconds",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_path3_view_redraws_once_at_minute_boundary",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_private_tmux_socket_displays_current_safe_activity",
+          "status": "FAIL",
+          "skip_label": null
+        },
+        {
+          "test": "test_real_codex_stream_redacts_event_payload_in_both_sinks",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_real_tmux_launcher_only_adds_missing_path3_on_private_socket",
+          "status": "FAIL",
+          "skip_label": null
+        },
+        {
+          "test": "test_retired_stage_tasks_cannot_publish_guarded_operation",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_semantic_activity_never_reveals_arguments_or_secrets",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_sensitive_unstructured_legacy_output_not_echoed",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_shared_100_column_terminal_cap_with_cjk",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_shortcuts_are_visible_at_top_with_configured_prefix",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_stale_worker_is_not_reported_running",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_two_window_launcher_fails_closed",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_two_window_launcher_scenarios",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_view_does_not_redraw_when_idle_is_unchanged",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_view_repaints_on_terminal_resize",
+          "status": "PASS",
+          "skip_label": null
+        },
+        {
+          "test": "test_view_repaints_when_status_changes",
+          "status": "PASS",
+          "skip_label": null
+        }
+      ]
+    },
+    {
+      "scenario": "private_tmux_socket_probe",
+      "status": "NOT_RUN",
+      "command_category": "/usr/bin/tmux -S private.sock -f /dev/null new-session -d -s pr1195-private /bin/sleep 2; cwd unique candidate temporary directory",
+      "actual_exit": 1,
+      "observed_assertions": [
+        "error connecting to private.sock (Operation not permitted)",
+        "No socket created",
+        "No default socket or existing session contacted",
+        "Long absolute candidate socket probe separately exited 1: File name too long"
+      ],
+      "isolation": {
+        "explicit_socket": true,
+        "isolated_candidate_cwd": true,
+        "socket_created": false,
+        "capture_pane_observed": false
+      }
+    },
+    {
+      "scenario": "independent_path2_stdout_stderr",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "independent_path3_jsonl_combined",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "safe_command_at_start_parameters",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "cross_chunk_redaction_in_terminal",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "L_detail_toggle",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "J_older_history",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "K_newer_history",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "C_display_only_clear",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "failure_exit_preservation_in_terminal",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "bounded_output_in_terminal",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    },
+    {
+      "scenario": "private_capture_pane",
+      "status": "NOT_RUN",
+      "command_category": "independent synthetic candidate monitor run with private tmux capture-pane/send-keys",
+      "actual_exit": null,
+      "observed_assertions": [],
+      "reason": "Private tmux socket denied; stopped as instructed. Unit results do not establish terminal acceptance."
+    }
+  ],
+  "cleanup": {
+    "status": "PASS",
+    "observations": [
+      "TemporaryDirectory contexts removed failed socket probe directories",
+      "No tmux server successfully started; no global cleanup invoked",
+      "Raw temporary logs removed after sanitized extraction"
+    ]
+  },
+  "publication": {
+    "status": "NOT_RUN",
+    "command_category": "git add requested evidence paths",
+    "actual_exit": 128,
+    "reason": "Cannot create Git index.lock: read-only filesystem",
+    "tracked": false,
+    "committed": false,
+    "published": false,
+    "files_preserved": true
+  },
+  "evidence_hashes": {
+    "README.md": "7d591ce305bf2e312c593f39896560889eceec0e1556d32933be9aeb95950721",
+    "scenarios_canonical_json": "7828f24027a549038fa435fe2122c230f5acbd9b73090ef4a2080abf423adea3"
+  }
+}
