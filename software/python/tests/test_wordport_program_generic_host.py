@@ -62,8 +62,8 @@ class GenericImageContract(unittest.TestCase):
     def test_third_arbitrary_image_is_accepted_and_page_aligned(self):
         image, digest = self.image("future-build.bin", b"z" * 8194)
         source, size, sha, erase = module.admit_image("program", str(image), digest)
-        self.assertEqual((size, erase, sha), (8194, 0x3000, digest))
-        self.assertIn("flash erase_address 0x08000000 0x3000",
+        self.assertEqual((size, erase, sha), (8194, 0x2400, digest))
+        self.assertIn("flash erase_address 0x08000000 0x2400",
                       self.render(source, size, erase))
         self.assertNotIn("18768", SCRIPT.read_text())
         self.assertNotIn("62800", SCRIPT.read_text())
@@ -183,7 +183,7 @@ class GenericSessionHostOnly(unittest.TestCase):
             self.assertEqual(staged.read_bytes(), bytes_in)
             self.assertNotIn(str(image), tcl)
             self.assertIn(str(staged), tcl)
-            self.assertIn("flash erase_address 0x08000000 0x3000", tcl)
+            self.assertIn("flash erase_address 0x08000000 0x2400", tcl)
             (tcl_file.parent / "readback-image.bin").write_bytes(staged.read_bytes())
             return subprocess.CompletedProcess(args, 0,
                 stdout="PLASMA_ERASE_OK\nPLASMA_PROGRAM_OK\n"
@@ -198,7 +198,7 @@ class GenericSessionHostOnly(unittest.TestCase):
              patch.object(module, "z2_preflight", return_value=(
                  image, self.directory / "native.so",
                  self.barrier, "mock-boot-id", "a" * 40,
-                 len(bytes_in), image_sha, 0x3000)), \
+                 len(bytes_in), image_sha, 0x2400)), \
              patch.object(module.subprocess, "Popen", side_effect=fake_popen), \
              patch.object(module.subprocess, "run", side_effect=fake_run), \
              redirect_stdout(output):
@@ -212,7 +212,7 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.assertEqual(result["image_sha256"], image_sha)
         self.assertEqual(result["readback_sha256"], image_sha)
         self.assertEqual(result["image_bytes"], 8194)
-        self.assertEqual(result["erase_bytes"], 0x3000)
+        self.assertEqual(result["erase_bytes"], 0x2400)
         self.assertTrue(result["socket_released"])
         self.assertTrue(result["no_auto_retry"])
 
