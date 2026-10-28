@@ -45,7 +45,7 @@ Supported input is currently **raw BIN only**, starting at Main Flash base.
 must originate from the owner-approved Programming Asset, **not** be obtained
 by trusting the same file on Z2 at execution time. The checked file is staged
 in a 0700 per-run evidence folder as a 0400 read-only snapshot and checked
-again before OpenOCD uses it. No image is required for `reset-run` or
+again before OpenOCD uses it. No image is required for `reset-run`, `register-read`, `core-register-read` or
 `diagnose-after`.
 
 Current physical Provider admission is strictly:
@@ -151,6 +151,50 @@ For a second image, submit a **new Work Order** with the alternate
 `--firmware` and independently approved `--image-sha256`. The code,
 target configuration and FPGA Image do not change. Each command is
 one explicit attempt; there is no implicit alternating/retry loop.
+
+## Register Access Gate 1 — Development Mode
+
+The generic Path 2 command now has two independent register qualification
+operations, in addition to the legacy combined `diagnose-after`:
+
+```bash
+S=scripts/plasma_wordport_program.py
+SOURCE_SHA="$(sha256sum "$S" | awk '{print $1}')"
+for OP in register-read core-register-read; do
+  python3 "$S" --role swpc --operation "$OP" \\
+    --icpn STM32F103C8T6 --site-id 1 \\
+    --source-sha256 "$SOURCE_SHA" --owner-attested || break
+done
+```
+
+- `register-read`: uses OpenOCD `read_memory` for `DBGMCU_IDCODE`
+  (`0xE0042000`, low 12 bits `0x410`), `SCB_CPUID` (`0xE000ED00`,
+  Cortex-M3 part number `0xC23`) and `FLASH_SR` (`0x4002200C`).
+  **No CPU halt**, Flash erase/write or reset.
+- `core-register-read`: uses `get_reg -force` to read `pc`, `sp`,
+  `lr`, `xPSR`. A core already halted is left halted. A running core
+  is briefly halted, and the script always attempts to resume it after
+  the register operations, **including on read failure**. An unknown
+  initial state fails closed; an unsuccessful restore also FAILs.
+- `diagnose-after` invokes both probes in one session and only passes
+  if **both** have complete, individually validated values and correct
+  CPU state restoration. Do not use the old diagnostics success marker
+  alone as qualification evidence.
+- Every read must output one concrete `0xXXXXXXXX` register value.
+  OpenOCD/Bridge exit 0 **alone is insufficient**. Missing/invalid/
+  duplicate values, wrong target identity and restore failure report
+  `FAIL`. Receipts include `peripheral_registers`, `core_registers`,
+  `core_state_before` and `core_state_after`.
+- The historical `plasma_diag` invoked during an in-flight failed Flash
+  operation is an error-only best-effort snapshot. It intentionally does
+  not resume an erased or otherwise uncertain target, and its log cannot
+  authorize a PASS. Stop and diagnose on a Flash Loader failure.
+
+These operations use the currently deployed, SHA-pinned Path 2 bridge,
+Root Guard, FPGA Image, and per-Site owner checks. The fixed development
+fixture does not require repeated manual electrical or socket checks.
+The Gate 1 source/Host-only tests alone are **not** a real register HIL
+PASS; run on approved SWPC/Z2 hardware and retain actual receipts.
 
 ## Evidence, failure and limits
 
