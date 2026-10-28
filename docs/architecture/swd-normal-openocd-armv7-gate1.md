@@ -216,6 +216,12 @@ compiles a C subprocess and checks **both directions**: while Python
 holds the test lock C cannot acquire it, and while C holds the lock
 Python LinuxMMIO cannot open its synthetic regular-file backend.
 Symlink lock paths are rejected. No live Z2 lock/device was touched.
+The default OpenOCD C build **hard-rejects alternate lock paths**, even
+when absolute; only `-DPLASMA_SWD_HOST_TEST=1` in the separate hosted
+regular-file C test binaries permits temporary lock paths. Source-locked
+OpenOCD is built without this flag. The negative test compiles both
+variants and checks that the production variant rejects an arbitrary
+pathname *without creating a file*.
 
 `plasma_swd_lease_word_port_init()` now **requires an already-held
 process-owner lock** (not merely a provider callback); all later Site

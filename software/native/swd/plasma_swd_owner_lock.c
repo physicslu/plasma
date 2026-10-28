@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <string.h>
 #include <unistd.h>
 
 int plasma_swd_owner_lock_acquire(struct plasma_swd_owner_lock *owner,
@@ -17,6 +18,12 @@ int plasma_swd_owner_lock_acquire(struct plasma_swd_owner_lock *owner,
     if (!owner || !absolute_path || absolute_path[0] != '/' ||
         owner->acquired)
         return -1;
+#ifndef PLASMA_SWD_HOST_TEST
+    /* Production must use the SAME lock inode/path as Python LinuxMMIO.
+     * Arbitrary alternate paths would defeat cross-process exclusion. */
+    if (strcmp(absolute_path, PLASMA_SWD_MMIO_OWNER_LOCK) != 0)
+        return -1;
+#endif
     /* LinuxMMIO uses O_CREAT|O_RDWR|O_CLOEXEC|O_NOFOLLOW, mode 0600
      * and flock(LOCK_EX|LOCK_NB) on the EXACT same lock file.
      */

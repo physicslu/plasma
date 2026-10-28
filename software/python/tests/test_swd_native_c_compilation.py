@@ -90,6 +90,7 @@ def test_native_leased_word_port_host_only_owner_revocation(tmp_path):
         cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
         "-O2", "-I", str(SRC),
         str(SRC / "plasma_swd_fifo_core.c"),
+        "-DPLASMA_SWD_HOST_TEST=1",
         str(SRC / "plasma_swd_lease_word_port.c"),
         str(SRC / "plasma_swd_owner_lock.c"),
         str(SRC / "tests/test_plasma_swd_lease_word_port.c"),
@@ -129,6 +130,7 @@ def test_c_owner_flock_excludes_existing_python_linuxmmio(tmp_path):
     compile_args = [
         cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
         "-O2", "-I", str(SRC),
+        "-DPLASMA_SWD_HOST_TEST=1",
         str(SRC / "plasma_swd_owner_lock.c"),
         str(SRC / "tests/test_plasma_swd_owner_lock_cli.c"),
         "-o", str(binary),
@@ -157,6 +159,21 @@ def test_c_owner_flock_excludes_existing_python_linuxmmio(tmp_path):
         denied = call_cli("try")
         assert denied.returncode == 8, denied.stdout + denied.stderr
         assert "LOCK_BUSY_OR_DENIED" in denied.stdout
+    # A production build (without the Host-only compile flag) must reject
+    # an arbitrary lock pathname BEFORE it can open or create that file.
+    prod = tmp_path / "production-lock-path-negative"
+    prod_cmd = [arg for arg in compile_args
+                if arg != "-DPLASMA_SWD_HOST_TEST=1"]
+    prod_cmd[-1] = str(prod)
+    prod_compiled = subprocess.run(
+        prod_cmd, text=True, capture_output=True, timeout=30, check=False)
+    assert prod_compiled.returncode == 0, (
+        prod_compiled.stdout + prod_compiled.stderr)
+    rejected = subprocess.run(
+        [str(prod), "try", str(tmp_path / "arbitrary-other-lock")],
+        capture_output=True, text=True, timeout=5, check=False)
+    assert rejected.returncode == 8
+    assert not (tmp_path / "arbitrary-other-lock").exists()
     granted = call_cli("try")
     assert granted.returncode == 0, granted.stdout + granted.stderr
 
