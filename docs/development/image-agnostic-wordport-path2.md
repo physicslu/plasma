@@ -206,7 +206,7 @@ PASS; run on approved SWPC/Z2 hardware and retain actual receipts.
 Use the reviewed new script, not an independent OpenOCD instance on SWPC:
 
 ~~~bash
-cd /storage/projects/plasma
+cd <plasma-worktree>
 # One cycle is v0.1 then v0.2, i.e. 2 complete programming attempts.
 # Ensure picocom/minicom is closed before starting.
 python3 scripts/plasma_ab_burn_in.py --cycles 5 --port /dev/ttyACM0
