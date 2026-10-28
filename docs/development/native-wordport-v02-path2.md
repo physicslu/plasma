@@ -51,9 +51,10 @@ Label that evidence POST_SESSION_REATTACH, never original failure-instant.
 ## Deployment: performed by owner, not this PR
 
 After review and the appropriate Gate authorization, install the exact
-reviewed Python entrypoint on both SWPC and Z2. The expected Z2 destination:
+reviewed Python entrypoint on both SWPC and Z2. The Z2 destination is the exact reviewed Z2_ENTRY constant in the script;
+substitute <Z2_NATIVE_BUNDLE> with the corresponding enrolled device path:
 
-    /home/xilinx/plasma-native-c-wordport-1199/scripts/plasma_native_wordport_v02.py
+    <Z2_NATIVE_BUNDLE>/scripts/plasma_native_wordport_v02.py
 
 Keep the existing PR #1199 ARMv7 native library, barrier library, guarded
 bluepill-wordport-session.py, Root source pin, tested FPGA Image/Manifest and
@@ -86,7 +87,7 @@ install code or grant sudo/SSH rights.
 
 ### Direct Z2 CLI
 
-    S=/home/xilinx/plasma-native-c-wordport-1199/scripts/plasma_native_wordport_v02.py
+    S="<Z2_NATIVE_BUNDLE>/scripts/plasma_native_wordport_v02.py"
     SCRIPTSHA="$(sha256sum "$S" | cut -d' ' -f1)"
     sudo /opt/plasma/python/3.12.13/bin/python3 -I -B "$S" \
       --role z2 --operation program-v02 \
@@ -100,7 +101,7 @@ hardware terminal until wiring, recovery and the approved operation are checked.
 
 Each attempt creates private Z2 records under:
 
-    /home/xilinx/plasma-native-c-wordport-1199/.work/native-v02-path2/run-*
+    <Z2_NATIVE_BUNDLE>/.work/native-v02-path2/run-*
 
 Receipt.json, exact openocd.tcl, full openocd.log, bridge.log and a readback
 BIN (only on completed dump) are preserved on Z2, not automatically published
