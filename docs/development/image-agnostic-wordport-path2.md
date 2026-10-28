@@ -52,7 +52,9 @@ Current physical Provider admission is strictly:
 
 - `--icpn STM32F103C8T6`, `--site-id 1`.
 - Z2 PS OpenOCD 0.12.0 `target/stm32f1x.cfg`; Main Flash 0x08000000,
-  64 KiB, 1 KiB erase pages, 2-byte program granularity.
+  64 KiB, 1 KiB erase pages, 2-byte program granularity. Under the
+  currently reviewed physical range policy, erase may cover **at most
+  the first 62 pages** (0xF800 bytes); the last two pages stay untouched.
 - Already verified Z2 Boot ID/Root Guard, held tested FPGA image/Golden,
   exact Native C bridge SHA, owner MMIO exclusivity, real operator
   attestation of 3.3V/common ground/pins.
@@ -76,10 +78,13 @@ Examples of dynamic erase planning (not baked into runtime):
 | Earlier v0.2 CDC BIN | 62,800 | 62 | 0xF800 |
 | Another valid 8,194-byte BIN | 8,194 | 9 | 0x2400 |
 
-The full 64KiB image would erase all 64 pages, including page 63; preserve
-any calibration/previous data outside the selected image before approving
-that destructive operation. No assumption of preserved trailing sectors
-outside the computed erase range is made.
+A full 64-KiB image is **rejected** by the current Site 1 profile:
+the previous independent backup showed non-erased content in page 63.
+Neither caller-supplied length nor user-attested electrical safety can
+silently expand the approved erase boundary. A separately reviewed
+profile/operation may later extend this range with explicit backup and
+recovery evidence. No assumption of preserved bytes *inside* the
+computed erase range is made.
 
 ## Example — owner-approved SWPC Path 2 CLI
 
