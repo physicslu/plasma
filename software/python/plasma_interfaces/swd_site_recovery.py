@@ -142,16 +142,20 @@ class SiteRecoveryJournal:
             if dir_fd >= 0:
                 os.close(dir_fd)
 
+    def _has_intent(self, dir_fd: int) -> bool:
+        # A missing, corrupt or symlinked marker may never become READY.
+        try:
+            os.stat(self._intent, dir_fd=dir_fd, follow_symlinks=False)
+            return True
+        except FileNotFoundError:
+            return False
+        except OSError as exc:
+            raise SiteRecoveryBlocked("Cannot inspect durable write intent") from exc
+
     def _read(self, dir_fd: int) -> dict:
         # An intent can survive a crash that rolls back an un-fsynced rename.
         # Treat its *existence* as blocking, even if its bytes are corrupt.
-        try:
-            os.stat(self._intent, dir_fd=dir_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            pass
-        except OSError as exc:
-            raise SiteRecoveryBlocked("Cannot inspect durable write intent") from exc
-        else:
+        if self._has_intent(dir_fd):
             raise SiteRecoveryBlocked("Unresolved durable Site write intent")
         # A leftover pre-rename temp file is a conservative recovery blocker.
         if any(name.startswith(self._file + ".pending-") for name in os.listdir(dir_fd)):
@@ -171,8 +175,10 @@ class SiteRecoveryJournal:
                 os.close(fd)
 
     def status(self) -> str:
-        """Inspection is never a write authorization by itself."""
+        """Read-only conservative state; NEVER permission to write."""
         with self._exclusive() as directory:
+            if self._has_intent(directory):
+                return "UNCERTAIN"
             return self._read(directory)["state"]
 
     def assert_ready(self) -> None:
