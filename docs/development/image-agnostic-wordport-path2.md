@@ -161,8 +161,8 @@ operations, in addition to the legacy combined `diagnose-after`:
 S=scripts/plasma_wordport_program.py
 SOURCE_SHA="$(sha256sum "$S" | awk '{print $1}')"
 for OP in register-read core-register-read; do
-  python3 "$S" --role swpc --operation "$OP" \\
-    --icpn STM32F103C8T6 --site-id 1 \\
+  python3 "$S" --role swpc --operation "$OP" \
+    --icpn STM32F103C8T6 --site-id 1 \
     --source-sha256 "$SOURCE_SHA" --owner-attested || break
 done
 ```
