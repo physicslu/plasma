@@ -117,6 +117,8 @@ class SiteRecoveryJournal:
         self.identity = identity
         self._file = f"site-{identity.site_id}.json"
         self._lock = f"site-{identity.site_id}.lock"
+        # Durable monotonic write-ahead marker. Never cleared by this module.
+        self._intent = f"site-{identity.site_id}.intent"
 
     @contextmanager
     def _exclusive(self) -> Iterator[int]:
@@ -141,6 +143,16 @@ class SiteRecoveryJournal:
                 os.close(dir_fd)
 
     def _read(self, dir_fd: int) -> dict:
+        # An intent can survive a crash that rolls back an un-fsynced rename.
+        # Treat its *existence* as blocking, even if its bytes are corrupt.
+        try:
+            os.stat(self._intent, dir_fd=dir_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            raise SiteRecoveryBlocked("Cannot inspect durable write intent") from exc
+        else:
+            raise SiteRecoveryBlocked("Unresolved durable Site write intent")
         # A leftover pre-rename temp file is a conservative recovery blocker.
         if any(name.startswith(self._file + ".pending-") for name in os.listdir(dir_fd)):
             raise SiteRecoveryBlocked("Incomplete durable journal replacement")
@@ -168,8 +180,19 @@ class SiteRecoveryJournal:
             if self._read(directory)["state"] != "READY":
                 raise SiteRecoveryBlocked("Prior DUT write outcome is uncertain")
 
+    @staticmethod
+    def _write_all(fd: int, data: bytes) -> None:
+        offset = 0
+        while offset < len(data):
+            written = os.write(fd, data[offset:])
+            if written <= 0:
+                raise OSError("Short write-ahead record")
+            offset += written
+
     def _persist_uncertain(self, directory: int, prior: dict,
                            operation_id: str) -> None:
+        if prior["generation"] >= 2**63 - 2:
+            raise SiteRecoveryBlocked("Site generation exhausted")
         payload = {
             "schema": _SCHEMA,
             "state": "UNCERTAIN",
@@ -182,22 +205,29 @@ class SiteRecoveryJournal:
         temp = self._file + ".pending-" + secrets.token_hex(12)
         fd = -1
         try:
+            # Never rename/delete this marker automatically. Unlike a temp
+            # which becomes the journal inode, this independent marker must
+            # remain durable if the journal rename is lost on power failure.
+            fd = os.open(self._intent, os.O_WRONLY | os.O_CREAT |
+                         os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+            _check_fd(fd, directory=False)
+            self._write_all(fd, raw)
+            os.fsync(fd)
+            os.fsync(directory)  # durable intent FIRST: no PUSH beforehand
+            os.close(fd)
+            fd = -1
+
             fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                          os.O_NOFOLLOW, 0o600, dir_fd=directory)
             _check_fd(fd, directory=False)
-            offset = 0
-            while offset < len(raw):
-                written = os.write(fd, raw[offset:])
-                if written <= 0:
-                    raise OSError("Short journal write")
-                offset += written
-            os.fsync(fd)       # data and inode durable before publishing
+            self._write_all(fd, raw)
+            os.fsync(fd)
             os.close(fd)
             fd = -1
             os.replace(temp, self._file, src_dir_fd=directory, dst_dir_fd=directory)
-            os.fsync(directory)  # rename durable before any injected PUSH
+            os.fsync(directory)  # journal rename durable before any PUSH
         except OSError as exc:
-            # Do NOT remove an incomplete .pending file; block recovery.
+            # Neither durable intent nor incomplete temp is auto-removed.
             raise SiteRecoveryBlocked("Cannot durably establish UNCERTAIN") from exc
         finally:
             if fd >= 0:
