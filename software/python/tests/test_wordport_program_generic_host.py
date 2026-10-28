@@ -362,7 +362,7 @@ class InterruptMaskGateHostOnly(unittest.TestCase):
 
     def test_program_requires_mask_before_erase_and_again_before_program(self):
         tcl = self.program()
-        self.assertLess(tcl.index("\\nhalt\\n"), tcl.index("cortex_m maskisr on"))
+        self.assertLess(tcl.index("\nhalt\n"), tcl.index("cortex_m maskisr on"))
         self.assertLess(tcl.index("cortex_m maskisr on"), tcl.index("plasma_require_irq_mask PRE_ERASE"))
         self.assertLess(tcl.index("plasma_require_irq_mask PRE_ERASE"),
                         tcl.index("flash erase_address "))
@@ -401,16 +401,16 @@ class InterruptMaskGateHostOnly(unittest.TestCase):
         ):
             with self.subTest(case=name):
                 script = (
-                    "proc echo {args} { puts [join $args { }] }\\n"
-                    f"set ::dhcsr {{{value}}}\\n"
-                    "proc read_memory {address width count} {\\n"
-                    "    if {$::dhcsr eq \\"ERROR\\"} {error \\"SYNTHETIC_DAP_FAULT\\"}\\n"
-                    "    return [list $::dhcsr]\\n"
-                    "}\\n"
+                    "proc echo {args} { puts [join $args { }] }\n"
+                    f"set ::dhcsr {{{value}}}\n"
+                    "proc read_memory {address width count} {\n"
+                    "    if {$::dhcsr eq \"ERROR\"} {error \"SYNTHETIC_DAP_FAULT\"}\n"
+                    "    return [list $::dhcsr]\n"
+                    "}\n"
                     + module.IRQ_MASK_GATE_TCL
-                    + "\\nif {[catch {plasma_require_irq_mask PRE_PROGRAM} msg]} {\\n"
-                    "    puts \\"MOCK_GATE_REJECTED $msg\\"\\n"
-                    "} else { puts \\"MOCK_GATE_PASS\\" }\\n"
+                    + "\nif {[catch {plasma_require_irq_mask PRE_PROGRAM} msg]} {\n"
+                    + "    puts \"MOCK_GATE_REJECTED $msg\"\n"
+                    + "} else { puts \"MOCK_GATE_PASS\" }\n"
                 )
                 p = subprocess.run(["tclsh"], input=script, text=True,
                                    capture_output=True, timeout=5)
