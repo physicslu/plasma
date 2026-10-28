@@ -2,7 +2,8 @@
 """Read-only preflight or one-shot, owner-approved Blue Pill v0.2 SWD.
 
 Path 2 uses --role swpc (pinned SSH); standalone Z2 uses --role z2.
-Neither route installs software, loads an FPGA Image, retries, or resets DUT.
+Neither route installs software, loads an FPGA Image or automatically retries.
+DUT reset is allowed ONLY in explicitly owner-attested reset-run mode.
 """
 from __future__ import annotations
 
@@ -96,6 +97,15 @@ init
 """
     if operation == "diagnose-after":
         return config + 'plasma_diag POST_SESSION "REATTACH_NOT_FAILURE_INSTANT"\nshutdown\n'
+    if operation == "reset-run":
+        # No flash probe, erase, program, verify, dump, or preparatory halt.
+        return config + ('echo "PLASMA_RESET_RUN_BEGIN"\n'
+                         'if {[catch {reset run} failure]} {\n'
+                         '    echo "PLASMA_RESET_RUN_FAIL $failure"\n'
+                         '    shutdown error\n'
+                         '}\n'
+                         'echo "PLASMA_RESET_RUN_OK"\n'
+                         'shutdown\n')
     if operation != "program-v02":
         raise ValueError("UNKNOWN_OPERATION")
     return config + f"""halt
@@ -287,9 +297,13 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
                    readback.is_file() and readback.stat().st_size == V02_BYTES and
                    sha(readback) == V02_SHA)
         diagnostic = "POST_ERROR_SAME_SESSION" if "PLASMA_DIAG_BEGIN" in log else "NOT_CAPTURED"
-    else:
+    elif args.operation == "diagnose-after":
         success = eligible and "PLASMA_DIAG_END POST_SESSION" in log
         diagnostic = "POST_SESSION_REATTACH_NOT_FAILURE_INSTANT"
+    else:  # Explicit one-shot reset-run, never implicit on program-v02.
+        success = (eligible and "PLASMA_RESET_RUN_OK" in log and
+                   "PLASMA_RESET_RUN_FAIL" not in log)
+        diagnostic = "NOT_APPLICABLE_RESET_RUN"
     receipt = {
         "operation": args.operation, "result": "PASS" if success else "FAIL",
         "diagnostic": diagnostic, "openocd_exit": completed.returncode if completed else None,
@@ -298,7 +312,9 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         "readback_sha256": sha(readback) if readback.is_file() else None,
         "openocd_log_sha256": sha(evidence / "openocd.log"),
         "evidence_directory": str(evidence), "socket_released": not socket.exists(),
-        "no_reset_no_retry": True,
+        "no_reset_no_retry": args.operation != "reset-run",
+        "no_auto_retry": True,
+        "no_flash_write": args.operation != "program-v02",
     }
     (evidence / "receipt.json").write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
     print(json.dumps(receipt, sort_keys=True))
@@ -348,11 +364,11 @@ def on_swpc(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", choices=("swpc", "z2"), required=True)
-    parser.add_argument("--operation", choices=("preflight", "program-v02", "diagnose-after"), required=True)
+    parser.add_argument("--operation", choices=("preflight", "program-v02", "diagnose-after", "reset-run"), required=True)
     parser.add_argument("--firmware", required=True, help="Absolute firmware path on Z2")
     parser.add_argument("--source-sha256", required=True)
     parser.add_argument("--owner-attested", action="store_true",
-                        help="Required for programming/diagnosis; not needed for read-only preflight")
+                        help="Required for programming/diagnosis/reset; not needed for read-only preflight")
     args = parser.parse_args()
     try:
         return on_swpc(args) if args.role == "swpc" else on_z2(args)
