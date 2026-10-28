@@ -45,3 +45,36 @@ def test_c_core_is_separate_from_hardware_and_retired_debug_mode():
         assert forbidden not in c, forbidden
     assert "PLASMA_SWD_ACK_WAIT" in c and "PLASMA_SWD_ACK_FAULT" in c
     assert "PLASMA_SWD_UNSUPPORTED" in c and "s->blocked" in c
+
+
+def test_c_opencd_5088_swd_callback_shapes_with_host_only_shim(tmp_path):
+    """Fake header verifies C ABI shapes, NOT genuine OpenOCD source build."""
+    cc = shutil.which("cc")
+    assert cc, "C compiler required"
+    executable = tmp_path / "host-only-openocd-callback"
+    cmd = [
+        cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-O2", "-I", str(SRC),
+        "-I", str(SRC / "tests/openocd_shim"),
+        str(SRC / "plasma_swd_fifo_core.c"),
+        str(SRC / "plasma_swd_openocd5088_callbacks.c"),
+        str(SRC / "tests/test_openocd5088_callbacks.c"),
+        "-o", str(executable),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True,
+                            timeout=30, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    done = subprocess.run([str(executable)], capture_output=True, text=True,
+                          timeout=10, check=False)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "PLASMA_OPENOCD5088_CALLBACK_SHIM_HOST_ONLY_PASS" in done.stdout
+
+
+def test_native_callback_is_source_locked_and_no_product_adapter_registered():
+    src = (SRC / "plasma_swd_openocd5088_callbacks.c").read_text()
+    assert "#include <jtag/swd.h>" in src
+    assert "struct swd_driver plasma_swd_openocd5088_ops" in src
+    for name in (".init", ".switch_seq", ".read_reg", ".write_reg", ".run"):
+        assert name in src
+    assert "struct adapter_driver" not in src
+    assert "remote_bitbang_adapter_driver" not in src

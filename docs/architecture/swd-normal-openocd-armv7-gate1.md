@@ -91,8 +91,45 @@ no-ACK TARGETSEL is rejected rather than falsely claiming an ACK. The real
 AP posted-read ordering/RDBUFF, error-code conversion, C driver integration
 and native cross-compilation are still **NOT_IMPLEMENTED**.
 
-Neither this document nor the two Host-only integration contracts
-implements or compiles a native OpenOCD C adapter.
+The Python contracts remain Host-only; the standalone C core and callback
+slice below are now implemented, but **OpenOCD adapter registration and real
+OpenOCD binary integration are not**.
+
+## Native C SWD FIFO core and OpenOCD 5088 callback slice (Host-only)
+
+The new `software/native/swd/plasma_swd_fifo_core.[ch]` is an actual
+C implementation of the private **ABI v5 register-level transaction queue**,
+not merely the earlier Python contract. An external pre-authorized and
+already-leased C word-access backend injects read32, write32 and a write
+barrier; construction never opens `/dev/mem`, claims a Site, loads an
+FPGA Image or creates a Socket. No device-backed C backend is implemented
+or admitted in this Gate 1 increment.
+
+- It checks Site1/2 identity `0x00050001/2` and admits only OFF→NORMAL;
+  bounded queue depth 16; translates OpenOCD SWD cmd byte parity/direction
+  into the private SWD FIFO command; supports exact-byte 1..256-bit LSB-first
+  SWJ staging; sequential 16-bit tagged FIFO completion, explicit barrier,
+  raw ACK and data-valid validation. Read result pointers are committed
+  only after the **whole queued batch** succeeds.
+- WAIT/FAULT/invalid ACK, MMIO/barrier uncertainty, timeout or mismatched
+  tag poison the adapter and forbid implicit replay of a possible DUT write.
+  AP delay hints and DPv2 no-ACK TARGETSEL are **explicitly unsupported**
+  rather than silently represented as a normal SWD transfer.
+- `plasma_swd_openocd5088_callbacks.c` binds the C core to the
+  `struct swd_driver` callback signatures from the pinned OpenOCD
+  `5088db4c9154ca833c6d558381074b33672e127a` source. It references
+  the canonical `swd_seq_*` arrays from OpenOCD's header rather than
+  synthesizing an alternate SWJ bitstream. A Host-only C compilation test
+  uses an **explicit test declaration shim**, not real OpenOCD object files.
+- **Not delivered:** OpenOCD `struct adapter_driver` CLI/transport
+  registration, a trusted C-owner/lease-MMIO binding, full OpenOCD executable
+  compilation against the exact original headers and API, ARMv7 ELF/HIL,
+  AP posted-read compatibility through the complete ADIv5 stack, GIC,
+  external SWD timing and any DUT programming. The C callback slice is
+  **not** a selectable or deployable OpenOCD adapter yet.
+- GitHub-hosted `test_swd_native_c_compilation.py` compiles/runs C
+  with `cc -std=c11 -Wall -Wextra -Werror` and fake MMIO. This validates
+  real C execution and error handling without asserting physical acceptance.
 
 ## ARMv7 MMIO word width contract
 
