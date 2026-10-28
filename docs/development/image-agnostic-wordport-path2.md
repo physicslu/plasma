@@ -87,6 +87,39 @@ profile/operation may later extend this range with explicit backup and
 recovery evidence. No assumption of preserved bytes *inside* the
 computed erase range is made.
 
+## Target-side interrupt isolation — mandatory default
+
+**All IC programming routes** must establish a verified, non-interfering target
+execution state **before destructive Erase/Program**. For an interrupt-capable
+MCU that runs a Flash algorithm, mask relevant application interrupts or use
+an exact-target, source-qualified equivalent. This is a cross-vendor default,
+not a universal OpenOCD Cortex-M command; missing or unsupported isolation
+fails closed. See the [cross-vendor programming policy](../architecture/programming-interrupt-isolation-policy.md)
+for ROM ISP, passive memory and explicit NOT_APPLICABLE/exception requirements.
+
+**Current STM32F103C8T6 Z2 Site 1 flow (PR #1200):**
+
+1. Exact source/Image/Geometry/Boot/ownership preflight; OpenOCD init; halt.
+2. Execute cortex_m maskisr on, then check DHCSR at 0xE000EDF0 **before
+   Erase**: require S_HALT bit17, C_MASKINTS bit3, C_HALT bit1 and
+   C_DEBUGEN bit0 (mask 0x0002000B).
+3. After the bounded Erase, re-check the same bits **before Program**.
+   Missing/invalid bits/read errors stop programming without retry/reset.
+4. Program → Verify → independent exact-length Readback/SHA.
+   Reset-run and CDC are explicit subsequent operations.
+
+**Physical evidence 2026-10-28:** operator-run
+/storage/projects/plasma-ab-runs/20261028T144418Z-3434822:
+4/4 v0.1/v0.2/v0.1/v0.2 full Program/Readback/Reset/CDC PASS,
+all OpenOCD and Bridge exits zero. Four Z2 OpenOCD logs each contain
+PLASMA_IRQ_MASK_PASS PRE_ERASE 0x0003000B and
+PLASMA_IRQ_MASK_PASS PRE_PROGRAM 0x0003000B (eight positive checks).
+These are **two pre-operation snapshots per attempt**, not continuous
+verification throughout SRAM algorithm execution or proof of an exclusive
+root cause. The owner's separate 100-attempt burn-in is not yet claimed
+complete. This documentation change does not modify the live runtime
+or qualify any other IC family.
+
 ## Development-mode electrical observability
 
 The fixed Blue Pill prototype has no automated voltage/current sense,
