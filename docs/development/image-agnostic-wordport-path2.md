@@ -201,6 +201,39 @@ fixture does not require repeated manual electrical or socket checks.
 The Gate 1 source/Host-only tests alone are **not** a real register HIL
 PASS; run on approved SWPC/Z2 hardware and retain actual receipts.
 
+## Same-session Flash failure forensic capture (Gate 1, Draft)
+
+The Z2 PS-local OpenOCD `program` Tcl runs `plasma_diag` **before**
+`shutdown error` on Erase, Program, Verify or Readback failure in the *same*
+SWD/WordPort session. The diagnostic first attempts independent read-only
+32-bit `DHCSR`, `DBGMCU_IDCODE`, `SCB_CPUID`, `ICSR`, `SHCSR`, `CFSR`, `HFSR`,
+`DFSR`, `MMFAR`, `BFAR`, `FLASH_SR`, `FLASH_CR` and `FLASH_AR` reads. It
+records a `PLASMA_DIAG_MEM_PASS/FAIL` marker per register, with failure reasons
+if unavailable (e.g. CPU lockup). Only **after** those attempts does it poll
+the core, and attempt an in-session Halt if the state is `running`. If it can
+safely reach `halted`, it captures `pc`, `sp`, `lr` and `xPSR` using OpenOCD's
+lowercase `xpsr` key. Unknown/unpollable core state is fail-closed; no forced
+reset. There is no auto retry, resume or state-clearing fault-register write.
+
+The Z2 `receipt.json` now includes `failure_diagnostics` with `status` of
+`COMPLETE`, `PARTIAL` or `NOT_CAPTURED`; `stage`, `cause`, actual
+`memory_registers`, `core_registers`, `missing_memory`, `missing_core`,
+`read_errors`, and target states. The raw `openocd.log` remains the
+authoritative original record and its SHA256 travels with the SWPC receipt.
+A failed Flash operation is always `result=FAIL` even if all forensic reads
+succeed. `PARTIAL` is a **valid capture state, not a programming PASS**.
+A target lockup may make registers physically inaccessible. The script must
+not synthesize values, assume an unrelated new attach reflects the original
+fault instant, or claim that a later flash status (including EOP) proves
+why a prior Flash algorithm timed out.
+
+On `PROGRAM_FAIL` with any same-session capture, the SWPC A/B Runner
+persists that original receipt and does **not** open a second register
+session; `DIAG_SAME_SESSION` appears in progress/events. If no same-session
+capture is possible and the original owner/socket was safely released,
+one explicitly labeled post-failure read-only `register-read` may be attempted.
+No flash writes/retries are triggered by diagnostics.
+
 ## SWPC Site 1 v0.1 ↔ v0.2 burn-in — bounded operator CLI
 
 Use the reviewed new script, not an independent OpenOCD instance on SWPC:
@@ -229,13 +262,15 @@ A parallel SWPC terminal can monitor:
 tail -f "$(ls -td ~/plasma-ab-runs/20*/ | head -n1)/progress.log"
 ~~~
 
+For an **interactive foreground SWPC terminal**, press **Ctrl+Q** to request a safe stop in the **same terminal**. The runner temporarily disables Unix terminal XON/IXOFF flow control so Ctrl+Q is received as a key rather than swallowed by the TTY. It restores the previous terminal configuration on exit. **Ctrl+C** remains supported. There is no immediate destructive kill: both hotkeys stop after the current complete attempt (Program/Readback/Reset/CDC), before another Flash operation. Non-interactive Runner jobs do not have keyboard input; use signals or the stop-file path instead.
+
 To **request safe stop** from any SWPC terminal, run:
 
 ~~~bash
 touch /tmp/plasma-ab-stop
 ~~~
 
-Or press **Ctrl+C** in the foreground run. Neither mechanism interrupts
+Or press **Ctrl+Q** / **Ctrl+C** in the foreground run. Neither mechanism interrupts
 an in-flight Erase/Program/Verify/Readback or kills the remote OpenOCD.
 A stop request is honored after the currently selected complete
 Program/Reset/CDC attempt, before the next Flash operation. The stop
