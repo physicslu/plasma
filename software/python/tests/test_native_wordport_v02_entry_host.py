@@ -42,6 +42,18 @@ class NativeV02HostOnly(unittest.TestCase):
         self.assertNotIn("flash mass_erase", tcl)
         self.assertIn("PLASMA_V02_COMPLETED_NO_RESET", tcl)
 
+    def test_reset_run_is_explicit_and_never_changes_flash(self):
+        tcl = self.render("reset-run")
+        self.assertEqual(tcl.count("reset run"), 1)
+        self.assertIn("PLASMA_RESET_RUN_BEGIN", tcl)
+        self.assertIn("PLASMA_RESET_RUN_OK", tcl)
+        self.assertIn("PLASMA_RESET_RUN_FAIL", tcl)
+        self.assertIn("shutdown error", tcl)
+        for forbidden in ("flash erase_address ", "flash write_image ",
+                          "flash probe ", "verify_image ", "dump_image ",
+                          "\\nhalt\\n", "\\nresume\\n"):
+            self.assertNotIn(forbidden, tcl)
+
     def test_diagnostics_on_each_error_and_nonzero_exit(self):
         tcl = self.render("program-v02")
         for stage in ("ERASE", "PROGRAM", "VERIFY", "READBACK"):
@@ -128,6 +140,12 @@ proc mdw {address count} {
     }
 }
 proc halt {} {puts "MOCK_HALT"}
+proc reset {subcommand} {
+    puts "MOCK_RESET $subcommand"
+    if {$::env(INJECT_RESET_FAILURE) eq "1"} {
+        error "INJECTED_RESET_FAILURE"
+    }
+}
 proc reg {name} {puts "MOCK_REG $name"}
 proc debug_reason {} {puts "MOCK_DEBUG_REASON"}
 proc shutdown {args} {
@@ -138,17 +156,37 @@ proc shutdown {args} {
 source [lindex $argv 0]
 """)
 
-    def run_tcl(self, mdw_fail=False):
+    def run_tcl(self, mdw_fail=False, operation="program-v02", reset_failure=False):
         import os
         config = self.directory / "generated.tcl"
         config.write_text(module.make_tcl(
             self.directory / "mock.sock",
             self.directory / "v02.bin",
-            self.directory / "readback.bin", "program-v02"))
-        environment = dict(os.environ, INJECT_MDW_ERROR="1" if mdw_fail else "0")
+            self.directory / "readback.bin", operation))
+        environment = dict(os.environ, INJECT_MDW_ERROR="1" if mdw_fail else "0",
+                           INJECT_RESET_FAILURE="1" if reset_failure else "0")
         return subprocess.run(["tclsh", str(self.simulator), str(config)],
                               env=environment, capture_output=True,
                               text=True, timeout=10)
+
+    def test_explicit_reset_run_executes_only_once(self):
+        r = self.run_tcl(operation="reset-run")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.count("MOCK_RESET run"), 1)
+        self.assertIn("PLASMA_RESET_RUN_OK", r.stdout)
+        self.assertIn("MOCK_SHUTDOWN", r.stdout)
+        for forbidden in ("MOCK_FLASH", "MOCK_HALT", "MOCK_VERIFY",
+                          "MOCK_DUMP", "MOCK_MDW", "MOCK_REG"):
+            self.assertNotIn(forbidden, r.stdout)
+
+    def test_explicit_reset_failure_does_not_fake_success_or_retry(self):
+        r = self.run_tcl(operation="reset-run", reset_failure=True)
+        self.assertEqual(r.returncode, 17, r.stderr)
+        self.assertEqual(r.stdout.count("MOCK_RESET run"), 1)
+        self.assertIn("PLASMA_RESET_RUN_FAIL INJECTED_RESET_FAILURE", r.stdout)
+        self.assertNotIn("PLASMA_RESET_RUN_OK", r.stdout)
+        self.assertIn("MOCK_SHUTDOWN error", r.stdout)
+        self.assertNotIn("MOCK_FLASH", r.stdout)
 
     def test_loader_timeout_executes_same_session_snapshot_and_fails(self):
         r = self.run_tcl()
@@ -213,7 +251,15 @@ class NativeV02DynamicSession(unittest.TestCase):
     def test_good_readback_with_hung_bridge_remains_fail_closed(self):
         self._check_successful_openocd_bridge_lifecycle(bridge_hangs=True)
 
-    def _check_successful_openocd_bridge_lifecycle(self, bridge_hangs):
+    def test_reset_run_waits_for_clean_bridge_exit(self):
+        self._check_successful_openocd_bridge_lifecycle(
+            bridge_hangs=False, operation="reset-run")
+
+    def test_reset_run_with_hung_bridge_remains_fail_closed(self):
+        self._check_successful_openocd_bridge_lifecycle(
+            bridge_hangs=True, operation="reset-run")
+
+    def _check_successful_openocd_bridge_lifecycle(self, bridge_hangs, operation="program-v02"):
         # Host-only regression for Z2 receipt: OpenOCD success and exact
         # independent readback, followed by a Bridge still live at OpenOCD exit.
         # A healthy Bridge must be allowed to exit normally, not be killed.
@@ -253,6 +299,12 @@ class NativeV02DynamicSession(unittest.TestCase):
 
         def fake_run(argv, **kwargs):
             self.assertEqual(argv[0], module.OPENOCD)
+            if operation == "reset-run":
+                return subprocess.CompletedProcess(
+                    argv, 0,
+                    stdout="PLASMA_RESET_RUN_BEGIN\nPLASMA_RESET_RUN_OK\n",
+                    stderr="",
+                )
             readback = next(self.bundle.glob(
                 ".work/native-v02-path2/run-*")) / "readback-v02.bin"
             readback.write_bytes(payload)
@@ -264,7 +316,7 @@ class NativeV02DynamicSession(unittest.TestCase):
                 stderr="",
             )
 
-        args = SimpleNamespace(operation="program-v02")
+        args = SimpleNamespace(operation=operation)
         out = io.StringIO()
         with patch.object(module, "BUNDLE", self.bundle), \
              patch.object(module, "V02_BYTES", len(payload)), \
@@ -285,9 +337,12 @@ class NativeV02DynamicSession(unittest.TestCase):
             ".work/native-v02-path2/run-*/receipt.json"))
         receipt = json.loads(receipt_file.read_text())
         self.assertEqual(receipt["openocd_exit"], 0)
-        self.assertEqual(receipt["readback_sha256"], expected_hash)
+        self.assertEqual(receipt["readback_sha256"],
+                         expected_hash if operation == "program-v02" else None)
         self.assertTrue(receipt["socket_released"])
-        self.assertTrue(receipt["no_reset_no_retry"])
+        self.assertEqual(receipt["no_reset_no_retry"], operation != "reset-run")
+        self.assertEqual(receipt["no_flash_write"], operation != "program-v02")
+        self.assertTrue(receipt["no_auto_retry"])
         if bridge_hangs:
             self.assertEqual(exit_code, 1)
             self.assertEqual(receipt["result"], "FAIL")
@@ -435,7 +490,7 @@ class NativeV02PreflightHostOnly(unittest.TestCase):
         with patch.object(module.os, "geteuid", return_value=0), \
              patch.object(module, "check_source"), \
              patch.object(module, "Z2_ENTRY", SCRIPT):
-            for op in ("program-v02", "diagnose-after"):
+            for op in ("program-v02", "diagnose-after", "reset-run"):
                 args = SimpleNamespace(operation=op, owner_attested=False, source_sha256="a" * 64)
                 with self.subTest(operation=op), self.assertRaises(module.NotRun) as raised:
                     module.z2_preflight(args)
@@ -444,7 +499,7 @@ class NativeV02PreflightHostOnly(unittest.TestCase):
 
     def test_source_contract_explicit_preflight_and_no_program_tcl(self):
         text = SCRIPT.read_text()
-        self.assertIn('"preflight", "program-v02", "diagnose-after"', text)
+        self.assertIn('"preflight", "program-v02", "diagnose-after", "reset-run"', text)
         self.assertIn('if args.operation == "preflight":', text)
         self.assertIn('"hw_action": "NONE"', text)
         self.assertIn('"no_erase_program_halt_reset": True', text)
