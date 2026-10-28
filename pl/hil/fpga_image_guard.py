@@ -254,7 +254,13 @@ def scan_proc_consumers(*, procroot: Path, release,
     raise AssertionError("unreachable bounded process scan")
 
 
-def read_live_z2_facts(*, release) -> dict:
+def read_live_z2_facts(*, release, runtime_program_session: bool = False) -> dict:
+    """Keep kernel/image guards; runtime WordPort does not census all PIDs.
+
+    Runtime call requires the same protected FPGA lock and is NOT a safe
+    alternative for FPGA Manager load, test or restoration admission.
+    """
+    need(type(runtime_program_session) is bool, "INVALID_PROCESS_SCAN_POLICY")
     need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
     candidate = FIRMWARE / release.firmware_name
     recovery = FIRMWARE / release.recovery_name
@@ -269,9 +275,16 @@ def read_live_z2_facts(*, release) -> dict:
          "SOC_FAMILY_MISMATCH")
     manager = (SYS / "class/fpga_manager/fpga0/state").read_text().strip()
     uio, platform = scan_kernel_owners(sysroot=SYS, release=release)
-    proc_diagnostic = {}
-    complete, conflicts = scan_proc_consumers(
-        procroot=PROC, release=release, diagnostic=proc_diagnostic)
+    if runtime_program_session:
+        # The session holds the global configuration lock. External device
+        # consumers remain checked by the engine's scoped fuser preflight.
+        # Do NOT fabricate proc_complete=True or a zero-conflict census.
+        complete, conflicts = None, None
+        proc_diagnostic = {"status": "NOT_RUN_PROGRAM_SESSION"}
+    else:
+        proc_diagnostic = {}
+        complete, conflicts = scan_proc_consumers(
+            procroot=PROC, release=release, diagnostic=proc_diagnostic)
     boot_after = (PROC / "sys/kernel/random/boot_id").read_text().strip()
     need(boot_before == boot_after, "BOOT_CHANGED_DURING_SCAN")
     return {
@@ -325,6 +338,12 @@ class RootZ2TargetPort:
     def current_facts(self) -> dict:
         self._require_locked()
         return read_live_z2_facts(release=self.release)
+
+    def runtime_program_facts(self) -> dict:
+        """Read-only program admission, never FPGA reconfiguration authority."""
+        self._require_locked()
+        return read_live_z2_facts(
+            release=self.release, runtime_program_session=True)
 
     def image_sha256(self, which: str) -> str:
         self._require_locked()
