@@ -7,6 +7,11 @@ from contextlib import redirect_stdout
 import importlib.util
 import io
 import json
+import os
+import pty
+import termios
+import time
+from types import SimpleNamespace
 from pathlib import Path
 import tempfile
 import unittest
@@ -192,6 +197,65 @@ class ABOrchestrationTests(unittest.TestCase):
              redirect_stdout(io.StringIO()):
             self.assertEqual(runner.run(), 2)
 
+
+
+class ForegroundStopAndEvidenceTests(unittest.TestCase):
+    """Host-only pseudo-TTY tests: no actual SWPC, Z2 or serial device."""
+
+    def test_ctrl_q_key_is_consumed_and_terminal_settings_restored(self):
+        master, slave = pty.openpty()
+        self.addCleanup(os.close, master)
+        stream = os.fdopen(slave, "rb", buffering=0, closefd=False)
+        self.addCleanup(stream.close)
+        self.addCleanup(os.close, slave)
+        previous = termios.tcgetattr(slave)
+        target = SimpleNamespace(stop_requested=False)
+        with patch.object(app.sys, "stdin", stream), \
+             redirect_stdout(io.StringIO()):
+            with app.ForegroundStopHotkey(target):
+                active = termios.tcgetattr(slave)
+                self.assertEqual(active[0] & termios.IXON, 0)
+                self.assertEqual(active[3] & termios.ICANON, 0)
+                os.write(master, b"\x11")
+                for _ in range(60):
+                    if target.stop_requested:
+                        break
+                    time.sleep(0.02)
+                self.assertTrue(target.stop_requested, "Ctrl+Q must request stop")
+        restored = termios.tcgetattr(slave)
+        self.assertEqual(restored, previous)
+
+    def test_noninteractive_hotkey_noop_and_signal_fallback_preserved(self):
+        target = SimpleNamespace(stop_requested=False)
+        stream = io.StringIO()
+        with patch.object(app.sys, "stdin", stream):
+            with app.ForegroundStopHotkey(target) as key:
+                self.assertIsNone(key.fd)
+        self.assertFalse(target.stop_requested)
+
+    def test_same_session_partial_registers_are_preserved_without_reattach(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = argparse.Namespace(
+                cycles=2, port="/dev/ttyACM0", frames=4, cdc_timeout=25,
+                stop_file=str(root / "operator-stop"), output=str(root / "runs"))
+            runner = app.BurnIn(args)
+            diagnostic = {"status": "PARTIAL", "source": "SAME_OPENOCD_SESSION",
+                          "stage": "PROGRAM",
+                          "memory_registers": {"FLASH_SR": "0x00000020"},
+                          "core_registers": {},
+                          "missing_core": ["pc", "sp", "lr", "xPSR"]}
+            failed = {"receipt": {"result": "FAIL", "operation": "program",
+                                  "socket_released": True,
+                                  "failure_diagnostics": diagnostic},
+                      "exit_code": 1, "pass": False}
+            with patch.object(runner, "run_engine",
+                              side_effect=AssertionError("no new attach allowed")), \
+                 redirect_stdout(io.StringIO()):
+                runner.capture_failure("v0.1", "PROGRAM_FAIL", failed)
+            self.assertIn("DIAG_SAME_SESSION", runner.status_file.read_text())
+            self.assertIn('"FLASH_SR": "0x00000020"',
+                          runner.record.read_text())
 
 if __name__ == "__main__":
     unittest.main()
