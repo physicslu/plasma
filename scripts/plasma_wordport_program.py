@@ -272,9 +272,6 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
     base.mkdir(mode=0o700, parents=True, exist_ok=True)
     evidence = base / f"run-{time.time_ns()}-{os.getpid()}"
     evidence.mkdir(mode=0o700)
-    socketdir = socket_base / f"plasma-wordport-{os.getpid()}"
-    socketdir.mkdir(mode=0o700)
-    socket = socketdir / "swd.sock"
     readback = evidence / "readback-image.bin"
     # Freeze the selected Image in a private, per-run immutable snapshot.
     # Never let OpenOCD read a mutable operator-supplied path after admission.
@@ -285,6 +282,9 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         staged.chmod(0o400)
         if staged.stat().st_size != image_bytes or sha(staged) != image_sha:
             raise NotRun(77, "STAGED_IMAGE_CHANGED")
+    socketdir = socket_base / f"plasma-wordport-{os.getpid()}"
+    socketdir.mkdir(mode=0o700)
+    socket = socketdir / "swd.sock"
     tcl = evidence / "openocd.tcl"
     tcl.write_text(make_tcl(socket, staged, readback, args.operation,
                             image_bytes=image_bytes, erase_bytes=erase_bytes))
