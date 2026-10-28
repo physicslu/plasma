@@ -62,6 +62,9 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument('--boot-id', required=True)
     p.add_argument('--barrier', required=True)
     p.add_argument('--barrier-sha256', required=True)
+    p.add_argument('--native', required=True,
+                   help='Absolute SHA-pinned ARMv7 Native C WordPort shared library')
+    p.add_argument('--native-sha256', required=True)
     p.add_argument('--socket', required=True)
     p.add_argument('--owner-attested', action='store_true', required=True,
                    help='Current approved wiring, isolated debugger, 3.3V VTref, common ground')
@@ -88,10 +91,13 @@ def run(args) -> dict:
     from plasma_interfaces.fixed_abi_mmio_port import ARMv7DMBBarrier
     from plasma_interfaces.linux_mmio import LinuxMMIO
     from plasma_interfaces.bluepill_z2_word_port import BluepillZ2WordPort, bluepill_z2_aperture
-    from plasma_interfaces.bluepill_remote_bitbang import RemoteBitbangSWD, serve_local_unix_once
+    from plasma_interfaces.bluepill_remote_bitbang import serve_local_unix_once
+    from plasma_interfaces.native_bluepill_word_port import (
+        NativeBluepillWordPort, qualify_native_bridge_library)
 
     barrier = ARMv7DMBBarrier(args.barrier, sha256=args.barrier_sha256)
     barrier()  # Qualify native execution before opening any device.
+    qualify_native_bridge_library(args.native, args.native_sha256)
     with port.exclusive():
         record = root.read_state(release)
         need(isinstance(record, dict), 'IMAGE_CHECKPOINT_REQUIRED')
@@ -103,8 +109,10 @@ def run(args) -> dict:
         with ExitStack() as stack:
             mmio = stack.enter_context(LinuxMMIO((bluepill_z2_aperture(),)))
             lease = stack.enter_context(mmio.claim_site(1, BASE))
-            bridge = RemoteBitbangSWD(BluepillZ2WordPort(lease, barrier=barrier), base=BASE)
-            count = serve_local_unix_once(args.socket, bridge, idle_timeout_s=30)
+            bridge = NativeBluepillWordPort(
+                BluepillZ2WordPort(lease, barrier=barrier),
+                library=args.native, sha256=args.native_sha256)
+            count = serve_local_unix_once(args.socket, bridge, idle_timeout_s=60)
             stats = mmio.stats()
         return {'result': 'BRIDGE_CLOSED', 'boot_id': args.boot_id,
                 'lease_id': record['session_id'], 'wire_bytes': count,
@@ -120,7 +128,7 @@ def main() -> int:
     args = parser().parse_args()
     signal.signal(signal.SIGTERM, deadline_expired)
     signal.signal(signal.SIGALRM, deadline_expired)
-    signal.alarm(60)
+    signal.alarm(600)
     try:
         result = run(args)
     finally:
