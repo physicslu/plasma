@@ -678,25 +678,153 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
     return 0 if success else 1
 
 
+def z2_login_credentials(home: Path) -> tuple[dict[str, str], Path]:
+    """Require the enrolled worker's password plus the independently pinned key.
+
+    Do not reuse an operator's home, create a new private key or trust a freshly
+    discovered host key. Credential bytes stay in this process only.
+    """
+    login = home / ".config/plasma/z2-login-smoke.json"
+    hosts = home / ".config/plasma/z2-login-known_hosts"
+    for path, mode in ((login.parent, 0o700), (login, 0o600), (hosts, 0o600)):
+        try:
+            info = path.lstat()
+        except OSError:
+            raise NotRun(69, "ENROLLED_Z2_PASSWORD_OR_HOST_KEY_UNAVAILABLE") from None
+        expected_type = stat.S_ISDIR if path == login.parent else stat.S_ISREG
+        if (not expected_type(info.st_mode) or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != mode):
+            raise NotRun(77, "ENROLLED_Z2_CREDENTIAL_OWNER_OR_MODE_INVALID")
+    try:
+        credentials = json.loads(login.read_text())
+    except (ValueError, OSError):
+        raise NotRun(77, "ENROLLED_Z2_CREDENTIAL_JSON_INVALID") from None
+    if (type(credentials) is not dict
+            or not {"ssh_host", "ssh_username", "ssh_password"} <= set(credentials)
+            or not set(credentials) <= {"ssh_host", "ssh_username", "ssh_password",
+                                        "sudo_password"}
+            or credentials.get("ssh_username") != "xilinx"
+            or any(type(credentials.get(x)) is not str or not credentials[x]
+                   for x in ("ssh_host", "ssh_username", "ssh_password"))
+            or (type(credentials.get("sudo_password", credentials["ssh_password"]))
+                is not str or not credentials.get("sudo_password", credentials["ssh_password"]))):
+        raise NotRun(77, "ENROLLED_Z2_CREDENTIAL_SCHEMA_INVALID")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,250}", credentials["ssh_host"]):
+        raise NotRun(77, "ENROLLED_Z2_HOST_INVALID")
+    try:
+        pinned = subprocess.run(
+            ["ssh-keygen", "-F", credentials["ssh_host"], "-f", str(hosts)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        raise NotRun(69, "Z2_TRUSTED_HOST_KEY_LOOKUP_UNAVAILABLE") from None
+    if pinned.returncode != 0:
+        raise NotRun(77, "Z2_HOST_KEY_NOT_PINNED")
+    return credentials, hosts
+
+
+def password_ssh_z2(command: list[str], credentials: dict[str, str],
+                    hosts: Path, *, timeout: int = 750) -> tuple[int, str]:
+    """Run one pinned SSH + sudo command over a private local controlling PTY.
+
+    SSH and sudo passwords are written only to the PTY. Neither password is
+    passed in argv, the environment, a log or a child process's command line.
+    No host-key fallback, sshpass, agent/key dependency, or shell interpolation
+    of credentials. Preserve the actual remote exit code and bounded output.
+    """
+    import fcntl
+    import pty
+    import select
+    import signal
+    import termios
+    import tty
+
+    sudo_password = credentials.get("sudo_password", credentials["ssh_password"])
+    remote = "sudo -S -p 'PLASMA_SUDO_PROMPT:' " + " ".join(
+        shlex.quote(arg) for arg in command)
+    argv = [
+        "ssh", "-F", "/dev/null", "-T",
+        "-o", "StrictHostKeyChecking=yes",
+        "-o", "UserKnownHostsFile=" + str(hosts),
+        "-o", "GlobalKnownHostsFile=/dev/null",
+        "-o", "BatchMode=no",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-o", "PreferredAuthentications=password,keyboard-interactive",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "ConnectTimeout=8",
+        "-o", "ConnectionAttempts=1",
+        "--", credentials["ssh_username"] + "@" + credentials["ssh_host"], remote,
+    ]
+    master, slave = pty.openpty()
+    child = None
+    output = bytearray()
+    ssh_sent = sudo_sent = False
+    expired = False
+
+    def controlling_tty():
+        os.setsid()
+        fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+
+    try:
+        tty.setraw(slave, termios.TCSANOW)  # no ECHO of typed passwords
+        child = subprocess.Popen(
+            argv, stdin=slave, stdout=slave, stderr=slave,
+            close_fds=True, preexec_fn=controlling_tty)
+        os.close(slave)
+        slave = -1
+        deadline = time.monotonic() + timeout
+        while True:
+            if time.monotonic() >= deadline:
+                expired = True
+                break
+            ready, _, _ = select.select([master], [], [], 0.2)
+            if not ready:
+                if child.poll() is not None:
+                    break
+                continue
+            try:
+                chunk = os.read(master, 4096)
+            except OSError:
+                break  # EIO when child closes PTY
+            if not chunk:
+                break
+            output.extend(chunk)
+            if len(output) > 131072:
+                del output[:-131072]
+            tail = output[-512:].decode("utf-8", "replace")
+            if not sudo_sent and tail.endswith("PLASMA_SUDO_PROMPT:"):
+                os.write(master, sudo_password.encode() + b"\n")
+                sudo_sent = True
+            elif (not ssh_sent and
+                  re.search(r"(?i)(?:password|passphrase)[^\r\n]{0,90}:\s*$", tail)
+                  and "PLASMA_SUDO_PROMPT:" not in tail):
+                os.write(master, credentials["ssh_password"].encode() + b"\n")
+                ssh_sent = True
+        if expired:
+            return 124, "Z2_SSH_OPERATION_TIMEOUT"
+        exit_code = child.wait(timeout=5)
+        # Scrub only, never echo the raw PTY transcript.
+        clean = output.decode("utf-8", "replace")
+        for secret in (credentials["ssh_password"], sudo_password):
+            clean = clean.replace(secret, "[REDACTED]")
+        return exit_code, clean
+    finally:
+        if child is not None and child.poll() is None:
+            os.killpg(child.pid, signal.SIGTERM)
+            try:
+                child.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                os.killpg(child.pid, signal.SIGKILL)
+                child.wait()
+        os.close(master)
+        if slave != -1:
+            os.close(slave)
+
+
 def on_swpc(args):
     check_source(args.source_sha256)
     if args.operation != "preflight" and not args.owner_attested:
         raise NotRun(77, "OWNER_ATTESTATION_REQUIRED_FOR_HARDWARE")
-    home = Path.home()
-    login = home / ".config/plasma/z2-login-smoke.json"
-    key = home / ".ssh/plasma_z2_ed25519"
-    hosts = home / ".ssh/known_hosts"
-    if (not login.is_file() or stat.S_IMODE(login.stat().st_mode) != 0o600
-            or not key.is_file() or not hosts.is_file()):
-        raise NotRun(69, "ENROLLED_SSH_CREDENTIALS_UNAVAILABLE")
-    credentials = json.loads(login.read_text())
-    if (set(credentials) != {"ssh_host", "ssh_username", "ssh_password", "sudo_password"}
-            or credentials["ssh_username"] != "xilinx"):
-        raise NotRun(77, "SSH_CREDENTIAL_SCHEMA_DENIED")
-    pinned = subprocess.run(["ssh-keygen", "-F", credentials["ssh_host"], "-f", str(hosts)],
-                            capture_output=True, timeout=5)
-    if pinned.returncode:
-        raise NotRun(77, "Z2_HOST_KEY_NOT_PINNED")
+    credentials, hosts = z2_login_credentials(Path.home())
     command = [PYTHON, "-I", "-B", str(Z2_ENTRY), "--role", "z2",
                "--operation", args.operation, "--icpn", args.icpn,
                "--site-id", str(args.site_id),
@@ -706,20 +834,11 @@ def on_swpc(args):
                     "--image-sha256", args.image_sha256]
     if args.owner_attested:
         command.append("--owner-attested")
-    ssh = ["ssh", "-F", "/dev/null", "-i", str(key), "-o", "BatchMode=yes",
-           "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=yes",
-           "-o", "UserKnownHostsFile=" + str(hosts),
-           "-o", "ConnectTimeout=8", "-o", "ConnectionAttempts=1",
-           "--", credentials["ssh_username"] + "@" + credentials["ssh_host"],
-           "sudo -S -p '' " + " ".join(shlex.quote(x) for x in command)]
-    completed = subprocess.run(ssh, input=credentials["sudo_password"] + "\n",
-                               capture_output=True, text=True, timeout=750)
-    for data, stream in ((completed.stdout, sys.stdout), (completed.stderr, sys.stderr)):
-        clean = data.replace(credentials["sudo_password"], "[REDACTED]")
-        clean = clean.replace(credentials["ssh_password"], "[REDACTED]")
-        if clean:
-            print(clean[-16000:], end="", file=stream)
-    return completed.returncode
+    exit_code, clean = password_ssh_z2(command, credentials, hosts)
+    if clean:
+        # Keep the receipt at the END for SWPC's parse_receipt().
+        print(clean[-16000:], end="" if clean.endswith("\n") else "\n")
+    return exit_code
 
 
 def main():
