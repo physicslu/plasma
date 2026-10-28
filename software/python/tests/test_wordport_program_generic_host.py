@@ -283,14 +283,14 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.assertIn("PLASMA_CORE_REGISTER_PASS $label", tcl)
         self.assertNotIn("foreach name {pc sp lr xPSR}", tcl)
         # The evidence contract deliberately retains the public xPSR label.
-        log = ("PLASMA_CORE_STATE_BEFORE running\\n"
-               "PLASMA_CORE_REGISTER_PASS pc 0x0800040A\\n"
-               "PLASMA_CORE_REGISTER_PASS sp 0x20004F78\\n"
-               "PLASMA_CORE_REGISTER_PASS lr 0x08000401\\n"
-               "PLASMA_CORE_REGISTER_PASS xPSR 0x01000000\\n"
-               "PLASMA_CORE_RESUME_OK\\n"
-               "PLASMA_CORE_STATE_AFTER running\\n"
-               "PLASMA_CORE_SUMMARY PASS\\n")
+        log = ("PLASMA_CORE_STATE_BEFORE running\n"
+               "PLASMA_CORE_REGISTER_PASS pc 0x0800040A\n"
+               "PLASMA_CORE_REGISTER_PASS sp 0x20004F78\n"
+               "PLASMA_CORE_REGISTER_PASS lr 0x08000401\n"
+               "PLASMA_CORE_REGISTER_PASS xPSR 0x01000000\n"
+               "PLASMA_CORE_RESUME_OK\n"
+               "PLASMA_CORE_STATE_AFTER running\n"
+               "PLASMA_CORE_SUMMARY PASS\n")
         self.assertTrue(module.read_core_evidence(log)[0])
         self.assertFalse(module.read_core_evidence(
             log.replace("PASS xPSR", "PASS xpsr"))[0])
