@@ -34,9 +34,10 @@ int plasma_swd_recovery_gate_begin(
         !job_id || !*job_id || strlen(job_id) > 128u)
         return PLASMA_RECOVERY_DENIED;
 
-    /* The external authority MUST validate actual Site EX/PPU SH ownership,
-     * current Boot/Image/Manifest, and persist UNCERTAIN + intent. The
-     * untrusted native caller cannot synthesize its own permission here.
+    /* A future trusted PS-local authority MUST validate actual Site EX/
+     * PPU SH ownership, current Boot/Image/Manifest, and persist UNCERTAIN
+     * + intent. These injected callbacks are NOT authenticated here and
+     * CAN be forged by callers. This helper alone is NOT a security gate.
      */
     if (authority->begin(authority->ctx, site_id, owner_epoch,
                          job_id, &generation) != 0 || generation == 0)
