@@ -29,7 +29,7 @@ OPENOCD_SCRIPTS = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/s
 NATIVE_SHA = "66261cef851c9777469b393b7539c5b0f8c2b039a032f1a5b4cbf9e93460e447"
 SESSION_SHA = "5e2e0781a66c541377e262325a26789ff55499e27cc433e399becf0fcf59b811"
 PY_MODULE_SHA = "9eb8a5e90f11132e46a0b67a69f5694d0c56e1ade47d1bec6f682fec77f19ab1"
-STAGE_MODULE_SHA = "551624f3effcdec4266b0a6867b1dd9e1ee4175486c5621767251bd7e8a1192f"
+STAGE_MODULE_SHA = "0fca10848c89f9f85516fd5b83ae685de769eafb7bda26c2123d8ad25a8ff110"
 RBB_MODULE_SHA = "8a466e46c611662c3f2f91ba41fa1b9b80d8951befef2db5b9af0d8b7bd30b11"
 # Flash geometry belongs to the exact target/provider, never to a firmware revision.
 # Additional target support must be admitted through a reviewed Programming Profile.
@@ -266,7 +266,7 @@ proc plasma_require_irq_mask {phase} {
 
 def make_tcl(socket: Path, firmware: Path | None, readback: Path, operation: str,
              *, image_bytes: int = 0, erase_bytes: int = 0,
-             stage_socket: Path | None = None) -> str:
+             stage_socket: Path | None = None, readback_enabled: bool = False) -> str:
     """Compile a bounded OpenOCD command for a verified target profile."""
     if operation == "program" and (
         firmware is None or image_bytes < 1 or
@@ -430,6 +430,15 @@ proc plasma_core_probe {} {
                          'shutdown\n')
     if operation != "program":
         raise ValueError("UNKNOWN_OPERATION")
+    readback_tcl = (f'''{mark("BEGIN", "READBACK")}\
+if {{[catch {{dump_image {readback} 0x{PROFILE["main_flash_base"]:08X} {image_bytes}}} failure]}} {{
+    {mark("FAIL", "READBACK").strip()}
+    plasma_diag READBACK "$failure"
+    shutdown error
+}}
+{mark("END", "READBACK")}\
+echo "PLASMA_READBACK_OK"
+''' if readback_enabled else 'echo "PLASMA_READBACK_SKIPPED"\n')
     return config + IRQ_MASK_GATE_TCL + f"""halt
 # Protect the next SRAM Flash algorithm from the previously running
 # application's maskable NVIC/SysTick interrupts.  Do not reset the MCU:
@@ -475,14 +484,7 @@ if {{[catch {{verify_image {firmware} 0x{PROFILE["main_flash_base"]:08X} bin}} f
 }}
 {mark("END", "VERIFY")}\
 echo "PLASMA_VERIFY_OK"
-{mark("BEGIN", "READBACK")}\
-if {{[catch {{dump_image {readback} 0x{PROFILE["main_flash_base"]:08X} {image_bytes}}} failure]}} {{
-    {mark("FAIL", "READBACK").strip()}
-    plasma_diag READBACK "$failure"
-    shutdown error
-}}
-{mark("END", "READBACK")}\
-echo "PLASMA_READBACK_OK"
+{readback_tcl}\
 echo "PLASMA_PROGRAM_COMPLETED_NO_RESET"
 shutdown
 """
@@ -667,7 +669,8 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
     stage_socket = Path(str(socket) + ".stage")
     tcl.write_text(make_tcl(socket, staged, readback, args.operation,
                             image_bytes=image_bytes, erase_bytes=erase_bytes,
-                            stage_socket=stage_socket))
+                            stage_socket=stage_socket,
+                            readback_enabled=getattr(args, "readback", False)))
     bridge_cmd = [
         PYTHON, "-I", "-B", str(BUNDLE / "scripts/bluepill-wordport-session.py"),
         "--root-source-sha", root_sha, "--boot-id", boot,
@@ -736,12 +739,17 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         except (OSError, ValueError):
             error = "STAGE_EVIDENCE_INVALID"
     try:
-        stages = stage_report(events, image_bytes, erase_bytes, operation=args.operation)
+        stages = stage_report(events, image_bytes, erase_bytes, operation=args.operation,
+                              readback_enabled=getattr(args, "readback", False))
     except ValueError as exc:
         error = f"STAGE_EVIDENCE_INVALID: {exc}"[:500]
-        stages = stage_report([], image_bytes, erase_bytes, operation=args.operation)
-    required = ("erase", "program", "verify", "readback") if args.operation == "program" else (
-        ("reset",) if args.operation == "reset-run" else ())
+        stages = stage_report([], image_bytes, erase_bytes, operation=args.operation,
+                              readback_enabled=getattr(args, "readback", False))
+    if args.operation == "program":
+        required = ("erase", "program", "verify") + (
+            ("readback",) if getattr(args, "readback", False) else ())
+    else:
+        required = ("reset",) if args.operation == "reset-run" else ()
     stage_complete = all(stages[name]["result"] == "PASS" for name in required)
     stage_seconds = sum(stages[name].get("duration_s", 0) for name in required)
     total_seconds = (run_end_ns - preflight_start_ns) / 1e9
@@ -788,8 +796,11 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
                 other_seconds >= 0)
     if args.operation == "program":
         success = (eligible and "PLASMA_PROGRAM_COMPLETED_NO_RESET" in log and
-                   readback.is_file() and readback.stat().st_size == image_bytes and
-                   sha(readback) == image_sha)
+                   "PLASMA_VERIFY_OK" in log and
+                   ((readback.is_file() and readback.stat().st_size == image_bytes and
+                     sha(readback) == image_sha and "PLASMA_READBACK_OK" in log)
+                    if getattr(args, "readback", False) else
+                    (not readback.exists() and "PLASMA_READBACK_SKIPPED" in log)))
         failure_diagnostics = read_failure_diagnostics(log)
         diagnostic = ("POST_ERROR_SAME_SESSION" if failure_diagnostics["status"] != "NOT_CAPTURED"
                       else "NOT_CAPTURED")
@@ -817,6 +828,7 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         "image_bytes": image_bytes, "image_sha256": image_sha,
         "target_cfg": PROFILE["target_cfg"],
         "erase_bytes": erase_bytes,
+        "readback_enabled": bool(args.operation == "program" and getattr(args, "readback", False)),
         "readback_sha256": sha(readback) if readback.is_file() else None,
         "openocd_log_sha256": sha(evidence / "openocd.log"),
         "evidence_directory": str(evidence), "socket_released": not socket.exists(),
@@ -1017,6 +1029,8 @@ def on_swpc(args):
     if args.firmware:
         command += ["--firmware", args.firmware,
                     "--image-sha256", args.image_sha256]
+    if getattr(args, "readback", False):
+        command.append("--readback")
     if args.owner_attested:
         command.append("--owner-attested")
     exit_code, clean = password_ssh_z2(command, credentials, hosts)
@@ -1034,10 +1048,14 @@ def main():
     parser.add_argument("--site-id", type=int, required=True, help="One-based physical Site")
     parser.add_argument("--firmware", help="Operator-selected absolute BIN path on Z2")
     parser.add_argument("--image-sha256", help="Independent SHA256 from approved Programming Asset")
+    parser.add_argument("--readback", action="store_true",
+                        help="Opt in to full independent Flash dump and SHA256 comparison (default: skip)")
     parser.add_argument("--source-sha256", required=True)
     parser.add_argument("--owner-attested", action="store_true",
                         help="Explicit owner-approved hardware command (not repeated sensor/fixture validation)")
     args = parser.parse_args()
+    if args.readback and args.operation != "program":
+        parser.error("--readback is only valid with --operation program")
     try:
         return on_swpc(args) if args.role == "swpc" else on_z2(args)
     except NotRun as exc:

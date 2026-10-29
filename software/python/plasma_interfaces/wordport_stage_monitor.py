@@ -108,11 +108,12 @@ class StageMonitor:
 
 
 def stage_report(events: list[dict], image_bytes: int, erase_bytes: int,
-                 *, operation: str) -> dict:
+                 *, operation: str, readback_enabled: bool = True) -> dict:
     """Validate the exact evidence schema; preserve partial runs truthfully."""
     if type(image_bytes) is not int or type(erase_bytes) is not int or image_bytes < 0 or erase_bytes < 0:
         raise ValueError("INVALID_STAGE_BYTE_COUNT")
-    expected = (("ERASE", "PROGRAM", "VERIFY", "READBACK") if operation == "program"
+    expected = (("ERASE", "PROGRAM", "VERIFY") + (("READBACK",) if readback_enabled else ())
+                if operation == "program"
                 else (("RESET",) if operation == "reset-run" else ()))
     keys = ("monotonic_ns", "utc_ns", "wire_bytes", "mmio_reads", "mmio_writes",
             "socket_recv_calls", "socket_sendall_calls")
@@ -174,4 +175,6 @@ def stage_report(events: list[dict], image_bytes: int, erase_bytes: int,
             "swd_wait": "NOT_OBSERVED", "swd_fault": "NOT_OBSERVED",
             "swd_retry": "NOT_OBSERVED",
         }
+    if operation == "program" and not readback_enabled:
+        result["readback"] = {"result": "SKIPPED", "bytes": 0}
     return result

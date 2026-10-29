@@ -85,7 +85,8 @@ def parse_receipt(output: str) -> dict:
     return {"result": "FAIL", "reason": "MISSING_JSON_RECEIPT"}
 
 
-def valid_performance(receipt: dict, operation: str, image: dict | None) -> bool:
+def valid_performance(receipt: dict, operation: str, image: dict | None,
+                      *, readback_enabled: bool = False) -> bool:
     evidence = receipt.get("performance")
     versions = receipt.get("versions")
     if (not isinstance(evidence, dict) or evidence.get("schema") != "plasma.swd.performance.v1"
@@ -97,7 +98,8 @@ def valid_performance(receipt: dict, operation: str, image: dict | None) -> bool
                                    "rbb_module_sha256", "native_c_sha256",
                                    "openocd_sha256", "target_cfg_sha256"))):
         return False
-    required = (("erase", "program", "verify", "readback") if operation == "program"
+    required = (("erase", "program", "verify") +
+                (("readback",) if readback_enabled else ()) if operation == "program"
                 else ("reset",))
     stages = evidence.get("stages")
     preflight = evidence.get("preflight")
@@ -109,10 +111,15 @@ def valid_performance(receipt: dict, operation: str, image: dict | None) -> bool
     if any(not isinstance(stages.get(name), dict) or stages[name].get("result") != "PASS"
            for name in required):
         return False
+    if operation == "program" and not readback_enabled and (
+            not isinstance(stages.get("readback"), dict) or
+            stages["readback"] != {"result": "SKIPPED", "bytes": 0}):
+        return False
     if operation == "program" and image is not None:
         if (stages["erase"].get("bytes") != receipt.get("erase_bytes") or
                 any(stages[name].get("bytes") != image["size"]
-                    for name in ("program", "verify", "readback"))):
+                    for name in (("program", "verify", "readback") if readback_enabled
+                                 else ("program", "verify")))):
             return False
     try:
         summed = preflight["duration_s"] + evidence["other_duration_s"] + sum(
@@ -134,7 +141,8 @@ def valid_performance(receipt: dict, operation: str, image: dict | None) -> bool
 
 
 def valid_receipt(operation: str, receipt: dict, image: dict | None = None,
-                  *, expected_source_sha: str | None = None) -> bool:
+                  *, expected_source_sha: str | None = None,
+                  readback_enabled: bool = False) -> bool:
     if receipt.get("result") != "PASS" or receipt.get("operation") != operation:
         return False
     if operation == "preflight":
@@ -147,13 +155,16 @@ def valid_receipt(operation: str, receipt: dict, image: dict | None = None,
             or receipt.get("no_auto_retry") is not True):
         return False
     if (operation in ("program", "reset-run") and
-            (not valid_performance(receipt, operation, image) or
+            (not valid_performance(receipt, operation, image,
+                                   readback_enabled=readback_enabled) or
              (expected_source_sha is not None and
               receipt["versions"]["engine_sha256"] != expected_source_sha))):
         return False
     if operation == "program":
         return (image is not None and receipt.get("image_sha256") == image["sha256"]
-                and receipt.get("readback_sha256") == image["sha256"]
+                and receipt.get("readback_enabled") is readback_enabled
+                and (receipt.get("readback_sha256") == image["sha256"] if readback_enabled
+                     else receipt.get("readback_sha256") is None)
                 and receipt.get("image_bytes") == image["size"]
                 and receipt.get("no_reset_no_retry") is True)
     if operation in ("reset-run", "register-read"):
@@ -367,6 +378,8 @@ class BurnIn:
                    "--source-sha256", self.engine_sha]
         if image is not None:
             command += ["--firmware", image["path"], "--image-sha256", image["sha256"]]
+        if operation == "program" and getattr(self.args, "readback", False):
+            command.append("--readback")
         if operation != "preflight":
             command.append("--owner-attested")
         started = time.monotonic()
@@ -389,7 +402,8 @@ class BurnIn:
                 "elapsed_s": round(time.monotonic() - started, 3),
                 "log": str(self.directory / (name + ".log")),
                 "pass": exit_code == 0 and valid_receipt(
-                    operation, receipt, image, expected_source_sha=self.engine_sha)}
+                    operation, receipt, image, expected_source_sha=self.engine_sha,
+                    readback_enabled=operation == "program" and getattr(self.args, "readback", False))}
 
     def capture_failure(self, version: str, stage: str, failed: dict):
         self.report("FAIL", f"{version} {stage}; stopping future programs",
@@ -450,13 +464,16 @@ class BurnIn:
                 return 130
             self.current = index
             image = IMAGES[version]
-            self.report("PROGRAM", f"{version}: erase/program/verify/readback begin")
+            self.report("PROGRAM", f"{version}: erase/program/verify" +
+                        ("/readback" if getattr(self.args, "readback", False) else "") + " begin")
             program = self.run_engine("program", image)
             if not program["pass"]:
                 self.failed += 1
                 self.capture_failure(version, "PROGRAM_FAIL", program)
                 return 1
-            self.report("PROGRAM_PASS", f"{version} readback SHA256 matched",
+            self.report("PROGRAM_PASS", f"{version} " +
+                        ("readback SHA256 matched" if getattr(self.args, "readback", False)
+                         else "OpenOCD Verify passed (independent readback skipped)"),
                         {"program_receipt": program})
             # Even after a stop request, finish this successful attempt by
             # resetting and checking CDC; never leave an intentional halted core.
@@ -496,6 +513,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="SWPC Blue Pill USB CDC device; usually /dev/ttyACM0")
     parser.add_argument("--frames", type=int, default=60,
                         help="consecutive valid USB CDC heartbeats per image (3..1000; default 60)")
+    parser.add_argument("--readback", action="store_true",
+                        help="Opt in to independent Flash readback and SHA256 (default: skip)")
     parser.add_argument("--cdc-timeout", type=float, default=None,
                         help="per-image CDC timeout in seconds (5..1800; default auto by frame count/version)")
     parser.add_argument("--stop-file", default="/tmp/plasma-ab-stop")
