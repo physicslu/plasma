@@ -132,7 +132,11 @@ def self_test(parts: dict[str, str]) -> None:
         if needle not in parts[k]:
             reject("negative control fixture no longer matches " + k + ": " + needle)
         changed = dict(parts)
-        changed[k] = changed[k].replace(needle, replacement, 1)
+        # Instrumented and plain sessions both call the local socket server.
+        # The negative control must replace every branch to test the boundary.
+        changed[k] = changed[k].replace(needle, replacement) if (
+            k == "bridge" and needle == "serve_local_unix_once(args.socket") else (
+            changed[k].replace(needle, replacement, 1))
         try:
             validate(*(changed[key] for key in keys))
         except ValueError as err:
