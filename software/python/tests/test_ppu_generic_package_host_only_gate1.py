@@ -1,6 +1,7 @@
 """#1209 revised Gate 1: one transaction engine, sandbox-only C/Python/FPGA."""
 from __future__ import annotations
 
+import base64
 import fcntl
 import hashlib
 import importlib.util
@@ -310,3 +311,65 @@ def test_no_extra_adapter_or_second_transaction_persistence() -> None:
     assert source.count("class DeploymentCoordinator:") == 1
     assert "def execute_package_host_only(" in source
     assert "subprocess.run(" not in source
+
+
+def test_real_bootstrap_chunk_upload_to_same_coordinator_host_only_sandbox(tmp_path: Path) -> None:
+    """Existing upload bytes -> ZIP verifier -> one Coordinator; never live API admission."""
+    service = load("ppu_channel_real_upload_service_gate1", "ppu-bootstrap-service.py")
+    for name, kind, files in SAMPLES:
+        isolated = tmp_path / name
+        isolated.mkdir()
+        archive, digest = package(isolated, name, kind, files)
+        payload = archive.read_bytes()
+        paths = service.ServicePaths(
+            product_root=isolated / "product-untouched",
+            state_root=isolated / "bootstrap-state",
+        )
+        opened = service.create_upload(paths, size=len(payload), sha256=digest)
+        upload_id = opened["upload_id"]
+        midpoint = max(1, len(payload) // 2)
+        offset = 0
+        for chunk in (payload[:midpoint], payload[midpoint:]):
+            if not chunk:
+                continue
+            receipt = service.append_chunk(
+                paths, upload_id, offset=offset,
+                data_base64=base64.b64encode(chunk).decode("ascii"),
+                sha256=hashlib.sha256(chunk).hexdigest(),
+            )
+            offset += len(chunk)
+            assert receipt["received_bytes"] == offset
+        committed = service.commit_upload(paths, upload_id)
+        assert committed["state"] == "committed"
+        # Bootstrap currently names every uploaded archive .tar.gz, regardless
+        # of actual ZIP bytes. The runtime kit installer must NOT receive it.
+        stored = service._upload_paths(paths, upload_id).committed
+        assert stored.read_bytes() == payload
+        assert zipfile.is_zipfile(stored)
+        co = coordinator(isolated)
+        result = co.execute_package_host_only(request(stored, digest))
+        assert result["result"] == "PASS"
+        assert result["package"]["kind"] == kind
+        assert result["install_qualified"] is False
+        assert not paths.product_root.exists()
+        assert not co.paths.product_root.exists()
+        # The live request parser still fails closed for engineering and FPGA.
+        blocked_kind = "fpga-image" if kind == "fpga-image" else "engineering-module"
+        with pytest.raises(service.BootstrapServiceError, match="INSTALL_NOT_QUALIFIED"):
+            service._deployment_request({"kind": blocked_kind, "upload_id": upload_id})
+
+
+def test_chunk_upload_rejects_tamper_before_host_only_install(tmp_path: Path) -> None:
+    service = load("ppu_channel_upload_tamper_gate1", "ppu-bootstrap-service.py")
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/main.py": b"pass\\n"})
+    payload = archive.read_bytes()
+    paths = service.ServicePaths(state_root=tmp_path / "bootstrap-state")
+    opened = service.create_upload(paths, size=len(payload), sha256=digest)
+    upload_id = opened["upload_id"]
+    with pytest.raises(service.BootstrapServiceError, match="SHA-256 mismatch"):
+        service.append_chunk(paths, upload_id, offset=0,
+                             data_base64=base64.b64encode(payload).decode("ascii"),
+                             sha256="0" * 64)
+    with pytest.raises(service.BootstrapServiceError, match="incomplete"):
+        service.commit_upload(paths, upload_id)
+    assert not service._upload_paths(paths, upload_id).committed.exists()
