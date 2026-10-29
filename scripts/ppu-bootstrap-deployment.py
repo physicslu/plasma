@@ -28,8 +28,8 @@ from typing import Any, Callable, Mapping, Sequence
 SCHEMA_VERSION = 1
 SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "rolled_back", "verify_failed"}
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
-_HEX40 = re.compile(r"[0-9a-f]{40}\\Z")
-_HEX64 = re.compile(r"[0-9a-f]{64}\\Z")
+_HEX40 = re.compile(r"[0-9a-f]{40}\Z")
+_HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 QUALIFICATION_HEALTH_FAILURE = "qualification-injected post-activation health-check failure"
 
 
