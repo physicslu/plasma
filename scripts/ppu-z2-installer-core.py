@@ -166,6 +166,15 @@ class VerifiedEngineeringBundle:
     install_qualified: bool = False
 
 
+def _unique_engineering_json_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise Z2InstallerError("ENGINEERING_MANIFEST_DUPLICATE_JSON_KEY")
+        result[key] = value
+    return result
+
+
 def verify_engineering_package(
     release_artifact: Path,
     *,
@@ -202,10 +211,13 @@ def verify_engineering_package(
                 or any(
                     info.is_dir() or info.file_size > 500_000
                     or info.flag_bits & 0x1
+                    or (stat.S_IFMT(info.external_attr >> 16) not in (0, stat.S_IFREG))
                     for info in infos
                 )):
                 raise Z2InstallerError("ENGINEERING_PACKAGE_FILE_SET_DENIED")
-            manifest = json.loads(archive.read("manifest.json"))
+            manifest = json.loads(
+                archive.read("manifest.json"), object_pairs_hook=_unique_engineering_json_pairs
+            )
             if not isinstance(manifest, dict) or set(manifest) != _ENGINEERING_MANIFEST_FIELDS:
                 raise Z2InstallerError("ENGINEERING_MANIFEST_FIELDS_DENIED")
             if (manifest["schema"] != "plasma.ppu.deploy.v1"
