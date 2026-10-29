@@ -52,14 +52,12 @@ checks root identity, protected source, exact ARMv7 native interpreter,
 current process/driver ownership, firmware digests and shared FPGA lock.
 
 Do **not** reuse the old `f1b-path3-z2-hil-once` task/one-shot claim.
-The current development registry retains fixed Path 2 stage tasks:
-`z2-path2-download` → `download`, `z2-path2-testing` → `test`, and
-`z2-path2-restore` → `restore`. The trusted-main Dispatcher passes an
-authorized stage and exact source SHA through the shared Stage Transport;
-the protected Z2 root executor must verify the source manifest and return
-an authentic sanitized receipt. No GitHub PR checkout may self-install
-or become a privileged endpoint. Task registration alone grants no live
-SWPC/Z2 authorization or root access.
+The following fixed Stage task IDs and commands are **historical only**:
+`z2-path2-download`, `z2-path2-testing` and `z2-path2-restore` are not in
+the current Registry. The current dynamic hardware Work Order uses
+`operator-cli`; the protected Z2 Root Entry independently verifies its
+source manifest and returns an authentic receipt when explicitly authorized.
+No GitHub PR checkout may self-install or become a privileged endpoint.
 
 ## Three independent manual stage invocations
 

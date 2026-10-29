@@ -57,8 +57,11 @@ remains separate, not a generic execution gate.
 - `cpu-only` — reviewed Python under `scripts/`, Host-only Bubblewrap with
   no network/devices, bounded argv/timeout and stdout-digest or explicit
   exit-code verification. Process exit 0 is not physical evidence.
-- `vivado-host-build` — source-pinned Host build qualified only for the
-  existing F1-B Site 1 Project; it has no implicit Z2 download or Root right.
+- `vivado-host-build` — a PR-HEAD-pinned Host build for a project with a
+  reviewed `host-build.json`, build Tcl and project-specific artifact/HWH
+  verifier. A syntactically valid project path alone is insufficient. The
+  two legacy fixed Registry Build tasks remain F1-B-only compatibility
+  routes. Neither route grants Z2 download or Root authority.
 - `operator-cli` — owner-approved `scope: guarded-hardware` with a checked-in
   Python `script`, `argv` and bounded `timeout_seconds`. The existing
   non-root SWPC Runner executes that script directly, **not** a fixed
