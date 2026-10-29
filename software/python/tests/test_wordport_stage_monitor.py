@@ -82,6 +82,28 @@ class StageEvidenceTests(unittest.TestCase):
             stage_report([{**base, "monotonic_ns": "1"}], 0, 0,
                          operation="reset-run")
 
+    def test_fast_mode_skips_independent_readback_but_does_not_skip_verify(self):
+        counters = {"wire_bytes": 1, "mmio_reads": 1, "mmio_writes": 1,
+                    "socket_recv_calls": 1, "socket_sendall_calls": 1}
+        events = []
+        for index, stage in enumerate(("ERASE", "PROGRAM", "VERIFY")):
+            for edge in ("BEGIN", "END"):
+                tick = len(events) + 1
+                events.append({"stage": stage, "edge": edge,
+                               "monotonic_ns": tick, "utc_ns": tick,
+                               **{key: value * tick for key, value in counters.items()}})
+        report = stage_report(events, 2048, 2048, operation="program",
+                              readback_enabled=False)
+        self.assertEqual(report["verify"]["result"], "PASS")
+        self.assertEqual(report["readback"], {"result": "SKIPPED", "bytes": 0})
+        with self.assertRaisesRegex(ValueError, "INVALID_STAGE_EVIDENCE_SCHEMA"):
+            stage_report(events + [{**events[-1], "stage": "READBACK", "edge": "BEGIN",
+                                    "monotonic_ns": 7}], 2048, 2048,
+                         operation="program", readback_enabled=False)
+        missing_verify = stage_report(events[:-2], 2048, 2048,
+                                      operation="program", readback_enabled=False)
+        self.assertEqual(missing_verify["verify"]["result"], "NOT_OBSERVED")
+
     def test_marker_timeout_does_not_create_pass_event(self):
         port = FakePort()
         calls = SocketCallCounters()
