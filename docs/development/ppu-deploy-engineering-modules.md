@@ -1,8 +1,6 @@
 # `ppu-deploy` — PPU engineering-module deployment (Gate 1)
 
-Status: **Gate 1 host-only implementation / independent Draft PR**. This
-document does **not** authorize deployment, merge, firmware programming or
-equipment operation. The product deployment path (`plasmactl`) is separate.
+Status: **engineering deployment implementation included in main; actual SWPC/Z2 deployment unverified by this page**. See [single-entry convergence Gate 1](../architecture/ppu-unified-deployment-gate1.md). The existing engineering SSH transaction remains separate from product Bootstrap and is **not yet retired**; the new `ppu-deploy plan` exposes a blocked single-API migration intent. This page is not deployment or hardware authorization.
 
 ## Scope and ownership
 

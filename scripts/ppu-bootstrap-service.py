@@ -26,6 +26,7 @@ import json
 import os
 import re
 import secrets
+import stat
 import subprocess
 import sys
 import threading
@@ -48,6 +49,10 @@ UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 DEPLOYMENT_API_IN_FLIGHT_STATES = {"queued", "running"}
 DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "failed", "recovery_required"}
+COORDINATOR_SAFE_RESTART_STATES = {
+    "runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed",
+}
+MAX_COORDINATOR_JOURNAL_BYTES = 1024 * 1024
 
 
 class BootstrapServiceError(RuntimeError):
@@ -73,6 +78,10 @@ class ServicePaths:
     @property
     def deployment_record(self) -> Path:
         return self.state_root / "deployment-api.json"
+
+    @property
+    def coordinator_journal(self) -> Path:
+        return self.state_root / "deployment.json"
 
 
 @dataclass(frozen=True)
@@ -149,6 +158,101 @@ def _deployment_api_record(paths: ServicePaths) -> dict[str, Any] | None:
     if state not in DEPLOYMENT_API_IN_FLIGHT_STATES | DEPLOYMENT_API_TERMINAL_STATES:
         raise BootstrapServiceError(f"deployment API state is invalid: {state!r}")
     return record
+
+
+def _read_coordinator_journal(paths: ServicePaths) -> dict[str, Any] | None:
+    """Bounded, non-following read of the existing Coordinator's private journal."""
+    path = paths.coordinator_journal
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return None  # First deployment: the Coordinator has no journal yet.
+    except OSError as exc:
+        raise BootstrapServiceError("deployment Coordinator journal is unavailable") from exc
+    try:
+        with os.fdopen(fd, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077:
+                raise BootstrapServiceError("deployment Coordinator journal is not a private regular file")
+            try:
+                raw = stream.read(MAX_COORDINATOR_JOURNAL_BYTES + 1)
+                if len(raw) > MAX_COORDINATOR_JOURNAL_BYTES:
+                    raise BootstrapServiceError("deployment Coordinator journal is oversized")
+                record = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise BootstrapServiceError("deployment Coordinator journal is unreadable") from exc
+    except OSError as exc:
+        raise BootstrapServiceError("deployment Coordinator journal is unreadable") from exc
+    if (
+        not isinstance(record, dict)
+        or type(record.get("schema_version")) is not int
+        or record["schema_version"] != 1
+        or not isinstance(record.get("transaction_id"), str)
+        or not record["transaction_id"]
+        or type(record.get("sequence")) is not int
+        or record["sequence"] < 1
+    ):
+        raise BootstrapServiceError("deployment Coordinator journal identity is invalid")
+    return record
+
+
+def _admit_coordinator_journal(paths: ServicePaths) -> dict[str, Any] | None:
+    """Fail closed before queueing when the *shared* Coordinator is unsafe.
+
+    This is a read-only early rejection, not an API/Coordinator transaction-ID
+    reconciliation or a replacement for the Coordinator's exclusive flock.
+    The Coordinator independently rechecks the journal under its own lock.
+    """
+    record = _read_coordinator_journal(paths)
+    if record is None:
+        return None
+    if (
+        not isinstance(record.get("state"), str)
+        or record["state"] not in COORDINATOR_SAFE_RESTART_STATES
+    ):
+        raise BootstrapServiceError(
+            "previous Coordinator deployment is active, unknown or requires recovery"
+        )
+    return record
+
+
+def _reconcile_runtime_result(
+    paths: ServicePaths,
+    *,
+    api_transaction_id: str,
+    previous_coordinator_id: str | None,
+    runner_result: Mapping[str, Any],
+) -> dict[str, str]:
+    """Bind an API result to the exact Coordinator transaction under its journal.
+
+    The API ID is written by the existing Coordinator while holding its flock.
+    It is only a correlation field, never a Master/Root authorization token.
+    """
+    if not isinstance(api_transaction_id, str) or not UPLOAD_ID_RE.fullmatch(api_transaction_id):
+        raise BootstrapServiceError("deployment API transaction identity is invalid")
+    if not isinstance(runner_result, Mapping) or runner_result.get("result") != "PASS":
+        raise BootstrapServiceError("deployment runner did not prove success")
+    expected_release = runner_result.get("kit_release_id")
+    if not isinstance(expected_release, str) or not expected_release:
+        raise BootstrapServiceError("deployment runner release identity is missing")
+    journal = _read_coordinator_journal(paths)
+    if journal is None:
+        raise BootstrapServiceError("deployment Coordinator receipt is missing")
+    if (
+        journal.get("state") != "runtime_active"
+        or journal.get("kind") != "ppu-runtime"
+        or journal.get("api_transaction_id") != api_transaction_id
+        or not isinstance(journal.get("release_id"), str)
+        or journal["release_id"] != expected_release
+        or journal["transaction_id"] == previous_coordinator_id
+    ):
+        raise BootstrapServiceError("deployment API and Coordinator result are not reconciled")
+    return {
+        "api_transaction_id": api_transaction_id,
+        "coordinator_transaction_id": journal["transaction_id"],
+        "coordinator_release_id": journal["release_id"],
+        "coordinator_state": journal["state"],
+    }
 
 
 def _recover_interrupted_api_deployment(paths: ServicePaths) -> dict[str, Any] | None:
@@ -311,6 +415,9 @@ def run_deployment_subprocess(
     upload_id: str,
     request: Mapping[str, Any],
 ) -> dict[str, Any]:
+    api_transaction_id = request.get("api_transaction_id")
+    if not isinstance(api_transaction_id, str) or not UPLOAD_ID_RE.fullmatch(api_transaction_id):
+        raise BootstrapServiceError("internal Bootstrap API transaction identity is missing")
     upload = _upload_paths(paths, upload_id)
     meta = _read_json(upload.meta)
     if meta.get("state") != "committed" or not upload.committed.is_file() or not upload.sidecar.is_file():
@@ -334,6 +441,8 @@ def run_deployment_subprocess(
         str(request["display_name"]),
         "--product-root",
         str(paths.product_root),
+        "--api-transaction-id",
+        api_transaction_id,
     ]
     completed = subprocess.run(
         argv,
@@ -356,7 +465,18 @@ def run_deployment_subprocess(
 
 
 def _deployment_request(body: Mapping[str, Any]) -> dict[str, str]:
-    allowed = {"upload_id", "gateway_host", "ppu_id", "facility_id", "display_name"}
+    # Unified API is PS-only until the exact engineering-module adapter is
+    # qualified against Bootstrap's single deployment lock/journal, and FPGA
+    # Image + Manifest installation is implemented. The current Bootstrap
+    # must not feed either type to the PS-only installer.
+    kind = body.get("kind", "ppu-runtime")
+    if kind == "engineering-module":
+        raise BootstrapServiceError("ENGINEERING_INSTALL_NOT_QUALIFIED")
+    if kind == "fpga-image":
+        raise BootstrapServiceError("FPGA_IMAGE_INSTALL_NOT_QUALIFIED")
+    if kind != "ppu-runtime":
+        raise BootstrapServiceError("UNKNOWN_DEPLOYMENT_KIND")
+    allowed = {"kind", "upload_id", "gateway_host", "ppu_id", "facility_id", "display_name"}
     unexpected = set(body) - allowed
     if unexpected:
         raise BootstrapServiceError(f"unsupported deployment fields: {', '.join(sorted(unexpected))}")
@@ -408,6 +528,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 raise BootstrapServiceError(
                     "previous deployment requires explicit recovery before another deployment"
                 )
+            previous_coordinator = _admit_coordinator_journal(self.bootstrap_paths)
             transaction_id = uuid.uuid4().hex
             record = {
                 "schema_version": 1,
@@ -427,14 +548,29 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 record["updated_at_epoch_s"] = time.time()
                 _atomic_json(self.bootstrap_paths.deployment_record, record)
                 try:
-                    result = dict(self.deployment_runner(self.bootstrap_paths, upload_id, request))
+                    # The public request is strictly normalized before this
+                    # internal correlation ID is added; clients cannot choose it.
+                    internal_request = {**request, "api_transaction_id": transaction_id}
+                    result = dict(self.deployment_runner(self.bootstrap_paths, upload_id, internal_request))
+                    receipt = _reconcile_runtime_result(
+                        self.bootstrap_paths,
+                        api_transaction_id=transaction_id,
+                        previous_coordinator_id=(
+                            previous_coordinator["transaction_id"] if previous_coordinator else None
+                        ),
+                        runner_result=result,
+                    )
                 except Exception as exc:
-                    record["state"] = "failed"
-                    record["error_code"] = "deployment_runner_failed"
+                    # A failed/ambiguous runner may already have activated a
+                    # release. Do not make this transaction retryable without
+                    # an authoritative matching Coordinator receipt.
+                    record["state"] = "recovery_required"
+                    record["error_code"] = "coordinator_result_unreconciled"
                     record["error"] = str(exc)
+                    record["result"] = None
                 else:
                     record["state"] = "succeeded"
-                    record["result"] = result
+                    record["result"] = {**result, "coordinator_receipt": receipt}
                 record["updated_at_epoch_s"] = time.time()
                 _atomic_json(self.bootstrap_paths.deployment_record, record)
 
