@@ -356,7 +356,18 @@ def run_deployment_subprocess(
 
 
 def _deployment_request(body: Mapping[str, Any]) -> dict[str, str]:
-    allowed = {"upload_id", "gateway_host", "ppu_id", "facility_id", "display_name"}
+    # Unified API is PS-only until the exact engineering-module adapter is
+    # qualified against Bootstrap's single deployment lock/journal, and FPGA
+    # Image + Manifest installation is implemented. The current Bootstrap
+    # must not feed either type to the PS-only installer.
+    kind = body.get("kind", "ppu-runtime")
+    if kind == "engineering-module":
+        raise BootstrapServiceError("ENGINEERING_INSTALL_NOT_QUALIFIED")
+    if kind == "fpga-image":
+        raise BootstrapServiceError("FPGA_IMAGE_INSTALL_NOT_QUALIFIED")
+    if kind != "ppu-runtime":
+        raise BootstrapServiceError("UNKNOWN_DEPLOYMENT_KIND")
+    allowed = {"kind", "upload_id", "gateway_host", "ppu_id", "facility_id", "display_name"}
     unexpected = set(body) - allowed
     if unexpected:
         raise BootstrapServiceError(f"unsupported deployment fields: {', '.join(sorted(unexpected))}")
