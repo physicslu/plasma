@@ -68,6 +68,25 @@ class StageEvidenceTests(unittest.TestCase):
         self.assertEqual(stage_report(events[:1], 18768, 19456,
                                       operation="program")["erase"]["result"], "INTERRUPTED")
 
+    def test_program_verify_stage_schema_excludes_readback(self):
+        port = FakePort()
+        calls = SocketCallCounters()
+        path = self.root / "stage.sock"
+        evidence = self.root / "events.jsonl"
+        with StageMonitor(path, evidence, port, calls):
+            for stage in ("ERASE", "PROGRAM", "VERIFY"):
+                self._send(path, "BEGIN " + stage)
+                port.reads += 1
+                port.writes += 2
+                self._send(path, "END " + stage)
+        events = [json.loads(line) for line in evidence.read_text().splitlines()]
+        report = stage_report(events, 62800, 63488, operation="program-verify")
+        self.assertEqual(set(report), {"erase", "program", "verify"})
+        self.assertTrue(all(item["result"] == "PASS" for item in report.values()))
+        self.assertEqual(stage_report(events, 62800, 63488,
+                                      operation="program")["readback"]["result"],
+                         "NOT_OBSERVED")
+
     def test_reject_duplicate_or_decreasing_counters(self):
         base = {"stage": "RESET", "edge": "BEGIN", "monotonic_ns": 1,
                 "utc_ns": 1, "wire_bytes": 5, "mmio_reads": 3, "mmio_writes": 4,

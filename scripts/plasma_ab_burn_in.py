@@ -98,6 +98,7 @@ def valid_performance(receipt: dict, operation: str, image: dict | None) -> bool
                                    "openocd_sha256", "target_cfg_sha256"))):
         return False
     required = (("erase", "program", "verify", "readback") if operation == "program"
+                else ("erase", "program", "verify") if operation == "program-verify"
                 else ("reset",))
     stages = evidence.get("stages")
     preflight = evidence.get("preflight")
@@ -109,10 +110,12 @@ def valid_performance(receipt: dict, operation: str, image: dict | None) -> bool
     if any(not isinstance(stages.get(name), dict) or stages[name].get("result") != "PASS"
            for name in required):
         return False
-    if operation == "program" and image is not None:
+    if operation in ("program", "program-verify") and image is not None:
         if (stages["erase"].get("bytes") != receipt.get("erase_bytes") or
                 any(stages[name].get("bytes") != image["size"]
-                    for name in ("program", "verify", "readback"))):
+                    for name in required if name != "erase")):
+            return False
+        if operation == "program-verify" and "readback" in stages:
             return False
     try:
         summed = preflight["duration_s"] + evidence["other_duration_s"] + sum(
@@ -146,7 +149,7 @@ def valid_receipt(operation: str, receipt: dict, image: dict | None = None,
             or receipt.get("socket_released") is not True
             or receipt.get("no_auto_retry") is not True):
         return False
-    if (operation in ("program", "reset-run") and
+    if (operation in ("program", "program-verify", "reset-run") and
             (not valid_performance(receipt, operation, image) or
              (expected_source_sha is not None and
               receipt["versions"]["engine_sha256"] != expected_source_sha))):
@@ -156,6 +159,13 @@ def valid_receipt(operation: str, receipt: dict, image: dict | None = None,
                 and receipt.get("readback_sha256") == image["sha256"]
                 and receipt.get("image_bytes") == image["size"]
                 and receipt.get("no_reset_no_retry") is True)
+    if operation == "program-verify":
+        return (image is not None and receipt.get("image_sha256") == image["sha256"]
+                and receipt.get("image_bytes") == image["size"]
+                and receipt.get("readback_requested") is False
+                and receipt.get("readback_sha256") is None
+                and receipt.get("no_reset_no_retry") is True
+                and receipt.get("no_flash_write") is False)
     if operation in ("reset-run", "register-read"):
         return receipt.get("no_flash_write") is True
     return False
@@ -435,6 +445,7 @@ class BurnIn:
         signal.signal(signal.SIGTERM, self.request_stop)
         self.report("READY", f"cycles={self.args.cycles}, flash_attempts={len(self.sequence)} "
                     f"order={getattr(self.args, 'order', 'v01-first')} port={self.args.port} frames={self.args.frames} "
+                     f"readback={'off' if getattr(self.args, 'skip_readback', False) else 'on'} "
                      f"cdc_timeout={self.args.cdc_timeout if self.args.cdc_timeout is not None else 'auto'}; "
                      f"stop: Ctrl+Q / Ctrl+C / touch {stop_path}")
         for version in dict.fromkeys(self.sequence):
@@ -450,13 +461,18 @@ class BurnIn:
                 return 130
             self.current = index
             image = IMAGES[version]
-            self.report("PROGRAM", f"{version}: erase/program/verify/readback begin")
-            program = self.run_engine("program", image)
+            skip_readback = getattr(self.args, "skip_readback", False)
+            operation = "program-verify" if skip_readback else "program"
+            self.report("PROGRAM", f"{version}: erase/program/verify"
+                        + ("" if skip_readback else "/readback") + " begin")
+            program = self.run_engine(operation, image)
             if not program["pass"]:
                 self.failed += 1
                 self.capture_failure(version, "PROGRAM_FAIL", program)
                 return 1
-            self.report("PROGRAM_PASS", f"{version} readback SHA256 matched",
+            self.report("PROGRAM_PASS", f"{version} "
+                        + ("Verify PASS; independent Readback not requested"
+                           if skip_readback else "readback SHA256 matched"),
                         {"program_receipt": program})
             # Even after a stop request, finish this successful attempt by
             # resetting and checking CDC; never leave an intentional halted core.
@@ -496,6 +512,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="SWPC Blue Pill USB CDC device; usually /dev/ttyACM0")
     parser.add_argument("--frames", type=int, default=60,
                         help="consecutive valid USB CDC heartbeats per image (3..1000; default 60)")
+    parser.add_argument("--skip-readback", action="store_true",
+                        help="explicit burn-in mode: Erase/Program/Verify only; no independent dump_image/SHA")
     parser.add_argument("--cdc-timeout", type=float, default=None,
                         help="per-image CDC timeout in seconds (5..1800; default auto by frame count/version)")
     parser.add_argument("--stop-file", default="/tmp/plasma-ab-stop")

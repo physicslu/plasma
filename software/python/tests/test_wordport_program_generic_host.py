@@ -44,7 +44,7 @@ class GenericImageContract(unittest.TestCase):
         ):
             with self.subTest(relative=relative):
                 self.assertEqual(hashlib.sha256((repo / relative).read_bytes()).hexdigest(), expected)
-        self.assertEqual(str(module.BUNDLE), "/home/xilinx/plasma-swd-performance-20261029")
+        self.assertEqual(str(module.BUNDLE), "/home/xilinx/plasma-swd-ab-100-no-readback-20261029")
 
     def render(self, image_path, size, erased, operation="program"):
         return module.make_tcl(
@@ -94,6 +94,21 @@ class GenericImageContract(unittest.TestCase):
         self.assertNotIn("62800", SCRIPT.read_text())
         self.assertNotIn("e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
                          SCRIPT.read_text())
+
+    def test_program_verify_mode_keeps_flash_verification_and_failure_snapshot(self):
+        image, digest = self.image("selected.bin", b"V" * 2048)
+        source, size, sha, erased = module.admit_image("program-verify", str(image), digest)
+        self.assertEqual((source, size, sha, erased), (image, 2048, digest, 2048))
+        tcl = self.render(source, size, erased, operation="program-verify")
+        self.assertEqual(tcl.count("flash erase_address "), 1)
+        self.assertEqual(tcl.count("flash write_image "), 1)
+        self.assertEqual(tcl.count("verify_image "), 1)
+        self.assertNotIn("dump_image ", tcl)
+        self.assertNotIn("PLASMA_READBACK_OK", tcl)
+        self.assertIn("plasma_diag VERIFY", tcl)
+        self.assertIn("PLASMA_PROGRAM_COMPLETED_NO_RESET", tcl)
+        with self.assertRaises(module.NotRun):
+            module.admit_image("program-verify", None, None)
 
     def test_exact_geometry_boundary_and_negative_image_inputs(self):
         last, digest = self.image("approved-62pages.bin", b"F" * 63488)

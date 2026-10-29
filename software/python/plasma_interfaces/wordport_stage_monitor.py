@@ -113,6 +113,7 @@ def stage_report(events: list[dict], image_bytes: int, erase_bytes: int,
     if type(image_bytes) is not int or type(erase_bytes) is not int or image_bytes < 0 or erase_bytes < 0:
         raise ValueError("INVALID_STAGE_BYTE_COUNT")
     expected = (("ERASE", "PROGRAM", "VERIFY", "READBACK") if operation == "program"
+                else ("ERASE", "PROGRAM", "VERIFY") if operation == "program-verify"
                 else (("RESET",) if operation == "reset-run" else ()))
     keys = ("monotonic_ns", "utc_ns", "wire_bytes", "mmio_reads", "mmio_writes",
             "socket_recv_calls", "socket_sendall_calls")

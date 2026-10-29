@@ -47,8 +47,14 @@ class ABOrchestrationTests(unittest.TestCase):
             receipt.update({"image_sha256": image["sha256"],
                             "image_bytes": image["size"],
                             "readback_sha256": image["sha256"]})
-        if operation in ("program", "reset-run"):
-            names = ("erase", "program", "verify", "readback") if operation == "program" else ("reset",)
+        if operation == "program-verify":
+            receipt["readback_requested"] = False
+            receipt["readback_sha256"] = None
+            receipt["no_flash_write"] = False
+        if operation in ("program", "program-verify", "reset-run"):
+            names = (("erase", "program", "verify", "readback") if operation == "program"
+                     else ("erase", "program", "verify") if operation == "program-verify"
+                     else ("reset",))
             size = image["size"] if image else 0
             erase = (size + 1023) // 1024 * 1024
             receipt["erase_bytes"] = erase
@@ -167,6 +173,31 @@ class ABOrchestrationTests(unittest.TestCase):
         self.assertIn('"stage": "COMPLETE"', runner.status_file.read_text())
         events = [json.loads(v) for v in runner.record.read_text().splitlines()]
         self.assertEqual(sum(v["stage"] == "ATTEMPT_PASS" for v in events), 4)
+
+    def test_skip_readback_keeps_verify_heartbeat_and_fails_closed_receipt(self):
+        self.args.cycles = 1
+        self.args.skip_readback = True
+        img = app.IMAGES["v0.1"]
+        good = self.fake_engine("program-verify", img)["receipt"]
+        self.assertTrue(app.valid_receipt("program-verify", good, img))
+        for changed in (
+            {"readback_requested": True}, {"readback_sha256": img["sha256"]},
+            {"no_flash_write": True},
+        ):
+            self.assertFalse(app.valid_receipt("program-verify", {**good, **changed}, img))
+        ops = []
+        runner = app.BurnIn(self.args)
+        def engine(operation, image=None):
+            ops.append(operation)
+            return self.fake_engine(operation, image)
+        with patch.object(runner, "run_engine", side_effect=engine), \
+             patch.object(app, "verify_cdc", return_value={"result": "PASS"}), \
+             patch.object(app.signal, "signal"), redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.run(), 0)
+        self.assertEqual(ops, ["preflight", "preflight", "program-verify", "reset-run",
+                               "program-verify", "reset-run"])
+        self.assertEqual(runner.passed, 2)
+        self.assertIn("readback=off", runner.log.read_text())
 
     def test_v02_first_respects_each_program_reset_cdc_gate(self):
         self.args.cycles = 1

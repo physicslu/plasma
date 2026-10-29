@@ -20,7 +20,7 @@ import subprocess
 import sys
 import time
 
-BUNDLE = Path("/home/xilinx/plasma-swd-performance-20261029")
+BUNDLE = Path("/home/xilinx/plasma-swd-ab-100-no-readback-20261029")
 Z2_ENTRY = BUNDLE / "scripts/plasma_wordport_program.py"
 ROOT = Path("/root/plasma-path2-approved")
 PYTHON = "/opt/plasma/python/3.12.13/bin/python3"
@@ -29,7 +29,7 @@ OPENOCD_SCRIPTS = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/s
 NATIVE_SHA = "66261cef851c9777469b393b7539c5b0f8c2b039a032f1a5b4cbf9e93460e447"
 SESSION_SHA = "5e2e0781a66c541377e262325a26789ff55499e27cc433e399becf0fcf59b811"
 PY_MODULE_SHA = "9eb8a5e90f11132e46a0b67a69f5694d0c56e1ade47d1bec6f682fec77f19ab1"
-STAGE_MODULE_SHA = "551624f3effcdec4266b0a6867b1dd9e1ee4175486c5621767251bd7e8a1192f"
+STAGE_MODULE_SHA = "84f0b557b09cb728c612971c598baea7457c28bfe0f2873bef205238ba9f226e"
 RBB_MODULE_SHA = "8a466e46c611662c3f2f91ba41fa1b9b80d8951befef2db5b9af0d8b7bd30b11"
 # Flash geometry belongs to the exact target/provider, never to a firmware revision.
 # Additional target support must be admitted through a reviewed Programming Profile.
@@ -78,7 +78,7 @@ def admit_image(operation: str, path: str | None, expected_sha: str | None):
     """
     if bool(path) != bool(expected_sha):
         raise NotRun(77, "IMAGE_PATH_AND_SHA_REQUIRED_TOGETHER")
-    if operation == "program" and not path:
+    if operation in ("program", "program-verify") and not path:
         raise NotRun(77, "PROGRAM_IMAGE_REQUIRED")
     if not path:
         return None, 0, None, 0
@@ -428,8 +428,19 @@ proc plasma_core_probe {} {
                          + mark("END", "RESET") +
                          'echo "PLASMA_RESET_RUN_OK"\n'
                          'shutdown\n')
-    if operation != "program":
+    if operation not in ("program", "program-verify"):
         raise ValueError("UNKNOWN_OPERATION")
+    readback_steps = ""
+    if operation == "program":
+        readback_steps = f"""{mark("BEGIN", "READBACK")}\
+if {{[catch {{dump_image {readback} 0x{PROFILE["main_flash_base"]:08X} {image_bytes}}} failure]}} {{
+    {mark("FAIL", "READBACK").strip()}
+    plasma_diag READBACK "$failure"
+    shutdown error
+}}
+{mark("END", "READBACK")}\
+echo "PLASMA_READBACK_OK"
+"""
     return config + IRQ_MASK_GATE_TCL + f"""halt
 # Protect the next SRAM Flash algorithm from the previously running
 # application's maskable NVIC/SysTick interrupts.  Do not reset the MCU:
@@ -475,14 +486,7 @@ if {{[catch {{verify_image {firmware} 0x{PROFILE["main_flash_base"]:08X} bin}} f
 }}
 {mark("END", "VERIFY")}\
 echo "PLASMA_VERIFY_OK"
-{mark("BEGIN", "READBACK")}\
-if {{[catch {{dump_image {readback} 0x{PROFILE["main_flash_base"]:08X} {image_bytes}}} failure]}} {{
-    {mark("FAIL", "READBACK").strip()}
-    plasma_diag READBACK "$failure"
-    shutdown error
-}}
-{mark("END", "READBACK")}\
-echo "PLASMA_READBACK_OK"
+{readback_steps}
 echo "PLASMA_PROGRAM_COMPLETED_NO_RESET"
 shutdown
 """
@@ -653,7 +657,7 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
     # Freeze the selected Image in a private, per-run immutable snapshot.
     # Never let OpenOCD read a mutable operator-supplied path after admission.
     staged = None
-    if args.operation == "program":
+    if args.operation in ("program", "program-verify"):
         staged = evidence / "program-image.bin"
         staged.write_bytes(firmware.read_bytes())
         staged.chmod(0o400)
@@ -740,8 +744,11 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
     except ValueError as exc:
         error = f"STAGE_EVIDENCE_INVALID: {exc}"[:500]
         stages = stage_report([], image_bytes, erase_bytes, operation=args.operation)
-    required = ("erase", "program", "verify", "readback") if args.operation == "program" else (
-        ("reset",) if args.operation == "reset-run" else ())
+    required = (("erase", "program", "verify", "readback")
+                if args.operation == "program" else
+                ("erase", "program", "verify")
+                if args.operation == "program-verify" else
+                ("reset",) if args.operation == "reset-run" else ())
     stage_complete = all(stages[name]["result"] == "PASS" for name in required)
     stage_seconds = sum(stages[name].get("duration_s", 0) for name in required)
     total_seconds = (run_end_ns - preflight_start_ns) / 1e9
@@ -786,10 +793,11 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
                 bridge is not None and bridge.returncode == 0 and not socket.exists() and
                 stage_complete and counter_reconciliation["result"] == "PASS" and
                 other_seconds >= 0)
-    if args.operation == "program":
+    if args.operation in ("program", "program-verify"):
         success = (eligible and "PLASMA_PROGRAM_COMPLETED_NO_RESET" in log and
-                   readback.is_file() and readback.stat().st_size == image_bytes and
-                   sha(readback) == image_sha)
+                   (args.operation == "program-verify" or
+                    (readback.is_file() and readback.stat().st_size == image_bytes and
+                     sha(readback) == image_sha)))
         failure_diagnostics = read_failure_diagnostics(log)
         diagnostic = ("POST_ERROR_SAME_SESSION" if failure_diagnostics["status"] != "NOT_CAPTURED"
                       else "NOT_CAPTURED")
@@ -818,11 +826,12 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         "target_cfg": PROFILE["target_cfg"],
         "erase_bytes": erase_bytes,
         "readback_sha256": sha(readback) if readback.is_file() else None,
+        "readback_requested": args.operation == "program",
         "openocd_log_sha256": sha(evidence / "openocd.log"),
         "evidence_directory": str(evidence), "socket_released": not socket.exists(),
         "no_reset_no_retry": args.operation != "reset-run",
         "no_auto_retry": True,
-        "no_flash_write": args.operation != "program",
+        "no_flash_write": args.operation not in ("program", "program-verify"),
         "performance": performance,
         "versions": {"engine_sha256": sha(Path(__file__)),
                      "bridge_session_sha256": SESSION_SHA,
@@ -835,7 +844,7 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
                      if (Path(OPENOCD_SCRIPTS) / PROFILE["target_cfg"]).is_file() else "NOT_OBSERVED",
                      "boot_id": boot},
     }
-    if args.operation == "program":
+    if args.operation in ("program", "program-verify"):
         receipt["failure_diagnostics"] = failure_diagnostics
     if args.operation in ("register-read", "core-register-read", "diagnose-after"):
         receipt["peripheral_registers"] = peripheral_values if required_peripheral else None
@@ -1029,7 +1038,7 @@ def on_swpc(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", choices=("swpc", "z2"), required=True)
-    parser.add_argument("--operation", choices=("preflight", "program", "register-read", "core-register-read", "diagnose-after", "reset-run"), required=True)
+    parser.add_argument("--operation", choices=("preflight", "program", "program-verify", "register-read", "core-register-read", "diagnose-after", "reset-run"), required=True)
     parser.add_argument("--icpn", required=True, help="Exact ICPN to bind the target profile")
     parser.add_argument("--site-id", type=int, required=True, help="One-based physical Site")
     parser.add_argument("--firmware", help="Operator-selected absolute BIN path on Z2")
