@@ -104,18 +104,17 @@ def test_master_programming_asset_deployment_routes_existing_installer_not_root_
     assert not hasattr(plan, "sudo")
 
 
-def test_master_fpga_deploy_reports_missing_install_route_without_root_execution(
+def test_master_fpga_image_install_is_unavailable_until_unified_deployer_exists(
     tmp_path: Path,
 ) -> None:
     path, digest = staged(tmp_path, relative="images/fpga.bin", data=b"new FPGA image")
-    plan = plan_privileged_operation(
-        PrivilegedRequest(PPUAction.FPGA_IMAGE_DEPLOY, staged_relative_path=path, expected_sha256=digest),
-        good_master(),
-        trusted_staging_root=tmp_path,
-    )
-    assert plan.route is PrivilegedRoute.FPGA_IMAGE_INSTALL_NOT_IMPLEMENTED
-    assert plan.staged_artifact.sha256 == digest
-    assert not hasattr(plan, "command")
+    with pytest.raises(PlasmaError, match="FPGA Image installation is not implemented") as exc:
+        plan_privileged_operation(
+            PrivilegedRequest(PPUAction.FPGA_IMAGE_DEPLOY, staged_relative_path=path, expected_sha256=digest),
+            good_master(),
+            trusted_staging_root=tmp_path,
+        )
+    assert exc.value.code is ErrorCode.OPERATION_UNSUPPORTED
 
 
 def test_master_fpga_reload_requires_no_caller_selected_command() -> None:
