@@ -66,3 +66,7 @@ Minimum Host-only evidence:
 **Unimplemented / not claimed:** Console registration/unique Master and generation, 1+5 live Console admission, real root-enabled Engineer entry, hardware-backed Root Bridge for Master, actual target privilege transfer, FPGA/Site two-process concurrency, physical HIL and production qualification. These require separate integration and exact-hardware evidence. Do not merge/retire an existing enforcement layer simply because the pure Host-only policy tests pass.
 
 See [Z2 Root Guard rule audit](../development/z2-root-guard-rule-audit-gate1.md) for necessary, redundant-candidate and maintenance-only checks.
+
+## Follow-on Gate 1: Master non-root Host-only operation request planning
+
+The subsequent [Master non-root execution/deployment contract](ppu-master-nonroot-execution-gate1.md) adds **planning-only** operation and staged-artifact checks that reuse existing PPU release/Bootstrap and protected Root boundaries. No actual Master registration, Unix privilege transition, or live privileged dispatch is implemented by either Gate 1. Master-deployed Python Scripts must never be treated as reviewed Root executable source merely because their package passes a digest check.
