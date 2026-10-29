@@ -25,6 +25,10 @@ SPEC.loader.exec_module(deployment)
 class QualifiedFakeInstaller:
     """Only a Host-test fake. The production PS-only installer lacks these methods."""
 
+    @staticmethod
+    def InstallPaths(**kwargs):
+        return SimpleNamespace(**kwargs)
+
     def __init__(self, *, error: str | None = None):
         self.events: list[str] = []
         self.error = error
