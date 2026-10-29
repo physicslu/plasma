@@ -1,6 +1,6 @@
 # PPU single deployment entry — Gate 1 Path 1 (Host-only integration baseline)
 
-> **Status:** owner-approved 2026-10-29, Draft PR, **NOT deployed or merged**. This is the first fail-closed convergence delta. No SWPC/Z2 operation or Linux permission change. Source baseline: `main e338083564c30dc6bdc24009f7b62a3984fb7023`. PR #1208 remains a separate unmerged Master role contract and must not be treated as a deployed Principal/Root authorization boundary.
+> **Status:** owner-approved 2026-10-29, Draft PR, **NOT deployed or merged**. This is the first fail-closed convergence delta. No SWPC/Z2 operation or Linux permission change. Source baseline: `main e338083564c30dc6bdc24009f7b62a3984fb7023`. PR #1208 subsequently merged into newer main (1fb0c4b6), but its Host-only Master role contract must not be treated as a deployed Principal/Root authorization boundary.
 
 ## Decision: one product-facing installation endpoint, one transaction
 
@@ -50,6 +50,36 @@ Existing `scripts/ppu-deploy` gains a **read-only** `api-status --api-url https:
 - **Dual-host lifecycle:** retain SWPC bundle version matching, idempotent retry, atomic activation, verify and bounded compensation/rollback including Z2 failure, and fail-closed `recovery_required` if one side's state is unknown. A multi-host transaction is not automatically atomic because both hosts have local locks.
 - **No breaking cut-over:** only after Host-only source/CI plus separately approved real Z2/SWPC acceptance demonstrate `wordport`, `openocd-integration`, and `abtest` deploy/verify/rollback, switch SWPC CLI to API and remove SSH writer and its duplicate journal/rollback. Retain existing physical Root Guard, owner lock, Image/Manifest/Golden and Engineer factory recovery throughout.
 - **FPGA Image install:** stage verified paired BIN+Manifest through the same future transaction; keep protected `download/test/restore` for live lifecycle. Do not disguise `download` as `install`.
+
+## Owner-approved downstream acceptance batch: #1207 engineering modules after #1209 convergence (2026-10-29)
+
+> **Plan-only / NOT_RUN.** The owner approved adding the already-merged #1207 engineering modules as the **first downstream deployment acceptance batch after** the #1209 unified entry is fully qualified. This does **not** expand the existing #1209 Host-only Gate 1, authorize live deployment or hardware operations, or make the engineering write API available. No generic C, arbitrary Python or FPGA Image installation is included.
+
+### Dependency and release boundaries
+
+1. **Source:** merged PR #1207 (merge commit `e338083564c30dc6bdc24009f7b62a3984fb7023`) provides exactly the three allowlisted `ppu-deploy` engineering module packages and optional Readback behavior. Treat it as a source dependency, **not** proof that its code has been installed on SWPC or Z2.
+2. **Master boundary:** PR #1208 has since merged into `main` at `1fb0c4b6c95e9da8f746fc3571a160b5a8bf6390`, but its non-root/Master contract is Host-only. It is **not** active Master generation/revocation, publisher provenance, production Root authority or a trusted on-device installer.
+3. **Convergence:** current #1209 Gate 1 supplies the shared transaction contract, read-only package verifier, HTTPS client and explicit engineering reject-only API admission. Actual engineering installation is still `ENGINEERING_INSTALL_NOT_QUALIFIED`; legacy SSH writing remains operational but **must not** be mistaken for a successful unified-API cutover. #1209 originated from `main e3380835`; reconcile its delta against newer `main` and rerun affected CI before any Gate 2 assessment, without force-pushing or changing this approved Host-only scope.
+4. **Future prerequisite work (outside current Gate 1):** owner-approved scope must separately qualify a trusted on-device engineering installer, authenticated/revocable active Master plus approved package publisher/source, certificate-verified Bootstrap HTTPS service, API↔Coordinator transaction-ID reconciliation, durable single journal/lock and safe SWPC+Z2 cross-host compensation and rollback. Preserve protected Root, ownership/quiescence, FPGA Image/Manifest/Golden and factory recovery. Do not retire SSH before verified replacement parity and accepted real rollout.
+
+### First deployment acceptance batch (only after prerequisites)
+
+| Module | Exact #1207 scope | Future acceptance evidence |
+| --- | --- | --- |
+| `wordport` | Z2 PS WordPort Python engine/integration and SWPC WordPort client | Immutable package/source/file digests; both hosts report matching active version, successful single-API deploy/verify and bounded rollback receipts. |
+| `openocd-integration` | Same reviewed Z2 WordPort/OpenOCD Python integration and SWPC client | Verify OpenOCD integration files, pinned OpenOCD binary/config identity **without replacing the executable**; matching cross-host transaction/receipt and rollback proof. |
+| `abtest` | Shared Z2 Python integration plus SWPC A/B Runner | Verify Runner and engine versions on both hosts, manifest/source hashes, API activation/verify/rollback and CDC/Verify configuration contract; **no automatic flash cycle or DUT operation** as part of deployment acceptance. |
+
+The three packages overlap on Z2 Python files, and `wordport`/`openocd-integration` share the SWPC engine file; `abtest` adds the SWPC Runner. Acceptance must prove compatibility and version consistency across this overlap, **not** assume three independently isolated installs or silently overwrite newer shared files.
+
+### Release/acceptance stop criteria (future, separately authorized Gate 1)
+
+- **Preflight:** exact approved `main`/source commit, signed or independently authenticated publisher, package SHA-256 and per-file hashes, approved module name/paths, current SWPC/Z2 installed version, Z2 Boot ID, active Master generation, HTTPS service identity, lock/quiescence, and real rollback resources all recorded. Ensure unchanged pinned OpenOCD/config, Native C bridge and paired FPGA Image/Manifest; these are checked, **not** deployed by this batch.
+- **Positive:** one Bootstrap `POST /v1/deployments` admission per selected module using the existing Coordinator lock/journal; correlate API and Coordinator transaction IDs and observed on-host activation. Collect immutable before/after SWPC and Z2 receipts and status; verify each exact file SHA, source commit, archive hash and same active bundle version; confirm repeat submission is safe/idempotent.
+- **Negative/recovery:** reject unknown module, path/symlink/manifest tampering, mismatched hash/publisher, stale/revoked Master, invalid TLS, active owner/busy hardware, API↔Coordinator ID disagreement, mismatched SWPC/Z2 versions and in-flight/unknown journal. Exercise approved non-hardware failure injection for Z2/SWPC activation and verified rollback on both hosts; stop in explicit `recovery_required` when restoration cannot be proven. No blind retry.
+- **Evidence:** archive exact branch/main/Installer/Coordinator/engine/Stage SHAs, source and package digests, client/server request + journal transaction IDs, Master/publisher attestation (without secrets), pre/post state, real exit and rollback outcomes; label PASS/FAIL/NOT_RUN separately for each module and negative case.
+- **Hardware boundary:** earlier #1206 evidence records 100 physical A/B pairs for an earlier software SHA; it does **not** qualify the new #1207/#1209 deployed stack. New Flash, FPGA, CDC or DUT execution is **NOT_RUN** until explicitly included in a future owner-approved hardware acceptance scope. Host-only CI is not physical evidence.
+- **Cutover:** only after independent review of all three module receipts, fail-closed negatives, cross-host recovery, required GitHub CI and owner-authorized live acceptance may SWPC switch from legacy SSH to unified API. No source changes, deployment, merge or hardware operation are authorized by this plan update.
 
 ## Gate 1 / Gate 2 boundaries
 
