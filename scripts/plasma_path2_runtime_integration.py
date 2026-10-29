@@ -107,10 +107,13 @@ def host_build(task: dict, *, workspace: Path, approval: dict,
 
 
 def direct_root_operation(task: dict, approval: dict) -> dict:
-    """Path 2 direct CLI-to-existing-Root; bypass legacy Stage/Profile gates.
+    """RETIRED FROM LIVE WORK ORDERS: historical Path 2 Root adapter.
 
-    Only authenticated, digest-pinned owner Work Orders reach this code.
-    Hardware evidence still comes solely from the protected Root transport.
+    Retained for offline/legacy compatibility tests, not reachable from the
+    current Development Dispatcher: `z2-root-operation` is denied there.
+    Direct import/call is NOT a substitute for Owner Work Order admission,
+    effective OS authority or protected Root ownership/recovery guards.
+    Historical receipts came solely from the separately protected transport.
     """
     require(type(task) is dict and type(approval) is dict and
             set(task) >= {"execution_path", "capability", "objective",

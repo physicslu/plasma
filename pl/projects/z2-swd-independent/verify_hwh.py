@@ -248,7 +248,23 @@ def fpga_only_swd_rx_ideal_budget(reports: Path) -> dict:
 
 
 def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
-                     xdc: Path, source_sha: str, build_stdout: str = "") -> dict:
+                     source_sha: str, build: Path | None = None,
+                     xdc: Path | None = None, build_stdout: str = "") -> dict:
+    # The generic Path 2 runner supplies only build; the historical project
+    # verifier CLI supplies xdc and build_stdout. Both enforce identical
+    # source-locked HWH, XDC, report, and off-board timing checks.
+    if build is not None:
+        require(xdc is None and build_stdout == "" and
+                build.is_dir() and not build.is_symlink(),
+                "SWD_GENERIC_BUILD_INPUT_INVALID")
+        xdc = Path(__file__).resolve().parents[2] / (
+            "constraints/pynq-z2/z2-swd-independent.xdc")
+        log = build / "vivado-stdout.log"
+        require(log.is_file() and not log.is_symlink() and
+                0 < log.stat().st_size <= 2_000_000,
+                "SWD_GENERIC_BUILD_LOG_MISSING_OR_UNSAFE")
+        build_stdout = log.read_text(encoding="utf-8")
+    require(xdc is not None, "SWD_BUILD_XDC_MISSING")
     require(isinstance(source_sha, str) and SHA40.fullmatch(source_sha) is not None,
             "SWD_BUILD_SOURCE_SHA_DENIED")
     require(hwh.is_file() and not hwh.is_symlink() and
@@ -281,6 +297,7 @@ def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
         "bit_sha256": sha256(bit), "hwh_sha256": sha256(hwh),
         "xdc_sha256": check_xdc(xdc),
         "report_sha256": report_hashes, "hwh": hw,
+        "map": hw["regions"],
         "external_swd_io_timing": io_timing,
         "fpga_only_swd_rx_ideal_budget": fpga_budget,
         "host_build_status": "SUPERVISOR_REVIEW_REQUIRED",

@@ -5,7 +5,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Separate build-time knobs: the default preserves the released v0.1 wire contract. */
+#ifndef APP_VERSION
 #define APP_VERSION "0.1"
+#endif
+#ifndef APP_LED_PERIOD_MS
+#define APP_LED_PERIOD_MS 500u
+#endif
+#ifndef APP_HEARTBEAT_PERIOD_MS
+#define APP_HEARTBEAT_PERIOD_MS 500u
+#endif
+#if APP_LED_PERIOD_MS == 0 || APP_HEARTBEAT_PERIOD_MS == 0
+#error "LED/heartbeat periods must be positive"
+#endif
 #define APP_RX_CAPACITY 256u
 #define APP_REPLY_CAPACITY 8u
 #define APP_LINE_CAPACITY 48u

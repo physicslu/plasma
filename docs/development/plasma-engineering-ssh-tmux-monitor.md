@@ -12,7 +12,9 @@ The path label and all three shortcuts occupy **one header row**:
 STAGE, DOING and RECENT ACTIVITY. Path 3 shows a pinned-work-order
 capability category `STAGE: Codex workspace` when available; this does
 **not** mean Vivado synthesis/implementation/bitstream generation was observed.
-Path 2 retains its authorized fixed-stage category.
+Path 2 shows the admitted Work Order capability (`cpu-only`,
+`vivado-host-build` or `operator-cli`) when available. A monitor stage label
+does not impose a fixed hardware Stage/Profile or confer device authority.
 
 `WRAPPER: PASS EXIT: 0` is the result of the monitored top-level process,
 **not** acceptance of the Work Order, a verified test receipt, PR readiness

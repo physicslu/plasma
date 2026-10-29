@@ -153,6 +153,34 @@ def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
     assert result["fpga_only_swd_rx_ideal_budget"]["candidate_hw_max_swd_hz"] == 12500000
     assert result["external_swd_io_timing"]["timing18_warnings"] == 6
 
+    # The merged generic Path 2 interface supplies build= rather than
+    # xdc/build_stdout. It must preserve every project-specific safety gate.
+    (tmp_path / "vivado-stdout.log").write_text(
+        "SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS setup=1.0 hold=0.1\n"
+        "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED\n")
+    generic = swd.verify_artifacts(
+        hwh=hwh, bit=bit, reports=reports, source_sha=sha, build=tmp_path)
+    assert generic["map"] == result["hwh"]["regions"]
+    assert generic["bit_sha256"] == result["bit_sha256"]
+    assert generic["report_sha256"] == result["report_sha256"]
+    assert generic["external_swd_io_timing"]["gate"] == (
+        "BLOCKED_MISSING_OFFCHIP_TIMING")
+    assert generic["external_swd_io_timing"]["external_io_timing_qualified"] is False
+    assert generic["physical_image_loaded"] == "NOT_RUN"
+    assert generic["z2_hil"] == "NOT_RUN"
+
+    (tmp_path / "vivado-stdout.log").write_text(
+        "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED\n")
+    with pytest.raises(swd.SWDBuildDenied,
+                       match="SWD_BUILD_TCL_SIGNOFF_MARKER_MISSING"):
+        swd.verify_artifacts(hwh=hwh, bit=bit, reports=reports,
+                             source_sha=sha, build=tmp_path)
+    (tmp_path / "vivado-stdout.log").unlink()
+    with pytest.raises(swd.SWDBuildDenied,
+                       match="SWD_GENERIC_BUILD_LOG_MISSING_OR_UNSAFE"):
+        swd.verify_artifacts(hwh=hwh, bit=bit, reports=reports,
+                             source_sha=sha, build=tmp_path)
+
 
 def test_real_swd_timing18_report_fixture_is_blocked(tmp_path):
     # Exact counts, severity, and Tcl report headline from real SWPC run.

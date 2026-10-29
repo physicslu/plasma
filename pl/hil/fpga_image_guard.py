@@ -166,46 +166,104 @@ def scan_kernel_owners(*, sysroot: Path, release) -> tuple[list[str], list[str]]
     return uio, platform
 
 
-def scan_proc_consumers(*, procroot: Path, release) -> tuple[bool, list[str]]:
-    conflicts, observed = [], 0
-    for item in sorted(procroot.iterdir()):
-        if not item.name.isdecimal():
-            continue
+def scan_proc_consumers(*, procroot: Path, release,
+                        diagnostic: dict | None = None) -> tuple[bool, list[str]]:
+    """Fail-closed /proc owner census; retry only a confirmed vanished PID.
+
+    A vanished process invalidates that snapshot. We restart the *whole*
+    read-only census, never just skip that PID. Existing conflicts, denied
+    visibility or still-live but unreadable PIDs are not retryable.
+    """
+    for attempt in range(1, 4):
+        conflicts, observed = [], 0
         try:
-            targets = []
-            for fd in (item / "fd").iterdir():
-                try:
-                    targets.append(os.readlink(fd))
-                except FileNotFoundError:
-                    continue
-            maps = (item / "maps").read_text()
-            observed += 1
-            for target in targets:
-                need(bool(target) and target != "UNKNOWN", "INCOMPLETE_FD_OBSERVATION")
-                if target.startswith("/dev/uio") or target.split(" (deleted)")[0] in (
-                        "/dev/mem", "/dev/xdevcfg", "/dev/fpga0"):
-                    conflicts.append(item.name)
-            for line in maps.splitlines():
-                fields = line.split()
-                need(len(fields) >= 5, "MALFORMED_PROC_VMA")
-                if len(fields) < 6:
-                    continue
-                device = fields[5]
-                if device.startswith("/dev/uio") or device in (
-                        "/dev/xdevcfg", "/dev/fpga0"):
-                    conflicts.append(item.name)
-                elif device == "/dev/mem":
-                    lo, hi = (int(x, 16) for x in fields[0].split("-"))
-                    offset = int(fields[2], 16)
-                    if overlaps(offset, hi - lo, release.owner_base,
-                                release.owner_bytes):
+            processes = sorted(procroot.iterdir())
+        except (OSError, ValueError) as exc:
+            if diagnostic is not None:
+                diagnostic.update(status="PROC_ENUMERATION_FAILED",
+                                  attempt=attempt, error=type(exc).__name__)
+            return False, []
+        retry_pid = None
+        for item in processes:
+            if not item.name.isdecimal():
+                continue
+            phase = "FD"
+            try:
+                targets = []
+                for fd in (item / "fd").iterdir():
+                    try:
+                        targets.append(os.readlink(fd))
+                    except FileNotFoundError:
+                        # A closed file descriptor is no longer an owner;
+                        # the subsequent full process VMA check is mandatory.
+                        continue
+                phase = "MAPS"
+                maps = (item / "maps").read_text()
+                observed += 1
+                for target in targets:
+                    need(bool(target) and target != "UNKNOWN",
+                         "INCOMPLETE_FD_OBSERVATION")
+                    if target.startswith("/dev/uio") or target.split(" (deleted)")[0] in (
+                            "/dev/mem", "/dev/xdevcfg", "/dev/fpga0"):
                         conflicts.append(item.name)
-        except (FileNotFoundError, PermissionError, OSError, ValueError):
-            return False, sorted(set([*conflicts, item.name]))
-    return observed > 0, sorted(set(conflicts))
+                for line in maps.splitlines():
+                    fields = line.split()
+                    need(len(fields) >= 5, "MALFORMED_PROC_VMA")
+                    if len(fields) < 6:
+                        continue
+                    device = fields[5]
+                    if device.startswith("/dev/uio") or device in (
+                            "/dev/xdevcfg", "/dev/fpga0"):
+                        conflicts.append(item.name)
+                    elif device == "/dev/mem":
+                        lo, hi = (int(x, 16) for x in fields[0].split("-"))
+                        offset = int(fields[2], 16)
+                        if overlaps(offset, hi - lo, release.owner_base,
+                                    release.owner_bytes):
+                            conflicts.append(item.name)
+            except (FileNotFoundError, PermissionError, OSError, ValueError) as exc:
+                # Never retry a known conflict even if another process vanished.
+                # Check for ENOENT explicitly; an inaccessible PID is NOT
+                # a confirmed exit and must never qualify for a rescan.
+                vanished = False
+                if isinstance(exc, FileNotFoundError):
+                    try:
+                        item.stat()
+                    except FileNotFoundError:
+                        vanished = True
+                    except OSError:
+                        pass
+                if vanished and not conflicts and attempt < 3:
+                    retry_pid = item.name
+                    break
+                if diagnostic is not None:
+                    diagnostic.update(
+                        status=("PROC_CONFLICT_AND_INCOMPLETE" if conflicts else
+                                "VANISHED_PID_RESCAN_EXHAUSTED" if vanished else
+                                "PROC_VISIBILITY_DENIED"),
+                        pid=item.name, phase=phase,
+                        error=type(exc).__name__, attempt=attempt)
+                return False, sorted(set([*conflicts, item.name]))
+        if retry_pid is not None:
+            # Start again from a fresh /proc listing. No DUT/FPGA I/O.
+            continue
+        if diagnostic is not None:
+            diagnostic.update(
+                status=("PROC_CONFLICT" if conflicts else
+                        "COMPLETE" if observed > 0 else "NO_PROCESS_OBSERVED"),
+                attempt=attempt, observed=observed,
+                conflicts=len(set(conflicts)), rescans=attempt - 1)
+        return observed > 0, sorted(set(conflicts))
+    raise AssertionError("unreachable bounded process scan")
 
 
-def read_live_z2_facts(*, release) -> dict:
+def read_live_z2_facts(*, release, runtime_program_session: bool = False) -> dict:
+    """Keep kernel/image guards; runtime WordPort does not census all PIDs.
+
+    Runtime call requires the same protected FPGA lock and is NOT a safe
+    alternative for FPGA Manager load, test or restoration admission.
+    """
+    need(type(runtime_program_session) is bool, "INVALID_PROCESS_SCAN_POLICY")
     need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
     candidate = FIRMWARE / release.firmware_name
     recovery = FIRMWARE / release.recovery_name
@@ -220,7 +278,16 @@ def read_live_z2_facts(*, release) -> dict:
          "SOC_FAMILY_MISMATCH")
     manager = (SYS / "class/fpga_manager/fpga0/state").read_text().strip()
     uio, platform = scan_kernel_owners(sysroot=SYS, release=release)
-    complete, conflicts = scan_proc_consumers(procroot=PROC, release=release)
+    if runtime_program_session:
+        # The session holds the global configuration lock. External device
+        # consumers remain checked by the engine's scoped fuser preflight.
+        # Do NOT fabricate proc_complete=True or a zero-conflict census.
+        complete, conflicts = None, None
+        proc_diagnostic = {"status": "NOT_RUN_PROGRAM_SESSION"}
+    else:
+        proc_diagnostic = {}
+        complete, conflicts = scan_proc_consumers(
+            procroot=PROC, release=release, diagnostic=proc_diagnostic)
     boot_after = (PROC / "sys/kernel/random/boot_id").read_text().strip()
     need(boot_before == boot_after, "BOOT_CHANGED_DURING_SCAN")
     return {
@@ -228,6 +295,7 @@ def read_live_z2_facts(*, release) -> dict:
         "recovery_sha256": recovery_sha, "candidate_sha256": candidate_sha,
         "uio_overlaps": uio, "platform_overlaps": platform,
         "proc_complete": complete, "proc_conflicts": conflicts,
+        "proc_scan_diagnostic": proc_diagnostic,
         "observation_kind": "LIVE_ROOT_READ_ONLY",
         "axi_isolation_evidence": "UNPROVEN",
         "active_image_attestation": "UNPROVEN",
@@ -287,6 +355,12 @@ class RootZ2TargetPort:
     def current_facts(self) -> dict:
         self._require_locked()
         return read_live_z2_facts(release=self.release)
+
+    def runtime_program_facts(self) -> dict:
+        """Read-only program admission, never FPGA reconfiguration authority."""
+        self._require_locked()
+        return read_live_z2_facts(
+            release=self.release, runtime_program_session=True)
 
     def image_sha256(self, which: str) -> str:
         self._require_locked()

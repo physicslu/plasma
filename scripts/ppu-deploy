@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""PLASMA PPU engineering-module deployment CLI."""
+from ppu_deploy import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())

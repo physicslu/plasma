@@ -52,7 +52,12 @@ jobs:
           archives=list(Path("docs/archive/ci-workflows/stm32c0-stages").glob("*.yml"))
           assert len(archives) == 5
           assert Path(".github/workflows/device-catalog-stm32c0-stage-dispatch.yml").is_file()
-          assert r["scanned"] == r["total"] and r["total"] + len(archives) - 1 >= 325
+          # Three retired LA-only Issue #981 workflows no longer exist.
+          for obsolete in ("plasma-codex-la2016.yml",
+                           "plasma-codex-la2016-direct.yml",
+                           "plasma-codex-la2016-diagnose.yml"):
+              assert not Path(".github/workflows", obsolete).exists()
+          assert r["scanned"] == r["total"] and r["total"] + len(archives) - 1 >= 322
           assert r["status"] == "NO_GO_WORKFLOW_TRIGGER_RISK"
           assert r["runtime_enabled"] is False
           assert r["potential_exposures"] > 0

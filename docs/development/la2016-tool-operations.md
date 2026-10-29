@@ -13,11 +13,11 @@
 | AppImage | `/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage` |
 | AppImage SHA256 | `b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475` |
 | 執行方式 | AppImage **必須**使用 `--appimage-extract-and-run`；沿用已存在的環境，**不要求、搜尋或驗證** `SIGROK_FIRMWARE_PATH` |
-| Device Lock | SWPC `/run/lock/plasma-la2016.lock`，同時確認 USB 沒有別的程式占用；單靠 advisory lock 不夠 |
+| 裝置占用 | 直接由原生 `kingst-la2016` Driver 的 Open/Claim 結果判定；Busy 回報 `DEVICE_BUSY` 並停止，不加 PLASMA 專用 Lock 或強制 `fuser` 前置檢查 |
 | 2026-10-23 被動 SWD | CH0 = Blue Pill PA14/SWCLK、CH1 = PA13/SWDIO、CH2 = 3.3V 邏輯狀態；共地 |
 | 2026-10-16 獨立 Loopback | KINGST PWM1 → **同一台** KINGST CH0；與 Blue Pill SWD 測試是完全不同接線 |
 
-**動態辨識：** 本手冊只固定 USB VID:PID `77a1:01a2` 作為識別條件，不固定 `busnum`、`devnum`、`/dev/bus/usb/...` 路徑；當次授權的 Codex／操作程序須確認唯一設備、存取權限及實際佔用狀態。
+**動態辨識：** 本手冊只固定 USB VID:PID `77a1:01a2` 作為識別條件，不固定 `busnum`、`devnum`、`/dev/bus/usb/...` 路徑；Path 3 Codex 每次直接確認唯一設備及 Linux DAC/ACL 存取權限。設備占用由原生 Driver Open/Claim 回報，無需 Host Supervisor、固定 JSON Request 或額外占用探針。
 
 **相容性注意：** 系統內建 `sigrok-cli` 不必然包含 `kingst-la2016` 驅動，不能因為 PATH 有 sigrok 就替代上述指定 AppImage。歷史證據沒有要求在每次採樣時重新上傳 LA FPGA Firmware；不應額外加入未知初始化步驟。
 
@@ -28,16 +28,20 @@ SIGROK_APPIMAGE=/opt/plasma/hil-tools/kingst-la2016-sigrok.AppImage
 sha256sum "$SIGROK_APPIMAGE"
 # 比對上方已釘選的完整 SHA256；不符合就停止。
 
+# 不開啟 PLASMA 專用 Lock，不作強制 fuser 前置檢查。
+# Busy/Claim 失敗以原生 Driver 回傳為準：DEVICE_BUSY，停止本次工作，
+# 不重試、不搶占、不放寬 Linux DAC/ACL 或其他設備安全界線。
+
 # Owner-approved LA2016 access: NO separate MCU/FPGA firmware file or SHA preflight.
 # SIGROK_FIRMWARE_PATH is optional; preserve the inherited environment unchanged.
 # Let the native sigrok driver report any actual resource or initialization error.
 # No manual LA firmware upload, update, extraction or download in normal capture.
 
 # 動態查找 USB 77a1:01a2；每次執行時從 sysfs 重新取得 busnum/devnum。
-# 沿用 scripts/plasma-codex-la2016.py 的唯一裝置、權限、fuser 策略。
+# 直接使用 sysfs 確認唯一設備及 USB node 的 Linux 權限；占用狀態由 Driver 開啟結果判斷。
 # 不使用歷史 USB 節點值，也不輸出 USB 序號。
 LA_CONN="$(python3 - <<'PY'
-import os, pathlib, stat, subprocess, sys
+import os, pathlib, stat
 root = pathlib.Path('/sys/bus/usb/devices')
 found = []
 for entry in root.iterdir():
@@ -61,13 +65,6 @@ for entry in root.iterdir():
         raise RuntimeError('LA_USB_SYSFS_OR_NODE_ERROR') from exc
 if len(found) != 1:
     raise SystemExit(f'LA2016_UNIQUE_USB_MAPPING_FAILED: {len(found)} candidates')
-try:
-    check = subprocess.run(['fuser', '-s', str(found[0][1])], timeout=3,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-except (OSError, subprocess.TimeoutExpired) as exc:
-    raise SystemExit('LA_USB_OWNER_CHECK_UNAVAILABLE') from exc
-if check.returncode != 1:  # 0=busy, 1=free, other=uncertain
-    raise SystemExit('LA_USB_BUSY_OR_OWNER_UNCERTAIN')
 print(found[0][0])
 PY
 )" || exit 1
@@ -82,9 +79,12 @@ export LA_CONN
   --driver "kingst-la2016:conn=$LA_CONN" \
   --config samplerate=5m --channels CH0,CH1,CH2 \
   --samples 50000000 --output-file "$OUT"
+capture_status=$?
+# 原生 Driver 關閉 USB；保留實際 exit code/driver stderr 作為成功或 Busy/Error 證據。
+test "$capture_status" -eq 0
 ```
 
-`OUT` 應事先指定為本次唯一且新的 `.sr` 輸出檔。上述命令並非每次都會成功：USB 存取權限、資源路徑、採樣通道／接線及設備占用狀態都要在現場確認。**在實際的 SWD 嘗試開始之前，應先啟動 LA 採樣並保持重疊時間窗**；否則不能稱為該失敗事件的波形。
+`OUT` 應事先指定為本次唯一且新的 `.sr` 輸出檔。上述是歷史 SWD 範例，當次 Owner Work Order 的通道與時間參數由 Codex 依目標自行選擇。若原生 Driver 的 Open/Claim 回報設備已占用，記錄 `DEVICE_BUSY`、原始錯誤及 Exit Code，停止且不搶占或重試；其他原生錯誤記錄 `RUNTIME_FAIL`。沒有額外 `flock`、lock file 或強制 `fuser` 前置檢查；實際 USB 權限仍由 Linux DAC/ACL 控制。正常結束必須讓 Driver 關閉設備，異常退出保留真實退出證據。上述命令並非每次都會成功：USB 存取權限、資源路徑、採樣通道／接線及設備占用狀態都要在現場確認。**在實際的 SWD 嘗試開始之前，應先啟動 LA 採樣並保持重疊時間窗**；否則不能稱為該失敗事件的波形。
 
 ### 原生 Driver 韌體錯誤：只在實際發生時處理
 
@@ -95,6 +95,14 @@ export LA_CONN
 ## 2. 模式 A：被動 SWD 邏輯波形（PLASMA 當前用途）
 
 **電氣約束：** LA2016 僅連接共地與輸入通道，不得在這個模式啟用 PWM1。**ST-LINK 與 Z2 PL 是兩個不同的 SWD 主控，不得同時驅動 Blue Pill。** 目前比較用的成功基準來自 2026-10-23 STLINK-V3SET；Z2 失敗測試則只能由 Z2 單獨驅動。
+
+### 被動擷取：重用仍有效的 Owner 電氣確認
+
+**`OWNER_ELECTRICAL_ATTESTATION_REUSE`（2026-10-27 Gate 1）：** 對**相同治具、相同接線、相同訊號源且未獲報變更**的 LA2016 被動數位輸入擷取，可以沿用 Owner 先前提供的合法輸入電壓及共地確認。查核「接線／電氣條件」是核對這份已知配置有無實際變化或相反證據，**不要求每次被動擷取重新取得人工電壓／共地聲明、類比量測讀值、照片或新增批准 Gate**。數位 LA 無法自行證明類比電壓，因此不得僅因本次 Work Order 沒有重複附上此類證明，就把本可執行的被動擷取判成 `NOT_RUN`。
+
+具體先例：2026-10-23 的 CH0／CH1／CH2 SWD 觀察接線有封存紀錄，Owner 於 2026-10-27 確認 CH3 接 3.3 V 且 LA 與訊號源共地；**僅在該配置仍有效時**可作為重用依據，不能推定任意新接線皆安全。[Run #40495187390](https://github.com/physicslu/plasma/actions/runs/40495187390) 的 Codex 因 Work Order 自行增加「本次重新證明四通道電壓／共地」而在 USB 權限檢查通過後以零次擷取 `NOT_RUN`；這是派工條件過度要求，不是 Driver 或硬體故障，也不是一份成功波形。
+
+若 Owner 表示配置變更或不確定、實際發現超出輸入規格的電壓、共地中斷、接線衝突或其他可信的電氣危險，必須停止並報出具體阻礙；不能把舊確認當作無期限的安全保證。本規則**只移除重複人工確認**，保留當次 Gate 1 操作範圍、Linux DAC/ACL、真實設備占用與 Driver 錯誤回報；不授權 PWM1 輸出、Z2／FPGA／DUT 操作或權限繞過。
 
 曾成功的設定：
 
@@ -118,7 +126,7 @@ python3 docs/evidence/stlink-stm32f103-swd-reference/2026-10-23/verify.py
 
 **警告：PWM1 是實際電氣輸出。** 只在已確認的「PWM1 → 同一台 LA2016 CH0」獨立回路下，且本次明確授權時使用。**Blue Pill / Z2 SWD 接線時絕對不能執行以下 PWM Enable 命令。**
 
-以下命令形式是 2026-10-16 **真正實測 PASS** 的兩組設定（實測 1 kHz 50% 與 2 kHz 25%，各 1 MHz 採樣）。必須在整個 Supervisor 工作中持續佔有 LA lock，並在包括錯誤和中斷在內的所有退出分支關閉 PWM：
+以下命令形式是 2026-10-16 **真正實測 PASS** 的兩組設定（實測 1 kHz 50% 與 2 kHz 25%，各 1 MHz 採樣）。必須確認原生 Driver 已取得設備，並在包括錯誤、中斷在內的所有退出分支關閉 PWM；如無獨立且經驗證的限時 OFF 保護，Codex 不得啟用 PWM 輸出：
 
 ```bash
 # 先確認已改成 OWNER 授權的同機 PWM1->CH0 Loopback 接線與工具環境
@@ -136,7 +144,7 @@ OUT="<new loopback waveform filename>"
 **必備安全清理（不可省略）：**
 
 ```bash
-# Supervisor 的 finally/error/termination 路徑都必須執行這個關閉命令
+# 由 Codex 直接執行 OFF，且必須有獨立限時 OFF 保護與實際波形查核（不是 JSON Supervisor）
 "$SIGROK_APPIMAGE" --appimage-extract-and-run --loglevel 4 \
   --driver "kingst-la2016:conn=$LA_CONN" \
   --config channel_group=PWM1:enabled=off --set
@@ -162,10 +170,12 @@ python3 docs/evidence/la2016-pwm-loopback/2026-10-16/verify.py
 
 每一次真正的 LA 工作都應保存：
 
-1. LA 裝置身分（不公開獨特序號／即時 bus address）、**AppImage SHA256**、原生 Driver 開啟／初始化結果、操作員及適用的 Device Lock 狀態。LA2016 內部 MCU／FPGA 韌體的獨立來源、存在或 SHA 前置檢查標記為 `NOT_REQUIRED_BY_OWNER`；若原生 Driver 報出資源錯誤才記錄 `RUNTIME_FAIL`。
+1. LA 裝置身分（不公開獨特序號／即時 bus address）、**AppImage SHA256**、原生 Driver 開啟／初始化結果、操作員及原生 Driver 的 Open/Busy/Close 狀態。LA2016 內部 MCU／FPGA 韌體的獨立來源、存在或 SHA 前置檢查標記為 `NOT_REQUIRED_BY_OWNER`；若原生 Driver 報出資源錯誤才記錄 `RUNTIME_FAIL`。
 2. 模式是 **Passive Input** 還是 **PWM Loopback**、實際連線與通道配置、採樣率、Requested／Actual samples、threshold 與捕捉期間。
 3. 原始 `.sr`、命令 Exit Code、帶時間戳記的控制程式／OpenOCD 操作收據、原始檔案 SHA256、decoder output、導出比較報告。
 4. 如曾使用 PWM，保留關閉命令 Exit Code 與**另外擷取**的 OFF 驗證波形。
 5. 成功參考與失敗波形分別註明證據來源與日期；沒有新擷取就填 `NOT_RUN`，不可用舊波形冒充本次 Z2 PASS。
 
-本文件不更動系統 sigrok、udev、Kernel、FPGA image、DUT Flash、ST-LINK 配線或電源控制。實際執行仍以當次 Owner 授權與硬體 Owner/Lock 為準。
+本文件為直接 CLI 操作參考；現行模式參見 [Path 3 Direct Hardware Tools](plasma-path3-direct-hardware-tools.md)。歷史 Issue #981 JSON Supervisor / LA-only A/B 執行入口已退役，不得用舊命令啟動。
+
+本文件不更動系統 sigrok、udev、Kernel、FPGA image、DUT Flash、ST-LINK 配線或電源控制。實際執行仍以當次 Owner 授權、原生設備占用結果及其他硬體 Ownership Guard 為準。

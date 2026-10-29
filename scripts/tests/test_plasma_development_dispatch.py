@@ -21,6 +21,11 @@ import plasma_development_dispatch as dev
 
 WORKFLOW=ROOT/".github/workflows/plasma-engineering-runtime-dispatch.yml"
 REGISTRY=ROOT/"specs/engineering-dispatch/development-tasks-v1.json"
+F1_LEGACY_PROJECT = {
+    "execution_path": "path2-cli", "capability": "vivado-host-build",
+    "project": "pl/projects/z2-fixed-unified-site1", "toolchain": "2026.1",
+    "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07",
+}
 
 
 class DevelopmentPath2Contracts(unittest.TestCase):
@@ -496,7 +501,7 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             from io import StringIO
             from contextlib import redirect_stdout
             with patch.dict(os.environ,env):
-                with patch.object(dev,"live_pr_metadata", return_value=None), patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock:
+                with patch.object(dev,"live_pr_metadata", return_value=None), patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock, patch.object(dev.os,"geteuid",return_value=1000):
                     with redirect_stdout(StringIO()) as out:
                         self.assertEqual(self._call_main(args),0)
                     self.assertEqual(json.loads(out.getvalue())["pinned_sha"],"b"*40)
@@ -1032,7 +1037,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
-        job=wf.split("  development-codex:",1)[1].split("\n  development-codex-resume:",1)[0]
+        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
         self.assertIn("Collect Path 3 evidence even when Codex",job)
         self.assertIn("if: always()",job)
         self.assertIn("git -C candidate diff --binary HEAD",job)
@@ -1047,7 +1052,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
     def test_path3_publisher_is_pr_pinned_and_keeps_token_out_of_codex(self):
         workflow = WORKFLOW.read_text()
         job = workflow.split("  development-codex:", 1)[1].split(
-            "\n  development-codex-resume:", 1)[0]
+            "\n  authorize:", 1)[0]
         self.assertIn("contents: write  # trusted publisher", job)
         self.assertIn("Publish successful Path 3 edits to the exact authorized PR", job)
         self.assertIn("git -C candidate diff --cached --check", job)
@@ -1128,12 +1133,12 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
 
 class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
-    """Offline-only Path 2 host-build policy tests; never invokes Vivado."""
+    """Retained fixed F1-B builder utility tests, not live Path 2 routing."""
 
     @classmethod
     def setUpClass(cls):
         cls.registry=json.loads(REGISTRY.read_text())
-        cls.task=dev.task_by_id(cls.registry,"fixed-site1-vivado-host-build")
+        cls.task=F1_LEGACY_PROJECT
 
     def event(self):
         e=DevelopmentPath2Contracts().event()
@@ -1143,72 +1148,34 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
     def context(self):
         return DevelopmentPath2Contracts().context() | {"GITHUB_RUN_ATTEMPT":"1"}
 
-    def test_path2_is_not_synonymous_with_cpu_only(self):
-        task=self.task
-        self.assertEqual(task["execution_path"],"path2-cli")
-        self.assertEqual(task["capability"],"vivado-host-build")
-        approved=dev.authorize(self.event(),self.context(),self.registry)
-        self.assertEqual(approved["execution_capability"],"vivado-host-build")
-        self.assertEqual(approved["pr_number"],0)
-        self.assertEqual(approved["pinned_sha"],approved["trusted_sha"])
-        # Existing CPU-only path and original bwrap isolation remain intact.
-        cpu=dev.task_by_id(self.registry,"nine-nine-path2")
-        self.assertEqual(cpu["capability"],"cpu-only")
+    def test_retired_fixed_builds_cannot_be_dispatched(self):
+        for task_id in ("fixed-site1-vivado-host-build", "z2-path2-build"):
+            with self.subTest(task_id=task_id):
+                self.assertNotIn(task_id, self.registry["tasks"])
+                with self.assertRaisesRegex(dev.Denied, "TASK_ID_DENIED"):
+                    dev.authorize(self.event() | {
+                        "comment": {**self.event()["comment"],
+                                    "body": f"/plasma-dispatch run {task_id} 981"}
+                    }, self.context(), self.registry)
+                with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_FIXED_BUILD_TASK"):
+                    dev.task_by_id({**self.registry, "tasks": {task_id: self.task}},
+                                   task_id)
+                with patch.object(dev, "reviewed_host_build_driver") as loader:
+                    with self.assertRaisesRegex(dev.Denied, "HOST_BUILD_APPROVAL_REQUIRED"):
+                        dev.run_task(self.task, workspace=ROOT, approval={
+                            "task_id": task_id, "execution_path": "path2-cli",
+                            "execution_capability": "vivado-host-build",
+                            "pr_number": 0, "pinned_sha": "a" * 40,
+                            "trusted_sha": "a" * 40})
+                    loader.assert_not_called()
+        with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_AUTO_STAGE_FLAGS"):
+            dev.request({**self.event(), "comment": {
+                **self.event()["comment"],
+                "body": "/plasma-dispatch run z2-path2-build --auto-download 981"
+            }}, self.context())
 
-    def test_host_build_approved_pr_head_allows_reruns(self):
-        ctx=self.context()
-        for attempt in ("2", "3"):
-            plan = dev.authorize(self.event(), ctx | {"GITHUB_RUN_ATTEMPT": attempt},
-                                 self.registry)
-            self.assertEqual(plan["execution_capability"], "vivado-host-build")
-        fixture=DevelopmentBranchDispatchContracts()
-        branch_event=fixture.branch_event(
-            task="fixed-site1-vivado-host-build",pr=1100,sha="b"*40)
-        plan=dev.authorize(branch_event,ctx,self.registry,
-                           pr_info=fixture.valid_pr())
-        self.assertEqual(plan["pr_number"],1100)
-        self.assertEqual(plan["pinned_sha"],"b"*40)
-        self.assertEqual(plan["trusted_sha"],"a"*40)
-        self.assertEqual(plan["execution_capability"],"vivado-host-build")
-        for attempt in ("2", "3"):
-            repeated = dev.authorize(branch_event,
-                                     ctx | {"GITHUB_RUN_ATTEMPT": attempt},
-                                     self.registry, pr_info=fixture.valid_pr())
-            self.assertEqual(repeated["pinned_sha"], "b" * 40)
-        for change in ("sha","repo","owner","base","state"):
-            pr=fixture.valid_pr()
-            if change=="sha": pr["head"]["sha"]="c"*40
-            elif change=="repo": pr["head"]["repo"]["full_name"]="other/plasma"
-            elif change=="owner": pr["user"]["login"]="other"
-            elif change=="base": pr["base"]["ref"]="not-main"
-            elif change=="state": pr["state"]="closed"
-            with self.subTest(change=change),self.assertRaises(dev.Denied):
-                dev.authorize(branch_event,ctx,self.registry,pr_info=pr)
-        with self.assertRaisesRegex(dev.Denied,"PR_METADATA_DENIED"):
-            dev.authorize(branch_event,ctx,self.registry)
-        with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_SOURCE_BINDING_DENIED"):
-            dev.authorize(fixture.branch_event(
-                task="fixed-site1-vivado-host-build",sha="a"*40),
-                ctx,self.registry,pr_info=fixture.valid_pr(sha="a"*40))
 
-    def test_host_build_schema_rejects_arbitrary_cli_and_capabilities(self):
-        task=dict(self.task)
-        for key,value in (
-            ("project","../../scripts"),
-            ("project","/tmp/my-project"),
-            ("project","pl/projects/../danger"),
-            ("toolchain","2025.2"),
-            ("board_repo_sha","bad"),
-            ("capability","host-root"),
-        ):
-            with self.subTest(field=key,bad=value),self.assertRaises(dev.Denied):
-                bad=dict(task,**{key:value})
-                reg={**self.registry,"tasks":{"fixed-site1-vivado-host-build":bad}}
-                dev.task_by_id(reg,"fixed-site1-vivado-host-build")
-        with self.assertRaises(dev.Denied):
-            reg={**self.registry,"tasks":{"fixed-site1-vivado-host-build":
-                                         dict(task,argv=["--program-fpga"])}}
-            dev.task_by_id(reg,"fixed-site1-vivado-host-build")
+
 
     def test_runner_guard_allows_approved_pr_host_build_without_new_runner(self):
         wf=WORKFLOW.read_text()
@@ -1227,142 +1194,8 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         self.assertIn("== 'operator-cli' && 35 || 5",wf)
         self.assertNotIn("runs-on: [self-hosted, linux, x64, vivado]",wf)
 
-    def test_host_build_source_preflight_is_pure_and_strict(self):
-        import plasma_vivado_host_build as build
-        approval=dev.authorize(self.event(),self.context(),self.registry)
-        env={
-            "GITHUB_REPOSITORY":"physicslu/plasma",
-            "RUNNER_NAME":"SWPC-plasma-codex",
-            "RUNNER_ENVIRONMENT":"self-hosted",
-            "GITHUB_EVENT_NAME":"issue_comment",
-            "GITHUB_REF":"refs/heads/main",
-            "GITHUB_RUN_ATTEMPT":"1",
-            "GITHUB_SHA":approval["trusted_sha"],
-        }
-        # This uses only local tracked source. No SWPC or Vivado call.
-        p=build.preflight(self.task,workspace=ROOT,approval=approval,env=env)
-        self.assertEqual(p["toolchain"],"2026.1")
-        self.assertIn("z2-fixed-unified-site1",p["project"])
-        self.assertEqual(p["board_sha"],self.task["board_repo_sha"])
-        for changed in (
-            {"GITHUB_SHA":"b"*40},
-        ):
-            with self.subTest(change=changed),self.assertRaises(build.BuildDenied):
-                build.preflight(self.task,workspace=ROOT,approval=approval,
-                                env=env|changed)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(self.task,workspace=ROOT,
-                            approval=dict(approval,pr_number=1059),env=env)
-        fixture=DevelopmentBranchDispatchContracts()
-        candidate=dev.authorize(
-            fixture.branch_event(task="fixed-site1-vivado-host-build",
-                                 pr=1100,sha="b"*40),
-            self.context(),self.registry,pr_info=fixture.valid_pr())
-        accepted=build.preflight(self.task,workspace=ROOT,
-                                 approval=candidate,env=env)
-        self.assertEqual(accepted["source_sha"],"b"*40)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(self.task,workspace=ROOT,
-                            approval=dict(candidate,pinned_sha="a"*40),env=env)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(dict(self.task,project="pl/projects/../bad"),
-                            workspace=ROOT,approval=approval,env=env)
 
-    def test_host_build_exec_requires_authorization_before_any_process(self):
-        task=self.task
-        with patch("plasma_vivado_host_build.run") as dangerous:
-            with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_APPROVAL_REQUIRED"):
-                dev.run_task(task,workspace=ROOT,approval=None,sandbox=False)
-            dangerous.assert_not_called()
-        with patch("plasma_vivado_host_build.run") as builder:
-            dev.run_task(task,workspace=ROOT,
-                         approval={"task_id":"fixed-site1-vivado-host-build",
-                                   "execution_path":"path2-cli",
-                                   "execution_capability":"vivado-host-build",
-                                   "pr_number":0,
-                                   "pinned_sha":"a"*40,"trusted_sha":"a"*40},
-                         sandbox=False)
-            builder.assert_called_once()
-        # An approved PR must not silently fall back to the trusted main
-        # driver when its own fixed candidate driver is missing.
-        with tempfile.TemporaryDirectory() as td:
-            candidate = Path(td) / "candidate"
-            candidate.mkdir()
-            with patch("plasma_vivado_host_build.run") as builder:
-                with self.assertRaisesRegex(
-                    dev.Denied, "HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-                ):
-                    dev.run_task(task, workspace=candidate,
-                                 approval={
-                                     "task_id":"fixed-site1-vivado-host-build",
-                                     "execution_path":"path2-cli",
-                                     "execution_capability":"vivado-host-build",
-                                     "pr_number":1063,
-                                     "pinned_sha":"b"*40,
-                                     "trusted_sha":"a"*40},
-                                 sandbox=False)
-                builder.assert_not_called()
-        for invalid in (
-            {"task_id":"wrong"},
-            {"pr_number":1063,"pinned_sha":"a"*40,"trusted_sha":"a"*40},
-            {"pr_number":0,"pinned_sha":"b"*40,"trusted_sha":"a"*40},
-        ):
-            base={"task_id":"fixed-site1-vivado-host-build",
-                  "execution_path":"path2-cli",
-                  "execution_capability":"vivado-host-build",
-                  "pr_number":0,
-                  "pinned_sha":"a"*40,"trusted_sha":"a"*40}
-            with self.subTest(invalid=invalid),patch(
-                "plasma_vivado_host_build.run") as builder:
-                with self.assertRaisesRegex(dev.Denied,
-                                            "HOST_BUILD_APPROVAL_REQUIRED"):
-                    dev.run_task(task,workspace=ROOT,approval=base|invalid,
-                                 sandbox=False)
-                builder.assert_not_called()
 
-    def test_candidate_vivado_driver_is_reviewed_and_not_trusted_main(self):
-        # Host-only unit fixture. Do not start Vivado or access SWPC/hardware.
-        import plasma_vivado_host_build as trusted_build
-        task=self.task
-        approval={
-            "task_id":"fixed-site1-vivado-host-build",
-            "execution_path":"path2-cli",
-            "execution_capability":"vivado-host-build",
-            "pr_number":1064,"pinned_sha":"b"*40,"trusted_sha":"a"*40,
-        }
-        with tempfile.TemporaryDirectory() as td:
-            work=Path(td)/"candidate"
-            scripts=work/"scripts"
-            scripts.mkdir(parents=True)
-            driver=scripts/"plasma_vivado_host_build.py"
-            driver.write_text(
-                "def run(task, *, workspace, approval, evidence_dir=None, "
-                "executor=None):\n"
-                "    return {'status':'CANDIDATE_DRIVER_TEST_ONLY'}\n",
-                encoding="utf-8")
-            with patch.object(trusted_build,"run") as main_driver:
-                result=dev.run_task(task,workspace=work,approval=approval)
-                self.assertEqual(result["status"],"CANDIDATE_DRIVER_TEST_ONLY")
-                main_driver.assert_not_called()
-            # PR driver is not admissible if absent or a symlink escape.
-            driver.unlink()
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
-            outside=Path(td)/"unreviewed.py"
-            outside.write_text("raise RuntimeError('must not import')\n")
-            driver.symlink_to(outside)
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
-            driver.unlink()
-            driver.write_text("x"*65537)
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
 
     def test_workflow_transports_authorized_pr_identity_to_existing_runner(self):
         wf=WORKFLOW.read_text()
@@ -1712,19 +1545,21 @@ class GenericWorkOrderContracts(unittest.TestCase):
                             executor=lambda *_a, **_kw: self.fail("Codex launched"),
                             task_id=task_id)
 
-    def test_dynamic_vivado_host_build_uses_existing_exact_engine(self):
+    def test_dynamic_vivado_host_build_uses_project_contract(self):
         import plasma_vivado_host_build as build
-        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        fixed = F1_LEGACY_PROJECT
         order = self._order("path2-cli",
                             capability="vivado-host-build",
-                            project=fixed["project"],
+                            project="pl/projects/z2-identity",
                             toolchain=fixed["toolchain"],
-                            board_repo_sha=fixed["board_repo_sha"])
+                            board_repo_sha=fixed["board_repo_sha"],
+                            pr_number=1100, source_sha="b" * 40)
         for key in ("scope", "script", "argv", "expected_stdout_sha256"):
             order.pop(key, None)
         event = self._event(order)
         req = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
         task = dev.task_for_request(self.registry, req, event)
         self.assertNotIn("path2-work-order", self.registry["tasks"])
         self.assertEqual(task["work_order_scope"], "host-only")
@@ -1740,34 +1575,63 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertEqual(set(projected), {
             "execution_path", "capability", "project", "toolchain",
             "board_repo_sha"})
-        plan = build.preflight(
-            projected, workspace=ROOT, approval=approval,
-            env={"GITHUB_SHA": approval["trusted_sha"]})
-        self.assertEqual(plan["board_sha"], fixed["board_repo_sha"])
-        with patch.object(build, "run", return_value={"status": "MOCK_HOST_BUILD"}) as runner:
+        plan = build.generic_project_contract(
+            projected, workspace=ROOT, approval=approval)
+        self.assertEqual(plan["vivado_project"], "z2_identity")
+        self.assertEqual(plan["build_env"], "PLASMA_IDENTITY_BUILD")
+        with patch.object(dev, "reviewed_host_build_driver") as candidate:
+            candidate.return_value.run.return_value = {"status": "MOCK_HOST_BUILD"}
             result = dev.run_task(task, workspace=ROOT, approval=approval)
             self.assertEqual(result["status"], "MOCK_HOST_BUILD")
-            runner.assert_called_once()
-            self.assertEqual(runner.call_args.args[0], projected)
+            candidate.assert_called_once()
+            self.assertEqual(candidate.return_value.run.call_args.args[0], projected)
 
-        # The fixed legacy Build identity still has its original adapter.
-        static_event = DevelopmentVivadoHostBuildContracts().event()
-        static_approval = dev.authorize(
-            static_event, self._context(), self.registry)
-        self.assertEqual(static_approval["task_id"],
-                         "fixed-site1-vivado-host-build")
-
-    def test_dynamic_vivado_host_build_negative_contracts(self):
-        fixed = dev.task_by_id(self.registry, "z2-path2-build")
-        order = self._order("path2-cli",
-                            capability="vivado-host-build",
-                            project=fixed["project"],
+    def test_dynamic_vivado_host_build_uses_trusted_main_contract(self):
+        import plasma_vivado_host_build as build
+        fixed = F1_LEGACY_PROJECT
+        order = self._order("path2-cli", capability="vivado-host-build",
+                            project="pl/projects/z2-identity",
                             toolchain=fixed["toolchain"],
                             board_repo_sha=fixed["board_repo_sha"])
         for key in ("scope", "script", "argv", "expected_stdout_sha256"):
             order.pop(key, None)
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(approval["pr_number"], 0)
+        self.assertEqual(approval["pinned_sha"], approval["trusted_sha"])
+        projected = {key: task[key] for key in (
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha")}
+        self.assertEqual(build.generic_project_contract(
+            projected, workspace=ROOT, approval=approval)["vivado_project"],
+                         "z2_identity")
+        self.assertIs(dev.reviewed_host_build_driver(
+            workspace=ROOT, approval=approval), build)
+        with self.assertRaisesRegex(build.BuildDenied,
+                                    "BUILD_GENERIC_PROJECT_DENIED"):
+            build.generic_project_contract(
+                projected | {"project": "pl/projects/not-qualified"},
+                workspace=ROOT, approval=approval)
+        with patch.object(dev, "reviewed_host_build_driver") as driver:
+            driver.return_value.run.return_value = {"status": "MOCK_HOST_BUILD"}
+            self.assertEqual(dev.run_task(task, workspace=ROOT,
+                                          approval=approval)["status"],
+                             "MOCK_HOST_BUILD")
+            driver.assert_called_once()
+
+    def test_dynamic_vivado_host_build_negative_contracts(self):
+        fixed = F1_LEGACY_PROJECT
+        order = self._order("path2-cli",
+                            capability="vivado-host-build",
+                            project="pl/projects/z2-identity",
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"],
+                            pr_number=1100, source_sha="b" * 40)
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
         for change in (
-            {"project": "pl/projects/other-platform"},
             {"project": "../danger"},
             {"toolchain": "2025.2"},
             {"board_repo_sha": "invalid"},
@@ -1781,6 +1645,26 @@ class GenericWorkOrderContracts(unittest.TestCase):
             with self.subTest(change=change), self.assertRaisesRegex(
                     dev.Denied, "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
                 dev.request(self._event(order | change), self._context())
+        # A syntactically valid project is admitted by the Dispatcher, then
+        # fails closed before Vivado if it has no reviewed project contract.
+        missing = order | {"project": "pl/projects/other-platform"}
+        event = self._event(missing)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
+        task = dev.task_for_request(self.registry, req, event)
+        projected = {k: task[k] for k in (
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha")}
+        import plasma_vivado_host_build as build
+        with self.assertRaisesRegex(build.BuildDenied, "BUILD_GENERIC_PROJECT_DENIED"):
+            build.generic_project_contract(projected, workspace=ROOT,
+                                           approval=approval)
+        # A main-only Work Order is valid, but cannot supply a spoofed SHA.
+        with self.assertRaisesRegex(dev.Denied,
+                                    "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED"):
+            dev.request(self._event({k: v for k, v in order.items()
+                                     if k != "pr_number"}), self._context())
         # Stage field was retired at the Work Order schema boundary.
         with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_FIELDS_DENIED"):
             dev.request(self._event(order | {"stage": "download"}), self._context())
@@ -1793,7 +1677,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
         event = self._event(order)
         req = dev.request(event, self._context())
         task = dev.task_for_request(self.registry, req, event)
-        approval = dev.authorize(event, self._context(), self.registry)
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
         import plasma_vivado_host_build as build
         for change in (
             {"work_order_sha256": "0" * 64},
@@ -1819,7 +1704,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 order | {"acceptance": "A different unauthorized requirement."}))
 
     def test_dynamic_vivado_candidate_head_requires_exact_pr_and_driver(self):
-        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        fixed = F1_LEGACY_PROJECT
         order = self._order("path2-cli", capability="vivado-host-build",
                             project=fixed["project"],
                             toolchain=fixed["toolchain"],
@@ -1955,6 +1840,24 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 )
         protected.assert_not_called()
 
+    def test_path2_documentation_does_not_restore_retired_root_work_order(self):
+        import plasma_path2_runtime_integration as integration
+        dispatcher = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
+        loader = (ROOT / "docs/development/path2-generic-fpga-image-loader.md").read_text()
+        policy = (ROOT / "docs/development/development-blocking-policy.md").read_text()
+        index = (ROOT / "docs/README.md").read_text()
+        self.assertNotIn("direct_root_operation(", dispatcher)
+        self.assertIn('raise Denied("RETIRED_PATH2_ROOT_OPERATION")', dispatcher)
+        self.assertIn("HISTORICAL WORK ORDER ONLY", loader)
+        self.assertIn("**Current Path 2:**", loader)
+        self.assertNotIn("admission accept Path 2 hardware requests", loader)
+        self.assertIn("**Retired Path 2 Work Order:**", policy)
+        self.assertIn("**Current Path 3:**", policy)
+        self.assertNotIn("Both Paths use the same fixed\nstage allowlist", policy)
+        self.assertIn("Current / Path 2 guarded-hardware operator-cli", index)
+        self.assertIn("Historical / retired z2-root-operation Work Order", index)
+        self.assertIn("RETIRED FROM LIVE WORK ORDERS", integration.direct_root_operation.__doc__)
+
     def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):
         base = self._order("path2-cli")
         base.pop("scope")
@@ -2072,6 +1975,15 @@ class GenericWorkOrderContracts(unittest.TestCase):
             dev.authorize(
                 self._event(order), self._context(),
                 self.registry)["monitor_summary"], order["monitor_summary"])
+
+    def test_path3_monitor_summary_allows_benign_comma_without_commands(self):
+        # Run 40468107474 was rejected solely by the former punctuation
+        # whitelist, before an otherwise authorized Path 3 job could start.
+        summary = "LA2016 CH3 confirmed, 10ms passive capture"
+        event = self._event(self._order(monitor_summary=summary))
+        self.assertEqual(
+            dev.authorize(event, self._context(), self.registry)["monitor_summary"],
+            summary)
 
     def test_path2_public_goal_and_safe_stage_from_authorized_contract(self):
         summary = "PATH2 Host-only CLI regression"
@@ -2209,10 +2121,44 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn('"operator-cli"', content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
+
+    def test_path3_has_single_generic_runner_and_no_special_probe_adapter(self):
+        workflow = WORKFLOW.read_text()
+        dispatcher = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
+        self.assertIn("  development-codex:", workflow)
+        self.assertNotIn("  development-codex-resume:", workflow)
+        self.assertNotIn("SESSION_RESUME", workflow)
+        self.assertNotIn("--resume-phase", workflow)
+        self.assertNotIn("session_resume", dispatcher)
+        self.assertNotIn("plasma_path3_cross_job_resume", dispatcher)
+        self.assertNotIn("plasma_path3_session_resume_probe", dispatcher)
+        self.assertNotIn("plasma_path3_session_resume_probe", workflow)
+        self.assertNotIn("hardware_stages", dispatcher)
+        self.assertNotIn("agent-request.json", dispatcher)
+        self.assertNotIn("plasma_development_stage_transport", dispatcher)
+        self.assertNotIn("plasma_development_codex_sandbox", dispatcher)
+        contract = (ROOT / "AGENTS.md").read_text()
+        self.assertIn("Ordinary Path 3 explicitly pins `--sandbox workspace-write`", contract)
+        self.assertIn("SHA/digest-bound Owner hardware Work Order", contract)
+        self.assertNotIn("Path 3 inherits operator Codex Approval/Sandbox", contract)
+        full_contract = (ROOT / "docs/development/plasma-autonomous-development-contract-full.md").read_text()
+        self.assertIn("Ordinary Codex execution explicitly pins `--sandbox workspace-write`", full_contract)
+        self.assertIn("`codex_execution: guarded-hardware-no-sandbox`", full_contract)
+        self.assertNotIn("Codex inherits the operator's effective configuration", full_contract)
+        # Legacy and arbitrary fixed adapter/probe routes are denied on the
+        # live Owner/SHA Work Order path, regardless of device model.
+        for name, value in (("session_resume", "page-boundary-off-by-one"),
+                            ("hardware_stages", ["read"]),
+                            ("profile", "la2016"),
+                            ("adapter", "z2-ssh"),
+                            ("probe", "preflight")):
+            with self.subTest(name=name), self.assertRaises(dev.Denied):
+                dev.request(self._event(self._order("path3-codex", **{name: value})),
+                            self._context())
 
     def test_path3_invokes_once_and_records_result(self):
         order = self._order()

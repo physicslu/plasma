@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import sys
 import uuid
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import plasma_engineering_activity as engineering_activity
 
@@ -29,6 +31,13 @@ MANIFEST = ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
 VERSION = "plasma.engineering.development_tasks.v1"
 COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
+# Retained Path 3 F1-B licensed-host diagnostic only. This is not a Path 2
+# Registry identity or a general Work Order admission rule.
+F1_PATH3_HOST_BUILD = {
+    "execution_path": "path3-codex", "capability": "vivado-host-build",
+    "project": "pl/projects/z2-fixed-unified-site1", "toolchain": "2026.1",
+    "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07",
+}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
 # Explicit operator-public metadata; never derived from objective/acceptance.
@@ -36,7 +45,7 @@ WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
 # shell syntax and raw JSON from crossing the GitHub output/monitor boundary.
 MONITOR_SUMMARY = re.compile(
     r"[A-Za-z0-9\u4e00-\u9fff]"
-    r"[A-Za-z0-9\u4e00-\u9fff ._()/+-]{6,78}"
+    r"[A-Za-z0-9\u4e00-\u9fff ,._()/+-]{6,78}"
     r"[A-Za-z0-9\u4e00-\u9fff)]\Z"
 )
 MONITOR_SENSITIVE = re.compile(
@@ -110,21 +119,8 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "A2_TASK_BINDING_DENIED")
         return task
     if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
-        require(task_id in ("fixed-site1-vivado-host-build", "z2-path2-build"),
-                "PATH2_BUILD_TASK_ID_DENIED")
-        # Path 2 is an execution method, NOT synonymous with CPU-only Python.
-        # Host builds use a fixed, reviewed Vivado capability and project.
-        require(set(task) == {"execution_path", "capability", "project",
-                              "toolchain", "board_repo_sha"},
-                "HOST_BUILD_TASK_FIELDS_DENIED")
-        require(type(task["project"]) is str and re.fullmatch(
-            r"pl/projects/[a-z0-9-]{3,70}", task["project"]
-        ) is not None, "HOST_BUILD_PROJECT_DENIED")
-        require(task["toolchain"] == "2026.1" and
-                type(task["board_repo_sha"]) is str and
-                SHA40.fullmatch(task["board_repo_sha"]) is not None,
-                "HOST_BUILD_TOOLCHAIN_DENIED")
-        return task
+        # A candidate registry may not revive a fixed Site 1 build route.
+        raise Denied("RETIRED_PATH2_FIXED_BUILD_TASK")
     if execution_path == "path2-cli":
         # Legacy CPU-only CLI fixtures keep their independent sandbox.
         require(set(task) >= {
@@ -206,7 +202,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                            "execution_path", "capability"}
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
-                               "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
+                               "pr_number", "source_sha", "native_preflight", "script", "argv",
                                "expected_stdout_sha256", "verification",
                                "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
@@ -236,22 +232,11 @@ def parse_dynamic_work_order(event: object) -> dict:
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
-        if "session_resume" in order:
-            require(order["session_resume"] == "page-boundary-off-by-one"
-                    and scope == "host-only"
-                    and set(order) <= base | optional_ref | {"session_resume", "monitor_summary"}
-                    and type(order.get("pr_number")) is int
-                    and order["pr_number"] >= 0
-                    and "source_sha" in order,
-                    "WORK_ORDER_RESUME_SCOPE_DENIED")
-        else:
-            require(capability == "codex-workspace" and
-                    set(order) <= (base - {"scope"}) | optional_ref |
-                    {"monitor_summary", "codex_execution"} and
-                    ("codex_execution" not in order or
-                     order["codex_execution"] == "guarded-hardware-no-sandbox"),
-                    "WORK_ORDER_PATH3_FIELDS_DENIED")
-        require(capability == "codex-workspace",
+        require(capability == "codex-workspace" and
+                set(order) <= (base - {"scope"}) | optional_ref |
+                {"monitor_summary", "codex_execution"} and
+                ("codex_execution" not in order or
+                 order["codex_execution"] == "guarded-hardware-no-sandbox"),
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
     elif capability == "cpu-only" and "native_preflight" in order:
         # Existing Path 2 task_id and Runner. No candidate scripts, shell,
@@ -325,13 +310,15 @@ def parse_dynamic_work_order(event: object) -> dict:
                 1 <= timeout_seconds <= 1800,
                 "WORK_ORDER_OPERATOR_CLI_TIMEOUT_DENIED")
     elif capability == "vivado-host-build":
-        # Development Mode uses the same fixed Site 1 host-only build engine.
-        # No arbitrary project, shell, Tcl driver, stage or hardware authority.
+        # Admission accepts a pinned project path from trusted main or an
+        # exact PR HEAD. The selected driver still proves its project contract.
         require(path == "path2-cli" and scope in (None, "host-only")
                 and {"project", "toolchain", "board_repo_sha"} <= set(order)
                 and set(order) <= base | optional_ref |
                 {"project", "toolchain", "board_repo_sha", "monitor_summary"}
-                and order["project"] == "pl/projects/z2-fixed-unified-site1"
+                and type(order["project"]) is str
+                and re.fullmatch(r"pl/projects/[a-z0-9-]{3,70}",
+                                 order["project"]) is not None
                 and order["toolchain"] == "2026.1"
                 and type(order["board_repo_sha"]) is str
                 and SHA40.fullmatch(order["board_repo_sha"]) is not None,
@@ -350,12 +337,6 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(type(order.get("source_sha")) is str and
                 SHA40.fullmatch(order["source_sha"]) is not None,
                 "WORK_ORDER_NATIVE_MAIN_SHA_REQUIRED")
-    elif order.get("session_resume") == "page-boundary-off-by-one":
-        # Exception for this exact CPU-only post-merge diagnostic only.
-        # Main pinning is checked against trusted GITHUB_SHA by request().
-        require(type(order.get("source_sha")) is str and
-                SHA40.fullmatch(order["source_sha"]) is not None,
-                "WORK_ORDER_RESUME_MAIN_SHA_REQUIRED")
     else:
         require("source_sha" not in order,
                 "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED")
@@ -402,8 +383,6 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         elif order["capability"] == "operator-cli":
             task["verification"] = "exit-code"
             task["timeout_seconds"] = order.get("timeout_seconds", 600)
-    if "session_resume" in order:
-        task["session_resume"] = order["session_resume"]
     if "native_preflight" in order:
         task["native_preflight"] = order["native_preflight"]
     for key in ("script", "argv", "expected_stdout_sha256",
@@ -450,11 +429,6 @@ def request(event: object, context: dict) -> dict:
                 order["pr_number"] == 0):
             require(order["source_sha"] == sha,
                     "WORK_ORDER_NATIVE_MAIN_SHA_MISMATCH")
-        if (order.get("session_resume") == "page-boundary-off-by-one" and
-                order["pr_number"] == 0):
-            # Never admit a different main commit, branch or omitted pin.
-            require(order["source_sha"] == sha,
-                    "WORK_ORDER_RESUME_MAIN_SHA_MISMATCH")
         return {
             "task_id": DYNAMIC_TASKS[order["execution_path"]],
             "auto_download_after_build_success": False,
@@ -465,8 +439,6 @@ def request(event: object, context: dict) -> dict:
             "comment_id": comment["id"],
             "issue_number": ISSUE,
             "work_order_sha256": work_order_digest(order),
-            **({"session_resume": order["session_resume"]}
-               if "session_resume" in order else {}),
         }
     require(len(body) <= 200, "COMMAND_DENIED")
     branch_match = BRANCH_COMMAND.fullmatch(body)
@@ -478,10 +450,8 @@ def request(event: object, context: dict) -> dict:
     flags = match.group("flags") or ""
     auto_download = " --auto-download" in flags
     auto_testing = " --auto-testing" in flags
-    require(not auto_download or task_id == "z2-path2-build",
-            "PATH2_AUTO_DOWNLOAD_TASK_DENIED")
-    require(not auto_testing or task_id == "z2-path2-build",
-        "PATH2_AUTO_TEST_TASK_DENIED")
+    require(not auto_download and not auto_testing,
+            "RETIRED_PATH2_AUTO_STAGE_FLAGS")
     return {
         "task_id": task_id,
         "auto_download_after_build_success": auto_download,
@@ -600,8 +570,8 @@ def authorize(event: object, context: dict, registry: object,
 def reviewed_host_build_driver(*, workspace: Path, approval: dict):
     """Use trusted main for main builds, an exact owner-pinned PR driver otherwise.
 
-    The trusted dispatcher owns all authorization; this capability is limited
-    to the fixed Vivado host build, never generic candidate Python execution.
+    The trusted dispatcher owns all authorization; the exact PR candidate
+    driver must independently qualify its project contract and host artifacts.
     """
     if approval["pr_number"] == 0:
         import plasma_vivado_host_build as build
@@ -627,9 +597,7 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(type(approval) is dict and
                 approval.get("execution_capability") == "vivado-host-build" and
                 approval.get("execution_path") == "path2-cli" and
-                approval.get("task_id") in (
-                    "fixed-site1-vivado-host-build", "z2-path2-build",
-                    DYNAMIC_TASKS["path2-cli"]) and
+                approval.get("task_id") == DYNAMIC_TASKS["path2-cli"] and
                 type(approval.get("pinned_sha")) is str and
                 SHA40.fullmatch(approval["pinned_sha"]) is not None and
                 type(approval.get("trusted_sha")) is str and
@@ -641,8 +609,7 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                   approval["pinned_sha"] != approval["trusted_sha"])),
                 "HOST_BUILD_APPROVAL_REQUIRED")
         if approval["task_id"] == DYNAMIC_TASKS["path2-cli"]:
-            # Project the authenticated Work Order to the existing fixed
-            # five-field Build Engine contract; do not relax its preflight.
+            # Project the authenticated Work Order to the host build engine.
             require(type(task) is dict and
                     set(task) >= {"execution_path", "capability", "objective",
                                   "acceptance", "work_order_sha256",
@@ -655,7 +622,9 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                     task["execution_path"] == "path2-cli" and
                     task["capability"] == "vivado-host-build" and
                     task["work_order_scope"] == "host-only" and
-                    task["project"] == "pl/projects/z2-fixed-unified-site1" and
+                    type(task["project"]) is str and
+                    re.fullmatch(r"pl/projects/[a-z0-9-]{3,70}",
+                                 task["project"]) is not None and
                     task["toolchain"] == "2026.1" and
                     type(task["board_repo_sha"]) is str and
                     SHA40.fullmatch(task["board_repo_sha"]) is not None and
@@ -670,21 +639,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
             task = {key: task[key] for key in (
                 "execution_path", "capability", "project", "toolchain",
                 "board_repo_sha")}
-        # A request requiring an unregistered live Download provider must
-        # fail before importing candidate Build code or starting Vivado.
-        if (approval["task_id"] == "z2-path2-build" and
-                approval.get("auto_download_after_build_success") is True):
-            raise Denied("PATH2_LIVE_DOWNLOAD_PROVIDER_NOT_REGISTERED")
         build = reviewed_host_build_driver(workspace=workspace,
                                            approval=approval)
-        if approval["task_id"] == "z2-path2-build":
-            import plasma_path2_runtime_integration as integration
-            return integration.host_build(
-                task, workspace=workspace, approval=approval,
-                evidence_dir=evidence_dir,
-                build_driver=lambda _ctx: build.run(
-                    task, workspace=workspace, approval=approval,
-                    evidence_dir=evidence_dir, executor=executor))
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "z2-root-operation":
@@ -1340,9 +1296,7 @@ def run_licensed_f1b_task(task: dict, *, workspace: Path, req: dict) -> dict:
         source = build.authenticate_host_inputs(workspace, req["source_sha"])
         with (evidence / "host-input-authentication.json").open("x") as stream:
             stream.write(json.dumps(source, indent=2, sort_keys=True) + "\n")
-        fixed = parse_json(ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
-                           )["tasks"]["fixed-site1-vivado-host-build"]
-        fixed = dict(fixed, execution_path="path3-codex")
+        fixed = dict(F1_PATH3_HOST_BUILD)
         approval = {"execution_path": "path3-codex",
                     "execution_capability": "vivado-host-build",
                     "task_id": req["task_id"], "pr_number": req["pr_number"],
@@ -1394,19 +1348,31 @@ def safe_error_reason(exc: Exception) -> str:
 
 
 def live_pr_metadata(req: dict) -> dict | None:
-    """Worker independently queries GitHub; never trust a cached admission snapshot."""
+    """Worker independently rechecks public GitHub PR over authenticated TLS.
+
+    Do NOT add GH_TOKEN/GITHUB_TOKEN to the SWPC candidate execution job:
+    candidate PR Python runs as the same non-root user and must not inherit or
+    recover GitHub credentials through parent-process environment or /proc.
+    This repository's PR metadata is public. A 403/404/network/rate-limit
+    denial fails closed; the earlier hosted authorization is NOT a fallback.
+    """
     if not req["pr_number"]:
         return None
     try:
-        result = subprocess.run(
-            ["gh", "api", f"repos/{REPO}/pulls/{req['pr_number']}"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            check=True, timeout=15)
-        require(len(result.stdout) <= 262144, "LIVE_PR_RESPONSE_TOO_LARGE")
-        pr = json.loads(result.stdout)
+        url = f"https://api.github.com/repos/{REPO}/pulls/{req['pr_number']}"
+        request = Request(url, headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "PLASMA-SWPC-PR-Admission",
+            "X-GitHub-Api-Version": "2022-11-28",
+        })
+        with urlopen(request, timeout=15) as response:
+            require(response.status == 200, "LIVE_PR_HTTP_STATUS_DENIED")
+            body = response.read(262145)
+        require(len(body) <= 262144, "LIVE_PR_RESPONSE_TOO_LARGE")
+        pr = json.loads(body)
         verify_pr(pr, req)
         return pr
-    except (OSError, ValueError, subprocess.SubprocessError):
+    except (OSError, HTTPError, URLError, TimeoutError, ValueError):
         raise Denied("LIVE_PR_VERIFICATION_FAILED") from None
 
 
@@ -1424,7 +1390,6 @@ def main() -> int:
     parser.add_argument("--registry-sha256")
     parser.add_argument("--work-order-sha256")
     parser.add_argument("--execution-capability")
-    parser.add_argument("--resume-phase", choices=("new", "resume"))
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args()
@@ -1464,8 +1429,7 @@ def main() -> int:
                             os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER and
                             os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted" and
                             task["capability"] == "cpu-only" and
-                            task["work_order_scope"] == "host-only" and
-                            args.resume_phase is None,
+                            task["work_order_scope"] == "host-only",
                             "NATIVE_PREFLIGHT_WORKER_DENIED")
                     import plasma_codex_native_preflight as native
                     try:
@@ -1492,21 +1456,6 @@ def main() -> int:
                             "provenance": "NOT_INDEPENDENTLY_VERIFIED",
                             "sha256_pin_authorized": False,
                         }
-                # This exact CPU-only fixture is the ONLY cross-Job route.
-                # Unflagged Path 3 retains its existing single-exec behavior.
-                elif task.get("session_resume") or args.resume_phase:
-                    require(args.action == "execute-codex" and
-                            task.get("session_resume") == "page-boundary-off-by-one"
-                            and args.resume_phase in ("new", "resume"),
-                            "RESUME_EXPLICIT_PHASE_DENIED")
-                    import plasma_path3_cross_job_resume as crossjob
-                    try:
-                        receipt = crossjob.execute(
-                            args.resume_phase,
-                            {**req, "execution_path": task["execution_path"]},
-                            args.workspace)
-                    except crossjob.ResumeDenied as exc:
-                        raise Denied(str(exc)) from None
                 else:
                     receipt = (
                         (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
@@ -1529,10 +1478,7 @@ def main() -> int:
                 }
                 task_failed = (
                     (args.action == "execute-codex"
-                     and receipt.get("status") != (
-                         "NEW_EXPECTED_TEST_FAIL" if args.resume_phase == "new"
-                         else "RESUME_FIX_PASS" if args.resume_phase == "resume"
-                         else "EVIDENCE_READY_REVIEW_REQUIRED"))
+                     and receipt.get("status") != "EVIDENCE_READY_REVIEW_REQUIRED")
                     or (task.get("native_preflight") == NATIVE_PREFLIGHT
                         and receipt.get("status") != "OBSERVED")
                 )

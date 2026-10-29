@@ -1,6 +1,30 @@
-# PYNQ-Z2 two independent AXI SWD Sites — Gate 1 source-only
+# PYNQ-Z2 two independent AXI SWD Sites — Gate 1 Host Build candidate
 
 **Approved architecture:** [ADR-0006](../../../docs/adr/0006-independent-swd-engine-and-future-gpio-bus.md) (supersedes ADR-0005). **Build standard:** [ADR-0004](../../../docs/adr/0004-project-isolated-fpga-build-path2-operator-cli.md).
+
+## Common Path 2 Vivado Host Build (PR #1189 Gate 1 continuation)
+
+The project owns `host-build.json` for the merged generic `vivado-host-build`
+capability. An Owner/SHA-pinned Issue #981 Work Order selects
+`pl/projects/z2-swd-independent` and Vivado `2026.1` with an exact PYNQ-Z2
+Board Files SHA. The trusted existing Dispatcher/Runner verifies the source,
+project contract and board provenance; no separate SWD build Dispatcher,
+Stage, Runner or Workflow is required. The existing historical
+`operator-cli` SWD build evidence remains valid **only for its recorded SHA**.
+
+`build_bitstream.tcl` emits the exact generic success marker only after actual
+synthesis, implementation, constrained-path slack/DRC and artifact production.
+`verify_hwh.py` implements the generic `verify_artifacts(..., build=...)`
+interface while retaining the original standalone CLI. Both paths require
+exact Site1/Site2 AXI regions, four Pmod pads, XDC, BIT/HWH and seven routed
+reports, including `check_timing`, `datasheet_io` and `io_pad_configuration`.
+The receipt includes those hashes and the explicitly **unqualified** off-board
+SWD timing result. `TIMING-18` (historically 2 missing input delays and 4
+missing output delays) is never silently waived or transformed into HIL PASS.
+
+The generic result is `HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED`; it is not
+a deployable FPGA Image or permission to load a bitstream. Z2, FPGA Manager,
+actual PS MMIO, OpenOCD, DUT and physical HIL remain `NOT_RUN` in this Gate.
 
 **State (2026-10-27):** `INDEPENDENT_SITE_AXI_RTL_HOST_SIM_PASS` for the *prior* SHA-pinned Host Build; new FIFO/IRQ/SWJ RTL on PR #1189 requires exact-new-HEAD CI and Vivado revalidation. The previous `SWPC_VIVADO_HOST_BUILD_PASS` and `BIT_HWH_HASHES_VERIFIED` do **not** qualify the updated RTL. **EXTERNAL_IO_TIMING_BLOCKED (2 input + 4 output TIMING-18), Z2_HIL_NOT_RUN, OPENOCD_NATIVE_ADAPTER_NOT_IMPLEMENTED**. This is **not a qualified deployable Image or programming-ready controller**. See [external-timing-audit.md](external-timing-audit.md).
 

@@ -24,6 +24,11 @@ SHA = "a" * 40
 BIT = "b" * 64
 HWH = "c" * 64
 EVIDENCE = "d" * 64
+HISTORICAL_F1_TASK = {
+    "execution_path": "path2-cli", "capability": "vivado-host-build",
+    "project": "pl/projects/z2-fixed-unified-site1", "toolchain": "2026.1",
+    "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07",
+}
 
 
 def approval(task_id="z2-path2-build", **changes):
@@ -72,7 +77,7 @@ class RouteContracts(unittest.TestCase):
         })
         with tempfile.TemporaryDirectory() as td:
             result = runtime.host_build(
-                self.registry["tasks"]["z2-path2-build"],
+                HISTORICAL_F1_TASK,
                 workspace=Path(td), approval=approval(),
                 evidence_dir=Path(td), build_driver=build,
                 qualify=decision)
@@ -89,7 +94,7 @@ class RouteContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             no_qual = runtime.host_build
             with self.assertRaisesRegex(Exception, "VIVADO_BUILD_EVIDENCE_NOT_QUALIFIED"):
-                no_qual(self.registry["tasks"]["z2-path2-build"],
+                no_qual(HISTORICAL_F1_TASK,
                         workspace=Path(td), approval=approval(),
                         evidence_dir=Path(td),
                         build_driver=lambda _: {"status": "PASS"},
@@ -102,7 +107,7 @@ class RouteContracts(unittest.TestCase):
         self.assertIn('"operator-cli"', wf)
         self.assertIn("github.run_attempt == 1", wf)
         self.assertIn("scripts/tests/test_plasma_path2_runtime_integration.py", wf)
-        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+        self.assertEqual(wf.count("runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
 
 
     def evidence(self, td):

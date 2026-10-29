@@ -1,5 +1,13 @@
 # Path 2 capability policy — reviewed fixed host builds
 
+> **Historical F1-B build record.** Status statements and fixed Registry
+> examples below describe their dated Gate 1/PR, not the current dynamic
+> Path 2 build contract. Current dynamic admission accepts trusted event
+> `main` or an exact open PR HEAD for `pl/projects/<name>`; successful execution requires a
+> reviewed project build contract and artifact/HWH verifier. The former
+> fixed F1-B Registry Build tasks have been retired; examples below are not
+> live commands. F1-B now has a project-owned `host-build.json` contract.
+
 Path 2 is a **fixed CLI execution mechanism**. It is not conceptually tied to
 `cpu-only` and a Python-only `scripts/experiments/*.py` script.
 
@@ -28,8 +36,9 @@ programming commands, MMIO, Z2 SSH, DUT, LA, power or deployment are
 permitted. Output receipts and timing/report checks are candidate evidence,
 not proof of a real FPGA image being loaded or identity provenance.
 
-The manifest entry `fixed-site1-vivado-host-build` is the reusable typed
-project definition and *not* a second Work Order system.
+The historical manifest entry `fixed-site1-vivado-host-build` was a typed
+Project definition, not a second Work Order system. It is no longer in the
+live registry; use the dynamic Path 2 `vivado-host-build` Work Order.
 
 **Gate 1:** GitHub CI is not a substitute for the actual SWPC Host Build.
 Run the reviewed, fixed PR SHA on the existing Path 2 Runner after explicit

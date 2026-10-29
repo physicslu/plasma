@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[3]
 LA = ROOT / "docs/development/la2016-tool-operations.md"
 ST = ROOT / "docs/development/stlink-swd-tool-operations.md"
 AGENTS = ROOT / "AGENTS.md"
+DIRECT = ROOT / "docs/development/plasma-path3-direct-hardware-tools.md"
 PIN = "b551cb26e8bd3261bb650fac98e62b70a6786f7f5521d62e86bc7e30cebf4475"
 
 
@@ -40,6 +41,45 @@ class La2016NativeAccessContracts(unittest.TestCase):
         self.assertIn("Root Guard", doc)
         self.assertIn("Z2 FPGA Image/Manifest", doc)
 
+    def test_direct_codex_uses_native_busy_without_extra_probe(self):
+        runbook = LA.read_text(encoding="utf-8")
+        direct = DIRECT.read_text(encoding="utf-8")
+        for content in (runbook, direct):
+            self.assertIn("DEVICE_BUSY", content)
+            self.assertIn("RUNTIME_FAIL", content)
+            self.assertNotIn("LA_LOCK_PATH=", content)
+            self.assertNotIn("LA_LOCK_FD", content)
+            self.assertNotIn("flock -x -n", content)
+            self.assertNotIn("subprocess.run(['fuser'", content)
+            self.assertNotIn("LA_USB_BUSY_OR_OWNER_UNCERTAIN", content)
+        self.assertIn("native Driver Open/Claim", direct)
+        self.assertIn("No intermediary hardware JSON command translation", direct)
+        self.assertNotIn("and existing `SIGROK_FIRMWARE_PATH`/firmware resources", direct)
+
+    def test_usb_identity_acl_and_safe_close_are_still_required(self):
+        runbook = LA.read_text(encoding="utf-8")
+        direct = DIRECT.read_text(encoding="utf-8")
+        for text in ("77a1", "01a2", "LA_USB_DAC_DENIED",
+                     "os.access(node, os.R_OK | os.W_OK)"):
+            self.assertIn(text, runbook)
+        self.assertIn("SHA256", direct)
+        self.assertIn("RW DAC/ACL", direct)
+        self.assertIn("normal USB close", direct)
+        self.assertIn("Native concurrency rejection has **not** been physically requalified", direct)
+
+
+    def test_native_busy_coexists_with_reusable_owner_electrical_evidence(self):
+        """PR #1192 must preserve PR #1194's passive-input safety contract."""
+        for path in (LA, DIRECT):
+            with self.subTest(path=path.name):
+                doc = path.read_text(encoding="utf-8")
+                self.assertIn("DEVICE_BUSY", doc)
+                self.assertIn("OWNER_ELECTRICAL_ATTESTATION_REUSE", doc)
+                self.assertIn("不要求每次", doc)
+                self.assertIn("Linux DAC/ACL", doc)
+                self.assertNotIn("LA_LOCK_PATH=", doc)
+                self.assertNotIn("flock -x -n", doc)
+        self.assertIn("真實電氣危險", DIRECT.read_text(encoding="utf-8"))
 
 if __name__ == "__main__":
     unittest.main()

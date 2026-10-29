@@ -1,0 +1,29 @@
+{
+  "duration_s": 30.002381,
+  "edge_counts_CH0_CH1_CH2_CH3": [
+    2,
+    0,
+    0,
+    0
+  ],
+  "first_edge_sample_indices_CH0_CH1_CH2_CH3": [
+    [
+      5164661,
+      6165135
+    ],
+    [],
+    [],
+    []
+  ],
+  "la_exit": 0,
+  "la_started_before_remote_trigger": true,
+  "logic_chunks": 15,
+  "remote_exit": 0,
+  "sample_count": 30002381,
+  "sample_rate_hz": 1000000,
+  "states_ch3_ch2_ch1_ch0": {
+    "6": 29001907,
+    "7": 1000474
+  },
+  "wave_sha256": "e9412e4bfdaa4de5d622c1090518327b943bd53b1c5d1cb438f07a8384f34713"
+}

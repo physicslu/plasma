@@ -1,6 +1,6 @@
 # Source-controlled, independent Site1+Site2 SWD IP Vivado build.
-# Invoke ONLY via an owner-approved, SHA-pinned Path 2 operator-cli Python
-# entrypoint on SWPC. This Tcl does not access PS/Z2/DUT/FPGA Manager.
+# Invoke ONLY via an owner-approved, SHA-pinned Path 2 vivado-host-build
+# project contract on SWPC. This Tcl does not access PS/Z2/DUT/FPGA Manager.
 # Gate 1 candidate: no real Vivado execution or timing PASS is claimed.
 set script_dir [file dirname [file normalize [info script]]]
 if {![info exists ::env(PLASMA_SWD_BUILD)] || $::env(PLASMA_SWD_BUILD) eq ""} {
@@ -78,4 +78,7 @@ if {[llength $blocking_methodology] > 0} {
 # be reviewed. This source has not been validated by actual Vivado yet.
 puts "SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS setup=$setup_slack hold=$hold_slack"
 puts "SWD_HOST_BUILD_SOURCE_ONLY_REVIEW_REQUIRED setup=$setup_slack hold=$hold_slack"
+# Exact-line contract marker for the generic Path 2 build. It certifies
+# artifact availability for independent review, NOT off-board SWD timing.
+puts "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED"
 puts "SWD_NO_AUTOMATIC_DOWNLOAD_OR_DUT_OPERATION"

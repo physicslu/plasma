@@ -1,0 +1,14 @@
+{
+  "schema": "plasma.vivado-host-project.v1",
+  "vivado_project": "z2_fixed_unified_site1",
+  "build_env": "PLASMA_F1_BUILD",
+  "success_marker": "FIXED_F1_BITSTREAM_BUILD_PASS_HOST_ONLY_NOT_Z2",
+  "reports": [
+    "timing_summary.rpt",
+    "drc.rpt",
+    "methodology.rpt",
+    "utilization.rpt",
+    "check_timing.rpt"
+  ],
+  "prepare_artifact": false
+}

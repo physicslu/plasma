@@ -11,6 +11,10 @@
 | **Plan** | 尚未全部實作的核准方向；不能宣稱為現有能力。 |
 | **Historical** | 僅供遷移背景；不是相容性或執行契約。 |
 
+## 跨廠牌燒錄預設安全政策
+
+- **Current design default / 部分實作** — [Target Execution and Interrupt Isolation](architecture/programming-interrupt-isolation-policy.md)：所有 IC 的破壞性 Erase/Program 前預設須驗證目標執行隔離；具中斷的 MCU 必須採用符合 Provider 的中斷遮罩或等效策略，無 CPU／ROM ISP 則須提出適用性或例外證據。現有實機驗證僅及於 STM32F103C8T6 Z2 Site 1，其他 Provider 的 Runtime Gate 仍待實作。
+
 ## Current external SWD PoC vs retired internal fixtures
 
 - **Current** — Z2 PS-local OpenOCD + WordPort/RemoteBitbang + paired PL SWD Image for Blue Pill: see root `AGENTS.md`, [PS OpenOCD architecture](architecture/ic-support-openocd-plan-executor.md), [retirement map](development/swd-legacy-path-retirement.md).
@@ -35,17 +39,29 @@
 
 ## Engineering governance and execution paths
 
-- **Current / PR #1167 merged, Issue #1168 F1-B HIL PASS** — [Path 2 受保護 Z2 Root Entry](development/path2-generic-fpga-image-loader.md)：沿用可信 Dispatcher、SWPC SSH／sudo Transport 與既有兩參數 `operation + source_sha` Root Entry；Entry 固定呼叫 `pl.hil.fpga_image_root`，不再使用 Stage/Profile。實機驗收僅涵蓋 Site 1 F1-B Download／Identity Test／Golden Restore，不代表 Blue Pill Flash 或其他 Programmer IP 通過。
+- **Gate 1 Draft / Host-only / PR #1202** — [Root Guard 燒錄 Session 與 FPGA Configuration 准入分離](development/root-guard-runtime-program-split-2026-10-29.md)：正常燒錄取消全系統 `/proc` FD／VMA 完整掃描，保留裝置限定 `fuser`、全域 FPGA 鎖、Image／Boot／UIO Guard；FPGA Download／Test／Restore 持續嚴格掃描。尚未部署、合併或實機驗收，亦非八通道 Broker 已完成。
 
-- **Historical Gate 1 offline test / current guarded route separate** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；當前受控執行路徑改由已註冊的可信 Stage Transport 與 Z2 Root SHA256 Manifest 保護。每次實機操作仍須獨立核對授權、映像 Hash、AXI 與 Recovery 證據。\n
 
-- **Historical offline coordinator contract** — [Path 2 Three-Stage Build / Download / Testing Coordinator](architecture/plasma-path2-three-stage-gate1.md)：記錄 Build、Download、Testing 獨立 Trigger、兩段預設關閉的自動銜接與離線 Adapter／Receipt 測試；當前硬體權限取決於獨立受控 Dispatcher／Stage Transport 與 Work Order 授權，不由 Orchestrator 測試授予。
+
+- **Current / Path 2 guarded-hardware operator-cli** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：現行 Path 2 通用硬體 Work Order 使用 `capability: operator-cli`、`scope: guarded-hardware`、來源 SHA 綁定的 Python `script`、`argv` 與受限 `timeout_seconds`；在非 Root SWPC Runner 執行，不自動取得 sudo／Root 權限。Exit 69／77 是失敗的 NOT_RUN，Exit 0 僅為待審證據。CPU-only／Vivado Host Build 為各自獨立能力。
+- **Path 2 dynamic Vivado Host Build / PR #1210** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：工作單使用可信事件的 `main` 來源，或綁定開放 PR 精確 HEAD；專案建置契約與驗證器經真實 SWPC Path 2 建置驗收 `z2-identity`、`z2-control-waveform`。此能力只建置，不下載 FPGA 或操作 Z2；實際 `main` 狀態以 PR 是否合併為準。
+- **Historical / retired z2-root-operation Work Order; F1-B #1168 evidence** — [Path 2 受保護 Z2 Root Entry 歷史契約](development/path2-generic-fpga-image-loader.md)：舊 Dispatcher 固定 `download|test|restore` Work Order 已退役，現行 Dispatcher 明確拒絕；獨立兩參數 Protected Root Entry／底層 Transport 與來源、互斥、復原守衛仍保留。#1168 實機 PASS 僅涵蓋當時 Site 1 F1-B，不能推導 Blue Pill／其他 Programmer IP／八 Site 資格。
+
+- **Historical Gate 1 offline provider integration** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；Stage Transport／Protected Root Entry 為保留的底層受保護工具，不是現行 Path 2 Dispatcher 的 `z2-root-operation` Capability。實際硬體使用 `operator-cli` 時仍須逐次核對授權、映像 Hash、所有權及 Recovery 證據。
+
+- **Historical offline coordinator contract** — [Path 2 Three-Stage Build / Download / Testing Coordinator](architecture/plasma-path2-three-stage-gate1.md)：記錄舊 Build／Download／Testing 獨立 Trigger、自動銜接與離線 Adapter／Receipt 測試；現行通用 Path 2 硬體入口為 `operator-cli`，不會自動進入舊 Coordinator／Stage Transport。底層 Protected Root 權限與復原條件仍須獨立成立。
 
 - **Current after Gate 2 / Owner-approved Gate 1 design** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：Gate 1 由 ChatGPT 推薦並讓使用者選擇 Path 1（ChatGPT Direct Work）、Path 2（SWPC CLI Work）或 Path 3（SWPC Codex Work）；批准後在明確授權內自動執行，PR 準備妥當才請求 Gate 2 合併。包含三套流程圖、角色分工、Github Actions Dispatch 前提、證據／資安邊界與不需 PR 的純驗證任務。**這是規範，不代表通用 SWPC Dispatcher 已啟用或授權硬體操作。**
 
 - **Current / Development Mode** — [Three Shared BLOCKING Decisions](development/development-blocking-policy.md)：Path 2／Path 3 共用授權與來源、Z2 實機安全／復原、真實回執三個核心阻擋邊界；移除重複檢查，但不繞過裝置安全條件。
 
 ## Architecture and contracts
+- **Gate 1 / Path 1 / Draft / Host-only** — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
+- **Gate 1 / Path 1 / Host-only / Draft** — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。
+- **Gate 1 / Path 1 / Host-only / Product policy candidate** — [PPU Z2 Monitor/Master/Engineer Privilege Boundary](architecture/ppu-privilege-boundary-gate1.md)：PPU 三級產品能力、Master 非 Linux Root 操作與部署、Engineer Root 維修、特權 Bridge 的預期邊界；僅 Host-only policy／tests，尚未接入 Runtime／Z2。
+- **Gate 1 / Path 1 / Source audit** — [Z2 Root Guard Rule Necessity Audit](development/z2-root-guard-rule-audit-gate1.md)：逐項核對 Root Guard、Source Pin、UIO／MMIO Owner、/proc 掃描、PPU Reload Fence、Job Lease 與 UNCERTAIN，標明必要保留、維護專用、重複候選及尚未合併的 Draft；本次不刪除受保護程式。
+
+
 
 - **Gate 1 Draft / Host-only / NOT_DEPLOYED** — [SWD NORMAL OpenOCD/ARMv7 Boundary](architecture/swd-normal-openocd-armv7-gate1.md)：新增獨立 Site NORMAL 的交易轉接契約與注入式 32-bit MMIO Window、負向測試；未實作真正 OpenOCD C Adapter／ARMv7 LDR/STR，也沒有新 Vivado／Z2／DUT 驗收。
 
@@ -148,18 +164,20 @@
 
 - **Development Mode / SWPC Monitor；實際工作執行驗收須逐次舉證** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。既有監看畫面可顯示兩個 Path，不代表已驗證特定 GitHub Run 的完整即時觀察；須以受授權工作的 Run ID、Log 與 Exit Code 個別確認 PASS／FAIL／NOT_RUN。本條目不設定 Path 3 的 Host-only 前置條件，也不授權部署或硬體操作。
 - **Gate 1 / RCA archival closure (PR pending Gate 2)** — [PLASMA Path 3 Token Optimization RCA Closure](development/plasma-path3-token-optimization-rca-closure-2026-10-23.md)：固定 PR #1128 與兩次 SWPC 9×9 Run ID、Token/時間/81 成功率、Artifact SHA-256 與尚未完成的模型／Effort 因果歸因；Repo-first 工作流 DONE，逐請求 Token Attribution 保留低優先級技術債。
-- **Gate 1 / Draft / Native Codex read-only bootstrap, SWPC NOT_RUN** — [Codex Native Read-only Preflight](development/plasma-codex-native-preflight.md)：沿用 Issue #981 與既有 Path 2 Dispatcher/Runner，新增固定 main-pinned、無模型 Session 的 Native ELF／SHA-256 唯讀盤點入口；未合併、未派工，不代表 PR #1135 已解阻。\n- **Gate 1 / Cross-Job Resume Candidate, SWPC NOT_RUN** — [Path 3 Cross-Job Resume Gate 1](development/plasma-path3-cross-job-resume-gate1.md)：沿用 Issue #981、既有 Dispatcher/Workflow/Runner，建立 CPU-only 雙 Job Resume 候選契約與負向測試；真實 SWPC 跨 Job 驗收尚未執行，不代表可合併或部署。
-- **Gate 1 / CPU-only Path 3 Session Resume PoC (real Direct CLI Owner-reported PASS)** — [Path 3 Controlled Session Resume Host-only PoC](development/plasma-path3-session-resume-host-only-poc.md)：Fake Codex 離線測試 PASS；Owner 另於 SWPC 非特權隔離 Worktree 執行真實兩程序 NEW → FAIL → RESUME → PASS（同 Thread ID、專屬挑戰與修復驗證）；跨 GitHub Job 的正式 Path 3 Resume 仍 NOT_IMPLEMENTED／NOT_RUN。
+- **Gate 1 / Draft / Native Codex read-only bootstrap, SWPC NOT_RUN** — [Codex Native Read-only Preflight](development/plasma-codex-native-preflight.md)：沿用 Issue #981 與既有 Path 2 Dispatcher/Runner，新增固定 main-pinned、無模型 Session 的 Native ELF／SHA-256 唯讀盤點入口；未合併、未派工，不代表 PR #1135 已解阻。
+- **Historical / RETIRED after PR #1181 / Cross-Job Resume** — [Path 3 Cross-Job Resume historical Gate 1](development/plasma-path3-cross-job-resume-gate1.md)：舊 CPU-only 雙 Job Resume 的來源與未執行 SWPC 跨 Job 驗收記錄；`session_resume`、第二個 Job 與 Runtime Adapter 已刪除，不是現行 Dispatcher 契約。
+- **Historical / OFFLINE FIXTURE ONLY / Session Resume PoC** — [Path 3 Session Resume Host-only PoC](development/plasma-path3-session-resume-host-only-poc.md)：保留 Fake Codex 離線單元測試與 Owner-reported 兩程序試驗紀錄；獨立 Probe 不在 Path 3 Runtime 呼叫鏈上，且不授權 SWPC 或任何硬體操作。
 - **Path 3 Repo-first instruction optimization / full normative reference** — [PLASMA Detailed Autonomous Development Contract](development/plasma-autonomous-development-contract-full.md)：完整保留原根目錄 AGENTS.md 的詳細規範；目前根目錄 AGENTS.md 為低於 Codex 預設 32 KiB 專案指令上限的精簡入口。針對實際任務按需讀取此完整條款，不代表 SWPC 已驗證載入來源或 Token 效率改善。
 - **Gate 1 / Local-only Tool; Desktop Telemetry NOT_RUN** — [Codex Desktop vs Path 3 Token Usage Benchmark](development/codex-benchmark-usage.md)：針對 2026-10-22 9×9 測試，提供僅讀取指定本機 Session JSONL 的 Token 統計工具，區分單次 Turn、累計快照與 Path 3 Codex exec 用量；GitHub-hosted CI 使用合成資料，不代表已讀取 Mac Desktop 真實 Session，也不授權 SWPC、Z2 或 DUT。
 
-- **Historical Gate 1 offline integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：記錄當時的 Host-side Build Qualification、離線 F1-B Adapter／Lease 測試；目前有獨立的受控 Stage Transport。每次 Build／Download／Testing 仍須通過固定 Work Order SHA、映像 Hash、Sandbox 及硬體授權檢查。\n\n- **Historical offline Lease/Restore contract** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：原始 Gate 1 以離線測試建立 Loaded State、Lease、Restore Intent、Timeout、不可盲目重試及 Testing 重入安全契約；是否執行實機操作由當前受控路徑與逐次授權決定。
+- **Historical Gate 1 offline integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：記錄當時的 F1-B Host Build Qualification 與離線 Adapter／Lease 測試；文內舊 Download／Testing task ID 不是現行 Dispatcher 指令。
+- **Historical offline Lease/Restore contract** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：原始 Gate 1 以離線測試建立 Loaded State、Lease、Restore Intent、Timeout、不可盲目重試及 Testing 重入安全契約；是否執行實機操作由當前受控路徑與逐次授權決定。
 
-- **Historical offline F1-B Adapter contract** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：原始 Gate 1 驗證 Vivado host-side Build、Hardware Profile、Supervisor、Test Callback 與離線 Mock／Schema 契約；當前受控 Stage Transport 的授權與證據檢查獨立成立。
+- **Historical offline F1-B Adapter contract** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：原始 Gate 1 驗證 Vivado host-side Build、Hardware Profile、Supervisor、Test Callback 與離線 Mock／Schema 契約；不是現行通用硬體 Work Order 的必要 Stage。
 
 - **Historical / Real Z2 Development PASS; AXI isolation UNPROVEN** — [F1-B Path 3 2026-10-20 Evidence](development/plasma-f1b-path3-39395142726-evidence.md)：紀錄 Run #39395142726 真實 FPGA Manager 單次 Load、三個 Identity readback、原始 base.bin Restore 的證據與開發風險邊界；不屬量產驗證。
-- **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留 Codex 真實執行命令順序、故障修正與證據，供 Path 2 未來 Build／Download／Testing 獨立 Trigger 及可選階段銜接參考；不得直接重放一次性實機風險特例。
-- **Path 2 guarded Z2 execution / historical handoff** — [Path 2 F1-B Z2 Three-stage Execution Handoff](development/plasma-path2-f1b-z2-execution-handoff.md)：現行可信路徑保留 Work Order 固定 SHA、映像 Hash、Z2 Root SHA256 Manifest 及 Download／Testing／Restore 逐次證據要求；歷史 NOT_RUN 不等於目前狀態，舊 Bridge/PIN 部署步驟已由受信任 Stage Transport 取代。
+- **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留當時真實執行命令、故障修正與證據；舊 Stage 串接不是現行通用 Path 2 路線，不得直接重放一次性實機風險特例。
+- **Historical F1-B Z2 handoff** — [Path 2 F1-B Z2 Three-stage Execution Handoff](development/plasma-path2-f1b-z2-execution-handoff.md)：保留當時受控執行與失敗證據；文內舊 Root 路徑和固定 Stage 指令不是現行入口。現行硬體工作仍須受授權來源、映像、所有權及復原檢查。
 
 - **Plan / Host-only** — [Runtime FPGA Driver／Switching HIL Acceptance v1](development/runtime-fpga-switching-hil-plan-v1.md)：Phase 1 唯讀盤點、Phase 2 Driver HIL、Phase 3 Fault Injection、Phase 4 A/B Switching 的逐項 PASS／NO-GO 契約。
 - **Current** — [Documentation Maintenance](development/documentation-maintenance.md)
@@ -173,10 +191,7 @@
 - **Plan / HIL smoke** — [PLASMA Codex Z2 SSH／UART Login + Live tmux](development/plasma-codex-z2-login.md)：使用現有 SWPC 專用 Runner 執行受控、限時的實機 SSH／UART 登入驗證，支援 SWPC tmux 即時監看；不公開帳密、私有位址或原始 UART 資料。
 - **Plan / HIL readiness** — [PLASMA Codex Z2 SSH-only PS/PL Readiness](development/plasma-codex-z2-readiness.md)：重用已實機通過的 SSH 通道、唯讀觀察 Z2 Linux／FPGA Manager／FCLK／UIO／Driver／服務狀態，獨立記錄尚未符合的 HIL 條件；不執行 FPGA 重載、MMIO 或 DUT 操作。
 - **Gate 1 retirement / Host-only** — [Z2 SWD-05 Legacy Dedicated Dispatch Retirement](development/plasma-z2-swd05-legacy-retirement-gate1.md)：退役 Issue #981 既有專用派工 Workflow／SWPC CLI／歷史 Route；保留 SWD-05 Linux Driver、原本受保護的 FPGA Owner Lock 與 Path 2／3 執行介面，不代表 SWPC 或 Z2 已執行清理。
-- **Gate 1 / Pending Gate 2 / Host-only** — [Nine Legacy Issue #981 Codex Trigger Retirement](development/plasma-legacy-codex-issue981-trigger-retirement.md)：僅移除 9 個舊 `/plasma-codex ... 981` Workflow 的 `issue_comment` 派工事件，保留 GitHub-hosted CI 與底層 Z2／LA2016 安全能力；PR #1154 合併前 `main` 入口仍有效，無 SWPC／硬體操作。
-- **Plan / Agent HIL acceptance** — [PLASMA Codex Agent → KINGST LA2016](development/plasma-codex-la2016.md)：Issue #981 受限 Codex 意圖請求、bubblewrap USB 隔離、PWM1→CH0 兩組波形與 OFF 實證、SHA-256 證據；僅 Gate 2 後允許實機執行。
-- **Plan / Read-only diagnostics** — [PLASMA Codex LA2016 Worker Failure Diagnostics](development/plasma-codex-la2016-diagnose.md)：Issue #981 專用 Codex Runner 的 AppImage、USB 被動存取、bubblewrap 與唯讀 Agent 請求診斷；不執行 PWM、CH0 擷取或硬體操作。
-- **Plan / Agent direct A/B (Gate 1 only)** — [PLASMA Codex Direct LA2016 Loopback](development/plasma-codex-la2016-direct.md)：將 Codex 直接操作 sigrok-cli 與既有 JSON Supervisor 對照；分離 LA-only USB 隔離、獨立 PWM OFF 以及波形驗證，尚未授權實機操作。
+- **Historical / Issue #981 legacy triggers retired** — [舊 Codex 觸發器退役紀錄](development/plasma-legacy-codex-issue981-trigger-retirement.md)：歷史 9 個 Issue 入口已停用；其中 LA2016 三條 Supervisor／Direct A/B／診斷 Workflow 連同過時腳本在 2026-10-26 移除。現行硬體工作統一使用通用 Path 3，不再恢復舊指令。
 - **Host-only reference review / M1 NO-GO** — [PPU Phase 2C: Z2 Kernel Source Lineage and AXI Isolation](architecture/ppu-phase2c-z2-kernel-source-lineage-axi-review.md)：釘選 Xilinx 2024.1 參考驅動 Git Blobs，分離 Z2 目標 Kernel/DTB 未匹配來源事實，審查 Manager 與 Region 的不同隔離路徑；不授權實機載入。
 - **Gate 1 / read-only inventory** — [Z2 Kernel/Device Tree Read-only Inventory](development/z2-kernel-dt-readonly-gate1.md)：限定唯讀 Kernel Config、Device Tree、FPGA Manager／Region／Bridge 與 UIO metadata；Host 假資料驗證與獨立 SWPC Codex 實機取證分開，M1 維持 NO-GO。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
@@ -207,7 +222,10 @@
 - **Observed / LA-only functional PASS** — [2026-10-16 KINGST PWM1 → CH0 Loopback Evidence](evidence/la2016-pwm-loopback/2026-10-16/README.md)：保存 1 kHz／50% 與 2 kHz／25% 實測波形、OFF 對照、SHA256 與離線重算工具；不代表 Z2 或類比電壓驗收。
 - **Observed / ST-LINK SWD reference** — [2026-10-23 STM32F103 Blue Pill Golden Reference](evidence/stlink-stm32f103-swd-reference/2026-10-23/README.md)：保存三輪 ST-LINK Flash／讀回、六份 LA2016 原始 SWD 波形與離線驗證；CDC 首次 ID 與 SWCLK 時序差異仍未結案，不代表 Z2 燒錄能力。
 - **Observed / Z2 DPIDR FAIL** — [2026-10-26 Z2 PS OpenOCD + LA2016 Blue Pill Evidence](evidence/bluepill-z2-dpidr-la2016-2026-10-26/README.md)：保存已載入 FPGA 映像的 Identity PASS、兩份原始 LA2016 波形、PS-local Bridge／OpenOCD 失敗收據與測後狀態；第二次擷取的 CH0／SWCLK 全程無邊緣，根因未定。
+- **Observed / Z2 SWD + page-18 Flash + CDC PASS** — [2026-10-27 實驗步驟與證據](evidence/bluepill-z2-flash-2026-10-27/README.md)、[繁體中文摘要](evidence/bluepill-z2-flash-2026-10-27/SUMMARY.md)、[Step 1–2 原始紀錄](evidence/bluepill-z2-flash-2026-10-27/receipts/step12-result.md)：保存 FPGA BIN/Manifest、PS-local OpenOCD 程式、LA2016 波形、約 3.6 kHz SWCLK 實測、page-18 同內容擦寫讀回及 SWD reset 後 USB CDC heartbeat；未知內容的最後一頁沒有擦除或公開。
+- **Observed / Z2 Blue Pill v0.1 erase/write FAIL → no-erase write PASS** — [2026-10-28 v0.1/v0.2 實驗紀錄](evidence/bluepill-z2-ab-flash-failure-2026-10-28/README.md)：首次 v0.1 擦除後寫入演算法逾時，全片讀回確認前 19 頁全 `0xFF`；之後不擦除直接寫回 v0.1，獨立讀回、同步 LA2016 活動及 reset 後 CDC heartbeat PASS。v0.2 未執行；私有 Flash/波形未公開。
 - **Reference / Operator-observed Tool Runbook** — [ST-LINK SWD 工具操作手冊](development/stlink-swd-tool-operations.md)：整理已驗證的 st-info/st-flash 操作、ST-LINK 排他接線、VTref、Flash Write + 獨立 Readback／SHA256，以及 Reset/NRST 未驗證限制；文件本身不授權實機操作。
+- **Current / Path 3 direct tools** — [Path 3 Codex 直接操作 LA2016／Z2 PS](development/plasma-path3-direct-hardware-tools.md)：不透過固定 JSON Host Supervisor，沿用 sigrok CLI、既有 SSH、Z2 PS OpenOCD／WordPort，保留實體互斥、電氣、Manifest 與 Root Guard。原 Issue #981 LA-only workflow 已退役；本次無實機執行。
 - **Reference / Operator-observed Tool Runbook** — [KINGST LA2016 工具操作手冊](development/la2016-tool-operations.md)：實測 sigrok AppImage 與 firmware resource 初始化、被動 SWD 抓波形、成功 Golden Reference、PWM1→CH0 Loopback、PWM OFF 波形驗證；區分歷史成功與當次裝置狀態。
 - **Host-only / HARDWARE NO-GO** — [PSPL-02 / SWD-00 Internal Waveform HIL](development/pspl02-swd00-hil-runbook.md)：三區段 baseline 專用的產物校驗、預檢、受限 MMIO 與原映像復原程序；現場獨立復原及 privileged ownership 尚待確認。
 - **Plan / Accepted Policy** — [SWD-04 Z2 PS/PL HIL Runbook](development/swd04-z2-hil-runbook.md)：以獨立 Preflight、白名單 AXI MMIO、DPIDR、ABORT 與恢復原 PYNQ 系統的 Host-only 安全契約，實機驗證尚未執行。
@@ -217,6 +235,11 @@
 - **HIL-A2 / Path 2 Gate 1 preparation / Z2 NOT RUN / M1 NO-GO** — [Cortex-A9 CPU-only Native DMB Contract](development/hil-a2-cpu-only.md)：沿用共用 Dispatcher 與固定 A1 Artifact，定義預設關閉的實機 CPU-only Capability、Work Order、離線驗證及獨立 Evidence；不授權 SWPC／Z2 實機執行。
 - **HIL-A1 / GitHub-hosted cross-build / M1 NO-GO** — [ARMv7 Barrier SWPC A1 / Z2 A2](development/armv7-barrier-hil-a.md)：A1 於 GitHub-hosted 以固定 Debian OCI／APT Snapshot 交叉編譯 ARMv7 ELF、驗證 `dmb sy` 並上傳 SHA256 Artifact；原 SWPC A1 實測因工具鏈缺失 FAIL；A2 Z2 執行仍為 NOT RUN。
 - **P0 / Host-only / M1 NO-GO** — [Fixed ABI Site 1 Native-Word MMIO Adapter + ARMv7 DMB Candidate](development/p0-fixed-abi-site1-mmio-adapter-host.md)：沿用 LinuxMMIO 的 Site lease、嚴格 ABI 讀寫白名單、要求 Write Barrier 並驗證 COMMIT 順序；原生 ARMv7 Library、實體 Z2／DUT 尚未合格。
+- **Gate 1 / Paths 1+3 / Draft** — [Native C WordPort Bridge](development/native-c-wordport-gate1-host.md)：在既有 Z2 PS 受保護 Python Owner／Site lease 與本機 UNIX Socket 內，以 SHA-pinned ARMv7 C 處理 Remote Bitbang GPIO/MMIO/DMB；原始 Protocol A/B 為 Host-only 測試，後續經核准實測 DPIDR、v0.1 Flash 與 heartbeat。總 session alarm 600 秒、socket idle 60 秒；[公開執行腳本與操作索引](evidence/native-c-wordport-2026-10-28/README.md)保存可審查來源，原始波形及 Flash 讀回保留於私有工作目錄。
+- **Gate 1 / Host-only candidate / Path 2** — [Image-agnostic Native C WordPort Programming](development/image-agnostic-wordport-path2.md)：每次 Work Order 動態選擇原始 BIN 與獨立 SHA256，依 exact ICPN Programming Profile／Flash Geometry 計算 Erase；OpenOCD Verify 必要、完整 Readback 選用，使用既有 Z2 PS OpenOCD／PL WordPort；目前只准 STM32F103C8T6 Site 1，尚未部署及執行新的實機驗證。
+- **Gate 1 / Draft PR #1207 / Host-only** — [通用 PPU 工程模組部署 `ppu-deploy`](development/ppu-deploy-engineering-modules.md)：Z2 PS WordPort／OpenOCD Python 整合與 SWPC A/B Runner 由同一來源版本協調部署，包含 SHA、互斥、啟用驗證與回滾；目前只有 Host-only 測試，不代表 GitHub PR 已合併或 Z2／SWPC 已部署。
+- **Gate 1 / Path 2 guarded-hardware / Draft** — [Native C WordPort v0.2 SWPC→Z2／Z2 Direct](development/native-wordport-v02-path2.md)：重用 PR #1199 PS-local Native C Bridge，新增固定入口與來源 SHA、v0.2 62,800-byte 一次性 Erase／Program／Verify／Readback，失敗時於同一 OpenOCD 工作階段先讀 DHCSR／FIFO／FLASH 狀態再 Halt 讀 PC／xPSR。GitHub-hosted 僅 Host-only 測試；SWPC／Z2／DUT 執行仍 NOT_RUN，禁止自動重試、Reset 或部署。
+- **Gate 1 / Draft / PR #1203** — [SWD Performance Baseline 與階段量測](development/swd-performance-baseline-2026-10-29.md)：紀錄既有 A/B 原始證據、monotonic 階段時間與 Native C／WordPort 計數器對帳；實機新 A/B 量測須符合 Owner/SHA 與 Site 1 安全授權。
 - **Gate 1A / GitHub-hosted SIM-1／SIM-2** — [Fixed ABI v1 Dual-Site RTL + Protocol-neutral PS↔PL Driver](development/fixed-abi-dual-site-gate1a.md)：Site1／Site2 真實 RTL 模擬引擎、正式 PS SWD Controller 閉環及負向隔離；不代表 Z2／DUT／八 Site 實體驗證。
 - **Host-only software integration** — [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md)：正式 Python 模組使用 native 32-bit mmap 存取、Register Allowlist、Site Lease、Thread Safety 與生命週期保護；已完成 SWD-03 Development HIL（2026-10-16），但未涵蓋 LT02 新 IP。
 - **Host-only candidate / NO REAL UIO HIL** — [UIO Runtime Backend Phase 2A](development/uio-runtime-backend-host-v1.md)：實作 Fake sysfs／Regular File 專用 UIO mapN、精確物理資源 Pin、Site Lease、Mapping Generation、Failure Injection；**拒絕開啟 `/dev/uioX` Character Device**，M1 仍 NO-GO。

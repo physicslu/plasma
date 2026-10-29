@@ -2,10 +2,11 @@
 
 **Status of original Gate 1:** offline adapter/receipt validation only; it did
 not activate a Runner, launch Vivado, operate SWPC/Z2, or qualify production.
-**Current main:** Path 2 is not globally Host-only. The pure coordinator remains
-inert by itself; authorized fixed CLI Build or real Z2 stages are supplied
-only by the separately guarded Dispatcher/Stage Transport. Fake adapter
-receipts never prove real hardware execution.
+**Current routing:** Path 2 is not globally Host-only. This pure historical
+coordinator remains inert by itself. Dynamic hardware work uses the reviewed
+`operator-cli` Work Order; the protected FPGA Root Entry is independently
+guarded. The live Dispatcher does not supply this coordinator with automatic
+Download/Testing stages. Fake adapter receipts never prove hardware execution.
 
 ## Existing components to reuse
 
@@ -34,8 +35,11 @@ A standalone Download or Testing request **must pin the expected artifact SHA256
 
 GitHub-hosted test `pl/tests/test_path2_three_stage_orchestrator.py` uses inert Python callbacks for: three independent triggers, both opt-in transitions independently and together, default OFF, provenance mismatch rejection, missing prior receipts, fail/NO_GO, missing handler preflight, and no retry. Existing CI should run this under `Python and PL source tests`. No changes to trusted Dispatcher Registry or shared Workflow are permitted by this PR.
 
-**Current authorization boundary:** the later trusted-main integration now supplies
-fixed Build/Download/Test routes, but this coordinator itself cannot authorize
-any of them. Each real stage must independently pass owner authorization,
-protected Z2 root source-manifest checks and runtime safety/receipt validation.
+**Current authorization boundary:** the fixed F1-B Build task identities
+have been retired from the Registry. Dynamic, Project-qualified `vivado-host-build`
+is the current Build route; this historical coordinator is not a live
+Download/Test route.
+Each real hardware action must independently pass owner authorization,
+applicable protected Z2 root source-manifest checks and runtime safety/receipt
+validation.
 The historical fake-callback PASS is not a physical HIL PASS.

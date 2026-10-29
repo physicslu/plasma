@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,7 @@ from typing import Sequence
 MAX_KIT_FILES = 20_000
 MAX_KIT_UNCOMPRESSED_BYTES = 3 * 1024 * 1024 * 1024
 KIT_PREFIX = "plasma-z2-ps-kit-"
+API_TRANSACTION_ID_RE = re.compile(r"[0-9a-f]{32}\Z")
 
 
 class BootstrapKitError(RuntimeError):
@@ -234,7 +236,13 @@ def install_verified_kit(
     display_name: str,
     product_root: Path = Path("/opt/plasma"),
     runner=subprocess.run,
+    api_transaction_id: str | None = None,
 ) -> dict[str, object]:
+    if api_transaction_id is not None and (
+        not isinstance(api_transaction_id, str)
+        or not API_TRANSACTION_ID_RE.fullmatch(api_transaction_id)
+    ):
+        raise BootstrapKitError("Bootstrap API transaction identity is invalid")
     installed = product_root / "install" / "last-install.json"
     command = "deploy" if installed.is_file() else "install"
     argv = [
@@ -268,6 +276,8 @@ def install_verified_kit(
                 str(kit.python_sidecar),
             ]
         )
+    if api_transaction_id is not None:
+        argv.extend(["--api-transaction-id", api_transaction_id])
     environment = os.environ.copy()
     environment["PLASMA_Z2_PRODUCT_ROOT"] = str(product_root)
     try:
@@ -314,6 +324,7 @@ def deploy_kit(
     facility_id: str,
     display_name: str,
     product_root: Path = Path("/opt/plasma"),
+    api_transaction_id: str | None = None,
 ) -> dict[str, object]:
     with tempfile.TemporaryDirectory(prefix="plasma-bootstrap-kit-") as temporary:
         kit = verify_kit(artifact, sidecar=sidecar, extract_to=Path(temporary) / "kit")
@@ -324,6 +335,7 @@ def deploy_kit(
             facility_id=facility_id,
             display_name=display_name,
             product_root=product_root,
+            api_transaction_id=api_transaction_id,
         )
 
 
@@ -342,6 +354,7 @@ def _parser() -> argparse.ArgumentParser:
     deploy.add_argument("--facility-id", required=True)
     deploy.add_argument("--display-name", default="Plasma PPU")
     deploy.add_argument("--product-root", type=Path, default=Path("/opt/plasma"))
+    deploy.add_argument("--api-transaction-id", help="Bootstrap API correlation ID; not deployment authority")
     return parser
 
 
@@ -372,6 +385,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             facility_id=args.facility_id,
             display_name=args.display_name,
             product_root=args.product_root,
+            api_transaction_id=args.api_transaction_id,
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0

@@ -1,15 +1,23 @@
-# Historical Path 2 Protected Root Entry — image lifecycle and recovery (merged PR #1167)
+# Historical Path 2 Root Work Order — retained Protected Root Entry (PR #1167 / Issue #1168)
 
 > **2026-10-26 retirement note:** The former `z2-root-operation` Work Order
 > with `download|test|restore` is no longer admitted by the current Path 2
 > Dispatcher. The independent protected FPGA image Root Entry and tested Golden
-> recovery code remain installed/available subject to actual OS authorization.
+> recovery code remain in the repository; any actual Z2 installation, source
+> pin and OS authority must be verified on that device before use.
 > Current general Path 2 Work Orders use `capability: operator-cli` without a
 > fixed operation list or F1-B Project binding. All F1-B PASS data below are
 > *historical*, not evidence of Blue Pill SWD or current hardware readiness.
+> **HISTORICAL WORK ORDER ONLY — NOT A CURRENT DISPATCHER CONTRACT.**
+> The Dispatcher rejects `z2-root-operation` with
+> `RETIRED_PATH2_ROOT_OPERATION`. The two-argument Protected Root
+> Entry is a separate, guarded FPGA image lifecycle/recovery tool. A
+> `operator-cli` script may explicitly invoke a reviewed protected tool only
+> when independently authorized and permitted by actual OS, source-pin,
+> ownership and recovery checks; a Work Order grants no implicit Root access.
 
 
-**Verified status as of 2026-10-25:** PR #1167 is merged into `main`.
+**Historical verified status (2026-10-25):** PR #1167 was merged into `main`.
 Operator SSH deployment and its F1-B Download → 3-read MMIO Test →
 Golden Restore all passed on the real PYNQ-Z2. The *independent*, trusted
 Path 2 Dispatcher → SWPC Runner → Z2 Root sequence then passed in
@@ -23,17 +31,17 @@ All three actual Root receipts shared Boot ID
 physical results only**. They do not qualify OpenOCD, Blue Pill flash,
 new FPGA Programmer IPs, or a general eight-Site product image.
 
-## Execution boundary
+## Retired Work Order execution boundary (historical, not current)
 
-The existing owner-authenticated Development Dispatcher and shared Work Order
-admission accept Path 2 hardware requests with **capability
-`z2-root-operation`**, `scope: guarded-hardware`, and precisely one
-`operation: download|test|restore`. No Stage, Project or Profile field is
-accepted, and no fixed Stage Task ID is registered. There is no chained
-full-HIL automation or arbitrary shell/SSH command.
+In the 2026-10-25 historical implementation, the owner-authenticated
+Dispatcher admitted Path 2 requests with `capability: z2-root-operation`,
+`scope: guarded-hardware` and one `operation: download|test|restore`.
+That **Dispatcher admission is retired**. The live Work Order parser rejects
+the obsolete capability and operation field; it does not delegate a fixed
+Download/Test/Restore Stage or a privileged Root call.
 
 ```text
-owner-pinned Path 2 Work Order
+HISTORICAL ONLY: owner-pinned Path 2 z2-root-operation Work Order
  -> trusted-main Development Dispatcher (B1)
  -> existing SWPC Runner and enrolled, pinned SSH/sudo transport
  -> existing /usr/local/libexec/plasma/z2-path2-root-entry
@@ -41,8 +49,14 @@ owner-pinned Path 2 Work Order
  -> exact Z2 boot/image/result receipt (B3)
 ```
 
-Only two fixed positional Root Entry arguments are supported:
-`<download|test|restore> <reviewed-40-hex-git-sha>`.
+**Current Path 2:** Owner/SHA-pinned `operator-cli` Work Orders select a
+reviewed repository Python `script`, `argv` and bounded
+`timeout_seconds` with `scope: guarded-hardware`; the trusted Dispatcher
+runs that script on the non-root SWPC Runner. It does **not** call the Root
+Entry automatically, select a fixed Stage/Profile or provide sudo authority.
+The independent protected Root executable retains its own two positional
+arguments, `<download|test|restore> <reviewed-40-hex-git-sha>`, and all
+effective OS, source-pin, image/Manifest, lock and recovery protections.
 
 ### Provenance without a runtime Profile
 
@@ -89,9 +103,11 @@ For any subsequent deployment, independently verify the then-current
 trusted-main Git Tree, exact root source pin and complete SHA256 manifest,
 root ownership, active FPGA Manager image/recovery, exclusive device
 ownership and the current Boot ID. A new `main` commit (even docs-only)
-changes the exact SHA requested by a post-merge Path 2 Work Order: perform
-a separately authorized, safely checked source-pin migration rather than
-bypassing the Root Entry SHA match.
+advances Git HEAD but **does not automatically update the installed Root
+source pin**. Any later explicit protected Root call must supply a separately
+authorized exact SHA matching the installed reviewed source; perform a
+safely checked source-pin migration only when actually required. Never
+bypass the Root Entry SHA match.
 
 The Z2 installer requires root, ARMv7 Python 3.12.13, FPGA Manager
 `operating`, the **observed last Manager firmware load of `base.bin`**,
@@ -114,7 +130,7 @@ otherwise manual review is required. Console output is also written under
 Never interpret the installer returning as a physical PASS unless the final
 line explicitly states `RESULT=PASS`.
 
-This is a current **F1-B Site 1** programming-image smoke, not SWD flashing:
+This historical smoke was **F1-B Site 1** programming-image verification, not SWD flashing:
 no OpenOCD, Blue Pill erase/program/readback, or DUT power commands.
 The active Root implementation is `pl.hil.fpga_image_root`; the historical
 `path2_f1b_minimal_stage.py` remains in the repository but is not selected by
@@ -147,10 +163,11 @@ FPGA image before use. The old three-argument Root Entry is **not**
 supported by the revised source. If installed host code and Z2 code differ,
 fail closed; never retry a partially completed FPGA write blindly.
 
-For a new Direct Work Order the old four `z2-path2-download/testing/restore/
-full-hil` fixed IDs, `path2-stage-contract`, Stage Orchestrator, runtime
-Project Profile and Stage CI admission are retired. Other PLASMA programming
-and socket profiles are unrelated and retained.
+For current Work Orders, use the generic `operator-cli` boundary above.
+The old four `z2-path2-download/testing/restore/full-hil` fixed IDs,
+`path2-stage-contract`, Stage Orchestrator, runtime Project Profile and
+Stage CI admission remain retired. Other PLASMA programming and socket
+profiles are unrelated and retained.
 
 ### Evidence and limits
 
@@ -218,9 +235,9 @@ enumeration of every device, manufacturer or programming operation.
    approved physical image/ABI/electrical/target qualification. Host-only
    contracts and #1168's F1-B receipts cannot grant new privileges.
 
-**Source-lock warning:** merging even this documentation-only PR advances
-the exact trusted-main Git SHA, so any later Path 2 `main` Work Order must
-have a separately verified matching protected Z2 Source Pin/Manifest. A
+**Source-lock warning:** merging even a documentation-only PR advances
+the exact trusted-main Git SHA; any later *explicit protected Root call*
+must use the reviewed SHA expected by the installed Z2 Source Pin/Manifest. A
 Git Tree match is evidence of identical contents, but **does not** bypass
 the currently enforced exact commit pin. Do not roll the Z2 back to a
 historical #1167 PR HEAD.

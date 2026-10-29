@@ -178,10 +178,38 @@ def test_simulation_reuses_kit_local_deployment_coordinator_and_installer_core()
     assert 'installer_core = kit_scripts / "ppu-z2-installer-core.py"' in source
     assert 'CORE_OVERRIDE: str(installer_core)' in source
     assert "_install_openocd_from_verified_kit" in source
+    assert 'argv.extend(["--api-transaction-id", api_transaction_id])' in source
     assert 'verified.root / "scripts" / "openocd-runtime.py"' in source
     assert '"openocd_artifact_sha256": openocd_sha' in source
     assert '"openocd_hardware_runtime_ready": openocd_evidence.get("hardware_runtime_ready")' in source
     assert '"python_artifact_execution": "not_executed_in_qemu-simulation"' in source
+
+
+def test_qemu_kit_cli_accepts_bounded_bootstrap_api_correlation_only():
+    kit = _load(KIT, "ppu_qemu_bootstrap_api_contract")
+    args = kit._parser().parse_args([
+        "deploy", "fixture-kit.tar.gz", "--sidecar", "fixture.sha256",
+        "--gateway-host", "127.0.0.1", "--ppu-id", "ppu-01",
+        "--facility-id", "lab", "--api-transaction-id", "f" * 32,
+    ])
+    assert args.api_transaction_id == "f" * 32
+    assert args.command == "deploy"
+
+
+def test_qemu_kit_rejects_invalid_api_correlation_before_kit_io(monkeypatch):
+    kit = _load(KIT, "ppu_qemu_bootstrap_api_invalid_contract")
+    monkeypatch.setattr(kit, "_require_simulation_target", lambda: None)
+    with pytest.raises(kit.QEMUSimulationKitError, match="transaction identity is invalid"):
+        kit.deploy(
+            kit_artifact=Path("nonexistent-kit.tar.gz"),
+            sidecar=Path("nonexistent-kit.sha256"),
+            gateway_host="127.0.0.1",
+            ppu_id="ppu-test",
+            facility_id="lab",
+            display_name="simulated PPU",
+            product_root=Path("/nonexistent-ppu"),
+            api_transaction_id="untrusted-transaction-id",
+        )
 
 
 def test_local_kit_builder_keeps_simulation_python_boundary_explicit():
