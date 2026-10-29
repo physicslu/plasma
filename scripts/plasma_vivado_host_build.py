@@ -690,6 +690,9 @@ def run_generic(task: dict, *, workspace: Path, approval: dict,
     bit = project / f"{stem}.runs/impl_1/system_wrapper.bit"
     hwh = project / f"{stem}.gen/sources_1/bd/system/hw_handoff/system.hwh"
     reports = build / "reports"
+    output_files = (bit, hwh, *(reports / name for name in plan["reports"]))
+    require(all(path.resolve().is_relative_to(build.resolve()) for path in output_files),
+            "BUILD_GENERIC_OUTPUT_ESCAPE")
     require(bit.is_file() and not bit.is_symlink() and hwh.is_file() and
             not hwh.is_symlink() and 0 < bit.stat().st_size <= 16_000_000 and
             0 < hwh.stat().st_size <= 4_000_000 and
@@ -709,6 +712,7 @@ def run_generic(task: dict, *, workspace: Path, approval: dict,
     digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
     actual_reports = {name: digest(reports / name) for name in plan["reports"]}
     require(type(verified) is dict and
+            verified.get("source_sha") == plan["source_sha"] and
             verified.get("bit_sha256") == digest(bit) and
             verified.get("hwh_sha256") == digest(hwh) and
             verified.get("report_sha256") == actual_reports and
