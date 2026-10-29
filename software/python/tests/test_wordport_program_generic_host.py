@@ -51,7 +51,19 @@ class GenericImageContract(unittest.TestCase):
             self.directory / "bridge.sock", image_path,
             self.directory / "readback-image.bin", operation,
             image_bytes=size, erase_bytes=erased,
+            readback_enabled=True,
         )
+
+    def test_default_skips_readback_but_requires_verify(self):
+        image, _ = self.image("fast.bin", b"x" * 2048)
+        fast = module.make_tcl(self.directory / "bridge.sock", image,
+                               self.directory / "readback.bin", "program",
+                               image_bytes=2048, erase_bytes=2048)
+        self.assertIn("verify_image ", fast)
+        self.assertIn("PLASMA_VERIFY_OK", fast)
+        self.assertIn("PLASMA_READBACK_SKIPPED", fast)
+        self.assertNotIn("dump_image ", fast)
+        self.assertNotIn("reset run", fast)
 
     def test_bridge_sha_matches_current_main_root_guard_session(self):
         """Bridge pin is an integrity boundary, not a stale PR #1199 value."""
@@ -173,6 +185,12 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.barrier.write_bytes(b"synthetic barrier")
 
     def test_arbitrary_image_snapshot_exact_readback_and_bridge_close(self):
+        self._mock_program_session(readback_enabled=True)
+
+    def test_default_fast_program_session_no_readback_still_passes_verify(self):
+        self._mock_program_session(readback_enabled=False)
+
+    def _mock_program_session(self, *, readback_enabled: bool):
         bytes_in = b"AB" * 4097
         image = self.directory / "selected-any-name.bin"
         image.write_bytes(bytes_in)
@@ -220,10 +238,13 @@ class GenericSessionHostOnly(unittest.TestCase):
             self.assertNotIn(str(image), tcl)
             self.assertIn(str(staged), tcl)
             self.assertIn("flash erase_address 0x08000000 0x2400", tcl)
-            (tcl_file.parent / "readback-image.bin").write_bytes(staged.read_bytes())
+            self.assertEqual("dump_image " in tcl, readback_enabled)
+            if readback_enabled:
+                (tcl_file.parent / "readback-image.bin").write_bytes(staged.read_bytes())
             base = time.monotonic_ns()
             rows = []
-            for index, stage in enumerate(("ERASE", "PROGRAM", "VERIFY", "READBACK")):
+            steps = ("ERASE", "PROGRAM", "VERIFY") + (("READBACK",) if readback_enabled else ())
+            for index, stage in enumerate(steps):
                 for edge, step in (("BEGIN", 0), ("END", 1)):
                     rows.append({"stage": stage, "edge": edge,
                         "monotonic_ns": base + (index * 2 + step) * 100,
@@ -236,12 +257,14 @@ class GenericSessionHostOnly(unittest.TestCase):
             opened[0].stage_evidence.write_text("".join(json.dumps(x) + "\n" for x in rows))
             return subprocess.CompletedProcess(args, 0,
                 stdout="PLASMA_ERASE_OK\nPLASMA_PROGRAM_OK\n"
-                       "PLASMA_VERIFY_OK\nPLASMA_READBACK_OK\n"
+                       "PLASMA_VERIFY_OK\n" +
+                       ("PLASMA_READBACK_OK\n" if readback_enabled
+                        else "PLASMA_READBACK_SKIPPED\n") +
                        "PLASMA_PROGRAM_COMPLETED_NO_RESET\n",
                 stderr="")
 
         args = SimpleNamespace(operation="program", icpn="STM32F103C8T6",
-                               site_id=1)
+                               site_id=1, readback=readback_enabled)
         output = io.StringIO()
         with patch.object(module, "BUNDLE", self.bundle), \
              patch.object(module, "z2_preflight", return_value=(
@@ -259,7 +282,12 @@ class GenericSessionHostOnly(unittest.TestCase):
         result = json.loads(output.getvalue())
         self.assertEqual(result["result"], "PASS")
         self.assertEqual(result["image_sha256"], image_sha)
-        self.assertEqual(result["readback_sha256"], image_sha)
+        self.assertEqual(result["readback_sha256"], image_sha if readback_enabled else None)
+        self.assertIs(result["readback_enabled"], readback_enabled)
+        self.assertEqual(result["performance"]["stages"]["verify"]["result"], "PASS")
+        if not readback_enabled:
+            self.assertEqual(result["performance"]["stages"]["readback"],
+                             {"result": "SKIPPED", "bytes": 0})
         self.assertEqual(result["image_bytes"], 8194)
         self.assertEqual(result["erase_bytes"], 0x2400)
         preflight = result["performance"]["preflight"]
@@ -485,7 +513,7 @@ class FlashFailureForensicsContract(unittest.TestCase):
         return module.make_tcl(
             self.base / "swd.sock", self.base / "image.bin",
             self.base / "readback.bin", "program",
-            image_bytes=2048, erase_bytes=2048,
+            image_bytes=2048, erase_bytes=2048, readback_enabled=True,
         )
 
     def test_flash_failure_capture_before_poll_and_halt(self):
