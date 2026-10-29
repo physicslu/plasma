@@ -2,6 +2,12 @@
 
 Status: backend security boundary, opt-in deployment/browser integration, and initial entry Principal identity/profile flow implemented; canonical Gateway deployment remains the default until secure mode is explicitly enabled
 
+## Owner-approved product direction (not yet implemented)
+
+For a standalone physical PPU, replace the product-facing five-role Console UX with **Monitor** (information-only) and **one currently registered Master** (all authorized programming-related operations/deployments). **Engineer** is separately entered Linux root maintenance mode, not an extra permanent master or seventh Console. Default concurrent Console identity capacity is 1 Master + 5 Monitor, configurable on the PPU. A new physically confirmed Master registration must atomically revoke all prior Master write access across existing tokens/sessions and survive reboot; accepted running Jobs continue. See [Console Controller / PPU Security Simplification](console-controller-ppu-security-simplification.md) for current vs intended behavior, precise retirements and test criteria.
+
+**Do not confuse the direction above with current security enforcement.** This file below documents the actual opt-in Secure Gateway implementation: static `viewer/operator/engineer/admin/service` principals, Bearer token hashes, per-action permissions, resource scopes, idempotency/audit. Product-only role UI/manual token entry can be retired **after** new authenticated Console ownership enforcement covers every REST/CLI/privileged write path, not before. Internal permission granularity and authenticated service identities may remain implementation details. The currently documented canonical plain Gateway must not be represented as already enforcing new Master ownership.
+
 ## Security invariant
 
 A Plasma state-changing command must not reach a Batch runtime or PPU unless all of the following are true:
