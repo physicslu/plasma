@@ -4,6 +4,7 @@ This test deliberately does NOT build PR #1189's FIFO or grant Root access.
 It validates a future callsite contract, not deployed SWD safety.
 """
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
@@ -40,7 +41,9 @@ def test_native_c_gate_has_no_root_hardware_or_automatic_recovery():
     assert "gate->owner_pid != getpid()" in source
     assert "push(push_ctx)" in source
     assert "PLASMA_RECOVERY_UNCERTAIN" in source
+    # Scan C tokens, not explanatory comments mentioning prohibited paths.
+    code = re.sub(r"/\\*.*?\\*/", "", source + "\n" + header, flags=re.DOTALL)
     for forbidden in ("/dev/mem", "mmap(", "ioctl(", "system(",
                       "execve(", "mark_ready", "clear_uncertain",
                       "retry_write", "sudo "):
-        assert forbidden not in source + header
+        assert forbidden not in code
