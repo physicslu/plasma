@@ -67,9 +67,11 @@ The engine derives `image_bytes` from the selected staged file,
 verifies its independent SHA-256 and checks 2-byte alignment and range.
 Erase length = `ceil(image_bytes / erase_page_size) * erase_page_size`
 and must remain within the target's qualified Main Flash range.
-The engine performs one Erase, one Program, one Verify and a separate
-**exact image-byte-count** Readback/SHA comparison. A successfully
-programmed image is left halted: no implicit reset or retry.
+The engine always performs one Erase, one Program and the OpenOCD
+`verify_image` step. Independent **exact image-byte-count** Readback/SHA
+is **opt-in** via `--readback` (default OFF). The optional flag never
+disables Verify. A successfully programmed image is left halted: no
+implicit reset or retry.
 
 Examples of dynamic erase planning (not baked into runtime):
 
@@ -105,7 +107,8 @@ for ROM ISP, passive memory and explicit NOT_APPLICABLE/exception requirements.
    C_DEBUGEN bit0 (mask 0x0002000B).
 3. After the bounded Erase, re-check the same bits **before Program**.
    Missing/invalid bits/read errors stop programming without retry/reset.
-4. Program → Verify → independent exact-length Readback/SHA.
+4. Program → mandatory Verify → optionally independent exact-length
+   Readback/SHA (`--readback`).
    Reset-run and CDC are explicit subsequent operations.
 
 **Physical evidence 2026-10-28:** operator-run
@@ -309,11 +312,16 @@ cd <plasma-worktree>
 # One cycle is v0.1 then v0.2, i.e. 2 complete programming attempts.
 # Ensure picocom/minicom is closed before starting.
 python3 scripts/plasma_ab_burn_in.py --cycles 5 --port /dev/ttyACM0
+# Optional forensic measurement: same flow plus full independent Flash dump.
+python3 scripts/plasma_ab_burn_in.py --cycles 5 --port /dev/ttyACM0 --readback
 ~~~
 
 This is **10** explicit attempts: per-image engine preflight, then for each
-attempt one SHA-guarded Program → independent Readback SHA → explicit
-Reset Run → fresh USB CDC Heartbeat verification. It admits only Site 1
+attempt one SHA-guarded Program → mandatory OpenOCD Verify → explicit
+Reset Run → fresh USB CDC Heartbeat verification. With `--readback`, the
+independent Flash dump and exact SHA comparison occur after Verify.
+**CDC Heartbeat is evidence of target execution, not a substitute for Flash
+Verify.** The runner admits only Site 1
 STM32F103C8T6, known immutable v0.1/v0.2 CI asset hashes and firmware
 versions 0.1/0.2. Heartbeats require four consecutive sequence values,
 500 ms v0.1 / 1,000 ms v0.2 uptime increments (100 ms tolerance).
@@ -368,13 +376,18 @@ New per-run records are isolated from the historical v0.2 results:
     openocd.tcl
     openocd.log
     bridge.log
-    readback-image.bin        # if dump completed
+    readback-image.bin        # only with --readback, if dump completed
     receipt.json
 ```
 
-The receipt records the exact ICPN/Site, Image SHA and length, computed
-erase bytes, OpenOCD/Bridge exits and readback SHA. PASS requires both
-OpenOCD and Bridge normal exit plus the full independent readback hash.
+The receipt records exact ICPN/Site, Image SHA and length, computed
+erase bytes, OpenOCD/Bridge exits, `readback_enabled` and optional
+`readback_sha256`. PASS always requires OpenOCD and Bridge normal exit,
+valid stage/counter evidence, and OpenOCD Verify success. When
+`--readback` is enabled, PASS additionally requires an exact-length
+independent Flash dump with matching SHA-256; otherwise evidence marks
+Readback `SKIPPED` and no readback file is created. This distinction is
+preserved independently of the subsequent CDC Heartbeat check.
 Flash Loader timeout captures the already-reviewed post-error snapshot
 without automatic retry or reset.
 

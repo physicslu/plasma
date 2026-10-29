@@ -16,11 +16,16 @@ on:
       - 'scripts/plasma_native_wordport_v02.py'
       - 'scripts/plasma_wordport_program.py'
       - 'scripts/plasma_ab_burn_in.py'
+      - 'scripts/ppu-deploy'
+      - 'scripts/ppu_deploy.py'
+      - 'scripts/ppu_deploy_target.py'
+      - 'software/python/tests/test_ppu_deploy_host.py'
       - 'software/python/tests/test_plasma_ab_burn_in_host.py'
       - 'software/python/tests/test_native_wordport_v02_entry_host.py'
       - 'software/python/tests/test_wordport_program_generic_host.py'
       - 'docs/development/native-wordport-v02-path2.md'
       - 'docs/development/image-agnostic-wordport-path2.md'
+      - 'docs/development/ppu-deploy-engineering-modules.md'
       - 'scripts/build-native-bluepill-wordport.sh'
       - 'scripts/tests/test_bluepill_wordport_session.py'
       - 'docs/development/native-c-wordport-gate1-host.md'
@@ -60,6 +65,8 @@ jobs:
             -p 'test_plasma_ab_burn_in_host.py' -v
           python -m unittest discover -s software/python/tests \
             -p 'test_wordport_stage_monitor.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_ppu_deploy_host.py' -v
       - name: Python and shell syntax
         run: |
           python -m py_compile software/python/plasma_interfaces/native_bluepill_word_port.py \
@@ -71,6 +78,10 @@ jobs:
             scripts/plasma_native_wordport_v02.py \
             scripts/plasma_wordport_program.py \
             scripts/plasma_ab_burn_in.py \
+            scripts/ppu-deploy \
+            scripts/ppu_deploy.py \
+            scripts/ppu_deploy_target.py \
+            software/python/tests/test_ppu_deploy_host.py \
             software/python/tests/test_plasma_ab_burn_in_host.py \
             software/python/tests/test_native_wordport_v02_entry_host.py \
             software/python/tests/test_wordport_program_generic_host.py

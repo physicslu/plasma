@@ -30,6 +30,7 @@ class ABOrchestrationTests(unittest.TestCase):
         self.path = Path(temp.name)
         self.args = argparse.Namespace(
             cycles=2, port="/dev/ttyACM0", frames=4, cdc_timeout=25.0,
+            readback=False,
             stop_file=str(self.path / "operator-stop"),
             output=str(self.path / "runs"),
         )
@@ -46,9 +47,11 @@ class ABOrchestrationTests(unittest.TestCase):
         if image:
             receipt.update({"image_sha256": image["sha256"],
                             "image_bytes": image["size"],
-                            "readback_sha256": image["sha256"]})
+                            "readback_enabled": self.args.readback and operation == "program",
+                            "readback_sha256": image["sha256"] if self.args.readback and operation == "program" else None})
         if operation in ("program", "reset-run"):
-            names = ("erase", "program", "verify", "readback") if operation == "program" else ("reset",)
+            names = (("erase", "program", "verify") +
+                     (("readback",) if self.args.readback else ())) if operation == "program" else ("reset",)
             size = image["size"] if image else 0
             erase = (size + 1023) // 1024 * 1024
             receipt["erase_bytes"] = erase
@@ -75,6 +78,8 @@ class ABOrchestrationTests(unittest.TestCase):
                 "engine_sha256", "bridge_session_sha256", "native_python_module_sha256",
                 "stage_module_sha256", "rbb_module_sha256", "native_c_sha256",
                 "openocd_sha256", "target_cfg_sha256")}
+            if operation == "program" and not self.args.readback:
+                receipt["performance"]["stages"]["readback"] = {"result": "SKIPPED", "bytes": 0}
         return {"receipt": receipt, "exit_code": 0, "pass": True,
                 "elapsed_s": 0.25, "log": "mock-log"}
 
@@ -113,6 +118,35 @@ class ABOrchestrationTests(unittest.TestCase):
                              "hw_action": "NONE"}, img))
         self.assertEqual(app.parse_receipt("log\n" + json.dumps(okay)), okay)
         self.assertEqual(app.parse_receipt("not json")["result"], "FAIL")
+
+    def test_opt_in_readback_requires_exact_sha_and_full_stage(self):
+        self.args.readback = True
+        image = app.IMAGES["v0.2"]
+        receipt = self.fake_engine("program", image)["receipt"]
+        self.assertTrue(app.valid_receipt("program", receipt, image,
+                                          readback_enabled=True))
+        self.assertFalse(app.valid_receipt("program", receipt, image))
+        receipt["readback_sha256"] = "0" * 64
+        self.assertFalse(app.valid_receipt("program", receipt, image,
+                                           readback_enabled=True))
+
+    def test_default_fast_rejects_missing_verify_or_forged_skip(self):
+        import copy
+        image = app.IMAGES["v0.1"]
+        good = self.fake_engine("program", image)["receipt"]
+        self.assertTrue(app.valid_receipt("program", good, image))
+        for mutation in ("missing_verify", "not_skipped", "unexpected_hash", "wrong_mode"):
+            bad = copy.deepcopy(good)
+            if mutation == "missing_verify":
+                bad["performance"]["stages"]["verify"]["result"] = "FAIL"
+            elif mutation == "not_skipped":
+                bad["performance"]["stages"]["readback"] = {"result": "PASS", "bytes": image["size"]}
+            elif mutation == "unexpected_hash":
+                bad["readback_sha256"] = image["sha256"]
+            else:
+                bad["readback_enabled"] = True
+            with self.subTest(mutation=mutation):
+                self.assertFalse(app.valid_receipt("program", bad, image))
 
     def test_performance_version_and_counter_mismatch_rejected(self):
         import copy
@@ -398,7 +432,10 @@ class CDCFrameBudgetTests(unittest.TestCase):
             runner.return_value.run.return_value = 0
             self.assertEqual(app.main(["--cycles", "1"]), 0)
             self.assertEqual(runner.call_args.args[0].frames, 60)
+            self.assertFalse(runner.call_args.args[0].readback)
             self.assertIsNone(runner.call_args.args[0].cdc_timeout)
+            self.assertEqual(app.main(["--cycles", "1", "--readback"]), 0)
+            self.assertTrue(runner.call_args.args[0].readback)
             self.assertEqual(app.main(["--cycles", "1", "--frames", "1000"]), 0)
             self.assertEqual(runner.call_args.args[0].frames, 1000)
             self.assertEqual(app.main(["--cycles", "1", "--order", "v02-first"]), 0)

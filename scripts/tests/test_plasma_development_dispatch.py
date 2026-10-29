@@ -1719,12 +1719,14 @@ class GenericWorkOrderContracts(unittest.TestCase):
                             capability="vivado-host-build",
                             project="pl/projects/z2-identity",
                             toolchain=fixed["toolchain"],
-                            board_repo_sha=fixed["board_repo_sha"])
+                            board_repo_sha=fixed["board_repo_sha"],
+                            pr_number=1100, source_sha="b" * 40)
         for key in ("scope", "script", "argv", "expected_stdout_sha256"):
             order.pop(key, None)
         event = self._event(order)
         req = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
         task = dev.task_for_request(self.registry, req, event)
         self.assertNotIn("path2-work-order", self.registry["tasks"])
         self.assertEqual(task["work_order_scope"], "host-only")
@@ -1744,11 +1746,12 @@ class GenericWorkOrderContracts(unittest.TestCase):
             projected, workspace=ROOT, approval=approval)
         self.assertEqual(plan["vivado_project"], "z2_identity")
         self.assertEqual(plan["build_env"], "PLASMA_IDENTITY_BUILD")
-        with patch.object(build, "run", return_value={"status": "MOCK_HOST_BUILD"}) as runner:
+        with patch.object(dev, "reviewed_host_build_driver") as candidate:
+            candidate.return_value.run.return_value = {"status": "MOCK_HOST_BUILD"}
             result = dev.run_task(task, workspace=ROOT, approval=approval)
             self.assertEqual(result["status"], "MOCK_HOST_BUILD")
-            runner.assert_called_once()
-            self.assertEqual(runner.call_args.args[0], projected)
+            candidate.assert_called_once()
+            self.assertEqual(candidate.return_value.run.call_args.args[0], projected)
 
     def test_dynamic_vivado_host_build_negative_contracts(self):
         fixed = dev.task_by_id(self.registry, "z2-path2-build")
@@ -1756,7 +1759,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
                             capability="vivado-host-build",
                             project="pl/projects/z2-identity",
                             toolchain=fixed["toolchain"],
-                            board_repo_sha=fixed["board_repo_sha"])
+                            board_repo_sha=fixed["board_repo_sha"],
+                            pr_number=1100, source_sha="b" * 40)
         for key in ("scope", "script", "argv", "expected_stdout_sha256"):
             order.pop(key, None)
         for change in (
@@ -1778,7 +1782,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
         missing = order | {"project": "pl/projects/other-platform"}
         event = self._event(missing)
         req = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
         task = dev.task_for_request(self.registry, req, event)
         projected = {k: task[k] for k in (
             "execution_path", "capability", "project", "toolchain",
@@ -1787,6 +1792,11 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with self.assertRaisesRegex(build.BuildDenied, "BUILD_GENERIC_PROJECT_DENIED"):
             build.generic_project_contract(projected, workspace=ROOT,
                                            approval=approval)
+        with self.assertRaisesRegex(dev.Denied,
+                                    "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
+            dev.request(self._event({k: v for k, v in order.items()
+                                     if k not in ("pr_number", "source_sha")}),
+                        self._context())
         # Stage field was retired at the Work Order schema boundary.
         with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_FIELDS_DENIED"):
             dev.request(self._event(order | {"stage": "download"}), self._context())
@@ -1799,7 +1809,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
         event = self._event(order)
         req = dev.request(event, self._context())
         task = dev.task_for_request(self.registry, req, event)
-        approval = dev.authorize(event, self._context(), self.registry)
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
         import plasma_vivado_host_build as build
         for change in (
             {"work_order_sha256": "0" * 64},
