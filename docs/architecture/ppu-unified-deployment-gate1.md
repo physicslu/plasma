@@ -1,0 +1,38 @@
+# PPU single deployment entry — Gate 1 Path 1 (Host-only integration baseline)
+
+> **Status:** owner-approved 2026-10-29, Draft PR, **NOT deployed or merged**. This is the first fail-closed convergence delta. No SWPC/Z2 operation or Linux permission change. Source baseline: `main e338083564c30dc6bdc24009f7b62a3984fb7023`. PR #1208 remains a separate unmerged Master role contract and must not be treated as a deployed Principal/Root authorization boundary.
+
+## Decision: one product-facing installation endpoint, one transaction
+
+The **only target normal-install endpoint** is the existing Z2 PPU Bootstrap `POST /v1/deployments`; SWPC `ppu-deploy` and Console are *clients*, not independent Z2 installers. The authoritative transaction must be the existing `scripts/ppu-bootstrap-deployment.py`: `/var/lib/plasma-bootstrap/deployment.lock` plus `deployment.json`, verified release staging, activation and rollback. `ppu-z2-installer.py` and its Core remain **internal** verified PS installers, not separate product APIs. `ppu-bootstrap-installer.py` remains only **local factory/Engineer recovery**, outside normal network deployment. Protected FPGA Root `download|test|restore` remains hardware lifecycle and recovery, not an Image installation API.
+
+| Entry or subsystem | Current factual behavior | Gate 1 contract / intended endpoint |
+| --- | --- | --- |
+| Console/Manager Bootstrap HTTP | One authenticated PS Runtime install API using the existing device-local Bootstrap Bearer token and bounded upload/transaction | **KEEP** `POST /v1/deployments` as the only product installation API. Existing token proves controlled commissioning authority, **not** registered Master generation, publisher authenticity or production-grade transport confidentiality. |
+| `plasmactl z2-ps` | Root CLI; install/deploy already routes through Bootstrap deployment coordinator and its journal | **REUSE** existing Coordinator; eventually expose as client of same API for routine upgrades. Keep local factory/root recovery separate. |
+| SWPC `scripts/ppu-deploy` | Independently SSH-executes bounded Z2-side Python installer; separate SWPC/Z2 state, version, compensation and rollback for `wordport`, `openocd-integration`, `abtest` | **MIGRATE** all three to the same Bootstrap API and same Coordinator lock/journal. Current SSH path remains untouched until end-to-end feature parity and physical authority are proven. Do **not** claim it is already migrated. |
+| `ppu_deploy_target.py` | Current engineering installer with pinning, root check, allowed paths and owner scan | **RETIRE LATER**, after reviewed replacement has exact file allowlist, atomic verified transaction, active-device exclusion and rollback, never by deleting its functioning security checks first. |
+| `ppu-z2-installer.py` and `ppu-bootstrap-deployment.py` | Canonical PS-only installer and durable transaction core | **KEEP AS COMPONENTS**, not separately exposed normal installation authorities. Engineering modules cannot be passed into this PS-only installer today. |
+| FPGA Image + Manifest install | No current unified installed Image + Manifest staging capability; protected Root only loads/tests/restores already installed approved files | **UNQUALIFIED**, explicitly reject for now. Add future paired Image + Manifest atomic deployment only after hardware qualification; retain Root/Golden. |
+| Factory/bootstrap installer | Installs independent Bootstrap control plane for a missing/broken product Runtime | **KEEP offline** under Engineer/local maintenance, not an alternative routine authenticated network installation API. |
+
+## This PR's actual source changes
+
+1. `scripts/ppu_unified_deployment.py` introduces a **non-executing** typed deployment plan: exact `ppu-runtime`, `engineering-module` (exact three modules), `fpga-image`; exact source commit and archive SHA-256; the **same** Bootstrap endpoint, canonical Coordinator lock and journal. Engineering and FPGA kinds report `blocked-not-qualified`.
+2. `scripts/ppu_deploy.py` `plan` now includes `unified_deployment` evidence with proposed common API and a **blocked** status; `deploy/verify/rollback/status` are intentionally **unchanged** and still use legacy engineering SSH. No remote call is made by `plan`.
+3. The **existing** `scripts/ppu-bootstrap-service.py` `_deployment_request()` accepts absent or explicit `kind=ppu-runtime` for compatibility, strictly denies `engineering-module`, `fpga-image`, unknown kinds and caller-chosen fields. There is **no new HTTP endpoint**, and no path by which the PS-only Installer accidentally receives executable engineering code.
+4. `software/python/tests/test_ppu_single_deployment_entry_gate1.py` proves on Host only: all three module identities, SHA, a common endpoint and lock/journal reference, unchanged PS Runtime deployment request, fail-closed unsupported installers, invalid Root/script selectors, and preserved Root/owner/rollback/factory contracts.
+
+**No claims of completed convergence:** Product deployment still operates through Bootstrap; engineering deployment still has independent SSH and local state. There are currently **two actual transaction implementations**; one is being retired only after replacement is safe and available. Merely sharing an endpoint string or a plan is not yet shared transactional locking. The current main still does not implement a trusted Master ownership generation service or an authenticated non-Root WordPort privileged helper. Gate 1 Host-only must **never** authorize `sudo`, arbitrary Python/argv, source pin replacement or FPGA programming.
+
+## Required next integration acceptance before removing legacy paths
+
+- **One production authority:** authenticate a real active Master (and validate revocation/generation at dispatch), bind PPU identity, use transport that meets deployment security requirements. Bootstrap commissioning token alone cannot stand in for this.
+- **One transaction and journal:** adapt immutable and allowlisted engineering packages to existing Bootstrap upload/Coordinator, not a new Lock/Journal. Enforce source integrity and *publisher authenticity* independently, path confinement, protected Root code boundary, Site/FPGA quiescence and negative recovery cases. The target helper must be installed/reviewed and cannot be a client-supplied `python -c` under Root.
+- **Dual-host lifecycle:** retain SWPC bundle version matching, idempotent retry, atomic activation, verify and bounded compensation/rollback including Z2 failure, and fail-closed `recovery_required` if one side's state is unknown. A multi-host transaction is not automatically atomic because both hosts have local locks.
+- **No breaking cut-over:** only after Host-only source/CI plus separately approved real Z2/SWPC acceptance demonstrate `wordport`, `openocd-integration`, and `abtest` deploy/verify/rollback, switch SWPC CLI to API and remove SSH writer and its duplicate journal/rollback. Retain existing physical Root Guard, owner lock, Image/Manifest/Golden and Engineer factory recovery throughout.
+- **FPGA Image install:** stage verified paired BIN+Manifest through the same future transaction; keep protected `download/test/restore` for live lifecycle. Do not disguise `download` as `install`.
+
+## Gate 1 / Gate 2 boundaries
+
+This PR changes only Host-only planning, the existing API's **reject-only** admission and associated documentation/tests. It does **not** perform deployment, add any Root capability, change installed Z2 permissions, make a network request, operate SWPC/Z2/FPGA/DUT, merge PR #1208, or retire a live engineering path. Any actual migration of protected runtime, on-device Owner claims and production Master authorization still requires evidence beyond GitHub-hosted tests.
