@@ -49,6 +49,7 @@
 - **Current / Development Mode** — [Three Shared BLOCKING Decisions](development/development-blocking-policy.md)：Path 2／Path 3 共用授權與來源、Z2 實機安全／復原、真實回執三個核心阻擋邊界；移除重複檢查，但不繞過裝置安全條件。
 
 ## Architecture and contracts
+- **Gate 1 / Path 1 / Draft / Host-only** — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
 - **Gate 1 / Path 1 / Host-only / Product policy candidate** — [PPU Z2 Monitor/Master/Engineer Privilege Boundary](architecture/ppu-privilege-boundary-gate1.md)：PPU 三級產品能力、Master 非 Linux Root 操作與部署、Engineer Root 維修、特權 Bridge 的預期邊界；僅 Host-only policy／tests，尚未接入 Runtime／Z2。
 - **Gate 1 / Path 1 / Source audit** — [Z2 Root Guard Rule Necessity Audit](development/z2-root-guard-rule-audit-gate1.md)：逐項核對 Root Guard、Source Pin、UIO／MMIO Owner、/proc 掃描、PPU Reload Fence、Job Lease 與 UNCERTAIN，標明必要保留、維護專用、重複候選及尚未合併的 Draft；本次不刪除受保護程式。
 
