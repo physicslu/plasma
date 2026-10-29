@@ -124,6 +124,13 @@ class NativeBluepillWordPort:
     def poisoned(self) -> bool:
         return bool(self._state.poisoned)
 
+    def counter_snapshot(self) -> dict[str, int]:
+        """Atomic cumulative MMIO counters for a stopped OpenOCD stage."""
+        parent = self._port._lease._parent
+        with parent._mutex:
+            return {"mmio_reads": int(self._state.reads),
+                    "mmio_writes": int(self._state.writes)}
+
     def _invoke(self, method: str, *args: object) -> int:
         parent = self._port._lease._parent
         with parent._mutex:

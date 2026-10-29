@@ -53,6 +53,7 @@
 - **Gate 1 / Path 1 / Source audit** — [Z2 Root Guard Rule Necessity Audit](development/z2-root-guard-rule-audit-gate1.md)：逐項核對 Root Guard、Source Pin、UIO／MMIO Owner、/proc 掃描、PPU Reload Fence、Job Lease 與 UNCERTAIN，標明必要保留、維護專用、重複候選及尚未合併的 Draft；本次不刪除受保護程式。
 
 
+
 - **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
 
 - **Gate 1 Draft / GitHub-hosted only** — [Unified FPGA Build & Diagnostic Engine v1.0](architecture/plasma-unified-fpga-build-diagnostics-v1.md)：Path 2／Path 3 共用 Vivado Driver、階段式錯誤診斷、License／目錄前置檢查、SHA256 Artifact；本次僅驗證離線測試，未在 SWPC 重新建置，硬體 M1 NO-GO。
@@ -223,6 +224,7 @@
 - **Gate 1 / Paths 1+3 / Draft** — [Native C WordPort Bridge](development/native-c-wordport-gate1-host.md)：在既有 Z2 PS 受保護 Python Owner／Site lease 與本機 UNIX Socket 內，以 SHA-pinned ARMv7 C 處理 Remote Bitbang GPIO/MMIO/DMB；原始 Protocol A/B 為 Host-only 測試，後續經核准實測 DPIDR、v0.1 Flash 與 heartbeat。總 session alarm 600 秒、socket idle 60 秒；[公開執行腳本與操作索引](evidence/native-c-wordport-2026-10-28/README.md)保存可審查來源，原始波形及 Flash 讀回保留於私有工作目錄。
 - **Gate 1 / Host-only candidate / Path 2** — [Image-agnostic Native C WordPort Programming](development/image-agnostic-wordport-path2.md)：每次 Work Order 動態選擇原始 BIN 與獨立 SHA256，依 exact ICPN Programming Profile／Flash Geometry 計算 Erase／Readback，使用既有 Z2 PS OpenOCD／PL WordPort；目前只准 STM32F103C8T6 Site 1，尚未部署及執行新的實機驗證。
 - **Gate 1 / Path 2 guarded-hardware / Draft** — [Native C WordPort v0.2 SWPC→Z2／Z2 Direct](development/native-wordport-v02-path2.md)：重用 PR #1199 PS-local Native C Bridge，新增固定入口與來源 SHA、v0.2 62,800-byte 一次性 Erase／Program／Verify／Readback，失敗時於同一 OpenOCD 工作階段先讀 DHCSR／FIFO／FLASH 狀態再 Halt 讀 PC／xPSR。GitHub-hosted 僅 Host-only 測試；SWPC／Z2／DUT 執行仍 NOT_RUN，禁止自動重試、Reset 或部署。
+- **Gate 1 / Draft / PR #1203** — [SWD Performance Baseline 與階段量測](development/swd-performance-baseline-2026-10-29.md)：紀錄既有 A/B 原始證據、monotonic 階段時間與 Native C／WordPort 計數器對帳；實機新 A/B 量測須符合 Owner/SHA 與 Site 1 安全授權。
 - **Gate 1A / GitHub-hosted SIM-1／SIM-2** — [Fixed ABI v1 Dual-Site RTL + Protocol-neutral PS↔PL Driver](development/fixed-abi-dual-site-gate1a.md)：Site1／Site2 真實 RTL 模擬引擎、正式 PS SWD Controller 閉環及負向隔離；不代表 Z2／DUT／八 Site 實體驗證。
 - **Host-only software integration** — [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md)：正式 Python 模組使用 native 32-bit mmap 存取、Register Allowlist、Site Lease、Thread Safety 與生命週期保護；已完成 SWD-03 Development HIL（2026-10-16），但未涵蓋 LT02 新 IP。
 - **Host-only candidate / NO REAL UIO HIL** — [UIO Runtime Backend Phase 2A](development/uio-runtime-backend-host-v1.md)：實作 Fake sysfs／Regular File 專用 UIO mapN、精確物理資源 Pin、Site Lease、Mapping Generation、Failure Injection；**拒絕開啟 `/dev/uioX` Character Device**，M1 仍 NO-GO。

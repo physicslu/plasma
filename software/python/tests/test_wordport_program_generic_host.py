@@ -12,6 +12,7 @@ import socket
 import shutil
 import subprocess
 import tempfile
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -32,6 +33,18 @@ class GenericImageContract(unittest.TestCase):
         path = self.directory / name
         path.write_bytes(payload)
         return path, hashlib.sha256(payload).hexdigest()
+
+    def test_development_bundle_source_pins_match_files(self):
+        repo = SCRIPT.parents[1]
+        for relative, expected in (
+            ("scripts/bluepill-wordport-session.py", module.SESSION_SHA),
+            ("software/python/plasma_interfaces/native_bluepill_word_port.py", module.PY_MODULE_SHA),
+            ("software/python/plasma_interfaces/wordport_stage_monitor.py", module.STAGE_MODULE_SHA),
+            ("software/python/plasma_interfaces/bluepill_remote_bitbang.py", module.RBB_MODULE_SHA),
+        ):
+            with self.subTest(relative=relative):
+                self.assertEqual(hashlib.sha256((repo / relative).read_bytes()).hexdigest(), expected)
+        self.assertEqual(str(module.BUNDLE), "/home/xilinx/plasma-swd-performance-20261029")
 
     def render(self, image_path, size, erased, operation="program"):
         return module.make_tcl(
@@ -170,6 +183,7 @@ class GenericSessionHostOnly(unittest.TestCase):
             def __init__(self, args):
                 path = Path(args[args.index("--socket") + 1])
                 self.socket = path
+                self.stage_evidence = Path(args[args.index("--stage-evidence") + 1])
                 self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 self.listener.bind(str(path))
                 self.returncode = None
@@ -182,7 +196,12 @@ class GenericSessionHostOnly(unittest.TestCase):
                 self.listener.close()
                 self.socket.unlink()
                 self.returncode = 0
-                return ('{"result":"BRIDGE_CLOSED"}\n', "")
+                return (json.dumps({"result": "BRIDGE_CLOSED", "wire_bytes": 30,
+                    "native_counters": {"mmio_reads": 13, "mmio_writes": 20,
+                                        "dmb_count_derived": 30},
+                    "socket_counters": {"wire_bytes": 30,
+                                        "socket_recv_calls": 5,
+                                        "socket_sendall_calls": 5}}) + "\n", "")
 
             def terminate(self):
                 self.terminated = True
@@ -202,6 +221,19 @@ class GenericSessionHostOnly(unittest.TestCase):
             self.assertIn(str(staged), tcl)
             self.assertIn("flash erase_address 0x08000000 0x2400", tcl)
             (tcl_file.parent / "readback-image.bin").write_bytes(staged.read_bytes())
+            base = time.monotonic_ns()
+            rows = []
+            for index, stage in enumerate(("ERASE", "PROGRAM", "VERIFY", "READBACK")):
+                for edge, step in (("BEGIN", 0), ("END", 1)):
+                    rows.append({"stage": stage, "edge": edge,
+                        "monotonic_ns": base + (index * 2 + step) * 100,
+                        "utc_ns": 1_000_000_000 + (index * 2 + step) * 100,
+                        "mmio_reads": 3 + index * 2 + step * 2,
+                        "mmio_writes": index * 4 + step * 4,
+                        "wire_bytes": index * 5 + step * 5,
+                        "socket_recv_calls": index + step,
+                        "socket_sendall_calls": index + step})
+            opened[0].stage_evidence.write_text("".join(json.dumps(x) + "\n" for x in rows))
             return subprocess.CompletedProcess(args, 0,
                 stdout="PLASMA_ERASE_OK\nPLASMA_PROGRAM_OK\n"
                        "PLASMA_VERIFY_OK\nPLASMA_READBACK_OK\n"
@@ -220,7 +252,7 @@ class GenericSessionHostOnly(unittest.TestCase):
              patch.object(module.subprocess, "run", side_effect=fake_run), \
              redirect_stdout(output):
             code = module.on_z2(args, socket_base=self.sock_base)
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 0, output.getvalue())
         self.assertEqual(len(opened), 1)
         self.assertFalse(opened[0].terminated)
         self.assertEqual(list(self.sock_base.iterdir()), [])
@@ -230,7 +262,15 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.assertEqual(result["readback_sha256"], image_sha)
         self.assertEqual(result["image_bytes"], 8194)
         self.assertEqual(result["erase_bytes"], 0x2400)
+        preflight = result["performance"]["preflight"]
+        self.assertLessEqual(preflight["start_monotonic_ns"],
+                             preflight["end_monotonic_ns"])
+        self.assertLessEqual(preflight["start_utc_ns"], preflight["end_utc_ns"])
+        for key in ("wire_bytes", "mmio_reads", "mmio_writes",
+                    "dmb_count_derived", "socket_recv_calls", "socket_sendall_calls"):
+            self.assertEqual(preflight[key], 0)
         self.assertEqual(result["electrical"], "NOT_MEASURED_DEV_MODE_NON_BLOCKING")
+        self.assertEqual(result["performance"]["counter_reconciliation"]["result"], "PASS")
         self.assertTrue(result["socket_released"])
         self.assertTrue(result["no_auto_retry"])
 

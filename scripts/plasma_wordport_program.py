@@ -20,15 +20,17 @@ import subprocess
 import sys
 import time
 
-BUNDLE = Path("/home/xilinx/plasma-native-c-wordport-1199")
+BUNDLE = Path("/home/xilinx/plasma-swd-performance-20261029")
 Z2_ENTRY = BUNDLE / "scripts/plasma_wordport_program.py"
 ROOT = Path("/root/plasma-path2-approved")
 PYTHON = "/opt/plasma/python/3.12.13/bin/python3"
 OPENOCD = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/bin/openocd"
 OPENOCD_SCRIPTS = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/share/openocd/scripts"
 NATIVE_SHA = "66261cef851c9777469b393b7539c5b0f8c2b039a032f1a5b4cbf9e93460e447"
-SESSION_SHA = "e2120e459e007dd1c01daa2cf216f4bcd71f2a6ce5dcc7f540a1b1c6d9f93461"
-PY_MODULE_SHA = "57dfad519993910ae04e1b05b1592b06d9db856b665a50bd81dd47dc6154b3ef"
+SESSION_SHA = "5e2e0781a66c541377e262325a26789ff55499e27cc433e399becf0fcf59b811"
+PY_MODULE_SHA = "9eb8a5e90f11132e46a0b67a69f5694d0c56e1ade47d1bec6f682fec77f19ab1"
+STAGE_MODULE_SHA = "551624f3effcdec4266b0a6867b1dd9e1ee4175486c5621767251bd7e8a1192f"
+RBB_MODULE_SHA = "8a466e46c611662c3f2f91ba41fa1b9b80d8951befef2db5b9af0d8b7bd30b11"
 # Flash geometry belongs to the exact target/provider, never to a firmware revision.
 # Additional target support must be admitted through a reviewed Programming Profile.
 PROFILE = {
@@ -263,7 +265,8 @@ proc plasma_require_irq_mask {phase} {
 """
 
 def make_tcl(socket: Path, firmware: Path | None, readback: Path, operation: str,
-             *, image_bytes: int = 0, erase_bytes: int = 0) -> str:
+             *, image_bytes: int = 0, erase_bytes: int = 0,
+             stage_socket: Path | None = None) -> str:
     """Compile a bounded OpenOCD command for a verified target profile."""
     if operation == "program" and (
         firmware is None or image_bytes < 1 or
@@ -284,6 +287,20 @@ source [find {PROFILE["target_cfg"]}]
 """ + FAILURE_DIAGNOSTIC_TCL + """
 init
 """
+    if stage_socket is not None:
+        if not SAFE_PATH.fullmatch(str(stage_socket)):
+            raise ValueError("INVALID_STAGE_SOCKET_PATH")
+        config += f'''proc plasma_mark {{edge stage}} {{
+    set channel [socket unix {stage_socket}]
+    puts $channel "$edge $stage"
+    flush $channel
+    set reply [gets $channel]
+    close $channel
+    if {{$reply ne "OK"}} {{error "STAGE_SNAPSHOT_FAILED"}}
+}}
+'''
+    def mark(edge: str, stage: str) -> str:
+        return f"plasma_mark {edge} {stage}\n" if stage_socket is not None else ""
     # Read-only register qualification (no Flash operations and no reset).
     # OpenOCD read_memory/get_reg return actual Tcl values; exit/echo alone
     # must never be confused with successful register acquisition.
@@ -402,11 +419,13 @@ proc plasma_core_probe {} {
         return config + register_tcl + "\n".join(commands) + "\n"
     if operation == "reset-run":
         # No flash probe, erase, program, verify, dump, or preparatory halt.
-        return config + ('echo "PLASMA_RESET_RUN_BEGIN"\n'
+        return config + (mark("BEGIN", "RESET") + 'echo "PLASMA_RESET_RUN_BEGIN"\n'
                          'if {[catch {reset run} failure]} {\n'
+                         + ('    plasma_mark FAIL RESET\n' if stage_socket is not None else '') +
                          '    echo "PLASMA_RESET_RUN_FAIL $failure"\n'
                          '    shutdown error\n'
                          '}\n'
+                         + mark("END", "RESET") +
                          'echo "PLASMA_RESET_RUN_OK"\n'
                          'shutdown\n')
     if operation != "program":
@@ -424,11 +443,14 @@ if {{[catch {{plasma_require_irq_mask PRE_ERASE}} reason]}} {{
     shutdown error
 }}
 flash probe 0
+{mark("BEGIN", "ERASE")}\
 echo "PLASMA_ERASE_BEGIN"
 if {{[catch {{flash erase_address 0x{PROFILE["main_flash_base"]:08X} 0x{erase_bytes:X}}} failure]}} {{
+    {mark("FAIL", "ERASE").strip()}
     plasma_diag ERASE "$failure"
     shutdown error
 }}
+{mark("END", "ERASE")}\
 echo "PLASMA_ERASE_OK"
 # Erase may use a target RAM algorithm: verify the mask remained set
 # before handing the target to the separate Flash Program algorithm.
@@ -436,21 +458,30 @@ if {{[catch {{plasma_require_irq_mask PRE_PROGRAM}} reason]}} {{
     echo "PLASMA_IRQ_MASK_GATE_FAIL PRE_PROGRAM $reason"
     shutdown error
 }}
+{mark("BEGIN", "PROGRAM")}\
 echo "PLASMA_PROGRAM_BEGIN"
 if {{[catch {{flash write_image {firmware} 0x{PROFILE["main_flash_base"]:08X} bin}} failure]}} {{
+    {mark("FAIL", "PROGRAM").strip()}
     plasma_diag PROGRAM "$failure"
     shutdown error
 }}
+{mark("END", "PROGRAM")}\
 echo "PLASMA_PROGRAM_OK"
+{mark("BEGIN", "VERIFY")}\
 if {{[catch {{verify_image {firmware} 0x{PROFILE["main_flash_base"]:08X} bin}} failure]}} {{
+    {mark("FAIL", "VERIFY").strip()}
     plasma_diag VERIFY "$failure"
     shutdown error
 }}
+{mark("END", "VERIFY")}\
 echo "PLASMA_VERIFY_OK"
+{mark("BEGIN", "READBACK")}\
 if {{[catch {{dump_image {readback} 0x{PROFILE["main_flash_base"]:08X} {image_bytes}}} failure]}} {{
+    {mark("FAIL", "READBACK").strip()}
     plasma_diag READBACK "$failure"
     shutdown error
 }}
+{mark("END", "READBACK")}\
 echo "PLASMA_READBACK_OK"
 echo "PLASMA_PROGRAM_COMPLETED_NO_RESET"
 shutdown
@@ -519,6 +550,10 @@ def z2_preflight(args):
         raise NotRun(77, "PINNED_BRIDGE_SESSION_SHA_MISMATCH")
     if sha(file_at(str(BUNDLE / "software/python/plasma_interfaces/native_bluepill_word_port.py"))) != PY_MODULE_SHA:
         raise NotRun(77, "PINNED_NATIVE_MODULE_SHA_MISMATCH")
+    if sha(file_at(str(BUNDLE / "software/python/plasma_interfaces/wordport_stage_monitor.py"))) != STAGE_MODULE_SHA:
+        raise NotRun(77, "PINNED_STAGE_MODULE_SHA_MISMATCH")
+    if sha(file_at(str(BUNDLE / "software/python/plasma_interfaces/bluepill_remote_bitbang.py"))) != RBB_MODULE_SHA:
+        raise NotRun(77, "PINNED_RBB_MODULE_SHA_MISMATCH")
     file_at(OPENOCD)
     if not os.access(OPENOCD, os.X_OK):
         raise NotRun(77, "OPENOCD_NOT_EXECUTABLE")
@@ -562,7 +597,24 @@ def z2_preflight(args):
 
 
 def on_z2(args, *, socket_base: Path = Path("/run")):
+    preflight_start_ns = time.monotonic_ns()
+    preflight_start_utc_ns = time.time_ns()
     firmware, native, barrier, boot, root_sha, image_bytes, image_sha, erase_bytes = z2_preflight(args)
+    preflight_end_ns = time.monotonic_ns()
+    preflight_end_utc_ns = time.time_ns()
+    preflight_timing = {"result": "PASS", "start_monotonic_ns": preflight_start_ns,
+                        "end_monotonic_ns": preflight_end_ns,
+                        "start_utc_ns": preflight_start_utc_ns,
+                        "end_utc_ns": preflight_end_utc_ns,
+                        "duration_s": (preflight_end_ns - preflight_start_ns) / 1e9,
+                        "bytes": image_bytes, "effective_bytes_per_s": None,
+                        # The PS-local Native C bridge is not started until
+                        # after this preflight completes.
+                        "wire_bytes": 0, "mmio_reads": 0, "mmio_writes": 0,
+                        "dmb_count_derived": 0, "socket_recv_calls": 0,
+                        "socket_sendall_calls": 0,
+                        "swd_wait": "NOT_OBSERVED", "swd_fault": "NOT_OBSERVED",
+                        "swd_retry": "NOT_OBSERVED"}
     if args.operation == "preflight":
         print(json.dumps({
             "operation": "preflight", "result": "PASS",
@@ -588,6 +640,7 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
             "electrical": "NOT_MEASURED_DEV_MODE_NON_BLOCKING",
             "hw_action": "NONE",
             "no_erase_program_halt_reset": True,
+            "stage_timing": {"preflight": preflight_timing},
         }, sort_keys=True), flush=True)
         return 0
     base = BUNDLE / ".work/native-wordport-path2"
@@ -610,20 +663,25 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
     socketdir.mkdir(mode=0o700)
     socket = socketdir / "swd.sock"
     tcl = evidence / "openocd.tcl"
+    stage_evidence = evidence / "stages.jsonl"
+    stage_socket = Path(str(socket) + ".stage")
     tcl.write_text(make_tcl(socket, staged, readback, args.operation,
-                            image_bytes=image_bytes, erase_bytes=erase_bytes))
+                            image_bytes=image_bytes, erase_bytes=erase_bytes,
+                            stage_socket=stage_socket))
     bridge_cmd = [
         PYTHON, "-I", "-B", str(BUNDLE / "scripts/bluepill-wordport-session.py"),
         "--root-source-sha", root_sha, "--boot-id", boot,
         "--barrier", str(barrier), "--barrier-sha256", sha(barrier),
         "--native", str(native), "--native-sha256", NATIVE_SHA,
-        "--socket", str(socket), "--owner-attested",
+        "--socket", str(socket), "--stage-evidence", str(stage_evidence),
+        "--owner-attested",
     ]
     bridge = None
     completed = None
     bridge_stdout = bridge_stderr = ""
     error = None
     timeout_log = ""
+    run_start_ns = time.monotonic_ns()
     try:
         bridge = subprocess.Popen(bridge_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   text=True, start_new_session=True)
@@ -666,10 +724,68 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         if socketdir.exists() and not socket.exists():
             socketdir.rmdir()
     log = (completed.stdout + completed.stderr) if completed is not None else timeout_log
+    run_end_ns = time.monotonic_ns()
     (evidence / "openocd.log").write_text(log)
     (evidence / "bridge.log").write_text(bridge_stdout + bridge_stderr)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "software/python"))
+    from plasma_interfaces.wordport_stage_monitor import stage_report
+    events = []
+    if stage_evidence.is_file():
+        try:
+            events = [json.loads(line) for line in stage_evidence.read_text().splitlines()]
+        except (OSError, ValueError):
+            error = "STAGE_EVIDENCE_INVALID"
+    try:
+        stages = stage_report(events, image_bytes, erase_bytes, operation=args.operation)
+    except ValueError as exc:
+        error = f"STAGE_EVIDENCE_INVALID: {exc}"[:500]
+        stages = stage_report([], image_bytes, erase_bytes, operation=args.operation)
+    required = ("erase", "program", "verify", "readback") if args.operation == "program" else (
+        ("reset",) if args.operation == "reset-run" else ())
+    stage_complete = all(stages[name]["result"] == "PASS" for name in required)
+    stage_seconds = sum(stages[name].get("duration_s", 0) for name in required)
+    total_seconds = (run_end_ns - preflight_start_ns) / 1e9
+    other_seconds = total_seconds - preflight_timing["duration_s"] - stage_seconds
+    bridge_receipt = None
+    try:
+        bridge_receipt = json.loads(bridge_stdout.strip().splitlines()[-1])
+    except (IndexError, ValueError):
+        pass
+    counter_reconciliation = {"result": "NOT_OBSERVED"}
+    if isinstance(bridge_receipt, dict) and "native_counters" in bridge_receipt:
+        native_total = bridge_receipt["native_counters"]
+        socket_total = bridge_receipt["socket_counters"]
+        totals = {**native_total, **socket_total}
+        keys = ("mmio_reads", "mmio_writes", "dmb_count_derived", "wire_bytes",
+                "socket_recv_calls", "socket_sendall_calls")
+        sums = {key: sum(stages[name].get(key, 0) for name in required) for key in keys}
+        residual = {key: totals[key] - sums[key] for key in keys}
+        counter_reconciliation = {"result": "PASS" if all(v >= 0 for v in residual.values())
+                                  and socket_total["wire_bytes"] == bridge_receipt["wire_bytes"]
+                                  else "FAIL", "total": {key: totals[key] for key in keys},
+                                  "stages_sum": sums, "other": residual}
+    performance = {"schema": "plasma.swd.performance.v1", "preflight": preflight_timing,
+                   "stages": stages, "run_start_monotonic_ns": run_start_ns,
+                   "run_end_monotonic_ns": run_end_ns,
+                   "run_duration_s": (run_end_ns - run_start_ns) / 1e9,
+                   "total_duration_s": total_seconds,
+                   "other_duration_s": other_seconds,
+                   "counter_reconciliation": counter_reconciliation,
+                   "flash_loader": {"working_area_configured_bytes": 4096,
+                                    "working_area_allocated_bytes": "NOT_OBSERVED",
+                                    "erase_pages_planned": erase_bytes // PROFILE["erase_granularity_bytes"],
+                                    "erase_pages_observed": "NOT_OBSERVED",
+                                    "loader_executed": "NOT_OBSERVED",
+                                    "fifo_bytes": "NOT_OBSERVED",
+                                    "fifo_batches": "NOT_OBSERVED",
+                                    "fallback": "NOT_OBSERVED"},
+                   "swd_wait": "NOT_OBSERVED", "swd_fault": "NOT_OBSERVED",
+                   "swd_retry": "NOT_OBSERVED"}
+    (evidence / "performance.json").write_text(json.dumps(performance, sort_keys=True, indent=2) + "\n")
     eligible = (completed is not None and completed.returncode == 0 and
-                bridge is not None and bridge.returncode == 0 and not socket.exists())
+                bridge is not None and bridge.returncode == 0 and not socket.exists() and
+                stage_complete and counter_reconciliation["result"] == "PASS" and
+                other_seconds >= 0)
     if args.operation == "program":
         success = (eligible and "PLASMA_PROGRAM_COMPLETED_NO_RESET" in log and
                    readback.is_file() and readback.stat().st_size == image_bytes and
@@ -707,6 +823,17 @@ def on_z2(args, *, socket_base: Path = Path("/run")):
         "no_reset_no_retry": args.operation != "reset-run",
         "no_auto_retry": True,
         "no_flash_write": args.operation != "program",
+        "performance": performance,
+        "versions": {"engine_sha256": sha(Path(__file__)),
+                     "bridge_session_sha256": SESSION_SHA,
+                     "native_python_module_sha256": PY_MODULE_SHA,
+                     "stage_module_sha256": STAGE_MODULE_SHA,
+                     "rbb_module_sha256": RBB_MODULE_SHA,
+                     "native_c_sha256": NATIVE_SHA,
+                     "openocd_sha256": sha(Path(OPENOCD)) if Path(OPENOCD).is_file() else "NOT_OBSERVED",
+                     "target_cfg_sha256": sha(Path(OPENOCD_SCRIPTS) / PROFILE["target_cfg"])
+                     if (Path(OPENOCD_SCRIPTS) / PROFILE["target_cfg"]).is_file() else "NOT_OBSERVED",
+                     "boot_id": boot},
     }
     if args.operation == "program":
         receipt["failure_diagnostics"] = failure_diagnostics
