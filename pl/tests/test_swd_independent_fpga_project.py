@@ -35,6 +35,19 @@ def test_vivado_sources_standalone_new_swd_only_and_no_mpe_fallback():
         assert banned not in p
 
 
+def test_vivado_2026_1_readonly_reset_parameter_is_verified_not_written():
+    bd = (PROJECT / "create_block_design.tcl").read_text()
+    active = "\n".join(line for line in bd.splitlines()
+                       if not line.lstrip().startswith("#"))
+    # Real SWPC Vivado 2026.1 emits BD 41-737 CRITICAL WARNING when
+    # CONFIG.C_EXT_RESET_HIGH is written. The default is 0 in real HWH;
+    # retain fail-closed HWH validation of that actual output instead.
+    assert "set_property CONFIG.C_EXT_RESET_HIGH" not in active
+    verifier = (PROJECT / "verify_hwh.py").read_text()
+    assert 'number(parameters(rst).get("C_EXT_RESET_HIGH")) == 0' in verifier
+    assert 'ports(rst).get("ext_reset_in") == "ps7_0_FCLK_RESET0_N"' in verifier
+
+
 def test_pin_contract_has_exactly_four_unique_board_pads():
     xdc = (PL / "constraints/pynq-z2/z2-swd-independent.xdc").read_text()
     actual = [x for x in xdc.splitlines() if x.startswith("set_property ")]

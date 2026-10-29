@@ -35,7 +35,9 @@ connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M01_AXI] \
     [get_bd_intf_pins swd_site2/S_AXI]
 
 set rst [create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps7_0_100M]
-set_property CONFIG.C_EXT_RESET_HIGH {0} $rst
+# Vivado 2026.1 exposes C_EXT_RESET_HIGH as read-only. Its actual value is
+# checked as 0 in the emitted HWH by verify_hwh.py; do not issue an invalid
+# setter that produces BD 41-737 CRITICAL WARNING in the generic host build.
 connect_bd_net [get_bd_pins ps7_0/FCLK_CLK0] \
     [get_bd_pins ps7_0/M_AXI_GP0_ACLK] \
     [get_bd_pins rst_ps7_0_100M/slowest_sync_clk] \
