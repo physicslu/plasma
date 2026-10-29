@@ -30,6 +30,7 @@ SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "rolled_back", "v
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
+_API_TRANSACTION_ID = re.compile(r"[0-9a-f]{32}\Z")
 QUALIFICATION_HEALTH_FAILURE = "qualification-injected post-activation health-check failure"
 
 
@@ -65,6 +66,7 @@ class DeploymentRequest:
     facility_id: str
     display_name: str
     qualification_fail_health_check: bool = False
+    api_transaction_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -98,6 +100,7 @@ class DeploymentRecord:
     kind: str = "ppu-runtime"
     module: str | None = None
     source_commit: str | None = None
+    api_transaction_id: str | None = None
 
 
 class Journal:
@@ -221,6 +224,12 @@ class DeploymentCoordinator:
                 fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
 
     def execute(self, request: DeploymentRequest) -> Mapping[str, Any]:
+        # This is an audit correlation tag only, never a Root/Master grant.
+        if request.api_transaction_id is not None and (
+            not isinstance(request.api_transaction_id, str)
+            or not _API_TRANSACTION_ID.fullmatch(request.api_transaction_id)
+        ):
+            raise DeploymentError("Bootstrap API transaction identity is invalid")
         with self._deployment_lock():
             if request.qualification_fail_health_check:
                 previous = self.installer._previous_current(self._installer_paths().current)
@@ -328,6 +337,7 @@ class DeploymentCoordinator:
             started_at_epoch_s=now,
             updated_at_epoch_s=now,
             release_artifact=str(request.release_artifact),
+            api_transaction_id=request.api_transaction_id,
         )
         self.journal.write(record, "received")
 
@@ -454,6 +464,7 @@ def _parser() -> argparse.ArgumentParser:
     deploy.add_argument("--ppu-id", required=True)
     deploy.add_argument("--facility-id", required=True)
     deploy.add_argument("--display-name", default="Plasma PPU")
+    deploy.add_argument("--api-transaction-id", help="optional Bootstrap API correlation ID; not authority")
     deploy.add_argument(
         "--qualification-fail-health-check",
         action="store_true",
@@ -487,6 +498,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         facility_id=args.facility_id,
         display_name=args.display_name,
         qualification_fail_health_check=bool(args.qualification_fail_health_check),
+        api_transaction_id=args.api_transaction_id,
     )
     try:
         result = DeploymentCoordinator(paths=paths, installer=installer).execute(request)

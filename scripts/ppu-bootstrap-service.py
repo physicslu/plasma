@@ -216,18 +216,17 @@ def _admit_coordinator_journal(paths: ServicePaths) -> dict[str, Any] | None:
     return record
 
 
-def _host_only_reconcile_runtime_result(
+def _reconcile_runtime_result(
     paths: ServicePaths,
     *,
     api_transaction_id: str,
     previous_coordinator_id: str | None,
     runner_result: Mapping[str, Any],
 ) -> dict[str, str]:
-    """Model an exact API/Coordinator receipt binding without enabling cutover.
+    """Bind an API result to the exact Coordinator transaction under its journal.
 
-    Gate 1 Host-only: the live Bootstrap worker does NOT call this function.
-    Production dispatch needs lock-time transaction correlation and recovery
-    qualification before a success receipt can rely on this result.
+    The API ID is written by the existing Coordinator while holding its flock.
+    It is only a correlation field, never a Master/Root authorization token.
     """
     if not isinstance(api_transaction_id, str) or not UPLOAD_ID_RE.fullmatch(api_transaction_id):
         raise BootstrapServiceError("deployment API transaction identity is invalid")
@@ -241,7 +240,8 @@ def _host_only_reconcile_runtime_result(
         raise BootstrapServiceError("deployment Coordinator receipt is missing")
     if (
         journal.get("state") != "runtime_active"
-        or journal.get("kind", "ppu-runtime") != "ppu-runtime"
+        or journal.get("kind") != "ppu-runtime"
+        or journal.get("api_transaction_id") != api_transaction_id
         or not isinstance(journal.get("release_id"), str)
         or journal["release_id"] != expected_release
         or journal["transaction_id"] == previous_coordinator_id
@@ -415,6 +415,9 @@ def run_deployment_subprocess(
     upload_id: str,
     request: Mapping[str, Any],
 ) -> dict[str, Any]:
+    api_transaction_id = request.get("api_transaction_id")
+    if not isinstance(api_transaction_id, str) or not UPLOAD_ID_RE.fullmatch(api_transaction_id):
+        raise BootstrapServiceError("internal Bootstrap API transaction identity is missing")
     upload = _upload_paths(paths, upload_id)
     meta = _read_json(upload.meta)
     if meta.get("state") != "committed" or not upload.committed.is_file() or not upload.sidecar.is_file():
@@ -438,6 +441,8 @@ def run_deployment_subprocess(
         str(request["display_name"]),
         "--product-root",
         str(paths.product_root),
+        "--api-transaction-id",
+        api_transaction_id,
     ]
     completed = subprocess.run(
         argv,
@@ -523,7 +528,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 raise BootstrapServiceError(
                     "previous deployment requires explicit recovery before another deployment"
                 )
-            _admit_coordinator_journal(self.bootstrap_paths)
+            previous_coordinator = _admit_coordinator_journal(self.bootstrap_paths)
             transaction_id = uuid.uuid4().hex
             record = {
                 "schema_version": 1,
@@ -543,14 +548,29 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 record["updated_at_epoch_s"] = time.time()
                 _atomic_json(self.bootstrap_paths.deployment_record, record)
                 try:
-                    result = dict(self.deployment_runner(self.bootstrap_paths, upload_id, request))
+                    # The public request is strictly normalized before this
+                    # internal correlation ID is added; clients cannot choose it.
+                    internal_request = {**request, "api_transaction_id": transaction_id}
+                    result = dict(self.deployment_runner(self.bootstrap_paths, upload_id, internal_request))
+                    receipt = _reconcile_runtime_result(
+                        self.bootstrap_paths,
+                        api_transaction_id=transaction_id,
+                        previous_coordinator_id=(
+                            previous_coordinator["transaction_id"] if previous_coordinator else None
+                        ),
+                        runner_result=result,
+                    )
                 except Exception as exc:
-                    record["state"] = "failed"
-                    record["error_code"] = "deployment_runner_failed"
+                    # A failed/ambiguous runner may already have activated a
+                    # release. Do not make this transaction retryable without
+                    # an authoritative matching Coordinator receipt.
+                    record["state"] = "recovery_required"
+                    record["error_code"] = "coordinator_result_unreconciled"
                     record["error"] = str(exc)
+                    record["result"] = None
                 else:
                     record["state"] = "succeeded"
-                    record["result"] = result
+                    record["result"] = {**result, "coordinator_receipt": receipt}
                 record["updated_at_epoch_s"] = time.time()
                 _atomic_json(self.bootstrap_paths.deployment_record, record)
 

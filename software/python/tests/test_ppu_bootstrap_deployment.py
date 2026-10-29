@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -134,12 +135,31 @@ def test_successful_transaction_orders_verify_stage_activate_health(tmp_path: Pa
     result = coordinator.execute(_request(tmp_path))
     assert result["result"] == "PASS"
     assert result["transaction"]["state"] == "runtime_active"
+    assert result["transaction"]["api_transaction_id"] is None  # Local CLI remains independent.
     assert result["capabilities"]["fpga_update"] is False
     assert installer.calls == ["verify", "python", "baseline", "previous", "stage", "activate", "health"]
     journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
     assert journal["state"] == "runtime_active"
     assert coordinator.paths.journal.stat().st_mode & 0o077 == 0
     assert coordinator.paths.lock.stat().st_mode & 0o077 == 0
+
+
+def test_api_transaction_id_is_recorded_by_the_locked_coordinator(tmp_path: Path):
+    coordinator = _coordinator(tmp_path, FakeInstaller())
+    api_id = "f" * 32
+    result = coordinator.execute(replace(_request(tmp_path), api_transaction_id=api_id))
+    assert result["transaction"]["api_transaction_id"] == api_id
+    journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
+    assert journal["api_transaction_id"] == api_id
+    assert journal["transaction_id"] == result["transaction"]["transaction_id"]
+
+
+@pytest.mark.parametrize("api_id", ["", "f" * 31, "F" * 32, "unknown", True])
+def test_invalid_api_transaction_id_is_rejected_before_coordinator_mutation(tmp_path: Path, api_id):
+    coordinator = _coordinator(tmp_path, FakeInstaller())
+    with pytest.raises(deployment.DeploymentError, match="API transaction identity"):
+        coordinator.execute(replace(_request(tmp_path), api_transaction_id=api_id))
+    assert not coordinator.paths.journal.exists()
 
 
 def test_verification_failure_is_terminal_and_never_stages(tmp_path: Path):

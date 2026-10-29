@@ -7,6 +7,7 @@ import json
 import sys
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -92,6 +93,7 @@ def test_runtime_request_rejects_caller_selected_executable_and_provenance() -> 
         {"script": "run.py"},
         {"source_commit": "a" * 40},
         {"artifact_sha256": "f" * 64},
+        {"api_transaction_id": "f" * 32},
     ):
         with pytest.raises(bootstrap.BootstrapServiceError, match="unsupported deployment fields"):
             bootstrap._deployment_request({
@@ -241,10 +243,12 @@ def test_bootstrap_api_rejects_coordinator_recovery_before_queueing(tmp_path: Pa
 
 
 def _active_runtime_journal(paths, *, state="runtime_active", kind="ppu-runtime",
-                            release_id="0.4.0-abcdef123456", tx="new-coord-tx") -> Path:
+                            release_id="0.4.0-abcdef123456", tx="new-coord-tx",
+                            api_id="f" * 32) -> Path:
     path = _coordinator_record(paths, state)
     data = json.loads(path.read_text(encoding="utf-8"))
-    data.update(transaction_id=tx, kind=kind, release_id=release_id)
+    data.update(transaction_id=tx, kind=kind, release_id=release_id,
+                api_transaction_id=api_id)
     path.write_text(json.dumps(data), encoding="utf-8")
     return path
 
@@ -253,7 +257,7 @@ def test_host_only_api_coordinator_transaction_reconciliation(tmp_path: Path) ->
     paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
     _active_runtime_journal(paths)
     api_id = "f" * 32
-    binding = bootstrap._host_only_reconcile_runtime_result(
+    binding = bootstrap._reconcile_runtime_result(
         paths, api_transaction_id=api_id,
         previous_coordinator_id="old-coord-tx",
         runner_result={"result": "PASS", "kit_release_id": "0.4.0-abcdef123456"},
@@ -264,7 +268,7 @@ def test_host_only_api_coordinator_transaction_reconciliation(tmp_path: Path) ->
         "coordinator_release_id": "0.4.0-abcdef123456",
         "coordinator_state": "runtime_active",
     }
-    # The helper is evidence-only; no API transaction is written or activated.
+    # The helper is read-only; the real worker separately persists the result.
     assert not paths.deployment_record.exists()
 
 
@@ -274,13 +278,15 @@ def test_host_only_api_coordinator_transaction_reconciliation(tmp_path: Path) ->
     {"kind": "engineering-module"},
     {"release_id": "wrong-release"},
     {"tx": "old-coord-tx"},
+    {"api_id": "e" * 32},
+    {"api_id": None},
 ])
 def test_host_only_reconciliation_rejects_mismatched_journal(tmp_path: Path, override: dict) -> None:
     paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
     journal = _active_runtime_journal(paths, **override)
     before = journal.read_bytes()
     with pytest.raises(bootstrap.BootstrapServiceError, match="not reconciled"):
-        bootstrap._host_only_reconcile_runtime_result(
+        bootstrap._reconcile_runtime_result(
             paths, api_transaction_id="f" * 32,
             previous_coordinator_id="old-coord-tx",
             runner_result={"result": "PASS", "kit_release_id": "0.4.0-abcdef123456"},
@@ -292,7 +298,7 @@ def test_host_only_reconciliation_rejects_missing_or_untrusted_evidence(tmp_path
     paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
     good_result = {"result": "PASS", "kit_release_id": "0.4.0-abcdef123456"}
     with pytest.raises(bootstrap.BootstrapServiceError, match="receipt is missing"):
-        bootstrap._host_only_reconcile_runtime_result(
+        bootstrap._reconcile_runtime_result(
             paths, api_transaction_id="f" * 32,
             previous_coordinator_id=None, runner_result=good_result,
         )
@@ -303,13 +309,116 @@ def test_host_only_reconciliation_rejects_missing_or_untrusted_evidence(tmp_path
         ("f" * 32, {"result": "PASS"}, "release identity"),
     ]:
         with pytest.raises(bootstrap.BootstrapServiceError, match=message):
-            bootstrap._host_only_reconcile_runtime_result(
+            bootstrap._reconcile_runtime_result(
                 paths, api_transaction_id=api_id,
                 previous_coordinator_id=None, runner_result=result,
             )
     journal.chmod(0o644)
     with pytest.raises(bootstrap.BootstrapServiceError, match="private regular file"):
-        bootstrap._host_only_reconcile_runtime_result(
+        bootstrap._reconcile_runtime_result(
             paths, api_transaction_id="f" * 32,
             previous_coordinator_id=None, runner_result=good_result,
         )
+
+
+def _host_only_server(paths, runner):
+    server = object.__new__(bootstrap.BootstrapHTTPServer)
+    server.bootstrap_paths = paths
+    server.deployment_thread = None
+    server.mutation_lock = threading.RLock()
+    server.deployment_runner = runner
+    return server
+
+
+def _submit_host_only_runtime(server, paths):
+    upload_id = "a" * 32
+    upload = bootstrap._upload_paths(paths, upload_id)
+    upload.meta.parent.mkdir(parents=True, exist_ok=True)
+    upload.meta.write_text('{"state":"committed"}', encoding="utf-8")
+    response = server.start_deployment({
+        "upload_id": upload_id, "gateway_host": "127.0.0.1",
+        "ppu_id": "ppu-01", "facility_id": "lab", "display_name": "PPU",
+    })
+    assert server.deployment_thread is not None
+    server.deployment_thread.join(timeout=5)
+    assert not server.deployment_thread.is_alive()
+    return response, bootstrap._deployment_api_record(paths)
+
+
+def test_api_worker_persists_exact_coordinator_receipt(tmp_path: Path) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    handoff = []
+
+    def runner(paths, upload_id, request):
+        handoff.append(dict(request))
+        assert upload_id == "a" * 32
+        _active_runtime_journal(paths, api_id=request["api_transaction_id"])
+        return {"result": "PASS", "kit_release_id": "0.4.0-abcdef123456"}
+
+    server = _host_only_server(paths, runner)
+    initial, completed = _submit_host_only_runtime(server, paths)
+    assert initial["transaction_id"] == handoff[0]["api_transaction_id"]
+    assert completed["state"] == "succeeded"
+    assert completed["result"]["coordinator_receipt"] == {
+        "api_transaction_id": initial["transaction_id"],
+        "coordinator_transaction_id": "new-coord-tx",
+        "coordinator_release_id": "0.4.0-abcdef123456",
+        "coordinator_state": "runtime_active",
+    }
+
+
+def test_bootstrap_runner_passes_internal_api_id_to_verified_kit(tmp_path: Path, monkeypatch) -> None:
+    kit_tool = tmp_path / "ppu-bootstrap-kit.py"
+    kit_tool.write_text("# inert fixture", encoding="utf-8")
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap", kit_tool=kit_tool)
+    upload = bootstrap._upload_paths(paths, "a" * 32)
+    upload.meta.parent.mkdir(parents=True, exist_ok=True)
+    upload.meta.write_text('{"state":"committed"}', encoding="utf-8")
+    upload.committed.write_bytes(b"fixture")
+    upload.sidecar.write_text("fixture", encoding="utf-8")
+    commands = []
+
+    def fake_run(argv, **kwargs):
+        commands.append(list(argv))
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps({"result": "PASS", "kit_release_id": "v1"}),
+        )
+
+    monkeypatch.setattr(bootstrap.subprocess, "run", fake_run)
+    request = {"api_transaction_id": "f" * 32, "gateway_host": "127.0.0.1",
+               "ppu_id": "ppu-01", "facility_id": "lab", "display_name": "PPU"}
+    assert bootstrap.run_deployment_subprocess(paths, "a" * 32, request)["result"] == "PASS"
+    assert commands[0][-2:] == ["--api-transaction-id", "f" * 32]
+    with pytest.raises(bootstrap.BootstrapServiceError, match="internal Bootstrap API transaction"):
+        bootstrap.run_deployment_subprocess(paths, "a" * 32, {**request, "api_transaction_id": None})
+    assert len(commands) == 1
+
+
+@pytest.mark.parametrize("failure", ["missing", "wrong-api", "wrong-release", "stale-id", "exception"])
+def test_api_worker_requires_recovery_on_unreconciled_result(tmp_path: Path, failure: str) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    if failure == "stale-id":
+        _active_runtime_journal(paths, api_id=None)
+
+    def runner(paths, upload_id, request):
+        if failure == "exception":
+            raise RuntimeError("engine exited after possible activation")
+        if failure != "missing":
+            _active_runtime_journal(
+                paths,
+                api_id=("e" * 32 if failure == "wrong-api" else request["api_transaction_id"]),
+                release_id=("different-release" if failure == "wrong-release" else "0.4.0-abcdef123456"),
+            )
+        return {"result": "PASS", "kit_release_id": "0.4.0-abcdef123456"}
+
+    server = _host_only_server(paths, runner)
+    _, completed = _submit_host_only_runtime(server, paths)
+    assert completed["state"] == "recovery_required"
+    assert completed["error_code"] == "coordinator_result_unreconciled"
+    assert completed["result"] is None
+    with pytest.raises(bootstrap.BootstrapServiceError, match="requires explicit recovery"):
+        server.start_deployment({
+            "upload_id": "a" * 32, "gateway_host": "127.0.0.1",
+            "ppu_id": "ppu-01", "facility_id": "lab", "display_name": "PPU",
+        })
