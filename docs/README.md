@@ -11,6 +11,10 @@
 | **Plan** | 尚未全部實作的核准方向；不能宣稱為現有能力。 |
 | **Historical** | 僅供遷移背景；不是相容性或執行契約。 |
 
+## 跨廠牌燒錄預設安全政策
+
+- **Current design default / 部分實作** — [Target Execution and Interrupt Isolation](architecture/programming-interrupt-isolation-policy.md)：所有 IC 的破壞性 Erase/Program 前預設須驗證目標執行隔離；具中斷的 MCU 必須採用符合 Provider 的中斷遮罩或等效策略，無 CPU／ROM ISP 則須提出適用性或例外證據。現有實機驗證僅及於 STM32F103C8T6 Z2 Site 1，其他 Provider 的 Runtime Gate 仍待實作。
+
 ## Current external SWD PoC vs retired internal fixtures
 
 - **Current** — Z2 PS-local OpenOCD + WordPort/RemoteBitbang + paired PL SWD Image for Blue Pill: see root `AGENTS.md`, [PS OpenOCD architecture](architecture/ic-support-openocd-plan-executor.md), [retirement map](development/swd-legacy-path-retirement.md).
@@ -214,6 +218,8 @@
 - **HIL-A1 / GitHub-hosted cross-build / M1 NO-GO** — [ARMv7 Barrier SWPC A1 / Z2 A2](development/armv7-barrier-hil-a.md)：A1 於 GitHub-hosted 以固定 Debian OCI／APT Snapshot 交叉編譯 ARMv7 ELF、驗證 `dmb sy` 並上傳 SHA256 Artifact；原 SWPC A1 實測因工具鏈缺失 FAIL；A2 Z2 執行仍為 NOT RUN。
 - **P0 / Host-only / M1 NO-GO** — [Fixed ABI Site 1 Native-Word MMIO Adapter + ARMv7 DMB Candidate](development/p0-fixed-abi-site1-mmio-adapter-host.md)：沿用 LinuxMMIO 的 Site lease、嚴格 ABI 讀寫白名單、要求 Write Barrier 並驗證 COMMIT 順序；原生 ARMv7 Library、實體 Z2／DUT 尚未合格。
 - **Gate 1 / Paths 1+3 / Draft** — [Native C WordPort Bridge](development/native-c-wordport-gate1-host.md)：在既有 Z2 PS 受保護 Python Owner／Site lease 與本機 UNIX Socket 內，以 SHA-pinned ARMv7 C 處理 Remote Bitbang GPIO/MMIO/DMB；原始 Protocol A/B 為 Host-only 測試，後續經核准實測 DPIDR、v0.1 Flash 與 heartbeat。總 session alarm 600 秒、socket idle 60 秒；[公開執行腳本與操作索引](evidence/native-c-wordport-2026-10-28/README.md)保存可審查來源，原始波形及 Flash 讀回保留於私有工作目錄。
+- **Gate 1 / Host-only candidate / Path 2** — [Image-agnostic Native C WordPort Programming](development/image-agnostic-wordport-path2.md)：每次 Work Order 動態選擇原始 BIN 與獨立 SHA256，依 exact ICPN Programming Profile／Flash Geometry 計算 Erase／Readback，使用既有 Z2 PS OpenOCD／PL WordPort；目前只准 STM32F103C8T6 Site 1，尚未部署及執行新的實機驗證。
+- **Gate 1 / Path 2 guarded-hardware / Draft** — [Native C WordPort v0.2 SWPC→Z2／Z2 Direct](development/native-wordport-v02-path2.md)：重用 PR #1199 PS-local Native C Bridge，新增固定入口與來源 SHA、v0.2 62,800-byte 一次性 Erase／Program／Verify／Readback，失敗時於同一 OpenOCD 工作階段先讀 DHCSR／FIFO／FLASH 狀態再 Halt 讀 PC／xPSR。GitHub-hosted 僅 Host-only 測試；SWPC／Z2／DUT 執行仍 NOT_RUN，禁止自動重試、Reset 或部署。
 - **Gate 1A / GitHub-hosted SIM-1／SIM-2** — [Fixed ABI v1 Dual-Site RTL + Protocol-neutral PS↔PL Driver](development/fixed-abi-dual-site-gate1a.md)：Site1／Site2 真實 RTL 模擬引擎、正式 PS SWD Controller 閉環及負向隔離；不代表 Z2／DUT／八 Site 實體驗證。
 - **Host-only software integration** — [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md)：正式 Python 模組使用 native 32-bit mmap 存取、Register Allowlist、Site Lease、Thread Safety 與生命週期保護；已完成 SWD-03 Development HIL（2026-10-16），但未涵蓋 LT02 新 IP。
 - **Host-only candidate / NO REAL UIO HIL** — [UIO Runtime Backend Phase 2A](development/uio-runtime-backend-host-v1.md)：實作 Fake sysfs／Regular File 專用 UIO mapN、精確物理資源 Pin、Site Lease、Mapping Generation、Failure Injection；**拒絕開啟 `/dev/uioX` Character Device**，M1 仍 NO-GO。

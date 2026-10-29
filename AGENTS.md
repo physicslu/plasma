@@ -62,7 +62,7 @@ Approved Z2 development credentials remain exclusively in the private owner-cont
 
 ## 2. Programming data model
 
-Keep canonical Site, Programming Asset, Normalized Image, Job and Batch semantics. A Program operation writes only; Erase, Program, Verify and Read are separately selected. A complete flow states its stages explicitly. Site execution is independent except genuine shared physical resources. Do not infer supported IC models, OpenOCD qualification or board behavior from catalog metadata alone. Consult full contract and domain tests before altering execution semantics.
+Keep canonical Site, Programming Asset, Normalized Image, Job and Batch semantics. A Program operation writes only; Erase, Program, Verify and Read are separately selected. A complete flow states its stages explicitly. Site execution is independent except genuine shared physical resources. Do not infer supported IC models, OpenOCD qualification or board behavior from catalog metadata alone. Consult full contract and domain tests before altering execution semantics. **Cross-manufacturer programming default:** before destructive Erase/Program, verify target execution quiescence and isolate relevant application interrupts for interrupt-capable MCUs by an exact-ICPN/Provider-qualified strategy. Missing/unknown isolation fails closed. Non-CPU NOT_APPLICABLE or alternative ISP methods require reviewed evidence; do not apply Cortex-M `maskisr` blindly across other IC families. See `docs/architecture/programming-interrupt-isolation-policy.md` (design default; non-STM32 runtime enforcement not yet implemented).
 
 ## 3. Source-of-truth priority
 
