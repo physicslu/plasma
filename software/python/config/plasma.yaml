@@ -3,6 +3,11 @@ ppu:
   facility_id: swpc-lab
   model: PYNQ-Z2
   display_name: Plasma Z2 Prototype
+  # PPU Console limits (distinct authenticated Console identities, not sockets/tabs).
+  # Total is derived: max_master_consoles + max_readonly_consoles.
+  console:
+    max_master_consoles: 1
+    max_readonly_consoles: 5
 
 server:
   host: 127.0.0.1
