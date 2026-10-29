@@ -55,3 +55,16 @@ The existing `DeploymentCoordinator.execute_package_host_only()` is explicitly g
 **Important design constraint:** do not expose `execute_package_host_only()` over HTTP by weakening its temporary-root guard, and do not turn `HostOnlyPackageRequest` into a caller-controlled authority. Instead use the existing API/Coordinator with a *test-injected* Host-only runner for integration tests, preserving live denial; then implement reviewed production package dispatch and target staging in the same Coordinator after server-side admission. Preserve the existing Bootstrap API transaction → Coordinator receipt correlation and `recovery_required` behavior on ambiguity. Avoid presenting the temporary sandbox receipt as a live PPU install receipt.
 
 **Current evidence status:** source audit only; no application/FPGA deployment code, Host-only integration test or GitHub-hosted CI has been executed under this PR yet. Next concrete implementation is a test harness for the existing chunk-upload and deployment-state lifecycle, plus fail-closed regressions, followed by the production admission and installer path. Do not declare the channel complete before that evidence exists.
+
+
+## Owner decision — global programming-idle deployment gate (2026-10-30)
+
+**Approved invariant:** C, Python and FPGA artifacts share ONE device-wide deployment admission gate. A snapshot of eight idle Sites alone is insufficient: it races with new work admission. The programming scheduler must atomically **block new programming admissions** before checking/draining active jobs, and keep the exclusion until deployment verification or recovery has completed. No artifact-specific installer, per-kind lock, journal or privileged deployment channel may bypass this gate.
+
+Required logical predicate (all independently evidenced, not caller-asserted):
+
+`DeployAllowed = AdmissionBlocked AND AllEightSitesIdle AND NoActiveJob AND HardwareQuiescent AND DeploymentAuthorized`.
+
+Proposed state transitions: `RUNNING -> DRAINING -> DEPLOYING -> VERIFYING -> READY`; any uncertain state or failure goes to `RECOVERY_REQUIRED` with programming admissions still blocked. The owner of the scheduling/admission lock and the Deployment Engine must agree on one atomic exclusion boundary; reading a status endpoint and subsequently acquiring a deployment lock is **not** atomic and is prohibited as qualification evidence. Recovery must revalidate the programming and deployment state before unlocking admissions.
+
+**Host-only Gate 1 acceptance:** tests must demonstrate denial with one of eight Sites busy, an active job, an unquiesced hardware controller, missing authority, and a concurrent new programming request; demonstrate that the admission fence precedes the final idle check and remains held through verify/rollback. All simulated evidence must be explicitly labeled Host-only. Real scheduler ownership, PS/PL quiescence and device-wide race-free interlock remain **NOT_QUALIFIED** until audited and tested. This decision does not authorize production deployment, PL activation, hardware access or PR merge.
