@@ -32,6 +32,7 @@ import sys
 import threading
 import time
 import uuid
+import zipfile
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -422,6 +423,11 @@ def run_deployment_subprocess(
     meta = _read_json(upload.meta)
     if meta.get("state") != "committed" or not upload.committed.is_file() or not upload.sidecar.is_file():
         raise BootstrapServiceError("deployment upload is not committed")
+    # The legacy runtime kit consumes tar.gz, while generic v1 packages are ZIP.
+    # Never pass a generic ZIP to the runtime installer just because the upload
+    # store currently gives every committed artifact a .tar.gz suffix.
+    if zipfile.is_zipfile(upload.committed):
+        raise BootstrapServiceError("GENERIC_PACKAGE_RUNTIME_INSTALLER_DENIED")
     if not paths.kit_tool.is_file():
         raise BootstrapServiceError("PPU bootstrap kit deployment tool is unavailable")
     argv = [
