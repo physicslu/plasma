@@ -417,3 +417,19 @@ def test_invalid_host_only_api_transaction_fails_before_journal(tmp_path: Path, 
     with pytest.raises(engine.DeploymentError, match="HOST_ONLY_API_TRANSACTION_ID_INVALID"):
         co.execute_package_host_only(req)
     assert not co.paths.journal.exists()
+
+
+def test_corrupt_archive_never_reaches_runtime_installer(tmp_path: Path) -> None:
+    service = load("ppu_channel_invalid_archive_gate1", "ppu-bootstrap-service.py")
+    payload = b"not-a-tar-and-not-a-zip" * 3
+    digest = hashlib.sha256(payload).hexdigest()
+    kit = tmp_path / "kit-present-but-must-not-execute.py"
+    kit.write_text("raise AssertionError('legacy installer invoked')\\n")
+    paths = service.ServicePaths(state_root=tmp_path / "state", kit_tool=kit)
+    upload_id = service.create_upload(paths, size=len(payload), sha256=digest)["upload_id"]
+    service.append_chunk(paths, upload_id, offset=0,
+                         data_base64=base64.b64encode(payload).decode("ascii"), sha256=digest)
+    service.commit_upload(paths, upload_id)
+    with pytest.raises(service.BootstrapServiceError, match="RUNTIME_ARCHIVE_FORMAT_INVALID"):
+        service.run_deployment_subprocess(paths, upload_id, {"api_transaction_id": "a" * 32})
+    assert not paths.product_root.exists()
