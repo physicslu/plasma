@@ -317,3 +317,57 @@ def test_existing_core_rejects_symlink_package(tmp_path: Path) -> None:
             link, module="wordport", source_commit="a"*40,
             expected_sha256=hashlib.sha256(b"fake").hexdigest(),
         )
+
+
+def test_engineering_bundle_rejects_duplicate_manifest_keys() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "ppu_core_duplicate_json_gate1", ROOT / "scripts" / "ppu-z2-installer-core.py"
+    )
+    assert spec and spec.loader
+    installer = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = installer
+    spec.loader.exec_module(installer)
+    with pytest.raises(installer.Z2InstallerError, match="DUPLICATE_JSON_KEY"):
+        json.loads(
+            '{"schema":"v1","schema":"v2"}',
+            object_pairs_hook=installer._unique_engineering_json_pairs,
+        )
+
+
+def test_engineering_bundle_rejects_zip_symlink(tmp_path: Path) -> None:
+    import io
+    import stat
+    import zipfile
+    spec = importlib.util.spec_from_file_location(
+        "ppu_core_zip_symlink_gate1", ROOT / "scripts" / "ppu-z2-installer-core.py"
+    )
+    assert spec and spec.loader
+    installer = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = installer
+    spec.loader.exec_module(installer)
+    client_spec = importlib.util.spec_from_file_location(
+        "ppu_deploy_zip_symlink_gate1", ROOT / "scripts" / "ppu_deploy.py"
+    )
+    assert client_spec and client_spec.loader
+    client = importlib.util.module_from_spec(client_spec)
+    sys.modules[client_spec.name] = client
+    client_spec.loader.exec_module(client)
+    _, original, _ = client.build_bundle("wordport", "a" * 40)
+    output = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(original)) as source:
+        with zipfile.ZipFile(output, "w") as destination:
+            for info in source.infolist():
+                content = source.read(info.filename)
+                if info.filename == "scripts/plasma_wordport_program.py":
+                    info = zipfile.ZipInfo(info.filename)
+                    info.create_system = 3
+                    info.external_attr = (stat.S_IFLNK | 0o777) << 16
+                destination.writestr(info, content)
+    package = tmp_path / "symlink-package.zip"
+    payload = output.getvalue()
+    package.write_bytes(payload)
+    with pytest.raises(installer.Z2InstallerError, match="FILE_SET_DENIED"):
+        installer.verify_engineering_package(
+            package, module="wordport", source_commit="a"*40,
+            expected_sha256=hashlib.sha256(payload).hexdigest(),
+        )
