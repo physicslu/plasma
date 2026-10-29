@@ -104,7 +104,7 @@ def test_master_programming_asset_deployment_routes_existing_installer_not_root_
     assert not hasattr(plan, "sudo")
 
 
-def test_master_fpga_deploy_routes_existing_source_pinned_root(
+def test_master_fpga_deploy_reports_missing_install_route_without_root_execution(
     tmp_path: Path,
 ) -> None:
     path, digest = staged(tmp_path, relative="images/fpga.bin", data=b"new FPGA image")
@@ -113,8 +113,9 @@ def test_master_fpga_deploy_routes_existing_source_pinned_root(
         good_master(),
         trusted_staging_root=tmp_path,
     )
-    assert plan.route is PrivilegedRoute.EXISTING_FPGA_ROOT
+    assert plan.route is PrivilegedRoute.FPGA_IMAGE_INSTALL_NOT_IMPLEMENTED
     assert plan.staged_artifact.sha256 == digest
+    assert not hasattr(plan, "command")
 
 
 def test_master_fpga_reload_requires_no_caller_selected_command() -> None:
