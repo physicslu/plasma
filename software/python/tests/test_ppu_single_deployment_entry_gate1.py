@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import io
+import tarfile
 import sys
 import threading
 from pathlib import Path
@@ -383,7 +385,11 @@ def test_bootstrap_runner_passes_internal_api_id_to_verified_kit(tmp_path: Path,
     upload = bootstrap._upload_paths(paths, "a" * 32)
     upload.meta.parent.mkdir(parents=True, exist_ok=True)
     upload.meta.write_text('{"state":"committed"}', encoding="utf-8")
-    upload.committed.write_bytes(b"fixture")
+    with tarfile.open(upload.committed, "w:gz") as archive:
+        payload = b"fixture"
+        entry = tarfile.TarInfo("fixture.txt")
+        entry.size = len(payload)
+        archive.addfile(entry, io.BytesIO(payload))
     upload.sidecar.write_text("fixture", encoding="utf-8")
     commands = []
 
