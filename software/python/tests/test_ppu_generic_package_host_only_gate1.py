@@ -433,3 +433,20 @@ def test_corrupt_archive_never_reaches_runtime_installer(tmp_path: Path) -> None
     with pytest.raises(service.BootstrapServiceError, match="RUNTIME_ARCHIVE_FORMAT_INVALID"):
         service.run_deployment_subprocess(paths, upload_id, {"api_transaction_id": "a" * 32})
     assert not paths.product_root.exists()
+
+
+@pytest.mark.parametrize("bad_path", [None, 123, [], {}, True])
+def test_generic_manifest_non_string_path_fails_closed(tmp_path: Path, bad_path) -> None:
+    archive, _ = package(tmp_path, "wordport", "python",
+                         {"payload/python/main.py": b"pass\\n"})
+    with zipfile.ZipFile(archive, "r") as source:
+        manifest = json.loads(source.read("manifest.json"))
+        payload = source.read("payload/python/main.py")
+    manifest["files"][0]["path"] = bad_path
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("manifest.json", json.dumps(manifest))
+        output.writestr("payload/python/main.py", payload)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_FILE_METADATA_DENIED"):
+        contract.verify_host_only_package(archive, expected_sha256=digest,
+                                          source_commit=SOURCE, target_profile=TARGET)
