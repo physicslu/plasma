@@ -46,7 +46,7 @@ The product **Master action capability** and the actual OS privilege boundary ar
 
 Tests: `software/python/tests/test_ppu_privileged_operation_contract_gate1.py`.
 
-- Allow valid *modelled* Master requests to plan an existing Site Job, verified-release deployment, FPGA **reload** Root request and Job Manager route; FPGA **install** must classify as **NOT_IMPLEMENTED**, not a currently usable Root endpoint. Engineer maintenance role is classified only when separately marked local-authorized.
+- Allow valid *modelled* Master requests to plan an existing Site Job, verified-release deployment, FPGA **reload** Root request and Job Manager route; FPGA **install** must fail closed with `OPERATION_UNSUPPORTED` instead of returning an executable or placeholder Root route. Engineer maintenance role is classified only when separately marked local-authorized.
 - Reject Monitor hardware/program/deploy/readback, unauthenticated request, obsolete Master generation, spoofed string role, arbitrary command/argv and Root override.
 - Reject malformed Site, busy Site, unsafe/UNKNOWN recovery, unqualified target/FPGA Image, unpinned Root source, FPGA reload while any Site active.
 - Check fake staged files: path traversal, absolute paths, symlink file/ancestors, FIFO, group-writable input, wrong SHA, mutated Script. No device files or Root privileges are acquired.
