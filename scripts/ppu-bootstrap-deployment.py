@@ -89,6 +89,7 @@ class HostOnlyPackageRequest:
     source_commit: str
     artifact_sha256: str
     target_profile: Mapping[str, str]
+    api_transaction_id: str | None = None
 
 
 class EngineeringInstallRolledBack(RuntimeError):
@@ -351,6 +352,11 @@ class DeploymentCoordinator:
         """
         if not isinstance(request, HostOnlyPackageRequest):
             raise DeploymentError("HOST_ONLY_PACKAGE_REQUEST_INVALID")
+        if request.api_transaction_id is not None and (
+            not isinstance(request.api_transaction_id, str)
+            or not _API_TRANSACTION_ID.fullmatch(request.api_transaction_id)
+        ):
+            raise DeploymentError("HOST_ONLY_API_TRANSACTION_ID_INVALID")
         if self.paths.bootstrap_state_root == DeploymentPaths().bootstrap_state_root:
             raise DeploymentError("HOST_ONLY_PRODUCTION_STATE_ROOT_DENIED")
         if (not self.paths.bootstrap_state_root.is_absolute()
@@ -379,6 +385,7 @@ class DeploymentCoordinator:
                 state="received", sequence=0, started_at_epoch_s=now,
                 updated_at_epoch_s=now, release_artifact=str(request.archive),
                 source_commit=request.source_commit, kind="host-only-package",
+                api_transaction_id=request.api_transaction_id,
             )
             self.journal.write(record, "received")
             try:
