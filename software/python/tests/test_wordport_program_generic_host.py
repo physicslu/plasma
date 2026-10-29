@@ -251,6 +251,13 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.assertEqual(result["readback_sha256"], image_sha)
         self.assertEqual(result["image_bytes"], 8194)
         self.assertEqual(result["erase_bytes"], 0x2400)
+        preflight = result["performance"]["preflight"]
+        self.assertLessEqual(preflight["start_monotonic_ns"],
+                             preflight["end_monotonic_ns"])
+        self.assertLessEqual(preflight["start_utc_ns"], preflight["end_utc_ns"])
+        for key in ("wire_bytes", "mmio_reads", "mmio_writes",
+                    "dmb_count_derived", "socket_recv_calls", "socket_sendall_calls"):
+            self.assertEqual(preflight[key], 0)
         self.assertEqual(result["electrical"], "NOT_MEASURED_DEV_MODE_NON_BLOCKING")
         self.assertEqual(result["performance"]["counter_reconciliation"]["result"], "PASS")
         self.assertTrue(result["socket_released"])
