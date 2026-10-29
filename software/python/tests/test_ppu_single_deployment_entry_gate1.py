@@ -228,3 +228,78 @@ def test_bootstrap_api_rejects_coordinator_recovery_before_queueing(tmp_path: Pa
     with pytest.raises(bootstrap.BootstrapServiceError, match="requires recovery"):
         server.start_deployment(request)
     assert not paths.deployment_record.exists()  # No queued API transaction was created.
+
+
+def _active_runtime_journal(paths, *, state="runtime_active", kind="ppu-runtime",
+                            release_id="0.4.0-abcdef123456", tx="new-coord-tx") -> Path:
+    path = _coordinator_record(paths, state)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.update(transaction_id=tx, kind=kind, release_id=release_id)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def test_host_only_api_coordinator_transaction_reconciliation(tmp_path: Path) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    _active_runtime_journal(paths)
+    api_id = "f" * 32
+    binding = bootstrap._host_only_reconcile_runtime_result(
+        paths, api_transaction_id=api_id,
+        previous_coordinator_id="old-coord-tx",
+        runner_result={"result": "PASS", "kit_release_id": "0.4.0-abcdef123456"},
+    )
+    assert binding == {
+        "api_transaction_id": api_id,
+        "coordinator_transaction_id": "new-coord-tx",
+        "coordinator_release_id": "0.4.0-abcdef123456",
+        "coordinator_state": "runtime_active",
+    }
+    # The helper is evidence-only; no API transaction is written or activated.
+    assert not paths.deployment_record.exists()
+
+
+@pytest.mark.parametrize("override", [
+    {"state": "recovery_required"},
+    {"state": "activating"},
+    {"kind": "engineering-module"},
+    {"release_id": "wrong-release"},
+    {"tx": "old-coord-tx"},
+])
+def test_host_only_reconciliation_rejects_mismatched_journal(tmp_path: Path, override: dict) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    journal = _active_runtime_journal(paths, **override)
+    before = journal.read_bytes()
+    with pytest.raises(bootstrap.BootstrapServiceError, match="not reconciled"):
+        bootstrap._host_only_reconcile_runtime_result(
+            paths, api_transaction_id="f" * 32,
+            previous_coordinator_id="old-coord-tx",
+            runner_result={"result": "PASS", "kit_release_id": "0.4.0-abcdef123456"},
+        )
+    assert journal.read_bytes() == before
+
+
+def test_host_only_reconciliation_rejects_missing_or_untrusted_evidence(tmp_path: Path) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    good_result = {"result": "PASS", "kit_release_id": "0.4.0-abcdef123456"}
+    with pytest.raises(bootstrap.BootstrapServiceError, match="receipt is missing"):
+        bootstrap._host_only_reconcile_runtime_result(
+            paths, api_transaction_id="f" * 32,
+            previous_coordinator_id=None, runner_result=good_result,
+        )
+    journal = _active_runtime_journal(paths)
+    for api_id, result, message in [
+        ("not-a-transaction", good_result, "transaction identity"),
+        ("f" * 32, {"result": "FAIL", "kit_release_id": "0.4.0-abcdef123456"}, "prove success"),
+        ("f" * 32, {"result": "PASS"}, "release identity"),
+    ]:
+        with pytest.raises(bootstrap.BootstrapServiceError, match=message):
+            bootstrap._host_only_reconcile_runtime_result(
+                paths, api_transaction_id=api_id,
+                previous_coordinator_id=None, runner_result=result,
+            )
+    journal.chmod(0o644)
+    with pytest.raises(bootstrap.BootstrapServiceError, match="private regular file"):
+        bootstrap._host_only_reconcile_runtime_result(
+            paths, api_transaction_id="f" * 32,
+            previous_coordinator_id=None, runner_result=good_result,
+        )

@@ -160,18 +160,13 @@ def _deployment_api_record(paths: ServicePaths) -> dict[str, Any] | None:
     return record
 
 
-def _admit_coordinator_journal(paths: ServicePaths) -> None:
-    """Fail closed before queueing when the *shared* Coordinator is unsafe.
-
-    This is a read-only early rejection, not an API/Coordinator transaction-ID
-    reconciliation or a replacement for the Coordinator's exclusive flock.
-    The Coordinator independently rechecks the journal under its own lock.
-    """
+def _read_coordinator_journal(paths: ServicePaths) -> dict[str, Any] | None:
+    """Bounded, non-following read of the existing Coordinator's private journal."""
     path = paths.coordinator_journal
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     except FileNotFoundError:
-        return  # First deployment: the Coordinator has no journal yet.
+        return None  # First deployment: the Coordinator has no journal yet.
     except OSError as exc:
         raise BootstrapServiceError("deployment Coordinator journal is unavailable") from exc
     try:
@@ -198,6 +193,19 @@ def _admit_coordinator_journal(paths: ServicePaths) -> None:
         or record["sequence"] < 1
     ):
         raise BootstrapServiceError("deployment Coordinator journal identity is invalid")
+    return record
+
+
+def _admit_coordinator_journal(paths: ServicePaths) -> dict[str, Any] | None:
+    """Fail closed before queueing when the *shared* Coordinator is unsafe.
+
+    This is a read-only early rejection, not an API/Coordinator transaction-ID
+    reconciliation or a replacement for the Coordinator's exclusive flock.
+    The Coordinator independently rechecks the journal under its own lock.
+    """
+    record = _read_coordinator_journal(paths)
+    if record is None:
+        return None
     if (
         not isinstance(record.get("state"), str)
         or record["state"] not in COORDINATOR_SAFE_RESTART_STATES
@@ -205,6 +213,46 @@ def _admit_coordinator_journal(paths: ServicePaths) -> None:
         raise BootstrapServiceError(
             "previous Coordinator deployment is active, unknown or requires recovery"
         )
+    return record
+
+
+def _host_only_reconcile_runtime_result(
+    paths: ServicePaths,
+    *,
+    api_transaction_id: str,
+    previous_coordinator_id: str | None,
+    runner_result: Mapping[str, Any],
+) -> dict[str, str]:
+    """Model an exact API/Coordinator receipt binding without enabling cutover.
+
+    Gate 1 Host-only: the live Bootstrap worker does NOT call this function.
+    Production dispatch needs lock-time transaction correlation and recovery
+    qualification before a success receipt can rely on this result.
+    """
+    if not isinstance(api_transaction_id, str) or not UPLOAD_ID_RE.fullmatch(api_transaction_id):
+        raise BootstrapServiceError("deployment API transaction identity is invalid")
+    if not isinstance(runner_result, Mapping) or runner_result.get("result") != "PASS":
+        raise BootstrapServiceError("deployment runner did not prove success")
+    expected_release = runner_result.get("kit_release_id")
+    if not isinstance(expected_release, str) or not expected_release:
+        raise BootstrapServiceError("deployment runner release identity is missing")
+    journal = _read_coordinator_journal(paths)
+    if journal is None:
+        raise BootstrapServiceError("deployment Coordinator receipt is missing")
+    if (
+        journal.get("state") != "runtime_active"
+        or journal.get("kind", "ppu-runtime") != "ppu-runtime"
+        or not isinstance(journal.get("release_id"), str)
+        or journal["release_id"] != expected_release
+        or journal["transaction_id"] == previous_coordinator_id
+    ):
+        raise BootstrapServiceError("deployment API and Coordinator result are not reconciled")
+    return {
+        "api_transaction_id": api_transaction_id,
+        "coordinator_transaction_id": journal["transaction_id"],
+        "coordinator_release_id": journal["release_id"],
+        "coordinator_state": journal["state"],
+    }
 
 
 def _recover_interrupted_api_deployment(paths: ServicePaths) -> dict[str, Any] | None:
