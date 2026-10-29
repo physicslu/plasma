@@ -1,0 +1,13 @@
+{
+  "time": "2026-10-29T08:35:06.164993+00:00",
+  "stage": "COMPLETE",
+  "current": 200,
+  "total": 200,
+  "passed": 200,
+  "failed": 0,
+  "message": "all 200 attempts PASS",
+  "elapsed_s": 9832.3,
+  "stop_file": "/tmp/plasma-ab-stop",
+  "evidence_directory": "/storage/projects/plasma-ab-runs/20261029T055113Z-4136626",
+  "engine_sha256": "006ec0956b7d29c47dc3b660c1870aca5f99a3c1bcfa7d72cf0c41b8650adbc2"
+}
