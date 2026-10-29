@@ -59,9 +59,10 @@ remains separate, not a generic execution gate.
   exit-code verification. Process exit 0 is not physical evidence.
 - `vivado-host-build` — a trusted-event-main or PR-HEAD-pinned Host build for a project with a
   reviewed `host-build.json`, build Tcl and project-specific artifact/HWH
-  verifier. A syntactically valid project path alone is insufficient. The
-  two legacy fixed Registry Build tasks remain F1-B-only compatibility
-  routes. Neither route grants Z2 download or Root authority.
+  verifier. A syntactically valid project path alone is insufficient. F1-B
+  Site 1 uses its own reviewed Project contract through this same dynamic
+  route; both former fixed Build Registry task identities are rejected.
+  Host builds never grant Z2 download or Root authority.
 - `operator-cli` — owner-approved `scope: guarded-hardware` with a checked-in
   Python `script`, `argv` and bounded `timeout_seconds`. The existing
   non-root SWPC Runner executes that script directly, **not** a fixed

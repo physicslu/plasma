@@ -228,8 +228,7 @@ def preflight(task: dict, *, workspace: Path, approval: dict,
             approval.get("execution_capability") == "vivado-host-build" and
             approval.get("execution_path") == execution_path and
             approval.get("task_id") in (
-                ("fixed-site1-vivado-host-build", "z2-path2-build",
-                 "path2-work-order")
+                ("path2-work-order",)
                 if execution_path == "path2-cli"
                 else ("f1b-path3-codex-vivado-build",)
             ) and
@@ -507,6 +506,7 @@ def run(task: dict, *, workspace: Path, approval: dict,
     if execution_path == "path2-cli" and approval.get("task_id") == "path2-work-order":
         return run_generic(task, workspace=workspace, approval=approval,
                            evidence_dir=evidence_dir, executor=executor)
+    require(execution_path == "path3-codex", "BUILD_LEGACY_PATH_RETIRED")
     require(evidence_dir is not None and evidence_dir.is_dir() and
             not evidence_dir.is_symlink(), "BUILD_EVIDENCE_DIR_REQUIRED")
     diagnostic = diagnostics_type()(
@@ -582,7 +582,7 @@ def generic_project_contract(task: dict, *, workspace: Path,
             type(contract["vivado_project"]) is str and
             re.fullmatch(r"[a-z][a-z0-9_]{2,63}", contract["vivado_project"]) and
             type(contract["build_env"]) is str and
-            re.fullmatch(r"PLASMA_[A-Z_]{3,64}_BUILD", contract["build_env"]) and
+            re.fullmatch(r"PLASMA_[A-Z0-9_]{2,64}_BUILD", contract["build_env"]) and
             type(contract["success_marker"]) is str and
             re.fullmatch(r"[A-Z0-9_]{12,100}", contract["success_marker"]) and
             type(contract["reports"]) is list and

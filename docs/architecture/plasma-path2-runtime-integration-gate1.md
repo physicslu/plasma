@@ -7,8 +7,10 @@ Gate 1 did not authorize Z2 hardware. Historical base: main
 **Current routing:** This page records a historical offline F1-B coordinator.
 The live dynamic Path 2 hardware Work Order uses `operator-cli` with
 `scope: guarded-hardware`; the Dispatcher rejects the retired
-`z2-root-operation` capability. Its Registry retains fixed F1-B Build task
-identities, but no `z2-path2-download` or `z2-path2-testing` task. The
+`z2-root-operation` capability. The two former fixed F1-B Build task
+identities have also been removed from the live Registry; F1-B builds use
+the dynamic project-qualified `vivado-host-build` Work Order. Neither
+`z2-path2-download` nor `z2-path2-testing` is a Registry task. The
 protected Z2 Root Entry and Stage Transport are independently guarded tools,
 not automatic Dispatcher stages. Actual Z2 execution still requires source
 integrity, per-run authorization, ownership and recovery evidence. The
@@ -46,9 +48,10 @@ offline results below cannot establish hardware PASS.
 | `/plasma-dispatch run z2-path2-download 981` | **Historical proposal only**; no current Registry task with this ID |
 | `/plasma-dispatch run z2-path2-testing 981` | **Historical proposal only**; no current Registry task with this ID |
 
-The historical `fixed-site1-vivado-host-build` command remains backwards
-compatible. `z2-path2-build` invokes the **same** fixed engine, never a new
-Build Engine. No command is sent to Issue #981 under this Gate 1.
+The historical `fixed-site1-vivado-host-build` and `z2-path2-build` commands
+are now **retired and rejected**. They previously reused the same fixed
+engine. Do not repeat these examples on Issue #981; use the reviewed dynamic
+Work Order instead. No command is sent to Issue #981 under this Gate 1.
 
 For the new tasks only, `--auto-download` (Build) and `--auto-testing`
 (Build/Download) are separate owner-selected per-run options. Both default

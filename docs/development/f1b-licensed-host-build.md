@@ -1,5 +1,11 @@
 # F1-B licensed runner integration (candidate, not activated)
 
+> **Historical command warning:** The `fixed-site1-vivado-host-build` Path 2
+> command shown below has been retired. Use an Owner-authenticated dynamic
+> `vivado-host-build` Work Order with `project: pl/projects/z2-fixed-unified-site1`
+> and its checked-in `host-build.json` instead. Do not replay the dated
+> command or infer current Runner status from this incident record.
+
 Vivado startup on Path 3 Run 39620483855 failed with exit 42; category-only
 FlexNet diagnostics reported Invalid host. A matching interface in sysfs does
 not establish visibility to FlexNet in the sandbox's network namespace.

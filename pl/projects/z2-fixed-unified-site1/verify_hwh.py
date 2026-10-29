@@ -120,7 +120,7 @@ def digest(path: Path) -> str:
 
 
 def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
-                     source_sha: str) -> dict:
+                     source_sha: str, build: Path | None = None) -> dict:
     require(bool(re.fullmatch(r"[a-f0-9]{40}", source_sha)),
             "SOURCE_SHA_INVALID")
     require(hwh.is_file() and bit.is_file()

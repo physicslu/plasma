@@ -35,8 +35,10 @@ A standalone Download or Testing request **must pin the expected artifact SHA256
 
 GitHub-hosted test `pl/tests/test_path2_three_stage_orchestrator.py` uses inert Python callbacks for: three independent triggers, both opt-in transitions independently and together, default OFF, provenance mismatch rejection, missing prior receipts, fail/NO_GO, missing handler preflight, and no retry. Existing CI should run this under `Python and PL source tests`. No changes to trusted Dispatcher Registry or shared Workflow are permitted by this PR.
 
-**Current authorization boundary:** only the fixed F1-B Build task identities
-remain in the Registry; this coordinator is not a live Download/Test route.
+**Current authorization boundary:** the fixed F1-B Build task identities
+have been retired from the Registry. Dynamic, Project-qualified `vivado-host-build`
+is the current Build route; this historical coordinator is not a live
+Download/Test route.
 Each real hardware action must independently pass owner authorization,
 applicable protected Z2 root source-manifest checks and runtime safety/receipt
 validation.

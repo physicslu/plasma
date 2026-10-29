@@ -101,9 +101,10 @@ class DiagnosticContracts(unittest.TestCase):
                 ses.persist()
 
     def test_deleted_path3_build_admission_is_not_a_backdoor(self):
-        fixed = json.loads(
-            (ROOT / "specs/engineering-dispatch/development-tasks-v1.json").read_text()
-        )["tasks"]["fixed-site1-vivado-host-build"]
+        fixed = {"execution_path": "path2-cli", "capability": "vivado-host-build",
+                 "project": "pl/projects/z2-fixed-unified-site1",
+                 "toolchain": "2026.1",
+                 "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"}
         self.assertFalse(hasattr(build, "main"))
         with self.assertRaises(build.BuildDenied):
             build.preflight(dict(fixed, execution_path="path3-codex"),
@@ -124,7 +125,7 @@ class DiagnosticContracts(unittest.TestCase):
                   patch.object(build, "_run_pipeline",
                                return_value={"status": "PASS"})):
                 with self.assertRaises(PermissionError):
-                    build.run({}, workspace=Path(td),
+                    build.run({}, workspace=Path(td), execution_path="path3-codex",
                               approval={"pinned_sha": "a" * 40},
                               evidence_dir=Path(td))
             with (patch.object(build, "diagnostics_type",
@@ -135,7 +136,7 @@ class DiagnosticContracts(unittest.TestCase):
                 with self.assertRaisesRegex(
                     build.BuildDenied, "BUILD_OUTPUT_PERMISSION_DENIED"
                 ):
-                    build.run({}, workspace=Path(td),
+                    build.run({}, workspace=Path(td), execution_path="path3-codex",
                               approval={"pinned_sha": "a" * 40},
                               evidence_dir=Path(td))
 
@@ -356,7 +357,7 @@ class LicenseDiscoveryContracts(unittest.TestCase):
                 with self.assertRaisesRegex(
                     build.BuildDenied, "BUILD_LICENSE_NOT_FOUND"
                 ):
-                    build.run({}, workspace=folder,
+                    build.run({}, workspace=folder, execution_path="path3-codex",
                               approval={"pinned_sha": "a" * 40},
                               evidence_dir=evidence,
                               executor=lambda *args, **kwargs: self.fail("process spawned"))
@@ -385,7 +386,7 @@ class PipelineFailureEvidence(unittest.TestCase):
         builddir = folder / "pl" / "build" / "mock"
         builddir.mkdir(parents=True)
         sha = "b" * 40
-        task = {"execution_path": "path2-cli", "capability": "vivado-host-build"}
+        task = {"execution_path": "path3-codex", "capability": "vivado-host-build"}
         approval = {"pinned_sha": sha}
         plan = {"source_sha": sha, "board_sha": "e" * 40,
                 "script": "/fake/build_bitstream.tcl",
@@ -410,6 +411,7 @@ class PipelineFailureEvidence(unittest.TestCase):
         ):
             with self.assertRaises(build.BuildDenied):
                 build.run(task, workspace=folder, approval=approval,
+                          execution_path="path3-codex",
                           evidence_dir=evidence, executor=executor)
         return json.loads((evidence / "plasma-fpga-build-diagnostics.json").read_text()), evidence
 
