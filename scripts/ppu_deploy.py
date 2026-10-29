@@ -155,10 +155,14 @@ def api_status(*, api_url: str, token_file: Path) -> dict:
     api_module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = api_module
     spec.loader.exec_module(api_module)
+    try:
+        status = api_module.BootstrapAPIClient(api_url, token).status()
+    except api_module.DeploymentAPIError as exc:
+        raise DeploymentError(str(exc)) from None
     return {
         "result": "PASS",
         "mode": "API_STATUS_READ_ONLY",
-        "api_status": api_module.BootstrapAPIClient(api_url, token).status(),
+        "api_status": status,
         "no_deployment": True,
     }
 
