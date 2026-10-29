@@ -27,7 +27,6 @@ class PrivilegedRoute(StrEnum):
     EXISTING_PPU_RELEASE = "existing_ppu_bootstrap_deployment"
     EXISTING_WORDPORT_JOB = "existing_z2_ps_wordport_job"
     EXISTING_FPGA_ROOT = "existing_protected_fpga_root"
-    FPGA_IMAGE_INSTALL_NOT_IMPLEMENTED = "fpga_image_install_requires_reviewed_staging"
     EXISTING_JOB_MANAGER = "existing_ppu_job_manager"
     EXISTING_GATEWAY = "existing_authenticated_gateway"
     ENGINEER_MAINTENANCE = "separate_engineer_root_maintenance"
@@ -216,9 +215,9 @@ def plan_privileged_operation(
     elif action in _RELEASE_ACTIONS:
         route = PrivilegedRoute.EXISTING_PPU_RELEASE
     elif action is PPUAction.FPGA_IMAGE_DEPLOY:
-        # Protected Root only supports download/test/restore for an already
-        # root-installed BIN + Manifest; it does NOT install new images.
-        route = PrivilegedRoute.FPGA_IMAGE_INSTALL_NOT_IMPLEMENTED
+        # No executable install route exists: protected Root only
+        # downloads/tests/restores an already installed BIN + Manifest.
+        _reject("FPGA Image installation is not implemented", ErrorCode.OPERATION_UNSUPPORTED)
     elif action is PPUAction.FPGA_IMAGE_RELOAD:
         route = PrivilegedRoute.EXISTING_FPGA_ROOT
     elif action in _SITE_ACTIONS:
