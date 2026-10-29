@@ -38,6 +38,7 @@
 
 
 - **Current / Path 2 guarded-hardware operator-cli** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：現行 Path 2 通用硬體 Work Order 使用 `capability: operator-cli`、`scope: guarded-hardware`、來源 SHA 綁定的 Python `script`、`argv` 與受限 `timeout_seconds`；在非 Root SWPC Runner 執行，不自動取得 sudo／Root 權限。Exit 69／77 是失敗的 NOT_RUN，Exit 0 僅為待審證據。CPU-only／Vivado Host Build 為各自獨立能力。
+- **Path 2 dynamic Vivado Host Build / PR #1210** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：工作單使用可信事件的 `main` 來源，或綁定開放 PR 精確 HEAD；專案建置契約與驗證器經真實 SWPC Path 2 建置驗收 `z2-identity`、`z2-control-waveform`。此能力只建置，不下載 FPGA 或操作 Z2；實際 `main` 狀態以 PR 是否合併為準。
 - **Historical / retired z2-root-operation Work Order; F1-B #1168 evidence** — [Path 2 受保護 Z2 Root Entry 歷史契約](development/path2-generic-fpga-image-loader.md)：舊 Dispatcher 固定 `download|test|restore` Work Order 已退役，現行 Dispatcher 明確拒絕；獨立兩參數 Protected Root Entry／底層 Transport 與來源、互斥、復原守衛仍保留。#1168 實機 PASS 僅涵蓋當時 Site 1 F1-B，不能推導 Blue Pill／其他 Programmer IP／八 Site 資格。
 
 - **Historical Gate 1 offline provider integration** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；Stage Transport／Protected Root Entry 為保留的底層受保護工具，不是現行 Path 2 Dispatcher 的 `z2-root-operation` Capability。實際硬體使用 `operator-cli` 時仍須逐次核對授權、映像 Hash、所有權及 Recovery 證據。
@@ -158,13 +159,14 @@
 - **Path 3 Repo-first instruction optimization / full normative reference** — [PLASMA Detailed Autonomous Development Contract](development/plasma-autonomous-development-contract-full.md)：完整保留原根目錄 AGENTS.md 的詳細規範；目前根目錄 AGENTS.md 為低於 Codex 預設 32 KiB 專案指令上限的精簡入口。針對實際任務按需讀取此完整條款，不代表 SWPC 已驗證載入來源或 Token 效率改善。
 - **Gate 1 / Local-only Tool; Desktop Telemetry NOT_RUN** — [Codex Desktop vs Path 3 Token Usage Benchmark](development/codex-benchmark-usage.md)：針對 2026-10-22 9×9 測試，提供僅讀取指定本機 Session JSONL 的 Token 統計工具，區分單次 Turn、累計快照與 Path 3 Codex exec 用量；GitHub-hosted CI 使用合成資料，不代表已讀取 Mac Desktop 真實 Session，也不授權 SWPC、Z2 或 DUT。
 
-- **Historical Gate 1 offline integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：記錄當時的 Host-side Build Qualification、離線 F1-B Adapter／Lease 測試；目前有獨立的受控 Stage Transport。每次 Build／Download／Testing 仍須通過固定 Work Order SHA、映像 Hash、Sandbox 及硬體授權檢查。\n\n- **Historical offline Lease/Restore contract** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：原始 Gate 1 以離線測試建立 Loaded State、Lease、Restore Intent、Timeout、不可盲目重試及 Testing 重入安全契約；是否執行實機操作由當前受控路徑與逐次授權決定。
+- **Historical Gate 1 offline integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：記錄當時的 F1-B Host Build Qualification 與離線 Adapter／Lease 測試；文內舊 Download／Testing task ID 不是現行 Dispatcher 指令。
+- **Historical offline Lease/Restore contract** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：原始 Gate 1 以離線測試建立 Loaded State、Lease、Restore Intent、Timeout、不可盲目重試及 Testing 重入安全契約；是否執行實機操作由當前受控路徑與逐次授權決定。
 
-- **Historical offline F1-B Adapter contract** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：原始 Gate 1 驗證 Vivado host-side Build、Hardware Profile、Supervisor、Test Callback 與離線 Mock／Schema 契約；當前受控 Stage Transport 的授權與證據檢查獨立成立。
+- **Historical offline F1-B Adapter contract** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：原始 Gate 1 驗證 Vivado host-side Build、Hardware Profile、Supervisor、Test Callback 與離線 Mock／Schema 契約；不是現行通用硬體 Work Order 的必要 Stage。
 
 - **Historical / Real Z2 Development PASS; AXI isolation UNPROVEN** — [F1-B Path 3 2026-10-20 Evidence](development/plasma-f1b-path3-39395142726-evidence.md)：紀錄 Run #39395142726 真實 FPGA Manager 單次 Load、三個 Identity readback、原始 base.bin Restore 的證據與開發風險邊界；不屬量產驗證。
-- **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留 Codex 真實執行命令順序、故障修正與證據，供 Path 2 未來 Build／Download／Testing 獨立 Trigger 及可選階段銜接參考；不得直接重放一次性實機風險特例。
-- **Path 2 guarded Z2 execution / historical handoff** — [Path 2 F1-B Z2 Three-stage Execution Handoff](development/plasma-path2-f1b-z2-execution-handoff.md)：現行可信路徑保留 Work Order 固定 SHA、映像 Hash、Z2 Root SHA256 Manifest 及 Download／Testing／Restore 逐次證據要求；歷史 NOT_RUN 不等於目前狀態，舊 Bridge/PIN 部署步驟已由受信任 Stage Transport 取代。
+- **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留當時真實執行命令、故障修正與證據；舊 Stage 串接不是現行通用 Path 2 路線，不得直接重放一次性實機風險特例。
+- **Historical F1-B Z2 handoff** — [Path 2 F1-B Z2 Three-stage Execution Handoff](development/plasma-path2-f1b-z2-execution-handoff.md)：保留當時受控執行與失敗證據；文內舊 Root 路徑和固定 Stage 指令不是現行入口。現行硬體工作仍須受授權來源、映像、所有權及復原檢查。
 
 - **Plan / Host-only** — [Runtime FPGA Driver／Switching HIL Acceptance v1](development/runtime-fpga-switching-hil-plan-v1.md)：Phase 1 唯讀盤點、Phase 2 Driver HIL、Phase 3 Fault Injection、Phase 4 A/B Switching 的逐項 PASS／NO-GO 契約。
 - **Current** — [Documentation Maintenance](development/documentation-maintenance.md)

@@ -4,14 +4,15 @@
 Gate 1 did not authorize Z2 hardware. Historical base: main
 `8e909769601cd8cea82120c16b5c171b176c358d` (#1076/#1077/#1079).
 
-**Current main:** Path 2 is a fixed CLI execution method, not a globally
-Host-only mode. Build remains host-side; owner-authorized fixed Download,
-Testing and Restore stage tasks route through the trusted-main Dispatcher,
-`plasma_development_stage_transport.py` and protected Z2 root entry.
-The old SWPC Bridge / separate approved-SHA PIN installer is obsolete.
-Actual Z2 execution still depends on installed root source integrity and
-fresh per-run authorization, observations and recovery evidence; the offline
-results on this page cannot establish hardware PASS.
+**Current routing:** This page records a historical offline F1-B coordinator.
+The live dynamic Path 2 hardware Work Order uses `operator-cli` with
+`scope: guarded-hardware`; the Dispatcher rejects the retired
+`z2-root-operation` capability. Its Registry retains fixed F1-B Build task
+identities, but no `z2-path2-download` or `z2-path2-testing` task. The
+protected Z2 Root Entry and Stage Transport are independently guarded tools,
+not automatic Dispatcher stages. Actual Z2 execution still requires source
+integrity, per-run authorization, ownership and recovery evidence. The
+offline results below cannot establish hardware PASS.
 
 ## Existing building blocks; no duplicate Build or Supervisor
 
@@ -42,8 +43,8 @@ results on this page cannot establish hardware PASS.
 | Historical owner Issue #981 command examples (not executed by this document) | Meaning |
 | --- | --- |
 | `/plasma-dispatch run z2-path2-build 981` | Run existing fixed Vivado Build **once**, independently check host outputs, deliver Build stage receipt |
-| `/plasma-dispatch run z2-path2-download 981` | Historical candidate had no real Provider; current main routes an individually authorized Download through protected Stage Transport |
-| `/plasma-dispatch run z2-path2-testing 981` | Historical candidate had no real Provider; current main routes independently authorized Testing through protected Stage Transport |
+| `/plasma-dispatch run z2-path2-download 981` | **Historical proposal only**; no current Registry task with this ID |
+| `/plasma-dispatch run z2-path2-testing 981` | **Historical proposal only**; no current Registry task with this ID |
 
 The historical `fixed-site1-vivado-host-build` command remains backwards
 compatible. `z2-path2-build` invokes the **same** fixed engine, never a new
@@ -53,9 +54,10 @@ For the new tasks only, `--auto-download` (Build) and `--auto-testing`
 (Build/Download) are separate owner-selected per-run options. Both default
 `false`. The existing Orchestrator treats `--auto-testing` on Build with
 `--auto-download` false as Build only. Any Build request that could continue
-to Download is rejected **before** launching Vivado by the Build-only adapter boundary. Individually authorized real
-Download/Testing use the separate trusted-main Stage Transport, with root
-integrity and live target checks; unqualified requests still fail closed.
+to Download is rejected **before** launching Vivado by the Build-only adapter
+boundary. Real Download/Testing requires a separately authorized protected
+operation or reviewed `operator-cli` script with root integrity and live
+target checks; these historical flags do not launch a live stage.
 Untrusted flags, wrong task, wrong SHA, PR metadata, replayed attempts,
 arbitrary scripts, and unsupported capabilities remain denied.
 

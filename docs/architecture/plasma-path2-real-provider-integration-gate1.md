@@ -6,14 +6,13 @@ Original main base: `bcf500685f749fb8eb056248c518ed4fc1f4c285`
 (includes #1076, #1077, #1079, #1081).
 
 **Current Path 2 boundary (supersedes the candidate-only routing below):**
-trusted-main Dispatcher and `scripts/plasma_path2_runtime_integration.py`
-route fixed stage tasks through `scripts/plasma_development_stage_transport.py`
-to the protected Z2 root entry, subject to owner approval, source identity,
-root-owned SHA256 manifest and runtime stop conditions. The old installed SWPC
-Bridge / separate approved-SHA PIN deployment is **not** a prerequisite. This
-does not prove that the route is enrolled on a particular Z2 or that a fresh
-real HIL run passed. Host-only still accurately labels the *offline tests*,
-not the entire Path 2 execution method.
+The trusted-main Dispatcher admits dynamic guarded-hardware `operator-cli`
+Work Orders without a fixed F1-B Stage/Profile. It rejects the former
+`z2-root-operation` Work Order. The retained Stage Transport and protected Z2
+Root Entry can be invoked only as independently authorized, guarded tools;
+they are not a mandatory Dispatcher route. The old SWPC Bridge / separate
+approved-SHA PIN deployment is obsolete. This historical page's offline
+tests do not prove current Z2 enrollment or a fresh real HIL PASS.
 
 ## What is actually implemented
 
@@ -133,9 +132,9 @@ three-word readback, no auto-chaining, changed boot or image, failures,
 and safe idempotent restore. **Host-only tests are not real HIL**.
 The historical candidate registered the three Task identities
 (`z2-path2-download`, `z2-path2-testing`, `z2-path2-restore`), but its then-
-planned SWPC Bridge installation prerequisite has been superseded. Current
-main uses the trusted Stage Transport and protected Z2 root entry, not
-`/usr/local/libexec/plasma/z2-path2-f1b-bridge`. Missing root installation,
+planned SWPC Bridge installation prerequisite has been superseded. The live
+Dispatcher no longer registers these fixed hardware stages; the protected
+Root Entry remains an independently guarded tool. Missing root installation,
 source-manifest mismatch, credentials, target ownership or recovery readiness
 must fail closed. GitHub-hosted fake-device CI cannot prove a real Z2 stage.
 
@@ -231,8 +230,9 @@ durable one-time recovery intent, original-image validation, bounded/reaped
 native MMIO child, trustworthy actual loaded-image attribution, terminal
 unknown/manual-recovery handling, and checked successful Restore route.
 This paragraph described the **original Gate 1 gap**, before the protected
-root entry and shared Stage Transport were wired into current main. Stage task
-registration exists now, but the live Z2 root installation and all current
+root entry and shared Stage Transport were wired into an earlier main. Their
+fixed Stage task registration has since been retired; any live Z2 root
+installation and all current
 safety observations must be proved per authorized run. Neither the original
 offline contracts nor a Dispatcher policy check establish FPGA Manager Download
 or HIL PASS.
@@ -272,8 +272,8 @@ unconditional restore after SIGBUS, AXI stall, or unreaped child.
 The original Gate 1 did not install the physical root provider; the old
 `PATH2_LIVE_PROVIDER_NOT_REGISTERED` description is a historical baseline,
 **not** the current trusted-main registration state. Current main uses
-`registered_hardware_stage` plus trusted Stage Transport and a protected
-Z2 root entry for fixed `download`, `test`, and `restore` actions. An injected
+dynamic `operator-cli` for reviewed hardware scripts; the protected Z2 Root
+Entry remains available only through independently authorized calls. An injected
 callback/fake never authenticates target state. GitHub-hosted CI cannot post
 an Issue #981 hardware command merely to qualify these contracts.
 

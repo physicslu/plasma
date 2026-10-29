@@ -224,9 +224,10 @@ the actual command and physical effect, not the technology label `SW` or
   `NOT_RUN` reason and preserved process evidence. An operation already
   attempted must not be reclassified as `NOT_RUN`. Keep the FPGA image Root
   Entry restricted to image lifecycle and Golden recovery, not arbitrary
-  shell commands. Existing F1-B Vivado host-build internals are not a generic
-  project driver; do not whitelist more Project IDs without actual build/
-  artifact contract evidence. New tasks use the dynamic owner Work Order, not
+  shell commands. Dynamic Vivado host builds require a reviewed project-owned
+  build contract, authenticated event-main source or exact open-PR HEAD
+  binding with `pr_number` and `source_sha`, and a Project-specific verifier;
+  a Project ID alone is not qualification. New tasks use the dynamic owner Work Order, not
   a new legacy Registry task_id. Z2 Root source/manifest pin mismatches
   never authorize implicit redeployment or privilege escalation.
 - **Reuse the existing SWPC environment.** Path 2 (fixed CLI) and Path 3

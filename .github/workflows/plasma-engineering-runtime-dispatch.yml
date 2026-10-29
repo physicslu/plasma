@@ -144,7 +144,8 @@ jobs:
           python3 scripts/tests/test_plasma_path2_operator_cli.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
-          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_licensed_f1b.py
+          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_licensed_f1b.py scripts/tests/test_plasma_generic_vivado_host_build.py pl/projects/z2-identity/verify_hwh.py pl/projects/z2-control-waveform/verify_hwh.py
+          python3 scripts/tests/test_plasma_generic_vivado_host_build.py
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
           python3 scripts/tests/test_plasma_licensed_f1b.py
           python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
