@@ -121,6 +121,41 @@ should not be called or deployed as an OpenOCD callback wrapper.
   evidence of quiescence and safe target state; otherwise DENY and flag
   operator review). A lost or corrupt journal is not proof of a clean Site.
 
+## PR #1202 compatibility review (current main, 2026-10-29)
+
+PR #1202 was merged into **main** as
+`e5b310a17f0fea8cef9d6a1aad6947bb74f202be`; this is a
+**source change only**, NOT proof of deployed Root source pin or Z2 HIL.
+See [Root Guard program/maintenance split](root-guard-runtime-program-split-2026-10-29.md).
+This Gate 1R reference design leaves those protected Root files untouched.
+
+- The **currently implemented one-Site Blue Pill** program path uses the
+  protected `live_program_session_report()` branch without a
+  whole-system `/proc` PID census. The Bridge still checks device-scoped
+  `fuser` for its actual MMIO nodes while holding its existing global
+  FPGA configuration lock. `fuser` is not an atomic hardware owner.
+- FPGA **Download/Test/Restore** retains `live_report()` with complete
+  process census and existing strict exclusion before Manager operations.
+  No program-only fast path can authorize an Image reload.
+- Future **independent Site 1/2**, and eventually eight Sites, must use
+  ADR-0007's shared PPU Reload Fence plus per-Site exclusive ownership
+  and a real MMIO Hardware Broker. Reusing the current one-Site global
+  lock for entire Flash jobs would serialize sites; removing that lock
+  without a trusted Broker would sacrifice isolation. Neither decision
+  is made in this Host-only PR.
+- The protected Root program report, a `fuser` result, a fresh Site
+  lock, or a successful Image reload **cannot** clear an existing
+  durable Site UNCERTAIN/intent record. New Owner write admission and
+  recovery require a separately verified persistent Site authority.
+- A future Root integration must use a compatible, source-pinned
+  Program/Manager split, preserve the existing Golden/Image/Boot/IRQ
+  admission checks, and avoid both new unapproved Root privileges and
+  a special per-Site Host Supervisor.
+
+**Verification boundary:** source-level contract alignment only.
+No SWPC/Z2 install, Root resynchronization, MMIO, FPGA Manager or DUT
+was invoked by this review.
+
 ## Native C in-process execution gate (new Host-only contract)
 
 A deliberately unwired C seam has been added at
