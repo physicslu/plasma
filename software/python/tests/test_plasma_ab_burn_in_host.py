@@ -47,6 +47,34 @@ class ABOrchestrationTests(unittest.TestCase):
             receipt.update({"image_sha256": image["sha256"],
                             "image_bytes": image["size"],
                             "readback_sha256": image["sha256"]})
+        if operation in ("program", "reset-run"):
+            names = ("erase", "program", "verify", "readback") if operation == "program" else ("reset",)
+            size = image["size"] if image else 0
+            erase = (size + 1023) // 1024 * 1024
+            receipt["erase_bytes"] = erase
+            receipt["performance"] = {
+                "schema": "plasma.swd.performance.v1",
+                "preflight": {"result": "PASS", "duration_s": 0.1},
+                "stages": {name: {"result": "PASS", "duration_s": 0.1,
+                                  "bytes": erase if name == "erase" else
+                                           (0 if name == "reset" else size)} for name in names},
+                "other_duration_s": 0.2,
+                "total_duration_s": 0.3 + 0.1 * len(names),
+                "counter_reconciliation": {"result": "PASS",
+                    "total": {key: 10 for key in ("wire_bytes", "mmio_reads", "mmio_writes",
+                                                  "dmb_count_derived", "socket_recv_calls",
+                                                  "socket_sendall_calls")},
+                    "stages_sum": {key: 8 for key in ("wire_bytes", "mmio_reads", "mmio_writes",
+                                                       "dmb_count_derived", "socket_recv_calls",
+                                                       "socket_sendall_calls")},
+                    "other": {key: 2 for key in ("wire_bytes", "mmio_reads", "mmio_writes",
+                                                  "dmb_count_derived", "socket_recv_calls",
+                                                  "socket_sendall_calls")}},
+            }
+            receipt["versions"] = {name: "a" * 64 for name in (
+                "engine_sha256", "bridge_session_sha256", "native_python_module_sha256",
+                "stage_module_sha256", "rbb_module_sha256", "native_c_sha256",
+                "openocd_sha256", "target_cfg_sha256")}
         return {"receipt": receipt, "exit_code": 0, "pass": True,
                 "elapsed_s": 0.25, "log": "mock-log"}
 
@@ -85,6 +113,28 @@ class ABOrchestrationTests(unittest.TestCase):
                              "hw_action": "NONE"}, img))
         self.assertEqual(app.parse_receipt("log\n" + json.dumps(okay)), okay)
         self.assertEqual(app.parse_receipt("not json")["result"], "FAIL")
+
+    def test_performance_version_and_counter_mismatch_rejected(self):
+        import copy
+        image = app.IMAGES["v0.2"]
+        original = self.fake_engine("program", image)["receipt"]
+        self.assertTrue(app.valid_receipt("program", original, image,
+                                          expected_source_sha="a" * 64))
+        for change in ("source", "module", "counter", "missing_counter", "time"):
+            receipt = copy.deepcopy(original)
+            if change == "source":
+                receipt["versions"]["engine_sha256"] = "b" * 64
+            elif change == "module":
+                receipt["versions"]["stage_module_sha256"] = "G" * 64
+            elif change == "counter":
+                receipt["performance"]["counter_reconciliation"]["other"]["wire_bytes"] = 3
+            elif change == "missing_counter":
+                del receipt["performance"]["counter_reconciliation"]["total"]["mmio_reads"]
+            else:
+                receipt["performance"]["total_duration_s"] = 999
+            with self.subTest(change=change):
+                self.assertFalse(app.valid_receipt("program", receipt, image,
+                                                   expected_source_sha="a" * 64))
 
     def test_successful_two_cycle_run_program_reset_and_cdc_in_order(self):
         ops = []
