@@ -30,6 +30,7 @@ int plasma_swd_recovery_gate_begin(
     gate->poisoned = true;
 
     if (!authority || !authority->begin || !authority->check ||
+        !authority->execute_while_owned ||
         (site_id != 1u && site_id != 2u) || owner_epoch == 0 ||
         !job_id || !*job_id || strlen(job_id) > 128u)
         return PLASMA_RECOVERY_DENIED;
@@ -64,23 +65,24 @@ int plasma_swd_recovery_gate_push(
 {
     if (!gate || !gate->active || gate->poisoned ||
         gate->site_id != site_id || gate->owner_epoch != owner_epoch ||
-        gate->owner_pid != getpid() || !gate->authority.check ||
-        !push)
+        gate->owner_pid != getpid() ||
+        !gate->authority.execute_while_owned || !push)
         return poison(gate, PLASMA_RECOVERY_DENIED);
 
-    /* A live PS-local authority must verify this EXACT Owner generation on
-     * EACH PUSH. The in-memory flag is deliberately insufficient.
+    /* The future trusted authority must hold the verified Site lease and
+     * PPU Reload Fence across BOTH its check and the physical PUSH.
+     * Separately checking then invoking push here creates a TOCTOU gap.
+     * These are still injected Host-only callbacks, NOT trusted Root code.
      */
-    if (gate->authority.check(gate->authority.ctx, site_id, owner_epoch,
-                              gate->generation) != 0)
+    const int result = gate->authority.execute_while_owned(
+        gate->authority.ctx, site_id, owner_epoch, gate->generation,
+        push, push_ctx);
+    if (result == PLASMA_RECOVERY_OK)
+        return PLASMA_RECOVERY_OK;
+    if (result == PLASMA_RECOVERY_DENIED)
         return poison(gate, PLASMA_RECOVERY_DENIED);
-
-    /* A callback can have accepted DUT-side effects even when it fails.
-     * Poison the session; never retry or publish READY from this helper.
-     */
-    if (push(push_ctx) != 0)
-        return poison(gate, PLASMA_RECOVERY_UNCERTAIN);
-    return PLASMA_RECOVERY_OK;
+    /* Unknown return or a possibly dispatched SWD operation: fail closed. */
+    return poison(gate, PLASMA_RECOVERY_UNCERTAIN);
 }
 
 void plasma_swd_recovery_gate_retire(struct plasma_swd_recovery_gate *gate)

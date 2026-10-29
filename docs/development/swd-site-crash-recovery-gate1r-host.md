@@ -156,6 +156,16 @@ This Gate 1R reference design leaves those protected Root files untouched.
 No SWPC/Z2 install, Root resynchronization, MMIO, FPGA Manager or DUT
 was invoked by this review.
 
+## Current main integration delta (2026-10-29)
+
+Latest reviewed `main` also contains merged PR #1200, including a one-Site
+Native C WordPort v0.2 entry and image-agnostic Blue Pill programming
+wrapper. Those are **not** the unmerged ABI-v5 independent Site FIFO
+implementation in Draft #1189; this reference C Gate does not silently
+interpose on them or authorize live target writes. Their source locks,
+Bridge dependencies and device acceptance remain separate. Do not
+reinterpret a WordPort CI PASS as two-Site crash-recovery qualification.
+
 ## Native C in-process execution gate (new Host-only contract)
 
 A deliberately unwired C seam has been added at
@@ -169,10 +179,14 @@ does not change or link that PR's FIFO or OpenOCD driver.
   Job/Boot/Image/Manifest under the intended PS-local Root authority.
   The sample fake callback is TEST-ONLY. A caller-provided function pointer
   is not security proof, and a generation integer is not a credential.
-- `gate_push` checks the process identity, Site and Owner epoch and calls
-  the external authority's `check` again **before every synthetic PUSH**.
-  Missing callbacks, a different Site/epoch, forked child, revoked Owner or
-  failed PUSH poison the in-process gate. Clean PUSH does not mark READY.
+- `gate_push` checks process identity, Site and Owner epoch, and then calls
+  an external `execute_while_owned` authority operation, which MUST hold
+  the verified Site Owner lease and PPU Reload Fence across **both**
+  revalidation and the synthetic PUSH. A separate `check` followed by
+  later `push` would have a TOCTOU revocation window and is prohibited by
+  the reviewed interface. Missing callbacks, a different Site/epoch,
+  forked child, revoked Owner or failed PUSH poison the in-process gate.
+  Clean PUSH does not mark READY.
 - Multiple PUSHes from the **same validated live Owner** are allowed in one
   session without a synchronous fsync for each SWD bit or word. A new
   process cannot gain session authority merely by copying memory, getting

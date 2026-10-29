@@ -18,6 +18,8 @@ struct fake_authority {
     int checks;
     int pushes;
     int fail_push;
+    int inside_guard;
+    int guarded_calls;
 };
 
 static int begin(void *ctx, unsigned int site_id, uint64_t epoch,
@@ -45,10 +47,28 @@ static int check(void *ctx, unsigned int site_id,
     return 0;
 }
 
+/* Host-only mock of an atomic trusted lease check-and-PUSH operation.
+ * Production must hold an actual kernel/Root-enforced lock here.
+ * This test cannot attest any physical Root or FPGA access.
+ */
+static int execute_while_owned(void *ctx, unsigned int site_id,
+                              uint64_t epoch, uint64_t generation,
+                              int (*push)(void *), void *push_ctx)
+{
+    struct fake_authority *a = ctx;
+    if (!push || check(ctx, site_id, epoch, generation))
+        return PLASMA_RECOVERY_DENIED;
+    ++a->guarded_calls;
+    a->inside_guard = 1;
+    int result = push(push_ctx);
+    a->inside_guard = 0;
+    return result ? PLASMA_RECOVERY_UNCERTAIN : PLASMA_RECOVERY_OK;
+}
+
 static int fake_push(void *ctx)
 {
     struct fake_authority *a = ctx;
-    assert(a->intent); /* No SWD PUSH callback before durable-intent claim. */
+    assert(a->intent && a->inside_guard); /* Must be inside authority critical region. */
     a->pushes++;
     return a->fail_push ? -1 : 0;
 }
@@ -56,7 +76,8 @@ static int fake_push(void *ctx)
 static struct plasma_swd_recovery_authority callbacks(
     struct fake_authority *a)
 {
-    struct plasma_swd_recovery_authority cb = {a, begin, check};
+    struct plasma_swd_recovery_authority cb = {a, begin, check,
+                                                execute_while_owned};
     return cb;
 }
 
@@ -86,7 +107,7 @@ int main(void)
                                          fake_push, &a) == PLASMA_RECOVERY_OK);
     assert(plasma_swd_recovery_gate_push(&g, 1u, 11u,
                                          fake_push, &a) == PLASMA_RECOVERY_OK);
-    assert(a.pushes == 2 && a.checks == 3);
+    assert(a.pushes == 2 && a.checks == 3 && a.guarded_calls == 2);
     assert(plasma_swd_recovery_gate_push(&g, 2u, 11u,
                                          fake_push, &a) != 0);
     assert(a.pushes == 2);

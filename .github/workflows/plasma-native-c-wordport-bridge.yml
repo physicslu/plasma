@@ -11,6 +11,14 @@ on:
       - 'software/python/plasma_interfaces/bluepill_z2_word_port.py'
       - 'software/python/plasma_interfaces/linux_mmio.py'
       - 'scripts/bluepill-wordport-session.py'
+      - 'scripts/plasma_native_wordport_v02.py'
+      - 'scripts/plasma_wordport_program.py'
+      - 'scripts/plasma_ab_burn_in.py'
+      - 'software/python/tests/test_plasma_ab_burn_in_host.py'
+      - 'software/python/tests/test_native_wordport_v02_entry_host.py'
+      - 'software/python/tests/test_wordport_program_generic_host.py'
+      - 'docs/development/native-wordport-v02-path2.md'
+      - 'docs/development/image-agnostic-wordport-path2.md'
       - 'scripts/build-native-bluepill-wordport.sh'
       - 'scripts/tests/test_bluepill_wordport_session.py'
       - 'docs/development/native-c-wordport-gate1-host.md'
@@ -29,8 +37,11 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-      - name: Install package's runtime import dependency
-        run: python -m pip install 'PyYAML>=6.0'
+      - name: Install Python dependency and Host-only Tcl interpreter
+        run: |
+          python -m pip install 'PyYAML>=6.0'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends tcl
       - name: Host-only Protocol A/B positive and negative tests
         env:
           PYTHONPATH: software/python
@@ -39,11 +50,23 @@ jobs:
             -p 'test_native_bluepill_wordport_host.py' -v
           python -m unittest discover -s scripts/tests \
             -p 'test_bluepill_wordport_session.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_native_wordport_v02_entry_host.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_wordport_program_generic_host.py' -v
+          python -m unittest discover -s software/python/tests \
+            -p 'test_plasma_ab_burn_in_host.py' -v
       - name: Python and shell syntax
         run: |
           python -m py_compile software/python/plasma_interfaces/native_bluepill_word_port.py \
             software/python/tests/test_native_bluepill_wordport_host.py \
-            scripts/bluepill-wordport-session.py
+            scripts/bluepill-wordport-session.py \
+            scripts/plasma_native_wordport_v02.py \
+            scripts/plasma_wordport_program.py \
+            scripts/plasma_ab_burn_in.py \
+            software/python/tests/test_plasma_ab_burn_in_host.py \
+            software/python/tests/test_native_wordport_v02_entry_host.py \
+            software/python/tests/test_wordport_program_generic_host.py
           bash -n scripts/build-native-bluepill-wordport.sh
       - name: Install ephemeral ARMv7 cross toolchain (hosted only)
         run: |

@@ -18,8 +18,11 @@ enum plasma_swd_recovery_result {
 };
 
 /* begin() must durably establish UNCERTAIN BEFORE returning success.
- * check() must independently revalidate the trusted PS-local session and
- * Site lease epoch; a numeric generation is NOT a security credential.
+ * check() only validates the initial session; a successful check is NOT
+ * a grant to perform a later PUSH because authorization may be revoked.
+ * execute_while_owned() MUST independently validate and hold the same
+ * trusted PS Site lease/PPU reload fence across the entire PUSH callback.
+ * No user-supplied function pointer authenticates the Root authority.
  * Neither callback is implemented here. Neither may clear uncertainty.
  */
 struct plasma_swd_recovery_authority {
@@ -29,6 +32,12 @@ struct plasma_swd_recovery_authority {
                  uint64_t *generation);
     int (*check)(void *ctx, unsigned int site_id,
                  uint64_t owner_epoch, uint64_t generation);
+    /* 0=success, DENIED=not dispatched, UNCERTAIN=may have dispatched.
+     * Must hold trusted Owner and Reload Fence while invoking push().
+     */
+    int (*execute_while_owned)(void *ctx, unsigned int site_id,
+                               uint64_t owner_epoch, uint64_t generation,
+                               int (*push)(void *), void *push_ctx);
 };
 
 /* In-memory session is NEVER sufficient across process death or FPGA reload.
@@ -52,9 +61,10 @@ int plasma_swd_recovery_gate_begin(
     const struct plasma_swd_recovery_authority *authority,
     unsigned int site_id, uint64_t owner_epoch, const char *job_id);
 
-/* This is the mandatory seam intended to wrap EACH Native C FIFO PUSH.
- * Validation precedes any callback and fails closed on any error.
- * A successful PUSH leaves durable UNCERTAIN in place; no auto-clear.
+/* Candidate seam for EACH Native C FIFO PUSH, not yet wired to #1189.
+ * The trusted authority executes the callback INSIDE its lease/fence critical
+ * section; an earlier standalone check is insufficient (TOCTOU). A successful
+ * PUSH leaves durable UNCERTAIN in place, with no automatic retry/clear.
  */
 int plasma_swd_recovery_gate_push(
     struct plasma_swd_recovery_gate *gate,

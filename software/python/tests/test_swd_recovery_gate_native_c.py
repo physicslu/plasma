@@ -36,10 +36,14 @@ def test_native_c_recovery_guard_host_only(tmp_path):
 def test_native_c_gate_has_no_root_hardware_or_automatic_recovery():
     source = (NATIVE / "plasma_swd_recovery_gate.c").read_text()
     header = (NATIVE / "plasma_swd_recovery_gate.h").read_text()
+    fake = (NATIVE / "tests/test_plasma_swd_recovery_gate.c").read_text()
     assert "authority->begin(" in source
-    assert "authority.check(" in source
+    assert "authority->check(" in source
+    assert "authority.execute_while_owned(" in source
     assert "gate->owner_pid != getpid()" in source
-    assert "push(push_ctx)" in source
+    assert "push(push_ctx)" not in source
+    assert "push(push_ctx)" in fake
+    assert "a->inside_guard" in fake
     assert "PLASMA_RECOVERY_UNCERTAIN" in source
     # Scan C tokens, not explanatory comments mentioning prohibited paths.
     code = re.sub(r"/\*.*?\*/", "", source + "\n" + header, flags=re.DOTALL)
