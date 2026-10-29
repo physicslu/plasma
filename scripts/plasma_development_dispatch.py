@@ -31,6 +31,13 @@ MANIFEST = ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
 VERSION = "plasma.engineering.development_tasks.v1"
 COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
+# Retained Path 3 F1-B licensed-host diagnostic only. This is not a Path 2
+# Registry identity or a general Work Order admission rule.
+F1_PATH3_HOST_BUILD = {
+    "execution_path": "path3-codex", "capability": "vivado-host-build",
+    "project": "pl/projects/z2-fixed-unified-site1", "toolchain": "2026.1",
+    "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07",
+}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
 # Explicit operator-public metadata; never derived from objective/acceptance.
@@ -112,21 +119,8 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "A2_TASK_BINDING_DENIED")
         return task
     if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
-        require(task_id in ("fixed-site1-vivado-host-build", "z2-path2-build"),
-                "PATH2_BUILD_TASK_ID_DENIED")
-        # Path 2 is an execution method, NOT synonymous with CPU-only Python.
-        # Host builds use a fixed, reviewed Vivado capability and project.
-        require(set(task) == {"execution_path", "capability", "project",
-                              "toolchain", "board_repo_sha"},
-                "HOST_BUILD_TASK_FIELDS_DENIED")
-        require(type(task["project"]) is str and re.fullmatch(
-            r"pl/projects/[a-z0-9-]{3,70}", task["project"]
-        ) is not None, "HOST_BUILD_PROJECT_DENIED")
-        require(task["toolchain"] == "2026.1" and
-                type(task["board_repo_sha"]) is str and
-                SHA40.fullmatch(task["board_repo_sha"]) is not None,
-                "HOST_BUILD_TOOLCHAIN_DENIED")
-        return task
+        # A candidate registry may not revive a fixed Site 1 build route.
+        raise Denied("RETIRED_PATH2_FIXED_BUILD_TASK")
     if execution_path == "path2-cli":
         # Legacy CPU-only CLI fixtures keep their independent sandbox.
         require(set(task) >= {
@@ -456,10 +450,8 @@ def request(event: object, context: dict) -> dict:
     flags = match.group("flags") or ""
     auto_download = " --auto-download" in flags
     auto_testing = " --auto-testing" in flags
-    require(not auto_download or task_id == "z2-path2-build",
-            "PATH2_AUTO_DOWNLOAD_TASK_DENIED")
-    require(not auto_testing or task_id == "z2-path2-build",
-        "PATH2_AUTO_TEST_TASK_DENIED")
+    require(not auto_download and not auto_testing,
+            "RETIRED_PATH2_AUTO_STAGE_FLAGS")
     return {
         "task_id": task_id,
         "auto_download_after_build_success": auto_download,
@@ -605,9 +597,7 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(type(approval) is dict and
                 approval.get("execution_capability") == "vivado-host-build" and
                 approval.get("execution_path") == "path2-cli" and
-                approval.get("task_id") in (
-                    "fixed-site1-vivado-host-build", "z2-path2-build",
-                    DYNAMIC_TASKS["path2-cli"]) and
+                approval.get("task_id") == DYNAMIC_TASKS["path2-cli"] and
                 type(approval.get("pinned_sha")) is str and
                 SHA40.fullmatch(approval["pinned_sha"]) is not None and
                 type(approval.get("trusted_sha")) is str and
@@ -649,21 +639,8 @@ def run_task(task: dict, *, workspace: Path = ROOT,
             task = {key: task[key] for key in (
                 "execution_path", "capability", "project", "toolchain",
                 "board_repo_sha")}
-        # A request requiring an unregistered live Download provider must
-        # fail before importing candidate Build code or starting Vivado.
-        if (approval["task_id"] == "z2-path2-build" and
-                approval.get("auto_download_after_build_success") is True):
-            raise Denied("PATH2_LIVE_DOWNLOAD_PROVIDER_NOT_REGISTERED")
         build = reviewed_host_build_driver(workspace=workspace,
                                            approval=approval)
-        if approval["task_id"] == "z2-path2-build":
-            import plasma_path2_runtime_integration as integration
-            return integration.host_build(
-                task, workspace=workspace, approval=approval,
-                evidence_dir=evidence_dir,
-                build_driver=lambda _ctx: build.run(
-                    task, workspace=workspace, approval=approval,
-                    evidence_dir=evidence_dir, executor=executor))
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
     if task.get("capability") == "z2-root-operation":
@@ -1319,9 +1296,7 @@ def run_licensed_f1b_task(task: dict, *, workspace: Path, req: dict) -> dict:
         source = build.authenticate_host_inputs(workspace, req["source_sha"])
         with (evidence / "host-input-authentication.json").open("x") as stream:
             stream.write(json.dumps(source, indent=2, sort_keys=True) + "\n")
-        fixed = parse_json(ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
-                           )["tasks"]["fixed-site1-vivado-host-build"]
-        fixed = dict(fixed, execution_path="path3-codex")
+        fixed = dict(F1_PATH3_HOST_BUILD)
         approval = {"execution_path": "path3-codex",
                     "execution_capability": "vivado-host-build",
                     "task_id": req["task_id"], "pr_number": req["pr_number"],

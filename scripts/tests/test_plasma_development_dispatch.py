@@ -21,6 +21,11 @@ import plasma_development_dispatch as dev
 
 WORKFLOW=ROOT/".github/workflows/plasma-engineering-runtime-dispatch.yml"
 REGISTRY=ROOT/"specs/engineering-dispatch/development-tasks-v1.json"
+F1_LEGACY_PROJECT = {
+    "execution_path": "path2-cli", "capability": "vivado-host-build",
+    "project": "pl/projects/z2-fixed-unified-site1", "toolchain": "2026.1",
+    "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07",
+}
 
 
 class DevelopmentPath2Contracts(unittest.TestCase):
@@ -1128,12 +1133,12 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
 
 class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
-    """Offline-only Path 2 host-build policy tests; never invokes Vivado."""
+    """Retained fixed F1-B builder utility tests, not live Path 2 routing."""
 
     @classmethod
     def setUpClass(cls):
         cls.registry=json.loads(REGISTRY.read_text())
-        cls.task=dev.task_by_id(cls.registry,"fixed-site1-vivado-host-build")
+        cls.task=F1_LEGACY_PROJECT
 
     def event(self):
         e=DevelopmentPath2Contracts().event()
@@ -1143,72 +1148,34 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
     def context(self):
         return DevelopmentPath2Contracts().context() | {"GITHUB_RUN_ATTEMPT":"1"}
 
-    def test_path2_is_not_synonymous_with_cpu_only(self):
-        task=self.task
-        self.assertEqual(task["execution_path"],"path2-cli")
-        self.assertEqual(task["capability"],"vivado-host-build")
-        approved=dev.authorize(self.event(),self.context(),self.registry)
-        self.assertEqual(approved["execution_capability"],"vivado-host-build")
-        self.assertEqual(approved["pr_number"],0)
-        self.assertEqual(approved["pinned_sha"],approved["trusted_sha"])
-        # Existing CPU-only path and original bwrap isolation remain intact.
-        cpu=dev.task_by_id(self.registry,"nine-nine-path2")
-        self.assertEqual(cpu["capability"],"cpu-only")
+    def test_retired_fixed_builds_cannot_be_dispatched(self):
+        for task_id in ("fixed-site1-vivado-host-build", "z2-path2-build"):
+            with self.subTest(task_id=task_id):
+                self.assertNotIn(task_id, self.registry["tasks"])
+                with self.assertRaisesRegex(dev.Denied, "TASK_ID_DENIED"):
+                    dev.authorize(self.event() | {
+                        "comment": {**self.event()["comment"],
+                                    "body": f"/plasma-dispatch run {task_id} 981"}
+                    }, self.context(), self.registry)
+                with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_FIXED_BUILD_TASK"):
+                    dev.task_by_id({**self.registry, "tasks": {task_id: self.task}},
+                                   task_id)
+                with patch.object(dev, "reviewed_host_build_driver") as loader:
+                    with self.assertRaisesRegex(dev.Denied, "HOST_BUILD_APPROVAL_REQUIRED"):
+                        dev.run_task(self.task, workspace=ROOT, approval={
+                            "task_id": task_id, "execution_path": "path2-cli",
+                            "execution_capability": "vivado-host-build",
+                            "pr_number": 0, "pinned_sha": "a" * 40,
+                            "trusted_sha": "a" * 40})
+                    loader.assert_not_called()
+        with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_AUTO_STAGE_FLAGS"):
+            dev.request({**self.event(), "comment": {
+                **self.event()["comment"],
+                "body": "/plasma-dispatch run z2-path2-build --auto-download 981"
+            }}, self.context())
 
-    def test_host_build_approved_pr_head_allows_reruns(self):
-        ctx=self.context()
-        for attempt in ("2", "3"):
-            plan = dev.authorize(self.event(), ctx | {"GITHUB_RUN_ATTEMPT": attempt},
-                                 self.registry)
-            self.assertEqual(plan["execution_capability"], "vivado-host-build")
-        fixture=DevelopmentBranchDispatchContracts()
-        branch_event=fixture.branch_event(
-            task="fixed-site1-vivado-host-build",pr=1100,sha="b"*40)
-        plan=dev.authorize(branch_event,ctx,self.registry,
-                           pr_info=fixture.valid_pr())
-        self.assertEqual(plan["pr_number"],1100)
-        self.assertEqual(plan["pinned_sha"],"b"*40)
-        self.assertEqual(plan["trusted_sha"],"a"*40)
-        self.assertEqual(plan["execution_capability"],"vivado-host-build")
-        for attempt in ("2", "3"):
-            repeated = dev.authorize(branch_event,
-                                     ctx | {"GITHUB_RUN_ATTEMPT": attempt},
-                                     self.registry, pr_info=fixture.valid_pr())
-            self.assertEqual(repeated["pinned_sha"], "b" * 40)
-        for change in ("sha","repo","owner","base","state"):
-            pr=fixture.valid_pr()
-            if change=="sha": pr["head"]["sha"]="c"*40
-            elif change=="repo": pr["head"]["repo"]["full_name"]="other/plasma"
-            elif change=="owner": pr["user"]["login"]="other"
-            elif change=="base": pr["base"]["ref"]="not-main"
-            elif change=="state": pr["state"]="closed"
-            with self.subTest(change=change),self.assertRaises(dev.Denied):
-                dev.authorize(branch_event,ctx,self.registry,pr_info=pr)
-        with self.assertRaisesRegex(dev.Denied,"PR_METADATA_DENIED"):
-            dev.authorize(branch_event,ctx,self.registry)
-        with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_SOURCE_BINDING_DENIED"):
-            dev.authorize(fixture.branch_event(
-                task="fixed-site1-vivado-host-build",sha="a"*40),
-                ctx,self.registry,pr_info=fixture.valid_pr(sha="a"*40))
 
-    def test_host_build_schema_rejects_arbitrary_cli_and_capabilities(self):
-        task=dict(self.task)
-        for key,value in (
-            ("project","../../scripts"),
-            ("project","/tmp/my-project"),
-            ("project","pl/projects/../danger"),
-            ("toolchain","2025.2"),
-            ("board_repo_sha","bad"),
-            ("capability","host-root"),
-        ):
-            with self.subTest(field=key,bad=value),self.assertRaises(dev.Denied):
-                bad=dict(task,**{key:value})
-                reg={**self.registry,"tasks":{"fixed-site1-vivado-host-build":bad}}
-                dev.task_by_id(reg,"fixed-site1-vivado-host-build")
-        with self.assertRaises(dev.Denied):
-            reg={**self.registry,"tasks":{"fixed-site1-vivado-host-build":
-                                         dict(task,argv=["--program-fpga"])}}
-            dev.task_by_id(reg,"fixed-site1-vivado-host-build")
+
 
     def test_runner_guard_allows_approved_pr_host_build_without_new_runner(self):
         wf=WORKFLOW.read_text()
@@ -1227,142 +1194,8 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         self.assertIn("== 'operator-cli' && 35 || 5",wf)
         self.assertNotIn("runs-on: [self-hosted, linux, x64, vivado]",wf)
 
-    def test_host_build_source_preflight_is_pure_and_strict(self):
-        import plasma_vivado_host_build as build
-        approval=dev.authorize(self.event(),self.context(),self.registry)
-        env={
-            "GITHUB_REPOSITORY":"physicslu/plasma",
-            "RUNNER_NAME":"SWPC-plasma-codex",
-            "RUNNER_ENVIRONMENT":"self-hosted",
-            "GITHUB_EVENT_NAME":"issue_comment",
-            "GITHUB_REF":"refs/heads/main",
-            "GITHUB_RUN_ATTEMPT":"1",
-            "GITHUB_SHA":approval["trusted_sha"],
-        }
-        # This uses only local tracked source. No SWPC or Vivado call.
-        p=build.preflight(self.task,workspace=ROOT,approval=approval,env=env)
-        self.assertEqual(p["toolchain"],"2026.1")
-        self.assertIn("z2-fixed-unified-site1",p["project"])
-        self.assertEqual(p["board_sha"],self.task["board_repo_sha"])
-        for changed in (
-            {"GITHUB_SHA":"b"*40},
-        ):
-            with self.subTest(change=changed),self.assertRaises(build.BuildDenied):
-                build.preflight(self.task,workspace=ROOT,approval=approval,
-                                env=env|changed)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(self.task,workspace=ROOT,
-                            approval=dict(approval,pr_number=1059),env=env)
-        fixture=DevelopmentBranchDispatchContracts()
-        candidate=dev.authorize(
-            fixture.branch_event(task="fixed-site1-vivado-host-build",
-                                 pr=1100,sha="b"*40),
-            self.context(),self.registry,pr_info=fixture.valid_pr())
-        accepted=build.preflight(self.task,workspace=ROOT,
-                                 approval=candidate,env=env)
-        self.assertEqual(accepted["source_sha"],"b"*40)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(self.task,workspace=ROOT,
-                            approval=dict(candidate,pinned_sha="a"*40),env=env)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(dict(self.task,project="pl/projects/../bad"),
-                            workspace=ROOT,approval=approval,env=env)
 
-    def test_host_build_exec_requires_authorization_before_any_process(self):
-        task=self.task
-        with patch("plasma_vivado_host_build.run") as dangerous:
-            with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_APPROVAL_REQUIRED"):
-                dev.run_task(task,workspace=ROOT,approval=None,sandbox=False)
-            dangerous.assert_not_called()
-        with patch("plasma_vivado_host_build.run") as builder:
-            dev.run_task(task,workspace=ROOT,
-                         approval={"task_id":"fixed-site1-vivado-host-build",
-                                   "execution_path":"path2-cli",
-                                   "execution_capability":"vivado-host-build",
-                                   "pr_number":0,
-                                   "pinned_sha":"a"*40,"trusted_sha":"a"*40},
-                         sandbox=False)
-            builder.assert_called_once()
-        # An approved PR must not silently fall back to the trusted main
-        # driver when its own fixed candidate driver is missing.
-        with tempfile.TemporaryDirectory() as td:
-            candidate = Path(td) / "candidate"
-            candidate.mkdir()
-            with patch("plasma_vivado_host_build.run") as builder:
-                with self.assertRaisesRegex(
-                    dev.Denied, "HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-                ):
-                    dev.run_task(task, workspace=candidate,
-                                 approval={
-                                     "task_id":"fixed-site1-vivado-host-build",
-                                     "execution_path":"path2-cli",
-                                     "execution_capability":"vivado-host-build",
-                                     "pr_number":1063,
-                                     "pinned_sha":"b"*40,
-                                     "trusted_sha":"a"*40},
-                                 sandbox=False)
-                builder.assert_not_called()
-        for invalid in (
-            {"task_id":"wrong"},
-            {"pr_number":1063,"pinned_sha":"a"*40,"trusted_sha":"a"*40},
-            {"pr_number":0,"pinned_sha":"b"*40,"trusted_sha":"a"*40},
-        ):
-            base={"task_id":"fixed-site1-vivado-host-build",
-                  "execution_path":"path2-cli",
-                  "execution_capability":"vivado-host-build",
-                  "pr_number":0,
-                  "pinned_sha":"a"*40,"trusted_sha":"a"*40}
-            with self.subTest(invalid=invalid),patch(
-                "plasma_vivado_host_build.run") as builder:
-                with self.assertRaisesRegex(dev.Denied,
-                                            "HOST_BUILD_APPROVAL_REQUIRED"):
-                    dev.run_task(task,workspace=ROOT,approval=base|invalid,
-                                 sandbox=False)
-                builder.assert_not_called()
 
-    def test_candidate_vivado_driver_is_reviewed_and_not_trusted_main(self):
-        # Host-only unit fixture. Do not start Vivado or access SWPC/hardware.
-        import plasma_vivado_host_build as trusted_build
-        task=self.task
-        approval={
-            "task_id":"fixed-site1-vivado-host-build",
-            "execution_path":"path2-cli",
-            "execution_capability":"vivado-host-build",
-            "pr_number":1064,"pinned_sha":"b"*40,"trusted_sha":"a"*40,
-        }
-        with tempfile.TemporaryDirectory() as td:
-            work=Path(td)/"candidate"
-            scripts=work/"scripts"
-            scripts.mkdir(parents=True)
-            driver=scripts/"plasma_vivado_host_build.py"
-            driver.write_text(
-                "def run(task, *, workspace, approval, evidence_dir=None, "
-                "executor=None):\n"
-                "    return {'status':'CANDIDATE_DRIVER_TEST_ONLY'}\n",
-                encoding="utf-8")
-            with patch.object(trusted_build,"run") as main_driver:
-                result=dev.run_task(task,workspace=work,approval=approval)
-                self.assertEqual(result["status"],"CANDIDATE_DRIVER_TEST_ONLY")
-                main_driver.assert_not_called()
-            # PR driver is not admissible if absent or a symlink escape.
-            driver.unlink()
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
-            outside=Path(td)/"unreviewed.py"
-            outside.write_text("raise RuntimeError('must not import')\n")
-            driver.symlink_to(outside)
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
-            driver.unlink()
-            driver.write_text("x"*65537)
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
 
     def test_workflow_transports_authorized_pr_identity_to_existing_runner(self):
         wf=WORKFLOW.read_text()
@@ -1714,7 +1547,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
 
     def test_dynamic_vivado_host_build_uses_project_contract(self):
         import plasma_vivado_host_build as build
-        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        fixed = F1_LEGACY_PROJECT
         order = self._order("path2-cli",
                             capability="vivado-host-build",
                             project="pl/projects/z2-identity",
@@ -1755,7 +1588,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
 
     def test_dynamic_vivado_host_build_uses_trusted_main_contract(self):
         import plasma_vivado_host_build as build
-        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        fixed = F1_LEGACY_PROJECT
         order = self._order("path2-cli", capability="vivado-host-build",
                             project="pl/projects/z2-identity",
                             toolchain=fixed["toolchain"],
@@ -1789,7 +1622,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             driver.assert_called_once()
 
     def test_dynamic_vivado_host_build_negative_contracts(self):
-        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        fixed = F1_LEGACY_PROJECT
         order = self._order("path2-cli",
                             capability="vivado-host-build",
                             project="pl/projects/z2-identity",
@@ -1871,7 +1704,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 order | {"acceptance": "A different unauthorized requirement."}))
 
     def test_dynamic_vivado_candidate_head_requires_exact_pr_and_driver(self):
-        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        fixed = F1_LEGACY_PROJECT
         order = self._order("path2-cli", capability="vivado-host-build",
                             project=fixed["project"],
                             toolchain=fixed["toolchain"],
