@@ -60,6 +60,52 @@ The paragraphs below record the **prior Gate 1 baseline/history**, including
 the previously intentional exact-three allowlist, and must not be mistaken for
 the revised generic Host-only architecture above.
 
+## Owner architecture decision — unified multi-purpose Capability Package (2026-10-29)
+
+**Status: architecture decision / proposed contract extension; NOT implemented or qualified.** This decision extends the generic single-Engine direction above; it does not replace the existing Bootstrap transaction, authorize device access, or change the current `plasma.ppu.package.v1` validator.
+
+**One logical Package, one network upload/validation path, one Deployment Engine; separate execution lifecycles.** Production programming, engineering diagnostics, experimental testing, and PPU system/runtime updates all use the same PPU Package ingress and existing Bootstrap `POST /v1/deployments` transaction authority. Purpose-specific authorization and execution remain separate. Do not add a second deployment service, installer adapter, lock, journal, SSH writer, or privileged daemon. A common upload mechanism does **not** mean the currently PS-runtime-only API already admits all purposes.
+
+### Package composition and dependency resolution
+
+- SWPC resolves an **exact ICPN** and intended operation to required PS parsers/providers, programming profile/qualification references, programming asset/firmware, and any required PL image. A complete immutable Manifest describes all dependencies, including independently pinned PPU-resident components; only missing or changed content-addressed components need transfer after verified target inventory. Do not trust an unverified cache hit.
+- The **Base FPGA** is preinstalled on the PPU and normally reused without transmission or reprogramming. A **specialized FPGA** is an optional component only when the selected operation needs additional PL capability. Reuse a compatible, already verified specialized image when present. No exact-ICPN-to-unique-bitstream assumption.
+- A specialized FPGA is delivered with its required paired image/manifest and, where applicable, HWH metadata, verified against board/FPGA part, hardware ABI, current Root Guard and Golden/recovery policy. A valid digest or pairing is **not** publisher authentication. Never overwrite the protected Golden image as an ordinary package update.
+- A single logical Bundle may contain multiple components (native C, Python, PL image, profiles and optional firmware). This requires a **versioned multi-component Bundle/Manifest contract** beyond the current single-`kind` Host-only `plasma.ppu.package.v1`; define compatibility and dependency rules without silently widening v1 admission.
+- Shared FPGA fabric may serve multiple Sites. A whole-image replacement is a **PPU-wide hardware resource change** unless verified isolation/partial reconfiguration exists. Enforce active Site/job quiescence, exclusive owner/lease, safe electrical state and proven recovery before any PL change. Do not assume independent per-Site image swapping.
+- A programming asset may be packaged for delivery but **programming a DUT is not a deployment transaction**. Installation/activation is journaled by the one Deployment Engine; Programming Jobs, diagnostics sessions and experiments retain their own operation IDs, permissions, outcomes and evidence. Do not claim IC Flash erase/program/OTP/security operations are generally reversible.
+- A Bundle's declared `purpose` (e.g. `programming`, `diagnostics`, `experiment`, `system`) selects admission policy, **not privilege by itself**. A programming Bundle cannot self-assert ICPN L2/SUPPORTED status; the PPU checks independently trusted ProgrammingQualification, target compatibility and operation authorization. Experimental payloads must not auto-promote to production.
+- Reuse the existing PS-local OpenOCD/WordPort and protected FPGA Root boundaries. SWPC distributes high-level packages and jobs, never live per-bit SWD execution.
+
+### Unified logical flow
+
+`SWPC exact ICPN / diagnostic / experiment / system intent`
+→ `Capability Resolver + complete dependency Manifest`
+→ `existing bounded PPU upload + integrity/provenance validation`
+→ `existing Bootstrap Deployment API + single DeploymentCoordinator lock/journal`
+→ `verified stage/install/activate of required PS/PL/data components`
+→ `purpose-specific Programming Engine / diagnostic / experimental / runtime lifecycle`.
+
+The **common ingress** is a logical reuse of existing capabilities, not a new server or separate privileged control plane. Avoid unnecessary transfer of Base FPGA or identical verified artifacts. Factory/Engineer recovery remains independent of ordinary network deployment.
+
+### Gap audit — implementation versus target architecture (as of 2026-10-29)
+
+| Priority | Capability / missing work | Verified baseline or gap | Required acceptance |
+| --- | --- | --- | --- |
+| P0 | Multi-purpose, multi-component Bundle contract | **MISSING**: current `plasma.ppu.package.v1` Host-only verifier is single-`kind` (`native-c`, `python`, `fpga-image`); no complete PS+PL+profile+firmware Bundle semantics | Versioned Manifest schema, exact file/dependency validation, incompatible/duplicate/missing-component negatives, v1 compatibility |
+| P0 | Exact-ICPN Capability Resolver | **MISSING** as unified deployment selection: target IC, Provider, Parser, base/special PL ABI and firmware dependency resolution are not an end-to-end Bundle contract | Deterministic resolution and independently verified qualification/compatibility; no self-authorized SUPPORTED/L2 |
+| P0 | Unified purpose-based authorization | **NOT QUALIFIED**: active Master generation/revocation, trusted publisher/source, TLS server and least-privilege installer not live-qualified | Fail-closed authorization for programming/diagnostics/experiment/system; reject escalation and untrusted source |
+| P0 | SWPC API migration + real installation | **PARTIAL HOST-ONLY**: HTTPS client and shared Coordinator tests exist, but engineering/FPGA API admission rejects; engineering CLI still writes via SSH | One actual API/lock/journal and trusted PS install/activation; verified two-host receipts/compensation before SSH retirement |
+| P0 | PPU-wide quiescence and FPGA safety | **NOT QUALIFIED** for unified Bundle activation; existing protected Root/owner/Golden rules must be preserved | Real owner/lease, Site/job exclusion, board/ABI/Image+Manifest pairing, failed-load/unknown-state recovery |
+| P1 | Base/specialized FPGA inventory and reuse | **MISSING** as Bundle dependency/cache policy | Verified component identity/ABI, content-addressed cache hits, no unnecessary Base FPGA upload/reload, cache corruption negatives |
+| P1 | Shared ingress for firmware/profile data | **MISSING** as unified Bundle delivery/activation contract; existing PS-runtime upload is not a general programming-asset service | Bound size, hashes, safe parsing, version pinning, data-vs-executable separation, no unintended install authority |
+| P1 | Purpose-specific execution isolation | **MISSING** as an end-to-end package-to-job/session contract | Separate Programming Job / diagnostic / experiment IDs, lifecycle and evidence; deployment does not auto-execute |
+| P1 | Cross-host consistency and recovery | **PARTIAL HOST-ONLY**; no proven atomic SWPC+PPU activation | Idempotent receipts, crash/reboot/timeout reconciliation, bounded compensation and `recovery_required` for ambiguity |
+| P1 | Mixed-package and eight-Site acceptance | **NOT RUN** on physical target | Host-only negative matrix, then separately authorized PPU hardware acceptance, concurrent Site conflicts and recovery |
+| P2 | Partial reconfiguration | **UNDECIDED / NOT A PREREQUISITE** | First prove whole-image switching safety; evaluate partial reconfiguration only if hardware/resource economics justify it |
+
+**Delivery sequencing:** (1) freeze Bundle v2/purpose/dependency/ICPN contracts and Host-only tests; (2) qualify existing API/Engine trusted real installation and component inventory; (3) integrate programming/diagnostic/experiment activation with Root/Site exclusion; (4) run separately authorized end-to-end SWPC/PPU and hardware recovery acceptance; (5) retire legacy SSH only after proven parity. No merge, deployment, Root/FPGA load, SWPC/Z2/DUT operation or production qualification is implied by this documentation.
+
 ## Decision: one product-facing installation endpoint, one transaction
 
 The **only target normal-install endpoint** is the existing Z2 PPU Bootstrap `POST /v1/deployments`; SWPC `ppu-deploy` and Console are *clients*, not independent Z2 installers. The authoritative transaction must be the existing `scripts/ppu-bootstrap-deployment.py`: `/var/lib/plasma-bootstrap/deployment.lock` plus `deployment.json`, verified release staging, activation and rollback. `ppu-z2-installer.py` and its Core remain **internal** verified PS installers, not separate product APIs. `ppu-bootstrap-installer.py` remains only **local factory/Engineer recovery**, outside normal network deployment. Protected FPGA Root `download|test|restore` remains hardware lifecycle and recovery, not an Image installation API.
