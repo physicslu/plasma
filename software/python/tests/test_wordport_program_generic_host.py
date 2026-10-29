@@ -187,6 +187,90 @@ class GenericSessionHostOnly(unittest.TestCase):
         self.barrier = self.directory / "barrier.so"
         self.barrier.write_bytes(b"synthetic barrier")
 
+    def test_program_verify_receipt_requires_no_readback_artifact(self):
+        image = self.directory / "selected.bin"
+        image.write_bytes(b"AB" * 1024)
+        image_sha = hashlib.sha256(image.read_bytes()).hexdigest()
+
+        class Bridge:
+            def __init__(self, argv):
+                self.socket = Path(argv[argv.index("--socket") + 1])
+                self.stage_evidence = Path(argv[argv.index("--stage-evidence") + 1])
+                self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self.listener.bind(str(self.socket))
+                self.returncode = None
+
+            def poll(self):
+                return self.returncode
+
+            def communicate(self, timeout):
+                self.listener.close()
+                self.socket.unlink()
+                self.returncode = 0
+                counters = {"mmio_reads": 30, "mmio_writes": 60,
+                            "dmb_count_derived": 90}
+                sock = {"wire_bytes": 100, "socket_recv_calls": 10,
+                        "socket_sendall_calls": 10}
+                return json.dumps({"result": "BRIDGE_CLOSED", "wire_bytes": 100,
+                                   "native_counters": counters,
+                                   "socket_counters": sock}) + "\n", ""
+
+            def terminate(self):
+                self.returncode = -15
+
+        opened = []
+        def fake_popen(argv, **kwargs):
+            bridge = Bridge(argv)
+            opened.append(bridge)
+            return bridge
+
+        def fake_run(argv, **kwargs):
+            tcl_file = Path(argv[argv.index("-f") + 1])
+            tcl = tcl_file.read_text()
+            self.assertIn("verify_image", tcl)
+            self.assertNotIn("dump_image ", tcl)
+            self.assertFalse((tcl_file.parent / "readback-image.bin").exists())
+            base = time.monotonic_ns()
+            rows = []
+            for index, stage in enumerate(("ERASE", "PROGRAM", "VERIFY")):
+                for edge, step in (("BEGIN", 0), ("END", 1)):
+                    rows.append({"stage": stage, "edge": edge,
+                        "monotonic_ns": base + (index * 2 + step) * 100,
+                        "utc_ns": 1_000_000_000 + (index * 2 + step) * 100,
+                        "mmio_reads": 3 + index * 2 + step * 2,
+                        "mmio_writes": index * 4 + step * 4,
+                        "wire_bytes": index * 5 + step * 5,
+                        "socket_recv_calls": index + step,
+                        "socket_sendall_calls": index + step})
+            opened[0].stage_evidence.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows))
+            return subprocess.CompletedProcess(argv, 0,
+                stdout="PLASMA_ERASE_OK\nPLASMA_PROGRAM_OK\n"
+                       "PLASMA_VERIFY_OK\nPLASMA_PROGRAM_COMPLETED_NO_RESET\n",
+                stderr="")
+
+        args = SimpleNamespace(operation="program-verify", icpn="STM32F103C8T6",
+                               site_id=1)
+        output = io.StringIO()
+        with patch.object(module, "BUNDLE", self.bundle), \
+             patch.object(module, "z2_preflight", return_value=(
+                 image, self.directory / "native.so", self.barrier,
+                 "mock-boot-id", "a" * 40, 2048, image_sha, 2048)), \
+             patch.object(module.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(module.subprocess, "run", side_effect=fake_run), \
+             redirect_stdout(output):
+            code = module.on_z2(args, socket_base=self.sock_base)
+        self.assertEqual(code, 0, output.getvalue())
+        receipt = json.loads(output.getvalue())
+        self.assertEqual(receipt["result"], "PASS")
+        self.assertIs(receipt["readback_requested"], False)
+        self.assertIsNone(receipt["readback_sha256"])
+        self.assertEqual(set(receipt["performance"]["stages"]),
+                         {"erase", "program", "verify"})
+        self.assertEqual(receipt["performance"]["counter_reconciliation"]["result"],
+                         "PASS")
+        self.assertFalse(Path(receipt["evidence_directory"], "readback-image.bin").exists())
+
     def test_arbitrary_image_snapshot_exact_readback_and_bridge_close(self):
         bytes_in = b"AB" * 4097
         image = self.directory / "selected-any-name.bin"
