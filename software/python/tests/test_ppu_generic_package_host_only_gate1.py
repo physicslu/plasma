@@ -450,3 +450,29 @@ def test_generic_manifest_non_string_path_fails_closed(tmp_path: Path, bad_path)
     with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_FILE_METADATA_DENIED"):
         contract.verify_host_only_package(archive, expected_sha256=digest,
                                           source_commit=SOURCE, target_profile=TARGET)
+
+
+@pytest.mark.parametrize("field,bad_value", [("image", None), ("image", []),
+                                              ("image", 123), ("handoff", {}),
+                                              ("handoff", True)])
+def test_generic_fpga_pair_rejects_non_string_members(
+    tmp_path: Path, field: str, bad_value,
+) -> None:
+    files = {"payload/fpga/z2-identity.bit": b"image",
+             "payload/fpga/z2-identity.hwh": b"handoff"}
+    archive, digest = package(tmp_path, "z2-identity", "fpga-image", files,
+                              alterations={"fpga_pair": {
+                                  "image": "payload/fpga/z2-identity.bit",
+                                  "handoff": "payload/fpga/z2-identity.hwh",
+                              }})
+    with zipfile.ZipFile(archive) as source:
+        manifest = json.loads(source.read("manifest.json"))
+    manifest["fpga_pair"][field] = bad_value
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("manifest.json", json.dumps(manifest))
+        for name, data in files.items():
+            output.writestr(name, data)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_FPGA_PAIR_DENIED"):
+        contract.verify_host_only_package(archive, expected_sha256=digest,
+                                          source_commit=SOURCE, target_profile=TARGET)
