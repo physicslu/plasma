@@ -325,6 +325,9 @@ def parse_dynamic_work_order(event: object) -> dict:
                 and type(order["project"]) is str
                 and re.fullmatch(r"pl/projects/[a-z0-9-]{3,70}",
                                  order["project"]) is not None
+                and (order["project"] == "pl/projects/z2-fixed-unified-site1"
+                     or type(order.get("pr_number")) is int and
+                     order["pr_number"] > 0)
                 and order["toolchain"] == "2026.1"
                 and type(order["board_repo_sha"]) is str
                 and SHA40.fullmatch(order["board_repo_sha"]) is not None,
@@ -636,6 +639,9 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                     type(task["project"]) is str and
                     re.fullmatch(r"pl/projects/[a-z0-9-]{3,70}",
                                  task["project"]) is not None and
+                    (task["project"] == "pl/projects/z2-fixed-unified-site1"
+                     or type(approval.get("pr_number")) is int and
+                     approval["pr_number"] > 0) and
                     task["toolchain"] == "2026.1" and
                     type(task["board_repo_sha"]) is str and
                     SHA40.fullmatch(task["board_repo_sha"]) is not None and

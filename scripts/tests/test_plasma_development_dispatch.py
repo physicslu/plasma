@@ -1782,10 +1782,12 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 dev.request(self._event(order | change), self._context())
         # A non-F1-B project reaches only the exact-HEAD candidate driver.
         # Its project contract and Vivado evidence are checked by that driver.
-        other = order | {"project": "pl/projects/z2-identity"}
+        other = order | {"project": "pl/projects/z2-identity",
+                         "pr_number": 1100, "source_sha": "b" * 40}
         event = self._event(other)
         req = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
         task = dev.task_for_request(self.registry, req, event)
         self.assertEqual(task["project"], "pl/projects/z2-identity")
         with patch.object(dev, "reviewed_host_build_driver") as candidate:
@@ -1795,6 +1797,10 @@ class GenericWorkOrderContracts(unittest.TestCase):
             candidate.assert_called_once()
             self.assertEqual(candidate.return_value.run.call_args.args[0]["project"],
                              "pl/projects/z2-identity")
+        with self.assertRaisesRegex(dev.Denied,
+                                    "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
+            dev.request(self._event(order | {"project": "pl/projects/z2-identity"}),
+                        self._context())
         # Stage field was retired at the Work Order schema boundary.
         with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_FIELDS_DENIED"):
             dev.request(self._event(order | {"stage": "download"}), self._context())
