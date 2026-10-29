@@ -4,7 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from plasma_core.config import PPUConfig, PlasmaConfig, ServerConfig, SiteConfig, load_config
+from plasma_core.config import (
+    ConsoleAccessConfig, PPUConfig, PlasmaConfig, ServerConfig, SiteConfig, load_config,
+)
 from plasma_core.errors import ErrorCode, PlasmaError
 
 
@@ -20,6 +22,70 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual([item.id for item in config.sites if item.enabled], [1, 2])
         self.assertEqual([item.id for item in config.sites], list(range(1, 9)))
         self.assertTrue(config.server.output_root.is_absolute())
+
+    def test_ppu_console_limit_defaults_and_derived_total(self) -> None:
+        config = load_config(Path(__file__).parents[1] / "config" / "plasma.yaml")
+        self.assertEqual(config.ppu.console.max_master_consoles, 1)
+        self.assertEqual(config.ppu.console.max_readonly_consoles, 5)
+        self.assertEqual(config.ppu.console.max_total_consoles, 6)
+        # Existing deployments without ppu.console remain valid.
+        legacy = PlasmaConfig(server=ServerConfig())
+        legacy.validate()
+        self.assertEqual(legacy.ppu.console.max_total_consoles, 6)
+
+    def test_console_limits_are_not_hardcoded_in_loader(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "plasma.yaml"
+            path.write_text(
+                "ppu:\n"
+                "  id: unit-1\n"
+                "  console:\n"
+                "    max_master_consoles: 1\n"
+                "    max_readonly_consoles: 17\n"
+                "server:\n"
+                "  max_supported_sites: 2\n"
+                "  max_concurrent_jobs: 1\n",
+                encoding="utf-8",
+            )
+            config = load_config(path)
+            self.assertEqual(config.ppu.console.max_readonly_consoles, 17)
+            self.assertEqual(config.ppu.console.max_total_consoles, 18)
+
+    def test_console_limit_validation_fails_closed(self) -> None:
+        for candidate in (
+            ConsoleAccessConfig(max_master_consoles=0),
+            ConsoleAccessConfig(max_master_consoles=2),
+            ConsoleAccessConfig(max_master_consoles=True),
+            ConsoleAccessConfig(max_readonly_consoles=-1),
+            ConsoleAccessConfig(max_readonly_consoles=True),
+            ConsoleAccessConfig(max_readonly_consoles="5"),
+        ):
+            with self.subTest(candidate=candidate):
+                config = PlasmaConfig(
+                    server=ServerConfig(),
+                    ppu=PPUConfig(console=candidate),
+                )
+                with self.assertRaises(PlasmaError) as caught:
+                    config.validate()
+                self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
+
+    def test_console_policy_rejects_non_mapping_and_unknown_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "plasma.yaml"
+            for fragment in (
+                "  console: 5\n",
+                "  console: null\n",
+                "  console:\n    unexpected_field: 5\n",
+            ):
+                with self.subTest(fragment=fragment):
+                    path.write_text(
+                        "ppu:\n  id: unit-1\n" + fragment
+                        + "server:\n  max_concurrent_jobs: 1\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(PlasmaError) as caught:
+                        load_config(path)
+                    self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
 
     def test_domain_identity_is_one_based(self) -> None:
         config = PlasmaConfig(
