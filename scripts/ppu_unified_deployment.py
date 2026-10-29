@@ -46,7 +46,7 @@ class UnifiedDeploymentIntent:
     shared_lock: str = DEPLOYMENT_LOCK
     shared_journal: str = DEPLOYMENT_JOURNAL
 
-    def to_descriptor(self) -> dict[str, str | None]:
+    def to_descriptor(self) -> dict[str, object]:
         return {
             "kind": self.kind.value,
             "module": self.module,
