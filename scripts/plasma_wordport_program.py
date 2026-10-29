@@ -598,12 +598,23 @@ def z2_preflight(args):
 
 def on_z2(args, *, socket_base: Path = Path("/run")):
     preflight_start_ns = time.monotonic_ns()
+    preflight_start_utc_ns = time.time_ns()
     firmware, native, barrier, boot, root_sha, image_bytes, image_sha, erase_bytes = z2_preflight(args)
     preflight_end_ns = time.monotonic_ns()
+    preflight_end_utc_ns = time.time_ns()
     preflight_timing = {"result": "PASS", "start_monotonic_ns": preflight_start_ns,
                         "end_monotonic_ns": preflight_end_ns,
+                        "start_utc_ns": preflight_start_utc_ns,
+                        "end_utc_ns": preflight_end_utc_ns,
                         "duration_s": (preflight_end_ns - preflight_start_ns) / 1e9,
-                        "bytes": image_bytes, "effective_bytes_per_s": None}
+                        "bytes": image_bytes, "effective_bytes_per_s": None,
+                        # The PS-local Native C bridge is not started until
+                        # after this preflight completes.
+                        "wire_bytes": 0, "mmio_reads": 0, "mmio_writes": 0,
+                        "dmb_count_derived": 0, "socket_recv_calls": 0,
+                        "socket_sendall_calls": 0,
+                        "swd_wait": "NOT_OBSERVED", "swd_fault": "NOT_OBSERVED",
+                        "swd_retry": "NOT_OBSERVED"}
     if args.operation == "preflight":
         print(json.dumps({
             "operation": "preflight", "result": "PASS",
