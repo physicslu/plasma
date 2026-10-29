@@ -121,6 +121,38 @@ should not be called or deployed as an OpenOCD callback wrapper.
   evidence of quiescence and safe target state; otherwise DENY and flag
   operator review). A lost or corrupt journal is not proof of a clean Site.
 
+## Native C in-process execution gate (new Host-only contract)
+
+A deliberately unwired C seam has been added at
+`software/native/swd/plasma_swd_recovery_gate.h/.c`. This is compatible
+with the source layout of the independent C engine in Draft PR #1189, but
+does not change or link that PR's FIFO or OpenOCD driver.
+
+- `gate_begin` requires an externally injected authority callback that
+  **must have durably established UNCERTAIN** and returns a nonzero
+  generation after validating exact Site, live Owner epoch and current
+  Job/Boot/Image/Manifest under the intended PS-local Root authority.
+  The sample fake callback is TEST-ONLY. A caller-provided function pointer
+  is not security proof, and a generation integer is not a credential.
+- `gate_push` checks the process identity, Site and Owner epoch and calls
+  the external authority's `check` again **before every synthetic PUSH**.
+  Missing callbacks, a different Site/epoch, forked child, revoked Owner or
+  failed PUSH poison the in-process gate. Clean PUSH does not mark READY.
+- Multiple PUSHes from the **same validated live Owner** are allowed in one
+  session without a synchronous fsync for each SWD bit or word. A new
+  process cannot gain session authority merely by copying memory, getting
+  a lock, or supplying the old generation.
+- `gate_retire` only invalidates in-memory state; it never clears journal
+  or durable intent. No automatic retry or recovery transition exists.
+
+**Critical limitation:** this seam is NOT connected to
+`plasma_swd_fifo_admit`, `plasma_swd_fifo_run`, `push_one`, NORMAL-mode
+entry, or direct PS MMIO writers. Those are the mandatory future
+integration/control points. The C adapter uses injected callbacks that can
+be trivially forged until the trusted PS Owner and Root authority are
+concretely wired. Therefore passing the fake-C tests is NOT evidence of
+an unbypassable safety barrier or physical product safety.
+
 ## Source integration and remaining blockers (NOT IMPLEMENTED)
 
 1. **Trusted PS-local authority:** decide Root-owned state directory identity,
