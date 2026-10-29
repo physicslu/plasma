@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
+import re
+from contextlib import contextmanager
 import importlib.util
 import json
 import os
@@ -23,7 +26,10 @@ from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
-SAFE_RESTART_STATES = {"runtime_active", "rolled_back", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "rolled_back", "verify_failed"}
+ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
+_HEX40 = re.compile(r"[0-9a-f]{40}\\Z")
+_HEX64 = re.compile(r"[0-9a-f]{64}\\Z")
 QUALIFICATION_HEALTH_FAILURE = "qualification-injected post-activation health-check failure"
 
 
@@ -61,6 +67,20 @@ class DeploymentRequest:
     qualification_fail_health_check: bool = False
 
 
+@dataclass(frozen=True)
+class EngineeringDeploymentRequest:
+    """Internal host-only contract. Never construct this from raw HTTP claims."""
+
+    release_artifact: Path
+    module: str
+    source_commit: str
+    artifact_sha256: str
+
+
+class EngineeringInstallRolledBack(RuntimeError):
+    """The trusted installer proves it restored the complete prior state."""
+
+
 @dataclass
 class DeploymentRecord:
     schema_version: int
@@ -75,6 +95,9 @@ class DeploymentRecord:
     previous_release: str | None = None
     error_code: str | None = None
     error_message: str | None = None
+    kind: str = "ppu-runtime"
+    module: str | None = None
+    source_commit: str | None = None
 
 
 class Journal:
@@ -181,7 +204,9 @@ class DeploymentCoordinator:
             f"previous deployment transaction was interrupted in state {interrupted_state}; recovery is required"
         )
 
-    def execute(self, request: DeploymentRequest) -> Mapping[str, Any]:
+    @contextmanager
+    def _deployment_lock(self):
+        """The *same* durable lock for PS Runtime and Engineering plans."""
         self.paths.bootstrap_state_root.mkdir(parents=True, exist_ok=True)
         with self.paths.lock.open("a+b") as lock_stream:
             os.chmod(self.paths.lock, 0o600)
@@ -189,7 +214,14 @@ class DeploymentCoordinator:
                 fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as exc:
                 raise DeploymentError("another PPU deployment transaction is active") from exc
-            self._admit_previous_transaction()
+            try:
+                self._admit_previous_transaction()
+                yield
+            finally:
+                fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
+
+    def execute(self, request: DeploymentRequest) -> Mapping[str, Any]:
+        with self._deployment_lock():
             if request.qualification_fail_health_check:
                 previous = self.installer._previous_current(self._installer_paths().current)
                 if previous is None:
@@ -197,6 +229,94 @@ class DeploymentCoordinator:
                         "qualification health-check failure injection requires an existing previous release"
                     )
             return self._execute_locked(request)
+
+    def execute_engineering(self, request: EngineeringDeploymentRequest) -> Mapping[str, Any]:
+        """Host-only qualified-installer seam; not remotely callable or Root-enabled.
+
+        This adds no second installer, process, socket, lock or journal.
+        Existing deployed PS-only Installer exposes neither engineering method,
+        and the Bootstrap HTTP API explicitly rejects engineering packages.
+        The future reviewed Installer must verify publisher identity, exact
+        file list, pinned Root source, quiescence, and durable rollback itself.
+        """
+        if not isinstance(request, EngineeringDeploymentRequest):
+            raise DeploymentError("ENGINEERING_REQUEST_INVALID")
+        if request.module not in ENGINEERING_MODULES:
+            raise DeploymentError("ENGINEERING_MODULE_NOT_ALLOWED")
+        if not _HEX40.fullmatch(request.source_commit) or not _HEX64.fullmatch(request.artifact_sha256):
+            raise DeploymentError("ENGINEERING_PROVENANCE_FORMAT_INVALID")
+        if not isinstance(request.release_artifact, Path) or request.release_artifact.is_symlink():
+            raise DeploymentError("ENGINEERING_ARCHIVE_UNTRUSTED")
+        with self._deployment_lock():
+            # Fail before journal mutation if this is the real PS-only installer.
+            verify = getattr(self.installer, "verify_engineering_package", None)
+            install = getattr(self.installer, "install_engineering_package", None)
+            if not callable(verify) or not callable(install):
+                raise DeploymentError("ENGINEERING_INSTALL_NOT_QUALIFIED")
+            record = DeploymentRecord(
+                schema_version=SCHEMA_VERSION,
+                transaction_id=self.transaction_id_factory(),
+                state="received",
+                sequence=0,
+                started_at_epoch_s=self.clock(),
+                updated_at_epoch_s=self.clock(),
+                release_artifact=str(request.release_artifact),
+                kind="engineering-module",
+                module=request.module,
+                source_commit=request.source_commit,
+            )
+            self.journal.write(record, "received")
+            try:
+                self.journal.write(record, "verifying")
+                digest = hashlib.sha256()
+                with request.release_artifact.open("rb") as file:
+                    for block in iter(lambda: file.read(1024 * 1024), b""):
+                        digest.update(block)
+                if digest.hexdigest() != request.artifact_sha256:
+                    raise DeploymentError("ENGINEERING_ARCHIVE_SHA256_MISMATCH")
+                # Trusted installed verifier MUST independently re-check this
+                # archive at installation; this check is not TOCTOU protection.
+                verified = verify(
+                    request.release_artifact, module=request.module,
+                    source_commit=request.source_commit,
+                    expected_sha256=request.artifact_sha256,
+                )
+            except Exception as exc:
+                self.journal.write(
+                    record, "verify_failed",
+                    error_code="engineering_verification_failed", error_message=str(exc),
+                )
+                raise DeploymentError(f"engineering verification failed: {exc}") from exc
+            self.journal.write(record, "verified", artifact_sha256=request.artifact_sha256)
+            try:
+                self.journal.write(record, "activating")
+                evidence = install(verified, paths=self._installer_paths())
+                if not isinstance(evidence, Mapping) or evidence.get("result") != "PASS":
+                    raise DeploymentError("ENGINEERING_INSTALL_RECEIPT_INVALID")
+            except EngineeringInstallRolledBack as exc:
+                self.journal.write(
+                    record, "rolled_back", error_code="engineering_rollback_completed",
+                    error_message=str(exc),
+                )
+                raise DeploymentError(f"engineering installation rolled back: {exc}") from exc
+            except Exception as exc:
+                self.journal.write(
+                    record, "recovery_required", error_code="engineering_outcome_unknown",
+                    error_message=str(exc),
+                )
+                raise DeploymentError(f"engineering installation requires recovery: {exc}") from exc
+            self.journal.write(record, "engineering_active")
+            return {
+                "schema_version": SCHEMA_VERSION,
+                "result": "PASS",
+                "transaction": asdict(record),
+                "installer_evidence": dict(evidence),
+                "not_claimed": [
+                    "SWPC/Z2 atomic transaction",
+                    "production authorization",
+                    "hardware programming",
+                ],
+            }
 
     def _execute_locked(self, request: DeploymentRequest) -> Mapping[str, Any]:
         now = self.clock()
