@@ -288,7 +288,7 @@ def test_existing_core_rejects_changed_artifact_and_spoofed_source(tmp_path: Pat
     package = tmp_path / "wordport.zip"
     package.write_bytes(archive_bytes)
     digest = hashlib.sha256(archive_bytes).hexdigest()
-    with pytest.raises(installer.Z2InstallerError, match="IDENTITY"):
+    with pytest.raises(installer.Z2InstallerError, match="MANIFEST_CONTENT"):
         installer.verify_engineering_package(
             package, module="wordport", source_commit="b"*40, expected_sha256=digest
         )
