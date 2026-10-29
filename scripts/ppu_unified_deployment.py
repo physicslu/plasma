@@ -161,6 +161,7 @@ def verify_host_only_package(
             verified_files = []
             for entry in manifest["files"]:
                 if (not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size", "executable"}
+                        or type(entry["path"]) is not str
                         or not _safe_relative_path(entry["path"])
                         or type(entry["sha256"]) is not str or not SHA64.fullmatch(entry["sha256"])
                         or type(entry["size"]) is not int or not 0 <= entry["size"] <= MAX_PACKAGE_BYTES
