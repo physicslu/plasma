@@ -28,6 +28,7 @@ import re
 import secrets
 import stat
 import subprocess
+import tarfile
 import sys
 import threading
 import time
@@ -428,6 +429,10 @@ def run_deployment_subprocess(
     # store currently gives every committed artifact a .tar.gz suffix.
     if zipfile.is_zipfile(upload.committed):
         raise BootstrapServiceError("GENERIC_PACKAGE_RUNTIME_INSTALLER_DENIED")
+    # A file extension and upload digest do not prove the runtime archive type.
+    # A truncated/corrupted ZIP or arbitrary bytes must not enter the kit tool.
+    if not tarfile.is_tarfile(upload.committed):
+        raise BootstrapServiceError("RUNTIME_ARCHIVE_FORMAT_INVALID")
     if not paths.kit_tool.is_file():
         raise BootstrapServiceError("PPU bootstrap kit deployment tool is unavailable")
     argv = [
