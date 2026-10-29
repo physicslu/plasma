@@ -192,6 +192,7 @@ def verify_host_only_package(
             if kind == "fpga-image":
                 pair = manifest["fpga_pair"]
                 if (not isinstance(pair, dict) or set(pair) != {"image", "handoff"}
+                        or type(pair["image"]) is not str or type(pair["handoff"]) is not str
                         or pair["image"] not in file_names or pair["handoff"] not in file_names
                         or not pair["image"].endswith((".bin", ".bit"))
                         or not pair["handoff"].endswith(".hwh")
