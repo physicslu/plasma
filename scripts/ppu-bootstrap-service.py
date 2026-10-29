@@ -26,6 +26,7 @@ import json
 import os
 import re
 import secrets
+import stat
 import subprocess
 import sys
 import threading
@@ -48,6 +49,10 @@ UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 DEPLOYMENT_API_IN_FLIGHT_STATES = {"queued", "running"}
 DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "failed", "recovery_required"}
+COORDINATOR_SAFE_RESTART_STATES = {
+    "runtime_active", "engineering_active", "rolled_back", "verify_failed",
+}
+MAX_COORDINATOR_JOURNAL_BYTES = 1024 * 1024
 
 
 class BootstrapServiceError(RuntimeError):
@@ -73,6 +78,10 @@ class ServicePaths:
     @property
     def deployment_record(self) -> Path:
         return self.state_root / "deployment-api.json"
+
+    @property
+    def coordinator_journal(self) -> Path:
+        return self.state_root / "deployment.json"
 
 
 @dataclass(frozen=True)
@@ -149,6 +158,50 @@ def _deployment_api_record(paths: ServicePaths) -> dict[str, Any] | None:
     if state not in DEPLOYMENT_API_IN_FLIGHT_STATES | DEPLOYMENT_API_TERMINAL_STATES:
         raise BootstrapServiceError(f"deployment API state is invalid: {state!r}")
     return record
+
+
+def _admit_coordinator_journal(paths: ServicePaths) -> None:
+    """Fail closed before queueing when the *shared* Coordinator is unsafe.
+
+    This is a read-only early rejection, not an API/Coordinator transaction-ID
+    reconciliation or a replacement for the Coordinator's exclusive flock.
+    The Coordinator independently rechecks the journal under its own lock.
+    """
+    path = paths.coordinator_journal
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return  # First deployment: the Coordinator has no journal yet.
+    except OSError as exc:
+        raise BootstrapServiceError("deployment Coordinator journal is unavailable") from exc
+    try:
+        with os.fdopen(fd, "r", encoding="utf-8") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077:
+                raise BootstrapServiceError("deployment Coordinator journal is not a private regular file")
+            try:
+                raw = stream.read(MAX_COORDINATOR_JOURNAL_BYTES + 1)
+                if len(raw) > MAX_COORDINATOR_JOURNAL_BYTES:
+                    raise BootstrapServiceError("deployment Coordinator journal is oversized")
+                record = json.loads(raw)
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise BootstrapServiceError("deployment Coordinator journal is unreadable") from exc
+    except OSError as exc:
+        raise BootstrapServiceError("deployment Coordinator journal is unreadable") from exc
+    if (
+        not isinstance(record, dict)
+        or type(record.get("schema_version")) is not int
+        or record["schema_version"] != 1
+        or not isinstance(record.get("transaction_id"), str)
+        or not record["transaction_id"]
+        or type(record.get("sequence")) is not int
+        or record["sequence"] < 1
+    ):
+        raise BootstrapServiceError("deployment Coordinator journal identity is invalid")
+    if record.get("state") not in COORDINATOR_SAFE_RESTART_STATES:
+        raise BootstrapServiceError(
+            "previous Coordinator deployment is active, unknown or requires recovery"
+        )
 
 
 def _recover_interrupted_api_deployment(paths: ServicePaths) -> dict[str, Any] | None:
@@ -419,6 +472,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 raise BootstrapServiceError(
                     "previous deployment requires explicit recovery before another deployment"
                 )
+            _admit_coordinator_journal(self.bootstrap_paths)
             transaction_id = uuid.uuid4().hex
             record = {
                 "schema_version": 1,

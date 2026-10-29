@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -128,6 +130,7 @@ def test_shared_transaction_artifacts_and_recovery_contract_preserved() -> None:
     paths = coordinator.DeploymentPaths()
     assert contract.DEPLOYMENT_LOCK == str(paths.lock)
     assert contract.DEPLOYMENT_JOURNAL == str(paths.journal)
+    assert bootstrap.COORDINATOR_SAFE_RESTART_STATES == coordinator.SAFE_RESTART_STATES
     assert "recovery_required" not in coordinator.SAFE_RESTART_STATES
     assert "runtime_active" in coordinator.SAFE_RESTART_STATES
     source = (ROOT / "scripts" / "ppu-bootstrap-deployment.py").read_text()
@@ -147,3 +150,77 @@ def test_existing_engineering_and_factory_paths_are_retained_for_migration() -> 
     assert "wordport" in legacy and "abtest" in legacy
     assert "plasma-bootstrap.service" in factory
     assert "download|test|restore" in root
+
+
+def _coordinator_record(paths, state: str) -> Path:
+    paths.state_root.mkdir(parents=True, exist_ok=True)
+    record = paths.coordinator_journal
+    record.write_text(json.dumps({
+        "schema_version": 1, "transaction_id": "coord-tx-01",
+        "sequence": 3, "state": state,
+    }), encoding="utf-8")
+    record.chmod(0o600)
+    return record
+
+
+@pytest.mark.parametrize("state", sorted(bootstrap.COORDINATOR_SAFE_RESTART_STATES))
+def test_bootstrap_api_preflight_accepts_only_safe_coordinator_journal(tmp_path: Path, state: str) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    bootstrap._admit_coordinator_journal(paths)  # First install has no journal.
+    _coordinator_record(paths, state)
+    bootstrap._admit_coordinator_journal(paths)
+
+
+@pytest.mark.parametrize("state", [
+    "received", "verifying", "staging", "activating", "recovery_required", "unexpected",
+])
+def test_bootstrap_api_preflight_rejects_active_or_unsafe_coordinator_state(
+    tmp_path: Path, state: str,
+) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    record = _coordinator_record(paths, state)
+    original = record.read_bytes()
+    with pytest.raises(bootstrap.BootstrapServiceError, match="active, unknown or requires recovery"):
+        bootstrap._admit_coordinator_journal(paths)
+    assert record.read_bytes() == original  # Never rewrite the Coordinator journal.
+
+
+def test_bootstrap_api_preflight_rejects_corrupt_or_untrusted_journal(tmp_path: Path) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    journal = _coordinator_record(paths, "runtime_active")
+    journal.chmod(0o644)
+    with pytest.raises(bootstrap.BootstrapServiceError, match="private regular file"):
+        bootstrap._admit_coordinator_journal(paths)
+    journal.chmod(0o600)
+    journal.write_text("not json", encoding="utf-8")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="unreadable"):
+        bootstrap._admit_coordinator_journal(paths)
+    journal.write_text(" " * (bootstrap.MAX_COORDINATOR_JOURNAL_BYTES + 1), encoding="utf-8")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="oversized"):
+        bootstrap._admit_coordinator_journal(paths)
+    journal.write_text(json.dumps({"schema_version": 1, "transaction_id": "x", "sequence": 0,
+                                   "state": "runtime_active"}), encoding="utf-8")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="identity is invalid"):
+        bootstrap._admit_coordinator_journal(paths)
+    journal.unlink()
+    journal.symlink_to(tmp_path / "not-owned-journal")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="unavailable"):
+        bootstrap._admit_coordinator_journal(paths)
+
+
+def test_bootstrap_api_rejects_coordinator_recovery_before_queueing(tmp_path: Path) -> None:
+    paths = bootstrap.ServicePaths(state_root=tmp_path / "bootstrap")
+    _coordinator_record(paths, "recovery_required")
+    upload_id = "a" * 32
+    upload = bootstrap._upload_paths(paths, upload_id)
+    upload.meta.parent.mkdir(parents=True, exist_ok=True)
+    upload.meta.write_text('{"state":"committed"}', encoding="utf-8")
+    server = object.__new__(bootstrap.BootstrapHTTPServer)
+    server.bootstrap_paths = paths
+    server.deployment_thread = None
+    server.mutation_lock = threading.RLock()
+    request = {"upload_id": upload_id, "gateway_host": "127.0.0.1",
+               "ppu_id": "ppu-01", "facility_id": "lab", "display_name": "PPU"}
+    with pytest.raises(bootstrap.BootstrapServiceError, match="requires recovery"):
+        server.start_deployment(request)
+    assert not paths.deployment_record.exists()  # No queued API transaction was created.
