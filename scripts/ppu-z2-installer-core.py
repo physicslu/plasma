@@ -25,6 +25,8 @@ import stat
 import subprocess
 import sys
 import tarfile
+import zipfile
+import re
 import tempfile
 import time
 import urllib.error
@@ -127,6 +129,121 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+
+# A single PS Installer must *verify* the pre-existing engineering module
+# format before it can ever be allowed into the canonical deployment journal.
+# This does NOT authorize installation: no install_engineering_package exists.
+ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
+_ENGINEERING_Z2 = frozenset({
+    "scripts/plasma_wordport_program.py",
+    "scripts/bluepill-wordport-session.py",
+    "software/python/plasma_interfaces/native_bluepill_word_port.py",
+    "software/python/plasma_interfaces/wordport_stage_monitor.py",
+    "software/python/plasma_interfaces/bluepill_remote_bitbang.py",
+})
+_ENGINEERING_SWPC = frozenset({
+    "scripts/plasma_wordport_program.py",
+    "scripts/plasma_ab_burn_in.py",
+})
+_ENGINEERING_HEX40 = re.compile(r"[0-9a-f]{40}\Z")
+_ENGINEERING_HEX64 = re.compile(r"[0-9a-f]{64}\Z")
+_ENGINEERING_MANIFEST_FIELDS = frozenset({
+    "schema", "module", "source_commit", "z2_files", "swpc_files",
+    "target_helper_sha256", "bundle_sha256",
+})
+
+
+@dataclass(frozen=True)
+class VerifiedEngineeringBundle:
+    """Integrity-checked, NOT publisher-authenticated, NOT install-approved."""
+
+    module: str
+    source_commit: str
+    archive_sha256: str
+    file_names: tuple[str, ...]
+    install_qualified: bool = False
+
+
+def verify_engineering_package(
+    release_artifact: Path,
+    *,
+    module: str,
+    source_commit: str,
+    expected_sha256: str,
+) -> VerifiedEngineeringBundle:
+    """Host-compatible preflight for the current reviewed ppu-deploy ZIP format.
+
+    This is deliberately not an installation capability. Never run or import
+    Python supplied inside a bundle under Root. SHA verifies byte integrity,
+    not an approved Git provenance or publisher identity. An actual installer
+    must separately pin publisher/source, OS owner and staging at dispatch.
+    """
+    if (type(module) is not str or module not in ENGINEERING_MODULES
+        or type(source_commit) is not str or not _ENGINEERING_HEX40.fullmatch(source_commit)
+        or type(expected_sha256) is not str or not _ENGINEERING_HEX64.fullmatch(expected_sha256)):
+        raise Z2InstallerError("ENGINEERING_MANIFEST_IDENTITY_DENIED")
+    if (not isinstance(release_artifact, Path)
+        or release_artifact.is_symlink()
+        or not release_artifact.is_file()
+        or release_artifact.stat().st_size > 2_000_000):
+        raise Z2InstallerError("ENGINEERING_PACKAGE_UNTRUSTED")
+    if _sha256(release_artifact) != expected_sha256:
+        raise Z2InstallerError("ENGINEERING_PACKAGE_SHA256_MISMATCH")
+    try:
+        with zipfile.ZipFile(release_artifact) as archive:
+            infos = archive.infolist()
+            names = [info.filename for info in infos]
+            if (len(names) != len(set(names))
+                or set(names) != _ENGINEERING_Z2 | {"manifest.json"}
+                or len(infos) > len(_ENGINEERING_Z2) + 1
+                or sum(info.file_size for info in infos) > 2_000_000
+                or any(
+                    info.is_dir() or info.file_size > 500_000
+                    or info.flag_bits & 0x1
+                    for info in infos
+                )):
+                raise Z2InstallerError("ENGINEERING_PACKAGE_FILE_SET_DENIED")
+            manifest = json.loads(archive.read("manifest.json"))
+            if not isinstance(manifest, dict) or set(manifest) != _ENGINEERING_MANIFEST_FIELDS:
+                raise Z2InstallerError("ENGINEERING_MANIFEST_FIELDS_DENIED")
+            if (manifest["schema"] != "plasma.ppu.deploy.v1"
+                or manifest["module"] != module
+                or manifest["source_commit"] != source_commit
+                or manifest["bundle_sha256"] != hashlib.sha256(
+                    json.dumps({
+                        key: value for key, value in manifest.items() if key != "bundle_sha256"
+                    }, sort_keys=True).encode()
+                ).hexdigest()
+                or not isinstance(manifest["target_helper_sha256"], str)
+                or not _ENGINEERING_HEX64.fullmatch(manifest["target_helper_sha256"])
+                or not isinstance(manifest["z2_files"], dict)
+                or set(manifest["z2_files"]) != _ENGINEERING_Z2
+                or not isinstance(manifest["swpc_files"], dict)
+                or set(manifest["swpc_files"]) != (
+                    _ENGINEERING_SWPC if module == "abtest"
+                    else {"scripts/plasma_wordport_program.py"}
+                )):
+                raise Z2InstallerError("ENGINEERING_MANIFEST_CONTENT_DENIED")
+            for relative, digest in manifest["z2_files"].items():
+                if (not isinstance(digest, str)
+                    or not _ENGINEERING_HEX64.fullmatch(digest)
+                    or hashlib.sha256(archive.read(relative)).hexdigest() != digest):
+                    raise Z2InstallerError("ENGINEERING_PACKAGE_CONTENT_SHA256_MISMATCH")
+            for digest in manifest["swpc_files"].values():
+                if not isinstance(digest, str) or not _ENGINEERING_HEX64.fullmatch(digest):
+                    raise Z2InstallerError("ENGINEERING_SWPC_DIGEST_DENIED")
+    except (OSError, zipfile.BadZipFile, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        if isinstance(exc, Z2InstallerError):
+            raise
+        raise Z2InstallerError("ENGINEERING_PACKAGE_PARSE_DENIED") from exc
+    return VerifiedEngineeringBundle(
+        module=module,
+        source_commit=source_commit,
+        archive_sha256=expected_sha256,
+        file_names=tuple(sorted(_ENGINEERING_Z2)),
+    )
 
 
 def _verify_sidecar(artifact: Path, sidecar: Path | None = None) -> str:
