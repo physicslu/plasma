@@ -84,7 +84,7 @@ static struct plasma_swd_recovery_authority callbacks(
 int main(void)
 {
     struct plasma_swd_recovery_gate g = {0};
-    struct fake_authority a = {1u, 11u, 1u, 0, 1, 1, 0, 0, 0};
+    struct fake_authority a = {1u, 11u, 1u, 0, 1, 1, 0, 0, 0, 0, 0};
     struct plasma_swd_recovery_authority cb = callbacks(&a);
 
     /* Without trusted begin(), all synthetic SWD PUSH attempts are denied. */
@@ -124,7 +124,7 @@ int main(void)
     assert(a.pushes == 2);
 
     /* External authority revokes a live Owner immediately. */
-    struct fake_authority b = {2u, 99u, 2u, 0, 1, 1, 0, 0, 0};
+    struct fake_authority b = {2u, 99u, 2u, 0, 1, 1, 0, 0, 0, 0, 0};
     struct plasma_swd_recovery_authority cb2 = callbacks(&b);
     assert(plasma_swd_recovery_gate_begin(&g, &cb2, 2u, 99u,
                                            "site2") == PLASMA_RECOVERY_OK);
@@ -134,7 +134,7 @@ int main(void)
     assert(b.pushes == 0 && b.intent == 1);
 
     /* Synthetic error after possible target side effect always poisons. */
-    struct fake_authority c = {1u, 50u, 3u, 0, 1, 1, 0, 0, 1};
+    struct fake_authority c = {1u, 50u, 3u, 0, 1, 1, 0, 0, 1, 0, 0};
     struct plasma_swd_recovery_authority cb3 = callbacks(&c);
     assert(plasma_swd_recovery_gate_begin(&g, &cb3, 1u, 50u,
                                            "unknown-completion") == PLASMA_RECOVERY_OK);
@@ -147,7 +147,7 @@ int main(void)
     /* A forked child cannot inherit its parent's in-process execution gate.
      * The child may carry copied memory, but not the original process PID.
      */
-    struct fake_authority d = {2u, 60u, 4u, 0, 1, 1, 0, 0, 0};
+    struct fake_authority d = {2u, 60u, 4u, 0, 1, 1, 0, 0, 0, 0, 0};
     struct plasma_swd_recovery_authority cb4 = callbacks(&d);
     assert(plasma_swd_recovery_gate_begin(&g, &cb4, 2u, 60u,
                                            "fork") == PLASMA_RECOVERY_OK);
