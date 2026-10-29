@@ -80,7 +80,7 @@ _ENGINEER_ONLY = frozenset({
     PPUAction.PROTECTED_ROOT_REPLACE, PPUAction.LINUX_SYSTEM_MAINTAIN,
     PPUAction.LINUX_ACCOUNT_MANAGE, PPUAction.ROOT_SHELL_OPEN,
 })
-_PRIVELEGED = frozenset({PPUAction.FPGA_IMAGE_DEPLOY, PPUAction.FPGA_IMAGE_RELOAD})
+_PRIVILEGED = frozenset({PPUAction.FPGA_IMAGE_DEPLOY, PPUAction.FPGA_IMAGE_RELOAD})
 
 ROLE_ACTIONS: dict[PPURole, frozenset[PPUAction]] = {
     PPURole.MONITOR: _MONITOR,
@@ -113,7 +113,7 @@ def execution_boundary(action: PPUAction) -> PPUBoundary:
         raise PlasmaError(ErrorCode.AUTHORIZATION_DENIED, "unknown PPU capability")
     if action in _ENGINEER_ONLY:
         return PPUBoundary.ENGINEER_ROOT_MAINTENANCE
-    if action in _PRIVELEGED:
+    if action in _PRIVILEGED:
         return PPUBoundary.REVIEWED_PRIVILEGED_BRIDGE
     if action in _PROGRAMMING:
         return PPUBoundary.PROGRAMMING_SERVICE
