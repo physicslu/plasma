@@ -373,3 +373,23 @@ def test_chunk_upload_rejects_tamper_before_host_only_install(tmp_path: Path) ->
     with pytest.raises(service.BootstrapServiceError, match="incomplete"):
         service.commit_upload(paths, upload_id)
     assert not service._upload_paths(paths, upload_id).committed.exists()
+
+
+def test_generic_zip_cannot_reach_legacy_runtime_installer(tmp_path: Path) -> None:
+    """Runtime dispatch must fail before invoking the PS tar.gz kit installer."""
+    service = load("ppu_channel_runtime_zip_guard_gate1", "ppu-bootstrap-service.py")
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/main.py": b"pass\\n"})
+    payload = archive.read_bytes()
+    kit = tmp_path / "kit-present-but-must-not-execute.py"
+    kit.write_text("raise AssertionError('legacy installer invoked')\\n")
+    paths = service.ServicePaths(state_root=tmp_path / "state", kit_tool=kit)
+    upload_id = service.create_upload(paths, size=len(payload), sha256=digest)["upload_id"]
+    service.append_chunk(paths, upload_id, offset=0,
+                         data_base64=base64.b64encode(payload).decode("ascii"),
+                         sha256=digest)
+    service.commit_upload(paths, upload_id)
+    with pytest.raises(service.BootstrapServiceError, match="GENERIC_PACKAGE_RUNTIME_INSTALLER_DENIED"):
+        service.run_deployment_subprocess(paths, upload_id, {
+            "api_transaction_id": "a" * 32,
+        })
+    assert not paths.product_root.exists()
