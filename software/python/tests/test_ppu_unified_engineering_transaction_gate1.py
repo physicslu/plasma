@@ -232,3 +232,88 @@ def test_no_second_ssh_helper_or_installer_added() -> None:
     assert "install_engineering_package" in source
     assert "python -c" not in source
     assert "subprocess.run(" not in source.split("def execute_engineering(", 1)[1].split("def _execute_locked(",1)[0]
+
+
+def test_existing_core_verifies_real_bundle_for_all_three_modules_without_install() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "ppu_z2_verified_engineering_bundle_gate1",
+        ROOT / "scripts" / "ppu-z2-installer-core.py",
+    )
+    assert spec and spec.loader
+    installer = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = installer
+    spec.loader.exec_module(installer)
+    client_spec = importlib.util.spec_from_file_location(
+        "ppu_engineering_build_client_gate1",
+        ROOT / "scripts" / "ppu_deploy.py",
+    )
+    assert client_spec and client_spec.loader
+    client = importlib.util.module_from_spec(client_spec)
+    sys.modules[client_spec.name] = client
+    client_spec.loader.exec_module(client)
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        for module in client.MODULES:
+            manifest, archive_bytes, local = client.build_bundle(module, "a" * 40)
+            package = Path(tmp) / (module + ".zip")
+            package.write_bytes(archive_bytes)
+            receipt = installer.verify_engineering_package(
+                package, module=module, source_commit="a" * 40,
+                expected_sha256=hashlib.sha256(archive_bytes).hexdigest(),
+            )
+            assert receipt.module == module
+            assert receipt.install_qualified is False
+            assert set(receipt.file_names) == set(client.Z2_FILES)
+            assert not hasattr(installer, "install_engineering_package")
+
+
+def test_existing_core_rejects_changed_artifact_and_spoofed_source(tmp_path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "ppu_z2_engineering_negative_gate1",
+        ROOT / "scripts" / "ppu-z2-installer-core.py",
+    )
+    assert spec and spec.loader
+    installer = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = installer
+    spec.loader.exec_module(installer)
+    client_spec = importlib.util.spec_from_file_location(
+        "ppu_deploy_package_negative_gate1",
+        ROOT / "scripts" / "ppu_deploy.py",
+    )
+    assert client_spec and client_spec.loader
+    client = importlib.util.module_from_spec(client_spec)
+    sys.modules[client_spec.name] = client
+    client_spec.loader.exec_module(client)
+    _, archive_bytes, _ = client.build_bundle("wordport", "a"*40)
+    package = tmp_path / "wordport.zip"
+    package.write_bytes(archive_bytes)
+    digest = hashlib.sha256(archive_bytes).hexdigest()
+    with pytest.raises(installer.Z2InstallerError, match="IDENTITY"):
+        installer.verify_engineering_package(
+            package, module="wordport", source_commit="b"*40, expected_sha256=digest
+        )
+    package.write_bytes(archive_bytes + b"tampered")
+    with pytest.raises(installer.Z2InstallerError, match="SHA256"):
+        installer.verify_engineering_package(
+            package, module="wordport", source_commit="a"*40, expected_sha256=digest
+        )
+
+
+def test_existing_core_rejects_symlink_package(tmp_path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "ppu_z2_engineering_symlink_gate1",
+        ROOT / "scripts" / "ppu-z2-installer-core.py",
+    )
+    assert spec and spec.loader
+    installer = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = installer
+    spec.loader.exec_module(installer)
+    package = tmp_path / "engineering.zip"
+    package.write_bytes(b"fake")
+    link = tmp_path / "shadow.zip"
+    link.symlink_to(package)
+    with pytest.raises(installer.Z2InstallerError, match="UNTRUSTED"):
+        installer.verify_engineering_package(
+            link, module="wordport", source_commit="a"*40,
+            expected_sha256=hashlib.sha256(b"fake").hexdigest(),
+        )
