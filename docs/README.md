@@ -50,6 +50,8 @@
 
 ## Architecture and contracts
 
+- **Plan / Owner-confirmed / Docs-only PR #1204** — [Console Controller / PPU Security Simplification](architecture/console-controller-ppu-security-simplification.md)：統一規劃單台 PPU 的 Master（唯一主控）、Monitor（預設五台唯讀）與 Engineer（Root 維修模式），盤點 Console 與 Z2/PPU 現有授權／Root Guard／FPGA Reload Fence／Job Lease／UNCERTAIN 復原應保留、精簡、退役之範圍；不宣稱已部署或具備實機執行資格。
+
 - **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
 
 - **Gate 1 Draft / GitHub-hosted only** — [Unified FPGA Build & Diagnostic Engine v1.0](architecture/plasma-unified-fpga-build-diagnostics-v1.md)：Path 2／Path 3 共用 Vivado Driver、階段式錯誤診斷、License／目錄前置檢查、SHA256 Artifact；本次僅驗證離線測試，未在 SWPC 重新建置，硬體 M1 NO-GO。

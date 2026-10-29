@@ -10,6 +10,12 @@ one PPU -> at most one active execution owner
 
 The invariant is enforced at the Plasma Server / `SiteManager` boundary rather than only in React or the Web Gateway. A UI guard is useful for operator experience, but it is not an execution safety boundary because a future Plasma Manager, another browser, CLI, or direct Plasma Protocol client may reach the same PPU through another path.
 
+## Distinction from durable Console Master ownership (2026-10-29 product direction)
+
+The existing active-Job PPU execution lease is **not** the future device-registered Master Console. Its `execution_owner_kind`/`execution_owner_id` can come from batch IDs, browser page-instance labels or client IDs, and the lease ends with active Job lifecycle; these are concurrency labels, **not** proof of authenticated Console identity. A PPU may have one persistent Master across many Jobs and restarts, and any disconnected old Master must be barred from *new* mutations after physically confirmed replacement without aborting a running accepted Job. The [Console Controller / PPU Security Simplification](console-controller-ppu-security-simplification.md) specifies registration/generation/seat policy.
+
+This document's current invariant remains truthful for the implemented **PPU-global Job lease**, including its restriction on overlapping different Batch owners. The independent per-Site lock and SH/EX reload fence in [Draft PR #1189](https://github.com/physicslu/plasma/pull/1189) are **Host-only**, not a deployed replacement; do not claim eight-Site concurrent production operation until proven. Any migration toward independent per-Site execution must preserve correct Job admission, Site exclusivity, image-reload quiescence and crash recovery. Neither product role simplification nor Console seat limits are substitutes for these hardware controls.
+
 ## Owner model
 
 One logical owner may run multiple Site Jobs concurrently on the same PPU. A different owner is rejected while any Job belonging to the active owner remains non-terminal.
