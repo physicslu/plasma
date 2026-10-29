@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import socket
 import stat
+import threading
 from typing import Protocol
 
 
@@ -23,6 +24,34 @@ class WordPort(Protocol):
 
 class SWDBitbangError(RuntimeError):
     """Unsupported wire command or uncertain/unqualified PL transaction."""
+
+
+class SocketCallCounters:
+    """Count application recv/sendall calls, not kernel syscalls."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.wire_bytes = 0
+        self.recv_calls = 0
+        self.send_calls = 0
+
+    def recv_called(self) -> None:
+        with self._lock:
+            self.recv_calls += 1
+
+    def received(self, size: int) -> None:
+        with self._lock:
+            self.wire_bytes += size
+
+    def send_called(self) -> None:
+        with self._lock:
+            self.send_calls += 1
+
+    def snapshot(self) -> dict[str, int]:
+        with self._lock:
+            return {"wire_bytes": self.wire_bytes,
+                    "socket_recv_calls": self.recv_calls,
+                    "socket_sendall_calls": self.send_calls}
 
 
 class RemoteBitbangSWD:
@@ -154,7 +183,8 @@ class RemoteBitbangSWD:
 
 
 def serve_connection(conn: socket.socket, bridge: RemoteBitbangSWD,
-                     *, command_limit: int = 20_000_000) -> int:
+                     *, command_limit: int = 20_000_000,
+                     counters: SocketCallCounters | None = None) -> int:
     """Serve one already accepted local connection; never create a listener.
 
     This does not authorize actual hardware. The owner is responsible for
@@ -166,7 +196,11 @@ def serve_connection(conn: socket.socket, bridge: RemoteBitbangSWD,
     try:
         bridge.admit()
         while not bridge.closed:
+            if counters is not None:
+                counters.recv_called()
             block = conn.recv(4096)
+            if counters is not None:
+                counters.received(len(block))
             if not block:
                 raise SWDBitbangError("Unexpected EOF before Q")
             count += len(block)
@@ -174,6 +208,8 @@ def serve_connection(conn: socket.socket, bridge: RemoteBitbangSWD,
                 raise SWDBitbangError("Remote bitbang command budget exhausted")
             result = bridge.exchange(block)
             if result:
+                if counters is not None:
+                    counters.send_called()
                 conn.sendall(result)
         return count
     finally:
@@ -181,7 +217,8 @@ def serve_connection(conn: socket.socket, bridge: RemoteBitbangSWD,
 
 
 def serve_local_unix_once(path: str | Path, bridge: RemoteBitbangSWD,
-                          *, idle_timeout_s: float = 30.0) -> int:
+                          *, idle_timeout_s: float = 30.0,
+                          counters: SocketCallCounters | None = None) -> int:
     """Bind exactly one user-owned local SWD session, only when called.
 
     Does not construct a real MMIO port, perform FPGA reconfiguration, or
@@ -215,7 +252,7 @@ def serve_local_unix_once(path: str | Path, bridge: RemoteBitbangSWD,
         conn, _ = server.accept()
         with conn:
             conn.settimeout(float(idle_timeout_s))
-            return serve_connection(conn, bridge)
+            return serve_connection(conn, bridge, counters=counters)
     finally:
         server.close()
         if created_inode is not None:

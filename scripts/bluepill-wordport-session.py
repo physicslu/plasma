@@ -66,6 +66,8 @@ def parser() -> argparse.ArgumentParser:
                    help='Absolute SHA-pinned ARMv7 Native C WordPort shared library')
     p.add_argument('--native-sha256', required=True)
     p.add_argument('--socket', required=True)
+    p.add_argument('--stage-evidence',
+                   help='Private JSONL evidence file for synchronized stage snapshots')
     p.add_argument('--owner-attested', action='store_true', required=True,
                    help='Current approved wiring, isolated debugger, 3.3V VTref, common ground')
     return p
@@ -91,9 +93,10 @@ def run(args) -> dict:
     from plasma_interfaces.fixed_abi_mmio_port import ARMv7DMBBarrier
     from plasma_interfaces.linux_mmio import LinuxMMIO
     from plasma_interfaces.bluepill_z2_word_port import BluepillZ2WordPort, bluepill_z2_aperture
-    from plasma_interfaces.bluepill_remote_bitbang import serve_local_unix_once
+    from plasma_interfaces.bluepill_remote_bitbang import SocketCallCounters, serve_local_unix_once
     from plasma_interfaces.native_bluepill_word_port import (
         NativeBluepillWordPort, qualify_native_bridge_library)
+    from plasma_interfaces.wordport_stage_monitor import StageMonitor
 
     barrier = ARMv7DMBBarrier(args.barrier, sha256=args.barrier_sha256)
     barrier()  # Qualify native execution before opening any device.
@@ -112,11 +115,31 @@ def run(args) -> dict:
             bridge = NativeBluepillWordPort(
                 BluepillZ2WordPort(lease, barrier=barrier),
                 library=args.native, sha256=args.native_sha256)
-            count = serve_local_unix_once(args.socket, bridge, idle_timeout_s=60)
+            counters = SocketCallCounters()
+            if args.stage_evidence:
+                stage_socket = Path(args.socket + '.stage')
+                stage_evidence = Path(args.stage_evidence)
+                need(stage_evidence.is_absolute() and not stage_evidence.exists() and
+                     not stage_evidence.is_symlink() and
+                     stage_evidence.parent.is_dir() and
+                     stage_evidence.parent.stat().st_uid == os.getuid() and
+                     not stage_evidence.parent.stat().st_mode & 0o077,
+                     'PRIVATE_FRESH_STAGE_EVIDENCE_REQUIRED')
+                with StageMonitor(stage_socket, stage_evidence, bridge, counters):
+                    count = serve_local_unix_once(args.socket, bridge, idle_timeout_s=60,
+                                                  counters=counters)
+            else:
+                count = serve_local_unix_once(args.socket, bridge, idle_timeout_s=60,
+                                              counters=counters)
+            native_counts = bridge.counter_snapshot()
             stats = mmio.stats()
         return {'result': 'BRIDGE_CLOSED', 'boot_id': args.boot_id,
                 'lease_id': record['session_id'], 'wire_bytes': count,
                 'read32': stats.read32, 'write32': stats.write32,
+                'socket_counters': counters.snapshot(),
+                'native_counters': {**native_counts,
+                    'dmb_count_derived': native_counts['mmio_writes'] +
+                                         native_counts['mmio_reads'] - 3},
                 'electrical': 'OWNER_ATTESTED', 'dpidr': 'REQUIRES_OPENOCD_RECEIPT'}
 
 

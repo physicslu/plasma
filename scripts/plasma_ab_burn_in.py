@@ -85,7 +85,56 @@ def parse_receipt(output: str) -> dict:
     return {"result": "FAIL", "reason": "MISSING_JSON_RECEIPT"}
 
 
-def valid_receipt(operation: str, receipt: dict, image: dict | None = None) -> bool:
+def valid_performance(receipt: dict, operation: str, image: dict | None) -> bool:
+    evidence = receipt.get("performance")
+    versions = receipt.get("versions")
+    if (not isinstance(evidence, dict) or evidence.get("schema") != "plasma.swd.performance.v1"
+            or not isinstance(versions, dict)
+            or not all(isinstance(versions.get(key), str) and
+                       re.fullmatch(r"[0-9a-f]{64}", versions[key])
+                       for key in ("engine_sha256", "bridge_session_sha256",
+                                   "native_python_module_sha256", "stage_module_sha256",
+                                   "rbb_module_sha256", "native_c_sha256",
+                                   "openocd_sha256", "target_cfg_sha256"))):
+        return False
+    required = (("erase", "program", "verify", "readback") if operation == "program"
+                else ("reset",))
+    stages = evidence.get("stages")
+    preflight = evidence.get("preflight")
+    reconciliation = evidence.get("counter_reconciliation")
+    if (not isinstance(stages, dict) or not isinstance(preflight, dict)
+            or preflight.get("result") != "PASS" or not isinstance(reconciliation, dict)
+            or reconciliation.get("result") != "PASS"):
+        return False
+    if any(not isinstance(stages.get(name), dict) or stages[name].get("result") != "PASS"
+           for name in required):
+        return False
+    if operation == "program" and image is not None:
+        if (stages["erase"].get("bytes") != receipt.get("erase_bytes") or
+                any(stages[name].get("bytes") != image["size"]
+                    for name in ("program", "verify", "readback"))):
+            return False
+    try:
+        summed = preflight["duration_s"] + evidence["other_duration_s"] + sum(
+            stages[name]["duration_s"] for name in required)
+        if (evidence["other_duration_s"] < 0 or
+                abs(summed - evidence["total_duration_s"]) > 0.001):
+            return False
+        for key in ("mmio_reads", "mmio_writes", "dmb_count_derived",
+                    "wire_bytes", "socket_recv_calls", "socket_sendall_calls"):
+            total = reconciliation["total"][key]
+            if any(type(value) is not int or value < 0 for value in
+                   (total, reconciliation["stages_sum"][key], reconciliation["other"][key])):
+                return False
+            if total != reconciliation["stages_sum"][key] + reconciliation["other"][key]:
+                return False
+    except (KeyError, TypeError, ValueError):
+        return False
+    return True
+
+
+def valid_receipt(operation: str, receipt: dict, image: dict | None = None,
+                  *, expected_source_sha: str | None = None) -> bool:
     if receipt.get("result") != "PASS" or receipt.get("operation") != operation:
         return False
     if operation == "preflight":
@@ -96,6 +145,11 @@ def valid_receipt(operation: str, receipt: dict, image: dict | None = None) -> b
     if (receipt.get("openocd_exit") != 0 or receipt.get("bridge_exit") != 0
             or receipt.get("socket_released") is not True
             or receipt.get("no_auto_retry") is not True):
+        return False
+    if (operation in ("program", "reset-run") and
+            (not valid_performance(receipt, operation, image) or
+             (expected_source_sha is not None and
+              receipt["versions"]["engine_sha256"] != expected_source_sha))):
         return False
     if operation == "program":
         return (image is not None and receipt.get("image_sha256") == image["sha256"]
@@ -334,7 +388,8 @@ class BurnIn:
         return {"receipt": receipt, "exit_code": exit_code,
                 "elapsed_s": round(time.monotonic() - started, 3),
                 "log": str(self.directory / (name + ".log")),
-                "pass": exit_code == 0 and valid_receipt(operation, receipt, image)}
+                "pass": exit_code == 0 and valid_receipt(
+                    operation, receipt, image, expected_source_sha=self.engine_sha)}
 
     def capture_failure(self, version: str, stage: str, failed: dict):
         self.report("FAIL", f"{version} {stage}; stopping future programs",
