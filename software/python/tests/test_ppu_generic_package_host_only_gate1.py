@@ -393,3 +393,27 @@ def test_generic_zip_cannot_reach_legacy_runtime_installer(tmp_path: Path) -> No
             "api_transaction_id": "a" * 32,
         })
     assert not paths.product_root.exists()
+
+
+def test_host_only_package_journal_correlates_bootstrap_api_transaction(tmp_path: Path) -> None:
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/main.py": b"pass\\n"})
+    co = coordinator(tmp_path)
+    tx = "b" * 32
+    req = engine.HostOnlyPackageRequest(archive, SOURCE, digest, TARGET, api_transaction_id=tx)
+    receipt = co.execute_package_host_only(req)
+    assert receipt["result"] == "PASS"
+    journal = json.loads(co.paths.journal.read_text())
+    assert journal["api_transaction_id"] == tx
+    assert journal["transaction_id"] == receipt["transaction"]["transaction_id"]
+    assert journal["kind"] == "host-only-package"
+    assert not co.paths.product_root.exists()
+
+
+@pytest.mark.parametrize("invalid", ["", "not-a-transaction", "0" * 31, "Z" * 32, 123])
+def test_invalid_host_only_api_transaction_fails_before_journal(tmp_path: Path, invalid) -> None:
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/main.py": b"pass\\n"})
+    co = coordinator(tmp_path)
+    req = engine.HostOnlyPackageRequest(archive, SOURCE, digest, TARGET, api_transaction_id=invalid)
+    with pytest.raises(engine.DeploymentError, match="HOST_ONLY_API_TRANSACTION_ID_INVALID"):
+        co.execute_package_host_only(req)
+    assert not co.paths.journal.exists()
