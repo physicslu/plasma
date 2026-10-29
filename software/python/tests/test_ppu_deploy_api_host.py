@@ -242,7 +242,17 @@ def test_transport_uncertain_does_not_retry_or_resubmit(tmp_path: Path):
 
 def test_no_production_ssh_cutover_or_hidden_root_calls():
     code = (REPO / "scripts" / "ppu_deploy_api.py").read_text()
-    assert "subprocess" not in code and "password_ssh_z2" not in code
+    import ast
+    tree = ast.parse(code)
+    imports = {
+        alias.name for node in ast.walk(tree)
+        if isinstance(node, ast.Import) for alias in node.names
+    } | {
+        node.module for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+    }
+    assert "subprocess" not in imports and "os" not in imports
+    assert "password_ssh_z2" not in code
     assert "sudo " not in code and "os.geteuid" not in code
     existing = (REPO / "scripts" / "ppu_deploy.py").read_text()
     assert "password_ssh_z2" in existing  # remains until separately qualified migration
