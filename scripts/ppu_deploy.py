@@ -93,6 +93,29 @@ def build_bundle(module: str, commit: str) -> tuple[dict, bytes, dict[str, bytes
     return manifest, buffer.getvalue(), local
 
 
+def unified_api_plan(module: str, commit: str, archive: bytes) -> dict:
+    """Host-only cross-entry plan: the Bootstrap endpoint is the only target.
+
+    Engineering module installs are still NOT_QUALIFIED there. Existing
+    SSH deployments are preserved during migration, not counted as migrated.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "ppu_unified_deployment", REPO / "scripts/ppu_unified_deployment.py"
+    )
+    if spec is None or spec.loader is None:
+        raise DeploymentError("UNIFIED_DEPLOYMENT_CONTRACT_MISSING")
+    unified = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = unified
+    spec.loader.exec_module(unified)
+    intent = unified.plan_unified_deployment(
+        unified.DeploymentKind.ENGINEERING_MODULE,
+        source_commit=commit,
+        artifact_sha256=sha(archive),
+        module=module,
+    )
+    return intent.to_descriptor()
+
+
 class Deployer:
     def __init__(self, local_root: Path = LOCAL_ROOT):
         self.root = local_root
@@ -278,7 +301,8 @@ def main(argv: list[str] | None = None) -> int:
                                     capture_output=True, text=True, check=True, timeout=10).stdout.strip()
             manifest, archive, _ = build_bundle(args.module, commit)
             result = {"result": "PASS", "mode": "PLAN_ONLY", "manifest": manifest,
-                      "package_bytes": len(archive), "no_deployment": True}
+                      "package_bytes": len(archive), "no_deployment": True,
+                      "unified_deployment": unified_api_plan(args.module, commit, archive)}
         elif args.action == "deploy":
             result = deployer.deploy(args.module)
         elif args.action == "verify":
