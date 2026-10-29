@@ -50,7 +50,7 @@ HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 DEPLOYMENT_API_IN_FLIGHT_STATES = {"queued", "running"}
 DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "failed", "recovery_required"}
 COORDINATOR_SAFE_RESTART_STATES = {
-    "runtime_active", "engineering_active", "rolled_back", "verify_failed",
+    "runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed",
 }
 MAX_COORDINATOR_JOURNAL_BYTES = 1024 * 1024
 

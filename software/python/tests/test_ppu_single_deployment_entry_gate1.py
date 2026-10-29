@@ -105,7 +105,7 @@ def test_runtime_request_rejects_caller_selected_executable_and_provenance() -> 
 
 @pytest.mark.parametrize("kind,module", [
     (contract.DeploymentKind.ENGINEERING_MODULE, None),
-    (contract.DeploymentKind.ENGINEERING_MODULE, "any-python"),
+    (contract.DeploymentKind.ENGINEERING_MODULE, "../unsafe"),
     (contract.DeploymentKind.PPU_RUNTIME, "wordport"),
     (contract.DeploymentKind.FPGA_IMAGE, "unreviewed"),
 ])
@@ -114,6 +114,15 @@ def test_single_entry_plan_rejects_unreviewed_module_kinds(kind, module) -> None
         contract.plan_unified_deployment(
             kind, module=module, source_commit="a" * 40, artifact_sha256="f" * 64,
         )
+
+
+def test_generic_module_name_is_not_hardcoded_to_first_three_examples() -> None:
+    plan = contract.plan_unified_deployment(
+        contract.DeploymentKind.ENGINEERING_MODULE, module="future-native-bridge",
+        source_commit="a" * 40, artifact_sha256="b" * 64,
+    )
+    assert plan.module == "future-native-bridge"
+    assert plan.state is contract.IntegrationState.BLOCKED_NOT_QUALIFIED
 
 
 @pytest.mark.parametrize("commit,digest", [

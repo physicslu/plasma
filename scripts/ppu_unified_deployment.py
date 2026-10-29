@@ -7,30 +7,188 @@ NOT_QUALIFIED, not dynamically dispatched or privileged here.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
+import stat
+import zipfile
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
+from pathlib import Path, PurePosixPath
 from typing import Mapping
 
 DEPLOYMENT_API = "/v1/deployments"
 DEPLOYMENT_LOCK = "/var/lib/plasma-bootstrap/deployment.lock"
 DEPLOYMENT_JOURNAL = "/var/lib/plasma-bootstrap/deployment.json"
-ENGINEERING_MODULES = ("wordport", "openocd-integration", "abtest")
+# The first three #1207 modules are acceptance fixtures, not a permanent module
+# allowlist. Package admission is based on a reviewed source/publisher and a
+# trusted target profile, neither of which is furnished by a module name.
+FIRST_ACCEPTANCE_MODULES = ("wordport", "openocd-integration", "abtest")
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
+SAFE_NAME = re.compile(r"[a-z][a-z0-9_.-]{0,63}\Z")
+SAFE_VERSION = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}\Z")
+PACKAGE_SCHEMA = "plasma.ppu.package.v1"
+PACKAGE_KINDS = frozenset({"native-c", "python", "fpga-image"})
+MAX_PACKAGE_FILES = 128
+MAX_PACKAGE_BYTES = 32 * 1024 * 1024
 
 
 class UnifiedDeploymentError(ValueError):
     pass
 
 
-class DeploymentKind(StrEnum):
+@dataclass(frozen=True)
+class VerifiedPackageFile:
+    path: str
+    sha256: str
+    size: int
+    executable: bool
+
+
+@dataclass(frozen=True)
+class VerifiedPackage:
+    """Content verified for Host-only simulation; never an execution grant."""
+
+    name: str
+    kind: str
+    version: str
+    source_commit: str
+    archive_sha256: str
+    files: tuple[VerifiedPackageFile, ...]
+    target: Mapping[str, str]
+    install_qualified: bool = False
+
+
+def _unique_json_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise UnifiedDeploymentError("PACKAGE_DUPLICATE_JSON_KEY")
+        result[key] = value
+    return result
+
+
+def _safe_relative_path(name: str) -> bool:
+    if not isinstance(name, str) or "\\" in name or name.startswith("/"):
+        return False
+    pure = PurePosixPath(name)
+    return (len(pure.parts) >= 2 and pure.parts[0] == "payload"
+            and ".." not in pure.parts and pure.as_posix() == name
+            and not any(part in ("", ".") for part in pure.parts))
+
+
+def verify_host_only_package(
+    archive_path: Path, *, expected_sha256: str, source_commit: str,
+    target_profile: Mapping[str, str],
+) -> VerifiedPackage:
+    """Strict generic archive contract. Never installs, loads PL or runs code.
+
+    The target_profile is provided by the trusted caller, never by the archive.
+    SHA-256 proves integrity only; publisher/source approval is a later live gate.
+    """
+    if (type(expected_sha256) is not str or not SHA64.fullmatch(expected_sha256)
+            or type(source_commit) is not str or not SHA40.fullmatch(source_commit)):
+        raise UnifiedDeploymentError("PACKAGE_PROVENANCE_FORMAT_INVALID")
+    if (not isinstance(archive_path, Path) or archive_path.is_symlink()
+            or not archive_path.is_file() or archive_path.stat().st_size > MAX_PACKAGE_BYTES):
+        raise UnifiedDeploymentError("PACKAGE_ARCHIVE_UNTRUSTED")
+    if not isinstance(target_profile, Mapping) or set(target_profile) != {"platform", "board", "fpga_part"}:
+        raise UnifiedDeploymentError("PACKAGE_TARGET_PROFILE_INVALID")
+    if any(type(value) is not str or not SAFE_VERSION.fullmatch(value) for value in target_profile.values()):
+        raise UnifiedDeploymentError("PACKAGE_TARGET_PROFILE_INVALID")
+    digest = hashlib.sha256()
+    with archive_path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    if digest.hexdigest() != expected_sha256:
+        raise UnifiedDeploymentError("PACKAGE_ARCHIVE_SHA256_MISMATCH")
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            infos = archive.infolist()
+            names = [info.filename for info in infos]
+            if (len(names) != len(set(names)) or len(infos) > MAX_PACKAGE_FILES + 1
+                    or sum(info.file_size for info in infos) > MAX_PACKAGE_BYTES
+                    or "manifest.json" not in names or any(
+                        info.is_dir() or info.flag_bits & 1
+                        or stat.S_IFMT(info.external_attr >> 16) not in (0, stat.S_IFREG)
+                        or (info.filename != "manifest.json" and not _safe_relative_path(info.filename))
+                        for info in infos)):
+                raise UnifiedDeploymentError("PACKAGE_FILE_SET_DENIED")
+            manifest_info = archive.getinfo("manifest.json")
+            if manifest_info.file_size > 64 * 1024:
+                raise UnifiedDeploymentError("PACKAGE_MANIFEST_TOO_LARGE")
+            manifest = json.loads(archive.read(manifest_info), object_pairs_hook=_unique_json_pairs)
+            if not isinstance(manifest, dict):
+                raise UnifiedDeploymentError("PACKAGE_MANIFEST_INVALID")
+            kind = manifest.get("kind")
+            expected_fields = {"schema", "name", "kind", "version", "source_commit", "target", "files"}
+            if kind == "fpga-image":
+                expected_fields.add("fpga_pair")
+            if (set(manifest) != expected_fields or manifest["schema"] != PACKAGE_SCHEMA
+                    or kind not in PACKAGE_KINDS
+                    or type(manifest["name"]) is not str or not SAFE_NAME.fullmatch(manifest["name"])
+                    or type(manifest["version"]) is not str or not SAFE_VERSION.fullmatch(manifest["version"])
+                    or manifest["source_commit"] != source_commit
+                    or not isinstance(manifest["target"], dict)
+                    or manifest["target"] != dict(target_profile)
+                    or not isinstance(manifest["files"], list)
+                    or not 1 <= len(manifest["files"]) <= MAX_PACKAGE_FILES):
+                raise UnifiedDeploymentError("PACKAGE_MANIFEST_CONTENT_DENIED")
+            verified_files = []
+            for entry in manifest["files"]:
+                if (not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size", "executable"}
+                        or not _safe_relative_path(entry["path"])
+                        or type(entry["sha256"]) is not str or not SHA64.fullmatch(entry["sha256"])
+                        or type(entry["size"]) is not int or not 0 <= entry["size"] <= MAX_PACKAGE_BYTES
+                        or type(entry["executable"]) is not bool):
+                    raise UnifiedDeploymentError("PACKAGE_FILE_METADATA_DENIED")
+                name = entry["path"]
+                if name not in names:
+                    raise UnifiedDeploymentError("PACKAGE_MEMBER_MISSING")
+                info = archive.getinfo(name)
+                if info.file_size != entry["size"]:
+                    raise UnifiedDeploymentError("PACKAGE_FILE_SIZE_MISMATCH")
+                content_digest = hashlib.sha256()
+                with archive.open(info) as member:
+                    for chunk in iter(lambda: member.read(64 * 1024), b""):
+                        content_digest.update(chunk)
+                if content_digest.hexdigest() != entry["sha256"]:
+                    raise UnifiedDeploymentError("PACKAGE_FILE_SHA256_MISMATCH")
+                verified_files.append(VerifiedPackageFile(**entry))
+            file_names = {entry.path for entry in verified_files}
+            if file_names | {"manifest.json"} != set(names) or len(file_names) != len(verified_files):
+                raise UnifiedDeploymentError("PACKAGE_UNDECLARED_OR_DUPLICATE_FILES")
+            if (kind == "native-c" and not any(entry.executable for entry in verified_files)):
+                raise UnifiedDeploymentError("PACKAGE_NATIVE_EXECUTABLE_MISSING")
+            if kind == "python" and not any(entry.path.endswith(".py") for entry in verified_files):
+                raise UnifiedDeploymentError("PACKAGE_PYTHON_SOURCE_MISSING")
+            if kind == "fpga-image":
+                pair = manifest["fpga_pair"]
+                if (not isinstance(pair, dict) or set(pair) != {"image", "handoff"}
+                        or pair["image"] not in file_names or pair["handoff"] not in file_names
+                        or not pair["image"].endswith((".bin", ".bit"))
+                        or not pair["handoff"].endswith(".hwh")
+                        or any(entry.executable for entry in verified_files)):
+                    raise UnifiedDeploymentError("PACKAGE_FPGA_PAIR_DENIED")
+            return VerifiedPackage(
+                manifest["name"], kind, manifest["version"], source_commit,
+                expected_sha256, tuple(verified_files), dict(target_profile),
+            )
+    except (OSError, zipfile.BadZipFile, UnicodeDecodeError, json.JSONDecodeError,
+            KeyError, TypeError, ValueError) as exc:
+        if isinstance(exc, UnifiedDeploymentError):
+            raise
+        raise UnifiedDeploymentError("PACKAGE_PARSE_DENIED") from exc
+
+
+class DeploymentKind(str, Enum):
     PPU_RUNTIME = "ppu-runtime"
     ENGINEERING_MODULE = "engineering-module"
     FPGA_IMAGE = "fpga-image"
 
 
-class IntegrationState(StrEnum):
+class IntegrationState(str, Enum):
     EXISTING_RUNTIME = "existing-runtime"
     BLOCKED_NOT_QUALIFIED = "blocked-not-qualified"
 
@@ -80,8 +238,8 @@ def plan_unified_deployment(
     if not isinstance(artifact_sha256, str) or not SHA64.fullmatch(artifact_sha256):
         raise UnifiedDeploymentError("ARTIFACT_SHA256_REQUIRED")
     if kind is DeploymentKind.ENGINEERING_MODULE:
-        if type(module) is not str or module not in ENGINEERING_MODULES:
-            raise UnifiedDeploymentError("UNAPPROVED_ENGINEERING_MODULE")
+        if type(module) is not str or not SAFE_NAME.fullmatch(module):
+            raise UnifiedDeploymentError("INVALID_ENGINEERING_MODULE_NAME")
         state = IntegrationState.BLOCKED_NOT_QUALIFIED
     elif kind is DeploymentKind.PPU_RUNTIME:
         if module is not None:

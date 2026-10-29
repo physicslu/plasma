@@ -2,6 +2,52 @@
 
 > **Status:** owner-approved 2026-10-29, including revised Gate 1 Path 1 for PS Runtime API/Coordinator correlation; Draft PR, **NOT deployed or merged**. No SWPC/Z2 operation or Linux permission change. Original baseline `main e338083564c30dc6bdc24009f7b62a3984fb7023` has been reconciled with merged #1208 at `main 1fb0c4b6c95e9da8f746fc3571a160b5a8bf6390`. The Host-only Master role contract is not a deployed Principal/Root authorization boundary.
 
+## Latest owner decision — revised Gate 1, generic package + single Engine (2026-10-29)
+
+**This section supersedes the earlier three-module-only design limits below.**
+The PPU is a dedicated embedded IC programmer: it needs **one logical Deployment
+Engine**, not a fleet-oriented Coordinator → Installer Adapter → privileged
+daemon chain. Reuse the existing `DeploymentCoordinator` transaction process as
+that Engine, its **one** `deployment.lock` and **one** `deployment.json`. The
+existing PS Runtime installer verification functions remain internal helpers;
+there is no new install service/adapter, separate lock or journal.
+
+The new package envelope `plasma.ppu.package.v1` is independent of a static
+module-name allowlist. A ZIP has one strict `manifest.json` and declared
+`payload/` files, with exact byte count and SHA-256 for each file; the manifest
+records `name`, `version`, immutable source commit, `kind`, and target
+`platform`/`board`/`fpga_part`. Supported data types are `native-c`, `python`,
+and `fpga-image`. An FPGA package additionally declares an Image + HWH pair.
+Compatibility is compared with an independently supplied target profile. ZIP
+symlinks, duplicate entries/JSON keys, traversal, undeclared files, digest
+mismatch, nonregular entries and incompatible board identity are denied.
+Module names identify a package; they do **not** grant Root, file write,
+execution or authority. Authentic publisher approval, target Master and
+protected Root Source Pin remain **unqualified for production**.
+
+`DeploymentCoordinator.execute_package_host_only()` reuses the existing lock,
+journal and recovery classification, validates a package, stages files only
+inside a deliberately isolated Host-only simulation tree, atomically changes a
+version receipt, verifies staged contents, and compensates/rolls back an
+activation failure. Unverified restoration becomes `recovery_required`. It
+never executes package C/Python, loads FPGA, changes `/opt/plasma` or activates
+systemd. Both the Bootstrap network endpoint and SWPC HTTPS client continue to
+reject Engineering/FPGA deployment requests. The existing SSH implementation
+and local factory rescue remain unchanged until *separately authorized* live
+parity, ownership and recovery evidence exists.
+
+**First Host-only acceptance batch**: `wordport`, `openocd-integration` and
+`abtest`, using the merged #1207 package/source as the compatibility reference;
+additional synthetic native-C and FPGA Image/HWH packages prove the generic
+envelope is not a three-module special case. Positive stages and rollback
+negative tests are *simulation evidence only*: no SWPC, Z2, FPGA or DUT was
+accessed. Cross-host commit, actual protected Installer/Root authority, real
+API Master authorization and deployment still require later qualification.
+
+The paragraphs below record the **prior Gate 1 baseline/history**, including
+the previously intentional exact-three allowlist, and must not be mistaken for
+the revised generic Host-only architecture above.
+
 ## Decision: one product-facing installation endpoint, one transaction
 
 The **only target normal-install endpoint** is the existing Z2 PPU Bootstrap `POST /v1/deployments`; SWPC `ppu-deploy` and Console are *clients*, not independent Z2 installers. The authoritative transaction must be the existing `scripts/ppu-bootstrap-deployment.py`: `/var/lib/plasma-bootstrap/deployment.lock` plus `deployment.json`, verified release staging, activation and rollback. `ppu-z2-installer.py` and its Core remain **internal** verified PS installers, not separate product APIs. `ppu-bootstrap-installer.py` remains only **local factory/Engineer recovery**, outside normal network deployment. Protected FPGA Root `download|test|restore` remains hardware lifecycle and recovery, not an Image installation API.

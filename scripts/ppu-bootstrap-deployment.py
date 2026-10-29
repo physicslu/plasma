@@ -16,17 +16,19 @@ from contextlib import contextmanager
 import importlib.util
 import json
 import os
+import shutil
 import sys
 import tempfile
 import time
 import uuid
+import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
-SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "rolled_back", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed"}
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -79,6 +81,16 @@ class EngineeringDeploymentRequest:
     artifact_sha256: str
 
 
+@dataclass(frozen=True)
+class HostOnlyPackageRequest:
+    """Never built from HTTP; dry-run target identity comes from a test fixture."""
+
+    archive: Path
+    source_commit: str
+    artifact_sha256: str
+    target_profile: Mapping[str, str]
+
+
 class EngineeringInstallRolledBack(RuntimeError):
     """The trusted installer proves it restored the complete prior state."""
 
@@ -101,6 +113,7 @@ class DeploymentRecord:
     module: str | None = None
     source_commit: str | None = None
     api_transaction_id: str | None = None
+    package_kind: str | None = None
 
 
 class Journal:
@@ -325,6 +338,191 @@ class DeploymentCoordinator:
                     "production authorization",
                     "hardware programming",
                 ],
+            }
+
+    def execute_package_host_only(
+        self, request: HostOnlyPackageRequest, *, inject_failure: str | None = None,
+    ) -> Mapping[str, Any]:
+        """One Lock/Journal/Engine; exercise package lifecycle in a sandbox ONLY.
+
+        No installed Root path, service, hardware handler or HTTP request calls
+        this method. The sandbox is under a non-production Bootstrap state root;
+        payload files are never executed, imported or installed into product_root.
+        """
+        if not isinstance(request, HostOnlyPackageRequest):
+            raise DeploymentError("HOST_ONLY_PACKAGE_REQUEST_INVALID")
+        if self.paths.bootstrap_state_root == DeploymentPaths().bootstrap_state_root:
+            raise DeploymentError("HOST_ONLY_PRODUCTION_STATE_ROOT_DENIED")
+        if (not self.paths.bootstrap_state_root.is_absolute()
+                or self.paths.bootstrap_state_root.is_symlink()):
+            raise DeploymentError("HOST_ONLY_SANDBOX_ROOT_INVALID")
+        temporary_root = Path(tempfile.gettempdir()).resolve()
+        if not self.paths.bootstrap_state_root.resolve().is_relative_to(temporary_root):
+            raise DeploymentError("HOST_ONLY_SANDBOX_MUST_BE_TEMPORARY")
+        if inject_failure not in (None, "after_stage", "after_activate", "rollback_unknown"):
+            raise DeploymentError("HOST_ONLY_FAILURE_SELECTOR_INVALID")
+
+        # A data-only contract module, not an installer, adapter or new daemon.
+        contract_path = Path(__file__).with_name("ppu_unified_deployment.py")
+        spec = importlib.util.spec_from_file_location("ppu_host_only_package_contract", contract_path)
+        if spec is None or spec.loader is None:
+            raise DeploymentError("HOST_ONLY_CONTRACT_UNAVAILABLE")
+        contract = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = contract
+        spec.loader.exec_module(contract)
+
+        with self._deployment_lock():
+            now = self.clock()
+            record = DeploymentRecord(
+                schema_version=SCHEMA_VERSION,
+                transaction_id=self.transaction_id_factory(),
+                state="received", sequence=0, started_at_epoch_s=now,
+                updated_at_epoch_s=now, release_artifact=str(request.archive),
+                source_commit=request.source_commit, kind="host-only-package",
+            )
+            self.journal.write(record, "received")
+            try:
+                self.journal.write(record, "verifying")
+                package = contract.verify_host_only_package(
+                    request.archive, expected_sha256=request.artifact_sha256,
+                    source_commit=request.source_commit, target_profile=request.target_profile,
+                )
+            except Exception as exc:
+                self.journal.write(record, "verify_failed",
+                                   error_code="package_verification_failed", error_message=str(exc))
+                raise DeploymentError(f"host-only package verification failed: {exc}") from exc
+            record.module = package.name
+            record.package_kind = package.kind
+            record.artifact_sha256 = package.archive_sha256
+            self.journal.write(record, "verified")
+
+            # Only a non-production simulation store is mutated; the real
+            # /opt/plasma, FPGA Manager and factory recovery are untouched.
+            store = self.paths.bootstrap_state_root / "host-only-packages"
+            release_id = (f"{package.version}-{package.source_commit[:12]}-"
+                          f"{package.archive_sha256[:16]}")
+            release_root = store / "releases" / package.name / release_id
+            active_path = store / "active" / f"{package.name}.json"
+            record.release_id = release_id
+            previous: bytes | None = None
+            activated = False
+
+            # Never follow an existing symlink in the simulated install tree.
+            for boundary in (store, store / "releases", release_root.parent,
+                             release_root, store / "active", active_path):
+                if boundary.is_symlink():
+                    self.journal.write(record, "verify_failed",
+                                       error_code="host_only_store_symlink_denied")
+                    raise DeploymentError("HOST_ONLY_SANDBOX_SYMLINK_DENIED")
+
+            def verify_staged_files() -> None:
+                for member in package.files:
+                    path = release_root / member.path
+                    if not path.is_file() or path.is_symlink() or path.stat().st_size != member.size:
+                        raise DeploymentError("HOST_ONLY_STAGED_FILE_MISSING")
+                    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                    if digest != member.sha256:
+                        raise DeploymentError("HOST_ONLY_STAGED_SHA256_MISMATCH")
+
+            def save_active(contents: bytes | None) -> None:
+                active_path.parent.mkdir(parents=True, exist_ok=True)
+                if active_path.is_symlink():
+                    raise DeploymentError("HOST_ONLY_ACTIVE_SYMLINK_DENIED")
+                if contents is None:
+                    active_path.unlink(missing_ok=True)
+                else:
+                    temporary = active_path.with_name(active_path.name + ".new")
+                    if temporary.is_symlink():
+                        raise DeploymentError("HOST_ONLY_ACTIVE_TEMP_SYMLINK_DENIED")
+                    with temporary.open("wb") as stream:
+                        stream.write(contents)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    os.chmod(temporary, 0o600)
+                    os.replace(temporary, active_path)
+
+            try:
+                if active_path.is_symlink():
+                    raise DeploymentError("HOST_ONLY_ACTIVE_SYMLINK_DENIED")
+                if active_path.exists():
+                    previous = active_path.read_bytes()
+                    prior = json.loads(previous)
+                    if (not isinstance(prior, dict) or prior.get("name") != package.name
+                            or set(prior) != {"name", "kind", "release_id",
+                                              "archive_sha256", "source_commit"}
+                            or prior.get("kind") not in contract.PACKAGE_KINDS
+                            or type(prior.get("release_id")) is not str
+                            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,160}", prior["release_id"])
+                            or type(prior.get("source_commit")) is not str
+                            or not _HEX40.fullmatch(prior["source_commit"])
+                            or type(prior.get("archive_sha256")) is not str
+                            or not _HEX64.fullmatch(prior["archive_sha256"])
+                            or not prior["release_id"].endswith(prior["archive_sha256"][:16])):
+                        raise DeploymentError("HOST_ONLY_PRIOR_RECEIPT_INVALID")
+                    prior_root = store / "releases" / package.name / prior["release_id"]
+                    if not prior_root.is_dir() or prior_root.is_symlink():
+                        raise DeploymentError("HOST_ONLY_PRIOR_RELEASE_NOT_VERIFIED")
+                    record.previous_release = prior["release_id"]
+                self.journal.write(record, "staging")
+                if not release_root.exists():
+                    release_root.parent.mkdir(parents=True, exist_ok=True)
+                    stage = Path(tempfile.mkdtemp(prefix=".host-only-", dir=release_root.parent))
+                    try:
+                        with zipfile.ZipFile(request.archive) as archive:
+                            for entry in package.files:
+                                target = stage / entry.path
+                                target.parent.mkdir(parents=True, exist_ok=True)
+                                with archive.open(entry.path) as src, target.open("wb") as dest:
+                                    shutil.copyfileobj(src, dest)
+                                target.chmod(0o555 if entry.executable else 0o444)
+                        os.replace(stage, release_root)
+                    finally:
+                        if stage.exists():
+                            shutil.rmtree(stage)
+                verify_staged_files()
+                self.journal.write(record, "staged")
+                if inject_failure == "after_stage":
+                    raise DeploymentError("HOST_ONLY_INJECTED_STAGE_FAILURE")
+                self.journal.write(record, "activating")
+                receipt = json.dumps({
+                    "name": package.name, "kind": package.kind, "release_id": release_id,
+                    "archive_sha256": package.archive_sha256,
+                    "source_commit": package.source_commit,
+                }, sort_keys=True).encode()
+                save_active(receipt)
+                activated = True
+                if inject_failure in ("after_activate", "rollback_unknown"):
+                    raise DeploymentError("HOST_ONLY_INJECTED_ACTIVATION_FAILURE")
+                self.journal.write(record, "health_check")
+                verify_staged_files()
+                if active_path.read_bytes() != receipt:
+                    raise DeploymentError("HOST_ONLY_ACTIVATION_RECEIPT_MISMATCH")
+            except Exception as exc:
+                try:
+                    if inject_failure == "rollback_unknown":
+                        raise DeploymentError("HOST_ONLY_INJECTED_ROLLBACK_UNCERTAIN")
+                    if activated:
+                        save_active(previous)
+                        if previous is None:
+                            if active_path.exists():
+                                raise DeploymentError("HOST_ONLY_ROLLBACK_NOT_VERIFIED")
+                        elif active_path.read_bytes() != previous:
+                            raise DeploymentError("HOST_ONLY_ROLLBACK_NOT_VERIFIED")
+                    self.journal.write(record, "rolled_back",
+                                       error_code="host_only_install_rolled_back", error_message=str(exc))
+                except Exception as rollback_exc:
+                    self.journal.write(record, "recovery_required",
+                                       error_code="host_only_rollback_unknown",
+                                       error_message=str(rollback_exc))
+                raise DeploymentError(f"host-only package transaction failed: {exc}") from exc
+
+            self.journal.write(record, "package_active")
+            return {
+                "result": "PASS", "transaction": asdict(record),
+                "package": {"name": package.name, "kind": package.kind,
+                            "version": package.version, "sha256": package.archive_sha256},
+                "host_only": True, "install_qualified": False,
+                "not_claimed": ["real engineering deployment", "FPGA load", "SWPC/Z2 rollout"],
             }
 
     def _execute_locked(self, request: DeploymentRequest) -> Mapping[str, Any]:
