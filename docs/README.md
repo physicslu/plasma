@@ -38,7 +38,7 @@
 
 
 - **Current / Path 2 guarded-hardware operator-cli** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：現行 Path 2 通用硬體 Work Order 使用 `capability: operator-cli`、`scope: guarded-hardware`、來源 SHA 綁定的 Python `script`、`argv` 與受限 `timeout_seconds`；在非 Root SWPC Runner 執行，不自動取得 sudo／Root 權限。Exit 69／77 是失敗的 NOT_RUN，Exit 0 僅為待審證據。CPU-only／Vivado Host Build 為各自獨立能力。
-- **Path 2 dynamic Vivado Host Build / PR #1210** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：#1211 Dispatcher 准入要求開放 PR 精確 HEAD；#1210 的專案建置契約與驗證器經真實 SWPC Path 2 建置驗收 `z2-identity`、`z2-control-waveform`。此能力只建置，不下載 FPGA 或操作 Z2；實際 `main` 狀態以 PR 是否合併為準。
+- **Path 2 dynamic Vivado Host Build / PR #1210** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：工作單使用可信事件的 `main` 來源，或綁定開放 PR 精確 HEAD；專案建置契約與驗證器經真實 SWPC Path 2 建置驗收 `z2-identity`、`z2-control-waveform`。此能力只建置，不下載 FPGA 或操作 Z2；實際 `main` 狀態以 PR 是否合併為準。
 - **Historical / retired z2-root-operation Work Order; F1-B #1168 evidence** — [Path 2 受保護 Z2 Root Entry 歷史契約](development/path2-generic-fpga-image-loader.md)：舊 Dispatcher 固定 `download|test|restore` Work Order 已退役，現行 Dispatcher 明確拒絕；獨立兩參數 Protected Root Entry／底層 Transport 與來源、互斥、復原守衛仍保留。#1168 實機 PASS 僅涵蓋當時 Site 1 F1-B，不能推導 Blue Pill／其他 Programmer IP／八 Site 資格。
 
 - **Historical Gate 1 offline provider integration** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；Stage Transport／Protected Root Entry 為保留的底層受保護工具，不是現行 Path 2 Dispatcher 的 `z2-root-operation` Capability。實際硬體使用 `operator-cli` 時仍須逐次核對授權、映像 Hash、所有權及 Recovery 證據。

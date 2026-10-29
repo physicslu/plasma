@@ -2,8 +2,8 @@
 
 > **Historical F1-B build record.** Status statements and fixed Registry
 > examples below describe their dated Gate 1/PR, not the current dynamic
-> Path 2 build contract. Current dynamic admission accepts an exact PR HEAD
-> for `pl/projects/<name>`; successful execution additionally requires a
+> Path 2 build contract. Current dynamic admission accepts trusted event
+> `main` or an exact open PR HEAD for `pl/projects/<name>`; successful execution requires a
 > reviewed project build contract and artifact/HWH verifier. The legacy
 > fixed F1-B Registry tasks remain separate compatibility routes.
 

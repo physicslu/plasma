@@ -225,8 +225,8 @@ the actual command and physical effect, not the technology label `SW` or
   attempted must not be reclassified as `NOT_RUN`. Keep the FPGA image Root
   Entry restricted to image lifecycle and Golden recovery, not arbitrary
   shell commands. Dynamic Vivado host builds require a reviewed project-owned
-  build contract, exact open-PR HEAD source binding with `pr_number` and
-  `source_sha`, and a Project-specific artifact verifier;
+  build contract, authenticated event-main source or exact open-PR HEAD
+  binding with `pr_number` and `source_sha`, and a Project-specific verifier;
   a Project ID alone is not qualification. New tasks use the dynamic owner Work Order, not
   a new legacy Registry task_id. Z2 Root source/manifest pin mismatches
   never authorize implicit redeployment or privilege escalation.

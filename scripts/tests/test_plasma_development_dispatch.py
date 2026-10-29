@@ -1753,6 +1753,41 @@ class GenericWorkOrderContracts(unittest.TestCase):
             candidate.assert_called_once()
             self.assertEqual(candidate.return_value.run.call_args.args[0], projected)
 
+    def test_dynamic_vivado_host_build_uses_trusted_main_contract(self):
+        import plasma_vivado_host_build as build
+        fixed = dev.task_by_id(self.registry, "z2-path2-build")
+        order = self._order("path2-cli", capability="vivado-host-build",
+                            project="pl/projects/z2-identity",
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"])
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(approval["pr_number"], 0)
+        self.assertEqual(approval["pinned_sha"], approval["trusted_sha"])
+        projected = {key: task[key] for key in (
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha")}
+        self.assertEqual(build.generic_project_contract(
+            projected, workspace=ROOT, approval=approval)["vivado_project"],
+                         "z2_identity")
+        self.assertIs(dev.reviewed_host_build_driver(
+            workspace=ROOT, approval=approval), build)
+        with self.assertRaisesRegex(build.BuildDenied,
+                                    "BUILD_GENERIC_PROJECT_DENIED"):
+            build.generic_project_contract(
+                projected | {"project": "pl/projects/not-qualified"},
+                workspace=ROOT, approval=approval)
+        with patch.object(dev, "reviewed_host_build_driver") as driver:
+            driver.return_value.run.return_value = {"status": "MOCK_HOST_BUILD"}
+            self.assertEqual(dev.run_task(task, workspace=ROOT,
+                                          approval=approval)["status"],
+                             "MOCK_HOST_BUILD")
+            driver.assert_called_once()
+
     def test_dynamic_vivado_host_build_negative_contracts(self):
         fixed = dev.task_by_id(self.registry, "z2-path2-build")
         order = self._order("path2-cli",
@@ -1792,11 +1827,11 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with self.assertRaisesRegex(build.BuildDenied, "BUILD_GENERIC_PROJECT_DENIED"):
             build.generic_project_contract(projected, workspace=ROOT,
                                            approval=approval)
+        # A main-only Work Order is valid, but cannot supply a spoofed SHA.
         with self.assertRaisesRegex(dev.Denied,
-                                    "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
+                                    "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED"):
             dev.request(self._event({k: v for k, v in order.items()
-                                     if k not in ("pr_number", "source_sha")}),
-                        self._context())
+                                     if k != "pr_number"}), self._context())
         # Stage field was retired at the Work Order schema boundary.
         with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_FIELDS_DENIED"):
             dev.request(self._event(order | {"stage": "download"}), self._context())

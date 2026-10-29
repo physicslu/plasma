@@ -57,7 +57,7 @@ remains separate, not a generic execution gate.
 - `cpu-only` — reviewed Python under `scripts/`, Host-only Bubblewrap with
   no network/devices, bounded argv/timeout and stdout-digest or explicit
   exit-code verification. Process exit 0 is not physical evidence.
-- `vivado-host-build` — a PR-HEAD-pinned Host build for a project with a
+- `vivado-host-build` — a trusted-event-main or PR-HEAD-pinned Host build for a project with a
   reviewed `host-build.json`, build Tcl and project-specific artifact/HWH
   verifier. A syntactically valid project path alone is insufficient. The
   two legacy fixed Registry Build tasks remain F1-B-only compatibility
