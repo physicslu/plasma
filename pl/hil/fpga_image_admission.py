@@ -23,15 +23,34 @@ def need(ok: bool, code: str) -> None:
 
 def check_exact(*, release, passive: dict, uio: dict,
                 original_manager_load: str, expected_firmware: str,
-                previous_firmware: str | None = None) -> dict:
+                previous_firmware: str | None = None,
+                runtime_program_session: bool = False) -> dict:
     need(type(passive) is dict and
          passive.get("observation_kind") == "LIVE_ROOT_READ_ONLY" and
          passive.get("root") is True and bool(passive.get("boot_id")) and
          passive.get("manager_state") == "operating" and
          passive.get("recovery_sha256") == release.recovery_sha256 and
-         passive.get("candidate_sha256") == release.firmware_sha256 and
-         passive.get("proc_complete") is True and
-         passive.get("proc_conflicts") == [], "INCOMPLETE_ROOT_OR_PROCESS_FACTS")
+         passive.get("candidate_sha256") == release.firmware_sha256,
+         "INCOMPLETE_ROOT_OR_PROCESS_FACTS")
+    need(type(runtime_program_session) is bool, "INVALID_PROCESS_SCAN_POLICY")
+    scan = passive.get("proc_scan_diagnostic")
+    if runtime_program_session:
+        # This is NOT a no-conflict measurement. In particular a forged
+        # proc_complete=True must not be mistaken for a runtime exemption.
+        need(passive.get("proc_complete") is None and
+             passive.get("proc_conflicts") is None and
+             scan == {"status": "NOT_RUN_PROGRAM_SESSION"},
+             "PROGRAM_SESSION_PROCESS_FACTS_INVALID")
+    else:
+        scan = scan if type(scan) is dict else {}
+        # No free-form command lines or environment values; only the root census
+        # status, numeric PID, FD/MAPS phase and exception type are reported.
+        detail = ":".join(str(scan.get(key, "UNKNOWN"))[:40]
+                          for key in ("status", "pid", "phase", "error"))
+        need(passive.get("proc_complete") is True,
+             "PROC_SCAN_INCOMPLETE:" + detail)
+        need(passive.get("proc_conflicts") == [],
+             "PROC_RESOURCE_OWNER_CONFLICT")
     need(type(uio) is dict and uio == release.expected_uio,
          "BOUND_UIO_EXACT_FACTS_CHANGED")
     need(passive.get("uio_overlaps") == [release.uio_name],
@@ -62,11 +81,14 @@ def check_exact(*, release, passive: dict, uio: dict,
 
 
 def collect_live(*, root_port: guard.RootZ2TargetPort, release,
-                 expected_firmware: str, previous_firmware: str | None = None) -> dict:
+                 expected_firmware: str, previous_firmware: str | None = None,
+                 runtime_program_session: bool = False) -> dict:
     root_port._require_locked()
     need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
     need(root_port.release == release, "ROOT_RELEASE_BINDING_CHANGED")
-    passive = root_port.current_facts()
+    need(type(runtime_program_session) is bool, "INVALID_PROCESS_SCAN_POLICY")
+    passive = (root_port.runtime_program_facts() if runtime_program_session
+               else root_port.current_facts())
     uio_root = guard.SYS / "class/uio" / release.uio_name
     device = (uio_root / "device").resolve(strict=True)
     driver = (device / "driver").resolve(strict=True).name
@@ -87,7 +109,8 @@ def collect_live(*, root_port: guard.RootZ2TargetPort, release,
         release=release, passive=passive, uio=uio,
         original_manager_load=guard.manager_last_load(),
         expected_firmware=expected_firmware,
-        previous_firmware=previous_firmware)
+        previous_firmware=previous_firmware,
+        runtime_program_session=runtime_program_session)
     need((guard.PROC / "sys/kernel/random/boot_id").read_text().strip()
          == report["target_boot_id"], "BOOT_CHANGED_AFTER_RISK_SCAN")
     return report

@@ -74,7 +74,7 @@ def validate(architecture: str, agents: str, bridge: str,
             call_names.add(ast.unparse(node.func))
         except ValueError:
             reject("cannot inspect bridge execution call")
-    for call in ("root.native_runtime_preflight", "root.live_report",
+    for call in ("root.native_runtime_preflight", "root.live_program_session_report",
                  "LinuxMMIO", "mmio.claim_site", "serve_local_unix_once"):
         if call not in call_names:
             reject("PS-native WordPort call missing: " + call)
@@ -122,6 +122,7 @@ def self_test(parts: dict[str, str]) -> None:
         ("agents", "**SWPC runs Web / Controller / BFF**", "**SWPC runs OpenOCD**"),
         ("bridge", "Z2 PS and connect", "SWPC and connect"),
         ("bridge", "root.native_runtime_preflight()", "pass"),
+        ("bridge", "root.live_program_session_report(port, release)", "pass"),
         ("bridge", "serve_local_unix_once(args.socket", "serve_remote_unix_once(args.socket"),
         ("installer", "install_or_reuse_openocd()", "install_not_available()"),
         ("workflow", "run: python scripts/tests/test-openocd-ps-architecture.py",

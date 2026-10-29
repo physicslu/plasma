@@ -353,6 +353,327 @@ class GenericGuardSafetyTests(unittest.TestCase):
 
 
 
+class GuardProcessCensusRegressionTests(unittest.TestCase):
+    """Host-only races; fake /proc only; never touch Z2 or real MMIO."""
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.td = tempfile.TemporaryDirectory()
+        self.addCleanup(self.td.cleanup)
+        self.proc = Path(self.td.name)
+        self.release = SimpleNamespace(owner_base=0x40000000,
+                                       owner_bytes=0x10000)
+
+    def pid(self, number, *, mapped=None):
+        directory = self.proc / str(number)
+        (directory / "fd").mkdir(parents=True)
+        (directory / "maps").write_text(
+            mapped or "00100000-00101000 r--p 00000000 00:00 0 [anon]\n")
+        return directory
+
+    def test_clean_scan_and_real_fd_conflict_are_distinct(self):
+        active = self.pid(1000)
+        result = {}
+        self.assertEqual(guard.scan_proc_consumers(
+            procroot=self.proc, release=self.release, diagnostic=result),
+            (True, []))
+        self.assertEqual(result["status"], "COMPLETE")
+        (active / "fd/3").symlink_to("/dev/uio1")
+        result = {}
+        self.assertEqual(guard.scan_proc_consumers(
+            procroot=self.proc, release=self.release, diagnostic=result),
+            (True, ["1000"]))
+        self.assertEqual(result["status"], "PROC_CONFLICT")
+
+    def test_confirmed_pid_exit_restarts_full_scan(self):
+        import shutil
+        vanishing = self.pid(1000)
+        self.pid(2000)
+        original = Path.read_text
+        calls = []
+        def vanish_once(path, *args, **kwargs):
+            if path == vanishing / "maps":
+                calls.append("vanished")
+                shutil.rmtree(vanishing)
+                raise FileNotFoundError("synthetic terminated PID")
+            return original(path, *args, **kwargs)
+        detail = {}
+        with patch.object(Path, "read_text", new=vanish_once):
+            self.assertEqual(guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail),
+                (True, []))
+        self.assertEqual(calls, ["vanished"])
+        self.assertEqual(detail["status"], "COMPLETE")
+        self.assertEqual(detail["rescans"], 1)
+        self.assertEqual(detail["attempt"], 2)
+
+    def test_existing_pid_with_missing_maps_fails_closed(self):
+        (self.proc / "1000/fd").mkdir(parents=True)
+        self.pid(2000)
+        detail = {}
+        self.assertEqual(guard.scan_proc_consumers(
+            procroot=self.proc, release=self.release, diagnostic=detail),
+            (False, ["1000"]))
+        self.assertEqual(detail["attempt"], 1)
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+
+    def test_permission_denied_never_retries(self):
+        active = self.pid(1000)
+        original = Path.read_text
+        def denied(path, *args, **kwargs):
+            if path == active / "maps":
+                raise PermissionError("synthetic proc permission error")
+            return original(path, *args, **kwargs)
+        detail = {}
+        with patch.object(Path, "read_text", new=denied):
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail)
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+        self.assertEqual(detail["attempt"], 1)
+
+    def test_conflict_before_vanishing_process_cannot_be_skipped(self):
+        import shutil
+        owner = self.pid(1000)
+        (owner / "fd/1").symlink_to("/dev/uio1")
+        vanishing = self.pid(2000)
+        original = Path.read_text
+        def disappear(path, *args, **kwargs):
+            if path == vanishing / "maps":
+                shutil.rmtree(vanishing)
+                raise FileNotFoundError("synthetic terminated PID")
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=disappear):
+            detail = {}
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail)
+        self.assertEqual(result, (False, ["1000", "2000"]))
+        self.assertEqual(detail["status"], "PROC_CONFLICT_AND_INCOMPLETE")
+        self.assertEqual(detail["attempt"], 1)
+
+    def test_missing_maps_with_inaccessible_pid_is_not_exit(self):
+        active = self.pid(1000)
+        original_read = Path.read_text
+        original_stat = Path.stat
+
+        def missing_maps(path, *args, **kwargs):
+            if path == active / "maps":
+                raise FileNotFoundError("inaccessible live PID maps")
+            return original_read(path, *args, **kwargs)
+
+        def hidden_pid(path, *args, **kwargs):
+            if path == active:
+                raise PermissionError("cannot establish PID disappearance")
+            return original_stat(path, *args, **kwargs)
+
+        detail = {}
+        with patch.object(Path, "read_text", new=missing_maps), \
+                patch.object(Path, "stat", new=hidden_pid):
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release,
+                diagnostic=detail)
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["attempt"], 1)
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+
+    def test_three_successive_disappearing_pids_fail_closed(self):
+        import shutil
+        for pid in (1000, 2000, 3000, 9000):
+            self.pid(pid)
+        original = Path.read_text
+        def disappear(path, *args, **kwargs):
+            if path.parent.name in ("1000", "2000", "3000") and path.name == "maps":
+                shutil.rmtree(path.parent)
+                raise FileNotFoundError("synthetic terminated PID")
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=disappear):
+            detail = {}
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail)
+        self.assertEqual(result, (False, ["3000"]))
+        self.assertEqual(detail["status"], "VANISHED_PID_RESCAN_EXHAUSTED")
+        self.assertEqual(detail["attempt"], 3)
+
+
+class RootAdmissionFailureClassificationTests(unittest.TestCase):
+    """An incomplete Root snapshot is not a known owner and never passes."""
+
+    def facts(self):
+        from types import SimpleNamespace
+        release = SimpleNamespace(
+            recovery_sha256="b" * 64,
+            firmware_sha256="a" * 64,
+            expected_uio={"uio": "uio1"},
+            uio_name="uio1", firmware_name="candidate.bin",
+            recovery_name="recovery.bin", site_bitmap=1, image_id="test")
+        passive = {
+            "observation_kind": "LIVE_ROOT_READ_ONLY", "root": True,
+            "boot_id": "fixed-test-boot", "manager_state": "operating",
+            "recovery_sha256": release.recovery_sha256,
+            "candidate_sha256": release.firmware_sha256,
+            "proc_complete": True, "proc_conflicts": [],
+            "proc_scan_diagnostic": {"status": "COMPLETE"},
+            "uio_overlaps": ["uio1"],
+            "platform_overlaps": ["40000000.fabric"],
+        }
+        return release, passive
+
+    def check(self, release, passive):
+        from pl.hil import fpga_image_admission as admission
+        return admission.check_exact(
+            release=release, passive=passive, uio=release.expected_uio,
+            original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+            expected_firmware=release.firmware_name)
+
+    def test_complete_nonconflicting_facts_pass(self):
+        release, facts = self.facts()
+        self.assertEqual(self.check(release, facts)["image_id"], "test")
+
+    def test_incomplete_scan_reports_precise_kind_and_blocks(self):
+        release, facts = self.facts()
+        facts["proc_complete"] = False
+        facts["proc_scan_diagnostic"] = {
+            "status": "PROC_VISIBILITY_DENIED", "pid": "1234",
+            "phase": "MAPS", "error": "PermissionError"}
+        with self.assertRaisesRegex(ValueError,
+                                    "PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:1234:MAPS:PermissionError"):
+            self.check(release, facts)
+
+    def test_owner_conflict_blocks_when_proc_snapshot_complete(self):
+        release, facts = self.facts()
+        facts["proc_conflicts"] = ["1234"]
+        with self.assertRaisesRegex(ValueError, "PROC_RESOURCE_OWNER_CONFLICT"):
+            self.check(release, facts)
+
+    def test_other_root_integrity_failure_remains_fail_closed(self):
+        release, facts = self.facts()
+        facts["manager_state"] = "unknown"
+        with self.assertRaisesRegex(ValueError, "INCOMPLETE_ROOT_OR_PROCESS_FACTS"):
+            self.check(release, facts)
+
+
+class ProgramSessionProcScanSplitTests(unittest.TestCase):
+    """Strict Manager census stays; program admission records NOT_RUN honestly."""
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.work = Path(self.temp.name)
+        self.sys = self.work / "sys"
+        self.proc = self.work / "proc"
+        self.firmware = self.work / "firmware"
+        self.firmware.mkdir()
+        self.release = SimpleNamespace(
+            firmware_name="candidate.bin", recovery_name="golden.bin",
+            firmware_sha256="a" * 64, recovery_sha256="b" * 64,
+            soc_compatible="test,zynq", owner_base=0x40000000,
+            owner_bytes=0x10000, uio_name="uio1",
+            expected_uio={"uio": "uio1"},
+            site_bitmap=1, image_id="test")
+        boot = self.proc / "sys/kernel/random/boot_id"
+        boot.parent.mkdir(parents=True)
+        boot.write_text("test-boot-001")
+        compatible = self.proc / "device-tree/compatible"
+        compatible.parent.mkdir(parents=True)
+        compatible.write_bytes(b"test,zynq\x00")
+        state = self.sys / "class/fpga_manager/fpga0/state"
+        state.parent.mkdir(parents=True)
+        state.write_text("operating")
+
+    def facts(self, *, runtime, scan):
+        with patch.object(guard, "SYS", self.sys), \
+                patch.object(guard, "PROC", self.proc), \
+                patch.object(guard, "FIRMWARE", self.firmware), \
+                patch.object(guard.os, "geteuid", return_value=0), \
+                patch.object(guard, "sha_file", side_effect=lambda path, expected: expected), \
+                patch.object(guard, "scan_kernel_owners",
+                             return_value=(["uio1"], ["40000000.fabric"])), \
+                patch.object(guard, "scan_proc_consumers", side_effect=scan):
+            return guard.read_live_z2_facts(
+                release=self.release, runtime_program_session=runtime)
+
+    def test_runtime_never_enumerates_all_proc_pids(self):
+        def forbidden(**kwargs):
+            raise AssertionError("runtime must not census all Linux processes")
+        facts = self.facts(runtime=True, scan=forbidden)
+        self.assertIsNone(facts["proc_complete"])
+        self.assertIsNone(facts["proc_conflicts"])
+        self.assertEqual(facts["proc_scan_diagnostic"],
+                         {"status": "NOT_RUN_PROGRAM_SESSION"})
+        self.assertEqual(facts["manager_state"], "operating")
+        self.assertEqual(facts["uio_overlaps"], ["uio1"])
+
+    def test_manager_still_requires_complete_process_visibility(self):
+        diag = {}
+        def scanner(**kwargs):
+            kwargs["diagnostic"].update(status="PROC_VISIBILITY_DENIED",
+                                        pid="1234", phase="MAPS",
+                                        error="PermissionError")
+            return False, ["1234"]
+        facts = self.facts(runtime=False, scan=scanner)
+        self.assertIs(facts["proc_complete"], False)
+        self.assertEqual(facts["proc_conflicts"], ["1234"])
+        self.assertEqual(facts["proc_scan_diagnostic"]["pid"], "1234")
+
+    def test_manager_runtime_flag_does_not_forge_a_clean_scan(self):
+        from pl.hil import fpga_image_admission as admission
+        release = self.release
+        facts = self.facts(runtime=True, scan=AssertionError("not called"))
+        common = dict(
+            release=release, passive=facts, uio=release.expected_uio,
+            original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+            expected_firmware=release.firmware_name)
+        self.assertEqual(admission.check_exact(
+            **common, runtime_program_session=True)["image_id"], "test")
+        with self.assertRaisesRegex(ValueError, "PROC_SCAN_INCOMPLETE"):
+            admission.check_exact(**common)
+        for field, value in (
+                ("proc_complete", True),
+                ("proc_conflicts", []),
+                ("proc_scan_diagnostic", {"status": "COMPLETE"})):
+            with self.subTest(field=field):
+                malformed = dict(facts, **{field: value})
+                with self.assertRaisesRegex(ValueError,
+                                            "PROGRAM_SESSION_PROCESS_FACTS_INVALID"):
+                    admission.check_exact(
+                        **dict(common, passive=malformed),
+                        runtime_program_session=True)
+
+    def test_runtime_cannot_bypass_bad_image_or_manager_state(self):
+        from pl.hil import fpga_image_admission as admission
+        facts = self.facts(runtime=True, scan=AssertionError("not called"))
+        common = dict(
+            release=self.release, uio=self.release.expected_uio,
+            original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+            expected_firmware=self.release.firmware_name,
+            runtime_program_session=True)
+        for change in ({"manager_state": "unknown"},
+                       {"candidate_sha256": "c" * 64},
+                       {"boot_id": ""}):
+            with self.subTest(change=change), \
+                    self.assertRaisesRegex(ValueError, "INCOMPLETE_ROOT_OR_PROCESS_FACTS"):
+                admission.check_exact(
+                    **dict(common, passive=dict(facts, **change)))
+        with self.assertRaisesRegex(ValueError, "BOUND_UIO_EXACT_FACTS_CHANGED"):
+            admission.check_exact(**dict(common, passive=facts,
+                                         uio={"uio": "uio9"}))
+
+    def test_bridge_uses_narrow_entry_and_scoped_fuser_under_lock(self):
+        source = (ROOT / "scripts/bluepill-wordport-session.py").read_text()
+        begin = source.index("with port.exclusive():")
+        after = source[begin:]
+        self.assertIn("root.live_program_session_report(port, release)", after)
+        self.assertIn("['fuser', '-s', device]", after)
+        self.assertLess(after.index("['fuser', '-s', device]"),
+                        after.index("stack.enter_context(LinuxMMIO("))
+        self.assertNotIn("root.live_report(port, release, release.firmware_name)", after)
+        root_src = (ROOT / "pl/hil/fpga_image_root.py").read_text()
+        start = root_src.index("def run(operation: str)")
+        self.assertIn("live_report(port, release", root_src[start:])
+        self.assertNotIn("live_program_session_report(", root_src[start:])
+
+
 
 if __name__ == "__main__":
     unittest.main()

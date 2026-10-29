@@ -297,6 +297,25 @@ def live_report(port: guard.RootZ2TargetPort, release: ImageManifest,
     return report
 
 
+def live_program_session_report(port: guard.RootZ2TargetPort,
+                                release: ImageManifest) -> dict:
+    """Read-only Bridge admission; no whole-system process census.
+
+    Explicitly NOT callable by FPGA Manager download/test/restore. The
+    Bridge has already checked its owner lock, current image checkpoint,
+    protected source pin and targeted MMIO-owner preflight.
+    """
+    report = admission.collect_live(
+        root_port=port, release=release,
+        expected_firmware=release.firmware_name,
+        runtime_program_session=True)
+    need(report["expected_manager_firmware"] == release.firmware_name and
+         port.image_sha256("candidate") == release.firmware_sha256 and
+         port.image_sha256("recovery") == release.recovery_sha256,
+         "CURRENT_IMAGE_OR_RECOVERY_CHANGED")
+    return report
+
+
 def _initial_state(report: dict, release: ImageManifest) -> dict:
     return {"schema": SCHEMA, "session_id": "fpga-" + uuid.uuid4().hex,
             "boot_id": report["target_boot_id"], "status": "RECOVERY",
