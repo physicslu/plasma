@@ -178,6 +178,19 @@ sites:
 
 The current loader accepts canonical `ppu`, `server`, and `sites` fields only. Retired `programmer` / `channels` configuration and zero-based identity are rejected rather than silently translated.
 
+### Planned PPU-owned Console capacity policy (product decision, not active on main)
+
+The approved product target is **one Master Console plus up to five connected Monitor Consoles by default**. The authoritative [Console Controller / PPU Security Simplification](console-controller-ppu-security-simplification.md) records replacement, Engineer maintenance and retirement rules. The following is a proposed extension of the **existing** `ppu` configuration (not a new parallel config root):
+
+```yaml
+ppu:
+  console:
+    max_master_consoles: 1
+    max_readonly_consoles: 5
+```
+
+The total limit is **derived (6 by default)**, never separately persisted. The one-Master invariant stays fixed; Monitor capacity is configurable. Apply capacity to distinct **authenticated live Console identities**, not connections, tabs or sessions. Actual registered Master, owner generation/revocations, credentials and live occupancy belong in protected PPU runtime/durable state, not YAML. An independent source branch `agent/ppu-console-capacity-config-gate1-20261029` contains parser/validation tests only; **main and the installed Z2 do not yet enforce this policy**. No configuration change authorizes bypassing existing Gateway or Root guards.
+
 ## 6. Routing and precedence rules
 
 There is no universal precedence chain for every setting. Precedence is domain-specific.
