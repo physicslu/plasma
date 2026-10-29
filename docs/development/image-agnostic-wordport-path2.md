@@ -109,7 +109,7 @@ for ROM ISP, passive memory and explicit NOT_APPLICABLE/exception requirements.
    Reset-run and CDC are explicit subsequent operations.
 
 **Physical evidence 2026-10-28:** operator-run
-/storage/projects/plasma-ab-runs/20261028T144418Z-3434822:
+SWPC operator-retained private A/B run (2026-10-28):
 4/4 v0.1/v0.2/v0.1/v0.2 full Program/Readback/Reset/CDC PASS,
 all OpenOCD and Bridge exits zero. Four Z2 OpenOCD logs each contain
 PLASMA_IRQ_MASK_PASS PRE_ERASE 0x0003000B and
