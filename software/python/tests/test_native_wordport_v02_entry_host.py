@@ -30,6 +30,14 @@ class NativeV02HostOnly(unittest.TestCase):
             operation,
         )
 
+    def test_pinned_bridge_is_the_merged_program_session(self):
+        import hashlib
+        bridge = SCRIPT.parent / "bluepill-wordport-session.py"
+        self.assertEqual(module.SESSION_SHA,
+                         hashlib.sha256(bridge.read_bytes()).hexdigest())
+        self.assertIn("root.live_program_session_report(port, release)",
+                      bridge.read_text())
+
     def test_program_one_erase_and_write_no_automatic_reset(self):
         tcl = self.render("program-v02")
         self.assertEqual(tcl.count("flash erase_address "), 1)

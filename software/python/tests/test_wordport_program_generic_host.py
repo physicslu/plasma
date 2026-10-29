@@ -53,6 +53,17 @@ class GenericImageContract(unittest.TestCase):
             image_bytes=size, erase_bytes=erased,
         )
 
+    def test_bridge_sha_matches_current_main_root_guard_session(self):
+        """Bridge pin is an integrity boundary, not a stale PR #1199 value."""
+        bridge = SCRIPT.parent / "bluepill-wordport-session.py"
+        self.assertEqual(module.SESSION_SHA,
+                         hashlib.sha256(bridge.read_bytes()).hexdigest())
+        text = bridge.read_text()
+        self.assertIn("root.live_program_session_report(port, release)", text)
+        self.assertNotIn("root.live_report(port, release, release.firmware_name)",
+                         text)
+        self.assertIn("['fuser', '-s', device]", text)
+
     def test_two_historical_images_are_data_not_compiled_in(self):
         # No dependency on either Blue Pill v0.1 or v0.2 build artifact.
         for size, erase in ((18768, 0x4C00), (62800, 0xF800)):

@@ -23,7 +23,7 @@
 Draft PR #1200 的 OpenOCD 實驗程式在 init; halt 後執行 cortex_m maskisr on，並在 PRE_ERASE 及 PRE_PROGRAM 讀取 DHCSR (0xE000EDF0)，要求 S_HALT(17)、C_MASKINTS(3)、C_HALT(1)、C_DEBUGEN(0)，必要位元遮罩 0x0002000B；若不符合即 Fail Closed。
 
 2026-10-28 操作員提供之 SWPC Run：
-<SWPC_AB_EVIDENCE_ROOT>/20261028T144418Z-3434822
+SWPC operator-retained private A/B run (2026-10-28)
 
 v0.1→v0.2→v0.1→v0.2 共 4/4 次完整 Program／Readback／Reset／CDC PASS；OpenOCD、Bridge Exit Code 全為 0。四份獨立 Z2 openocd.log 每份皆包含：
 
