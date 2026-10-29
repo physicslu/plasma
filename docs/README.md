@@ -29,6 +29,10 @@
 
 ## Engineering governance and execution paths
 
+- **Gate 1 Draft / Host-only / PR #1202** — [Root Guard 燒錄 Session 與 FPGA Configuration 准入分離](development/root-guard-runtime-program-split-2026-10-29.md)：正常燒錄取消全系統 `/proc` FD／VMA 完整掃描，保留裝置限定 `fuser`、全域 FPGA 鎖、Image／Boot／UIO Guard；FPGA Download／Test／Restore 持續嚴格掃描。尚未部署、合併或實機驗收，亦非八通道 Broker 已完成。
+
+
+
 - **Current / Path 2 guarded-hardware operator-cli** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：現行 Path 2 通用硬體 Work Order 使用 `capability: operator-cli`、`scope: guarded-hardware`、來源 SHA 綁定的 Python `script`、`argv` 與受限 `timeout_seconds`；在非 Root SWPC Runner 執行，不自動取得 sudo／Root 權限。Exit 69／77 是失敗的 NOT_RUN，Exit 0 僅為待審證據。CPU-only／Vivado Host Build 為各自獨立能力。
 - **Historical / retired z2-root-operation Work Order; F1-B #1168 evidence** — [Path 2 受保護 Z2 Root Entry 歷史契約](development/path2-generic-fpga-image-loader.md)：舊 Dispatcher 固定 `download|test|restore` Work Order 已退役，現行 Dispatcher 明確拒絕；獨立兩參數 Protected Root Entry／底層 Transport 與來源、互斥、復原守衛仍保留。#1168 實機 PASS 僅涵蓋當時 Site 1 F1-B，不能推導 Blue Pill／其他 Programmer IP／八 Site 資格。
 
