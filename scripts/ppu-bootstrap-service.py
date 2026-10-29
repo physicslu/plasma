@@ -170,7 +170,7 @@ def _read_coordinator_journal(paths: ServicePaths) -> dict[str, Any] | None:
     except OSError as exc:
         raise BootstrapServiceError("deployment Coordinator journal is unavailable") from exc
     try:
-        with os.fdopen(fd, "r", encoding="utf-8") as stream:
+        with os.fdopen(fd, "rb") as stream:
             metadata = os.fstat(stream.fileno())
             if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077:
                 raise BootstrapServiceError("deployment Coordinator journal is not a private regular file")
@@ -178,7 +178,7 @@ def _read_coordinator_journal(paths: ServicePaths) -> dict[str, Any] | None:
                 raw = stream.read(MAX_COORDINATOR_JOURNAL_BYTES + 1)
                 if len(raw) > MAX_COORDINATOR_JOURNAL_BYTES:
                     raise BootstrapServiceError("deployment Coordinator journal is oversized")
-                record = json.loads(raw)
+                record = json.loads(raw.decode("utf-8"))
             except (ValueError, UnicodeDecodeError) as exc:
                 raise BootstrapServiceError("deployment Coordinator journal is unreadable") from exc
     except OSError as exc:

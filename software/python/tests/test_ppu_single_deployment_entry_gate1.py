@@ -198,6 +198,16 @@ def test_bootstrap_api_preflight_rejects_corrupt_or_untrusted_journal(tmp_path: 
     journal.write_text(" " * (bootstrap.MAX_COORDINATOR_JOURNAL_BYTES + 1), encoding="utf-8")
     with pytest.raises(bootstrap.BootstrapServiceError, match="oversized"):
         bootstrap._admit_coordinator_journal(paths)
+    # A character-limited read can admit a journal exceeding the byte budget.
+    multibyte_journal = {
+        "schema_version": 1, "transaction_id": "x", "sequence": 1,
+        "state": "runtime_active", "padding": "é" * (bootstrap.MAX_COORDINATOR_JOURNAL_BYTES // 2),
+    }
+    encoded = json.dumps(multibyte_journal, ensure_ascii=False).encode("utf-8")
+    assert len(encoded) > bootstrap.MAX_COORDINATOR_JOURNAL_BYTES
+    journal.write_bytes(encoded)
+    with pytest.raises(bootstrap.BootstrapServiceError, match="oversized"):
+        bootstrap._admit_coordinator_journal(paths)
     journal.write_text(json.dumps({"schema_version": 1, "transaction_id": "x", "sequence": 0,
                                    "state": "runtime_active"}), encoding="utf-8")
     with pytest.raises(bootstrap.BootstrapServiceError, match="identity is invalid"):
