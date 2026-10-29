@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -114,6 +115,53 @@ def unified_api_plan(module: str, commit: str, archive: bytes) -> dict:
         module=module,
     )
     return intent.to_descriptor()
+
+
+
+def api_status(*, api_url: str, token_file: Path) -> dict:
+    """Read-only HTTPS Bootstrap status, never falls back to SSH.
+
+    Token is read from a caller-owned, regular mode-0600 file; it is never a
+    command-line argument, output field, log or environment-variable secret.
+    """
+    if not isinstance(token_file, Path):
+        raise DeploymentError("API_TOKEN_FILE_REQUIRED")
+    fd = -1
+    try:
+        fd = os.open(token_file, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        metadata = os.fstat(fd)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or metadata.st_mode & 0o077
+            or metadata.st_size > 512
+        ):
+            raise DeploymentError("API_TOKEN_FILE_UNSAFE")
+        with os.fdopen(fd, "rb", closefd=False) as file:
+            raw = file.read(513)
+        if len(raw) > 512:
+            raise DeploymentError("API_TOKEN_FILE_UNSAFE")
+        token = raw.decode("ascii").strip()
+    except (OSError, UnicodeError) as exc:
+        raise DeploymentError(f"API_TOKEN_FILE_UNAVAILABLE:{type(exc).__name__}") from None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+    spec = importlib.util.spec_from_file_location(
+        "ppu_deploy_api_client", REPO / "scripts/ppu_deploy_api.py"
+    )
+    if spec is None or spec.loader is None:
+        raise DeploymentError("API_CLIENT_UNAVAILABLE")
+    api_module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = api_module
+    spec.loader.exec_module(api_module)
+    return {
+        "result": "PASS",
+        "mode": "API_STATUS_READ_ONLY",
+        "api_status": api_module.BootstrapAPIClient(api_url, token).status(),
+        "no_deployment": True,
+    }
+
 
 
 class Deployer:
@@ -288,14 +336,21 @@ class Deployer:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("plan", "deploy", "verify", "rollback", "status"))
+    parser.add_argument("action", choices=("plan", "deploy", "verify", "rollback", "status", "api-status"))
     parser.add_argument("module", nargs="?", choices=MODULES)
+    parser.add_argument("--api-url", help="HTTPS PPU Bootstrap origin, only for api-status")
+    parser.add_argument("--token-file", type=Path, help="Private mode-0600 Bootstrap Bearer token file")
     args = parser.parse_args(argv)
+    if args.action == "api-status":
+        if args.module is not None or not args.api_url or args.token_file is None:
+            parser.error("api-status requires --api-url and --token-file, without module")
     try:
         deployer = Deployer()
         if args.action in ("plan", "deploy") and not args.module:
             parser.error("plan/deploy require an approved module")
-        if args.action == "plan":
+        if args.action == "api-status":
+            result = api_status(api_url=args.api_url, token_file=args.token_file)
+        elif args.action == "plan":
             # Planning does not contact Z2 or mutate local state.
             commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO,
                                     capture_output=True, text=True, check=True, timeout=10).stdout.strip()
