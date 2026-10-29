@@ -202,6 +202,10 @@ def test_bootstrap_api_preflight_rejects_corrupt_or_untrusted_journal(tmp_path: 
                                    "state": "runtime_active"}), encoding="utf-8")
     with pytest.raises(bootstrap.BootstrapServiceError, match="identity is invalid"):
         bootstrap._admit_coordinator_journal(paths)
+    journal.write_text(json.dumps({"schema_version": 1, "transaction_id": "x", "sequence": 1,
+                                   "state": []}), encoding="utf-8")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="active, unknown or requires recovery"):
+        bootstrap._admit_coordinator_journal(paths)
     journal.unlink()
     journal.symlink_to(tmp_path / "not-owned-journal")
     with pytest.raises(bootstrap.BootstrapServiceError, match="unavailable"):

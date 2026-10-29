@@ -198,7 +198,10 @@ def _admit_coordinator_journal(paths: ServicePaths) -> None:
         or record["sequence"] < 1
     ):
         raise BootstrapServiceError("deployment Coordinator journal identity is invalid")
-    if record.get("state") not in COORDINATOR_SAFE_RESTART_STATES:
+    if (
+        not isinstance(record.get("state"), str)
+        or record["state"] not in COORDINATOR_SAFE_RESTART_STATES
+    ):
         raise BootstrapServiceError(
             "previous Coordinator deployment is active, unknown or requires recovery"
         )
