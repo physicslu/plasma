@@ -27,7 +27,7 @@ PYTHON = "/opt/plasma/python/3.12.13/bin/python3"
 OPENOCD = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/bin/openocd"
 OPENOCD_SCRIPTS = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/share/openocd/scripts"
 NATIVE_SHA = "66261cef851c9777469b393b7539c5b0f8c2b039a032f1a5b4cbf9e93460e447"
-SESSION_SHA = "ce325d8c965f36208036158a2bce810f445f4ff053415f96e62fba156ff41650"
+SESSION_SHA = "e2120e459e007dd1c01daa2cf216f4bcd71f2a6ce5dcc7f540a1b1c6d9f93461"
 PY_MODULE_SHA = "57dfad519993910ae04e1b05b1592b06d9db856b665a50bd81dd47dc6154b3ef"
 # Flash geometry belongs to the exact target/provider, never to a firmware revision.
 # Additional target support must be admitted through a reviewed Programming Profile.
