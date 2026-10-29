@@ -340,9 +340,15 @@ def deploy(
     facility_id: str,
     display_name: str,
     product_root: Path,
+    api_transaction_id: str | None = None,
 ) -> dict[str, object]:
     _require_simulation_target()
     kit_module = _load(SCRIPT_DIR / "ppu-bootstrap-kit.py", "plasma_z2like_demo_kit_format")
+    if api_transaction_id is not None and (
+        not isinstance(api_transaction_id, str)
+        or not kit_module.API_TRANSACTION_ID_RE.fullmatch(api_transaction_id)
+    ):
+        raise QEMUSimulationKitError("Bootstrap API transaction identity is invalid")
     with tempfile.TemporaryDirectory(prefix="plasma-z2like-demo-kit-") as temporary:
         verified = kit_module.verify_kit(
             kit_artifact,
@@ -399,6 +405,8 @@ def deploy(
             "--display-name",
             display_name,
         ]
+        if api_transaction_id is not None:
+            argv.extend(["--api-transaction-id", api_transaction_id])
         completed = subprocess.run(
             argv,
             check=False,
@@ -471,6 +479,7 @@ def _parser() -> argparse.ArgumentParser:
     deploy_parser.add_argument("--facility-id", required=True)
     deploy_parser.add_argument("--display-name", default="Plasma QEMU Z2 Simulation")
     deploy_parser.add_argument("--product-root", type=Path, default=Path("/opt/plasma"))
+    deploy_parser.add_argument("--api-transaction-id", help="Bootstrap API correlation ID; not authority")
     return parser
 
 
@@ -510,6 +519,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             facility_id=args.facility_id,
             display_name=args.display_name,
             product_root=args.product_root,
+            api_transaction_id=args.api_transaction_id,
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
