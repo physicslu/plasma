@@ -26,6 +26,10 @@ The implementation is covered by software/CI validation. Integration-host runtim
 
 Standalone PPU operation remains a separate supported mode and does not require Manager.
 
+## Standalone PPU Console ownership direction (2026-10-29)
+
+The product target for a single physical PPU is **one Master Console plus a configurable limit of Monitor-only Consoles (five by default)**, with local physical-confirmed Master replacement and a separately authorized Engineer/Linux-root maintenance mode. **Console authorization is PPU-owned** and independent of optional Manager routing, browser UI modes, or the current execution Job lease. The [Console Controller / PPU Security Simplification](console-controller-ppu-security-simplification.md) records current code, proposed deletions and acceptance criteria. This is a **future-state decision**, not a currently deployed security feature; the Managed Mode BFF/Manager routing below remains documented current behavior. Single-device Standalone mode must not require Manager/Internet to authenticate the registered Console.
+
 ## First-principles boundary
 
 Plasma assigns three different questions to three different components:
