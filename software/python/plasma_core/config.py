@@ -44,13 +44,40 @@ class SiteConfig:
 
 
 @dataclass(slots=True)
+class ConsoleAccessConfig:
+    """PPU-owned capacity policy; not an authentication or live API gate."""
+
+    max_master_consoles: int = 1
+    max_readonly_consoles: int = 5
+
+    @property
+    def max_total_consoles(self) -> int:
+        return self.max_master_consoles + self.max_readonly_consoles
+
+    def validate(self) -> None:
+        # The one-master product rule is an invariant; only reader capacity
+        # is variable without a future explicit product-policy revision.
+        if type(self.max_master_consoles) is not int or self.max_master_consoles != 1:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "ppu.console.max_master_consoles must be 1 (single active master)",
+            )
+        if type(self.max_readonly_consoles) is not int or self.max_readonly_consoles < 0:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "ppu.console.max_readonly_consoles must be a nonnegative integer",
+            )
+
+
+@dataclass(slots=True)
 class PPUConfig:
-    """Identity of one physical Plasma Programming Unit (PPU)."""
+    """Identity and local policy of one physical Programming Unit."""
 
     id: str = "local-ppu"
     facility_id: str = "default-facility"
     model: str = "generic"
     display_name: str = "Plasma Programming Unit"
+    console: ConsoleAccessConfig = field(default_factory=ConsoleAccessConfig)
 
 
 @dataclass(slots=True)
@@ -68,6 +95,9 @@ class PlasmaConfig:
         return sum(site.enabled for site in self.sites)
 
     def validate(self) -> None:
+        if not isinstance(self.ppu.console, ConsoleAccessConfig):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "ppu.console must be a console policy")
+        self.ppu.console.validate()
         for field_name, value in (
             ("ppu.id", self.ppu.id),
             ("ppu.facility_id", self.ppu.facility_id),
@@ -142,7 +172,11 @@ def _site_from_dict(raw: dict[str, Any]) -> SiteConfig:
 
 
 def _ppu_from_dict(raw: dict[str, Any]) -> PPUConfig:
-    return PPUConfig(**dict(raw))
+    values = dict(raw)
+    console = values.pop("console", {})
+    if not isinstance(console, dict):
+        raise TypeError("ppu.console must be a mapping")
+    return PPUConfig(**values, console=ConsoleAccessConfig(**console))
 
 
 def load_config(path: str | Path) -> PlasmaConfig:
