@@ -42,7 +42,7 @@ def test_native_c_gate_has_no_root_hardware_or_automatic_recovery():
     assert "push(push_ctx)" in source
     assert "PLASMA_RECOVERY_UNCERTAIN" in source
     # Scan C tokens, not explanatory comments mentioning prohibited paths.
-    code = re.sub(r"/\\*.*?\\*/", "", source + "\n" + header, flags=re.DOTALL)
+    code = re.sub(r"/\*.*?\*/", "", source + "\n" + header, flags=re.DOTALL)
     for forbidden in ("/dev/mem", "mmap(", "ioctl(", "system(",
                       "execve(", "mark_ready", "clear_uncertain",
                       "retry_write", "sudo "):
