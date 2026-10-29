@@ -248,3 +248,24 @@ def test_no_production_ssh_cutover_or_hidden_root_calls():
     assert "password_ssh_z2" in existing  # remains until separately qualified migration
     server_source = (REPO / "scripts" / "ppu-bootstrap-service.py").read_text()
     assert "ENGINEERING_INSTALL_NOT_QUALIFIED" in server_source
+
+def test_swpc_cli_requires_private_local_token_file(tmp_path: Path):
+    swpc = load("ppu_deploy_api_cli_token_gate1", "ppu_deploy.py")
+    token = tmp_path / "bootstrap-token"
+    token.write_text(TOKEN + "\n", encoding="ascii")
+    token.chmod(0o644)
+    with pytest.raises(swpc.DeploymentError, match="API_TOKEN_FILE_UNSAFE"):
+        swpc.api_status(api_url="https://ppu.example.test:18081", token_file=token)
+    token.chmod(0o600)
+    alias = tmp_path / "bootstrap-token-link"
+    alias.symlink_to(token)
+    with pytest.raises(swpc.DeploymentError, match="API_TOKEN_FILE_UNAVAILABLE"):
+        swpc.api_status(api_url="https://ppu.example.test:18081", token_file=alias)
+
+
+def test_swpc_cli_api_status_requires_explicit_url_and_token(capsys):
+    swpc = load("ppu_deploy_api_cli_args_gate1", "ppu_deploy.py")
+    with pytest.raises(SystemExit) as exc:
+        swpc.main(["api-status"])
+    assert exc.value.code == 2
+    assert "requires --api-url and --token-file" in capsys.readouterr().err
