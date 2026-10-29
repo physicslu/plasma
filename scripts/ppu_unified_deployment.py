@@ -78,6 +78,29 @@ def _safe_relative_path(name: str) -> bool:
             and not any(part in ("", ".") for part in pure.parts))
 
 
+def _kind_allows_file(kind: str, file: VerifiedPackageFile) -> bool:
+    """Keep the three package formats distinct; a name is never an exec grant."""
+    path = file.path
+    if kind == "native-c":
+        if path.startswith("payload/bin/"):
+            return file.executable
+        if path.startswith("payload/lib/"):
+            return not file.executable and path.endswith((".so", ".a"))
+        if path.startswith("payload/include/"):
+            return not file.executable and path.endswith((".h", ".hpp"))
+        return False
+    if kind == "python":
+        return (path.startswith(("payload/python/", "payload/scripts/",
+                                 "payload/software/python/"))
+                and not file.executable
+                and path.endswith((".py", ".pyi", ".json", ".toml", ".ini",
+                                   ".yaml", ".yml", ".txt")))
+    if kind == "fpga-image":
+        return (path.startswith("payload/fpga/") and not file.executable
+                and path.endswith((".bit", ".bin", ".hwh", ".json")))
+    return False
+
+
 def verify_host_only_package(
     archive_path: Path, *, expected_sha256: str, source_commit: str,
     target_profile: Mapping[str, str],
@@ -159,6 +182,8 @@ def verify_host_only_package(
             file_names = {entry.path for entry in verified_files}
             if file_names | {"manifest.json"} != set(names) or len(file_names) != len(verified_files):
                 raise UnifiedDeploymentError("PACKAGE_UNDECLARED_OR_DUPLICATE_FILES")
+            if any(not _kind_allows_file(kind, entry) for entry in verified_files):
+                raise UnifiedDeploymentError("PACKAGE_KIND_FILE_DENIED")
             if (kind == "native-c" and not any(entry.executable for entry in verified_files)):
                 raise UnifiedDeploymentError("PACKAGE_NATIVE_EXECUTABLE_MISSING")
             if kind == "python" and not any(entry.path.endswith(".py") for entry in verified_files):

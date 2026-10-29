@@ -30,13 +30,21 @@ engine = load("ppu_generic_package_engine_gate1", "ppu-bootstrap-deployment.py")
 SOURCE = "a" * 40
 TARGET = {"platform": "linux-armv7", "board": "pynq-z2", "fpga_part": "xc7z020clg400-1"}
 SAMPLES = (
-    ("wordport", "python", {"payload/python/wordport.py": b"# wordport engine\n"}),
+    ("wordport", "python", {
+        "payload/python/wordport.py": b"# wordport engine\n",
+        "payload/python/wordport.json": b"{\"mode\":\"host-only\"}",
+    }),
     ("openocd-integration", "python", {"payload/python/openocd.py": b"# openocd integration\n"}),
     ("abtest", "python", {"payload/python/abtest.py": b"# A/B runner\n"}),
-    ("native-bridge", "native-c", {"payload/bin/bridge": b"\x7fELFtest-fixture"}),
+    ("native-bridge", "native-c", {
+        "payload/bin/bridge": b"\x7fELFtest-fixture",
+        "payload/lib/bridge.so": b"\x7fELFlibrary-fixture",
+        "payload/include/bridge.h": b"/* interface fixture */\n",
+    }),
     ("z2-identity", "fpga-image", {
         "payload/fpga/z2-identity.bit": b"host-only-image-fixture",
         "payload/fpga/z2-identity.hwh": b"host-only-handoff-fixture",
+        "payload/fpga/z2-identity.json": b"{\"schema\":\"host-only-fixture\"}",
     }),
 )
 
@@ -110,6 +118,24 @@ def test_generic_future_module_without_static_allowlist(tmp_path: Path) -> None:
     assert coordinator(tmp_path).execute_package_host_only(request(archive, digest))["result"] == "PASS"
 
 
+@pytest.mark.parametrize("kind,files", [
+    ("python", {"payload/python/main.py": b"pass\n", "payload/bin/hidden": b"binary"}),
+    ("python", {"payload/python/main.py": b"pass\n", "payload/fpga/hidden.bit": b"image"}),
+    ("native-c", {"payload/bin/main": b"binary", "payload/python/hidden.py": b"pass\n"}),
+    ("fpga-image", {
+        "payload/fpga/z2-identity.bit": b"image",
+        "payload/fpga/z2-identity.hwh": b"handoff",
+        "payload/python/hidden.py": b"pass\n",
+    }),
+])
+def test_package_kind_cannot_install_other_kinds_payload(
+    tmp_path: Path, kind: str, files: dict[str, bytes],
+) -> None:
+    archive, digest = package(tmp_path, "generic", kind, files)
+    with pytest.raises(engine.DeploymentError, match="PACKAGE_KIND_FILE_DENIED"):
+        coordinator(tmp_path).execute_package_host_only(request(archive, digest))
+
+
 def test_first_three_pilot_packages_use_real_1207_source_bytes(tmp_path: Path) -> None:
     client = load("ppu_generic_package_existing_client", "ppu_deploy.py")
     for name in client.MODULES:
@@ -146,7 +172,7 @@ def test_host_only_rejects_incompatible_or_forged_manifest(tmp_path: Path, alter
 
 
 def test_hash_mismatch_and_symlink_archive_rejected(tmp_path: Path) -> None:
-    archive, digest = package(tmp_path, "wordport", "python", {"payload/one.py": b"x"})
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/one.py": b"x"})
     co = coordinator(tmp_path)
     with pytest.raises(engine.DeploymentError, match="PACKAGE_ARCHIVE_SHA256_MISMATCH"):
         co.execute_package_host_only(request(archive, "0" * 64))
@@ -157,7 +183,7 @@ def test_hash_mismatch_and_symlink_archive_rejected(tmp_path: Path) -> None:
 
 
 def test_held_real_coordinator_lock_rejects_generic_package(tmp_path: Path) -> None:
-    archive, digest = package(tmp_path, "wordport", "python", {"payload/one.py": b"x"})
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/one.py": b"x"})
     co = coordinator(tmp_path)
     co.paths.bootstrap_state_root.mkdir()
     with co.paths.lock.open("a+b") as held:
@@ -174,11 +200,11 @@ def test_held_real_coordinator_lock_rejects_generic_package(tmp_path: Path) -> N
 ])
 def test_host_only_rollback_and_unknown_recovery(tmp_path: Path, fault: str, expected: str) -> None:
     co = coordinator(tmp_path)
-    archive1, digest1 = package(tmp_path, "wordport", "python", {"payload/one.py": b"old"})
+    archive1, digest1 = package(tmp_path, "wordport", "python", {"payload/python/one.py": b"old"})
     co.execute_package_host_only(request(archive1, digest1))
     active = co.paths.bootstrap_state_root / "host-only-packages" / "active" / "wordport.json"
     previous = active.read_bytes()
-    archive2, digest2 = package(tmp_path, "wordport", "python", {"payload/one.py": b"new"})
+    archive2, digest2 = package(tmp_path, "wordport", "python", {"payload/python/one.py": b"new"})
     with pytest.raises(engine.DeploymentError, match="host-only package transaction failed"):
         co.execute_package_host_only(request(archive2, digest2), inject_failure=fault)
     assert json.loads(co.paths.journal.read_text())["state"] == expected
@@ -190,7 +216,7 @@ def test_host_only_rollback_and_unknown_recovery(tmp_path: Path, fault: str, exp
 
 
 def test_untrusted_production_path_and_network_api_remain_disabled(tmp_path: Path) -> None:
-    archive, digest = package(tmp_path, "wordport", "python", {"payload/one.py": b"x"})
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/one.py": b"x"})
     prod = engine.DeploymentCoordinator(paths=engine.DeploymentPaths(), installer=SimpleNamespace())
     with pytest.raises(engine.DeploymentError, match="HOST_ONLY_PRODUCTION_STATE_ROOT_DENIED"):
         prod.execute_package_host_only(request(archive, digest))
@@ -209,7 +235,7 @@ def test_fpga_missing_handoff_never_activates(tmp_path: Path) -> None:
 
 
 def test_package_symlinked_simulated_release_tree_fails_closed(tmp_path: Path) -> None:
-    archive, digest = package(tmp_path, "wordport", "python", {"payload/one.py": b"x"})
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/one.py": b"x"})
     co = coordinator(tmp_path)
     store = co.paths.bootstrap_state_root / "host-only-packages"
     store.mkdir(parents=True)
@@ -217,6 +243,33 @@ def test_package_symlinked_simulated_release_tree_fails_closed(tmp_path: Path) -
     with pytest.raises(engine.DeploymentError, match="HOST_ONLY_SANDBOX_SYMLINK_DENIED"):
         co.execute_package_host_only(request(archive, digest))
     assert json.loads(co.paths.journal.read_text())["state"] == "verify_failed"
+
+
+def test_reused_staged_release_rejects_symlinked_payload_parent(tmp_path: Path) -> None:
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/one.py": b"safe"})
+    co = coordinator(tmp_path)
+    receipt = co.execute_package_host_only(request(archive, digest))
+    release = (co.paths.bootstrap_state_root / "host-only-packages" / "releases"
+               / "wordport" / receipt["transaction"]["release_id"])
+    code_dir = release / "payload" / "python"
+    outside = tmp_path / "outside-python-files"
+    code_dir.rename(outside)
+    code_dir.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(engine.DeploymentError, match="HOST_ONLY_STAGED_SYMLINK_DENIED"):
+        co.execute_package_host_only(request(archive, digest))
+    assert json.loads(co.paths.journal.read_text())["state"] == "rolled_back"
+
+
+def test_reused_staged_release_rejects_undeclared_file(tmp_path: Path) -> None:
+    archive, digest = package(tmp_path, "wordport", "python", {"payload/python/one.py": b"safe"})
+    co = coordinator(tmp_path)
+    receipt = co.execute_package_host_only(request(archive, digest))
+    release = (co.paths.bootstrap_state_root / "host-only-packages" / "releases"
+               / "wordport" / receipt["transaction"]["release_id"])
+    (release / "payload/python/hidden.py").write_bytes(b"extra")
+    with pytest.raises(engine.DeploymentError, match="HOST_ONLY_STAGED_UNDECLARED_FILE"):
+        co.execute_package_host_only(request(archive, digest))
+    assert json.loads(co.paths.journal.read_text())["state"] == "rolled_back"
 
 
 def test_unreviewed_zip_member_and_traversal_are_denied(tmp_path: Path) -> None:

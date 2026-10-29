@@ -21,6 +21,15 @@ and `fpga-image`. An FPGA package additionally declares an Image + HWH pair.
 Compatibility is compared with an independently supplied target profile. ZIP
 symlinks, duplicate entries/JSON keys, traversal, undeclared files, digest
 mismatch, nonregular entries and incompatible board identity are denied.
+The v1 Host-only file-shape boundaries are independent of module names:
+`native-c` accepts executable files only under `payload/bin/` and
+nonexecutable `.so`/`.a` libraries or `.h`/`.hpp` headers under `payload/lib/`
+and `payload/include/`; `python` accepts nonexecutable Python and reviewed
+configuration/text extensions under `payload/python/`, `payload/scripts/`, or
+`payload/software/python/`; `fpga-image` accepts only nonexecutable
+`.bit`/`.bin`/`.hwh`/`.json` under `payload/fpga/`, still requiring the exact
+declared Image/HWH pair. Cross-kind payload paths fail closed. This restricts
+package *data shape*, never authorizes execution or production installation.
 Module names identify a package; they do **not** grant Root, file write,
 execution or authority. Authentic publisher approval, target Master and
 protected Root Source Pin remain **unqualified for production**.
@@ -35,6 +44,9 @@ systemd. Both the Bootstrap network endpoint and SWPC HTTPS client continue to
 reject Engineering/FPGA deployment requests. The existing SSH implementation
 and local factory rescue remain unchanged until *separately authorized* live
 parity, ownership and recovery evidence exists.
+When reusing a previously staged release, the same Host-only Engine now
+checks that its file set is exact and that no nested symlink or undeclared file
+was inserted; any mismatch fails closed with a journaled transaction outcome.
 
 **First Host-only acceptance batch**: `wordport`, `openocd-integration` and
 `abtest`, using the merged #1207 package/source as the compatibility reference;

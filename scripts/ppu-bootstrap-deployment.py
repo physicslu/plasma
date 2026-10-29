@@ -416,6 +416,21 @@ class DeploymentCoordinator:
                     raise DeploymentError("HOST_ONLY_SANDBOX_SYMLINK_DENIED")
 
             def verify_staged_files() -> None:
+                allowed = {member.path for member in package.files}
+                observed = set()
+                for item in release_root.rglob("*"):
+                    if item.is_symlink():
+                        raise DeploymentError("HOST_ONLY_STAGED_SYMLINK_DENIED")
+                    if item.is_dir():
+                        continue
+                    if not item.is_file():
+                        raise DeploymentError("HOST_ONLY_STAGED_SPECIAL_FILE_DENIED")
+                    relative = item.relative_to(release_root).as_posix()
+                    if relative not in allowed:
+                        raise DeploymentError("HOST_ONLY_STAGED_UNDECLARED_FILE")
+                    observed.add(relative)
+                if observed != allowed:
+                    raise DeploymentError("HOST_ONLY_STAGED_FILE_MISSING")
                 for member in package.files:
                     path = release_root / member.path
                     if not path.is_file() or path.is_symlink() or path.stat().st_size != member.size:
