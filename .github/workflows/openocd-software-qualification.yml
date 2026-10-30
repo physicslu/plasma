@@ -109,6 +109,7 @@ jobs:
             software/python/plasma_web/programming_qualification.py
           python software/python/tests/test_openocd_software_qualification_v1.py
           python software/python/tests/test_programming_qualification.py
+          python software/python/tests/test_stm32f103_low_density_v10_candidate.py
       - name: Report reviewed software support
         env:
           PYTHONPATH: software/python

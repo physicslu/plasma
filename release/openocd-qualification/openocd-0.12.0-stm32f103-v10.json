@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-v10-candidate",
+  "adr": "ADR-0002",
+  "status": "NOT_ADMITTED_PENDING_SOURCE_EVIDENCE",
+  "predecessor_qualification": {
+    "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-v9.json",
+    "git_blob_sha1": "43b973728aa72a8801fdeb549e0d55f5ed842b69",
+    "qualification_id": "adr0002-phase2-openocd-012-stm32f103-v9",
+    "supported_exact_icpn_count": 77
+  },
+  "pending_cohort": {
+    "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-low-density-12-v1.json",
+    "git_blob_sha1": "99440443c8082fea3a2fce19e3e1c17638b47be3",
+    "candidate_exact_icpn_count": 12,
+    "supported_exact_icpn_count": 0,
+    "blocked": true
+  },
+  "supported_exact_icpn_count": 77,
+  "possible_supported_after_all_gates": 89,
+  "excluded_exact_icpns": [
+    "STM32F103T4U6A",
+    "STM32F103T6U6A",
+    "STM32F103T6U7A"
+  ],
+  "active_provider_registry_changed": false,
+  "production_catalog_changed": false,
+  "reason": "DS5936 Rev 7 original PDF SHA256 unavailable; no versioned exact-ICPN low-density qualification may claim SUPPORTED without evidence custody and review",
+  "acceptance_boundary": {
+    "l2_promotion_authorized": false,
+    "job_batch_execution_changed": false,
+    "installed_runtime_attested": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false
+  }
+}

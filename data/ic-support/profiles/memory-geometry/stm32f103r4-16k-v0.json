@@ -1,0 +1,43 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f103r4-16k-v0",
+  "kind": "memory_geometry",
+  "status": "pilot_source_review_candidate_not_qualified",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "base_device": "STM32F103R4"
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds5936_rev7",
+      "document": "DS5936 DocID15060 Rev 7",
+      "sections": [
+        "Table 1 Device summary",
+        "Table 2 low-density device features",
+        "Table 58 Ordering information"
+      ]
+    },
+    {
+      "source_id": "st_pm0075_rev2",
+      "sections": [
+        "1.2 Flash module organization",
+        "2.3 Main Flash program and erase"
+      ]
+    }
+  ],
+  "data": {
+    "main_flash_start": "0x08000000",
+    "main_flash_size_bytes": 16384,
+    "main_flash_end": "0x8003FFF",
+    "page_size_bytes": 1024,
+    "page_count": 16,
+    "erase_granularity_bytes": 1024,
+    "program_granularity_bytes": 2
+  },
+  "acceptance_boundary": {
+    "source_pdf_sha256_attested": false,
+    "programming_qualification_state": "UNKNOWN",
+    "runtime_execution_authorized": false
+  },
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1"
+}
