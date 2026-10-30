@@ -98,15 +98,19 @@ def read_image_manifest() -> ImageManifest:
               "abi_offset", "identity_words", "site_bitmap",
               "site_bitmap_offset", "axi_base", "axi_bytes", "owner_base",
               "owner_bytes", "uio_name", "expected_uio"}
-    need(type(data) is dict and set(data) == fields and
+    need(type(data) is dict and set(data) in (fields, fields - {"uio_name"}) and
          data["schema"] == "plasma.fpga.image.v1",
          "IMAGE_MANIFEST_SCHEMA_DENIED")
     # This is the Z2 prototype Root. Manifest claims cannot change its board.
     need(data["board_id"] == "pynq-z2" and
          data["fpga_part"] == "xc7z020clg400-1",
          "IMAGE_BOARD_PART_MISMATCH")
-    for key in ("image_id", "board_id", "fpga_part", "soc_compatible", "uio_name"):
+    for key in ("image_id", "board_id", "fpga_part", "soc_compatible"):
         need(type(data[key]) is str and 0 < len(data[key]) <= 128,
+             "IMAGE_RELEASE_VALUE_DENIED")
+    if "uio_name" in data:
+        need(type(data["uio_name"]) is str and
+             re.fullmatch(r"uio[0-9]+", data["uio_name"]) is not None,
              "IMAGE_RELEASE_VALUE_DENIED")
     need(_basename(data["firmware_name"]) and _basename(data["recovery_name"]) and
          data["firmware_name"] != data["recovery_name"] and
@@ -149,16 +153,26 @@ def read_image_manifest() -> ImageManifest:
                  w[1] == data["site_bitmap"] and w[2] == 0xFFFFFFFF
                  for w in words), "IMAGE_RELEASE_SITE_IDENTITY_DENIED")
     uio = data["expected_uio"]
-    need(type(uio) is dict and set(uio) ==
-         {"uio", "driver", "maps", "runtime", "irq_counts"} and
-         uio["uio"] == data["uio_name"] and
+    need(type(uio) is dict and set(uio) in (
+         {"uio", "driver", "maps", "runtime", "irq_counts"},
+         {"platform_node", "driver", "maps", "runtime"}) and
+         (("uio" in uio and "uio_name" in data and
+           uio["uio"] == data["uio_name"]) or
+          ("platform_node" in uio and
+           "uio_name" not in data and
+           type(uio["platform_node"]) is str and
+           re.fullmatch(r"[0-9a-fA-F]+\.[A-Za-z0-9_.-]+",
+                        uio["platform_node"]) is not None and
+           int(uio["platform_node"].split(".", 1)[0], 16) ==
+           data["owner_base"])) and
          type(uio["driver"]) is str and
          type(uio["runtime"]) is str and
          uio["maps"] == [[data["owner_base"], data["owner_bytes"]]] and
-         type(uio["irq_counts"]) is list and
-         len(uio["irq_counts"]) == 2 and
-         all(type(n) is int and 0 <= n <= 0xFFFFFFFF
-             for n in uio["irq_counts"]), "IMAGE_RELEASE_UIO_DENIED")
+         ("irq_counts" not in uio or
+          (type(uio["irq_counts"]) is list and
+           len(uio["irq_counts"]) == 2 and
+           all(type(n) is int and 0 <= n <= 0xFFFFFFFF
+               for n in uio["irq_counts"]))), "IMAGE_RELEASE_UIO_DENIED")
     return ImageManifest(
         image_id=data["image_id"], board_id=data["board_id"],
         fpga_part=data["fpga_part"], soc_compatible=data["soc_compatible"],
@@ -172,7 +186,7 @@ def read_image_manifest() -> ImageManifest:
         site_bitmap_offset=data["site_bitmap_offset"],
         axi_base=data["axi_base"], axi_bytes=data["axi_bytes"],
         owner_base=data["owner_base"], owner_bytes=data["owner_bytes"],
-        uio_name=data["uio_name"], expected_uio=uio)
+        uio_name=data.get("uio_name", ""), expected_uio=uio)
 
 
 def read_identity(read32, release: ImageManifest) -> dict[int, int]:
