@@ -263,50 +263,57 @@ class PackageAPIBridgeTests(unittest.TestCase):
                     server.server_close()
 
 
-    def test_authenticated_http_upload_submit_and_status(self):
+    def _authenticated_http_upload_submit_and_status(self, sample):
+        """Real loopback HTTP handlers; no claim of TLS or remote PPU acceptance."""
         api = load('ppu_package_loopback_client', 'ppu_deploy_api.py')
-        for sample in [SAMPLES[0], SAMPLES[3], SAMPLES[4]]:
-            with self.subTest(case=sample):
-                tmp_path = self.case_temp()
-                """Real loopback HTTP handlers; no claim of TLS or remote PPU acceptance."""
-                import http.client
-                try:
-                    server, co, gate, body = composition(tmp_path, sample, network=True)
-                except PermissionError as exc:
-                    raise AssertionError(f"required loopback socket unavailable: {exc}") from exc
-                token = service.provision_token(server.bootstrap_paths.token_file)
-                thread = threading.Thread(target=server.serve_forever, daemon=True)
-                thread.start()
-                connection = http.client.HTTPConnection(*server.server_address, timeout=5)
-                def transport(method, path, payload, headers):
-                    connection.request(method, path, body=payload, headers=dict(headers))
-                    response = connection.getresponse()
-                    return response.status, response.read()
-                def call(path, payload=None, authenticated=True, method='POST'):
-                    headers = {'Content-Type': 'application/json'}
-                    if authenticated:
-                        headers['Authorization'] = 'Bearer ' + token
-                    connection.request(method, path, body=json.dumps(payload) if payload is not None else None,
-                                       headers=headers)
-                    response = connection.getresponse()
-                    return response.status, json.loads(response.read())
-                try:
-                    data = service._upload_paths(server.bootstrap_paths, body['upload_id']).committed.read_bytes()
-                    digest = hashlib.sha256(data).hexdigest()
-                    assert call('/v1/uploads', {'size': len(data), 'sha256': digest}, False)[0] == 401
-                    client = api.BootstrapAPIClient('https://fixture.invalid', token, transport=transport)
-                    uid = client.upload(data)
-                    submitted = client.submit(kind=body['kind'], upload_id=uid)
-                    result = finish(server)
-                    assert result['state'] == 'succeeded'
-                    polled = client.deployment_state(submitted.transaction_id)
-                    assert polled['transaction_id'] == submitted.transaction_id
-                    assert polled['result']['coordinator_receipt']['coordinator_transaction_id'] == co.journal.read().transaction_id
-                finally:
-                    connection.close()
-                    server.shutdown()
-                    thread.join(5)
-                    server.server_close()
+        tmp_path = self.case_temp()
+        import http.client
+        try:
+            server, co, gate, body = composition(tmp_path, sample, network=True)
+        except PermissionError as exc:
+            raise AssertionError(f"required loopback socket unavailable: {exc}") from exc
+        token = service.provision_token(server.bootstrap_paths.token_file)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        connection = http.client.HTTPConnection(*server.server_address, timeout=5)
+        def transport(method, path, payload, headers):
+            connection.request(method, path, body=payload, headers=dict(headers))
+            response = connection.getresponse()
+            return response.status, response.read()
+        def call(path, payload=None, authenticated=True, method='POST'):
+            headers = {'Content-Type': 'application/json'}
+            if authenticated:
+                headers['Authorization'] = 'Bearer ' + token
+            connection.request(method, path, body=json.dumps(payload) if payload is not None else None,
+                               headers=headers)
+            response = connection.getresponse()
+            return response.status, json.loads(response.read())
+        try:
+            data = service._upload_paths(server.bootstrap_paths, body['upload_id']).committed.read_bytes()
+            digest = hashlib.sha256(data).hexdigest()
+            assert call('/v1/uploads', {'size': len(data), 'sha256': digest}, False)[0] == 401
+            client = api.BootstrapAPIClient('https://fixture.invalid', token, transport=transport)
+            uid = client.upload(data)
+            submitted = client.submit(kind=body['kind'], upload_id=uid)
+            result = finish(server)
+            assert result['state'] == 'succeeded'
+            polled = client.deployment_state(submitted.transaction_id)
+            assert polled['transaction_id'] == submitted.transaction_id
+            assert polled['result']['coordinator_receipt']['coordinator_transaction_id'] == co.journal.read().transaction_id
+        finally:
+            connection.close()
+            server.shutdown()
+            thread.join(5)
+            server.server_close()
+
+    def test_authenticated_http_python(self):
+        self._authenticated_http_upload_submit_and_status(SAMPLES[0])
+
+    def test_authenticated_http_native_c(self):
+        self._authenticated_http_upload_submit_and_status(SAMPLES[3])
+
+    def test_authenticated_http_fpga_image(self):
+        self._authenticated_http_upload_submit_and_status(SAMPLES[4])
 
 
     def test_client_upload_http_handlers_to_coordinator_without_socket(self):

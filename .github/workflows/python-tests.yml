@@ -83,4 +83,4 @@ jobs:
       - name: Run pytest
         run: python -m pytest -q software/python/tests pl/tests
       - name: Verify three real loopback package cases
-        run: python -m pytest -v -rs software/python/tests/test_ppu_package_api_bridge_gate1.py -k test_authenticated_http_upload_submit_and_status
+        run: python -m pytest -v -rs software/python/tests/test_ppu_package_api_bridge_gate1.py -k test_authenticated_http

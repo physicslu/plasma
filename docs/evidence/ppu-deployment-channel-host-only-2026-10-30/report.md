@@ -150,3 +150,22 @@ shared scheduler/Coordinator exclusion with real quiescence evidence, and
 bounded generic activation through the existing Coordinator and installer
 functions. These must be implemented and tested before enabling live generic
 requests. Keep PR #1214 Draft.
+
+### Published follow-up and per-kind CI evidence
+
+The first follow-up commit is
+`d3e2d3e32dd327d5fb553f6b41d947dd15eacbc9`. GitHub-hosted Python Run
+`41004427207`, Job `123895976814`, completed the full Python/PL suite with
+**2839 passed, 12 skipped, 5679 subtests passed**. Its focused loopback step
+reported **1 method and 3 subtests passed, 0 skipped**. That result proves all
+three loopback subcases executed, but the Job log did not name each passing
+subcase separately. The 12 skips belong to the larger suite and are not
+counted as loopback PASS evidence.
+
+The following incremental correction makes Python, native C, and FPGA each a
+separately named test method. In the isolated Python 3.11 environment, the
+focused command reported **three named PASS, zero SKIP**; seven related modules
+reported **172 passed, 26 subtests passed**. GitHub-hosted evidence for this
+incremental correction must be checked on its own eventual commit. No formal
+server authorization, scheduler fence, generic product installation, or
+hardware qualification is inferred from these tests.
