@@ -8,12 +8,23 @@ on:
       - ".gitignore"
       - ".clineignore"
       - "software/python/**"
+      - "software/native/swd/**"
+      - "scripts/ci/inject-plasma-openocd5088-native.py"
       - "data/ic-support/benchmarks/nxp-kl25/backend-implementation-lock.json"
       - "!software/python/docs/**"
       - "pl/rtl/**"
       - "pl/constraints/**"
       - "pl/projects/**"
       - "pl/tests/**"
+      - "pl/verification/test_mpe_dual_swd_core_rtl.py"
+      - "pl/verification/cocotb/test_mpe_dual_swd_core.py"
+      - "pl/verification/test_mpe_swd_axi_rtl.py"
+      - "pl/verification/cocotb/test_mpe_swd_axi.py"
+      - "pl/verification/test_mpe_swd_virtual_target_rtl.py"
+      - "pl/verification/test_swd_independent_axi_rtl.py"
+      - "pl/verification/cocotb/test_swd_independent_axi.py"
+      - "pl/verification/cocotb/test_mpe_swd_virtual_target.py"
+      - "pl/sim/mpe_obuf_stub.sv"
       - "scripts/plasmactl"
       - "scripts/render-start.sh"
       - "scripts/ci/runtime-data-root-contract.py"
@@ -35,6 +46,15 @@ on:
       - "pl/constraints/**"
       - "pl/projects/**"
       - "pl/tests/**"
+      - "pl/verification/test_mpe_dual_swd_core_rtl.py"
+      - "pl/verification/cocotb/test_mpe_dual_swd_core.py"
+      - "pl/verification/test_mpe_swd_axi_rtl.py"
+      - "pl/verification/cocotb/test_mpe_swd_axi.py"
+      - "pl/verification/test_mpe_swd_virtual_target_rtl.py"
+      - "pl/verification/test_swd_independent_axi_rtl.py"
+      - "pl/verification/cocotb/test_swd_independent_axi.py"
+      - "pl/verification/cocotb/test_mpe_swd_virtual_target.py"
+      - "pl/sim/mpe_obuf_stub.sv"
       - "scripts/plasmactl"
       - "scripts/render-start.sh"
       - "scripts/ci/runtime-data-root-contract.py"
@@ -82,3 +102,159 @@ jobs:
         run: python -m pip install -e "./software/python[dev]"
       - name: Run pytest
         run: python -m pytest -q software/python/tests pl/tests
+
+
+  # Existing hosted source-test workflow; source-locked native OpenOCD
+  # adapter registration is tested without a self-hosted host or DUT.
+  swd-openocd-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scope native OpenOCD source build
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ -n "${BASE_SHA}" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            changed="$(git diff --name-only "${BASE_SHA}" HEAD)"
+          else
+            changed="$(git show --pretty= --name-only HEAD)"
+          fi
+          if echo "${changed}" | grep -Eq '^(software/native/swd/|scripts/ci/inject-plasma-openocd5088-native.py|software/python/tests/test_swd_native_c_compilation.py|[.]github/workflows/python-tests.yml)'; then
+            echo "required=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "required=false" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Install upstream OpenOCD build requirements
+        if: steps.scope.outputs.required == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool pkg-config make gcc git \
+            libusb-1.0-0-dev libftdi1-dev libhidapi-dev \
+            gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf libc6-dev-armhf-cross
+      - name: Fetch exact original OpenOCD and inject reviewed PLASMA files
+        if: steps.scope.outputs.required == 'true'
+        env:
+          OPENOCD_SHA: 5088db4c9154ca833c6d558381074b33672e127a
+        run: |
+          set -euo pipefail
+          git init "${RUNNER_TEMP}/openocd-pinned"
+          git -C "${RUNNER_TEMP}/openocd-pinned" remote add origin https://github.com/openocd-org/openocd.git
+          git -C "${RUNNER_TEMP}/openocd-pinned" fetch --no-tags --depth 1 origin "${OPENOCD_SHA}"
+          git -C "${RUNNER_TEMP}/openocd-pinned" checkout --detach FETCH_HEAD
+          git -C "${RUNNER_TEMP}/openocd-pinned" submodule update --init --depth 1 jimtcl
+          python scripts/ci/inject-plasma-openocd5088-native.py \
+            --openocd "${RUNNER_TEMP}/openocd-pinned" --plasma "${GITHUB_WORKSPACE}"
+      - name: Configure and build exact-source native OpenOCD
+        if: steps.scope.outputs.required == 'true'
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/openocd-pinned"
+          ./bootstrap
+          ./configure --disable-werror --enable-internal-jimtcl --disable-internal-libjaylink
+          make -j2
+          test -x src/openocd
+      - name: ARMv7 native v5 MMIO word width and DMB inspection
+        if: steps.scope.outputs.required == 'true'
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/plasma-v5-native-words.o"
+          arm-linux-gnueabihf-gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -march=armv7-a -marm -mfloat-abi=hard -mfpu=vfpv3 \
+            -I software/native/swd \
+            -c software/native/swd/plasma_swd_native_words.c -o "${out}"
+          arm-linux-gnueabihf-readelf -h "${out}" > "${RUNNER_TEMP}/plasma-native-v5-elf.txt"
+          arm-linux-gnueabihf-objdump -d "${out}" > "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          grep -Eq 'Class:[[:space:]]+ELF32' "${RUNNER_TEMP}/plasma-native-v5-elf.txt"
+          grep -Eq 'Machine:[[:space:]]+ARM' "${RUNNER_TEMP}/plasma-native-v5-elf.txt"
+          grep -Eq '(^|[[:space:]])dmb[[:space:]]+sy([[:space:]]|$)' "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          grep -Eq '(^|[[:space:]])ldr([[:space:]]|[a-z]*[[:space:]])' "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          grep -Eq '(^|[[:space:]])str([[:space:]]|[a-z]*[[:space:]])' "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          sha256sum "${out}" "${RUNNER_TEMP}/plasma-native-v5-disassembly.txt"
+          echo "ARMv7 native ABI-v5 word LDR/STR and DMB SY: HOST BUILD PASS" >> "${GITHUB_STEP_SUMMARY}"
+          # Compile the new PS FD-mmap lifecycle for the actual ARMv7-A ISA
+          # without invoking it or opening any device on the runner.
+          arm-linux-gnueabihf-gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -march=armv7-a -marm -mfloat-abi=hard -mfpu=vfpv3 \
+            -I software/native/swd \
+            -c software/native/swd/plasma_swd_ps_mapping.c \
+            -o "${RUNNER_TEMP}/plasma-v5-ps-mapping.o"
+          arm-linux-gnueabihf-readelf -h "${RUNNER_TEMP}/plasma-v5-ps-mapping.o" \
+            > "${RUNNER_TEMP}/plasma-v5-ps-mapping-elf.txt"
+          grep -Eq 'Class:[[:space:]]+ELF32' "${RUNNER_TEMP}/plasma-v5-ps-mapping-elf.txt"
+          grep -Eq 'Machine:[[:space:]]+ARM' "${RUNNER_TEMP}/plasma-v5-ps-mapping-elf.txt"
+          sha256sum "${RUNNER_TEMP}/plasma-v5-ps-mapping.o"
+          arm-linux-gnueabihf-gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -march=armv7-a -marm -mfloat-abi=hard -mfpu=vfpv3 \
+            -I software/native/swd \
+            -c software/native/swd/plasma_swd_owner_evidence.c \
+            -o "${RUNNER_TEMP}/plasma-v5-owner-evidence.o"
+          arm-linux-gnueabihf-readelf -h "${RUNNER_TEMP}/plasma-v5-owner-evidence.o" \
+            > "${RUNNER_TEMP}/plasma-v5-owner-evidence-elf.txt"
+          grep -Eq 'Class:[[:space:]]+ELF32' "${RUNNER_TEMP}/plasma-v5-owner-evidence-elf.txt"
+          grep -Eq 'Machine:[[:space:]]+ARM' "${RUNNER_TEMP}/plasma-v5-owner-evidence-elf.txt"
+          sha256sum "${RUNNER_TEMP}/plasma-v5-owner-evidence.o"
+          echo "C Root identity comparison: compile PASS; current PL/AXI facts: UNPROVEN" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Device mapping attributes / AXI completion / HIL: NOT_RUN" >> "${GITHUB_STEP_SUMMARY}"
+      - name: Verify selectable SWD adapter but no unowned device admission
+        if: steps.scope.outputs.required == 'true'
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/openocd-pinned"
+          set +e
+          src/openocd -s tcl -d2 -c 'adapter list' -c shutdown \
+            > "${RUNNER_TEMP}/plasma-openocd-list.log" 2>&1
+          list_status=$?
+          src/openocd -s tcl -d2 -c 'adapter driver plasma_swd' -c 'transport select swd' -c shutdown \
+            > "${RUNNER_TEMP}/plasma-openocd-select.log" 2>&1
+          select_status=$?
+          src/openocd -s tcl -d2 -c 'adapter driver plasma_swd' -c 'transport select swd' -c init -c shutdown \
+            > "${RUNNER_TEMP}/plasma-openocd-no-owner.log" 2>&1
+          unowned_status=$?
+          set -e
+          echo "list_status=${list_status} select_status=${select_status} unowned_status=${unowned_status}"
+          cat "${RUNNER_TEMP}/plasma-openocd-list.log"
+          cat "${RUNNER_TEMP}/plasma-openocd-select.log"
+          cat "${RUNNER_TEMP}/plasma-openocd-no-owner.log"
+          if [ "${list_status}" -ne 0 ] || [ "${select_status}" -ne 0 ]; then
+            echo 'FAIL: source-locked selectable OpenOCD adapter CLI' >&2
+            exit 1
+          fi
+          if ! grep -q plasma_swd "${RUNNER_TEMP}/plasma-openocd-list.log"; then
+            echo 'FAIL: plasma_swd not listed as a native driver' >&2
+            exit 1
+          fi
+          if [ "${unowned_status}" -eq 0 ]; then
+            echo 'FAIL: unleased native SWD adapter initialized' >&2
+            exit 1
+          fi
+          echo PLASMA_OPENOCD5088_EXACT_SOURCE_BUILD_AND_NO_OWNER_DENY_PASS
+
+  mpe-rtl:
+    # Permanent MPE domain verification in the existing host-only source
+    # workflow; no privileged runner, Z2 SSH, BIT or DUT operation.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install host-only FPGA simulator
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends iverilog
+          python -m pip install 'pytest==8.4.2' 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: Simulate independent SWD Site IP and archival MPE regressions
+        run: python -m pytest -vv -s pl/verification/test_mpe_dual_swd_core_rtl.py pl/verification/test_mpe_swd_axi_rtl.py pl/verification/test_mpe_swd_virtual_target_rtl.py pl/verification/test_swd_independent_axi_rtl.py

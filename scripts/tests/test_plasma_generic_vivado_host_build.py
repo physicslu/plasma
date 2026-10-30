@@ -38,6 +38,34 @@ class GenericVivadoContracts(unittest.TestCase):
                 self.assertEqual(plan["success_marker"], "BITSTREAM_BUILD_PASS")
                 self.assertTrue(plan["prepare_artifact"])
 
+    def test_independent_swd_uses_generic_project_contract_without_deploy(self):
+        plan = build.generic_project_contract(
+            task("pl/projects/z2-swd-independent"), workspace=ROOT,
+            approval=APPROVAL)
+        self.assertEqual(plan["vivado_project"], "z2_swd_independent")
+        self.assertEqual(plan["build_env"], "PLASMA_SWD_BUILD")
+        self.assertEqual(plan["success_marker"],
+                         "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED")
+        self.assertEqual(set(plan["reports"]), {
+            "timing_summary.rpt", "drc.rpt", "methodology.rpt",
+            "utilization.rpt", "check_timing.rpt", "datasheet_io.rpt",
+            "io_pad_configuration.rpt"})
+        self.assertFalse(plan["prepare_artifact"])
+
+    def test_swd_without_reviewed_generic_contract_is_denied(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root / "pl/projects/z2-swd-independent"
+            project.mkdir(parents=True)
+            source = ROOT / "pl/projects/z2-swd-independent"
+            for name in ("create_project.tcl", "create_block_design.tcl",
+                         "build_bitstream.tcl", "verify_hwh.py"):
+                (project / name).write_bytes((source / name).read_bytes())
+            with self.assertRaises(build.BuildDenied):
+                build.generic_project_contract(
+                    task("pl/projects/z2-swd-independent"), workspace=root,
+                    approval=APPROVAL)
+
     def test_f1b_uses_explicit_contract_with_full_qualification(self):
         plan = build.generic_project_contract(
             task("pl/projects/z2-fixed-unified-site1"),

@@ -14,6 +14,64 @@ Read these documents before changing FPGA/PL behavior:
 
 The retired `z2-swd-gpio` and `z2-swd03-axi` image builds must never be selected for Blue Pill PoC or interpreted as real target DPIDR. Retained shared Identity/Board Files helpers and synthetic RTL are for dependent host-only tests. Follow root `AGENTS.md` and `docs/development/swd-legacy-path-retirement.md` for current Z2 PS-local OpenOCD + WordPort + PL SWD.
 
+## New FPGA Project and SWPC build standard (ADR-0004)
+
+For each **new deliverable FPGA Image family × Board target**, create a
+separately reproducible Vivado Project under `pl/projects/<project-name>/`,
+owning its explicit RTL/IP/BD/XDC sources, source/board pins, Vivado Tcl,
+target-specific HWH/Bitstream verifier and Image Manifest. Common reviewed
+RTL/tooling may be reused, but **new projects MUST NOT inherit the fixed
+F1-B Site 1 build engine or its project-specific verification**.
+
+The **canonical repeatable SWPC Host Build route** for new FPGA Images is the
+trusted **Path 2 `operator-cli`** with an Owner-authorized SHA-pinned Work Order
+and a reviewed, version-controlled Python build entrypoint. That script invokes
+the new Project's Vivado Tcl and records toolchain, timing, DRC/methodology,
+BIT/HWH/BIN (when applicable), full reports and SHA256. Path 3 owner-approved
+engineering experiments remain separate and are not substitutes for a
+qualified Path 2 product build.
+
+`vivado-host-build` is F1-B-specific and **not a general new-Project route**.
+Its retirement is `F1B_BUILD_ENGINE_RETIREMENT_PENDING`: do not expand its
+project allowlist; do not delete its existing historical/recovery dependencies
+until a new MPE operator-cli build is qualified, consumers migrated, safety
+retained and a separate owner-approved Gate 2 retirement PR is accepted.
+New MPE/new product projects shall have no F1-B build-engine or legacy
+single-Site SWD source dependency; CI must test this fail-closed boundary.
+Host Build != FPGA Manager Load, DUT power, PS MMIO, Flash or HIL authorization.
+See `docs/adr/0004-project-isolated-fpga-build-path2-operator-cli.md`.
+
+## Independent SWD NORMAL-only IP (ADR-0006)
+
+**Owner-approved current Draft architecture (2026-10-27):** use two
+separately addressable AXI4-Lite SWD slave IPs behind the conventional
+AXI Interconnect. Site 1 is Pmod A; Site 2 is Pmod B. Both have independent
+command/response FIFOs, FSM/clock, SWDIO IOBUF, IRQ and error control.
+Do not add an MPE manager or shared cross-Site SWD scheduler.
+
+**Remove SWD-specific Debug Bitbang outright:** no MODE_DEBUG, Debug Drive,
+Debug Sample, debug pin multiplexing, Python SWD debug socket/codec, nor
+OpenOCD remote_bitbang fallback in the *new* independent-SWD-IP project.
+Retain OFF=0 / NORMAL=1 with idle/quiescent admission and SWDIO Hi-Z when
+disabled. Removed offsets 0x3C/0x40 and mode value 2 must fail closed,
+not map to another function. Candidate register ABI is v5 (0x00050001/2).
+Do not alter the historical installed single-Site Blue Pill image or
+its archived PR #1196 proof.
+
+The **future general-purpose GPIO Bus**, protocol-specific JTAG, SPI, UART
+and I2C engines and any shared Site Pin Mux are separately planned work,
+NOT instantiated or qualified by this SWD-only PR. GPIO must handle
+open-drain/Hi-Z and safe exclusive pin ownership before I2C use.
+Owner-specified future GPIO architecture does not grant current hardware
+access or substitute for Root Guard, Golden Recovery, Image/Manifest,
+MMIO Site leases, safe voltage or a real Z2 HIL test.
+
+Historical MPE RTL/Tcl remains non-final; never select it as the new IP.
+Do not conflate Host-only RTL or Vivado success with physical HIL.
+Follow [ADR-0006](../docs/adr/0006-independent-swd-engine-and-future-gpio-bus.md);
+[ADR-0005](../docs/adr/0005-independent-swd-ip-guarded-bitbang.md) is
+superseded and retained solely for decision history.
+
 ## 1. RTL language and coding policy
 
 New synthesizable RTL shall use SystemVerilog (`.sv`).

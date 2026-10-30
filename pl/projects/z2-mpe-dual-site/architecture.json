@@ -1,0 +1,160 @@
+{
+  "schema": "plasma.mpe.architecture.v1",
+  "status": "RTL_SLICE_SOURCE_ONLY_UNVERIFIED",
+  "image_family": "plasma.mpe.swd.v1",
+  "board": "pynq-z2",
+  "fpga_part": "xc7z020clg400-1",
+  "site_ids_one_based": true,
+  "site_count": 2,
+  "expandable_max_sites": 8,
+  "engine_per_site": "independent_clock_fsm_iobuf_fifo_irq",
+  "host_execution": "Z2_PS_OPENOCD_NATIVE_SWD_ADAPTER",
+  "ps_to_pl": "AXI4LITE_TRANSACTION_COMMANDS_NOT_BITBANG",
+  "axi": {
+    "base": "0x43C00000",
+    "span": "0x10000",
+    "data_bits": 32,
+    "fclk_hz": 100000000,
+    "global_span": "0x1000",
+    "site_stride": "0x1000",
+    "site_bank_index_origin": 1,
+    "full_word_write_required": true
+  },
+  "physical": {
+    "io_standard": "LVCMOS33",
+    "target_io_voltage": 3.3,
+    "no_power_control": true,
+    "no_external_reset": true,
+    "swdio_idle": "HIZ",
+    "swclk_idle": 0,
+    "pmoda_shared_raspberry_pi_header": true,
+    "other_data_pins": "HIZ_ONLY"
+  },
+  "sites": [
+    {
+      "site_id": 1,
+      "pmod": "JA",
+      "swclk": {
+        "pmod_pin": 1,
+        "fpga_pin": "Y18"
+      },
+      "swdio": {
+        "pmod_pin": 2,
+        "fpga_pin": "Y19"
+      },
+      "ground_pins": [
+        5,
+        11
+      ]
+    },
+    {
+      "site_id": 2,
+      "pmod": "JB",
+      "swclk": {
+        "pmod_pin": 1,
+        "fpga_pin": "W14"
+      },
+      "swdio": {
+        "pmod_pin": 2,
+        "fpga_pin": "Y14"
+      },
+      "ground_pins": [
+        5,
+        11
+      ]
+    }
+  ],
+  "site_registers": [
+    {
+      "name": "SITE_ID_CAP",
+      "offset": "0x00",
+      "access": "R"
+    },
+    {
+      "name": "STATUS",
+      "offset": "0x04",
+      "access": "R"
+    },
+    {
+      "name": "CLK_HALF_PERIOD",
+      "offset": "0x08",
+      "access": "RW_IDLE"
+    },
+    {
+      "name": "TIMEOUT_CYCLES",
+      "offset": "0x0C",
+      "access": "RW_IDLE"
+    },
+    {
+      "name": "TX_DATA",
+      "offset": "0x10",
+      "access": "W"
+    },
+    {
+      "name": "CMD_PUSH",
+      "offset": "0x14",
+      "access": "W_ATOMIC"
+    },
+    {
+      "name": "COMPLETION_META",
+      "offset": "0x18",
+      "access": "R"
+    },
+    {
+      "name": "COMPLETION_DATA",
+      "offset": "0x1C",
+      "access": "R"
+    },
+    {
+      "name": "COMPLETION_POP",
+      "offset": "0x20",
+      "access": "W_TAGGED"
+    },
+    {
+      "name": "FIFO_LEVELS",
+      "offset": "0x24",
+      "access": "R"
+    },
+    {
+      "name": "CONTROL",
+      "offset": "0x28",
+      "access": "W"
+    },
+    {
+      "name": "ERROR_LATCH",
+      "offset": "0x2C",
+      "access": "R"
+    },
+    {
+      "name": "IRQ_ENABLE",
+      "offset": "0x30",
+      "access": "RW"
+    },
+    {
+      "name": "IRQ_STATUS",
+      "offset": "0x34",
+      "access": "RW1C"
+    }
+  ],
+  "swd_operations": [
+    "LINE_RESET",
+    "SWJ_SEQUENCE",
+    "DP_READ",
+    "DP_WRITE",
+    "AP_READ",
+    "AP_WRITE",
+    "IDLE_CYCLES"
+  ],
+  "command_fifo_depth_target": 16,
+  "completion_fifo_depth_target": 16,
+  "proof": {
+    "rtl": "NOT_RUN",
+    "sim": "NOT_RUN",
+    "synth": "NOT_RUN",
+    "bitstream": "NOT_RUN",
+    "z2": "NOT_RUN",
+    "swdio_electrical": "NOT_RUN",
+    "dpidr": "NOT_RUN",
+    "two_site_hil": "NOT_RUN"
+  }
+}
