@@ -1,0 +1,44 @@
+# Independent SWD IP — minimal engineering deployment Gate 1
+
+**Status: BLOCKED / Host-only review, 2026-10-30.** This is a proposed single-Site engineering bring-up runbook, not permission to deploy or operate Z2, FPGA or DUT. Source baseline: `main a22c9cb04a9ea1361a39d2504fc83f510898390e`; Draft [#1189](https://github.com/physicslu/plasma/pull/1189) HEAD `ab79b04efb2c38401103876043e39d4745284163`; merged [#1210](https://github.com/physicslu/plasma/pull/1210); Draft [#1214](https://github.com/physicslu/plasma/pull/1214) HEAD `0c5f58d8ef7052bc6c9bdc68ab8f8beafeb40a4b`; Draft [#1215](https://github.com/physicslu/plasma/pull/1215) HEAD `bd580d858b9fbb9c1513b1b67563439aedef470f`.
+
+## Existing route and artifact decision
+
+The merged Path 2 generic `vivado-host-build` builds a SHA-pinned PR project on SWPC; it does **not** transfer or load an image. The existing `scripts/ppu-deploy` SSH engineering installer only accepts `wordport`, `openocd-integration`, and `abtest` from clean committed main; it cannot install the independent SWD IP or its C adapter. Path 3's enrolled SSH/sudo route is a development *execution capability*, not by itself a reviewed package/install transaction. The live Bootstrap `POST /v1/deployments` remains PS-runtime-only and rejects generic FPGA installation; Draft #1214's Host-only API/client work does not change that. Do not relabel any of these as a ready new-IP deployment channel, and do not add a daemon, installer, lock, journal or SSH product path to fill the gap.
+
+The [candidate evidence manifest](../evidence/swd-independent-engineering-gate1-2026-10-30/candidate-manifest.json) is deliberately **not** the protected Root `plasma.fpga.image.v1` manifest. It records a verified Host Build and explicit missing fields; it cannot be placed at `/lib/firmware/plasma-image-manifest.json` or used as FPGA Manager input.
+
+## Host-only evidence at exact #1189 HEAD
+
+Owner-pinned SWPC [Run 40893512347](https://github.com/physicslu/plasma/actions/runs/40893512347), [Artifact 12905788568](https://github.com/physicslu/plasma/actions/runs/40893512347/artifacts/12905788568), Vivado 2026.1, Board Files SHA `e02d6a3866b5465218f777168cdc51344ac94e07`. The ZIP SHA256 `931682a44c83b9f0058ad26c22241830eeb4e8edcde731bce19a5caedd592230` matches GitHub metadata. Independent ZIP-byte checks matched BIT SHA256 `ac89d58b41bbfa1eafd4b51a389b7953186fc8e2ed8b1629bfc0a92f51797e88`, HWH SHA256 `5309c05beb8a17c9b13e8e2ba3d3c23d8264ca4adc38649bab6391e896577eb6`, and all seven report digests in the Receipt. HWH reports Site 1 `0x43C01000/4096`, Site 2 `0x43C02000/4096`, PYNQ-Z2 `xc7z020clg400-1`, PS FCLK 100 MHz and four Pmod pins Y18/Y19/W14/Y14. Routed setup `+0.345 ns`, hold `+0.028 ns`, DRC pass **only for constrained paths**. `check_timing.rpt` still reports 2 missing input and 4 missing output delays (`TIMING-18`); target/cable min/max budget is absent. The Artifact is BIT/HWH/reports, with **no Root-ready BIN or companion Image Manifest**.
+
+Exact-HEAD [GitHub-hosted source CI](https://github.com/physicslu/plasma/actions/runs/40893017601) passed source tests, MPE RTL and source-locked OpenOCD native build/ARMv7 inspection. Local isolated Host-only run of `test_swd_host_build_operator.py`, `test_swd_independent_fpga_project.py`, `test_swd_native_linux_mmio.py`, and `test_swd_native_c_compilation.py`: **52 PASS**. These do not prove Z2 device-backed MMIO. The C mapper in `software/native/swd/plasma_swd_ps_mapping.c` accepts a pre-opened `/dev/mem` FD and injected authorization callback; `plasma_swd_owner_evidence.c` compares injected Root/Boot/Image/voltage facts. No live trusted provider, actual ARMv7 mmap/barrier/HIL or deployable OpenOCD adapter is established by these tests.
+
+## Fail-closed deployment prerequisites
+
+All items below need an observed PASS on the exact proposed source and current Z2 boot **before any future physical load**. An unknown result is BLOCKED.
+
+1. Resolve external SWD timing: target/cable min/max, 3.3 V electrical profile, justified input/output constraints and fresh exact-source route/TIMING/DRC/BIT/HWH. A slower requested SWCLK does not silently close unconstrained off-board paths.
+2. Convert the exact BIT to a bounded Z2 FPGA Manager BIN using the reviewed toolchain; record byte SHA256 and pair it with a Root-compatible `plasma.fpga.image.v1` manifest. Independently validate board/part, Site 1 ABI v5 identity `0x00050001`, Site 1 aperture, HWH, source/Board SHA and the actual BIN bytes. The current candidate manifest is not that Root manifest.
+3. Verify Z2's **current** boot ID, Root source commit/hash pin, FPGA Manager provenance, Image/Manifest, supervisor and PPU Reload owner locks, Site 1 lock, active jobs and hardware quiescence. Prove the exact lock inode/DAC used by Root and native Site owner. No new job admission during load; no snapshot-only idle check. Current Z2 state has not been inspected in this Gate.
+4. Verify a current-boot protected Golden `base.bin`, its SHA, a known-good protected Restore operation, and a backup/readback of the currently installed driver/OpenOCD/WordPort source and configuration before changing anything. Historical Golden evidence is not a current-boot receipt. The existing `ppu-deploy` allowlist cannot be used to write this IP or native C driver.
+5. Build a selectable PS-local ARMv7 OpenOCD adapter with a device-backed C Site owner/lease provider, exact ABI v5 access, actual LDR/STR/DMB and safe `/dev/mem` mapping; verify that no unowned adapter initialization can touch MMIO. The current source-locked build is a Host-only negative admission result. Do not run live target OpenOCD on SWPC.
+6. Obtain a reviewed, bounded staging/install action through an existing authorized development route. The Root Entry remains `download|test|restore + source_sha`; it cannot be repurposed as arbitrary file copy or Root shell. Confirm effective OS access and source pin without altering protection merely to pass.
+
+## Future single-Site acceptance sequence
+
+Only under a separate owner-approved physical Gate with current safety evidence: freeze exact source and package hashes; establish Site 1 electrical wiring and voltage with no competing driver; block new jobs and drain active work; acquire protected reload ownership; stage and verify paired BIN/Manifest and driver backup; use the existing protected Root Download; record load receipt, same-boot Image/Manifest/ABI v5 and Site 1 identity; release reload lock only into a proven safe Site ownership state. Then start **Z2 PS-local** OpenOCD with the reviewed native adapter, perform a single bounded Site 1 DP IDCODE/DPIDR read, and record raw ACK, value, command exits, timestamps, Boot/Image/Root/Owner IDs and electrical observations. For the previously measured STM32F103 Blue Pill, the independent ST-LINK reference is `0x1BA01477`; any new target needs its own declared expected value. Synthetic `0x2BA01477` is never DUT evidence. No Flash erase/program/write is part of this minimal read test.
+
+On WAIT/FAULT/invalid ACK, timeout, SIGBUS, uncertain MMIO or owner loss: stop further DUT traffic; close and reap OpenOCD/driver; preserve error and FIFO/lease evidence; prohibit automatic retry of a possibly executed command. A functional DPIDR FAIL after a proven safe FPGA load does **not** automatically trigger Golden Restore; Keep Loaded is the default while current-boot identity, ownership and electrical/PL output state remain known safe. Failed FPGA load, UNKNOWN/in-flight state, unreaped owner or unsafe output state requires a documented protected recovery decision. Invoke the existing Root `restore` only when explicitly selected or fault recovery requires it, then verify the actual Golden receipt and post-restore safe state. Never infer recovery from process exit 0 or an old file hash.
+
+## Gap and decision
+
+| Gate | State | Blocking evidence |
+| --- | --- | --- |
+| Exact-source Host Build BIT/HWH and digest pairing | **PASS — Host-only** | Run 40893512347 and independent ZIP checks above. |
+| External SWD timing and Root-ready BIN/Manifest | **BLOCKED** | `TIMING-18` ×6; no BIN/Root manifest in Artifact or project. |
+| PS Driver ABI and actual ARMv7 device mapping | **PASS — source contract; NOT_VERIFIED — Z2** | ABI v5 candidate, Host-only C/CI; no trusted live owner/provider or PS HIL. |
+| Current idle/fence, Golden and driver backup | **NOT_VERIFIED** | No Z2 access in this Gate; historical Root evidence cannot establish present state. |
+| Single Site DPIDR and recovery | **NOT_RUN** | Requires the above and separate physical scope. |
+
+**READY_FOR_ENGINEERING_DEPLOYMENT = NO.** The smallest next physical Gate should authorize only exact-source Site 1 image/driver staging, protected load, one DPIDR read and bounded recovery after the listed software/timing/package blockers are closed. This Gate grants no physical action.
