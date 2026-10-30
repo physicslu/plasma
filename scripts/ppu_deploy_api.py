@@ -89,16 +89,33 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
             or result.get("install_qualified") is not False):
         return False
     plan = result.get("plan")
-    return (
+    valid = (
         isinstance(plan, dict)
         and plan.get("execution_permitted") is False
         and type(plan.get("kind")) is str
-        and plan["kind"] in {"python", "native-c", "fpga-image"}
+        and plan["kind"] in {"python", "native-c", "fpga-image", "bundle"}
         and (kind is None or plan["kind"] == kind)
         and type(plan.get("archive_sha256")) is str
         and _HEX64.fullmatch(plan["archive_sha256"]) is not None
         and isinstance(plan.get("files"), list)
         and isinstance(plan.get("requested_actions"), list)
+    )
+    if not valid:
+        return False
+    if plan["kind"] != "bundle":
+        return True
+    components = plan.get("components")
+    return (
+        type(plan.get("purpose")) is str and bool(plan["purpose"])
+        and type(components) is list and 1 <= len(components) <= 32
+        and all(isinstance(part, dict)
+                and type(part.get("id")) is str and bool(part["id"])
+                and type(part.get("kind")) is str and bool(part["kind"])
+                and type(part.get("version")) is str and bool(part["version"])
+                and type(part.get("requires")) is list
+                and type(part.get("files")) is list
+                for part in components)
+        and len({part["id"] for part in components}) == len(components)
     )
 
 
@@ -235,7 +252,7 @@ class BootstrapAPIClient:
         """Runtime deploy unchanged; generic packages are admission-only."""
         if kind == "engineering-module":
             raise DeploymentAPIError("ENGINEERING_INSTALL_NOT_QUALIFIED")
-        if kind not in {"ppu-runtime", "python", "native-c", "fpga-image"} or module is not None:
+        if kind not in {"ppu-runtime", "python", "native-c", "fpga-image", "bundle"} or module is not None:
             raise DeploymentAPIError("API_DEPLOYMENT_KIND_DENIED")
         if not isinstance(upload_id, str) or not _HEX32.fullmatch(upload_id):
             raise DeploymentAPIError("API_UPLOAD_ID_INVALID")

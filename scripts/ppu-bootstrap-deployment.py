@@ -383,7 +383,7 @@ class DeploymentCoordinator:
             self.journal.write(record, "received")
             try:
                 self.journal.write(record, "verifying")
-                package = contract.verify_host_only_package(
+                package = contract.verify_host_only_artifact(
                     request.archive, expected_sha256=request.artifact_sha256,
                     source_commit=request.source_commit, target_profile=request.target_profile,
                 )
@@ -465,7 +465,7 @@ class DeploymentCoordinator:
                     if (not isinstance(prior, dict) or prior.get("name") != package.name
                             or set(prior) != {"name", "kind", "release_id",
                                               "archive_sha256", "source_commit"}
-                            or prior.get("kind") not in contract.PACKAGE_KINDS
+                            or prior.get("kind") not in contract.PACKAGE_KINDS | {contract.BUNDLE_KIND}
                             or type(prior.get("release_id")) is not str
                             or not re.fullmatch(r"[A-Za-z0-9_.-]{1,160}", prior["release_id"])
                             or type(prior.get("source_commit")) is not str
@@ -535,7 +535,11 @@ class DeploymentCoordinator:
             return {
                 "result": "PASS", "transaction": asdict(record),
                 "package": {"name": package.name, "kind": package.kind,
-                            "version": package.version, "sha256": package.archive_sha256},
+                            "version": package.version, "sha256": package.archive_sha256,
+                            "purpose": getattr(package, "purpose", None),
+                            "components": [dict(id=c.id, kind=c.kind, version=c.version,
+                                                requires=list(c.requires))
+                                           for c in getattr(package, "components", ())]},
                 "host_only": True, "install_qualified": False,
                 "not_claimed": ["real engineering deployment", "FPGA load", "SWPC/Z2 rollout"],
             }
