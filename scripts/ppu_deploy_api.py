@@ -1,9 +1,8 @@
 """Bounded SWPC HTTP API transport for the *existing* PPU Bootstrap service.
 
-No SSH, subprocess, Root or devices. For this Gate 1 the adapter is used only
-in Host-only mock tests; no production CLI calls it. Engineering / FPGA install
-must be rejected BEFORE uploading any bytes until qualified on-device support
-and authenticated Master + publisher authorization exist.
+No SSH, subprocess, Root or devices. The client can express generic packages;
+the PPU server must independently authorize them before installation. No
+production CLI calls this adapter until that server boundary is qualified.
 
 HTTPS with validated server certificates is required. Today's Bootstrap
 service is private commissioning HTTP and not yet production TLS-qualified.
@@ -204,33 +203,37 @@ class BootstrapAPIClient:
         *,
         kind: str,
         upload_id: str,
-        gateway_host: str,
-        ppu_id: str,
-        facility_id: str,
-        display_name: str,
+        gateway_host: str | None = None,
+        ppu_id: str | None = None,
+        facility_id: str | None = None,
+        display_name: str | None = None,
         module: str | None = None,
     ) -> DeploymentSubmission:
-        """Fail closed *before network* for engineering/FPGA packages.
+        """Submit through the public API; server admission owns deployment authority.
 
-        PPU Runtime is also only a client protocol, not an authorization to
-        deploy. Caller still needs explicit owner-controlled deployment Gate.
+        Generic package submission does not grant installation permission. The
+        PPU Bootstrap server must independently reject unqualified requests.
         """
         if kind == "engineering-module":
             raise DeploymentAPIError("ENGINEERING_INSTALL_NOT_QUALIFIED")
-        if kind == "fpga-image":
-            raise DeploymentAPIError("FPGA_IMAGE_INSTALL_NOT_QUALIFIED")
-        if kind != "ppu-runtime" or module is not None:
+        if kind not in {"ppu-runtime", "native-c", "python", "fpga-image"} or module is not None:
             raise DeploymentAPIError("API_DEPLOYMENT_KIND_DENIED")
         if not isinstance(upload_id, str) or not _HEX32.fullmatch(upload_id):
             raise DeploymentAPIError("API_UPLOAD_ID_INVALID")
-        body = {
-            "kind": "ppu-runtime",
-            "upload_id": upload_id,
-            "gateway_host": gateway_host,
-            "ppu_id": ppu_id,
-            "facility_id": facility_id,
-            "display_name": display_name,
-        }
+        if kind == "ppu-runtime":
+            if any(not isinstance(value, str) or not value for value in
+                   (gateway_host, ppu_id, facility_id, display_name)):
+                raise DeploymentAPIError("API_RUNTIME_IDENTITY_REQUIRED")
+            body = {
+                "kind": kind, "upload_id": upload_id,
+                "gateway_host": gateway_host, "ppu_id": ppu_id,
+                "facility_id": facility_id, "display_name": display_name,
+            }
+        else:
+            if any(value is not None for value in
+                   (gateway_host, ppu_id, facility_id, display_name)):
+                raise DeploymentAPIError("API_GENERIC_CALLER_AUTHORITY_DENIED")
+            body = {"kind": kind, "upload_id": upload_id}
         response = self._call("POST", "/v1/deployments", body)
         receipt = response.get("deployment")
         if not isinstance(receipt, dict):

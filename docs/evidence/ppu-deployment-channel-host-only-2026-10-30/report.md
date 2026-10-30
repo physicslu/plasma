@@ -96,3 +96,57 @@ GitHub token in the Codex namespace. Until a supported trusted handoff
 publishes these validated bytes, PR HEAD remains the pinned source and
 Gate 2 readiness is **NOT_MET**. Production install and physical acceptance
 remain **NOT_RUN/NOT_QUALIFIED** as described above.
+
+## Deployment Channel Completion Gate 1 follow-up (2026-10-30)
+
+This follow-up starts from exact Draft PR #1214 HEAD
+`e0516ff0371018d2079883d9924903a3ffec61ba` and main
+`a22c9cb04a9ea1361a39d2504fc83f510898390e`. Earlier publication-status
+statements above describe the prior recovery checkpoint, not this follow-up.
+
+The public `BootstrapAPIClient.submit()` now sends `python`, `native-c`, and
+`fpga-image` package requests with only `kind` and `upload_id`. It rejects
+caller-supplied runtime identity fields for those kinds; the server remains the
+authority. The in-memory API integration now uses public `upload()`, `submit()`,
+and `deployment_state()` rather than private `_call()` for generic submission.
+The real-loopback test also uses those public methods. A missing loopback socket
+is now a test failure, not a silent skip; Python CI has a focused verbose step
+that reports the three subcases separately.
+
+Observed in an isolated Python 3.11 environment, with only local `127.0.0.1`
+socket permission for the loopback test: seven related test modules **170 passed,
+29 subtests passed** (exit 0); focused loopback **1 test, 3 subtests passed,
+0 skipped** (exit 0). This is Host-only HTTP, not HTTPS/TLS or a live PPU.
+GitHub-hosted results for this follow-up remain pending until publication and
+CI execution; the earlier successful aggregate CI cannot qualify these new
+bytes.
+
+The formal deployment channel is still **BLOCKED**, for concrete missing
+dependencies:
+
+- The installed Bootstrap service still runs commissioning HTTP with a
+  device-local Bearer token, and its ordinary server constructor has no
+  independently authenticated Master/publisher policy, generation/revocation,
+  source approval, or TLS listener. The generic admission callback is only
+  accepted with a temporary test state root and injected runner. Live generic
+  submission is rejected before activation.
+- `SiteManager.enqueue()` uses process-local admission/owner state. The
+  Bootstrap Coordinator is a separate process and its optional test exclusion
+  defaults to `nullcontext()`. No shared production fence can atomically block
+  new jobs, prove eight-Site idle, or establish real hardware quiescence.
+- The existing on-device installer is PS Runtime-only. Generic ZIP activation
+  in the Coordinator is restricted to a temporary sandbox; no independently
+  trusted target installer/activation or two-host recovery exists. FPGA fixture
+  bytes do not qualify Image/Manifest/HWH/ABI or protected Root/Golden recovery.
+- PR #1215 is a Draft architecture dependency. It and #1214 both edit
+  `docs/README.md`; the documentation decision and integration order require
+  reconciliation before a production client-neutral claim.
+
+No formal generic server admission, product install, TLS bypass, scheduler
+interlock claim, deployment, service restart, SWPC/Z2/FPGA/DUT operation, or
+Gate 2 qualification is created by this follow-up. The smallest remaining
+implementation is an installed PPU TLS/authentication trust boundary, a
+shared scheduler/Coordinator exclusion with real quiescence evidence, and
+bounded generic activation through the existing Coordinator and installer
+functions. These must be implemented and tested before enabling live generic
+requests. Keep PR #1214 Draft.

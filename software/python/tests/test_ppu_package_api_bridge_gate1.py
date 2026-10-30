@@ -264,6 +264,7 @@ class PackageAPIBridgeTests(unittest.TestCase):
 
 
     def test_authenticated_http_upload_submit_and_status(self):
+        api = load('ppu_package_loopback_client', 'ppu_deploy_api.py')
         for sample in [SAMPLES[0], SAMPLES[3], SAMPLES[4]]:
             with self.subTest(case=sample):
                 tmp_path = self.case_temp()
@@ -272,11 +273,15 @@ class PackageAPIBridgeTests(unittest.TestCase):
                 try:
                     server, co, gate, body = composition(tmp_path, sample, network=True)
                 except PermissionError as exc:
-                    self.skipTest(f"loopback sockets unavailable: {exc}")
+                    raise AssertionError(f"required loopback socket unavailable: {exc}") from exc
                 token = service.provision_token(server.bootstrap_paths.token_file)
                 thread = threading.Thread(target=server.serve_forever, daemon=True)
                 thread.start()
                 connection = http.client.HTTPConnection(*server.server_address, timeout=5)
+                def transport(method, path, payload, headers):
+                    connection.request(method, path, body=payload, headers=dict(headers))
+                    response = connection.getresponse()
+                    return response.status, response.read()
                 def call(path, payload=None, authenticated=True, method='POST'):
                     headers = {'Content-Type': 'application/json'}
                     if authenticated:
@@ -289,21 +294,14 @@ class PackageAPIBridgeTests(unittest.TestCase):
                     data = service._upload_paths(server.bootstrap_paths, body['upload_id']).committed.read_bytes()
                     digest = hashlib.sha256(data).hexdigest()
                     assert call('/v1/uploads', {'size': len(data), 'sha256': digest}, False)[0] == 401
-                    status, opened = call('/v1/uploads', {'size': len(data), 'sha256': digest})
-                    assert status == 201
-                    uid = opened['upload']['upload_id']
-                    assert call(f'/v1/uploads/{uid}/chunks', {
-                        'offset': 0, 'data_base64': base64.b64encode(data).decode(), 'sha256': digest,
-                    })[0] == 200
-                    assert call(f'/v1/uploads/{uid}/commit', {})[0] == 200
-                    status, submitted = call('/v1/deployments', {**body, 'upload_id': uid})
-                    assert status == 202
+                    client = api.BootstrapAPIClient('https://fixture.invalid', token, transport=transport)
+                    uid = client.upload(data)
+                    submitted = client.submit(kind=body['kind'], upload_id=uid)
                     result = finish(server)
                     assert result['state'] == 'succeeded'
-                    status, polled = call('/v1/deployment', method='GET')
-                    assert status == 200
-                    assert polled['deployment']['transaction_id'] == submitted['deployment']['transaction_id']
-                    assert polled['deployment']['result']['coordinator_receipt']['coordinator_transaction_id'] == co.journal.read().transaction_id
+                    polled = client.deployment_state(submitted.transaction_id)
+                    assert polled['transaction_id'] == submitted.transaction_id
+                    assert polled['result']['coordinator_receipt']['coordinator_transaction_id'] == co.journal.read().transaction_id
                 finally:
                     connection.close()
                     server.shutdown()
@@ -344,18 +342,17 @@ class PackageAPIBridgeTests(unittest.TestCase):
                     data = service._upload_paths(server.bootstrap_paths, body['upload_id']).committed.read_bytes()
                     client = api.BootstrapAPIClient('https://fixture.invalid', bearer_token=token, transport=transport)
                     uid = client.upload(data)
-                    response = client._call('POST', '/v1/deployments', {**body, 'upload_id': uid})
+                    submission = client.submit(kind=body['kind'], upload_id=uid)
                     record = finish(server)
                     assert record['state'] == 'succeeded'
-                    state = client.deployment_state(response['deployment']['transaction_id'])
+                    state = client.deployment_state(submission.transaction_id)
                     assert state['result']['coordinator_receipt']['coordinator_transaction_id'] == co.journal.read().transaction_id
                     assert calls[-1] == ('GET', '/v1/deployment')
                     assert ('POST', f'/v1/uploads/{uid}/commit') in calls
-                    # No widening of the real SWPC public submission API.
+                    # Caller-supplied target authority is rejected before transport.
                     count = len(calls)
                     with self.assertRaises(api.DeploymentAPIError):
-                        client.submit(kind=body['kind'], upload_id=uid, gateway_host='unused',
-                                      ppu_id='unused', facility_id='unused', display_name='unused')
+                        client.submit(kind=body['kind'], upload_id=uid, ppu_id='forged')
                     assert len(calls) == count
                 finally:
                     server.server_close()

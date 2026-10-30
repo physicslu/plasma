@@ -64,8 +64,11 @@ class FakeBootstrapTransport:
             receipt = server.commit_upload(self.paths, self.upload_id)
             return 200, json.dumps({"ok": True, "upload": receipt}).encode()
         if method == "POST" and path == "/v1/deployments":
-            request = server._deployment_request(body)
-            assert request["upload_id"] == self.upload_id
+            if body["kind"] == "ppu-runtime":
+                request = server._deployment_request(body)
+                assert request["upload_id"] == self.upload_id
+            else:
+                assert body == {"kind": body["kind"], "upload_id": self.upload_id}
             receipt = {
                 "transaction_id": self.transaction_id,
                 "state": self.state,
@@ -125,7 +128,7 @@ def test_ps_runtime_submission_and_status_without_ssh(tmp_path: Path):
     assert not any("ssh" in url for _, url, _ in fake.calls)
 
 
-@pytest.mark.parametrize("kind", ["engineering-module", "fpga-image", "root-shell"])
+@pytest.mark.parametrize("kind", ["engineering-module", "root-shell"])
 def test_unqualified_deployment_denied_before_any_network(kind: str, tmp_path: Path):
     api, fake = make(tmp_path)
     with pytest.raises(client.DeploymentAPIError, match="NOT_QUALIFIED|DENIED"):
@@ -134,6 +137,23 @@ def test_unqualified_deployment_denied_before_any_network(kind: str, tmp_path: P
             gateway_host="10.20.30.40", ppu_id="ppu-01",
             facility_id="lab", display_name="PPU",
         )
+    assert fake.calls == []
+
+
+@pytest.mark.parametrize("kind", ["python", "native-c", "fpga-image"])
+def test_generic_submit_uses_public_api_without_caller_authority(kind: str, tmp_path: Path):
+    api, fake = make(tmp_path)
+    upload_id = "a" * 32
+    fake.upload_id = upload_id
+    submission = api.submit(kind=kind, upload_id=upload_id)
+    assert submission.transaction_id == fake.transaction_id
+    assert fake.calls == [("POST", "/v1/deployments", {"kind": kind, "upload_id": upload_id})]
+
+
+def test_generic_caller_cannot_supply_runtime_identity(tmp_path: Path):
+    api, fake = make(tmp_path)
+    with pytest.raises(client.DeploymentAPIError, match="CALLER_AUTHORITY_DENIED"):
+        api.submit(kind="fpga-image", upload_id="a" * 32, ppu_id="forged")
     assert fake.calls == []
 
 
