@@ -93,7 +93,7 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
         isinstance(plan, dict)
         and plan.get("execution_permitted") is False
         and type(plan.get("kind")) is str
-        and plan["kind"] in {"python", "native-c", "fpga-image"}
+        and plan["kind"] in {"python", "native-c", "fpga-image", "bundle"}
         and (kind is None or plan["kind"] == kind)
         and type(plan.get("archive_sha256")) is str
         and _HEX64.fullmatch(plan["archive_sha256"]) is not None
@@ -235,7 +235,7 @@ class BootstrapAPIClient:
         """Runtime deploy unchanged; generic packages are admission-only."""
         if kind == "engineering-module":
             raise DeploymentAPIError("ENGINEERING_INSTALL_NOT_QUALIFIED")
-        if kind not in {"ppu-runtime", "python", "native-c", "fpga-image"} or module is not None:
+        if kind not in {"ppu-runtime", "python", "native-c", "fpga-image", "bundle"} or module is not None:
             raise DeploymentAPIError("API_DEPLOYMENT_KIND_DENIED")
         if not isinstance(upload_id, str) or not _HEX32.fullmatch(upload_id):
             raise DeploymentAPIError("API_UPLOAD_ID_INVALID")
