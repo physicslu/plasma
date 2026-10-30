@@ -113,10 +113,14 @@ def test_wrong_hardware_rejected_before_writing(offset, bad):
     assert port.ram == {}
 
 
-def test_site_1_only_and_payload_bounds():
+def test_site_identity_and_payload_bounds():
     port = FakeLT02()
-    with pytest.raises(LoopTestError, match="Site 1"):
-        LoopTestDriver(port, base=BASE, site_id=2)
+    for invalid in (0, 9, True, None, "2"):
+        with pytest.raises(LoopTestError, match="Site ID"):
+            LoopTestDriver(port, base=BASE, site_id=invalid)
+    # Software supports IDs 1..8, but only independently verified HWH may
+    # authorize Site 2 or above on actual FPGA hardware.
+    assert LoopTestDriver(port, base=BASE, site_id=2).site_id == 2
     runner = LoopTestDriver(port, base=BASE)
     for bad in (b"", b"x" * (MAX_CASE_BYTES + 1)):
         with pytest.raises(ValueError, match="payload length"):
