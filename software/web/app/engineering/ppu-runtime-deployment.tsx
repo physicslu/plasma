@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ManagerRegistryEntry } from "./ppu-registry-api";
 import {
+  admitManagerPpuBundle,
   appendManagerPpuBootstrapChunk,
   bytesToBase64,
   commitManagerPpuBootstrapUpload,
@@ -46,12 +47,13 @@ export default function PpuRuntimeDeployment({
   const [status, setStatus] = useState<ManagerBootstrapStatus | null>(null);
   const [platformCapability, setPlatformCapability] = useState<"checking" | "supported" | "unsupported">("checking");
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"pair" | "deploy" | "loopback" | null>(null);
+  const [busy, setBusy] = useState<"pair" | "deploy" | "bundle" | "loopback" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pairingToken, setPairingToken] = useState("");
   const [kit, setKit] = useState<File | null>(null);
   const [sidecar, setSidecar] = useState<File | null>(null);
+  const [bundleFile, setBundleFile] = useState<File | null>(null);
   const [ppuId, setPpuId] = useState(alias);
   const [facilityId, setFacilityId] = useState("lab");
   const [displayName, setDisplayName] = useState(alias || "Plasma PPU");
@@ -129,6 +131,12 @@ export default function PpuRuntimeDeployment({
     && deployment?.state !== "queued"
     && deployment?.state !== "running",
   );
+  const canAdmitBundle = Boolean(
+    alias && bundleFile && bundleFile.size > 0 && bundleFile.size <= 32 * 1024 * 1024
+    && pairing?.paired && pairing.device_match && maintenanceReady
+    && !hasActiveExecution && !recoveryRequired && busy === null
+    && deployment?.state !== "queued" && deployment?.state !== "running",
+  );
   const deploymentTone = useMemo(() => {
     if (!deployment) return "neutral";
     if (deployment.state === "succeeded") return "success";
@@ -203,6 +211,41 @@ export default function PpuRuntimeDeployment({
       await refresh(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "PPU Platform Release update failed");
+    } finally {
+      setUploadProgress(null);
+      setBusy(null);
+    }
+  }
+
+  async function admitBundle() {
+    if (!canAdmitBundle || !bundleFile) return;
+    setBusy("bundle");
+    setError(null);
+    setNotice(null);
+    setUploadProgress(0);
+    try {
+      // Browser may send data to Manager/BFF, but NEVER receives PPU token.
+      // Admission is strictly non-executing and NOT an install permission.
+      const digest = await sha256Hex(await bundleFile.arrayBuffer());
+      const created = await createManagerPpuBootstrapUpload(alias, bundleFile.size, digest);
+      let offset = 0;
+      while (offset < bundleFile.size) {
+        const bytes = new Uint8Array(await bundleFile.slice(
+          offset, Math.min(offset + CHUNK_BYTES, bundleFile.size),
+        ).arrayBuffer());
+        await appendManagerPpuBootstrapChunk(
+          alias, created.upload.upload_id, offset, bytesToBase64(bytes),
+          await sha256Hex(bytes),
+        );
+        offset += bytes.byteLength;
+        setUploadProgress(Math.round((offset / bundleFile.size) * 100));
+      }
+      await commitManagerPpuBootstrapUpload(alias, created.upload.upload_id);
+      const receipt = await admitManagerPpuBundle(alias, created.upload.upload_id);
+      setNotice(`Bundle admitted only (not installed/activated). Transaction: ${receipt.deployment.transaction_id}`);
+      await refresh(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Bundle Admission failed");
     } finally {
       setUploadProgress(null);
       setBusy(null);
@@ -404,6 +447,28 @@ export default function PpuRuntimeDeployment({
         <p className="ppuPlatformSectionNote">
           The current qualified update authority deploys the Runtime component through the installed Bootstrap and preserves existing rollback/recovery gates. Bootstrap remains independently versioned and is not silently rewritten by this path. Programming Logic, including FPGA bitstreams and ICPN-selected Python logic, is a separate lifecycle.
         </p>
+      </section>
+
+      <section className="ppuPlatformSection" aria-labelledby="platform-bundle-admission-heading">
+        <header className="ppuPlatformSectionHeader">
+          <div>
+            <small>BUNDLE ADMISSION ONLY</small>
+            <h4 id="platform-bundle-admission-heading">Generic Bundle v2</h4>
+            <p>Accept verified multi-component packages and opaque resources. Does not install, execute or load FPGA.</p>
+          </div>
+        </header>
+        <div className="ppuPlatformDeploymentForm">
+          <label className="operatorField ppuPlatformFileField">
+            <span>Bundle v2 ZIP (max 32 MiB)</span>
+            <input type="file" accept=".zip" disabled={busy !== null}
+              onChange={event => setBundleFile(event.target.files?.[0] ?? null)} />
+          </label>
+          <button className="operatorButton ppuPlatformDeployButton" type="button"
+            disabled={!canAdmitBundle} onClick={() => void admitBundle()}>
+            {busy === "bundle" ? `Admitting${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Verify & Admit Bundle (No Install)"}
+          </button>
+        </div>
+        <p className="ppuPlatformSectionNote">Admission produces a Receipt only. Publisher trust, Master authorization and device Install/Activate are not qualified.</p>
       </section>
 
       <section className="ppuPlatformDeploymentStatus" aria-label="Platform deployment status" data-tone={deploymentTone}>
