@@ -31,7 +31,7 @@ Status: **Draft / Host-only implementation**. FPGA Manager load and restore no l
 - `pl/hil/fpga_image_admission.py` currently enforces `uio == release.expected_uio` and further checks: process census, UIO overlap, platform overlap, fabric IRQ, firmware manager provenance and boot consistency.
 - Do not simply change `uio1` to `uio0`, remove `check_exact()`, or write to `/dev/mem` to bypass ownership checks.
 
-## Minimal implementation sequence (not yet executed)
+## Original implementation sequence (partially completed)
 
 1. Inventory the exact Root Loader callers of `collect_live()` and `check_exact()`, plus recovery entry, lock and active-image assumptions.
 2. Confirm Vivado HWH AXI mapping, Device Tree ownership and any users of `43c00000.audio-codec-ctrl`. Identify whether an approved nonpersistent PL loader can operate independently of that MMIO owner.

@@ -366,6 +366,19 @@ class GenericGuardSafetyTests(unittest.TestCase):
                                    expected_firmware="candidate.bin",
                                    require_mmio=False)
 
+    def test_missing_golden_and_bad_candidate_bytes_fail_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            firmware = Path(td)
+            (firmware / "candidate.bin").write_bytes(b"wrong candidate")
+            with patch.object(guard, "FIRMWARE", firmware), \
+                    patch.object(guard, "protected"):
+                with self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                            "FIRMWARE_LOCATION_DENIED"):
+                    guard.sha_file(firmware / "golden.bin", "a" * 64)
+                with self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                            "FIRMWARE_BYTES_CHANGED"):
+                    guard.sha_file(firmware / "candidate.bin", "a" * 64)
+
     def test_common_guard_rejects_unapproved_manager_name(self):
         for name in ("../unauthorized.bin", "/tmp/unauthorized.bin",
                      "image with spaces.bin", ""):
