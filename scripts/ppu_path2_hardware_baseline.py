@@ -76,7 +76,10 @@ def _private_ipv4(host: str) -> str:
     if (addr.version != 4 or not addr.is_private or addr.is_loopback
             or addr.is_link_local or addr.is_multicast or addr.is_unspecified):
         raise BaselineError("PPU_PRIVATE_LAN_ONLY")
-    if host != os.environ.get(HOST_ENV):
+    # The physically enrolled development Z2 is 192.168.2.99.
+    # An explicit local operator-controlled env pin may override for a
+    # separately enrolled PPU. Never accept an arbitrary Work Order URL.
+    if host != os.environ.get(HOST_ENV, "192.168.2.99"):
         raise BaselineError("PPU_ALLOWED_IP_PIN_MISSING_OR_MISMATCH")
     return host
 
@@ -100,6 +103,51 @@ def _commissioning_transport(host: str):
         finally:
             connection.close()
     return request
+
+
+def probe_status(host: str, *, read_get=None) -> dict[str, Any]:
+    """Read-only actual installed Bootstrap identity/version preflight.
+
+    The returned identity is OBSERVED, not automatically an approved
+    mutating-device pin. Only the later owner-reviewed Work Order can pin it.
+    """
+    host = _private_ipv4(host)
+    def direct_get(path: str) -> dict[str, Any]:
+        connection = http.client.HTTPConnection(host, 18081, timeout=10)
+        try:
+            connection.request("GET", path, headers={"Accept": "application/json"})
+            response = connection.getresponse()
+            raw = response.read(65537)
+            if response.status != 200 or not raw or len(raw) > 65536:
+                raise BaselineError("PPU_PROBE_HTTP_REJECTED")
+            payload = json.loads(raw.decode("utf-8"))
+            if type(payload) is not dict:
+                raise BaselineError("PPU_PROBE_RESPONSE_INVALID")
+            return payload
+        finally:
+            connection.close()
+
+    reader = direct_get if read_get is None else read_get
+    health = reader("/v1/health")
+    status = reader("/v1/status")
+    identity = status.get("identity")
+    bootstrap = status.get("bootstrap")
+    runtime = status.get("runtime")
+    if (health.get("service") != "plasma-ppu-bootstrap"
+            or type(identity) is not dict or type(bootstrap) is not dict
+            or type(runtime) is not dict
+            or bootstrap.get("state") != "bootstrap_ready"
+            or type(identity.get("device_id")) is not str
+            or not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", identity["device_id"])):
+        raise BaselineError("PPU_PROBE_IDENTITY_INVALID")
+    return {"schema": SCHEMA, "phase": "READ_ONLY_DEVICE_PROBE",
+            "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+            "device_id_observed": identity["device_id"],
+            "bootstrap_version_observed": bootstrap.get("version"),
+            "bootstrap_api_version_observed": bootstrap.get("api_version"),
+            "runtime_state_observed": runtime.get("state"),
+            "installed_verifier_source_sha": "NOT_ATTESTED",
+            "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN"}
 
 
 def _git_head() -> str:
@@ -270,6 +318,9 @@ def run(api, client_module, *, source_sha: str, target: Mapping[str, str],
         report["b1"] = {"status": "BLOCKED", "code": "PINNED_DEVICE_IDENTITY_MISMATCH"}
         return report
     report["device_id"] = actual
+    report["bootstrap_version_observed"] = status["bootstrap"].get("version")
+    report["bootstrap_api_version_observed"] = status["bootstrap"].get("api_version")
+    report["installed_verifier_source_sha"] = "NOT_ATTESTED"
     if status.get("runtime", {}).get("state") == "recovery_required" or (
             isinstance(status.get("deployment"), dict) and
             status["deployment"].get("state") in ("queued", "running", "recovery_required")):
@@ -311,21 +362,32 @@ def run(api, client_module, *, source_sha: str, target: Mapping[str, str],
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Z2 hardware Package receive/admission ONLY")
     parser.add_argument("--host", required=True)
-    parser.add_argument("--device-id", required=True)
+    parser.add_argument("--probe", action="store_true",
+                        help="read-only Z2 identity/version, no credential or writes")
+    parser.add_argument("--device-id")
     parser.add_argument("--source-sha", required=True)
-    parser.add_argument("--platform", required=True)
-    parser.add_argument("--board", required=True)
-    parser.add_argument("--fpga-part", required=True)
+    parser.add_argument("--platform")
+    parser.add_argument("--board")
+    parser.add_argument("--fpga-part")
     args = parser.parse_args(argv)
     try:
         if not SHA40.fullmatch(args.source_sha) or _git_head() != args.source_sha:
             raise BaselineError("SOURCE_SHA_PIN_MISMATCH")
+        host = _private_ipv4(args.host)
+        if args.probe:
+            print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps(
+                {**probe_status(host), "source_sha": args.source_sha},
+                sort_keys=True, separators=(",", ":"),
+            ))
+            return 0
+        if not all(type(v) is str for v in
+                   (args.device_id, args.platform, args.board, args.fpga_part)):
+            raise BaselineError("PINNED_DEVICE_AND_TARGET_REQUIRED")
         target = {"platform": args.platform, "board": args.board, "fpga_part": args.fpga_part}
         if any(not SAFE.fullmatch(v) for v in target.values()):
             raise BaselineError("TARGET_PROFILE_INPUT_DENIED")
         if not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", args.device_id):
             raise BaselineError("DEVICE_ID_PIN_INVALID")
-        host = _private_ipv4(args.host)
         credential = os.environ.get(TOKEN_ENV)
         if not credential:
             raise BaselineError("PRIVATE_TOKEN_FILE_NOT_PROVISIONED")
@@ -341,7 +403,7 @@ def main(argv: list[str] | None = None) -> int:
             report, sort_keys=True, separators=(",", ":"),
         ))
         return 0 if report["b1"]["status"] == "PASS" else 1
-    except (BaselineError, OSError, ValueError, subprocess.SubprocessError) as exc:
+    except Exception as exc:
         # NEVER print exception details containing token, URL, or untrusted body.
         print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps({
             "schema": SCHEMA, "b1": "NOT_RUN",
