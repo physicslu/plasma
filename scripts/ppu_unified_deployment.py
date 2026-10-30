@@ -586,3 +586,154 @@ def verify_host_only_artifact(
             source_commit=source_commit, target_profile=target_profile,
         )
     raise UnifiedDeploymentError("PACKAGE_SCHEMA_UNSUPPORTED")
+
+
+# PR3: deterministic capability resolution and authority simulation.
+# These functions accept trusted test fixtures injected by a host-only caller;
+# they never turn a package claim, pairing token or HTTP request into authority.
+BUNDLE_POLICY_SCHEMA = "plasma.ppu.host-policy.v1"
+
+
+def bundle_component_identity(component: VerifiedBundleComponent) -> str:
+    """Content identity for a versioned component; does not prove publisher."""
+    if not isinstance(component, VerifiedBundleComponent):
+        raise UnifiedDeploymentError("BUNDLE_COMPONENT_IDENTITY_DENIED")
+    descriptor = {
+        "id": component.id,
+        "kind": component.kind,
+        "version": component.version,
+        "requires": list(component.requires),
+        "files": [
+            {"path": f.path, "sha256": f.sha256, "size": f.size,
+             "executable": f.executable}
+            for f in sorted(component.files, key=lambda entry: entry.path)
+        ],
+    }
+    return hashlib.sha256(
+        json.dumps(descriptor, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def resolve_host_only_bundle(
+    bundle: VerifiedBundle,
+    *,
+    trusted_inventory: Mapping[str, Mapping[str, object]],
+) -> dict[str, object]:
+    """Topological release plan, no install/execute/FPGA load.
+
+    The inventory MUST be independently supplied by the PPU owner and verified
+    before calling this pure resolver. Cache misses cause staging; an unverified
+    apparent cache hit is not reusable.
+    """
+    if not isinstance(bundle, VerifiedBundle) or not isinstance(trusted_inventory, Mapping):
+        raise UnifiedDeploymentError("BUNDLE_RESOLUTION_INPUT_INVALID")
+    if any(type(name) is not str or name not in {c.id for c in bundle.components}
+           for name in trusted_inventory):
+        raise UnifiedDeploymentError("BUNDLE_INVENTORY_UNKNOWN_COMPONENT")
+    by_id = {component.id: component for component in bundle.components}
+    _verify_bundle_dependencies(bundle.components)
+    seen: set[str] = set()
+    order: list[str] = []
+
+    def visit(component_id: str) -> None:
+        if component_id in seen:
+            return
+        component = by_id[component_id]
+        for dependency in component.requires:
+            visit(dependency)
+        seen.add(component_id)
+        order.append(component_id)
+
+    for component in bundle.components:
+        visit(component.id)
+
+    stage: list[str] = []
+    reuse: list[str] = []
+    identities: dict[str, str] = {}
+    for component_id in order:
+        component = by_id[component_id]
+        identity = bundle_component_identity(component)
+        identities[component_id] = identity
+        existing = trusted_inventory.get(component_id)
+        if existing is None:
+            stage.append(component_id)
+            continue
+        if (
+            not isinstance(existing, Mapping)
+            or set(existing) != {"version", "sha256", "target", "verified"}
+            or existing.get("verified") is not True
+            or type(existing.get("version")) is not str
+            or type(existing.get("sha256")) is not str
+            or type(existing.get("target")) is not dict
+            or existing["target"] != dict(bundle.target)
+        ):
+            raise UnifiedDeploymentError("BUNDLE_INVENTORY_UNTRUSTED")
+        if existing["version"] == component.version and existing["sha256"] == identity:
+            reuse.append(component_id)
+        else:
+            stage.append(component_id)
+    return {
+        "schema": "plasma.ppu.bundle-resolution.v1",
+        "archive_sha256": bundle.archive_sha256,
+        "component_order": order,
+        "stage": stage,
+        "reuse": reuse,
+        "component_sha256": identities,
+        "install_qualified": False,
+    }
+
+
+def evaluate_host_only_bundle_authority(
+    bundle: VerifiedBundle,
+    *,
+    trusted_policy: Mapping[str, object],
+    now_epoch_s: int,
+) -> dict[str, object]:
+    """Fail-closed simulation of independently trusted publisher/Master policy.
+
+    A manifest field, source SHA, hash, Bearer token or user-controlled flag
+    MUST NEVER be accepted in place of a device-owned signed publisher grant.
+    This pure function is NOT wired to Bootstrap HTTP or an on-device installer.
+    """
+    if not isinstance(bundle, VerifiedBundle) or type(now_epoch_s) is not int:
+        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_INPUT_INVALID")
+    required = {
+        "schema", "publisher", "source_commit", "archive_sha256", "target",
+        "purpose", "master_generation", "active_master_generation",
+        "allowed_kinds", "expires_epoch_s",
+    }
+    if not isinstance(trusted_policy, Mapping) or set(trusted_policy) != required:
+        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_NOT_PROVISIONED")
+    if (trusted_policy["schema"] != BUNDLE_POLICY_SCHEMA
+            or type(trusted_policy["publisher"]) is not str
+            or not SAFE_NAME.fullmatch(trusted_policy["publisher"])
+            or type(trusted_policy["source_commit"]) is not str
+            or trusted_policy["source_commit"] != bundle.source_commit
+            or type(trusted_policy["archive_sha256"]) is not str
+            or trusted_policy["archive_sha256"] != bundle.archive_sha256
+            or type(trusted_policy["target"]) is not dict
+            or trusted_policy["target"] != dict(bundle.target)
+            or type(trusted_policy["purpose"]) is not str
+            or trusted_policy["purpose"] != bundle.purpose):
+        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_MISMATCH")
+    if (type(trusted_policy["master_generation"]) is not int
+            or type(trusted_policy["active_master_generation"]) is not int
+            or trusted_policy["master_generation"] <= 0
+            or trusted_policy["master_generation"] != trusted_policy["active_master_generation"]
+            or type(trusted_policy["expires_epoch_s"]) is not int
+            or trusted_policy["expires_epoch_s"] <= now_epoch_s):
+        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_REVOKED_OR_EXPIRED")
+    allowed = trusted_policy["allowed_kinds"]
+    if (type(allowed) is not list or not allowed
+            or any(type(kind) is not str or not SAFE_NAME.fullmatch(kind) for kind in allowed)
+            or len(set(allowed)) != len(allowed)
+            or any(component.kind not in allowed for component in bundle.components)):
+        raise UnifiedDeploymentError("BUNDLE_COMPONENT_KIND_NOT_AUTHORIZED")
+    return {
+        "publisher": trusted_policy["publisher"],
+        "master_generation": trusted_policy["master_generation"],
+        "purpose": bundle.purpose,
+        "archive_sha256": bundle.archive_sha256,
+        "scope": "host-only-fixture",
+        "device_install_authorized": False,
+    }
