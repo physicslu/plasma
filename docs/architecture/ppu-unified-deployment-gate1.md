@@ -192,3 +192,37 @@ The three packages overlap on Z2 Python files, and `wordport`/`openocd-integrati
 ## Gate 1 / Gate 2 boundaries
 
 This PR changes Host-only planning, the existing API's **reject-only** Engineering admission, PS Runtime transaction-ID correlation in source, and documentation/tests. It does **not** perform deployment, add any Root capability, change installed Z2 permissions, make a live SWPC/Z2 request, operate SWPC/Z2/FPGA/DUT, or retire a live engineering path. Any actual migration of protected runtime, on-device Owner claims and production Master authorization still requires evidence beyond GitHub-hosted tests.
+
+
+## Gate 1 / PR 1 — Generic Package Receive and Admission (Host-only)
+
+The existing Bootstrap `/v1/uploads` and `/v1/deployments` endpoints accept
+single-kind `plasma.ppu.package.v1` ZIP archives for **receive, verify and plan
+only**. `python`, `native-c` and `fpga-image` generic submissions return a
+durable `deployment-api.json` admission receipt with a non-caller-selected
+transaction ID, terminal `state=admitted` and `stage=package_admission_only`.
+This state is intentionally distinct from `succeeded` (an actual runtime
+installation success). The PPU verifies the
+committed archive SHA256, strict Manifest schema, per-file SHA256, safe paths,
+exact package kind and target compatibility against an operator-provisioned,
+private `--package-target-file` (default `/etc/plasma/ppu-package-target.json`).
+The target file has only `platform`, `board`, `fpga_part` string fields,
+is owned by the running service identity, and is mode 0600.
+
+An optional Manifest `actions` array declares intent from the finite set
+`install`, `verify`, `activate`, `rollback`; **none is executed in PR 1**.
+Legacy v1 manifests without `actions` remain readable and produce an empty
+action plan. The service never trusts caller-provided target identity, module
+selection, shell commands or publisher claims. Manifest `source_commit`
+is **unverified self-description**, not a source/publisher attestation.
+A matching SHA256 proves integrity against the uploaded digest, not provenance.
+The existing commissioning Bearer API is retained; production TLS and
+publisher authentication remain NOT_QUALIFIED.
+
+The generic admission branch does not invoke the runtime Installer,
+Coordinator worker, Root Entry, FPGA Manager or DUT; runtime deployment behavior
+remains unchanged. Existing private API receipt and Coordinator journal are
+checked for active/recovery states before accepting a new admission. A successful
+admission **does not authorize installation**, site quiescence or FPGA image
+activation. PR 2 / PR 3 own those later operations. Host-only HTTP tests do
+not establish real PPU deployment.
