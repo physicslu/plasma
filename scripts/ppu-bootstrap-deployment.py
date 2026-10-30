@@ -340,6 +340,55 @@ class DeploymentCoordinator:
                 ],
             }
 
+    def execute_authorized_bundle_host_only(
+        self,
+        request: HostOnlyPackageRequest,
+        *,
+        trusted_policy: Mapping[str, object],
+        trusted_inventory: Mapping[str, Mapping[str, object]],
+        now_epoch_s: int,
+        inject_failure: str | None = None,
+    ) -> Mapping[str, Any]:
+        """PR3 policy/resolution -> the SAME Host-only Engine Lock/Journal.
+
+        Test-fixture trust is never accepted from HTTP, never a real publisher
+        signature or Master authorization. The only eventual writer is the
+        existing execute_package_host_only() transaction.
+        """
+        if not isinstance(request, HostOnlyPackageRequest):
+            raise DeploymentError("HOST_ONLY_PACKAGE_REQUEST_INVALID")
+        # An independently qualified device installer is NOT connected here.
+        contract_path = Path(__file__).with_name("ppu_unified_deployment.py")
+        spec = importlib.util.spec_from_file_location("ppu_pr3_host_only_contract", contract_path)
+        if spec is None or spec.loader is None:
+            raise DeploymentError("HOST_ONLY_CONTRACT_UNAVAILABLE")
+        contract = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = contract
+        spec.loader.exec_module(contract)
+        try:
+            bundle = contract.verify_host_only_artifact(
+                request.archive, expected_sha256=request.artifact_sha256,
+                source_commit=request.source_commit,
+                target_profile=request.target_profile,
+            )
+            if not isinstance(bundle, contract.VerifiedBundle):
+                raise contract.UnifiedDeploymentError("BUNDLE_V2_REQUIRED")
+            authority = contract.evaluate_host_only_bundle_authority(
+                bundle, trusted_policy=trusted_policy, now_epoch_s=now_epoch_s,
+            )
+            resolution = contract.resolve_host_only_bundle(
+                bundle, trusted_inventory=trusted_inventory,
+            )
+        except contract.UnifiedDeploymentError as exc:
+            raise DeploymentError(f"host-only Bundle authorization denied: {exc}") from exc
+        receipt = dict(self.execute_package_host_only(
+            request, inject_failure=inject_failure,
+        ))
+        receipt["authorization"] = authority
+        receipt["resolution"] = resolution
+        receipt["install_qualified"] = False
+        return receipt
+
     def execute_package_host_only(
         self, request: HostOnlyPackageRequest, *, inject_failure: str | None = None,
     ) -> Mapping[str, Any]:
