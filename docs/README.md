@@ -246,7 +246,7 @@
 
 ## Deployment
 
-- **Gate 1 / Host-only / BLOCKED** — [Independent SWD IP minimal engineering deployment](deployment/swd-independent-engineering-gate1.md)：核對 #1189 精確 SHA 的 BIT/HWH、Root Guard、Driver ABI 與單 Site DPIDR 前置條件；[候選證據 Manifest](evidence/swd-independent-engineering-gate1-2026-10-30/candidate-manifest.json) 不可作為 Root 載入 Manifest，未部署或操作硬體。
+- **Gate 1A / Host-only / Deployment BLOCKED** — [Independent SWD IP minimal engineering deployment](deployment/swd-independent-engineering-gate1.md)：核對 #1189 精確 SHA 的 BIT/HWH、Root Guard、Driver ABI 與單 Site DPIDR 前置條件；[Artifact Completion Evidence](evidence/swd-independent-engineering-gate1-2026-10-30/artifact-completion-report.md) 記錄 BIN 轉換、Root 格式測試與剩餘阻擋。未部署或操作硬體。
 
 - **Current** — [Deployment Index](deployment/README.md)
 - **Current** — [`plasmactl` Deployment Profiles](deployment/plasmactl-deployment-profiles.md)：定義統一 operator CLI、`integration`／`local-control-station`／`swpc-z2like` profile ownership、activation rollback 與 qualification boundary。
