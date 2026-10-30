@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 16015)
-Total output lines: 301
-
 # Plasma Documentation Index
 
 本頁是 `docs/` 的 canonical 文件入口。執行中的程式、設定 schema、REST／wire contract 與自動測試優先於描述性文字；若兩者不一致，先停止操作、以實作與測試確認事實，再在同一個變更中修正文檔。
@@ -122,7 +119,72 @@ Total output lines: 301
 - **CI / Architecture Contract** — [Runtime Data Root Contract v1](architecture/runtime-data-root-contract-v1.md)：所有可安裝 Python 模組使用明確 Data Root，AST CI 禁止新增 wheel `__file__` 相對路徑推算；只保留 2 個受控 Source-tree 開發例外，並守護 NXP、OpenOCD 與 KL25 Root Resolver。
 - **Current** — [Selected IC Profile v1](architecture/selected-ic-profile-v1.md)：將 exact ICPN 的 Device operating characteristics、Programming requirements、Backend evidence 與 PLASMA compatibility 分層組合；STM32F103C8T6 為第一個 manufacturer-first pilot。
 - **Current / Design-input contract** — [Programming Hardware and Socket Profile v1](architecture/programming-hardware-socket-profile-v1.md)：以 STM32F103C8T6/LQFP48/SWD 建立 physical pin map、全部供電/接地 contact、NRST/BOOT0 與 package geometry 的 machine-readable Socket design input；明確不宣稱 socket vendor、signal integrity、runtime hardware、HIL 或 execution readiness。
-- **Gate 1 / Source-only L2 提案（Draft、未合併）** — [STM32F103 Medium-density 非 LQFP 12 顆 exact-ICPN 資格擴展](architecture/stm32f103-medium-nonlqfp-l2-v9.md)：8 顆直接適用性、4 顆 T…4015 tokens truncated…
+- **Gate 1 / Source-only L2 提案（Draft、未合併）** — [STM32F103 Medium-density 非 LQFP 12 顆 exact-ICPN 資格擴展](architecture/stm32f103-medium-nonlqfp-l2-v9.md)：8 顆直接適用性、4 顆 TR 包裝等價；7 顆 VFQFPN36 命名／Geometry 缺口保留 L1，2 顆 R/RTR 特例排除。僅 OpenOCD 0.12.0 原始碼與 ST 原廠證據，不代表實體 HIL 或執行授權。
+- **Design-input only** — [STM32F103VBT6 LQFP100 Socket Reuse](architecture/stm32f103vbt6-lqfp100-socket-v1.md)：第四個 ST exact-ICPN 延伸樣板；原廠 DS5319 x8/xB LQFP100 共用 100-pin 接腳、17 個必要接點（含 VREF+/VREF−）、NC 保護；VBT6 獨立綁定 128 KiB／128 頁 L2 幾何，且保留 V8 的 64 KiB 封裝契約，僅 Host-only 驗證，不宣稱 L3／HIL。
+- **Design-input only** — [STM32F103V8T6 LQFP100 Socket Profile](architecture/stm32f103v8t6-lqfp100-socket-v1.md)：第三個 ST exact-ICPN 封裝樣板；以 LQFP100 原廠 100-pin map、VREF+/VREF−、5 組 VDD/VSS、NC 接點及 Host-only 負向測試定義獨立設計輸入；不宣稱 Socket/HIL/L3。
+- **Design-input only** — [STM32F103RBT6 LQFP64 Socket Reuse](architecture/stm32f103rbt6-lqfp64-socket-v1.md)：在官方 x8/xB 封裝適用性證據下，共用 LQFP64 實體接腳，但將 STM32F103RBT6 的 128 KiB／128 頁 Flash geometry 獨立綁定；不宣稱 HIL、L3 或 execution。
+- **Design-input only** — [STM32F103R8T6 LQFP64 Socket Profile](architecture/stm32f103r8t6-lqfp64-socket-v1.md)：第二個 ST exact-ICPN 封裝樣板；64-pin manufacturer-backed pin map、SWD/power/NRST contract 與 Host-only fail-closed tests，尚未宣稱 Socket/HIL/L3。
+- **Current** — [Manufacturer Enrichment Coverage Framework v1](architecture/manufacturer-enrichment-coverage-v1.md)：定義 M0–M5 manufacturer enrichment coverage、逐 ICPN missing-dimension 投影、explicit exact-ICPN scope composition 與 fail-closed inheritance 規則；不授權 runtime 或 hardware readiness。
+- **Current** — [Manufacturer Device Basic Profile v1](architecture/stm32f1-device-basic-profile-v1.md)：目前以 explicit family profiles 覆蓋 STM32F1／STM32F2／STM32C0／STM32G0／STM32G4／STM32U0／STM32U3／STM32L5／STM32H7RS／STM32WBA5X／STM32N6，共 1,622 個 Production exact ICPN；剩餘 3,007 個 ST exact ICPN 已完成 evidence review，但因 Product Selector/eStore 直接證據不足、衝突或無法無損映射至固定 M1 欄位而 fail-closed。IC Information 固定為 10 欄，所有 Basic Profile 與 Programming Profile、Memory Map、HIL 分離。
+- **Current** — [STM32H5 Host-only Readback Guard v1](architecture/st-h5-host-readback-guard-v1.md)：190 顆 H5 合成讀值的安全邊界測試；失敗／fallback／不匹配一律阻擋，不代表實機燒錄資格.
+- **Current** — [STM32C5 Host-only STLDR Source Guard v1](architecture/st-c5-host-loader-table-v1.md)：139 exact DFP／33 base-only 的離線 Loader 來源與 Tcl array 測試，不能執行燒錄.
+- **Current** — [Versioned OpenOCD Provider Registry v1](architecture/openocd-versioned-provider-registry-v1.md)：將 Upstream／ST 來源與 x86／ARMv7 Artifact SHA-256 分離，沒有實機安裝證據不宣稱可燒錄。
+- **Current** — [ICPN Backend Candidate Registry v1](architecture/icpn-backend-candidate-registry-v1.md)：H5／C5 合計 362 顆來源鎖定的唯讀候選資訊，與 Production Backend Mapping、燒錄資格分離。
+- **Current** — [Device Support and Validation](architecture/device-support-validation.md)
+- **Plan** — [Device Support / Hardware Execution / OpenOCD Architecture](architecture/device-support-hardware-openocd.md)：PoC 維持 PYNQ + Python；Production 將 Programmer Backend、stable Plasma HW API、UIO/MMIO/DMA/IRQ 與 PL protocol engine 分層，並避免 OpenOCD per-bit bit-banging。
+- **Plan** — [IC Support Reusable Profile Architecture](architecture/ic-support-profile-architecture.md)
+- **Current** — [IC Support Coverage Normalization](architecture/ic-support-coverage-normalization.md)：以 derived inventory 將 production exact ICPN 正規化為 Base Device、Programming Profile 與 backend readiness，避免把商業料號數量誤當成燒錄演算法數量。
+- **Current** — [IC Support Runtime Resolver Foundation](architecture/ic-support-runtime-resolver.md)：定義 exact ICPN → reusable IC Support profiles 的 runtime-consumable resolver，並維持 Profile resolved 與 backend/runtime implemented 的 fail-closed 邊界。
+- **Current** — [Profile-driven OpenOCD Plan Compiler](architecture/ic-support-openocd-plan-compiler.md)：將 evidence-backed Programming Profile 與 Memory Geometry 編譯成 deterministic OpenOCD dry-run plan；C8／CB geometry 分流，但硬體 execution 維持 fail-closed。
+- **Historical baseline** — [OpenOCD Software Qualification v1](architecture/openocd-software-qualification-v1.md)：首批 C8/CB direct-reference qualification。
+- **Historical expansion** — [OpenOCD Software Qualification v2](architecture/openocd-software-qualification-v2.md)：加入首批 C8/CB `TR=tape-and-reel` packing-only equivalence。
+- **Historical expansion** — [OpenOCD Software Qualification v3](architecture/openocd-software-qualification-v3.md)：把 STM32F103 medium-density direct applicability 擴到 R8/RB/V8/VB T6，並只對已直接資格化的 T6 exact ICPN 展開 TR packing equivalence。
+- **Historical expansion** — [OpenOCD Software Qualification v4](architecture/openocd-software-qualification-v4.md)：在 exact Production identity 與 DS5319 Flash characteristics 證據下，直接資格化 C8/CB/R8/RB/VB 的 T7 LQFP cohort，再對其 TR packing variant 做 deterministic inheritance；總計 22 個 exact ICPN SUPPORTED。
+- **Historical expansion** — [OpenOCD Software Qualification v5](architecture/openocd-software-qualification-v5.md)：建立 multi-density umbrella authority，加入 STM32F103 high-density R-pin/LQFP bounded cohort，合計 31 個 exact ICPN SUPPORTED。
+- **Historical expansion** — [OpenOCD Software Qualification v6](architecture/openocd-software-qualification-v6.md)：legacy Phase 命名文件；以現行術語解讀為 ST Level 0 identity set 維持 4,629 exact ICPN，41 個 exact ICPN 具 `SUPPORTED` qualification、可導出 Level 2 `PROGRAMMABLE`。
+- **Current** — [OpenOCD Software Qualification v7](architecture/openocd-software-qualification-v7.md)：ST Level 0 identity set 維持 4,629 exact ICPN；49 個 exact ICPN 的 Programming Qualification 為 `SUPPORTED`，因此可導出 Level 2 `PROGRAMMABLE`；其餘 ICPN 的 L1 programming-candidate coverage 另由 route projection 決定；Level 3 `PLASMA_VERIFIED` 仍未宣告。
+- **Current** — [OpenOCD Compiled-Plan Executor](architecture/ic-support-openocd-plan-executor.md)：驗證 PS-side canonical OpenOCD plan → isolated software subprocess boundary；production hardware gate 仍關閉，PL/native programming 不在本階段範圍。
+- **Current** — [Vendor-neutral IC admission governance](architecture/vendor-neutral-ic-admission.md)：以 content-addressed artifact、review、disposition、canonical envelope、operation admission 與 backend binding 建立通用治理邊界；尚未接入 production runtime。
+- **Current** — [IC Support Architecture Freeze v1](architecture/ic-support-architecture-freeze-v1.md)：凍結 PR-A／PR-B／PR-C／PR-D 後的 vendor-neutral trust、operation admission、Compiler Registry 與 software/hardware readiness 邊界；不宣稱 HIL 或實體燒錄 readiness。
+- **Current** — [Mock Runtime v1.1](architecture/mock-runtime-v1.1.md)
+- **Current** — [Mock Synthetic Image Contract](architecture/mock-synthetic-image.md)
+- **Current** — [Optional Manager Control Plane](architecture/manager-optional-control-plane.md)
+- **Current** — [Manager Read-only Fleet Aggregation](architecture/manager-readonly-fleet-aggregation.md)
+- **Historical** — [Historical Multi-Programmer / Multi-Site Naming](architecture/multi-programmer-sites.md)
+
+## Development and validation
+
+- **Gate 1 / Path 3 / Phase A / Host-only** — [Blue Pill USB CDC Firmware v0.1 Evidence](evidence/blue-pill-usb-cdc-phase-a-20261023/README.md)：STM32F103C8T6 韌體編譯、ELF／HEX／BIN 靜態核對、Heartbeat／命令 Host 測試與 SHA256；實體 USB、LED、ST-LINK 與 Flash 均為 NOT_RUN，暫用 VID/PID 不是正式 PLASMA USB ID。
+- **Gate 1 / Path 3 / Phase A / Code Review** — [Blue Pill USB CDC PR #1132 Review Repair Evidence](evidence/blue-pill-usb-cdc-pr1132-review-20261023/README.md)：Documentation CI 修復、連續 SEQ 與可選 Host Port 暫停測試、SWPC 重編譯與 SHA256；實體 USB 斷線與 HIL 仍為 NOT_RUN。
+
+- **Development Mode / SWPC Monitor；實際工作執行驗收須逐次舉證** — [PLASMA Path 2/3 SSH tmux Monitor](development/plasma-engineering-ssh-tmux-monitor.md)：同一 tmux Window 並排顯示 Path 2 CLI 與 Path 3 Codex；閒置 IDLE、執行時 Run ID／即時進度、結束後 Exit Code。既有監看畫面可顯示兩個 Path，不代表已驗證特定 GitHub Run 的完整即時觀察；須以受授權工作的 Run ID、Log 與 Exit Code 個別確認 PASS／FAIL／NOT_RUN。本條目不設定 Path 3 的 Host-only 前置條件，也不授權部署或硬體操作。
+- **Gate 1 / RCA archival closure (PR pending Gate 2)** — [PLASMA Path 3 Token Optimization RCA Closure](development/plasma-path3-token-optimization-rca-closure-2026-10-23.md)：固定 PR #1128 與兩次 SWPC 9×9 Run ID、Token/時間/81 成功率、Artifact SHA-256 與尚未完成的模型／Effort 因果歸因；Repo-first 工作流 DONE，逐請求 Token Attribution 保留低優先級技術債。
+- **Gate 1 / Draft / Native Codex read-only bootstrap, SWPC NOT_RUN** — [Codex Native Read-only Preflight](development/plasma-codex-native-preflight.md)：沿用 Issue #981 與既有 Path 2 Dispatcher/Runner，新增固定 main-pinned、無模型 Session 的 Native ELF／SHA-256 唯讀盤點入口；未合併、未派工，不代表 PR #1135 已解阻。
+- **Historical / RETIRED after PR #1181 / Cross-Job Resume** — [Path 3 Cross-Job Resume historical Gate 1](development/plasma-path3-cross-job-resume-gate1.md)：舊 CPU-only 雙 Job Resume 的來源與未執行 SWPC 跨 Job 驗收記錄；`session_resume`、第二個 Job 與 Runtime Adapter 已刪除，不是現行 Dispatcher 契約。
+- **Historical / OFFLINE FIXTURE ONLY / Session Resume PoC** — [Path 3 Session Resume Host-only PoC](development/plasma-path3-session-resume-host-only-poc.md)：保留 Fake Codex 離線單元測試與 Owner-reported 兩程序試驗紀錄；獨立 Probe 不在 Path 3 Runtime 呼叫鏈上，且不授權 SWPC 或任何硬體操作。
+- **Path 3 Repo-first instruction optimization / full normative reference** — [PLASMA Detailed Autonomous Development Contract](development/plasma-autonomous-development-contract-full.md)：完整保留原根目錄 AGENTS.md 的詳細規範；目前根目錄 AGENTS.md 為低於 Codex 預設 32 KiB 專案指令上限的精簡入口。針對實際任務按需讀取此完整條款，不代表 SWPC 已驗證載入來源或 Token 效率改善。
+- **Gate 1 / Local-only Tool; Desktop Telemetry NOT_RUN** — [Codex Desktop vs Path 3 Token Usage Benchmark](development/codex-benchmark-usage.md)：針對 2026-10-22 9×9 測試，提供僅讀取指定本機 Session JSONL 的 Token 統計工具，區分單次 Turn、累計快照與 Path 3 Codex exec 用量；GitHub-hosted CI 使用合成資料，不代表已讀取 Mac Desktop 真實 Session，也不授權 SWPC、Z2 或 DUT。
+
+- **Historical Gate 1 offline integration** — [Path 2 Runtime Integration Gate 1](architecture/plasma-path2-runtime-integration-gate1.md)：記錄當時的 F1-B Host Build Qualification 與離線 Adapter／Lease 測試；文內舊 Download／Testing task ID 不是現行 Dispatcher 指令。
+- **Historical offline Lease/Restore contract** — [Path 2 Persistent FPGA Lease and Restore Contract](architecture/plasma-path2-persistent-fpga-lease-gate1.md)：原始 Gate 1 以離線測試建立 Loaded State、Lease、Restore Intent、Timeout、不可盲目重試及 Testing 重入安全契約；是否執行實機操作由當前受控路徑與逐次授權決定。
+
+- **Historical offline F1-B Adapter contract** — [Path 2 F1-B Adapter Integration](architecture/plasma-path2-f1b-adapter-integration-gate1.md)：原始 Gate 1 驗證 Vivado host-side Build、Hardware Profile、Supervisor、Test Callback 與離線 Mock／Schema 契約；不是現行通用硬體 Work Order 的必要 Stage。
+
+- **Historical / Real Z2 Development PASS; AXI isolation UNPROVEN** — [F1-B Path 3 2026-10-20 Evidence](development/plasma-f1b-path3-39395142726-evidence.md)：紀錄 Run #39395142726 真實 FPGA Manager 單次 Load、三個 Identity readback、原始 base.bin Restore 的證據與開發風險邊界；不屬量產驗證。
+- **Historical / Path 2 reference only** — [F1-B Codex As-run Steps and Path 2 Handoff](development/plasma-f1b-path3-39395142726-codex-steps.md)：保留當時真實執行命令、故障修正與證據；舊 Stage 串接不是現行通用 Path 2 路線，不得直接重放一次性實機風險特例。
+- **Historical F1-B Z2 handoff** — [Path 2 F1-B Z2 Three-stage Execution Handoff](development/plasma-path2-f1b-z2-execution-handoff.md)：保留當時受控執行與失敗證據；文內舊 Root 路徑和固定 Stage 指令不是現行入口。現行硬體工作仍須受授權來源、映像、所有權及復原檢查。
+
+- **Plan / Host-only** — [Runtime FPGA Driver／Switching HIL Acceptance v1](development/runtime-fpga-switching-hil-plan-v1.md)：Phase 1 唯讀盤點、Phase 2 Driver HIL、Phase 3 Fault Injection、Phase 4 A/B Switching 的逐項 PASS／NO-GO 契約。
+- **Current** — [Documentation Maintenance](development/documentation-maintenance.md)
+- **Current** — [AI-assisted Git Workflow](development/ai-git-development-workflow.md)
+- **Current** — [PLASMA GitHub Actions Control Bridge](development/plasma-actions-control-bridge.md)：定義 Issue #814、actor／workflow allowlist、`dispatch`／`cancel`／`rerun` 命令與最小權限安全邊界。
+- **Plan / Pilot** — [PLASMA Codex SWPC Read-only Bootstrap](development/plasma-codex-pilot.md)：Issue #981 Gate 1 A 的安全派工、獨立 Worker、tmux 監控與驗收邊界；尚非正式部署。
+- **Plan / Preflight** — [PLASMA Codex SWPC Bootstrap Preflight](development/plasma-codex-swpc-bootstrap-preflight.md)：Issue #981 的現有 SWPC Runner 唯讀前置檢查與真實 Worker 驗證邊界；未執行部署或硬體操作。
+- **Plan / Host setup** — [PLASMA Codex SWPC Dedicated Worker Provisioning](development/plasma-codex-worker-provisioning.md)：Issue #981 獨立 Linux 帳號、tmux 監控目錄、Runner 註冊與安全驗證的分階段作業程序；文件與程式碼本身不代表 SWPC 已配置。
+- **Plan / Passive inventory** — [PLASMA Codex Direct HIL Tool Readiness](development/plasma-codex-hil-tool-inventory.md)：重用 Z2 SSH／UART／JTAG、Hub 直接 USB 命令及 KINGST LA Driver／CLI，僅盤點專用 Worker 的 PATH、USB 列舉與裝置權限，不開啟或操作設備；Gate 2 前不觸發實機盤點。
+- **Plan / Host activation** — [PLASMA Codex Hardware Access Parity](development/plasma-codex-hardware-parity.md)：複製原 Codex 經驗證的 Z2／Hub／KINGST 所需 Linux 裝置權限及已鎖定 sigrok AppImage；僅由 SWPC 受信任管理員在 Gate 2 後啟用，保留原設備權限與兩階段合併審核。
+- **Plan / HIL smoke** — [PLASMA Codex Z2 SSH／UART Login + Live tmux](development/plasma-codex-z2-login.md)：使用現有 SWPC 專用 Runner 執行受控、限時的實機 SSH／UART 登入驗證，支援 SWPC tmux 即時監看；不公開帳密、私有位址或原始 UART 資料。
+- **Plan / HIL readiness** — [PLASMA Codex Z2 SSH-only PS/PL Readiness](development/plasma-codex-z2-readiness.md)：重用已實機通過的 SSH 通道、唯讀觀察 Z2 Linux／FPGA Manager／FCLK／UIO／Driver／服務狀態，獨立記錄尚未符合的 HIL 條件；不執行 FPGA 重載、MMIO 或 DUT 操作。
 - **Gate 1 retirement / Host-only** — [Z2 SWD-05 Legacy Dedicated Dispatch Retirement](development/plasma-z2-swd05-legacy-retirement-gate1.md)：退役 Issue #981 既有專用派工 Workflow／SWPC CLI／歷史 Route；保留 SWD-05 Linux Driver、原本受保護的 FPGA Owner Lock 與 Path 2／3 執行介面，不代表 SWPC 或 Z2 已執行清理。
 - **Historical / Issue #981 legacy triggers retired** — [舊 Codex 觸發器退役紀錄](development/plasma-legacy-codex-issue981-trigger-retirement.md)：歷史 9 個 Issue 入口已停用；其中 LA2016 三條 Supervisor／Direct A/B／診斷 Workflow 連同過時腳本在 2026-10-26 移除。現行硬體工作統一使用通用 Path 3，不再恢復舊指令。
 - **Host-only reference review / M1 NO-GO** — [PPU Phase 2C: Z2 Kernel Source Lineage and AXI Isolation](architecture/ppu-phase2c-z2-kernel-source-lineage-axi-review.md)：釘選 Xilinx 2024.1 參考驅動 Git Blobs，分離 Z2 目標 Kernel/DTB 未匹配來源事實，審查 Manager 與 Region 的不同隔離路徑；不授權實機載入。
