@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from .test_ppu_generic_package_host_only_gate1 import (
-    SOURCE, TARGET, coordinator, load, request,
+    SOURCE, TARGET, coordinator, load, request, engine,
 )
 from .test_ppu_package_receive_admission_pr1 import loopback  # noqa: F401
 
