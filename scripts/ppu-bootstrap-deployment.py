@@ -12,7 +12,7 @@ import argparse
 import fcntl
 import hashlib
 import re
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import importlib.util
 import json
 import os
@@ -90,6 +90,7 @@ class HostOnlyPackageRequest:
     artifact_sha256: str
     target_profile: Mapping[str, str]
     api_transaction_id: str | None = None
+    publisher: str | None = None
 
 
 class EngineeringInstallRolledBack(RuntimeError):
@@ -115,6 +116,7 @@ class DeploymentRecord:
     source_commit: str | None = None
     api_transaction_id: str | None = None
     package_kind: str | None = None
+    publisher: str | None = None
 
 
 class Journal:
@@ -343,6 +345,7 @@ class DeploymentCoordinator:
 
     def execute_package_host_only(
         self, request: HostOnlyPackageRequest, *, inject_failure: str | None = None,
+        programming_exclusion: Callable | None = None,
     ) -> Mapping[str, Any]:
         """One Lock/Journal/Engine; exercise package lifecycle in a sandbox ONLY.
 
@@ -352,6 +355,11 @@ class DeploymentCoordinator:
         """
         if not isinstance(request, HostOnlyPackageRequest):
             raise DeploymentError("HOST_ONLY_PACKAGE_REQUEST_INVALID")
+        if request.publisher is not None and (
+            type(request.publisher) is not str
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", request.publisher)
+        ):
+            raise DeploymentError("HOST_ONLY_PUBLISHER_ID_INVALID")
         if request.api_transaction_id is not None and (
             not isinstance(request.api_transaction_id, str)
             or not _API_TRANSACTION_ID.fullmatch(request.api_transaction_id)
@@ -377,7 +385,12 @@ class DeploymentCoordinator:
         sys.modules[spec.name] = contract
         spec.loader.exec_module(contract)
 
-        with self._deployment_lock():
+        # Test-injected scheduler fence must block new admissions before its
+        # final idle check, and retain exclusion on uncertain recovery. This
+        # models ownership only; no production scheduler interlock is qualified.
+        with self._deployment_lock(), (
+            programming_exclusion() if programming_exclusion is not None else nullcontext()
+        ):
             now = self.clock()
             record = DeploymentRecord(
                 schema_version=SCHEMA_VERSION,
@@ -386,6 +399,7 @@ class DeploymentCoordinator:
                 updated_at_epoch_s=now, release_artifact=str(request.archive),
                 source_commit=request.source_commit, kind="host-only-package",
                 api_transaction_id=request.api_transaction_id,
+                publisher=request.publisher,
             )
             self.journal.write(record, "received")
             try:
@@ -413,6 +427,7 @@ class DeploymentCoordinator:
             record.release_id = release_id
             previous: bytes | None = None
             activated = False
+            active_cache_unverified = False
 
             # Never follow an existing symlink in the simulated install tree.
             for boundary in (store, store / "releases", release_root.parent,
@@ -501,7 +516,13 @@ class DeploymentCoordinator:
                     finally:
                         if stage.exists():
                             shutil.rmtree(stage)
-                verify_staged_files()
+                try:
+                    verify_staged_files()
+                except Exception:
+                    # A receipt pointing at these damaged bytes is not a
+                    # verified rollback resource, even before activation.
+                    active_cache_unverified = record.previous_release == release_id
+                    raise
                 self.journal.write(record, "staged")
                 if inject_failure == "after_stage":
                     raise DeploymentError("HOST_ONLY_INJECTED_STAGE_FAILURE")
@@ -521,6 +542,8 @@ class DeploymentCoordinator:
                     raise DeploymentError("HOST_ONLY_ACTIVATION_RECEIPT_MISMATCH")
             except Exception as exc:
                 try:
+                    if active_cache_unverified:
+                        raise DeploymentError("HOST_ONLY_ACTIVE_CACHE_REQUIRES_RECOVERY")
                     if inject_failure == "rollback_unknown":
                         raise DeploymentError("HOST_ONLY_INJECTED_ROLLBACK_UNCERTAIN")
                     if activated:

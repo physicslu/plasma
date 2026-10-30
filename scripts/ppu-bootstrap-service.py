@@ -29,6 +29,7 @@ import secrets
 import stat
 import subprocess
 import tarfile
+import tempfile
 import sys
 import threading
 import time
@@ -254,6 +255,39 @@ def _reconcile_runtime_result(
         "coordinator_transaction_id": journal["transaction_id"],
         "coordinator_release_id": journal["release_id"],
         "coordinator_state": journal["state"],
+    }
+
+
+def _reconcile_package_result(
+    paths: ServicePaths, *, api_transaction_id: str,
+    previous_coordinator_id: str | None, runner_result: Mapping[str, Any],
+    request: Mapping[str, str],
+) -> dict[str, str]:
+    """Test-only package projection of the same authoritative journal."""
+    journal = _read_coordinator_journal(paths)
+    transaction = runner_result.get("transaction")
+    if (runner_result.get("result") != "PASS" or runner_result.get("host_only") is not True
+            or runner_result.get("install_qualified") is not False
+            or not isinstance(transaction, Mapping) or journal is None
+            or dict(transaction) != journal
+            or journal.get("state") != "package_active"
+            or journal.get("kind") != "host-only-package"
+            or journal.get("package_kind") != request["kind"]
+            or journal.get("source_commit") != request["source_commit"]
+            or journal.get("publisher") != request["publisher"]
+            or journal.get("artifact_sha256") != request["artifact_sha256"]
+            or journal.get("api_transaction_id") != api_transaction_id
+            or journal["transaction_id"] == previous_coordinator_id
+            or not journal.get("release_id")):
+        raise BootstrapServiceError("host-only package Coordinator result is not reconciled")
+    return {
+        "api_transaction_id": api_transaction_id,
+        "coordinator_transaction_id": journal["transaction_id"],
+        "coordinator_release_id": journal["release_id"],
+        "coordinator_state": journal["state"],
+        "publisher": request["publisher"],
+        "source_commit": request["source_commit"],
+        "artifact_sha256": request["artifact_sha256"],
     }
 
 
@@ -513,22 +547,69 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         paths: ServicePaths,
         base_module: ModuleType,
         deployment_runner: Callable[[ServicePaths, str, Mapping[str, Any]], Mapping[str, Any]] = run_deployment_subprocess,
+        host_only_package_admission: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
     ) -> None:
+        # Test composition only: never selectable by HTTP, CLI or configuration.
+        # Admission supplies independently trusted publisher/source identity;
+        # the injected runner must hold the programming exclusion through verify.
+        if host_only_package_admission is not None:
+            root = paths.state_root
+            if (deployment_runner is run_deployment_subprocess or root.is_symlink()
+                    or not root.is_absolute()
+                    or root.resolve() == Path(tempfile.gettempdir()).resolve()
+                    or not root.resolve().is_relative_to(Path(tempfile.gettempdir()).resolve())):
+                raise BootstrapServiceError("HOST_ONLY_PACKAGE_COMPOSITION_DENIED")
         self.bootstrap_paths = paths
         self.base_module = base_module
         self.deployment_runner = deployment_runner
+        self.host_only_package_admission = host_only_package_admission
         self.mutation_lock = threading.RLock()
         self.deployment_thread: threading.Thread | None = None
         self.recovered_deployment = _recover_interrupted_api_deployment(paths)
         super().__init__(address, BootstrapHandler)
 
     def start_deployment(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        request = _deployment_request(body)
+        kind = body.get("kind")
+        package_request = isinstance(kind, str) and kind in {"native-c", "python", "fpga-image"}
+        if package_request and self.host_only_package_admission is not None:
+            if set(body) != {"kind", "upload_id"}:
+                raise BootstrapServiceError("HOST_ONLY_CALLER_AUTHORITY_DENIED")
+            if not isinstance(body["upload_id"], str) or not UPLOAD_ID_RE.fullmatch(body["upload_id"]):
+                raise BootstrapServiceError("deployment upload_id is invalid")
+            # Never take provenance or target authority from the upload manifest.
+            request = dict(self.host_only_package_admission(body))
+            if (request.get("kind") != body["kind"]
+                    or request.get("upload_id") != body["upload_id"]
+                    or not isinstance(request.get("publisher"), str)
+                    or not request["publisher"]
+                    or type(request.get("source_commit")) is not str
+                    or not re.fullmatch(r"[0-9a-f]{40}", request["source_commit"])
+                    or type(request.get("artifact_sha256")) is not str
+                    or not HEX64_RE.fullmatch(request["artifact_sha256"])):
+                raise BootstrapServiceError("HOST_ONLY_PACKAGE_AUTHORITY_INVALID")
+        else:
+            request = _deployment_request(body)
         upload_id = request["upload_id"]
         upload = _upload_paths(self.bootstrap_paths, upload_id)
         meta = _read_json(upload.meta)
         if meta.get("state") != "committed":
             raise BootstrapServiceError("deployment upload is not committed")
+        if package_request and (meta.get("sha256") != request["artifact_sha256"]
+                                or _sha256(upload.committed) != request["artifact_sha256"]):
+            raise BootstrapServiceError("HOST_ONLY_PACKAGE_UPLOAD_IDENTITY_MISMATCH")
+        if package_request:
+            contract = _load_script(Path(__file__).with_name("ppu_unified_deployment.py"),
+                                    "ppu_bootstrap_package_preflight")
+            try:
+                package = contract.verify_host_only_package(
+                    upload.committed, expected_sha256=request["artifact_sha256"],
+                    source_commit=request["source_commit"],
+                    target_profile=request.get("target_profile"),
+                )
+            except ValueError as exc:
+                raise BootstrapServiceError(f"host-only package preflight failed: {exc}") from exc
+            if package.kind != request["kind"]:
+                raise BootstrapServiceError("HOST_ONLY_PACKAGE_KIND_MISMATCH")
         with self.mutation_lock:
             if self.deployment_thread is not None and self.deployment_thread.is_alive():
                 raise BootstrapServiceError("another deployment is already running")
@@ -563,13 +644,15 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     # internal correlation ID is added; clients cannot choose it.
                     internal_request = {**request, "api_transaction_id": transaction_id}
                     result = dict(self.deployment_runner(self.bootstrap_paths, upload_id, internal_request))
-                    receipt = _reconcile_runtime_result(
+                    reconcile = _reconcile_package_result if package_request else _reconcile_runtime_result
+                    receipt = reconcile(
                         self.bootstrap_paths,
                         api_transaction_id=transaction_id,
                         previous_coordinator_id=(
                             previous_coordinator["transaction_id"] if previous_coordinator else None
                         ),
                         runner_result=result,
+                        **({"request": request} if package_request else {}),
                     )
                 except Exception as exc:
                     # A failed/ambiguous runner may already have activated a

@@ -14,79 +14,8 @@ from types import SimpleNamespace
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[3]
-
-
-def load(name: str, filename: str):
-    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / filename)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-contract = load("ppu_generic_package_contract_gate1", "ppu_unified_deployment.py")
-engine = load("ppu_generic_package_engine_gate1", "ppu-bootstrap-deployment.py")
-SOURCE = "a" * 40
-TARGET = {"platform": "linux-armv7", "board": "pynq-z2", "fpga_part": "xc7z020clg400-1"}
-SAMPLES = (
-    ("wordport", "python", {
-        "payload/python/wordport.py": b"# wordport engine\n",
-        "payload/python/wordport.json": b"{\"mode\":\"host-only\"}",
-    }),
-    ("openocd-integration", "python", {"payload/python/openocd.py": b"# openocd integration\n"}),
-    ("abtest", "python", {"payload/python/abtest.py": b"# A/B runner\n"}),
-    ("native-bridge", "native-c", {
-        "payload/bin/bridge": b"\x7fELFtest-fixture",
-        "payload/lib/bridge.so": b"\x7fELFlibrary-fixture",
-        "payload/include/bridge.h": b"/* interface fixture */\n",
-    }),
-    ("z2-identity", "fpga-image", {
-        "payload/fpga/z2-identity.bit": b"host-only-image-fixture",
-        "payload/fpga/z2-identity.hwh": b"host-only-handoff-fixture",
-        "payload/fpga/z2-identity.json": b"{\"schema\":\"host-only-fixture\"}",
-    }),
-)
-
-
-def package(tmp: Path, name: str, kind: str, files: dict[str, bytes], *,
-            alterations: dict | None = None, names_override=None) -> tuple[Path, str]:
-    entries = [{"path": filename, "sha256": hashlib.sha256(data).hexdigest(),
-                "size": len(data), "executable": filename.startswith("payload/bin/")}
-               for filename, data in files.items()]
-    manifest = {
-        "schema": contract.PACKAGE_SCHEMA, "name": name, "kind": kind,
-        "version": "2026.10.29", "source_commit": SOURCE,
-        "target": TARGET, "files": entries,
-    }
-    if kind == "fpga-image":
-        manifest["fpga_pair"] = {
-            "image": "payload/fpga/z2-identity.bit", "handoff": "payload/fpga/z2-identity.hwh"
-        }
-    if alterations:
-        manifest.update(alterations)
-    archive = tmp / f"{name}.zip"
-    with zipfile.ZipFile(archive, "w") as output:
-        output.writestr("manifest.json", json.dumps(manifest))
-        for filename, data in files.items():
-            output.writestr(filename if names_override is None else names_override, data)
-    return archive, hashlib.sha256(archive.read_bytes()).hexdigest()
-
-
-def coordinator(tmp: Path):
-    paths = engine.DeploymentPaths(
-        bootstrap_state_root=tmp / "isolated-bootstrap-state",
-        product_root=tmp / "production-untouched", config_root=tmp / "config-untouched",
-        runtime_state_root=tmp / "runtime-untouched", log_root=tmp / "log-untouched",
-        systemd_root=tmp / "systemd-untouched",
-    )
-    return engine.DeploymentCoordinator(paths=paths, installer=SimpleNamespace(),
-                                       clock=lambda: 123.0)
-
-
-def request(archive: Path, digest: str):
-    return engine.HostOnlyPackageRequest(archive, SOURCE, digest, TARGET)
+from .ppu_package_fixtures import (ROOT, load, contract, engine, SOURCE, TARGET, SAMPLES,
+                                  package, coordinator, request)
 
 
 @pytest.mark.parametrize("name,kind,files", SAMPLES)
@@ -258,7 +187,7 @@ def test_reused_staged_release_rejects_symlinked_payload_parent(tmp_path: Path) 
     code_dir.symlink_to(outside, target_is_directory=True)
     with pytest.raises(engine.DeploymentError, match="HOST_ONLY_STAGED_SYMLINK_DENIED"):
         co.execute_package_host_only(request(archive, digest))
-    assert json.loads(co.paths.journal.read_text())["state"] == "rolled_back"
+    assert json.loads(co.paths.journal.read_text())["state"] == "recovery_required"
 
 
 def test_reused_staged_release_rejects_undeclared_file(tmp_path: Path) -> None:
@@ -270,7 +199,7 @@ def test_reused_staged_release_rejects_undeclared_file(tmp_path: Path) -> None:
     (release / "payload/python/hidden.py").write_bytes(b"extra")
     with pytest.raises(engine.DeploymentError, match="HOST_ONLY_STAGED_UNDECLARED_FILE"):
         co.execute_package_host_only(request(archive, digest))
-    assert json.loads(co.paths.journal.read_text())["state"] == "rolled_back"
+    assert json.loads(co.paths.journal.read_text())["state"] == "recovery_required"
 
 
 def test_unreviewed_zip_member_and_traversal_are_denied(tmp_path: Path) -> None:
@@ -382,7 +311,8 @@ def test_generic_zip_cannot_reach_legacy_runtime_installer(tmp_path: Path) -> No
     payload = archive.read_bytes()
     kit = tmp_path / "kit-present-but-must-not-execute.py"
     kit.write_text("raise AssertionError('legacy installer invoked')\\n")
-    paths = service.ServicePaths(state_root=tmp_path / "state", kit_tool=kit)
+    paths = service.ServicePaths(state_root=tmp_path / "state",
+                                 product_root=tmp_path / "untouched-product", kit_tool=kit)
     upload_id = service.create_upload(paths, size=len(payload), sha256=digest)["upload_id"]
     service.append_chunk(paths, upload_id, offset=0,
                          data_base64=base64.b64encode(payload).decode("ascii"),
@@ -425,7 +355,8 @@ def test_corrupt_archive_never_reaches_runtime_installer(tmp_path: Path) -> None
     digest = hashlib.sha256(payload).hexdigest()
     kit = tmp_path / "kit-present-but-must-not-execute.py"
     kit.write_text("raise AssertionError('legacy installer invoked')\\n")
-    paths = service.ServicePaths(state_root=tmp_path / "state", kit_tool=kit)
+    paths = service.ServicePaths(state_root=tmp_path / "state",
+                                 product_root=tmp_path / "untouched-product", kit_tool=kit)
     upload_id = service.create_upload(paths, size=len(payload), sha256=digest)["upload_id"]
     service.append_chunk(paths, upload_id, offset=0,
                          data_base64=base64.b64encode(payload).decode("ascii"), sha256=digest)
