@@ -51,6 +51,7 @@
 - **Current / Development Mode** — [Three Shared BLOCKING Decisions](development/development-blocking-policy.md)：Path 2／Path 3 共用授權與來源、Z2 實機安全／復原、真實回執三個核心阻擋邊界；移除重複檢查，但不繞過裝置安全條件。
 
 ## Architecture and contracts
+- **Owner-approved architecture / implementation pending** — [Dual-client, single PPU Deployment Engine](architecture/ppu-dual-client-deployment.md)：工程模式 SWPC CLI／Codex、量產模式 User PC Web Console，共用同一 PPU HTTPS API／DeploymentCoordinator；量產不依賴 SWPC。PR #1214 負責實作與 Host-only 測試，未取得量產或實機資格。
 - **Gate 1 / Path 1 / Draft / Host-only** — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
 - **Gate 1 / Path 1 / Host-only / Draft** — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。
 - **Gate 1 / Path 1 / Host-only / Product policy candidate** — [PPU Z2 Monitor/Master/Engineer Privilege Boundary](architecture/ppu-privilege-boundary-gate1.md)：PPU 三級產品能力、Master 非 Linux Root 操作與部署、Engineer Root 維修、特權 Bridge 的預期邊界；僅 Host-only policy／tests，尚未接入 Runtime／Z2。
