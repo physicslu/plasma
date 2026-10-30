@@ -1,0 +1,31 @@
+{
+  "schema": "plasma.fpga.image.v1",
+  "image_id": "z2-independent-swd-v5-ab79b04e",
+  "board_id": "pynq-z2",
+  "fpga_part": "xc7z020clg400-1",
+  "soc_compatible": "xlnx,zynq-7000",
+  "firmware_name": "plasma-swd-independent-ab79b04e.bin",
+  "firmware_sha256": "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773",
+  "recovery_name": "base.bin",
+  "recovery_sha256": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+  "abi_version": 327681,
+  "abi_offset": 0,
+  "identity_words": [
+    [0, 327681, 4294967295],
+    [4096, 327682, 4294967295]
+  ],
+  "site_bitmap": 3,
+  "site_bitmap_offset": null,
+  "axi_base": 1136660480,
+  "axi_bytes": 8192,
+  "owner_base": 1136656384,
+  "owner_bytes": 65536,
+  "uio_name": "uio1",
+  "expected_uio": {
+    "uio": "uio1",
+    "driver": "uio_pdrv_genirq",
+    "maps": [[1136656384, 65536]],
+    "runtime": "suspended",
+    "irq_counts": [0, 0]
+  }
+}

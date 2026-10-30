@@ -56,10 +56,24 @@ def check_exact(*, release, passive: dict, uio: dict,
         need(passive.get("proc_conflicts") == [],
              "PROC_RESOURCE_OWNER_CONFLICT")
     if require_mmio:
-        need(type(uio) is dict and uio == release.expected_uio,
-             "BOUND_UIO_EXACT_FACTS_CHANGED")
-        need(passive.get("uio_overlaps") == [release.uio_name],
-             "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
+        owner = release.expected_uio
+        if "platform_node" in owner:
+            need(type(uio) is dict and
+                 set(uio) == {"uio", "platform_node", "driver", "maps",
+                              "runtime"} and
+                 {k: uio[k] for k in owner} == owner and
+                 type(uio["uio"]) is str and
+                 re.fullmatch(r"uio[0-9]+", uio["uio"]) is not None,
+                 "BOUND_UIO_OWNER_FACTS_CHANGED")
+            need(passive.get("uio_overlaps") == [uio["uio"]],
+                 "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
+            need(passive.get("platform_overlaps") == [owner["platform_node"]],
+                 "UIO_PLATFORM_OWNER_MISMATCH")
+        else:
+            need(type(uio) is dict and uio == owner,
+                 "BOUND_UIO_EXACT_FACTS_CHANGED")
+            need(passive.get("uio_overlaps") == [release.uio_name],
+                 "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
     else:
         # An ordinal change is irrelevant to Manager load; competing bound
         # mappings of the same physical owner are still a resource conflict.
@@ -108,20 +122,40 @@ def collect_live(*, root_port: guard.RootZ2TargetPort, release,
                else root_port.current_facts())
     uio = None
     if require_mmio:
-        uio_root = guard.SYS / "class/uio" / release.uio_name
+        owner = release.expected_uio
+        if "platform_node" in owner:
+            matches = []
+            for item in sorted((guard.SYS / "class/uio").glob("uio*")):
+                if not re.fullmatch(r"uio[0-9]+", item.name):
+                    continue
+                try:
+                    node = (item / "device").resolve(strict=True)
+                except (FileNotFoundError, OSError):
+                    continue
+                need(node.parent == (guard.SYS / "bus/platform/devices").resolve(),
+                     "UIO_NOT_PLATFORM_DEVICE")
+                if node.name == owner["platform_node"]:
+                    matches.append(item)
+            need(len(matches) == 1, "UIO_PLATFORM_OWNER_NOT_UNIQUE")
+            uio_root = matches[0]
+        else:
+            uio_root = guard.SYS / "class/uio" / release.uio_name
         device = (uio_root / "device").resolve(strict=True)
         driver = (device / "driver").resolve(strict=True).name
         maps = [[int((p / "addr").read_text().strip(), 0),
                  int((p / "size").read_text().strip(), 0)]
                 for p in sorted((uio_root / "maps").glob("map*"))]
-        irq = [line for line in (guard.PROC / "interrupts").read_text().splitlines()
-               if line.split() and line.split()[-1] == "fabric"]
-        need(len(irq) == 1, "FABRIC_IRQ_TOPOLOGY_CHANGED")
-        counters = [int(x) for x in irq[0].split()[1:3]]
-        need(len(counters) == 2, "FABRIC_IRQ_CPU_COUNT_CHANGED")
         uio = dict(uio=uio_root.name, driver=driver, maps=maps,
-                   runtime=(device / "power/runtime_status").read_text().strip(),
-                   irq_counts=counters)
+                   runtime=(device / "power/runtime_status").read_text().strip())
+        if "platform_node" in owner:
+            uio["platform_node"] = device.name
+        else:
+            irq = [line for line in (guard.PROC / "interrupts").read_text().splitlines()
+                   if line.split() and line.split()[-1] == "fabric"]
+            need(len(irq) == 1, "FABRIC_IRQ_TOPOLOGY_CHANGED")
+            counters = [int(x) for x in irq[0].split()[1:3]]
+            need(len(counters) == 2, "FABRIC_IRQ_CPU_COUNT_CHANGED")
+            uio["irq_counts"] = counters
         need(passive["platform_overlaps"] == [device.name],
              "UIO_PLATFORM_OWNER_MISMATCH")
     report = check_exact(
