@@ -408,7 +408,8 @@ def main(argv: list[str] | None = None) -> int:
         print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps({
             "schema": SCHEMA, "b1": "NOT_RUN",
             "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
-            "code": type(exc).__name__, "result": "NOT_RUN",
+            "code": str(exc) if isinstance(exc, BaselineError) else type(exc).__name__,
+            "result": "NOT_RUN",
         }, sort_keys=True, separators=(",", ":")))
         return 69
 
