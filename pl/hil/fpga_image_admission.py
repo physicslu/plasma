@@ -24,7 +24,8 @@ def need(ok: bool, code: str) -> None:
 def check_exact(*, release, passive: dict, uio: dict,
                 original_manager_load: str, expected_firmware: str,
                 previous_firmware: str | None = None,
-                runtime_program_session: bool = False) -> dict:
+                runtime_program_session: bool = False,
+                require_mmio: bool = True) -> dict:
     need(type(passive) is dict and
          passive.get("observation_kind") == "LIVE_ROOT_READ_ONLY" and
          passive.get("root") is True and bool(passive.get("boot_id")) and
@@ -33,6 +34,9 @@ def check_exact(*, release, passive: dict, uio: dict,
          passive.get("candidate_sha256") == release.firmware_sha256,
          "INCOMPLETE_ROOT_OR_PROCESS_FACTS")
     need(type(runtime_program_session) is bool, "INVALID_PROCESS_SCAN_POLICY")
+    need(type(require_mmio) is bool and
+         (require_mmio or not runtime_program_session),
+         "INVALID_MMIO_ADMISSION_POLICY")
     scan = passive.get("proc_scan_diagnostic")
     if runtime_program_session:
         # This is NOT a no-conflict measurement. In particular a forged
@@ -51,10 +55,19 @@ def check_exact(*, release, passive: dict, uio: dict,
              "PROC_SCAN_INCOMPLETE:" + detail)
         need(passive.get("proc_conflicts") == [],
              "PROC_RESOURCE_OWNER_CONFLICT")
-    need(type(uio) is dict and uio == release.expected_uio,
-         "BOUND_UIO_EXACT_FACTS_CHANGED")
-    need(passive.get("uio_overlaps") == [release.uio_name],
-         "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
+    if require_mmio:
+        need(type(uio) is dict and uio == release.expected_uio,
+             "BOUND_UIO_EXACT_FACTS_CHANGED")
+        need(passive.get("uio_overlaps") == [release.uio_name],
+             "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
+    else:
+        # An ordinal change is irrelevant to Manager load; competing bound
+        # mappings of the same physical owner are still a resource conflict.
+        overlaps = passive.get("uio_overlaps")
+        need(type(overlaps) is list and len(overlaps) <= 1 and
+             all(type(name) is str and
+                 re.fullmatch(r"uio[0-9]+", name) for name in overlaps),
+             "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
     need(type(passive.get("platform_overlaps")) is list and
          len(passive["platform_overlaps"]) == 1 and
          bool(re.fullmatch(r"[0-9a-fA-F]+\.[A-Za-z0-9_.-]+",
@@ -72,7 +85,7 @@ def check_exact(*, release, passive: dict, uio: dict,
         "image_id": release.image_id,
         "bin_sha256": release.firmware_sha256,
         "recovery_sha256": release.recovery_sha256,
-        "current_uio": uio,
+        "current_uio": uio if require_mmio else None,
         "axi_isolation": "UNPROVEN_ACCEPTED_FOR_SOURCE_BOUND_DEVELOPMENT",
         "production_qualification": False,
         "manual_recovery_on_timeout_or_unknown": True,
@@ -82,35 +95,42 @@ def check_exact(*, release, passive: dict, uio: dict,
 
 def collect_live(*, root_port: guard.RootZ2TargetPort, release,
                  expected_firmware: str, previous_firmware: str | None = None,
-                 runtime_program_session: bool = False) -> dict:
+                 runtime_program_session: bool = False,
+                 require_mmio: bool = True) -> dict:
     root_port._require_locked()
     need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
     need(root_port.release == release, "ROOT_RELEASE_BINDING_CHANGED")
     need(type(runtime_program_session) is bool, "INVALID_PROCESS_SCAN_POLICY")
+    need(type(require_mmio) is bool and
+         (require_mmio or not runtime_program_session),
+         "INVALID_MMIO_ADMISSION_POLICY")
     passive = (root_port.runtime_program_facts() if runtime_program_session
                else root_port.current_facts())
-    uio_root = guard.SYS / "class/uio" / release.uio_name
-    device = (uio_root / "device").resolve(strict=True)
-    driver = (device / "driver").resolve(strict=True).name
-    maps = [[int((p / "addr").read_text().strip(), 0),
-             int((p / "size").read_text().strip(), 0)]
-            for p in sorted((uio_root / "maps").glob("map*"))]
-    irq = [line for line in (guard.PROC / "interrupts").read_text().splitlines()
-           if line.split() and line.split()[-1] == "fabric"]
-    need(len(irq) == 1, "FABRIC_IRQ_TOPOLOGY_CHANGED")
-    counters = [int(x) for x in irq[0].split()[1:3]]
-    need(len(counters) == 2, "FABRIC_IRQ_CPU_COUNT_CHANGED")
-    uio = dict(uio=uio_root.name, driver=driver, maps=maps,
-               runtime=(device / "power/runtime_status").read_text().strip(),
-               irq_counts=counters)
-    need(passive["platform_overlaps"] == [device.name],
-         "UIO_PLATFORM_OWNER_MISMATCH")
+    uio = None
+    if require_mmio:
+        uio_root = guard.SYS / "class/uio" / release.uio_name
+        device = (uio_root / "device").resolve(strict=True)
+        driver = (device / "driver").resolve(strict=True).name
+        maps = [[int((p / "addr").read_text().strip(), 0),
+                 int((p / "size").read_text().strip(), 0)]
+                for p in sorted((uio_root / "maps").glob("map*"))]
+        irq = [line for line in (guard.PROC / "interrupts").read_text().splitlines()
+               if line.split() and line.split()[-1] == "fabric"]
+        need(len(irq) == 1, "FABRIC_IRQ_TOPOLOGY_CHANGED")
+        counters = [int(x) for x in irq[0].split()[1:3]]
+        need(len(counters) == 2, "FABRIC_IRQ_CPU_COUNT_CHANGED")
+        uio = dict(uio=uio_root.name, driver=driver, maps=maps,
+                   runtime=(device / "power/runtime_status").read_text().strip(),
+                   irq_counts=counters)
+        need(passive["platform_overlaps"] == [device.name],
+             "UIO_PLATFORM_OWNER_MISMATCH")
     report = check_exact(
         release=release, passive=passive, uio=uio,
         original_manager_load=guard.manager_last_load(),
         expected_firmware=expected_firmware,
         previous_firmware=previous_firmware,
-        runtime_program_session=runtime_program_session)
+        runtime_program_session=runtime_program_session,
+        require_mmio=require_mmio)
     need((guard.PROC / "sys/kernel/random/boot_id").read_text().strip()
          == report["target_boot_id"], "BOOT_CHANGED_AFTER_RISK_SCAN")
     return report

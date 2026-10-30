@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from pl.hil import fpga_image_root as stage
 from pl.hil import fpga_image_guard as guard
+from pl.hil import fpga_image_admission as admission
 
 
 class FakePort:
@@ -29,7 +30,8 @@ class FakePort:
     def exclusive(self):
         return nullcontext()
 
-    def report(self, port, release, image, *, previous_image=None):
+    def report(self, port, release, image, *, previous_image=None,
+               require_mmio=False):
         if image != self.image:
             raise stage.ImageDeploymentDenied("MANAGER_PROVENANCE_MISMATCH")
         return {"target_boot_id": self.boot, "image_id": release.image_id,
@@ -300,6 +302,34 @@ class GenericImageRootTests(unittest.TestCase):
                 stage.run(verb)
         self.assertEqual(len(self.port.writes), 1)
 
+    def test_post_load_report_failure_stays_unknown(self):
+        original = self.port.report
+        def failed_after(port, release, image, **kwargs):
+            if image == release.firmware_name:
+                raise stage.ImageDeploymentDenied("POST_LOAD_MANAGER_UNPROVEN")
+            return original(port, release, image, **kwargs)
+        with patch.object(stage, "live_report", side_effect=failed_after):
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "POST_LOAD_MANAGER_UNPROVEN"):
+                stage.run("download")
+        self.assertEqual(self.port.writes, [self.release.firmware_name])
+        self.assertEqual(stage.read_state(self.release)["status"], "UNKNOWN")
+
+    def test_identity_requires_mmio_admission_before_child(self):
+        stage.run("download")
+        original = self.port.report
+        def deny_mmio(port, release, image, **kwargs):
+            if kwargs.get("require_mmio"):
+                raise admission.AdmissionDenied("UIO_PLATFORM_OWNER_MISMATCH")
+            return original(port, release, image, **kwargs)
+        with patch.object(stage, "live_report", side_effect=deny_mmio), \
+                patch.object(guard, "run_child") as child:
+            with self.assertRaisesRegex(admission.AdmissionDenied,
+                                        "UIO_PLATFORM_OWNER_MISMATCH"):
+                stage.run("test")
+            child.assert_not_called()
+        self.assertEqual(stage.read_state(self.release)["status"], "IMAGE")
+
     def test_unknown_operation_rejected_before_manager(self):
         for command in ("erase", "program", "read", "full", "reset", ""):
             with self.assertRaises(stage.ImageDeploymentDenied):
@@ -326,6 +356,15 @@ class GenericGuardSafetyTests(unittest.TestCase):
     def test_runtime_child_path_matches_shared_owner(self):
         self.assertEqual(stage.CHILD,
                          guard.OWNER_DIR / "fpga-image-identity.json")
+
+    def test_live_admission_requires_global_owner_lock(self):
+        from types import SimpleNamespace
+        port = guard.RootZ2TargetPort(release=SimpleNamespace())
+        with self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                    "FPGA_OWNER_LOCK_REQUIRED"):
+            admission.collect_live(root_port=port, release=port.release,
+                                   expected_firmware="candidate.bin",
+                                   require_mmio=False)
 
     def test_common_guard_rejects_unapproved_manager_name(self):
         for name in ("../unauthorized.bin", "/tmp/unauthorized.bin",
@@ -528,6 +567,153 @@ class RootAdmissionFailureClassificationTests(unittest.TestCase):
     def test_complete_nonconflicting_facts_pass(self):
         release, facts = self.facts()
         self.assertEqual(self.check(release, facts)["image_id"], "test")
+
+    def test_manager_load_ignores_stale_uio_index_but_mmio_does_not(self):
+        release, facts = self.facts()
+        facts["uio_overlaps"] = ["uio0"]
+        report = admission.check_exact(
+            release=release, passive=facts, uio=None,
+            original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+            expected_firmware=release.firmware_name, require_mmio=False)
+        self.assertIsNone(report["current_uio"])
+        with self.assertRaisesRegex(ValueError, "BOUND_UIO_EXACT_FACTS_CHANGED"):
+            admission.check_exact(
+                release=release, passive=facts, uio={"uio": "uio0"},
+                original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+                expected_firmware=release.firmware_name)
+
+    def test_load_still_denies_missing_hash_census_owner_and_provenance(self):
+        release, facts = self.facts()
+        common = dict(release=release, uio=None,
+                      original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+                      expected_firmware=release.firmware_name,
+                      require_mmio=False)
+        cases = (("recovery_sha256", "0" * 64, "INCOMPLETE_ROOT_OR_PROCESS_FACTS"),
+                 ("candidate_sha256", "0" * 64, "INCOMPLETE_ROOT_OR_PROCESS_FACTS"),
+                 ("proc_complete", False, "PROC_SCAN_INCOMPLETE"),
+                 ("proc_conflicts", ["42"], "PROC_RESOURCE_OWNER_CONFLICT"),
+                 ("uio_overlaps", ["uio0", "uio1"], "OTHER_BOUND_UIO_OR_MAPPING_DENIED"),
+                 ("platform_overlaps", [], "BOUND_PLATFORM_EXCEPTION_NOT_ISOLATED"),
+                 ("manager_state", "unknown", "INCOMPLETE_ROOT_OR_PROCESS_FACTS"),
+                 ("boot_id", "", "INCOMPLETE_ROOT_OR_PROCESS_FACTS"))
+        for field, value, code in cases:
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, code):
+                admission.check_exact(**dict(common, passive=facts | {field: value}))
+        with self.assertRaisesRegex(ValueError, "MANAGER_LOAD_PROVENANCE_UNPROVEN"):
+            admission.check_exact(**dict(common, passive=facts,
+                                         original_manager_load="no load"))
+
+    def test_mmio_still_denies_wrong_aperture_or_owner(self):
+        release, facts = self.facts()
+        with self.assertRaisesRegex(ValueError, "BOUND_UIO_EXACT_FACTS_CHANGED"):
+            admission.check_exact(
+                release=release, passive=facts,
+                uio={"uio": "uio1", "maps": [[0x43c00000, 65536]]},
+                original_manager_load="fpga_manager fpga0: writing candidate.bin to fpga0",
+                expected_firmware=release.firmware_name)
+        facts["uio_overlaps"] = ["uio0"]
+        with self.assertRaisesRegex(ValueError, "OTHER_BOUND_UIO_OR_MAPPING_DENIED"):
+            self.check(release, facts)
+        facts["uio_overlaps"] = ["uio1"]
+        facts["platform_overlaps"] = ["43c00000.audio-codec-ctrl",
+                                     "40000000.fabric"]
+        with self.assertRaisesRegex(ValueError, "BOUND_PLATFORM_EXCEPTION_NOT_ISOLATED"):
+            self.check(release, facts)
+
+    def test_preload_collection_uses_locked_full_census_without_uio_read(self):
+        release, facts = self.facts()
+        facts["uio_overlaps"] = ["uio0"]
+        class Port:
+            def __init__(self):
+                self.release = release
+                self.full_scans = 0
+            def _require_locked(self):
+                return None
+            def current_facts(self):
+                self.full_scans += 1
+                return facts
+            def runtime_program_facts(self):
+                raise AssertionError("program-session shortcut")
+        port = Port()
+        with tempfile.TemporaryDirectory() as td:
+            proc = Path(td)
+            boot = proc / "sys/kernel/random/boot_id"
+            boot.parent.mkdir(parents=True)
+            boot.write_text(facts["boot_id"])
+            with patch.object(guard, "PROC", proc), \
+                    patch.object(guard, "SYS", proc / "missing-sys"), \
+                    patch.object(guard, "manager_last_load",
+                                 return_value="fpga_manager fpga0: writing candidate.bin to fpga0"), \
+                    patch.object(admission.os, "geteuid", return_value=0):
+                report = admission.collect_live(
+                    root_port=port, release=release,
+                    expected_firmware=release.firmware_name,
+                    require_mmio=False)
+        self.assertEqual(port.full_scans, 1)
+        self.assertIsNone(report["current_uio"])
+
+    def test_preload_rejects_boot_change_after_census(self):
+        release, facts = self.facts()
+        class Port:
+            def __init__(self):
+                self.release = release
+            def _require_locked(self):
+                return None
+            def current_facts(self):
+                return facts
+        with tempfile.TemporaryDirectory() as td:
+            proc = Path(td)
+            boot = proc / "sys/kernel/random/boot_id"
+            boot.parent.mkdir(parents=True)
+            boot.write_text("different-boot")
+            with patch.object(guard, "PROC", proc), \
+                    patch.object(guard, "manager_last_load",
+                                 return_value="fpga_manager fpga0: writing candidate.bin to fpga0"), \
+                    patch.object(admission.os, "geteuid", return_value=0):
+                with self.assertRaisesRegex(ValueError,
+                                            "BOOT_CHANGED_AFTER_RISK_SCAN"):
+                    admission.collect_live(
+                        root_port=Port(), release=release,
+                        expected_firmware=release.firmware_name,
+                        require_mmio=False)
+
+    def test_mmio_collection_rejects_unproven_uio_owner(self):
+        release, facts = self.facts()
+        class Port:
+            def __init__(self):
+                self.release = release
+            def _require_locked(self):
+                return None
+            def current_facts(self):
+                return facts
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            proc = root / "proc"
+            boot = proc / "sys/kernel/random/boot_id"
+            boot.parent.mkdir(parents=True)
+            boot.write_text(facts["boot_id"])
+            uio = root / "sys/class/uio/uio1"
+            device = root / "sys/bus/platform/devices/43c00000.audio-codec-ctrl"
+            device.mkdir(parents=True)
+            (root / "uio_pdrv_genirq").touch()
+            (device / "driver").symlink_to(root / "uio_pdrv_genirq")
+            (device / "power").mkdir()
+            (device / "power/runtime_status").write_text("active")
+            (uio / "maps/map0").mkdir(parents=True)
+            (uio / "device").symlink_to(device)
+            (uio / "maps/map0/addr").write_text("0x40000000")
+            (uio / "maps/map0/size").write_text("0x10000")
+            (proc / "interrupts").write_text("1: 0 0 fabric\n")
+            with patch.object(guard, "PROC", proc), \
+                    patch.object(guard, "SYS", root / "sys"), \
+                    patch.object(guard, "manager_last_load",
+                                 return_value="fpga_manager fpga0: writing candidate.bin to fpga0"), \
+                    patch.object(admission.os, "geteuid", return_value=0):
+                with self.assertRaisesRegex(ValueError,
+                                            "UIO_PLATFORM_OWNER_MISMATCH"):
+                    admission.collect_live(
+                        root_port=Port(), release=release,
+                        expected_firmware=release.firmware_name)
 
     def test_incomplete_scan_reports_precise_kind_and_blocks(self):
         release, facts = self.facts()

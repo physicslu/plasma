@@ -1,6 +1,6 @@
 # Z2 single-device FPGA deployment: six necessary checks (proposed contract)
 
-Status: **DESIGN ONLY — NOT IMPLEMENTED**. No existing Root Guard or Admission checks are relaxed by this document. Applies to the engineering SWD Site 1 DPIDR smoke test, not Production qualification.
+Status: **Draft / Host-only implementation**. FPGA Manager load and restore no longer require the fixed UIO index; MMIO identity admission retains the strict legacy mapping check. Real Device Tree/HWH Owner, ABI and HIL remain unverified. Applies to the engineering SWD Site 1 DPIDR smoke test, not Production qualification.
 
 ## Three independent transitions
 
@@ -72,4 +72,4 @@ Source audit: `pl/hil/fpga_image_root.py`, `pl/hil/fpga_image_admission.py`, `pl
 5. Preserve strict legacy behavior for existing callers until a new implementation and negative tests are in place. Do not silently change the meaning of `collect_live()` for WordPort/program sessions.
 6. Add tests proving: wrong UIO index but correct proven owner does not falsely fail; wrong owner/base/size and competing consumers do fail; load rejection does not write Manager; a post-load MMIO failure leaves state `UNKNOWN` and does not pretend automatic restore succeeded.
 
-**Current implementation status:** call graph audited; code change and regression execution NOT DONE. This audit alone does not authorize a Z2 FPGA load.
+**Current implementation status:** Root admission timing split is implemented and covered by Host-only tests. The legacy manifest and strict MMIO mapping contract remain; G5 Owner proof, G6 real ABI and Z2 HIL are blocked or not run. This source change does not authorize a Z2 FPGA load.
