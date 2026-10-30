@@ -578,4 +578,11 @@ def verify_host_only_artifact(
             archive_path, expected_sha256=expected_sha256,
             source_commit=source_commit, target_profile=target_profile,
         )
+    if schema is None:
+        # v1 preflight used to reject an invalid ZIP member before interpreting
+        # a malformed/absent schema. Preserve that fail-closed diagnostic.
+        return verify_host_only_package(
+            archive_path, expected_sha256=expected_sha256,
+            source_commit=source_commit, target_profile=target_profile,
+        )
     raise UnifiedDeploymentError("PACKAGE_SCHEMA_UNSUPPORTED")
