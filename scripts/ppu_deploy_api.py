@@ -1,9 +1,8 @@
 """Bounded SWPC HTTP API transport for the *existing* PPU Bootstrap service.
 
-No SSH, subprocess, Root or devices. For this Gate 1 the adapter is used only
-in Host-only mock tests; no production CLI calls it. Engineering / FPGA install
-must be rejected BEFORE uploading any bytes until qualified on-device support
-and authenticated Master + publisher authorization exist.
+No SSH, subprocess, Root or devices. A generic package may be submitted for
+manifest/SHA256 admission only; this never authorizes install or FPGA loading.
+Legacy engineering-module installation remains explicitly unqualified.
 
 HTTPS with validated server certificates is required. Today's Bootstrap
 service is private commissioning HTTP and not yet production TLS-qualified.
@@ -204,41 +203,48 @@ class BootstrapAPIClient:
         *,
         kind: str,
         upload_id: str,
-        gateway_host: str,
-        ppu_id: str,
-        facility_id: str,
-        display_name: str,
+        gateway_host: str | None = None,
+        ppu_id: str | None = None,
+        facility_id: str | None = None,
+        display_name: str | None = None,
         module: str | None = None,
     ) -> DeploymentSubmission:
-        """Fail closed *before network* for engineering/FPGA packages.
-
-        PPU Runtime is also only a client protocol, not an authorization to
-        deploy. Caller still needs explicit owner-controlled deployment Gate.
-        """
+        """Runtime deploy unchanged; generic packages are admission-only."""
         if kind == "engineering-module":
             raise DeploymentAPIError("ENGINEERING_INSTALL_NOT_QUALIFIED")
-        if kind == "fpga-image":
-            raise DeploymentAPIError("FPGA_IMAGE_INSTALL_NOT_QUALIFIED")
-        if kind != "ppu-runtime" or module is not None:
+        if kind not in {"ppu-runtime", "python", "native-c", "fpga-image"} or module is not None:
             raise DeploymentAPIError("API_DEPLOYMENT_KIND_DENIED")
         if not isinstance(upload_id, str) or not _HEX32.fullmatch(upload_id):
             raise DeploymentAPIError("API_UPLOAD_ID_INVALID")
-        body = {
-            "kind": "ppu-runtime",
-            "upload_id": upload_id,
-            "gateway_host": gateway_host,
-            "ppu_id": ppu_id,
-            "facility_id": facility_id,
-            "display_name": display_name,
-        }
+        if kind == "ppu-runtime":
+            if any(type(value) is not str or not value for value in
+                   (gateway_host, ppu_id, facility_id, display_name)):
+                raise DeploymentAPIError("API_RUNTIME_IDENTITY_REQUIRED")
+            body = {
+                "kind": kind, "upload_id": upload_id,
+                "gateway_host": gateway_host, "ppu_id": ppu_id,
+                "facility_id": facility_id, "display_name": display_name,
+            }
+        else:
+            if any(value is not None for value in
+                   (gateway_host, ppu_id, facility_id, display_name)):
+                raise DeploymentAPIError("API_GENERIC_CALLER_AUTHORITY_DENIED")
+            body = {"kind": kind, "upload_id": upload_id}
         response = self._call("POST", "/v1/deployments", body)
         receipt = response.get("deployment")
         if not isinstance(receipt, dict):
             raise DeploymentOutcomeUnknown("API_SUBMISSION_RECEIPT_UNKNOWN")
-        tx = receipt.get("transaction_id")
-        state = receipt.get("state")
-        if not isinstance(tx, str) or not _HEX32.fullmatch(tx) or state not in _INFLIGHT:
+        tx, state = receipt.get("transaction_id"), receipt.get("state")
+        if not isinstance(tx, str) or not _HEX32.fullmatch(tx):
             raise DeploymentOutcomeUnknown("API_SUBMISSION_RECEIPT_UNKNOWN")
+        if kind == "ppu-runtime":
+            if state not in _INFLIGHT:
+                raise DeploymentOutcomeUnknown("API_SUBMISSION_RECEIPT_UNKNOWN")
+        elif (state != "succeeded" or not isinstance(receipt.get("result"), dict)
+              or receipt["result"].get("result") != "PASS"
+              or receipt["result"].get("stage") != "package_admission_only"
+              or receipt["result"].get("install_qualified") is not False):
+            raise DeploymentOutcomeUnknown("API_ADMISSION_RECEIPT_UNKNOWN")
         return DeploymentSubmission(upload_id, tx, state)
 
     def deployment_state(self, transaction_id: str) -> dict[str, Any]:

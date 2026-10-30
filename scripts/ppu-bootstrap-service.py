@@ -66,6 +66,7 @@ class ServicePaths:
     machine_id_path: Path = Path("/etc/machine-id")
     bootstrap_script: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap.py")
     kit_tool: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap-kit.py")
+    package_target_file: Path = Path("/etc/plasma/ppu-package-target.json")
 
     @property
     def token_file(self) -> Path:
@@ -492,6 +493,26 @@ def _deployment_request(body: Mapping[str, Any]) -> dict[str, str]:
     return normalized
 
 
+
+def _trusted_package_target(paths: ServicePaths) -> dict[str, str]:
+    """Local PPU target identity, not data accepted from the uploaded manifest."""
+    path = paths.package_target_file
+    if path.is_symlink():
+        raise BootstrapServiceError("PACKAGE_TARGET_PROFILE_UNTRUSTED")
+    try:
+        info = path.stat()
+    except OSError as exc:
+        raise BootstrapServiceError("PACKAGE_TARGET_PROFILE_UNAVAILABLE") from exc
+    if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077
+            or info.st_uid != os.geteuid()):
+        raise BootstrapServiceError("PACKAGE_TARGET_PROFILE_UNTRUSTED")
+    profile = _read_private_json(path)
+    if (set(profile) != {"platform", "board", "fpga_part"}
+            or any(type(value) is not str for value in profile.values())):
+        raise BootstrapServiceError("PACKAGE_TARGET_PROFILE_INVALID")
+    return profile
+
+
 class BootstrapHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
 
@@ -511,7 +532,79 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         self.recovered_deployment = _recover_interrupted_api_deployment(paths)
         super().__init__(address, BootstrapHandler)
 
+    def admit_package(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """Receive -> verify -> plan only. NEVER dispatch the runtime Installer."""
+        if set(body) != {"kind", "upload_id"}:
+            raise BootstrapServiceError("PACKAGE_REQUEST_FIELDS_DENIED")
+        kind, upload_id = body["kind"], body["upload_id"]
+        if kind not in {"python", "native-c", "fpga-image"}:
+            raise BootstrapServiceError("PACKAGE_KIND_DENIED")
+        if type(upload_id) is not str or not UPLOAD_ID_RE.fullmatch(upload_id):
+            raise BootstrapServiceError("PACKAGE_UPLOAD_ID_DENIED")
+        with self.mutation_lock:
+            if self.deployment_thread is not None and self.deployment_thread.is_alive():
+                raise BootstrapServiceError("another deployment is already running")
+            previous = _deployment_api_record(self.bootstrap_paths)
+            if previous is not None and previous["state"] in DEPLOYMENT_API_IN_FLIGHT_STATES | {"recovery_required"}:
+                raise BootstrapServiceError("previous deployment not safe for package admission")
+            _admit_coordinator_journal(self.bootstrap_paths)
+            upload = _upload_paths(self.bootstrap_paths, upload_id)
+            meta = _read_json(upload.meta)
+            if (meta.get("state") != "committed"
+                    or meta.get("upload_id") != upload_id
+                    or type(meta.get("sha256")) is not str
+                    or not HEX64_RE.fullmatch(meta["sha256"])):
+                raise BootstrapServiceError("PACKAGE_UPLOAD_NOT_COMMITTED")
+            target = _trusted_package_target(self.bootstrap_paths)
+            contract = _load_script(
+                Path(__file__).with_name("ppu_unified_deployment.py"),
+                "plasma_ppu_package_admission_contract",
+            )
+            try:
+                verified = contract.verify_host_only_package(
+                    upload.committed, expected_sha256=meta["sha256"],
+                    source_commit=None, target_profile=target,
+                )
+            except contract.UnifiedDeploymentError as exc:
+                raise BootstrapServiceError(str(exc)) from exc
+            if verified.kind != kind:
+                raise BootstrapServiceError("PACKAGE_KIND_MISMATCH")
+            transaction_id = uuid.uuid4().hex
+            now = time.time()
+            plan = {
+                "package": verified.name,
+                "kind": verified.kind,
+                "version": verified.version,
+                "source_commit": verified.source_commit,
+                "archive_sha256": verified.archive_sha256,
+                "files": [dict(path=item.path, sha256=item.sha256, size=item.size,
+                               executable=item.executable) for item in verified.files],
+                "target": dict(verified.target),
+                "requested_actions": list(verified.actions),
+                "execution_permitted": False,
+            }
+            record = {
+                "schema_version": 1,
+                "transaction_id": transaction_id,
+                "state": "succeeded",
+                "upload_id": upload_id,
+                "started_at_epoch_s": now,
+                "updated_at_epoch_s": now,
+                "error_code": None,
+                "error": None,
+                "result": {
+                    "result": "PASS",
+                    "stage": "package_admission_only",
+                    "install_qualified": False,
+                    "plan": plan,
+                },
+            }
+            _atomic_json(self.bootstrap_paths.deployment_record, record)
+            return record
+
     def start_deployment(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        if body.get("kind") in {"python", "native-c", "fpga-image"}:
+            return self.admit_package(body)
         request = _deployment_request(body)
         upload_id = request["upload_id"]
         upload = _upload_paths(self.bootstrap_paths, upload_id)
@@ -713,7 +806,9 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     return
             if path == "/v1/deployments":
                 record = self.owner.start_deployment(body)
-                self._json(HTTPStatus.ACCEPTED, {"ok": True, "deployment": record})
+                status = (HTTPStatus.OK if record.get("result", {}).get("stage") == "package_admission_only"
+                          else HTTPStatus.ACCEPTED)
+                self._json(status, {"ok": True, "deployment": record})
                 return
             self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not_found"})
         except BootstrapServiceError as exc:
@@ -728,6 +823,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--product-root", type=Path, default=Path("/opt/plasma"))
     parser.add_argument("--state-root", type=Path, default=Path("/var/lib/plasma-bootstrap"))
     parser.add_argument("--machine-id", type=Path, default=Path("/etc/machine-id"))
+    parser.add_argument("--package-target-file", type=Path,
+                        default=Path("/etc/plasma/ppu-package-target.json"))
     parser.add_argument(
         "--bootstrap-script",
         type=Path,
@@ -757,6 +854,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         machine_id_path=args.machine_id,
         bootstrap_script=args.bootstrap_script,
         kit_tool=args.kit_tool,
+        package_target_file=args.package_target_file,
     )
     try:
         if args.command == "provision-token":

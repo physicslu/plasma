@@ -30,6 +30,7 @@ SAFE_NAME = re.compile(r"[a-z][a-z0-9_.-]{0,63}\Z")
 SAFE_VERSION = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}\Z")
 PACKAGE_SCHEMA = "plasma.ppu.package.v1"
 PACKAGE_KINDS = frozenset({"native-c", "python", "fpga-image"})
+PACKAGE_ACTIONS = frozenset({"install", "verify", "activate", "rollback"})
 MAX_PACKAGE_FILES = 128
 MAX_PACKAGE_BYTES = 32 * 1024 * 1024
 
@@ -58,6 +59,7 @@ class VerifiedPackage:
     files: tuple[VerifiedPackageFile, ...]
     target: Mapping[str, str]
     install_qualified: bool = False
+    actions: tuple[str, ...] = ()  # Declarative intent, never executable authority.
 
 
 def _unique_json_pairs(pairs):
@@ -102,7 +104,7 @@ def _kind_allows_file(kind: str, file: VerifiedPackageFile) -> bool:
 
 
 def verify_host_only_package(
-    archive_path: Path, *, expected_sha256: str, source_commit: str,
+    archive_path: Path, *, expected_sha256: str, source_commit: str | None,
     target_profile: Mapping[str, str],
 ) -> VerifiedPackage:
     """Strict generic archive contract. Never installs, loads PL or runs code.
@@ -111,7 +113,8 @@ def verify_host_only_package(
     SHA-256 proves integrity only; publisher/source approval is a later live gate.
     """
     if (type(expected_sha256) is not str or not SHA64.fullmatch(expected_sha256)
-            or type(source_commit) is not str or not SHA40.fullmatch(source_commit)):
+            or (source_commit is not None and
+                (type(source_commit) is not str or not SHA40.fullmatch(source_commit)))):
         raise UnifiedDeploymentError("PACKAGE_PROVENANCE_FORMAT_INVALID")
     if (not isinstance(archive_path, Path) or archive_path.is_symlink()
             or not archive_path.is_file() or archive_path.stat().st_size > MAX_PACKAGE_BYTES):
@@ -148,16 +151,26 @@ def verify_host_only_package(
             expected_fields = {"schema", "name", "kind", "version", "source_commit", "target", "files"}
             if kind == "fpga-image":
                 expected_fields.add("fpga_pair")
-            if (set(manifest) != expected_fields or manifest["schema"] != PACKAGE_SCHEMA
+            permitted_fields = (expected_fields, expected_fields | {"actions"})
+            if (set(manifest) not in permitted_fields or manifest["schema"] != PACKAGE_SCHEMA
                     or kind not in PACKAGE_KINDS
                     or type(manifest["name"]) is not str or not SAFE_NAME.fullmatch(manifest["name"])
                     or type(manifest["version"]) is not str or not SAFE_VERSION.fullmatch(manifest["version"])
-                    or manifest["source_commit"] != source_commit
+                    or type(manifest["source_commit"]) is not str
+                    or not SHA40.fullmatch(manifest["source_commit"])
+                    or (source_commit is not None and manifest["source_commit"] != source_commit)
                     or not isinstance(manifest["target"], dict)
                     or manifest["target"] != dict(target_profile)
                     or not isinstance(manifest["files"], list)
                     or not 1 <= len(manifest["files"]) <= MAX_PACKAGE_FILES):
                 raise UnifiedDeploymentError("PACKAGE_MANIFEST_CONTENT_DENIED")
+            actions = manifest.get("actions", [])
+            if ("actions" in manifest and
+                    (type(actions) is not list or not 1 <= len(actions) <= 4
+                     or any(type(action) is not str or action not in PACKAGE_ACTIONS
+                            for action in actions)
+                     or len(set(actions)) != len(actions))):
+                raise UnifiedDeploymentError("PACKAGE_ACTIONS_DENIED")
             verified_files = []
             for entry in manifest["files"]:
                 if (not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size", "executable"}
@@ -197,8 +210,9 @@ def verify_host_only_package(
                         or any(entry.executable for entry in verified_files)):
                     raise UnifiedDeploymentError("PACKAGE_FPGA_PAIR_DENIED")
             return VerifiedPackage(
-                manifest["name"], kind, manifest["version"], source_commit,
+                manifest["name"], kind, manifest["version"], manifest["source_commit"],
                 expected_sha256, tuple(verified_files), dict(target_profile),
+                actions=tuple(actions),
             )
     except (OSError, zipfile.BadZipFile, UnicodeDecodeError, json.JSONDecodeError,
             KeyError, TypeError, ValueError) as exc:
