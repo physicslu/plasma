@@ -216,6 +216,34 @@ export function commitManagerPpuBootstrapUpload(alias: string, uploadId: string)
   });
 }
 
+export function admitManagerPpuBundle(
+  alias: string,
+  uploadId: string,
+): Promise<DeploymentPayload> {
+  if (!/^[0-9a-f]{32}$/.test(uploadId)) {
+    return Promise.reject(new Error("Invalid Bundle upload ID"));
+  }
+  // Browser -> existing BFF -> Manager -> the same PPU Bootstrap API.
+  // Do not add a device credential or an install/activate flag.
+  return jsonRequest<DeploymentPayload>(`${root(alias)}/deployments`, {
+    method: "POST",
+    body: JSON.stringify({ kind: "bundle", upload_id: uploadId }),
+  }).then(receipt => {
+    const deployment = receipt.deployment;
+    const result = deployment?.result;
+    const plan = result && typeof result === "object"
+      ? (result.plan as Record<string, unknown> | undefined) : undefined;
+    if (deployment?.state !== "admitted" ||
+        result?.stage !== "package_admission_only" ||
+        result?.install_qualified !== false ||
+        plan?.kind !== "bundle" ||
+        plan?.execution_permitted !== false) {
+      throw new Error("Bundle admission receipt does not prove non-execution");
+    }
+    return receipt;
+  });
+}
+
 export function startManagerPpuBootstrapDeployment(
   alias: string,
   input: { upload_id: string; ppu_id: string; facility_id: string; display_name: string },

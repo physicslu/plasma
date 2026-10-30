@@ -457,6 +457,37 @@ class ManagerBootstrapCoordinator:
 
     def start_deployment(self, alias: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
         _normalized, record, client, _payload, _device_id, token = self._authenticated(alias)
+        # A Bundle uses the same authenticated Bootstrap transaction endpoint,
+        # but does NOT acquire install authority from the Manager pairing token.
+        if body.get("kind") == "bundle":
+            if set(body) != {"kind", "upload_id"}:
+                raise BootstrapManagerError("generic Bundle requires only kind and upload_id")
+            upload_id = body["upload_id"]
+            if (type(upload_id) is not str or len(upload_id) != 32
+                    or any(ch not in "0123456789abcdef" for ch in upload_id)):
+                raise BootstrapManagerError("generic Bundle upload_id is invalid")
+            status, response = client.start_deployment(token, {
+                "kind": "bundle", "upload_id": upload_id,
+            })
+            deployment = response.get("deployment") if isinstance(response, dict) else None
+            result = deployment.get("result") if isinstance(deployment, dict) else None
+            plan = result.get("plan") if isinstance(result, dict) else None
+            if (
+                status != 200 or response.get("ok") is not True
+                or not isinstance(deployment, dict)
+                or deployment.get("state") != "admitted"
+                or not isinstance(result, dict)
+                or result.get("stage") != "package_admission_only"
+                or result.get("install_qualified") is not False
+                or not isinstance(plan, dict)
+                or plan.get("kind") != "bundle"
+                or plan.get("execution_permitted") is not False
+            ):
+                raise BootstrapManagerError(
+                    "generic Bundle admission response is not non-executing"
+                )
+            return status, response
+
         allowed = {"upload_id", "ppu_id", "facility_id", "display_name"}
         unexpected = set(body) - allowed
         if unexpected:
