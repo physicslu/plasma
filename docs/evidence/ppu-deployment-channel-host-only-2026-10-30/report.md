@@ -169,3 +169,45 @@ reported **172 passed, 26 subtests passed**. GitHub-hosted evidence for this
 incremental correction must be checked on its own eventual commit. No formal
 server authorization, scheduler fence, generic product installation, or
 hardware qualification is inferred from these tests.
+
+### Exact-code-commit CI and Gate 2 readiness matrix
+
+The per-kind correction was published as code commit
+`7a6e1482408751805189d819e6c197aff72cc5db` (parent
+`d3e2d3e32dd327d5fb553f6b41d947dd15eacbc9`, non-force expected-SHA
+update). On this exact code commit, GitHub-hosted Python Run
+[`41004918189`](https://github.com/physicslu/plasma/actions/runs/41004918189/job/123897527658)
+reported **2841 passed, 12 skipped, 5676 subtests passed** in the full suite.
+Its focused step separately reported:
+
+| Loopback method | GitHub-hosted Linux result |
+| --- | --- |
+| `test_authenticated_http_python` | **PASS** |
+| `test_authenticated_http_native_c` | **PASS** |
+| `test_authenticated_http_fpga_image` | **PASS** |
+
+The focused step reported **3 passed, 12 deselected, 0 skipped**. The full
+suite's 12 skipped tests are separate; they are not counted as passing.
+Repository contracts documentation, route, and terminology jobs in Run
+[`41004917985`](https://github.com/physicslu/plasma/actions/runs/41004917985)
+all passed. Bootstrap script, QEMU simulation, Z2 runtime-kit build, and other
+applicable checks on this code commit passed; QEMU and build results do not
+prove physical Z2 execution.
+
+| Gate 2 item | Status | Evidence / remaining dependency |
+| --- | --- | --- |
+| Public generic API client and three loopback kinds | **PASS (Host-only)** | `scripts/ppu_deploy_api.py` public `submit()` and `software/python/tests/test_ppu_package_api_bridge_gate1.py`; Python Run `41004918189`. |
+| API/Coordinator Lock, Journal, receipt and simulated Rollback | **PASS (Host-only)** | Existing bridge and generic package regression tests in Python Run `41004918189`; no product install claim. |
+| Live TLS, authenticated Master/publisher/source/replay policy | **BLOCKED** | `scripts/ppu-bootstrap-service.py` still uses commissioning Bearer/HTTP; generic admission remains test-only. |
+| Atomic production eight-Site Job fence and hardware quiescence | **BLOCKED** | `software/python/plasma_server/site_manager.py` and `scripts/ppu-bootstrap-deployment.py` have no shared production exclusion or hardware quiescence proof. |
+| Generic on-device activation and cross-host recovery | **BLOCKED** | Current installed installer is PS Runtime-only; generic Coordinator staging is temporary Host-only sandbox. |
+| FPGA Image/Manifest/HWH/ABI, Root Guard and Golden recovery integration | **NOT_VERIFIED** | Root guard remains separate; inert FPGA fixture and QEMU do not qualify it. |
+| PR #1215 dual-client architecture/document index reconciliation | **BLOCKED** | #1215 is still Draft and also edits `docs/README.md`; no production client cutover claim. |
+
+**Host-only Gate 2 readiness: NOT MET.** The minimum remaining dependencies
+are trusted on-device TLS/authentication with revocation and publisher/source
+admission; a real shared scheduler/Coordinator fence with eight-Site and
+hardware quiescence authority; and bounded generic activation/recovery through
+the existing on-device deployment components. Keep the live generic path
+fail-closed until these are implemented and independently tested. No service
+activation, deployment, hardware action, or merge occurred in this Gate 1.
