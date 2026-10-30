@@ -48,7 +48,7 @@ MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 DEPLOYMENT_API_IN_FLIGHT_STATES = {"queued", "running"}
-DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "failed", "recovery_required"}
+DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "admitted", "failed", "recovery_required"}
 COORDINATOR_SAFE_RESTART_STATES = {
     "runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed",
 }
@@ -586,7 +586,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             record = {
                 "schema_version": 1,
                 "transaction_id": transaction_id,
-                "state": "succeeded",
+                "state": "admitted",
                 "upload_id": upload_id,
                 "started_at_epoch_s": now,
                 "updated_at_epoch_s": now,
@@ -806,7 +806,7 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     return
             if path == "/v1/deployments":
                 record = self.owner.start_deployment(body)
-                status = (HTTPStatus.OK if record.get("result", {}).get("stage") == "package_admission_only"
+                status = (HTTPStatus.OK if (record.get("result") or {}).get("stage") == "package_admission_only"
                           else HTTPStatus.ACCEPTED)
                 self._json(status, {"ok": True, "deployment": record})
                 return

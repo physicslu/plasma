@@ -62,7 +62,7 @@ def test_real_http_accepts_manifest_actions_without_install(loopback, tmp_path, 
                               alterations={"actions": ["install", "verify", "activate"]})
     upload_id = api.upload(archive.read_bytes())
     submission = api.submit(kind=kind, upload_id=upload_id)
-    assert submission.state == "succeeded"
+    assert submission.state == "admitted"
     receipt = api.deployment_state(submission.transaction_id)
     result = receipt["result"]
     plan = result["plan"]

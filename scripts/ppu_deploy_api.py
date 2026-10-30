@@ -27,7 +27,7 @@ _MAX_UPLOAD = 512 * 1024 * 1024
 _MAX_JSON = 2 * 1024 * 1024
 _HEX32 = re.compile(r"[a-f0-9]{32}\Z")
 _HEX64 = re.compile(r"[a-f0-9]{64}\Z")
-_TERMINAL = frozenset({"succeeded", "failed", "recovery_required"})
+_TERMINAL = frozenset({"succeeded", "admitted", "failed", "recovery_required"})
 _INFLIGHT = frozenset({"queued", "running"})
 
 
@@ -240,7 +240,7 @@ class BootstrapAPIClient:
         if kind == "ppu-runtime":
             if state not in _INFLIGHT:
                 raise DeploymentOutcomeUnknown("API_SUBMISSION_RECEIPT_UNKNOWN")
-        elif (state != "succeeded" or not isinstance(receipt.get("result"), dict)
+        elif (state != "admitted" or not isinstance(receipt.get("result"), dict)
               or receipt["result"].get("result") != "PASS"
               or receipt["result"].get("stage") != "package_admission_only"
               or receipt["result"].get("install_qualified") is not False):
@@ -262,6 +262,12 @@ class BootstrapAPIClient:
             evidence = receipt.get("result")
             if not isinstance(evidence, dict) or evidence.get("result") != "PASS":
                 raise DeploymentOutcomeUnknown("API_SUCCESS_EVIDENCE_MISSING")
+        if receipt["state"] == "admitted":
+            evidence = receipt.get("result")
+            if (not isinstance(evidence, dict) or evidence.get("result") != "PASS"
+                    or evidence.get("stage") != "package_admission_only"
+                    or evidence.get("install_qualified") is not False):
+                raise DeploymentOutcomeUnknown("API_ADMISSION_EVIDENCE_MISSING")
         return receipt
 
     def status(self) -> dict[str, Any]:

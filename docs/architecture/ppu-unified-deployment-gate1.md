@@ -200,7 +200,9 @@ The existing Bootstrap `/v1/uploads` and `/v1/deployments` endpoints accept
 single-kind `plasma.ppu.package.v1` ZIP archives for **receive, verify and plan
 only**. `python`, `native-c` and `fpga-image` generic submissions return a
 durable `deployment-api.json` admission receipt with a non-caller-selected
-transaction ID and `stage=package_admission_only`. The PPU verifies the
+transaction ID, terminal `state=admitted` and `stage=package_admission_only`.
+This state is intentionally distinct from `succeeded` (an actual runtime
+installation success). The PPU verifies the
 committed archive SHA256, strict Manifest schema, per-file SHA256, safe paths,
 exact package kind and target compatibility against an operator-provisioned,
 private `--package-target-file` (default `/etc/plasma/ppu-package-target.json`).
