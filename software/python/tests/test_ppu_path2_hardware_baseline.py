@@ -174,3 +174,43 @@ def test_no_unsafe_installer_or_device_operation_source_contract():
     assert "sudo " not in body
     assert "fpga_manager" not in body
     assert "systemctl" not in body
+
+
+def test_read_only_physical_probe_reports_version_but_not_installer_or_b1(monkeypatch):
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    seen = []
+    responses = {
+        "/v1/health": {"ok": True, "service": "plasma-ppu-bootstrap", "api_version": "1"},
+        "/v1/status": {
+            "bootstrap": {"state": "bootstrap_ready", "version": "1.0", "api_version": "1"},
+            "identity": {"device_id": DEVICE},
+            "runtime": {"state": "runtime_active"},
+        },
+    }
+    def reader(path):
+        seen.append(path)
+        return responses[path]
+
+    result = baseline.probe_status("192.168.2.99", read_get=reader)
+    assert seen == ["/v1/health", "/v1/status"]
+    assert result["device_id_observed"] == DEVICE
+    assert result["bootstrap_version_observed"] == "1.0"
+    assert result["installed_verifier_source_sha"] == "NOT_ATTESTED"
+    assert result["b1"] == result["b2_v2"] == "NOT_RUN"
+    assert result["install"] == result["fpga"] == result["dut"] == "NOT_RUN"
+
+
+def test_probe_denies_spoofed_identity_and_unknown_host(monkeypatch):
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    assert baseline._private_ipv4("192.168.2.99") == "192.168.2.99"
+    with pytest.raises(baseline.BaselineError, match="PPU_ALLOWED_IP_PIN"):
+        baseline._private_ipv4("192.168.2.98")
+    with pytest.raises(baseline.BaselineError, match="PPU_PROBE_IDENTITY_INVALID"):
+        baseline.probe_status("192.168.2.99", read_get=lambda p: {
+            "/v1/health": {"service": "plasma-ppu-bootstrap"},
+            "/v1/status": {
+                "bootstrap": {"state": "bootstrap_ready"},
+                "identity": {"device_id": "fake-device"},
+                "runtime": {"state": "runtime_active"},
+            },
+        }[p])
