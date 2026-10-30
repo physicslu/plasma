@@ -33,6 +33,9 @@
 
 ## Engineering governance and execution paths
 
+- **Gate 1R Draft / Host-only only** — [SWD per-Site Crash Recovery Journal candidate](development/swd-site-crash-recovery-gate1r-host.md)：持久化 Intent／UNCERTAIN、模擬 Native C Session Atomic Execute；未接入可信 Root／真實 SWD FIFO，不具備部署或自動恢復資格。
+
+
 - **Gate 1 Draft / Host-only / PR #1202** — [Root Guard 燒錄 Session 與 FPGA Configuration 准入分離](development/root-guard-runtime-program-split-2026-10-29.md)：正常燒錄取消全系統 `/proc` FD／VMA 完整掃描，保留裝置限定 `fuser`、全域 FPGA 鎖、Image／Boot／UIO Guard；FPGA Download／Test／Restore 持續嚴格掃描。尚未部署、合併或實機驗收，亦非八通道 Broker 已完成。
 
 
