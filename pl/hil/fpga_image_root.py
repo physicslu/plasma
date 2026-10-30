@@ -283,13 +283,15 @@ def _digest(data: object) -> str:
 
 
 def live_report(port: guard.RootZ2TargetPort, release: ImageManifest,
-                image: str, *, previous_image: str | None = None) -> dict:
+                image: str, *, previous_image: str | None = None,
+                require_mmio: bool = True) -> dict:
     need(image in (release.recovery_name, release.firmware_name) or
          (previous_image is not None and image == previous_image),
          "IMAGE_NOT_IN_MANIFEST")
     report = admission.collect_live(root_port=port, release=release,
                                     expected_firmware=image,
-                                    previous_firmware=previous_image)
+                                    previous_firmware=previous_image,
+                                    require_mmio=require_mmio)
     need(report["expected_manager_firmware"] == image and
          port.image_sha256("candidate") == release.firmware_sha256 and
          port.image_sha256("recovery") == release.recovery_sha256,
@@ -361,9 +363,11 @@ def _confirm_current(port, release: ImageManifest, record: dict | None,
         # loaded. The protected journal + current-boot Manager record anchor
         # the held Image; only the incoming B BIN and Golden are rehashed.
         report = live_report(port, release, expected,
-                             previous_image=expected)
+                             previous_image=expected,
+                             require_mmio=operation == "test")
     else:
-        report = live_report(port, release, expected)
+        report = live_report(port, release, expected,
+                             require_mmio=operation == "test")
     if record is None or different:
         fresh = _initial_state(report, release)
         if record is not None and record["status"] == "IMAGE":
@@ -394,7 +398,8 @@ def run(operation: str) -> dict:
                 need(manifest_sha256() == record["manifest_sha256"],
                      "MANIFEST_CHANGED_IN_FLIGHT")
                 guard.manager_write(release.firmware_name)
-                after = live_report(port, release, release.firmware_name)
+                after = live_report(port, release, release.firmware_name,
+                                    require_mmio=False)
                 record.update(status="IMAGE", image=release.firmware_name,
                               download_count=record["download_count"] + 1,
                               evidence_sha256=_digest(after))
@@ -437,7 +442,8 @@ def run(operation: str) -> dict:
                          release.site_bitmap, "IDENTITY_CHILD_SITE_MISMATCH")
                 need(manifest_sha256() == record["manifest_sha256"],
                      "MANIFEST_CHANGED_IN_FLIGHT")
-                after = live_report(port, release, release.firmware_name)
+                after = live_report(port, release, release.firmware_name,
+                                    require_mmio=True)
                 record.update(status="IMAGE", test_count=record["test_count"] + 1,
                               evidence_sha256=_digest({"target": after,
                                                        "identity": result}))
@@ -461,7 +467,8 @@ def run(operation: str) -> dict:
             need(manifest_sha256() == record["manifest_sha256"],
                  "MANIFEST_CHANGED_IN_FLIGHT")
             guard.manager_write(release.recovery_name)
-            after = live_report(port, release, release.recovery_name)
+            after = live_report(port, release, release.recovery_name,
+                                require_mmio=False)
             record.update(status="RECOVERY", image=release.recovery_name,
                           restore_count=record["restore_count"] + 1,
                           evidence_sha256=_digest(after))

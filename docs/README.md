@@ -18,6 +18,7 @@
 ## Current external SWD PoC vs retired internal fixtures
 
 - **Current** — Z2 PS-local OpenOCD + WordPort/RemoteBitbang + paired PL SWD Image for Blue Pill: see root `AGENTS.md`, [PS OpenOCD architecture](architecture/ic-support-openocd-plan-executor.md), [retirement map](development/swd-legacy-path-retirement.md).
+- **Gate 1 / Draft / Host-only** — [Z2 FPGA six-check admission](deployment/z2-minimal-six-check-admission.md)：FPGA Manager 載入與 MMIO admission 分時檢查；真實 Owner、ABI 與 HIL 尚未驗收。
 - **Historical / retired for real Blue Pill:** `z2-swd-gpio` PS EMIO GPIO and `z2-swd03-axi` internal synthetic DPIDR. SWD-04/05 archived fixtures are not current external target operations.
 
 ## Architecture Decision Records
