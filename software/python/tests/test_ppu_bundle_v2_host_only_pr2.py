@@ -232,3 +232,27 @@ def test_bundle_v2_no_implicit_exec_or_fpga_load(tmp_path):
     assert "FPGA load" in result["not_claimed"]
     assert not co.paths.product_root.exists()
     assert not co.paths.systemd_root.exists()
+
+
+def test_bundle_v2_client_fails_closed_for_incomplete_receipt():
+    from .test_ppu_package_receive_admission_pr1 import client
+    base_plan = {
+        "kind": "bundle", "archive_sha256": "a" * 64,
+        "execution_permitted": False, "requested_actions": [],
+        "files": [], "purpose": "diagnostics",
+        "components": [],
+    }
+    receipt = {
+        "state": "admitted", "result": {
+            "result": "PASS", "stage": "package_admission_only",
+            "install_qualified": False, "plan": base_plan,
+        },
+    }
+    assert not client._valid_package_admission(receipt, kind="bundle")
+    base_plan["components"] = [
+        {"id": "same", "kind": "ic-catalog", "version": "1",
+         "requires": [], "files": ["payload/components/same/data/catalog.json"]},
+        {"id": "same", "kind": "profile", "version": "1",
+         "requires": [], "files": ["payload/components/same/data/profile.json"]},
+    ]
+    assert not client._valid_package_admission(receipt, kind="bundle")
