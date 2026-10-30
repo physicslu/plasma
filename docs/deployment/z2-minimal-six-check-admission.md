@@ -51,3 +51,25 @@ No new deployment framework, extra supervisor/relay, production TLS or publisher
 - No MMIO transaction occurs without G5–G6.
 - UIO enumeration changes alone cannot create false authorization or false denial when stable device identity is proven.
 - Golden/previous-image restore remains verifiable; failures report the earliest actual cause.
+
+## Verified root call chain (main @ a22c9cb0)
+
+Source audit: `pl/hil/fpga_image_root.py`, `pl/hil/fpga_image_admission.py`, `pl/hil/fpga_image_guard.py`, and `scripts/tests/test_fpga_image_root.py`.
+
+- `run(download|test|restore)` -> `_confirm_current()` -> `live_report()` -> `admission.collect_live()` -> `check_exact()`.
+- All three operations currently share the same strict UIO/IRQ/platform-owner and process-census admission. Thus a candidate's UIO mismatch blocks **before** `manager_write()`.
+- `download` writes `DOWNLOAD_IN_FLIGHT` before `guard.manager_write(candidate)`, then checks `live_report(candidate)`; failure records `UNKNOWN`. `restore` uses the corresponding guarded state path. The `UNKNOWN` fail-closed behavior must remain.
+- `test` uses an identity child after `IMAGE` state; this is a distinct MMIO stage. `live_program_session_report()` separately uses `runtime_program_session=True` and must not be used as a shortcut to authorize FPGA reload.
+- `guard.manager_write()` writes only a firmware basename through Linux FPGA Manager, then checks `operating` and current-boot load provenance. It does not itself require UIO; the admission caller does.
+- `read_image_manifest()` currently mandates `uio_name` and `expected_uio` with an exact index, so fixing only `check_exact()` would leave the schema and identity-child callers inconsistent.
+
+## Minimal code-change boundaries
+
+1. Keep `trusted_local()`, `read_image_manifest()` board/hash validation, `RootZ2TargetPort.exclusive()`, process-conflict prevention, `_confirm_current()` checkpoint and `UNKNOWN` state behavior.
+2. Introduce a **pre-load fact check** for G1–G4, using real kernel facts and image/recovery checks without requiring an already-active *candidate* UIO mapping. Do not confuse an old Golden mapping with the candidate's post-load mapping.
+3. Before `manager_write(candidate)`, establish a working protected restoration route. A file hash and Manager `operating` alone are insufficient.
+4. After load, re-enumerate Device Tree/UIO and validate G5–G6 **before** launching the identity child or SWD driver. Resolve by physical aperture and verified platform owner; reject ambiguous overlaps.
+5. Preserve strict legacy behavior for existing callers until a new implementation and negative tests are in place. Do not silently change the meaning of `collect_live()` for WordPort/program sessions.
+6. Add tests proving: wrong UIO index but correct proven owner does not falsely fail; wrong owner/base/size and competing consumers do fail; load rejection does not write Manager; a post-load MMIO failure leaves state `UNKNOWN` and does not pretend automatic restore succeeded.
+
+**Current implementation status:** call graph audited; code change and regression execution NOT DONE. This audit alone does not authorize a Z2 FPGA load.
