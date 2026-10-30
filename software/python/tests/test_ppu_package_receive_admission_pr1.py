@@ -168,3 +168,70 @@ def test_generic_requires_control_token(loopback, tmp_path):
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:401"):
         bad.upload(archive.read_bytes())
     assert not paths.deployment_record.exists()
+
+
+@pytest.mark.parametrize("malformed_kind", [[], ["python"], {}, {"kind": "python"}])
+def test_http_unhashable_kind_is_rejected_without_losing_service(loopback, tmp_path, malformed_kind):
+    api, paths, server = loopback
+    archive, _ = package(tmp_path, "wordport", "python",
+                         {"payload/python/wordport.py": b"# valid"})
+    upload_id = api.upload(archive.read_bytes())
+    with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
+        api._call("POST", "/v1/deployments", {"kind": malformed_kind, "upload_id": upload_id})
+    assert not paths.deployment_record.exists()
+    assert server.deployment_thread is None
+    valid = api.submit(kind="python", upload_id=upload_id)
+    assert valid.state == "admitted"
+
+
+def test_client_rejects_admission_without_a_nonexecuting_plan():
+    transaction_id = "a" * 32
+    upload_id = "b" * 32
+
+    def fake_transport(method, path, data, headers):
+        # A compromised or buggy server may claim "admitted" without a plan.
+        receipt = {
+            "transaction_id": transaction_id, "state": "admitted",
+            "upload_id": upload_id, "result": {
+                "result": "PASS", "stage": "package_admission_only",
+                "install_qualified": False,
+                "plan": {"kind": "python", "execution_permitted": True},
+            },
+        }
+        if path in ("/v1/deployments", "/v1/deployment"):
+            return 200, json.dumps({"ok": True, "deployment": receipt}).encode()
+        raise AssertionError(path)
+
+    api = client.BootstrapAPIClient(
+        "https://ppu.host-only.invalid:18081", TOKEN, transport=fake_transport,
+    )
+    with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_RECEIPT_UNKNOWN"):
+        api.submit(kind="python", upload_id=upload_id)
+    with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_EVIDENCE_MISSING"):
+        api.deployment_state(transaction_id)
+
+
+def test_client_rejects_incorrect_kind_in_admission_receipt():
+    transaction_id = "a" * 32
+    upload_id = "b" * 32
+
+    def fake_transport(method, path, data, headers):
+        receipt = {
+            "transaction_id": transaction_id, "state": "admitted",
+            "upload_id": upload_id, "result": {
+                "result": "PASS", "stage": "package_admission_only",
+                "install_qualified": False,
+                "plan": {
+                    "kind": "fpga-image", "execution_permitted": False,
+                    "archive_sha256": "f" * 64, "files": [],
+                    "requested_actions": [],
+                },
+            },
+        }
+        return 200, json.dumps({"ok": True, "deployment": receipt}).encode()
+
+    api = client.BootstrapAPIClient(
+        "https://ppu.host-only.invalid:18081", TOKEN, transport=fake_transport,
+    )
+    with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_RECEIPT_UNKNOWN"):
+        api.submit(kind="python", upload_id=upload_id)

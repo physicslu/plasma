@@ -537,7 +537,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         if set(body) != {"kind", "upload_id"}:
             raise BootstrapServiceError("PACKAGE_REQUEST_FIELDS_DENIED")
         kind, upload_id = body["kind"], body["upload_id"]
-        if kind not in {"python", "native-c", "fpga-image"}:
+        if type(kind) is not str or kind not in {"python", "native-c", "fpga-image"}:
             raise BootstrapServiceError("PACKAGE_KIND_DENIED")
         if type(upload_id) is not str or not UPLOAD_ID_RE.fullmatch(upload_id):
             raise BootstrapServiceError("PACKAGE_UPLOAD_ID_DENIED")
@@ -603,7 +603,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             return record
 
     def start_deployment(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        if body.get("kind") in {"python", "native-c", "fpga-image"}:
+        if type(body.get("kind")) is str and body["kind"] in {"python", "native-c", "fpga-image"}:
             return self.admit_package(body)
         request = _deployment_request(body)
         upload_id = request["upload_id"]

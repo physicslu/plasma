@@ -79,6 +79,29 @@ def _bounded_json(raw: bytes, *, expected: bool = True) -> dict[str, Any]:
     return obj
 
 
+def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = None) -> bool:
+    """An admitted package is verified, never installed or executable."""
+    result = receipt.get("result")
+    if (receipt.get("state") != "admitted"
+            or not isinstance(result, dict)
+            or result.get("result") != "PASS"
+            or result.get("stage") != "package_admission_only"
+            or result.get("install_qualified") is not False):
+        return False
+    plan = result.get("plan")
+    return (
+        isinstance(plan, dict)
+        and plan.get("execution_permitted") is False
+        and type(plan.get("kind")) is str
+        and plan["kind"] in {"python", "native-c", "fpga-image"}
+        and (kind is None or plan["kind"] == kind)
+        and type(plan.get("archive_sha256")) is str
+        and _HEX64.fullmatch(plan["archive_sha256"]) is not None
+        and isinstance(plan.get("files"), list)
+        and isinstance(plan.get("requested_actions"), list)
+    )
+
+
 @dataclass(frozen=True)
 class DeploymentSubmission:
     upload_id: str
@@ -240,10 +263,7 @@ class BootstrapAPIClient:
         if kind == "ppu-runtime":
             if state not in _INFLIGHT:
                 raise DeploymentOutcomeUnknown("API_SUBMISSION_RECEIPT_UNKNOWN")
-        elif (state != "admitted" or not isinstance(receipt.get("result"), dict)
-              or receipt["result"].get("result") != "PASS"
-              or receipt["result"].get("stage") != "package_admission_only"
-              or receipt["result"].get("install_qualified") is not False):
+        elif not _valid_package_admission(receipt, kind=kind):
             raise DeploymentOutcomeUnknown("API_ADMISSION_RECEIPT_UNKNOWN")
         return DeploymentSubmission(upload_id, tx, state)
 
@@ -262,12 +282,8 @@ class BootstrapAPIClient:
             evidence = receipt.get("result")
             if not isinstance(evidence, dict) or evidence.get("result") != "PASS":
                 raise DeploymentOutcomeUnknown("API_SUCCESS_EVIDENCE_MISSING")
-        if receipt["state"] == "admitted":
-            evidence = receipt.get("result")
-            if (not isinstance(evidence, dict) or evidence.get("result") != "PASS"
-                    or evidence.get("stage") != "package_admission_only"
-                    or evidence.get("install_qualified") is not False):
-                raise DeploymentOutcomeUnknown("API_ADMISSION_EVIDENCE_MISSING")
+        if receipt["state"] == "admitted" and not _valid_package_admission(receipt):
+            raise DeploymentOutcomeUnknown("API_ADMISSION_EVIDENCE_MISSING")
         return receipt
 
     def status(self) -> dict[str, Any]:
