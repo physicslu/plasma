@@ -50,6 +50,24 @@ Expected ownership:
 /etc/systemd/system/plasma-bootstrap.service
 ```
 
+The factory bundle must contain `scripts/ppu_unified_deployment.py` together
+with `ppu-bootstrap-service.py`. The existing factory installer copies both
+to `/opt/plasma/bootstrap/`, allowing the Package Admission code merged in
+PR #1219 to load its verifier directly from the installed Bootstrap directory.
+The Factory Installer does **not** automatically create a board identity file,
+install a generic Package, activate anything or modify Runtime/FPGA.
+
+Before generic Package Admission, the operator must independently verify the
+specific device's board/FPGA identity, then explicitly provision
+`/etc/plasma/ppu-package-target.json` as a root-owned regular file with mode
+`0600`, containing exactly `platform`, `board` and `fpga_part`. An absent,
+untrusted or mismatched target profile fails closed. This is a local device
+enrollment responsibility, not a property claimed by a remote Manifest.
+See the [physical admission transcript](../evidence/ppu-package-admission-2026-10-30/README.md)
+for the bounded real-Z2 evidence and limitations. The current commissioning
+HTTP service does not qualify TLS confidentiality or publisher authenticity;
+the SWPC production HTTPS Client must not silently downgrade to HTTP.
+
 A clean factory install must not create `/opt/plasma/current`.
 
 Provision the device-local pairing token separately:

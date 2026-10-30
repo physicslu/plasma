@@ -26,6 +26,7 @@ REQUIRED_SCRIPTS = (
     "ppu-bootstrap-service.py",
     "ppu-bootstrap-deployment.py",
     "ppu-bootstrap-kit.py",
+    "ppu_unified_deployment.py",
 )
 
 
@@ -52,12 +53,14 @@ def _load_base(path: Path):
 
 def _copy_scripts(source_root: Path, install_root: Path) -> None:
     source_root = source_root.resolve()
+    # Reject an incomplete bundle before touching a previously installed service.
+    for name in REQUIRED_SCRIPTS:
+        if not (source_root / name).is_file():
+            raise BootstrapInstallError(f"factory bundle is missing required script: {name}")
     install_root.mkdir(parents=True, exist_ok=True)
     install_root.chmod(0o755)
     for name in REQUIRED_SCRIPTS:
         source = source_root / name
-        if not source.is_file():
-            raise BootstrapInstallError(f"factory bundle is missing required script: {name}")
         destination = install_root / name
         temporary = destination.with_name(destination.name + ".new")
         shutil.copyfile(source, temporary)
