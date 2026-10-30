@@ -537,7 +537,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         if set(body) != {"kind", "upload_id"}:
             raise BootstrapServiceError("PACKAGE_REQUEST_FIELDS_DENIED")
         kind, upload_id = body["kind"], body["upload_id"]
-        if type(kind) is not str or kind not in {"python", "native-c", "fpga-image"}:
+        if type(kind) is not str or kind not in {"python", "native-c", "fpga-image", "bundle"}:
             raise BootstrapServiceError("PACKAGE_KIND_DENIED")
         if type(upload_id) is not str or not UPLOAD_ID_RE.fullmatch(upload_id):
             raise BootstrapServiceError("PACKAGE_UPLOAD_ID_DENIED")
@@ -561,7 +561,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 "plasma_ppu_package_admission_contract",
             )
             try:
-                verified = contract.verify_host_only_package(
+                verified = contract.verify_host_only_artifact(
                     upload.committed, expected_sha256=meta["sha256"],
                     source_commit=None, target_profile=target,
                 )
@@ -583,6 +583,14 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 "requested_actions": list(verified.actions),
                 "execution_permitted": False,
             }
+            if verified.kind == "bundle":
+                plan["purpose"] = verified.purpose
+                plan["components"] = [
+                    {"id": c.id, "kind": c.kind, "version": c.version,
+                     "requires": list(c.requires),
+                     "files": [f.path for f in c.files]}
+                    for c in verified.components
+                ]
             record = {
                 "schema_version": 1,
                 "transaction_id": transaction_id,
@@ -603,7 +611,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             return record
 
     def start_deployment(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        if type(body.get("kind")) is str and body["kind"] in {"python", "native-c", "fpga-image"}:
+        if type(body.get("kind")) is str and body["kind"] in {"python", "native-c", "fpga-image", "bundle"}:
             return self.admit_package(body)
         request = _deployment_request(body)
         upload_id = request["upload_id"]
