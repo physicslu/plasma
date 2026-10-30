@@ -89,7 +89,7 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
             or result.get("install_qualified") is not False):
         return False
     plan = result.get("plan")
-    return (
+    valid = (
         isinstance(plan, dict)
         and plan.get("execution_permitted") is False
         and type(plan.get("kind")) is str
@@ -99,6 +99,23 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
         and _HEX64.fullmatch(plan["archive_sha256"]) is not None
         and isinstance(plan.get("files"), list)
         and isinstance(plan.get("requested_actions"), list)
+    )
+    if not valid:
+        return False
+    if plan["kind"] != "bundle":
+        return True
+    components = plan.get("components")
+    return (
+        type(plan.get("purpose")) is str and bool(plan["purpose"])
+        and type(components) is list and 1 <= len(components) <= 32
+        and all(isinstance(part, dict)
+                and type(part.get("id")) is str and bool(part["id"])
+                and type(part.get("kind")) is str and bool(part["kind"])
+                and type(part.get("version")) is str and bool(part["version"])
+                and type(part.get("requires")) is list
+                and type(part.get("files")) is list
+                for part in components)
+        and len({part["id"] for part in components}) == len(components)
     )
 
 
