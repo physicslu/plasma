@@ -20,7 +20,6 @@ from .test_ppu_generic_package_host_only_gate1 import (
 from .test_ppu_package_receive_admission_pr1 import loopback  # noqa: F401
 
 contract = load("ppu_pr2_bundle_v2_contract", "ppu_unified_deployment.py")
-engine = load("ppu_pr2_bundle_v2_coordinator", "ppu-bootstrap-deployment.py")
 
 PARTS = [
     ("ic-metadata", "ic-catalog", [], {
