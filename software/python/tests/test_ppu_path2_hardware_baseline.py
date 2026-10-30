@@ -214,3 +214,35 @@ def test_probe_denies_spoofed_identity_and_unknown_host(monkeypatch):
                 "runtime": {"state": "runtime_active"},
             },
         }[p])
+
+
+def test_path2_missing_private_credential_is_explicit_not_run_without_network(monkeypatch, capsys):
+    monkeypatch.setattr(baseline, "_git_head", lambda: SOURCE)
+    monkeypatch.delenv(baseline.TOKEN_ENV, raising=False)
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    result = baseline.main([
+        "--host", "192.168.2.99", "--device-id", DEVICE,
+        "--source-sha", SOURCE, "--platform", TARGET["platform"],
+        "--board", TARGET["board"], "--fpga-part", TARGET["fpga_part"],
+    ])
+    assert result == 69
+    out = capsys.readouterr().out
+    assert "PRIVATE_TOKEN_FILE_NOT_PROVISIONED" in out
+    assert '"result":"NOT_RUN"' in out
+    assert "BEARER" not in out
+
+
+def test_path2_untrusted_credential_file_denied_before_network(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(baseline, "_git_head", lambda: SOURCE)
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    token_file = tmp_path / "token"
+    token_file.write_text("t" * 48)
+    token_file.chmod(0o644)
+    monkeypatch.setenv(baseline.TOKEN_ENV, str(token_file))
+    result = baseline.main([
+        "--host", "192.168.2.99", "--device-id", DEVICE,
+        "--source-sha", SOURCE, "--platform", TARGET["platform"],
+        "--board", TARGET["board"], "--fpga-part", TARGET["fpga_part"],
+    ])
+    assert result == 69
+    assert "PRIVATE_TOKEN_FILE_UNSAFE" in capsys.readouterr().out
