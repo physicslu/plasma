@@ -39,6 +39,8 @@ Real Z2   = install / systemd-DAC / runtime / physical-host validation
 
 A CI PASS must never be reported as a Real Z2 PASS.
 
+> **Verification checkpoint:** The examples below include `scripts/plasmactl install z2-ps` / `deploy z2-ps` and describe release-kit behavior. Before treating them as current operator instructions, reconcile those exact commands against the active `scripts/plasmactl` implementation and PPU Deployment Engine transaction/rollback tests. Until verified, this document is a PS release-kit reference, not proof of the current SWPC→PPU production transport.
+
 ## Release identity and Python ownership
 
 PPU Release Identity v2 remains mandatory:
