@@ -157,3 +157,29 @@ Read all seven `docs/architecture/openocd-software-qualification-v*.md` document
 **Decision:** retain all seven as provenance-bearing versioned qualification records. Treat v7 as the current **umbrella reference for this bounded STM32F103 cohort**, v4 as its referenced medium-density authority, v5/v6 as historical. Do not infer that the v7 cohort is the entire current PLASMA catalog or supersedes unrelated provider manifests. Do not modify qualification counts or L2 entitlements during documentation cleanup.
 
 **Document cleanup candidate:** create a short navigation table linking v1–v7 with explicit scope/status, and add verified backlinks to the main documentation index. Do not rewrite immutable evidence or move these files without checking inbound links.
+
+## Owner scope revision — software development documentation first (WEB / PS / PL)
+
+**Current priority:** Reorganize the documentation used to implement and maintain the PLASMA programming system: **WEB**, embedded-Linux **PS**, FPGA **PL**, and their shared contracts. This is a bounded documentation-governance phase, not an IC Catalog migration.
+
+**Explicitly deferred:** IC Catalog, ICPN discovery, L0–L3 promotion, Provider/Programming Qualification, vendor acquisition/research, and Device Catalog CI workflow consolidation. Existing qualification-version navigation already added to the docs index is preserved, but no additional catalog edits should be made under this phase. Historical/evidence files remain untouched.
+
+### Domain entrypoints (verified tracked paths, not a full semantic audit)
+
+| Domain | Initial entrypoints | Audit focus |
+| --- | --- | --- |
+| WEB | `software/web/README.md`, `docs/architecture/web-rest-api-contract.md`, `docs/architecture/web-product-modes.md`, `docs/deployment/web-runtime-hygiene.md` | Frontend/runtime, REST contract, UI modes, deployment boundaries |
+| PS | `docs/development/linux-mmio-backend-v1.md`, `docs/deployment/z2-ps-installer.md`, `docs/development/mmio-lt02-ps-pl-loopback.md`, `docs/architecture/runtime-data-root-contract-v1.md` | Embedded Linux ownership, services, driver/MMIO, PS–PL bridge, installation and recovery |
+| PL | `docs/architecture/fixed-fpga-hardware-abi-v1-gate1.md`, `docs/architecture/fixed-fpga-swd-site1-rtl-gate1.md`, `docs/architecture/plasma-unified-fpga-build-diagnostics-v1.md`, `docs/development/swd06-rtl-python-differential.md` | FPGA RTL/IP, ABI, timing/build evidence, HIL and safety |
+| Shared | Root `AGENTS.md`, full development contract, `docs/adr/README.md`, `docs/README.md` | Single entrypoint, authoritative cross-domain contracts, references and status |
+
+**Rule:** A filename or historical Gate 1 title is not proof of current implementation. Verify code, test and accepted ADR before marking a document Current. Keep PS/PL interface and WEB/API boundaries consistent across domain indexes. Do not create new normative rules in a navigation document.
+
+### Next document-only deliverables
+
+1. WEB/PS/PL authority and cross-reference map, identifying canonical source for each implementation contract.
+2. Exact overlapping and conflicting clauses, with line-level evidence and proposed minimal edits.
+3. Smaller topical indexes with stable existing links; preserve documentation CI.
+4. Regression checks and a scoped Gate 2 report before any merge.
+
+No runtime code, device operations, workflow refactoring, qualification promotions or broad file deletions are in scope.
