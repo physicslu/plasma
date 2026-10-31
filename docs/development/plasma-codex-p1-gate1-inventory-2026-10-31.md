@@ -318,3 +318,9 @@ Batch 1 16-file scope remains unchanged. Continue link/implementation review bef
 Verified `scripts/plasmactl` routes integration-only `update`, `deploy`, `web-restart` to `scripts/plasmactl-integration`. The integration backend runs Vite via `plasma-vite.service`, checks `software/web/package-lock.json` before `npm ci`, and restarts only Vite for `web-restart`. Updated W04 to explicitly limit the runbook to SWPC integration; it does not prove product PPU network deployment. Corrected C03 ADR-0003 navigation label from the older dynamic-reconfiguration framing to fixed-image candidate framing, without changing ADR-0003's Proposed status.
 
 No per-file CI or hardware action performed. Remaining batch work: complete relative-link and evidence reconciliation, then the owner-directed consolidated CI review.
+
+## Frozen Batch 1 repository-relative Markdown link audit — 16/16
+
+At PR HEAD `924fe90910a34ea0c982c676eafbf2810a4e4746`, fetched the complete recursive Git tree (5,208 entries, `truncated=false`) and all 16 frozen documents. For Markdown inline links of form `[label](relative/path)`, resolved relative paths against each source directory and checked exact target paths in the HEAD Git tree. **Result: 16/16 checked; 0 missing target paths.** Counts by frozen ID: W01=4, W02=4, W03=0, W04=0, S01=3, S02=0, S03=3, S04=0, P01=6, P02=2, P03=1, P04=14, C01=8, C02=4, C03=264, C04=3. Total inline Markdown links inspected: **316** (includes anchors/external links, which are not checked for target existence). This check does not verify heading anchors, external HTTP URLs, reference-style links, or semantic accuracy.
+
+This is a **documentation-only static source audit**, not a CI execution. Preserve the owner instruction to defer consolidated CI until all 16 dispositions are complete. Final acceptance remains pending the other criteria.
