@@ -143,4 +143,4 @@ No 662-file content review, cross-reference graph, exact duplicate proof, or per
 4. ADR maintenance currently requires `docs/README.md` to track all `docs/**/*.md`; a future index split must preserve the documentation integrity guard rather than assuming a shorter index is harmless.
 5. Seven `openocd-software-qualification-v*.md` files are present, but no contents/backlinks have yet been compared; **no supersession claim** is justified.
 
-**Recommended minimal remediation, separate from authority redesign:** In the full contract, replace the legacy “primary operating contract / read it before every change” introductory paragraph with language consistent with the existing on-demand root entrypoint. Preserve the rest of the contract verbatim. This avoids a token-loading contradiction without reducing mandatory hardware or privilege controls.
+**Owner decision implemented:** Root `AGENTS.md` is the mandatory entrypoint. The old conflicting full-contract introduction was replaced with on-demand normative reference wording in commit `aa37f7eee2e992a91d5e8bdca1fb0295da006a52`. Applicable safety and hardware clauses remain mandatory.
