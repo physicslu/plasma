@@ -103,16 +103,10 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
     if not valid:
         return False
     if plan["kind"] != "bundle":
-        return True
-    # Reject ambiguous responses: v3 must NOT coexist with v2 fields.
-    schema = plan.get("bundle_schema")
-    if schema is None and "packages" not in plan:
-        field = "components"  # historical v2 response only
-    elif schema == "plasma.ppu.bundle.v3" and "components" not in plan:
-        field = "packages"
-    else:
         return False
-    packages = plan.get(field)
+    if plan.get("bundle_schema") != "plasma.ppu.bundle.v3" or "components" in plan:
+        return False
+    packages = plan.get("packages")
     return (
         type(plan.get("purpose")) is str and bool(plan["purpose"])
         and type(packages) is list and 1 <= len(packages) <= 32
