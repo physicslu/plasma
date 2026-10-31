@@ -147,13 +147,16 @@ def test_archive_changed_after_upload_commit_fails_closed(loopback, tmp_path):
     assert not paths.deployment_record.exists()
 
 
-def test_legacy_manifest_remains_accepted_and_no_runtime_launch(loopback, tmp_path):
+def test_retired_v1_manifest_rejected_after_unchanged_upload(loopback, tmp_path):
+    """Legacy content may be transported, but must fail at Admission."""
     api, paths, server = loopback
     archive, _ = package(tmp_path, "wordport", "python",
                          {"payload/python/wordport.py": b"# legacy"})
     uid = api.upload(archive.read_bytes())
-    r = api.submit(kind="python", upload_id=uid)
-    assert api.deployment_state(r.transaction_id)["result"]["plan"]["requested_actions"] == []
+    assert uid
+    with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
+        api.submit(kind="python", upload_id=uid)
+    assert not paths.deployment_record.exists()
     assert not paths.product_root.exists()
     assert server.deployment_thread is None
 
