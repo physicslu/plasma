@@ -10,8 +10,9 @@ from pathlib import Path
 import pytest
 
 from .test_ppu_bundle_v2_host_only_pr2 import (
-    bundle, contract, PARTS,
+    contract, PARTS,
 )
+from .test_ppu_bundle_v3_packages_contract import bundle_v3
 from .test_ppu_generic_package_host_only_gate1 import (
     TARGET, SOURCE, coordinator, request, engine,
 )
@@ -26,7 +27,7 @@ NOW = 1793448000
 
 
 def verified(tmp_path: Path):
-    archive, digest = bundle(tmp_path)
+    archive, digest = bundle_v3(tmp_path)
     return archive, digest, contract.verify_host_only_artifact(
         archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET,
     )
@@ -42,7 +43,7 @@ def trusted_policy(artifact):
         "purpose": artifact.purpose,
         "master_generation": 3,
         "active_master_generation": 3,
-        "allowed_kinds": [c.kind for c in artifact.components],
+        "allowed_kinds": [c.kind for c in artifact.packages],
         "expires_epoch_s": NOW + 3600,
     }
 
@@ -51,22 +52,22 @@ def test_pr3_versioned_dag_and_staged_components(tmp_path):
     _archive, _digest, artifact = verified(tmp_path)
     plan = contract.resolve_host_only_bundle(artifact, trusted_inventory={})
     assert plan["install_qualified"] is False
-    assert len(plan["component_order"]) == 6
+    assert len(plan["package_order"]) == 6
     assert plan["reuse"] == []
-    assert set(plan["stage"]) == {c.id for c in artifact.components}
-    assert plan["component_order"].index("ic-metadata") < plan["component_order"].index("flash-profile")
-    assert plan["component_order"].index("flash-profile") < plan["component_order"].index("wordport")
-    assert plan["component_order"].index("wordport") < plan["component_order"].index("bridge")
-    assert plan["component_order"].index("bridge") < plan["component_order"].index("fpga-addon")
+    assert set(plan["stage"]) == {c.id for c in artifact.packages}
+    assert plan["package_order"].index("ic-metadata") < plan["package_order"].index("flash-profile")
+    assert plan["package_order"].index("flash-profile") < plan["package_order"].index("wordport")
+    assert plan["package_order"].index("wordport") < plan["package_order"].index("bridge")
+    assert plan["package_order"].index("bridge") < plan["package_order"].index("fpga-addon")
 
 
 def test_pr3_matching_independently_verified_inventory_reuses_one(tmp_path):
     _archive, _digest, artifact = verified(tmp_path)
-    base = artifact.components[0]
+    base = artifact.packages[0]
     inventory = {
         base.id: {
             "version": base.version,
-            "sha256": contract.bundle_component_identity(base),
+            "sha256": contract.bundle_package_identity(base),
             "target": dict(artifact.target),
             "verified": True,
         },
@@ -88,11 +89,11 @@ def test_pr3_matching_independently_verified_inventory_reuses_one(tmp_path):
 ])
 def test_pr3_untrusted_cache_hits_fail_closed(tmp_path, change, error):
     _archive, _digest, artifact = verified(tmp_path)
-    first = artifact.components[0]
+    first = artifact.packages[0]
     inventory = {
         first.id: {
             "version": first.version,
-            "sha256": contract.bundle_component_identity(first),
+            "sha256": contract.bundle_package_identity(first),
             "target": dict(artifact.target),
             "verified": True,
             **change,
