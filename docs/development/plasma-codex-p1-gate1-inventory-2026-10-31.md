@@ -17,7 +17,10 @@
 - **Decision: no file deletion, relocation, or replacement authority map in this Gate 1.** Audit inbound references and paragraph-level overlap first; the canceled PR #1227 is not a basis for new edits.
 - Existing `docs/README.md` still describes merged PR #1226 entries as “Gate 1 Draft”; correct those labels only after reference review in a separate focused change.
 
-## P1-C: Device Catalog CI consolidation feasibility
+## P1-C: Device Catalog CI consolidation feasibility — DEFERRED BY OWNER
+
+**Owner scope update:** The 245 Device Catalog workflows are explicitly **out of scope** for this PR and current P1 work. Retain the following counts as historical inventory only; do not inspect workflow internals, propose Matrix conversion, change CI or create a separate workflow task without new Owner approval.
+
 
 At the pinned `main`, GitHub `.github/workflows/` directory listing shows:
 - **321** YAML workflow files in total.
@@ -32,6 +35,13 @@ These are **filename counts only**, not execution frequency, redundancy, cost, o
 3. Compare baseline and proposed positive/negative fixtures, duration, and GitHub Actions minutes.
 4. Preserve vendor/ICPN evidence isolation, source locks, non-production qualification and Gate 2 controls.
 5. Deliver a separate source-only PR with an explicit migration/rollback plan; no CI edits in this audit.
+
+## Document-only next actions
+
+1. Inventory inbound links to current AGENTS, full contract, Path 2/3 rules, ADRs and retired documents; classify authoritative vs historical references.
+2. Build a paragraph-level duplicate/contradiction list, separating shared safety requirements from Path-specific or device-specific implementation detail.
+3. Correct stale PR #1226 Draft labels and broken references only after verifying their targets; retain the two Owner gates and actual runtime safeguards.
+4. Do not add a shared AGENTS.override.md or make any runtime/CI changes without evidence and separate authorization.
 
 ## Acceptance and exclusions
 
