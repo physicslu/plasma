@@ -135,7 +135,8 @@ class ManagerAdmissionClient:
                             "PACKAGE_FILE_SHA256_MISMATCH": "PACKAGE_FILE_SHA256_MISMATCH",
                             "PACKAGE_MANIFEST_CONTENT_DENIED": "PACKAGE_MANIFEST_CONTENT_DENIED",
                         }
-                        reason = allowed.get(rejected.get("message"), "")
+                        message = rejected.get("message")
+                        reason = allowed.get(message, "") if type(message) is str else ""
                 raise self.module.DeploymentAPIError(
                     f"API_HTTP_REJECTED:{code}" + (f":{reason}" if reason else "")
                 )
