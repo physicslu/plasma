@@ -144,3 +144,16 @@ No 662-file content review, cross-reference graph, exact duplicate proof, or per
 5. Seven `openocd-software-qualification-v*.md` files are present, but no contents/backlinks have yet been compared; **no supersession claim** is justified.
 
 **Owner decision implemented:** Root `AGENTS.md` is the mandatory entrypoint. The old conflicting full-contract introduction was replaced with on-demand normative reference wording in commit `aa37f7eee2e992a91d5e8bdca1fb0295da006a52`. Applicable safety and hardware clauses remain mandatory.
+
+## Qualification v1–v7 content review (not filename-only)
+
+Read all seven `docs/architecture/openocd-software-qualification-v*.md` documents at pinned `main`.
+
+- **v1–v4:** progressively record the reference cohort, ordering-equivalent TR variants, R/V medium-density additions and T7 additions. Each describes bounded, exact ICPN applicability. The files self-label as current phase-specific qualification references; **do not erase their evidence** simply because a newer umbrella manifest exists.
+- **v5:** explicitly self-labels Historical, superseded by v6; records the transition to a content-addressed umbrella and a 31-exact-ICPN cohort.
+- **v6:** explicitly self-labels Historical, superseded by v7; records the R/V high-density expansion and a 41-exact-ICPN cohort.
+- **v7:** explicitly self-labels Current ADR-0002 Programming Qualification authority for Catalog Level 2 derivation; documents a 49-exact-ICPN combined registry and references v4 medium-density authority.
+
+**Decision:** retain all seven as provenance-bearing versioned qualification records. Treat v7 as the current **umbrella reference for this bounded STM32F103 cohort**, v4 as its referenced medium-density authority, v5/v6 as historical. Do not infer that the v7 cohort is the entire current PLASMA catalog or supersedes unrelated provider manifests. Do not modify qualification counts or L2 entitlements during documentation cleanup.
+
+**Document cleanup candidate:** create a short navigation table linking v1–v7 with explicit scope/status, and add verified backlinks to the main documentation index. Do not rewrite immutable evidence or move these files without checking inbound links.
