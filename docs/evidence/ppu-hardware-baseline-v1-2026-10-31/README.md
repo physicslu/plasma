@@ -70,3 +70,24 @@ artifact is the authoritative raw stdout/process/receipt evidence.
   read-only Manager pairing preflight and then B1/B2. Keep B1 independent of
   B2. Never claim Production TLS, Publisher/Master authority, Installer or
   FPGA/DUT qualification from B1/B2.
+
+
+## Owner-approved Manager registration — immutable registry blocker
+
+The owner approved registration of the physical Z2 using the **existing Manager API**,
+with no creation/rotation of any Token and no other SWPC runtime settings change.
+
+- Pinned PR HEAD: `550ace3ebc25b77bc1d00d9724a904e00864832e`.
+- [Path 2 Run 41151768961](https://github.com/physicslu/plasma/actions/runs/41151768961), job `development-execute` ID `124389732136`.
+- Trusted dispatcher `development-authorize`: SUCCESS. CLI exit 69, process classification `NOT_RUN_RESOURCE_UNAVAILABLE`.
+- Exact error: `ENROLL_REGISTRY_NOT_MUTABLE`.
+- Real physical Z2 identity checked against `ppu-device-7ed4b30913a9bf6101da5a7a` before Manager mutation.
+- SWPC Manager: `127.0.0.1:18280`. Expected immutable endpoint: `http://192.168.2.99:18080`.
+- Process stdout SHA256: `41c2bdd33d8d5570e19a6a0c05ab7dc52dc299be5d243c72f01f73f472f9cae1`.
+- Raw evidence: `plasma-development-cli-41151768961` GitHub Actions artifact.
+- The code checked Manager `/api/registry`, received `mutable=false`, and **did not send POST /api/registry**.
+- No alias was added, no Package was uploaded, no pairing changed, no device service/install/FPGA/DUT operation occurred.
+
+**Security boundary:** The current Manager profile's immutable registry does not support the approved API-level registration. In existing Manager code, missing persistent `registry_state_path` also disables `BootstrapCredentialStore.path_for_registry` persistence. Current Gate 1 forbids modifying other SWPC system configuration, restarts or adding/rotating credentials. A separate explicit approval is needed before changing Manager runtime configuration and checking pairing.
+
+**Final classification for this run:** Physical device read-only identity PASS; Manager Registry Enrollment BLOCKED; B1/B2 NOT_RUN; Gate 2 NOT_READY.
