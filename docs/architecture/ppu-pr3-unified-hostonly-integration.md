@@ -1,5 +1,7 @@
 # PPU Unified Deployment PR3 — Path 1 Host-only integration
 
+> **Historical PR3 (v2) engineering record.** Canonical future Bundle authoring uses [Bundle → Packages → Files](ppu-canonical-bundle-packages.md), schema `plasma.ppu.bundle.v3`. Earlier `component` names are historical v2 wire/API details, not new terminology.
+
 Status: Gate 1 Candidate; **no device installation, hardware access or rollout**.
 Base: main fe3f8896804bad7155cbefd4d3e47baefcc6fc12 (PR #1219, #1221, #1222 merged).
 

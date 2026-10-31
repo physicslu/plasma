@@ -585,12 +585,14 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             }
             if verified.kind == "bundle":
                 plan["purpose"] = verified.purpose
-                plan["components"] = [
-                    {"id": c.id, "kind": c.kind, "version": c.version,
-                     "requires": list(c.requires),
-                     "files": [f.path for f in c.files]}
-                    for c in verified.components
+                # Canonical Bundle v3 is the only active admission contract.
+                plan["packages"] = [
+                    {"id": package.id, "kind": package.kind, "version": package.version,
+                     "requires": list(package.requires),
+                     "files": [f.path for f in package.files]}
+                    for package in verified.packages
                 ]
+                plan["bundle_schema"] = verified.schema
             record = {
                 "schema_version": 1,
                 "transaction_id": transaction_id,
