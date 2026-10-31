@@ -14,11 +14,9 @@ Repository: pl/ FPGA and verification; software/python/ embedded/control/REST; s
 
 **Hardware execution boundary (normative; CI-enforced):** In the deployed PLASMA system, **SWPC runs Web / Controller / BFF** and sends high-level commands/status over Ethernet; **Z2 PS runs the embedded Linux programming runtime, including the OpenOCD process and its PS-local WordPort/Remote Bitbang bridge**; **Z2 PL executes FPGA SWD/SPI hardware I/O to the DUT**. SWPC may build, package, simulate or host-only test OpenOCD for development but must not run the live programmer backend or forward per-bit SWD traffic to Z2 as the product/physical-PoC path. Paths 2/3 on SWPC are development execution routes, not product OpenOCD hosts. The [PS OpenOCD architecture](docs/architecture/ic-support-openocd-plan-executor.md) is a mandatory code/PR/CI boundary: a change to execution location requires an explicit revised Gate 1 architecture decision and a synchronized architecture contract, implementation and CI test. Keep this invariant separate from production hardware-qualification claims.
 
-### Current Z2 Blue Pill physical SWD path (normative)
+### Z2 Blue Pill SWD — select the current physical route
 
-For external Blue Pill SWD, use Z2 PS-local ARMv7 SWD-capable OpenOCD -> UNIX WordPort/RemoteBitbang (`scripts/bluepill-wordport-session.py`) -> verified PL SWD Image paired with `pl/projects/z2-bluepill-rbb/image-manifest.json` -> PMOD SWCLK/SWDIO. Manifest/CI/history never prove current FPGA load or successful DUT DPIDR. Before hardware operation verify current Z2 Boot ID, Root source pin, exact Image/Manifest, FPGA Manager/lease/owner lock, recovery and legal wiring/voltage. SWPC Path 3 Codex only coordinates over SSH and passive LA; it is not the live OpenOCD host.
-
-**RETIRED / never select for external Blue Pill PoC:** `pl/projects/z2-swd-gpio` (PS EMIO software bit-bang) and `pl/projects/z2-swd03-axi` (internal synthetic DPIDR, no DUT pins). Their build entrypoints reject execution. Direct historical SWD-04/SWD-05 standalone HIL module CLIs are retired too; preserve their imported Root/ownership/recovery functions required by F1-B. Retained shared helpers, internal RTL, SWD-04/05 synthetic procedures and tests are not alternate hardware routes. Compare actual current Git worktree/SHA against approved source, not stale README/search results. See `docs/development/swd-legacy-path-retirement.md`.
+For external Blue Pill SWD, the sole current route is Z2 PS-local ARMv7 OpenOCD -> UNIX WordPort/RemoteBitbang (`scripts/bluepill-wordport-session.py`) -> paired PL SWD Image/Manifest (`pl/projects/z2-bluepill-rbb/image-manifest.json`) -> PMOD SWCLK/SWDIO. SWPC is not the live OpenOCD host. Before real hardware work check current boot, source, image identity, Root/FPGA ownership, recovery and voltage; historical CI or DPIDR never substitutes for a real observation. **Do not select retired** `z2-swd-gpio`, `z2-swd03-axi` or standalone SWD-04/05 HIL entrypoints. Keep imported Root/recovery helpers intact. Details and exclusions: [SWD retirement contract](docs/development/swd-legacy-path-retirement.md), [OpenOCD architecture](docs/architecture/ic-support-openocd-plan-executor.md).
 
 ## 1A. Prototype-first engineering policy (normative)
 
@@ -26,13 +24,11 @@ Prototype outcomes require the smallest authentic build/test/HIL result. Hosted 
 
 For healthy normal development aim for at most 180 seconds of pre-experiment checks; this is an objective, **not** permission to omit real safeguards. Preserve legal voltages, current PL/MMIO ownership, artifact identity, rollback image and recovery. Stop on actual SIGBUS, conflicting drivers, dangerous power/voltage, missing root authority or uncertain restoration. Never equate a file hash or CI green check with physical safety.
 
-### FPGA PS/PL Image pairing (normative)
+### FPGA PS/PL Image pairing and Keep Loaded (normative)
 
-A new FPGA Image is delivered to PS **with its companion Manifest**; the generic protected Root validates the actual BIN SHA256 against that Manifest, applicable Z2 board/FPGA part, ABI/identity, runtime ownership and recovery preconditions. Do **not** reintroduce a per-Image approval token, fixed `approved-fpga-image.json` release allowlist, `runtime_admitted` flag or Root source-commit change per new Image. Source Pin protects **Root executable code**, not the Image data. A valid paired Manifest is consistency evidence, not a cryptographic assertion of publisher authenticity.
+Deliver each FPGA BIN with its companion Manifest. Protected Root validates BIN SHA256, board/part, ABI, current ownership and recovery; Root source pin protects executable code, **not** individual Image data. Do not add per-Image approval tokens, fixed release allowlists, `runtime_admitted` or Root source changes for each Image. Manifest is consistency evidence, not publisher authentication.
 
-**Image A → Image B must support direct FPGA Manager replacement without loading Golden between them**, provided the previous same-boot state and current FPGA Manager provenance are known and the actual FPGA owner/lock and new BIN/Manifest checks pass. Golden remains a recovery resource, not a normal switching gate. Never bypass hardware conflicts, failed loads or UNKNOWN/unsafe in-flight state.
-
-**Keep Loaded is the default after a proven FPGA Download, not a reward for DPIDR PASS.** A protected FPGA Manager Download must have a genuine successful load receipt plus confirmed current-boot identity, exclusive ownership and safe hardware state before the Image may be considered loaded. Once loaded, leave that Image in PL by default, regardless of whether subsequent MMIO Identity/ABI or Blue Pill DPIDR is PASS, FAIL or NOT_RUN; a functional FAIL alone never triggers Golden Restore. On test failure stop further SWD/DUT activity, cleanly close/reap OpenOCD and the WordPort bridge, and release the MMIO lease and owner lock safely; retain the Image for diagnosis only while ownership and electrical/PL output state remain known safe. On failed FPGA load, UNKNOWN/unsafe/in-flight state or an unreaped owner, fail closed: do not blindly retry, access DUT or assume Keep Loaded is safe. Preserve the verified Golden recovery artifact and existing protected Root `restore` capability, but invoke Restore only when explicitly selected or when a documented fault-recovery decision requires it; do not auto-restore merely because an experiment ends or a downstream test fails.
+Allow direct safe Image A -> Image B replacement without routine Golden reload. After a **proven successful FPGA Download**, Keep Loaded by default even if downstream MMIO/DPIDR fails; functional FAIL is not itself a restore trigger. Stop SWD/DUT activity and reap processes/release leases safely on test failure. For failed load, UNKNOWN/unsafe/in-flight state, electrical hazards or unreaped owner, **fail closed**; preserve verified Golden and invoke Restore only for explicit or documented recovery, never blindly. Detailed preconditions and recovery policy: [shared FPGA/Z2 contract](docs/development/plasma-development-common.md).
 
 ### 1A.1 Development Mode — choose Path, then read its rules (normative)
 
@@ -46,104 +42,45 @@ A new FPGA Image is delivered to PS **with its companion Manifest**; the generic
 - If approved work requires real SWPC acceptance, GitHub-hosted mocks are not physical evidence. Record actual Run/Job, exit, hashes and recovery; do not merge untested changes merely to trigger a main-only dispatcher.
 - No unapproved deployment, destructive Git, privilege escalation, device operation or credential disclosure. Material scope expansion requires revised Gate 1.
 
-## 1B. Canonical Codex task/SSH execution contract (normative)
+## 1B. SSH/sudo and Codex execution boundary
 
-A Codex task is an execution assignment within an approved Gate 1, not a new planning request. Perform accessible authorized tests, diagnosis, repairs and evidence collection autonomously. Do not assume ability to SSH or sudo because credentials exist or instructions request it. Consult the [shared SSH and HIL contract](docs/development/plasma-development-common.md) and the dedicated Z2 HIL command document for any authorized Z2 task.
+An approved Gate 1 is an execution assignment, not a new planning gate. Path 3 may use the enrolled SSH/sudo route only with actual privileges and authorized scope; credentials remain in the private owner-controlled store, never in commits/logs/artifacts. No sudoers modification, privilege bypass or invented Z2 state. For real FPGA/HIL work, follow [shared Z2 Root/recovery constraints](docs/development/plasma-development-common.md) and [Path 3 execution contract](docs/development/plasma-path3-codex.md).
 
-Approved Z2 development credentials remain exclusively in the private owner-controlled host credential source. Never commit, print, log, transmit to unrelated endpoints or include in PR artifacts. Do not change sudoers, grant new privileges or use credentials to bypass an actual sandbox denial. Do not invent device IP addresses or operating state. For authorized FPGA load, require candidate identity, known-good rollback and confirmed restoration even on failure; no intentional AXI-fault or external SWD operations in internal-loopback-only tasks.
+## 2–10. Domain and execution contracts (load on demand)
 
-## 2. Programming data model
+- **Programming semantics:** Site identity is one-based; Program writes only; Erase/Verify/Read are distinct operations. Asset input and Normalized Image execution identity are not interchangeable. Site cancellation must not cancel unrelated Sites; synchronize only genuinely shared resources. Read [shared data model and Site invariants](docs/development/plasma-development-common.md) and domain tests before edits.
+- **Interrupt isolation:** Before destructive Erase/Program on interrupt-capable MCUs, qualify target quiescence/interrupt isolation per exact ICPN/Provider. Unknown isolation fails closed; do not blindly apply Cortex-M `maskisr` to other families. See [programming interrupt isolation policy](docs/architecture/programming-interrupt-isolation-policy.md); non-STM32 enforcement is not assumed implemented.
+- **Source priority:** executable code/config > `scripts/plasmactl` for host operations > package manifests > tests > current docs > historical discussions. Inspect actual implementation; never infer support from metadata or mock results.
+- **Zones:** Cloud/CI is host-only evidence; SWPC is integration/build/development host; Z2 PS/PL and DUT are real hardware. Path 3 `workspace-write` is the ordinary sandbox; owner-authorized SHA/digest-bound hardware Work Orders may use `danger-full-access`, but sandbox settings do not override Linux DAC/ACL, SSH, protected Root Entry, or safety checks. Do not inspect unrelated user files.
+- **Architecture/runtime:** SWPC Web/Controller/BFF, Z2 PS live OpenOCD and bridge, Z2 PL SWD/SPI; Gateway is standard-library HTTP/REST polling, not FastAPI/WebSocket. Read current source, `scripts/plasmactl`, and the [shared architecture/runtime clauses](docs/development/plasma-development-common.md) before changes. Gateway integration commonly uses port 18080; no unapproved service restart, port exposure or deployment. Desired persistence does not mean activation.
+- **Process safety:** identify precise service/PIDs before stopping; no broad `pkill`/`killall` or disruption of unrelated SSH, network or storage services.
 
-Keep canonical Site, Programming Asset, Normalized Image, Job and Batch semantics. A Program operation writes only; Erase, Program, Verify and Read are separately selected. A complete flow states its stages explicitly. Site execution is independent except genuine shared physical resources. Do not infer supported IC models, OpenOCD qualification or board behavior from catalog metadata alone. Consult full contract and domain tests before altering execution semantics. **Cross-manufacturer programming default:** before destructive Erase/Program, verify target execution quiescence and isolate relevant application interrupts for interrupt-capable MCUs by an exact-ICPN/Provider-qualified strategy. Missing/unknown isolation fails closed. Non-CPU NOT_APPLICABLE or alternative ISP methods require reviewed evidence; do not apply Cortex-M `maskisr` blindly across other IC families. See `docs/architecture/programming-interrupt-isolation-policy.md` (design default; non-STM32 runtime enforcement not yet implemented).
+## PLASMA Engineering Compatibility Policy (normative)
 
-## 3. Source-of-truth priority
+**Engineering development defaults to Replace-by-Default, not backward compatibility.** New versions replace old versions directly across API, Schema, Protocol, Package, FPGA IP, Driver, tools and internal interfaces.
 
-When statements disagree: (1) executable code/check-in config, (2) scripts/plasmactl for integration-host operations, (3) Python/Web package manifests, (4) tests, (5) current architecture/development docs including detailed clauses, (6) historical discussions. Do not silently resurrect stale behavior or stale unsupported claims.
+- **Migrate dependents together:** update implementation, callers, tests, fixtures, documentation and CI to the new contract in the same scoped change.
+- **Retire old versions:** do not retain Compatibility Layers, Legacy Adapters or dual-track architectures merely to satisfy old tests.
+- **Validate the new contract:** rewrite obsolete tests for the new version while preserving applicable functional and safety acceptance requirements.
+- **Explicitly approved exceptions only:** separately evaluate migration or compatibility requirements for released products, existing customer data, irreversible data formats or formally published external interfaces. Do not assume such an exception without owner approval.
 
-## 4. Execution zones
+## 11–15. Approval, Git and validation summary
 
-- **Cloud / GitHub-hosted:** source changes, deterministic host-only tests, PR/CI. Never claim real SWPC, FPGA, voltage, Z2 or DUT success from these.
-- **SWPC / integration host:** licensed builds, scoped host validation and owner-authorized USB/TTY experiments by existing Path 3 Codex. Ordinary Path 3 explicitly pins `--sandbox workspace-write`; only the SHA/digest-bound Owner hardware Work Order explicitly selects `--sandbox danger-full-access`. Neither mode changes the non-root Runner's real Linux DAC/ACL, SSH or protected Root Entry access; no Dispatcher-enforced hardware device allowlist is applied. Check workspace branch/state before changes; never overwrite unrelated work.
-- **Z2 / hardware:** real FPGA/PS/PL/DUT operations only with explicit Gate 1 and effective guard/ownership/recovery checks. Hardware observations are not inherited from software success.
-- Default workspace is the PLASMA repository. Do not inspect unrelated personal files, system settings, credential stores or external repos except already-authorized task-specific resources.
+Gate 1 requires an explicit bounded plan before implementation. Once approved, finish all in-scope changes, tests, CI and repairs autonomously. Do not introduce additional approval gates. Material scope expansion requires revised Gate 1.
 
-## 5. Current software architecture
+Gate 2 is explicit approval for merging a specific merge-ready PR. Before merging, check current HEAD, main, required CI, Rulesets, Reviews, Threads and Mergeability. Verify merge commit, parents and tree afterwards. Merge does not independently authorize deployment or hardware operations.
 
-Use software/python and software/web canonical source and test manifests. Plasma Gateway uses standard-library HTTP + REST polling; it is not FastAPI/WebSocket. Do not invent implicit Gateway endpoints, switch network ports or assume a central fleet scheduler. Inspect current source before changing APIs or protocol.
+Use scoped branches and PRs; preserve unrelated work. No destructive Git operations or history rewriting without explicit scope. Never merge simply to unlock a test that should run before merging.
 
-## 6. Python environment and domain rules
-
-Python supports 3.11+; use the repo's actual development environment. Keep Protocol v3.3 and Web REST v3 identity canonical. Never equate a generated image, target description or host-only OpenOCD config with qualified real programming support. Check relevant source/tests and the detailed rules before modifying those domains.
-
-## 7. Web environment
-
-Use the actual Web package.json, scripts and components; do not assume a framework. Apply Web REST v3 and normalized execution semantics; run affected lint/unit/build validation. Frontend simulation does not prove PPU Runtime or FPGA hardware.
-
-## 8. Runtime services and ports
-
-Read scripts/plasmactl and runtime configuration before changing any service or port. Plasma Gateway integration endpoint normally uses port 18080; some code-level defaults differ. Desired configuration persistence is not Runtime activation. No unapproved activation, restart, service/network exposure or production deployment.
-
-## 9. Site execution invariants
-
-Sites remain independent except genuine common hardware/resource synchronization. Per-Site cancellation must not cancel unrelated Sites. Batch cancellation retains authoritative batch classification while preserving truthful final Job outcome. Program is write-only. A common Normalized Image lease may synchronize Sites when one PPU shares the execution image.
-
-## 10. Service and process safety
-
-Identify exact PIDs/service owners before stopping processes. Never use broad pkill/killall by language/runtime name; do not stop unrelated host services, networking, SSH or storage. Never expose internal ports to untrusted networks to bypass connectivity problems.
-
-## 11. Autonomous task execution contract
-
-### 11.1 Exact two-gate workflow
-
-1. Before any new code/config/docs/PR/host or hardware modification, inspect read-only, present the bounded Plan and Path, and obtain explicit **Gate 1** approval.
-2. Execute the authorized scope independently through actual acceptance (including real SWPC/Z2 only if included). Record real output/exit/status; diagnose, fix and retest in the same Gate 1. A missing capability is NOT_RUN, not PASS.
-3. Prepare branch and PR with required CI, Ruleset/Review/Thread and evidence. Move Draft -> Ready when complete; no intermediate human approval gate.
-4. Obtain explicit **Gate 2** approval for a specific PR and HEAD, then recheck live GitHub state and use authorized merge method. Confirm Merge SHA, both Parents and Git Tree.
-5. Post-merge deployment or physical operations proceed only if explicitly covered by Gate 1; otherwise request revised Gate 1. Never treat merge as permission to deploy.
-
-### 11.1A Clickable owner approval choices (normative UX; no new gate)
-
-Use up to four explicit scoped choices when appropriate, but buttons do not themselves create new gates. Present only the currently applicable Gate and never ask twice after explicit owner approval. Gate 2 merge choice only when PR is merge-ready. Non-approval choices do not authorize implementation or merge.
-
-### 11.1B Execution Routing (normative)
-
-- Default (unnumbered): ChatGPT Direct -> GitHub PR -> GitHub-hosted CI for software/docs/Host-only engineering.
-- Path 2: existing GitHub Actions -> authorized SWPC fixed CLI -> real exit/evidence, when deterministic commands suffice.
-- Path 3: existing GitHub Actions -> authorized SWPC-plasma-codex Runner -> rootless USB/TTY-visible Codex CLI autonomous work -> trusted worker commits fixes to the exact authorized PR -> authentic evidence and CI. In the owner-approved Gate 1 scope Codex may operate Z2 through the enrolled SSH/sudo route; device visibility alone does not waive physical safety.
-- Path choice belongs to Gate 1. **No silent route fallback**, no simulated or assumed GitHub Dispatch, no unintended SWPC activity or privilege bypass. Path 2 retains its protected executor. Path 3 may use enrolled Z2 SSH/sudo for approved privileged development and FPGA operations, subject to actual Linux access, safe image identity, device ownership and Golden Restore.
-- The historical execution-route design is in [docs/development/plasma-three-path-execution-model.md](docs/development/plasma-three-path-execution-model.md).
-
-### 11.2 Routine autonomous work after Gate 1
-
-Do not repeatedly seek confirmation for ordinary in-scope edits, builds, CI repairs or polling. Avoid redundant comprehensive readiness reviews for unchanged SHA. Stop only on material scope expansion, real access/safety blocker or Gate 2 merge decision.
-
-## 12. Scope coverage and escalation — no third gate
-
-Explicit Gate 1 scope is required for runtime/deployment/restart/network configuration, physical power/voltage/FPGA/IC programming, destructive or history-rewriting Git operations, and material architecture or security changes. No force-push, rebase of shared history, git reset --hard or git clean that can discard user work without such scope. Merge to main always requires Gate 2.
-
-## 13. Merge-ready definition
-
-Implementation and diff reviewed; applicable tests/CI PASS; no blocking Rulesets/Reviews/unresolved Threads; exact HEAD and base verified; mergeability confirmed; real required SWPC/hardware evidence available or explicitly deferred by owner. No invented PASS claims. Then Ready for Review and Gate 2, not an automatic merge.
-
-## 14. Git publication policy
-
-Use feature branch and PR, preserve other contributors' changes. No direct feature commits to main, no force-push or history rewrite for aesthetics. Confirm HEAD, branch, worktree and target main before edits. Verify merge commit SHA/Parents/Tree after owner Gate 2.
-
-## 15. Validation policy
-
-Development Mode uses the minimum sufficient authentic experiment. Stop after one complete PASS; only FAIL or insufficient evidence warrants targeted diagnosis, repair and retest. Program/Readback/Verify have no numerical retry quota; this is not permission for uncontrolled loops or unsafe repeats. Never automatically repeat an operation after uncertain electrical state, unreaped process or uncertain recovery. Run smallest focused tests first and full relevant CI before readiness. Python and PL source tests, Web lint/test/artifact checks, cross-stack integration and physical HIL are distinct layers; a lower layer does not certify a higher one. Never infer hardware acceptance from hosted mocks.
+Use authentic tests and record PASS, FAIL or NOT_RUN. Hosted CI does not prove hardware success. Stop unsafe retries; retain physical ownership, electrical safety and recovery checks. Consult [shared detailed Gate, Git and validation rules](docs/development/plasma-development-common.md) sections 11–15 before acting. Use [Path 2](docs/development/plasma-path2-cli.md) or [Path 3](docs/development/plasma-path3-codex.md) only when relevant.
 
 ## 16. FPGA / PL rules
 
 For pl/ or hardware-visible changes read pl/AGENTS.md and the FPGA development/verification guides. Production RTL uses SystemVerilog and canonical Site naming. Validate CDC/reset/clock/XDC/register maps, PS/PYNQ access, simulation/lint/SVA/cocotb as applicable. Claim synthesis, timing, BIT/HWH and real Z2 outcomes only when executed and observed.
 
-## 17. Z2 production direction
+## 17–18. Production direction and known limits
 
-Z2 is an embedded PPU, not a clone of the workstation. Do not transplant developer tools, credentials or build-time infrastructure into the runtime by default. Check PYNQ/XRT compatibility before standardizing runtime dependencies.
-
-## 18. Current known boundaries / technical debt
-
-Preserve current implementation limits: Python >=3.11; integration Gateway normally port 18080; REST polling; canonical-only Protocol v3.3 and Web REST v3; not every declared Programming Asset type is implemented; Recipe/Package remains evolving; fleet Manager is not unrestricted proxy/scheduler; Desired persistence does not mean activation; SWPC mock does not certify DUT programming. Consult [shared contract](docs/development/plasma-development-common.md) before advancing unsupported features.
+Z2 is an embedded PPU, not a development workstation: do not copy build tools or credentials into runtime by default. Do not claim unsupported ICs, Asset formats, fleet functions, activation or real DUT qualification. Consult [shared contract](docs/development/plasma-development-common.md) and current source for actual limitations.
 
 ## 19. Communication and completion report
 
