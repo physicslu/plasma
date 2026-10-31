@@ -1,6 +1,6 @@
 # Plasma Autonomous Development Contract
 
-This is PLASMA's **primary operating contract** and the **compact Codex instruction entrypoint**. Read it before any code, configuration, documentation, deployment or hardware change. The [complete detailed clauses](docs/development/plasma-autonomous-development-contract-full.md) remain normative and are incorporated by reference. Read **relevant detailed sections on demand**; do not preload the entire detailed document for unrelated tasks. If an operation touches privileges, electrical safety, deployment, Git history or architecture, read the matching detailed clauses before acting. An abbreviated instruction never grants permissions that the full contract or an executable guard denies. For Path 2 privileged Z2 FPGA Manager/MMIO operations, retain the existing Protected Root Entry (`scripts/z2/plasma-path2-root-entry`), which validates `operation + source_sha` and invokes the reviewed `pl.hil.fpga_image_root` implementation. Path 3 may perform owner-approved Z2 SSH/sudo development deployment and FPGA operations via the enrolled credential route with real Linux privileges and hardware ownership/recovery checks; no new Stage or intermediate approval is required.
+This is PLASMA's **primary operating contract** and the **compact Codex instruction entrypoint**. Read it before any code, configuration, documentation, deployment or hardware change. The [shared detailed contract](docs/development/plasma-development-common.md) remains normative and is incorporated by reference. Read **relevant sections on demand**, not the entire contract for unrelated tasks. Load [Path 2 CLI](docs/development/plasma-path2-cli.md) only for SWPC CLI execution or [Path 3 Codex](docs/development/plasma-path3-codex.md) only for SWPC Codex execution. ChatGPT Direct is the unnumbered default; do not renumber historical Path 2/3 identifiers. If an operation touches privileges, electrical safety, deployment, Git history or architecture, read the matching detailed clauses before acting. An abbreviated instruction never grants permissions that the full contract or an executable guard denies. For Path 2 privileged Z2 FPGA Manager/MMIO operations, retain the existing Protected Root Entry (`scripts/z2/plasma-path2-root-entry`), which validates `operation + source_sha` and invokes the reviewed `pl.hil.fpga_image_root` implementation. Path 3 may perform owner-approved Z2 SSH/sudo development deployment and FPGA operations via the enrolled credential route with real Linux privileges and hardware ownership/recovery checks; no new Stage or intermediate approval is required.
 
 **Exactly two owner approval gates:** Gate 1 — Plan Approval *before any new implementation*; Gate 2 — Merge Approval for a specific merge-ready PR. No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approved, autonomously complete all in-scope work and actual acceptance, including fixes and CI; do not request repeated approval. Material scope change requires a revised Gate 1. **Never merge without Gate 2.**
 
@@ -37,9 +37,9 @@ A new FPGA Image is delivered to PS **with its companion Manifest**; the generic
 ### 1A.1 Development Mode — choose Path, then read its rules (normative)
 
 - Use the existing Work Order, Dispatcher, Runner and native tools. Do not introduce a third approval gate or task-specific middleware.
-- Path 1: ChatGPT Direct for code, docs and Host-only CI.
-- **Path 2:** deterministic SWPC CLI, CPU-only tasks, operator CLI and Vivado builds. **When Path 2 is selected, read [Path 2 execution rules](docs/development/plasma-codex-path2-execution.md).**
-- **Path 3:** SWPC Codex CLI for autonomous diagnosis/repair and approved hardware tasks. **When Path 3 is selected, read [Path 3 execution rules](docs/development/plasma-codex-path3-execution.md).**
+- Default: ChatGPT Direct for code, docs and Host-only CI (formerly Path 1; no separate path selection).
+- **Path 2:** deterministic SWPC CLI, CPU-only tasks, operator CLI and Vivado builds. **When Path 2 is selected, read [Path 2 execution contract](docs/development/plasma-path2-cli.md) and the applicable [existing operational rules](docs/development/plasma-codex-path2-execution.md).**
+- **Path 3:** SWPC Codex CLI for autonomous diagnosis/repair and approved hardware tasks. **When Path 3 is selected, read [Path 3 execution contract](docs/development/plasma-path3-codex.md) and the applicable [existing operational rules](docs/development/plasma-codex-path3-execution.md).**
 - Select the smallest capable Path. Path 2 and Path 3 may share the existing Runner; do not invent extra isolation or fixed-operation middleware without demonstrated need.
 - Preserve exact Owner/Gate 1 scope, SHA/digest binding, actual Linux privileges, applicable Root Guard, hardware ownership, electrical safety, recovery and authentic evidence. Choosing a Path never grants additional authority.
 - For an unchanged PR HEAD, avoid repeating full readiness reviews; before an authorized Gate 2 merge verify live HEAD/main, necessary CI, Rulesets, Reviews, Threads, dependencies and Mergeability.
@@ -48,7 +48,7 @@ A new FPGA Image is delivered to PS **with its companion Manifest**; the generic
 
 ## 1B. Canonical Codex task/SSH execution contract (normative)
 
-A Codex task is an execution assignment within an approved Gate 1, not a new planning request. Perform accessible authorized tests, diagnosis, repairs and evidence collection autonomously. Do not assume ability to SSH or sudo because credentials exist or instructions request it. Consult the [full SSH and HIL contract](docs/development/plasma-autonomous-development-contract-full.md) and the dedicated Z2 HIL command document for any authorized Z2 task.
+A Codex task is an execution assignment within an approved Gate 1, not a new planning request. Perform accessible authorized tests, diagnosis, repairs and evidence collection autonomously. Do not assume ability to SSH or sudo because credentials exist or instructions request it. Consult the [shared SSH and HIL contract](docs/development/plasma-development-common.md) and the dedicated Z2 HIL command document for any authorized Z2 task.
 
 Approved Z2 development credentials remain exclusively in the private owner-controlled host credential source. Never commit, print, log, transmit to unrelated endpoints or include in PR artifacts. Do not change sudoers, grant new privileges or use credentials to bypass an actual sandbox denial. Do not invent device IP addresses or operating state. For authorized FPGA load, require candidate identity, known-good rollback and confirmed restoration even on failure; no intentional AXI-fault or external SWD operations in internal-loopback-only tasks.
 
@@ -105,13 +105,13 @@ Identify exact PIDs/service owners before stopping processes. Never use broad pk
 
 Use up to four explicit scoped choices when appropriate, but buttons do not themselves create new gates. Present only the currently applicable Gate and never ask twice after explicit owner approval. Gate 2 merge choice only when PR is merge-ready. Non-approval choices do not authorize implementation or merge.
 
-### 11.1B Three-Path Work Execution Model (normative)
+### 11.1B Execution Routing (normative)
 
-- Path 1: ChatGPT Direct Work -> GitHub PR -> GitHub-hosted CI; for software/docs/Host-only engineering.
+- Default (unnumbered): ChatGPT Direct -> GitHub PR -> GitHub-hosted CI for software/docs/Host-only engineering.
 - Path 2: existing GitHub Actions -> authorized SWPC fixed CLI -> real exit/evidence, when deterministic commands suffice.
 - Path 3: existing GitHub Actions -> authorized SWPC-plasma-codex Runner -> rootless USB/TTY-visible Codex CLI autonomous work -> trusted worker commits fixes to the exact authorized PR -> authentic evidence and CI. In the owner-approved Gate 1 scope Codex may operate Z2 through the enrolled SSH/sudo route; device visibility alone does not waive physical safety.
 - Path choice belongs to Gate 1. **No silent route fallback**, no simulated or assumed GitHub Dispatch, no unintended SWPC activity or privilege bypass. Path 2 retains its protected executor. Path 3 may use enrolled Z2 SSH/sudo for approved privileged development and FPGA operations, subject to actual Linux access, safe image identity, device ownership and Golden Restore.
-- The detailed Three-Path design is in [docs/development/plasma-three-path-execution-model.md](docs/development/plasma-three-path-execution-model.md).
+- The historical execution-route design is in [docs/development/plasma-three-path-execution-model.md](docs/development/plasma-three-path-execution-model.md).
 
 ### 11.2 Routine autonomous work after Gate 1
 
@@ -143,7 +143,7 @@ Z2 is an embedded PPU, not a clone of the workstation. Do not transplant develop
 
 ## 18. Current known boundaries / technical debt
 
-Preserve current implementation limits: Python >=3.11; integration Gateway normally port 18080; REST polling; canonical-only Protocol v3.3 and Web REST v3; not every declared Programming Asset type is implemented; Recipe/Package remains evolving; fleet Manager is not unrestricted proxy/scheduler; Desired persistence does not mean activation; SWPC mock does not certify DUT programming. Consult [detailed contract](docs/development/plasma-autonomous-development-contract-full.md) before advancing unsupported features.
+Preserve current implementation limits: Python >=3.11; integration Gateway normally port 18080; REST polling; canonical-only Protocol v3.3 and Web REST v3; not every declared Programming Asset type is implemented; Recipe/Package remains evolving; fleet Manager is not unrestricted proxy/scheduler; Desired persistence does not mean activation; SWPC mock does not certify DUT programming. Consult [shared contract](docs/development/plasma-development-common.md) before advancing unsupported features.
 
 ## 19. Communication and completion report
 
@@ -153,4 +153,4 @@ Report exact checked SHA and execution Path, real executor/Runner, run/job ID wh
 
 Do not read or publish private prompts, SSH credentials, API tokens, raw Codex Session transcripts, operator home directories or other unrelated files. The owner may explicitly authorize a bounded resource for a task; redact any sensitive output and honor actual permissions. The existing protected Z2 Root operation/transport and B1/B2/B3 ownership/restoration checks are authoritative for authorized hardware work. No hardware access without approved scope.
 
-**On-demand contract routing:** For a narrowly scoped task, read the relevant section(s) of [the complete detailed contract](docs/development/plasma-autonomous-development-contract-full.md) and affected nested AGENTS.md files; do not preload all 62 KiB without technical need. Root AGENTS.md is concise to fit the default Codex project instruction budget; this does **not** relax any full-contract constraint.
+**On-demand contract routing:** For a narrowly scoped task, read the relevant section(s) of [the relevant shared contract sections](docs/development/plasma-development-common.md) and affected nested AGENTS.md files; do not preload the full shared contract without technical need. Root AGENTS.md is concise to fit the default Codex project instruction budget; this does **not** relax any full-contract constraint.

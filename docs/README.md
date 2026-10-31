@@ -316,6 +316,10 @@ Historical PS-only reference: [Linux MMIO Backend v1](development/linux-mmio-bac
 - **Current** — [Render Public Smoke Acceptance](deployment/render-public-smoke.md)
 - **Current** — [Render Public Browser Acceptance](deployment/render-public-browser.md)
 
+- **Normative** — [Shared Development Contract](development/plasma-development-common.md): common Gate, Git, CI, safety and architecture clauses; read relevant sections on demand.
+- **Normative** — [Path 2 SWPC CLI Contract](development/plasma-path2-cli.md): deterministic SWPC CLI route.
+- **Normative** — [Path 3 SWPC Codex Contract](development/plasma-path3-codex.md): Codex CLI autonomous route.
+
 ## Component contracts outside `docs/`
 
 - [Python control plane](../software/python/README.md)
