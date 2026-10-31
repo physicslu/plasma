@@ -37,10 +37,10 @@ test("PR3 preserves single Manager deployment operation gate and PPU internal ow
   const [manager, server, api, ui] = await Promise.all([
     read("manager"), read("server"), read("api"), read("ui"),
   ]);
-  assert.match(manager, /if body.get\("kind"\) == "bundle":/);
-  assert.match(manager, /generic Bundle requires only kind and upload_id/);
-  assert.match(manager, /"kind": "bundle", "upload_id": upload_id/);
-  assert.match(manager, /generic Bundle admission response is not non-executing/);
+  assert.match(manager, /if body.get\("kind"\) in \{"python", "native-c", "fpga-image", "bundle"\}:/);
+  assert.match(manager, /generic package requires only kind and upload_id/);
+  assert.match(manager, /"kind": body\["kind"\], "upload_id": upload_id/);
+  assert.match(manager, /generic package admission response is not non-executing/);
   assert.match(server, /gate.try_begin_platform_launch\(alias\)/);
   assert.match(server, /_bootstrap_mutation_allowed\(alias\)/);
   assert.match(server, /coordinator.start_deployment\(alias, body\)/);
