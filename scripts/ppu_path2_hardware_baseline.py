@@ -203,7 +203,15 @@ class DirectSSHAuthenticatedBootstrap:
             response_data = json.loads(data.decode("utf-8"))
         except (ValueError, UnicodeError):
             raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_INVALID") from None
-        if type(response_data) is not dict or response_data.get("ok") is not True:
+        if type(response_data) is not dict:
+            raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_INVALID")
+        if path == "/v1/status":
+            # Existing physical Z2 status_document has no top-level ok flag.
+            if (type(response_data.get("identity")) is not dict
+                    or type(response_data.get("bootstrap")) is not dict
+                    or type(response_data.get("runtime")) is not dict):
+                raise BaselineError("DIRECT_BOOTSTRAP_STATUS_INVALID")
+        elif response_data.get("ok") is not True:
             raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_INVALID")
         return response_data
 
