@@ -272,3 +272,9 @@ Evidence: the four frozen WEB documents W01–W04 were read from their pinned ba
 | W04 | SWPC Web operational runbook | Distinguishes `plasmactl update`, `web-restart`, and `deploy`. Actual command implementation and rollback/restart tests not yet verified. | Pending |
 
 **Counts:** Batch 1 baseline 16/16 exists; 4/16 WEB documents have initial content disposition; 2/16 baseline documents have been directly modified to date (C03 index, W01 README); **0/16 fully accepted** until evidence and CI are complete. Audit report itself is not a baseline document. No modifications to W02–W04 or runtime code in this step.
+
+## Owner execution directive — batch CI only
+
+Owner instructed: **finish organizing all 16 frozen Batch 1 documents before performing a consolidated CI verification.** Do not run, poll, or report per-file CI as an acceptance step. Continue document/content/source reconciliation without requesting separate approval for each document. After all 16 have recorded dispositions and the final edits are complete, perform one consolidated relevant CI review and report Gate 2 readiness.
+
+GitHub may independently trigger push-based Actions; this instruction does not authorize modifying shared workflows or claiming those automatic runs are suppressed. Do not manually dispatch workflows during the document-edit phase. Keep PR Draft, do not merge, deploy, operate hardware, or expand into IC Catalog.
