@@ -57,3 +57,37 @@ These are **filename counts only**, not execution frequency, redundancy, cost, o
 ## Acceptance and exclusions
 
 This inventory records evidence and defers unsafe transformations. No Codex run, new Runner, override file, Workflow modification, merge, deployment, SWPC/Z2/DUT/FPGA operation, or measured Token reduction is claimed. Actual changes require their own Gate 1 scope and Gate 2 approval.
+
+## Gate 1 repository document inventory — first verified pass
+
+This section records direct GitHub directory-listing counts at pinned `main`; these are **not** recursively aggregated totals and do not establish whether a document is active, obsolete, or duplicative.
+
+| Directory | Immediate entries | Immediate Markdown files | Subdirectories |
+| --- | ---: | ---: | --- |
+| `docs/architecture/` | 95 | 94 | none |
+| `docs/development/` | 90 | 89 | `evidence/` |
+| `docs/deployment/` | 25 | 25 | none |
+| `docs/adr/` | 4 | 4 | none |
+| `handover/` | 34 | 34 | none |
+| `docs/operator/` | 1 | 1 | none |
+| `docs/testing/` | 1 | 1 | none |
+| `docs/evidence/` | 13 | 0 | 13 evidence subdirectories |
+| `docs/archive/` | 1 | 0 | `ci-workflows/` |
+| `docs/engineering/` | 1 | 0 | `ci/` |
+
+**Verified minimum:** 248 immediate Markdown files across the seven flat/direct document locations listed above (94+89+25+4+34+1+1); not the repository-wide total. Nested evidence, engineering and archive contents require separate classification. Do not treat YAML/JSON evidence as obsolete documentation.
+
+### First-pass authority candidates and ambiguity
+
+- `docs/adr/README.md` indexes three immediate ADR decision files (0001–0003). Audit cross-references to other ADR-like identifiers before declaring the index complete.
+- `docs/architecture/` contains `openocd-software-qualification-v1.md` through `v7.md`. **Seven versioned files are a review candidate, not proof of seven redundant contracts**: determine supersession, inbound references and whether each contains immutable qualification evidence.
+- `docs/architecture/device-catalog-ci-coverage-map.md` is a likely large reference, but workflow consolidation is explicitly out of scope.
+- `docs/evidence/` is a structured collection of device-specific evidence folders; preserve raw evidence and receipts, even if a current guide links to them.
+- `docs/archive/ci-workflows/` contains archived workflow subtrees. Do not re-enable, delete, or migrate them in this PR.
+
+### Required next evidence before any move or deletion
+
+1. Recursive tracked-file inventory, including `docs/evidence/`, `docs/engineering/`, `docs/archive/`, root Markdown, and `specs/`.
+2. For each candidate: current authority classification, duplicate/supersession proof, backlinks, ADR/CI/test references, and proposed replacement URL.
+3. Resolve conflicts by explicit owner approval and source precedence; retain immutable evidence and signed/hash-locked material.
+4. Perform link-integrity and documentation CI after each bounded change. No bulk archival move based on title/version alone.
