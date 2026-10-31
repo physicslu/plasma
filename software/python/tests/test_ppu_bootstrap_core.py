@@ -177,7 +177,7 @@ def _factory_python_upload(installed_service, paths, tmp_path: Path):
     from .test_ppu_generic_package_host_only_gate1 import TARGET
 
     file_data = b"# inert factory admission fixture\n"
-    file_name = "payload/packages/wordport/wordport.py"
+    file_name = "payload/packages/wordport/python/wordport.py"
     manifest = {
         "schema": "plasma.ppu.bundle.v3",
         "name": "factory-smoke", "version": "1.0",
