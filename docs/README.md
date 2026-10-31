@@ -13,6 +13,8 @@
 
 ## PPU deployment / physical admission evidence
 
+- **Canonical / Gate 1 Draft** — [Bundle → Packages → Files (v3)](architecture/ppu-canonical-bundle-packages.md)：單一新標準 `plasma.ppu.bundle.v3`、`packages[]`、Package DAG 與相容邊界；`bundle.v2/components`、`package.v1` 僅屬 Legacy Input，Host-only，不代表已部署至 Z2。
+
 - **Operator-reported physical HIL / PR #1219 admission only** — [SWPC → PYNQ-Z2 Package Admission, 2026-10-30](evidence/ppu-package-admission-2026-10-30/README.md)：實際乙太網路 ZIP Upload／Commit、SHA256、Manifest Admission 與 Receipt；`admitted` 不代表安裝／啟用，TLS、Publisher／Source Trust 和 FPGA／DUT 資格仍未驗收。後續 Factory Bundle 相依檔修復為獨立 Draft PR #1221。
 
 ## 跨廠牌燒錄預設安全政策
