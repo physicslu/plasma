@@ -585,18 +585,14 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             }
             if verified.kind == "bundle":
                 plan["purpose"] = verified.purpose
-                # Canonical v3 wire format is Bundle -> Packages -> Files.
-                # Legacy v2 receipt remains unchanged for older clients.
-                package_key = ("packages" if verified.schema == contract.BUNDLE_SCHEMA
-                               else "components")
-                plan[package_key] = [
+                # Canonical Bundle v3 is the only active admission contract.
+                plan["packages"] = [
                     {"id": package.id, "kind": package.kind, "version": package.version,
                      "requires": list(package.requires),
                      "files": [f.path for f in package.files]}
                     for package in verified.packages
                 ]
-                if verified.schema == contract.BUNDLE_SCHEMA:
-                    plan["bundle_schema"] = verified.schema
+                plan["bundle_schema"] = verified.schema
             record = {
                 "schema_version": 1,
                 "transaction_id": transaction_id,
