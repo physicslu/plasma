@@ -57,11 +57,18 @@ def loopback(tmp_path: Path):
 
 @pytest.mark.parametrize("name,kind,files", SAMPLES)
 def test_real_http_accepts_manifest_actions_without_install(loopback, tmp_path, name, kind, files):
+    # Reuse the same HTTP upload and admission path; only the ZIP contract changes.
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+
     api, paths, server = loopback
-    archive, digest = package(tmp_path, name, kind, files,
-                              alterations={"actions": ["install", "verify", "activate"]})
+    package_files = {
+        filename.removeprefix("payload/"): data for filename, data in files.items()
+    }
+    archive, digest = bundle_v3(
+        tmp_path, parts=[(name, kind, [], package_files)]
+    )
     upload_id = api.upload(archive.read_bytes())
-    submission = api.submit(kind=kind, upload_id=upload_id)
+    submission = api.submit(kind="bundle", upload_id=upload_id)
     assert submission.state == "admitted"
     receipt = api.deployment_state(submission.transaction_id)
     result = receipt["result"]
@@ -69,8 +76,12 @@ def test_real_http_accepts_manifest_actions_without_install(loopback, tmp_path, 
     assert result["stage"] == "package_admission_only"
     assert result["install_qualified"] is False
     assert plan["archive_sha256"] == digest
-    assert plan["kind"] == kind and plan["package"] == name
-    assert plan["requested_actions"] == ["install", "verify", "activate"]
+    assert plan["kind"] == "bundle"
+    assert plan["bundle_schema"] == "plasma.ppu.bundle.v3"
+    assert len(plan["packages"]) == 1
+    assert plan["packages"][0]["id"] == name
+    assert plan["packages"][0]["kind"] == kind
+    assert plan["requested_actions"] == ["install", "verify", "activate", "rollback"]
     assert plan["execution_permitted"] is False
     assert plan["target"] == TARGET
     assert len(plan["files"]) == len(files)
