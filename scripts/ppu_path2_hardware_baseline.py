@@ -193,6 +193,51 @@ class ManagerAdmissionClient:
         return self.module.BootstrapAPIClient.deployment_state(self, transaction_id)
 
 
+def probe_manager_registries(expected_host: str, *, ports=(18180, 18280)):
+    """Read-only SWPC Manager profile inventory, never selects target or mutates.
+
+    Reveal only aliases matching the independently known exact real PPU
+    endpoint. A different alias still requires an owner-pinned Work Order.
+    """
+    host = _private_ipv4(expected_host)
+    result = []
+    for port in ports:
+        if type(port) is not int or port not in (18180, 18280):
+            raise BaselineError("MANAGER_LOOPBACK_PORT_DENIED")
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            conn.request("GET", "/api/registry", headers={"Accept": "application/json"})
+            response = conn.getresponse()
+            raw = response.read(65537)
+            if response.status != 200 or not raw or len(raw) > 65536:
+                result.append({"port": port, "status": "NOT_AVAILABLE"})
+                continue
+            registry = json.loads(raw.decode("utf-8"))
+            ppus = registry.get("ppus") if isinstance(registry, dict) else None
+            if registry.get("ok") is not True or not isinstance(ppus, list):
+                result.append({"port": port, "status": "INVALID_REGISTRY"})
+                continue
+            matches = sorted(
+                entry["alias"] for entry in ppus
+                if (isinstance(entry, dict)
+                    and entry.get("endpoint") == f"http://{host}:18080"
+                    and type(entry.get("alias")) is str
+                    and re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}", entry["alias"]))
+            )
+            result.append({
+                "port": port, "status": "MATCH" if matches else "NO_PHYSICAL_TARGET",
+                "real_z2_aliases": matches,
+            })
+        except (OSError, ValueError, json.JSONDecodeError):
+            result.append({"port": port, "status": "NOT_AVAILABLE"})
+        finally:
+            conn.close()
+    return {"schema": SCHEMA, "phase": "READ_ONLY_MANAGER_REGISTRY_INVENTORY",
+            "target_host": host, "managers": result, "b1": "NOT_RUN",
+            "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+            "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN"}
+
+
 def probe_status(host: str, *, read_get=None) -> dict[str, Any]:
     """Read-only actual installed Bootstrap identity/version preflight.
 
@@ -454,6 +499,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="read-only Z2 identity/version, no credential or writes")
     parser.add_argument("--manager-alias", default="z2")
     parser.add_argument("--manager-port", type=int, default=18280)
+    parser.add_argument("--manager-inventory", action="store_true",
+                        help="read-only SWPC Manager profile registry scan")
     parser.add_argument("--manager-probe", action="store_true",
                         help="read-only paired Manager status, no writes")
     parser.add_argument("--device-id")
@@ -466,6 +513,12 @@ def main(argv: list[str] | None = None) -> int:
         if not SHA40.fullmatch(args.source_sha) or _git_head() != args.source_sha:
             raise BaselineError("SOURCE_SHA_PIN_MISMATCH")
         host = _private_ipv4(args.host)
+        if args.manager_inventory:
+            print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps(
+                {**probe_manager_registries(host), "source_sha": args.source_sha},
+                sort_keys=True, separators=(",", ":"),
+            ))
+            return 0
         if args.probe:
             print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps(
                 {**probe_status(host), "source_sha": args.source_sha},
