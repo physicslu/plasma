@@ -451,7 +451,7 @@ def enroll_manager_real_z2(host: str, device_id: str, *,
         "endpoint": endpoint, "device_id_verified": device_id,
         "lifecycle": record.get("lifecycle"),
         "pairing": "NOT_VERIFIED",
-        "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+        "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v3": "NOT_RUN",
         "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN",
     }
 
@@ -535,7 +535,7 @@ def inspect_swpc_manager_runtime(*, home: Path | None = None,
         "bootstrap_module_installed": bootstrap_module_available,
         "manager_service_state": manager_unit_active,
         "user_service_control_available": owner_can_manage_user_service,
-        "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+        "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v3": "NOT_RUN",
         "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN",
     }
 
@@ -581,7 +581,7 @@ def probe_manager_registries(expected_host: str, *, ports=(18180, 18280)):
             conn.close()
     return {"schema": SCHEMA, "phase": "READ_ONLY_MANAGER_REGISTRY_INVENTORY",
             "target_host": host, "managers": result, "b1": "NOT_RUN",
-            "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+            "b2_v1": "NOT_RUN", "b2_v3": "NOT_RUN",
             "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN"}
 
 
@@ -621,7 +621,7 @@ def probe_status(host: str, *, read_get=None) -> dict[str, Any]:
             or not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", identity["device_id"])):
         raise BaselineError("PPU_PROBE_IDENTITY_INVALID")
     return {"schema": SCHEMA, "phase": "READ_ONLY_DEVICE_PROBE",
-            "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+            "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v3": "NOT_RUN",
             "device_id_observed": identity["device_id"],
             "bootstrap_version_observed": bootstrap.get("version"),
             "bootstrap_api_version_observed": bootstrap.get("api_version"),
@@ -674,19 +674,19 @@ def sample_v1(source_sha: str, target: Mapping[str, str], *, corrupt_file_sha: b
     return _zipped(manifest, {path: content})
 
 
-def sample_v2(source_sha: str, target: Mapping[str, str]) -> bytes:
-    first_path = "payload/components/catalog/data/ic.json"
-    second_path = "payload/components/profile/data/geometry.json"
+def sample_v3(source_sha: str, target: Mapping[str, str]) -> bytes:
+    first_path = "payload/packages/catalog/data/ic.json"
+    second_path = "payload/packages/profile/data/geometry.json"
     first = b'{"ic":"safe-host-only-fixture"}'
     second = b'{"flash_size":65536}'
     manifest = {
-        "schema": "plasma.ppu.bundle.v2",
+        "schema": "plasma.ppu.bundle.v3",
         "name": "hardware-baseline-bundle",
         "version": "1.0.0",
         "purpose": "diagnostics",
         "source_commit": source_sha,
         "target": dict(target),
-        "components": [
+        "packages": [
             {"id": "catalog", "kind": "ic-catalog", "version": "1.0.0",
              "requires": [], "files": [_file(first_path, first)]},
             {"id": "profile", "kind": "programming-profile", "version": "1.0.0",
@@ -788,11 +788,11 @@ def b2_negative(api, client_module, source_sha: str, target: Mapping[str, str]) 
 
 def run(api, client_module, *, source_sha: str, target: Mapping[str, str],
         expected_device_id: str) -> dict[str, Any]:
-    """Distinct B1, B2-v1, B2-v2 verdicts; no installation ever."""
+    """Distinct B1, B2-v1, B2-v3 verdicts; no installation ever."""
     report: dict[str, Any] = {
         "schema": SCHEMA, "source_sha": source_sha, "target": dict(target),
         "device_id": None, "b1": {"status": "NOT_RUN"},
-        "b2_v1": {"status": "NOT_RUN"}, "b2_v2": {"status": "NOT_RUN"},
+        "b2_v1": {"status": "NOT_RUN"}, "b2_v3": {"status": "NOT_RUN"},
         "b3_install": "NOT_RUN", "b4_activation_rollback": "NOT_RUN",
         "fpga": "NOT_RUN", "dut": "NOT_RUN",
         "transport_security": "PRIVATE_COMMISSIONING_HTTP_NOT_PRODUCTION_QUALIFIED",
@@ -828,23 +828,23 @@ def run(api, client_module, *, source_sha: str, target: Mapping[str, str],
         report["b2_v1"] = result
     except Exception as exc:
         report["b2_v1"] = {"status": "BLOCKED", "code": type(exc).__name__}
-    # A missing v2 verifier on Z2 is an independent qualification gap,
+    # A missing v3 verifier on Z2 is an independent qualification gap,
     # not a failure of B1 or a reason to upgrade the installed Bootstrap.
     try:
-        raw_v2 = sample_v2(source_sha, target)
-        v2_uid = api.upload(raw_v2)
-        report["b2_v2"] = b2_admission(
-            api, v2_uid, source_sha, target, _sha(raw_v2), kind="bundle",
+        raw_v3 = sample_v3(source_sha, target)
+        v3_uid = api.upload(raw_v3)
+        report["b2_v3"] = b2_admission(
+            api, v3_uid, source_sha, target, _sha(raw_v3), kind="bundle",
         )
     except Exception as exc:
-        report["b2_v2"] = {"status": "NOT_QUALIFIED", "code": type(exc).__name__}
+        report["b2_v3"] = {"status": "NOT_QUALIFIED", "code": type(exc).__name__}
     if (report["b1"]["status"] == "PASS"
             and report["b2_v1"]["status"] == "PASS"
-            and report["b2_v2"]["status"] == "PASS"):
+            and report["b2_v3"]["status"] == "PASS"):
         report["baseline_qualification"] = "B1_B2_V1_V2_PASS"
     elif (report["b1"]["status"] == "PASS"
           and report["b2_v1"]["status"] == "PASS"):
-        report["baseline_qualification"] = "B1_B2_V1_PASS_V2_NOT_QUALIFIED"
+        report["baseline_qualification"] = "B1_B2_V1_PASS_V3_NOT_QUALIFIED"
     elif report["b1"]["status"] == "PASS":
         report["baseline_qualification"] = "B1_PASS_PARTIAL"
     return report
@@ -936,7 +936,7 @@ def main(argv: list[str] | None = None) -> int:
                 "paired": True, "device_match": True,
                 "bootstrap_version_observed": status["bootstrap"].get("version"),
                 "runtime_state_observed": status.get("runtime", {}).get("state"),
-                "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+                "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v3": "NOT_RUN",
                 "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN",
             }, sort_keys=True, separators=(",", ":")))
             return 0
@@ -950,7 +950,7 @@ def main(argv: list[str] | None = None) -> int:
         # Only print reviewed static errors; no response body or credentials.
         print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps({
             "schema": SCHEMA, "b1": "NOT_RUN",
-            "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+            "b2_v1": "NOT_RUN", "b2_v3": "NOT_RUN",
             "code": str(exc) if isinstance(exc, BaselineError) else type(exc).__name__,
             "result": "NOT_RUN",
         }, sort_keys=True, separators=(",", ":")))
