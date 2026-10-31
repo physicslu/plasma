@@ -18,9 +18,9 @@ from .test_ppu_package_receive_admission_pr1 import loopback  # noqa: F401
 from .test_ppu_package_receive_admission_pr1 import client
 
 
-def bundle_v3(tmp_path: Path, *, mutate=None, legacy: bool = False):
+def bundle_v3(tmp_path: Path, *, mutate=None, legacy: bool = False, parts=PARTS):
     tmp_path.mkdir(parents=True, exist_ok=True)
-    archive, _digest = legacy_bundle(tmp_path / "legacy")
+    archive, _digest = legacy_bundle(tmp_path / "legacy", parts=parts)
     with zipfile.ZipFile(archive) as src:
         manifest = json.loads(src.read("manifest.json"))
         if not legacy:
@@ -145,3 +145,25 @@ def test_client_rejects_ambiguous_v2_v3_receipt_fields():
     del r["result"]["plan"]["components"]
     del r["result"]["plan"]["bundle_schema"]
     assert not client._valid_package_admission(r, kind="bundle")
+
+
+
+@pytest.mark.parametrize("count,accepted", [(1, True), (32, True), (33, False)])
+def test_v3_exact_package_count_boundary(tmp_path, count, accepted):
+    parts = [(
+        f"catalog-{i:02d}", "ic-catalog", [],
+        {"data/catalog.json": f'{{"i":{i}}}'.encode()},
+    ) for i in range(count)]
+    archive, digest = bundle_v3(tmp_path, parts=parts)
+    if not accepted:
+        with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_MANIFEST_CONTENT_DENIED"):
+            contract.verify_host_only_artifact(
+                archive, expected_sha256=digest, source_commit=SOURCE,
+                target_profile=TARGET,
+            )
+    else:
+        verified = contract.verify_host_only_artifact(
+            archive, expected_sha256=digest, source_commit=SOURCE,
+            target_profile=TARGET,
+        )
+        assert len(verified.packages) == count
