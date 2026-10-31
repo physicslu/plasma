@@ -574,7 +574,7 @@ def verify_host_only_artifact(
     archive_path: Path, *, expected_sha256: str, source_commit: str | None,
     target_profile: Mapping[str, str],
 ) -> VerifiedPackage | VerifiedBundle:
-    """Admit only canonical Bundle v3; retired schemas fail closed."""
+    """Admit standalone Package v1 and canonical Bundle v3; retired bundles fail closed."""
     if not isinstance(archive_path, Path) or archive_path.is_symlink():
         raise UnifiedDeploymentError("PACKAGE_ARCHIVE_UNTRUSTED")
     try:
@@ -592,6 +592,11 @@ def verify_host_only_artifact(
         if isinstance(exc, UnifiedDeploymentError):
             raise
         raise UnifiedDeploymentError("PACKAGE_SCHEMA_PROBE_DENIED") from exc
+    if schema == PACKAGE_SCHEMA:
+        return verify_host_only_package(
+            archive_path, expected_sha256=expected_sha256,
+            source_commit=source_commit, target_profile=target_profile,
+        )
     if schema == BUNDLE_SCHEMA:
         return verify_host_only_bundle(
             archive_path, expected_sha256=expected_sha256,
