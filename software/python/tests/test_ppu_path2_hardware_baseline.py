@@ -406,3 +406,98 @@ def test_manager_exact_ppu_content_denial_proves_negative_case(monkeypatch):
         client.DeploymentAPIError,
         expected_reason="PACKAGE_FILE_SHA256_MISMATCH",
     )
+
+
+def test_owner_enrollment_creates_only_pending_real_z2_registry(monkeypatch):
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    responses = [
+        (200, {"ok": True, "mutable": True, "ppus": [
+            {"alias": "qemu", "endpoint": "http://172.30.77.2:18080"}]}),
+        (201, {"ok": True, "entry": {
+            "alias": "z2", "endpoint": "http://192.168.2.99:18080",
+            "lifecycle": "pending"}}),
+        (200, {"ok": True, "mutable": True, "ppus": [
+            {"alias": "z2", "endpoint": "http://192.168.2.99:18080"}]}),
+    ]
+    requests = []
+    class Response:
+        def __init__(self, code, body):
+            self.status, self.raw = code, json.dumps(body).encode()
+        def read(self, limit):
+            return self.raw
+    class Conn:
+        def __init__(self, host, port, timeout):
+            assert (host, port) == ("127.0.0.1", 18280)
+        def request(self, method, path, body=None, headers=None):
+            requests.append((method, path, json.loads(body) if body else None, headers))
+        def getresponse(self):
+            return Response(*responses.pop(0))
+        def close(self):
+            pass
+    report = baseline.enroll_manager_real_z2(
+        "192.168.2.99", DEVICE,
+        probe=lambda host: {"device_id_observed": DEVICE},
+        connection_factory=Conn,
+    )
+    assert report["registration"] == "REGISTERED_PENDING"
+    assert report["pairing"] == "NOT_VERIFIED"
+    assert report["b1"] == report["b2_v1"] == report["b2_v2"] == "NOT_RUN"
+    assert [(method, path) for method, path, _, _ in requests] == [
+        ("GET", "/api/registry"), ("POST", "/api/registry"),
+        ("GET", "/api/registry"),
+    ]
+    assert requests[1][2] == {
+        "alias": "z2", "endpoint": "http://192.168.2.99:18080"}
+    assert all("Authorization" not in h for _, _, _, h in requests)
+
+
+def test_owner_enrollment_never_writes_if_physical_identity_not_matching():
+    def never(*args, **kwargs):
+        raise AssertionError("Manager operation must not happen")
+    with pytest.raises(baseline.BaselineError, match="ENROLL_REAL_DEVICE_ID_MISMATCH"):
+        baseline.enroll_manager_real_z2(
+            "192.168.2.99", DEVICE,
+            probe=lambda host: {"device_id_observed": "ppu-device-deadbeefdeadbeef"},
+            connection_factory=never,
+        )
+
+
+def test_owner_enrollment_fails_closed_on_duplicate_alias_and_immutable_registry():
+    def simulate(first):
+        class Response:
+            status = 200
+            def read(self, limit):
+                return json.dumps(first).encode()
+        class Conn:
+            def __init__(self, host, port, timeout):
+                pass
+            def request(self, method, path, body=None, headers=None):
+                assert method == "GET"
+            def getresponse(self):
+                return Response()
+            def close(self):
+                pass
+        return Conn
+    for obj, error in [
+        ({"ok": True, "mutable": False, "ppus": []},
+         "ENROLL_REGISTRY_NOT_MUTABLE"),
+        ({"ok": True, "mutable": True, "ppus": [
+            {"alias": "z2", "endpoint": "http://172.30.77.2:18080"}]},
+         "ENROLL_ALIAS_CONFLICT"),
+        ({"ok": True, "mutable": True, "ppus": [
+            {"alias": "qemu", "endpoint": "http://192.168.2.99:18080"}]},
+         "ENROLL_ENDPOINT_ALREADY_OWNED"),
+    ]:
+        with pytest.raises(baseline.BaselineError, match=error):
+            baseline.enroll_manager_real_z2(
+                "192.168.2.99", DEVICE,
+                probe=lambda host: {"device_id_observed": DEVICE},
+                connection_factory=simulate(obj),
+            )
+
+
+def test_owner_enrollment_never_accepts_arbitrary_alias_or_port():
+    with pytest.raises(baseline.BaselineError, match="ENROLL_FIXED_MANAGER_ALIAS_AND_PORT_REQUIRED"):
+        baseline.enroll_manager_real_z2(
+            "192.168.2.99", DEVICE, alias="qemu",
+            probe=lambda host: {"device_id_observed": DEVICE})
