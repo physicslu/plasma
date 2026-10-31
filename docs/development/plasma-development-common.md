@@ -2,11 +2,6 @@
 
 > **Normative detailed clauses.** The repository root [AGENTS.md](../../AGENTS.md) is the concise mandatory instruction entrypoint for Codex and other agents. This file preserves the previous complete engineering contract as the detailed, on-demand source of clauses. Apply its relevant sections before modifying affected domains, deploying, handling privileged resources, or working with hardware. In case of conflict, check the latest executable code, current root AGENTS.md and owner-approved task scope. Historical source: `main` b3caa1d289f375125f781f2a563fe1eb8b02204e.
 
----
-
-# Plasma Autonomous Development Contract
-
-The repository root [AGENTS.md](../../AGENTS.md) is the mandatory entrypoint for AI coding agents working on Plasma. This document is the detailed normative reference: load and apply the relevant sections on demand when the task touches their domains, including deployment, privileged resources, FPGA/PS hardware, or safety controls. Do not require a full read for every unrelated change, and do not bypass applicable clauses.
 
 The operating model has **exactly two user approval gate types**: a **Gate 1 — Plan Approval** before implementation starts and a **Gate 2 — Merge Approval** when the work is merge-ready. After Gate 1, engineering execution continues autonomously within the approved scope, including branch/commit/PR work, CI repair, Draft -> Ready, and any deployment/runtime/hardware acceptance explicitly included in the approved plan. There is no separate deployment, runtime, hardware, or Ready-for-review approval gate. If necessary work materially exceeds the approved scope, return to Gate 1 with a revised plan rather than inventing a third gate.
 
@@ -15,7 +10,7 @@ PLASMA is being developed by one owner; unless the owner expressly declares
 qualification, release or production work, prioritize the shortest working
 Build -> Run -> Observe -> Fix loop. Do not silently apply future fleet,
 factory, multi-tenant or enterprise security requirements to a prototype
-smoke test. See Sections 1A.1 and 11.1B. This is an engineering priority,
+smoke test. See Section 1A.1 and the route-specific Path 2/3 contracts. This is an engineering priority,
 not a declaration that disabled executable controls are already enabled.
 
 **Execution routing:** ChatGPT Direct is the default; use [Path 2](plasma-path2-cli.md) for SWPC CLI or [Path 3](plasma-path3-codex.md) for SWPC Codex only when the approved task requires that executor. Path selection belongs to Gate 1.
@@ -808,65 +803,11 @@ After Merge Approval, merge to `main` and verify the resulting repository state.
 
 If continuing would materially exceed the approved scope, stop and propose a revised plan. Approval of that revision is another Gate 1 decision, not a new gate type.
 
-### 11.1A Clickable owner approval choices (normative UX; no new gate)
+### 11.1A Owner approval UX (normative; no extra gate)
 
-For **every user approval request** under the two-gate workflow, prefer a compact
-set of **clickable buttons or selection controls**, when the conversation
-surface supports them. The owner should normally be able to approve by
-**one click** rather than typing `批准`, `approve` or a long instruction.
+Use at most four concise, actionable approval choices where the client supports them; otherwise accept clear ordinary-text approval. At Gate 1 show the actual plan, recommended executor (ChatGPT Direct default, Path 2 SWPC CLI, or Path 3 SWPC Codex), scope, risks and acceptance. Do not show unavailable paths as working alternatives. A choice must explicitly authorize the described Gate 1 scope; a default, hover or unrelated reply is not approval. A path selection alone grants no hardware, deployment, credential or merge authority. If the executor/dispatch/runner is unavailable, report the real blocker without silently falling back.
 
-- Show **at most four choices in total** for one decision; fewer are
-  preferable when adequate. Do not use a long form or stack unrelated
-  decisions. Label each choice as a clear **action**, in the user's language
-  (normally Traditional Chinese for this project).
-- Display **only the currently applicable approval gate**. At Gate 1,
-  summarize the proposed plan and scope *before* offering approval. At Gate 2,
-  first report the exact PR, target branch, current head/CI/readiness and
-  any deployment or hardware consequences covered by the approved plan.
-  **Never display an actionable Gate 2 approval choice before merge-ready.**
-- For PLASMA engineering work, **Gate 1 must recommend and identify one
-  explicit execution path** from Section 11.1B, including its actor, execution
-  host, approved resources, CI/evidence, acceptance conditions and stop rules.
-  The user chooses the recommended path or a feasible alternative using up to
-  three scoped, clickable Gate 1 approval actions, with an optional fourth
-  defer/revise action. Label choices in Traditional Chinese:
-  **「批准 Gate 1 — ChatGPT Direct（預設）」**,
-  **「批准 Gate 1 — Path 2（SWPC CLI Work）」**, and
-  **「批准 Gate 1 — Path 3（SWPC Codex Work）」**. Mark one recommendation
-  with its actual reason. No default/selection is approval until deliberately
-  submitted. If the user explicitly approves a path in normal text, do not
-  request a redundant click.
-- **No silent execution-path fallback**. If a path lacks a working GitHub
-  workflow, dispatch permission, required runner or tool access, disclose the
-  blocker; never report a dispatch, Codex execution, SWPC HIL or CI result
-  that did not actually occur. Selecting a path never itself authorizes
-  real hardware, deployment, credential expansion or merging. For
-  non-PLASMA tasks without an execution-path decision, ordinary Gate 1
-  wording remains valid.
-- Recommended Gate 2 choices: **「批准 Gate 2：合併 PR #N」**,
-  **「要求修改」**, **「暫緩」**, **「關閉 PR（不合併）」**.
-  Tailor or omit choices; these do not introduce any new approval gate.
-- Each approval control must convey an **explicit, scoped owner approval**
-  identifying **Gate 1 + the plan**, or **Gate 2 + the specific PR/target**
-  when deliberately selected (for example, by submitting a clear approval
-  message as the user's next turn). A rendered button, default selection,
-  hover, unrelated reply, or an agent's inference is **not approval**.
-  Do not use a generic unlabeled `Approve` control whose target is unclear.
-- **Non-approval choices never authorize work or merge**. A request to
-  revise, defer, decline or close a PR is not Gate 1 or Gate 2 approval.
-  Follow the selected instruction within the existing workflow and
-  authorization boundaries; closing a PR must not be treated as merging it.
-- If the client or agent execution environment **cannot render clickable
-  choices**, provide a concise, unambiguous set of **at most four short
-  selectable/text alternatives**, without pretending buttons exist or adding
-  a new consent step. Explicit unambiguous approvals given by ordinary user
-  text remain valid; never require the owner to click again.
-- **Presentation changes no authorization semantics**: Gate 1 is still
-  required before implementation, Gate 2 is still required before merge,
-  out-of-scope changes still return to a revised Gate 1, and routine
-  already-approved execution must not ask for redundant confirmations.
-  No click may silently bypass readiness, repository safety, or physical
-  hardware safeguards.
+At Gate 2 show the exact PR, target, current HEAD, CI/readiness and any authorized operational consequences; offer explicit merge, revise, defer or close choices as applicable. Never present merge approval before readiness. **Only an affirmative Gate 2 decision for that PR authorizes merging**; revise, defer or close are not merge approvals. Neither UI choice nor agent inference may bypass repository, scope, OS or hardware safeguards. After an approved Gate 1, do not ask for redundant consent for in-scope fixes, CI or tests.
 
 ### 11.2 Routine autonomous work after Gate 1
 
