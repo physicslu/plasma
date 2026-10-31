@@ -300,3 +300,46 @@ def test_v3_host_only_activation_switches_receipt_without_running_payload(tmp_pa
     assert json.loads(active.read_bytes())["archive_sha256"] == new_digest
     assert not co.paths.product_root.exists()
     assert not co.paths.systemd_root.exists()
+
+
+def test_v3_rejects_legacy_package_v1_at_canonical_entry(tmp_path):
+    archive, digest = bundle_v3(tmp_path)
+    with zipfile.ZipFile(archive, "r") as source:
+        manifest = json.loads(source.read("manifest.json"))
+        members = [(name, source.read(name)) for name in source.namelist() if name != "manifest.json"]
+    manifest["schema"] = "plasma.ppu.package.v1"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("manifest.json", json.dumps(manifest))
+        for name, data in members:
+            output.writestr(name, data)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_SCHEMA_UNSUPPORTED"):
+        contract.verify_host_only_artifact(
+            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+        )
+
+
+def test_v3_rejects_duplicate_manifest_key(tmp_path):
+    archive, _ = bundle_v3(tmp_path)
+    with zipfile.ZipFile(archive) as source:
+        raw = source.read("manifest.json").decode()
+        members = [(name, source.read(name)) for name in source.namelist() if name != "manifest.json"]
+    malformed = raw.replace('{"schema":', '{"schema":"plasma.ppu.bundle.v3","schema":', 1)
+    assert malformed != raw
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("manifest.json", malformed)
+        for name, data in members:
+            output.writestr(name, data)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    with pytest.raises(contract.UnifiedDeploymentError):
+        contract.verify_host_only_artifact(
+            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+        )
+
+
+def test_v3_rejects_file_hash_mismatch(tmp_path):
+    archive, digest = bundle_v3(tmp_path, mutate=lambda m: m["packages"][0]["files"][0].update(sha256="0" * 64))
+    with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_FILE_SHA256_MISMATCH"):
+        contract.verify_host_only_artifact(
+            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+        )
