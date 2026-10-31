@@ -104,18 +104,26 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
         return False
     if plan["kind"] != "bundle":
         return True
-    components = plan.get("components")
+    # Reject ambiguous responses: v3 must NOT coexist with v2 fields.
+    schema = plan.get("bundle_schema")
+    if schema is None and "packages" not in plan:
+        field = "components"  # historical v2 response only
+    elif schema == "plasma.ppu.bundle.v3" and "components" not in plan:
+        field = "packages"
+    else:
+        return False
+    packages = plan.get(field)
     return (
         type(plan.get("purpose")) is str and bool(plan["purpose"])
-        and type(components) is list and 1 <= len(components) <= 32
-        and all(isinstance(part, dict)
-                and type(part.get("id")) is str and bool(part["id"])
-                and type(part.get("kind")) is str and bool(part["kind"])
-                and type(part.get("version")) is str and bool(part["version"])
-                and type(part.get("requires")) is list
-                and type(part.get("files")) is list
-                for part in components)
-        and len({part["id"] for part in components}) == len(components)
+        and type(packages) is list and 1 <= len(packages) <= 32
+        and all(isinstance(package, dict)
+                and type(package.get("id")) is str and bool(package["id"])
+                and type(package.get("kind")) is str and bool(package["kind"])
+                and type(package.get("version")) is str and bool(package["version"])
+                and type(package.get("requires")) is list
+                and type(package.get("files")) is list
+                for package in packages)
+        and len({package["id"] for package in packages}) == len(packages)
     )
 
 
