@@ -259,3 +259,16 @@ For each document record: (1) authority/status classification, (2) exact duplica
 **Explicit exclusions:** IC Catalog/ICPN/Provider Qualification and the 245 Device Catalog workflows; no hardware operations, deployment, runtime code changes or merge. Existing out-of-batch historical navigation in `docs/README.md` is preserved, not expanded. Root `AGENTS.md` remains mandatory entrypoint, full contract on demand.
 
 **Initial evidence:** All 16 paths were fetched successfully from the PR branch; the starting blob SHAs above identify their exact baseline. This is an inventory milestone, **not** a claim that 16/16 content acceptance is complete.
+
+## Batch 1 Gate 1 dispositions — WEB first pass
+
+Evidence: the four frozen WEB documents W01–W04 were read from their pinned baseline blobs; source spot checks inspected `software/web/app/api/fleet/route.ts`, `software/web/app/api/manager/ppu/route.ts`, `software/python/plasma_web/secure_gateway.py` and `software/python/plasma_web/gateway.py` on `main`.
+
+| ID | Authority/status | Finding and disposition | Acceptance |
+| --- | --- | --- | --- |
+| W01 | Developer entrypoint, not normative API | Added links to W02/W03/W04 and root AGENTS; clarified Manager BFF versus PPU REST. Commit `df64fb9557063ae0481ff7f831d6f684c96c8719`. | Pending link and CI regression |
+| W02 | PPU-facing REST v3 contract | Contract declares `rest_contract_version="3"` and names `SecurePlasmaWebHandler`; actual `secure_gateway.py` defines that class and `gateway.py` emits version fields. Endpoint-by-endpoint route/test comparison still pending. | Pending |
+| W03 | Product UX semantics | Distinguishes Production/Engineering from Fleet topology; explicitly describes Mock-only execution prototype and future Manager packaging paths. Do not silently elevate future packaging to deployed behavior. | Pending |
+| W04 | SWPC Web operational runbook | Distinguishes `plasmactl update`, `web-restart`, and `deploy`. Actual command implementation and rollback/restart tests not yet verified. | Pending |
+
+**Counts:** Batch 1 baseline 16/16 exists; 4/16 WEB documents have initial content disposition; 2/16 baseline documents have been directly modified to date (C03 index, W01 README); **0/16 fully accepted** until evidence and CI are complete. Audit report itself is not a baseline document. No modifications to W02–W04 or runtime code in this step.
