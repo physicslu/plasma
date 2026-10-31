@@ -105,7 +105,7 @@ def test_pr3_untrusted_cache_hits_fail_closed(tmp_path, change, error):
 
 def test_pr3_unknown_inventory_component_denied(tmp_path):
     _archive, _digest, artifact = verified(tmp_path)
-    with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_INVENTORY_UNKNOWN_COMPONENT"):
+    with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_INVENTORY_UNKNOWN_PACKAGE"):
         contract.resolve_host_only_bundle(artifact, trusted_inventory={"phantom": {}})
 
 
@@ -140,8 +140,8 @@ def test_pr3_exact_authority_gate_accepts_only_host_only_scope(tmp_path):
     ({"master_generation": 2}, "BUNDLE_AUTHORITY_REVOKED_OR_EXPIRED"),
     ({"active_master_generation": 4}, "BUNDLE_AUTHORITY_REVOKED_OR_EXPIRED"),
     ({"expires_epoch_s": NOW}, "BUNDLE_AUTHORITY_REVOKED_OR_EXPIRED"),
-    ({"allowed_kinds": ["python"]}, "BUNDLE_COMPONENT_KIND_NOT_AUTHORIZED"),
-    ({"allowed_kinds": []}, "BUNDLE_COMPONENT_KIND_NOT_AUTHORIZED"),
+    ({"allowed_kinds": ["python"]}, "BUNDLE_PACKAGE_KIND_NOT_AUTHORIZED"),
+    ({"allowed_kinds": []}, "BUNDLE_PACKAGE_KIND_NOT_AUTHORIZED"),
 ])
 def test_pr3_authority_denials_have_no_journal_or_installs(tmp_path, change, reason):
     archive, digest, artifact = verified(tmp_path)
