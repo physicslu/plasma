@@ -205,3 +205,26 @@ Read the following documents from pinned `main`: `software/web/README.md`, `docs
 **Boundary note:** This is an 11-document sample, not a comprehensive code-vs-document reconciliation. Future work must check actual API route implementation, PS deployment engine, PL register definitions, RTL, and tests before assigning a single authoritative contract.
 
 **Owner scope:** IC Catalog and all device-catalog workflows remain deferred. Do not migrate evidence or change catalog/provider qualifications under this PR.
+
+## Implementation-to-document spot checks — WEB / PS / PL
+
+Reviewed tracked source on pinned `main`, not just Markdown filenames.
+
+| Contract or concern | Actual source inspected | Grounded conclusion |
+| --- | --- | --- |
+| WEB REST remote-write boundary | `software/python/plasma_web/secure_gateway.py` | `SecurePlasmaWebHandler` exists and inherits the canonical gateway handler; the REST contract names this actual class. Authentication/authorization implementation needs endpoint-by-endpoint test reconciliation before any claim of full coverage. |
+| WEB Manager BFF | `software/web/app/api/manager/ppu/route.ts` | GET and POST route handlers exist; managed-routing errors can return 503 and unmanaged mode can report `managed:false`. This is a distinct browser-side manager route, not proof that the PPU REST contract itself defines these BFF endpoints. |
+| PS secure gateway wiring | `software/python/plasma_web/secure_gateway_app.py` | Imports `SecurePlasmaWebHandler`, gateway phase mixins and security/runtime activation components. Do not treat PS installer documentation as the sole runtime API source. |
+| PL proposed fixed-image ABI | `pl/verification/fixed_image_abi_v1_gate1.json` | Explicit machine-readable `status=review_candidate_not_implemented`, `sites_physically_verified=0`, `site_count_ceiling=8`; ceiling is **not** eight verified physical channels. |
+| PL AXI identity RTL | `pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv` | Explicitly host-simulation-only and not connected to physical decoder, UIO, FPGA Manager or pins; build parameter examples are not identity evidence. |
+| PL integrated fixture RTL | `pl/projects/z2-fixed-unified-site1/rtl/fixed_ppu_z2_internal_fixture_axi.sv` | Explicitly internal synthetic SWD responder with no external PMOD/SWD/JTAG/DUT. Never use its simulated response as external DUT proof. |
+
+### Cross-domain authority map (initial, subject to tests)
+
+- **Agent workflow:** root `AGENTS.md` entrypoint; detailed contract on demand.
+- **WEB browser UX:** `software/web/` implementation and tests; `web-product-modes.md` defines product semantics; `web-rest-api-contract.md` describes PPU-facing REST, distinct from Manager BFF routes.
+- **PS gateway:** `software/python/plasma_web/` runtime implementation and tests; PS install/release docs govern packaging/operations, not arbitrary browser endpoints.
+- **PL fixed-image candidate:** `pl/verification/fixed_image_abi_v1_gate1.json` is the machine-readable **proposal**; relevant `pl/rtl/` is simulation evidence, not physical admission.
+- **Cross-domain boundary:** WEB/PS REST is distinct from PS/PL register-level ABI; neither grants hardware operation or eight-site physical qualification.
+
+**Next verification needed:** route-by-route API-to-tests map; PS deployment-engine executable entrypoint and rollback tests; JSON ABI-to-RTL register/offset tests and physical admission receipts. No code edits, claims of physical acceptance, or catalog work in this PR.
