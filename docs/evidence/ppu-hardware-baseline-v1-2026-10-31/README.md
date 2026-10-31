@@ -1,93 +1,48 @@
-# PLASMA Z2 Hardware Package Baseline v1 — Gate 1 Path 2 Evidence
+# PLASMA Z2 Physical Package Baseline v1 — Path 2 Evidence
 
-Status: **B1 NOT_RUN / B2-v1 NOT_RUN / B2-v2 NOT_RUN**. This is not
-hardware Receive/Admission qualification. Read-only physical preflight and
-SWPC Manager inventory were successfully executed; **no package was uploaded**.
+Status: **Physical B1 Receive PASS; B2-v1 Integrity/Admission PASS; B2-v2 Bundle NOT_QUALIFIED.** B3/B4, FPGA and DUT NOT_RUN.
 
-## Source and trust boundary
+## First real positive acceptance — directly through existing engineering-mode SSH to Bootstrap API
 
-- Main ancestor: \`c58621afe896e6a6f57fe712c27ffcbc06a6f0e8\`.
-- Candidate: [Draft PR #1224](https://github.com/physicslu/plasma/pull/1224), exact SHA must be re-pinned on every subsequent run.
-- Existing Issue #981 trusted owner Work Order / Path 2 \`operator-cli\`,
-  \`guarded-hardware\`, runner \`SWPC-plasma-codex\`, Verification \`exit-code\`.
-- Real physical Z2 Bootstrap: \`192.168.2.99:18081\`, observed identity
-  \`ppu-device-7ed4b30913a9bf6101da5a7a\`, Bootstrap version \`0.1.0\`,
-  API \`1\`, Runtime \`runtime_active\`. Installed source commit of the
-  Bundle verifier is **NOT_ATTESTED**.
-- No Z2 Installer, FPGA/PL, DUT, factory service, SWPC settings or control-token
-  file was changed by this Gate 1.
+- [GitHub workflow Run #41154668038](https://github.com/physicslu/plasma/actions/runs/41154668038), `development-execute` on `SWPC-plasma-codex`.
+- Exact first successful source SHA: `acc3e87fa6188fd82a29d761f716be5e04593974`.
+- Work Order SHA256: `0f8800d49184ab29f570e80dfe0c7153b17b7a8813ed8052a8c8a2d64b5b54b4`.
+- Real process: **Exit 0**, stdout SHA256 `6a7bca66b89e67af7edd406ec6752c7df69de5f715e7db3333f56ac424633c70`, no stderr.
+- Evidence artifact: `plasma-development-cli-41154668038` (raw process receipt and sanitized JSON output).
+- Physical device ID: `ppu-device-7ed4b30913a9bf6101da5a7a`; Bootstrap version `0.1.0`, API version `1`, Runtime `runtime_active`.
+- Engineering transport: existing SWPC worker enrolled SSH account / pinned known_hosts, existing protected Z2 sudo control-token read **into process memory only**, followed by private-LAN HTTP Bootstrap `:18081`. No Manager registry or paired Manager required. No credential value included in any evidence or Work Order. This commissioning transport is **NOT qualified for production TLS**.
 
-## Independent physical Path 2 results
-
-| Stage | Workflow / Evidence | Pin and Result |
+| Real Z2 tier | Result | Source-of-truth evidence |
 |---|---|---|
-| Physical Z2 read-only HTTP probe | [Run 41098395015](https://github.com/physicslu/plasma/actions/runs/41098395015) | Original candidate \`8a64808830106c0d56a73d65f9c5f23ce57e5716\`; authorized Path 2 exit 0; device ID, Bootstrap version, Runtime status observed. B1/B2 NOT_RUN |
-| Original direct Bootstrap B1/B2 attempt | [Run 41099568098](https://github.com/physicslu/plasma/actions/runs/41099568098) | No Token file provisioned to Runner; Exit 69; B1/B2 NOT_RUN. Motivated reuse of existing Manager pairings |
-| Manager-paired read-only probe (port 18280) | [Run 41150496276](https://github.com/physicslu/plasma/actions/runs/41150496276) | Candidate \`b21cedfb511729b09c19a67d77fc900539c882a4\`; Exit 69 \`MANAGER_PHYSICAL_TARGET_NOT_ENROLLED\`; no mutation |
-| Manager Registry inventory | [Run 41150656253](https://github.com/physicslu/plasma/actions/runs/41150656253) | Candidate \`857975fe993f20e08495f6ea9606c686a55e1888\`; exact trusted Runner exit 0; local Manager :18180 NOT_AVAILABLE, :18280 NO_PHYSICAL_TARGET; B1/B2 NOT_RUN |
+| B1 Receive/Commit | **PASS** | Real Z2 accepted 701 bytes, archive SHA256 `eaa03e92721482c3dc8be2b7b3dc9055e287d6a442e788c4108fab5f307b2b3b`, Upload ID `d6bf049f696d4ab9a248a84694bc1c22` |
+| B1 negative SHA | **PASS** | Deliberate wrong chunk SHA256 was rejected as `CHUNK_SHA256_MISMATCH`, verified specific response, then correct chunks committed |
+| B2-v1 Integrity/Admission | **PASS** | Transaction ID `94ea95005714452bb1021b358f08684c`, `stage=package_admission_only`, `execution_permitted=false`, `install_qualified=false` |
+| B2-v1 negative file SHA / target | **PASS** | Actual Z2 rejected `PACKAGE_FILE_SHA256_MISMATCH` and `PACKAGE_MANIFEST_CONTENT_DENIED` |
+| B2-v2 Bundle Admission | **NOT_QUALIFIED** | Installed Z2 rejected Bundle v2 Admission; original Run classified `DeploymentAPIError`; the installed verifier's exact source SHA is NOT_ATTESTED, so do not assume a specific incompatibility cause |
+| B3 Install / B4 Activate/Rollback | **NOT_RUN** | No install or activation API was called |
+| FPGA / DUT | **NOT_RUN** | No PL load, probe or IC programming |
 
-Registry-inventory output (from actual Path 2 process receipt):
+**Conclusion:** B1 Receive and B2-v1 Admission are valid independently reusable **physical** Baseline tiers. B2-v2 requires separate on-device verification/qualification; it cannot invalidate B1 or B2-v1.
 
-\`\`\`json
-{
-  "phase": "READ_ONLY_MANAGER_REGISTRY_INVENTORY",
-  "managers": [
-    {"port": 18180, "status": "NOT_AVAILABLE"},
-    {"port": 18280, "status": "NO_PHYSICAL_TARGET",
-     "real_z2_aliases": []}
-  ],
-  "b1": "NOT_RUN",
-  "b2_v1": "NOT_RUN",
-  "b2_v2": "NOT_RUN",
-  "install": "NOT_RUN",
-  "fpga": "NOT_RUN",
-  "dut": "NOT_RUN"
-}
-\`\`\`
+## Historical diagnostics prior to successful direct API execution
 
-Actual process receipt \`stdout_sha256\`:
-\`85aad67e9ed31c9b63370ae4885502eb02d76325d63d51040021dc5bec89d9d4\`;
-\`work_order_sha256\`:
-\`b15f8b58f462beea897e19bb96907c9a98ed5d97325cc7fe958cbd208827bf1c\`.
-The matching workflow's downloadable \`plasma-development-cli-41150656253\`
-artifact is the authoritative raw stdout/process/receipt evidence.
+| Step | Real Run | Observed result |
+|---|---|---|
+| Z2 read-only identity/version | [41098395015](https://github.com/physicslu/plasma/actions/runs/41098395015) | PASS; Z2 device ID and Bootstrap `0.1.0` |
+| Initial standalone CLI token-file requirement | [41099568098](https://github.com/physicslu/plasma/actions/runs/41099568098) | `PRIVATE_TOKEN_FILE_NOT_PROVISIONED`; B1/B2 NOT_RUN |
+| Control Manager paired probe | [41150496276](https://github.com/physicslu/plasma/actions/runs/41150496276) | `MANAGER_PHYSICAL_TARGET_NOT_ENROLLED`; B1/B2 NOT_RUN |
+| Manager registry inventory | [41150656253](https://github.com/physicslu/plasma/actions/runs/41150656253) | :18180 unavailable; :18280 has no real Z2 alias |
+| Owner-approved Manager registry enrollment | [41151768961](https://github.com/physicslu/plasma/actions/runs/41151768961) | `ENROLL_REGISTRY_NOT_MUTABLE`, no POST mutation; B1/B2 NOT_RUN |
+| SWPC Manager fixed-path/runtime inspection | [41154085590](https://github.com/physicslu/plasma/actions/runs/41154085590) | Read-only; no Manager or credential change |
+| First direct SSH+API attempt | [41154527571](https://github.com/physicslu/plasma/actions/runs/41154527571) | Existing Status API has no `ok` field; fixed host acceptance parser |
 
-## Classification and next admissible step
+The earlier Manager limitations remain relevant to **Control Station managed deployment** but are **not dependencies for the engineering-mode direct SWPC→Z2 Bootstrap acceptance**. No Manager config, persistent Registry, pairing credential, or PPU service was changed.
 
-- **Physical connection:** Proven with the initial read-only direct Z2 probe.
-- **SWPC Manager availability:** :18280 reachable, but its Registry has no
-  \`http://192.168.2.99:18080\` alias; :18180 unavailable. Therefore the
-  Runner does not have an authenticated Manager route to the physical Z2.
-- **Do not reinterpret Run exit 0 from inventory as a B1 PASS.** No upload,
-  server-side hash/commit or Admission transaction occurred in those runs.
-- The product Manager's existing Bootstrap Credential Store must be enrolled
-  for the **real physical Z2** with matching device ID and its configured
-  Gateway endpoint. Registration/pairing must be performed only in an
-  explicitly authorized, controlled Platform maintenance workflow.
-  **This Gate 1 does not authorize changing SWPC system configuration**;
-  no guessed Token, no direct HTTP mutation fallback, no QEMU substitution.
-- When owner confirms the real Manager enrollment, rerun the exact-HEAD
-  read-only Manager pairing preflight and then B1/B2. Keep B1 independent of
-  B2. Never claim Production TLS, Publisher/Master authority, Installer or
-  FPGA/DUT qualification from B1/B2.
+## Qualification and reproducibility rules
 
-
-## Owner-approved Manager registration — immutable registry blocker
-
-The owner approved registration of the physical Z2 using the **existing Manager API**,
-with no creation/rotation of any Token and no other SWPC runtime settings change.
-
-- Pinned PR HEAD: `550ace3ebc25b77bc1d00d9724a904e00864832e`.
-- [Path 2 Run 41151768961](https://github.com/physicslu/plasma/actions/runs/41151768961), job `development-execute` ID `124389732136`.
-- Trusted dispatcher `development-authorize`: SUCCESS. CLI exit 69, process classification `NOT_RUN_RESOURCE_UNAVAILABLE`.
-- Exact error: `ENROLL_REGISTRY_NOT_MUTABLE`.
-- Real physical Z2 identity checked against `ppu-device-7ed4b30913a9bf6101da5a7a` before Manager mutation.
-- SWPC Manager: `127.0.0.1:18280`. Expected immutable endpoint: `http://192.168.2.99:18080`.
-- Process stdout SHA256: `41c2bdd33d8d5570e19a6a0c05ab7dc52dc299be5d243c72f01f73f472f9cae1`.
-- Raw evidence: `plasma-development-cli-41151768961` GitHub Actions artifact.
-- The code checked Manager `/api/registry`, received `mutable=false`, and **did not send POST /api/registry**.
-- No alias was added, no Package was uploaded, no pairing changed, no device service/install/FPGA/DUT operation occurred.
-
-**Security boundary:** The current Manager profile's immutable registry does not support the approved API-level registration. In existing Manager code, missing persistent `registry_state_path` also disables `BootstrapCredentialStore.path_for_registry` persistence. Current Gate 1 forbids modifying other SWPC system configuration, restarts or adding/rotating credentials. A separate explicit approval is needed before changing Manager runtime configuration and checking pairing.
-
-**Final classification for this run:** Physical device read-only identity PASS; Manager Registry Enrollment BLOCKED; B1/B2 NOT_RUN; Gate 2 NOT_READY.
+1. Always run from open owner PR exact candidate HEAD under existing Issue #981 trusted `main` Dispatcher, `path2-cli` / `operator-cli` / `guarded-hardware` on `SWPC-plasma-codex`.
+2. The CLI must verify exact pinned physical device ID before the first write; SSH uses enrolled Z2 login and pinned host key, root-protected existing token is only held in transient memory and never written, logged or printed.
+3. Positive receive is proven by real committed bytes, archive SHA, Z2 Upload ID. Negative SHA/target cases must be **rejected by the Z2 verifier**, not by a busy Manager or missing pairing.
+4. B2-v1 and B2-v2 are independent; retain explicit NOT_QUALIFIED on missing physical Bundle v2 evidence. `exit 0` is not a blanket PASS for all tiers.
+5. Receipts must preserve true GitHub Run, Job, source SHA, stdout SHA256 and Work Order SHA256. Do not substitute host-only CI or simulator results.
+6. Never infer installed Z2 Bundle verifier source SHA or Publisher/Master install authority; never install/activate/rollback, reconfigure FPGA, use DUT or modify Factory Recovery as part of B1/B2.
