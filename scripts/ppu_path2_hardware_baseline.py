@@ -119,8 +119,26 @@ class ManagerAdmissionClient:
             if len(data) > 2 * 1024 * 1024:
                 raise BaselineError("MANAGER_RESPONSE_TOO_LARGE")
             if code < 200 or code >= 300:
-                # No upstream HTML/body or credential-containing error in logs.
-                raise self.module.DeploymentAPIError(f"API_HTTP_REJECTED:{code}")
+                # Negative tests must prove *content rejection*, not merely a
+                # 409 from Manager's idle gate or missing pairing. Whitelist
+                # static non-secret PPU verifier errors; never log upstream data.
+                reason = ""
+                if code == 409:
+                    try:
+                        rejected = json.loads(data.decode("utf-8"))
+                    except (ValueError, UnicodeDecodeError):
+                        rejected = None
+                    if (isinstance(rejected, dict)
+                            and rejected.get("error") == "bootstrap_request_rejected"):
+                        allowed = {
+                            "chunk SHA-256 mismatch": "CHUNK_SHA256_MISMATCH",
+                            "PACKAGE_FILE_SHA256_MISMATCH": "PACKAGE_FILE_SHA256_MISMATCH",
+                            "PACKAGE_MANIFEST_CONTENT_DENIED": "PACKAGE_MANIFEST_CONTENT_DENIED",
+                        }
+                        reason = allowed.get(rejected.get("message"), "")
+                raise self.module.DeploymentAPIError(
+                    f"API_HTTP_REJECTED:{code}" + (f":{reason}" if reason else "")
+                )
             result = json.loads(data.decode("utf-8"))
         finally:
             conn.close()
@@ -349,7 +367,8 @@ def sample_v2(source_sha: str, target: Mapping[str, str]) -> bytes:
     return _zipped(manifest, {first_path: first, second_path: second})
 
 
-def _expect_http_rejection(api, method: str, path: str, body: dict, error: str) -> None:
+def _expect_http_rejection(api, method: str, path: str, body: dict, error: str,
+                           *, expected_reason: str | None = None) -> None:
     try:
         api._call(method, path, body)
     except Exception as exc:
@@ -357,6 +376,10 @@ def _expect_http_rejection(api, method: str, path: str, body: dict, error: str) 
             raise BaselineError("NEGATIVE_WRONG_ERROR_CLASS") from exc
         if "API_HTTP_REJECTED:409" not in str(exc):
             raise BaselineError("NEGATIVE_NOT_REJECTED_AS_409") from None
+        if (expected_reason is not None
+                and isinstance(api, ManagerAdmissionClient)
+                and not str(exc).endswith(":" + expected_reason)):
+            raise BaselineError("NEGATIVE_REJECTION_CAUSE_UNPROVEN") from None
     else:
         raise BaselineError("NEGATIVE_UNEXPECTEDLY_ACCEPTED")
 
@@ -373,7 +396,7 @@ def b1_upload(api, client_module, data: bytes) -> dict[str, Any]:
     _expect_http_rejection(api, "POST", f"/v1/uploads/{uid}/chunks", {
         "offset": 0, "data_base64": base64.b64encode(first).decode(),
         "sha256": "0" * 64,
-    }, client_module.DeploymentAPIError)
+    }, client_module.DeploymentAPIError, expected_reason="CHUNK_SHA256_MISMATCH")
     offset = 0
     for start in range(0, len(data), 1024 * 1024):
         part = data[start:start + 1024 * 1024]
@@ -422,12 +445,14 @@ def b2_negative(api, client_module, source_sha: str, target: Mapping[str, str]) 
     uid = api.upload(failed)
     _expect_http_rejection(api, "POST", "/v1/deployments",
                            {"kind": "python", "upload_id": uid},
-                           client_module.DeploymentAPIError)
+                           client_module.DeploymentAPIError,
+                           expected_reason="PACKAGE_FILE_SHA256_MISMATCH")
     mismatched = sample_v1(source_sha, target, mismatch_target=True)
     uid2 = api.upload(mismatched)
     _expect_http_rejection(api, "POST", "/v1/deployments",
                            {"kind": "python", "upload_id": uid2},
-                           client_module.DeploymentAPIError)
+                           client_module.DeploymentAPIError,
+                           expected_reason="PACKAGE_MANIFEST_CONTENT_DENIED")
     return {"wrong_file_sha256": "REJECTED", "wrong_target": "REJECTED"}
 
 
