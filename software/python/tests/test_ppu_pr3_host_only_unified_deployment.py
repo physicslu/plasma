@@ -9,10 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from .test_ppu_bundle_v2_host_only_pr2 import (
-    contract, PARTS,
-)
-from .test_ppu_bundle_v3_packages_contract import bundle_v3
+from .test_ppu_bundle_v3_packages_contract import bundle_v3, contract, PARTS
 from .test_ppu_generic_package_host_only_gate1 import (
     TARGET, SOURCE, coordinator, request, engine,
 )
