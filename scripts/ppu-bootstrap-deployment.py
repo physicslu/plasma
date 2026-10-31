@@ -583,7 +583,8 @@ class DeploymentCoordinator:
             self.journal.write(record, "package_active")
             return {
                 "result": "PASS", "transaction": asdict(record),
-                "package": {"name": package.name, "kind": package.kind,
+                **{("bundle" if getattr(package, "schema", None) == contract.BUNDLE_SCHEMA
+                    else "package"): {"name": package.name, "kind": package.kind,
                             "version": package.version, "sha256": package.archive_sha256,
                             "purpose": getattr(package, "purpose", None),
                             **({("packages" if package.schema ==
@@ -591,7 +592,7 @@ class DeploymentCoordinator:
                                 dict(id=p.id, kind=p.kind, version=p.version,
                                      requires=list(p.requires))
                                 for p in package.packages
-                            ]} if hasattr(package, "packages") else {"components": []})},
+                            ]} if hasattr(package, "packages") else {"components": []})}},
                 "host_only": True, "install_qualified": False,
                 "not_claimed": ["real engineering deployment", "FPGA load", "SWPC/Z2 rollout"],
             }
