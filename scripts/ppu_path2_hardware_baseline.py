@@ -214,7 +214,7 @@ def probe_manager_registries(expected_host: str, *, ports=(18180, 18280)):
                 continue
             registry = json.loads(raw.decode("utf-8"))
             ppus = registry.get("ppus") if isinstance(registry, dict) else None
-            if registry.get("ok") is not True or not isinstance(ppus, list):
+            if not isinstance(registry, dict) or registry.get("ok") is not True or not isinstance(ppus, list):
                 result.append({"port": port, "status": "INVALID_REGISTRY"})
                 continue
             matches = sorted(
