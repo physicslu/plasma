@@ -322,14 +322,16 @@ def admit_existing_bootstrap_request(body: Mapping[str, object]) -> dict[str, st
 # PR2: versioned, multi-component bundle. All semantics here are data-only.
 # Unknown component kinds are accepted as opaque NON-EXECUTABLE resources;
 # only explicitly qualified, separately reviewed handlers may later use them.
-BUNDLE_SCHEMA = "plasma.ppu.bundle.v2"
+BUNDLE_SCHEMA = "plasma.ppu.bundle.v3"  # Canonical: Bundle -> Packages -> Files
+LEGACY_BUNDLE_SCHEMA = "plasma.ppu.bundle.v2"  # Read-only format compatibility
 BUNDLE_KIND = "bundle"
-MAX_BUNDLE_COMPONENTS = 32
+MAX_BUNDLE_PACKAGES = 32
+MAX_BUNDLE_COMPONENTS = MAX_BUNDLE_PACKAGES  # Legacy symbol; do not emit in v3
 BUNDLE_KNOWN_KINDS = frozenset({"python", "native-c", "fpga-image"})
 
 
 @dataclass(frozen=True)
-class VerifiedBundleComponent:
+class VerifiedBundlePackage:
     id: str
     kind: str
     version: str
@@ -346,14 +348,27 @@ class VerifiedBundle:
     archive_sha256: str
     files: tuple[VerifiedPackageFile, ...]
     target: Mapping[str, str]
-    components: tuple[VerifiedBundleComponent, ...]
+    packages: tuple[VerifiedBundlePackage, ...]
     purpose: str
     install_qualified: bool = False
     actions: tuple[str, ...] = ()
+    schema: str = BUNDLE_SCHEMA
+
+    @property
+    def components(self) -> tuple[VerifiedBundlePackage, ...]:
+        """Legacy v2 reader only; new consumers MUST use packages."""
+        return self.packages
 
 
-def _bundle_component_file_allowed(kind: str, component_id: str, member: VerifiedPackageFile) -> bool:
-    prefix = f"payload/components/{component_id}/"
+VerifiedBundleComponent = VerifiedBundlePackage  # legacy import compatibility
+
+
+def _bundle_package_file_allowed(
+    kind: str, package_id: str, member: VerifiedPackageFile, *,
+    schema: str = BUNDLE_SCHEMA,
+) -> bool:
+    root = "packages" if schema == BUNDLE_SCHEMA else "components"
+    prefix = f"payload/{root}/{package_id}/"
     if not member.path.startswith(prefix):
         return False
     suffix = member.path[len(prefix):]
@@ -383,8 +398,8 @@ def _bundle_component_file_allowed(kind: str, component_id: str, member: Verifie
     return not member.executable and suffix.startswith(("data/", "assets/"))
 
 
-def _verify_bundle_dependencies(components: tuple[VerifiedBundleComponent, ...]) -> None:
-    by_id = {component.id: component for component in components}
+def _verify_bundle_dependencies(packages: tuple[VerifiedBundlePackage, ...]) -> None:
+    by_id = {package.id: package for package in packages}
     visited: set[str] = set()
     visiting: set[str] = set()
 
@@ -409,7 +424,7 @@ def verify_host_only_bundle(
     archive_path: Path, *, expected_sha256: str, source_commit: str | None,
     target_profile: Mapping[str, str],
 ) -> VerifiedBundle:
-    """Verify a v2 multi-component artifact; NEVER install or execute it.
+    """Verify v3 package-based and legacy v2 component wire formats; no execution.
 
     Publisher provenance, Master authorization, privilege and Site ownership
     are not established by a valid manifest or checksum.
@@ -451,10 +466,14 @@ def verify_host_only_bundle(
             manifest = json.loads(archive.read(manifest_info), object_pairs_hook=_unique_json_pairs)
             if not isinstance(manifest, dict):
                 raise UnifiedDeploymentError("BUNDLE_MANIFEST_INVALID")
+            schema = manifest.get("schema")
+            if schema not in (BUNDLE_SCHEMA, LEGACY_BUNDLE_SCHEMA):
+                raise UnifiedDeploymentError("BUNDLE_SCHEMA_UNSUPPORTED")
+            package_key = "packages" if schema == BUNDLE_SCHEMA else "components"
             fields = {"schema", "name", "version", "source_commit", "target",
-                      "purpose", "components"}
+                      "purpose", package_key}
             if (set(manifest) not in (fields, fields | {"actions"})
-                    or manifest["schema"] != BUNDLE_SCHEMA
+                    or manifest["schema"] != schema
                     or type(manifest["name"]) is not str or not SAFE_NAME.fullmatch(manifest["name"])
                     or type(manifest["version"]) is not str or not SAFE_VERSION.fullmatch(manifest["version"])
                     or type(manifest["source_commit"]) is not str
@@ -464,18 +483,18 @@ def verify_host_only_bundle(
                     or not SAFE_NAME.fullmatch(manifest["purpose"])
                     or type(manifest["target"]) is not dict
                     or manifest["target"] != dict(target_profile)
-                    or type(manifest["components"]) is not list
-                    or not 1 <= len(manifest["components"]) <= MAX_BUNDLE_COMPONENTS):
+                    or type(manifest[package_key]) is not list
+                    or not 1 <= len(manifest[package_key]) <= MAX_BUNDLE_PACKAGES):
                 raise UnifiedDeploymentError("BUNDLE_MANIFEST_CONTENT_DENIED")
             actions = manifest.get("actions", [])
             if (type(actions) is not list or len(actions) > 4
                     or len(actions) != len(set(a for a in actions if type(a) is str))
                     or any(type(a) is not str or a not in PACKAGE_ACTIONS for a in actions)):
                 raise UnifiedDeploymentError("BUNDLE_ACTIONS_DENIED")
-            components: list[VerifiedBundleComponent] = []
+            packages: list[VerifiedBundlePackage] = []
             files: list[VerifiedPackageFile] = []
             ids: set[str] = set()
-            for entry in manifest["components"]:
+            for entry in manifest[package_key]:
                 if (type(entry) is not dict
                         or set(entry) != {"id", "kind", "version", "requires", "files"}
                         or type(entry["id"]) is not str or not SAFE_NAME.fullmatch(entry["id"])
@@ -487,9 +506,9 @@ def verify_host_only_bundle(
                                for dep in entry["requires"])
                         or len(entry["requires"]) != len(set(entry["requires"]))
                         or type(entry["files"]) is not list or not entry["files"]):
-                    raise UnifiedDeploymentError("BUNDLE_COMPONENT_INVALID")
+                    raise UnifiedDeploymentError("BUNDLE_PACKAGE_INVALID" if schema == BUNDLE_SCHEMA else "BUNDLE_COMPONENT_INVALID")
                 ids.add(entry["id"])
-                component_files: list[VerifiedPackageFile] = []
+                package_files: list[VerifiedPackageFile] = []
                 for item in entry["files"]:
                     if (type(item) is not dict
                             or set(item) != {"path", "sha256", "size", "executable"}
@@ -499,8 +518,13 @@ def verify_host_only_bundle(
                             or type(item["executable"]) is not bool):
                         raise UnifiedDeploymentError("BUNDLE_FILE_METADATA_DENIED")
                     verified = VerifiedPackageFile(**item)
-                    if not _bundle_component_file_allowed(entry["kind"], entry["id"], verified):
-                        raise UnifiedDeploymentError("BUNDLE_COMPONENT_FILE_KIND_DENIED")
+                    if not _bundle_package_file_allowed(
+                        entry["kind"], entry["id"], verified, schema=schema
+                    ):
+                        raise UnifiedDeploymentError(
+                            "BUNDLE_PACKAGE_FILE_KIND_DENIED" if schema == BUNDLE_SCHEMA
+                            else "BUNDLE_COMPONENT_FILE_KIND_DENIED"
+                        )
                     if verified.path not in names:
                         raise UnifiedDeploymentError("BUNDLE_MEMBER_MISSING")
                     info = archive.getinfo(verified.path)
@@ -512,32 +536,32 @@ def verify_host_only_bundle(
                             digest.update(chunk)
                     if digest.hexdigest() != verified.sha256:
                         raise UnifiedDeploymentError("BUNDLE_FILE_SHA256_MISMATCH")
-                    component_files.append(verified)
+                    package_files.append(verified)
                     files.append(verified)
                 if (entry["kind"] == "python"
-                        and not any(f.path.endswith(".py") for f in component_files)):
+                        and not any(f.path.endswith(".py") for f in package_files)):
                     raise UnifiedDeploymentError("BUNDLE_PYTHON_SOURCE_MISSING")
                 if (entry["kind"] == "native-c"
-                        and not any(f.executable for f in component_files)):
+                        and not any(f.executable for f in package_files)):
                     raise UnifiedDeploymentError("BUNDLE_NATIVE_BINARY_MISSING")
                 if entry["kind"] == "fpga-image":
-                    image = [f for f in component_files if f.path.endswith((".bit", ".bin"))]
-                    handoff = [f for f in component_files if f.path.endswith(".hwh")]
+                    image = [f for f in package_files if f.path.endswith((".bit", ".bin"))]
+                    handoff = [f for f in package_files if f.path.endswith(".hwh")]
                     if len(image) != 1 or len(handoff) != 1:
                         raise UnifiedDeploymentError("BUNDLE_FPGA_PAIR_DENIED")
-                components.append(VerifiedBundleComponent(
+                packages.append(VerifiedBundlePackage(
                     entry["id"], entry["kind"], entry["version"],
-                    tuple(entry["requires"]), tuple(component_files),
+                    tuple(entry["requires"]), tuple(package_files),
                 ))
             if (len(files) > MAX_PACKAGE_FILES or len({f.path for f in files}) != len(files)
                     or set(names) != {"manifest.json"} | {f.path for f in files}):
                 raise UnifiedDeploymentError("BUNDLE_UNDECLARED_OR_DUPLICATE_FILES")
-            _verify_bundle_dependencies(tuple(components))
+            _verify_bundle_dependencies(tuple(packages))
             return VerifiedBundle(
                 manifest["name"], BUNDLE_KIND, manifest["version"],
                 manifest["source_commit"], expected_sha256, tuple(files),
-                dict(target_profile), tuple(components), manifest["purpose"],
-                actions=tuple(actions),
+                dict(target_profile), tuple(packages), manifest["purpose"],
+                actions=tuple(actions), schema=schema,
             )
     except (OSError, zipfile.BadZipFile, UnicodeDecodeError, json.JSONDecodeError,
             KeyError, TypeError, ValueError) as exc:
@@ -550,7 +574,7 @@ def verify_host_only_artifact(
     archive_path: Path, *, expected_sha256: str, source_commit: str | None,
     target_profile: Mapping[str, str],
 ) -> VerifiedPackage | VerifiedBundle:
-    """Select v1/v2 parser by on-disk schema; neither branch grants execution."""
+    """Select legacy v1/v2 or canonical v3; no branch grants execution."""
     if not isinstance(archive_path, Path) or archive_path.is_symlink():
         raise UnifiedDeploymentError("PACKAGE_ARCHIVE_UNTRUSTED")
     try:
@@ -573,7 +597,7 @@ def verify_host_only_artifact(
             archive_path, expected_sha256=expected_sha256,
             source_commit=source_commit, target_profile=target_profile,
         )
-    if schema == BUNDLE_SCHEMA:
+    if schema in (BUNDLE_SCHEMA, LEGACY_BUNDLE_SCHEMA):
         return verify_host_only_bundle(
             archive_path, expected_sha256=expected_sha256,
             source_commit=source_commit, target_profile=target_profile,
@@ -594,24 +618,28 @@ def verify_host_only_artifact(
 BUNDLE_POLICY_SCHEMA = "plasma.ppu.host-policy.v1"
 
 
-def bundle_component_identity(component: VerifiedBundleComponent) -> str:
-    """Content identity for a versioned component; does not prove publisher."""
-    if not isinstance(component, VerifiedBundleComponent):
-        raise UnifiedDeploymentError("BUNDLE_COMPONENT_IDENTITY_DENIED")
+def bundle_package_identity(package: VerifiedBundlePackage) -> str:
+    """Verified Package identity; digest is not publisher authorization."""
+    if not isinstance(package, VerifiedBundlePackage):
+        raise UnifiedDeploymentError("BUNDLE_PACKAGE_IDENTITY_DENIED")
     descriptor = {
-        "id": component.id,
-        "kind": component.kind,
-        "version": component.version,
-        "requires": list(component.requires),
+        "id": package.id,
+        "kind": package.kind,
+        "version": package.version,
+        "requires": list(package.requires),
         "files": [
             {"path": f.path, "sha256": f.sha256, "size": f.size,
              "executable": f.executable}
-            for f in sorted(component.files, key=lambda entry: entry.path)
+            for f in sorted(package.files, key=lambda entry: entry.path)
         ],
     }
     return hashlib.sha256(
         json.dumps(descriptor, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+# Legacy API name, retained for historical PR3 callers only.
+bundle_component_identity = bundle_package_identity
 
 
 def resolve_host_only_bundle(
@@ -627,11 +655,11 @@ def resolve_host_only_bundle(
     """
     if not isinstance(bundle, VerifiedBundle) or not isinstance(trusted_inventory, Mapping):
         raise UnifiedDeploymentError("BUNDLE_RESOLUTION_INPUT_INVALID")
-    if any(type(name) is not str or name not in {c.id for c in bundle.components}
+    if any(type(name) is not str or name not in {p.id for p in bundle.packages}
            for name in trusted_inventory):
         raise UnifiedDeploymentError("BUNDLE_INVENTORY_UNKNOWN_COMPONENT")
-    by_id = {component.id: component for component in bundle.components}
-    _verify_bundle_dependencies(bundle.components)
+    by_id = {package.id: package for package in bundle.packages}
+    _verify_bundle_dependencies(bundle.packages)
     seen: set[str] = set()
     order: list[str] = []
 
@@ -644,15 +672,15 @@ def resolve_host_only_bundle(
         seen.add(component_id)
         order.append(component_id)
 
-    for component in bundle.components:
-        visit(component.id)
+    for package in bundle.packages:
+        visit(package.id)
 
     stage: list[str] = []
     reuse: list[str] = []
     identities: dict[str, str] = {}
     for component_id in order:
         component = by_id[component_id]
-        identity = bundle_component_identity(component)
+        identity = bundle_package_identity(component)
         identities[component_id] = identity
         existing = trusted_inventory.get(component_id)
         if existing is None:
@@ -673,12 +701,13 @@ def resolve_host_only_bundle(
         else:
             stage.append(component_id)
     return {
-        "schema": "plasma.ppu.bundle-resolution.v1",
+        "schema": ("plasma.ppu.bundle-resolution.v2" if bundle.schema == BUNDLE_SCHEMA
+                   else "plasma.ppu.bundle-resolution.v1"),
         "archive_sha256": bundle.archive_sha256,
-        "component_order": order,
+        ("package_order" if bundle.schema == BUNDLE_SCHEMA else "component_order"): order,
         "stage": stage,
         "reuse": reuse,
-        "component_sha256": identities,
+        ("package_sha256" if bundle.schema == BUNDLE_SCHEMA else "component_sha256"): identities,
         "install_qualified": False,
     }
 
@@ -727,8 +756,8 @@ def evaluate_host_only_bundle_authority(
     if (type(allowed) is not list or not allowed
             or any(type(kind) is not str or not SAFE_NAME.fullmatch(kind) for kind in allowed)
             or len(set(allowed)) != len(allowed)
-            or any(component.kind not in allowed for component in bundle.components)):
-        raise UnifiedDeploymentError("BUNDLE_COMPONENT_KIND_NOT_AUTHORIZED")
+            or any(package.kind not in allowed for package in bundle.packages)):
+        raise UnifiedDeploymentError("BUNDLE_PACKAGE_KIND_NOT_AUTHORIZED" if bundle.schema == BUNDLE_SCHEMA else "BUNDLE_COMPONENT_KIND_NOT_AUTHORIZED")
     return {
         "publisher": trusted_policy["publisher"],
         "master_generation": trusted_policy["master_generation"],
