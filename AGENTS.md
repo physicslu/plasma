@@ -55,6 +55,15 @@ An approved Gate 1 is an execution assignment, not a new planning gate. Path 3 m
 - **Architecture/runtime:** SWPC Web/Controller/BFF, Z2 PS live OpenOCD and bridge, Z2 PL SWD/SPI; Gateway is standard-library HTTP/REST polling, not FastAPI/WebSocket. Read current source, `scripts/plasmactl`, and the [shared architecture/runtime clauses](docs/development/plasma-development-common.md) before changes. Gateway integration commonly uses port 18080; no unapproved service restart, port exposure or deployment. Desired persistence does not mean activation.
 - **Process safety:** identify precise service/PIDs before stopping; no broad `pkill`/`killall` or disruption of unrelated SSH, network or storage services.
 
+## PLASMA Engineering Compatibility Policy (normative)
+
+**Engineering development defaults to Replace-by-Default, not backward compatibility.** New versions replace old versions directly across API, Schema, Protocol, Package, FPGA IP, Driver, tools and internal interfaces.
+
+- **Migrate dependents together:** update implementation, callers, tests, fixtures, documentation and CI to the new contract in the same scoped change.
+- **Retire old versions:** do not retain Compatibility Layers, Legacy Adapters or dual-track architectures merely to satisfy old tests.
+- **Validate the new contract:** rewrite obsolete tests for the new version while preserving applicable functional and safety acceptance requirements.
+- **Explicitly approved exceptions only:** separately evaluate migration or compatibility requirements for released products, existing customer data, irreversible data formats or formally published external interfaces. Do not assume such an exception without owner approval.
+
 ## 11–15. Approval, Git and validation summary
 
 Gate 1 requires an explicit bounded plan before implementation. Once approved, finish all in-scope changes, tests, CI and repairs autonomously. Do not introduce additional approval gates. Material scope expansion requires revised Gate 1.
