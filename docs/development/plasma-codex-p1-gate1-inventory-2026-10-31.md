@@ -299,3 +299,10 @@ All frozen PS S01–S04, PL P01–P04 and shared C01–C04 documents were read f
 | C04 | ADR status index; ADR-0003 Proposed | No change |
 
 **Batch review coverage:** 16/16 initial content classification (W01–W04 in preceding section; S01–S04, P01–P04, C01–C04 above). **Final accepted: 0/16 pending implementation/test/link reconciliation and consolidated CI.** Directly edited frozen baseline paths so far: W01, S01, P01, P03, C02, C03 (6/16); C02/C03 edits predate frozen baseline, and the baseline SHA captures their then-current state. No changes outside the frozen documents except this audit report. The owner-directed CI-only-after-batch rule remains in force.
+
+## Additional cross-domain source/document reconciliation (CI not run)
+
+- **W02:** PPU REST v3 contract explicitly distinguished from Next.js Manager BFF and frontend fleet aggregation. Verified actual `software/web/app/api/manager/ppu/route.ts` GET/POST, `software/web/app/api/fleet/route.ts` GET, `software/python/plasma_web/secure_gateway.py` secure handler and `software/python/plasma_web/gateway.py` REST version emission. **Not** claiming complete route/test coverage.
+- **S01:** The release-kit document itself uses `scripts/plasmactl install z2-ps` and `deploy z2-ps`. Added an explicit verification checkpoint against the executable deployment engine and rollback tests; do not promote release-kit examples to canonical current transport without reconciliation.
+- **P02:** Site-1 RTL feasibility is simulation-only; linked the superseding SWD semantic convergence candidate and preserved physical pairing/real DUT proof boundary.
+- **Changes:** W02, S01, P02 updated in this pass; frozen set unchanged. Continue evidence and navigation reconciliation across all 16 before one consolidated CI review.
