@@ -6,7 +6,7 @@
 
 # Plasma Autonomous Development Contract
 
-This file is the primary operating contract for AI coding agents working on the Plasma repository. Read it before making code, configuration, deployment, hardware, or documentation changes.
+The repository root [AGENTS.md](../../AGENTS.md) is the mandatory entrypoint for AI coding agents working on Plasma. This document is the detailed normative reference: load and apply the relevant sections on demand when the task touches their domains, including deployment, privileged resources, FPGA/PS hardware, or safety controls. Do not require a full read for every unrelated change, and do not bypass applicable clauses.
 
 The operating model has **exactly two user approval gate types**: a **Gate 1 — Plan Approval** before implementation starts and a **Gate 2 — Merge Approval** when the work is merge-ready. After Gate 1, engineering execution continues autonomously within the approved scope, including branch/commit/PR work, CI repair, Draft -> Ready, and any deployment/runtime/hardware acceptance explicitly included in the approved plan. There is no separate deployment, runtime, hardware, or Ready-for-review approval gate. If necessary work materially exceeds the approved scope, return to Gate 1 with a revised plan rather than inventing a third gate.
 
