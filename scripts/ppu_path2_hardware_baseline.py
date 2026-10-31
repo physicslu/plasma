@@ -213,6 +213,88 @@ class ManagerAdmissionClient:
         return self.module.BootstrapAPIClient.deployment_state(self, transaction_id)
 
 
+def enroll_manager_real_z2(host: str, device_id: str, *,
+                           alias: str = "z2", port: int = 18280,
+                           probe=None, connection_factory=None) -> dict[str, Any]:
+    """Owner-approved exact real Z2 registry ADD; never pair or rotate secrets.
+
+    Fail closed on alias/endpoint conflict, immutable Manager, wrong real
+    hardware identity. Registry registration alone is NOT pairing or B1.
+    """
+    host = _private_ipv4(host)
+    if not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", device_id):
+        raise BaselineError("ENROLL_DEVICE_ID_INVALID")
+    if alias != "z2" or port != 18280:
+        raise BaselineError("ENROLL_FIXED_MANAGER_ALIAS_AND_PORT_REQUIRED")
+    observed = (probe(host) if probe is not None else probe_status(host))
+    if observed.get("device_id_observed") != device_id:
+        raise BaselineError("ENROLL_REAL_DEVICE_ID_MISMATCH")
+    factory = connection_factory or http.client.HTTPConnection
+
+    def request(method, body=None):
+        conn = factory("127.0.0.1", port, timeout=10)
+        try:
+            raw = None if body is None else json.dumps(
+                body, sort_keys=True, separators=(",", ":")).encode()
+            conn.request(method, "/api/registry", body=raw, headers={
+                "Accept": "application/json",
+                **({"Content-Type": "application/json"} if raw is not None else {}),
+            })
+            response = conn.getresponse()
+            data = response.read(65537)
+            if not data or len(data) > 65536:
+                raise BaselineError("ENROLL_MANAGER_RESPONSE_INVALID")
+            payload = json.loads(data.decode("utf-8"))
+            if type(payload) is not dict:
+                raise BaselineError("ENROLL_MANAGER_RESPONSE_INVALID")
+            return response.status, payload
+        finally:
+            conn.close()
+
+    endpoint = f"http://{host}:18080"
+    code, registry = request("GET")
+    if code != 200 or registry.get("ok") is not True:
+        raise BaselineError("ENROLL_MANAGER_REGISTRY_UNAVAILABLE")
+    if registry.get("mutable") is not True or type(registry.get("ppus")) is not list:
+        raise BaselineError("ENROLL_REGISTRY_NOT_MUTABLE")
+    entries = registry["ppus"]
+    if any(type(x) is not dict for x in entries):
+        raise BaselineError("ENROLL_REGISTRY_INVALID")
+    if any(x.get("endpoint") == endpoint and x.get("alias") != alias for x in entries):
+        raise BaselineError("ENROLL_ENDPOINT_ALREADY_OWNED")
+    ours = [x for x in entries if x.get("alias") == alias]
+    if len(ours) > 1 or (ours and ours[0].get("endpoint") != endpoint):
+        raise BaselineError("ENROLL_ALIAS_CONFLICT")
+    if ours:
+        state = "ALREADY_ENROLLED"
+        record = ours[0]
+    else:
+        status, added = request("POST", {"alias": alias, "endpoint": endpoint})
+        if status != 201 or added.get("ok") is not True:
+            raise BaselineError("ENROLL_MANAGER_ADD_REJECTED")
+        record = added.get("entry")
+        if (type(record) is not dict or record.get("endpoint") != endpoint
+                or record.get("alias") != alias or record.get("lifecycle") != "pending"):
+            raise BaselineError("ENROLL_ADD_RECEIPT_INVALID")
+        state = "REGISTERED_PENDING"
+
+    verify_code, verification = request("GET")
+    valid = verification.get("ppus") if type(verification) is dict else None
+    if verify_code != 200 or type(valid) is not list or not any(
+            type(x) is dict and x.get("endpoint") == endpoint
+            and x.get("alias") == alias for x in valid):
+        raise BaselineError("ENROLL_POSTWRITE_REGISTRY_UNVERIFIED")
+    return {
+        "schema": SCHEMA, "phase": "MANAGER_PHYSICAL_Z2_REGISTRY_ENROLLMENT",
+        "registration": state, "alias": alias, "manager_port": port,
+        "endpoint": endpoint, "device_id_verified": device_id,
+        "lifecycle": record.get("lifecycle"),
+        "pairing": "NOT_VERIFIED",
+        "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+        "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN",
+    }
+
+
 def probe_manager_registries(expected_host: str, *, ports=(18180, 18280)):
     """Read-only SWPC Manager profile inventory, never selects target or mutates.
 
@@ -526,6 +608,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="read-only Z2 identity/version, no credential or writes")
     parser.add_argument("--manager-alias", default="z2")
     parser.add_argument("--manager-port", type=int, default=18280)
+    parser.add_argument("--enroll-manager", action="store_true",
+                        help="owner-approved real Z2 registry add ONLY; no pairing or package")
     parser.add_argument("--manager-inventory", action="store_true",
                         help="read-only SWPC Manager profile registry scan")
     parser.add_argument("--manager-probe", action="store_true",
@@ -540,6 +624,17 @@ def main(argv: list[str] | None = None) -> int:
         if not SHA40.fullmatch(args.source_sha) or _git_head() != args.source_sha:
             raise BaselineError("SOURCE_SHA_PIN_MISMATCH")
         host = _private_ipv4(args.host)
+        if args.enroll_manager:
+            if not args.device_id:
+                raise BaselineError("ENROLL_DEVICE_ID_REQUIRED")
+            result = enroll_manager_real_z2(
+                host, args.device_id, alias=args.manager_alias, port=args.manager_port,
+            )
+            print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps(
+                {**result, "source_sha": args.source_sha},
+                sort_keys=True, separators=(",", ":"),
+            ))
+            return 0
         if args.manager_inventory:
             print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps(
                 {**probe_manager_registries(host), "source_sha": args.source_sha},
