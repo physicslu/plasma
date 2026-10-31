@@ -85,6 +85,8 @@ def self_test() -> None:
         "software/python/plasma_manager/network_commissioning.py",
         "software/python/plasma_web/ppu_network_settings.py",
         "scripts/static-ipv4-fault-injection-repeatability.py",
+        "software/python/plasma_web/gateway.py",
+        "software/python/plasma_web/gateway_security.py",
         "software/python/plasma_web/ppu_network_activation.py",
         "software/python/plasma_web/gateway_phase2.py",
         "software/python/tests/test_static_ipv4_fault_injection_lab.py",
@@ -115,6 +117,8 @@ def self_test() -> None:
         assert not requires_network_qualification([path]), path
     assert requires_network_qualification([negatives[0], positives[2]])
     assert not requires_network_qualification(negatives)
+    assert not requires_network_qualification([])
+    assert not requires_network_qualification(["", "  "])
     print("PPU network heavy-gate trigger self-test: PASS")
 
 
