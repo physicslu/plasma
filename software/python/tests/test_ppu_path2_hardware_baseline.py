@@ -634,3 +634,23 @@ def test_direct_real_z2_status_document_is_valid_without_top_level_ok(monkeypatc
         "192.168.2.99", module=client, token="x" * 48,
         connection_factory=Conn)
     assert api.status() == expected
+
+
+def test_b1_b2_v1_receive_admission_qualify_even_when_v2_is_missing(loopback):
+    api, paths, server = loopback
+    class BundleUnavailable(PinnedLoopback):
+        def submit(self, *, kind, upload_id):
+            if kind == "bundle":
+                raise client.DeploymentAPIError("API_HTTP_REJECTED:409")
+            return super().submit(kind=kind, upload_id=upload_id)
+    result = baseline.run(
+        BundleUnavailable(api), client, source_sha=SOURCE,
+        target=TARGET, expected_device_id=DEVICE,
+    )
+    assert result["b1"]["status"] == "PASS"
+    assert result["b2_v1"]["status"] == "PASS"
+    assert result["b2_v2"]["status"] == "NOT_QUALIFIED"
+    assert result["baseline_qualification"] == "B1_B2_V1_PASS_V2_NOT_QUALIFIED"
+    assert result["b3_install"] == result["b4_activation_rollback"] == "NOT_RUN"
+    assert server.deployment_thread is None
+    assert not paths.product_root.exists()
