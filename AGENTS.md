@@ -55,47 +55,15 @@ An approved Gate 1 is an execution assignment, not a new planning gate. Path 3 m
 - **Architecture/runtime:** SWPC Web/Controller/BFF, Z2 PS live OpenOCD and bridge, Z2 PL SWD/SPI; Gateway is standard-library HTTP/REST polling, not FastAPI/WebSocket. Read current source, `scripts/plasmactl`, and the [shared architecture/runtime clauses](docs/development/plasma-development-common.md) before changes. Gateway integration commonly uses port 18080; no unapproved service restart, port exposure or deployment. Desired persistence does not mean activation.
 - **Process safety:** identify precise service/PIDs before stopping; no broad `pkill`/`killall` or disruption of unrelated SSH, network or storage services.
 
-## 11. Autonomous task execution contract
+## 11–15. Approval, Git and validation summary
 
-### 11.1 Exact two-gate workflow
+Gate 1 requires an explicit bounded plan before implementation. Once approved, finish all in-scope changes, tests, CI and repairs autonomously. Do not introduce additional approval gates. Material scope expansion requires revised Gate 1.
 
-1. Before any new code/config/docs/PR/host or hardware modification, inspect read-only, present the bounded Plan and Path, and obtain explicit **Gate 1** approval.
-2. Execute the authorized scope independently through actual acceptance (including real SWPC/Z2 only if included). Record real output/exit/status; diagnose, fix and retest in the same Gate 1. A missing capability is NOT_RUN, not PASS.
-3. Prepare branch and PR with required CI, Ruleset/Review/Thread and evidence. Move Draft -> Ready when complete; no intermediate human approval gate.
-4. Obtain explicit **Gate 2** approval for a specific PR and HEAD, then recheck live GitHub state and use authorized merge method. Confirm Merge SHA, both Parents and Git Tree.
-5. Post-merge deployment or physical operations proceed only if explicitly covered by Gate 1; otherwise request revised Gate 1. Never treat merge as permission to deploy.
+Gate 2 is explicit approval for merging a specific merge-ready PR. Before merging, check current HEAD, main, required CI, Rulesets, Reviews, Threads and Mergeability. Verify merge commit, parents and tree afterwards. Merge does not independently authorize deployment or hardware operations.
 
-### 11.1A Clickable owner approval choices (normative UX; no new gate)
+Use scoped branches and PRs; preserve unrelated work. No destructive Git operations or history rewriting without explicit scope. Never merge simply to unlock a test that should run before merging.
 
-Use up to four explicit scoped choices when appropriate, but buttons do not themselves create new gates. Present only the currently applicable Gate and never ask twice after explicit owner approval. Gate 2 merge choice only when PR is merge-ready. Non-approval choices do not authorize implementation or merge.
-
-### 11.1B Execution Routing (normative)
-
-- Default (unnumbered): ChatGPT Direct -> GitHub PR -> GitHub-hosted CI for software/docs/Host-only engineering.
-- Path 2: existing GitHub Actions -> authorized SWPC fixed CLI -> real exit/evidence, when deterministic commands suffice.
-- Path 3: existing GitHub Actions -> authorized SWPC-plasma-codex Runner -> rootless USB/TTY-visible Codex CLI autonomous work -> trusted worker commits fixes to the exact authorized PR -> authentic evidence and CI. In the owner-approved Gate 1 scope Codex may operate Z2 through the enrolled SSH/sudo route; device visibility alone does not waive physical safety.
-- Path choice belongs to Gate 1. **No silent route fallback**, no simulated or assumed GitHub Dispatch, no unintended SWPC activity or privilege bypass. Path 2 retains its protected executor. Path 3 may use enrolled Z2 SSH/sudo for approved privileged development and FPGA operations, subject to actual Linux access, safe image identity, device ownership and Golden Restore.
-- The historical execution-route design is in [docs/development/plasma-three-path-execution-model.md](docs/development/plasma-three-path-execution-model.md).
-
-### 11.2 Routine autonomous work after Gate 1
-
-Do not repeatedly seek confirmation for ordinary in-scope edits, builds, CI repairs or polling. Avoid redundant comprehensive readiness reviews for unchanged SHA. Stop only on material scope expansion, real access/safety blocker or Gate 2 merge decision.
-
-## 12. Scope coverage and escalation — no third gate
-
-Explicit Gate 1 scope is required for runtime/deployment/restart/network configuration, physical power/voltage/FPGA/IC programming, destructive or history-rewriting Git operations, and material architecture or security changes. No force-push, rebase of shared history, git reset --hard or git clean that can discard user work without such scope. Merge to main always requires Gate 2.
-
-## 13. Merge-ready definition
-
-Implementation and diff reviewed; applicable tests/CI PASS; no blocking Rulesets/Reviews/unresolved Threads; exact HEAD and base verified; mergeability confirmed; real required SWPC/hardware evidence available or explicitly deferred by owner. No invented PASS claims. Then Ready for Review and Gate 2, not an automatic merge.
-
-## 14. Git publication policy
-
-Use feature branch and PR, preserve other contributors' changes. No direct feature commits to main, no force-push or history rewrite for aesthetics. Confirm HEAD, branch, worktree and target main before edits. Verify merge commit SHA/Parents/Tree after owner Gate 2.
-
-## 15. Validation policy
-
-Development Mode uses the minimum sufficient authentic experiment. Stop after one complete PASS; only FAIL or insufficient evidence warrants targeted diagnosis, repair and retest. Program/Readback/Verify have no numerical retry quota; this is not permission for uncontrolled loops or unsafe repeats. Never automatically repeat an operation after uncertain electrical state, unreaped process or uncertain recovery. Run smallest focused tests first and full relevant CI before readiness. Python and PL source tests, Web lint/test/artifact checks, cross-stack integration and physical HIL are distinct layers; a lower layer does not certify a higher one. Never infer hardware acceptance from hosted mocks.
+Use authentic tests and record PASS, FAIL or NOT_RUN. Hosted CI does not prove hardware success. Stop unsafe retries; retain physical ownership, electrical safety and recovery checks. Consult [shared detailed Gate, Git and validation rules](docs/development/plasma-development-common.md) sections 11–15 before acting. Use [Path 2](docs/development/plasma-path2-cli.md) or [Path 3](docs/development/plasma-path3-codex.md) only when relevant.
 
 ## 16. FPGA / PL rules
 
