@@ -467,7 +467,7 @@ def verify_host_only_bundle(
             if not isinstance(manifest, dict):
                 raise UnifiedDeploymentError("BUNDLE_MANIFEST_INVALID")
             schema = manifest.get("schema")
-            if schema not in (BUNDLE_SCHEMA, LEGACY_BUNDLE_SCHEMA):
+            if schema != BUNDLE_SCHEMA:
                 raise UnifiedDeploymentError("BUNDLE_SCHEMA_UNSUPPORTED")
             package_key = "packages" if schema == BUNDLE_SCHEMA else "components"
             fields = {"schema", "name", "version", "source_commit", "target",
@@ -574,7 +574,7 @@ def verify_host_only_artifact(
     archive_path: Path, *, expected_sha256: str, source_commit: str | None,
     target_profile: Mapping[str, str],
 ) -> VerifiedPackage | VerifiedBundle:
-    """Select legacy v1/v2 or canonical v3; no branch grants execution."""
+    """Admit only canonical Bundle v3; retired schemas fail closed."""
     if not isinstance(archive_path, Path) or archive_path.is_symlink():
         raise UnifiedDeploymentError("PACKAGE_ARCHIVE_UNTRUSTED")
     try:
@@ -592,20 +592,8 @@ def verify_host_only_artifact(
         if isinstance(exc, UnifiedDeploymentError):
             raise
         raise UnifiedDeploymentError("PACKAGE_SCHEMA_PROBE_DENIED") from exc
-    if schema == PACKAGE_SCHEMA:
-        return verify_host_only_package(
-            archive_path, expected_sha256=expected_sha256,
-            source_commit=source_commit, target_profile=target_profile,
-        )
-    if schema in (BUNDLE_SCHEMA, LEGACY_BUNDLE_SCHEMA):
+    if schema == BUNDLE_SCHEMA:
         return verify_host_only_bundle(
-            archive_path, expected_sha256=expected_sha256,
-            source_commit=source_commit, target_profile=target_profile,
-        )
-    if schema is None:
-        # v1 preflight used to reject an invalid ZIP member before interpreting
-        # a malformed/absent schema. Preserve that fail-closed diagnostic.
-        return verify_host_only_package(
             archive_path, expected_sha256=expected_sha256,
             source_commit=source_commit, target_profile=target_profile,
         )
