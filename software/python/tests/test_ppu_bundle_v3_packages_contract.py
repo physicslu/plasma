@@ -72,8 +72,9 @@ def test_v3_host_only_coordinator_uses_packages_not_components(tmp_path):
     co = coordinator(tmp_path)
     receipt = co.execute_package_host_only(request(archive, digest))
     assert receipt["result"] == "PASS"
-    assert len(receipt["package"]["packages"]) == 6
-    assert "components" not in receipt["package"]
+    assert len(receipt["bundle"]["packages"]) == 6
+    assert "components" not in receipt["bundle"]
+    assert "package" not in receipt  # canonical v3 envelope, v2 remains legacy
     assert receipt["install_qualified"] is False
     assert not co.paths.product_root.exists()
 
