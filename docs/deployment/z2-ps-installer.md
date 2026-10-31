@@ -2,6 +2,8 @@
 
 Status: **PS-only release-kit implementation with P3 controlled Site Desired runtime activation wiring; every deployment candidate still requires real Z2 qualification**
 
+> **Scope and authority:** This document describes the Z2 **PS release-kit and managed acceptance** path, not blanket authorization for production deployment or physical DUT/FPGA operations. The currently approved deployment mechanism and credentials must be verified against the active PPU Deployment Engine and root [AGENTS.md](../../AGENTS.md); any SSH-based diagnostic or installation examples here do not establish SSH as a required production deployment transport. Preserve the separately approved Factory Recovery boundary.
+
 ## Purpose
 
 The Z2 PS deployment path turns a clean PYNQ-Z2 image into a Plasma PPU PS node without compiling Plasma or CPython on the board.
@@ -36,6 +38,10 @@ Real Z2   = install / systemd-DAC / runtime / physical-host validation
 ```
 
 A CI PASS must never be reported as a Real Z2 PASS.
+
+> **Verification checkpoint:** The examples below include `scripts/plasmactl install z2-ps` / `deploy z2-ps` and describe release-kit behavior. Before treating them as current operator instructions, reconcile those exact commands against the active `scripts/plasmactl` implementation and PPU Deployment Engine transaction/rollback tests. Until verified, this document is a PS release-kit reference, not proof of the current SWPC→PPU production transport.
+
+> **Source-backed CLI clarification (Gate 1):** `scripts/plasmactl` dispatches the `z2-ps` profile to `scripts/plasmactl-z2-ps`; the backend implements `install`, `deploy`, `verify`, and `status` commands. This confirms the documented **local Z2 PS release-kit CLI exists**, but does **not** prove the newer single SWPC→PPU Deployment Engine has replaced every legacy SSH engineering path. The separate [unified deployment Gate 1 contract](../architecture/ppu-unified-deployment-gate1.md) explicitly records partial Host-only convergence and a remaining on-device installer gap. Keep these two lifecycle claims separate until independently qualified.
 
 ## Release identity and Python ownership
 

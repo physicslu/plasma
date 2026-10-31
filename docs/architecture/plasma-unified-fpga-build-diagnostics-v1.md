@@ -4,6 +4,8 @@ Status: **Gate 1 Draft — offline / GitHub-hosted validation only**. This
 document is a proposed implementation contract, not a claim of a new SWPC
 Vivado build, physical FPGA test, or M1 qualification.
 
+> **Gate boundary:** This is a proposed unified build/diagnostic contract. A Host-only or offline build receipt does not prove a Z2-loaded bitstream, PS/PL image pairing, timing closure on the approved hardware, external SWD signaling, or DUT qualification. Consult root [AGENTS.md](../../AGENTS.md) for current hardware-operation authorization.
+
 ## Scope and existing implementation
 
 This v1 reuses the already qualified F1-B Vivado 2026.1 Project Tcl, pinned
