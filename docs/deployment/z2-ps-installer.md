@@ -41,6 +41,8 @@ A CI PASS must never be reported as a Real Z2 PASS.
 
 > **Verification checkpoint:** The examples below include `scripts/plasmactl install z2-ps` / `deploy z2-ps` and describe release-kit behavior. Before treating them as current operator instructions, reconcile those exact commands against the active `scripts/plasmactl` implementation and PPU Deployment Engine transaction/rollback tests. Until verified, this document is a PS release-kit reference, not proof of the current SWPC→PPU production transport.
 
+> **Source-backed CLI clarification (Gate 1):** `scripts/plasmactl` dispatches the `z2-ps` profile to `scripts/plasmactl-z2-ps`; the backend implements `install`, `deploy`, `verify`, and `status` commands. This confirms the documented **local Z2 PS release-kit CLI exists**, but does **not** prove the newer single SWPC→PPU Deployment Engine has replaced every legacy SSH engineering path. The separate [unified deployment Gate 1 contract](../architecture/ppu-unified-deployment-gate1.md) explicitly records partial Host-only convergence and a remaining on-device installer gap. Keep these two lifecycle claims separate until independently qualified.
+
 ## Release identity and Python ownership
 
 PPU Release Identity v2 remains mandatory:
