@@ -529,3 +529,81 @@ def test_swpc_inspection_reports_only_sanitized_fixed_files(tmp_path):
     assert "SENSITIVE_CONTENT_MUST_NOT_LEAK" not in json.dumps(report)
     assert "12345" not in json.dumps(report)
     assert report["b1"] == "NOT_RUN"
+
+
+def test_existing_enrolled_ssh_token_retrieval_is_memory_only_and_not_logged(monkeypatch):
+    import base64
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    private = "existing-secret-material-" + "P" * 43
+    calls = []
+    class Worker:
+        @staticmethod
+        def z2_login_credentials(home):
+            return ({"ssh_host": "192.168.2.99", "ssh_username": "xilinx",
+                     "ssh_password": "never-show", "sudo_password": "never-show"},
+                    home / ".config/plasma/z2-login-known_hosts")
+        @staticmethod
+        def password_ssh_z2(cmd, credentials, known_hosts, *, timeout):
+            calls.append((cmd, timeout))
+            return (0, "PLASMA_BOOTSTRAP_MATERIAL:" +
+                    base64.b64encode(private.encode()).decode())
+    token = baseline._existing_bootstrap_token_via_z2_ssh("192.168.2.99", helper=Worker)
+    assert token == private
+    assert token not in repr(calls)
+    assert calls[0][0][:3] == ["python3", "-I", "-c"]
+    assert "control-token" in calls[0][0][3]
+
+
+def test_direct_ssh_denies_host_drift_and_secret_access_failure(monkeypatch):
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    class HostDrift:
+        @staticmethod
+        def z2_login_credentials(home):
+            return ({"ssh_host": "192.168.2.100"}, home)
+    with pytest.raises(baseline.BaselineError, match="SSH_HOST_NOT_APPROVED_TARGET"):
+        baseline._existing_bootstrap_token_via_z2_ssh("192.168.2.99", helper=HostDrift)
+    class MissingToken:
+        @staticmethod
+        def z2_login_credentials(home):
+            return ({"ssh_host": "192.168.2.99"}, home)
+        @staticmethod
+        def password_ssh_z2(*args, **kwargs):
+            return 77, "root-readable error secret can be here"
+    with pytest.raises(baseline.BaselineError, match="TOKEN_ACCESS_DENIED") as exc:
+        baseline._existing_bootstrap_token_via_z2_ssh("192.168.2.99", helper=MissingToken)
+    assert "root-readable error" not in str(exc.value)
+
+
+def test_physical_direct_bootstrap_uses_only_z2_http_and_rejects_wrong_hash(monkeypatch):
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    calls = []
+    class Response:
+        def __init__(self, status, data):
+            self.status = status
+            self._data = data
+        def read(self, n):
+            return self._data
+    class Conn:
+        def __init__(self, host, port, timeout):
+            assert (host, port) == ("192.168.2.99", 18081)
+        def request(self, method, path, body=None, headers=None):
+            calls.append((method, path, headers, body))
+        def getresponse(self):
+            return Response(409, json.dumps({
+                "ok": False, "error": "bootstrap_request_rejected",
+                "message": "chunk SHA-256 mismatch",
+            }).encode())
+        def close(self):
+            pass
+    api = baseline.DirectSSHAuthenticatedBootstrap(
+        "192.168.2.99", module=client, token="x" * 48,
+        connection_factory=Conn)
+    baseline._expect_http_rejection(
+        api, "POST", "/v1/uploads/" + "a" * 32 + "/chunks",
+        {"offset": 0, "data_base64": "AA==", "sha256": "0" * 64},
+        client.DeploymentAPIError, expected_reason="CHUNK_SHA256_MISMATCH")
+    assert len(calls) == 1
+    assert calls[0][1].endswith("/chunks")
+    assert calls[0][2]["Authorization"] == "Bearer " + "x" * 48
+    with pytest.raises(baseline.BaselineError, match="ROUTE_DENIED"):
+        api._call("POST", "/v1/installer", {"execute": True})
