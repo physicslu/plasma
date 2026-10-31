@@ -76,6 +76,7 @@ Changing `components` to `packages` on an existing `plasma.ppu.bundle.v2` is **i
 - Canonical v3 admission Plan emits `bundle_schema: "plasma.ppu.bundle.v3"` and **`packages` only**; v2 Plan emits the historical **`components` only**. Malformed mixed responses must be rejected.
 - The Python model exposes `VerifiedBundle.packages: tuple[VerifiedBundlePackage]`, `MAX_BUNDLE_PACKAGES=32`, `bundle_package_identity`, and Package-based DAG resolution. Legacy attribute/function aliases remain narrowly for v2 consumers and cannot be used for new schema authoring.
 - New v3 Bundle Resolution emits `schema=plasma.ppu.bundle-resolution.v2`, `package_order`, `package_sha256`; v2 continues the old `component_order` and `component_sha256` Receipt shape.
+- Host-only transaction returns a top-level `bundle` envelope containing `packages` for v3; legacy v2 and Package v1 continue to return their historical `package` envelope. This is only a simulated transaction Receipt, not proof of device installation.
 - Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions; opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
 - Component/Package hashing only establishes content identity; a Bearer token, checksum or Manifest `source_commit` does not prove Publisher/Master authorization.
 
