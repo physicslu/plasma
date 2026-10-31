@@ -51,3 +51,25 @@
 - WP2: Minimal documentation authority index and references, preserving normative semantics.
 - WP3: Host-only telemetry improvements in a separate scoped implementation PR.
 - WP4: Local Desktop-vs-Path3 matched task benchmark after approval and quota availability.
+
+
+## WP1 initial evidence: root AGENTS size concentration
+
+Read-only section inventory at pinned main: `AGENTS.md` has 165 physical lines and ~30,001 UTF-8 characters. The largest section, `## 1A. Prototype-first engineering policy (normative)`, is ~12,035 characters (~40% of the entrypoint); `## 1. Project purpose and canonical domain` is ~3,225; `## 11. Autonomous task execution contract` is ~2,837. Section 1A includes owner-approved Path 2/3 sandbox, hardware, Root Guard, FPGA image handling, native tools and real safety conditions. **Do not truncate or archive it merely because it is long.**
+
+Prior repo-first reduction in PR #1128 shrank AGENTS from 62,093 to 17,285 bytes; present ~30 KB indicates subsequent growth, not proof of duplication. Next audit must compare added clauses since #1128 against normative contract and current code before proposing any text removal.
+
+### Candidate safe-first document changes (not yet applied)
+
+- Add a small task-to-authority navigation table; verify it introduces no new approval or privilege semantics.
+- Replace only demonstrably identical repeated explanatory passages with links to one normative source. Do not replace critical safety guards with vague pointers.
+- Keep all explicit retirement banners for cross-job resume and historical Issue #981 entrypoints.
+- Keep Desktop and Path 3 entrypoint instructions aligned in the repository; do not add a global AGENTS.override.md.
+
+### Host-only acceptance cases for subsequent implementation
+
+1. Desktop task with no hardware scope: required AGENTS and task-relevant detailed clauses remain discoverable.
+2. Path 3 owner-bound hardware task: sandbox, owner SHA/digest, device ownership, Root Guard and rollback rules remain intact.
+3. Negative: an outdated session-resume document cannot authorize a new Path 3 middleware/job.
+4. Negative: a short prompt cannot override mandatory privileges, safety, deployment or electrical constraints.
+5. Telemetry: duplicate cumulative snapshots are not double-counted; cached input remains a subset of input; missing request-count/model evidence stays NOT_AVAILABLE.
