@@ -1,6 +1,8 @@
 
 # PPU Deployment Engine PR2 Gate 1 — Generic Bundle v2 (Host-only)
 
+> **Historical v2 wire contract only.** The canonical new vocabulary is **Bundle → Packages → Files**; use [Bundle v3 Canonical Contract](ppu-canonical-bundle-packages.md). The historical `components` field and `payload/components/` path are retained only to decode existing v2 packages and preserve immutable PR2/PR3 evidence.
+
 Status: **Gate 1 Draft**. Based on main cb8fcf63d353320618d2de42af0f7e9ae90ad3b1, containing PR #1219 and #1221. No merge, real installation, service restart, SWPC/Z2/FPGA/DUT operation or rollout is authorized.
 
 ## Boundary and architecture
