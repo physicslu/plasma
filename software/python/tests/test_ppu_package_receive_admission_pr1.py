@@ -175,15 +175,19 @@ def test_generic_requires_control_token(loopback, tmp_path):
 
 @pytest.mark.parametrize("malformed_kind", [[], ["python"], {}, {"kind": "python"}])
 def test_http_unhashable_kind_is_rejected_without_losing_service(loopback, tmp_path, malformed_kind):
+    # Keep the HTTP negative cases; use the canonical v3 positive control.
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+
     api, paths, server = loopback
-    archive, _ = package(tmp_path, "wordport", "python",
-                         {"payload/python/wordport.py": b"# valid"})
+    archive, _ = bundle_v3(
+        tmp_path, parts=[("wordport", "python", [], {"python/wordport.py": b"# valid"})]
+    )
     upload_id = api.upload(archive.read_bytes())
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
         api._call("POST", "/v1/deployments", {"kind": malformed_kind, "upload_id": upload_id})
     assert not paths.deployment_record.exists()
     assert server.deployment_thread is None
-    valid = api.submit(kind="python", upload_id=upload_id)
+    valid = api.submit(kind="bundle", upload_id=upload_id)
     assert valid.state == "admitted"
 
 
