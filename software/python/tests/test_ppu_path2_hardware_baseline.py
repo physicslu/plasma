@@ -309,3 +309,44 @@ def test_manager_registry_identity_and_pairing_are_mandatory(monkeypatch):
     with pytest.raises(baseline.BaselineError, match="MANAGER_PHYSICAL_TARGET_NOT_ENROLLED"):
         api.preflight(DEVICE, expected_host="192.168.2.99")
 
+
+
+def test_readonly_manager_inventory_is_bounded_and_does_not_provision(monkeypatch):
+    calls = []
+    data = {
+        18180: {"ok": True, "ppus": [
+            {"alias": "qemu-ppu", "endpoint": "http://172.30.77.2:18080"},
+        ]},
+        18280: {"ok": True, "ppus": [
+            {"alias": "prod-z2", "endpoint": "http://192.168.2.99:18080"},
+            {"alias": "another-ppu", "endpoint": "http://192.168.2.100:18080"},
+        ]},
+    }
+    class Response:
+        status = 200
+        def __init__(self, port):
+            self.port = port
+        def read(self, limit):
+            return json.dumps(data[self.port]).encode()
+    class Conn:
+        def __init__(self, host, port, timeout):
+            assert host == "127.0.0.1"
+            assert port in (18180, 18280)
+            self.port = port
+        def request(self, method, path, **kwargs):
+            calls.append((self.port, method, path))
+        def getresponse(self):
+            return Response(self.port)
+        def close(self):
+            pass
+    monkeypatch.setattr(baseline.http.client, "HTTPConnection", Conn)
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    report = baseline.probe_manager_registries("192.168.2.99")
+    assert report["managers"] == [
+        {"port": 18180, "status": "NO_PHYSICAL_TARGET", "real_z2_aliases": []},
+        {"port": 18280, "status": "MATCH", "real_z2_aliases": ["prod-z2"]},
+    ]
+    assert calls == [
+        (18180, "GET", "/api/registry"), (18280, "GET", "/api/registry"),
+    ]
+    assert report["b1"] == report["b2_v2"] == report["install"] == "NOT_RUN"
