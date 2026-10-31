@@ -162,11 +162,16 @@ def test_no_unsafe_installer_or_device_operation_source_contract():
     body = SCRIPT.read_text(encoding="utf-8")
     assert "scope" not in body or "guarded-hardware" in body
     assert '"/v1/deployments"' in body or "b2_admission" in body
-    assert "ssh" not in body.lower().replace("no ssh", "").replace("invokes ssh", "")
+    # Enrolled SSH read-only credential acquisition is explicitly authorized.
+    assert "password_ssh_z2" in body
+    assert "StrictHostKeyChecking" not in body  # existing pinned helper owns SSH policy
+    assert "_TOKEN_REMOTE_READ" in body
     assert 'kind="ppu-runtime"' not in body
     assert "sudo " not in body
     assert "fpga_manager" not in body
-    assert "systemctl" not in body
+    assert '"systemctl", "--user", "show"' in body  # only read-only user service inspection
+    assert '"restart"' not in body
+    assert '"enable"' not in body
 
 
 def test_read_only_physical_probe_reports_version_but_not_installer_or_b1(monkeypatch):
@@ -642,7 +647,7 @@ def test_b1_b2_v1_receive_admission_qualify_even_when_v2_is_missing(loopback):
         def submit(self, *, kind, upload_id):
             if kind == "bundle":
                 raise client.DeploymentAPIError("API_HTTP_REJECTED:409")
-            return super().submit(kind=kind, upload_id=upload_id)
+            return self._api.submit(kind=kind, upload_id=upload_id)
     result = baseline.run(
         BundleUnavailable(api), client, source_sha=SOURCE,
         target=TARGET, expected_device_id=DEVICE,
