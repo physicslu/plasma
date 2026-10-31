@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """PLASMA Path 2 physical PPU Package B1/B2 acceptance.
 
-Owner-approved operator-cli / guarded-hardware ONLY. This script has exactly
-one private-LAN Bootstrap ingress. It NEVER installs, activates, invokes SSH,
+Owner-approved operator-cli / guarded-hardware ONLY. This script reaches physical Z2 mutations ONLY through the existing
+SWPC loopback Manager; a separate read-only direct Bootstrap probe remains. It NEVER installs, activates, invokes SSH,
 runs shell, loads FPGA, changes Site state or programs DUT. No token in argv,
-stdout, Github Work Order or evidence. A commissioning HTTP bearer is only
-acceptable over a physically controlled isolated network.
+stdout, Github Work Order or evidence. The Manager owns the device-bound credential and its Platform maintenance
+gate; this CLI never reads, copies, prints, rotates or supplies a token.
 """
 from __future__ import annotations
 
@@ -19,7 +19,6 @@ import json
 import os
 from pathlib import Path
 import re
-import stat
 import subprocess
 import sys
 import zipfile
@@ -31,7 +30,6 @@ SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 HEX32 = re.compile(r"[0-9a-f]{32}\Z")
 SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.+-]{0,80}\Z")
 SCHEMA = "plasma.ppu.hardware-package-baseline.v1"
-TOKEN_ENV = "PLASMA_PPU_BOOTSTRAP_TOKEN_FILE"
 HOST_ENV = "PLASMA_PPU_COMMISSIONING_ALLOWED_IP"
 CLIENT_PATH = ROOT / "scripts/ppu_deploy_api.py"
 
@@ -54,20 +52,6 @@ def _load_client():
     return module
 
 
-def _token_from_private_file(path: Path) -> str:
-    # No token in a Work Order, CLI argument, a stdout receipt or GitHub log.
-    if not path.is_absolute() or path.is_symlink():
-        raise BaselineError("PRIVATE_TOKEN_FILE_DENIED")
-    s = path.stat()
-    if (not stat.S_ISREG(s.st_mode) or stat.S_IMODE(s.st_mode) != 0o600
-            or s.st_uid != os.geteuid() or s.st_size < 32 or s.st_size > 512):
-        raise BaselineError("PRIVATE_TOKEN_FILE_UNSAFE")
-    token = path.read_text(encoding="ascii").strip()
-    if len(token) < 32 or len(token) > 512 or any(ord(c) < 33 or ord(c) > 126 for c in token):
-        raise BaselineError("PRIVATE_TOKEN_INVALID")
-    return token
-
-
 def _private_ipv4(host: str) -> str:
     try:
         addr = ipaddress.ip_address(host)
@@ -84,25 +68,107 @@ def _private_ipv4(host: str) -> str:
     return host
 
 
-def _commissioning_transport(host: str):
-    """Direct, pinned, no proxy, no redirect. NOT production TLS."""
-    _private_ipv4(host)
+class ManagerAdmissionClient:
+    """Reuse Manager's existing device-paired Bootstrap routes, no credentials.
 
-    def request(method: str, path: str, payload: bytes | None,
-                headers: Mapping[str, str]) -> tuple[int, bytes]:
-        if (method not in ("GET", "POST") or not path.startswith("/v1/")
-                or ".." in path or "?" in path or "#" in path or "\\" in path
-                or any(ord(c) < 33 or ord(c) > 126 for c in path)):
-            raise BaselineError("TRANSPORT_PATH_DENIED")
-        connection = http.client.HTTPConnection(host, 18081, timeout=10)
+    The trusted Manager enforces alias -> live device identity, idle-state
+    Platform gate, device-scoped credential, and upload/commit serialization.
+    Not a new installer or bypass endpoint.
+    """
+    def __init__(self, *, alias: str, port: int, client_module):
+        if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}", alias):
+            raise BaselineError("MANAGER_ALIAS_INVALID")
+        if type(port) is not int or port not in (18180, 18280):
+            raise BaselineError("MANAGER_LOOPBACK_PORT_DENIED")
+        self.alias = alias
+        self.port = port
+        self.module = client_module
+        self.base_path = f"/api/registry/{alias}/bootstrap"
+
+    def _call(self, method: str, path: str, body: Mapping[str, object] | None):
+        if method not in ("GET", "POST") or not path.startswith("/v1/"):
+            raise BaselineError("MANAGER_ACTION_DENIED")
+        if path in ("/v1/status", "/v1/deployment"):
+            if method != "GET" or body is not None:
+                raise BaselineError("MANAGER_READ_ACTION_DENIED")
+            manager_path, payload = self.base_path, None
+        elif method == "POST" and path in ("/v1/uploads", "/v1/deployments"):
+            manager_path, payload = self.base_path + path[3:], dict(body or {})
+        else:
+            match = re.fullmatch(
+                r"/v1/uploads/([0-9a-f]{32})/(chunks|commit)", path
+            )
+            if method != "POST" or match is None:
+                raise BaselineError("MANAGER_ACTION_NOT_ALLOWLISTED")
+            uid, operation = match.groups()
+            manager_path = f"{self.base_path}/uploads/{uid}/{operation}"
+            payload = {"action": "commit"} if operation == "commit" else dict(body or {})
+        raw = (json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+               if payload is not None else None)
+        if raw is not None and len(raw) > 2 * 1024 * 1024:
+            raise BaselineError("MANAGER_REQUEST_TOO_LARGE")
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=15)
         try:
-            connection.request(method, path, body=payload, headers=dict(headers))
-            result = connection.getresponse()
-            data = result.read(2 * 1024 * 1024 + 1)
-            return result.status, data
+            conn.request(method, manager_path, body=raw, headers={
+                "Accept": "application/json",
+                **({"Content-Type": "application/json"} if raw else {}),
+            })
+            response = conn.getresponse()
+            data = response.read(2 * 1024 * 1024 + 1)
+            code = response.status
+            if len(data) > 2 * 1024 * 1024:
+                raise BaselineError("MANAGER_RESPONSE_TOO_LARGE")
+            if code < 200 or code >= 300:
+                # No upstream HTML/body or credential-containing error in logs.
+                raise self.module.DeploymentAPIError(f"API_HTTP_REJECTED:{code}")
+            result = json.loads(data.decode("utf-8"))
         finally:
-            connection.close()
-    return request
+            conn.close()
+        if type(result) is not dict or result.get("ok") is not True:
+            raise BaselineError("MANAGER_RESPONSE_INVALID")
+        if path == "/v1/status":
+            bootstrap = result.get("bootstrap")
+            pairing = result.get("pairing")
+            if (not isinstance(bootstrap, dict) or not isinstance(pairing, dict)
+                    or result.get("ppu_alias") != self.alias
+                    or result.get("bootstrap_endpoint_policy") != "z2-ps-same-host:18081"):
+                raise BaselineError("MANAGER_BOOTSTRAP_STATUS_INVALID")
+            self._last_pairing = dict(pairing)
+            return bootstrap
+        if path == "/v1/deployment":
+            bootstrap = result.get("bootstrap")
+            if not isinstance(bootstrap, dict):
+                raise BaselineError("MANAGER_DEPLOYMENT_STATUS_INVALID")
+            return {"ok": True, "deployment": bootstrap.get("deployment")}
+        return result
+
+    def status(self) -> dict[str, Any]:
+        return self._call("GET", "/v1/status", None)
+
+    def preflight(self, expected_device_id: str) -> dict[str, Any]:
+        status = self.status()
+        pairing = self._last_pairing
+        identity = status.get("identity")
+        if (not isinstance(identity, dict)
+                or identity.get("device_id") != expected_device_id):
+            raise BaselineError("MANAGER_DEVICE_IDENTITY_MISMATCH")
+        if pairing.get("paired") is not True:
+            raise BaselineError("MANAGER_BOOTSTRAP_NOT_PAIRED")
+        if (pairing.get("device_match") is not True
+                or pairing.get("device_id") != expected_device_id):
+            raise BaselineError("MANAGER_PAIRING_DEVICE_MISMATCH")
+        return status
+
+    def upload(self, archive: bytes) -> str:
+        return self.module.BootstrapAPIClient.upload(self, archive)
+
+    def submit(self, *, kind: str, upload_id: str, **kwargs):
+        return self.module.BootstrapAPIClient.submit(
+            self, kind=kind, upload_id=upload_id, **kwargs,
+        )
+
+    def deployment_state(self, transaction_id: str) -> dict[str, Any]:
+        return self.module.BootstrapAPIClient.deployment_state(self, transaction_id)
 
 
 def probe_status(host: str, *, read_get=None) -> dict[str, Any]:
@@ -364,6 +430,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", required=True)
     parser.add_argument("--probe", action="store_true",
                         help="read-only Z2 identity/version, no credential or writes")
+    parser.add_argument("--manager-alias", default="z2")
+    parser.add_argument("--manager-port", type=int, default=18280)
+    parser.add_argument("--manager-probe", action="store_true",
+                        help="read-only paired Manager status, no writes")
     parser.add_argument("--device-id")
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--platform")
@@ -388,15 +458,23 @@ def main(argv: list[str] | None = None) -> int:
             raise BaselineError("TARGET_PROFILE_INPUT_DENIED")
         if not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", args.device_id):
             raise BaselineError("DEVICE_ID_PIN_INVALID")
-        credential = os.environ.get(TOKEN_ENV)
-        if not credential:
-            raise BaselineError("PRIVATE_TOKEN_FILE_NOT_PROVISIONED")
-        token = _token_from_private_file(Path(credential))
         module = _load_client()
-        api = module.BootstrapAPIClient(
-            f"https://{host}:18081", token,
-            transport=_commissioning_transport(host),
-        )
+        api = ManagerAdmissionClient(alias=args.manager_alias,
+                                     port=args.manager_port,
+                                     client_module=module)
+        status = api.preflight(args.device_id)
+        if args.manager_probe:
+            print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps({
+                "schema": SCHEMA, "phase": "READ_ONLY_MANAGER_PAIRING_PROBE",
+                "source_sha": args.source_sha, "device_id": args.device_id,
+                "manager_alias": args.manager_alias, "manager_port": args.manager_port,
+                "paired": True, "device_match": True,
+                "bootstrap_version_observed": status["bootstrap"].get("version"),
+                "runtime_state_observed": status.get("runtime", {}).get("state"),
+                "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+                "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN",
+            }, sort_keys=True, separators=(",", ":")))
+            return 0
         report = run(api, module, source_sha=args.source_sha, target=target,
                      expected_device_id=args.device_id)
         print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps(
@@ -404,7 +482,7 @@ def main(argv: list[str] | None = None) -> int:
         ))
         return 0 if report["b1"]["status"] == "PASS" else 1
     except Exception as exc:
-        # NEVER print exception details containing token, URL, or untrusted body.
+        # Only print reviewed static errors; no response body or credentials.
         print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps({
             "schema": SCHEMA, "b1": "NOT_RUN",
             "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
