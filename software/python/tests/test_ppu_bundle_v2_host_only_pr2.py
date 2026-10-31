@@ -191,17 +191,29 @@ def test_bundle_v2_bad_manifest_rejected_before_install(tmp_path, mutator, reaso
     assert not (co.paths.bootstrap_state_root / "host-only-packages").exists()
 
 
-def test_bundle_v2_tampered_archive_and_v1_compatibility(tmp_path):
+def test_retired_v2_and_v1_rejected_with_sha256_guard_preserved(tmp_path):
     archive, digest = bundle(tmp_path)
     with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_ARCHIVE_SHA256_MISMATCH"):
-        contract.verify_host_only_artifact(archive, expected_sha256="0"*64,
-                                           source_commit=SOURCE, target_profile=TARGET)
+        contract.verify_host_only_artifact(
+            archive, expected_sha256="0" * 64,
+            source_commit=SOURCE, target_profile=TARGET,
+        )
+    with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_SCHEMA_UNSUPPORTED"):
+        contract.verify_host_only_artifact(
+            archive, expected_sha256=digest,
+            source_commit=SOURCE, target_profile=TARGET,
+        )
+
     from .test_ppu_generic_package_host_only_gate1 import package
-    v1, v1digest = package(tmp_path, "compat-python", "python",
-                           {"payload/python/test.py": b"# v1"})
-    assert contract.verify_host_only_artifact(
-        v1, expected_sha256=v1digest,
-        source_commit=SOURCE, target_profile=TARGET).kind == "python"
+    v1, v1digest = package(
+        tmp_path / "legacy-v1", "compat-python", "python",
+        {"payload/python/test.py": b"# retired v1"},
+    )
+    with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_SCHEMA_UNSUPPORTED"):
+        contract.verify_host_only_artifact(
+            v1, expected_sha256=v1digest,
+            source_commit=SOURCE, target_profile=TARGET,
+        )
 
 
 def test_bundle_v2_zip_symlink_and_unmanifested_file_denied(tmp_path):
