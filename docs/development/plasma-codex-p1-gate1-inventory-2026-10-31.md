@@ -183,3 +183,25 @@ Read all seven `docs/architecture/openocd-software-qualification-v*.md` document
 4. Regression checks and a scoped Gate 2 report before any merge.
 
 No runtime code, device operations, workflow refactoring, qualification promotions or broad file deletions are in scope.
+
+## WEB / PS / PL content audit — first verified sample
+
+Read the following documents from pinned `main`: `software/web/README.md`, `docs/architecture/web-rest-api-contract.md`, `docs/architecture/web-product-modes.md`, `docs/deployment/web-runtime-hygiene.md`, `docs/development/linux-mmio-backend-v1.md`, `docs/deployment/z2-ps-installer.md`, `docs/architecture/runtime-data-root-contract-v1.md`, `docs/architecture/fixed-fpga-hardware-abi-v1-gate1.md`, `docs/architecture/fixed-fpga-swd-site1-rtl-gate1.md`, `docs/architecture/plasma-unified-fpga-build-diagnostics-v1.md`, and `docs/adr/0003-runtime-fpga-driver-reconfiguration-boundary.md`.
+
+| Domain | Document and actual declared role | Proposed documentation treatment |
+| --- | --- | --- |
+| WEB | `software/web/README.md`: React/TypeScript PPU Console, REST v3, Site jobs and backend-owned progress | Keep as developer onboarding; link API authority rather than copy endpoints |
+| WEB | `docs/architecture/web-rest-api-contract.md`: browser-facing REST contract, independent of PLASMA33 wire protocol | Treat as REST contract reference; validate against executable routes/tests before calling implementation current |
+| WEB | `docs/architecture/web-product-modes.md`: Production/Engineering product mode model | Keep product UX semantics separate from API wire/versioning |
+| WEB | `docs/deployment/web-runtime-hygiene.md`: SWPC development runtime restart and deploy guidance | Keep as operational runbook, not frontend architecture |
+| PS | `docs/development/linux-mmio-backend-v1.md`: explicitly HISTORICAL / INTERNAL-FIXTURE ONLY for retired SWD-03 synthetic responder | Mark historical in navigation; never use as current Blue Pill Path 3 instructions |
+| PS | `docs/deployment/z2-ps-installer.md`: PS release kit and managed acceptance with live Z2 qualification still required | Keep release/install evidence boundary; verify against current deployment engine before changing authority |
+| PS | `docs/architecture/runtime-data-root-contract-v1.md`: installed Python package data-root CI contract | Narrowly scoped Python/runtime data ownership; not a generic PS/PL or hardware admission rule |
+| PL | `docs/architecture/fixed-fpga-hardware-abi-v1-gate1.md`: proposed ABI, REVIEW CANDIDATE, M1 NO-GO | Do not present as accepted/current hardware ABI |
+| PL | `docs/architecture/fixed-fpga-swd-site1-rtl-gate1.md`: simulation-only Site 1 vertical slice, M1 NO-GO | Preserve feasibility/evidence status; later semantic candidate supersedes earlier gap table |
+| PL | `docs/architecture/plasma-unified-fpga-build-diagnostics-v1.md`: Gate 1 draft offline validation | Do not claim physical build/HIL or new execution pipeline |
+| Shared PL/PS | `docs/adr/0003-runtime-fpga-driver-reconfiguration-boundary.md`: Proposed, not Accepted, original dynamic switching deferred | Keep proposal and amendment history; do not elevate to normative accepted ADR |
+
+**Boundary note:** This is an 11-document sample, not a comprehensive code-vs-document reconciliation. Future work must check actual API route implementation, PS deployment engine, PL register definitions, RTL, and tests before assigning a single authoritative contract.
+
+**Owner scope:** IC Catalog and all device-catalog workflows remain deferred. Do not migrate evidence or change catalog/provider qualifications under this PR.
