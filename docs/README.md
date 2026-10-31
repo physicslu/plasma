@@ -57,7 +57,7 @@
 - **Current / Development Mode** — [Three Shared BLOCKING Decisions](development/development-blocking-policy.md)：Path 2／Path 3 共用授權與來源、Z2 實機安全／復原、真實回執三個核心阻擋邊界；移除重複檢查，但不繞過裝置安全條件。
 
 ## Architecture and contracts
-- **Gate 1 / Draft PR #1222 / Host-only** — [PPU Generic Bundle v2 多元件部署交易](architecture/ppu-generic-bundle-v2-pr2.md)：支援任意非執行型資料元件、程式及 FPGA 檔案的依賴／SHA256 驗證與 Admission；Install／Verify／Activate／Rollback 僅在 Host-only 沙盒模擬，不代表真實部署。
+- **Gate 1 / Draft PR #1222 / Host-only** — [PPU Generic Bundle v2 多元件部署交易](architecture/ppu-canonical-bundle-packages.md)：支援任意非執行型資料元件、程式及 FPGA 檔案的依賴／SHA256 驗證與 Admission；Install／Verify／Activate／Rollback 僅在 Host-only 沙盒模擬，不代表真實部署。
 - **Gate 1 / Path 1 / PR3 Host-only** — [PPU 通用 Bundle v2 統一部署整合](architecture/ppu-pr3-unified-hostonly-integration.md)：多元件 DAG/Inventory/Publisher+Master fail-closed Host-only 契約、既有 Coordinator 的回復模擬、Manager/BFF/Web Console 共用 Bootstrap Admission；未部署、未操作實機。
 - **Gate 1 / Path 1 / Draft / Host-only** — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
 - **Gate 1 / Path 1 / Host-only / Draft** — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。
