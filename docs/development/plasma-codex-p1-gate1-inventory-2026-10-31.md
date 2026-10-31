@@ -306,3 +306,9 @@ All frozen PS S01–S04, PL P01–P04 and shared C01–C04 documents were read f
 - **S01:** The release-kit document itself uses `scripts/plasmactl install z2-ps` and `deploy z2-ps`. Added an explicit verification checkpoint against the executable deployment engine and rollback tests; do not promote release-kit examples to canonical current transport without reconciliation.
 - **P02:** Site-1 RTL feasibility is simulation-only; linked the superseding SWD semantic convergence candidate and preserved physical pairing/real DUT proof boundary.
 - **Changes:** W02, S01, P02 updated in this pass; frozen set unchanged. Continue evidence and navigation reconciliation across all 16 before one consolidated CI review.
+
+## PS deployment source-level discrepancy resolved in S01
+
+Read `scripts/plasmactl` (profile dispatch and help), `scripts/plasmactl-z2-ps` (install/deploy/verify/status command dispatch), and `docs/architecture/ppu-unified-deployment-gate1.md` (current proposed convergence). Confirmed the **local Z2 PS release-kit CLI** is implemented, while the newer **single network PPU Deployment Engine** remains a partial Host-only convergence with an outstanding trusted on-device installer; legacy SSH engineering paths are still explicitly described as existing. These are not the same deployed capability. S01 now states this distinction and links the evidence. This is documentation-only; no SSH connection, API submission, deployment, CI dispatch or hardware operation.
+
+Batch 1 16-file scope remains unchanged. Continue link/implementation review before consolidated CI.
