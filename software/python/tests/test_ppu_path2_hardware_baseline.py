@@ -350,3 +350,59 @@ def test_readonly_manager_inventory_is_bounded_and_does_not_provision(monkeypatc
         (18180, "GET", "/api/registry"), (18280, "GET", "/api/registry"),
     ]
     assert report["b1"] == report["b2_v2"] == report["install"] == "NOT_RUN"
+
+
+def test_manager_idle_gate_409_cannot_fake_invalid_package_rejection(monkeypatch):
+    class Reply:
+        status = 409
+        def read(self, limit):
+            return json.dumps({"ok": False, "error": {
+                "code": "ppu_idle_state_unproven",
+                "message": "runtime idle state unavailable",
+            }}).encode()
+    class Conn:
+        def __init__(self, host, port, timeout):
+            assert (host, port) == ("127.0.0.1", 18280)
+        def request(self, method, path, body=None, headers=None):
+            pass
+        def getresponse(self):
+            return Reply()
+        def close(self):
+            pass
+    monkeypatch.setattr(baseline.http.client, "HTTPConnection", Conn)
+    api = baseline.ManagerAdmissionClient(alias="z2", port=18280,
+                                          client_module=client)
+    with pytest.raises(baseline.BaselineError, match="NEGATIVE_REJECTION_CAUSE_UNPROVEN"):
+        baseline._expect_http_rejection(
+            api, "POST", "/v1/deployments",
+            {"kind": "python", "upload_id": "a" * 32},
+            client.DeploymentAPIError,
+            expected_reason="PACKAGE_FILE_SHA256_MISMATCH",
+        )
+
+
+def test_manager_exact_ppu_content_denial_proves_negative_case(monkeypatch):
+    class Reply:
+        status = 409
+        def read(self, limit):
+            return json.dumps({"ok": False,
+                "error": "bootstrap_request_rejected",
+                "message": "PACKAGE_FILE_SHA256_MISMATCH"}).encode()
+    class Conn:
+        def __init__(self, host, port, timeout):
+            pass
+        def request(self, method, path, body=None, headers=None):
+            pass
+        def getresponse(self):
+            return Reply()
+        def close(self):
+            pass
+    monkeypatch.setattr(baseline.http.client, "HTTPConnection", Conn)
+    api = baseline.ManagerAdmissionClient(alias="z2", port=18280,
+                                          client_module=client)
+    baseline._expect_http_rejection(
+        api, "POST", "/v1/deployments",
+        {"kind": "python", "upload_id": "a" * 32},
+        client.DeploymentAPIError,
+        expected_reason="PACKAGE_FILE_SHA256_MISMATCH",
+    )
