@@ -119,9 +119,10 @@ def test_bundle_v2_existing_one_lock_one_journal_host_only_transaction(tmp_path)
         assert not path.exists()
 
 
-def test_bundle_v2_reuses_existing_http_admission_only(loopback, tmp_path):
+def test_bundle_v3_reuses_existing_http_admission_only(loopback, tmp_path):
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
     api, paths, server = loopback
-    archive, digest = bundle(tmp_path)
+    archive, digest = bundle_v3(tmp_path)
     upload_id = api.upload(archive.read_bytes())
     submission = api.submit(kind="bundle", upload_id=upload_id)
     assert submission.state == "admitted"
@@ -132,7 +133,9 @@ def test_bundle_v2_reuses_existing_http_admission_only(loopback, tmp_path):
     assert plan["kind"] == "bundle"
     assert plan["purpose"] == "programming"
     assert plan["archive_sha256"] == digest
-    assert len(plan["components"]) == 6
+    assert plan["bundle_schema"] == contract.BUNDLE_SCHEMA
+    assert len(plan["packages"]) == 6
+    assert "components" not in plan
     assert plan["execution_permitted"] is False
     assert server.deployment_thread is None
     assert not paths.product_root.exists()
