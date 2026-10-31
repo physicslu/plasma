@@ -38,9 +38,12 @@
 
 ## Codex context governance and on-demand Path instructions
 
-- **Gate 1 Draft / Host-only / PR #1226** — [Shared Desktop and Path 3 Codex context governance audit](development/plasma-codex-context-governance-gate1-audit.md)：文件權威性、共用上下文與 Token 量測規劃；尚未完成實測節省驗證。
-- **Gate 1 Draft / Path 2 instructions / PR #1226** — [Path 2 on-demand execution rules](development/plasma-codex-path2-execution.md)：僅在選用 Path 2 時讀取，保留既有 CPU-only、operator-cli、Vivado 詳細規範。
-- **Gate 1 Draft / Path 3 instructions / PR #1226** — [Path 3 on-demand execution rules](development/plasma-codex-path3-execution.md)：僅在選用 Path 3 時讀取，保留既有 Codex CLI、原生工具、硬體安全條款。
+- **Gate 1 Draft / Documentation navigation** — [Codex document authority map](development/plasma-codex-document-authority-map.md)：共用、Path 2、Path 3、Desktop 量測與已退休歷史文件的最小讀取路徑；不改執行授權。
+
+
+- **Merged baseline / PR #1226** — [Shared Desktop and Path 3 Codex context governance audit](development/plasma-codex-context-governance-gate1-audit.md)：文件權威性、共用上下文與 Token 量測規劃；尚未完成實測節省驗證。
+- **Current / Path 2 instructions / PR #1226** — [Path 2 on-demand execution rules](development/plasma-codex-path2-execution.md)：僅在選用 Path 2 時讀取，保留既有 CPU-only、operator-cli、Vivado 詳細規範。
+- **Current / Path 3 instructions / PR #1226** — [Path 3 on-demand execution rules](development/plasma-codex-path3-execution.md)：僅在選用 Path 3 時讀取，保留既有 Codex CLI、原生工具、硬體安全條款。
 
 ## Engineering governance and execution paths
 
