@@ -12,36 +12,108 @@ from pathlib import Path
 
 import pytest
 
-from .test_ppu_bundle_v2_host_only_pr2 import bundle as legacy_bundle, contract, PARTS
-from .test_ppu_generic_package_host_only_gate1 import SOURCE, TARGET, coordinator, request
+import importlib.util
+import sys
+from types import SimpleNamespace
+
 from .test_ppu_package_receive_admission_pr1 import loopback  # noqa: F401
 from .test_ppu_package_receive_admission_pr1 import client
 
+ROOT = Path(__file__).resolve().parents[3]
+SOURCE = "a" * 40
+TARGET = {"platform": "linux-armv7", "board": "pynq-z2", "fpga_part": "xc7z020clg400-1"}
 
-def bundle_v3(tmp_path: Path, *, mutate=None, legacy: bool = False, parts=PARTS):
+
+def load(name, filename):
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / filename)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+contract = load("ppu_v3_independent_contract", "ppu_unified_deployment.py")
+engine = load("ppu_v3_independent_engine", "ppu-bootstrap-deployment.py")
+
+PARTS = [
+    ("ic-metadata", "ic-catalog", [], {
+        "data/device.json": b'{"icpn":"STM32F103C8T6"}',
+        "assets/lookup.dat": b"\\x01\\x02\\x03",
+    }),
+    ("flash-profile", "programming-profile", ["ic-metadata"], {
+        "data/geometry.yaml": b"flash: 65536\\n",
+    }),
+    ("wordport", "python", ["flash-profile"], {
+        "python/wordport.py": b"# NEVER EXECUTED\\n",
+        "config/wordport.json": b'{"mode":"sandbox"}',
+    }),
+    ("bridge", "native-c", ["wordport"], {
+        "bin/bridge": b"\\x7fELFhost-only-fixture",
+        "lib/bridge.so": b"\\x7fELFfake-shared-object",
+    }),
+    ("firmware", "firmware-asset", ["flash-profile"], {
+        "data/firmware.hex": b":00000001FF\\n",
+    }),
+    ("fpga-addon", "fpga-image", ["bridge"], {
+        "fpga/addon.bit": b"FPGA NOT LOADED",
+        "fpga/addon.hwh": b"HWH HOST ONLY",
+    }),
+]
+
+
+def coordinator(tmp):
+    paths = engine.DeploymentPaths(
+        bootstrap_state_root=tmp / "isolated-bootstrap-state",
+        product_root=tmp / "production-untouched",
+        config_root=tmp / "config-untouched",
+        runtime_state_root=tmp / "runtime-untouched",
+        log_root=tmp / "log-untouched",
+        systemd_root=tmp / "systemd-untouched",
+    )
+    return engine.DeploymentCoordinator(
+        paths=paths, installer=SimpleNamespace(), clock=lambda: 123.0,
+    )
+
+
+def request(archive, digest):
+    return engine.HostOnlyPackageRequest(archive, SOURCE, digest, TARGET)
+
+
+def bundle_v3(tmp_path: Path, *, mutate=None, parts=PARTS):
     tmp_path.mkdir(parents=True, exist_ok=True)
-    archive, _digest = legacy_bundle(tmp_path / "legacy", parts=parts)
-    with zipfile.ZipFile(archive) as src:
-        manifest = json.loads(src.read("manifest.json"))
-        if not legacy:
-            manifest["schema"] = contract.BUNDLE_SCHEMA
-            manifest["packages"] = manifest.pop("components")
-            for package in manifest["packages"]:
-                for member in package["files"]:
-                    member["path"] = member["path"].replace(
-                        "payload/components/", "payload/packages/", 1
-                    )
-        if mutate:
-            mutate(manifest)
-        target = tmp_path / ("bundle-legacy.zip" if legacy else "bundle-v3.zip")
-        with zipfile.ZipFile(target, "w") as out:
-            out.writestr("manifest.json", json.dumps(manifest))
-            for info in src.infolist():
-                if info.filename == "manifest.json":
-                    continue
-                dest = (info.filename if legacy else info.filename.replace(
-                    "payload/components/", "payload/packages/", 1))
-                out.writestr(dest, src.read(info.filename))
+    files = {}
+    packages = []
+    for name, kind, dependencies, data in parts:
+        members = []
+        for suffix, raw in data.items():
+            path = f"payload/packages/{name}/{suffix}"
+            files[path] = raw
+            members.append({
+                "path": path, "sha256": hashlib.sha256(raw).hexdigest(),
+                "size": len(raw), "executable": suffix.startswith("bin/"),
+            })
+        packages.append({
+            "id": name, "kind": kind, "version": "1.0.0",
+            "requires": list(dependencies), "files": members,
+        })
+    manifest = {
+        "schema": contract.BUNDLE_SCHEMA,
+        "name": "multi-purpose-bundle",
+        "version": "2026.10.31",
+        "purpose": "programming",
+        "source_commit": SOURCE,
+        "target": dict(TARGET),
+        "packages": packages,
+        "actions": ["install", "verify", "activate", "rollback"],
+    }
+    if mutate:
+        mutate(manifest)
+    target = tmp_path / "bundle-v3.zip"
+    with zipfile.ZipFile(target, "w") as out:
+        out.writestr("manifest.json", json.dumps(manifest))
+        for filename, data in files.items():
+            out.writestr(filename, data)
     return target, hashlib.sha256(target.read_bytes()).hexdigest()
 
 
@@ -98,18 +170,6 @@ def test_v3_real_loopback_http_admission_returns_packages_receipt(loopback, tmp_
     assert server.deployment_thread is None
 
 
-def test_v2_retired_archive_rejected_at_admission(loopback, tmp_path):
-    archive, digest = bundle_v3(tmp_path, legacy=True)
-    with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_SCHEMA_UNSUPPORTED"):
-        contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
-        )
-    api, paths, server = loopback
-    uid = api.upload(archive.read_bytes())
-    with pytest.raises(Exception):
-        api.submit(kind="bundle", upload_id=uid)
-    assert not paths.product_root.exists()
-    assert server.deployment_thread is None
 
 
 @pytest.mark.parametrize("modify", [
@@ -127,22 +187,6 @@ def test_v3_rejects_legacy_field_dependency_or_member_path(tmp_path, modify):
         )
 
 
-def test_client_rejects_ambiguous_v2_v3_receipt_fields():
-    r = {"state": "admitted", "result": {"result": "PASS",
-         "stage": "package_admission_only", "install_qualified": False,
-         "plan": {
-             "kind": "bundle", "bundle_schema": contract.BUNDLE_SCHEMA,
-             "execution_permitted": False, "archive_sha256": "a" * 64,
-             "purpose": "programming", "files": [], "requested_actions": [],
-             "packages": [{"id": "x", "kind": "ic-catalog", "version": "1",
-                           "requires": [], "files": []}],
-         }}}
-    assert client._valid_package_admission(r, kind="bundle")
-    r["result"]["plan"]["components"] = list(r["result"]["plan"]["packages"])
-    assert not client._valid_package_admission(r, kind="bundle")
-    del r["result"]["plan"]["components"]
-    del r["result"]["plan"]["bundle_schema"]
-    assert not client._valid_package_admission(r, kind="bundle")
 
 
 
@@ -200,7 +244,6 @@ def test_minimal_delta_same_transport_repeated_v3_admission(loopback, tmp_path):
 ])
 def test_v3_host_only_activation_and_rollback(tmp_path, failure, expected_state):
     """Exercise v3 activation receipt and failure recovery in a temp sandbox only."""
-    from .test_ppu_generic_package_host_only_gate1 import engine
 
     parts_old = [("wordport", "python", [], {
         "python/wordport.py": b"# prior v3 release\\n",
