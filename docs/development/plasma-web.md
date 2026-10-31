@@ -35,3 +35,8 @@ The Web Console must discover PPU/Site topology from canonical status rather tha
 Engineering Programming uses Web REST v3 Programming Asset routes. Browser source-input terminology must not be confused with the Normalized Image carried by Protocol v3.3.
 
 Do not assume production Z2 needs Node.js, npm, or the development server merely because the integration host uses them for development/build/demo work.
+
+## Current Web contract boundaries
+
+4. Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before stack assumptions.
+5. Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
