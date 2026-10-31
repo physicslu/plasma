@@ -1,7 +1,7 @@
 # PLASMA Codex Context and Documentation Governance — Gate 1 Audit
 
-**Status:** DRAFT, host-only, documentation-only.  
-**Pinned main:** `c58621afe896e6a6f57fe712c27ffcbc06a6f0e8`.  
+**Status:** MERGED documentation baseline — PR #1226, merge commit `833a0f577c3697d891629c405d91267c05c2b476`; subsequent work packages remain pending.  
+**Original audit baseline:** `c58621afe896e6a6f57fe712c27ffcbc06a6f0e8` (historical, not current HEAD).  
 **Applies to:** Desktop/local Codex CLI and trusted GitHub Path 3 Codex.
 
 ## Current evidence
@@ -39,16 +39,16 @@
 
 ## Gate 1 acceptance and boundaries
 
-- This PR changes documentation only; no executable code, CI workflows, permissions, runtime or hardware.
+- PR #1226 changed documentation only; no executable code, CI workflows, permissions, runtime or hardware.
 - Preserve exactly two owner approval gates and existing Owner/SHA, Root Guard, Linux permissions and recovery requirements.
 - No Codex invocation, SWPC/Z2/DUT/FPGA access, deployment, workflow consolidation or automatic document deletion.
 - Before implementation, prepare precise diffs and host-only positive/negative tests; no claimed token savings without controlled measurements.
-- Keep Draft pending Gate 2 review; do not merge automatically.
+- PR #1226 passed its Gate 2 and was merged; future implementation PRs require their own review and merge authorization.
 
 ## Next work packages
 
 - WP1: Read-only inbound-link/duplicate audit for AGENTS, full contract, ADRs and historical docs.
-- WP2: Minimal documentation authority index and references, preserving normative semantics.
+- WP2: Minimal documentation authority index and references, preserving normative semantics. **Completed in PR #1226 for Path 2/3 on-demand entrypoints; broader cross-document deduplication remains pending.**
 - WP3: Host-only telemetry improvements in a separate scoped implementation PR.
 - WP4: Local Desktop-vs-Path3 matched task benchmark after approval and quota availability.
 
