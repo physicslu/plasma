@@ -145,7 +145,29 @@ class ManagerAdmissionClient:
     def status(self) -> dict[str, Any]:
         return self._call("GET", "/v1/status", None)
 
-    def preflight(self, expected_device_id: str) -> dict[str, Any]:
+    def preflight(self, expected_device_id: str, *, expected_host: str) -> dict[str, Any]:
+        # Require the configured Manager target to be the exact physical Z2.
+        # A QEMU/surrogate or unrelated alias must never satisfy B1.
+        host = _private_ipv4(expected_host)
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        try:
+            conn.request("GET", "/api/registry", headers={"Accept": "application/json"})
+            response = conn.getresponse()
+            raw = response.read(65537)
+            if response.status != 200 or not raw or len(raw) > 65536:
+                raise BaselineError("MANAGER_REGISTRY_UNAVAILABLE")
+            registry = json.loads(raw.decode("utf-8"))
+        finally:
+            conn.close()
+        if type(registry) is not dict or registry.get("ok") is not True:
+            raise BaselineError("MANAGER_REGISTRY_INVALID")
+        entries = registry.get("ppus")
+        expected_endpoint = f"http://{host}:18080"
+        if (type(entries) is not list or sum(
+                type(item) is dict and item.get("alias") == self.alias
+                and item.get("endpoint") == expected_endpoint
+                for item in entries) != 1):
+            raise BaselineError("MANAGER_PHYSICAL_TARGET_NOT_ENROLLED")
         status = self.status()
         pairing = self._last_pairing
         identity = status.get("identity")
@@ -462,7 +484,7 @@ def main(argv: list[str] | None = None) -> int:
         api = ManagerAdmissionClient(alias=args.manager_alias,
                                      port=args.manager_port,
                                      client_module=module)
-        status = api.preflight(args.device_id)
+        status = api.preflight(args.device_id, expected_host=host)
         if args.manager_probe:
             print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps({
                 "schema": SCHEMA, "phase": "READ_ONLY_MANAGER_PAIRING_PROBE",
