@@ -228,3 +228,34 @@ Reviewed tracked source on pinned `main`, not just Markdown filenames.
 - **Cross-domain boundary:** WEB/PS REST is distinct from PS/PL register-level ABI; neither grants hardware operation or eight-site physical qualification.
 
 **Next verification needed:** route-by-route API-to-tests map; PS deployment-engine executable entrypoint and rollback tests; JSON ABI-to-RTL register/offset tests and physical admission receipts. No code edits, claims of physical acceptance, or catalog work in this PR.
+
+## Owner-approved Batch 1 Baseline v1 — FROZEN (16 documents)
+
+Owner explicitly approved **WEB 4 + PS 4 + PL 4 + Shared 4 = 16** as the first batch of PR #1228 Gate 1 documentation governance. This table is the frozen acceptance population. **Do not add, substitute or remove entries without a separate Owner baseline revision.** Audit/report documents and referenced implementation/test files may be consulted as evidence but do not count as additional batch documents.
+
+| ID | Area | Frozen document path | Starting blob SHA |
+| --- | --- | --- | --- |
+| W01 | WEB | `software/web/README.md` | `093d5244a5243b637e579cae1aa0bc5c0260f493` |
+| W02 | WEB | `docs/architecture/web-rest-api-contract.md` | `276036b571c0f43b7cce131b2c8e2b500561dc04` |
+| W03 | WEB | `docs/architecture/web-product-modes.md` | `aa77db3d60c956089c5ff1480946ff9fed44fd7b` |
+| W04 | WEB | `docs/deployment/web-runtime-hygiene.md` | `717f22539ee08484578ceedbbbed86f2f2c3203e` |
+| S01 | PS | `docs/deployment/z2-ps-installer.md` | `a4c7ff0bbece26b1f27e9d2d954add59d20fe67e` |
+| S02 | PS | `docs/architecture/runtime-data-root-contract-v1.md` | `3f1bf077afff287819a50c4abff107f430602b19` |
+| S03 | PS | `docs/development/linux-mmio-backend-v1.md` | `43b6f776ba17e39ac130c6ea5a6ba6a4e035f0fc` |
+| S04 | PS | `docs/development/swd-legacy-path-retirement.md` | `569ee37517bbd67fc9d5a9452a17d51739621727` |
+| P01 | PL | `docs/architecture/fixed-fpga-hardware-abi-v1-gate1.md` | `68f3336aaf708923bc6bd631489e9fe153e0bb2d` |
+| P02 | PL | `docs/architecture/fixed-fpga-swd-site1-rtl-gate1.md` | `613111849474a39d02da43e86215f1081afa3dc9` |
+| P03 | PL | `docs/architecture/plasma-unified-fpga-build-diagnostics-v1.md` | `0d666709cfc8d97fc7f475c95249fc5016cb7086` |
+| P04 | PL | `docs/adr/0003-runtime-fpga-driver-reconfiguration-boundary.md` | `92dab7ad202115896ca1c57b94b6c7cdfaa38432` |
+| C01 | Shared | `AGENTS.md` | `52485d65c715858addcfa3fe2b3a6d750dbf81cd` |
+| C02 | Shared | `docs/development/plasma-autonomous-development-contract-full.md` | `8117f704a3f99ba9e101e077c2986f88c1b66c5f` |
+| C03 | Shared | `docs/README.md` | `5b8c0c904a42c3d343456876b46c6ceb3d6ebed4` |
+| C04 | Shared | `docs/adr/README.md` | `9d65aa9c1617a75324deaec64c43a8cd1409d13b` |
+
+### Acceptance rules — all 16 entries
+
+For each document record: (1) authority/status classification, (2) exact duplicate/contradictory clauses or evidence-backed no-change decision, (3) implementation and test alignment where applicable, (4) valid navigation/inbound link impact, and (5) relevant documentation/contract CI outcome. Count **reviewed**, **modified**, and **accepted** separately. A file is accepted only with a recorded disposition and evidence; unchanged files may be accepted if no change is justified.
+
+**Explicit exclusions:** IC Catalog/ICPN/Provider Qualification and the 245 Device Catalog workflows; no hardware operations, deployment, runtime code changes or merge. Existing out-of-batch historical navigation in `docs/README.md` is preserved, not expanded. Root `AGENTS.md` remains mandatory entrypoint, full contract on demand.
+
+**Initial evidence:** All 16 paths were fetched successfully from the PR branch; the starting blob SHAs above identify their exact baseline. This is an inventory milestone, **not** a claim that 16/16 content acceptance is complete.
