@@ -38,7 +38,7 @@
 
 ## Codex context governance and on-demand Path instructions
 
-- **P1 Gate 1 / Host-only inventory** — [Codex P1 override, historical-doc and workflow audit](development/plasma-codex-p1-gate1-inventory-2026-10-31.md)：評估 override 風險、過時文件與 ADR、重複規範；Device Catalog Workflow 已依 Owner 指示暫緩，不改執行機制。
+- **P1 Gate 1 / Host-only inventory** — [Repository-wide documentation governance and cleanup audit](development/plasma-codex-p1-gate1-inventory-2026-10-31.md)：盤點全 Repository 文件權威來源、重複與矛盾規範、歷史文件和引用關係；Codex／Path 3 僅為其中一類，Device Catalog Workflow 暫緩。
 
 - **Merged / PR #1226** — [Shared Desktop and Path 3 Codex context governance audit](development/plasma-codex-context-governance-gate1-audit.md)：文件權威性、共用上下文與 Token 量測規劃；尚未完成實測節省驗證。
 - **Current / Path 2 instructions / PR #1226** — [Path 2 on-demand execution rules](development/plasma-codex-path2-execution.md)：僅在選用 Path 2 時讀取，保留既有 CPU-only、operator-cli、Vivado 詳細規範。
