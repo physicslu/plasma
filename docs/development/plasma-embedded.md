@@ -33,3 +33,7 @@ logs / diagnostics
 Development-only components such as Vivado, pytest, npm build tooling, source-control credentials, and developer SSH keys should not automatically be included in a production image.
 
 Before standardizing a Z2 Python environment, verify compatibility with PYNQ/XRT first.
+
+## Hardware validation evidence boundary
+
+9. Mock/software validation does not prove Z2/FPGA/OpenOCD/real-target behavior.
