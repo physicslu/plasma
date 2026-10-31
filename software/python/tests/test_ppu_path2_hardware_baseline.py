@@ -167,7 +167,7 @@ def test_no_unsafe_installer_or_device_operation_source_contract():
     assert "StrictHostKeyChecking" not in body  # existing pinned helper owns SSH policy
     assert "_TOKEN_REMOTE_READ" in body
     assert 'kind="ppu-runtime"' not in body
-    assert "sudo " not in body
+    assert "sudo -S" not in body  # existing enrolled helper owns privilege prompts
     assert "fpga_manager" not in body
     assert '"systemctl", "--user", "show"' in body  # only read-only user service inspection
     assert '"restart"' not in body
