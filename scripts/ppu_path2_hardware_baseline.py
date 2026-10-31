@@ -842,6 +842,9 @@ def run(api, client_module, *, source_sha: str, target: Mapping[str, str],
             and report["b2_v1"]["status"] == "PASS"
             and report["b2_v2"]["status"] == "PASS"):
         report["baseline_qualification"] = "B1_B2_V1_V2_PASS"
+    elif (report["b1"]["status"] == "PASS"
+          and report["b2_v1"]["status"] == "PASS"):
+        report["baseline_qualification"] = "B1_B2_V1_PASS_V2_NOT_QUALIFIED"
     elif report["b1"]["status"] == "PASS":
         report["baseline_qualification"] = "B1_PASS_PARTIAL"
     return report
