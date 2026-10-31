@@ -356,21 +356,9 @@ justifies them. This rule does **not** waive the source-of-truth order,
 actual runtime guards, hardware/electrical safety, rollback, or truthful
 reporting requirements.
 
-## 1B. Canonical Codex task/SSH execution contract (normative)
+## 1B. Shared Z2 SSH/sudo and hardware recovery boundary (normative)
 
-**A Codex instruction is an execution assignment, not an invitation to
-re-plan the same approved work.** For every task already covered by Gate 1,
-the agent must carry out *all* authorized steps through actual acceptance or
-a truthful, actionable blocker, without transferring routine SSH/sudo,
-building, staging, test execution, restore, CI repair or status checking to
-the owner. Explicit Gate 2 approval still controls merging.
-
-The standard input packet for hardware tasks is
-`docs/development/codex-z2-hil-development-command.md`. Its fixed sections
-are: objective, already-approved scope, target/repository, credentials,
-autonomous sequence, stop/recovery policy and PASS/FAIL/NOT RUN evidence.
-For non-hardware work use the same pattern, with the task's actual acceptance
-criteria; do not invent hardware stages.
+The owner-approved Gate 1 scope is an execution assignment, not a new planning request. The executor must perform authorized work or report a real blocker; Gate 2 remains solely for merging. Path 3 Codex-specific execution and sandbox details live in [Path 3 contract](plasma-path3-codex.md). Path 2 fixed-CLI capabilities live in [Path 2 contract](plasma-path2-cli.md).
 
 **Z2 development SSH/sudo authentication:**
 
