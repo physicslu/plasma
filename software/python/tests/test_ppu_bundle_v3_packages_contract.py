@@ -1,4 +1,4 @@
-"""Canonical Bundle v3: Bundle -> Packages -> Files, legacy v2 read-only.
+"""Canonical Bundle v3: Bundle -> Packages -> Files, retired v1/v2 rejected at admission.
 
 No Z2, SWPC, Installer, FPGA or DUT. Only local ZIP / HTTP / Coordinator mocks.
 """
@@ -98,21 +98,18 @@ def test_v3_real_loopback_http_admission_returns_packages_receipt(loopback, tmp_
     assert server.deployment_thread is None
 
 
-def test_v2_legacy_unchanged_receipt_and_parser(loopback, tmp_path):
+def test_v2_retired_archive_rejected_at_admission(loopback, tmp_path):
     archive, digest = bundle_v3(tmp_path, legacy=True)
-    verified = contract.verify_host_only_artifact(
-        archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
-    )
-    assert verified.schema == contract.LEGACY_BUNDLE_SCHEMA
-    assert len(verified.components) == 6
-    plan = contract.resolve_host_only_bundle(verified, trusted_inventory={})
-    assert "component_order" in plan and "package_order" not in plan
-    api, _, _ = loopback
+    with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_SCHEMA_UNSUPPORTED"):
+        contract.verify_host_only_artifact(
+            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+        )
+    api, paths, server = loopback
     uid = api.upload(archive.read_bytes())
-    receipt = api.deployment_state(api.submit(kind="bundle", upload_id=uid).transaction_id)
-    assert "components" in receipt["result"]["plan"]
-    assert "packages" not in receipt["result"]["plan"]
-    assert client._valid_package_admission(receipt, kind="bundle")
+    with pytest.raises(Exception):
+        api.submit(kind="bundle", upload_id=uid)
+    assert not paths.product_root.exists()
+    assert server.deployment_thread is None
 
 
 @pytest.mark.parametrize("modify", [
