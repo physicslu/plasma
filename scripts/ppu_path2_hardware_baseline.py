@@ -295,6 +295,90 @@ def enroll_manager_real_z2(host: str, device_id: str, *,
     }
 
 
+def inspect_swpc_manager_runtime(*, home: Path | None = None,
+                                 systemctl=None) -> dict[str, Any]:
+    """Read-only, fixed-path SWPC local-control-station owner inspection.
+
+    No credential bytes, arbitrary paths, generic process command or config
+    payloads enter stdout. Never runs a shell or privileged operation.
+    """
+    home = home or Path.home()
+    config = home / ".config/plasma/local-control-station/manager.yaml"
+    unit = home / ".config/systemd/user/plasma-local-manager.service"
+    current = home / ".local/share/plasma/local-control-station/current"
+    state = home / ".local/state/plasma/local-control-station"
+    def inspected_file(path: Path) -> dict[str, Any]:
+        if not path.exists() or path.is_symlink() or not path.is_file():
+            return {"exists": False, "regular_owned": False}
+        info = path.stat()
+        return {"exists": True, "regular_owned": info.st_uid == os.geteuid(),
+                "mode": oct(stat.S_IMODE(info.st_mode)), "sha256": _sha(path.read_bytes())}
+    unit_meta = inspected_file(unit)
+    config_meta = inspected_file(config)
+    config_text = config.read_text(encoding="utf-8") if config_meta["exists"] else ""
+    unit_text = unit.read_text(encoding="utf-8") if unit_meta["exists"] else ""
+    expected_command = (
+        str(current) + "/venv/bin/python -m plasma_manager.server --config " + str(config)
+    )
+    runtime_class = (
+        "GENERIC_MANAGER"
+        if "ExecStart=" + expected_command in unit_text
+        else "BOOTSTRAP_MANAGER"
+        if "ExecStart=" + expected_command.replace(
+            "plasma_manager.server", "plasma_manager.bootstrap_server") in unit_text
+        else "UNRECOGNIZED"
+    )
+    registry_values = re.findall(
+        r"(?m)^\s{2}registry_state_path:\s*(.+?)\s*$", config_text
+    )
+    reg_configured = len(registry_values) == 1 and registry_values[0] not in ("null", "~", "")
+    candidate_state_path = state / "registry.json"
+    found_state = inspected_file(candidate_state_path)
+    found_credentials = inspected_file(state / "bootstrap-credentials.json")
+    found_credentials.pop("sha256", None)
+    # Program availability via currently active release, no execution or secrets.
+    bootstrap_module_available = bool(
+        list((current / "venv/lib").glob("python*/site-packages/plasma_manager/bootstrap_server.py"))
+    )
+    manager_unit_active = "NOT_CHECKED"
+    owner_can_manage_user_service = False
+    ctl = systemctl or (lambda: subprocess.run(
+        ["systemctl", "--user", "show", "plasma-local-manager.service",
+         "--property=ActiveState,LoadState,MainPID", "--no-pager"],
+        check=False, capture_output=True, text=True, timeout=8))
+    try:
+        info = ctl()
+        if info.returncode == 0:
+            fields = dict(line.split("=", 1) for line in info.stdout.splitlines()
+                          if "=" in line and line.split("=", 1)[0] in (
+                              "ActiveState", "LoadState", "MainPID"))
+            manager_unit_active = fields.get("ActiveState", "UNKNOWN")
+            owner_can_manage_user_service = fields.get("LoadState") == "loaded"
+        else:
+            manager_unit_active = "USER_SYSTEMD_NOT_AVAILABLE"
+    except (OSError, subprocess.SubprocessError):
+        manager_unit_active = "USER_SYSTEMD_NOT_AVAILABLE"
+    return {
+        "schema": SCHEMA, "phase": "READ_ONLY_SWPC_MANAGER_RUNTIME_INSPECTION",
+        "manager_port": 18280,
+        "manager_config": config_meta, "manager_unit": unit_meta,
+        "manager_entrypoint": runtime_class,
+        "registry_state_configured": reg_configured,
+        "registry_candidate_state": found_state,
+        "bootstrap_credential_file": {
+            "exists": found_credentials.get("exists", False),
+            "regular_owned": found_credentials.get("regular_owned", False),
+            "mode": found_credentials.get("mode"),
+            "content": "NEVER_READ",
+        },
+        "bootstrap_module_installed": bootstrap_module_available,
+        "manager_service_state": manager_unit_active,
+        "user_service_control_available": owner_can_manage_user_service,
+        "b1": "NOT_RUN", "b2_v1": "NOT_RUN", "b2_v2": "NOT_RUN",
+        "install": "NOT_RUN", "fpga": "NOT_RUN", "dut": "NOT_RUN",
+    }
+
+
 def probe_manager_registries(expected_host: str, *, ports=(18180, 18280)):
     """Read-only SWPC Manager profile inventory, never selects target or mutates.
 
@@ -608,6 +692,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="read-only Z2 identity/version, no credential or writes")
     parser.add_argument("--manager-alias", default="z2")
     parser.add_argument("--manager-port", type=int, default=18280)
+    parser.add_argument("--inspect-swpc-manager", action="store_true",
+                        help="read-only fixed-path SWPC Manager runtime config inspection")
     parser.add_argument("--enroll-manager", action="store_true",
                         help="owner-approved real Z2 registry add ONLY; no pairing or package")
     parser.add_argument("--manager-inventory", action="store_true",
@@ -624,6 +710,12 @@ def main(argv: list[str] | None = None) -> int:
         if not SHA40.fullmatch(args.source_sha) or _git_head() != args.source_sha:
             raise BaselineError("SOURCE_SHA_PIN_MISMATCH")
         host = _private_ipv4(args.host)
+        if args.inspect_swpc_manager:
+            print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps(
+                {**inspect_swpc_manager_runtime(), "source_sha": args.source_sha},
+                sort_keys=True, separators=(",", ":"),
+            ))
+            return 0
         if args.enroll_manager:
             if not args.device_id:
                 raise BaselineError("ENROLL_DEVICE_ID_REQUIRED")
