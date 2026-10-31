@@ -1,6 +1,6 @@
-# PLASMA Codex Token Optimization — P1 Gate 1 Inventory
+# PLASMA Repository Documentation Reorganization — P1 Gate 1 Inventory
 
-**Scope:** Host-only source audit of P1 items. **Pinned main:** `833a0f577c3697d891629c405d91267c05c2b476`. PR #1227 was closed without merge; this is a separate, minimal audit, not a revival of that PR.
+**Scope:** Repository-wide documentation governance, de-duplication, canonical authority and historical cleanup (Host-only source audit). Codex/Path 3 are only examples, not the project boundary. **Pinned main:** `833a0f577c3697d891629c405d91267c05c2b476`. PR #1227 was closed without merge; this is a separate, minimal audit, not a revival of that PR.
 
 ## P1-A: AGENTS.override.md decision
 
@@ -35,6 +35,17 @@ These are **filename counts only**, not execution frequency, redundancy, cost, o
 3. Compare baseline and proposed positive/negative fixtures, duration, and GitHub Actions minutes.
 4. Preserve vendor/ICPN evidence isolation, source locks, non-production qualification and Gate 2 controls.
 5. Deliver a separate source-only PR with an explicit migration/rollback plan; no CI edits in this audit.
+
+## Repository-wide document reorganization: authority and information architecture
+
+- **Shared governance:** AGENTS.md and the detailed development contract; identify normative clauses, their canonical owner and safe cross-references.
+- **Architecture:** ADRs, architecture specifications, and current implementation documents; distinguish accepted decisions from proposals and historical experiments.
+- **Execution paths:** Path 1, Path 2, Path 3 and Desktop tooling; route-specific detail stays on demand, without making Path 3 the primary organizing axis.
+- **Product and IC support:** catalog/provider/qualification and raw evidence documents; distinguish runtime authority, qualification evidence, research notes and retired snapshots.
+- **Operational documentation:** deployment, FPGA/PS, programming, CI and HIL runbooks; avoid duplicated procedures and stale links while retaining safety invariants.
+- **Archive:** mark retired/obsolete documents as historical before any move; verify inbound links, GitHub references and CI/tests. Do not delete based on age alone.
+
+**Deliverables:** document inventory and classification, source-of-truth ownership matrix, overlap/conflict and inbound-link report, prioritized move/merge/deprecate plan, link validation and regression evidence. This Gate 1 does not itself authorize wholesale deletion or migration.
 
 ## Document-only next actions
 
