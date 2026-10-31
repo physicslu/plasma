@@ -76,6 +76,18 @@
 
 This navigation table does not promote any ICPN or replace exact provider/manifest qualification evidence.
 
+## WEB / PS / PL developer documentation entrypoints
+
+This section is a navigation aid, not a new implementation contract. Follow root [AGENTS.md](../AGENTS.md) for agent instructions and load applicable detailed clauses on demand.
+
+| Domain | Start here | Boundary |
+| --- | --- | --- |
+| WEB | [Console developer README](../software/web/README.md), [REST v3 contract](architecture/web-rest-api-contract.md), [Product Modes](architecture/web-product-modes.md), [Web runtime hygiene](deployment/web-runtime-hygiene.md) | Browser UI, REST API, product behavior and SWPC runtime are separate concerns |
+| PS | [Z2 PS release kit and installer](deployment/z2-ps-installer.md), [Runtime data-root CI contract](architecture/runtime-data-root-contract-v1.md), [SWD legacy retirement map](development/swd-legacy-path-retirement.md) | Installer acceptance is not proof of physical Z2 qualification; retired SWD-03 is not current external SWD |
+| PL | [Fixed FPGA ABI proposal](architecture/fixed-fpga-hardware-abi-v1-gate1.md), [Site 1 RTL feasibility](architecture/fixed-fpga-swd-site1-rtl-gate1.md), [FPGA build diagnostics proposal](architecture/plasma-unified-fpga-build-diagnostics-v1.md), [ADR-0003 proposed driver boundary](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md) | Proposed/M1 NO-GO and host-only evidence must not be mistaken for accepted or HIL-qualified hardware |
+
+Historical PS-only reference: [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md) documents a retired internal SWD-03 fixture, not the current Blue Pill runbook.
+
 ## Architecture and contracts
 - **Gate 1 / Draft PR #1222 / Host-only** — [PPU Generic Bundle v2 多元件部署交易](architecture/ppu-generic-bundle-v2-pr2.md)：支援任意非執行型資料元件、程式及 FPGA 檔案的依賴／SHA256 驗證與 Admission；Install／Verify／Activate／Rollback 僅在 Host-only 沙盒模擬，不代表真實部署。
 - **Gate 1 / Path 1 / PR3 Host-only** — [PPU 通用 Bundle v2 統一部署整合](architecture/ppu-pr3-unified-hostonly-integration.md)：多元件 DAG/Inventory/Publisher+Master fail-closed Host-only 契約、既有 Coordinator 的回復模擬、Manager/BFF/Web Console 共用 Bootstrap Admission；未部署、未操作實機。
