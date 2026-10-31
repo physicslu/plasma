@@ -457,17 +457,17 @@ class ManagerBootstrapCoordinator:
 
     def start_deployment(self, alias: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
         _normalized, record, client, _payload, _device_id, token = self._authenticated(alias)
-        # A Bundle uses the same authenticated Bootstrap transaction endpoint,
+        # Every generic package uses the same authenticated Bootstrap Admission endpoint,
         # but does NOT acquire install authority from the Manager pairing token.
-        if body.get("kind") == "bundle":
+        if body.get("kind") in {"python", "native-c", "fpga-image", "bundle"}:
             if set(body) != {"kind", "upload_id"}:
-                raise BootstrapManagerError("generic Bundle requires only kind and upload_id")
+                raise BootstrapManagerError("generic package requires only kind and upload_id")
             upload_id = body["upload_id"]
             if (type(upload_id) is not str or len(upload_id) != 32
                     or any(ch not in "0123456789abcdef" for ch in upload_id)):
-                raise BootstrapManagerError("generic Bundle upload_id is invalid")
+                raise BootstrapManagerError("generic package upload_id is invalid")
             status, response = client.start_deployment(token, {
-                "kind": "bundle", "upload_id": upload_id,
+                "kind": body["kind"], "upload_id": upload_id,
             })
             deployment = response.get("deployment") if isinstance(response, dict) else None
             result = deployment.get("result") if isinstance(deployment, dict) else None
@@ -480,11 +480,11 @@ class ManagerBootstrapCoordinator:
                 or result.get("stage") != "package_admission_only"
                 or result.get("install_qualified") is not False
                 or not isinstance(plan, dict)
-                or plan.get("kind") != "bundle"
+                or plan.get("kind") != body["kind"]
                 or plan.get("execution_permitted") is not False
             ):
                 raise BootstrapManagerError(
-                    "generic Bundle admission response is not non-executing"
+                    "generic package admission response is not non-executing"
                 )
             return status, response
 
