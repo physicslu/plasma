@@ -134,3 +134,13 @@ The counts are classified by path prefix, **not** by whether the content is norm
 ### Integrity boundary
 
 No 662-file content review, cross-reference graph, exact duplicate proof, or per-file migration classification has been completed merely by reading the Git tree. This verified inventory is a starting point for those tasks, not a claim that the repository has already been reorganized.
+
+## Content-level authority findings — verified against pinned main
+
+1. `docs/README.md` begins by declaring itself the canonical **documentation index**, and defines Current / Reference / Plan / Historical labels. This makes it a navigation entrypoint, **not** a substitute for the actual code/schema/tests or an ADR.
+2. The full development contract's new introductory paragraph explicitly calls root `AGENTS.md` the concise mandatory entrypoint and the full contract the **on-demand detailed normative source**. However, the retained historical body still says “This file is the primary operating contract ... Read it before making code, configuration, deployment, hardware, or documentation changes.” These two statements create an **actual document-loading precedence ambiguity** for agents and should be resolved by a narrow explanatory edit, without changing the safety clauses.
+3. `docs/adr/README.md` explicitly distinguishes Accepted, Proposed, Superseded and Deprecated. Its immediate records are ADR-0001 Accepted, ADR-0002 Accepted, and ADR-0003 **Proposed**. Never describe ADR-0003 as an implemented/approved driver.
+4. ADR maintenance currently requires `docs/README.md` to track all `docs/**/*.md`; a future index split must preserve the documentation integrity guard rather than assuming a shorter index is harmless.
+5. Seven `openocd-software-qualification-v*.md` files are present, but no contents/backlinks have yet been compared; **no supersession claim** is justified.
+
+**Recommended minimal remediation, separate from authority redesign:** In the full contract, replace the legacy “primary operating contract / read it before every change” introductory paragraph with language consistent with the existing on-demand root entrypoint. Preserve the rest of the contract verbatim. This avoids a token-loading contradiction without reducing mandatory hardware or privilege controls.
