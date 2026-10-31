@@ -64,3 +64,38 @@ def test_retired_v1_cannot_admit_or_stage(tmp_path: Path, kind: str, filename: s
         co.execute_package_host_only(request)
     assert not paths.product_root.exists()
     assert not (paths.bootstrap_state_root / "host-only-packages" / "active").exists()
+
+
+# Legacy wire-format fixture retained solely for explicit rejection tests.
+# It is not an admission entitlement or an execution compatibility layer.
+SAMPLES = (
+    ("wordport", "python", {"payload/python/wordport.py": b"# retired"}),
+    ("openocd-integration", "python", {"payload/python/openocd.py": b"# retired"}),
+    ("abtest", "python", {"payload/python/abtest.py": b"# retired"}),
+)
+
+
+def package(tmp: Path, name: str, kind: str, files: dict[str, bytes], *,
+            alterations: dict | None = None, names_override=None) -> tuple[Path, str]:
+    """Construct a retired v1 fixture for negative admission coverage only."""
+    tmp.mkdir(parents=True, exist_ok=True)
+    entries = [{"path": filename, "sha256": hashlib.sha256(data).hexdigest(),
+                "size": len(data), "executable": filename.startswith("payload/bin/")}
+               for filename, data in files.items()]
+    manifest = {
+        "schema": contract.PACKAGE_SCHEMA, "name": name, "kind": kind,
+        "version": "2026.10.29", "source_commit": SOURCE,
+        "target": TARGET, "files": entries,
+    }
+    if kind == "fpga-image":
+        manifest["fpga_pair"] = {
+            "image": "payload/fpga/z2-identity.bit", "handoff": "payload/fpga/z2-identity.hwh"
+        }
+    if alterations:
+        manifest.update(alterations)
+    archive = tmp / f"{name}.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("manifest.json", json.dumps(manifest))
+        for filename, data in files.items():
+            output.writestr(filename if names_override is None else names_override, data)
+    return archive, hashlib.sha256(archive.read_bytes()).hexdigest()
