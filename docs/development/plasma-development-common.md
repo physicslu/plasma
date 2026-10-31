@@ -534,61 +534,7 @@ A passing Cloud, CI, or Mock test must never be reported as a passing Z2 or real
 
 ## 5. Current software architecture
 
-PPU-local path:
-
-```text
-Browser / Plasma PPU Console
-        |
-        | HTTP REST polling / Web REST v3
-        v
-Plasma Gateway
-        |
-        | Plasma Protocol v3.3 / PLASMA33
-        v
-Plasma Server :9900
-        |
-        v
-SiteManager / SiteWorker
-        |
-        v
-Interface / Handler
-        |
-        v
-MockInterface today; Z2/FPGA/real-target validation is separate
-```
-
-Managed Control Station path:
-
-```text
-Browser
-    |
-    v
-Control Station Console/BFF
-    |
-    v
-Plasma Manager (registry / fleet observation / bounded managed PPU relay)
-    |
-    +--> PPU A Plasma Gateway -> local execution
-    +--> PPU B Plasma Gateway -> local execution
-    +--> ...
-```
-
-Implementation facts:
-
-- Plasma Gateway uses Python standard-library `ThreadingHTTPServer`.
-- It is **not FastAPI**.
-- It does **not use WebSocket**.
-- Web Console uses REST polling.
-- `plasma_manager` is optional and not required for local PPU execution.
-- Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default for the integration profile).
-- Manager fleet observation is read-only, but Manager also owns explicit bounded control relays. The managed allowlist includes health/status/settings surfaces plus the current Job, Batch, Programming Asset, Engineering session/target, Site Desired/runtime-activation and network-commissioning routes required by the Control Station product.
-- Managed routing is **not** a generic reverse proxy. Exact methods and paths are allowlisted in `software/python/plasma_manager/server.py`; Browser traffic reaches those routes through the same-origin BFF.
-- Job/Batch execution remains PPU/Gateway-owned. Manager relays commands and observations to the selected PPU; it is not a central Job scheduler and does not replace the PPU execution engine.
-- Site Desired reads/writes remain PPU-owned. Manager relays the allowlisted Site settings routes and the explicit `If-Match`/idempotency/security headers required by that contract.
-- Manager still does not provide automatic PPU discovery, a general Fleet write API, or an independent central authentication/scheduling policy layer.
-- Mock programming success does not prove hardware programming.
-
-Do not introduce FastAPI/WebSocket merely because they were discussed as future options.
+Detailed clauses are owned by [plasma-manager.md](plasma-manager.md). Load this domain contract only when its scope or interfaces are affected.
 
 ## 6. Python environment and domain rules
 
@@ -631,84 +577,15 @@ Retired Programmer/Channel domain vocabulary and old programming-data vocabulary
 
 ## 7. Web environment
 
-Web project:
-
-```text
-software/web/
-```
-
-Use `package.json` as source of truth for stack/versions. The project uses React + TypeScript and currently includes Next.js/Vinext and Vite tooling.
-
-Normal checks:
-
-```bash
-cd software/web
-npm run lint
-npm test
-npm run validate:artifact
-```
-
-The Web Console must discover PPU/Site topology from canonical status rather than hard-code an eight-Site product assumption. Job requests send one-based `site_id` only.
-
-Engineering Programming uses Web REST v3 Programming Asset routes. Browser source-input terminology must not be confused with the Normalized Image carried by Protocol v3.3.
-
-Do not assume production Z2 needs Node.js, npm, or the development server merely because the integration host uses them for development/build/demo work.
+Detailed clauses are owned by [plasma-web.md](plasma-web.md). Load this domain contract only when its scope or interfaces are affected.
 
 ## 8. Runtime services and ports
 
-Service management is defined by `scripts/plasmactl`. Port numbers are profile-specific defaults; use `docs/deployment/port-profile-matrix.md` as the canonical cross-profile map rather than assuming one Manager port applies to every deployment.
-
-| systemd service | Default port | Canonical role |
-|---|---:|---|
-| `plasma-server.service` | 9900 | Plasma PPU Programming Server / Protocol v3.3 TCP Server |
-| `plasma-web.service` | 18080 | Full Plasma Gateway |
-| `plasma-vite.service` | 5173 | Plasma PPU Console development/demo runtime |
-| `plasma-manager.service` | 18180 | Generic/integration/package Manager default; registry, fleet observation, and bounded managed PPU relay |
-
-The Linux `local-control-station` profile intentionally uses Console/BFF `127.0.0.1:18190` and Manager `127.0.0.1:18280`. The SWPC x86 `swpc-z2like` engineering surrogate owns only its full local Gateway on `127.0.0.1:18080`; its former host `18081` diagnostics/status ingress was retired by Issue #549 and must remain unused. Public `z2like-demo` uses SWPC host `18082` as its Cloudflare-Access-protected managed ingress to the private QEMU backend. Inside QEMU and on a real Z2, `:18081` remains the independent Bootstrap/recovery service. These are profile contracts, not accidental drift.
-
-Packaged PPU deployments must bind `plasma-server.service` and `plasma-web.service` to the same explicit canonical PPU configuration path. Site Desired persistence requires directory-level create/rename permission for atomic replacement; grant that write boundary only to the Plasma Gateway service and only for the managed Plasma configuration root. `plasma-server.service` remains read-only for canonical configuration. A successful Save Desired changes persistent desired state only; runtime activation is a separate explicit operation.
-
-Useful commands:
-
-```bash
-plasmactl status
-plasmactl ports
-plasmactl test
-plasmactl restart
-plasmactl logs
-plasmactl deploy
-```
-
-`plasmactl test` is the preferred full integration-host validation for cross-stack changes.
-
-Normal deployment flow:
-
-```text
-GitHub main
-   -> fast-forward update
-   -> re-exec latest plasmactl
-   -> full relevant validation
-   -> regenerate/reconcile systemd units
-   -> restart configured services
-   -> health check
-```
-
-Do not bypass failed tests and restart new code as if validation succeeded.
+Detailed clauses are owned by [plasma-manager.md](plasma-manager.md). Load this domain contract only when its scope or interfaces are affected.
 
 ## 9. Site execution invariants
 
-Unless a real shared resource requires synchronization:
-
-- Sites execute independently.
-- A Site must not wait for an unrelated Site pipeline.
-- Per-Site cancellation must not cancel unrelated Sites.
-- Batch cancellation is authoritative for batch classification when it races terminal Job success; the underlying final Job result remains truthful.
-- `program` means write only.
-- A complete programming flow is composed explicitly, e.g. `erase -> program -> verify`.
-- Batch operation selection may include any subset of Erase / Program / Verify / Read.
-
-For Program/Verify, a PPU-wide Normalized Image lease may synchronize Sites because one physical PPU must not execute different target Images concurrently when they share programming resources.
+Detailed clauses are owned by [plasma-manager.md](plasma-manager.md). Load this domain contract only when its scope or interfaces are affected.
 
 ## 10. Service and process safety
 
@@ -960,42 +837,11 @@ A passing lower layer does not prove the next layer.
 
 ## 16. FPGA / PL rules
 
-`pl/` contains FPGA/PL work for Z2. RTL, XDC, register maps, Vivado scripts, bitstreams, and hardware-visible interfaces are contracts.
-
-New production RTL uses SystemVerilog and follows `pl/AGENTS.md`, `docs/development/fpga-development-guide.md`, and `docs/development/fpga-verification-guide.md`.
-
-Canonical repeated programming-resource terminology is **Site**, including `pl/rtl/site/`. Do not create production `channel` modules/directories from retired software vocabulary; use channel only when it genuinely denotes a lower-level protocol/bus concept and document that distinction.
-
-When PL-visible behavior changes:
-
-- check Python/PYNQ register access;
-- check register-map documentation;
-- check clock/reset/CDC and XDC/timing constraints;
-- run appropriate simulation/lint/SVA/cocotb validation;
-- do not claim synthesis/implementation/timing/bitstream success unless actually run;
-- do not claim Z2 hardware success from software tests.
+Detailed clauses are owned by [plasma-fpga.md](plasma-fpga.md). Load this domain contract only when its scope or interfaces are affected.
 
 ## 17. Z2 production direction
 
-Z2 is the intended embedded PPU controller/runtime, not a clone of the integration workstation.
-
-Expected runtime responsibilities, subject to validation:
-
-```text
-Embedded Linux
-Python Plasma runtime
-PYNQ / FPGA runtime
-Plasma Server / API layer
-FPGA bitstream + HWH
-configuration / target definitions
-production Web assets or selected Web runtime
-system services
-logs / diagnostics
-```
-
-Development-only components such as Vivado, pytest, npm build tooling, source-control credentials, and developer SSH keys should not automatically be included in a production image.
-
-Before standardizing a Z2 Python environment, verify compatibility with PYNQ/XRT first.
+Detailed clauses are owned by [plasma-embedded.md](plasma-embedded.md). Load this domain contract only when its scope or interfaces are affected.
 
 ## 18. Current known boundaries / technical debt
 
