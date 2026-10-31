@@ -52,44 +52,14 @@ A Codex task is an execution assignment within an approved Gate 1, not a new pla
 
 Approved Z2 development credentials remain exclusively in the private owner-controlled host credential source. Never commit, print, log, transmit to unrelated endpoints or include in PR artifacts. Do not change sudoers, grant new privileges or use credentials to bypass an actual sandbox denial. Do not invent device IP addresses or operating state. For authorized FPGA load, require candidate identity, known-good rollback and confirmed restoration even on failure; no intentional AXI-fault or external SWD operations in internal-loopback-only tasks.
 
-## 2. Programming data model
+## 2–10. Domain and execution contracts (load on demand)
 
-Keep canonical Site, Programming Asset, Normalized Image, Job and Batch semantics. A Program operation writes only; Erase, Program, Verify and Read are separately selected. A complete flow states its stages explicitly. Site execution is independent except genuine shared physical resources. Do not infer supported IC models, OpenOCD qualification or board behavior from catalog metadata alone. Consult full contract and domain tests before altering execution semantics. **Cross-manufacturer programming default:** before destructive Erase/Program, verify target execution quiescence and isolate relevant application interrupts for interrupt-capable MCUs by an exact-ICPN/Provider-qualified strategy. Missing/unknown isolation fails closed. Non-CPU NOT_APPLICABLE or alternative ISP methods require reviewed evidence; do not apply Cortex-M `maskisr` blindly across other IC families. See `docs/architecture/programming-interrupt-isolation-policy.md` (design default; non-STM32 runtime enforcement not yet implemented).
-
-## 3. Source-of-truth priority
-
-When statements disagree: (1) executable code/check-in config, (2) scripts/plasmactl for integration-host operations, (3) Python/Web package manifests, (4) tests, (5) current architecture/development docs including detailed clauses, (6) historical discussions. Do not silently resurrect stale behavior or stale unsupported claims.
-
-## 4. Execution zones
-
-- **Cloud / GitHub-hosted:** source changes, deterministic host-only tests, PR/CI. Never claim real SWPC, FPGA, voltage, Z2 or DUT success from these.
-- **SWPC / integration host:** licensed builds, scoped host validation and owner-authorized USB/TTY experiments by existing Path 3 Codex. Ordinary Path 3 explicitly pins `--sandbox workspace-write`; only the SHA/digest-bound Owner hardware Work Order explicitly selects `--sandbox danger-full-access`. Neither mode changes the non-root Runner's real Linux DAC/ACL, SSH or protected Root Entry access; no Dispatcher-enforced hardware device allowlist is applied. Check workspace branch/state before changes; never overwrite unrelated work.
-- **Z2 / hardware:** real FPGA/PS/PL/DUT operations only with explicit Gate 1 and effective guard/ownership/recovery checks. Hardware observations are not inherited from software success.
-- Default workspace is the PLASMA repository. Do not inspect unrelated personal files, system settings, credential stores or external repos except already-authorized task-specific resources.
-
-## 5. Current software architecture
-
-Use software/python and software/web canonical source and test manifests. Plasma Gateway uses standard-library HTTP + REST polling; it is not FastAPI/WebSocket. Do not invent implicit Gateway endpoints, switch network ports or assume a central fleet scheduler. Inspect current source before changing APIs or protocol.
-
-## 6. Python environment and domain rules
-
-Python supports 3.11+; use the repo's actual development environment. Keep Protocol v3.3 and Web REST v3 identity canonical. Never equate a generated image, target description or host-only OpenOCD config with qualified real programming support. Check relevant source/tests and the detailed rules before modifying those domains.
-
-## 7. Web environment
-
-Use the actual Web package.json, scripts and components; do not assume a framework. Apply Web REST v3 and normalized execution semantics; run affected lint/unit/build validation. Frontend simulation does not prove PPU Runtime or FPGA hardware.
-
-## 8. Runtime services and ports
-
-Read scripts/plasmactl and runtime configuration before changing any service or port. Plasma Gateway integration endpoint normally uses port 18080; some code-level defaults differ. Desired configuration persistence is not Runtime activation. No unapproved activation, restart, service/network exposure or production deployment.
-
-## 9. Site execution invariants
-
-Sites remain independent except genuine common hardware/resource synchronization. Per-Site cancellation must not cancel unrelated Sites. Batch cancellation retains authoritative batch classification while preserving truthful final Job outcome. Program is write-only. A common Normalized Image lease may synchronize Sites when one PPU shares the execution image.
-
-## 10. Service and process safety
-
-Identify exact PIDs/service owners before stopping processes. Never use broad pkill/killall by language/runtime name; do not stop unrelated host services, networking, SSH or storage. Never expose internal ports to untrusted networks to bypass connectivity problems.
+- **Programming semantics:** Site identity is one-based; Program writes only; Erase/Verify/Read are distinct operations. Asset input and Normalized Image execution identity are not interchangeable. Site cancellation must not cancel unrelated Sites; synchronize only genuinely shared resources. Read [shared data model and Site invariants](docs/development/plasma-development-common.md) and domain tests before edits.
+- **Interrupt isolation:** Before destructive Erase/Program on interrupt-capable MCUs, qualify target quiescence/interrupt isolation per exact ICPN/Provider. Unknown isolation fails closed; do not blindly apply Cortex-M `maskisr` to other families. See [programming interrupt isolation policy](docs/architecture/programming-interrupt-isolation-policy.md); non-STM32 enforcement is not assumed implemented.
+- **Source priority:** executable code/config > `scripts/plasmactl` for host operations > package manifests > tests > current docs > historical discussions. Inspect actual implementation; never infer support from metadata or mock results.
+- **Zones:** Cloud/CI is host-only evidence; SWPC is integration/build/development host; Z2 PS/PL and DUT are real hardware. Path 3 `workspace-write` is the ordinary sandbox; owner-authorized SHA/digest-bound hardware Work Orders may use `danger-full-access`, but sandbox settings do not override Linux DAC/ACL, SSH, protected Root Entry, or safety checks. Do not inspect unrelated user files.
+- **Architecture/runtime:** SWPC Web/Controller/BFF, Z2 PS live OpenOCD and bridge, Z2 PL SWD/SPI; Gateway is standard-library HTTP/REST polling, not FastAPI/WebSocket. Read current source, `scripts/plasmactl`, and the [shared architecture/runtime clauses](docs/development/plasma-development-common.md) before changes. Gateway integration commonly uses port 18080; no unapproved service restart, port exposure or deployment. Desired persistence does not mean activation.
+- **Process safety:** identify precise service/PIDs before stopping; no broad `pkill`/`killall` or disruption of unrelated SSH, network or storage services.
 
 ## 11. Autonomous task execution contract
 
@@ -137,13 +107,9 @@ Development Mode uses the minimum sufficient authentic experiment. Stop after on
 
 For pl/ or hardware-visible changes read pl/AGENTS.md and the FPGA development/verification guides. Production RTL uses SystemVerilog and canonical Site naming. Validate CDC/reset/clock/XDC/register maps, PS/PYNQ access, simulation/lint/SVA/cocotb as applicable. Claim synthesis, timing, BIT/HWH and real Z2 outcomes only when executed and observed.
 
-## 17. Z2 production direction
+## 17–18. Production direction and known limits
 
-Z2 is an embedded PPU, not a clone of the workstation. Do not transplant developer tools, credentials or build-time infrastructure into the runtime by default. Check PYNQ/XRT compatibility before standardizing runtime dependencies.
-
-## 18. Current known boundaries / technical debt
-
-Preserve current implementation limits: Python >=3.11; integration Gateway normally port 18080; REST polling; canonical-only Protocol v3.3 and Web REST v3; not every declared Programming Asset type is implemented; Recipe/Package remains evolving; fleet Manager is not unrestricted proxy/scheduler; Desired persistence does not mean activation; SWPC mock does not certify DUT programming. Consult [shared contract](docs/development/plasma-development-common.md) before advancing unsupported features.
+Z2 is an embedded PPU, not a development workstation: do not copy build tools or credentials into runtime by default. Do not claim unsupported ICs, Asset formats, fleet functions, activation or real DUT qualification. Consult [shared contract](docs/development/plasma-development-common.md) and current source for actual limitations.
 
 ## 19. Communication and completion report
 
