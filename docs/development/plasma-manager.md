@@ -9,3 +9,119 @@
 - Manager is bounded managed PPU routing, not an assumed universal scheduler. Inspect actual endpoints, process ownership and ports before edits.
 - Changes to PPU-facing API also load [Embedded](plasma-embedded.md); changes to Web-facing API also load [Web](plasma-web.md).
 - Update callers, tests, fixtures and documentation in the same change under Replace-by-Default.
+
+## Migrated detailed clauses from shared contract
+
+## 5. Current software architecture
+
+PPU-local path:
+
+```text
+Browser / Plasma PPU Console
+        |
+        | HTTP REST polling / Web REST v3
+        v
+Plasma Gateway
+        |
+        | Plasma Protocol v3.3 / PLASMA33
+        v
+Plasma Server :9900
+        |
+        v
+SiteManager / SiteWorker
+        |
+        v
+Interface / Handler
+        |
+        v
+MockInterface today; Z2/FPGA/real-target validation is separate
+```
+
+Managed Control Station path:
+
+```text
+Browser
+    |
+    v
+Control Station Console/BFF
+    |
+    v
+Plasma Manager (registry / fleet observation / bounded managed PPU relay)
+    |
+    +--> PPU A Plasma Gateway -> local execution
+    +--> PPU B Plasma Gateway -> local execution
+    +--> ...
+```
+
+Implementation facts:
+
+- Plasma Gateway uses Python standard-library `ThreadingHTTPServer`.
+- It is **not FastAPI**.
+- It does **not use WebSocket**.
+- Web Console uses REST polling.
+- `plasma_manager` is optional and not required for local PPU execution.
+- Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default for the integration profile).
+- Manager fleet observation is read-only, but Manager also owns explicit bounded control relays. The managed allowlist includes health/status/settings surfaces plus the current Job, Batch, Programming Asset, Engineering session/target, Site Desired/runtime-activation and network-commissioning routes required by the Control Station product.
+- Managed routing is **not** a generic reverse proxy. Exact methods and paths are allowlisted in `software/python/plasma_manager/server.py`; Browser traffic reaches those routes through the same-origin BFF.
+- Job/Batch execution remains PPU/Gateway-owned. Manager relays commands and observations to the selected PPU; it is not a central Job scheduler and does not replace the PPU execution engine.
+- Site Desired reads/writes remain PPU-owned. Manager relays the allowlisted Site settings routes and the explicit `If-Match`/idempotency/security headers required by that contract.
+- Manager still does not provide automatic PPU discovery, a general Fleet write API, or an independent central authentication/scheduling policy layer.
+- Mock programming success does not prove hardware programming.
+
+Do not introduce FastAPI/WebSocket merely because they were discussed as future options.
+
+## 8. Runtime services and ports
+
+Service management is defined by `scripts/plasmactl`. Port numbers are profile-specific defaults; use `docs/deployment/port-profile-matrix.md` as the canonical cross-profile map rather than assuming one Manager port applies to every deployment.
+
+| systemd service | Default port | Canonical role |
+|---|---:|---|
+| `plasma-server.service` | 9900 | Plasma PPU Programming Server / Protocol v3.3 TCP Server |
+| `plasma-web.service` | 18080 | Full Plasma Gateway |
+| `plasma-vite.service` | 5173 | Plasma PPU Console development/demo runtime |
+| `plasma-manager.service` | 18180 | Generic/integration/package Manager default; registry, fleet observation, and bounded managed PPU relay |
+
+The Linux `local-control-station` profile intentionally uses Console/BFF `127.0.0.1:18190` and Manager `127.0.0.1:18280`. The SWPC x86 `swpc-z2like` engineering surrogate owns only its full local Gateway on `127.0.0.1:18080`; its former host `18081` diagnostics/status ingress was retired by Issue #549 and must remain unused. Public `z2like-demo` uses SWPC host `18082` as its Cloudflare-Access-protected managed ingress to the private QEMU backend. Inside QEMU and on a real Z2, `:18081` remains the independent Bootstrap/recovery service. These are profile contracts, not accidental drift.
+
+Packaged PPU deployments must bind `plasma-server.service` and `plasma-web.service` to the same explicit canonical PPU configuration path. Site Desired persistence requires directory-level create/rename permission for atomic replacement; grant that write boundary only to the Plasma Gateway service and only for the managed Plasma configuration root. `plasma-server.service` remains read-only for canonical configuration. A successful Save Desired changes persistent desired state only; runtime activation is a separate explicit operation.
+
+Useful commands:
+
+```bash
+plasmactl status
+plasmactl ports
+plasmactl test
+plasmactl restart
+plasmactl logs
+plasmactl deploy
+```
+
+`plasmactl test` is the preferred full integration-host validation for cross-stack changes.
+
+Normal deployment flow:
+
+```text
+GitHub main
+   -> fast-forward update
+   -> re-exec latest plasmactl
+   -> full relevant validation
+   -> regenerate/reconcile systemd units
+   -> restart configured services
+   -> health check
+```
+
+Do not bypass failed tests and restart new code as if validation succeeded.
+
+## 9. Site execution invariants
+
+Unless a real shared resource requires synchronization:
+
+- Sites execute independently.
+- A Site must not wait for an unrelated Site pipeline.
+- Per-Site cancellation must not cancel unrelated Sites.
+- Batch cancellation is authoritative for batch classification when it races terminal Job success; the underlying final Job result remains truthful.
+- `program` means write only.
+- A complete programming flow is composed explicitly, e.g. `erase -> program -> verify`.
+- Batch operation selection may include any subset of Erase / Program / Verify / Read.
+
+For Program/Verify, a PPU-wide Normalized Image lease may synchronize Sites because one physical PPU must not execute different target Images concurrently when they share programming resources.
