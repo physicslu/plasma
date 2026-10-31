@@ -44,6 +44,13 @@
 - **Current / Path 2 instructions / PR #1226** — [Path 2 on-demand execution rules](development/plasma-codex-path2-execution.md)：僅在選用 Path 2 時讀取，保留既有 CPU-only、operator-cli、Vivado 詳細規範。
 - **Current / Path 3 instructions / PR #1226** — [Path 3 on-demand execution rules](development/plasma-codex-path3-execution.md)：僅在選用 Path 3 時讀取，保留既有 Codex CLI、原生工具、硬體安全條款。
 
+## Domain engineering contracts
+
+- [Domain contract: plasma-fpga.md](development/plasma-fpga.md)
+- [Domain contract: plasma-embedded.md](development/plasma-embedded.md)
+- [Domain contract: plasma-manager.md](development/plasma-manager.md)
+- [Domain contract: plasma-web.md](development/plasma-web.md)
+
 ## Engineering governance and execution paths
 
 - **Gate 1 Draft / Host-only / PR #1202** — [Root Guard 燒錄 Session 與 FPGA Configuration 准入分離](development/root-guard-runtime-program-split-2026-10-29.md)：正常燒錄取消全系統 `/proc` FD／VMA 完整掃描，保留裝置限定 `fuser`、全域 FPGA 鎖、Image／Boot／UIO Guard；FPGA Download／Test／Restore 持續嚴格掃描。尚未部署、合併或實機驗收，亦非八通道 Broker 已完成。
