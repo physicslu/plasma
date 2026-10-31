@@ -177,14 +177,20 @@ def _factory_python_upload(installed_service, paths, tmp_path: Path):
     from .test_ppu_generic_package_host_only_gate1 import TARGET
 
     file_data = b"# inert factory admission fixture\n"
-    file_name = "payload/python/wordport.py"
+    file_name = "payload/packages/wordport/wordport.py"
     manifest = {
-        "schema": "plasma.ppu.package.v1",
-        "name": "factory-smoke", "kind": "python", "version": "1.0",
+        "schema": "plasma.ppu.bundle.v3",
+        "name": "factory-smoke", "version": "1.0",
         "source_commit": "a" * 40, "target": TARGET,
-        "files": [{
-            "path": file_name, "size": len(file_data),
-            "sha256": hashlib.sha256(file_data).hexdigest(), "executable": False,
+        "purpose": "factory-smoke",
+        "packages": [{
+            "id": "wordport", "kind": "python", "version": "1.0",
+            "requires": [],
+            "files": [{
+                "path": file_name, "size": len(file_data),
+                "sha256": hashlib.sha256(file_data).hexdigest(),
+                "executable": False,
+            }],
         }],
     }
     archive = tmp_path / "factory-smoke.zip"
@@ -223,7 +229,7 @@ def test_factory_installed_service_can_admit_package_without_installing(tmp_path
         deployment_runner=lambda *_: pytest.fail("runtime deployment must not execute"),
     )
     try:
-        result = server.admit_package({"kind": "python", "upload_id": uid})
+        result = server.admit_package({"kind": "bundle", "upload_id": uid})
         assert result["state"] == "admitted"
         receipt = result["result"]
         assert receipt["result"] == "PASS"
