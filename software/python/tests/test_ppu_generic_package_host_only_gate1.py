@@ -99,3 +99,19 @@ def package(tmp: Path, name: str, kind: str, files: dict[str, bytes], *,
         for filename, data in files.items():
             output.writestr(filename if names_override is None else names_override, data)
     return archive, hashlib.sha256(archive.read_bytes()).hexdigest()
+
+
+def coordinator(tmp: Path):
+    paths = engine.DeploymentPaths(
+        bootstrap_state_root=tmp / "isolated-bootstrap-state",
+        product_root=tmp / "production-untouched", config_root=tmp / "config-untouched",
+        runtime_state_root=tmp / "runtime-untouched", log_root=tmp / "log-untouched",
+        systemd_root=tmp / "systemd-untouched",
+    )
+    return engine.DeploymentCoordinator(
+        paths=paths, installer=SimpleNamespace(), clock=lambda: 123.0,
+    )
+
+
+def request(archive: Path, digest: str):
+    return engine.HostOnlyPackageRequest(archive, SOURCE, digest, TARGET)
