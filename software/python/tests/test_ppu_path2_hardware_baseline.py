@@ -143,26 +143,19 @@ def test_wrong_target_and_wrong_member_hash_rejected_without_execution(loopback)
 def test_bad_host_allowlist_denies_before_socket(monkeypatch):
     monkeypatch.setenv(baseline.HOST_ENV, "192.168.2.98")
     with pytest.raises(baseline.BaselineError, match="PPU_ALLOWED_IP_PIN"):
-        baseline._commissioning_transport("192.168.2.99")
+        baseline._private_ipv4("192.168.2.99")
     monkeypatch.setenv(baseline.HOST_ENV, "127.0.0.1")
     with pytest.raises(baseline.BaselineError, match="PPU_PRIVATE_LAN_ONLY"):
-        baseline._commissioning_transport("127.0.0.1")
+        baseline._private_ipv4("127.0.0.1")
     with pytest.raises(baseline.BaselineError, match="PPU_IP_LITERAL_REQUIRED"):
-        baseline._commissioning_transport("evil.example")
+        baseline._private_ipv4("evil.example")
 
 
-def test_token_file_must_be_private_owner_file(tmp_path):
-    good = tmp_path / "token"
-    good.write_text("t" * 48)
-    good.chmod(0o600)
-    assert baseline._token_from_private_file(good) == "t" * 48
-    good.chmod(0o644)
-    with pytest.raises(baseline.BaselineError, match="PRIVATE_TOKEN_FILE_UNSAFE"):
-        baseline._token_from_private_file(good)
-    symlink = tmp_path / "token-link"
-    symlink.symlink_to(good)
-    with pytest.raises(baseline.BaselineError, match="PRIVATE_TOKEN_FILE_DENIED"):
-        baseline._token_from_private_file(symlink)
+def test_manager_alias_and_port_are_strictly_allowlisted():
+    with pytest.raises(baseline.BaselineError, match="MANAGER_ALIAS_INVALID"):
+        baseline.ManagerAdmissionClient(alias="../../escape", port=18280, client_module=client)
+    with pytest.raises(baseline.BaselineError, match="MANAGER_LOOPBACK_PORT_DENIED"):
+        baseline.ManagerAdmissionClient(alias="z2", port=18380, client_module=client)
 
 
 def test_no_unsafe_installer_or_device_operation_source_contract():
@@ -216,10 +209,13 @@ def test_probe_denies_spoofed_identity_and_unknown_host(monkeypatch):
         }[p])
 
 
-def test_path2_missing_private_credential_is_explicit_not_run_without_network(monkeypatch, capsys):
+def test_path2_missing_manager_is_explicit_not_run_without_network(monkeypatch, capsys):
     monkeypatch.setattr(baseline, "_git_head", lambda: SOURCE)
-    monkeypatch.delenv(baseline.TOKEN_ENV, raising=False)
     monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+
+    def unavailable(*args, **kwargs):
+        raise baseline.BaselineError("MANAGER_REGISTRY_UNAVAILABLE")
+    monkeypatch.setattr(baseline.ManagerAdmissionClient, "preflight", unavailable)
     result = baseline.main([
         "--host", "192.168.2.99", "--device-id", DEVICE,
         "--source-sha", SOURCE, "--platform", TARGET["platform"],
@@ -227,22 +223,89 @@ def test_path2_missing_private_credential_is_explicit_not_run_without_network(mo
     ])
     assert result == 69
     out = capsys.readouterr().out
-    assert "PRIVATE_TOKEN_FILE_NOT_PROVISIONED" in out
+    assert "MANAGER_REGISTRY_UNAVAILABLE" in out
     assert '"result":"NOT_RUN"' in out
     assert "BEARER" not in out
 
 
-def test_path2_untrusted_credential_file_denied_before_network(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(baseline, "_git_head", lambda: SOURCE)
-    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
-    token_file = tmp_path / "token"
-    token_file.write_text("t" * 48)
-    token_file.chmod(0o644)
-    monkeypatch.setenv(baseline.TOKEN_ENV, str(token_file))
-    result = baseline.main([
-        "--host", "192.168.2.99", "--device-id", DEVICE,
-        "--source-sha", SOURCE, "--platform", TARGET["platform"],
-        "--board", TARGET["board"], "--fpga-part", TARGET["fpga_part"],
-    ])
-    assert result == 69
-    assert "PRIVATE_TOKEN_FILE_UNSAFE" in capsys.readouterr().out
+def test_manager_transport_rewrites_upload_routes_and_omits_token(monkeypatch):
+    seen = []
+    responses = [
+        (200, {"ok": True, "bootstrap": {
+            "bootstrap": {"state": "bootstrap_ready"},
+            "identity": {"device_id": DEVICE}},
+            "pairing": {"paired": True, "device_match": True, "device_id": DEVICE},
+            "ppu_alias": "z2",
+            "bootstrap_endpoint_policy": "z2-ps-same-host:18081"}),
+        (201, {"ok": True, "upload": {"upload_id": "a" * 32}}),
+        (200, {"ok": True, "upload": {"upload_id": "a" * 32, "state": "committed"}}),
+        (200, {"ok": True, "deployment": {"state": "admitted"}}),
+    ]
+    class Response:
+        def __init__(self, status, data):
+            self.status, self.data = status, json.dumps(data).encode()
+        def read(self, limit):
+            return self.data
+    class Conn:
+        def __init__(self, host, port, timeout):
+            assert (host, port) == ("127.0.0.1", 18280)
+        def request(self, method, path, body=None, headers=None):
+            seen.append((method, path, json.loads(body) if body else None, headers))
+        def getresponse(self):
+            status, data = responses.pop(0)
+            return Response(status, data)
+        def close(self):
+            pass
+    monkeypatch.setattr(baseline.http.client, "HTTPConnection", Conn)
+    api = baseline.ManagerAdmissionClient(alias="z2", port=18280, client_module=client)
+    assert api.status()["identity"]["device_id"] == DEVICE
+    assert api._call("POST", "/v1/uploads", {"size": 1, "sha256": "0" * 64})["ok"]
+    assert api._call("POST", "/v1/uploads/" + "a" * 32 + "/commit", {})["ok"]
+    assert api._call("POST", "/v1/deployments", {"kind": "bundle", "upload_id": "a" * 32})["ok"]
+    assert [p for _, p, _, _ in seen] == [
+        "/api/registry/z2/bootstrap", "/api/registry/z2/bootstrap/uploads",
+        "/api/registry/z2/bootstrap/uploads/" + "a" * 32 + "/commit",
+        "/api/registry/z2/bootstrap/deployments",
+    ]
+    assert seen[2][2] == {"action": "commit"}
+    assert all("Authorization" not in (h or {}) for _, _, _, h in seen)
+
+
+def test_manager_registry_identity_and_pairing_are_mandatory(monkeypatch):
+    registry = {"ok": True, "ppus": [{"alias": "z2", "endpoint": "http://192.168.2.99:18080"}]}
+    status = {"bootstrap": {"state": "bootstrap_ready"},
+              "identity": {"device_id": DEVICE}, "runtime": {"state": "runtime_active"}}
+    state = {"status": status, "paired": True, "device_match": True}
+    class Response:
+        status = 200
+        def read(self, size):
+            return json.dumps(registry).encode()
+    class Conn:
+        def __init__(self, host, port, timeout):
+            assert (host, port) == ("127.0.0.1", 18280)
+        def request(self, *args, **kwargs):
+            pass
+        def getresponse(self):
+            return Response()
+        def close(self):
+            pass
+    monkeypatch.setattr(baseline.http.client, "HTTPConnection", Conn)
+    api = baseline.ManagerAdmissionClient(alias="z2", port=18280, client_module=client)
+    def fake_status():
+        api._last_pairing = {"paired": state["paired"], "device_match": state["device_match"],
+                             "device_id": DEVICE}
+        return state["status"]
+    monkeypatch.setattr(api, "status", fake_status)
+    assert api.preflight(DEVICE, expected_host="192.168.2.99")["identity"]["device_id"] == DEVICE
+    state["paired"] = False
+    with pytest.raises(baseline.BaselineError, match="MANAGER_BOOTSTRAP_NOT_PAIRED"):
+        api.preflight(DEVICE, expected_host="192.168.2.99")
+    state["paired"] = True
+    state["device_match"] = False
+    with pytest.raises(baseline.BaselineError, match="MANAGER_PAIRING_DEVICE_MISMATCH"):
+        api.preflight(DEVICE, expected_host="192.168.2.99")
+    state["device_match"] = True
+    registry["ppus"][0]["endpoint"] = "http://172.30.77.2:18080"
+    with pytest.raises(baseline.BaselineError, match="MANAGER_PHYSICAL_TARGET_NOT_ENROLLED"):
+        api.preflight(DEVICE, expected_host="192.168.2.99")
+
