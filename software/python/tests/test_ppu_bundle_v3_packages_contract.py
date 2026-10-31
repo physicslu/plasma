@@ -191,3 +191,69 @@ def test_minimal_delta_same_transport_repeated_v3_admission(loopback, tmp_path):
     assert not paths.product_root.exists()
     assert not paths.coordinator_journal.exists()
     assert server.deployment_thread is None
+
+
+@pytest.mark.parametrize("failure,expected_state", [
+    ("after_stage", "rolled_back"),
+    ("after_activate", "rolled_back"),
+    ("rollback_unknown", "recovery_required"),
+])
+def test_v3_host_only_activation_and_rollback(tmp_path, failure, expected_state):
+    """Exercise v3 activation receipt and failure recovery in a temp sandbox only."""
+    from .test_ppu_generic_package_host_only_gate1 import engine
+
+    parts_old = [("wordport", "python", [], {
+        "python/wordport.py": b"# prior v3 release\\n",
+    })]
+    parts_new = [("wordport", "python", [], {
+        "python/wordport.py": b"# replacement v3 release\\n",
+    })]
+    old_archive, old_digest = bundle_v3(tmp_path / "old", parts=parts_old)
+    new_archive, new_digest = bundle_v3(tmp_path / "new", parts=parts_new)
+    co = coordinator(tmp_path)
+    first = co.execute_package_host_only(request(old_archive, old_digest))
+    assert first["result"] == "PASS"
+    assert first["transaction"]["state"] == "package_active"
+    assert first["install_qualified"] is False
+    active = (co.paths.bootstrap_state_root / "host-only-packages" / "active"
+              / "multi-purpose-bundle.json")
+    previous = active.read_bytes()
+    assert json.loads(previous)["archive_sha256"] == old_digest
+
+    with pytest.raises(engine.DeploymentError, match="HOST_ONLY_INJECTED"):
+        co.execute_package_host_only(
+            request(new_archive, new_digest), inject_failure=failure,
+        )
+    assert co.journal.read().state == expected_state
+    if expected_state == "rolled_back":
+        assert active.read_bytes() == previous
+    else:
+        with pytest.raises(engine.DeploymentError, match="requires recovery"):
+            co.execute_package_host_only(request(old_archive, old_digest))
+
+    for path in (co.paths.product_root, co.paths.systemd_root,
+                 co.paths.config_root, co.paths.runtime_state_root):
+        assert not path.exists()
+
+
+def test_v3_host_only_activation_switches_receipt_without_running_payload(tmp_path):
+    parts_old = [("wordport", "python", [], {
+        "python/wordport.py": b"# old release\\n",
+    })]
+    parts_new = [("wordport", "python", [], {
+        "python/wordport.py": b"# new release\\n",
+    })]
+    old_archive, old_digest = bundle_v3(tmp_path / "old", parts=parts_old)
+    new_archive, new_digest = bundle_v3(tmp_path / "new", parts=parts_new)
+    co = coordinator(tmp_path)
+    co.execute_package_host_only(request(old_archive, old_digest))
+    second = co.execute_package_host_only(request(new_archive, new_digest))
+    assert second["result"] == "PASS"
+    assert second["transaction"]["state"] == "package_active"
+    assert second["transaction"]["previous_release"] is not None
+    assert second["install_qualified"] is False
+    active = (co.paths.bootstrap_state_root / "host-only-packages" / "active"
+              / "multi-purpose-bundle.json")
+    assert json.loads(active.read_bytes())["archive_sha256"] == new_digest
+    assert not co.paths.product_root.exists()
+    assert not co.paths.systemd_root.exists()
