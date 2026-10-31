@@ -24,10 +24,7 @@ from collections.abc import Iterable
 
 NETWORK_EXACT = frozenset(
     {
-        ".github/workflows/ppu-release.yml",
         ".github/workflows/persistent-integration-host.yml",
-        "scripts/ppu-runtime.py",
-        "scripts/ppu-release.py",
         "scripts/ppu-network-phase1-acceptance.py",
         "scripts/ppu-network-phase2-acceptance.py",
         "scripts/virtual-ppu-network-lab.py",
@@ -66,11 +63,8 @@ NETWORK_EXACT = frozenset(
 )
 
 NETWORK_PREFIXES = (
-    "software/python/plasma_core/",
-    "software/python/plasma_interfaces/",
-    "software/python/plasma_handlers/",
-    "software/python/plasma_server/",
-    "software/python/plasma_manager/",
+    "software/python/plasma_manager/network_",
+    "software/python/plasma_server/network_",
 )
 
 
@@ -88,16 +82,20 @@ def requires_network_qualification(paths: Iterable[str]) -> bool:
 
 def self_test() -> None:
     positives = (
-        ".github/workflows/ppu-release.yml",
-        "scripts/ppu-runtime.py",
+        "software/python/plasma_manager/network_commissioning.py",
+        "software/python/plasma_web/ppu_network_settings.py",
         "scripts/static-ipv4-fault-injection-repeatability.py",
         "software/python/plasma_manager/network_commissioning.py",
         "software/python/plasma_web/ppu_network_activation.py",
         "software/python/plasma_web/gateway_phase2.py",
-        "software/python/plasma_core/errors.py",
         "software/python/tests/test_static_ipv4_fault_injection_lab.py",
     )
     negatives = (
+        "scripts/ppu-release.py",
+        "scripts/ppu-runtime.py",
+        "software/python/plasma_core/errors.py",
+        "software/python/plasma_interfaces/transport.py",
+        "software/python/plasma_server/execution_router.py",
         "release/openocd-qualification/openocd-0.12.0-stm32f103-v6.json",
         "release/openocd.json",
         "software/python/plasma_web/openocd_software_qualification.py",
