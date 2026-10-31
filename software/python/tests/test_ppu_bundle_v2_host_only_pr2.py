@@ -83,18 +83,20 @@ def bundle(tmp: Path, *, version: str = "2026.10.31", changed: dict | None = Non
     return archive, hashlib.sha256(archive.read_bytes()).hexdigest()
 
 
-def test_bundle_v2_accepts_mixed_code_fpga_and_unbounded_data_categories(tmp_path):
-    archive, digest = bundle(tmp_path)
+def test_bundle_v3_accepts_mixed_code_fpga_and_unbounded_data_categories(tmp_path):
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+    archive, digest = bundle_v3(tmp_path)
     result = contract.verify_host_only_artifact(
         archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET)
     assert result.kind == "bundle" and result.purpose == "programming"
     assert result.install_qualified is False
-    assert len(result.components) == 6
-    assert {c.kind for c in result.components} >= {
+    assert result.schema == contract.BUNDLE_SCHEMA
+    assert len(result.packages) == 6
+    assert {c.kind for c in result.packages} >= {
         "python", "native-c", "fpga-image", "ic-catalog", "programming-profile",
         "firmware-asset",
     }
-    assert sum(len(c.files) for c in result.components) == len(result.files)
+    assert sum(len(c.files) for c in result.packages) == len(result.files)
 
 
 def test_bundle_v2_existing_one_lock_one_journal_host_only_transaction(tmp_path):
