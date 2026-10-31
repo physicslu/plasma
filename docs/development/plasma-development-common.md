@@ -532,9 +532,20 @@ Z2 owns embedded runtime, PS/PL integration, FPGA loading, target-interface beha
 
 A passing Cloud, CI, or Mock test must never be reported as a passing Z2 or real-target test.
 
-## 5. Current software architecture
+## Domain contract ownership and loading
 
-Detailed clauses are owned by [plasma-manager.md](plasma-manager.md). Load this domain contract only when its scope or interfaces are affected.
+This common contract is normative for **all** engineering work. Its remaining clauses govern cross-domain behavior, source-of-truth, shared safety, Gate approvals, Git, evidence, execution zones, and workspace security. Do not move shared Z2 root/hardware recovery guards into a domain-only file: these safeguards apply to all paths and callers.
+
+Domain-specific normative detail has one owner:
+
+| Domain | Owner document | Load when |
+| --- | --- | --- |
+| FPGA / PL | [plasma-fpga.md](plasma-fpga.md) | RTL, XDC, timing, bitstream, PL ABI, MMIO |
+| Embedded / PPU | [plasma-embedded.md](plasma-embedded.md) | Z2 Linux, OpenOCD, PS drivers, recovery |
+| Manager / backend | [plasma-manager.md](plasma-manager.md) | Manager, Gateway, Controller, backend REST, Site routing |
+| Web / frontend | [plasma-web.md](plasma-web.md) | Web UI, frontend and REST client |
+
+Read [AGENTS.md](../../AGENTS.md) first. Select Path 2 or Path 3 execution instructions **independently** of the domains touched. Cross-layer changes load all affected domains and validate changed producer/consumer interfaces; unrelated domain contracts and full-system tests are not automatic requirements. Domain documents supplement shared safety and Gate rules; they cannot override them.
 
 ## 6. Python environment and domain rules
 
@@ -574,18 +585,6 @@ image_sha256
 ```
 
 Retired Programmer/Channel domain vocabulary and old programming-data vocabulary must not appear in canonical production code. Do not create compatibility aliases unless an explicit new architecture decision reintroduces a real compatibility requirement.
-
-## 7. Web environment
-
-Detailed clauses are owned by [plasma-web.md](plasma-web.md). Load this domain contract only when its scope or interfaces are affected.
-
-## 8. Runtime services and ports
-
-Detailed clauses are owned by [plasma-manager.md](plasma-manager.md). Load this domain contract only when its scope or interfaces are affected.
-
-## 9. Site execution invariants
-
-Detailed clauses are owned by [plasma-manager.md](plasma-manager.md). Load this domain contract only when its scope or interfaces are affected.
 
 ## 10. Service and process safety
 
@@ -834,14 +833,6 @@ Unit / Source
 ```
 
 A passing lower layer does not prove the next layer.
-
-## 16. FPGA / PL rules
-
-Detailed clauses are owned by [plasma-fpga.md](plasma-fpga.md). Load this domain contract only when its scope or interfaces are affected.
-
-## 17. Z2 production direction
-
-Detailed clauses are owned by [plasma-embedded.md](plasma-embedded.md). Load this domain contract only when its scope or interfaces are affected.
 
 ## 18. Current known boundaries / technical debt
 
