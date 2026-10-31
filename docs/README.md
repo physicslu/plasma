@@ -30,7 +30,7 @@
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
 - **Current / Accepted Policy** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 是 Internal Research Registry、一般 IC Selector 對客戶顯示 L1–L3 並提供 Level Filter、Job Picker 維持 L2/L3，L3 表示至少一組版本化 PLASMA configuration 已 HIL PASS。Active API/runtime 不保留 `phase1_*`／`phase2_*`／`phase3_*` 欄位。
-- **Proposed** — [ADR-0003: Runtime FPGA Driver 與動態重新配置責任邊界](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)：UIO-first Driver 選型候選、單一 PPU FPGA Configuration Owner、Linux 無須 Reboot 的 Bitstream 切換；尚待 Z2 Kernel／UIO／Bridge 證據，不是 Accepted Contract。
+- **Proposed** — [ADR-0003: Runtime FPGA Driver 與固定映像候選責任邊界](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)：UIO-first Driver 選型候選、單一 PPU FPGA Configuration Owner、Linux 無須 Reboot 的 Bitstream 切換；尚待 Z2 Kernel／UIO／Bridge 證據，不是 Accepted Contract。
 
 ## Operator
 
