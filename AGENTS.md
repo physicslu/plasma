@@ -46,6 +46,20 @@ Allow direct safe Image A -> Image B replacement without routine Golden reload. 
 
 An approved Gate 1 is an execution assignment, not a new planning gate. Path 3 may use the enrolled SSH/sudo route only with actual privileges and authorized scope; credentials remain in the private owner-controlled store, never in commits/logs/artifacts. No sudoers modification, privilege bypass or invented Z2 state. For real FPGA/HIL work, follow [shared Z2 Root/recovery constraints](docs/development/plasma-development-common.md) and [Path 3 execution contract](docs/development/plasma-path3-codex.md).
 
+## Domain contract routing (normative)
+
+Load [Common](docs/development/plasma-development-common.md) and only the applicable domain contracts according to the actual changed interfaces, not according to the execution Path:
+
+| Changed scope | Required domain contract | Add when interfaces are affected |
+| --- | --- | --- |
+| FPGA RTL / XDC / PL image / MMIO | [FPGA](docs/development/plasma-fpga.md) | [Embedded](docs/development/plasma-embedded.md) for PS-facing ABI |
+| Z2 Linux / OpenOCD / PS driver | [Embedded](docs/development/plasma-embedded.md) | [FPGA](docs/development/plasma-fpga.md) for PL ABI |
+| Manager / Gateway / backend REST | [Manager](docs/development/plasma-manager.md) | [Embedded](docs/development/plasma-embedded.md) or [Web](docs/development/plasma-web.md) for changed APIs |
+| Web UI / frontend | [Web](docs/development/plasma-web.md) | [Manager](docs/development/plasma-manager.md) for changed REST APIs |
+| Cross-layer API / protocol | Common + every affected domain | Validate affected producers and consumers |
+
+Path 2 / Path 3 are execution contracts selected independently. Do not infer that a domain change requires unrelated domain rules or whole-system testing. Skipping unrelated documents never waives actual interface compatibility, Root Guard, Gate approvals, hardware ownership, electrical safety or evidence requirements.
+
 ## 2–10. Domain and execution contracts (load on demand)
 
 - **Programming semantics:** Site identity is one-based; Program writes only; Erase/Verify/Read are distinct operations. Asset input and Normalized Image execution identity are not interchangeable. Site cancellation must not cancel unrelated Sites; synchronize only genuinely shared resources. Read [shared data model and Site invariants](docs/development/plasma-development-common.md) and domain tests before edits.
