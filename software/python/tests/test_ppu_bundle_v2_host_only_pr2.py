@@ -67,7 +67,7 @@ def bundle(tmp: Path, *, version: str = "2026.10.31", changed: dict | None = Non
             "requires": list(dependencies), "files": component_files,
         })
     manifest = {
-        "schema": contract.BUNDLE_SCHEMA, "name": "multi-purpose-bundle",
+        "schema": contract.LEGACY_BUNDLE_SCHEMA, "name": "multi-purpose-bundle",
         "version": version, "purpose": "programming",
         "source_commit": SOURCE, "target": dict(TARGET),
         "components": components,
