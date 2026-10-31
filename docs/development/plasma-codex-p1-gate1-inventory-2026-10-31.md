@@ -278,3 +278,24 @@ Evidence: the four frozen WEB documents W01–W04 were read from their pinned ba
 Owner instructed: **finish organizing all 16 frozen Batch 1 documents before performing a consolidated CI verification.** Do not run, poll, or report per-file CI as an acceptance step. Continue document/content/source reconciliation without requesting separate approval for each document. After all 16 have recorded dispositions and the final edits are complete, perform one consolidated relevant CI review and report Gate 2 readiness.
 
 GitHub may independently trigger push-based Actions; this instruction does not authorize modifying shared workflows or claiming those automatic runs are suppressed. Do not manually dispatch workflows during the document-edit phase. Keep PR Draft, do not merge, deploy, operate hardware, or expand into IC Catalog.
+
+## Batch 1 remaining document review — PS / PL / shared (CI deferred)
+
+All frozen PS S01–S04, PL P01–P04 and shared C01–C04 documents were read from the PR branch. These are **content review dispositions**, not final acceptance or CI claims.
+
+| ID | Authority / reviewed finding | Disposition |
+| --- | --- | --- |
+| S01 | Z2 PS release-kit and managed acceptance; distinct from deployment-engine transport and Factory Recovery | Edited: explicit PS-only / no implied SSH production transport / no hardware admission; verify live engine later |
+| S02 | Installed Python runtime data-root CI contract; scoped to Python package assets, not generic PS/PL memory map | No text change justified at present; verify relevant CI after batch |
+| S03 | Explicit historical synthetic SWD-03 MMIO backend; not current Blue Pill external SWD | Preserve historical evidence; no change |
+| S04 | Explicit current external Blue Pill path vs retired SWD-03/EMIO and guarded legacy HIL | Preserve boundary; no change |
+| P01 | Fixed-image ABI v1 candidate, M1 NO-GO | Edited: manifest status, zero physically verified sites, simulated AXI and internal synthetic fixture |
+| P02 | Site-1 RTL simulation-only candidate; newer semantic convergence document supersedes older gap table | Preserve historical feasibility result; no change |
+| P03 | Proposed unified FPGA build diagnostics, offline/host evidence only | Edited: no implicit physical image/timing/DUT qualification |
+| P04 | ADR-0003 Proposed, not Accepted, M1 NO-GO | Preserve status and owner-review requirement; no change |
+| C01 | Root AGENTS mandatory concise entrypoint | Preserve normative rules; no change |
+| C02 | Full development contract detailed normative reference, read on demand | Prior introductory clarification retained; no additional change |
+| C03 | Docs navigation index, already changed in PR | Preserve first-batch navigation; verify links at batch end |
+| C04 | ADR status index; ADR-0003 Proposed | No change |
+
+**Batch review coverage:** 16/16 initial content classification (W01–W04 in preceding section; S01–S04, P01–P04, C01–C04 above). **Final accepted: 0/16 pending implementation/test/link reconciliation and consolidated CI.** Directly edited frozen baseline paths so far: W01, S01, P01, P03, C02, C03 (6/16); C02/C03 edits predate frozen baseline, and the baseline SHA captures their then-current state. No changes outside the frozen documents except this audit report. The owner-directed CI-only-after-batch rule remains in force.
