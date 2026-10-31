@@ -165,3 +165,29 @@ def test_v3_exact_package_count_boundary(tmp_path, count, accepted):
             target_profile=TARGET,
         )
         assert len(verified.packages) == count
+
+
+def test_minimal_delta_same_transport_repeated_v3_admission(loopback, tmp_path):
+    """Reuse the proven upload/admission route; never infer installation from admission."""
+    api, paths, server = loopback
+    parts = [("wordport", "python", [], {"python/wordport.py": b"# host-only\n"})]
+    archive, digest = bundle_v3(tmp_path, parts=parts)
+    payload = archive.read_bytes()
+    receipts = []
+    for _ in range(2):
+        upload_id = api.upload(payload)
+        admitted = api.submit(kind="bundle", upload_id=upload_id)
+        assert admitted.state == "admitted"
+        receipt = api.deployment_state(admitted.transaction_id)
+        assert client._valid_package_admission(receipt, kind="bundle")
+        result = receipt["result"]
+        assert result["stage"] == "package_admission_only"
+        assert result["install_qualified"] is False
+        assert result["plan"]["execution_permitted"] is False
+        assert result["plan"]["archive_sha256"] == digest
+        assert len(result["plan"]["packages"]) == 1
+        receipts.append(receipt)
+    assert len(receipts) == 2
+    assert not paths.product_root.exists()
+    assert not paths.coordinator_journal.exists()
+    assert server.deployment_thread is None
