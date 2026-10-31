@@ -125,3 +125,63 @@ Unless a real shared resource requires synchronization:
 - Batch operation selection may include any subset of Erase / Program / Verify / Read.
 
 For Program/Verify, a PPU-wide Normalized Image lease may synchronize Sites because one physical PPU must not execute different target Images concurrently when they share programming resources.
+
+## Migrated Python and domain vocabulary
+
+## 6. Python environment and domain rules
+
+Python project:
+
+```text
+software/python/
+```
+
+`pyproject.toml` is authoritative. Baseline is Python >= 3.11.
+
+Preferred test command:
+
+```bash
+cd software/python
+.venv/bin/python -m pytest -q
+```
+
+Canonical Python/domain vocabulary includes:
+
+```text
+PPUConfig
+SiteConfig
+SiteManager
+SiteWorker
+SiteState
+ppu_id
+facility_id
+site_id
+ProgrammingAsset
+ProgrammingAssetType
+ProgrammingAssetFormat
+NormalizedImage
+JobRequest.image
+image_size
+image_sha256
+```
+
+Retired Programmer/Channel domain vocabulary and old programming-data vocabulary must not appear in canonical production code. Do not create compatibility aliases unless an explicit new architecture decision reintroduces a real compatibility requirement.
+
+
+## Known architecture boundaries and technical debt
+
+## 18. Current known boundaries / technical debt
+
+Agents must not silently turn these facts into wrong assumptions:
+
+1. Python supports >=3.11; CI and integration host may use different allowed minor versions.
+2. Integration deployment uses Plasma Gateway port 18080 while `plasma_web.gateway` retains a code-level local default of 8080.
+3. Plasma Gateway is standard-library HTTP + REST polling, not FastAPI/WebSocket.
+4. Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before stack assumptions.
+5. Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
+6. Only binary Image Asset normalization is implemented; other declared Asset formats/types are extension points, not validated functionality.
+7. Programming Recipe/Package is an architectural direction, not yet an implemented execution contract.
+8. Plasma Manager currently implements explicit registry/fleet aggregation plus bounded managed PPU command routing for the current Control Station contract, including allowlisted Job/Batch/Programming Asset and Site/network operations. It is not a generic proxy or central scheduler; automatic discovery, general Fleet write orchestration, and an independent central auth/scheduling policy remain outside the current contract.
+9. Mock/software validation does not prove Z2/FPGA/OpenOCD/real-target behavior.
+10. Site Desired persistence and Runtime activation are separate contracts. Current P3-capable deployments support explicit bounded runtime activation through the activation helper/server-control sockets; saving Desired state alone never implies that runtime activation occurred.
+
