@@ -607,3 +607,30 @@ def test_physical_direct_bootstrap_uses_only_z2_http_and_rejects_wrong_hash(monk
     assert calls[0][2]["Authorization"] == "Bearer " + "x" * 48
     with pytest.raises(baseline.BaselineError, match="ROUTE_DENIED"):
         api._call("POST", "/v1/installer", {"execute": True})
+
+
+def test_direct_real_z2_status_document_is_valid_without_top_level_ok(monkeypatch):
+    monkeypatch.delenv(baseline.HOST_ENV, raising=False)
+    expected = {
+        "bootstrap": {"state": "bootstrap_ready", "version": "0.1.0"},
+        "identity": {"device_id": DEVICE},
+        "runtime": {"state": "runtime_active"},
+        "deployment": None,
+    }
+    class Response:
+        status = 200
+        def read(self, n):
+            return json.dumps(expected).encode()
+    class Conn:
+        def __init__(self, host, port, timeout):
+            assert host == "192.168.2.99" and port == 18081
+        def request(self, method, path, body=None, headers=None):
+            assert method == "GET" and path == "/v1/status"
+        def getresponse(self):
+            return Response()
+        def close(self):
+            pass
+    api = baseline.DirectSSHAuthenticatedBootstrap(
+        "192.168.2.99", module=client, token="x" * 48,
+        connection_factory=Conn)
+    assert api.status() == expected
