@@ -69,6 +69,159 @@ def _private_ipv4(host: str) -> str:
     return host
 
 
+
+# Only the local Z2 process can access this file; Engineering Mode uses
+# the pre-existing worker SSH/sudo enrollment and an exact trusted host key.
+# Do not place the returned secret into any GitHub Work Order, log or file.
+_TOKEN_REMOTE_READ = """
+import base64, os, stat, sys
+path = "/var/lib/plasma-bootstrap/control-token"
+try:
+    if os.geteuid() != 0:
+        raise RuntimeError()
+    metadata = os.lstat(path)
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0 or metadata.st_mode & 0o077 or not 32 <= metadata.st_size <= 512:
+        raise RuntimeError()
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        data = os.read(fd, 513)
+    finally:
+        os.close(fd)
+    token = data.strip()
+    if not 32 <= len(token) <= 256 or any(ch <= 32 or ch > 126 for ch in token):
+        raise RuntimeError()
+    sys.stdout.write("PLASMA_BOOTSTRAP_MATERIAL:" + base64.b64encode(token).decode("ascii") + "\\n")
+except Exception:
+    sys.stderr.write("PLASMA_BOOTSTRAP_MATERIAL_NOT_ACCESSIBLE\\n")
+    sys.exit(77)
+"""
+
+
+def _existing_bootstrap_token_via_z2_ssh(host: str, *, helper=None) -> str:
+    """Fetch existing token in memory, via pinned SSH and existing sudo route.
+
+    The raw SSH output is private process data: never forward it, including
+    on failure. No provisioning, rotation, copy or persistent SWPC token file.
+    """
+    host = _private_ipv4(host)
+    if helper is None:
+        spec = importlib.util.spec_from_file_location(
+            "ppu_baseline_existing_z2_ssh", ROOT / "scripts/plasma_wordport_program.py"
+        )
+        if spec is None or spec.loader is None:
+            raise BaselineError("Z2_EXISTING_SSH_HELPER_UNAVAILABLE")
+        helper = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = helper
+        spec.loader.exec_module(helper)
+    try:
+        credentials, known_hosts = helper.z2_login_credentials(Path.home())
+    except Exception:
+        raise BaselineError("Z2_ENROLLED_SSH_CREDENTIAL_UNAVAILABLE") from None
+    if credentials.get("ssh_host") != host:
+        raise BaselineError("Z2_ENROLLED_SSH_HOST_NOT_APPROVED_TARGET")
+    try:
+        rc, output = helper.password_ssh_z2(
+            ["python3", "-I", "-c", _TOKEN_REMOTE_READ],
+            credentials, known_hosts, timeout=45,
+        )
+    except Exception:
+        raise BaselineError("Z2_ENROLLED_SSH_OPERATION_UNAVAILABLE") from None
+    if rc != 0:
+        raise BaselineError("Z2_BOOTSTRAP_TOKEN_ACCESS_DENIED")
+    matches = re.findall(r"PLASMA_BOOTSTRAP_MATERIAL:([A-Za-z0-9+/=]{44,360})", output)
+    if len(matches) != 1:
+        raise BaselineError("Z2_BOOTSTRAP_TOKEN_RESPONSE_INVALID")
+    try:
+        material = base64.b64decode(matches[0], validate=True)
+        token = material.decode("ascii")
+    except (ValueError, UnicodeError):
+        raise BaselineError("Z2_BOOTSTRAP_TOKEN_RESPONSE_INVALID") from None
+    if not (32 <= len(token) <= 256 and all(33 <= ord(c) <= 126 for c in token)):
+        raise BaselineError("Z2_BOOTSTRAP_TOKEN_RESPONSE_INVALID")
+    return token
+
+
+class DirectSSHAuthenticatedBootstrap:
+    """Private-LAN Z2 Bootstrap admission with SSH-acquired in-memory secret.
+
+    This is explicitly commissioning HTTP, not production authenticated TLS.
+    Never derives authorization from the package or a Manager pairing.
+    """
+    def __init__(self, host: str, *, module, token: str, connection_factory=None):
+        self.host = _private_ipv4(host)
+        self.module = module
+        self._token = token
+        self._connection_factory = connection_factory or http.client.HTTPConnection
+        self._physical_direct_baseline = True
+
+    def _call(self, method: str, path: str, body: Mapping[str, object] | None):
+        if (method not in ("GET", "POST")
+                or not re.fullmatch(
+                    r"/v1/(status|deployment|uploads(?:/[0-9a-f]{32}/(?:chunks|commit))?|deployments)",
+                    path)):
+            raise BaselineError("DIRECT_BOOTSTRAP_ROUTE_DENIED")
+        if method == "POST" and path not in ("/v1/uploads", "/v1/deployments") and not path.startswith("/v1/uploads/"):
+            raise BaselineError("DIRECT_BOOTSTRAP_WRITE_DENIED")
+        raw = (json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+               if body is not None else None)
+        if raw is not None and len(raw) > 2 * 1024 * 1024:
+            raise BaselineError("DIRECT_BOOTSTRAP_REQUEST_TOO_LARGE")
+        conn = self._connection_factory(self.host, 18081, timeout=15)
+        try:
+            conn.request(method, path, body=raw, headers={
+                "Authorization": "Bearer " + self._token,
+                "Accept": "application/json",
+                **({"Content-Type": "application/json"} if raw is not None else {}),
+            })
+            response = conn.getresponse()
+            data = response.read(2 * 1024 * 1024 + 1)
+            status = response.status
+        finally:
+            conn.close()
+        if len(data) > 2 * 1024 * 1024:
+            raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_TOO_LARGE")
+        if status < 200 or status >= 300:
+            reason = ""
+            if status == 409:
+                try:
+                    error = json.loads(data.decode("utf-8"))
+                except (ValueError, UnicodeError):
+                    error = None
+                if type(error) is dict and error.get("error") == "bootstrap_request_rejected":
+                    reasons = {
+                        "chunk SHA-256 mismatch": "CHUNK_SHA256_MISMATCH",
+                        "PACKAGE_FILE_SHA256_MISMATCH": "PACKAGE_FILE_SHA256_MISMATCH",
+                        "PACKAGE_MANIFEST_CONTENT_DENIED": "PACKAGE_MANIFEST_CONTENT_DENIED",
+                    }
+                    message = error.get("message")
+                    if type(message) is str:
+                        reason = reasons.get(message, "")
+            raise self.module.DeploymentAPIError(
+                f"API_HTTP_REJECTED:{status}" + (":" + reason if reason else "")
+            )
+        try:
+            response_data = json.loads(data.decode("utf-8"))
+        except (ValueError, UnicodeError):
+            raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_INVALID") from None
+        if type(response_data) is not dict or response_data.get("ok") is not True:
+            raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_INVALID")
+        return response_data
+
+    def status(self):
+        return self._call("GET", "/v1/status", None)
+
+    def upload(self, archive):
+        return self.module.BootstrapAPIClient.upload(self, archive)
+
+    def submit(self, *, kind, upload_id, **kwargs):
+        return self.module.BootstrapAPIClient.submit(
+            self, kind=kind, upload_id=upload_id, **kwargs,
+        )
+
+    def deployment_state(self, transaction_id):
+        return self.module.BootstrapAPIClient.deployment_state(self, transaction_id)
+
+
 class ManagerAdmissionClient:
     """Reuse Manager's existing device-paired Bootstrap routes, no credentials.
 
@@ -545,7 +698,8 @@ def _expect_http_rejection(api, method: str, path: str, body: dict, error: str,
         if "API_HTTP_REJECTED:409" not in str(exc):
             raise BaselineError("NEGATIVE_NOT_REJECTED_AS_409") from None
         if (expected_reason is not None
-                and isinstance(api, ManagerAdmissionClient)
+                and (isinstance(api, ManagerAdmissionClient)
+                     or getattr(api, "_physical_direct_baseline", False))
                 and not str(exc).endswith(":" + expected_reason)):
             raise BaselineError("NEGATIVE_REJECTION_CAUSE_UNPROVEN") from None
     else:
@@ -692,6 +846,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="read-only Z2 identity/version, no credential or writes")
     parser.add_argument("--manager-alias", default="z2")
     parser.add_argument("--manager-port", type=int, default=18280)
+    parser.add_argument("--direct-bootstrap-ssh", action="store_true",
+                        help="existing enrolled Z2 SSH token in memory; no Manager or installer")
     parser.add_argument("--inspect-swpc-manager", action="store_true",
                         help="read-only fixed-path SWPC Manager runtime config inspection")
     parser.add_argument("--enroll-manager", action="store_true",
@@ -748,6 +904,15 @@ def main(argv: list[str] | None = None) -> int:
         if not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", args.device_id):
             raise BaselineError("DEVICE_ID_PIN_INVALID")
         module = _load_client()
+        if args.direct_bootstrap_ssh:
+            token = _existing_bootstrap_token_via_z2_ssh(host)
+            api = DirectSSHAuthenticatedBootstrap(host, module=module, token=token)
+            report = run(api, module, source_sha=args.source_sha,
+                         target=target, expected_device_id=args.device_id)
+            print("PLASMA_PPU_HARDWARE_BASELINE_JSON=" + json.dumps(
+                report, sort_keys=True, separators=(",", ":"),
+            ))
+            return 0 if report["b1"]["status"] == "PASS" else 1
         api = ManagerAdmissionClient(alias=args.manager_alias,
                                      port=args.manager_port,
                                      client_module=module)
