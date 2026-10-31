@@ -657,20 +657,20 @@ def resolve_host_only_bundle(
         raise UnifiedDeploymentError("BUNDLE_RESOLUTION_INPUT_INVALID")
     if any(type(name) is not str or name not in {p.id for p in bundle.packages}
            for name in trusted_inventory):
-        raise UnifiedDeploymentError("BUNDLE_INVENTORY_UNKNOWN_COMPONENT")
+        raise UnifiedDeploymentError("BUNDLE_INVENTORY_UNKNOWN_PACKAGE" if bundle.schema == BUNDLE_SCHEMA else "BUNDLE_INVENTORY_UNKNOWN_COMPONENT")
     by_id = {package.id: package for package in bundle.packages}
     _verify_bundle_dependencies(bundle.packages)
     seen: set[str] = set()
     order: list[str] = []
 
-    def visit(component_id: str) -> None:
-        if component_id in seen:
+    def visit(package_id: str) -> None:
+        if package_id in seen:
             return
-        component = by_id[component_id]
-        for dependency in component.requires:
+        package = by_id[package_id]
+        for dependency in package.requires:
             visit(dependency)
-        seen.add(component_id)
-        order.append(component_id)
+        seen.add(package_id)
+        order.append(package_id)
 
     for package in bundle.packages:
         visit(package.id)
@@ -678,13 +678,13 @@ def resolve_host_only_bundle(
     stage: list[str] = []
     reuse: list[str] = []
     identities: dict[str, str] = {}
-    for component_id in order:
-        component = by_id[component_id]
-        identity = bundle_package_identity(component)
-        identities[component_id] = identity
-        existing = trusted_inventory.get(component_id)
+    for package_id in order:
+        package = by_id[package_id]
+        identity = bundle_package_identity(package)
+        identities[package_id] = identity
+        existing = trusted_inventory.get(package_id)
         if existing is None:
-            stage.append(component_id)
+            stage.append(package_id)
             continue
         if (
             not isinstance(existing, Mapping)
@@ -696,10 +696,10 @@ def resolve_host_only_bundle(
             or existing["target"] != dict(bundle.target)
         ):
             raise UnifiedDeploymentError("BUNDLE_INVENTORY_UNTRUSTED")
-        if existing["version"] == component.version and existing["sha256"] == identity:
-            reuse.append(component_id)
+        if existing["version"] == package.version and existing["sha256"] == identity:
+            reuse.append(package_id)
         else:
-            stage.append(component_id)
+            stage.append(package_id)
     return {
         "schema": ("plasma.ppu.bundle-resolution.v2" if bundle.schema == BUNDLE_SCHEMA
                    else "plasma.ppu.bundle-resolution.v1"),
