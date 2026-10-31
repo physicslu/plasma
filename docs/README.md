@@ -15,6 +15,7 @@
 
 - **Operator-reported physical HIL / PR #1219 admission only** — [SWPC → PYNQ-Z2 Package Admission, 2026-10-30](evidence/ppu-package-admission-2026-10-30/README.md)：實際乙太網路 ZIP Upload／Commit、SHA256、Manifest Admission 與 Receipt；`admitted` 不代表安裝／啟用，TLS、Publisher／Source Trust 和 FPGA／DUT 資格仍未驗收。後續 Factory Bundle 相依檔修復為獨立 Draft PR #1221。
 - **Gate 1 / Path 2 / guarded-hardware / Draft** — [PPU SWPC→Z2 B1/B2 實機驗收 Baseline v1](deployment/ppu-b1-b2-path2-hardware-baseline.md)：固定 Owner Work Order、實機 Receive/Commit 與 Admission 分級驗收、正負向證據及逐項 PASS／NOT_QUALIFIED／NOT_RUN；B3/B4 Install/Activate 未授權。
+- **Gate 1 / Path 2 / Physical Evidence (partial, NOT_RUN B1/B2)** — [SWPC → Z2 實機前置檢查與 Manager Registry 缺口證據](evidence/ppu-hardware-baseline-v1-2026-10-31/README.md)：真實 Z2 身分與 Bootstrap 狀態唯讀探測 PASS；Manager :18180 不可用、:18280 未登錄實體 Z2，B1/B2 未執行且未變更設備。
 
 ## 跨廠牌燒錄預設安全政策
 
