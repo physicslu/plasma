@@ -91,3 +91,46 @@ This section records direct GitHub directory-listing counts at pinned `main`; th
 2. For each candidate: current authority classification, duplicate/supersession proof, backlinks, ADR/CI/test references, and proposed replacement URL.
 3. Resolve conflicts by explicit owner approval and source precedence; retain immutable evidence and signed/hash-locked material.
 4. Perform link-integrity and documentation CI after each bounded change. No bulk archival move based on title/version alone.
+
+## Gate 1 complete tracked-tree Markdown inventory (verified)
+
+A recursive GitHub Git Tree read of pinned `main` `833a0f577c3697d891629c405d91267c05c2b476` returned **5,207 tracked tree entries**, `truncated=false`, and **662 tracked `.md` blobs**. This is the repository-wide Markdown count at that commit, unlike the earlier nonrecursive 248 minimum. It does not include untracked local files, other document formats, or content beyond the pinned commit.
+
+| Scope | Tracked Markdown count |
+| --- | ---: |
+| `data/device-catalog/**` | 342 |
+| `docs/architecture/**` | 94 |
+| `docs/development/**` | 89 |
+| `handover/**` | 34 |
+| `data/ic-support/**` | 31 |
+| `docs/deployment/**` | 25 |
+| `docs/evidence/**` | 15 |
+| `pl/projects/**` | 8 |
+| Other locations, including root, ADR, engineering, operator and testing | 24 |
+| **Total** | **662** |
+
+The counts are classified by path prefix, **not** by whether the content is normative. In particular, the 342 Device Catalog Markdown files are research/evidence candidates for classification, **not authorization to edit 245 Device Catalog GitHub Actions workflows**.
+
+### Highest-size document review candidates
+
+| Tracked path | Git blob size (bytes) | Review question |
+| --- | ---: | --- |
+| `docs/development/plasma-autonomous-development-contract-full.md` | 69,292 | Normative clauses vs AGENTS and path-specific docs |
+| `docs/README.md` | 64,814 | Can navigation be split into topical indexes without losing links? |
+| `docs/adr/0002-openocd-software-qualified-catalog-visibility.md` | 55,838 | Separate accepted ADR decisions from historical amendments/evidence |
+| `docs/development/todo.md` | 44,667 | Distinguish active backlog from historical completion log |
+| `data/device-catalog/research/MICROCHIP_BULK_ACQUISITION_V1.md` | 37,140 | Preserve immutable research evidence and provenance |
+| `docs/architecture/ppu-unified-deployment-gate1.md` | 34,584 | Current architecture vs Gate 1 proposal and superseded decisions |
+
+**Do not delete or shorten solely due to size.** Size is a triage signal, not evidence of duplication, invalid authority, or token cost in a real Codex session.
+
+### Work packages for document-only reorganization
+
+1. **Authority classification:** map each Markdown file to Normative, Reference, Evidence, Historical or Mixed; mark Mixed for section-level analysis rather than arbitrarily labeling the entire file.
+2. **Cross-reference graph:** extract tracked Markdown links and reference paths, identify broken/ambiguous backlinks and link dependencies; distinguish GitHub issue/PR links from file links.
+3. **Conflict analysis:** begin with AGENTS/full contract/ADR-0002 and current Path 1/2/3 docs; document exact overlapping clause and controlling decision.
+4. **Incremental migration:** propose small, reversible, reviewable documentation-only PRs by domain; keep this PR as audit. Preserve immutable source locks, receipts and historical records.
+
+### Integrity boundary
+
+No 662-file content review, cross-reference graph, exact duplicate proof, or per-file migration classification has been completed merely by reading the Git tree. This verified inventory is a starting point for those tasks, not a claim that the repository has already been reorganized.
