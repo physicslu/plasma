@@ -501,3 +501,31 @@ def test_owner_enrollment_never_accepts_arbitrary_alias_or_port():
         baseline.enroll_manager_real_z2(
             "192.168.2.99", DEVICE, alias="qemu",
             probe=lambda host: {"device_id_observed": DEVICE})
+
+
+def test_swpc_inspection_reports_only_sanitized_fixed_files(tmp_path):
+    conf = tmp_path / ".config/plasma/local-control-station"
+    units = tmp_path / ".config/systemd/user"
+    state = tmp_path / ".local/state/plasma/local-control-station"
+    current = tmp_path / ".local/share/plasma/local-control-station/current"
+    for p in [conf, units, state, current]:
+        p.mkdir(parents=True)
+    cfg = conf / "manager.yaml"
+    cfg.write_text("manager:\n  host: 127.0.0.1\n  port: 18280\nppus: []\n")
+    unit = units / "plasma-local-manager.service"
+    unit.write_text("[Service]\nExecStart=" + str(current) +
+                    "/venv/bin/python -m plasma_manager.server --config " + str(cfg) + "\n")
+    secret = state / "bootstrap-credentials.json"
+    secret.write_text("SENSITIVE_CONTENT_MUST_NOT_LEAK")
+    secret.chmod(0o600)
+    class Show:
+        returncode = 0
+        stdout = "LoadState=loaded\nActiveState=active\nMainPID=12345\n"
+    report = baseline.inspect_swpc_manager_runtime(home=tmp_path, systemctl=lambda: Show())
+    assert report["manager_entrypoint"] == "GENERIC_MANAGER"
+    assert report["manager_service_state"] == "active"
+    assert report["registry_state_configured"] is False
+    assert report["bootstrap_credential_file"]["exists"] is True
+    assert "SENSITIVE_CONTENT_MUST_NOT_LEAK" not in json.dumps(report)
+    assert "12345" not in json.dumps(report)
+    assert report["b1"] == "NOT_RUN"
