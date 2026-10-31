@@ -312,3 +312,9 @@ All frozen PS S01–S04, PL P01–P04 and shared C01–C04 documents were read f
 Read `scripts/plasmactl` (profile dispatch and help), `scripts/plasmactl-z2-ps` (install/deploy/verify/status command dispatch), and `docs/architecture/ppu-unified-deployment-gate1.md` (current proposed convergence). Confirmed the **local Z2 PS release-kit CLI** is implemented, while the newer **single network PPU Deployment Engine** remains a partial Host-only convergence with an outstanding trusted on-device installer; legacy SSH engineering paths are still explicitly described as existing. These are not the same deployed capability. S01 now states this distinction and links the evidence. This is documentation-only; no SSH connection, API submission, deployment, CI dispatch or hardware operation.
 
 Batch 1 16-file scope remains unchanged. Continue link/implementation review before consolidated CI.
+
+## SWPC Web runtime and ADR navigation source reconciliation (CI deferred)
+
+Verified `scripts/plasmactl` routes integration-only `update`, `deploy`, `web-restart` to `scripts/plasmactl-integration`. The integration backend runs Vite via `plasma-vite.service`, checks `software/web/package-lock.json` before `npm ci`, and restarts only Vite for `web-restart`. Updated W04 to explicitly limit the runbook to SWPC integration; it does not prove product PPU network deployment. Corrected C03 ADR-0003 navigation label from the older dynamic-reconfiguration framing to fixed-image candidate framing, without changing ADR-0003's Proposed status.
+
+No per-file CI or hardware action performed. Remaining batch work: complete relative-link and evidence reconciliation, then the owner-directed consolidated CI review.
