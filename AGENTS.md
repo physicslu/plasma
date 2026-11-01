@@ -19,7 +19,7 @@ No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approve
 
 ## Project purpose and hard boundaries
 
-PLASMA is a configurable, multi-Site IC programmer; PYNQ-Z2 is the prototype target. Hierarchy: Facility → PPU → SITE 1..N (one-based `site_id`). Socket is a fixture, not Site identity. Protocol v3.3 (PLASMA33) and Web REST v3 are canonical. Plasma Manager provides bounded managed PPU routing, not a universal scheduler. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity.
+PLASMA is a configurable, multi-Site IC programmer; PYNQ-Z2 is the prototype target. Hierarchy: Facility → PPU → SITE 1..N (one-based `site_id`). Socket is a fixture, not Site identity. Protocol v3.3 (PLASMA33) and Web REST v3 are canonical. PPU exposes the **Plasma Gateway** service, its **Plasma Gateway API** and **Plasma Gateway Endpoint**. The Linux **Default Gateway** is an unrelated layer-3 next-hop; do not conflate them. Plasma Manager provides bounded managed PPU routing, not a universal scheduler. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity.
 
 **Hardware execution boundary (normative; CI-enforced):**
 - **SWPC** runs Web / Controller / BFF and sends high-level commands over Ethernet.
@@ -28,7 +28,7 @@ PLASMA is a configurable, multi-Site IC programmer; PYNQ-Z2 is the prototype tar
 
 SWPC may build/test OpenOCD offline but must **not** host live OpenOCD or forward per-bit SWD traffic as the product path. Changing this placement requires an explicit revised Gate 1 architecture decision plus synchronized contract, implementation and CI. See [OpenOCD architecture](docs/architecture/ic-support-openocd-plan-executor.md).
 
-For external Blue Pill SWD the sole current route is Z2 PS-local OpenOCD → WordPort → paired PL image. Do not select retired SWD entrypoints. Details: [SWD retirement](docs/development/swd-legacy-path-retirement.md) and the FPGA / Embedded contracts.
+**Current Z2 Blue Pill physical SWD path (normative):** Z2 PS-local OpenOCD → WordPort → paired PL image → PMOD. Do not select retired SWD entrypoints. Details: [SWD retirement](docs/development/swd-legacy-path-retirement.md) and the FPGA / Embedded contracts.
 
 ## Domain contract routing (normative)
 
