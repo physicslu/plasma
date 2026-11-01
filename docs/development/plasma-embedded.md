@@ -10,9 +10,7 @@
 - Changes to PL registers or ABI also load [FPGA](plasma-fpga.md). Changes to Gateway/Manager-facing API also load [Manager](plasma-manager.md).
 - Record authentic PASS/FAIL/NOT_RUN; host-only tests cannot establish real programming qualification.
 
-## Migrated detailed clauses from shared contract
-
-## 17. Z2 production direction
+## Z2 production direction
 
 Z2 is the intended embedded PPU controller/runtime, not a clone of the integration workstation.
 
@@ -36,9 +34,9 @@ Before standardizing a Z2 Python environment, verify compatibility with PYNQ/XRT
 
 ## Hardware validation evidence boundary
 
-9. Mock/software validation does not prove Z2/FPGA/OpenOCD/real-target behavior.
+Mock/software validation does not prove Z2/FPGA/OpenOCD/real-target behavior.
 
-## 1B. Shared Z2 SSH/sudo and hardware recovery boundary (normative)
+## Z2 SSH/sudo and hardware recovery boundary (normative)
 
 The owner-approved Gate 1 scope is an execution assignment, not a new planning request. The executor must perform authorized work or report a real blocker; Gate 2 remains solely for merging. Path 3 Codex-specific execution and sandbox details live in [Path 3 contract](plasma-path3-codex.md). Path 2 fixed-CLI capabilities live in [Path 2 contract](plasma-path2-cli.md).
 
@@ -105,4 +103,3 @@ intentional AXI-fault `ERROR`/`RESET` stages or external SWD/DUT operations.
 Stop on genuine ownership, artifact, electrical, recovery or access
 hazards. Distinguish *candidate loaded*, *functional PASS* and *original
 image recovered*; all must be actually observed.
-
