@@ -387,12 +387,24 @@ class DeploymentCoordinator:
         ))
         receipt["authorization"] = authority
         receipt["resolution"] = resolution
-        receipt["b3_install"] = {"status": "HOST_ONLY_VERIFIED",
-                                 "package_order": resolution["package_order"],
-                                 "staged_packages": resolution["stage"],
-                                 "reused_packages": resolution["reuse"]}
-        receipt["b4_activate"] = {"status": "HOST_ONLY_SIMULATED",
-                                  "rollback_on_failure": "JOURNAL_TRACKED"}
+        # The existing sandbox engine stages the verified archive and atomically
+        # switches ONE bundle receipt. It does NOT install individual packages
+        # or activate runtime services. Do not label the resolver's planned
+        # package actions as completed B3/B4 operations.
+        receipt["b3_install"] = {
+            "status": "NOT_QUALIFIED",
+            "archive_staged_host_only": True,
+            "package_order_plan": resolution["package_order"],
+            "package_stage_plan": resolution["stage"],
+            "package_reuse_plan": resolution["reuse"],
+            "per_package_install_executed": False,
+        }
+        receipt["b4_activate"] = {
+            "status": "NOT_QUALIFIED",
+            "bundle_receipt_switched_host_only": True,
+            "runtime_activation_executed": False,
+            "rollback_simulation_supported": True,
+        }
         receipt["install_qualified"] = False
         return receipt
 
