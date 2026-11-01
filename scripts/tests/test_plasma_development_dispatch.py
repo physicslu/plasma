@@ -2145,10 +2145,10 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn("Ordinary Path 3 explicitly pins `--sandbox workspace-write`", contract)
         self.assertIn("No hardware access without approved Gate 1 scope.", contract)
         self.assertNotIn("Path 3 inherits operator Codex Approval/Sandbox", contract)
-        full_contract = (ROOT / "docs/development/plasma-autonomous-development-contract-full.md").read_text()
-        self.assertIn("Ordinary Codex execution explicitly pins `--sandbox workspace-write`", full_contract)
-        self.assertIn("`codex_execution: guarded-hardware-no-sandbox`", full_contract)
-        self.assertNotIn("Codex inherits the operator's effective configuration", full_contract)
+        path3_contract = (ROOT / "docs/development/plasma-path3-codex.md").read_text()
+        self.assertIn("Ordinary Path 3 explicitly pins `--sandbox workspace-write`", path3_contract)
+        self.assertIn("`codex_execution: guarded-hardware-no-sandbox`", path3_contract)
+        self.assertNotIn("Codex inherits the operator's effective configuration", path3_contract)
         # Legacy and arbitrary fixed adapter/probe routes are denied on the
         # live Owner/SHA Work Order path, regardless of device model.
         for name, value in (("session_resume", "page-boundary-off-by-one"),
