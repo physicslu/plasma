@@ -180,7 +180,7 @@ These facts must not be mistaken for implemented capabilities:
 8. Plasma Manager currently implements explicit registry/fleet aggregation plus bounded managed PPU command routing for the current Control Station contract, including allowlisted Job/Batch/Programming Asset and Site/network operations. It is not a generic proxy or central scheduler; automatic discovery, general Fleet write orchestration, and an independent central auth/scheduling policy remain outside the current contract.
 10. Site Desired persistence and Runtime activation are separate contracts. Current P3-capable deployments support explicit bounded runtime activation through the activation helper/server-control sockets; saving Desired state alone never implies that runtime activation occurred.
 
-Web-specific boundaries are owned by [plasma-web.md](plasma-web.md); hardware validation limits by [plasma-embedded.md](plasma-embedded.md). Shared validation evidence requirements remain in [plasma-development-common.md](plasma-development-common.md).
+Web-specific boundaries are owned by [plasma-web.md](plasma-web.md); hardware validation limits by [plasma-embedded.md](plasma-embedded.md). Global validation evidence requirements remain in [AGENTS.md](../../AGENTS.md).
 
 ## Python validation commands
 
