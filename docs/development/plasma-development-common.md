@@ -696,21 +696,9 @@ After GitHub merge, continue any deployment/runtime/hardware acceptance that was
 
 Run the smallest relevant checks during development, then full relevant validation before merge-ready.
 
-Python:
+Python validation commands: see [plasma-manager.md](plasma-manager.md).
 
-```bash
-cd software/python
-.venv/bin/python -m pytest -q
-```
-
-Web:
-
-```bash
-cd software/web
-npm run lint
-npm test
-npm run validate:artifact
-```
+Web validation commands: see [plasma-web.md](plasma-web.md).
 
 Cross-stack/deployment/config/API/release-affecting integration-host changes:
 
