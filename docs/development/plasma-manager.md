@@ -10,9 +10,7 @@
 - Changes to PPU-facing API also load [Embedded](plasma-embedded.md); changes to Web-facing API also load [Web](plasma-web.md).
 - Update callers, tests, fixtures and documentation in the same change under Replace-by-Default.
 
-## Migrated detailed clauses from shared contract
-
-## 5. Current software architecture
+## Current software architecture
 
 PPU-local path:
 
@@ -70,7 +68,7 @@ Implementation facts:
 
 Do not introduce FastAPI/WebSocket merely because they were discussed as future options.
 
-## 8. Runtime services and ports
+## Runtime services and ports
 
 Service management is defined by `scripts/plasmactl`. Port numbers are profile-specific defaults; use `docs/deployment/port-profile-matrix.md` as the canonical cross-profile map rather than assuming one Manager port applies to every deployment.
 
@@ -112,7 +110,7 @@ GitHub main
 
 Do not bypass failed tests and restart new code as if validation succeeded.
 
-## 9. Site execution invariants
+## Site execution invariants
 
 Unless a real shared resource requires synchronization:
 
@@ -126,9 +124,7 @@ Unless a real shared resource requires synchronization:
 
 For Program/Verify, a PPU-wide Normalized Image lease may synchronize Sites because one physical PPU must not execute different target Images concurrently when they share programming resources.
 
-## Migrated Python and domain vocabulary
-
-## 6. Python environment and domain rules
+## Python environment and domain rules
 
 Python project:
 
@@ -167,7 +163,6 @@ image_sha256
 
 Retired Programmer/Channel domain vocabulary and old programming-data vocabulary must not appear in canonical production code. Do not create compatibility aliases unless an explicit new architecture decision reintroduces a real compatibility requirement.
 
-
 ## Manager and backend architecture boundaries
 
 These facts must not be mistaken for implemented capabilities:
@@ -184,10 +179,7 @@ Web-specific boundaries are owned by [plasma-web.md](plasma-web.md); hardware va
 
 ## Python validation commands
 
-Python:
-
 ```bash
 cd software/python
 .venv/bin/python -m pytest -q
 ```
-

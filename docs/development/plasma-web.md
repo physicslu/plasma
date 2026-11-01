@@ -9,9 +9,7 @@
 - Changes to backend REST schema or API also load [Manager](plasma-manager.md) and validate affected client/server compatibility.
 - Use affected frontend tests and build checks. UI simulation does not prove real PPU or DUT operation.
 
-## Migrated detailed clauses from shared contract
-
-## 7. Web environment
+## Web environment
 
 Web project:
 
@@ -38,12 +36,10 @@ Do not assume production Z2 needs Node.js, npm, or the development server merely
 
 ## Current Web contract boundaries
 
-4. Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before stack assumptions.
-5. Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
+- Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before stack assumptions.
+- Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
 
 ## Web validation commands
-
-Web:
 
 ```bash
 cd software/web
@@ -51,4 +47,3 @@ npm run lint
 npm test
 npm run validate:artifact
 ```
-

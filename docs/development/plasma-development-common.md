@@ -1,7 +1,6 @@
 # PLASMA — Shared Development Contract
 
-> **Normative detailed clauses.** The repository root [AGENTS.md](../../AGENTS.md) is the concise mandatory instruction entrypoint for Codex and other agents. This file preserves the previous complete engineering contract as the detailed, on-demand source of clauses. Apply its relevant sections before modifying affected domains, deploying, handling privileged resources, or working with hardware. In case of conflict, check the latest executable code, current root AGENTS.md and owner-approved task scope. Historical source: `main` b3caa1d289f375125f781f2a563fe1eb8b02204e.
-
+> **Normative detailed clauses.** The repository root [AGENTS.md](../../AGENTS.md) is the concise mandatory instruction entrypoint for Codex and other agents. This file preserves the previous complete engineering contract as the detailed, on-demand source of clauses. Apply its relevant sections before modifying affected domains, deploying, handling privileged resources, or working with hardware. In case of conflict, check the latest executable code, current root AGENTS.md and owner-approved task scope.
 
 The operating model has **exactly two user approval gate types**: a **Gate 1 — Plan Approval** before implementation starts and a **Gate 2 — Merge Approval** when the work is merge-ready. After Gate 1, engineering execution continues autonomously within the approved scope, including branch/commit/PR work, CI repair, Draft -> Ready, and any deployment/runtime/hardware acceptance explicitly included in the approved plan. There is no separate deployment, runtime, hardware, or Ready-for-review approval gate. If necessary work materially exceeds the approved scope, return to Gate 1 with a revised plan rather than inventing a third gate.
 
@@ -15,7 +14,7 @@ not a declaration that disabled executable controls are already enabled.
 
 **Execution routing:** ChatGPT Direct is the default; use [Path 2](plasma-path2-cli.md) for SWPC CLI or [Path 3](plasma-path3-codex.md) for SWPC Codex only when the approved task requires that executor. Path selection belongs to Gate 1.
 
-## 2. Programming data model
+## Programming data model
 
 Plasma separates source data, execution instructions, and target-memory data.
 
@@ -72,9 +71,9 @@ Asset SHA -> cache identity
 Normalized Image SHA -> PPU Program/Verify shared-resource identity
 ```
 
-## 4. Execution zones
+## Execution zones
 
-### 4.1 Cloud / isolated software engineering
+### Cloud / isolated software engineering
 
 The isolated software-engineering environment may edit source, run non-hardware tests, and deliver changes on an `agent/*` branch through a pull request.
 
@@ -88,7 +87,7 @@ bash scripts/codex-cloud-maintenance.sh
 
 Cloud/CI validation does not prove integration-host deployment, Vivado implementation, Z2 runtime, FPGA I/O, socket/electrical behavior, or real IC programming.
 
-### 4.2 Integration / deployment host
+### Integration / deployment host
 
 The integration host owns deterministic cross-stack validation, shared runtime deployment, and Vivado integration.
 
@@ -104,7 +103,7 @@ git fetch origin main
 
 Never overwrite unrelated user changes.
 
-### 4.3 Z2 target / hardware validation
+### Z2 target / hardware validation
 
 Z2 owns embedded runtime, PS/PL integration, FPGA loading, target-interface behavior, electrical behavior, and hardware validation. In the deployed PLASMA architecture, SWPC owns **Web / Controller / BFF**; Z2 PS owns the **OpenOCD process and PS-local WordPort/Remote Bitbang bridge**; Z2 PL owns the hardware SWD/SPI interface. SWPC may build and test OpenOCD offline, but must not host live OpenOCD or forward bit-level SWD transactions to Z2. See the normative [OpenOCD PS architecture](../architecture/ic-support-openocd-plan-executor.md); existing architecture-contract CI must reject placement drift.
 
@@ -124,4 +123,3 @@ Domain-specific normative detail has one owner:
 | Web / frontend | [plasma-web.md](plasma-web.md) | Web UI, frontend and REST client |
 
 Read [AGENTS.md](../../AGENTS.md) first. Select Path 2 or Path 3 execution instructions **independently** of the domains touched. Cross-layer changes load all affected domains and validate changed producer/consumer interfaces; unrelated domain contracts and full-system tests are not automatic requirements. Domain documents supplement the global safety and Gate rules in AGENTS.md; they cannot override them.
-

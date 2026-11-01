@@ -11,9 +11,7 @@
 - Use genuine Vivado timing/DRC/build evidence where required; simulation and CI never prove real hardware.
 - Do not operate Z2/FPGA/DUT without approved scope and applicable guards.
 
-## Migrated detailed clauses from shared contract
-
-## 16. FPGA / PL rules
+## Rules
 
 `pl/` contains FPGA/PL work for Z2. RTL, XDC, register maps, Vivado scripts, bitstreams, and hardware-visible interfaces are contracts.
 
