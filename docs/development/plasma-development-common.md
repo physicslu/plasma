@@ -356,10 +356,6 @@ justifies them. This rule does **not** waive the source-of-truth order,
 actual runtime guards, hardware/electrical safety, rollback, or truthful
 reporting requirements.
 
-## 1B. Shared hardware access and recovery safety (normative)
-
-Hardware access, root operations, credential handling, physical recovery, and truthful HIL evidence are subject to the owner's approved Gate 1 scope and actual execution permissions. Never disclose credentials or infer hardware success from host-only tests. These safeguards apply across all domains and Path 2/3. The detailed Z2 SSH/sudo credential source and recovery procedure are owned by [plasma-embedded.md](plasma-embedded.md); every executor touching Z2 must load that contract, regardless of primary domain. Gate 2 remains the only merge authorization.
-
 ## 2. Programming data model
 
 Plasma separates source data, execution instructions, and target-memory data.
@@ -483,23 +479,6 @@ Domain-specific normative detail has one owner:
 
 Read [AGENTS.md](../../AGENTS.md) first. Select Path 2 or Path 3 execution instructions **independently** of the domains touched. Cross-layer changes load all affected domains and validate changed producer/consumer interfaces; unrelated domain contracts and full-system tests are not automatic requirements. Domain documents supplement shared safety and Gate rules; they cannot override them.
 
-## 10. Service and process safety
-
-Before stopping a process, identify it using `plasmactl ports`, `ss`, and `ps -fp PID` as appropriate.
-
-Never use broad destructive process commands such as:
-
-```text
-pkill python
-pkill node
-killall python
-killall node
-```
-
-Do not stop unrelated host services, networking, SSH, storage, containers, or applications.
-
-Do not expose internal service ports to an untrusted network as a shortcut for connectivity problems.
-
 ## 11. Autonomous task execution contract
 
 ### 11.1 Exact two-gate workflow
@@ -607,65 +586,6 @@ Do not turn routine engineering procedure into user-operated command relaying wh
 
 If a connector, permission, SSH, or remote-shell limitation forces the user to perform a mechanical action, identify it as a **tooling/access exception**, not an approval gate. Prefer an available semantically equivalent supported operation over asking the user to perform redundant mechanical work.
 
-## 12. Scope coverage and escalation — no third gate
-
-The Two-Gate Model remains in force for deployment, runtime, hardware, destructive Git, architecture, and security work.
-
-The following actions must be **explicitly covered by Gate 1** before execution:
-
-1. **Deployment/runtime changes**
-   - `plasmactl deploy`;
-   - restart shared Plasma services to activate new code;
-   - change active systemd definitions, public routing, firewall/network exposure, or shared runtime configuration.
-
-2. **Hardware-affecting operations**
-   - program a real IC;
-   - change DUT power/voltage;
-   - load a new FPGA bitstream onto connected hardware;
-   - change FPGA I/O behavior on a connected system;
-   - perform any action with credible electrical/hardware risk.
-
-3. **Destructive/history-rewriting Git operations**
-   - `git reset --hard`;
-   - `git clean -fd`;
-   - force checkout/restore that discards user work;
-   - rebase a published/shared branch;
-   - force-push;
-   - delete remote branches/tags that may contain user work.
-
-4. **Material architecture/security decisions**
-   - incompatible protocol/API changes without an already-defined migration contract;
-   - credential/access/security policy changes with nontrivial tradeoffs;
-   - architecture choices with materially different cost, compatibility, safety, or maintainability consequences;
-   - substantial scope expansion beyond the original request.
-
-If one of these actions is already described in the approved Gate 1 plan, proceed autonomously when appropriate.
-
-If it becomes necessary unexpectedly and was not covered by Gate 1, stop at a safe checkpoint, explain the added scope/risk, and request a **revised Gate 1 Plan Approval**. Do not create a deployment gate, hardware gate, Ready gate, or any other third gate.
-
-Merge/integration to `main` always remains Gate 2. Direct feature commits to `main` are not a substitute for the PR + Merge Approval flow.
-
-## 13. Merge-ready definition
-
-A PR is merge-ready only when applicable conditions are true:
-
-- implementation complete;
-- branch scope clean;
-- focused tests pass;
-- full relevant validation passes;
-- diff/syntax checks pass;
-- committed diff reviewed for correctness/security/scope;
-- branch pushed;
-- PR accurately describes behavior, validation and limitations;
-- required CI checks pass;
-- no blocking review findings remain;
-- GitHub reports mergeable;
-- no validation claim exceeds observed evidence.
-
-At that point attempt Ready automatically, then stop and request Gate 2 Merge Approval.
-
-A failure of the GitHub connector to perform Draft -> Ready is a tooling exception, not a user approval gate and not an engineering-readiness failure. If the PR otherwise satisfies the merge-ready definition, proceed to Gate 2 without requiring the user to perform a manual Ready click. After explicit Gate 2 approval, use the verified PR head SHA and attempt the supported merge operation. Ask the user for a mechanical Ready action only if GitHub repository rules or the merge API itself proves that Draft state blocks the approved merge.
-
 ## 14. Git publication policy
 
 Treat `main` as integration/deployment branch, not agent scratch space.
@@ -692,124 +612,3 @@ Never stage or commit unrelated user work. Never force-push for graph aesthetics
 
 After GitHub merge, continue any deployment/runtime/hardware acceptance that was explicitly included in the approved Gate 1 plan. Do not ask for a separate deployment approval. If deployment was not part of the approved plan, return to Gate 1 with a revised plan before doing it.
 
-## 15. Validation policy
-
-Run the smallest relevant checks during development, then full relevant validation before merge-ready.
-
-Python validation commands: see [plasma-manager.md](plasma-manager.md).
-
-Web validation commands: see [plasma-web.md](plasma-web.md).
-
-Cross-stack/deployment/config/API/release-affecting integration-host changes:
-
-```bash
-plasmactl test
-```
-
-Testing layers are distinct:
-
-```text
-Unit / Source
-    -> SSR / rendered HTML
-    -> Playwright browser E2E
-    -> deterministic Visual Regression
-    -> deployment/runtime validation
-    -> Z2/hardware validation when applicable
-```
-
-A passing lower layer does not prove the next layer.
-
-## 19. Communication and completion report
-
-The expected communication pattern is:
-
-```text
-Gate 1: concise plan -> wait for approval
-        |
-        v
-Autonomous work: implementation -> validation -> Draft PR -> CI repair -> Ready
-        |
-        v
-Gate 2: merge-ready report -> wait for Merge Approval
-        |
-        v
-Merge -> approved post-merge deployment/runtime/hardware acceptance -> completion
-```
-
-Progress updates between Gate 1 and Gate 2 are informational only. They must not ask for routine approval or create extra gates.
-
-Interrupt before Gate 2 only when:
-
-- necessary work materially exceeds the approved Gate 1 scope and requires a revised plan;
-- a material product/architecture ambiguity cannot be resolved from the approved plan;
-- a safety/security issue changes the risk boundary;
-- missing access genuinely blocks progress;
-- continuing risks unrelated user work.
-
-A revised plan returns to Gate 1. It does not create a third gate type.
-
-If the user explicitly asks for progress, report it without changing the approval-gate model.
-
-At Gate 2 / completion / blocker, report at minimum:
-
-```text
-Changed:
-- files/behavior changed
-
-Validated:
-- exact meaningful checks and results
-
-Not validated:
-- runtime/hardware/environment checks not actually performed
-
-Repository state:
-- branch / important HEAD
-- PR / CI state
-- whether merge, deploy, restart, history rewrite, or hardware action occurred
-
-Next gate/action:
-- Gate 2 Merge Approval if merge-ready;
-- revised Gate 1 only if scope changed materially;
-- otherwise the next autonomous execution step.
-```
-
-Never report a test, deployment, FPGA build, or hardware programming operation as successful unless actually executed and observed.
-
-## 20. Workspace and information boundary
-
-Treat `$PLASMA_REPO` as the normal workspace boundary for AI-assisted development.
-
-- Read/create/modify/delete files only inside the repository unless the task genuinely requires an already-authorized external resource.
-- Keep ordinary development commands inside the repository or subdirectories.
-- Do not inspect unrelated repositories, personal files, credentials, SSH configuration, container data, or system configuration as ordinary Plasma work.
-- Do not commit personal usernames, private hostnames, workstation inventory, passwords, keys, tokens, or other operator-specific infrastructure metadata into public guidance. An intentionally documented vendor-default lab image account name (such as the PYNQ-Z2 development account) is not a personal username or credential secret.
-- If a task cannot be completed without leaving the workspace boundary, stop and explain the required external resource.
-
-This policy is not an OS sandbox. Editor/agent permissions should still enforce project-scoped access where possible.
-
-### Development Z2 Root operation boundary
-
-The former Path 2 `z2-root-operation` fixed Work Order was retired from
-the trusted Dispatcher on 2026-10-26; new owner Work Orders must use the
-generic `operator-cli` for permitted, source-pinned non-root SWPC execution.
-This is **not** an implicit grant of sudo, SSH, MMIO or target programming.
-
-The independent protected FPGA Image lifecycle/recovery interface remains
-the installed two-argument Root Entry (`operation + source_sha`). That
-entry validates effective root, a root-owned source SHA256 manifest and
-the executable source pin; its reviewed `pl.hil.fpga_image_root` handles
-FPGA image/Golden operations. Its internal fixed lifecycle vocabulary
-must not be generalized into an arbitrary root shell or driver selector.
-Historical transport function/receipt names containing `stage` are
-compatibility details, not new Dispatcher admission.
-
-Path 3 may use its separately enrolled SSH/sudo development route within
-owner-approved Gate 1 scope and actual OS/device safety boundaries; it does
-not inherit Path 2 hardware authority or need a Path 2 Stage/Profile gate.
-The old SWPC Bridge and approved-SHA PIN are no longer general Development
-Mode prerequisites; leave existing root-owned files untouched. The trusted
-GitHub event SHA, live owner PR metadata, exact checkout and digest-pinned
-Work Order establish B1 authorization, not a user-supplied SHA alone.
-Z2 root-owned entry/source checks, image identity, ownership/recovery and
-authentic Root receipts continue to enforce B2/B3. This contract grants
-neither root access nor hardware permission to a host-only Work Order.
