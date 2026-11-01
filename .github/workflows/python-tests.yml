@@ -10,10 +10,6 @@ on:
       - "software/python/**"
       - "data/ic-support/benchmarks/nxp-kl25/backend-implementation-lock.json"
       - "!software/python/docs/**"
-      - "pl/rtl/**"
-      - "pl/constraints/**"
-      - "pl/projects/**"
-      - "pl/tests/**"
       - "scripts/plasmactl"
       - "scripts/render-start.sh"
       - "scripts/ci/runtime-data-root-contract.py"
@@ -31,10 +27,6 @@ on:
       - "software/python/**"
       - "data/ic-support/benchmarks/nxp-kl25/backend-implementation-lock.json"
       - "!software/python/docs/**"
-      - "pl/rtl/**"
-      - "pl/constraints/**"
-      - "pl/projects/**"
-      - "pl/tests/**"
       - "scripts/plasmactl"
       - "scripts/render-start.sh"
       - "scripts/ci/runtime-data-root-contract.py"
@@ -80,5 +72,5 @@ jobs:
         run: bash scripts/tests/test-plasmactl-engineering-mock.sh
       - name: Install package
         run: python -m pip install -e "./software/python[dev]"
-      - name: Run pytest
-        run: python -m pytest -q software/python/tests pl/tests
+      - name: Run pytest (PS / Python only; PL covered by pl-*.yml)
+        run: python -m pytest -q software/python/tests
