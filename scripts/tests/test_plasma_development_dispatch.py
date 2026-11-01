@@ -2143,7 +2143,9 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertNotIn("plasma_development_codex_sandbox", dispatcher)
         contract = (ROOT / "AGENTS.md").read_text()
         self.assertIn("Ordinary Path 3 explicitly pins `--sandbox workspace-write`", contract)
-        self.assertIn("No hardware access without approved Gate 1 scope.", contract)
+        self.assertIn("Choosing a Path never grants additional authority", contract)
+        self.assertIn("only an Owner-authenticated, SHA/digest-pinned dynamic hardware Work Order",
+                      (ROOT / "docs/development/plasma-path3-codex.md").read_text())
         self.assertNotIn("Path 3 inherits operator Codex Approval/Sandbox", contract)
         path3_contract = (ROOT / "docs/development/plasma-path3-codex.md").read_text()
         self.assertIn("Ordinary Path 3 explicitly pins `--sandbox workspace-write`", path3_contract)
