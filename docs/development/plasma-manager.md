@@ -181,3 +181,13 @@ These facts must not be mistaken for implemented capabilities:
 10. Site Desired persistence and Runtime activation are separate contracts. Current P3-capable deployments support explicit bounded runtime activation through the activation helper/server-control sockets; saving Desired state alone never implies that runtime activation occurred.
 
 Web-specific boundaries are owned by [plasma-web.md](plasma-web.md); hardware validation limits by [plasma-embedded.md](plasma-embedded.md). Shared validation evidence requirements remain in [plasma-development-common.md](plasma-development-common.md).
+
+## Python validation commands
+
+Python:
+
+```bash
+cd software/python
+.venv/bin/python -m pytest -q
+```
+
