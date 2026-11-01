@@ -463,6 +463,22 @@ class DeploymentCoordinator:
             record.package_kind = package.kind
             record.artifact_sha256 = package.archive_sha256
             self.journal.write(record, "verified")
+            # Resolve the canonical v3 DAG BEFORE mutating the sandbox.
+            # The single existing transaction still activates the entire
+            # bundle atomically; package binaries are never executed.
+            resolution = contract.resolve_host_only_bundle(package, trusted_inventory={})
+            package_by_id = {p.id: p for p in package.packages}
+            ordered_members = []
+            for package_id in resolution["package_order"]:
+                component = package_by_id[package_id]
+                prefix = f"payload/packages/{package_id}/"
+                members = [entry for entry in component.files]
+                for member in members:
+                    if not member.path.startswith(prefix):
+                        raise DeploymentError("HOST_ONLY_PACKAGE_FILE_SCOPE_INVALID")
+                ordered_members.extend(members)
+            if {m.path for m in ordered_members} != {m.path for m in package.files}:
+                raise DeploymentError("HOST_ONLY_PACKAGE_FILE_COVERAGE_MISMATCH")
 
             # Only a non-production simulation store is mutated; the real
             # /opt/plasma, FPGA Manager and factory recovery are untouched.
@@ -552,7 +568,9 @@ class DeploymentCoordinator:
                     stage = Path(tempfile.mkdtemp(prefix=".host-only-", dir=release_root.parent))
                     try:
                         with zipfile.ZipFile(request.archive) as archive:
-                            for entry in package.files:
+                            # Stage packages in dependency order, rather than
+                            # iterating over ZIP/manifest declaration order.
+                            for entry in ordered_members:
                                 target = stage / entry.path
                                 target.parent.mkdir(parents=True, exist_ok=True)
                                 with archive.open(entry.path) as src, target.open("wb") as dest:
