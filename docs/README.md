@@ -13,7 +13,9 @@
 
 ## PPU deployment / physical admission evidence
 
-- **Canonical / Gate 1 Draft** — [Bundle → Packages → Files (v3)](architecture/ppu-canonical-bundle-packages.md)：單一新標準 `plasma.ppu.bundle.v3`、`packages[]`、Package DAG 與相容邊界；`bundle.v2/components`、`package.v1` 僅屬 Legacy Input，Host-only，不代表已部署至 Z2。
+- **Gate 1 Draft / PR #1225 / Host-only** — [Canonical Bundle v3: Bundle → Packages → Files](architecture/ppu-canonical-bundle-packages.md)：`packages[]`、Package DAG、SHA256 Admission；v1/v2 舊格式不作為 v3 相容介面。尚未完成 Z2 B2 驗收。
+- **Proposed / PR #1225** — [PPU Target Platform Identity](architecture/ppu-target-platform-identity.md)：`linux-armv7` 可信套件目標與 `linux-armv7l` runtime 觀測值的區分；不得視為已證實的 HTTP 409 根因。
+
 
 - **Operator-reported physical HIL / PR #1219 admission only** — [SWPC → PYNQ-Z2 Package Admission, 2026-10-30](evidence/ppu-package-admission-2026-10-30/README.md)：實際乙太網路 ZIP Upload／Commit、SHA256、Manifest Admission 與 Receipt；`admitted` 不代表安裝／啟用，TLS、Publisher／Source Trust 和 FPGA／DUT 資格仍未驗收。後續 Factory Bundle 相依檔修復為獨立 Draft PR #1221。
 
@@ -32,11 +34,26 @@
 - **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
 - **Current / Accepted Policy** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 是 Internal Research Registry、一般 IC Selector 對客戶顯示 L1–L3 並提供 Level Filter、Job Picker 維持 L2/L3，L3 表示至少一組版本化 PLASMA configuration 已 HIL PASS。Active API/runtime 不保留 `phase1_*`／`phase2_*`／`phase3_*` 欄位。
-- **Proposed** — [ADR-0003: Runtime FPGA Driver 與動態重新配置責任邊界](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)：UIO-first Driver 選型候選、單一 PPU FPGA Configuration Owner、Linux 無須 Reboot 的 Bitstream 切換；尚待 Z2 Kernel／UIO／Bridge 證據，不是 Accepted Contract。
+- **Proposed** — [ADR-0003: Runtime FPGA Driver 與固定映像候選責任邊界](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)：UIO-first Driver 選型候選、單一 PPU FPGA Configuration Owner、Linux 無須 Reboot 的 Bitstream 切換；尚待 Z2 Kernel／UIO／Bridge 證據，不是 Accepted Contract。
 
 ## Operator
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
+
+## Codex context governance and on-demand Path instructions
+
+- **P1 Gate 1 / Host-only inventory** — [Repository-wide documentation governance and cleanup audit](development/plasma-codex-p1-gate1-inventory-2026-10-31.md)：盤點全 Repository 文件權威來源、重複與矛盾規範、歷史文件和引用關係；Codex／Path 3 僅為其中一類，Device Catalog Workflow 暫緩。
+
+- **Merged / PR #1226** — [Shared Desktop and Path 3 Codex context governance audit](development/plasma-codex-context-governance-gate1-audit.md)：文件權威性、共用上下文與 Token 量測規劃；尚未完成實測節省驗證。
+- **Current / Path 2 instructions / PR #1226** — [Path 2 on-demand execution rules](development/plasma-codex-path2-execution.md)：僅在選用 Path 2 時讀取，保留既有 CPU-only、operator-cli、Vivado 詳細規範。
+- **Current / Path 3 instructions / PR #1226** — [Path 3 on-demand execution rules](development/plasma-codex-path3-execution.md)：僅在選用 Path 3 時讀取，保留既有 Codex CLI、原生工具、硬體安全條款。
+
+## Domain engineering contracts
+
+- [Domain contract: plasma-fpga.md](development/plasma-fpga.md)
+- [Domain contract: plasma-embedded.md](development/plasma-embedded.md)
+- [Domain contract: plasma-manager.md](development/plasma-manager.md)
+- [Domain contract: plasma-web.md](development/plasma-web.md)
 
 ## Engineering governance and execution paths
 
@@ -56,8 +73,34 @@
 
 - **Current / Development Mode** — [Three Shared BLOCKING Decisions](development/development-blocking-policy.md)：Path 2／Path 3 共用授權與來源、Z2 實機安全／復原、真實回執三個核心阻擋邊界；移除重複檢查，但不繞過裝置安全條件。
 
+## STM32F103 OpenOCD qualification version navigation
+
+| Version | Status and scope |
+| --- | --- |
+| [v1](architecture/openocd-software-qualification-v1.md) | Phase 2A reference cohort; preserve qualification provenance |
+| [v2](architecture/openocd-software-qualification-v2.md) | ST ordering-equivalent TR expansion |
+| [v3](architecture/openocd-software-qualification-v3.md) | Medium-density R/V expansion |
+| [v4](architecture/openocd-software-qualification-v4.md) | Medium-density T7 authority, referenced by v7 |
+| [v5](architecture/openocd-software-qualification-v5.md) | Historical; explicitly superseded by v6 |
+| [v6](architecture/openocd-software-qualification-v6.md) | Historical; explicitly superseded by v7 |
+| [v7](architecture/openocd-software-qualification-v7.md) | Current umbrella qualification authority for its bounded STM32F103 cohort; not a global catalog entitlement |
+
+This navigation table does not promote any ICPN or replace exact provider/manifest qualification evidence.
+
+## WEB / PS / PL developer documentation entrypoints
+
+This section is a navigation aid, not a new implementation contract. Follow root [AGENTS.md](../AGENTS.md) for agent instructions and load applicable detailed clauses on demand.
+
+| Domain | Start here | Boundary |
+| --- | --- | --- |
+| WEB | [Console developer README](../software/web/README.md), [REST v3 contract](architecture/web-rest-api-contract.md), [Product Modes](architecture/web-product-modes.md), [Web runtime hygiene](deployment/web-runtime-hygiene.md) | Browser UI, REST API, product behavior and SWPC runtime are separate concerns |
+| PS | [Z2 PS release kit and installer](deployment/z2-ps-installer.md), [Runtime data-root CI contract](architecture/runtime-data-root-contract-v1.md), [SWD legacy retirement map](development/swd-legacy-path-retirement.md) | Installer acceptance is not proof of physical Z2 qualification; retired SWD-03 is not current external SWD |
+| PL | [Fixed FPGA ABI proposal](architecture/fixed-fpga-hardware-abi-v1-gate1.md), [Site 1 RTL feasibility](architecture/fixed-fpga-swd-site1-rtl-gate1.md), [FPGA build diagnostics proposal](architecture/plasma-unified-fpga-build-diagnostics-v1.md), [ADR-0003 proposed driver boundary](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md) | Proposed/M1 NO-GO and host-only evidence must not be mistaken for accepted or HIL-qualified hardware |
+
+Historical PS-only reference: [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md) documents a retired internal SWD-03 fixture, not the current Blue Pill runbook.
+
 ## Architecture and contracts
-- **Canonical Bundle v3 / Host-only** — [PPU Bundle v3 套件部署交易](architecture/ppu-canonical-bundle-packages.md)：支援任意非執行型資料元件、程式及 FPGA 檔案的依賴／SHA256 驗證與 Admission；Install／Verify／Activate／Rollback 僅在 Host-only 沙盒模擬，不代表真實部署。
+- **Gate 1 / Draft PR #1222 / Host-only** — [PPU Generic Bundle v2 多元件部署交易](architecture/ppu-generic-bundle-v2-pr2.md)：支援任意非執行型資料元件、程式及 FPGA 檔案的依賴／SHA256 驗證與 Admission；Install／Verify／Activate／Rollback 僅在 Host-only 沙盒模擬，不代表真實部署。
 - **Gate 1 / Path 1 / PR3 Host-only** — [PPU 通用 Bundle v2 統一部署整合](architecture/ppu-pr3-unified-hostonly-integration.md)：多元件 DAG/Inventory/Publisher+Master fail-closed Host-only 契約、既有 Coordinator 的回復模擬、Manager/BFF/Web Console 共用 Bootstrap Admission；未部署、未操作實機。
 - **Gate 1 / Path 1 / Draft / Host-only** — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
 - **Gate 1 / Path 1 / Host-only / Draft** — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。
@@ -283,6 +326,10 @@
 - **Current** — [Render Free Public Mock Demo](deployment/render-free-public-demo.md)
 - **Current** — [Render Public Smoke Acceptance](deployment/render-public-smoke.md)
 - **Current** — [Render Public Browser Acceptance](deployment/render-public-browser.md)
+
+- **Normative** — [Shared Development Contract](development/plasma-development-common.md): shared programming data, execution zones and domain routing; global Gate, Git and safety rules are in AGENTS.md.
+- **Normative** — [Path 2 SWPC CLI Contract](development/plasma-path2-cli.md): deterministic SWPC CLI route.
+- **Normative** — [Path 3 SWPC Codex Contract](development/plasma-path3-codex.md): Codex CLI autonomous route.
 
 ## Component contracts outside `docs/`
 

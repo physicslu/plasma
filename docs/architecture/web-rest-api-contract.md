@@ -1,5 +1,7 @@
 # Plasma Web REST API Contract
 
+> **API-layer distinction:** This document governs PPU-facing REST v3, not the Web application's Manager BFF routes (`software/web/app/api/manager/`) or the separate `/api/fleet` frontend aggregation route. Route availability and authorization must be checked against `software/python/plasma_web/gateway.py`, `secure_gateway.py`, and endpoint tests; a documented route alone is not deployment evidence.
+
 ## Scope
 
 This document defines the browser-facing **Plasma Web REST API contract**. It is separate from:
