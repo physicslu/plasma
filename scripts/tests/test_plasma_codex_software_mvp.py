@@ -233,8 +233,10 @@ class MVPTests(unittest.TestCase):
         self.assertIn('"--sandbox", "danger-full-access", "-"',dispatch)
         self.assertNotIn('"session_resume"',dispatch)
         self.assertNotIn("validate_agent_request(",dispatch)
-        contract=(ROOT/"AGENTS.md").read_text()
-        self.assertIn("Path 3 direct hardware tools",contract)
+        contract=(ROOT/"docs/development/plasma-path3-codex.md").read_text()
+        self.assertIn("[Path 3 native hardware tools](plasma-path3-direct-hardware-tools.md)",contract)
+        self.assertIn("Owner-authenticated, SHA/digest-pinned dynamic hardware Work Order",contract)
+        self.assertIn("not** the worker\'s Linux DAC/ACL",contract)
         self.assertTrue((ROOT/"docs/development/plasma-path3-direct-hardware-tools.md").is_file())
         self.assertTrue((ROOT/"docs/evidence/la2016-pwm-loopback/2026-10-16/verify.py").is_file())
 
