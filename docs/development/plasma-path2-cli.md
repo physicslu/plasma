@@ -26,3 +26,33 @@ Execute real SWPC acceptance **before Gate 2** if the task requires it. Record a
 ## 5. Shared clauses retained by reference
 
 Read the applicable portions of [shared contract](plasma-development-common.md), particularly Development Mode, source-of-truth, two-Gate model, credentials, Git/CI, hardware ownership, protected Root and recovery. The shared contract retains cross-route and historical constraints that must not be silently discarded.
+
+## Protected FPGA Root Entry and Work Order authorization (normative)
+
+### Development Z2 Root operation boundary
+
+The former Path 2 `z2-root-operation` fixed Work Order was retired from
+the trusted Dispatcher on 2026-10-26; new owner Work Orders must use the
+generic `operator-cli` for permitted, source-pinned non-root SWPC execution.
+This is **not** an implicit grant of sudo, SSH, MMIO or target programming.
+
+The independent protected FPGA Image lifecycle/recovery interface remains
+the installed two-argument Root Entry (`operation + source_sha`). That
+entry validates effective root, a root-owned source SHA256 manifest and
+the executable source pin; its reviewed `pl.hil.fpga_image_root` handles
+FPGA image/Golden operations. Its internal fixed lifecycle vocabulary
+must not be generalized into an arbitrary root shell or driver selector.
+Historical transport function/receipt names containing `stage` are
+compatibility details, not new Dispatcher admission.
+
+Path 3 may use its separately enrolled SSH/sudo development route within
+owner-approved Gate 1 scope and actual OS/device safety boundaries; it does
+not inherit Path 2 hardware authority or need a Path 2 Stage/Profile gate.
+The old SWPC Bridge and approved-SHA PIN are no longer general Development
+Mode prerequisites; leave existing root-owned files untouched. The trusted
+GitHub event SHA, live owner PR metadata, exact checkout and digest-pinned
+Work Order establish B1 authorization, not a user-supplied SHA alone.
+Z2 root-owned entry/source checks, image identity, ownership/recovery and
+authentic Root receipts continue to enforce B2/B3. This contract grants
+neither root access nor hardware permission to a host-only Work Order.
+
