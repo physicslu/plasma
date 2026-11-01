@@ -31,3 +31,11 @@ Codex may prepare branch/PR under approved scope; ChatGPT independently reviews 
 ## 7. Shared clauses retained by reference
 
 Read relevant sections of [shared contract](plasma-development-common.md) for two-Gate policy, trusted source, credentials, Root Guard, Git, CI, safety and failure handling. The shared contract preserves cross-route rules and does not grant additional hardware authority.
+
+## Shared hardware safety and recovery (normative)
+
+## 1B. Shared hardware access and recovery safety (normative)
+
+Hardware access, root operations, credential handling, physical recovery, and truthful HIL evidence are subject to the owner's approved Gate 1 scope and actual execution permissions. Never disclose credentials or infer hardware success from host-only tests. These safeguards apply across all domains and Path 2/3. The detailed Z2 SSH/sudo credential source and recovery procedure are owned by [plasma-embedded.md](plasma-embedded.md); every executor touching Z2 must load that contract, regardless of primary domain. Gate 2 remains the only merge authorization.
+
+
