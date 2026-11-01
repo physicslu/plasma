@@ -22,8 +22,8 @@ No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approve
 PLASMA is a configurable, multi-Site IC programmer; PYNQ-Z2 is the prototype target. Hierarchy: Facility → PPU → SITE 1..N (one-based `site_id`). Socket is a fixture, not Site identity. Protocol v3.3 (PLASMA33) and Web REST v3 are canonical. PPU exposes the **Plasma Gateway** service, its **Plasma Gateway API** and **Plasma Gateway Endpoint**. The Linux **Default Gateway** is an unrelated layer-3 next-hop; do not conflate them. Plasma Manager provides bounded managed PPU routing, not a universal scheduler. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity.
 
 **Hardware execution boundary (normative; CI-enforced):**
-- **SWPC** runs Web / Controller / BFF and sends high-level commands over Ethernet.
-- **Z2 PS** runs the embedded Linux programming runtime, including the live OpenOCD process and its PS-local WordPort/Remote Bitbang bridge.
+- **SWPC runs Web / Controller / BFF** and sends high-level commands over Ethernet.
+- **Z2 PS runs the embedded Linux programming runtime**, including the live OpenOCD process and its PS-local WordPort/Remote Bitbang bridge.
 - **Z2 PL** executes FPGA SWD/SPI hardware I/O to the DUT.
 
 SWPC may build/test OpenOCD offline but must **not** host live OpenOCD or forward per-bit SWD traffic as the product path. Changing this placement requires an explicit revised Gate 1 architecture decision plus synchronized contract, implementation and CI. See [OpenOCD architecture](docs/architecture/ic-support-openocd-plan-executor.md).
