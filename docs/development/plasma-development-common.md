@@ -10,7 +10,7 @@ PLASMA is being developed by one owner; unless the owner expressly declares
 qualification, release or production work, prioritize the shortest working
 Build -> Run -> Observe -> Fix loop. Do not silently apply future fleet,
 factory, multi-tenant or enterprise security requirements to a prototype
-smoke test. See Section 1A.1 and the route-specific Path 2/3 contracts. This is an engineering priority,
+smoke test. See the Development Mode policy in [AGENTS.md](../../AGENTS.md) and the route-specific Path 2/3 contracts. This is an engineering priority,
 not a declaration that disabled executable controls are already enabled.
 
 **Execution routing:** ChatGPT Direct is the default; use [Path 2](plasma-path2-cli.md) for SWPC CLI or [Path 3](plasma-path3-codex.md) for SWPC Codex only when the approved task requires that executor. Path selection belongs to Gate 1.
@@ -112,7 +112,7 @@ A passing Cloud, CI, or Mock test must never be reported as a passing Z2 or real
 
 ## Domain contract ownership and loading
 
-This common contract is normative for **all** engineering work. Its remaining clauses govern cross-domain behavior, source-of-truth, shared safety, Gate approvals, Git, evidence, execution zones, and workspace security. Do not move shared Z2 root/hardware recovery guards into a domain-only file: these safeguards apply to all paths and callers.
+This common contract is normative for **all** engineering work. Its remaining clauses cover programming data, execution zones and domain contract loading. Global Gate, Git and safety rules are owned by [AGENTS.md](../../AGENTS.md); Z2 recovery details are owned by [plasma-embedded.md](plasma-embedded.md).
 
 Domain-specific normative detail has one owner:
 
@@ -123,5 +123,5 @@ Domain-specific normative detail has one owner:
 | Manager / backend | [plasma-manager.md](plasma-manager.md) | Manager, Gateway, Controller, backend REST, Site routing |
 | Web / frontend | [plasma-web.md](plasma-web.md) | Web UI, frontend and REST client |
 
-Read [AGENTS.md](../../AGENTS.md) first. Select Path 2 or Path 3 execution instructions **independently** of the domains touched. Cross-layer changes load all affected domains and validate changed producer/consumer interfaces; unrelated domain contracts and full-system tests are not automatic requirements. Domain documents supplement shared safety and Gate rules; they cannot override them.
+Read [AGENTS.md](../../AGENTS.md) first. Select Path 2 or Path 3 execution instructions **independently** of the domains touched. Cross-layer changes load all affected domains and validate changed producer/consumer interfaces; unrelated domain contracts and full-system tests are not automatic requirements. Domain documents supplement the global safety and Gate rules in AGENTS.md; they cannot override them.
 
