@@ -353,8 +353,8 @@ class VerifiedBundle:
     schema: str = BUNDLE_SCHEMA
 
 def _bundle_package_file_allowed(
-    kind: str, package_id: str, member: VerifiedPackageFile, *,
- ) -> bool:
+    kind: str, package_id: str, member: VerifiedPackageFile,
+) -> bool:
     prefix = f"payload/packages/{package_id}/"
     if not member.path.startswith(prefix):
         return False
