@@ -387,6 +387,12 @@ class DeploymentCoordinator:
         ))
         receipt["authorization"] = authority
         receipt["resolution"] = resolution
+        receipt["b3_install"] = {"status": "HOST_ONLY_VERIFIED",
+                                 "package_order": resolution["package_order"],
+                                 "staged_packages": resolution["stage"],
+                                 "reused_packages": resolution["reuse"]}
+        receipt["b4_activate"] = {"status": "HOST_ONLY_SIMULATED",
+                                  "rollback_on_failure": "JOURNAL_TRACKED"}
         receipt["install_qualified"] = False
         return receipt
 
