@@ -346,7 +346,9 @@ def test_v3_rejects_file_hash_mismatch(tmp_path):
 
 
 @pytest.mark.parametrize("mutation,reason", [
+    (lambda m: m["target"].update(platform="linux-armv7l"), "BUNDLE_MANIFEST_CONTENT_DENIED"),
     (lambda m: m["target"].update(board="wrong-board"), "BUNDLE_MANIFEST_CONTENT_DENIED"),
+    (lambda m: m["target"].update(fpga_part="wrong-fpga"), "BUNDLE_MANIFEST_CONTENT_DENIED"),
     (lambda m: m["packages"][0]["files"][0].update(path="../escape"), "BUNDLE_FILE_METADATA_DENIED"),
     (lambda m: m["packages"][0]["files"][0].update(path="payload/packages/ic-metadata/data/missing.json"), "BUNDLE_MEMBER_MISSING"),
     (lambda m: m["packages"][0]["files"][0].update(size=999), "BUNDLE_FILE_SIZE_MISMATCH"),
