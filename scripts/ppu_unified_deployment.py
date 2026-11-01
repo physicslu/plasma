@@ -323,10 +323,8 @@ def admit_existing_bootstrap_request(body: Mapping[str, object]) -> dict[str, st
 # Unknown component kinds are accepted as opaque NON-EXECUTABLE resources;
 # only explicitly qualified, separately reviewed handlers may later use them.
 BUNDLE_SCHEMA = "plasma.ppu.bundle.v3"  # Canonical: Bundle -> Packages -> Files
-LEGACY_BUNDLE_SCHEMA = "plasma.ppu.bundle.v2"  # Read-only format compatibility
 BUNDLE_KIND = "bundle"
 MAX_BUNDLE_PACKAGES = 32
-MAX_BUNDLE_COMPONENTS = MAX_BUNDLE_PACKAGES  # Legacy symbol; do not emit in v3
 BUNDLE_KNOWN_KINDS = frozenset({"python", "native-c", "fpga-image"})
 
 
@@ -354,21 +352,10 @@ class VerifiedBundle:
     actions: tuple[str, ...] = ()
     schema: str = BUNDLE_SCHEMA
 
-    @property
-    def components(self) -> tuple[VerifiedBundlePackage, ...]:
-        """Legacy v2 reader only; new consumers MUST use packages."""
-        return self.packages
-
-
-VerifiedBundleComponent = VerifiedBundlePackage  # legacy import compatibility
-
-
 def _bundle_package_file_allowed(
     kind: str, package_id: str, member: VerifiedPackageFile, *,
-    schema: str = BUNDLE_SCHEMA,
-) -> bool:
-    root = "packages" if schema == BUNDLE_SCHEMA else "components"
-    prefix = f"payload/{root}/{package_id}/"
+ ) -> bool:
+    prefix = f"payload/packages/{package_id}/"
     if not member.path.startswith(prefix):
         return False
     suffix = member.path[len(prefix):]
@@ -424,7 +411,7 @@ def verify_host_only_bundle(
     archive_path: Path, *, expected_sha256: str, source_commit: str | None,
     target_profile: Mapping[str, str],
 ) -> VerifiedBundle:
-    """Verify v3 package-based and legacy v2 component wire formats; no execution.
+    """Verify canonical v3 package-based wire format only; no execution.
 
     Publisher provenance, Master authorization, privilege and Site ownership
     are not established by a valid manifest or checksum.
@@ -469,7 +456,7 @@ def verify_host_only_bundle(
             schema = manifest.get("schema")
             if schema != BUNDLE_SCHEMA:
                 raise UnifiedDeploymentError("BUNDLE_SCHEMA_UNSUPPORTED")
-            package_key = "packages" if schema == BUNDLE_SCHEMA else "components"
+            package_key = "packages"
             fields = {"schema", "name", "version", "source_commit", "target",
                       "purpose", package_key}
             if (set(manifest) not in (fields, fields | {"actions"})
@@ -506,7 +493,7 @@ def verify_host_only_bundle(
                                for dep in entry["requires"])
                         or len(entry["requires"]) != len(set(entry["requires"]))
                         or type(entry["files"]) is not list or not entry["files"]):
-                    raise UnifiedDeploymentError("BUNDLE_PACKAGE_INVALID" if schema == BUNDLE_SCHEMA else "BUNDLE_COMPONENT_INVALID")
+                    raise UnifiedDeploymentError("BUNDLE_PACKAGE_INVALID")
                 ids.add(entry["id"])
                 package_files: list[VerifiedPackageFile] = []
                 for item in entry["files"]:
@@ -519,11 +506,10 @@ def verify_host_only_bundle(
                         raise UnifiedDeploymentError("BUNDLE_FILE_METADATA_DENIED")
                     verified = VerifiedPackageFile(**item)
                     if not _bundle_package_file_allowed(
-                        entry["kind"], entry["id"], verified, schema=schema
+                        entry["kind"], entry["id"], verified
                     ):
                         raise UnifiedDeploymentError(
-                            "BUNDLE_PACKAGE_FILE_KIND_DENIED" if schema == BUNDLE_SCHEMA
-                            else "BUNDLE_COMPONENT_FILE_KIND_DENIED"
+                            "BUNDLE_PACKAGE_FILE_KIND_DENIED"
                         )
                     if verified.path not in names:
                         raise UnifiedDeploymentError("BUNDLE_MEMBER_MISSING")
