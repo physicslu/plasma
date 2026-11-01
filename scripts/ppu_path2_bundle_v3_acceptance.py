@@ -133,7 +133,7 @@ def main(argv=None):
             raise RuntimeError("TARGET_PIN_INVALID")
         report = run(host=args.host, device_id=args.device_id,
                      source_sha=args.source_sha, target=target)
-        result = 0 if report["b1_receive"].get("status") == "PASS" else 1
+        result = 0 if (report["b1_receive"].get("status") == "PASS" and report["b2_v3_admission"].get("status") == "PASS") else 1
     except Exception as exc:
         # Sanitized result only; never print network responses, SSH output or token.
         code = str(exc) if isinstance(exc, RuntimeError) and str(exc) in {
