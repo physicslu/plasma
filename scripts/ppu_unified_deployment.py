@@ -613,7 +613,6 @@ def bundle_package_identity(package: VerifiedBundlePackage) -> str:
 
 
 # Legacy API name, retained for historical PR3 callers only.
-bundle_component_identity = bundle_package_identity
 
 
 def resolve_host_only_bundle(
@@ -631,7 +630,7 @@ def resolve_host_only_bundle(
         raise UnifiedDeploymentError("BUNDLE_RESOLUTION_INPUT_INVALID")
     if any(type(name) is not str or name not in {p.id for p in bundle.packages}
            for name in trusted_inventory):
-        raise UnifiedDeploymentError("BUNDLE_INVENTORY_UNKNOWN_PACKAGE" if bundle.schema == BUNDLE_SCHEMA else "BUNDLE_INVENTORY_UNKNOWN_COMPONENT")
+        raise UnifiedDeploymentError("BUNDLE_INVENTORY_UNKNOWN_PACKAGE")
     by_id = {package.id: package for package in bundle.packages}
     _verify_bundle_dependencies(bundle.packages)
     seen: set[str] = set()
