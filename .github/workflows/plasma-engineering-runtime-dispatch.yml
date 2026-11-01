@@ -261,7 +261,15 @@ jobs:
           import json,sys
           with open(sys.argv[1], encoding="utf-8") as f:
               data=json.load(f)
-          assert data["status"] == "VALID_OWNER_REQUEST"
+          if data.get("status") != "VALID_OWNER_REQUEST":
+              # The dispatcher already maps errors to safe reason codes.
+              # Never expose raw event data, token, or arbitrary error strings.
+              import re
+              reason = data.get("reason")
+              if not isinstance(reason, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{2,79}", reason):
+                  reason = "DISPATCH_REQUEST_DENIED"
+              print(f"::error title=PLASMA Dispatcher admission denied::{reason}")
+              sys.exit(2)
           with open(sys.argv[2],"a",encoding="utf-8") as f:
               f.write(f"pr_number={data['pr_number']}\n")
               f.write(f"source_sha={data['source_sha']}\n")
