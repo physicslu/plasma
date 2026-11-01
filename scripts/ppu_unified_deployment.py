@@ -675,13 +675,12 @@ def resolve_host_only_bundle(
         else:
             stage.append(package_id)
     return {
-        "schema": ("plasma.ppu.bundle-resolution.v2" if bundle.schema == BUNDLE_SCHEMA
-                   else "plasma.ppu.bundle-resolution.v1"),
+        "schema": "plasma.ppu.bundle-resolution.v2",
         "archive_sha256": bundle.archive_sha256,
-        ("package_order" if bundle.schema == BUNDLE_SCHEMA else "component_order"): order,
+        "package_order": order,
         "stage": stage,
         "reuse": reuse,
-        ("package_sha256" if bundle.schema == BUNDLE_SCHEMA else "component_sha256"): identities,
+        "package_sha256": identities,
         "install_qualified": False,
     }
 
@@ -731,7 +730,7 @@ def evaluate_host_only_bundle_authority(
             or any(type(kind) is not str or not SAFE_NAME.fullmatch(kind) for kind in allowed)
             or len(set(allowed)) != len(allowed)
             or any(package.kind not in allowed for package in bundle.packages)):
-        raise UnifiedDeploymentError("BUNDLE_PACKAGE_KIND_NOT_AUTHORIZED" if bundle.schema == BUNDLE_SCHEMA else "BUNDLE_COMPONENT_KIND_NOT_AUTHORIZED")
+        raise UnifiedDeploymentError("BUNDLE_PACKAGE_KIND_NOT_AUTHORIZED")
     return {
         "publisher": trusted_policy["publisher"],
         "master_generation": trusted_policy["master_generation"],
