@@ -13,6 +13,10 @@
 
 ## PPU deployment / physical admission evidence
 
+- **Gate 1 Draft / PR #1225 / Host-only** — [Canonical Bundle v3: Bundle → Packages → Files](architecture/ppu-canonical-bundle-packages.md)：`packages[]`、Package DAG、SHA256 Admission；v1/v2 舊格式不作為 v3 相容介面。尚未完成 Z2 B2 驗收。
+- **Proposed / PR #1225** — [PPU Target Platform Identity](architecture/ppu-target-platform-identity.md)：`linux-armv7` 可信套件目標與 `linux-armv7l` runtime 觀測值的區分；不得視為已證實的 HTTP 409 根因。
+
+
 - **Operator-reported physical HIL / PR #1219 admission only** — [SWPC → PYNQ-Z2 Package Admission, 2026-10-30](evidence/ppu-package-admission-2026-10-30/README.md)：實際乙太網路 ZIP Upload／Commit、SHA256、Manifest Admission 與 Receipt；`admitted` 不代表安裝／啟用，TLS、Publisher／Source Trust 和 FPGA／DUT 資格仍未驗收。後續 Factory Bundle 相依檔修復為獨立 Draft PR #1221。
 
 ## 跨廠牌燒錄預設安全政策
@@ -96,7 +100,7 @@ This section is a navigation aid, not a new implementation contract. Follow root
 Historical PS-only reference: [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md) documents a retired internal SWD-03 fixture, not the current Blue Pill runbook.
 
 ## Architecture and contracts
-- **Gate 1 / Draft PR #1222 / Host-only** — [PPU Generic Bundle v2 多元件部署交易](architecture/ppu-generic-bundle-v2-pr2.md)：支援任意非執行型資料元件、程式及 FPGA 檔案的依賴／SHA256 驗證與 Admission；Install／Verify／Activate／Rollback 僅在 Host-only 沙盒模擬，不代表真實部署。
+- **Gate 1 / Draft PR #1225 / Host-only** — [PPU Canonical Bundle v3 套件部署契約](architecture/ppu-canonical-bundle-packages.md)：`Bundle → Packages → Files`、相依／SHA256 驗證與 Admission；Install／Verify／Activate／Rollback 僅在 Host-only 沙盒模擬，不代表真實部署。
 - **Gate 1 / Path 1 / PR3 Host-only** — [PPU 通用 Bundle v2 統一部署整合](architecture/ppu-pr3-unified-hostonly-integration.md)：多元件 DAG/Inventory/Publisher+Master fail-closed Host-only 契約、既有 Coordinator 的回復模擬、Manager/BFF/Web Console 共用 Bootstrap Admission；未部署、未操作實機。
 - **Gate 1 / Path 1 / Draft / Host-only** — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
 - **Gate 1 / Path 1 / Host-only / Draft** — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。

@@ -57,11 +57,18 @@ def loopback(tmp_path: Path):
 
 @pytest.mark.parametrize("name,kind,files", SAMPLES)
 def test_real_http_accepts_manifest_actions_without_install(loopback, tmp_path, name, kind, files):
+    # Reuse the same HTTP upload and admission path; only the ZIP contract changes.
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+
     api, paths, server = loopback
-    archive, digest = package(tmp_path, name, kind, files,
-                              alterations={"actions": ["install", "verify", "activate"]})
+    package_files = {
+        filename.removeprefix("payload/"): data for filename, data in files.items()
+    }
+    archive, digest = bundle_v3(
+        tmp_path, parts=[(name, kind, [], package_files)]
+    )
     upload_id = api.upload(archive.read_bytes())
-    submission = api.submit(kind=kind, upload_id=upload_id)
+    submission = api.submit(kind="bundle", upload_id=upload_id)
     assert submission.state == "admitted"
     receipt = api.deployment_state(submission.transaction_id)
     result = receipt["result"]
@@ -69,8 +76,12 @@ def test_real_http_accepts_manifest_actions_without_install(loopback, tmp_path, 
     assert result["stage"] == "package_admission_only"
     assert result["install_qualified"] is False
     assert plan["archive_sha256"] == digest
-    assert plan["kind"] == kind and plan["package"] == name
-    assert plan["requested_actions"] == ["install", "verify", "activate"]
+    assert plan["kind"] == "bundle"
+    assert plan["bundle_schema"] == "plasma.ppu.bundle.v3"
+    assert len(plan["packages"]) == 1
+    assert plan["packages"][0]["id"] == name
+    assert plan["packages"][0]["kind"] == kind
+    assert plan["requested_actions"] == ["install", "verify", "activate", "rollback"]
     assert plan["execution_permitted"] is False
     assert plan["target"] == TARGET
     assert len(plan["files"]) == len(files)
@@ -147,13 +158,16 @@ def test_archive_changed_after_upload_commit_fails_closed(loopback, tmp_path):
     assert not paths.deployment_record.exists()
 
 
-def test_legacy_manifest_remains_accepted_and_no_runtime_launch(loopback, tmp_path):
+def test_retired_v1_manifest_rejected_after_unchanged_upload(loopback, tmp_path):
+    """Legacy content may be transported, but must fail at Admission."""
     api, paths, server = loopback
     archive, _ = package(tmp_path, "wordport", "python",
                          {"payload/python/wordport.py": b"# legacy"})
     uid = api.upload(archive.read_bytes())
-    r = api.submit(kind="python", upload_id=uid)
-    assert api.deployment_state(r.transaction_id)["result"]["plan"]["requested_actions"] == []
+    assert uid
+    with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
+        api.submit(kind="python", upload_id=uid)
+    assert not paths.deployment_record.exists()
     assert not paths.product_root.exists()
     assert server.deployment_thread is None
 
@@ -172,15 +186,19 @@ def test_generic_requires_control_token(loopback, tmp_path):
 
 @pytest.mark.parametrize("malformed_kind", [[], ["python"], {}, {"kind": "python"}])
 def test_http_unhashable_kind_is_rejected_without_losing_service(loopback, tmp_path, malformed_kind):
+    # Keep the HTTP negative cases; use the canonical v3 positive control.
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+
     api, paths, server = loopback
-    archive, _ = package(tmp_path, "wordport", "python",
-                         {"payload/python/wordport.py": b"# valid"})
+    archive, _ = bundle_v3(
+        tmp_path, parts=[("wordport", "python", [], {"python/wordport.py": b"# valid"})]
+    )
     upload_id = api.upload(archive.read_bytes())
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
         api._call("POST", "/v1/deployments", {"kind": malformed_kind, "upload_id": upload_id})
     assert not paths.deployment_record.exists()
     assert server.deployment_thread is None
-    valid = api.submit(kind="python", upload_id=upload_id)
+    valid = api.submit(kind="bundle", upload_id=upload_id)
     assert valid.state == "admitted"
 
 

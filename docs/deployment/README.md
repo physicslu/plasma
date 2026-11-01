@@ -1,5 +1,7 @@
 # Plasma Deployment Notes
 
+**Canonical Package naming:** [Bundle → Packages → Files](../architecture/ppu-canonical-bundle-packages.md). New authored Bundle uses v3 `packages` and `payload/packages`, while historic v2 remains wire-compatible with `components`.
+
 `scripts/plasmactl` is the profile-aware operator entry point for integration-host, local Control Station, SWPC Z2-like surrogate, and Real Z2 PS-only deployment roles. Profile-specific backends preserve separate ownership and qualification boundaries; a common CLI does not make those roles interchangeable.
 
 - **Current** — [`plasmactl` Deployment Profiles](plasmactl-deployment-profiles.md): canonical profile router, role ownership, immutable deployment behavior, and qualification boundaries for `integration`, `local-control-station`, `swpc-z2like`, and `z2-ps`.
