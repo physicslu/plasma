@@ -1,4 +1,4 @@
-name: Python and PL source tests
+name: Python PS source tests
 
 on:
   push:
