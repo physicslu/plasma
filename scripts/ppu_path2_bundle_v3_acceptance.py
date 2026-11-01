@@ -96,6 +96,7 @@ def run(*, host: str, device_id: str, source_sha: str, target: dict[str, str]):
     except Exception as exc:
         report["b2_v3_admission"] = {
             "status": "NOT_QUALIFIED", "code": type(exc).__name__,
+            "http_rejection": (str(exc) if re.fullmatch(r"API_HTTP_REJECTED:[0-9]{3}(?::[A-Z0-9_]+)?", str(exc)) else "NOT_AVAILABLE"),
         }
         report["qualification"] = "B1_PASS_B2_V3_NOT_QUALIFIED"
     return report
