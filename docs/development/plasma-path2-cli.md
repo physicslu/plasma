@@ -1,6 +1,6 @@
 # PLASMA Path 2 — SWPC CLI Execution Contract
 
-**Status: Normative route-specific contract.** Root [AGENTS.md](../../AGENTS.md) and the [shared contract](plasma-development-common.md) govern approvals, Git, security, evidence and hardware. This document specifies only Path 2 differences. Do not load the Path 3 contract for ordinary Path 2 tasks.
+**Status: Normative route-specific contract.** Root [AGENTS.md](../../AGENTS.md) governs approvals, Git, security and evidence; [Embedded](plasma-embedded.md) governs Z2 recovery, and [Common](plasma-development-common.md) covers shared programming and execution zones. This document specifies only Path 2 differences. Do not load the Path 3 contract for ordinary Path 2 tasks.
 
 ## 1. Scope and execution boundary
 
@@ -25,4 +25,4 @@ Execute real SWPC acceptance **before Gate 2** if the task requires it. Record a
 
 ## 5. Shared clauses retained by reference
 
-Read the applicable portions of [shared contract](plasma-development-common.md), particularly Development Mode, source-of-truth, two-Gate model, credentials, Git/CI, hardware ownership, protected Root and recovery. The shared contract retains cross-route and historical constraints that must not be silently discarded.
+Read [AGENTS.md](../../AGENTS.md) for Development Mode, source-of-truth, two-Gate, Git/CI and security; read [Embedded](plasma-embedded.md) for Z2 credentials, hardware ownership, protected Root and recovery.

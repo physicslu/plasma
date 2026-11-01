@@ -1,6 +1,6 @@
 # PLASMA Path 3 — SWPC Codex Execution Contract
 
-**Status: Normative route-specific contract.** Root [AGENTS.md](../../AGENTS.md) and the [shared contract](plasma-development-common.md) remain authoritative for approvals, Git, safety, credentials and recovery. Do not load the Path 2 contract for ordinary Path 3 tasks.
+**Status: Normative route-specific contract.** Root [AGENTS.md](../../AGENTS.md) governs approvals, Git and safety; [Embedded](plasma-embedded.md) governs Z2 credentials and recovery. Do not load the Path 2 contract for ordinary Path 3 tasks.
 
 ## 1. Executor and route
 
@@ -18,7 +18,7 @@ Use native CLI, SSH, USB/TTY, Sigrok and project build/test tools within the app
 
 ## 4. Z2 SSH/sudo and hardware boundary
 
-Use the existing owner-controlled local credential source described in the [shared contract](plasma-development-common.md), never commit, print, log or copy secrets into PR artifacts. SSH/sudo must use the enrolled owner-approved route and actual Linux rights; no sudoers edits or sandbox bypass. For approved FPGA work, validate current board/boot, candidate BIN/Manifest and SHA, Root/FPGA Manager ownership, safe output/electrical state and Golden recovery. Path 3 may perform bounded development deployment/FPGA operations only when included in Gate 1. Z2 PS, not SWPC, hosts live DUT OpenOCD and PS-local WordPort; PL performs DUT I/O. Internal-loopback evidence is not external SWD/DUT qualification. On unknown/unsafe state stop and report NOT_RUN/FAIL accurately.
+Use the existing owner-controlled local credential source described in the [Embedded contract](plasma-embedded.md), never commit, print, log or copy secrets into PR artifacts. SSH/sudo must use the enrolled owner-approved route and actual Linux rights; no sudoers edits or sandbox bypass. For approved FPGA work, validate current board/boot, candidate BIN/Manifest and SHA, Root/FPGA Manager ownership, safe output/electrical state and Golden recovery. Path 3 may perform bounded development deployment/FPGA operations only when included in Gate 1. Z2 PS, not SWPC, hosts live DUT OpenOCD and PS-local WordPort; PL performs DUT I/O. Internal-loopback evidence is not external SWD/DUT qualification. On unknown/unsafe state stop and report NOT_RUN/FAIL accurately.
 
 ## 5. Autonomous fix/test loop
 
@@ -30,4 +30,12 @@ Codex may prepare branch/PR under approved scope; ChatGPT independently reviews 
 
 ## 7. Shared clauses retained by reference
 
-Read relevant sections of [shared contract](plasma-development-common.md) for two-Gate policy, trusted source, credentials, Root Guard, Git, CI, safety and failure handling. The shared contract preserves cross-route rules and does not grant additional hardware authority.
+Read [AGENTS.md](../../AGENTS.md) for two-Gate policy, trusted source, Git, CI and safety; read [Embedded](plasma-embedded.md) for credentials, Root Guard and recovery. Neither grants additional hardware authority.
+
+## Shared hardware safety and recovery (normative)
+
+## 1B. Shared hardware access and recovery safety (normative)
+
+Hardware access, root operations, credential handling, physical recovery, and truthful HIL evidence are subject to the owner's approved Gate 1 scope and actual execution permissions. Never disclose credentials or infer hardware success from host-only tests. These safeguards apply across all domains and Path 2/3. The detailed Z2 SSH/sudo credential source and recovery procedure are owned by [plasma-embedded.md](plasma-embedded.md); every executor touching Z2 must load that contract, regardless of primary domain. Gate 2 remains the only merge authorization.
+
+

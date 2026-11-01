@@ -28,7 +28,7 @@ For healthy normal development aim for at most 180 seconds of pre-experiment che
 
 Deliver each FPGA BIN with its companion Manifest. Protected Root validates BIN SHA256, board/part, ABI, current ownership and recovery; Root source pin protects executable code, **not** individual Image data. Do not add per-Image approval tokens, fixed release allowlists, `runtime_admitted` or Root source changes for each Image. Manifest is consistency evidence, not publisher authentication.
 
-Allow direct safe Image A -> Image B replacement without routine Golden reload. After a **proven successful FPGA Download**, Keep Loaded by default even if downstream MMIO/DPIDR fails; functional FAIL is not itself a restore trigger. Stop SWD/DUT activity and reap processes/release leases safely on test failure. For failed load, UNKNOWN/unsafe/in-flight state, electrical hazards or unreaped owner, **fail closed**; preserve verified Golden and invoke Restore only for explicit or documented recovery, never blindly. Detailed preconditions and recovery policy: [shared FPGA/Z2 contract](docs/development/plasma-development-common.md).
+Allow direct safe Image A -> Image B replacement without routine Golden reload. After a **proven successful FPGA Download**, Keep Loaded by default even if downstream MMIO/DPIDR fails; functional FAIL is not itself a restore trigger. Stop SWD/DUT activity and reap processes/release leases safely on test failure. For failed load, UNKNOWN/unsafe/in-flight state, electrical hazards or unreaped owner, **fail closed**; preserve verified Golden and invoke Restore only for explicit or documented recovery, never blindly. Detailed preconditions and recovery policy: [FPGA contract](docs/development/plasma-fpga.md) and [Embedded recovery contract](docs/development/plasma-embedded.md).
 
 ### 1A.1 Development Mode — choose Path, then read its rules (normative)
 
@@ -44,7 +44,21 @@ Allow direct safe Image A -> Image B replacement without routine Golden reload. 
 
 ## 1B. SSH/sudo and Codex execution boundary
 
-An approved Gate 1 is an execution assignment, not a new planning gate. Path 3 may use the enrolled SSH/sudo route only with actual privileges and authorized scope; credentials remain in the private owner-controlled store, never in commits/logs/artifacts. No sudoers modification, privilege bypass or invented Z2 state. For real FPGA/HIL work, follow [shared Z2 Root/recovery constraints](docs/development/plasma-development-common.md) and [Path 3 execution contract](docs/development/plasma-path3-codex.md).
+An approved Gate 1 is an execution assignment, not a new planning gate. Path 3 may use the enrolled SSH/sudo route only with actual privileges and authorized scope; credentials remain in the private owner-controlled store, never in commits/logs/artifacts. No sudoers modification, privilege bypass or invented Z2 state. For real FPGA/HIL work, follow [Embedded Z2 Root/recovery constraints](docs/development/plasma-embedded.md) and [Path 3 execution contract](docs/development/plasma-path3-codex.md).
+
+## Domain contract routing (normative)
+
+Load [Common](docs/development/plasma-development-common.md) and only the applicable domain contracts according to the actual changed interfaces, not according to the execution Path:
+
+| Changed scope | Required domain contract | Add when interfaces are affected |
+| --- | --- | --- |
+| FPGA RTL / XDC / PL image / MMIO | [FPGA](docs/development/plasma-fpga.md) | [Embedded](docs/development/plasma-embedded.md) for PS-facing ABI |
+| Z2 Linux / OpenOCD / PS driver | [Embedded](docs/development/plasma-embedded.md) | [FPGA](docs/development/plasma-fpga.md) for PL ABI |
+| Manager / Gateway / backend REST | [Manager](docs/development/plasma-manager.md) | [Embedded](docs/development/plasma-embedded.md) or [Web](docs/development/plasma-web.md) for changed APIs |
+| Web UI / frontend | [Web](docs/development/plasma-web.md) | [Manager](docs/development/plasma-manager.md) for changed REST APIs |
+| Cross-layer API / protocol | Common + every affected domain | Validate affected producers and consumers |
+
+Path 2 / Path 3 are execution contracts selected independently. Do not infer that a domain change requires unrelated domain rules or whole-system testing. Skipping unrelated documents never waives actual interface compatibility, Root Guard, Gate approvals, hardware ownership, electrical safety or evidence requirements.
 
 ## 2–10. Domain and execution contracts (load on demand)
 
@@ -52,7 +66,7 @@ An approved Gate 1 is an execution assignment, not a new planning gate. Path 3 m
 - **Interrupt isolation:** Before destructive Erase/Program on interrupt-capable MCUs, qualify target quiescence/interrupt isolation per exact ICPN/Provider. Unknown isolation fails closed; do not blindly apply Cortex-M `maskisr` to other families. See [programming interrupt isolation policy](docs/architecture/programming-interrupt-isolation-policy.md); non-STM32 enforcement is not assumed implemented.
 - **Source priority:** executable code/config > `scripts/plasmactl` for host operations > package manifests > tests > current docs > historical discussions. Inspect actual implementation; never infer support from metadata or mock results.
 - **Zones:** Cloud/CI is host-only evidence; SWPC is integration/build/development host; Z2 PS/PL and DUT are real hardware. Path 3 `workspace-write` is the ordinary sandbox; owner-authorized SHA/digest-bound hardware Work Orders may use `danger-full-access`, but sandbox settings do not override Linux DAC/ACL, SSH, protected Root Entry, or safety checks. Do not inspect unrelated user files.
-- **Architecture/runtime:** SWPC Web/Controller/BFF, Z2 PS live OpenOCD and bridge, Z2 PL SWD/SPI; Gateway is standard-library HTTP/REST polling, not FastAPI/WebSocket. Read current source, `scripts/plasmactl`, and the [shared architecture/runtime clauses](docs/development/plasma-development-common.md) before changes. Gateway integration commonly uses port 18080; no unapproved service restart, port exposure or deployment. Desired persistence does not mean activation.
+- **Architecture/runtime:** SWPC Web/Controller/BFF, Z2 PS live OpenOCD and bridge, Z2 PL SWD/SPI; Gateway is standard-library HTTP/REST polling, not FastAPI/WebSocket. Read current source, `scripts/plasmactl`, and the [Manager contract](docs/development/plasma-manager.md) and [Embedded contract](docs/development/plasma-embedded.md) before changes. Gateway integration commonly uses port 18080; no unapproved service restart, port exposure or deployment. Desired persistence does not mean activation.
 - **Process safety:** identify precise service/PIDs before stopping; no broad `pkill`/`killall` or disruption of unrelated SSH, network or storage services.
 
 ## PLASMA Engineering Compatibility Policy (normative)
@@ -72,7 +86,7 @@ Gate 2 is explicit approval for merging a specific merge-ready PR. Before mergin
 
 Use scoped branches and PRs; preserve unrelated work. No destructive Git operations or history rewriting without explicit scope. Never merge simply to unlock a test that should run before merging.
 
-Use authentic tests and record PASS, FAIL or NOT_RUN. Hosted CI does not prove hardware success. Stop unsafe retries; retain physical ownership, electrical safety and recovery checks. Consult [shared detailed Gate, Git and validation rules](docs/development/plasma-development-common.md) sections 11–15 before acting. Use [Path 2](docs/development/plasma-path2-cli.md) or [Path 3](docs/development/plasma-path3-codex.md) only when relevant.
+Use authentic tests and record PASS, FAIL or NOT_RUN. Hosted CI does not prove hardware success. Stop unsafe retries; retain physical ownership, electrical safety and recovery checks. Apply the Gate, Git and validation rules in this AGENTS.md; consult the applicable Path and domain contracts before acting. Use [Path 2](docs/development/plasma-path2-cli.md) or [Path 3](docs/development/plasma-path3-codex.md) only when relevant.
 
 ## 16. FPGA / PL rules
 
@@ -80,7 +94,7 @@ For pl/ or hardware-visible changes read pl/AGENTS.md and the FPGA development/v
 
 ## 17–18. Production direction and known limits
 
-Z2 is an embedded PPU, not a development workstation: do not copy build tools or credentials into runtime by default. Do not claim unsupported ICs, Asset formats, fleet functions, activation or real DUT qualification. Consult [shared contract](docs/development/plasma-development-common.md) and current source for actual limitations.
+Z2 is an embedded PPU, not a development workstation: do not copy build tools or credentials into runtime by default. Do not claim unsupported ICs, Asset formats, fleet functions, activation or real DUT qualification. Consult the applicable [Embedded](docs/development/plasma-embedded.md) and [Manager](docs/development/plasma-manager.md) contracts and current source for actual limitations.
 
 ## 19. Communication and completion report
 
@@ -91,3 +105,4 @@ Report exact checked SHA and execution Path, real executor/Runner, run/job ID wh
 Do not read or publish private prompts, SSH credentials, API tokens, raw Codex Session transcripts, operator home directories or other unrelated files. The owner may explicitly authorize a bounded resource for a task; redact any sensitive output and honor actual permissions. The existing protected Z2 Root operation/transport and B1/B2/B3 ownership/restoration checks are authoritative for authorized hardware work. No hardware access without approved scope.
 
 **On-demand contract routing:** For a narrowly scoped task, read the relevant section(s) of [the relevant shared contract sections](docs/development/plasma-development-common.md) and affected nested AGENTS.md files; do not preload the full shared contract without technical need. Root AGENTS.md is concise to fit the default Codex project instruction budget; this does **not** relax any full-contract constraint.
+
