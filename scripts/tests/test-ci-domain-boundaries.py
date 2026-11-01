@@ -169,6 +169,7 @@ def main() -> int:
     validate_workstream_registry()
 
     python_tests = read("python-tests.yml")
+    pl_host = read("pl-z2-swd-gpio.yml")
     repository_contracts = read("repository-contracts.yml")
     ppu_release = read("ppu-release.yml")
     z2_release = read("z2-ps-release.yml")
@@ -246,8 +247,15 @@ def main() -> int:
 
     # Preserve positive ownership so trigger cleanup cannot be satisfied by
     # accidentally deleting the workflows' real source boundaries.
-    require(python_tests, '"software/python/**"', owner="SW/PPU Python/PL")
-    require(python_tests, '"pl/rtl/**"', owner="SW/PPU Python/PL")
+    # PS ownership: python-tests listens to software/python/** only.
+    # PL ownership: dedicated pl-*.yml (pl-z2-swd-gpio covers pl/** host tests).
+    require(python_tests, '"software/python/**"', owner="SW/PPU Python/PS")
+    for pl_path in ('"pl/rtl/**"', '"pl/constraints/**"', '"pl/projects/**"', '"pl/tests/**"'):
+        forbid(python_tests, pl_path, owner="SW/PPU Python/PS")
+    forbid(python_tests, "software/python/tests pl/tests", owner="SW/PPU Python/PS")
+    require(python_tests, "python -m pytest -q software/python/tests", owner="SW/PPU Python/PS")
+    require(pl_host, '"pl/**"', owner="SW/PPU PL host contracts")
+    require(pl_host, "python3 -m pytest -q pl/tests", owner="SW/PPU PL host contracts")
     require(ppu_release, '"scripts/ppu-release.py"', owner="SW/PPU PPU release")
     require(ppu_release, '"scripts/ci/ppu-network-trigger.py"', owner="SW/PPU PPU network routing")
     require(ppu_release, "route-ppu-network:", owner="SW/PPU PPU network routing")
