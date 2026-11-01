@@ -58,6 +58,13 @@ def test_b3_b4_failure_journal_fails_closed(tmp_path, fault, expected_state):
     record = co.journal.read()
     assert record is not None
     assert record.state == expected_state
-    assert not (co.paths.bootstrap_state_root / "host-only-packages" /
-                "active" / "multi-purpose-bundle.json").exists()
+    active = (co.paths.bootstrap_state_root / "host-only-packages" /
+              "active" / "multi-purpose-bundle.json")
+    if expected_state == "recovery_required":
+        # Fail closed: an uncertain rollback MUST retain evidence of the
+        # possibly active release; it is NOT equivalent to a clean rollback.
+        assert active.exists()
+        assert record.error_code == "host_only_rollback_unknown"
+    else:
+        assert not active.exists()
     assert not co.paths.product_root.exists()
