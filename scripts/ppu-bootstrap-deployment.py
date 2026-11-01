@@ -371,8 +371,9 @@ class DeploymentCoordinator:
                 source_commit=request.source_commit,
                 target_profile=request.target_profile,
             )
-            if not isinstance(bundle, contract.VerifiedBundle):
-                raise contract.UnifiedDeploymentError("BUNDLE_V2_REQUIRED")
+            if (not isinstance(bundle, contract.VerifiedBundle)
+                    or bundle.schema != contract.BUNDLE_SCHEMA):
+                raise contract.UnifiedDeploymentError("BUNDLE_V3_REQUIRED")
             authority = contract.evaluate_host_only_bundle_authority(
                 bundle, trusted_policy=trusted_policy, now_epoch_s=now_epoch_s,
             )
