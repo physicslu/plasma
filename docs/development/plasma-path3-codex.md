@@ -32,10 +32,4 @@ Codex may prepare branch/PR under approved scope; ChatGPT independently reviews 
 
 Read [AGENTS.md](../../AGENTS.md) for two-Gate policy, trusted source, Git, CI and safety; read [Embedded](plasma-embedded.md) for credentials, Root Guard and recovery. Neither grants additional hardware authority.
 
-## Shared hardware safety and recovery (normative)
-
-## 1B. Shared hardware access and recovery safety (normative)
-
-Hardware access, root operations, credential handling, physical recovery, and truthful HIL evidence are subject to the owner's approved Gate 1 scope and actual execution permissions. Never disclose credentials or infer hardware success from host-only tests. These safeguards apply across all domains and Path 2/3. The detailed Z2 SSH/sudo credential source and recovery procedure are owned by [plasma-embedded.md](plasma-embedded.md); every executor touching Z2 must load that contract, regardless of primary domain. Gate 2 remains the only merge authorization.
-
-
+Ordinary Path 3 explicitly pins `--sandbox workspace-write`.
