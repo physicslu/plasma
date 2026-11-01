@@ -65,6 +65,65 @@ def validate_headings_and_links(markdown: list[Path]) -> list[str]:
     return errors
 
 
+
+def github_anchor(heading: str) -> str:
+    """Approximate GitHub heading slugs for ordinary Markdown headings."""
+    heading = re.sub(r"\\s+#+\\s*$", "", heading).strip().lower()
+    heading = re.sub(r"<[^>]+>", "", heading)
+    heading = re.sub(r"[^\\w\\- ]", "", heading, flags=re.UNICODE)
+    return re.sub(r"\\s+", "-", heading)
+
+
+def validate_core_contract_anchors() -> list[str]:
+    """Guard local Markdown fragments in the normative engineering contracts."""
+    core = [
+        ROOT / "AGENTS.md",
+        *(ROOT / "docs/development" / name for name in (
+            "plasma-development-common.md", "plasma-fpga.md",
+            "plasma-embedded.md", "plasma-manager.md", "plasma-web.md",
+            "plasma-path2-cli.md", "plasma-path3-codex.md",
+        )),
+    ]
+    errors: list[str] = []
+    for source in core:
+        text = source.read_text(encoding="utf-8")
+        for match in LINK.finditer(text):
+            destination = link_destination(match.group(1))
+            if "#" not in destination or destination.startswith(("http://", "https://")):
+                continue
+            target, fragment = destination.split("#", 1)
+            if not fragment:
+                continue
+            target_path = (source.parent / target).resolve() if target else source
+            if not target_path.is_file() or target_path.suffix.lower() != ".md":
+                continue
+            anchors: set[str] = set()
+            duplicates: dict[str, int] = {}
+            for line in target_path.read_text(encoding="utf-8").splitlines():
+                heading = re.match(r"^#{1,6}\\s+(.+)$", line)
+                if heading:
+                    slug = github_anchor(heading.group(1))
+                    count = duplicates.get(slug, 0)
+                    duplicates[slug] = count + 1
+                    anchors.add(slug if count == 0 else f"{slug}-{count}")
+            if fragment not in anchors:
+                errors.append(
+                    f"{source.relative_to(ROOT)}: missing Markdown anchor: {destination}"
+                )
+    return errors
+
+
+def validate_common_gate_ownership() -> list[str]:
+    """Global approval policy belongs in AGENTS.md, not the Common contract."""
+    common = (ROOT / "docs/development/plasma-development-common.md").read_text(encoding="utf-8")
+    errors: list[str] = []
+    if "The operating model has **exactly two user approval gate types**" in common:
+        errors.append("Common contract duplicates the global Gate policy")
+    if "Gate approvals and execution authorization are governed exclusively by" not in common:
+        errors.append("Common contract must delegate Gate ownership to AGENTS.md")
+    return errors
+
+
 def validate_index_coverage() -> list[str]:
     index = DOC_INDEX.read_text(encoding="utf-8")
     linked = {
@@ -186,6 +245,8 @@ def main() -> int:
     markdown = repository_markdown()
     errors = [
         *validate_headings_and_links(markdown),
+        *validate_core_contract_anchors(),
+        *validate_common_gate_ownership(),
         *validate_index_coverage(),
         *validate_contract_facts(markdown),
     ]
