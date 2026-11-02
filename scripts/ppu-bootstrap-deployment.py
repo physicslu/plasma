@@ -311,18 +311,6 @@ class DeploymentCoordinator:
                 raise DeploymentError(f"engineering verification failed: {exc}") from exc
             self.journal.write(record, "verified", artifact_sha256=request.artifact_sha256)
             try:
-                if install_only:
-                    self.journal.write(record, "installed")
-                    return {
-                        "result": "PASS", "transaction": asdict(record),
-                        "operation": "install_only", "host_only": True,
-                        "release_id": release_id,
-                        "package_order": resolution["package_order"],
-                        "active_pointer_unchanged": True,
-                        "runtime_activation_executed": False,
-                        "install_qualified": False,
-                        "not_claimed": ["real Z2 install", "FPGA load", "DUT operation"],
-                    }
                 self.journal.write(record, "activating")
                 evidence = install(verified, paths=self._installer_paths())
                 if not isinstance(evidence, Mapping) or evidence.get("result") != "PASS":
@@ -602,6 +590,18 @@ class DeploymentCoordinator:
                 self.journal.write(record, "staged")
                 if inject_failure == "after_stage":
                     raise DeploymentError("HOST_ONLY_INJECTED_STAGE_FAILURE")
+                if install_only:
+                    self.journal.write(record, "installed")
+                    return {
+                        "result": "PASS", "transaction": asdict(record),
+                        "operation": "install_only", "host_only": True,
+                        "release_id": release_id,
+                        "package_order": resolution["package_order"],
+                        "active_pointer_unchanged": True,
+                        "runtime_activation_executed": False,
+                        "install_qualified": False,
+                        "not_claimed": ["real Z2 install", "FPGA load", "DUT operation"],
+                    }
                 self.journal.write(record, "activating")
                 receipt = json.dumps({
                     "name": package.name, "kind": package.kind, "release_id": release_id,
