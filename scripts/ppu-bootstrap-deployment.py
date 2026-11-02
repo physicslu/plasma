@@ -537,6 +537,15 @@ class DeploymentCoordinator:
                             or result.get("fpga") != "NOT_RUN"):
                         raise DeploymentError("ASSET_SET_ACTIVATION_RECEIPT_INVALID")
             except Exception as exc:
+                if record.state == "verified":
+                    # Runtime refused the exclusive quiescence lease BEFORE
+                    # any Active Set write: safe to retry after Jobs finish.
+                    self.journal.write(
+                        record, "verify_failed",
+                        error_code="asset_set_quiescence_denied",
+                        error_message=type(exc).__name__,
+                    )
+                    raise DeploymentError("ASSET_SET_QUIESCE_DENIED") from exc
                 self.journal.write(
                     record, "recovery_required",
                     error_code="asset_set_activation_outcome_uncertain",
