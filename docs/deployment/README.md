@@ -2,7 +2,7 @@
 
 **Canonical Package naming:** [Bundle → Packages → Files](../architecture/ppu-canonical-bundle-packages.md). Bundle v3 (`packages`, `payload/packages`) is the only accepted wire format; Bundle v2 `components` and Package v1 are retired.
 
-**Start here for PPU deployment:** [PPU Deployment — Start Here](ppu-deployment-start-here.md) explains the Factory Bootstrap, Console Runtime deployment, `plasmactl z2-ps`, Bundle v3 assets and `ppu-deploy` routes and the provisioning order.
+**Start here for PPU deployment:** [PPU Deployment — Start Here](ppu-deployment-start-here.md) defines the two PPU deployment routes — **A. Product deployment** (Console → Bootstrap `POST /v1/deployments`, one Coordinator; Factory Bootstrap is its prerequisite, `plasmactl z2-ps` its internal executor, Bundle v3 its asset payload format) and **B. Engineering deployment** (`ppu-deploy` over SSH, development only) — and the provisioning order.
 
 `scripts/plasmactl` is the profile-aware operator entry point for integration-host, local Control Station, SWPC Z2-like surrogate, and Real Z2 PS-only deployment roles. Profile-specific backends preserve separate ownership and qualification boundaries; a common CLI does not make those roles interchangeable.
 
@@ -12,10 +12,10 @@
 - **Current** — [Product Release Format v1](product-release-format.md): canonical product version metadata, role/platform artifact matrix, `release.json`, detached archive SHA-256, internal `SHA256SUMS`, safe verification, and clean-extraction acceptance.
 - **Current** — [Control Station Runtime Packaging](control-station-runtime-packaging.md): source-tree-independent Vinext standalone Console/BFF, Manager Python zipapp, Control Station release orchestration, and macOS/Linux/Windows clean-runtime acceptance.
 - **Z2 PS Phase 1** — [PPU Runtime Packaging](ppu-runtime-packaging.md): source-tree-independent PPU Python zipapp, canonical `linux-armv7l` PPU release, fail-closed PS-only configuration, systemd topology, Manager enrollment, and Managed PS Loopback acceptance boundary.
-- **PPU deployment start page** — [PPU Deployment — Start Here](ppu-deployment-start-here.md): how the PPU deployment routes relate and the provisioning order.
+- **PPU deployment start page** — [PPU Deployment — Start Here](ppu-deployment-start-here.md): the two PPU deployment routes (product / engineering) and the provisioning order.
 - **PPU Bootstrap** — [PPU Bootstrap Factory Provisioning and Z2 HIL](ppu-bootstrap-factory-and-hil.md): factory/recovery Bootstrap install, Console first install / upgrade path, rollback and physical Z2 evidence.
 - **Bundle v3 assets** — [Generic Asset Set B3](ppu-bundle-v3-generic-assets-gate1.md), [Single Active Asset Set](ppu-single-active-asset-set-gate1.md), [FPGA Image Asset Handoff](ppu-fpga-asset-handoff-gate1.md): Bundle v3 upload/admission/install staging, Asset Set identity and read-only FPGA handoff (host-only; no activation or FPGA load). Historical PR #1241 smoke evidence: [Bundle v3 B3 smoke Path 2](ppu-bundle-v3-b3-path2.md).
-- **Single deployment entry design** — [PPU single deployment entry](../architecture/ppu-unified-deployment-gate1.md): one installation endpoint and one Coordinator transaction.
+- **Single deployment entry design** — [PPU single deployment entry](../architecture/ppu-unified-deployment-gate1.md): design record of Route A (one installation endpoint and one Coordinator transaction); not a separate route.
 - **FPGA image admission** — [Z2 six necessary checks](z2-minimal-six-check-admission.md): staging vs PL activation vs MMIO/SWD admission checks.
 - **ARMv7 runtime lab** — [PPU ARMv7 Runtime Lab](ppu-armv7-runtime-lab.md).
 - **QEMU Z2-like demo** — [SWPC z2like-demo QEMU ARMv7 Backend](z2like-demo-qemu.md).

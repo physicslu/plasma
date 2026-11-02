@@ -123,19 +123,19 @@
 
 ## Deployment
 
-- **Current** — [PPU Deployment — Start Here](deployment/ppu-deployment-start-here.md)：PPU 各佈署路線（Factory Bootstrap、Console Runtime、`plasmactl z2-ps`、Bundle v3、`ppu-deploy`）的定位與佈署順序。
+- **Current** — [PPU Deployment — Start Here](deployment/ppu-deployment-start-here.md)：PPU 只有兩條部署路線——**A. 正式部署**（Console → Bootstrap `POST /v1/deployments`，單一 Coordinator；Factory Bootstrap 為前置步驟、`plasmactl z2-ps` 為內部執行器、Bundle v3 為內容格式）與 **B. 工程部署**（SWPC `ppu-deploy` over SSH，僅供開發）——以及部署順序。
 - **Current** · `Host-only` · `PR #1245` — [Generic Bundle v3 B3 — one inert Asset Set staging path](deployment/ppu-bundle-v3-generic-assets-gate1.md)
 - **Current** · `Host-only` · `PR #1246` — [Single Active Asset Set P1 — Console SHA reconciliation & guarded Host-only activation](deployment/ppu-single-active-asset-set-gate1.md)
 - **Current** · `Host-only` · `PR #1248/#1249` — [FPGA Asset Handoff P2 — exact Active Image/Profile selection, no hardware load](deployment/ppu-fpga-asset-handoff-gate1.md): removes Smoke-only device allowlist; a staged digest is **not** an Active Set or FPGA load.
 - **Current** · `Host-only` · `PR #1217` — [Z2 FPGA six-check admission](deployment/z2-minimal-six-check-admission.md)：FPGA Manager 載入與 MMIO admission 分時檢查；真實 Owner、ABI 與 HIL 尚未驗收。
-- **Reference** · `Host-only` · `PR #1209` — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
+- **Reference** · `Host-only` · `PR #1209` — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：正式部署路線（Route A）的設計紀錄，不是獨立部署路線；唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
 - **Current** — [Persistent Integration Host Qualification](architecture/persistent-integration-host-qualification.md)：定義 L4 main-only post-merge qualification、self-hosted/rootful-Docker threat model、fail-closed preflight、runner enrollment boundary，以及為何目前不能把長期 runner 當成 arbitrary-PR execution worker。
 - **Current** — [Persistent Integration Runner Enrollment](development/persistent-integration-runner-enrollment.md)：定義 L4 host readiness、GitHub runner enrollment/restriction、首次 qualification、staleness、upgrade、revoke 與 recovery lifecycle；不把 registration token 或 host provisioning 寫入 repository automation。
 - **Current** — [Integration Host Deployment Guide](development/swpc-deployment.md)
 - **Current** — [Secure Gateway Deployment](development/secure-gateway-deployment.md)
 - **Current** — [Fleet Demo Deployment](development/fleet-demo.md)
 - **Current** — [Mock Continuous Delivery](development/mock-cd.md)
-- **Current** · `engineering SSH route` · `PR #1207` — [通用 PPU 工程模組部署 `ppu-deploy`](development/ppu-deploy-engineering-modules.md)：Z2 PS WordPort／OpenOCD Python 整合與 SWPC A/B Runner 由同一來源版本協調部署，包含 SHA、互斥、啟用驗證與回滾；目前只有 Host-only 測試，不代表 GitHub PR 已合併或 Z2／SWPC 已部署。
+- **Current** · `engineering SSH route` · `PR #1207` — [通用 PPU 工程模組部署 `ppu-deploy`](development/ppu-deploy-engineering-modules.md)：工程部署路線（Route B），不是產品安裝路徑；Z2 PS WordPort／OpenOCD Python 整合與 SWPC A/B Runner 由同一來源版本協調部署，包含 SHA、互斥、啟用驗證與回滾；目前只有 Host-only 測試，不代表 GitHub PR 已合併或 Z2／SWPC 已部署。
 - **Current** — [Deployment Index](deployment/README.md)
 - **Current** — [`plasmactl` Deployment Profiles](deployment/plasmactl-deployment-profiles.md)：定義統一 operator CLI、`integration`／`local-control-station`／`swpc-z2like` profile ownership、activation rollback 與 qualification boundary。
 - **Current** — [Deployment Port / Profile Matrix](deployment/port-profile-matrix.md)：定義 production、SWPC engineering 與 `z2like-demo` scenario 的 profile-specific port ownership、exposure 與安全邊界。

@@ -4,26 +4,35 @@ Entry page for how a PYNQ-Z2 PPU is provisioned and updated today. It links the 
 
 **Admission ≠ installation ≠ activation.** Accepting an archive (admission) does not install it; installing/staging it does not make it active; activating software does not load the FPGA. Each step has its own evidence.
 
-## The routes and their roles
+## Two deployment routes
 
-| Route | Role today | Authoritative document |
+There are exactly two PPU deployment routes. Everything else listed below is a prerequisite, an internal step, a payload format or a design record of one of them — not a separate route.
+
+| Route | Purpose | Entry | Transaction | Authoritative document |
+| --- | --- | --- | --- | --- |
+| **A. Product deployment** | Install / upgrade / roll back the PPU Runtime + OpenOCD and deliver Bundle v3 Asset Sets. | Console (EMode → PPU Sites → Runtime Deployment) → Console BFF → Plasma Manager → Bootstrap `POST /v1/deployments` on `:18081` | One Bootstrap Deployment Coordinator: one `deployment.lock`, one `deployment.json` journal | [Bootstrap factory and HIL](ppu-bootstrap-factory-and-hil.md#console-first-install--upgrade-path) |
+| **B. Engineering deployment** | Development-only installation of engineering modules (for example WordPort / OpenOCD Python integration, SWPC A/B Runner). Not a product install path and carries no product qualification. | SWPC `scripts/ppu-deploy` over SSH | Its own SSH transaction (SHA pinning, mutual exclusion, verify, rollback) | [ppu-deploy](../development/ppu-deploy-engineering-modules.md) |
+
+### What sits inside Route A
+
+| Item | Role within Route A | Authoritative document |
 | --- | --- | --- |
-| **Factory Bootstrap** (`plasma-bootstrap.service`, `:18081` on the real Z2) | One-time local/SSH install of the factory/recovery service that later accepts uploads and runs deployment transactions. Independent of the Product Runtime. | [Bootstrap factory and HIL](ppu-bootstrap-factory-and-hil.md) |
-| **Console Runtime deployment** | Normal path for installing or upgrading the PPU Runtime + OpenOCD: Browser → Console BFF → Plasma Manager → Bootstrap `:18081` → kit-local `plasmactl z2-ps` → Z2 installer → Runtime `:18080`. | [Bootstrap factory and HIL](ppu-bootstrap-factory-and-hil.md#console-first-install--upgrade-path) |
-| **`plasmactl install z2-ps`** | The release-kit installer itself. Bootstrap invokes it kit-locally; running it by hand is the manual clean-install / recovery form. | [Z2 PS release kit](z2-ps-installer.md), [plasmactl profiles](plasmactl-deployment-profiles.md) |
-| **Bundle v3 assets** | Delivery of Asset Sets (Python, native C, FPGA BIN/HWH + Manifest, Programming Profiles, firmware) through the same Bootstrap API and single Coordinator. Host-only staging; activation and FPGA loading are not implemented. | [Bundle v3 contract](../architecture/ppu-canonical-bundle-packages.md), [Generic Asset Set B3](ppu-bundle-v3-generic-assets-gate1.md), [Single Active Asset Set](ppu-single-active-asset-set-gate1.md), [FPGA Image Asset Handoff](ppu-fpga-asset-handoff-gate1.md) |
-| **`ppu-deploy` engineering modules** | Separate SSH transaction for engineering modules (for example WordPort). Development use, not the product install path. | [ppu-deploy](../development/ppu-deploy-engineering-modules.md) |
-| **Single deployment entry (design)** | The convergence decision: one product installation endpoint (`POST /v1/deployments`) and one Coordinator lock/journal. Bundle v3 is the realization of that direction. | [Single deployment entry](../architecture/ppu-unified-deployment-gate1.md) |
+| **Factory Bootstrap** (`plasma-bootstrap.service`) | **Step 0 prerequisite**, not a route: one-time local/SSH installation of the factory/recovery service that later receives every Route A deployment. Independent of the Product Runtime. | [Bootstrap factory and HIL](ppu-bootstrap-factory-and-hil.md#factory-bootstrap-installation) |
+| **`plasmactl install z2-ps`** | **Internal executor**: Bootstrap verifies the release kit and invokes the kit-local `plasmactl z2-ps`. Running it by hand is the manual clean-install / recovery form of the *same* transaction — it routes through the same `ppu-bootstrap-deployment.py` Coordinator and journal. | [Z2 PS release kit](z2-ps-installer.md), [Shared CLI / Console transaction model](ppu-bootstrap-factory-and-hil.md#shared-cli--console-transaction-model), [plasmactl profiles](plasmactl-deployment-profiles.md) |
+| **Bundle v3 assets (B1–B3)** | **Payload format**, not a route: Asset Sets (Python, native C, FPGA BIN/HWH + Manifest, Programming Profiles, firmware) are uploaded and admitted through the same `POST /v1/deployments` and Coordinator. Host-only staging; activation and FPGA loading are not implemented. | [Bundle v3 contract](../architecture/ppu-canonical-bundle-packages.md), [Generic Asset Set B3](ppu-bundle-v3-generic-assets-gate1.md), [Single Active Asset Set](ppu-single-active-asset-set-gate1.md), [FPGA Image Asset Handoff](ppu-fpga-asset-handoff-gate1.md) |
+| **Single deployment entry** | **Design record** of Route A: the decision for one installation endpoint and one Coordinator lock/journal. Reference only; it is realized by Route A. | [Single deployment entry](../architecture/ppu-unified-deployment-gate1.md) |
+
+The Runtime release kit (`plasma-z2-ps-kit-*.tar.gz`) and Bundle v3 are currently two payload formats accepted by the same Route A endpoint. Unifying them into one format is a separate decision and is not part of this page.
 
 ## Provisioning order for a PPU
 
-1. **Factory Bootstrap.** Install or refresh the factory Bootstrap once from an accepted `main` build (`ppu-bootstrap-factory-bundle` CI artifact). See *Factory Bootstrap installation* and *Single-Z2 R&D refresh* in [Bootstrap factory and HIL](ppu-bootstrap-factory-and-hil.md).
+1. **Factory Bootstrap (Route A step 0).** Install or refresh the factory Bootstrap once from an accepted `main` build (`ppu-bootstrap-factory-bundle` CI artifact). See *Factory Bootstrap installation* and *Single-Z2 R&D refresh* in [Bootstrap factory and HIL](ppu-bootstrap-factory-and-hil.md).
 2. **Device enrollment.** Verify the board/FPGA identity yourself, then provision the root-owned `/etc/plasma/ppu-package-target.json` (mode `0600`: `platform`, `board`, `fpga_part`) and the device pairing credential. See [Target platform identity](../architecture/ppu-target-platform-identity.md).
 3. **Manager registry.** Add the PPU connection (Gateway endpoint `:18080`) to the Manager registry; Manager derives the Bootstrap endpoint on `:18081`. A registry entry is not programming registration.
-4. **Runtime deployment.** Install/upgrade the PPU Runtime + OpenOCD from the Console (EMode → PPU Sites → Runtime Deployment). Rollback and reboot persistence are evidenced on the physical Z2 per the Bootstrap document.
-5. **Assets (Bundle v3).** Deliver Asset Sets: Bundle stage B1 upload/commit → B2 admission → B3 install/verify into staging (see [glossary](../glossary.md#b1b2b3)). B4 activation is not implemented.
-6. **FPGA image.** Today FPGA images are loaded only through the existing protected Root Entry procedures with the [six necessary checks](z2-minimal-six-check-admission.md). The decided target is programming-flow loading by the PS FPGA Hardware Manager ([ADR-0004](../adr/0004-fpga-image-lifecycle-and-job-driven-loading.md)), not yet implemented.
-7. **Engineering modules (optional, development).** Use `ppu-deploy` over SSH when an engineering module is needed.
+4. **Runtime deployment (Route A).** Install/upgrade the PPU Runtime + OpenOCD from the Console (EMode → PPU Sites → Runtime Deployment). Rollback and reboot persistence are evidenced on the physical Z2 per the Bootstrap document.
+5. **Assets (Route A, Bundle v3).** Deliver Asset Sets: Bundle stage B1 upload/commit → B2 admission → B3 install/verify into staging (see [glossary](../glossary.md#b1b2b3)). B4 activation is not implemented.
+6. **FPGA image.** Not a deployment step. Today FPGA images are loaded only through the existing protected Root Entry procedures with the [six necessary checks](z2-minimal-six-check-admission.md). The decided target is programming-flow loading by the PS FPGA Hardware Manager ([ADR-0004](../adr/0004-fpga-image-lifecycle-and-job-driven-loading.md)), not yet implemented.
+7. **Engineering modules (Route B, optional, development).** Use `ppu-deploy` over SSH when an engineering module is needed. `ppu-deploy api-status` only reads Route A Bootstrap status; it does not install through Route A.
 
 ## Ports
 
@@ -31,4 +40,4 @@ Real `z2-ps`: `:18080` Plasma Product Runtime Gateway, `:18081` independent Boot
 
 ## Not qualified
 
-Bootstrap HTTP is qualified only on a controlled private commissioning link; transport confidentiality and publisher authenticity are not qualified (SHA-256 proves integrity only). FPGA/PL behaviour, Site electrical behaviour, target power and real IC programming are not qualified by any deployment step.
+Bootstrap HTTP is qualified only on a controlled private commissioning link; transport confidentiality and publisher authenticity are not qualified (SHA-256 proves integrity only). FPGA/PL behaviour, Site electrical behaviour, target power and real IC programming are not qualified by any deployment route.

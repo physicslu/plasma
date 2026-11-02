@@ -1,6 +1,6 @@
 # PYNQ-Z2 PS Release Kit and Managed Acceptance
 
-> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) defines the two PPU deployment routes; the `z2-ps` release-kit installer is the internal executor of Route A (product deployment), not a separate route.
 
 Status: **PS-only release-kit implementation with P3 controlled Site Desired runtime activation wiring; every deployment candidate still requires real Z2 qualification**
 

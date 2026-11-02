@@ -1,6 +1,6 @@
 # PPU Bootstrap Factory Provisioning and Z2 HIL
 
-> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) defines the two PPU deployment routes; this document covers Route A (product deployment) and its Factory Bootstrap prerequisite.
 
 Status: physical PYNQ-Z2 PS first install, Runtime verification, reboot persistence, normal upgrade, controlled activation-failure rollback and reboot-after-rollback are evidenced. FPGA/PL, Site electrical behavior, target power, real IC programming and physical multi-Site concurrency remain separate qualification domains.
 

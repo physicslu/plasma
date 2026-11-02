@@ -131,7 +131,7 @@ Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration�
 - Control Station / Manager architecture：[`docs/architecture/configuration-architecture.md`](docs/architecture/configuration-architecture.md)
 - Manager contract：[`docs/development/plasma-manager.md`](docs/development/plasma-manager.md)
 - 開發治理入口：[`AGENTS.md`](AGENTS.md)、[術語表](docs/glossary.md)
-- PPU 佈署入口：[`docs/deployment/ppu-deployment-start-here.md`](docs/deployment/ppu-deployment-start-here.md)
+- PPU 部署入口（正式部署／工程部署兩條路線）：[`docs/deployment/ppu-deployment-start-here.md`](docs/deployment/ppu-deployment-start-here.md)
 - Protocol v3.3：[`software/python/docs/protocol.md`](software/python/docs/protocol.md)
 - Python software：[`software/python/README.md`](software/python/README.md)
 - Control Station Web：[`software/web/README.md`](software/web/README.md)

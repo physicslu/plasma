@@ -1,6 +1,6 @@
 # PPU single deployment entry — Gate 1 Path 1 (Host-only integration baseline)
 
-> **Start here:** [PPU deployment start page](../deployment/ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+> **Start here:** [PPU deployment start page](../deployment/ppu-deployment-start-here.md) defines the two PPU deployment routes; this document is the design record of Route A (product deployment), not a separate route.
 
 > **Status:** owner-approved 2026-10-29, including revised Gate 1 Path 1 for PS Runtime API/Coordinator correlation; merged in main (PR #1209), **NOT deployed**. No SWPC/Z2 operation or Linux permission change. Original baseline `main e338083564c30dc6bdc24009f7b62a3984fb7023` has been reconciled with merged #1208 at `main 1fb0c4b6c95e9da8f746fc3571a160b5a8bf6390`. The Host-only Master role contract is not a deployed Principal/Root authorization boundary.
 
