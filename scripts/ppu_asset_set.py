@@ -12,9 +12,11 @@ import hashlib
 import json
 import os
 import re
+import socket
 import stat
 import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -163,6 +165,56 @@ def read_active(product_root: Path) -> dict[str, Any]:
         "ready": False, "fpga": "NOT_VERIFIED",
         "profile": "NOT_VERIFIED",
     }
+
+
+@contextmanager
+def held_runtime_asset_lease(
+    socket_path: Path = Path("/run/plasma-server/control.sock"),
+):
+    """Borrow the existing Runtime's exclusive Job-admission gate.
+
+    The Runtime owns the gate; holding the Unix stream keeps it active.
+    Local Bootstrap must hold this context for the *entire* atomic switch.
+    A missing/untrusted socket or busy Sites refuse the switch. This does
+    not prove separate FPGA/PL hardware quiescence or IC readiness.
+    """
+    if (not isinstance(socket_path, Path) or not socket_path.is_absolute()
+            or socket_path.is_symlink() or socket_path.parent.is_symlink()):
+        raise AssetSetError("ASSET_SET_CONTROL_SOCKET_UNTRUSTED")
+    try:
+        node = socket_path.stat()
+        directory = socket_path.parent.stat()
+    except OSError as exc:
+        raise AssetSetError("ASSET_SET_CONTROL_SOCKET_UNAVAILABLE") from exc
+    if (not stat.S_ISSOCK(node.st_mode) or node.st_mode & 0o077
+            or not stat.S_ISDIR(directory.st_mode) or directory.st_mode & 0o022
+            or node.st_uid != directory.st_uid):
+        raise AssetSetError("ASSET_SET_CONTROL_SOCKET_UNTRUSTED")
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as control:
+        control.settimeout(5)
+        try:
+            control.connect(str(socket_path))
+            control.sendall(b'{"operation":"hold_asset_activation"}\n')
+            buffer = bytearray()
+            while b"\n" not in buffer:
+                chunk = control.recv(4096)
+                if not chunk or len(buffer) + len(chunk) > 8192:
+                    raise AssetSetError("ASSET_SET_QUIESCE_REPLY_INVALID")
+                buffer.extend(chunk)
+            record = json.loads(bytes(buffer).split(b"\n", 1)[0])
+        except (OSError, ValueError, UnicodeDecodeError) as exc:
+            raise AssetSetError("ASSET_SET_QUIESCE_TRANSPORT_UNAVAILABLE") from exc
+        if (not isinstance(record, dict) or record.get("ok") is not True
+                or not isinstance(record.get("result"), dict)
+                or record["result"].get("lease_kind") != "connection_held"
+                or record["result"].get("active_job_count") != 0
+                or type(record["result"].get("ppu_id")) is not str
+                or not record["result"]["ppu_id"]):
+            raise AssetSetError("ASSET_SET_QUIESCE_NOT_GRANTED")
+        # Connection must stay open until the final durable fsync. The
+        # Runtime releases the gate in its socket handler's finally block.
+        control.settimeout(None)
+        yield record["result"]
 
 
 def activate_verified(
