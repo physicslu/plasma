@@ -194,6 +194,17 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
                               "install_only": True})
     paths.bundle_install_policy.write_text(json.dumps(source_policy))
 
+    # B3 must not trust a past B2 receipt after the independent Master
+    # authorization file was revoked, even if committed ZIP bytes match.
+    master_grants = json.loads(paths.bundle_authority_policy.read_text())
+    withdrawn = json.loads(json.dumps(master_grants))
+    withdrawn["authorizations"][0]["archive_sha256"] = "f" * 64
+    paths.bundle_authority_policy.write_text(json.dumps(withdrawn))
+    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MASTER_AUTHORITY_DENIED"):
+        srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
+                              "install_only": True})
+    paths.bundle_authority_policy.write_text(json.dumps(master_grants))
+
     srv.start_deployment({"kind": "bundle", "upload_id": upload_id, "install_only": True})
     assert srv.deployment_thread is not None
     srv.deployment_thread.join(timeout=10)
