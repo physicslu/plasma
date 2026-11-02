@@ -1,5 +1,7 @@
 # PLASMA Native C WordPort v0.2 — Path 2 and Z2 direct Gate 1
 
+> **Historical:** superseded by `plasma_wordport_program.py` (see [image-agnostic WordPort Path 2](image-agnostic-wordport-path2.md)); do not use this version-pinned entry.
+
 This is a minimal adapter for the *already merged* PR #1199, not another
 Bridge, Dispatcher or hardware authority. The new reviewed Python entrypoint is
 scripts/plasma_native_wordport_v02.py; both routes use the SAME source bytes.
