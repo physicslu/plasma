@@ -61,7 +61,7 @@ def test_privileged_source_exact_closure_verifies_without_execute(tmp_path, monk
     ("unlisted_py", "PRIVILEGED_CODE_EXTRA_FILE_DENIED"),
     ("unlisted_pyc", "PRIVILEGED_CODE_EXTRA_FILE_DENIED"),
     ("world_writable", "PRIVILEGED_CODE_OWNERSHIP_DENIED"),
-    ("manifest_missing", "FileNotFoundError"),
+    ("manifest_missing", "PRIVILEGED_CODE_MANIFEST_MISSING"),
     ("manifest_extra", "PRIVILEGED_CODE_MANIFEST_INVALID"),
     ("symlink_subdir", "PRIVILEGED_CODE_OWNERSHIP_DENIED"),
 ])
@@ -98,3 +98,45 @@ def test_privileged_source_cli_denies_parameters_and_unprivileged(monkeypatch, c
     monkeypatch.setattr(source.os, "geteuid", lambda: 1000)
     assert source.main([]) == 2
     assert "PRIVILEGED_CODE_ROOT_REQUIRED" in capsys.readouterr().err
+
+
+def _installer_fixture(tmp_path, monkeypatch):
+    factory = tmp_path / "factory"
+    factory.mkdir()
+    files = list(source.CODE_FILES) + ["ppu_privileged_source.py"]
+    for rel in files:
+        src = ROOT / (("scripts/" + rel) if rel == "ppu_privileged_source.py" else rel)
+        dst = factory / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        dst.chmod(0o644)
+    spec = importlib.util.spec_from_file_location(
+        "ppu_privileged_source_install_test",
+        ROOT / "scripts/ppu-privileged-source-install.py",
+    )
+    assert spec and spec.loader
+    installer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(installer)
+    monkeypatch.setattr(installer, "_verifier", lambda _: source)
+    monkeypatch.setattr(source, "_parent_chain",
+                        lambda path, uid: source._trusted(path, uid=uid, directory=True))
+    return installer, factory, tmp_path / "privileged/fpga-root"
+
+
+def test_privileged_source_explicit_provision_no_hardware(tmp_path, monkeypatch):
+    installer, factory, destination = _installer_fixture(tmp_path, monkeypatch)
+    outcome = installer.provision(factory, destination, _test_uid=os.getuid())
+    assert outcome["result"] == "PROVISIONED_NOT_EXECUTED"
+    assert check(destination)["status"] == "VERIFIED_NOT_EXECUTED"
+    assert outcome["fpga_loaded"] is False
+    with pytest.raises(installer.ProvisionDenied, match="ALREADY_INSTALLED"):
+        installer.provision(factory, destination, _test_uid=os.getuid())
+
+
+def test_privileged_source_provision_denies_untrusted_input(tmp_path, monkeypatch):
+    installer, factory, destination = _installer_fixture(tmp_path, monkeypatch)
+    (factory / "pl/hil/fpga_image_root.py").unlink()
+    (factory / "pl/hil/fpga_image_root.py").symlink_to(ROOT / "pl/hil/fpga_image_root.py")
+    with pytest.raises(installer.ProvisionDenied, match="SYMLINK_DENIED"):
+        installer.provision(factory, destination, _test_uid=os.getuid())
+    assert not destination.exists()

@@ -60,7 +60,10 @@ def verify_source(root: Path = CODE_ROOT, *, expected_uid: int = 0) -> dict:
     """
     _parent_chain(root, expected_uid)
     manifest_file = root / MANIFEST
-    _trusted(manifest_file, uid=expected_uid, directory=False)
+    try:
+        _trusted(manifest_file, uid=expected_uid, directory=False)
+    except FileNotFoundError as exc:
+        raise PrivilegedSourceDenied("PRIVILEGED_CODE_MANIFEST_MISSING") from exc
     try:
         raw = manifest_file.read_bytes()
         require(len(raw) <= 16384, "PRIVILEGED_CODE_MANIFEST_INVALID")
