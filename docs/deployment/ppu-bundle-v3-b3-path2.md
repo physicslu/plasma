@@ -61,6 +61,42 @@ trusted authorization and archive evidence.
   or source/ZIP hashes do not match the approved candidate, stop and report
   the exact version/deployment blocker. Do not silently repin or proceed.
 
+## Incremental B3 capability refresh (without Factory requalification)
+
+Real Z2 Bundle v3 B1/B2 already passed on SWPC Runner
+[Run #41375651779](https://github.com/physicslu/plasma/actions/runs/41375651779)
+with `qualification=B1_B2_V3_PASS_B3_B4_NOT_RUN`. The first B3 attempt
+[Run #41375559026](https://github.com/physicslu/plasma/actions/runs/41375559026)
+stopped **before B1** with `B3_FACTORY_INSTALLER_NOT_INSTALLED`,
+`exit_code=69`, `b3=NOT_RUN`. This is a missing software capability,
+not a Factory environment or B1/B2 failure.
+
+Use **the existing Factory Bootstrap Installer** to install only the new
+B3 scripts and exact source/SHA policy. The new `--refresh-only` option
+requires an existing installed Bootstrap and preserves its systemd unit,
+state, pairing token, target profile, Runtime and active deployment pointers.
+It does not create a new Bootstrap service or restart the existing one.
+After its verified receipt, the Path 2 operator may restart only
+`plasma-bootstrap.service` once to load the approved software delta,
+then verify `/v1/status` exposes matching
+`bundle_v3_b3_install`, `bundle_v3_b3_source_commit` and
+`bundle_v3_b3_archive_sha256`. This is a controlled *software capability
+refresh*, not requalification or re-enrollment.
+
+The approved Path 2 script is
+`scripts/ppu_path2_b3_factory_refresh.py` (exact owner PR HEAD,
+`--host`, `--device-id`, `--source-sha`). It first verifies Z2 identity,
+existing SSH/Bootstrap enrollment and no running/recovery deployment;
+generates the exact source-bound Bundle ZIP and private policy; uses the
+existing trusted SSH identity to transfer only a SHA256-checked source
+archive to a unique temporary directory; verifies all source hashes on
+the device; calls the **same Installer** with `--refresh-only`; restarts
+only the Bootstrap unit; and checks the resulting trusted capability pin.
+Missing credentials, different device/source, archive mismatch or
+untrusted paths fail closed. It never executes B1/B2/B3, FPGA or DUT by
+itself; keep the subsequent Smoke installation in a separate operator
+step with its own Run/Job/Receipt.
+
 ## Path 2 execution
 
 Use the existing owner Issue #981 Work Order, `execution_path=path2-cli`,
