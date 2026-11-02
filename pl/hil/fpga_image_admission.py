@@ -56,10 +56,37 @@ def check_exact(*, release, passive: dict, uio: dict,
         need(passive.get("proc_conflicts") == [],
              "PROC_RESOURCE_OWNER_CONFLICT")
     if require_mmio:
-        need(type(uio) is dict and uio == release.expected_uio,
-             "BOUND_UIO_EXACT_FACTS_CHANGED")
-        need(passive.get("uio_overlaps") == [release.uio_name],
-             "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
+        owner = release.expected_uio
+        if "platform_node" in owner:
+            observed_owner = {k: v for k, v in owner.items()
+                              if k != "backend"}
+            need(type(uio) is dict and
+                 set(uio) == {"uio", "platform_node", "driver", "maps",
+                              "runtime"} and
+                 {k: uio[k] for k in observed_owner} == observed_owner and
+                 type(uio["uio"]) is str and
+                 re.fullmatch(r"uio[0-9]+", uio["uio"]) is not None,
+                 "BOUND_UIO_OWNER_FACTS_CHANGED")
+            need(passive.get("uio_overlaps") == [uio["uio"]],
+                 "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
+            need(passive.get("platform_overlaps") == [owner["platform_node"]],
+                 "UIO_PLATFORM_OWNER_MISMATCH")
+            if owner.get("backend") == "devmem":
+                # Kernel UIO here supplies *conflict evidence*, never the
+                # SWD register provider. Root opens /dev/mem only after this
+                # exact, source-pinned and process-conflict-free admission.
+                need(release.image_id == "z2-independent-swd-v5-ab79b04e" and
+                     release.axi_base == 0x43C01000 and
+                     release.axi_bytes == 0x2000 and
+                     release.abi_version == 0x00050001 and
+                     release.site_bitmap == 3 and
+                     passive["proc_conflicts"] == [],
+                     "DEVMEM_OWNER_NOT_ADMITTED")
+        else:
+            need(type(uio) is dict and uio == owner,
+                 "BOUND_UIO_EXACT_FACTS_CHANGED")
+            need(passive.get("uio_overlaps") == [release.uio_name],
+                 "OTHER_BOUND_UIO_OR_MAPPING_DENIED")
     else:
         # An ordinal change is irrelevant to Manager load; competing bound
         # mappings of the same physical owner are still a resource conflict.
@@ -86,6 +113,9 @@ def check_exact(*, release, passive: dict, uio: dict,
         "bin_sha256": release.firmware_sha256,
         "recovery_sha256": release.recovery_sha256,
         "current_uio": uio if require_mmio else None,
+        "mmio_backend": ("devmem" if require_mmio and
+                         release.expected_uio.get("backend") == "devmem"
+                         else "uio" if require_mmio else "NOT_RUN"),
         "axi_isolation": "UNPROVEN_ACCEPTED_FOR_SOURCE_BOUND_DEVELOPMENT",
         "production_qualification": False,
         "manual_recovery_on_timeout_or_unknown": True,
@@ -108,20 +138,40 @@ def collect_live(*, root_port: guard.RootZ2TargetPort, release,
                else root_port.current_facts())
     uio = None
     if require_mmio:
-        uio_root = guard.SYS / "class/uio" / release.uio_name
+        owner = release.expected_uio
+        if "platform_node" in owner:
+            matches = []
+            for item in sorted((guard.SYS / "class/uio").glob("uio*")):
+                if not re.fullmatch(r"uio[0-9]+", item.name):
+                    continue
+                try:
+                    node = (item / "device").resolve(strict=True)
+                except (FileNotFoundError, OSError):
+                    continue
+                need(node.parent == (guard.SYS / "bus/platform/devices").resolve(),
+                     "UIO_NOT_PLATFORM_DEVICE")
+                if node.name == owner["platform_node"]:
+                    matches.append(item)
+            need(len(matches) == 1, "UIO_PLATFORM_OWNER_NOT_UNIQUE")
+            uio_root = matches[0]
+        else:
+            uio_root = guard.SYS / "class/uio" / release.uio_name
         device = (uio_root / "device").resolve(strict=True)
         driver = (device / "driver").resolve(strict=True).name
         maps = [[int((p / "addr").read_text().strip(), 0),
                  int((p / "size").read_text().strip(), 0)]
                 for p in sorted((uio_root / "maps").glob("map*"))]
-        irq = [line for line in (guard.PROC / "interrupts").read_text().splitlines()
-               if line.split() and line.split()[-1] == "fabric"]
-        need(len(irq) == 1, "FABRIC_IRQ_TOPOLOGY_CHANGED")
-        counters = [int(x) for x in irq[0].split()[1:3]]
-        need(len(counters) == 2, "FABRIC_IRQ_CPU_COUNT_CHANGED")
         uio = dict(uio=uio_root.name, driver=driver, maps=maps,
-                   runtime=(device / "power/runtime_status").read_text().strip(),
-                   irq_counts=counters)
+                   runtime=(device / "power/runtime_status").read_text().strip())
+        if "platform_node" in owner:
+            uio["platform_node"] = device.name
+        else:
+            irq = [line for line in (guard.PROC / "interrupts").read_text().splitlines()
+                   if line.split() and line.split()[-1] == "fabric"]
+            need(len(irq) == 1, "FABRIC_IRQ_TOPOLOGY_CHANGED")
+            counters = [int(x) for x in irq[0].split()[1:3]]
+            need(len(counters) == 2, "FABRIC_IRQ_CPU_COUNT_CHANGED")
+            uio["irq_counts"] = counters
         need(passive["platform_overlaps"] == [device.name],
              "UIO_PLATFORM_OWNER_MISMATCH")
     report = check_exact(

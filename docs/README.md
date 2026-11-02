@@ -37,6 +37,12 @@
 - **Current / Accepted Policy** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 是 Internal Research Registry、一般 IC Selector 對客戶顯示 L1–L3 並提供 Level Filter、Job Picker 維持 L2/L3，L3 表示至少一組版本化 PLASMA configuration 已 HIL PASS。Active API/runtime 不保留 `phase1_*`／`phase2_*`／`phase3_*` 欄位。
 - **Proposed** — [ADR-0003: Runtime FPGA Driver 與固定映像候選責任邊界](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)：UIO-first Driver 選型候選、單一 PPU FPGA Configuration Owner、Linux 無須 Reboot 的 Bitstream 切換；尚待 Z2 Kernel／UIO／Bridge 證據，不是 Accepted Contract。
 
+- **Accepted / Owner architectural policy, PR #1189 pending merge** — [ADR-0004: 新 FPGA Project 與 Path 2 operator-cli 標準](adr/0004-project-isolated-fpga-build-path2-operator-cli.md)：新 FPGA Image 與 Board target 必須各自擁有獨立、可重現的 Vivado Project；SWPC 正式 Host Build 透過 SHA-pinned Path 2 `operator-cli`；F1-B 專屬 Build Engine 標記 `F1B_BUILD_ENGINE_RETIREMENT_PENDING`，完整驗收及獨立 Gate 2 才真正退休，Build 不是部署。
+
+- **Superseded / Historical** — [ADR-0005: 獨立 SWD IP 與原 SWD Debug Bitbang 提案](adr/0005-independent-swd-ip-guarded-bitbang.md)：已由 ADR-0006 取代，僅供歷史決策追溯。
+- **Accepted / Owner architecture direction / PR #1189 Draft** — [ADR-0006: 專用 SWD Engine 與未來通用 GPIO Bus](adr/0006-independent-swd-engine-and-future-gpio-bus.md)：現在移除 SWD Debug Mode／Bitbang Bridge；SWD 只保留 OFF/NORMAL，未來 GPIO Bus、JTAG、SPI、UART、I²C 分別規劃，未宣稱實作或實機驗收。
+- **Plan / Gate 1 Draft** — [ADR-0007: PPU Image/Reload 與每 Site 並行所有權](adr/0007-ppu-reload-fence-per-site-locking.md)：保留 Root Guard，PPU Fence 共享／獨占及每 Site 獨占鎖；僅完成 Host-only 驗證，不宣稱 Z2 或 8-Site HIL。
+
 ## Operator
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
@@ -109,6 +115,10 @@ Historical PS-only reference: [Linux MMIO Backend v1](development/linux-mmio-bac
 - **Gate 1 / Path 1 / Source audit** — [Z2 Root Guard Rule Necessity Audit](development/z2-root-guard-rule-audit-gate1.md)：逐項核對 Root Guard、Source Pin、UIO／MMIO Owner、/proc 掃描、PPU Reload Fence、Job Lease 與 UNCERTAIN，標明必要保留、維護專用、重複候選及尚未合併的 Draft；本次不刪除受保護程式。
 
 
+
+- **Gate 1 Draft / Host-only / NOT_DEPLOYED** — [SWD NORMAL OpenOCD/ARMv7 Boundary](architecture/swd-normal-openocd-armv7-gate1.md)：新增獨立 Site NORMAL 的交易轉接契約與注入式 32-bit MMIO Window、負向測試；未實作真正 OpenOCD C Adapter／ARMv7 LDR/STR，也沒有新 Vivado／Z2／DUT 驗收。
+
+- **Gate 1 / Clean-sheet dual-Site SWD / source-and-RTL simulation only / NOT_DEPLOYED** — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA Y18/Y19、Site 2 = PMODB W14/Y14，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO、可擴充 8-Site 的新 ABI 候選；目前僅有初步雙 Site RTL core Source，尚無 RTL 模擬 PASS、AXI-Lite/FIFO 整合、Bitstream、OpenOCD Native Adapter 或實機 HIL PASS，舊單 Site Remote Bitbang 保留歷史診斷用途，不因本文件被更改或部署。
 
 - **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
 
@@ -274,6 +284,7 @@ Historical PS-only reference: [Linux MMIO Backend v1](development/linux-mmio-bac
 - **Plan / Accepted Policy** — [SWD-04 Z2 PS/PL HIL Runbook](development/swd04-z2-hil-runbook.md)：以獨立 Preflight、白名單 AXI MMIO、DPIDR、ABORT 與恢復原 PYNQ 系統的 Host-only 安全契約，實機驗證尚未執行。
 - **Host-only / Execution Preparation** — [SWD-04 Offline Execution Checklist](development/swd04-offline-execution-checklist.md)：真實 Artifact、BIN 格式、離線工具包、服務隔離與 HIL／Recovery 操作單；缺少復原檔案時禁止載入。
 - **Host-only software integration** — [SWD-05 Linux PS SWD Transaction Driver](development/swd05-linux-swd-transaction-driver.md)：基於 SWD-03 AXI ABI 的單 Site Driver、注入式 MMIO、Response ACK、WAIT/FAULT/ABORT、posted AP read 與故障隔離；目前無 Z2 實機資格。
+- **Gate 1 / Host-only** — [Independent SWD v5 Image Hardware Contract Audit](development/swd-independent-image-hardware-contract.md)：以 ab79b04e 實際 HWH 驗證雙 Site Identity 位址與 GP0 連線，修正 UIO Owner Admission 契約；Device Tree Owner 與 Z2 HIL 尚未驗證。
 - **HIL-A1.5 / GitHub-hosted QEMU / SWPC NOT RUN / M1 NO-GO** — [ARMv7 Barrier Frozen Artifact QEMU Validation](development/hil-a15-qemu-armv7.md)：以固定 GitHub A1 Run/Artifact、SHA256、ARMv7 QEMU `ctypes` 1,000 次呼叫做 CPU-only 模擬驗證；SWPC 常駐 QEMU 僅建立受控執行方案，實體 Z2 A2 仍 NOT RUN。
 - **HIL-A2 / Path 2 Gate 1 preparation / Z2 NOT RUN / M1 NO-GO** — [Cortex-A9 CPU-only Native DMB Contract](development/hil-a2-cpu-only.md)：沿用共用 Dispatcher 與固定 A1 Artifact，定義預設關閉的實機 CPU-only Capability、Work Order、離線驗證及獨立 Evidence；不授權 SWPC／Z2 實機執行。
 - **HIL-A1 / GitHub-hosted cross-build / M1 NO-GO** — [ARMv7 Barrier SWPC A1 / Z2 A2](development/armv7-barrier-hil-a.md)：A1 於 GitHub-hosted 以固定 Debian OCI／APT Snapshot 交叉編譯 ARMv7 ELF、驗證 `dmb sy` 並上傳 SHA256 Artifact；原 SWPC A1 實測因工具鏈缺失 FAIL；A2 Z2 執行仍為 NOT RUN。

@@ -17,6 +17,12 @@
 | [ADR-0002](0002-openocd-software-qualified-catalog-visibility.md) | Accepted | 統一 Catalog Level：L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 internal-only，Customer IC Selector 顯示 L1–L3，Job Picker 僅 L2/L3。Catalog visibility、Job selection 與 execution entitlement 分離。 |
 | [ADR-0003](0003-runtime-fpga-driver-reconfiguration-boundary.md) | **Proposed** | Runtime FPGA Driver／UIO 選型候選、PPU Configuration Owner、Bitstream 不重啟 Linux 的安全交接；待現場 Kernel／UIO／Bridge 與 Hardware ABI 審核，不是 Accepted Driver。 |
 
+| [ADR-0004](0004-project-isolated-fpga-build-path2-operator-cli.md) | **Accepted (Owner decision; PR #1189 pending merge)** | 新 FPGA Image／Board 對應獨立可重現 Vivado Project，正式 SWPC Build 採 Path 2 `operator-cli`；F1-B 專屬 Build Engine 進入分階段退役，尚未關閉。 |
+
+| [ADR-0005](0005-independent-swd-ip-guarded-bitbang.md) | **Superseded by ADR-0006** | 歷史 SWD Debug Bitbang 候選架構；非目前實作方向。 |
+| [ADR-0007](0007-ppu-reload-fence-per-site-locking.md) | **Accepted (Owner decision; PR #1189 Draft)** | PPU Image/Reload 共享／獨占 Fence 與 per-Site 獨占鎖；保留 protected Root supervisor.lock，Host-only 驗證並行與 Reload 拒絕，不宣稱實機驗證。 |
+| [ADR-0006](0006-independent-swd-engine-and-future-gpio-bus.md) | **Accepted (Owner decision; PR #1189 Draft)** | 雙獨立 SWD NORMAL Engine，移除 SWD Debug Bitbang／0x3C／0x40；只保留 OFF/NORMAL，未來 GPIO Bus 與 JTAG/SPI/UART/I²C 為獨立周邊，尚未實作。 |
+
 ## Maintenance rule
 
 新增或取代架構決策時：
