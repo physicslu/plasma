@@ -8,6 +8,7 @@ on:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/ppu-bootstrap.py"
       - "scripts/ppu-bootstrap-service.py"
+      - "scripts/ppu_deploy_api.py"
       - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/ppu-bootstrap-kit.py"
       - "scripts/ppu-bootstrap-installer.py"
@@ -35,6 +36,7 @@ on:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/ppu-bootstrap.py"
       - "scripts/ppu-bootstrap-service.py"
+      - "scripts/ppu_deploy_api.py"
       - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/ppu-bootstrap-kit.py"
       - "scripts/ppu-bootstrap-installer.py"
@@ -91,6 +93,7 @@ jobs:
           python -m pytest -q
           software/python/tests/test_ppu_bootstrap_core.py
           software/python/tests/test_ppu_bootstrap_deployment.py
+          software/python/tests/test_ppu_deploy_api_host.py
           software/python/tests/test_ppu_b3_z2_install_gate1.py
           software/python/tests/test_ppu_b3_factory_refresh_gate1.py
           software/python/tests/test_z2_bootstrap_deployment_call_graph.py
