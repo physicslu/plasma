@@ -27,3 +27,21 @@ def test_two_independent_swd_axi_ips_normal_and_debug():
                        str(PL.parent / "software/python")],
         sim_build=str(PL / "build/swd-independent-two-site/axi-sim"),
     )
+
+
+def test_abi5_swd_edge_phase_against_independent_target():
+    """Bitbang timing control: target changes on SWCLK rise, host samples LOW.
+
+    Unlike the existing virtual target, ACK[0] is put on the wire by the
+    turnaround rising edge. This case must fail for the old HIGH-end sampler.
+    """
+    run(
+        simulator="icarus",
+        verilog_sources=[str(PL / "rtl/swd/plasma_swd_transaction_engine.sv")],
+        toplevel="plasma_swd_transaction_engine",
+        module="test_swd_abi5_edge_phase",
+        compile_args=["-g2012"],
+        timescale="1ns/1ps",
+        python_search=[str(PL / "verification/cocotb")],
+        sim_build=str(PL / "build/swd-independent-edge-phase/rtl-sim"),
+    )
