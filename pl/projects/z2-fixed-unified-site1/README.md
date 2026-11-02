@@ -29,8 +29,8 @@ The first attempt failed at license discovery; the second identified
 incorrect comparison of relative versus fully resolved Vivado BD pin paths.
 Using `get_bd_pins` to resolve the expected FCLK and reset pins fixes
 these two comparisons. No RTL/wiring changes or timing waivers were made.
-See `docs/architecture/plasma-path2-fixed-host-build-capability.md` for
-the dated problem/solution ledger.
+The dated problem/solution ledger was in the retired
+`docs/architecture/plasma-path2-fixed-host-build-capability.md` (see Git history).
 
 **First-run historical evidence limitation (now resolved):** That run's
 Artifact omitted the BIT/HWH raw files because they were stored under a hidden
