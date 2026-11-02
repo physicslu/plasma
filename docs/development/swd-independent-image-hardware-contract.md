@@ -104,6 +104,17 @@ different Image architecture.
 
 ## Remaining hardware gap
 
+The source-pinned `scripts/swd_abi5_path2_readonly_preflight.py` is a
+**non-mutating** first Path 2 Work Order. Using the existing enrolled SSH
+helper and pinned Z2 Bootstrap identity, it returns current Boot/Manager,
+Kernel UIO/platform overlap, firmware/Golden digest and Root installation
+facts. It intentionally does not run the protected process-consumer census,
+authorize `/dev/mem`, load PL, touch AXI, control DUT or read DPIDR. Its
+success means `PASS_READ_ONLY_FACTS_ONLY`, never HIL/Identity PASS. Stage
+load/Root G5 and actual DPIDR require subsequent reviewed, source-pinned
+steps and the live results from this first observation. No arbitrary
+SSH/script selection or new generic transport is introduced.
+
 Read-only DT/kernel ownership audit, a separately reviewed DT/driver change
 **only if** live facts require it, current-boot owner and process
 verification, source-pinned Root installation, ARMv7 MMIO/adapter

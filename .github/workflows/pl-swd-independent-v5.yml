@@ -18,6 +18,8 @@ on:
       - "software/python/plasma_interfaces/linux_mmio.py"
       - "software/python/plasma_interfaces/swd_native_linux_mmio.py"
       - "software/python/tests/test_swd_native_linux_mmio.py"
+      - "scripts/swd_abi5_path2_readonly_preflight.py"
+      - "scripts/tests/test_swd_abi5_path2_readonly_preflight.py"
       - ".github/workflows/pl-swd-independent-v5.yml"
   push:
     branches: [main]
@@ -37,6 +39,8 @@ on:
       - "software/python/plasma_interfaces/linux_mmio.py"
       - "software/python/plasma_interfaces/swd_native_linux_mmio.py"
       - "software/python/tests/test_swd_native_linux_mmio.py"
+      - "scripts/swd_abi5_path2_readonly_preflight.py"
+      - "scripts/tests/test_swd_abi5_path2_readonly_preflight.py"
       - ".github/workflows/pl-swd-independent-v5.yml"
 
 permissions:
@@ -67,7 +71,8 @@ jobs:
             pl/tests/test_swd_independent_image_contract.py \
             pl/tests/test_swd_independent_fpga_project.py \
             pl/tests/test_independent_swd_ip_adr.py \
-            software/python/tests/test_swd_native_linux_mmio.py
+            software/python/tests/test_swd_native_linux_mmio.py \
+            scripts/tests/test_swd_abi5_path2_readonly_preflight.py
       - name: Simulate independent dual Site and archival MPE RTL
         run: |
           python -m pytest -vv -s \
