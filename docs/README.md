@@ -13,6 +13,8 @@
 
 ## PPU deployment / physical admission evidence
 
+- [Bundle v3 B2 Master Authority — common Publisher/Asset approval across Python, Native C and FPGA](deployment/ppu-bundle-v3-master-authority-gate1.md): device-local exact complete Bundle SHA256 grants, B2/B3 fail-closed, no implicit execution.
+
 - [Generic Bundle v3 B3 — one inert Asset Set staging path (Gate 1 Draft)](deployment/ppu-bundle-v3-generic-assets-gate1.md)
 - [Single Active Asset Set P1 — Console SHA reconciliation & guarded Host-only activation (Draft)](deployment/ppu-single-active-asset-set-gate1.md)
 - [FPGA Asset Handoff P2 — exact Active Image/Profile selection, no hardware load (Draft)](deployment/ppu-fpga-asset-handoff-gate1.md): removes Smoke-only device allowlist; a staged digest is **not** an Active Set or FPGA load.
