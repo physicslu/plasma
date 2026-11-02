@@ -212,7 +212,15 @@ def validate_p1_path_filter_contracts() -> None:
     # qualification data under release/ must not rebuild Control Station.
     for name in ("control-station-runtime.yml", "product-release.yml"):
         source = read(name)
-        require_count(source, '"release/product.json"', 2, owner=f"P1 release: {name}")
+        trigger_count = sum(
+            line.strip() == '- "release/product.json"'
+            for line in source.splitlines()
+        )
+        if trigger_count != 2:
+            raise SystemExit(
+                f"P1 release: {name}: expected 2 product manifest path entries, "
+                f"got {trigger_count}"
+            )
         forbid(source, '"release/**"', owner=f"P1 release: {name}")
 
     # Changes to every P1-owned workflow must exercise this guard.
