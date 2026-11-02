@@ -110,8 +110,40 @@ def install_bootstrap(
     python_executable: str,
     paths: InstallPaths,
     enable_now: bool = False,
+    refresh_only: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> dict[str, object]:
+    if refresh_only:
+        # One-board development B3 upgrade: update ONLY the existing factory
+        # scripts, preserving systemd unit, enrollment, token and Runtime.
+        if enable_now:
+            raise BootstrapInstallError("B3_REFRESH_CANNOT_ENABLE_SERVICE")
+        if not (paths.install_root.is_dir()
+                and not paths.install_root.is_symlink()
+                and (paths.install_root / "ppu-bootstrap-service.py").is_file()
+                and paths.state_root.is_dir()
+                and not paths.state_root.is_symlink()
+                and not paths.systemd_unit.is_symlink()
+                and paths.systemd_unit.is_file()):
+            raise BootstrapInstallError("B3_REFRESH_REQUIRES_EXISTING_FACTORY")
+        if (source_root / "ppu-b3-smoke-policy.json").is_symlink() or not (
+                source_root / "ppu-b3-smoke-policy.json").is_file():
+            raise BootstrapInstallError("B3_REFRESH_SOURCE_POLICY_REQUIRED")
+        _copy_scripts(source_root, paths.install_root)
+        return {
+            "schema_version": 1,
+            "result": "PASS",
+            "operation": "refresh_only",
+            "install_root": str(paths.install_root),
+            "state_root": str(paths.state_root),
+            "systemd_unit": str(paths.systemd_unit),
+            "service": "plasma-bootstrap.service",
+            "unit_changed": False,
+            "service_restarted": False,
+            "control_token_provisioned": False,
+            "runtime_installed": False,
+            "fpga_update": False,
+        }
     _copy_scripts(source_root, paths.install_root)
     paths.state_root.mkdir(parents=True, exist_ok=True)
     paths.state_root.chmod(0o700)
@@ -176,6 +208,8 @@ def _parser() -> argparse.ArgumentParser:
         default=Path("/etc/systemd/system/plasma-bootstrap.service"),
     )
     parser.add_argument("--enable-now", action="store_true")
+    parser.add_argument("--refresh-only", action="store_true",
+                        help="Refresh B3 scripts only; preserve existing factory unit/token/state")
     return parser
 
 
@@ -189,6 +223,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             python_executable=args.python_executable,
             paths=InstallPaths(args.install_root, args.state_root, args.systemd_unit),
             enable_now=args.enable_now,
+            refresh_only=args.refresh_only,
         )
     except BootstrapInstallError as exc:
         print(f"ppu-bootstrap-installer: {exc}", file=sys.stderr)
