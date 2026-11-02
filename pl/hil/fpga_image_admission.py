@@ -148,8 +148,16 @@ def collect_live(*, root_port: guard.RootZ2TargetPort, release,
                     node = (item / "device").resolve(strict=True)
                 except (FileNotFoundError, OSError):
                     continue
-                need(node.parent == (guard.SYS / "bus/platform/devices").resolve(),
-                     "UIO_NOT_PLATFORM_DEVICE")
+                # Real kernels place platform devices under /sys/devices/...
+                # (e.g. soc0/); /sys/bus/platform/devices/<name> is a link.
+                # Membership = the platform bus entry of this exact name
+                # resolves back to this exact device node.
+                try:
+                    bus_entry = (guard.SYS / "bus/platform/devices" /
+                                 node.name).resolve(strict=True)
+                except (FileNotFoundError, OSError):
+                    bus_entry = None
+                need(bus_entry == node, "UIO_NOT_PLATFORM_DEVICE")
                 if node.name == owner["platform_node"]:
                     matches.append(item)
             need(len(matches) == 1, "UIO_PLATFORM_OWNER_NOT_UNIQUE")
