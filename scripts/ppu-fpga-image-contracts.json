@@ -3,7 +3,7 @@
   "contracts": [
     {
       "contract_id": "swd-independent-abi5-ab79b04e",
-      "evidence": "static-contract-only-pr1247-draft",
+      "evidence": "static-contract-devmem-manifest-ab79b04e",
       "target": {
         "platform": "linux-armv7",
         "board": "pynq-z2",
@@ -15,7 +15,7 @@
       "firmware_name": "plasma-swd-independent-ab79b04e.bin",
       "bin_sha256": "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773",
       "hwh_sha256": "5309c05beb8a17c9b13e8e2ba3d3c23d8264ca4adc38649bab6391e896577eb6",
-      "manifest_sha256": "b3a3643f46ac6eb861c288ae20dc78abe62852281709f1a5d94705acc1856669",
+      "manifest_sha256": "f470a4fac8accd0b1fcfb50243d4d663e1ddee209bc1c506e8e587c1f5ff859c",
       "recovery_name": "base.bin",
       "abi_version": 327681,
       "abi_offset": 0,
