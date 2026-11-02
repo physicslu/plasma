@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""Hosted-only Build Diagnostic v1 and generic host-build unit tests. No Vivado or SWPC access."""
+"""Hosted-only generic Vivado host-build contracts. No Vivado or SWPC access."""
 from __future__ import annotations
 
-import copy
-import hashlib
-import json
 import os
 from pathlib import Path
 import sys
@@ -14,97 +11,16 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
-import plasma_fpga_build_diagnostics as diag
 import plasma_vivado_host_build as build
 
 
-class DiagnosticContracts(unittest.TestCase):
-    def test_success_has_ordered_stages_digest_and_no_private_paths(self):
-        with tempfile.TemporaryDirectory() as td:
-            folder = Path(td)
-            session = diag.DiagnosticSession(
-                execution_path="path2-cli", source_sha="a" * 40,
-                evidence_dir=folder)
-            session.check("license_environment_present", True)
-            session.check("build_root_writable", True)
-            log = folder / "vivado.log"
-            log.write_bytes(b"mock timing report, PASS")
-            session.artifact("vivado_stdout", log)
-            for stage in diag.STAGES:
-                session.enter(stage)
-            session.complete()
-            output = session.persist()
-            receipt = json.loads(output.read_text())
-            self.assertEqual(receipt["schema_version"], diag.SCHEMA)
-            self.assertEqual(receipt["status"], "PASS")
-            self.assertEqual([s["stage"] for s in receipt["stages"]],
-                             list(diag.STAGES))
-            self.assertTrue(all(s["status"] == "PASS" for s in receipt["stages"]))
-            self.assertEqual(receipt["artifacts"]["vivado_stdout"]["sha256"],
-                             hashlib.sha256(log.read_bytes()).hexdigest())
-            self.assertEqual(receipt["physical_load"], "NOT_RUN")
-            self.assertEqual(receipt["m1"], "NO_GO")
-            self.assertNotIn(str(folder), output.read_text())
-            digest = (folder / "plasma-fpga-build-diagnostics.json.sha256").read_text()
-            self.assertEqual(digest.split()[0], hashlib.sha256(output.read_bytes()).hexdigest())
-            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
-
-    def test_failure_preserves_first_exception_type_without_secret(self):
-        with tempfile.TemporaryDirectory() as td:
-            ses = diag.DiagnosticSession(
-                execution_path="path3-codex", source_sha="b" * 40,
-                evidence_dir=Path(td))
-            ses.enter("PREFLIGHT")
-            ses.enter("BOARD_PREPARE")
-            exception = PermissionError(13, "License path /secret/license.lic TOKEN=XYZ")
-            ses.fail(exception)
-            ses.persist()
-            receipt = json.loads((Path(td) / "plasma-fpga-build-diagnostics.json").read_text())
-            self.assertEqual(receipt["status"], "FAIL")
-            self.assertEqual(receipt["failed_stage"], "BOARD_PREPARE")
-            self.assertEqual(receipt["exception_type"], "PermissionError")
-            self.assertEqual(receipt["error_code"], "BUILD_UNCLASSIFIED_EXCEPTION")
-            self.assertEqual(receipt["root_cause_status"], "UNKNOWN")
-            self.assertNotIn("/secret/", json.dumps(receipt))
-            self.assertNotIn("TOKEN=XYZ", json.dumps(receipt))
-            self.assertEqual([s["status"] for s in receipt["stages"]], ["PASS", "FAIL"])
-
-    def test_negative_stage_artifact_sha_and_symlink_rejected(self):
-        with tempfile.TemporaryDirectory() as td:
-            folder = Path(td)
-            ses = diag.DiagnosticSession(
-                execution_path="path2-cli", source_sha="a" * 40,
-                evidence_dir=folder)
-            for bad in ("sudo", "DEVICE_POWER", ""):
-                with self.assertRaises(ValueError):
-                    ses.enter(bad)
-            ses.enter("PREFLIGHT")
-            with self.assertRaises(ValueError):
-                ses.enter("PREFLIGHT")
-            target = folder / "host.log"
-            target.write_text("not from Vivado")
-            link = folder / "symlink.log"
-            link.symlink_to(target)
-            with self.assertRaises(ValueError):
-                ses.artifact("vivado_stderr", link)
-            with self.assertRaises(ValueError):
-                ses.artifact("arbitrary", target)
-            with self.assertRaises(ValueError):
-                ses.complete()
-            ses.fail(build.BuildDenied("BUILD_OUTPUT_PERMISSION_DENIED"))
-            ses.persist()
-            self.assertEqual(ses.as_dict()["root_cause_status"], "CONFIRMED")
-            report = folder / "plasma-fpga-build-diagnostics.json"
-            report.unlink()
-            report.symlink_to(target)
-            with self.assertRaises(ValueError):
-                ses.persist()
-
+class HostBuildRouteContracts(unittest.TestCase):
     def test_retired_f1b_path3_build_route_is_absent(self):
         """Only the dynamic Path 2 Work Order may reach the host build engine."""
         for name in ("main", "preflight", "_run_pipeline", "diagnostics_type",
                      "license_snapshot"):
             self.assertFalse(hasattr(build, name), name)
+        self.assertFalse((ROOT / "scripts/plasma_fpga_build_diagnostics.py").exists())
         for execution_path, approval in (
                 ("path3-codex", {"task_id": "f1b-path3-codex-vivado-build"}),
                 ("path3-codex", {"task_id": "path2-work-order"}),
