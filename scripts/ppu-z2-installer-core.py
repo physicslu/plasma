@@ -1069,6 +1069,175 @@ def install_release(
     return evidence
 
 
+
+def install_verified_bundle_v3(
+    verified,
+    *,
+    archive: Path,
+    paths: InstallPaths,
+) -> dict[str, object]:
+    """B3 ONLY: install an independently admitted/authorized canonical Bundle v3.
+
+    Called solely by the existing locked DeploymentCoordinator. This method
+    never executes package content, changes systemd, touches FPGA or DUT, or
+    retains an old release. Errors after an attempted write MUST cause the
+    Coordinator to enter recovery_required; no implicit B4 rollback.
+    """
+    if (getattr(verified, "schema", None) != "plasma.ppu.bundle.v3"
+            or getattr(verified, "kind", None) != "bundle"
+            or not getattr(verified, "packages", None)
+            or not isinstance(archive, Path) or archive.is_symlink()
+            or not archive.is_file()):
+        raise Z2InstallerError("B3_BUNDLE_NOT_VERIFIED")
+    if getattr(verified, "actions", ()) != ("install", "verify"):
+        raise Z2InstallerError("B3_INSTALL_ONLY_ACTIONS_REQUIRED")
+    if (not isinstance(paths, InstallPaths)
+            or not paths.product_root.is_absolute()
+            or paths.product_root.is_symlink()):
+        raise Z2InstallerError("B3_PRODUCT_ROOT_UNTRUSTED")
+    if paths.product_root == Path("/opt/plasma") and os.geteuid() != 0:
+        raise Z2InstallerError("B3_PRODUCT_ROOT_PRIVILEGE_DENIED")
+    base = paths.product_root / "bundles"
+    target = base / verified.name
+    candidate = base / ("." + verified.name + "." + verified.archive_sha256[:16] + ".staging")
+    if (not re.fullmatch(r"[a-z][a-z0-9_.-]{0,63}", verified.name)
+            or any(p.is_symlink() for p in (paths.product_root, base, target, candidate))
+            or candidate.exists()):
+        raise Z2InstallerError("B3_DESTINATION_UNTRUSTED_OR_RECOVERY_REQUIRED")
+    if base.exists() and not base.is_dir():
+        raise Z2InstallerError("B3_DESTINATION_INVALID")
+    if target.exists() and not target.is_dir():
+        raise Z2InstallerError("B3_PREVIOUS_INSTALL_INVALID")
+    marker = target / "b3-install.json"
+    if target.exists():
+        # Never delete data not positively identified as a prior B3 installation.
+        if marker.is_symlink() or not marker.is_file():
+            raise Z2InstallerError("B3_PREVIOUS_INSTALL_NOT_OWNED")
+        try:
+            previous = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, ValueError, UnicodeError) as exc:
+            raise Z2InstallerError("B3_PREVIOUS_INSTALL_RECEIPT_INVALID") from exc
+        if (type(previous) is not dict
+                or previous.get("schema") != "plasma.ppu.b3-install.v1"
+                or previous.get("bundle_name") != verified.name
+                or not re.fullmatch(r"[0-9a-f]{64}", str(previous.get("archive_sha256", "")))):
+            raise Z2InstallerError("B3_PREVIOUS_INSTALL_RECEIPT_INVALID")
+        for item in target.rglob("*"):
+            if item.is_symlink():
+                raise Z2InstallerError("B3_PREVIOUS_INSTALL_SYMLINK_DENIED")
+
+    expected_files = {entry.path: entry for entry in verified.files}
+    resolved_package_order = []
+    packages_by_id = {item.id: item for item in verified.packages}
+    visiting: set[str] = set()
+    seen: set[str] = set()
+
+    def visit(package_id: str) -> None:
+        if package_id in visiting:
+            raise Z2InstallerError("B3_PACKAGE_DEPENDENCY_CYCLE")
+        if package_id in seen:
+            return
+        visiting.add(package_id)
+        package = packages_by_id[package_id]
+        for dependency in package.requires:
+            if dependency not in packages_by_id:
+                raise Z2InstallerError("B3_PACKAGE_DEPENDENCY_MISSING")
+            visit(dependency)
+        visiting.remove(package_id)
+        seen.add(package_id)
+        resolved_package_order.append(package_id)
+
+    for package in verified.packages:
+        visit(package.id)
+    file_order = []
+    for package_id in resolved_package_order:
+        for item in packages_by_id[package_id].files:
+            if not item.path.startswith("payload/packages/" + package_id + "/"):
+                raise Z2InstallerError("B3_PACKAGE_FILE_SCOPE_DENIED")
+            file_order.append(item)
+    if len(file_order) != len(expected_files):
+        raise Z2InstallerError("B3_PACKAGE_FILE_SET_DENIED")
+
+    # Recheck content identity at write time, not only at B2/Coordinator.
+    if _sha256(archive) != verified.archive_sha256:
+        raise Z2InstallerError("B3_ARCHIVE_SHA256_CHANGED")
+    base.mkdir(parents=True, exist_ok=True)
+    candidate.mkdir(mode=0o700)
+    installed = False
+    try:
+        with zipfile.ZipFile(archive) as source:
+            if set(source.namelist()) != set(expected_files) | {"manifest.json"}:
+                raise Z2InstallerError("B3_ARCHIVE_MEMBER_SET_CHANGED")
+            for item in file_order:
+                out = candidate / item.path
+                out.parent.mkdir(parents=True, exist_ok=True)
+                with source.open(item.path) as input_stream, out.open("xb") as output_stream:
+                    digest = hashlib.sha256()
+                    size = 0
+                    for block in iter(lambda: input_stream.read(1024 * 1024), b""):
+                        size += len(block)
+                        digest.update(block)
+                        if size > item.size:
+                            raise Z2InstallerError("B3_FILE_SIZE_CHANGED")
+                        output_stream.write(block)
+                    output_stream.flush()
+                    os.fsync(output_stream.fileno())
+                if digest.hexdigest() != item.sha256 or size != item.size:
+                    raise Z2InstallerError("B3_FILE_SHA256_CHANGED")
+                out.chmod(0o555 if item.executable else 0o444)
+        if _sha256(archive) != verified.archive_sha256:
+            raise Z2InstallerError("B3_ARCHIVE_CHANGED_DURING_INSTALL")
+        for name, item in expected_files.items():
+            file = candidate / name
+            if (file.is_symlink() or not file.is_file()
+                    or file.stat().st_size != item.size
+                    or _sha256(file) != item.sha256):
+                raise Z2InstallerError("B3_STAGED_FILE_VERIFICATION_FAILED")
+        receipt = {
+            "schema": "plasma.ppu.b3-install.v1",
+            "bundle_name": verified.name,
+            "bundle_version": verified.version,
+            "source_commit": verified.source_commit,
+            "archive_sha256": verified.archive_sha256,
+            "package_order": resolved_package_order,
+            "files_verified": len(expected_files),
+            "runtime_activation_executed": False,
+            "fpga": "NOT_RUN",
+            "dut": "NOT_RUN",
+        }
+        marker_candidate = candidate / "b3-install.json"
+        with marker_candidate.open("x", encoding="utf-8") as output:
+            json.dump(receipt, output, sort_keys=True)
+            output.write("\n")
+            output.flush()
+            os.fsync(output.fileno())
+        marker_candidate.chmod(0o600)
+        if target.exists():
+            shutil.rmtree(target)  # Dev mode: remove prior B3 only; NO backup/B4.
+        os.replace(candidate, target)
+        installed = True
+        for name, item in expected_files.items():
+            file = target / name
+            if (not file.is_file() or file.is_symlink()
+                    or file.stat().st_size != item.size
+                    or _sha256(file) != item.sha256):
+                raise Z2InstallerError("B3_INSTALLED_FILE_VERIFICATION_FAILED")
+        if json.loads((target / "b3-install.json").read_text(encoding="utf-8")) != receipt:
+            raise Z2InstallerError("B3_INSTALL_RECEIPT_MISMATCH")
+        directory = os.open(base, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+        return {"result": "PASS", **receipt, "path": str(target)}
+    except Exception:
+        # Keep a failed candidate for forensic inspection. Recovery guard stays
+        # locked by the Coordinator; an operator must resolve it explicitly.
+        if installed:
+            pass
+        raise
+
+
 def _require_target_baseline() -> None:
     if platform.system() != "Linux":
         raise Z2InstallerError("Z2 installer requires Linux")
