@@ -337,3 +337,83 @@ def test_console_generic_b3_denies_mismatched_or_invalid_admission(tmp_path):
     with pytest.raises(client.DeploymentOutcomeUnknown, match="B3_DEVICE_ADMISSION_CHANGED"):
         api.install_bundle(client.DeploymentSubmission(uploaded, b2_tx, "admitted"))
     assert [item[1] for item in fake.calls] == ["/v1/deployment"]
+
+
+def test_console_asset_set_sha_match_skips_transfer_and_never_claims_ready(tmp_path):
+    archive = b"full-bundle-byte-identity"
+    sha = hashlib.sha256(archive).hexdigest()
+    api, fake = make(tmp_path)
+    fake.override["/v1/assets"] = (200, json.dumps({
+        "ok": True, "assets": {
+            "schema": "plasma.ppu.active-assets.v1",
+            "state": "ACTIVE", "asset_set_sha256": sha,
+            "ready": False, "fpga": "NOT_VERIFIED", "generation": 2,
+        },
+    }).encode())
+    record = api.reconcile_bundle_assets(archive)
+    assert record["result"] == "ALREADY_ACTIVE"
+    assert record["asset_set_sha256"] == sha
+    assert record["ready"] is False
+    assert [item[1] for item in fake.calls] == ["/v1/assets"]
+
+
+def test_console_asset_set_mismatch_uploads_whole_bundle_then_b2_b3(tmp_path):
+    archive = b"complete-replacement-bundle-data"
+    sha = hashlib.sha256(archive).hexdigest()
+    fake = FakeBootstrapTransport(tmp_path)
+    fake.override["/v1/assets"] = (200, json.dumps({
+        "ok": True, "assets": {
+            "schema": "plasma.ppu.active-assets.v1",
+            "state": "EMPTY", "asset_set_sha256": None,
+            "ready": False, "fpga": "NOT_VERIFIED",
+        },
+    }).encode())
+    def routed(method, path, raw, headers):
+        body = json.loads(raw) if raw is not None else None
+        if path == "/v1/deployments":
+            fake.calls.append((method, path, body))
+            if body.get("install_only") is True:
+                receipt = {
+                    "transaction_id": "d"*32, "upload_id": fake.upload_id,
+                    "state": "queued", "result": None,
+                }
+                return 202, json.dumps({"ok": True, "deployment": receipt}).encode()
+            return 200, json.dumps({"ok": True, "deployment":
+                _admitted_bundle_record(fake.upload_id, "e"*32)}).encode()
+        if path == "/v1/deployment":
+            fake.calls.append((method, path, body))
+            return 200, json.dumps({"ok": True, "deployment":
+                _admitted_bundle_record(fake.upload_id, "e"*32)}).encode()
+        return fake(method, path, raw, headers)
+    api = client.BootstrapAPIClient(
+        "https://ppu.example.test:18081", TOKEN, transport=routed,
+    )
+    result = api.reconcile_bundle_assets(archive)
+    assert result["result"] == "B3_INSTALL_QUEUED"
+    assert result["asset_set_sha256"] == sha
+    assert result["ready"] is False and result["fpga"] == "NOT_RUN"
+    assert result["b3"]["transaction_id"] == "d"*32
+    assert server._upload_paths(fake.paths, fake.upload_id).committed.read_bytes() == archive
+    assert [body for _method, path, body in fake.calls
+            if path == "/v1/deployments"] == [
+                {"kind": "bundle", "upload_id": fake.upload_id},
+                {"kind": "bundle", "upload_id": fake.upload_id, "install_only": True},
+            ]
+
+
+@pytest.mark.parametrize("record", [
+    {"schema": "plasma.ppu.active-assets.v1", "state": "ACTIVE",
+     "asset_set_sha256": "bad", "ready": False},
+    {"schema": "plasma.ppu.active-assets.v1", "state": "ACTIVE",
+     "asset_set_sha256": "a"*64, "ready": True},
+    {"schema": "plasma.ppu.active-assets.v1", "state": "EMPTY",
+     "asset_set_sha256": "a"*64, "ready": False},
+])
+def test_console_untrusted_active_identity_denies_transfer(record, tmp_path):
+    api, fake = make(tmp_path)
+    fake.override["/v1/assets"] = (
+        200, json.dumps({"ok": True, "assets": record}).encode(),
+    )
+    with pytest.raises(client.DeploymentOutcomeUnknown, match="ASSET_SET_STATUS_UNTRUSTED"):
+        api.reconcile_bundle_assets(b"archive-bytes")
+    assert [item[1] for item in fake.calls] == ["/v1/assets"]

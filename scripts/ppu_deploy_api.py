@@ -342,5 +342,48 @@ class BootstrapAPIClient:
             raise DeploymentOutcomeUnknown("API_ADMISSION_EVIDENCE_MISSING")
         return receipt
 
+    def assets_status(self) -> dict[str, Any]:
+        """Read PPU-verified Active Set identity, not local cached metadata."""
+        record = self._call("GET", "/v1/assets", None).get("assets")
+        if (not isinstance(record, dict)
+                or record.get("schema") != "plasma.ppu.active-assets.v1"
+                or record.get("state") not in {"EMPTY", "ACTIVE"}
+                or record.get("ready") is not False):
+            raise DeploymentOutcomeUnknown("ASSET_SET_STATUS_UNTRUSTED")
+        if record["state"] == "ACTIVE":
+            if (type(record.get("asset_set_sha256")) is not str
+                    or not _HEX64.fullmatch(record["asset_set_sha256"])):
+                raise DeploymentOutcomeUnknown("ASSET_SET_STATUS_UNTRUSTED")
+        elif record.get("asset_set_sha256") is not None:
+            raise DeploymentOutcomeUnknown("ASSET_SET_STATUS_UNTRUSTED")
+        return record
+
+    def reconcile_bundle_assets(self, archive: bytes) -> dict[str, Any]:
+        """Compare whole Bundle SHA; on mismatch explicitly B1 -> B2 -> B3.
+
+        Returns the B3 transaction ID for explicit observation. Does NOT
+        activate the Set, load an FPGA, launch a job or claim READY.
+        """
+        if not isinstance(archive, bytes) or not 0 < len(archive) <= _MAX_UPLOAD:
+            raise DeploymentAPIError("ASSET_SET_BUNDLE_INVALID")
+        digest = hashlib.sha256(archive).hexdigest()
+        active = self.assets_status()
+        if active["state"] == "ACTIVE" and active["asset_set_sha256"] == digest:
+            return {
+                "result": "ALREADY_ACTIVE", "asset_set_sha256": digest,
+                "ready": False, "b3": None, "fpga": "NOT_RUN",
+            }
+        uploaded = self.upload(archive)
+        b2 = self.submit(kind="bundle", upload_id=uploaded)
+        b3 = self.install_bundle(b2)
+        return {
+            "result": "B3_INSTALL_QUEUED", "asset_set_sha256": digest,
+            "ready": False, "b3": {
+                "upload_id": b3.upload_id,
+                "transaction_id": b3.transaction_id,
+                "state": b3.state,
+            }, "fpga": "NOT_RUN",
+        }
+
     def status(self) -> dict[str, Any]:
         return self._call("GET", "/v1/status", None)

@@ -275,6 +275,33 @@ class SiteManager:
                 "facility_id": self.config.ppu.facility_id,
             }
 
+    def acquire_asset_set_quiesce(self) -> dict[str, Any]:
+        """Held Runtime authority used only via the private Unix control socket.
+
+        The same _execution_lock serializes job reservations against the
+        quiesce transition, including queued and cancelling jobs.
+        """
+        with self._execution_lock:
+            if self._execution_lease is not None:
+                raise PlasmaError(
+                    ErrorCode.PPU_BUSY,
+                    "PPU execution active; cannot hold Asset Set activation",
+                    recoverable=True,
+                    context={"execution": self._execution_lease.snapshot()},
+                )
+            lease = self._runtime_quiesce.acquire_held()
+            self.server_log.event(
+                "INFO", "asset_set_runtime_quiesced",
+                ppu_id=self.config.ppu.id,
+                facility_id=self.config.ppu.facility_id,
+            )
+            return {
+                **lease,
+                "ppu_id": self.config.ppu.id,
+                "facility_id": self.config.ppu.facility_id,
+                "active_job_count": 0,
+            }
+
     def release_runtime_quiesce(self, token: str) -> None:
         with self._execution_lock:
             self._runtime_quiesce.release(token)
