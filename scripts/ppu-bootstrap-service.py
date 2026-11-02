@@ -51,7 +51,7 @@ DEPLOYMENT_API_IN_FLIGHT_STATES = {"queued", "running"}
 DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "admitted", "failed", "recovery_required"}
 COORDINATOR_SAFE_RESTART_STATES = {
     "runtime_active", "engineering_active", "package_active",
-    "bundle_installed", "rolled_back", "verify_failed",
+    "bundle_installed", "asset_set_active", "rolled_back", "verify_failed",
 }
 MAX_COORDINATOR_JOURNAL_BYTES = 1024 * 1024
 
