@@ -112,7 +112,31 @@ jobs:
             scripts/ppu-bootstrap-kit.py \
             scripts/ppu-bootstrap-installer.py \
             scripts/ppu_unified_deployment.py \
+            scripts/ppu-z2-installer.py \
+            scripts/ppu-z2-installer-core.py \
             "$root/scripts/"
+          mkdir -p "$root/artifacts"
+          python scripts/ppu-bundle-v3-smoke.py \
+            --source-commit "$GITHUB_SHA" \
+            --output "$root/artifacts/ppu-b3-smoke.zip"
+          python - "$root/artifacts/ppu-b3-smoke.zip" "$root/scripts/ppu-b3-smoke-policy.json" "$GITHUB_SHA" <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+          archive, policy_path, git_sha = sys.argv[1:]
+          policy = {
+              "schema": "plasma.ppu.b3-factory-policy.v1",
+              "bundle_name": "ppu-b3-smoke",
+              "source_commit": git_sha,
+              "archive_sha256": hashlib.sha256(Path(archive).read_bytes()).hexdigest(),
+              "target": {
+                  "platform": "linux-armv7",
+                  "board": "pynq-z2",
+                  "fpga_part": "xc7z020clg400-1",
+              },
+              "actions": ["install", "verify"],
+          }
+          Path(policy_path).write_text(json.dumps(policy, sort_keys=True) + "\n")
+          PY
           python - "$root/manifest.json" "$version" "$GITHUB_SHA" <<'PY'
           import json
           import sys
@@ -134,7 +158,7 @@ jobs:
           PY
           (
             cd "$root"
-            sha256sum manifest.json scripts/* > SHA256SUMS
+            sha256sum manifest.json scripts/* artifacts/* > SHA256SUMS
           )
           artifact="$RUNNER_TEMP/plasma-ppu-bootstrap-${identity}.tar.gz"
           tar -C "$RUNNER_TEMP" -czf "$artifact" "plasma-ppu-bootstrap-${identity}"
@@ -161,6 +185,9 @@ jobs:
             > "$RUNNER_TEMP/bootstrap-install-evidence.json"
           test -f "$sandbox/etc/systemd/system/plasma-bootstrap.service"
           test -f "$sandbox/opt/plasma/bootstrap/ppu_unified_deployment.py"
+          test -f "$sandbox/opt/plasma/bootstrap/ppu-z2-installer-core.py"
+          test -f "$sandbox/opt/plasma/bootstrap/ppu-b3-smoke-policy.json"
+          test "$(stat -c '%a' "$sandbox/opt/plasma/bootstrap/ppu-b3-smoke-policy.json")" = "600"
           test ! -e "$sandbox/opt/plasma/current"
           grep -q 'ppu-bootstrap-service.py serve --host 192.168.2.99 --port 18081' \
             "$sandbox/etc/systemd/system/plasma-bootstrap.service"

@@ -29,6 +29,14 @@ REQUIRED_SCRIPTS = (
     "ppu_unified_deployment.py",
 )
 
+# The reviewed Bundle v3 B3 capability ships inside the SAME factory
+# Bootstrap layer, not as a second installer or a remotely writable policy.
+B3_FILES = (
+    "ppu-z2-installer.py",
+    "ppu-z2-installer-core.py",
+    "ppu-b3-smoke-policy.json",
+)
+
 
 class BootstrapInstallError(RuntimeError):
     pass
@@ -59,12 +67,38 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
             raise BootstrapInstallError(f"factory bundle is missing required script: {name}")
     install_root.mkdir(parents=True, exist_ok=True)
     install_root.chmod(0o755)
-    for name in REQUIRED_SCRIPTS:
+    # Fail closed on a partial B3 factory image; old factory-only tests may
+    # still install their unchanged original five-file fixture with B3 disabled.
+    # Repository source has the two Installer files but no pinned factory
+    # policy; this is a NOT_QUALIFIED source tree, not a partial factory kit.
+    policy_present = (source_root / "ppu-b3-smoke-policy.json").is_file()
+    b3_present = list(B3_FILES) if policy_present else []
+    if policy_present and not all((source_root / name).is_file() for name in B3_FILES):
+        raise BootstrapInstallError("factory B3 source set is incomplete")
+    if policy_present:
+        try:
+            policy = json.loads((source_root / "ppu-b3-smoke-policy.json").read_text())
+        except (OSError, ValueError) as exc:
+            raise BootstrapInstallError("factory B3 policy unreadable") from exc
+        if (type(policy) is not dict
+                or set(policy) != {"schema", "bundle_name", "source_commit",
+                                   "archive_sha256", "target", "actions"}
+                or policy.get("schema") != "plasma.ppu.b3-factory-policy.v1"
+                or policy.get("bundle_name") != "ppu-b3-smoke"
+                or policy.get("actions") != ["install", "verify"]):
+            raise BootstrapInstallError("factory B3 policy invalid")
+    for name in (*REQUIRED_SCRIPTS, *(B3_FILES if b3_present else ())):
         source = source_root / name
+        if source.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap source symlink denied")
         destination = install_root / name
+        if destination.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap destination symlink denied")
         temporary = destination.with_name(destination.name + ".new")
+        if temporary.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap temp symlink denied")
         shutil.copyfile(source, temporary)
-        temporary.chmod(0o755)
+        temporary.chmod(0o600 if name.endswith("-policy.json") else 0o755)
         os.replace(temporary, destination)
 
 
@@ -76,8 +110,40 @@ def install_bootstrap(
     python_executable: str,
     paths: InstallPaths,
     enable_now: bool = False,
+    refresh_only: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> dict[str, object]:
+    if refresh_only:
+        # One-board development B3 upgrade: update ONLY the existing factory
+        # scripts, preserving systemd unit, enrollment, token and Runtime.
+        if enable_now:
+            raise BootstrapInstallError("B3_REFRESH_CANNOT_ENABLE_SERVICE")
+        if not (paths.install_root.is_dir()
+                and not paths.install_root.is_symlink()
+                and (paths.install_root / "ppu-bootstrap-service.py").is_file()
+                and paths.state_root.is_dir()
+                and not paths.state_root.is_symlink()
+                and not paths.systemd_unit.is_symlink()
+                and paths.systemd_unit.is_file()):
+            raise BootstrapInstallError("B3_REFRESH_REQUIRES_EXISTING_FACTORY")
+        if (source_root / "ppu-b3-smoke-policy.json").is_symlink() or not (
+                source_root / "ppu-b3-smoke-policy.json").is_file():
+            raise BootstrapInstallError("B3_REFRESH_SOURCE_POLICY_REQUIRED")
+        _copy_scripts(source_root, paths.install_root)
+        return {
+            "schema_version": 1,
+            "result": "PASS",
+            "operation": "refresh_only",
+            "install_root": str(paths.install_root),
+            "state_root": str(paths.state_root),
+            "systemd_unit": str(paths.systemd_unit),
+            "service": "plasma-bootstrap.service",
+            "unit_changed": False,
+            "service_restarted": False,
+            "control_token_provisioned": False,
+            "runtime_installed": False,
+            "fpga_update": False,
+        }
     _copy_scripts(source_root, paths.install_root)
     paths.state_root.mkdir(parents=True, exist_ok=True)
     paths.state_root.chmod(0o700)
@@ -142,6 +208,8 @@ def _parser() -> argparse.ArgumentParser:
         default=Path("/etc/systemd/system/plasma-bootstrap.service"),
     )
     parser.add_argument("--enable-now", action="store_true")
+    parser.add_argument("--refresh-only", action="store_true",
+                        help="Refresh B3 scripts only; preserve existing factory unit/token/state")
     return parser
 
 
@@ -155,6 +223,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             python_executable=args.python_executable,
             paths=InstallPaths(args.install_root, args.state_root, args.systemd_unit),
             enable_now=args.enable_now,
+            refresh_only=args.refresh_only,
         )
     except BootstrapInstallError as exc:
         print(f"ppu-bootstrap-installer: {exc}", file=sys.stderr)

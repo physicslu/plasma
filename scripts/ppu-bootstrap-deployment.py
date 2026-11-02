@@ -28,7 +28,7 @@ from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
-SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "bundle_installed", "rolled_back", "verify_failed"}
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -80,6 +80,20 @@ class EngineeringDeploymentRequest:
     source_commit: str
     artifact_sha256: str
 
+
+@dataclass(frozen=True)
+class BundleV3InstallRequest:
+    """Device-local B3 install, admitted by the existing Bootstrap API only.
+
+    Source, archive digest and target are PINNED by device-local policy; HTTP
+    can only refer to an already committed/admitted upload_id.
+    """
+
+    archive: Path
+    source_commit: str
+    artifact_sha256: str
+    target_profile: Mapping[str, str]
+    api_transaction_id: str
 
 @dataclass(frozen=True)
 class HostOnlyPackageRequest:
@@ -201,6 +215,16 @@ class DeploymentCoordinator:
     def _admit_previous_transaction(self) -> None:
         previous = self.journal.read()
         if previous is None or previous.state in SAFE_RESTART_STATES:
+            return
+        # "installed" is terminal for a verified B3 Host-only sandbox ONLY.
+        # Do not admit this state for runtime/engineering/Bootstrap HTTP:
+        # those paths have their own activation and recovery contract.
+        if (previous.state == "installed" and previous.kind == "host-only-package"
+                and self.paths.bootstrap_state_root != DeploymentPaths().bootstrap_state_root
+                and self.paths.bootstrap_state_root.is_absolute()
+                and not self.paths.bootstrap_state_root.is_symlink()
+                and self.paths.bootstrap_state_root.resolve().is_relative_to(
+                    Path(tempfile.gettempdir()).resolve())):
             return
         if previous.state == "recovery_required":
             raise DeploymentError(
@@ -340,6 +364,131 @@ class DeploymentCoordinator:
                 ],
             }
 
+
+    def execute_bundle_v3_install(
+        self, request: BundleV3InstallRequest,
+    ) -> Mapping[str, Any]:
+        """Single locked PS Installer B3; no activation, backup or B4.
+
+        This is NOT the Host-only simulator. A factory provisioned local policy
+        and a matching B2 admission receipt must be checked by Bootstrap before
+        invoking this path. The Installer independently verifies ZIP content.
+        """
+        if not isinstance(request, BundleV3InstallRequest):
+            raise DeploymentError("B3_INSTALL_REQUEST_INVALID")
+        if (not _HEX40.fullmatch(request.source_commit)
+                or not _HEX64.fullmatch(request.artifact_sha256)
+                or not _API_TRANSACTION_ID.fullmatch(request.api_transaction_id)
+                or not isinstance(request.archive, Path)
+                or request.archive.is_symlink()
+                or not request.archive.is_file()):
+            raise DeploymentError("B3_INSTALL_PROVENANCE_INVALID")
+        if (not isinstance(request.target_profile, Mapping)
+                or set(request.target_profile) != {"platform", "board", "fpga_part"}):
+            raise DeploymentError("B3_INSTALL_TARGET_INVALID")
+        verify_contract = Path(__file__).with_name("ppu_unified_deployment.py")
+        spec = importlib.util.spec_from_file_location("plasma_b3_device_contract", verify_contract)
+        if spec is None or spec.loader is None:
+            raise DeploymentError("B3_VERIFIER_UNAVAILABLE")
+        contract = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = contract
+        spec.loader.exec_module(contract)
+        # Explicitly reuse the sole deployment lock and journal. Do not add
+        # another lock, daemon, process supervisor or recovery mechanism.
+        with self._deployment_lock():
+            install = getattr(self.installer, "install_verified_bundle_v3", None)
+            if not callable(install):
+                raise DeploymentError("B3_DEVICE_INSTALLER_NOT_QUALIFIED")
+            now = self.clock()
+            record = DeploymentRecord(
+                schema_version=SCHEMA_VERSION,
+                transaction_id=self.transaction_id_factory(),
+                state="received",
+                sequence=0,
+                started_at_epoch_s=now,
+                updated_at_epoch_s=now,
+                release_artifact=str(request.archive),
+                source_commit=request.source_commit,
+                api_transaction_id=request.api_transaction_id,
+                artifact_sha256=request.artifact_sha256,
+                kind="bundle",
+                package_kind="bundle",
+            )
+            self.journal.write(record, "received")
+            try:
+                self.journal.write(record, "verifying")
+                bundle = contract.verify_host_only_artifact(
+                    request.archive, expected_sha256=request.artifact_sha256,
+                    source_commit=request.source_commit,
+                    target_profile=request.target_profile,
+                )
+                if (not isinstance(bundle, contract.VerifiedBundle)
+                        or bundle.schema != contract.BUNDLE_SCHEMA
+                        or bundle.kind != "bundle"
+                        or bundle.actions != ("install", "verify")
+                        or bundle.name != "ppu-b3-smoke"
+                        or {(p.id, p.kind) for p in bundle.packages} != {
+                            ("ic-catalog", "ic-catalog"),
+                            ("programming-profile", "programming-profile"),
+                            ("python-smoke", "python"),
+                        }):
+                    raise DeploymentError("B3_SMOKE_BUNDLE_SCOPE_DENIED")
+                # Enforce a closed, reviewed DAG instead of arbitrary package
+                # execution rights. A generic installer can be qualified later.
+                requires = {p.id: p.requires for p in bundle.packages}
+                if requires != {
+                    "ic-catalog": (),
+                    "programming-profile": ("ic-catalog",),
+                    "python-smoke": ("programming-profile",),
+                }:
+                    raise DeploymentError("B3_SMOKE_DEPENDENCY_SCOPE_DENIED")
+                record.module = bundle.name
+                record.release_id = (bundle.version + "-" +
+                                     bundle.archive_sha256[:16])
+                self.journal.write(record, "verified")
+            except Exception as exc:
+                self.journal.write(
+                    record, "verify_failed",
+                    error_code="b3_bundle_verification_failed",
+                    error_message=type(exc).__name__,
+                )
+                raise DeploymentError("B3_BUNDLE_VERIFICATION_DENIED") from exc
+            try:
+                self.journal.write(record, "staging")
+                evidence = install(
+                    bundle, archive=request.archive, paths=self._installer_paths(),
+                )
+                if (not isinstance(evidence, Mapping)
+                        or evidence.get("result") != "PASS"
+                        or evidence.get("archive_sha256") != request.artifact_sha256
+                        or evidence.get("source_commit") != request.source_commit
+                        or evidence.get("bundle_name") != bundle.name):
+                    raise DeploymentError("B3_DEVICE_INSTALL_RECEIPT_INVALID")
+            except Exception as exc:
+                self.journal.write(
+                    record, "recovery_required",
+                    error_code="b3_install_outcome_uncertain",
+                    error_message=type(exc).__name__,
+                )
+                raise DeploymentError("B3_INSTALL_REQUIRES_RECOVERY") from exc
+            self.journal.write(record, "bundle_installed")
+            return {
+                "result": "PASS",
+                "schema": "plasma.ppu.b3-deployment-receipt.v1",
+                "stage": "bundle_install_only",
+                "transaction": asdict(record),
+                "bundle_name": bundle.name,
+                "archive_sha256": request.artifact_sha256,
+                "source_commit": request.source_commit,
+                "package_order": evidence["package_order"],
+                "files_verified": evidence["files_verified"],
+                "install_path": evidence["path"],
+                "per_package_install_executed": True,
+                "runtime_activation_executed": False,
+                "fpga": "NOT_RUN",
+                "dut": "NOT_RUN",
+            }
+
     def execute_authorized_bundle_host_only(
         self,
         request: HostOnlyPackageRequest,
@@ -371,8 +520,9 @@ class DeploymentCoordinator:
                 source_commit=request.source_commit,
                 target_profile=request.target_profile,
             )
-            if not isinstance(bundle, contract.VerifiedBundle):
-                raise contract.UnifiedDeploymentError("BUNDLE_V2_REQUIRED")
+            if (not isinstance(bundle, contract.VerifiedBundle)
+                    or bundle.schema != contract.BUNDLE_SCHEMA):
+                raise contract.UnifiedDeploymentError("BUNDLE_V3_REQUIRED")
             authority = contract.evaluate_host_only_bundle_authority(
                 bundle, trusted_policy=trusted_policy, now_epoch_s=now_epoch_s,
             )
@@ -382,15 +532,36 @@ class DeploymentCoordinator:
         except contract.UnifiedDeploymentError as exc:
             raise DeploymentError(f"host-only Bundle authorization denied: {exc}") from exc
         receipt = dict(self.execute_package_host_only(
-            request, inject_failure=inject_failure,
+            request, inject_failure=inject_failure, install_only=True,
         ))
         receipt["authorization"] = authority
         receipt["resolution"] = resolution
+        # The existing sandbox engine stages the verified archive and atomically
+        # switches ONE bundle receipt. It does NOT install individual packages
+        # or activate runtime services. Do not label the resolver's planned
+        # package actions as completed B3/B4 operations.
+        receipt["b3_install"] = {
+            "status": "HOST_ONLY_VERIFIED",
+            "archive_staged_host_only": True,
+            "package_order_plan": resolution["package_order"],
+            "package_stage_plan": resolution["stage"],
+            "package_reuse_plan": resolution["reuse"],
+            "per_package_install_executed": False,
+            "per_package_host_only_staging_verified": True,
+            "real_device_install_qualified": False,
+        }
+        receipt["b4_activate"] = {
+            "status": "NOT_QUALIFIED",
+            "bundle_receipt_switched_host_only": False,
+            "runtime_activation_executed": False,
+            "rollback_simulation_supported": True,
+        }
         receipt["install_qualified"] = False
         return receipt
 
     def execute_package_host_only(
         self, request: HostOnlyPackageRequest, *, inject_failure: str | None = None,
+        install_only: bool = False,
     ) -> Mapping[str, Any]:
         """One Lock/Journal/Engine; exercise package lifecycle in a sandbox ONLY.
 
@@ -409,6 +580,10 @@ class DeploymentCoordinator:
         if not self.paths.bootstrap_state_root.resolve().is_relative_to(temporary_root):
             raise DeploymentError("HOST_ONLY_SANDBOX_MUST_BE_TEMPORARY")
         if inject_failure not in (None, "after_stage", "after_activate", "rollback_unknown"):
+            raise DeploymentError("HOST_ONLY_FAILURE_SELECTOR_INVALID")
+        if install_only and inject_failure in ("after_activate", "rollback_unknown"):
+            raise DeploymentError("INSTALL_ONLY_ACTIVATION_FAILURE_SELECTOR_DENIED")
+        if type(install_only) is not bool:
             raise DeploymentError("HOST_ONLY_FAILURE_SELECTOR_INVALID")
 
         # A data-only contract module, not an installer, adapter or new daemon.
@@ -444,6 +619,22 @@ class DeploymentCoordinator:
             record.package_kind = package.kind
             record.artifact_sha256 = package.archive_sha256
             self.journal.write(record, "verified")
+            # Resolve the canonical v3 DAG BEFORE mutating the sandbox.
+            # The single existing transaction still activates the entire
+            # bundle atomically; package binaries are never executed.
+            resolution = contract.resolve_host_only_bundle(package, trusted_inventory={})
+            package_by_id = {p.id: p for p in package.packages}
+            ordered_members = []
+            for package_id in resolution["package_order"]:
+                component = package_by_id[package_id]
+                prefix = f"payload/packages/{package_id}/"
+                members = [entry for entry in component.files]
+                for member in members:
+                    if not member.path.startswith(prefix):
+                        raise DeploymentError("HOST_ONLY_PACKAGE_FILE_SCOPE_INVALID")
+                ordered_members.extend(members)
+            if {m.path for m in ordered_members} != {m.path for m in package.files}:
+                raise DeploymentError("HOST_ONLY_PACKAGE_FILE_COVERAGE_MISMATCH")
 
             # Only a non-production simulation store is mutated; the real
             # /opt/plasma, FPGA Manager and factory recovery are untouched.
@@ -533,7 +724,9 @@ class DeploymentCoordinator:
                     stage = Path(tempfile.mkdtemp(prefix=".host-only-", dir=release_root.parent))
                     try:
                         with zipfile.ZipFile(request.archive) as archive:
-                            for entry in package.files:
+                            # Stage packages in dependency order, rather than
+                            # iterating over ZIP/manifest declaration order.
+                            for entry in ordered_members:
                                 target = stage / entry.path
                                 target.parent.mkdir(parents=True, exist_ok=True)
                                 with archive.open(entry.path) as src, target.open("wb") as dest:
@@ -547,6 +740,18 @@ class DeploymentCoordinator:
                 self.journal.write(record, "staged")
                 if inject_failure == "after_stage":
                     raise DeploymentError("HOST_ONLY_INJECTED_STAGE_FAILURE")
+                if install_only:
+                    self.journal.write(record, "installed")
+                    return {
+                        "result": "PASS", "transaction": asdict(record),
+                        "operation": "install_only", "host_only": True,
+                        "release_id": release_id,
+                        "package_order": resolution["package_order"],
+                        "active_pointer_unchanged": True,
+                        "runtime_activation_executed": False,
+                        "install_qualified": False,
+                        "not_claimed": ["real Z2 install", "FPGA load", "DUT operation"],
+                    }
                 self.journal.write(record, "activating")
                 receipt = json.dumps({
                     "name": package.name, "kind": package.kind, "release_id": release_id,
@@ -735,6 +940,15 @@ def _parser() -> argparse.ArgumentParser:
     deploy.add_argument("--facility-id", required=True)
     deploy.add_argument("--display-name", default="Plasma PPU")
     deploy.add_argument("--api-transaction-id", help="optional Bootstrap API correlation ID; not authority")
+    b3 = sub.add_parser("install-bundle", help="B3 canonical v3 PS file installation ONLY")
+    b3.add_argument("--release-artifact", type=Path, required=True)
+    b3.add_argument("--source-commit", required=True)
+    b3.add_argument("--artifact-sha256", required=True)
+    b3.add_argument("--platform", required=True)
+    b3.add_argument("--board", required=True)
+    b3.add_argument("--fpga-part", required=True)
+    b3.add_argument("--api-transaction-id", required=True)
+
     deploy.add_argument(
         "--qualification-fail-health-check",
         action="store_true",
@@ -757,6 +971,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         systemd_root=args.systemd_root,
     )
     installer = _load_installer(args.installer)
+    if args.command == "install-bundle":
+        request = BundleV3InstallRequest(
+            archive=args.release_artifact,
+            source_commit=args.source_commit,
+            artifact_sha256=args.artifact_sha256,
+            target_profile={
+                "platform": args.platform, "board": args.board,
+                "fpga_part": args.fpga_part,
+            },
+            api_transaction_id=args.api_transaction_id,
+        )
+        try:
+            result = DeploymentCoordinator(paths=paths, installer=installer).execute_bundle_v3_install(request)
+        except DeploymentError as exc:
+            print("ppu-bootstrap-deployment: B3 install denied: " + str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     release_artifact = args.release_artifact.resolve()
     sidecar = (args.sidecar or Path(str(release_artifact) + ".sha256")).resolve()
     request = DeploymentRequest(
