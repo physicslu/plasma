@@ -1,0 +1,6 @@
+{
+  "icpn": "STM32F103C8T6",
+  "vendor": "ST",
+  "family": "STM32F1",
+  "fixture_only": true
+}
