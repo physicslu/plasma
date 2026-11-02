@@ -2,7 +2,7 @@
 
 **Canonical Package naming:** [Bundle → Packages → Files](../architecture/ppu-canonical-bundle-packages.md). Bundle v3 (`packages`, `payload/packages`) is the only accepted wire format; Bundle v2 `components` and Package v1 are retired.
 
-**Start here for PPU deployment:** [PPU Deployment — Start Here](ppu-deployment-start-here.md) defines the two PPU deployment routes — **A. Product deployment** (Console → Bootstrap `POST /v1/deployments`, one Coordinator; Factory Bootstrap is its prerequisite, `plasmactl z2-ps` its internal executor, Bundle v3 its asset payload format) and **B. Engineering deployment** (`ppu-deploy` over SSH, development only) — and the provisioning order.
+**Start here for PPU deployment:** [PPU Deployment — Start Here](ppu-deployment-start-here.md) defines the two PPU deployment routes — **A. Product deployment** (Console → Bootstrap API (`/v1/uploads` upload → `POST /v1/deployments`), one Coordinator; Factory Bootstrap is its prerequisite, `plasmactl z2-ps` its internal executor, Bundle v3 its asset payload format) and **B. Engineering deployment** (`ppu-deploy` over SSH, development only) — and the provisioning order.
 
 `scripts/plasmactl` is the profile-aware operator entry point for integration-host, local Control Station, SWPC Z2-like surrogate, and Real Z2 PS-only deployment roles. Profile-specific backends preserve separate ownership and qualification boundaries; a common CLI does not make those roles interchangeable.
 
