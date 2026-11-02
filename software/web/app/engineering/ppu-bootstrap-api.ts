@@ -242,10 +242,10 @@ export function admitManagerPpuBundle(
         result?.source_authorized !== true ||
         plan?.kind !== "bundle" ||
         plan?.execution_permitted !== false ||
-        approval?.status !== "MASTER_APPROVED" ||
-        approval?.method !== "root-provisioned-exact-bundle-sha256" ||
+        approval?.status !== "LOCAL_APPROVED" ||
+        approval?.method !== "device-local-exact-bundle-sha256" ||
         approval?.archive_sha256 !== plan?.archive_sha256) {
-      throw new Error("Bundle B2 receipt lacks approved Master source authority or non-execution guarantee");
+      throw new Error("Bundle B2 receipt lacks device-local approval or non-execution guarantee");
     }
     return receipt;
   });

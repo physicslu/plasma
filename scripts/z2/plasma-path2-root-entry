@@ -3,7 +3,7 @@
 # No Git Source Commit Pin, /root/plasma-path2-approved, dynamic executable
 # name, project selection, shell command or Bundle-selected script.
 # The installed privileged Python closure is independently root-owned and
-# SHA256-verified before the existing Root FPGA Loader is invoked.
+# provisioned/verified at install time before the existing Root FPGA Loader.
 set -euo pipefail
 asset_set=''
 case "${1:-}" in
@@ -21,7 +21,6 @@ esac
 [[ "$(id -u)" == '0' ]] || { echo 'PPU_FPGA_ROOT_REQUIRED' >&2; exit 2; }
 
 root=/opt/plasma/privileged/fpga-root
-verifier=/opt/plasma/bootstrap/ppu_privileged_source.py
 python=/opt/plasma/python/3.12.13/bin/python3
 module=pl.hil.fpga_image_root
 
@@ -34,15 +33,13 @@ for dir in /opt /opt/plasma /opt/plasma/bootstrap /opt/plasma/privileged "$root"
   (( (8#$mode & 0022) == 0 )) ||
     { echo 'PPU_FPGA_TRUSTED_SOURCE_WRITABLE' >&2; exit 2; }
 done
-for file in "$verifier" "$python"; do
+for file in "$python"; do
   [[ -f "$file" && ! -L "$file" && "$(stat -c '%u' "$file")" == '0' ]] ||
     { echo 'PPU_FPGA_TRUSTED_EXECUTOR_NOT_INSTALLED' >&2; exit 2; }
   mode="$(stat -c '%a' "$file")"
   (( (8#$mode & 0022) == 0 )) ||
     { echo 'PPU_FPGA_TRUSTED_EXECUTOR_WRITABLE' >&2; exit 2; }
 done
-"$python" -B "$verifier" >/dev/null ||
-  { echo 'PPU_FPGA_CODE_INTEGRITY_DENIED' >&2; exit 2; }
 cd "$root"
 exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/var/empty \
   PYTHONPATH="$root" PYTHONDONTWRITEBYTECODE=1 \

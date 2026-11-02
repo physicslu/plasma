@@ -127,10 +127,6 @@ def prepare_asset_execution(
     try:
         authorized = authority.approve_identity(
             archive_sha256=request.asset_set_sha256,
-            source_commit=manifest["source_commit"],
-            purpose=manifest["purpose"],
-            target=manifest["target"],
-            package_kinds=[p["kind"] for p in manifest["packages"]],
             policy_path=policy_path,
         )
     except authority.BundleAuthorityDenied as exc:
@@ -148,8 +144,7 @@ def prepare_asset_execution(
         "relative_files": [f["path"] for f in descriptor["files"]],
         "dependencies": list(selected["requires"]),
         "master_authority": {
-            "publisher": authorized["publisher"],
-            "master_generation": authorized["master_generation"],
+            "generation": authorized["generation"],
             "archive_sha256": authorized["archive_sha256"],
             "policy_sha256": authorized["policy_sha256"],
         },
@@ -238,7 +233,7 @@ def dispatch_asset_execution(
 
     Caller-owned Runtime execution_scope must pin Site/PPU ownership
     throughout selected executor operation. FPGA executor additionally
-    enforces hardware quiescence, Root source pin, Golden and FPGA Manager
+    enforces hardware quiescence, protected Linux Root source, Golden and FPGA Manager
     checks; no Bundle can name arbitrary executables or commands.
     """
     if execution_scope is None or not callable(execution_scope):

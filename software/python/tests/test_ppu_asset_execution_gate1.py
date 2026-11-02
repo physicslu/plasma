@@ -76,7 +76,7 @@ def test_one_authorized_execution_layer_for_all_types(tmp_path, kind, executor_n
     assert plan["trusted_executor"] == executor_name
     assert plan["asset_set_sha256"] == requests[kind].asset_set_sha256
     assert plan["package_identity_sha256"] == requests[kind].package_identity_sha256
-    assert plan["master_authority"]["publisher"] == "open4th-test-master"
+    assert plan["master_authority"]["generation"] == 1
     assert plan["asset_executed"] is False
     assert plan["fpga_loaded"] is False
     assert plan["ready"] is False
@@ -161,7 +161,7 @@ def test_asset_execution_rechecks_current_master_revocation_after_b2_b3(tmp_path
         co.paths.product_root, policy, requests["fpga-image"],
     )["status"] == "AUTHORIZED_NOT_EXECUTED"
     grants = json.loads(policy.read_text())
-    grants["authorizations"][0]["archive_sha256"] = "e" * 64
+    grants["approved_bundle_sha256"] = ["e" * 64]
     policy.write_text(json.dumps(grants))
     called = []
     with pytest.raises(execution.AssetExecutionDenied,

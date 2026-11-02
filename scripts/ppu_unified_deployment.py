@@ -691,55 +691,33 @@ def resolve_host_only_bundle(
 
 
 def evaluate_host_only_bundle_authority(
-    bundle: VerifiedBundle,
-    *,
-    trusted_policy: Mapping[str, object],
+    bundle: VerifiedBundle, *, trusted_policy: Mapping[str, object],
     now_epoch_s: int,
 ) -> dict[str, object]:
-    """Fail-closed simulation of independently trusted publisher/Master policy.
+    """Host-only fixture for single-device approved exact Bundle SHA256.
 
-    A manifest field, source SHA, hash, Bearer token or user-controlled flag
-    MUST NEVER be accepted in place of a device-owned signed publisher grant.
-    This pure function is NOT wired to Bootstrap HTTP or an on-device installer.
+    Does not grant physical installation or hardware execution.
     """
     if not isinstance(bundle, VerifiedBundle) or type(now_epoch_s) is not int:
         raise UnifiedDeploymentError("BUNDLE_AUTHORITY_INPUT_INVALID")
-    required = {
-        "schema", "publisher", "source_commit", "archive_sha256", "target",
-        "purpose", "master_generation", "active_master_generation",
-        "allowed_kinds", "expires_epoch_s",
-    }
+    required = {"schema", "generation", "approved_bundle_sha256"}
     if not isinstance(trusted_policy, Mapping) or set(trusted_policy) != required:
         raise UnifiedDeploymentError("BUNDLE_AUTHORITY_NOT_PROVISIONED")
-    if (trusted_policy["schema"] != BUNDLE_POLICY_SCHEMA
-            or type(trusted_policy["publisher"]) is not str
-            or not SAFE_NAME.fullmatch(trusted_policy["publisher"])
-            or type(trusted_policy["source_commit"]) is not str
-            or trusted_policy["source_commit"] != bundle.source_commit
-            or type(trusted_policy["archive_sha256"]) is not str
-            or trusted_policy["archive_sha256"] != bundle.archive_sha256
-            or type(trusted_policy["target"]) is not dict
-            or trusted_policy["target"] != dict(bundle.target)
-            or type(trusted_policy["purpose"]) is not str
-            or trusted_policy["purpose"] != bundle.purpose):
-        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_MISMATCH")
-    if (type(trusted_policy["master_generation"]) is not int
-            or type(trusted_policy["active_master_generation"]) is not int
-            or trusted_policy["master_generation"] <= 0
-            or trusted_policy["master_generation"] != trusted_policy["active_master_generation"]
-            or type(trusted_policy["expires_epoch_s"]) is not int
-            or trusted_policy["expires_epoch_s"] <= now_epoch_s):
-        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_REVOKED_OR_EXPIRED")
-    allowed = trusted_policy["allowed_kinds"]
-    if (type(allowed) is not list or not allowed
-            or any(type(kind) is not str or not SAFE_NAME.fullmatch(kind) for kind in allowed)
-            or len(set(allowed)) != len(allowed)
-            or any(package.kind not in allowed for package in bundle.packages)):
-        raise UnifiedDeploymentError("BUNDLE_PACKAGE_KIND_NOT_AUTHORIZED")
+    approved = trusted_policy["approved_bundle_sha256"]
+    if (trusted_policy["schema"] != "plasma.ppu.bundle-authority.v2"
+            or type(trusted_policy["generation"]) is not int
+            or trusted_policy["generation"] <= 0
+            or type(approved) is not list
+            or len(approved) > 128
+            or any(type(x) is not str or SHA64.fullmatch(x) is None
+                   for x in approved)
+            or len(set(approved)) != len(approved)):
+        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_POLICY_INVALID")
+    if bundle.archive_sha256 not in approved:
+        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_DIGEST_NOT_APPROVED")
     return {
-        "publisher": trusted_policy["publisher"],
-        "master_generation": trusted_policy["master_generation"],
-        "purpose": bundle.purpose,
+        "method": "device-local-exact-bundle-sha256",
+        "generation": trusted_policy["generation"],
         "archive_sha256": bundle.archive_sha256,
         "scope": "host-only-fixture",
         "device_install_authorized": False,

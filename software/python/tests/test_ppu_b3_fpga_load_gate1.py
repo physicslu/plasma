@@ -376,8 +376,8 @@ def test_root_entry_trusts_immutable_code_not_git_commit_pin():
     shell = ENTRY.read_text()
     assert 'bundle-load)' in shell
     assert 'root=/opt/plasma/privileged/fpga-root' in shell
-    assert 'verifier=/opt/plasma/bootstrap/ppu_privileged_source.py' in shell
-    assert '"$python" -B "$verifier" >/dev/null' in shell
+    assert 'for file in "$python"; do' in shell
+    assert '"$python" -B "$verifier"' not in shell
     assert '"$python" -B -m "$module" "$operation" ${asset_set:+"$asset_set"}' in shell
     assert ".plasma-path2-source-commit" not in shell
     assert "/root/plasma-path2-approved" not in shell.splitlines()[-35:]

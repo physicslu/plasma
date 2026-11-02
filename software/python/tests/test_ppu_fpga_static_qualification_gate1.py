@@ -406,13 +406,13 @@ def test_b3_rejects_fpga_contract_or_master_grant_change_after_b2(tmp_path):
 
     # Master grant changed (new generation) after B2.
     grants = json.loads(paths.bundle_authority_policy.read_text())
-    paths.bundle_authority_policy.write_text(json.dumps(dict(grants, master_generation=2)))
+    paths.bundle_authority_policy.write_text(json.dumps(dict(grants, generation=2)))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_ADMISSION_AUTHORITY_CHANGED"):
         srv.start_deployment(b3)
-    # Master grant expired after B2.
-    expired = json.loads(json.dumps(grants))
-    expired["authorizations"][0]["expires_epoch_s"] = 1
-    paths.bundle_authority_policy.write_text(json.dumps(expired))
+    # Local Bundle approval revoked after B2.
+    withdrawn = json.loads(json.dumps(grants))
+    withdrawn["approved_bundle_sha256"] = []
+    paths.bundle_authority_policy.write_text(json.dumps(withdrawn))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MASTER_AUTHORITY_DENIED"):
         srv.start_deployment(b3)
     paths.bundle_authority_policy.write_text(json.dumps(grants))

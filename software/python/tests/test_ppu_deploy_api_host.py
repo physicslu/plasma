@@ -295,14 +295,11 @@ def _admitted_bundle_record(upload_id, tx, *, actions=None):
                 "purpose": "programming", "archive_sha256": "a" * 64,
                 "files": [], "execution_permitted": False,
                 "authorization": {
-                    "status": "MASTER_APPROVED",
-                    "method": "root-provisioned-exact-bundle-sha256",
+                    "status": "LOCAL_APPROVED",
+                    "method": "device-local-exact-bundle-sha256",
                     "archive_sha256": "a" * 64,
-                    "publisher": "test-master",
-                    "master_generation": 1,
+                    "generation": 1,
                     "policy_sha256": "b" * 64,
-                    "expires_epoch_s": 4102444800,
-                    "allowed_kinds": ["fpga-image"],
                 },
                 "requested_actions": ["install", "verify"] if actions is None else actions,
                 "packages": [{

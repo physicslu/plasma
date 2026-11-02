@@ -21,7 +21,6 @@ usage: plasma_swd_site_admission.py admit <site> | revoke <site>
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -30,7 +29,6 @@ import time
 from pathlib import Path
 
 PROTECTED_ROOT = Path("/opt/plasma/privileged/fpga-root")
-VERIFIER = Path("/opt/plasma/bootstrap/ppu_privileged_source.py")
 RECORD_DIR = Path("/run/plasma-z2-swd05")
 ELECTRICAL_DIR = Path("/root/plasma-swd-electrical")
 RECORD_TTL_S = 300
@@ -61,22 +59,20 @@ def _private_root_file(path: Path) -> os.stat_result:
 
 
 def verify_protected_tree(root: Path = PROTECTED_ROOT) -> str:
-    """Require root-owned reviewed code, not a 40-hex Git commit pin."""
-    verify = VERIFIER.lstat()
-    need(verify.st_uid == 0 and verify.st_mode & 0o022 == 0
-         and not VERIFIER.is_symlink() and VERIFIER.is_file(),
-         "PRIVILEGED_VERIFIER_UNTRUSTED")
-    spec = importlib.util.spec_from_file_location("plasma_swd_privileged_code", VERIFIER)
-    need(spec is not None and spec.loader is not None,
-         "PRIVILEGED_VERIFIER_UNAVAILABLE")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    report = module.verify_source(root)
-    need(report["status"] == "VERIFIED_NOT_EXECUTED"
-         and re.fullmatch(r"[0-9a-f]{64}", report["code_manifest_sha256"]) is not None,
-         "PRIVILEGED_CODE_NOT_VERIFIED")
-    return report["code_manifest_sha256"]
+    """Only Linux root-owned, non-writable installed code is trusted at use time.
+
+    Full inventory SHA256 verification already happened during installation.
+    Native C uses the root-owned manifest's immutable stat identity to
+    invalidate a prior Site admission on any local source replacement.
+    """
+    guard.protected(root, file=False)
+    info = _private_root_file(root / ".plasma-privileged-code.json")
+    need(info.st_size <= 16384, "PRIVILEGED_CODE_MANIFEST_INVALID")
+    for name in ("pl/hil/fpga_image_root.py", "pl/hil/fpga_image_guard.py",
+                 "pl/hil/fpga_image_admission.py",
+                 "software/python/plasma_interfaces/linux_mmio.py"):
+        guard.protected(root / name)
+    return hashlib.sha256((root / ".plasma-privileged-code.json").read_bytes()).hexdigest()
 
 
 def load_attestation(site: int, now: float) -> tuple[Path, os.stat_result, int, dict]:

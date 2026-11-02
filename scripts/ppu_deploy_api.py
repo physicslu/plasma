@@ -108,19 +108,16 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
         return False
     packages = plan.get("packages")
     authorization = plan.get("authorization")
-    # An old B2 PASS alone is not proof of the current root-provisioned Master grant.
+    # Local approval is independent of caller, Bundle metadata and B2 receipt.
     if (type(authorization) is not dict
-            or authorization.get("status") != "MASTER_APPROVED"
-            or authorization.get("method") != "root-provisioned-exact-bundle-sha256"
+            or set(authorization) != {"status", "method", "archive_sha256", "generation", "policy_sha256"}
+            or authorization.get("status") != "LOCAL_APPROVED"
+            or authorization.get("method") != "device-local-exact-bundle-sha256"
             or authorization.get("archive_sha256") != plan.get("archive_sha256")
-            or type(authorization.get("master_generation")) is not int
-            or authorization["master_generation"] <= 0
+            or type(authorization.get("generation")) is not int
+            or authorization["generation"] <= 0
             or type(authorization.get("policy_sha256")) is not str
-            or _HEX64.fullmatch(authorization["policy_sha256"]) is None
-            or type(authorization.get("expires_epoch_s")) is not int
-            or type(authorization.get("allowed_kinds")) is not list
-            or any(type(k) is not str for k in authorization["allowed_kinds"])
-            or len(set(authorization["allowed_kinds"])) != len(authorization["allowed_kinds"])):
+            or _HEX64.fullmatch(authorization["policy_sha256"]) is None):
         return False
     valid = (
         type(plan.get("purpose")) is str and bool(plan["purpose"])
@@ -133,11 +130,10 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
                 and type(package.get("files")) is list
                 for package in packages)
         and len({package["id"] for package in packages}) == len(packages)
-        and set(package["kind"] for package in packages) <= set(authorization["allowed_kinds"])
     )
     if not valid:
         return False
-    # B2 PASS = Master-authorized source + static Asset qualification only.
+    # B2 PASS = locally approved Bundle + static Asset qualification only.
     # It is never an FPGA load, Identity readback or execution grant.
     has_fpga = any(package["kind"] == "fpga-image" for package in packages)
     return (

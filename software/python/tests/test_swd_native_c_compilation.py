@@ -694,7 +694,8 @@ def test_site_admission_attestation_and_tree_negative(tmp_path, monkeypatch):
             adm.load_attestation(1, 0.0)
     tree = tmp_path / "tree"
     tree.mkdir()
-    monkeypatch.setattr(adm, "VERIFIER", tree / "missing-verifier.py")
+    # Missing Linux-protected installed source fails closed, no repeated hash.
+    monkeypatch.setattr(adm, "PROTECTED_ROOT", tree)
     # New source-closure issuer must fail before importing any untrusted code.
     with pytest.raises((adm.SiteAdmissionDenied, OSError)):
         adm.verify_protected_tree(tree)
