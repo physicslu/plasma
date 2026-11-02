@@ -187,6 +187,116 @@ def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
         uio_name=data["uio_name"], expected_uio=uio)
 
 
+def validate_bundle_fpga_handoff(
+    handoff: dict, *,
+    expected_active_set_sha256: str,
+    manifest_bytes: bytes,
+    bin_bytes: bytes,
+    hwh_bytes: bytes,
+) -> dict:
+    """Host-only Root compatibility verification of a PPU-selected Asset.
+
+    Reuses the exact production Root Image Manifest parser (including
+    Identity, AXI/ABI and UIO geometry), but grants *no* privilege and does
+    not modify /lib/firmware, invoke FPGA Manager or access DUT.
+
+    This check is an additional input/format gate, NOT proof of an
+    authorized Controller request, signed publisher, live hardware,
+    Root source pin or Golden Recovery. Later privileged installation
+    must revalidate from the immutable Active Set under exclusive locks.
+    """
+    need(type(expected_active_set_sha256) is str and
+         re.fullmatch(r"[0-9a-f]{64}", expected_active_set_sha256) is not None,
+         "ROOT_HANDOFF_ACTIVE_IDENTITY_INVALID")
+    need(type(handoff) is dict and
+         handoff.get("schema") == "plasma.ppu.fpga-asset-handoff.v1" and
+         handoff.get("status") == "VERIFIED_NOT_LOADED" and
+         handoff.get("asset_set_sha256") == expected_active_set_sha256 and
+         handoff.get("ready") is False and
+         handoff.get("fpga_install") == "NOT_RUN" and
+         handoff.get("fpga_load") == "NOT_RUN" and
+         handoff.get("root_hardware_validation") == "NOT_RUN",
+         "ROOT_HANDOFF_NOT_BOUND_TO_ACTIVE_SET")
+    selected = handoff.get("fpga_image")
+    profile = handoff.get("programming_profile")
+    need(type(selected) is dict and type(profile) is dict,
+         "ROOT_HANDOFF_SELECTION_MISSING")
+    image_id = selected.get("image_id")
+    package_id = selected.get("package_id")
+    package_version = selected.get("package_version")
+    need(all(type(item) is str and
+             re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item) is not None
+             for item in (image_id, package_id, package_version,
+                          profile.get("package_id"), profile.get("package_version"))),
+         "ROOT_HANDOFF_SELECTION_INVALID")
+    need(type(profile.get("package_identity_sha256")) is str and
+         re.fullmatch(r"[0-9a-f]{64}", profile["package_identity_sha256"]) is not None,
+         "ROOT_HANDOFF_PROFILE_IDENTITY_INVALID")
+    need(type(bin_bytes) is bytes and 0 < len(bin_bytes) <= 16_000_000 and
+         type(hwh_bytes) is bytes and 0 < len(hwh_bytes) <= 4_000_000,
+         "ROOT_HANDOFF_IMAGE_SIZE_INVALID")
+    manifest = parse_image_manifest_bytes(manifest_bytes)
+    prefix = "payload/packages/" + package_id + "/fpga/"
+    names = {
+        "bin": selected.get("bin_relative_path"),
+        "hwh": selected.get("hwh_relative_path"),
+        "manifest": selected.get("manifest_relative_path"),
+    }
+    need(all(type(name) is str and
+             name.startswith(prefix) and
+             re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", name[len(prefix):]) is not None
+             for name in names.values()),
+         "ROOT_HANDOFF_RELATIVE_PATH_INVALID")
+    need(names["bin"] == prefix + manifest.firmware_name and
+         names["hwh"].endswith(".hwh") and
+         names["manifest"].endswith(".json") and
+         len(set(names.values())) == 3,
+         "ROOT_HANDOFF_FILE_ROLE_INVALID")
+    checks = (
+        ("bin_sha256", bin_bytes, manifest.firmware_sha256),
+        ("hwh_sha256", hwh_bytes, None),
+        ("manifest_sha256", manifest_bytes, None),
+    )
+    for field, data, paired in checks:
+        expected = selected.get(field)
+        need(type(expected) is str and
+             re.fullmatch(r"[0-9a-f]{64}", expected) is not None,
+             "ROOT_HANDOFF_HASH_INVALID")
+        actual = hashlib.sha256(data).hexdigest()
+        need(actual == expected and (paired is None or actual == paired),
+             "ROOT_HANDOFF_HASH_MISMATCH")
+    need(manifest.image_id == image_id and
+         selected.get("board_id") == manifest.board_id and
+         selected.get("fpga_part") == manifest.fpga_part and
+         selected.get("abi_version_claim") == manifest.abi_version and
+         manifest.recovery_name == "base.bin",
+         "ROOT_HANDOFF_IMAGE_IDENTITY_MISMATCH")
+    # Golden is not part of the incoming Bundle; Root must independently
+    # prove its SHA and current-boot manager/ownership state before load.
+    return {
+        "schema": "plasma.ppu.fpga-root-handoff-preflight.v1",
+        "result": "ROOT_FORMAT_VERIFIED_NOT_INSTALLED",
+        "asset_set_sha256": expected_active_set_sha256,
+        "fpga_image_id": manifest.image_id,
+        "fpga_bin_name": manifest.firmware_name,
+        "fpga_bin_sha256": manifest.firmware_sha256,
+        "fpga_hwh_sha256": selected["hwh_sha256"],
+        "fpga_manifest_sha256": selected["manifest_sha256"],
+        "programming_profile_identity_sha256":
+            profile["package_identity_sha256"],
+        "board_id": manifest.board_id,
+        "fpga_part": manifest.fpga_part,
+        "abi_version": manifest.abi_version,
+        "golden_recovery": "NOT_VERIFIED",
+        "root_source_pin": "NOT_VERIFIED",
+        "hardware_ownership": "NOT_VERIFIED",
+        "fpga_installed": False,
+        "fpga_loaded": False,
+        "dut": "NOT_RUN",
+        "ready": False,
+    }
+
+
 def read_identity(read32, release: ImageManifest) -> dict[int, int]:
     observed = {}
     for offset, expected, mask in release.identity_words:
