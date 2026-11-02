@@ -33,44 +33,61 @@ signature, Master approval or device authorization.
   Active pointer, rebooting a service, running a Python Parser, loading
   an FPGA or touching a DUT.
 
-## Activation and Job quiescence — intentionally fail closed on Z2
+## Activation and authoritative cross-process Job Quiescence
 
-The *existing* DeploymentCoordinator \`deployment.lock\` and
-\`deployment.json\` Journal serialize and record a P1 activation
-transaction. \`activate_staged_asset_set()\` independently verifies
-the entire installed Asset Set before switching, and makes the pointer
-visible through a single atomic \`os.replace()\` plus fsync.
+The existing `DeploymentCoordinator` owns `deployment.lock` and
+`deployment.json` for B3 and Asset Set activation, with one atomic
+`assets/active.json` pointer swap and durable `fsync`. This is a
+**separate explicit operation**, never an implicit B3 side effect.
 
-**A held trusted exclusive Runtime/Job quiescence lease is mandatory.**
-It must prevent new Jobs from being admitted and ensure all queued,
-running and cancelling Site Jobs and relevant PS/PL hardware users have
-released ownership **for the entire activation**. A Console-provided
-\`idle=true\`, a status snapshot or a public token is NOT proof.
+The PPU Runtime already has a private Unix control socket
+(`/run/plasma-server/control.sock`) and a `SiteManager` execution
+lease/Runtime Quiesce gate. P1 extends **this same existing socket**, not
+another daemon or path, with a private
+`{"operation":"hold_asset_activation"}` request. Its behavior:
 
-The current SiteManager's execution lease and RuntimeQuiesceGate are
-process-local and are **not yet a verified cross-process Bootstrap guard**.
-Therefore real PPU/HTTP activation is **NOT QUALIFIED / NOT EXPOSED**.
-The Coordinator method requires an injected **trusted context manager**
-and denies without one. Host-only tests inject a controlled lease to
-verify the state transition and busy/failure logic. This does **not**
-qualify loading an FPGA or changing resources while real Jobs exist.
+1. Under the **same SiteManager execution lock** used when reserving
+   queued/running/cancelling Jobs, reject a held lease while any Site Job
+   remains active, including cancelled-but-not-terminal work.
+2. Grant a **connection-held exclusive Quiesce** if the Runtime can
+   authoritatively prove it has no active Jobs. While the socket stays
+   connected, new Jobs are rejected even if submitted immediately
+   after a zero-active-Jobs snapshot.
+3. The Bootstrap's internal Asset Set helper validates the private Unix
+   socket and holds the connection for the **entire** Active pointer
+   replacement and directory `fsync`; the Runtime frees its gate on
+   socket EOF or abrupt client disconnect. An absent/untrusted Runtime,
+   busy Job or concurrent legacy runtime-quiesce request fails closed.
+4. Runtime's pre-existing **TTL-based server-restart quiesce** remains
+   distinct and unchanged. The Asset Set lease is connection-scoped so
+   it cannot expire during an incomplete atomic pointer swap.
+5. Internal `activate_staged_asset_set()` defaults to using the trusted
+   local socket; Host-only tests can inject a controlled lease. No
+   Console request field or untrusted ZIP can supply `idle=true`
+   or bypass this authority.
 
-The last verified Active Set is not deleted or overwritten when B3
-stages a new Set; failed validation or quiescence refuses the new Set.
-Uncertain outcomes after an attempted pointer write require recovery
-through the same existing Coordinator journal rather than blind retry.
+**Evidence limit:** The P1 cross-process contract is Host-only tested.
+Runtime admission and activation have not yet been validated on a real
+Z2, and other out-of-process FPGA Manager/UIO/kernel owners remain
+outside this Job-quiescence guarantee. There is still **no public
+Console B4/Activation API** and no real PPU activation permission
+claimed here. Source installation, service restarts, physical HIL and
+full end-to-end recovery remain separate acceptance work.
 
-**ACTIVE is not READY**. A separate Controller-directed FPGA
-Configuration and full Programming Profile/ICPN/hardware qualification
-remain P2. The Active SHA must never be treated as proof that the
-selected FPGA Image is physically loaded or that a DUT is programmable.
+A failed update leaves the last verified Active Set unchanged; an
+uncertain pointer write enters the existing Coordinator recovery state.
+The existing Active content remains immutable while a new Set is staged.
+
+**ACTIVE is not READY**. FPGA Configuration, exact Profile/ICPN and
+PS/PL hardware ownership checks remain a distinct P2 task. Even a
+successful P1 Asset Set SHA match is not evidence that the FPGA is loaded.
 
 ## Non-goals and next evidence
 
 This PR does not add a new server/daemon/installer, multi-version Package
 Resolver, FPGA Loader, proprietary staging path, public B4 activation
-API, production publisher authentication, live PPU cross-process
-quiescence, Job execution or Z2 HIL results.
+API, production publisher authentication, real Z2 cross-process/HIL
+qualification, Job execution or Z2 HIL results.
 
 Before a real PPU activation can be enabled, integrate and demonstrate
 an authoritative cross-process Job ownership/quiescence lease held by
