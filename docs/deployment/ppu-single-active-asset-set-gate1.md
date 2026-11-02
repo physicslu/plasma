@@ -1,5 +1,7 @@
 # PPU Single Active Asset Set — P1 Gate 1
 
+> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+
 **State:** Draft implementation, Host-only / CI evidence only.
 **Dependencies:** [PR #1245](https://github.com/physicslu/plasma/pull/1245)
 (Generic Bundle B3 Install/Verify), plus the owner-approved architectural

@@ -1,5 +1,7 @@
 # PLASMA — Runtime FPGA Architecture v1.0
 
+> **Term note:** in this document **B1/B2/B3 are the PR #972 FPGA/UIO safety items** — B1 live Fabric UIO ownership handoff, B2 retained-mmap guard, B3 aperture Supervisor. Not the Bundle-stage meaning; see [glossary](../glossary.md#b1b2b3).
+
 > **狀態：Plan / Proposed Roadmap（非 Current Implementation，也不是 HIL PASS）**
 >
 > **記錄日期：2026-10-16**

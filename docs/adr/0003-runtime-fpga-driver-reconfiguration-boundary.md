@@ -1,5 +1,7 @@
 # ADR-0003 — PPU Runtime FPGA Driver and Reconfiguration Boundary
 
+> **Term note:** in this document **B1/B2/B3 are the PR #972 FPGA/UIO safety items** — B1 live Fabric UIO ownership handoff, B2 retained-mmap guard, B3 aperture Supervisor. Not the Bundle-stage meaning; see [glossary](../glossary.md#b1b2b3).
+
 > **Status: Proposed (amended fixed-image v1 Gate 1 candidate)** — **not Accepted**, M1 NO-GO. Original dynamic-switching content retained below as deferred research.
 >
 > **Date:** 2026-10-16. **Related:** [Runtime FPGA Architecture v1.0 roadmap](../architecture/runtime-fpga-architecture-v1.md), [Proposed Hardware ABI v1](../architecture/runtime-fpga-hardware-abi-v1.md), [Switching/HIL plan](../development/runtime-fpga-switching-hil-plan-v1.md).

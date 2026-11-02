@@ -1,5 +1,7 @@
 # Engineering Programming Workspace
 
+> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+
 ## Purpose
 
 `Engineering Mode -> Programming` is the canonical single-PPU engineering programming workspace.

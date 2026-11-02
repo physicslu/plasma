@@ -1,5 +1,7 @@
 # PPU Single Active Asset Set — Controller-Driven Programming Architecture
 
+> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+
 **Decision recorded:** 2026-11-02 (owner discussion).  
 **Status:** Owner-approved architecture decision (2026-11-02); implementation, wire/API details and hardware qualification **NOT IMPLEMENTED / NOT VERIFIED**.  
 **Scope:** PLASMA PPU PS programming resource selection after Bundle v3 delivery. This document does **not** authorize runtime changes, deployment, activation, FPGA/DUT operation, or a new Gate 1.

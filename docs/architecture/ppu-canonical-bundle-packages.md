@@ -1,5 +1,7 @@
 # PLASMA Universal Bundle — Canonical Naming and Wire Schema
 
+> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+
 **Architecture Decision (2026-10-31, Gate 1 Draft):** One deployment format, **Bundle → Packages → Files**. This document defines the only canonical vocabulary for future PLASMA PPU packaging. It does not grant install, activation, publisher authority, FPGA, DUT, or production-security qualification.
 
 ## Terminology (normative)
