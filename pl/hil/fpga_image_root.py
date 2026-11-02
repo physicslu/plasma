@@ -249,6 +249,7 @@ def validate_bundle_fpga_handoff(
              for name in names.values()),
          "ROOT_HANDOFF_RELATIVE_PATH_INVALID")
     need(names["bin"] == prefix + manifest.firmware_name and
+         names["bin"].endswith(".bin") and
          names["hwh"].endswith(".hwh") and
          names["manifest"].endswith(".json") and
          len(set(names.values())) == 3,
@@ -393,8 +394,10 @@ def stage_bundle_fpga_files_only(
     return {
         **preflight,
         "result": "ROOT_FILES_STAGED_NOT_ACTIVATED",
-        "fpga_installed": True,
+        "firmware_files_staged": True,
+        "fpga_installed": False,
         "fpga_loaded": False,
+        "golden_recovery": "SHA_VERIFIED",
         "root_hardware_activation": "NOT_RUN",
         "ready": False,
         "firmware_name": release.firmware_name,
