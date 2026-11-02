@@ -62,6 +62,8 @@ def test_real_installer_b3_stages_and_verifies_three_packages_without_activation
     root = Path(result["install_path"])
     assert root.is_dir() and root.is_relative_to(co.paths.product_root)
     assert (root / "b3-install.json").is_file()
+    assert (root / "manifest.json").is_file()
+    assert json.loads((root / "manifest.json").read_text())["schema"] == "plasma.ppu.bundle.v3"
     assert root.parent.name == "staged"
     assert root.name == digest
     # The installed smoke is executed by Z2 nobody, not the root installer.
