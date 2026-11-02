@@ -949,6 +949,22 @@ class BootstrapHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/v1/assets":
+            try:
+                helper = _load_script(
+                    Path(__file__).with_name("ppu_asset_set.py"),
+                    "plasma_ppu_assets_status",
+                )
+                current = helper.read_active(self.owner.bootstrap_paths.product_root)
+                self._json(HTTPStatus.OK, {"ok": True, "assets": current})
+            except Exception:
+                # An untrusted or corrupt pointer must not be returned as
+                # matching SHA; otherwise Console could skip a needed update.
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"ok": False, "error": "asset_set_identity_untrusted"},
+                )
+            return
         if path == "/v1/health":
             self._json(
                 HTTPStatus.OK,
