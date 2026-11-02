@@ -60,6 +60,8 @@ def test_real_installer_b3_stages_and_verifies_three_packages_without_activation
     root = Path(result["install_path"])
     assert root.is_dir() and root.is_relative_to(co.paths.product_root)
     assert (root / "b3-install.json").is_file()
+    assert root.parent.name == "staged"
+    assert root.name == digest
     # The installed smoke is executed by Z2 nobody, not the root installer.
     assert (root.stat().st_mode & 0o777) == 0o755
     assert ((root / "payload/packages/python-smoke").stat().st_mode & 0o777) == 0o755
@@ -70,7 +72,7 @@ def test_real_installer_b3_stages_and_verifies_three_packages_without_activation
     assert not (co.paths.product_root / "current").exists()
 
 
-def test_b3_repeat_install_direct_overwrite_without_backup_or_b4(tmp_path):
+def test_b3_repeat_install_reuses_immutable_content_without_backup_or_b4(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     co = make_coordinator(tmp_path)
     first = co.execute_bundle_v3_install(b3_request(archive, digest))
@@ -96,7 +98,7 @@ def test_b3_archive_hash_denied_without_product_mutation(tmp_path):
 def test_b3_existing_unowned_directory_is_never_deleted(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     co = make_coordinator(tmp_path)
-    dest = co.paths.product_root / "bundles" / "ppu-b3-smoke"
+    dest = co.paths.product_root / "assets" / "staged" / digest
     dest.mkdir(parents=True)
     (dest / "important.txt").write_text("unrelated")
     with pytest.raises(engine.DeploymentError, match="B3_INSTALL_REQUIRES_RECOVERY"):
@@ -108,7 +110,7 @@ def test_b3_existing_unowned_directory_is_never_deleted(tmp_path):
 def test_b3_existing_symlink_fail_closed(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     co = make_coordinator(tmp_path)
-    dest = co.paths.product_root / "bundles" / "ppu-b3-smoke"
+    dest = co.paths.product_root / "assets" / "staged" / digest
     dest.parent.mkdir(parents=True)
     external = tmp_path / "external"
     external.mkdir()
@@ -123,11 +125,9 @@ def test_b3_existing_symlink_fail_closed(tmp_path):
 def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     source_policy = {
-        "schema": "plasma.ppu.b3-factory-policy.v1",
-        "bundle_name": "ppu-b3-smoke",
-        "source_commit": SOURCE,
-        "archive_sha256": digest,
-        "target": dict(TARGET),
+        "schema": "plasma.ppu.b3-install-policy.v1",
+        "mode": "development",
+        "install_only": True,
         "actions": ["install", "verify"],
     }
     paths = bootstrap.ServicePaths(
@@ -179,9 +179,9 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
                               "install_only": True, "publisher": "caller"})
-    new = dict(source_policy, archive_sha256="f" * 64)
+    new = dict(source_policy, mode="untrusted")
     paths.bundle_install_policy.write_text(json.dumps(new))
-    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_ADMISSION_NOT_PINNED"):
+    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_POLICY_INVALID"):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
                               "install_only": True})
     paths.bundle_install_policy.write_text(json.dumps(source_policy))
