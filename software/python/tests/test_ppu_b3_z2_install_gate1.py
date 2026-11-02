@@ -9,7 +9,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import stat
 import threading
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -196,3 +198,92 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     assert result["result"]["coordinator_receipt"]["coordinator_state"] == "bundle_installed"
     assert result["result"]["runtime_activation_executed"] is False
     assert not (paths.product_root / "current").exists()
+
+
+def build_generic_assets(tmp_path, *, bitstream=b"fpga-image-v1"):
+    """Canonical, nonexecuting multi-kind Bundle; unrelated to smoke fixture."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    archive = tmp_path / "assets.zip"
+    package_specs = [
+        ("swd-parser", "python", (), {"python/parse.py": b"raise RuntimeError('NOT_EXECUTED')\\n"}),
+        ("custom-swd", "fpga-image", (), {
+            "fpga/swd.bin": bitstream, "fpga/swd.hwh": b"<hwh/>",
+            "fpga/image.json": b'{"image_id":"custom-swd"}',
+        }),
+        ("stm32-profile", "programming-profile", ("custom-swd", "swd-parser"), {
+            "data/profile.json": b'{"icpn":"STM32F103C8T6"}',
+        }),
+    ]
+    files = {}
+    packages = []
+    for package_id, kind, requires, members in package_specs:
+        entries = []
+        for suffix, raw in members.items():
+            name = f"payload/packages/{package_id}/{suffix}"
+            entries.append({
+                "path": name, "sha256": hashlib.sha256(raw).hexdigest(),
+                "size": len(raw), "executable": False,
+            })
+            files[name] = raw
+        packages.append({
+            "id": package_id, "kind": kind, "version": "1.0.0",
+            "requires": list(requires), "files": entries,
+        })
+    manifest = {
+        "schema": "plasma.ppu.bundle.v3", "name": "general-assets",
+        "version": "1.0.0", "purpose": "programming", "source_commit": SOURCE,
+        "target": dict(TARGET), "actions": ["install", "verify"],
+        "packages": packages,
+    }
+    files["manifest.json"] = json.dumps(manifest, sort_keys=True).encode()
+    with zipfile.ZipFile(archive, "w") as dest:
+        for name, raw in sorted(files.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | 0o644) << 16
+            info.compress_type = zipfile.ZIP_STORED
+            dest.writestr(info, raw)
+    return archive, hashlib.sha256(archive.read_bytes()).hexdigest()
+
+
+def test_generic_b3_installs_python_fpga_profile_without_execution(tmp_path):
+    archive, sha = build_generic_assets(tmp_path / "new-archive")
+    co = make_coordinator(tmp_path)
+    evidence = co.execute_bundle_v3_install(b3_request(archive, sha))
+    assert evidence["result"] == "PASS"
+    assert evidence["package_order"] == ["swd-parser", "custom-swd", "stm32-profile"]
+    assert evidence["files_verified"] == 4
+    assert evidence["runtime_activation_executed"] is False
+    assert evidence["fpga"] == "NOT_RUN" and evidence["dut"] == "NOT_RUN"
+    root = Path(evidence["install_path"])
+    assert root == co.paths.product_root / "assets" / "staged" / sha
+    assert (root / "payload/packages/custom-swd/fpga/swd.bin").read_bytes() == b"fpga-image-v1"
+    assert (root / "payload/packages/swd-parser/python/parse.py").is_file()
+    assert not (co.paths.product_root / "current").exists()
+    assert not (co.paths.product_root / "assets" / "active").exists()
+    assert not co.paths.systemd_root.exists()
+
+
+def test_generic_b3_same_bundle_name_different_content_stages_independently(tmp_path):
+    a, sa = build_generic_assets(tmp_path / "a")
+    b, sb = build_generic_assets(tmp_path / "b", bitstream=b"fpga-image-v2")
+    assert sa != sb
+    co = make_coordinator(tmp_path)
+    pa = Path(co.execute_bundle_v3_install(b3_request(a, sa))["install_path"])
+    pb = Path(co.execute_bundle_v3_install(b3_request(b, sb))["install_path"])
+    assert pa != pb and pa.is_dir() and pb.is_dir()
+    assert (pa / "payload/packages/custom-swd/fpga/swd.bin").read_bytes() == b"fpga-image-v1"
+    assert (pb / "payload/packages/custom-swd/fpga/swd.bin").read_bytes() == b"fpga-image-v2"
+
+
+def test_generic_b3_rejects_corrupted_existing_digest_stage(tmp_path):
+    archive, sha = build_generic_assets(tmp_path / "archive")
+    co = make_coordinator(tmp_path)
+    path = Path(co.execute_bundle_v3_install(b3_request(archive, sha))["install_path"])
+    damaged = path / "payload/packages/custom-swd/fpga/swd.bin"
+    damaged.chmod(0o600)
+    damaged.write_bytes(b"bad")
+    with pytest.raises(engine.DeploymentError, match="B3_INSTALL_REQUIRES_RECOVERY"):
+        co.execute_bundle_v3_install(b3_request(archive, sha))
+    assert damaged.read_bytes() == b"bad"
+    assert co.journal.read().state == "recovery_required"
