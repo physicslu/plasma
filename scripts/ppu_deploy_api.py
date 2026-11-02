@@ -121,7 +121,9 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
             or type(authorization.get("policy_sha256")) is not str
             or _HEX64.fullmatch(authorization["policy_sha256"]) is None
             or type(authorization.get("expires_epoch_s")) is not int
-            or type(authorization.get("allowed_kinds")) is not list):
+            or type(authorization.get("allowed_kinds")) is not list
+            or any(type(kind) is not str for kind in authorization["allowed_kinds"])
+            or len(set(authorization["allowed_kinds"])) != len(authorization["allowed_kinds"])):
         return False
     return (
         type(plan.get("purpose")) is str and bool(plan["purpose"])
