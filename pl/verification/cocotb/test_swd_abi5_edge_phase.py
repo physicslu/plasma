@@ -9,6 +9,7 @@ Host-only timing/logic qualification; not electrical timing or real Z2 HIL.
 """
 import cocotb
 from cocotb.triggers import Timer
+from stlink_golden_trace import extract_reference
 
 BLUEPILL_DPIDR = 0x1BA01477
 
@@ -24,6 +25,7 @@ class EdgeBench:
         self.transfer_edges = None
         self.target_bits = []
         self.rising_edges = 0
+        self.transmitted_request = []
 
     async def tick(self, count=1):
         d = self.d
@@ -39,6 +41,7 @@ class EdgeBench:
                 if idx < 8:
                     # Eight outgoing SWD request bits; target not driving yet.
                     assert int(d.swdio_oe.value) == 1, ("request OE", idx)
+                    self.transmitted_request.append(int(d.swdio_out.value))
                 else:
                     # First incoming bit begins at the turnaround rising edge.
                     rx_idx = idx - 8
@@ -98,6 +101,7 @@ class EdgeBench:
         # On each rising SWCLK: request[0..7], then turnaround emits ACK[0].
         # The ACK edge is *not* deferred until the following ACK phase.
         self.transfer_edges = 0
+        self.transmitted_request = []
         self.target_bits = bits(ack, 3)
         if ack == 1:
             self.target_bits += bits(data, 32)
@@ -132,3 +136,48 @@ async def abi5_swd_sample_before_rising_agrees_with_bitbang(d):
             assert out["valid"] == 0, out
         assert b.rising_edges > 8, b.rising_edges
         b.transfer_edges = None
+
+
+@cocotb.test()
+async def abi5_replay_real_stlink_verify_capture(d):
+    """Use *recorded* STLINK-V3SET Target response bits, not fixture-generated ACK.
+
+    The SHA-pinned LA2016 sample stream is decoded independently of RTL; only
+    the bounded DP IDCODE/ACK and AP WAIT response windows are re-timed to the
+    RTL's SWCLK. OE/clock source cannot be taken from the passive capture.
+    """
+    reference = extract_reference()
+    assert reference["sha256"] and len(reference["dpidr"]) >= 2
+    assert len(reference["wait"]) >= 1
+
+    for frame in reference["dpidr"][:2]:
+        b = EdgeBench(d)
+        await b.setup()
+        reset = await b.command(sequence=True)
+        assert reset["status"] == 0 and reset["link"] == 1, reset
+        b.begin_target(ack=1)
+        b.target_bits = list(frame["response_bits"])  # Exact ST-LINK LA bits
+        out = await b.command()
+        assert out["status"] == 0 and out["ack"] == 1, (reference["name"], out)
+        assert out["data"] == frame["data"] == BLUEPILL_DPIDR and out["valid"]
+        assert tuple(b.transmitted_request) == tuple(frame["header"])
+
+    # The saved WAIT was returned to a real request (not an invented response).
+    # First establish a connected DP by replaying the measured DPIDR response.
+    b = EdgeBench(d)
+    await b.setup()
+    reset = await b.command(sequence=True)
+    assert reset["status"] == 0 and reset["link"] == 1
+    b.begin_target(ack=1)
+    b.target_bits = list(reference["dpidr"][0]["response_bits"])
+    assert (await b.command())["status"] == 0
+    wait = reference["wait"][0]
+    request = wait["header"]
+    d.cmd_ap.value = request[1]
+    d.cmd_read.value = request[2]
+    d.cmd_addr.value = request[3] * 4 + request[4] * 8
+    b.begin_target(ack=2)
+    b.target_bits = list(wait["response_bits"])
+    out = await b.command()
+    assert out["status"] == 3 and out["ack"] == 2, out
+    assert tuple(b.transmitted_request) == tuple(request)
