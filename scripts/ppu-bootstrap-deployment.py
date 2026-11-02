@@ -426,22 +426,12 @@ class DeploymentCoordinator:
                         or bundle.schema != contract.BUNDLE_SCHEMA
                         or bundle.kind != "bundle"
                         or bundle.actions != ("install", "verify")
-                        or bundle.name != "ppu-b3-smoke"
-                        or {(p.id, p.kind) for p in bundle.packages} != {
-                            ("ic-catalog", "ic-catalog"),
-                            ("programming-profile", "programming-profile"),
-                            ("python-smoke", "python"),
-                        }):
-                    raise DeploymentError("B3_SMOKE_BUNDLE_SCOPE_DENIED")
-                # Enforce a closed, reviewed DAG instead of arbitrary package
-                # execution rights. A generic installer can be qualified later.
-                requires = {p.id: p.requires for p in bundle.packages}
-                if requires != {
-                    "ic-catalog": (),
-                    "programming-profile": ("ic-catalog",),
-                    "python-smoke": ("programming-profile",),
-                }:
-                    raise DeploymentError("B3_SMOKE_DEPENDENCY_SCOPE_DENIED")
+                        or not bundle.packages):
+                    raise DeploymentError("B3_BUNDLE_INSTALL_CONTRACT_DENIED")
+                # The canonical Bundle verifier already enforces Package IDs,
+                # kinds, file constraints, target compatibility, SHA-256, and
+                # closed acyclic dependency graph. Never special-case a named
+                # fixture or treat its contents as execution authority.
                 record.module = bundle.name
                 record.release_id = (bundle.version + "-" +
                                      bundle.archive_sha256[:16])
