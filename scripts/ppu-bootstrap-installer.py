@@ -69,10 +69,13 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
     install_root.chmod(0o755)
     # Fail closed on a partial B3 factory image; old factory-only tests may
     # still install their unchanged original five-file fixture with B3 disabled.
-    b3_present = [name for name in B3_FILES if (source_root / name).is_file()]
-    if b3_present and len(b3_present) != len(B3_FILES):
+    # Repository source has the two Installer files but no pinned factory
+    # policy; this is a NOT_QUALIFIED source tree, not a partial factory kit.
+    policy_present = (source_root / "ppu-b3-smoke-policy.json").is_file()
+    b3_present = list(B3_FILES) if policy_present else []
+    if policy_present and not all((source_root / name).is_file() for name in B3_FILES):
         raise BootstrapInstallError("factory B3 source set is incomplete")
-    if (source_root / "ppu-b3-smoke-policy.json").is_file():
+    if policy_present:
         try:
             policy = json.loads((source_root / "ppu-b3-smoke-policy.json").read_text())
         except (OSError, ValueError) as exc:
