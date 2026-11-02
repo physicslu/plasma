@@ -1,7 +1,7 @@
 # Template (fill @...@). Root on Z2: ONE bounded real DPIDR read on Site @SITE@ via OpenOCD plasma_swd.
 # Admission -> OpenOCD (dap init + dpreg 0, no target, no flash) -> revoke.
 import hashlib, json, os, re, subprocess, time
-SITE="@SITE@"; DEST="@DEST@"; ADM_SHA="@ADM_SHA@"; BIN_SHA="@BIN_SHA@"
+SITE="@SITE@"; DEST="@DEST@"; ADM_SHA="@ADM_SHA@"; BIN_SHA="@BIN_SHA@"; IMAGE_ID="@IMAGE_ID@"
 R="/root/plasma-path2-approved"; J=R+"/.plasma-fpga-image-deployment-state.json"
 REC=f"/run/plasma-z2-swd05/swd-site{SITE}-admission"; PY="/opt/plasma/python/3.12.13/bin/python3"
 ADM=DEST+"/libexec/plasma_swd_site_admission.py"; B=DEST+"/bin/openocd"; S=DEST+"/share/openocd/scripts"
@@ -15,7 +15,7 @@ out={"t_start":time.strftime("%Y-%m-%dT%H:%M:%S%z")}
 pre=out["pre"]=facts()
 ok=(F(B)==BIN_SHA and F(ADM)==ADM_SHA and pre["manager"]=="operating" and not pre["openocd_pids"]
     and not pre["record_present"] and pre["journal"]["status"]=="IMAGE"
-    and pre["journal"]["image_id"]=="z2-independent-swd-v5-ab79b04e")
+    and pre["journal"]["image_id"]==IMAGE_ID)
 out["precheck"]=ok
 if ok:
     a=subprocess.run([PY,"-I","-B",ADM,"admit",SITE],capture_output=True,text=True,timeout=120)

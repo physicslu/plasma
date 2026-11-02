@@ -12,6 +12,18 @@ import re
 from pl.hil import fpga_image_guard as guard
 
 
+# Reviewed ABI-v5 independent Images admitted to the opt-in /dev/mem
+# engineering backend: image_id -> paired BIN SHA-256. Every entry shares the
+# same HWH-proven two-Site geometry checked by the Root Manifest parser.
+DEVMEM_INDEPENDENT_IMAGES = {
+    "z2-independent-swd-v5-ab79b04e":
+        "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773",
+    # PR #1255 head bd976140e: SWDIO sampled before the SWCLK rising edge.
+    "z2-independent-swd-v5-bd976140":
+        "19143158b47e79569b673660315e58cd0765b52c7e60e6258422c437aea3da40",
+}
+
+
 class AdmissionDenied(ValueError):
     pass
 
@@ -75,7 +87,8 @@ def check_exact(*, release, passive: dict, uio: dict,
                 # Kernel UIO here supplies *conflict evidence*, never the
                 # SWD register provider. Root opens /dev/mem only after this
                 # exact, source-pinned and process-conflict-free admission.
-                need(release.image_id == "z2-independent-swd-v5-ab79b04e" and
+                need(DEVMEM_INDEPENDENT_IMAGES.get(release.image_id) ==
+                     release.firmware_sha256 and
                      release.axi_base == 0x43C01000 and
                      release.axi_bytes == 0x2000 and
                      release.abi_version == 0x00050001 and

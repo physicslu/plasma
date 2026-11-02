@@ -29,6 +29,35 @@
       "axi_bytes": 8192,
       "owner_base": 1136656384,
       "owner_bytes": 65536
+    },
+    {
+      "contract_id": "swd-independent-abi5-bd976140",
+      "evidence": "static-contract-devmem-manifest-bd976140-vivado-run-41469421780",
+      "target": {
+        "platform": "linux-armv7",
+        "board": "pynq-z2",
+        "fpga_part": "xc7z020clg400-1"
+      },
+      "build": "bd976140",
+      "source_commit": "bd976140e7b76b907db48e9f344be1301a502d49",
+      "image_id": "z2-independent-swd-v5-bd976140",
+      "firmware_name": "plasma-swd-independent-bd976140.bin",
+      "bin_sha256": "19143158b47e79569b673660315e58cd0765b52c7e60e6258422c437aea3da40",
+      "hwh_sha256": "042892bb59fa8f0d62b54ae6ab47806a592151820c2d9fd9288d21215690010b",
+      "manifest_sha256": "857228ddff88458edaad040a75a757729b5f2b667c57da7e2c5d245d28fe5222",
+      "recovery_name": "base.bin",
+      "abi_version": 327681,
+      "abi_offset": 0,
+      "site_identities": [
+        {"site_id": 1, "offset": 0, "identity": 327681},
+        {"site_id": 2, "offset": 4096, "identity": 327682}
+      ],
+      "site_bitmap": 3,
+      "site_bitmap_offset": null,
+      "axi_base": 1136660480,
+      "axi_bytes": 8192,
+      "owner_base": 1136656384,
+      "owner_bytes": 65536
     }
   ]
 }
