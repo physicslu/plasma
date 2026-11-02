@@ -151,6 +151,12 @@ async def abi5_replay_real_stlink_verify_capture(d):
     assert len(reference["wait"]) >= 1
 
     for frame in reference["dpidr"][:2]:
+        # Explicit Golden negative control: if ACK sampling slips by one
+        # SWCLK bit, the real OK=001 followed by IDCODE bit0=1 becomes FAULT=100.
+        measured = frame["response_bits"]
+        assert tuple(measured[:3]) == (1, 0, 0), measured[:3]
+        shifted = sum(bit << i for i, bit in enumerate(measured[1:4]))
+        assert shifted == 4, ("Golden trace cannot detect one-bit slip", shifted)
         b = EdgeBench(d)
         await b.setup()
         reset = await b.command(sequence=True)
