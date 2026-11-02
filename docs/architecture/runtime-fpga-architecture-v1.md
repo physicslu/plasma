@@ -33,7 +33,7 @@
 2. **Universal／Multi-Protocol Image**：已實作的協定 Engine 可在軟體命令下選擇；不重新載入 FPGA。
 3. **Runtime Dynamic Bitstream Switching**：只有當當前映像不具備必要硬體 Capability 時，才在全部 Site Quiesced 後以 Linux FPGA Framework 載入另一個 image；**Linux 不重啟**。
 
-是否能把常見協定都放進同一份 Zynq-7010 Bitstream，必須用實際 LUT／FF／BRAM／Timing 資料決定。禁止事先宣稱單一影像能支援全部協定。
+是否能把常見協定都放進同一份 Zynq-7020（XC7Z020）Bitstream，必須用實際 LUT／FF／BRAM／Timing 資料決定。禁止事先宣稱單一影像能支援全部協定。
 
 ### 2.2 Driver／MMIO 架構選項
 
@@ -97,7 +97,7 @@ Phase 為**工作分段，不新增 Approval Gate**。每個 Phase 的 Gate 1 �
 | **3：Generic FPGA Supervisor** | 將 Phase 0 Development Supervisor 演進為通用 Image Registry／ABI admission／Reload／Recovery，與 Runtime Backend 整合 | SUP-01..10：正常狀態轉移、busy／mmap／Driver conflict、hash fail、load fail、recovery fail、Process／Supervisor crash、預設 inert；全部 Host-only | **Plan** |
 | **4：Runtime Dynamic Switching HIL** | 準備兩份**真正不同**、相同 Driver-visible ABI 的 Image A/B；受控 Z2 A→B→A，不重新開機，使用實機 Driver／FPGA Manager | SW-01..12：Load／Back、Driver／ABI／Capability、Ownership、UIO Mapping、SSH／Ethernet／Gateway、Rollback、Boot ID 相同、有限重複切換；外部 AXI fault 不強制在 Z2 注入 | **Plan** |
 | **5：Dual-Site Functional & Performance** | Real ARMv7 Site 1/2 Function、Thread、Process-IPC、資料隔離、CPU／RAM／Time／Throughput／Latency；復原與回報 | 真正 Z2 HIL，2-Site Site 狀態／Counter／CRC、P50/P95/P99、CPU、RSS/PSS、Perf CSV／JSON／SVG、base image verified restore。Process-IPC **≠ Process-Direct MMIO** | **Plan** |
-| **6：8-Site & Zynq-7010 Capacity** | 用 Phase 1 ABI 將 RTL／Firmware 擴展至 8 Site，評估 SWD／JTAG／SPI／I²C／ICSP 需求、Engine 複用、Resource、時序、每 Site 電氣安全 | Vivado 7010 LUT／FF／BRAM／Timing、Host RTL Contract、2→4→8 Scaling、真實硬體具備時 HIL；無實機不可宣稱 8-Site PASS | **Plan** |
+| **6：8-Site & Zynq-7020 Capacity** | 用 Phase 1 ABI 將 RTL／Firmware 擴展至 8 Site，評估 SWD／JTAG／SPI／I²C／ICSP 需求、Engine 複用、Resource、時序、每 Site 電氣安全 | Vivado XC7Z020 LUT／FF／BRAM／Timing、Host RTL Contract、2→4→8 Scaling、真實硬體具備時 HIL；無實機不可宣稱 8-Site PASS | **Plan** |
 
 ### 4.1 Phase 2 Real Z2 HIL Gate（依批准範圍執行）
 
@@ -158,7 +158,7 @@ Phase 為**工作分段，不新增 Approval Gate**。每個 Phase 的 Gate 1 �
 - **PR #972**：MMIO-MS-01 Dual-Site six-aperture Candidate；Host-only Safety Remediation 已由 Codex 交付並完成離線驗證：B2 retained mmap Guard PASS、B3 Supervisor Host PASS；B1 真正 UIO Ownership 交接仍 BLOCKED／未執行。Runtime HEAD `e9ac002480f53dc89a95d71990f6757b2f6a69b9`，FPGA Build Source `404d2ef0152c50e9b2d6599f093752064198e895`，原 BIT／HWH／Manifest／BIN SHA256 未改變；530 PASS + 10 subtests、Fault Injection 75 PASS（subset）、RTL 18 PASS；PR #972 仍 Draft／未合併、HIL-B／C NOT RUN。
 - **HIL-A**：既有唯讀 Preflight BLOCKED／HIL-B NO-GO。Fabric UIO 綁定覆蓋 `0x40000000–0x4000FFFF`，此為尚未在實機解除的 B1；原 Site 2 fd-close／retained `/dev/mem` mmap 漏檢已完成 B2 Host 修正，但**不能把舊失敗描述成目前仍未修正的程式錯誤**。B3 六 Aperture Supervisor 已完成 Host 測試，仍缺實機 Load／Recovery 及獨立遠端驗證證據。
 - **過去五 Aperture HIL**：之前的 Base Image Restore PASS 不可視為新六 Aperture Supervisor PASS。
-- **待證明：** Kernel UIO 是否適用、PS↔PL Hardware Bridge、fixed ABI 共用成本、Zynq-7010 邏輯資源、FPGA Reload 期間的外部 DUT 硬體安全狀態。
+- **待證明：** Kernel UIO 是否適用、PS↔PL Hardware Bridge、fixed ABI 共用成本、Zynq-7020（XC7Z020）邏輯資源、FPGA Reload 期間的外部 DUT 硬體安全狀態。
 - **沒有實體 DUT 的 HIL** 不等於 SWD/JTAG/SPI/ICSP IC Programming 能力，也不能等同 ICPN L3 `PLASMA_VERIFIED`。
 - 本文件不變更 ADR-0002 的 Catalog Level 任何語意。
 
