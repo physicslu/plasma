@@ -202,7 +202,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     assert not (paths.product_root / "current").exists()
 
 
-def build_generic_assets(tmp_path, *, bitstream=b"fpga-image-v1"):
+def build_generic_assets(tmp_path, *, bitstream=b"fpga-image-v1", fpga_manifest=None):
     """Canonical, nonexecuting multi-kind Bundle; unrelated to smoke fixture."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     archive = tmp_path / "assets.zip"
@@ -210,7 +210,10 @@ def build_generic_assets(tmp_path, *, bitstream=b"fpga-image-v1"):
         ("swd-parser", "python", (), {"python/parse.py": b"raise RuntimeError('NOT_EXECUTED')\\n"}),
         ("custom-swd", "fpga-image", (), {
             "fpga/swd.bin": bitstream, "fpga/swd.hwh": b"<hwh/>",
-            "fpga/image.json": b'{"image_id":"custom-swd"}',
+            "fpga/image.json": (
+                fpga_manifest if fpga_manifest is not None
+                else b'{"image_id":"custom-swd"}'
+            ),
         }),
         ("stm32-profile", "programming-profile", ("custom-swd", "swd-parser"), {
             "data/profile.json": b'{"icpn":"STM32F103C8T6"}',
