@@ -79,8 +79,13 @@ def run(host: str, device_id: str, source_sha: str, *, interval: float = 1):
             ))):
         report["reason"] = "B3_ACTIVE_OR_RECOVERY_DEPLOYMENT"
         return report, 69
-    if status.get("capabilities", {}).get("bundle_v3_b3_install") is not True:
+    capabilities = status.get("capabilities")
+    if (type(capabilities) is not dict
+            or capabilities.get("bundle_v3_b3_install") is not True):
         report["reason"] = "B3_FACTORY_INSTALLER_NOT_INSTALLED"
+        return report, 69
+    if capabilities.get("bundle_v3_b3_source_commit") != source_sha:
+        report["reason"] = "B3_FACTORY_SOURCE_SHA_MISMATCH"
         return report, 69
     report["factory_bootstrap"] = "READY_CAPABILITY_REPORTED"
 
@@ -91,6 +96,9 @@ def run(host: str, device_id: str, source_sha: str, *, interval: float = 1):
         if hashlib.sha256(raw).hexdigest() != digest:
             report["reason"] = "LOCAL_ARCHIVE_DIGEST_CHANGED"
             return report, 2
+        if capabilities.get("bundle_v3_b3_archive_sha256") != digest:
+            report["reason"] = "B3_FACTORY_ARCHIVE_SHA256_MISMATCH"
+            return report, 69
         report["archive_sha256"] = digest
         # B1 includes a negative chunk-SHA test before the positive upload.
         b1 = common.b1_upload(client, common._load_client(), raw)
