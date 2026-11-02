@@ -27,6 +27,7 @@ REQUIRED_SCRIPTS = (
     "ppu-bootstrap-deployment.py",
     "ppu-bootstrap-kit.py",
     "ppu_unified_deployment.py",
+    "ppu_asset_set.py",
 )
 
 # Generic Bundle v3 B3 capability ships inside the SAME Bootstrap layer.
