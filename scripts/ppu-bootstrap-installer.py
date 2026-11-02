@@ -29,6 +29,14 @@ REQUIRED_SCRIPTS = (
     "ppu_unified_deployment.py",
 )
 
+# The reviewed Bundle v3 B3 capability ships inside the SAME factory
+# Bootstrap layer, not as a second installer or a remotely writable policy.
+B3_FILES = (
+    "ppu-z2-installer.py",
+    "ppu-z2-installer-core.py",
+    "ppu-b3-smoke-policy.json",
+)
+
 
 class BootstrapInstallError(RuntimeError):
     pass
@@ -59,12 +67,35 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
             raise BootstrapInstallError(f"factory bundle is missing required script: {name}")
     install_root.mkdir(parents=True, exist_ok=True)
     install_root.chmod(0o755)
-    for name in REQUIRED_SCRIPTS:
+    # Fail closed on a partial B3 factory image; old factory-only tests may
+    # still install their unchanged original five-file fixture with B3 disabled.
+    b3_present = [name for name in B3_FILES if (source_root / name).is_file()]
+    if b3_present and len(b3_present) != len(B3_FILES):
+        raise BootstrapInstallError("factory B3 source set is incomplete")
+    if (source_root / "ppu-b3-smoke-policy.json").is_file():
+        try:
+            policy = json.loads((source_root / "ppu-b3-smoke-policy.json").read_text())
+        except (OSError, ValueError) as exc:
+            raise BootstrapInstallError("factory B3 policy unreadable") from exc
+        if (type(policy) is not dict
+                or set(policy) != {"schema", "bundle_name", "source_commit",
+                                   "archive_sha256", "target", "actions"}
+                or policy.get("schema") != "plasma.ppu.b3-factory-policy.v1"
+                or policy.get("bundle_name") != "ppu-b3-smoke"
+                or policy.get("actions") != ["install", "verify"]):
+            raise BootstrapInstallError("factory B3 policy invalid")
+    for name in (*REQUIRED_SCRIPTS, *(B3_FILES if b3_present else ())):
         source = source_root / name
+        if source.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap source symlink denied")
         destination = install_root / name
+        if destination.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap destination symlink denied")
         temporary = destination.with_name(destination.name + ".new")
+        if temporary.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap temp symlink denied")
         shutil.copyfile(source, temporary)
-        temporary.chmod(0o755)
+        temporary.chmod(0o600 if name.endswith("-policy.json") else 0o755)
         os.replace(temporary, destination)
 
 
