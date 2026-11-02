@@ -50,7 +50,8 @@ HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 DEPLOYMENT_API_IN_FLIGHT_STATES = {"queued", "running"}
 DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "admitted", "failed", "recovery_required"}
 COORDINATOR_SAFE_RESTART_STATES = {
-    "runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed",
+    "runtime_active", "engineering_active", "package_active",
+    "bundle_installed", "rolled_back", "verify_failed",
 }
 MAX_COORDINATOR_JOURNAL_BYTES = 1024 * 1024
 
@@ -67,6 +68,12 @@ class ServicePaths:
     bootstrap_script: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap.py")
     kit_tool: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap-kit.py")
     package_target_file: Path = Path("/etc/plasma/ppu-package-target.json")
+
+    # Factory-installed policy is pinned to the same reviewed factory build.
+    # Never create or update it from a network request or a device pairing token.
+    bundle_install_policy: Path = Path("/opt/plasma/bootstrap/ppu-b3-smoke-policy.json")
+    deployment_engine_script: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap-deployment.py")
+    z2_installer_script: Path = Path("/opt/plasma/bootstrap/ppu-z2-installer.py")
 
     @property
     def token_file(self) -> Path:
@@ -513,6 +520,112 @@ def _trusted_package_target(paths: ServicePaths) -> dict[str, str]:
     return profile
 
 
+
+def _trusted_b3_install_policy(paths: ServicePaths) -> dict[str, Any]:
+    """Root/factory-provisioned exact ZIP authority; never from HTTP or ZIP."""
+    path = paths.bundle_install_policy
+    if path.is_symlink():
+        raise BootstrapServiceError("B3_FACTORY_POLICY_UNTRUSTED")
+    try:
+        info = path.stat()
+    except OSError as exc:
+        raise BootstrapServiceError("B3_FACTORY_POLICY_NOT_INSTALLED") from exc
+    if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077
+            or info.st_uid != os.geteuid()):
+        raise BootstrapServiceError("B3_FACTORY_POLICY_UNTRUSTED")
+    policy = _read_private_json(path)
+    if (set(policy) != {"schema", "bundle_name", "source_commit",
+                        "archive_sha256", "target", "actions"}
+            or policy.get("schema") != "plasma.ppu.b3-factory-policy.v1"
+            or policy.get("bundle_name") != "ppu-b3-smoke"
+            or not isinstance(policy.get("source_commit"), str)
+            or not re.fullmatch(r"[0-9a-f]{40}", policy["source_commit"])
+            or not isinstance(policy.get("archive_sha256"), str)
+            or not HEX64_RE.fullmatch(policy["archive_sha256"])
+            or policy.get("actions") != ["install", "verify"]
+            or type(policy.get("target")) is not dict
+            or policy["target"] != _trusted_package_target(paths)):
+        raise BootstrapServiceError("B3_FACTORY_POLICY_INVALID")
+    return policy
+
+
+def run_bundle_install_subprocess(
+    paths: ServicePaths,
+    upload_id: str,
+    request: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Same existing Deployment Engine CLI, no second writer or daemon."""
+    identity = request.get("api_transaction_id")
+    if type(identity) is not str or not UPLOAD_ID_RE.fullmatch(identity):
+        raise BootstrapServiceError("B3_CORRELATION_ID_INVALID")
+    upload = _upload_paths(paths, upload_id)
+    for script in (paths.deployment_engine_script, paths.z2_installer_script,
+                   paths.z2_installer_script.with_name("ppu-z2-installer-core.py")):
+        if script.is_symlink() or not script.is_file():
+            raise BootstrapServiceError("B3_INSTALLED_ENGINE_NOT_QUALIFIED")
+    policy = _trusted_b3_install_policy(paths)
+    argv = [
+        sys.executable, str(paths.deployment_engine_script),
+        "--installer", str(paths.z2_installer_script),
+        "--bootstrap-state-root", str(paths.state_root),
+        "--product-root", str(paths.product_root),
+        "install-bundle", "--release-artifact", str(upload.committed),
+        "--artifact-sha256", policy["archive_sha256"],
+        "--source-commit", policy["source_commit"],
+        "--platform", policy["target"]["platform"],
+        "--board", policy["target"]["board"],
+        "--fpga-part", policy["target"]["fpga_part"],
+        "--api-transaction-id", identity,
+    ]
+    completed = subprocess.run(
+        argv, check=False, capture_output=True, text=True, timeout=120,
+    )
+    if completed.returncode != 0:
+        # Do not include external process output or raw secrets in API errors.
+        raise BootstrapServiceError("B3_DEVICE_INSTALL_SUBPROCESS_FAILED")
+    try:
+        result = json.loads(completed.stdout)
+    except (ValueError, TypeError) as exc:
+        raise BootstrapServiceError("B3_DEVICE_INSTALL_RECEIPT_INVALID") from exc
+    if (type(result) is not dict or result.get("result") != "PASS"
+            or result.get("stage") != "bundle_install_only"
+            or result.get("archive_sha256") != policy["archive_sha256"]
+            or result.get("source_commit") != policy["source_commit"]):
+        raise BootstrapServiceError("B3_DEVICE_INSTALL_RECEIPT_INVALID")
+    return result
+
+
+def _reconcile_b3_install_result(
+    paths: ServicePaths,
+    *,
+    api_transaction_id: str,
+    previous_coordinator_id: str | None,
+    runner_result: Mapping[str, Any],
+) -> dict[str, str]:
+    if (type(api_transaction_id) is not str
+            or not UPLOAD_ID_RE.fullmatch(api_transaction_id)
+            or runner_result.get("result") != "PASS"):
+        raise BootstrapServiceError("B3_API_CORRELATION_INVALID")
+    record = _read_coordinator_journal(paths)
+    source = runner_result.get("source_commit")
+    digest = runner_result.get("archive_sha256")
+    if (record is None
+            or record.get("state") != "bundle_installed"
+            or record.get("kind") != "bundle"
+            or record.get("source_commit") != source
+            or record.get("artifact_sha256") != digest
+            or record.get("api_transaction_id") != api_transaction_id
+            or record.get("transaction_id") == previous_coordinator_id
+            or record.get("transaction_id") != runner_result.get("transaction", {}).get("transaction_id")):
+        raise BootstrapServiceError("B3_COORDINATOR_RECEIPT_UNRECONCILED")
+    return {
+        "api_transaction_id": api_transaction_id,
+        "coordinator_transaction_id": record["transaction_id"],
+        "coordinator_release_id": record["release_id"],
+        "coordinator_state": record["state"],
+    }
+
+
 class BootstrapHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
 
@@ -612,7 +725,89 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             _atomic_json(self.bootstrap_paths.deployment_record, record)
             return record
 
+    def start_bundle_install(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """B3 only after exact B2 admission on this device and local policy pin."""
+        if (type(body) is not dict or set(body) != {"kind", "upload_id", "install_only"}
+                or body["kind"] != "bundle" or body["install_only"] is not True):
+            raise BootstrapServiceError("B3_INSTALL_REQUEST_FIELDS_DENIED")
+        upload_id = body["upload_id"]
+        if type(upload_id) is not str or not UPLOAD_ID_RE.fullmatch(upload_id):
+            raise BootstrapServiceError("B3_UPLOAD_ID_INVALID")
+        with self.mutation_lock:
+            if self.deployment_thread is not None and self.deployment_thread.is_alive():
+                raise BootstrapServiceError("B3_DEPLOYMENT_ALREADY_RUNNING")
+            earlier = _deployment_api_record(self.bootstrap_paths)
+            if (earlier is None or earlier.get("state") != "admitted"
+                    or earlier.get("upload_id") != upload_id):
+                raise BootstrapServiceError("B3_MATCHING_B2_ADMISSION_REQUIRED")
+            result = earlier.get("result")
+            plan = result.get("plan") if type(result) is dict else None
+            policy = _trusted_b3_install_policy(self.bootstrap_paths)
+            if (type(plan) is not dict
+                    or result.get("stage") != "package_admission_only"
+                    or plan.get("bundle_schema") != "plasma.ppu.bundle.v3"
+                    or plan.get("kind") != "bundle"
+                    or plan.get("package") != policy["bundle_name"]
+                    or plan.get("source_commit") != policy["source_commit"]
+                    or plan.get("archive_sha256") != policy["archive_sha256"]
+                    or plan.get("target") != policy["target"]
+                    or plan.get("requested_actions") != policy["actions"]):
+                raise BootstrapServiceError("B3_ADMISSION_NOT_PINNED_TO_FACTORY_POLICY")
+            upload = _upload_paths(self.bootstrap_paths, upload_id)
+            metadata = _read_json(upload.meta)
+            if (metadata.get("state") != "committed"
+                    or metadata.get("sha256") != policy["archive_sha256"]
+                    or not upload.committed.is_file()
+                    or upload.committed.is_symlink()
+                    or _sha256(upload.committed) != policy["archive_sha256"]):
+                raise BootstrapServiceError("B3_UPLOADED_ARCHIVE_CHANGED")
+            previous_coordinator = _admit_coordinator_journal(self.bootstrap_paths)
+            transaction_id = uuid.uuid4().hex
+            record = {
+                "schema_version": 1, "transaction_id": transaction_id,
+                "state": "queued", "upload_id": upload_id,
+                "started_at_epoch_s": time.time(),
+                "updated_at_epoch_s": time.time(),
+                "error_code": None, "error": None, "result": None,
+            }
+            _atomic_json(self.bootstrap_paths.deployment_record, record)
+
+            def worker() -> None:
+                record["state"] = "running"
+                record["updated_at_epoch_s"] = time.time()
+                _atomic_json(self.bootstrap_paths.deployment_record, record)
+                try:
+                    runner = getattr(self, "bundle_install_runner", run_bundle_install_subprocess)
+                    evidence = dict(runner(
+                        self.bootstrap_paths, upload_id,
+                        {"api_transaction_id": transaction_id},
+                    ))
+                    correlation = _reconcile_b3_install_result(
+                        self.bootstrap_paths, api_transaction_id=transaction_id,
+                        previous_coordinator_id=(
+                            previous_coordinator["transaction_id"] if previous_coordinator else None
+                        ), runner_result=evidence,
+                    )
+                except Exception as exc:
+                    record["state"] = "recovery_required"
+                    record["error_code"] = "b3_install_outcome_unreconciled"
+                    record["error"] = type(exc).__name__
+                    record["result"] = None
+                else:
+                    record["state"] = "succeeded"
+                    record["result"] = {**evidence, "coordinator_receipt": correlation}
+                record["updated_at_epoch_s"] = time.time()
+                _atomic_json(self.bootstrap_paths.deployment_record, record)
+
+            self.deployment_thread = threading.Thread(
+                target=worker, name="plasma-bootstrap-deploy", daemon=True,
+            )
+            self.deployment_thread.start()
+            return record
+
     def start_deployment(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        if type(body) is dict and body.get("kind") == "bundle" and "install_only" in body:
+            return self.start_bundle_install(body)
         if type(body.get("kind")) is str and body["kind"] in {"python", "native-c", "fpga-image", "bundle"}:
             return self.admit_package(body)
         request = _deployment_request(body)
