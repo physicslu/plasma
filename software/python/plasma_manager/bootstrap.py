@@ -482,9 +482,14 @@ class ManagerBootstrapCoordinator:
                 or not isinstance(plan, dict)
                 or plan.get("kind") != "bundle"
                 or plan.get("execution_permitted") is not False
+                or result.get("source_authorized") is not True
+                or not isinstance(plan.get("authorization"), dict)
+                or plan["authorization"].get("status") != "MASTER_APPROVED"
+                or plan["authorization"].get("method") != "root-provisioned-exact-bundle-sha256"
+                or plan["authorization"].get("archive_sha256") != plan.get("archive_sha256")
             ):
                 raise BootstrapManagerError(
-                    "generic Bundle admission response is not non-executing"
+                    "generic Bundle admission response is not Master-authorized and non-executing"
                 )
             return status, response
 
