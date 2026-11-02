@@ -595,7 +595,7 @@ def verify_host_only_artifact(
 # PR3: deterministic capability resolution and authority simulation.
 # These functions accept trusted test fixtures injected by a host-only caller;
 # they never turn a package claim, pairing token or HTTP request into authority.
-BUNDLE_POLICY_SCHEMA = "plasma.ppu.host-policy.v1"
+BUNDLE_POLICY_SCHEMA = "plasma.ppu.bundle-authority.v2"
 
 
 def bundle_package_identity(package: VerifiedBundlePackage) -> str:

@@ -149,7 +149,9 @@ def test_existing_root_entry_remains_narrow_privileged_source_verified() -> None
     assert 'download|test|restore' in root_entry
     assert "PPU_FPGA_ROOT_REQUIRED" in root_entry
     assert "PPU_FPGA_TRUSTED_EXECUTOR_NOT_INSTALLED" in root_entry
-    assert "ppu_privileged_source.py" in root_entry
+    assert "ppu_privileged_source.py" not in root_entry
+    installer = (repo_root / "scripts/ppu-privileged-source-install.py").read_text()
+    assert "verify_source(stage, expected_uid=uid)" in installer
     assert ".plasma-path2-source-commit" not in root_entry
 
 
