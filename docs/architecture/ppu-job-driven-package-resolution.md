@@ -59,13 +59,15 @@ or allow Jobs to mix assets from several installed sets.
    authorized Asset Set activation makes exactly one verified Set Active.
    Activation must be atomic from the perspective of readers and Jobs:
    never overwrite live files or switch the pointer mid-Job.
-6. **Asset activation is not FPGA reconfiguration.** If the FPGA Image
-   required by the Active Set is not already loaded and proven compatible,
-   Console must authorize a distinct controlled FPGA configuration
-   operation. The single PPU Hardware Manager checks Site quiescence,
-   all hardware consumers, actual FPGA part, Image/Build ID, ABI,
-   capabilities, driver bindings, electrical safe state and recovery
-   prerequisites. If these cannot be proven, PPU remains NOT_READY.
+6. **Asset activation is not FPGA reconfiguration.** Per
+   [ADR-0004](../adr/0004-fpga-image-lifecycle-and-job-driven-loading.md),
+   when a programming flow starts and the FPGA Image required by the Job is
+   not already loaded and proven compatible, the PS **FPGA Hardware
+   Manager** loads it at PPU level before any Site work; no separate
+   Console load command is needed. It first checks Site quiescence, all
+   hardware consumers, actual FPGA part, Image/Build ID, ABI, capabilities,
+   driver bindings, electrical safe state and recovery prerequisites. If
+   these cannot be proven, PPU remains NOT_READY.
 7. Controller initiates E/P/V/R only after the PPU reports the selected Set
    **READY**. Every accepted Job pins that Set identity until terminal
    completion. A newly delivered Set may be staged while Jobs exist only
@@ -92,7 +94,8 @@ EMPTY -> RECEIVING -> VERIFIED -> ACTIVE -> READY
 - **VERIFIED**: new staged Set passed B1/B2/B3 and integrity checks, but is
   **not** selected for jobs.
 - **ACTIVE**: single selected verified Set is the only job resource universe;
-  FPGA may still require separately authorized configuration/validation.
+  the required FPGA Image is loaded by the PS FPGA Hardware Manager when a
+  programming flow starts (ADR-0004).
 - **READY**: selected Set, exact FPGA Image, Programming Profile, target
   qualification, available hardware and operational ownership satisfy
   admission to begin Jobs. Readiness is rechecked; not inferred solely
@@ -120,7 +123,7 @@ Console: selected Asset Set SHA and Controller-owned workflow
             |                                    |
   verified → safe single Active Set switch       |
             |                                    |
-  separate FPGA configuration if needed          |
+  PS loads FPGA if needed (ADR-0004)             |
             |                                    |
   verify FPGA + Profile + Job readiness <---------+
             |
@@ -142,12 +145,12 @@ a different Asset Set per device.
 
 | Owner / phase | Required role | Forbidden inference |
 | --- | --- | --- |
-| **Console/Controller** | Select exact Asset Set, compare identity, transfer entire Set on mismatch, explicitly request FPGA configuration if needed, initiate operations and sequencing | Never treat mere transfer as a PROGRAM command |
+| **Console/Controller** | Select exact Asset Set, compare identity, transfer entire Set on mismatch, choose the FPGA Package delivered in the Set, initiate operations and sequencing | Never treat mere transfer as a PROGRAM command |
 | **Bundle v3 / Packages** | Carry a complete logical Asset Set with file hashes, typed resources and dependency declarations | Does not own a workflow, activation, FPGA configuration or job execution |
 | **B1/B2/B3 on PPU** | Receive, admit and install/verify the authorized incoming Set | B3 does not itself make Set Active, READY or execute Parser |
 | **Asset Set manager (future)** | Enforce one Active Set, isolated Staging and safe atomic activation; publish exact identity/state | Cannot overwrite running Jobs or synthesize a hybrid set |
 | **PPU Programming Runtime** | Verify the requested Job against Active Set and exact ICPN, select *necessary resources within it* | No independent search for alternate versions/Profiles/FPGA Images across Bundles |
-| **FPGA Hardware Manager** | Sole configuration owner; perform explicitly authorized image transition, ABI/capability and safety validation | No implicit FPGA reload inside a SiteWorker or PROGRAM Job |
+| **FPGA Hardware Manager** | Sole configuration owner; when a programming flow starts, compare the loaded image with the Job's required image and load it if different, with ABI/capability and safety validation (ADR-0004) | Never reloads the FPGA from inside a SiteWorker; never substitutes another image |
 | **Site workers / backends** | Execute admitted operations and return actual per-Site results | No authority to select/activate a different Asset Set |
 
 The `packages[].requires` graph remains an **internal Bundle install
@@ -214,7 +217,8 @@ capability complete.
 **Settled:** single Active Asset Set per PPU; full Set transfer on Console/
 PPU identity mismatch; Controller-selected exact Set/Image/Profile; Job
 operations initiated by Controller; PPU resolves only assets in that Set;
-isolated staging, safe activation and distinct controlled FPGA configuration;
+isolated staging, safe activation and a distinct PPU-level FPGA load by the
+PS FPGA Hardware Manager when a programming flow starts (ADR-0004);
 no mid-Job Set change.
 
 **Not settled (requires implementation planning and evidence):**
@@ -228,9 +232,9 @@ no mid-Job Set change.
 3. Atomic Active pointer, staging paths, existing-Job pinning, failure/rollback
    semantics, power-loss/crash recovery and storage cleanup. A fallback
    retained recovery copy is not an additional Active Set.
-4. When and how separate Asset Set activation and FPGA configuration are
-   requested, coordinated with all Site/driver/PS-PL consumers, without
-   automatic reconfiguration during a PROGRAM Job.
+4. How the programming-flow FPGA load step (ADR-0004) is implemented and
+   coordinated with Asset Set activation and all Site/driver/PS-PL
+   consumers; it never runs inside a SiteWorker.
 5. Parser language/execution and Normalized Image details (including sparse
    HEX/SREC/ELF memory address regions); no arbitrary code entitlement.
 6. Exact Programming Profile, FPGA Image, IC qualification and target identity
