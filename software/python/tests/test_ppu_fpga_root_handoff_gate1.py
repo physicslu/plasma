@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from contextlib import nullcontext
 from unittest.mock import patch
 
 import pytest
@@ -142,3 +143,105 @@ def test_root_handoff_cannot_authorize_a_new_root_operation(tmp_path: Path):
     assert check(plan, sha, files)["fpga_installed"] is False
     with pytest.raises(protected_root.ImageDeploymentDenied, match="OPERATION_NOT_ALLOWLISTED"):
         protected_root.run("install-from-bundle")
+
+
+class _FakeExclusiveRoot:
+    def exclusive(self):
+        return nullcontext()
+
+
+def _mock_root_firmware_area(tmp_path: Path):
+    """Only a private temp directory, no /lib/firmware or Z2 operation."""
+    folder = tmp_path / "isolated-firmware"
+    folder.mkdir(mode=0o700)
+    (folder / "base.bin").write_bytes(b"synthetic-golden-only")
+    (folder / "plasma-image-manifest.json").write_bytes(b"existing-active-manifest")
+    return folder
+
+
+def _stage_sandbox(plan, sha, files, folder: Path):
+    from contextlib import ExitStack
+    with ExitStack() as checks:
+        checks.enter_context(patch.object(protected_root, "trusted_local"))
+        checks.enter_context(patch.object(protected_guard, "FIRMWARE", folder))
+        checks.enter_context(patch.object(protected_guard, "protected"))
+        checks.enter_context(patch.object(
+            protected_guard, "RootZ2TargetPort", return_value=_FakeExclusiveRoot()
+        ))
+        golden = checks.enter_context(patch.object(
+            protected_guard, "sha_file",
+            return_value=json.loads(files["manifest_bytes"])["recovery_sha256"],
+        ))
+        manager = checks.enter_context(patch.object(
+            protected_guard, "manager_write"
+        ))
+        result = protected_root.stage_bundle_fpga_files_only(
+            plan, expected_active_set_sha256=sha, **files,
+        )
+        manager.assert_not_called()
+        golden.assert_called_once_with(
+            folder / "base.bin",
+            json.loads(files["manifest_bytes"])["recovery_sha256"],
+        )
+    return result
+
+
+def test_root_files_only_stage_uses_existing_guard_no_fpga_load(tmp_path: Path):
+    plan, sha, files = prepared(tmp_path)
+    dest = _mock_root_firmware_area(tmp_path)
+    first = _stage_sandbox(plan, sha, files, dest)
+    assert first["result"] == "ROOT_FILES_STAGED_NOT_ACTIVATED"
+    assert first["fpga_installed"] is True
+    assert first["fpga_loaded"] is False
+    assert first["ready"] is False
+    assert first["golden_recovery"] == "NOT_VERIFIED"
+    name = first["firmware_name"]
+    assert (dest / name).read_bytes() == files["bin_bytes"]
+    assert (dest / (name + ".hwh")).read_bytes() == files["hwh_bytes"]
+    assert (dest / (name + ".manifest.json")).read_bytes() == files["manifest_bytes"]
+    assert all((dest / suffix).stat().st_mode & 0o777 == 0o600
+               for suffix in (name, name + ".hwh", name + ".manifest.json"))
+    assert (dest / "base.bin").read_bytes() == b"synthetic-golden-only"
+    assert (dest / "plasma-image-manifest.json").read_bytes() == b"existing-active-manifest"
+    again = _stage_sandbox(plan, sha, files, dest)
+    assert again["result"] == "ROOT_FILES_STAGED_NOT_ACTIVATED"
+    assert (dest / name).read_bytes() == files["bin_bytes"]
+
+
+def test_root_stage_denies_same_firmware_name_with_different_bytes(tmp_path: Path):
+    plan, sha, files = prepared(tmp_path)
+    dest = _mock_root_firmware_area(tmp_path)
+    existing = dest / "swd.bin"
+    existing.write_bytes(b"different-older-version")
+    with pytest.raises(protected_root.ImageDeploymentDenied, match="ROOT_HANDOFF_EXISTING_FILE_CONFLICT"):
+        _stage_sandbox(plan, sha, files, dest)
+    assert existing.read_bytes() == b"different-older-version"
+    assert not (dest / "swd.bin.manifest.json").exists()
+    assert (dest / "base.bin").read_bytes() == b"synthetic-golden-only"
+
+
+def test_root_stage_denies_symlinked_firmware_destination(tmp_path: Path):
+    plan, sha, files = prepared(tmp_path)
+    dest = _mock_root_firmware_area(tmp_path)
+    other = tmp_path / "external"
+    other.write_bytes(b"external-preserved")
+    (dest / "swd.bin").symlink_to(other)
+    with pytest.raises(protected_root.ImageDeploymentDenied, match="ROOT_HANDOFF_EXISTING_SYMLINK"):
+        _stage_sandbox(plan, sha, files, dest)
+    assert other.read_bytes() == b"external-preserved"
+
+
+def test_root_stage_refuses_failed_golden_before_file_mutation(tmp_path: Path):
+    plan, sha, files = prepared(tmp_path)
+    dest = _mock_root_firmware_area(tmp_path)
+    with patch.object(protected_root, "trusted_local"), \
+         patch.object(protected_guard, "FIRMWARE", dest), \
+         patch.object(protected_guard, "protected"), \
+         patch.object(protected_guard, "RootZ2TargetPort", return_value=_FakeExclusiveRoot()), \
+         patch.object(protected_guard, "sha_file", side_effect=protected_guard.TargetSafetyDenied("GOLDEN_HASH_DENIED")):
+        with pytest.raises(protected_guard.TargetSafetyDenied, match="GOLDEN_HASH_DENIED"):
+            protected_root.stage_bundle_fpga_files_only(
+                plan, expected_active_set_sha256=sha, **files
+            )
+    assert not (dest / "swd.bin").exists()
+    assert (dest / "base.bin").read_bytes() == b"synthetic-golden-only"
