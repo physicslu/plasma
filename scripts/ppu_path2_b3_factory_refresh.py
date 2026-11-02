@@ -61,8 +61,8 @@ ALLOWED_FILES = frozenset(
 # Actual privileged software updates remain in the original Factory Installer.
 REMOTE_VERIFY_EXTRACT = """
 import hashlib, json, os, pathlib, re, stat, sys, tarfile
-archive, destination, sha, expected_digest = sys.argv[1:]
-allowed = set(json.loads(sys.argv[5]))
+archive, destination, sha, expected_digest, allowed_json = sys.argv[1:]
+allowed = set(json.loads(allowed_json))
 root = pathlib.Path(destination)
 if root.exists() or not re.fullmatch(r"/tmp/plasma-b3-refresh-[0-9a-f]{12}-[A-Za-z0-9]{8}/extracted",destination):
     raise SystemExit("B3_REMOTE_STAGE_DESTINATION_DENIED")
