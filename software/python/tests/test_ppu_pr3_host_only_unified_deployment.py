@@ -123,7 +123,9 @@ def test_pr3_exact_authority_gate_accepts_only_host_only_scope(tmp_path):
     assert receipt["host_only"] is True
     assert receipt["authorization"]["device_install_authorized"] is False
     assert len(receipt["resolution"]["stage"]) == 6
-    assert co.journal.read().state == "package_active"
+    assert co.journal.read().state == "installed"
+    assert receipt["operation"] == "install_only"
+    assert receipt["active_pointer_unchanged"] is True
     assert not co.paths.product_root.exists()
 
 
@@ -164,22 +166,18 @@ def test_pr3_missing_authority_is_not_inferred_from_manifest_or_token(tmp_path):
     assert not co.paths.journal.exists()
 
 
-def test_pr3_host_only_transaction_rollback_and_unknown_recovery(tmp_path):
+def test_pr3_host_only_install_only_rejects_activation_faults(tmp_path):
     archive, digest, artifact = verified(tmp_path / "release")
     policy = trusted_policy(artifact)
     co = coordinator(tmp_path)
-    with pytest.raises(engine.DeploymentError, match="HOST_ONLY_INJECTED_ACTIVATION_FAILURE"):
-        co.execute_authorized_bundle_host_only(
-            request(archive, digest), trusted_policy=policy, trusted_inventory={},
-            now_epoch_s=NOW, inject_failure="after_activate",
-        )
-    assert co.journal.read().state == "rolled_back"
-    with pytest.raises(engine.DeploymentError, match="HOST_ONLY_INJECTED_ACTIVATION_FAILURE"):
-        co.execute_authorized_bundle_host_only(
-            request(archive, digest), trusted_policy=policy, trusted_inventory={},
-            now_epoch_s=NOW, inject_failure="rollback_unknown",
-        )
-    assert co.journal.read().state == "recovery_required"
+    for fault in ("after_activate", "rollback_unknown"):
+        with pytest.raises(engine.DeploymentError, match="INSTALL_ONLY_ACTIVATION_FAILURE_SELECTOR_DENIED"):
+            co.execute_authorized_bundle_host_only(
+                request(archive, digest), trusted_policy=policy, trusted_inventory={},
+                now_epoch_s=NOW, inject_failure=fault,
+            )
+    assert not co.paths.journal.exists()
+    assert not co.paths.product_root.exists()
 
 
 def test_pr3_manager_bundle_admission_uses_same_authenticated_api(tmp_path):
