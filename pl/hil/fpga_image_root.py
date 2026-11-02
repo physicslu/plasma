@@ -23,7 +23,10 @@ from pl.hil import fpga_image_admission as admission
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_FILE = guard.FIRMWARE / "plasma-image-manifest.json"
-STATE = ROOT / ".plasma-fpga-image-deployment-state.json"
+STATE = Path("/var/lib/plasma/privileged/fpga-deployment-state.json")
+# Never write mutable journal/state into the immutable privileged code root.
+# The root-protected state directory must be independently provisioned and
+# migration from old Path 2 state qualified before any Z2 FPGA action.
 CHILD = guard.OWNER_DIR / "fpga-image-identity.json"
 SCHEMA = "plasma.fpga.image-deployment.v3"
 LEGACY_SCHEMA = "plasma.fpga.image-deployment.v1"

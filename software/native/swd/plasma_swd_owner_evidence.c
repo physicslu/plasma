@@ -19,18 +19,6 @@ static bool hex64(const char value[65])
     return true;
 }
 
-static bool git40(const char value[41])
-{
-    if (!value || value[40] != '\0')
-        return false;
-    for (unsigned i = 0; i < 40; ++i) {
-        if (!((value[i] >= '0' && value[i] <= '9') ||
-              (value[i] >= 'a' && value[i] <= 'f')))
-            return false;
-    }
-    return true;
-}
-
 static bool boot_uuid(const char value[37])
 {
     if (!value || value[36] != '\0')
@@ -82,14 +70,14 @@ static bool complete(const struct plasma_swd_observed_identity *v,
 {
     return v && (site == 1u || site == 2u) &&
            boot_uuid(v->boot_id) &&
-           git40(v->root_source_commit) &&
+           hex64(v->trusted_code_sha256) &&
            hex64(v->image_manifest_sha256) &&
            hex64(v->loaded_image_sha256) &&
            image_name(v->image_id) &&
            session_id(v->root_image_session_id) &&
            v->abi_version == 5u &&
            (v->site_bitmap & (1u << (site - 1u))) != 0u &&
-           v->root_source_pinned && v->manager_operating &&
+           v->trusted_code_verified && v->manager_operating &&
            v->active_image_attested && v->axi_isolation_proven &&
            v->owner_scan_complete && v->voltage_qualified &&
            v->recovery_available;
@@ -99,7 +87,7 @@ static bool same(const struct plasma_swd_observed_identity *a,
                  const struct plasma_swd_observed_identity *b)
 {
     return strcmp(a->boot_id, b->boot_id) == 0 &&
-           strcmp(a->root_source_commit, b->root_source_commit) == 0 &&
+           strcmp(a->trusted_code_sha256, b->trusted_code_sha256) == 0 &&
            strcmp(a->image_manifest_sha256,
                   b->image_manifest_sha256) == 0 &&
            strcmp(a->loaded_image_sha256, b->loaded_image_sha256) == 0 &&

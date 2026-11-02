@@ -142,14 +142,15 @@ def test_root_guard_rejects_non_root_before_device_access(monkeypatch: pytest.Mo
             pytest.fail("Non-root must not enter protected image owner lock")
 
 
-def test_existing_root_entry_remains_narrow_source_pinned() -> None:
-    # Static regression on unchanged protected script; this test does not run it.
+def test_existing_root_entry_remains_narrow_privileged_source_verified() -> None:
+    # Static regression on the one fixed Root action entry; NO physical invocation.
     repo_root = Path(__file__).resolve().parents[3]
     root_entry = (repo_root / "scripts/z2/plasma-path2-root-entry").read_text()
     assert 'download|test|restore' in root_entry
-    assert "PATH2_ROOT_REQUIRED" in root_entry
-    assert "PATH2_REQUEST_NOT_PINNED" in root_entry
-    assert "sha256sum --check --status" in root_entry
+    assert "PPU_FPGA_ROOT_REQUIRED" in root_entry
+    assert "PPU_FPGA_CODE_INTEGRITY_DENIED" in root_entry
+    assert "ppu_privileged_source.py" in root_entry
+    assert ".plasma-path2-source-commit" not in root_entry
 
 
 def test_runtime_program_session_does_not_use_global_proc_census() -> None:

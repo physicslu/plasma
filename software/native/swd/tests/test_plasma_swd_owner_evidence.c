@@ -30,24 +30,18 @@ static void fill(char dst[65], char c)
     memset(dst, c, 64u);
     dst[64] = '\0';
 }
-static void fill40(char dst[41], char c)
-{
-    memset(dst, c, 40u);
-    dst[40] = '\0';
-}
-
 static struct plasma_swd_observed_identity identity(void)
 {
     struct plasma_swd_observed_identity e = {0};
     strcpy(e.boot_id, "123e4567-e89b-12d3-a456-426614174000");
     strcpy(e.image_id, "SWD_V5");
-    fill40(e.root_source_commit, 'a');
+    fill(e.trusted_code_sha256, 'a');
     fill(e.image_manifest_sha256, 'b');
     fill(e.loaded_image_sha256, 'c');
     strcpy(e.root_image_session_id, "fpga-0123456789abcdef0123456789abcdef");
     e.abi_version = 5u;
     e.site_bitmap = 3u;
-    e.root_source_pinned = true;
+    e.trusted_code_verified = true;
     e.manager_operating = true;
     e.active_image_attested = true;
     e.axi_isolation_proven = true;
@@ -72,7 +66,7 @@ static void negative_expected_claims(void)
     assert(plasma_swd_owner_evidence_init(
         &ctx, 1, 11, &e, &f, live_read) != PLASMA_SWD_OK);
     e = identity();
-    e.root_source_pinned = false;
+    e.trusted_code_verified = false;
     assert(plasma_swd_owner_evidence_init(
         &ctx, 1, 11, &e, &f, live_read) != PLASMA_SWD_OK);
     e = identity();
@@ -132,11 +126,11 @@ static void negative_live_claims(void)
     BAD_LIVE(active_image_attested, false);
     BAD_LIVE(axi_isolation_proven, false);
     BAD_LIVE(voltage_qualified, false);
-    BAD_LIVE(root_source_pinned, false);
+    BAD_LIVE(trusted_code_verified, false);
     BAD_LIVE(manager_operating, false);
     BAD_LIVE(recovery_available, false);
     BAD_LIVE(owner_scan_complete, false);
-    BAD_LIVE(root_source_pinned, false);
+    BAD_LIVE(trusted_code_verified, false);
     BAD_LIVE(abi_version, 4u);
     BAD_LIVE(site_bitmap, 2u);
 #undef BAD_LIVE
@@ -156,7 +150,7 @@ static void negative_live_claims(void)
     f.live = e;
     assert(plasma_swd_owner_evidence_init(
         &owner, 1, 11, &e, &f, live_read) == 0);
-    f.live.root_source_commit[0] = '0';
+    f.live.trusted_code_sha256[0] = '0';
     assert(plasma_swd_owner_evidence_authorize(&owner, 1, 11) != 0);
     memset(&owner, 0, sizeof(owner));
     f.live = e;

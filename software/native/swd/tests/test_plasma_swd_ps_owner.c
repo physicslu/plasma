@@ -20,7 +20,7 @@
 static char root[200];
 static struct plasma_swd_ps_paths P;
 static const char *BOOT = "4cefdc0c-f586-4d19-b126-1d8e1108c8f1";
-static const char *PIN = "61e2137c4ecb92bcabd579fbb28349347de05c60";
+static const char *PIN = "61e2137c4ecb92bcabd579fbb28349347de05c6061e2137c4ecb92bcabd579fb";
 static const char *MAN = "f470a4fac8accd0b1fcfb50243d4d663e1ddee209bc1c506e8e587c1f5ff859c";
 static const char *FW = "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773";
 static const char *SID = "fpga-e412210dbd8e4d49b54f043ea697cb21";
@@ -55,32 +55,39 @@ static void journal_text(char *buf, size_t cap, const char *status)
 static int write_record(unsigned int site, long long rec_exp, long long el_exp,
                         int voltage)
 {
-    struct stat js, es;
+    struct stat js, es, cs;
     char rec[4096], p[320];
     if (stat(P.root_journal, &js))
+        return -1;
+    if (stat(P.code_manifest, &cs))
         return -1;
     char el[256];
     path(el, "elec-site1.json");
     if (stat(el, &es))
         return -1;
     snprintf(rec, sizeof(rec),
-             "schema=plasma.swd.ps-admission.v1\nsite_id=%u\nboot_id=%s\n"
-             "root_source_commit=%s\nimage_manifest_sha256=%s\n"
+             "schema=plasma.swd.ps-admission.v2\nsite_id=%u\nboot_id=%s\n"
+             "trusted_code_sha256=%s\nimage_manifest_sha256=%s\n"
              "loaded_image_sha256=%s\nimage_id=%s\nroot_image_session_id=%s\n"
-             "abi_version=5\nsite_bitmap=3\nroot_source_pinned=1\n"
+             "abi_version=5\nsite_bitmap=3\ntrusted_code_verified=1\n"
              "manager_operating=1\nactive_image_attested=1\n"
              "axi_isolation_proven=1\nowner_scan_complete=1\n"
              "voltage_qualified=%d\nrecovery_available=1\njournal_dev=%llu\n"
              "journal_ino=%llu\njournal_size=%llu\njournal_mtime_ns=%lld\n"
              "electrical_path=%s\nelectrical_ino=%llu\nelectrical_mtime_ns=%lld\n"
-             "electrical_expires_epoch=%lld\nrecord_expires_epoch=%lld\n",
+             "electrical_expires_epoch=%lld\nrecord_expires_epoch=%lld\n"
+             "code_manifest_dev=%llu\ncode_manifest_ino=%llu\n"
+             "code_manifest_size=%llu\ncode_manifest_mtime_ns=%lld\n",
              site, BOOT, PIN, MAN, FW, IMG, SID, voltage,
              (unsigned long long)js.st_dev, (unsigned long long)js.st_ino,
              (unsigned long long)js.st_size,
              (long long)js.st_mtim.tv_sec * 1000000000LL + js.st_mtim.tv_nsec,
              el, (unsigned long long)es.st_ino,
              (long long)es.st_mtim.tv_sec * 1000000000LL + es.st_mtim.tv_nsec,
-             el_exp, rec_exp);
+             el_exp, rec_exp,
+             (unsigned long long)cs.st_dev, (unsigned long long)cs.st_ino,
+             (unsigned long long)cs.st_size,
+             (long long)cs.st_mtim.tv_sec * 1000000000LL + cs.st_mtim.tv_nsec);
     snprintf(p, sizeof(p), "%s/swd-site%u-admission", P.record_dir, site);
     return put(p, rec, 0600);
 }
@@ -115,20 +122,20 @@ static int setup(void)
     path(P.boot_id, "boot_id");
     path(P.manager_state, "state");
     path(P.root_journal, "journal.json");
-    path(P.root_pin, "pin");
+    path(P.code_manifest, "pin");
     path(P.record_dir, "run");
     path(P.lock, "plasma-mmio.lock");
     path(P.devmem, "devmem");
     mkdir(P.record_dir, 0700);
     char el[256];
     path(el, "elec-site1.json");
-    char pin[64];
+    char pin[128];
     snprintf(pin, sizeof(pin), "%s\n", PIN);
     char boot[64];
     snprintf(boot, sizeof(boot), "%s\n", BOOT);
     journal_text(j, sizeof(j), "IMAGE");
     if (put(P.boot_id, boot, 0644) || put(P.manager_state, "operating\n", 0644) ||
-        put(P.root_journal, j, 0600) || put(P.root_pin, pin, 0644) ||
+        put(P.root_journal, j, 0600) || put(P.code_manifest, pin, 0644) ||
         put(el, "{\"method\":\"OWNER_ONSITE_ATTESTATION\"}\n", 0600))
         return -1;
     plasma_swd_ps_owner_set_paths_for_host_test(&P);
