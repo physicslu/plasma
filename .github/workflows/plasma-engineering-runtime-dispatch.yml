@@ -29,14 +29,7 @@ on:
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_licensed_f1b.py"
-      - "scripts/plasma_path2_build_qualification.py"
-      - "scripts/plasma_path2_runtime_integration.py"
-      - "scripts/tests/test_plasma_path2_runtime_integration.py"
       - "scripts/plasma_path2_persistent_lease.py"
-      - "scripts/plasma_path2_bin_provenance.py"
-      - "scripts/plasma_path2_held_provider.py"
-      - "scripts/tests/test_plasma_path2_held_provider.py"
       - "scripts/z2/plasma-path2-root-entry"
       - "pl/hil/fpga_image_root.py"
       - "pl/hil/fpga_image_guard.py"
@@ -67,14 +60,7 @@ on:
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/plasma_fpga_build_diagnostics.py"
       - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_licensed_f1b.py"
-      - "scripts/plasma_path2_build_qualification.py"
-      - "scripts/plasma_path2_runtime_integration.py"
-      - "scripts/tests/test_plasma_path2_runtime_integration.py"
       - "scripts/plasma_path2_persistent_lease.py"
-      - "scripts/plasma_path2_bin_provenance.py"
-      - "scripts/plasma_path2_held_provider.py"
-      - "scripts/tests/test_plasma_path2_held_provider.py"
       - "scripts/z2/plasma-path2-root-entry"
       - "pl/hil/fpga_image_root.py"
       - "pl/hil/fpga_image_guard.py"
@@ -122,14 +108,9 @@ jobs:
           python3 scripts/tests/test_plasma_path2_operator_cli.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
-          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_licensed_f1b.py scripts/tests/test_plasma_generic_vivado_host_build.py pl/projects/z2-identity/verify_hwh.py pl/projects/z2-control-waveform/verify_hwh.py
+          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_generic_vivado_host_build.py pl/projects/z2-identity/verify_hwh.py pl/projects/z2-control-waveform/verify_hwh.py
           python3 scripts/tests/test_plasma_generic_vivado_host_build.py
           python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
-          python3 scripts/tests/test_plasma_licensed_f1b.py
-          python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
-          python3 scripts/tests/test_plasma_path2_runtime_integration.py
-          python3 -m py_compile scripts/plasma_path2_bin_provenance.py scripts/plasma_path2_held_provider.py scripts/tests/test_plasma_path2_held_provider.py
-          python3 scripts/tests/test_plasma_path2_held_provider.py
           python3 -m py_compile pl/hil/fpga_image_root.py pl/hil/fpga_image_guard.py pl/hil/fpga_image_admission.py scripts/tests/test_fpga_image_root.py
           python3 scripts/tests/test_fpga_image_root.py
           python3 -m py_compile scripts/plasma_development_stage_transport.py scripts/tests/test_plasma_path2_swpc_bridge.py

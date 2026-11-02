@@ -10,7 +10,6 @@ import unittest
 from unittest.mock import patch, Mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import plasma_development_stage_transport as t
-import plasma_path2_runtime_integration as r
 import plasma_development_dispatch as d
 
 SHA = 'a' * 40
@@ -45,7 +44,7 @@ class Contracts(unittest.TestCase):
             t.parse_receipt('audit', SHA, forged, project)
 
     def test_no_installed_host_dependency_or_candidate_import(self):
-        source = Path(t.__file__).read_text() + Path(r.__file__).read_text()
+        source = Path(t.__file__).read_text()
         for forbidden in ('/usr/local/libexec/plasma/z2-path2-f1b-bridge',
                           'z2-path2-f1b.approved-sha', 'importlib', 'exec_module'):
             self.assertNotIn(forbidden, source)
@@ -219,36 +218,6 @@ class Contracts(unittest.TestCase):
         step = workflow.split("- name: Execute candidate CLI using trusted dispatcher", 1)[1].split("        run: |", 1)[0]
         self.assertNotIn("GH_TOKEN:", step)
         self.assertNotIn("GITHUB_TOKEN:", step)
-
-    def test_separate_recovery_adapter_has_no_implicit_download_restore(self):
-        # Legacy protected transport is independently testable but no longer
-        # admitted as a general Path 2 Dispatcher Work Order.
-        task = {'execution_path': 'path2-cli', 'capability': 'z2-root-operation',
-                'objective': 'Validate protected lifecycle in offline tests',
-                'acceptance': 'Require exact source/receipt without side effects',
-                'operation': 'test', 'work_order_scope': 'guarded-hardware',
-                'work_order_sha256': 'b' * 64}
-        approval = {'task_id': 'path2-work-order', 'execution_path': 'path2-cli',
-                    'execution_capability': 'z2-root-operation',
-                    'authorized_operation': 'test', 'work_order_sha256': 'b' * 64,
-                    'pinned_sha': SHA, 'trusted_sha': SHA, 'pr_number': 0,
-                    'auto_download_after_build_success': False,
-                    'auto_test_after_download_success': False}
-        receipt = {'stage': 'test', 'source_sha': SHA, 'project': PROJECT,
-                   'real_z2': True, 'boot_id': 'fake-test-boot',
-                   'result': 'IDENTITY_PASS'}
-        with patch.object(t, 'execute_operation', return_value=receipt) as call:
-            result = r.direct_root_operation(task, approval)
-            self.assertFalse(result['auto_next_operation'])
-            call.assert_called_once_with('test', SHA)
-        for invalid in ({'operation': 'restore'},
-                        {'auto_download_after_build_success': True},
-                        {'auto_test_after_download_success': True}):
-            with self.subTest(change=invalid), patch.object(t, 'execute_operation') as call:
-                with self.assertRaises(r.RuntimeDenied):
-                    r.direct_root_operation(task | invalid if 'operation' in invalid else task,
-                                            approval if 'operation' in invalid else approval | invalid)
-                call.assert_not_called()
 
     def test_timeout_kills_and_reaps(self):
         proc = Mock(pid=999999)

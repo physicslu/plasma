@@ -46,7 +46,7 @@ pl/
 | --- | --- |
 | `btled` | 開發流程範例（按鍵→LED），不是 Plasma 產品 RTL。 |
 | `z2-bluepill-rbb` | 目前 Blue Pill SWD PoC 的 Image Manifest；**main 上只有 `image-manifest.json`**，RTL／Vivado 原始碼在未合併的 PR #1142，無法從 main 重新建置。 |
-| `z2-fixed-unified-site1` | F1-B 固定 ABI Site 1 PS7 整合；**已淘汰**。 |
+| `z2-fixed-unified-site1` | F1-B 固定 ABI Site 1 PS7 整合；**已淘汰並刪除**（2026-11-02，原始碼見 Git 歷史）。 |
 | `z2-swd-gpio` | PS EMIO GPIO software bit-bang；**已退役**，建置入口停用。 |
 | `z2-swd03-axi` | FPGA 內部合成 DPIDR responder，無外部腳位；**已退役**。 |
 | `z2-control-waveform` | PSPL-02／SWD-00 內部 PL loopback；host-only 候選，Z2 載入未驗收。 |

@@ -81,6 +81,13 @@ RETIRED_F1B_RUNTIME = (
     "pl/hil/approved-fpga-image.json",
     "scripts/plasma-z2-smoke.sh",
     "scripts/z2/plasma-z2-ssh-smoke-target.sh",
+    # Layer 2: F1-B Vivado build / dispatch / provenance.
+    "pl/projects/z2-fixed-unified-site1",
+    ".github/workflows/ppu-fixed-site1-f1-host.yml",
+    "scripts/plasma_path2_runtime_integration.py",
+    "scripts/plasma_path2_build_qualification.py",
+    "scripts/plasma_path2_held_provider.py",
+    "scripts/plasma_path2_bin_provenance.py",
 )
 
 
@@ -97,6 +104,14 @@ def test_f1b_legacy_runtime_is_retired_and_root_chain_is_independent():
             assert retired not in source, (name, retired)
     inventory = (ROOT / "docs/development/swd-legacy-path-retirement.md").read_text()
     assert "F1-B runtime RETIRED" in inventory
+    registry = (ROOT / "specs/engineering-dispatch/development-tasks-v1.json").read_text()
+    assert "f1b" not in registry.lower()
+    for name in ("scripts/plasma_development_dispatch.py",
+                 "scripts/plasma_vivado_host_build.py"):
+        source = (ROOT / name).read_text()
+        for retired in ("run_licensed_f1b_task", "f1b-path3-codex-vivado-build",
+                        "z2-fixed-unified-site1", "license_snapshot"):
+            assert retired not in source, (name, retired)
 
 
 @pytest.mark.parametrize("module,tag", [
