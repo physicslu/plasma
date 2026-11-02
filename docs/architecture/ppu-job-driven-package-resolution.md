@@ -1,84 +1,158 @@
-# PPU Job-Driven Package Resolution — Architecture Direction
+# PPU Single Active Asset Set — Controller-Driven Programming Architecture
 
 **Decision recorded:** 2026-11-02 (owner discussion).  
-**Status:** Agreed architectural principles; detailed execution contracts and implementation **NOT DECIDED / NOT IMPLEMENTED**.  
+**Status:** Owner-approved architecture decision (2026-11-02); implementation, wire/API details and hardware qualification **NOT IMPLEMENTED / NOT VERIFIED**.  
 **Scope:** PLASMA PPU PS programming resource selection after Bundle v3 delivery. This document does **not** authorize runtime changes, deployment, activation, FPGA/DUT operation, or a new Gate 1.
 
-## Core decision — Bundle = Assets, Controller = actions
+## Accepted decision — one Active Asset Set per PPU
 
-**An incoming Bundle represents Assets, not a runnable workflow.** A Bundle
-is a transport/inventory grouping of resource Packages and Files. Source code,
-Parser implementations, Firmware Images, Programming Profiles, IC metadata,
-and other payloads remain **assets/resources** merely by being packaged or
-installed. A code-bearing Package is not an instruction to execute that code.
+**A PPU has exactly one effective Active Asset Set at a time.** This is a
+*logical set* of resources, **not** one file or one Package. The set can
+contain Firmware Images, Parsers, Programming Profiles, FPGA bitstream/HWH
+pairs, IC data and necessary configuration. Bundle v3 is the **Assets
+delivery container** (Bundle → Packages → Files), not an executable
+workflow. Package presence never triggers a programming action.
 
-**The Controller owns initiation and sequencing of programming operations.**
-In PLASMA's current intended control-plane placement, the SWPC upper-level
-Controller (or its approved job/batch orchestration) initiates a Programming
-Job with explicit operation intent and Site/PPU context. The Controller,
-not the Bundle, controls *whether and when* to Erase / Program / Verify / Read
-and any separately defined sequence or cancellation.
+**Console/Controller is the authority for Asset Set selection and all
+programming actions.** Console specifies the **exact intended Asset Set
+identity** for a PPU. That selection binds the intended FPGA Image and
+Programming Profile and their exact identities; PPU must not silently
+select substitute images/profiles from other Bundles or older versions.
+Console separately initiates the E/P/V/R commands, Job/Batches and
+their sequencing. PPU resolves only the necessary resources *inside the
+single Active Asset Set* to carry out the admitted command.
 
-**The PPU PS owns resource selection and authorized execution of each admitted
-command.** Once the Controller has sent a Job, the PS resolves *only the
-necessary available Assets/Packages* for that operation, validates their
-compatibility and execution qualifications, and performs the requested action
-through the qualified Programming Route. Resolving assets **must not invent
-extra operations or an autonomous workflow**; for example, a PROGRAM Job
-does not implicitly authorize ERASE or VERIFY.
+**PPU is the admission, verification and execution authority**, not the
+choice of an alternate set. It verifies exact provenance/digest, target and
+ICPN applicability, compatible FPGA ABI/capabilities, resource availability,
+Site/PPU ownership and hardware qualification. If validation fails it must
+reject the command; no fallback to a different FPGA Image, Profile or
+Package version.
 
-This is a separation of authority: **Controller → Job intent/sequence;
-Bundle → Assets; PPU → resolve Assets and execute admitted Job**. It is a
-design decision, not an assertion that a complete hardware runtime exists.
+**One active set does not mean one physical copy at all times.** During a
+controlled update, a separately isolated staging area is required. It is
+acceptable to have Active + Staging concurrently; only one may be Active.
+A Job may not observe a partially installed/mixed Asset Set. Version and
+package dependencies stay internal to the selected Asset Set; there is no
+requirement to build a global, cross-Bundle multi-version Package Registry
+or allow Jobs to mix assets from several installed sets.
 
-The intent is to keep the programming control plane *Job-driven*:
+### Console-to-PPU reconciliation
+
+1. Console chooses the required Asset Set and its exact **Asset Set SHA256**
+   (or a future equivalently strong canonical identity binding all files,
+   package versions and relevant metadata). Name or version alone is NOT
+   a sufficient match.
+2. Console reads PPU's reported Active Asset Set identity and operational
+   readiness. **If SHA256 matches**, no redundant transfer is needed, but
+   PPU still validates runtime/FPGA/Profile readiness before a real Job.
+3. **If SHA256 differs, is absent, or cannot be trusted**, Console sends
+   the selected **complete Asset Set** using the approved transfer contract.
+   It does not ask PPU to construct a mix of old Package versions.
+4. PPU performs **B1 Receive → B2 Admission → B3 Install/Verify** in an
+   isolated staging/install area; failure leaves the existing Active Set
+   unchanged and records the real error/recovery state.
+5. After verification and when **no active or cancelling Jobs / Site
+   hardware users** can observe an inconsistent configuration, a separately
+   authorized Asset Set activation makes exactly one verified Set Active.
+   Activation must be atomic from the perspective of readers and Jobs:
+   never overwrite live files or switch the pointer mid-Job.
+6. **Asset activation is not FPGA reconfiguration.** If the FPGA Image
+   required by the Active Set is not already loaded and proven compatible,
+   Console must authorize a distinct controlled FPGA configuration
+   operation. The single PPU Hardware Manager checks Site quiescence,
+   all hardware consumers, actual FPGA part, Image/Build ID, ABI,
+   capabilities, driver bindings, electrical safe state and recovery
+   prerequisites. If these cannot be proven, PPU remains NOT_READY.
+7. Controller initiates E/P/V/R only after the PPU reports the selected Set
+   **READY**. Every accepted Job pins that Set identity until terminal
+   completion. A newly delivered Set may be staged while Jobs exist only
+   if independent isolation can be guaranteed; **activation/configuration
+   switching is prohibited while Jobs are active**.
+
+These are required **architecture invariants**, not claims of existing B4,
+Generic B3, console reconciliation or real hardware functionality. The
+exact canonical Set SHA construction, activation API, state persistence and
+crash recovery mechanism need subsequent implementation decisions.
+
+### Proposed PPU Asset Set state model
 
 ```text
-Resource delivery / availability                   Programming operation
-──────────────────────────────────                  ──────────────────────────
-SWPC / controlled source                            Controller: ERASE / PROGRAM /
-         |                                                VERIFY / READ
-         v                                                     |
-Bundle v3 / other agreed input mechanism                      v
-         |                                         Web / Gateway / PLASMA33
-         v                                                     |
-B1 Receive → B2 Admission → B3 Install/Verify                  v
-         |                                            Z2 PS: Job Admission
-         v                                                     |
-PPU-owned verified Package/resource inventory <─────── Package/resource resolver
-                                                               |
-                                                     Operation-specific resources
-                                                               |
-                                               Parser (if required) / Normalized Image
-                                                               |
-                                                  Qualified Programming Route
-                                                               |
-                                             Site Worker → PS backend → PL → DUT
+EMPTY -> RECEIVING -> VERIFIED -> ACTIVE -> READY
+             |           |         |        |
+             v           v         v        v
+          ERROR        ERROR     NOT_READY  NOT_READY
 ```
 
-The diagram is a **target architecture**, not an assertion that its end-to-end
-non-Mock execution is already operational.
+- **EMPTY**: no verified Active Asset Set is usable.
+- **RECEIVING**: new complete Asset Set transfer is in progress; an existing
+  Active Set, if present, stays logically separate.
+- **VERIFIED**: new staged Set passed B1/B2/B3 and integrity checks, but is
+  **not** selected for jobs.
+- **ACTIVE**: single selected verified Set is the only job resource universe;
+  FPGA may still require separately authorized configuration/validation.
+- **READY**: selected Set, exact FPGA Image, Programming Profile, target
+  qualification, available hardware and operational ownership satisfy
+  admission to begin Jobs. Readiness is rechecked; not inferred solely
+  from Asset Set SHA.
 
-## Responsibility boundaries
+This is a **conceptual lifecycle**, not a new executable state machine or
+a retrofit of existing Bootstrap B1/B2/B3 receipt states. In practice the
+PPU may need to report the *current Active state* and a *pending staged
+update* independently rather than replace current READY with RECEIVING.
 
-| Layer / phase | Responsibility | Explicit non-responsibility |
+### Target control flow
+
+```text
+Console: selected Asset Set SHA and Controller-owned workflow
+            |
+            v
+  PPU reports Active Set SHA + readiness
+            |
+       SHA mismatch? ----- no -----> check actual FPGA/Profile READY
+            | yes                                |
+            v                                    |
+   full Bundle v3 Asset Set delivery             |
+            |                                    |
+      B1 → B2 → B3 to Staging                    |
+            |                                    |
+  verified → safe single Active Set switch       |
+            |                                    |
+  separate FPGA configuration if needed          |
+            |                                    |
+  verify FPGA + Profile + Job readiness <---------+
+            |
+        Controller starts Job: E/P/V/R
+            |
+ PPU loads ONLY required resources FROM Active Set
+            |
+ qualified PS Backend / PL / Site DUT → Job evidence
+```
+
+A source Firmware/Parser/FPGA file is an **Asset**, not an instruction to
+execute its content. An explicit PROGRAM Job does not implicitly authorize
+ERASE or VERIFY. One PPU-wide full FPGA Image and one Active Asset Set are
+shared by its Sites; per-Site serial numbers, MAC addresses, calibration or
+other unique DUT data remain separate Job-level inputs and do not require
+a different Asset Set per device.
+
+### Responsibility boundaries
+
+| Owner / phase | Required role | Forbidden inference |
 | --- | --- | --- |
-| **B1 Receive** | Receive a concrete Bundle/archive and verify transfer integrity | Do not select the programming operation or execute a payload |
-| **B2 Admission** | Validate canonical Bundle v3 manifest, files, hashes, target and dependency DAG | Admission does not authorize execution or device programming |
-| **B3 Install/Verify** | Make the specifically authorized Package files available and verify installation | Do not automatically invoke Parser, Program, Verify or FPGA operations |
-| **Bundle / installed Assets** | Deliver and inventory resource Packages/Files (data or code-bearing assets), with identity/version and provenance | No workflow/action owner; no automatic Parser invocation or PROGRAM trigger |
-| **Controller (SWPC orchestration)** | Initiate an explicit operation and, where applicable, sequence of Jobs for selected PPU/Sites | Does not infer execution authority from Bundle content or substitute for PS qualification checks |
-| **PPU resource inventory** | Represent available assets, their identities/versions and their reviewed qualifications | Mere presence of an asset does not grant runtime or hardware authority |
-| **Programming Job Admission** | Validate a Controller-initiated command, target exact ICPN, selected PPU/Sites and required execution ownership | Do not invent operations or infer unsupported route capability from a Package claim |
-| **Job-driven Package/resource resolution (future)** | Find the minimal eligible Assets/Packages *for the Controller-requested Job*, resolve compatible versions and identities, reject missing/conflicting/unsupported resources | Cannot change the Controller's requested operation/sequence; not Bundle admission or installation ordering |
-| **Programming Runtime (future integration)** | Parse/normalize only when required, select a qualified Programming Profile/Backend, carry out admitted Site operations, report per-Site results | Must not let user-provided Parser/Package bypass the qualified route or electrical guards |
+| **Console/Controller** | Select exact Asset Set, compare identity, transfer entire Set on mismatch, explicitly request FPGA configuration if needed, initiate operations and sequencing | Never treat mere transfer as a PROGRAM command |
+| **Bundle v3 / Packages** | Carry a complete logical Asset Set with file hashes, typed resources and dependency declarations | Does not own a workflow, activation, FPGA configuration or job execution |
+| **B1/B2/B3 on PPU** | Receive, admit and install/verify the authorized incoming Set | B3 does not itself make Set Active, READY or execute Parser |
+| **Asset Set manager (future)** | Enforce one Active Set, isolated Staging and safe atomic activation; publish exact identity/state | Cannot overwrite running Jobs or synthesize a hybrid set |
+| **PPU Programming Runtime** | Verify the requested Job against Active Set and exact ICPN, select *necessary resources within it* | No independent search for alternate versions/Profiles/FPGA Images across Bundles |
+| **FPGA Hardware Manager** | Sole configuration owner; perform explicitly authorized image transition, ABI/capability and safety validation | No implicit FPGA reload inside a SiteWorker or PROGRAM Job |
+| **Site workers / backends** | Execute admitted operations and return actual per-Site results | No authority to select/activate a different Asset Set |
 
-**Deployment dependency vs. Job requirement are different contracts.**
-`packages[].requires` in Bundle v3 defines a *closed installation/ordering
-dependency* among Packages in one Bundle. A Job may require a different subset
-of already available resources. The latter should be resolved from the
-requested operation, target and trusted runtime capability, **not** by
-automatically executing every Package present in a Bundle.
+The `packages[].requires` graph remains an **internal Bundle install
+dependency**, not the Controller's Job sequence or a grant to execute every
+Package. The Controller's explicit Set selection determines the resource
+universe; the PPU's operation-specific lookup only selects required files
+*within that Set*.
 
 ## Operation-specific resolution examples (illustrative only)
 
@@ -133,37 +207,37 @@ Likewise, the current non-Mock Site execution routing still has explicit
 hardware-runtime qualification gates. This decision does not declare either
 capability complete.
 
-## Decisions deliberately left open
+## Implementation decisions still open
 
-1. **Resource distribution:** whether firmware data and Parser arrive in one
-   Bundle, different Bundles, a Programming Asset transfer, or another
-   controlled mechanism. Do not prematurely require redeploying software for
-   every firmware update.
-2. **Resolver location and inventory:** exact PPU-side component boundary,
-   inventory lifecycle, persistent storage/reuse and how already installed
-   resources are discovered.
-3. **Capability contract:** how a Job expresses needs, how installed Packages
-   advertise *reviewed* capabilities, and how the PS chooses compatible
-   versions/resources for an exact ICPN and operation.
-4. **Parser execution model:** Python, native code, library/plugin or service;
-   sandboxing, process lifecycle and whether/how it produces sparse
-   address-bearing memory segments for HEX/SREC/ELF.
-5. **Activation and updates:** whether a B4-style activation is appropriate
-   for a class of Package, when activation is required, and how in-flight
-   Jobs are insulated from resource replacement. No answer is implied here.
-6. **Qualification and failures:** authorization boundaries, resource/version
-   pinning per Job, recovery, missing-resource handling, evidence/Receipt
-   format, and actual PS → PL → DUT acceptance.
-7. **Concurrency:** eight-Site scheduling and which shared resources need
-   PPU-wide serialization vs independent per-Site execution, consistent with
-   current ownership and image-leasing invariants.
+**Settled:** single Active Asset Set per PPU; full Set transfer on Console/
+PPU identity mismatch; Controller-selected exact Set/Image/Profile; Job
+operations initiated by Controller; PPU resolves only assets in that Set;
+isolated staging, safe activation and distinct controlled FPGA configuration;
+no mid-Job Set change.
 
-The ownership model above leaves the exact Controller API, Job/Recipe sequencing
-contract and PS resource-resolution mechanism open; the existing E/P/V/R
-semantics and real PPU hardware gates remain authoritative.
+**Not settled (requires implementation planning and evidence):**
 
-No new API fields, `kind` strings, Manifest keys, execution permissions, or
-wire schemas are established by this architecture note.
+1. Canonical `asset_set_sha256` input/algorithm versus Bundle ZIP digest,
+   immutable Set identity storage and completeness checks. A Manifest-declared
+   or user-provided hash alone cannot establish authorization.
+2. Console reconciliation and transfer APIs; how a full Set maps to
+   canonical Bundle v3 and whether any standalone Programming Asset transport
+   is used without compromising the one-Set identity.
+3. Atomic Active pointer, staging paths, existing-Job pinning, failure/rollback
+   semantics, power-loss/crash recovery and storage cleanup. A fallback
+   retained recovery copy is not an additional Active Set.
+4. When and how separate Asset Set activation and FPGA configuration are
+   requested, coordinated with all Site/driver/PS-PL consumers, without
+   automatic reconfiguration during a PROGRAM Job.
+5. Parser language/execution and Normalized Image details (including sparse
+   HEX/SREC/ELF memory address regions); no arbitrary code entitlement.
+6. Exact Programming Profile, FPGA Image, IC qualification and target identity
+   binding; end-to-end AuthN/AuthZ, Job receipts and real PS/PL/DUT evidence.
+7. Batch/Job concurrency across up to eight Sites and isolation of unique
+   Serial Number, MAC, Key or calibration data from shared Set identity.
+
+This note adds **no new on-wire API/schema or executable permission**.
+Existing E/P/V/R and Hardware Guard contracts continue to apply.
 
 ## Current evidence and non-goals
 
@@ -174,6 +248,9 @@ wire schemas are established by this architecture note.
   Its real Z2 PS B1/B2/B3 test installed an **exact reviewed three-Package
   Smoke Bundle**, then **an explicit separate test invocation** ran Python
   smoke as an unprivileged user. This is not arbitrary Parser dispatch.
+- **Current B3 uses** `/opt/plasma/bundles/<bundle-name>/`, without
+  an Active Asset Set pointer or production-ready FPGA Image switching.
+  The proposed `assets/active` and `assets/staging` layout is **not built**.
 - The B3 real-device Installer's current permission is restricted to the
   reviewed Smoke Bundle; a ZIP with a new firmware Parser is **not**
   automatically authorized for installation or execution.
