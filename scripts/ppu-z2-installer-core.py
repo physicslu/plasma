@@ -1212,6 +1212,13 @@ def install_verified_bundle_v3(
             output.flush()
             os.fsync(output.fileno())
         marker_candidate.chmod(0o600)
+        # Staging remains private until verified. Once promoted, the
+        # explicitly reviewed smoke must be readable by an unprivileged Z2
+        # user; no package payload is auto-executed by this installer.
+        for directory in candidate.rglob("*"):
+            if directory.is_dir():
+                directory.chmod(0o755)
+        candidate.chmod(0o755)
         if target.exists():
             shutil.rmtree(target)  # Dev mode: remove prior B3 only; NO backup/B4.
         os.replace(candidate, target)
