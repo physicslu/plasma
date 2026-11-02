@@ -191,10 +191,11 @@ def test_root_files_only_stage_uses_existing_guard_no_fpga_load(tmp_path: Path):
     dest = _mock_root_firmware_area(tmp_path)
     first = _stage_sandbox(plan, sha, files, dest)
     assert first["result"] == "ROOT_FILES_STAGED_NOT_ACTIVATED"
-    assert first["fpga_installed"] is True
+    assert first["firmware_files_staged"] is True
+    assert first["fpga_installed"] is False
     assert first["fpga_loaded"] is False
     assert first["ready"] is False
-    assert first["golden_recovery"] == "NOT_VERIFIED"
+    assert first["golden_recovery"] == "SHA_VERIFIED"
     name = first["firmware_name"]
     assert (dest / name).read_bytes() == files["bin_bytes"]
     assert (dest / (name + ".hwh")).read_bytes() == files["hwh_bytes"]
