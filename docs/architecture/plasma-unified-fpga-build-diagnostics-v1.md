@@ -1,5 +1,7 @@
 # PLASMA Unified FPGA Build & Diagnostic Engine v1.0
 
+> **RETIRED AND DELETED (2026-11-02):** `scripts/plasma_fpga_build_diagnostics.py` and the `plasma-fpga-build-diagnostics.json` receipt were removed together with the F1-B path3 build pipeline that was their only caller. The current host build is `run_generic()` in `scripts/plasma_vivado_host_build.py`, which writes `plasma-path2-vivado-host-receipt.json`. This page is historical only.
+
 Status: **Gate 1 Draft — offline / GitHub-hosted validation only**. This
 document is a proposed implementation contract, not a claim of a new SWPC
 Vivado build, physical FPGA test, or M1 qualification.

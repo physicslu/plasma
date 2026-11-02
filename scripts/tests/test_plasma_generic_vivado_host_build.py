@@ -27,7 +27,7 @@ APPROVAL = {"task_id": "path2-work-order", "execution_path": "path2-cli",
 
 
 class GenericVivadoContracts(unittest.TestCase):
-    def test_two_non_f1_projects_supply_the_same_interface(self):
+    def test_two_projects_supply_the_same_interface(self):
         for name, expected in (("z2-identity", "z2_identity"),
                                ("z2-control-waveform", "z2_control_waveform")):
             with self.subTest(project=name):
@@ -66,19 +66,11 @@ class GenericVivadoContracts(unittest.TestCase):
                     task("pl/projects/z2-swd-independent"), workspace=root,
                     approval=APPROVAL)
 
-    def test_f1b_uses_explicit_contract_with_full_qualification(self):
-        plan = build.generic_project_contract(
-            task("pl/projects/z2-fixed-unified-site1"),
-            workspace=ROOT, approval=APPROVAL)
-        self.assertEqual(plan["vivado_project"], "z2_fixed_unified_site1")
-        self.assertEqual(plan["build_env"], "PLASMA_F1_BUILD")
-        self.assertEqual(plan["success_marker"],
-                         "FIXED_F1_BITSTREAM_BUILD_PASS_HOST_ONLY_NOT_Z2")
-        self.assertIn("check_timing.rpt", plan["reports"])
-        self.assertFalse(plan["prepare_artifact"])
-        # The same F1 verifier remains project-owned and rejects HWH mismatch.
-        verifier = plan["project_dir"] / "verify_hwh.py"
-        self.assertTrue(verifier.is_file())
+    def test_retired_f1b_project_has_no_build_contract(self):
+        with self.assertRaises(build.BuildDenied):
+            build.generic_project_contract(
+                task("pl/projects/z2-fixed-unified-site1"),
+                workspace=ROOT, approval=APPROVAL)
 
     def test_bad_or_missing_contract_stops_before_build(self):
         for project in ("pl/projects/does-not-exist", "../other"):
@@ -122,8 +114,7 @@ class GenericVivadoContracts(unittest.TestCase):
                                                workspace=root, approval=APPROVAL)
 
     def test_dynamic_work_order_selects_generic_runner(self):
-        for project in ("z2-identity", "z2-control-waveform",
-                        "z2-fixed-unified-site1"):
+        for project in ("z2-identity", "z2-control-waveform"):
             with self.subTest(project=project), patch.object(
                     build, "run_generic", return_value={"status": "observed"}) as runner:
                 result = build.run(task("pl/projects/" + project),
@@ -134,13 +125,13 @@ class GenericVivadoContracts(unittest.TestCase):
     def test_fixed_path2_task_ids_cannot_reenter_legacy_engine(self):
         for obsolete in ("fixed-site1-vivado-host-build", "z2-path2-build"):
             with self.subTest(obsolete=obsolete), patch.object(
-                    build, "_run_pipeline") as legacy:
+                    build, "run_generic") as generic:
                 with self.assertRaisesRegex(build.BuildDenied,
                                             "BUILD_LEGACY_PATH_RETIRED"):
-                    build.run(task("pl/projects/z2-fixed-unified-site1"),
+                    build.run(task("pl/projects/z2-identity"),
                               workspace=ROOT,
                               approval={**APPROVAL, "task_id": obsolete})
-                legacy.assert_not_called()
+                generic.assert_not_called()
 
     def test_runtime_requires_dispatcher_source_binding_before_tool_access(self):
         with tempfile.TemporaryDirectory() as temporary:

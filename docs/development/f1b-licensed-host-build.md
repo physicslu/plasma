@@ -1,5 +1,7 @@
 # F1-B licensed runner integration (candidate, not activated)
 
+> **RETIRED AND DELETED (2026-11-02):** the `f1b-path3-codex-vivado-build` task, `run_licensed_f1b_task`, the path3 F1-B build pipeline and `pl/projects/z2-fixed-unified-site1/` were removed. This page is a historical incident record only; nothing below is runnable.
+
 > **Historical command warning:** The `fixed-site1-vivado-host-build` Path 2
 > command shown below has been retired. Use an Owner-authenticated dynamic
 > `vivado-host-build` Work Order with `project: pl/projects/z2-fixed-unified-site1`
