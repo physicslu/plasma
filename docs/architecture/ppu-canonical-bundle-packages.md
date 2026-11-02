@@ -80,6 +80,28 @@ Changing `components` to `packages` on an existing `plasma.ppu.bundle.v2` is **i
 - Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions; opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
 - Component/Package hashing only establishes content identity; a Bearer token, checksum or Manifest `source_commit` does not prove Publisher/Master authorization.
 
+## Asset-only Bundle semantics and controller-owned workflow
+
+**Owner direction (2026-11-02): A Bundle is an Assets delivery container, not a
+Programming Job, Programming Recipe, or autonomous executable workflow.**
+Its Packages (including code-bearing Parser files) make resources available;
+installing or admitting those resources must not automatically parse firmware,
+erase, program, verify, read, or invoke FPGA/DUT operations. The upper-level
+Controller initiates operations and any explicit sequence of Jobs. The PPU PS
+accepts qualified Jobs, resolves the relevant available Package/Asset
+resources for each requested operation, and executes only the admitted Job
+through its qualified backend.
+
+Bundle `packages[].requires` is a **deployment dependency**, not a substitute
+for per-Job resource selection or execution permission. Calling the Bundle
+"Assets" is architectural shorthand: it does not rename the canonical v3
+wire schema or make an entire Bundle equal to a single `Programming Asset`
+REST/domain object. Parser type, runtime invocation, Job requirement schema
+and B4 activation decisions remain open; none are enabled by this note.
+
+See [PPU Job-Driven Package Resolution — Architecture Direction](ppu-job-driven-package-resolution.md)
+for the Controller/PPU/Bundle responsibility split and explicit non-goals.
+
 ## Execution and migration boundaries
 
 Only new v3 Bundles should be produced. Do **not** convert historical on-device v2 bytes in place; generate a new v3 ZIP with updated path, Manifest, hashes and provenance. Keep legacy v1/v2 parsers until all old callers and archived evidence are accounted for. Package installation, activation, recovery, trust signing and real PPU v3 admission remain separate qualification gates. No FPGA or DUT operation is authorized by the naming migration.
