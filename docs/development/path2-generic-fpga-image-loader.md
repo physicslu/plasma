@@ -74,7 +74,7 @@ mismatch before executing the code-selected handler.
 The current two-argument Root Entry directly selects
 `pl.hil.fpga_image_root` (with `fpga_image_guard` and
 `fpga_image_admission`), not the historical
-`pl.hil.path2_f1b_minimal_stage` module. This implementation verifies the
+`pl.hil.path2_f1b_minimal_stage` module (retired and deleted 2026-11-02). This implementation verifies the
 companion FPGA Image Manifest, source provenance, exclusive ownership,
 current-boot state, Identity/MMIO checks and guarded recovery. Existing
 physical acceptance evidence remains limited to Site 1 F1-B; it is not
@@ -133,7 +133,7 @@ line explicitly states `RESULT=PASS`.
 This historical smoke was **F1-B Site 1** programming-image verification, not SWD flashing:
 no OpenOCD, Blue Pill erase/program/readback, or DUT power commands.
 The active Root implementation is `pl.hil.fpga_image_root`; the historical
-`path2_f1b_minimal_stage.py` remains in the repository but is not selected by
+`path2_f1b_minimal_stage.py` was retired and deleted (2026-11-02); it was never selected by
 the two-argument Root Entry. The receipt key `stage` is retained for
 compatibility with existing receipt validation; it is **not** Stage/Profile
 admission. Renaming the compatibility key requires a separate caller/test audit.

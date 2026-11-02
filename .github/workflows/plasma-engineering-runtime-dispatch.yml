@@ -37,24 +37,13 @@ on:
       - "scripts/plasma_path2_bin_provenance.py"
       - "scripts/plasma_path2_held_provider.py"
       - "scripts/tests/test_plasma_path2_held_provider.py"
-      - "pl/hil/path2_z2_target_guard.py"
-      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
-      - "pl/hil/path2_f1b_dev_risk.py"
-      - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
       - "scripts/z2/plasma-path2-root-entry"
       - "pl/hil/fpga_image_root.py"
       - "pl/hil/fpga_image_guard.py"
       - "pl/hil/fpga_image_admission.py"
-      - "pl/hil/approved-fpga-image.json"
       - "scripts/tests/test_fpga_image_root.py"
-      - "pl/hil/path2_f1b_minimal_stage.py"
-      - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
       - "scripts/plasma_development_stage_transport.py"
       - "scripts/tests/test_plasma_path2_root_direct.py"
-      - "scripts/plasma-z2-smoke.sh"
-      - "scripts/z2/plasma-z2-ssh-smoke-target.sh"
-      - "scripts/tests/test_plasma_z2_ssh_smoke.py"
-      - "scripts/z2/plasma-path2-f1b-root-entry"
       - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "scripts/tests/test_plasma_development_stage_transport.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
@@ -86,24 +75,13 @@ on:
       - "scripts/plasma_path2_bin_provenance.py"
       - "scripts/plasma_path2_held_provider.py"
       - "scripts/tests/test_plasma_path2_held_provider.py"
-      - "pl/hil/path2_z2_target_guard.py"
-      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
-      - "pl/hil/path2_f1b_dev_risk.py"
-      - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
       - "scripts/z2/plasma-path2-root-entry"
       - "pl/hil/fpga_image_root.py"
       - "pl/hil/fpga_image_guard.py"
       - "pl/hil/fpga_image_admission.py"
-      - "pl/hil/approved-fpga-image.json"
       - "scripts/tests/test_fpga_image_root.py"
-      - "pl/hil/path2_f1b_minimal_stage.py"
-      - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
       - "scripts/plasma_development_stage_transport.py"
       - "scripts/tests/test_plasma_path2_root_direct.py"
-      - "scripts/plasma-z2-smoke.sh"
-      - "scripts/z2/plasma-z2-ssh-smoke-target.sh"
-      - "scripts/tests/test_plasma_z2_ssh_smoke.py"
-      - "scripts/z2/plasma-path2-f1b-root-entry"
       - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "scripts/tests/test_plasma_development_stage_transport.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
@@ -152,20 +130,12 @@ jobs:
           python3 scripts/tests/test_plasma_path2_runtime_integration.py
           python3 -m py_compile scripts/plasma_path2_bin_provenance.py scripts/plasma_path2_held_provider.py scripts/tests/test_plasma_path2_held_provider.py
           python3 scripts/tests/test_plasma_path2_held_provider.py
-          python3 -m py_compile pl/hil/path2_z2_target_guard.py scripts/tests/test_plasma_path2_z2_target_guard.py
-          python3 scripts/tests/test_plasma_path2_z2_target_guard.py
-          python3 -m py_compile pl/hil/path2_f1b_dev_risk.py scripts/tests/test_plasma_path2_f1b_dev_risk.py
-          python3 scripts/tests/test_plasma_path2_f1b_dev_risk.py
-          python3 -m py_compile pl/hil/path2_f1b_minimal_stage.py scripts/tests/test_plasma_path2_f1b_minimal_stage.py
           python3 -m py_compile pl/hil/fpga_image_root.py pl/hil/fpga_image_guard.py pl/hil/fpga_image_admission.py scripts/tests/test_fpga_image_root.py
           python3 scripts/tests/test_fpga_image_root.py
-          python3 scripts/tests/test_plasma_path2_f1b_minimal_stage.py
           python3 -m py_compile scripts/plasma_development_stage_transport.py scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_development_stage_transport.py
           python3 scripts/tests/test_plasma_path2_root_direct.py
-          python3 scripts/tests/test_plasma_z2_ssh_smoke.py
-          bash scripts/plasma-z2-smoke.sh --target z2-ci-offline --plan
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
