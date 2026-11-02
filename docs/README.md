@@ -14,6 +14,7 @@
 ## PPU deployment / physical admission evidence
 
 - [Bundle v3 B2 Master Authority — common Publisher/Asset approval across Python, Native C and FPGA](deployment/ppu-bundle-v3-master-authority-gate1.md): device-local exact complete Bundle SHA256 grants, B2/B3 fail-closed, no implicit execution.
+- [Single PPU Asset Execution Layer — typed Python, Native C, FPGA dispatch (Host-only)](deployment/ppu-common-asset-execution-gate1.md): exact Active Set and Master grant, no default runnable adapters or implicit FPGA load.
 
 - [Generic Bundle v3 B3 — one inert Asset Set staging path (Gate 1 Draft)](deployment/ppu-bundle-v3-generic-assets-gate1.md)
 - [Single Active Asset Set P1 — Console SHA reconciliation & guarded Host-only activation (Draft)](deployment/ppu-single-active-asset-set-gate1.md)
