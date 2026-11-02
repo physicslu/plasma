@@ -279,3 +279,61 @@ def test_swpc_cli_api_status_requires_explicit_url_and_token(capsys):
         swpc.main(["api-status"])
     assert exc.value.code == 2
     assert "requires --api-url and --token-file" in capsys.readouterr().err
+
+
+def _admitted_bundle_record(upload_id, tx, *, actions=None):
+    return {
+        "transaction_id": tx, "upload_id": upload_id, "state": "admitted",
+        "result": {
+            "result": "PASS", "stage": "package_admission_only",
+            "install_qualified": False,
+            "plan": {
+                "kind": "bundle", "bundle_schema": "plasma.ppu.bundle.v3",
+                "purpose": "programming", "archive_sha256": "a" * 64,
+                "files": [], "execution_permitted": False,
+                "requested_actions": ["install", "verify"] if actions is None else actions,
+                "packages": [{
+                    "id": "custom-swd", "kind": "fpga-image",
+                    "version": "1.0.0", "requires": [], "files": ["fpga/swd.bin"],
+                }],
+            },
+        },
+    }
+
+
+def test_console_generic_bundle_b2_then_explicit_b3_no_implicit_execution(tmp_path):
+    api, fake = make(tmp_path)
+    uploaded = "a" * 32
+    b2_tx = "e" * 32
+    b3_tx = "d" * 32
+    admitted = client.DeploymentSubmission(uploaded, b2_tx, "admitted")
+    fake.override["/v1/deployment"] = (
+        200, json.dumps({"ok": True, "deployment":
+                         _admitted_bundle_record(uploaded, b2_tx)}).encode())
+    fake.override["/v1/deployments"] = (
+        202, json.dumps({"ok": True, "deployment": {
+            "transaction_id": b3_tx, "upload_id": uploaded, "state": "queued",
+            "result": None,
+        }}).encode())
+    submission = api.install_bundle(admitted)
+    assert submission.upload_id == uploaded
+    assert submission.transaction_id == b3_tx
+    assert submission.state == "queued"
+    assert fake.calls[-2][1] == "/v1/deployment"
+    assert fake.calls[-1] == ("POST", "/v1/deployments", {
+        "kind": "bundle", "upload_id": uploaded, "install_only": True,
+    })
+
+
+def test_console_generic_b3_denies_mismatched_or_invalid_admission(tmp_path):
+    api, fake = make(tmp_path)
+    uploaded, b2_tx = "a" * 32, "e" * 32
+    with pytest.raises(client.DeploymentAPIError, match="B3_VALID_B2"):
+        api.install_bundle(client.DeploymentSubmission(uploaded, b2_tx, "queued"))
+    assert fake.calls == []
+    fake.override["/v1/deployment"] = (
+        200, json.dumps({"ok": True, "deployment":
+                         _admitted_bundle_record("b" * 32, b2_tx)}).encode())
+    with pytest.raises(client.DeploymentOutcomeUnknown, match="B3_DEVICE_ADMISSION_CHANGED"):
+        api.install_bundle(client.DeploymentSubmission(uploaded, b2_tx, "admitted"))
+    assert [item[1] for item in fake.calls] == ["/v1/deployment"]
