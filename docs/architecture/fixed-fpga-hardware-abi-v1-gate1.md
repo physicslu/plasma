@@ -9,7 +9,7 @@
 
 > **Semantic convergence Gate 1 amendment:** [SWD reset, clock, metadata, fault/ACK semantics](fixed-fpga-swd-semantics-gate1.md) supersedes earlier ambiguous SWD descriptions. Candidate still not Accepted; M1 NO-GO. New Site RO registers: SWD_RESPONSE_META (+0x06C), SWD_RAW_STATUS (+0x070).
 
-> **Implementation boundary:** The machine-readable candidate [ABI manifest](../../pl/verification/fixed_image_abi_v1_gate1.json) explicitly records `status: review_candidate_not_implemented`, `site_count_ceiling: 8`, and `sites_physically_verified: 0`. Isolated [AXI Global Identity RTL](../../pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv) is host-simulation-only; the [Z2 internal fixture](../../pl/projects/z2-fixed-unified-site1/rtl/fixed_ppu_z2_internal_fixture_axi.sv) is synthetic, not external SWD/DUT evidence. Neither a register proposal nor an eight-Site ceiling establishes hardware acceptance.
+> **Implementation boundary:** The machine-readable candidate [ABI manifest](../../pl/verification/fixed_image_abi_v1_gate1.json) explicitly records `status: review_candidate_not_implemented`, `site_count_ceiling: 8`, and `sites_physically_verified: 0`. Isolated [AXI Global Identity RTL](../../pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv) is host-simulation-only; the former Z2 internal fixture `pl/projects/z2-fixed-unified-site1/rtl/fixed_ppu_z2_internal_fixture_axi.sv` (deleted 2026-11-02) was synthetic, not external SWD/DUT evidence. Neither a register proposal nor an eight-Site ceiling establishes hardware acceptance.
 
 ## First-principle product invariant
 

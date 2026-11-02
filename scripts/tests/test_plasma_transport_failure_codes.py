@@ -9,47 +9,24 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import plasma_development_stage_transport as t
-import plasma_path2_runtime_integration as r
 import test_plasma_path2_swpc_bridge as harness_module
 bridge = harness_module.bridge
 
 SHA = 'a' * 40
 PROJECT = 'pl/projects/z2-fixed-unified-site1'
-TASK = {'execution_path': 'path2-cli', 'capability': 'z2-root-operation',
-        'operation': 'test', 'work_order_scope': 'guarded-hardware',
-        'objective': 'Direct test of reviewed Z2 operation',
-        'acceptance': 'Fail closed for remote and identity errors',
-        'work_order_sha256': 'b' * 64}
-APPROVAL = {'task_id':'path2-work-order', 'execution_path':'path2-cli',
-            'execution_capability':'z2-root-operation', 'pinned_sha':SHA,
-            'trusted_sha':SHA, 'pr_number':0, 'authorized_operation': 'test',
-            'work_order_sha256': 'b' * 64,
-            'auto_download_after_build_success': False,
-            'auto_test_after_download_success': False}
-
 class FailureCodes(unittest.TestCase):
-    def test_each_safe_code_survives_shared_adapter(self):
+    def test_each_safe_code_survives_failure_mapping(self):
         for code in t.SAFE_FAILURE_CODES:
-            with self.subTest(code=code), patch.object(t, 'execute_operation', side_effect=t.Blocked(code)):
-                with self.assertRaises(r.RuntimeDenied) as caught:
-                    r.direct_root_operation(TASK, APPROVAL)
-                self.assertEqual(caught.exception.args, (code,))
-
-    def test_every_failure_stops_executor_without_retry(self):
-        for code in t.SAFE_FAILURE_CODES:
-            with self.subTest(code=code), patch.object(t, 'execute_operation', side_effect=t.Blocked(code)) as call:
-                with self.assertRaises(r.RuntimeDenied):
-                    r.direct_root_operation(TASK, APPROVAL)
-                call.assert_called_once_with('test', SHA)
+            with self.subTest(code=code):
+                self.assertEqual(t.failure_code(t.Blocked(code)), code)
 
     def test_hostile_exception_text_is_never_exported(self):
         for exc in (t.Blocked('SOURCE_SHA_INVALID\nsecret'), t.Blocked('10.0.0.1 password'),
                     t.Blocked(['SOURCE_SHA_INVALID']), t.Blocked(),
+                    t.Blocked('SOURCE_SHA_INVALID', 'extra'),
                     OSError('secret path'), ValueError('secret stdout')):
-            with self.subTest(exc=type(exc)), patch.object(t,'execute_operation',side_effect=exc):
-                with self.assertRaises(r.RuntimeDenied) as caught:
-                    r.direct_root_operation(TASK, APPROVAL)
-                self.assertEqual(caught.exception.args, ('UNKNOWN',))
+            with self.subTest(exc=repr(exc)):
+                self.assertEqual(t.failure_code(exc), 'UNKNOWN')
 
     def test_local_missing_enrollment_never_launches(self):
         for exc in (FileNotFoundError('secret'), ValueError('bad json'), KeyError('account')):

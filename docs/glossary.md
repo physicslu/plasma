@@ -93,7 +93,7 @@ OpenOCD's `remote_bitbang` SWD commands, served on a PS-local UNIX socket and tr
 
 These codes appear in older documents, tests and code. They are **not** current routes.
 
-- **F1-B** — fixed-ABI Site 1 PS7 Vivado integration, `pl/projects/z2-fixed-unified-site1`. **Retired** (owner decision 2026-11-02).
+- **F1-B** — fixed-ABI Site 1 PS7 Vivado integration, `pl/projects/z2-fixed-unified-site1`. **Retired and deleted** (owner decision 2026-11-02); see Git history for its sources.
 - **z2-swd-gpio** — PS EMIO GPIO software bit-bang FPGA project. Retired; see [SWD retirement map](development/swd-legacy-path-retirement.md).
 - **z2-swd03-axi / SWD-03** — FPGA-internal synthetic DPIDR responder (`0x2BA01477`), no external pins. Retired as a physical route.
 - **SWD-04 / SWD-05** — historical internal-fixture HIL and synthetic SWD transaction driver; direct CLIs retired.

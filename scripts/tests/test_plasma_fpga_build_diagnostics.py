@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hosted-only F1 Build + Diagnostic v1 unit tests. No Vivado or SWPC access."""
+"""Hosted-only Build Diagnostic v1 and generic host-build unit tests. No Vivado or SWPC access."""
 from __future__ import annotations
 
 import copy
@@ -100,48 +100,25 @@ class DiagnosticContracts(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ses.persist()
 
-    def test_deleted_path3_build_admission_is_not_a_backdoor(self):
-        fixed = {"execution_path": "path2-cli", "capability": "vivado-host-build",
-                 "project": "pl/projects/z2-fixed-unified-site1",
-                 "toolchain": "2026.1",
-                 "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07"}
-        self.assertFalse(hasattr(build, "main"))
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(dict(fixed, execution_path="path3-codex"),
-                            workspace=ROOT, approval={},
-                            execution_path="path3-codex")
+    def test_retired_f1b_path3_build_route_is_absent(self):
+        """Only the dynamic Path 2 Work Order may reach the host build engine."""
+        for name in ("main", "preflight", "_run_pipeline", "diagnostics_type",
+                     "license_snapshot"):
+            self.assertFalse(hasattr(build, name), name)
+        for execution_path, approval in (
+                ("path3-codex", {"task_id": "f1b-path3-codex-vivado-build"}),
+                ("path3-codex", {"task_id": "path2-work-order"}),
+                ("path2-cli", {"task_id": "f1b-path3-codex-vivado-build"})):
+            with self.subTest(path=execution_path, approval=approval):
+                with patch.object(build, "run_generic") as generic:
+                    with self.assertRaisesRegex(build.BuildDenied,
+                                                "BUILD_LEGACY_PATH_RETIRED"):
+                        build.run({}, workspace=ROOT, approval=approval,
+                                  execution_path=execution_path)
+                    generic.assert_not_called()
 
-    def test_receipt_io_failure_cannot_silently_turn_into_build_pass(self):
-        class Unwritable:
-            def __init__(self, **kwargs):
-                self.failed = None
-            def fail(self, error):
-                self.failed = error
-            def persist(self):
-                raise PermissionError(13, "mock evidence FS denied")
-        with tempfile.TemporaryDirectory() as td:
-            with (patch.object(build, "diagnostics_type",
-                               return_value=Unwritable),
-                  patch.object(build, "_run_pipeline",
-                               return_value={"status": "PASS"})):
-                with self.assertRaises(PermissionError):
-                    build.run({}, workspace=Path(td), execution_path="path3-codex",
-                              approval={"pinned_sha": "a" * 40},
-                              evidence_dir=Path(td))
-            with (patch.object(build, "diagnostics_type",
-                               return_value=Unwritable),
-                  patch.object(build, "_run_pipeline",
-                               side_effect=build.BuildDenied(
-                                   "BUILD_OUTPUT_PERMISSION_DENIED"))):
-                with self.assertRaisesRegex(
-                    build.BuildDenied, "BUILD_OUTPUT_PERMISSION_DENIED"
-                ):
-                    build.run({}, workspace=Path(td), execution_path="path3-codex",
-                              approval={"pinned_sha": "a" * 40},
-                              evidence_dir=Path(td))
-
-    def test_reviewed_pr_driver_loads_sibling_diagnostic_library(self):
-        """A pinned candidate PR must not borrow a different main version."""
+    def test_reviewed_pr_driver_loads_candidate_generic_engine(self):
+        """A pinned candidate PR driver is loaded from the candidate tree."""
         import shutil
         import plasma_development_dispatch as dev
         with tempfile.TemporaryDirectory() as td:
@@ -149,23 +126,13 @@ class DiagnosticContracts(unittest.TestCase):
             scripts = workspace / "scripts"
             scripts.mkdir()
             driver = scripts / "plasma_vivado_host_build.py"
-            library = scripts / "plasma_fpga_build_diagnostics.py"
             shutil.copyfile(ROOT / "scripts/plasma_vivado_host_build.py", driver)
-            shutil.copyfile(ROOT / "scripts/plasma_fpga_build_diagnostics.py", library)
             reviewed = dev.reviewed_host_build_driver(
                 workspace=workspace, approval={"pr_number": 1200})
             self.assertTrue(callable(reviewed.run))
-            self.assertEqual(reviewed.diagnostics_type().SCHEMA if hasattr(
-                reviewed.diagnostics_type(), "SCHEMA") else
-                reviewed.diagnostics_type().__module__,
-                "plasma_reviewed_fpga_diagnostics")
-            library.unlink()
-            with self.assertRaisesRegex(
-                reviewed.BuildDenied, "BUILD_DIAGNOSTICS_LIBRARY_DENIED"
-            ):
-                reviewed.diagnostics_type()
-
-
+            self.assertTrue(callable(reviewed.run_generic))
+            self.assertEqual(reviewed.__name__,
+                             "plasma_reviewed_candidate_vivado_host_build")
 
 
 class HostBuildOutputPathContracts(unittest.TestCase):
@@ -339,114 +306,6 @@ class LicenseDiscoveryContracts(unittest.TestCase):
                 build.BuildDenied, "BUILD_LICENSE_SOURCE_DENIED"
             ):
                 build.discover_vivado_license(env={}, settings=settings)
-
-    def test_license_missing_is_preflight_failure_without_vivado_or_board(self):
-        with tempfile.TemporaryDirectory() as td:
-            folder = Path(td)
-            evidence = folder / "evidence"
-            evidence.mkdir()
-            settings = folder / "settings64.sh"
-            settings.write_text("mock settings")
-            with (patch.object(build, "preflight", return_value={}),
-                  patch.object(build, "SETTINGS64", settings),
-                  patch.object(build.os, "geteuid", return_value=1001),
-                  patch.object(build, "discover_vivado_license",
-                               side_effect=build.BuildDenied("BUILD_LICENSE_NOT_FOUND")),
-                  patch.object(build, "resolve_board_repository") as board,
-                  patch.object(build, "prepare_host_build_dir") as output):
-                with self.assertRaisesRegex(
-                    build.BuildDenied, "BUILD_LICENSE_NOT_FOUND"
-                ):
-                    build.run({}, workspace=folder, execution_path="path3-codex",
-                              approval={"pinned_sha": "a" * 40},
-                              evidence_dir=evidence,
-                              executor=lambda *args, **kwargs: self.fail("process spawned"))
-                board.assert_not_called()
-                output.assert_not_called()
-            receipt = json.loads((evidence / "plasma-fpga-build-diagnostics.json").read_text())
-            self.assertEqual(receipt["status"], "FAIL")
-            self.assertEqual(receipt["failed_stage"], "PREFLIGHT")
-            self.assertEqual(receipt["error_code"], "BUILD_LICENSE_NOT_FOUND")
-            self.assertEqual(receipt["checks"]["license_environment_present"], False)
-            self.assertNotIn(str(folder), json.dumps(receipt))
-            self.assertEqual(receipt["physical_load"], "NOT_RUN")
-
-
-
-class PipelineFailureEvidence(unittest.TestCase):
-    """All executors below are stubs, even for license and Vivado regression."""
-
-    def _pipeline(self, folder, *, executor, fail_output=False):
-        evidence = folder / "evidence"
-        evidence.mkdir()
-        settings = folder / "settings64.sh"
-        settings.write_text("# fake: never source")
-        board = folder / "board"
-        board.mkdir()
-        builddir = folder / "pl" / "build" / "mock"
-        builddir.mkdir(parents=True)
-        sha = "b" * 40
-        task = {"execution_path": "path3-codex", "capability": "vivado-host-build"}
-        approval = {"pinned_sha": sha}
-        plan = {"source_sha": sha, "board_sha": "e" * 40,
-                "script": "/fake/build_bitstream.tcl",
-                "verifier": "/fake/verify_hwh.py"}
-        checked = [("e" * 40).encode(), b"", sha.encode()]
-        def checked_command(*args, **kwargs):
-            return checked.pop(0)
-        with (
-            patch.object(build, "preflight", return_value=plan),
-            patch.object(build, "SETTINGS64", settings),
-            patch.object(build, "resolve_board_repository", return_value=board),
-            patch.object(build, "discover_vivado_license",
-                         return_value={"XILINXD_LICENSE_FILE": "/private/license"}),
-            patch.object(build, "_run_checked", side_effect=checked_command),
-            patch.object(build.os, "geteuid", return_value=1001),
-            patch.object(build, "prepare_host_build_dir", side_effect=(
-                build.BuildDenied("BUILD_OUTPUT_PERMISSION_DENIED")
-                if fail_output else lambda workspace: builddir
-            )),
-            patch.dict(os.environ, {"XILINXD_LICENSE_FILE": "/private/license",
-                                    "LM_LICENSE_FILE": ""}),
-        ):
-            with self.assertRaises(build.BuildDenied):
-                build.run(task, workspace=folder, approval=approval,
-                          execution_path="path3-codex",
-                          evidence_dir=evidence, executor=executor)
-        return json.loads((evidence / "plasma-fpga-build-diagnostics.json").read_text()), evidence
-
-    def test_output_permission_is_confirmed_and_no_process_started(self):
-        called = []
-        result, evidence = self._pipeline(
-            Path(tempfile.mkdtemp(prefix="plasma-diag-test-")),
-            executor=lambda *args, **kwargs: called.append(args),
-            fail_output=True,
-        )
-        self.assertFalse(called)
-        self.assertEqual(result["failed_stage"], "OUTPUT_PREPARE")
-        self.assertEqual(result["error_code"], "BUILD_OUTPUT_PERMISSION_DENIED")
-        self.assertEqual(result["root_cause_status"], "CONFIRMED")
-        self.assertEqual(result["checks"]["license_environment_present"], True)
-
-    def test_vivado_failure_keeps_log_sha_and_license_without_leaking_secret(self):
-        calls = []
-        class Failure:
-            returncode = 1
-            stdout = b"mock Vivado failure"
-            stderr = b"mock host failure"
-        def fake_vivado(*args, **kwargs):
-            calls.append((args, kwargs))
-            return Failure()
-        with tempfile.TemporaryDirectory() as td:
-            result, _ = self._pipeline(Path(td), executor=fake_vivado)
-        self.assertEqual(result["failed_stage"], "VIVADO_IMPLEMENTATION")
-        self.assertEqual(result["error_code"], "BUILD_VIVADO_IMPLEMENTATION_FAILED")
-        self.assertEqual(result["root_cause_status"], "UNKNOWN")
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][1]["env"]["XILINXD_LICENSE_FILE"], "/private/license")
-        self.assertEqual(result["artifacts"]["vivado_stdout"]["sha256"],
-                         hashlib.sha256(b"mock Vivado failure").hexdigest())
-        self.assertNotIn("/private/license", json.dumps(result))
 
 
 if __name__ == "__main__":
