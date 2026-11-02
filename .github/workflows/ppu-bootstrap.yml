@@ -24,6 +24,8 @@ on:
       - "software/python/tests/test_manager_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
+      - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
+      - "software/python/tests/test_ppu_b3_factory_refresh_gate1.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_hil_artifact_provenance_contract.py"
   push:
@@ -49,6 +51,8 @@ on:
       - "software/python/tests/test_manager_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
+      - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
+      - "software/python/tests/test_ppu_b3_factory_refresh_gate1.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_hil_artifact_provenance_contract.py"
 
@@ -87,6 +91,8 @@ jobs:
           python -m pytest -q
           software/python/tests/test_ppu_bootstrap_core.py
           software/python/tests/test_ppu_bootstrap_deployment.py
+          software/python/tests/test_ppu_b3_z2_install_gate1.py
+          software/python/tests/test_ppu_b3_factory_refresh_gate1.py
           software/python/tests/test_z2_bootstrap_deployment_call_graph.py
           software/python/tests/test_z2_hil_artifact_provenance_contract.py
 
