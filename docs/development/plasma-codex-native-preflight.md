@@ -1,6 +1,6 @@
 # PLASMA Codex Native installation — Path 2 read-only bootstrap
 
-**Status:** Gate 1 bootstrap candidate; Draft, NOT MERGED, SWPC NOT_RUN. This is a separate PR from blocked #1135. It is not a third approval gate.
+**Status:** Historical — Gate 1 bootstrap candidate record (in main); SWPC NOT_RUN. This is a separate PR from blocked #1135. It is not a third approval gate.
 
 ## Why this is required
 

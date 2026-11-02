@@ -1,5 +1,7 @@
 # PYNQ-Z2 PS Release Kit and Managed Acceptance
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+
 Status: **PS-only release-kit implementation with P3 controlled Site Desired runtime activation wiring; every deployment candidate still requires real Z2 qualification**
 
 > **Scope and authority:** This document describes the Z2 **PS release-kit and managed acceptance** path, not blanket authorization for production deployment or physical DUT/FPGA operations. The currently approved deployment mechanism and credentials must be verified against the active PPU Deployment Engine and root [AGENTS.md](../../AGENTS.md); any SSH-based diagnostic or installation examples here do not establish SSH as a required production deployment transport. Preserve the separately approved Factory Recovery boundary.

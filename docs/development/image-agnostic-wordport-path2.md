@@ -1,6 +1,6 @@
 # Image-agnostic Native C WordPort — Path 2 prototype
 
-Status: Gate 1 Draft PR #1200, **Host-only software candidate**. No hardware
+Status: merged in main (PR #1200), **Host-only software**. No hardware
 deployment, production Job authorization, FPGA reload or DUT operation in this
 change. Do not construe source-level success as a physical HIL result.
 

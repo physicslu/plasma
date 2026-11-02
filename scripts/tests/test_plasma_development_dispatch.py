@@ -1854,8 +1854,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn("**Retired Path 2 Work Order:**", policy)
         self.assertIn("**Current Path 3:**", policy)
         self.assertNotIn("Both Paths use the same fixed\nstage allowlist", policy)
-        self.assertIn("Current / Path 2 guarded-hardware operator-cli", index)
-        self.assertIn("Historical / retired z2-root-operation Work Order", index)
+        self.assertIn("**Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli", index)
+        self.assertIn("**Historical** · `retired z2-root-operation Work Order`", index)
         self.assertIn("RETIRED FROM LIVE WORK ORDERS", integration.direct_root_operation.__doc__)
 
     def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):

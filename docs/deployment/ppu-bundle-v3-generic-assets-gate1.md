@@ -1,8 +1,10 @@
 # PPU Bundle v3 — Generic Asset Set B3 (Gate 1)
 
-**Status:** Draft PR #1245, 2026-11-02. Host-only CI / Test only.
+> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+
+**Status:** merged in main (PR #1245), 2026-11-02. Host-only CI / Test only.
 **Baseline:** latest main plus owner-approved Single Active Asset Set architecture
-([PR #1244](https://github.com/physicslu/plasma/pull/1244), Draft).
+([PR #1244](https://github.com/physicslu/plasma/pull/1244), merged).
 **Hardware boundary:** no Z2 execution, FPGA reload, systemd restart or DUT programming
 authorized by this PR.
 

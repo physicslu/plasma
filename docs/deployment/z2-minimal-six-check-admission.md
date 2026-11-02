@@ -1,6 +1,6 @@
-# Z2 single-device FPGA deployment: six necessary checks (proposed contract)
+# Z2 single-device FPGA deployment: six necessary checks
 
-Status: **Draft / Host-only implementation**. FPGA Manager load and restore no longer require the fixed UIO index; MMIO identity admission retains the strict legacy mapping check. Real Device Tree/HWH Owner, ABI and HIL remain unverified. Applies to the engineering SWD Site 1 DPIDR smoke test, not Production qualification.
+Status: **Host-only implementation, merged in main (PR #1217)**. FPGA Manager load and restore no longer require the fixed UIO index; MMIO identity admission retains the strict legacy mapping check. Real Device Tree/HWH Owner, ABI and HIL remain unverified. Applies to the engineering SWD Site 1 DPIDR smoke test, not Production qualification.
 
 ## Three independent transitions
 

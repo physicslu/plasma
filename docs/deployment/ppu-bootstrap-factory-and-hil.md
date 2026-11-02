@@ -1,5 +1,7 @@
 # PPU Bootstrap Factory Provisioning and Z2 HIL
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+
 Status: physical PYNQ-Z2 PS first install, Runtime verification, reboot persistence, normal upgrade, controlled activation-failure rollback and reboot-after-rollback are evidenced. FPGA/PL, Site electrical behavior, target power, real IC programming and physical multi-Site concurrency remain separate qualification domains.
 
 ## Responsibility boundary
@@ -23,7 +25,7 @@ On the real `z2-ps` profile:
 <Z2-LAN-IP>:18081  independent Bootstrap / recovery service
 ```
 
-This is profile-specific. SWPC Z2-like `:18081` remains its restricted diagnostics/status ingress and is not the Bootstrap service.
+This is profile-specific. The former SWPC host `127.0.0.1:18081` diagnostics/status ingress is retired (Issue #549) and must stay unused; see the [port profile matrix](port-profile-matrix.md).
 
 Bootstrap HTTP is currently qualified only for a controlled private commissioning link. Transport confidentiality and publisher authenticity are **not qualified**. SHA-256 proves integrity only.
 
@@ -116,13 +118,13 @@ tar -xzf plasma-ppu-bootstrap-*.tar.gz
 cd plasma-ppu-bootstrap-*/
 sudo /usr/bin/python3 scripts/ppu-bootstrap-installer.py \
   --source-root "$PWD/scripts" \
-  --host 192.168.2.99 \
+  --host <Z2_HOST> \
   --enable-now
 # --enable-now does NOT restart an already-running Bootstrap unit.
 sudo systemctl restart plasma-bootstrap.service
 systemctl is-active plasma-bootstrap.service
-curl --noproxy '*' -fsS http://192.168.2.99:18081/v1/health
-curl --noproxy '*' -fsS http://192.168.2.99:18081/v1/status
+curl --noproxy '*' -fsS http://<Z2_HOST>:18081/v1/health
+curl --noproxy '*' -fsS http://<Z2_HOST>:18081/v1/status
 ```
 
 This reinstall updates the factory scripts and service unit without clearing
@@ -323,7 +325,7 @@ readlink -f /opt/plasma/current
 systemctl is-active plasma-server.service
 systemctl is-active plasma-web.service
 systemctl is-active plasma-runtime-activation.service
-curl -fsS http://192.168.2.99:18080/api/health/ready
+curl -fsS http://<Z2_HOST>:18080/api/health/ready
 ```
 
 Observed:
@@ -363,7 +365,7 @@ systemctl is-active plasma-bootstrap.service
 systemctl is-active plasma-server.service
 systemctl is-active plasma-web.service
 systemctl is-active plasma-runtime-activation.service
-curl -fsS http://192.168.2.99:18080/api/health/ready
+curl -fsS http://<Z2_HOST>:18080/api/health/ready
 sudo bash scripts/plasmactl verify z2-ps
 ```
 

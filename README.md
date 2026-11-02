@@ -79,8 +79,16 @@ Plasma Server
 SiteManager / SiteWorker
         |
         v
-MockInterface today; Z2/FPGA/real-target validation is a separate stage
+execution route: mock_workflow | openocd | plasma_native
+        |
+        v  (real hardware path, Z2 PS)
+PS-local OpenOCD -> UNIX WordPort / RemoteBitbang -> MMIO
+        |
+        v  (Z2 PL)
+PL SWD image -> PMOD SWCLK/SWDIO -> DUT
 ```
+
+硬體執行邊界：SWPC 只跑 Web／Controller／BFF；live OpenOCD 與 WordPort bridge 在 Z2 PS；SWD 腳位 I/O 在 Z2 PL（見 [`AGENTS.md`](AGENTS.md)、[OpenOCD architecture](docs/architecture/ic-support-openocd-plan-executor.md)）。目前 main 上的實體 PoC 是 Blue Pill SWD 路徑（[SWD retirement map](docs/development/swd-legacy-path-retirement.md)）；這不代表已完成 production 硬體資格或多 Site 實機驗證。Mock route 仍是預設的軟體驗證路徑。
 
 Engineering Mode 的 `Programming` workspace 是 canonical single-PPU engineering programming UI。退休的 `SITE MATRIX / PPU CONTROL` Single PPU Programming frontend 不再構成第二條產品控制路徑；PPU 本身仍保留 autonomous execution、Plasma Gateway API、Job、Site 與 diagnostics backend capability。
 
@@ -121,14 +129,16 @@ Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration�
 - PPU Network Configuration：[`docs/architecture/ppu-network-configuration.md`](docs/architecture/ppu-network-configuration.md)
 - Engineering Programming observability / audit contract：[`docs/architecture/engineering-programming-observability.md`](docs/architecture/engineering-programming-observability.md)
 - Control Station / Manager architecture：[`docs/architecture/configuration-architecture.md`](docs/architecture/configuration-architecture.md)
-- Manager implementation：[`docs/architecture/manager-readonly-fleet-aggregation.md`](docs/architecture/manager-readonly-fleet-aggregation.md)
+- Manager contract：[`docs/development/plasma-manager.md`](docs/development/plasma-manager.md)
+- 開發治理入口：[`AGENTS.md`](AGENTS.md)、[術語表](docs/glossary.md)
+- PPU 佈署入口：[`docs/deployment/ppu-deployment-start-here.md`](docs/deployment/ppu-deployment-start-here.md)
 - Protocol v3.3：[`software/python/docs/protocol.md`](software/python/docs/protocol.md)
 - Python software：[`software/python/README.md`](software/python/README.md)
 - Control Station Web：[`software/web/README.md`](software/web/README.md)
 - FPGA / PL：[`pl/README.md`](pl/README.md)
 - Multi-machine development：[`docs/development/multi-machine-development-guide.md`](docs/development/multi-machine-development-guide.md)
 - Integration-host deployment：[`docs/development/swpc-deployment.md`](docs/development/swpc-deployment.md)
-- Render Free public Mock demo：[`docs/deployment/render-free-public-demo.md`](docs/deployment/render-free-public-demo.md)
+- Render Free public Mock demo（僅 Mock 展示，不是產品佈署路徑）：[`docs/deployment/render-free-public-demo.md`](docs/deployment/render-free-public-demo.md)
 - Codex Cloud：[`docs/development/codex-cloud-environment.md`](docs/development/codex-cloud-environment.md)
 - Local AI / Cline / Ollama：[`docs/development/local-ai-development-guide.md`](docs/development/local-ai-development-guide.md)
 

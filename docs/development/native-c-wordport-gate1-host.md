@@ -1,6 +1,6 @@
 # PLASMA Native C WordPort Bridge — Gate 1 / Path 1 / Host-only
 
-**Scope:** source, hosted build, Host-only Protocol A/B tests and Draft PR.
+**Scope:** source, hosted build and Host-only Protocol A/B tests (merged in PR #1199).
 No SWPC/Z2 access, FPGA load, Root installation, OpenOCD/Flash Loader changes,
 deployment or real SWD/Flash qualification in this Gate.
 

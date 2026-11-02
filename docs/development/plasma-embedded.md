@@ -81,9 +81,8 @@ The owner-approved Gate 1 scope is an execution assignment, not a new planning r
 within the approved task:** safely synchronize code, identify actual board
 and known-good candidate/recovery artifacts, perform one bounded
 Development Mode preflight, obtain the authorized root channel, perform
-supervised candidate load, and check its new-build identity. For the approved
-internal-loopback milestone, execute PSPL-02 Control/Status and SWD-00 internal
-loopback. After a genuine successful FPGA Download receipt and confirmed
+supervised candidate load, and check its new-build identity, then run the
+functional tests within the approved scope. After a genuine successful FPGA Download receipt and confirmed
 same-boot ownership and safe PL/electrical state, **Keep Loaded is the normal
 default**; later Identity/ABI or DPIDR PASS, FAIL or NOT_RUN is a separate test
 outcome and is not a Restore trigger. On functional failure stop further DUT
@@ -98,8 +97,6 @@ preflight or live-MMIO primitives, implement/stage only the minimal bounded
 orchestration path already in the approved scope; do not misrepresent those
 tools as a one-command hardware runner.
 
-For this internal-loopback development milestone, do **not** run the
-intentional AXI-fault `ERROR`/`RESET` stages or external SWD/DUT operations.
 Stop on genuine ownership, artifact, electrical, recovery or access
-hazards. Distinguish *candidate loaded*, *functional PASS* and *original
-image recovered*; all must be actually observed.
+hazards. Distinguish *candidate loaded*, *functional PASS* and, when Restore
+was invoked, *Golden recovered*; report each only when actually observed.

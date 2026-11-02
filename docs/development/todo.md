@@ -165,7 +165,7 @@ Closure evidence must include a rebuilt/installed macOS package and real browser
 
 **Current finding:** `scripts/plasma_development_stage_transport.py` still exposes `execute(stage, source_sha, project=None)`, `STAGE_NAME` and historical `PLASMA_PATH2_STAGE=` / `stage` receipt vocabulary. The active direct path already calls `execute_operation(operation, source_sha)`; these old names are **not** authorization to reintroduce Stage/Profile admission.
 
-**Follow-up:** Inventory callers and tests, then consider a minimal operation-oriented naming/receipt migration with a compatibility strategy. Preserve SSH/sudo identity, B1/B2/B3, current hardware receipts and Issue #1168 acceptance. Do not rename protocol fields or transport functions without verifying all consumers and installed-Z2 compatibility.
+**Follow-up:** Inventory callers and tests, then consider a minimal operation-oriented naming/receipt migration with a compatibility strategy. Preserve SSH/sudo identity, the governance B1/B2/B3 blocking checks ([glossary](../glossary.md#b1b2b3)), current hardware receipts and Issue #1168 acceptance. Do not rename protocol fields or transport functions without verifying all consumers and installed-Z2 compatibility.
 
 ### Path 2 Legacy Project Argument Retirement
 
