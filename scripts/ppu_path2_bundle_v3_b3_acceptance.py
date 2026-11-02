@@ -212,7 +212,11 @@ def main(argv=None):
                 "EXACT_SOURCE_SHA_MISMATCH", "DEVICE_ID_PIN_INVALID"
             ) else type(exc).__name__
         )
-        code = 69
+        # Generic errors may have occurred AFTER a real B1/B2/B3 mutation.
+        # Never relabel an attempted physical operation as preflight NOT_RUN.
+        code = 69 if report["reason"] in (
+            "EXACT_SOURCE_SHA_MISMATCH", "DEVICE_ID_PIN_INVALID"
+        ) else 2
     print("PLASMA_PPU_PATH2_B3_JSON=" + json.dumps(
         report, sort_keys=True, separators=(",", ":"),
     ))
