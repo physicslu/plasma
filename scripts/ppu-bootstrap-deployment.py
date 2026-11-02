@@ -311,6 +311,18 @@ class DeploymentCoordinator:
                 raise DeploymentError(f"engineering verification failed: {exc}") from exc
             self.journal.write(record, "verified", artifact_sha256=request.artifact_sha256)
             try:
+                if install_only:
+                    self.journal.write(record, "installed")
+                    return {
+                        "result": "PASS", "transaction": asdict(record),
+                        "operation": "install_only", "host_only": True,
+                        "release_id": release_id,
+                        "package_order": resolution["package_order"],
+                        "active_pointer_unchanged": True,
+                        "runtime_activation_executed": False,
+                        "install_qualified": False,
+                        "not_claimed": ["real Z2 install", "FPGA load", "DUT operation"],
+                    }
                 self.journal.write(record, "activating")
                 evidence = install(verified, paths=self._installer_paths())
                 if not isinstance(evidence, Mapping) or evidence.get("result") != "PASS":
@@ -383,7 +395,7 @@ class DeploymentCoordinator:
         except contract.UnifiedDeploymentError as exc:
             raise DeploymentError(f"host-only Bundle authorization denied: {exc}") from exc
         receipt = dict(self.execute_package_host_only(
-            request, inject_failure=inject_failure,
+            request, inject_failure=inject_failure, install_only=True,
         ))
         receipt["authorization"] = authority
         receipt["resolution"] = resolution
@@ -392,16 +404,17 @@ class DeploymentCoordinator:
         # or activate runtime services. Do not label the resolver's planned
         # package actions as completed B3/B4 operations.
         receipt["b3_install"] = {
-            "status": "NOT_QUALIFIED",
+            "status": "HOST_ONLY_VERIFIED",
             "archive_staged_host_only": True,
             "package_order_plan": resolution["package_order"],
             "package_stage_plan": resolution["stage"],
             "package_reuse_plan": resolution["reuse"],
-            "per_package_install_executed": False,
+            "per_package_install_executed": True,
+            "real_device_install_qualified": False,
         }
         receipt["b4_activate"] = {
             "status": "NOT_QUALIFIED",
-            "bundle_receipt_switched_host_only": True,
+            "bundle_receipt_switched_host_only": False,
             "runtime_activation_executed": False,
             "rollback_simulation_supported": True,
         }
@@ -410,6 +423,7 @@ class DeploymentCoordinator:
 
     def execute_package_host_only(
         self, request: HostOnlyPackageRequest, *, inject_failure: str | None = None,
+        install_only: bool = False,
     ) -> Mapping[str, Any]:
         """One Lock/Journal/Engine; exercise package lifecycle in a sandbox ONLY.
 
@@ -428,6 +442,10 @@ class DeploymentCoordinator:
         if not self.paths.bootstrap_state_root.resolve().is_relative_to(temporary_root):
             raise DeploymentError("HOST_ONLY_SANDBOX_MUST_BE_TEMPORARY")
         if inject_failure not in (None, "after_stage", "after_activate", "rollback_unknown"):
+            raise DeploymentError("HOST_ONLY_FAILURE_SELECTOR_INVALID")
+        if install_only and inject_failure in ("after_activate", "rollback_unknown"):
+            raise DeploymentError("INSTALL_ONLY_ACTIVATION_FAILURE_SELECTOR_DENIED")
+        if type(install_only) is not bool:
             raise DeploymentError("HOST_ONLY_FAILURE_SELECTOR_INVALID")
 
         # A data-only contract module, not an installer, adapter or new daemon.
