@@ -592,3 +592,118 @@ def test_native_owner_evidence_never_treats_root_journal_as_loaded_image_proof()
         "runtime_admitted", "approved-fpga-image.json", "MODE_DEBUG",
     ):
         assert prohibited not in owner
+
+
+def test_ps_owner_root_admission_live_revocation_host_only(tmp_path):
+    """PS-local OpenOCD owner: record/journal/boot/attestation fail closed.
+
+    Fixture files stand in for /proc, sysfs, Root journal and /dev/mem.
+    Host-only; NOT Z2, FPGA or DUT evidence.
+    """
+    cc = shutil.which("cc")
+    assert cc, "Host C compiler required"
+    executable = tmp_path / "ps-owner"
+    sources = [
+        "plasma_swd_fifo_core.c", "plasma_swd_native_words.c",
+        "plasma_swd_owner_lock.c", "plasma_swd_lease_word_port.c",
+        "plasma_swd_ps_mapping.c", "plasma_swd_owner_evidence.c",
+        "plasma_swd_openocd5088_callbacks.c",
+        "plasma_swd_openocd5088_ps_owner.c",
+        "tests/test_plasma_swd_ps_owner.c",
+    ]
+    result = subprocess.run(
+        [cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-O2",
+         "-DPLASMA_SWD_HOST_TEST=1", "-I", str(SRC),
+         "-I", str(SRC / "tests/openocd_shim"),
+         *[str(SRC / s) for s in sources], "-o", str(executable)],
+        capture_output=True, text=True, timeout=60, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    fixtures = tmp_path / "fixtures"
+    fixtures.mkdir()
+    done = subprocess.run([str(executable), str(fixtures)], capture_output=True,
+                          text=True, timeout=30, check=False)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "PLASMA_SWD_PS_OWNER_HOST_ONLY_PASS" in done.stdout
+
+
+def test_ps_owner_production_paths_and_no_host_relaxation():
+    src = (SRC / "plasma_swd_openocd5088_ps_owner.c").read_text()
+    assert '"/dev/mem"' in src and "O_RDWR | O_SYNC | O_CLOEXEC" in src
+    assert "#define TRUSTED_UID 0u" in src
+    assert "PLASMA_SWD_MMIO_OWNER_LOCK" in src
+    assert "plasma_swd_owner_lock_acquire_site" in src
+    assert ".plasma-fpga-image-deployment-state.json" in src
+    # Voltage is an attestation, never claimed as a measurement.
+    assert "NOT a voltage measurement" in src
+    drv = (SRC / "plasma_swd_openocd5088_driver.c").read_text()
+    assert "plasma_swd_ps_owner_attach" in drv
+    assert "plasma_swd_ps_owner_safe_off" in drv
+
+
+def _site_admission_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "plasma_swd_site_admission",
+        ROOT / "scripts/z2/plasma_swd_site_admission.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_site_admission_record_matches_c_parser_keys():
+    """Host-only: Python Root record writer and C PS owner parser agree."""
+    import re
+    adm = _site_admission_module()
+    c_src = (SRC / "plasma_swd_openocd5088_ps_owner.c").read_text()
+    block = c_src.split("static const char *const KEYS[] = {", 1)[1].split("};", 1)[0]
+    c_keys = re.findall(r'"([a-z0-9_]+)"', block)
+    fields = {k: "1" for k in c_keys}
+    fields["schema"] = adm.SCHEMA
+    text = adm.render_record(fields)
+    assert [line.split("=", 1)[0] for line in text.splitlines()] == c_keys
+    assert f'#define SCHEMA "{adm.SCHEMA}"' in c_src
+    for bad in ({**fields, "boot_id": "a\nvoltage_qualified=1"},
+                {**fields, "boot_id": ""}, {**fields, "x": "1"},
+                {k: v for k, v in fields.items() if k != "site_id"}):
+        with pytest.raises(adm.SiteAdmissionDenied):
+            adm.render_record(bad)
+
+
+def test_site_admission_fails_closed_without_root_or_args(capsys):
+    import os
+    adm = _site_admission_module()
+    assert adm.main([]) == 2
+    assert adm.main(["admit", "3"]) == 2
+    assert adm.main(["load", "1"]) == 2
+    if os.geteuid() != 0:
+        assert adm.main(["admit", "1"]) == 1
+        out = capsys.readouterr().out
+        assert '"result": "DENIED"' in out and "ROOT_REQUIRED" in out
+
+
+def test_site_admission_attestation_and_tree_negative(tmp_path, monkeypatch):
+    import json
+    import os
+    adm = _site_admission_module()
+    att = tmp_path / "site1-attestation.json"
+    att.write_text(json.dumps({"schema": adm.ATTESTATION_SCHEMA}))
+    os.chmod(att, 0o600)
+    monkeypatch.setattr(adm, "ELECTRICAL_DIR", tmp_path)
+    if os.geteuid() != 0:  # non-root owner is never a trusted attestation
+        with pytest.raises(adm.SiteAdmissionDenied, match="NOT_ROOT_PRIVATE"):
+            adm.load_attestation(1, 0.0)
+    tree = tmp_path / "tree"
+    for rel in adm.PROTECTED_FILES:
+        (tree / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tree / rel).write_text("tampered\n")
+    with pytest.raises(adm.SiteAdmissionDenied):
+        adm.verify_protected_tree(tree)
+
+
+def test_site_admission_never_loads_fpga_or_writes_journal():
+    text = (ROOT / "scripts/z2/plasma_swd_site_admission.py").read_text()
+    for forbidden in ("manager_write", "write_state(", "root.run(",
+                      "LinuxMMIO", "/dev/mem", "record_json"):
+        assert forbidden not in text
+    assert "require_mmio=True" in text and "port.exclusive()" in text
+    assert "OWNER_ON_SITE_ATTESTATION_NOT_MEASUREMENT" in text

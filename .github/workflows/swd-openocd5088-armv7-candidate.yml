@@ -6,6 +6,7 @@ on:
       - ".github/workflows/swd-openocd5088-armv7-candidate.yml"
       - "scripts/ci/inject-plasma-openocd5088-native.py"
       - "software/native/swd/**"
+      - "scripts/z2/plasma_swd_site_admission.py"
 
 permissions:
   contents: read
@@ -71,6 +72,16 @@ jobs:
           unowned_exit=$?
           set -e
           test "$unowned_exit" -ne 0
+          grep -q PS_OWNER_SITE_NOT_SELECTED /artifacts/unowned-init-denied.log
+          set +e
+          src/openocd -s tcl -c 'adapter driver plasma_swd' \
+            -c 'plasma_swd site 1' -c 'transport select swd' -c init \
+            -c shutdown > /artifacts/unadmitted-site1-init-denied.log 2>&1
+          unadmitted_exit=$?
+          set -e
+          test "$unadmitted_exit" -ne 0
+          grep -Eq 'PS_OWNER_(SITE_LOCK_UNAVAILABLE|ADMISSION_RECORD_INVALID)' \
+            /artifacts/unadmitted-site1-init-denied.log
           ldd src/openocd > /artifacts/linked-libraries.txt
           if grep -q 'not found' /artifacts/linked-libraries.txt; then
             echo 'Missing ARMv7 shared library' >&2
@@ -78,13 +89,14 @@ jobs:
           fi
           cp src/openocd /artifacts/openocd
           cp -a tcl /artifacts/tcl
+          cp /plasma/scripts/z2/plasma_swd_site_admission.py /artifacts/
           cd /artifacts
-          sha256sum openocd > openocd.sha256
+          sha256sum openocd plasma_swd_site_admission.py > openocd.sha256
           printf '%s\n' \
             'Upstream OpenOCD 5088db4c9154ca833c6d558381074b33672e127a' \
             'Platform: ARMv7 ubuntu:22.04 QEMU user-space build' \
             'PLASMA plasma_swd source-locked adapter candidate' \
-            'Real PS Root/Owner/Voltage binding: NOT_IMPLEMENTED / NOT_QUALIFIED' \
+            'PS Root/Owner/Voltage-attestation binding: IMPLEMENTED, Host/QEMU denial only' \
             'Z2 HIL / Blue Pill DPIDR: NOT_RUN' \
             'DO NOT DEPLOY as a qualified production runtime' \
             > PROVENANCE.txt
@@ -102,7 +114,9 @@ jobs:
               "adapter_discovery": "PASS",
               "unowned_adapter_init": "DENIED",
               "hardware_runtime_ready": False,
-              "ps_local_owner_binding": "NOT_IMPLEMENTED",
+              "ps_local_owner_binding": "IMPLEMENTED_UNADMITTED_INIT_DENIED",
+              "site_admission_script_sha256": hashlib.sha256((folder / "plasma_swd_site_admission.py").read_bytes()).hexdigest(),
+              "unadmitted_site1_init": "DENIED",
               "z2_hil": "NOT_RUN",
               "bluepill_dpidr": "NOT_RUN",
           }
@@ -113,8 +127,9 @@ jobs:
           PY
           tar -C "$RUNNER_TEMP/plasma-openocd5088-armv7" -czf \
             "$RUNNER_TEMP/plasma-openocd5088-armv7-candidate.tar.gz" \
-            openocd openocd.sha256 tcl adapter-list.log adapter-select.log \
-            unowned-init-denied.log elf-header.txt linked-libraries.txt \
+            openocd openocd.sha256 plasma_swd_site_admission.py tcl \
+            adapter-list.log adapter-select.log unowned-init-denied.log \
+            unadmitted-site1-init-denied.log elf-header.txt linked-libraries.txt \
             candidate-evidence.json PROVENANCE.txt
           cd "$RUNNER_TEMP"
           sha256sum plasma-openocd5088-armv7-candidate.tar.gz \

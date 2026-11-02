@@ -33,6 +33,9 @@ COPIES = (
     "plasma_swd_openocd5088_binding.h",
     "plasma_swd_openocd5088_callbacks.c",
     "plasma_swd_openocd5088_driver.c",
+    "plasma_swd_openocd5088_ps_owner.h",
+    "plasma_swd_openocd5088_ps_owner.c",
+    "plasma_swd_openocd5088_commands.c",
 )
 
 
@@ -102,7 +105,9 @@ def main() -> None:
         "DRIVERFILES += %D%/plasma_swd_ps_mapping.c\n"
         "DRIVERFILES += %D%/plasma_swd_owner_evidence.c\n"
         "DRIVERFILES += %D%/plasma_swd_openocd5088_callbacks.c\n"
-        "DRIVERFILES += %D%/plasma_swd_openocd5088_driver.c",
+        "DRIVERFILES += %D%/plasma_swd_openocd5088_driver.c\n"
+        "DRIVERFILES += %D%/plasma_swd_openocd5088_ps_owner.c\n"
+        "DRIVERFILES += %D%/plasma_swd_openocd5088_commands.c",
     )
     for name in COPIES:
         shutil.copyfile(source_dir / name, target_dir / name)
