@@ -47,20 +47,37 @@ Owner-authorized Gate 1 change. No privilege escalation, real Root execution or 
    quiescence transaction. These are independent gates, not substitutes
    for privileged code integrity.
 
-## Open integration blockers — MUST NOT claim Gate 2 READY
+## Host-only SWD Site / Native C migration (implemented, not HIL)
 
-- Complete the ABI-v5 SWD Site Admission and Native C per-word
-  `root_source_commit` migration to a **full SHA256 code identity**
-  before removing the old tree on a real Z2. Their existing Root Pin
-  record cannot be silently reinterpreted as a new trust token.
-- Complete Path 2 and HIL script command-argument migration and
-  new privileged source installation integration, including
-  executable file ownership/verity and rollback semantics.
-- Prove Z2 on-device UIDs, ACLs, sysfs, `/dev/mem`, systemd sandbox,
-  live FPGA Manager and current-boot Golden recovery. **NOT_RUN**.
-- Do not remove the deployed old protected tree or change the running
-  Root Entry on Z2 without a separate physical qualification and
-  explicit deployment authorization.
+The ABI-v5 Root Site Admission issuer now rechecks the protected code
+closure and emits `plasma.swd.ps-admission.v2` with exact
+`trusted_code_sha256` (64 hex) and root-private Manifest stat identity.
+The Native C Owner parser and per-MMIO authorization verify the same
+code identity/Manifest inode, size and mtime; `root_source_commit` and
+`root_source_pinned` are no longer accepted on this updated code path.
+The FPGA Root's mutable journal is moved to
+`/var/lib/plasma/privileged/fpga-deployment-state.json`, outside
+`/opt/plasma/privileged/fpga-root`. This is a source-only change;
+physical Site Admission, Native C /dev/mem mapping, current-boot recovery
+and the journal migration have **NOT_RUN** evidence.
 
-A successful Host-only source verification is `VERIFIED_NOT_EXECUTED`,
-not a real FPGA or Site-ready receipt.
+## Remaining blockers — MUST NOT claim Gate 2 READY
+
+- A complete, atomic and failure-safe migration procedure for the installed
+  Root Entry, source and state/journal/Golden recovery on Z2 has not been
+  deployed or qualified; preserving the previously loaded Image after
+  journal relocation needs authentic on-device evidence.
+- Source-pin dependencies remain in operator/historical HIL read-only
+  diagnostics and helper scripts. Retain historical evidence but do not
+  execute an obsolete Root path against the new verified entry.
+- The exact Python runtime executable and factory provisioning privileges,
+  root-owned `/opt/plasma` code ancestry, sysfs, `/dev/mem`,
+  `ProtectHome`, Runtime quiesce and recovery on actual Z2 are **NOT_RUN**.
+- Python / Native C real non-root Executors and end-to-end Action
+  Journal/Receipt are **NOT_WIRED / NOT_QUALIFIED**.
+- Do not delete the deployed old protected tree or activate the new Root
+  Entry until a separately authorized device migration and rollback plan
+  is proven.
+
+Host-only `VERIFIED_NOT_EXECUTED` proves only source-closure checks,
+not a production Site-ready or FPGA acceptance receipt.

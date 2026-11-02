@@ -135,7 +135,7 @@ static int setup(void)
     snprintf(boot, sizeof(boot), "%s\n", BOOT);
     journal_text(j, sizeof(j), "IMAGE");
     if (put(P.boot_id, boot, 0644) || put(P.manager_state, "operating\n", 0644) ||
-        put(P.root_journal, j, 0600) || put(P.code_manifest, pin, 0644) ||
+        put(P.root_journal, j, 0600) || put(P.code_manifest, pin, 0600) ||
         put(el, "{\"method\":\"OWNER_ONSITE_ATTESTATION\"}\n", 0600))
         return -1;
     plasma_swd_ps_owner_set_paths_for_host_test(&P);

@@ -632,7 +632,7 @@ def test_ps_owner_production_paths_and_no_host_relaxation():
     assert "#define TRUSTED_UID 0u" in src
     assert "PLASMA_SWD_MMIO_OWNER_LOCK" in src
     assert "plasma_swd_owner_lock_acquire_site" in src
-    assert ".plasma-fpga-image-deployment-state.json" in src
+    assert "/var/lib/plasma/privileged/fpga-deployment-state.json" in src
     # Voltage is an attestation, never claimed as a measurement.
     assert "NOT a voltage measurement" in src
     drv = (SRC / "plasma_swd_openocd5088_driver.c").read_text()
@@ -693,10 +693,10 @@ def test_site_admission_attestation_and_tree_negative(tmp_path, monkeypatch):
         with pytest.raises(adm.SiteAdmissionDenied, match="NOT_ROOT_PRIVATE"):
             adm.load_attestation(1, 0.0)
     tree = tmp_path / "tree"
-    for rel in adm.PROTECTED_FILES:
-        (tree / rel).parent.mkdir(parents=True, exist_ok=True)
-        (tree / rel).write_text("tampered\n")
-    with pytest.raises(adm.SiteAdmissionDenied):
+    tree.mkdir()
+    monkeypatch.setattr(adm, "VERIFIER", tree / "missing-verifier.py")
+    # New source-closure issuer must fail before importing any untrusted code.
+    with pytest.raises((adm.SiteAdmissionDenied, OSError)):
         adm.verify_protected_tree(tree)
 
 
