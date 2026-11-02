@@ -14,6 +14,7 @@ from pathlib import Path
 import platform
 import re
 import sys
+import tempfile
 import uuid
 
 from pl.hil import fpga_image_guard as guard
@@ -294,6 +295,111 @@ def validate_bundle_fpga_handoff(
         "fpga_loaded": False,
         "dut": "NOT_RUN",
         "ready": False,
+    }
+
+
+def stage_bundle_fpga_files_only(
+    handoff: dict, *,
+    expected_active_set_sha256: str,
+    manifest_bytes: bytes,
+    bin_bytes: bytes,
+    hwh_bytes: bytes,
+) -> dict:
+    """Privileged *files-only* staging via the EXISTING protected Root owner.
+
+    This is an internal primitive, deliberately NOT an allowed Root Entry
+    command. Its caller must later provide independent Controller and
+    Runtime authorization for any configuration or manifest activation.
+    Staged companions never replace the active Root Image Manifest.
+    """
+    preflight = validate_bundle_fpga_handoff(
+        handoff, expected_active_set_sha256=expected_active_set_sha256,
+        manifest_bytes=manifest_bytes, bin_bytes=bin_bytes, hwh_bytes=hwh_bytes,
+    )
+    trusted_local()
+    guard.protected(guard.FIRMWARE, file=False)
+    release = parse_image_manifest_bytes(manifest_bytes)
+    port = guard.RootZ2TargetPort(release=release)
+    # The name comes only from the Root-validated basename, not from a
+    # Console-provided path. Each individual file is installed no-overwrite.
+    files = (
+        (release.firmware_name, bin_bytes),
+        (release.firmware_name + ".hwh", hwh_bytes),
+        (release.firmware_name + ".manifest.json", manifest_bytes),
+    )
+    with port.exclusive():
+        # Golden is separate from any Asset Set and cannot be replaced by it.
+        guard.sha_file(
+            guard.FIRMWARE / release.recovery_name,
+            release.recovery_sha256,
+        )
+        # Recheck the intended bytes and ensure no filename can escape Root
+        # firmware storage even if an API consumer supplies malformed input.
+        for name, raw in files:
+            need(_basename(name) and name != release.recovery_name and
+                 name != MANIFEST_FILE.name and
+                 (guard.FIRMWARE / name).parent == guard.FIRMWARE,
+                 "ROOT_HANDOFF_FIRMWARE_FILENAME_DENIED")
+            target = guard.FIRMWARE / name
+            expected_sha = hashlib.sha256(raw).hexdigest()
+            if target.is_symlink():
+                raise ImageDeploymentDenied("ROOT_HANDOFF_EXISTING_SYMLINK")
+            if target.exists():
+                guard.protected(target)
+                need(target.is_file() and target.stat().st_size == len(raw),
+                     "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
+                with target.open("rb") as source:
+                    observed_sha = hashlib.file_digest(source, "sha256").hexdigest()
+                need(observed_sha == expected_sha,
+                     "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
+                continue
+            fd, temp_name = tempfile.mkstemp(
+                prefix=".plasma-fpga-asset.", dir=guard.FIRMWARE
+            )
+            temp = Path(temp_name)
+            try:
+                with os.fdopen(fd, "wb") as destination:
+                    destination.write(raw)
+                    destination.flush()
+                    os.fsync(destination.fileno())
+                temp.chmod(0o600)
+                # link() fails if target exists; do not use os.replace()
+                # because it would silently overwrite a potentially
+                # held firmware file under the same logical name.
+                os.link(temp, target, follow_symlinks=False)
+            except FileExistsError as exc:
+                raise ImageDeploymentDenied(
+                    "ROOT_HANDOFF_FIRMWARE_NAME_COLLISION"
+                ) from exc
+            finally:
+                if temp.exists():
+                    temp.unlink()
+        folder = os.open(
+            guard.FIRMWARE, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        )
+        try:
+            os.fsync(folder)
+        finally:
+            os.close(folder)
+        # Rehash all installed files; the canonical Root Image Manifest
+        # remains untouched until an independently approved configuration.
+        for name, data in files:
+            target = guard.FIRMWARE / name
+            guard.protected(target)
+            with target.open("rb") as source:
+                digest = hashlib.file_digest(source, "sha256").hexdigest()
+            need(digest == hashlib.sha256(data).hexdigest(),
+                 "ROOT_HANDOFF_STAGED_FILE_CHANGED")
+    return {
+        **preflight,
+        "result": "ROOT_FILES_STAGED_NOT_ACTIVATED",
+        "fpga_installed": True,
+        "fpga_loaded": False,
+        "root_hardware_activation": "NOT_RUN",
+        "ready": False,
+        "firmware_name": release.firmware_name,
+        "manifest_companion_name": release.firmware_name + ".manifest.json",
+        "hwh_companion_name": release.firmware_name + ".hwh",
     }
 
 
