@@ -1,5 +1,9 @@
 # HISTORICAL — PLASMA Bundle v3 B3 Smoke-only Path 2 (PR #1241)
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+
+> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+
 > **Archived evidence only. DO NOT run these historical commands on a current PPU.**
 > The Smoke-only Path 2 scripts and pinned factory policy have been retired
 > by [Generic Bundle v3 B3 Gate 1](ppu-bundle-v3-generic-assets-gate1.md).
@@ -112,8 +116,8 @@ Use the existing owner Issue #981 Work Order, `execution_path=path2-cli`,
 `scripts/ppu_path2_bundle_v3_b3_acceptance.py`. Example source-bound arguments:
 
 ```text
---host 192.168.2.99
---device-id ppu-device-7ed4b30913a9bf6101da5a7a
+--host <Z2_HOST>
+--device-id <PPU_DEVICE_ID>
 --source-sha <exact current PR #1241 HEAD>
 ```
 

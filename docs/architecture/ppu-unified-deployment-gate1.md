@@ -1,6 +1,10 @@
 # PPU single deployment entry — Gate 1 Path 1 (Host-only integration baseline)
 
-> **Status:** owner-approved 2026-10-29, including revised Gate 1 Path 1 for PS Runtime API/Coordinator correlation; Draft PR, **NOT deployed or merged**. No SWPC/Z2 operation or Linux permission change. Original baseline `main e338083564c30dc6bdc24009f7b62a3984fb7023` has been reconciled with merged #1208 at `main 1fb0c4b6c95e9da8f746fc3571a160b5a8bf6390`. The Host-only Master role contract is not a deployed Principal/Root authorization boundary.
+> **Start here:** [PPU deployment start page](../deployment/ppu-deployment-start-here.md) defines the two PPU deployment routes; this document is the design record of Route A (product deployment), not a separate route.
+
+> **Status:** owner-approved 2026-10-29, including revised Gate 1 Path 1 for PS Runtime API/Coordinator correlation; merged in main (PR #1209), **NOT deployed**. No SWPC/Z2 operation or Linux permission change. Original baseline `main e338083564c30dc6bdc24009f7b62a3984fb7023` has been reconciled with merged #1208 at `main 1fb0c4b6c95e9da8f746fc3571a160b5a8bf6390`. The Host-only Master role contract is not a deployed Principal/Root authorization boundary.
+
+> **Current-state note (2026-11-02):** the canonical deployment format is now [Bundle v3](ppu-canonical-bundle-packages.md); references below to `plasma.ppu.package.v1` or Bundle v2 are historical. Two different `fpga-image` notions appear in this document: the **typed deployment-plan kind** of the earlier PS Runtime route, which the client and Bootstrap server reject (§ Host-only SWPC API transport continuation), and the **Bundle v3 Package kind**, which is admitted and staged as an inert asset but never loaded into PL by deployment.
 
 ## Latest owner decision — revised Gate 1, generic package + single Engine (2026-10-29)
 
@@ -104,7 +108,7 @@ The **common ingress** is a logical reuse of existing capabilities, not a new se
 | P1 | Mixed-package and eight-Site acceptance | **NOT RUN** on physical target | Host-only negative matrix, then separately authorized PPU hardware acceptance, concurrent Site conflicts and recovery |
 | P2 | Partial reconfiguration | **UNDECIDED / NOT A PREREQUISITE** | First prove whole-image switching safety; evaluate partial reconfiguration only if hardware/resource economics justify it |
 
-**Delivery sequencing:** (1) freeze Bundle v2/purpose/dependency/ICPN contracts and Host-only tests; (2) qualify existing API/Engine trusted real installation and component inventory; (3) integrate programming/diagnostic/experiment activation with Root/Site exclusion; (4) run separately authorized end-to-end SWPC/PPU and hardware recovery acceptance; (5) retire legacy SSH only after proven parity. No merge, deployment, Root/FPGA load, SWPC/Z2/DUT operation or production qualification is implied by this documentation.
+**Delivery sequencing:** (1) freeze the Bundle (now [Bundle v3](ppu-canonical-bundle-packages.md))/purpose/dependency/ICPN contracts and Host-only tests; (2) qualify existing API/Engine trusted real installation and component inventory; (3) integrate programming/diagnostic/experiment activation with Root/Site exclusion; (4) run separately authorized end-to-end SWPC/PPU and hardware recovery acceptance; (5) retire legacy SSH only after proven parity. No merge, deployment, Root/FPGA load, SWPC/Z2/DUT operation or production qualification is implied by this documentation.
 
 ## Decision: one product-facing installation endpoint, one transaction
 

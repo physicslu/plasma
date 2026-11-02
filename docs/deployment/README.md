@@ -1,24 +1,31 @@
 # Plasma Deployment Notes
 
-**Canonical Package naming:** [Bundle → Packages → Files](../architecture/ppu-canonical-bundle-packages.md). New authored Bundle uses v3 `packages` and `payload/packages`, while historic v2 remains wire-compatible with `components`.
+**Canonical Package naming:** [Bundle → Packages → Files](../architecture/ppu-canonical-bundle-packages.md). Bundle v3 (`packages`, `payload/packages`) is the only accepted wire format; Bundle v2 `components` and Package v1 are retired.
+
+**Start here for PPU deployment:** [PPU Deployment — Start Here](ppu-deployment-start-here.md) defines the two PPU deployment routes — **A. Product deployment** (Console → Bootstrap API (`/v1/uploads` upload → `POST /v1/deployments`), one Coordinator; Factory Bootstrap is its prerequisite, `plasmactl z2-ps` its internal executor, Bundle v3 its asset payload format) and **B. Engineering deployment** (`ppu-deploy` over SSH, development only) — and the provisioning order.
 
 `scripts/plasmactl` is the profile-aware operator entry point for integration-host, local Control Station, SWPC Z2-like surrogate, and Real Z2 PS-only deployment roles. Profile-specific backends preserve separate ownership and qualification boundaries; a common CLI does not make those roles interchangeable.
 
 - **Current** — [`plasmactl` Deployment Profiles](plasmactl-deployment-profiles.md): canonical profile router, role ownership, immutable deployment behavior, and qualification boundaries for `integration`, `local-control-station`, `swpc-z2like`, and `z2-ps`.
-- **Current** — [Deployment Port / Profile Matrix](port-profile-matrix.md): canonical cross-profile meaning of `9900`, `18080`, `18081`, `18082`, `18180`, `18190`, `18280`, and the integration-only `5173` development runtime.
+- **Current** — [Deployment Port / Profile Matrix](port-profile-matrix.md): canonical cross-profile meaning of `9900`, `18000` (packaged Console default), `18080`, `18081`, `18082`, `18180`, `18190`, `18280`, and the integration-only `5173` development runtime.
 - **Current foundation** — [Product Deployment Foundation](product-deployment-foundation.md): cross-platform Control Station (macOS/Linux/Windows) / Z2 PPU role boundaries, immutable release direction, platform service-manager adapters, and the implemented read-only product readiness audit.
 - **Current** — [Product Release Format v1](product-release-format.md): canonical product version metadata, role/platform artifact matrix, `release.json`, detached archive SHA-256, internal `SHA256SUMS`, safe verification, and clean-extraction acceptance.
 - **Current** — [Control Station Runtime Packaging](control-station-runtime-packaging.md): source-tree-independent Vinext standalone Console/BFF, Manager Python zipapp, Control Station release orchestration, and macOS/Linux/Windows clean-runtime acceptance.
 - **Z2 PS Phase 1** — [PPU Runtime Packaging](ppu-runtime-packaging.md): source-tree-independent PPU Python zipapp, canonical `linux-armv7l` PPU release, fail-closed PS-only configuration, systemd topology, Manager enrollment, and Managed PS Loopback acceptance boundary.
+- **PPU deployment start page** — [PPU Deployment — Start Here](ppu-deployment-start-here.md): the two PPU deployment routes (product / engineering) and the provisioning order.
+- **PPU Bootstrap** — [PPU Bootstrap Factory Provisioning and Z2 HIL](ppu-bootstrap-factory-and-hil.md): factory/recovery Bootstrap install, Console first install / upgrade path, rollback and physical Z2 evidence.
+- **Bundle v3 assets** — [Generic Asset Set B3](ppu-bundle-v3-generic-assets-gate1.md), [Single Active Asset Set](ppu-single-active-asset-set-gate1.md), [FPGA Image Asset Handoff](ppu-fpga-asset-handoff-gate1.md): Bundle v3 upload/admission/install staging, Asset Set identity and read-only FPGA handoff (host-only; no activation or FPGA load). Historical PR #1241 smoke evidence: [Bundle v3 B3 smoke Path 2](ppu-bundle-v3-b3-path2.md).
+- **Single deployment entry design** — [PPU single deployment entry](../architecture/ppu-unified-deployment-gate1.md): design record of Route A (one installation endpoint and one Coordinator transaction); not a separate route.
+- **FPGA image admission** — [Z2 six necessary checks](z2-minimal-six-check-admission.md): staging vs PL activation vs MMIO/SWD admission checks.
+- **ARMv7 runtime lab** — [PPU ARMv7 Runtime Lab](ppu-armv7-runtime-lab.md).
+- **QEMU Z2-like demo** — [SWPC z2like-demo QEMU ARMv7 Backend](z2like-demo-qemu.md).
+- **Control Station runtime acceptance** — [Control Station Runtime Acceptance](control-station-runtime-acceptance.md); Manager/BFF wiring: [Manager BFF Runtime Wiring](manager-bff-runtime-wiring.md).
 - **Z2 PS installer** — [PYNQ-Z2 PS Installer and Managed Loopback Acceptance](z2-ps-installer.md): verified release consumption, PYNQ/System-Python isolation, immutable side-by-side installation, explicit isolated Python >= 3.11 binding, P3 bounded runtime activation, systemd activation/rollback, Z2-local readiness, and the separate Managed PS Loopback qualification boundary.
-- **Render -> SWPC managed PS lab reference** — [Render Control Station -> SWPC Z2-like PPU Managed PS Loopback](render-swpc-managed-ps-loopback.md): earlier PS-loopback foundation for the separate Render-hosted Control Station/Manager and SWPC surrogate. Use the configured-Mock / managed-Programming documents for current Programming guidance.
 - **macOS installer pilot** — [macOS Control Station Installer Pilot](macos-control-station-installer-pilot.md): unsigned `.pkg`, immutable `/Library/Application Support/Plasma` runtime, per-user `launchd` LaunchAgents, absolute external Node/Python runtime binding, install/restart/stop-start/basic-uninstall acceptance, and downloadable CI artifact.
 - **Windows installer pilot** — [Windows Control Station Installer Pilot](windows-control-station-installer-pilot.md): unsigned MSI, immutable versioned `%ProgramFiles%` runtime, mutable `%ProgramData%` state, WinSW-backed Windows SCM services, install/restart/stop-start/basic-uninstall acceptance, and downloadable CI artifact.
-- **Historical public-preview reference** — [SWPC Public Preview / Mock Environment](swpc-public-preview.md): retained evidence for the earlier `plasma.open4th.com` preview topology. It is not the canonical current PPU/Control Station routing contract.
 - Integration-host installation, configuration, update, verification and service control: [Integration Host Deployment Guide](../development/swpc-deployment.md).
 - Linux local Control Station: [Local Control Station Reference Deployment](local-control-station.md).
 - SWPC configured Mock Programming: [SWPC Z2-like Configured Mock Programming](swpc-z2like-configured-mock-programming.md).
-- SWPC managed Programming ingress: [SWPC Z2-like Managed Programming Ingress](swpc-z2like-managed-programming-ingress.md).
 - Web runtime/HMR lifecycle rules: [Web Runtime Deployment Hygiene](web-runtime-hygiene.md).
 - Single-service public Mock deployment: [Render Free Public Mock Demo](render-free-public-demo.md).
 - Public API smoke acceptance: [Render Public Smoke Acceptance](render-public-smoke.md).

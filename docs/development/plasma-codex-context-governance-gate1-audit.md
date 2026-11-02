@@ -1,6 +1,6 @@
 # PLASMA Codex Context and Documentation Governance — Gate 1 Audit
 
-**Status:** DRAFT, host-only, documentation-only.  
+**Status:** Historical audit record (merged), host-only, documentation-only.  
 **Pinned main:** `c58621afe896e6a6f57fe712c27ffcbc06a6f0e8`.  
 **Applies to:** Desktop/local Codex CLI and trusted GitHub Path 3 Codex.
 

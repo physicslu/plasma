@@ -1,6 +1,8 @@
 # `ppu-deploy` — PPU engineering-module deployment (Gate 1)
 
-Status: **engineering deployment implementation included in main; actual SWPC/Z2 deployment unverified by this page**. See [single-entry convergence Gate 1](../architecture/ppu-unified-deployment-gate1.md). The existing engineering SSH transaction remains separate from product Bootstrap and is **not yet retired**; the new `ppu-deploy plan` exposes a blocked single-API migration intent. This page is not deployment or hardware authorization.
+> **Start here:** [PPU deployment start page](../deployment/ppu-deployment-start-here.md) defines the two PPU deployment routes; `ppu-deploy` is Route B (engineering deployment), development only.
+
+Status: **engineering deployment implementation included in main; actual SWPC/Z2 deployment unverified by this page**. See [single-entry convergence Gate 1](../architecture/ppu-unified-deployment-gate1.md). The engineering SSH transaction is the designated **Route B (engineering deployment)**, deliberately separate from product Bootstrap (Route A); the new `ppu-deploy plan` exposes a blocked single-API migration intent. This page is not deployment or hardware authorization.
 
 ## Scope and ownership
 

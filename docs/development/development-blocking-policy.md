@@ -1,5 +1,7 @@
 # Development Mode — Three Shared BLOCKING Decisions (current Path 2 / Path 3)
 
+> **Historical (2026-11-02):** superseded by [plasma-development-common.md](plasma-development-common.md), [plasma-path2-cli.md](plasma-path2-cli.md) and [plasma-path3-codex.md](plasma-path3-codex.md). Retained because tests still read it; it is not a current governance source. The governance "B1/B2/B3" defined here is listed in the [glossary](../glossary.md#b1b2b3).
+
 Paths 2 and 3 share owner/SHA-gated trusted Dispatcher admission and may
 share the SWPC Runner, but **do not share a mandatory hardware Stage Transport
 or fixed Stage allowlist**. Path 2 guarded-hardware Work Orders use

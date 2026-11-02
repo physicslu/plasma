@@ -196,8 +196,8 @@ exceptions do **not** redefine the normal two-gate workflow.
 
 ## Authority and path mapping
 
-Use the existing [Three-Path Model](../development/plasma-three-path-execution-model.md)
-(PR #1041) and
+Use the current [Path 2](../development/plasma-path2-cli.md) and
+[Path 3](../development/plasma-path3-codex.md) contracts and
 [Dispatcher Gate 1A](plasma-engineering-dispatch-v1.md) as normative.
 There are exactly two owner gates: Gate 1 approves scoped execution and Gate 2
 approves *PR merge*. Creating a GitHub run is a technical action after Gate 1,

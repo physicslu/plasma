@@ -2,7 +2,7 @@
 
 **Decision:** Console explicitly selects one PPU Active Asset Set, an exact FPGA Image, and a Programming Profile. PPU validates the choice; it must never silently select a different Image or Profile. Bundle is an Assets delivery container, never a programming or FPGA-load command.
 
-**Dependencies:** [P0 PR #1245](https://github.com/physicslu/plasma/pull/1245) → [P1 PR #1246](https://github.com/physicslu/plasma/pull/1246) → this P2 Draft. No component is merged without Gate 2.
+**Dependencies:** [P0 PR #1245](https://github.com/physicslu/plasma/pull/1245) → [P1 PR #1246](https://github.com/physicslu/plasma/pull/1246) → this P2 (PR #1248/#1249); all merged in main.
 
 ## First read-only vertical slice
 

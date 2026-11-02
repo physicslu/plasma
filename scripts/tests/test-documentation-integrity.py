@@ -140,6 +140,58 @@ def validate_index_coverage() -> list[str]:
     return errors
 
 
+INDEX_STATUSES = ("Current", "Reference", "Plan", "Historical")
+INDEX_ENTRY = re.compile(r"^- \*\*(?P<status>[^*]+)\*\*(?P<after>.*)$")
+UNSTATUSED_INDEX_SECTIONS = ("## Component contracts outside `docs/`",)
+
+
+def validate_index_statuses(index: str) -> list[str]:
+    """Each index entry has exactly one lifecycle status and appears once."""
+    errors: list[str] = []
+    seen: dict[str, int] = {}
+    section = ""
+    for number, line in enumerate(index.splitlines(), start=1):
+        if line.startswith("## "):
+            section = line
+            continue
+        if not line.startswith("- "):
+            continue
+        match = INDEX_ENTRY.match(line)
+        if match is None:
+            if section not in UNSTATUSED_INDEX_SECTIONS:
+                errors.append(f"docs/README.md:{number}: index entry has no **Status**")
+            continue
+        status = match.group("status")
+        if status not in INDEX_STATUSES:
+            errors.append(
+                f"docs/README.md:{number}: status '{status}' is not one of {', '.join(INDEX_STATUSES)}"
+            )
+        after = match.group("after")
+        if not re.match(r"^(?: · `[^`]+`)* — ", after):
+            errors.append(f"docs/README.md:{number}: expected '- **Status** · `tag` — [link](path)' format")
+        link = LINK.search(after)
+        if link is None:
+            errors.append(f"docs/README.md:{number}: index entry has no link")
+            continue
+        target = link_destination(link.group(1)).split("#", 1)[0]
+        if target in seen:
+            errors.append(f"docs/README.md:{number}: duplicate index entry for {target} (first at line {seen[target]})")
+        else:
+            seen[target] = number
+    return errors
+
+
+def self_test_index_statuses() -> list[str]:
+    good = "## A\n\n- **Current** · `PR #1` — [A](a.md)：x\n- **Plan** — [B](b.md)\n"
+    bad = "## A\n\n- **Gate 1 Draft** — [A](a.md)\n- **Current** — [A](a.md)\n- [C](c.md)\n"
+    errors: list[str] = []
+    if validate_index_statuses(good):
+        errors.append("index status guard rejects a valid index")
+    if len(validate_index_statuses(bad)) != 3:
+        errors.append("index status guard misses an invalid status, duplicate or unstatused entry")
+    return errors
+
+
 def source_integer(path: Path, name: str, pattern: str) -> int:
     match = re.search(pattern, path.read_text(encoding="utf-8"), re.MULTILINE)
     if match is None:
@@ -248,6 +300,8 @@ def main() -> int:
         *validate_core_contract_anchors(),
         *validate_common_gate_ownership(),
         *validate_index_coverage(),
+        *self_test_index_statuses(),
+        *validate_index_statuses(DOC_INDEX.read_text(encoding="utf-8")),
         *validate_contract_facts(markdown),
     ]
     if errors:

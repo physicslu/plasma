@@ -1,6 +1,6 @@
 # PLASMA — Shared Development Contract
 
-> **Normative detailed clauses.** The repository root [AGENTS.md](../../AGENTS.md) is the concise mandatory instruction entrypoint for Codex and other agents. This file preserves the previous complete engineering contract as the detailed, on-demand source of clauses. Apply its relevant sections before modifying affected domains, deploying, handling privileged resources, or working with hardware. In case of conflict, check the latest executable code, current root AGENTS.md and owner-approved task scope.
+> **Normative detailed clauses.** The repository root [AGENTS.md](../../AGENTS.md) is the concise mandatory instruction entrypoint for Codex and other agents. This file holds the shared detailed clauses (programming data model, execution zones and domain contract loading); domain-specific and Path-specific clauses live in the linked [FPGA](plasma-fpga.md), [Embedded](plasma-embedded.md), [Manager](plasma-manager.md), [Web](plasma-web.md), [Path 2](plasma-path2-cli.md) and [Path 3](plasma-path3-codex.md) contracts. Apply its relevant sections before modifying affected domains, deploying, handling privileged resources, or working with hardware. In case of conflict, check the latest executable code, current root AGENTS.md and owner-approved task scope.
 
 Gate approvals and execution authorization are governed exclusively by [AGENTS.md](../../AGENTS.md); this document adds no separate Gate policy.
 
