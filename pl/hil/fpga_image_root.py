@@ -2,7 +2,7 @@
 
 No protocol/IP-specific handler, runtime Project/Profile selector or Flash write.
 download/test/restore keep the two-argument protected Root Entry; B3
-``bundle-load <pin> <asset_set_sha256>`` adds only the installed Set SHA-256.
+``bundle-load <asset_set_sha256>`` takes only the installed Set SHA-256.
 """
 from __future__ import annotations
 

@@ -2,8 +2,10 @@
 # Protected Z2 operation entry: exact operation + SHA, no Stage/Profile.
 # The caller cannot select a Python module, Project or shell executable.
 #   download|test|restore <40-hex source pin>
-#   bundle-load <40-hex source pin> <64-hex installed B3 Asset Set SHA-256>
-# bundle-load accepts no path: Root locates the immutable B3 Set itself.
+#   bundle-load <64-hex installed B3 Asset Set SHA-256>
+# bundle-load accepts no path or pin: Root locates the immutable B3 Set itself
+# and runs the root-owned pinned source. The B3 Coordinator starts it through
+# systemd-run because the Bootstrap service cannot see /root (ProtectHome).
 set -euo pipefail
 asset_set=''
 case "${1:-}" in
@@ -11,16 +13,19 @@ case "${1:-}" in
     [[ $# -eq 2 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
     operation="$1" ;;
   bundle-load)
-    [[ $# -eq 3 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
+    [[ $# -eq 2 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
     operation="$1"
-    asset_set="$3"
+    asset_set="$2"
     [[ "$asset_set" =~ ^[0-9a-f]{64}$ ]] ||
       { echo 'PATH2_ASSET_SET_NOT_PINNED' >&2; exit 2; } ;;
   *) echo 'PATH2_OPERATION_NOT_ALLOWLISTED' >&2; exit 2 ;;
 esac
-source_sha="$2"
-[[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] ||
-  { echo 'PATH2_REQUEST_NOT_PINNED' >&2; exit 2; }
+source_sha=''
+if [[ -z "$asset_set" ]]; then
+  source_sha="$2"
+  [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] ||
+    { echo 'PATH2_REQUEST_NOT_PINNED' >&2; exit 2; }
+fi
 [[ "$(id -u)" == '0' ]] || { echo 'PATH2_ROOT_REQUIRED' >&2; exit 2; }
 
 root=/root/plasma-path2-approved
@@ -39,6 +44,8 @@ commit_pin="$root/.plasma-path2-source-commit"
 [[ "$(wc -l < "$commit_pin")" -eq 1 ]] ||
   { echo 'PATH2_APPROVED_COMMIT_PIN_INVALID' >&2; exit 2; }
 installed_sha="$(cat "$commit_pin")"
+# bundle-load runs whatever reviewed source is pinned in the root-owned tree.
+[[ -n "$asset_set" ]] && source_sha="$installed_sha"
 [[ "$installed_sha" =~ ^[0-9a-f]{40}$ &&
    "$installed_sha" == "$source_sha" ]] ||
   { echo 'PATH2_APPROVED_SOURCE_SHA_MISMATCH' >&2; exit 2; }

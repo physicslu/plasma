@@ -38,7 +38,7 @@ under the existing `deployment.lock` and `deployment.json` journal:
 B3 install/verify (unchanged)
   -> resolve FPGA handoff from the just-installed immutable Set
   -> hold Runtime Job Quiesce (existing socket, connection-held)
-  -> Root Entry: bundle-load <pin> <asset_set_sha256>
+  -> Root Entry: bundle-load <asset_set_sha256>
        re-verify staged files + b3-install.json + handoff (Root side)
        hardware-consumer census (existing collect_live; /dev/mem, /dev/uio*, OpenOCD)
        Golden SHA, current boot, FPGA Manager state
@@ -67,7 +67,7 @@ schema replaces the old one for all callers; there is no second B3 path.
 
 | Area | Files | Change |
 |---|---|---|
-| Protected Root | `scripts/z2/plasma-path2-root-entry`, `pl/hil/fpga_image_root.py` | Add allowlisted `bundle-load <pin> <asset_set_sha256>`. Root locates `/opt/plasma/assets/staged/<sha>/` itself (no caller path), re-verifies root ownership and hashes, stages files, promotes the Manifest atomically with backup, then runs the existing download and test. No other new operation. |
+| Protected Root | `scripts/z2/plasma-path2-root-entry`, `pl/hil/fpga_image_root.py` | Add allowlisted `bundle-load <asset_set_sha256>`. Root locates `/opt/plasma/assets/staged/<sha>/` itself (no caller path), re-verifies root ownership and hashes, stages files, promotes the Manifest atomically with backup, then runs the existing download and test. No other new operation. |
 | Root handoff | `pl/hil/fpga_image_root.py::validate_bundle_fpga_handoff` | Programming Profile becomes optional (B3 FPGA-only Bundles); everything else unchanged. |
 | B3 Coordinator | `scripts/ppu-bootstrap-deployment.py`, `scripts/ppu-bootstrap-service.py`, `scripts/ppu_deploy_api.py` | `fpga_load` request field, journal states in §2, call the Root Entry by fixed path with a timeout, new receipt `plasma.ppu.b3-deployment-receipt.v2`. |
 | Active Set | Bootstrap Asset Set helper | Publish `active.json` only after Identity PASS, inside the same Quiesce hold. |
@@ -165,3 +165,10 @@ tree, Golden and the existing OpenOCD installs.
   re-admission gate that blocks execution after a reload. Enforcing that
   block is a Runtime change outside this Gate.
 
+- HIL finding (2026-11-02): `plasma-bootstrap.service` runs with
+  `ProtectHome=true`, so the Bootstrap/Coordinator cannot see the Root tree
+  under `/root`. The Coordinator therefore starts the Root Entry through
+  `systemd-run --wait --pipe --collect` as a transient root unit outside that
+  sandbox, and `bundle-load` takes only `<asset_set_sha256>`: the Root Entry
+  runs its own root-owned pinned source (the Coordinator had no independent
+  pin source anyway). The Bootstrap sandbox is unchanged.

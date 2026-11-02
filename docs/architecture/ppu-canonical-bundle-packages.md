@@ -114,7 +114,7 @@ Set, reconfigure the FPGA, or execute a Programming Job.
 A B3 request with an explicit `"fpga_load": true` for a Bundle that contains
 exactly one `fpga-image` Package also loads that Image, in the same
 `deployment.lock` transaction: install/verify → Runtime Job Quiesce
-(connection-held) → protected Root Entry `bundle-load <pin> <asset_set_sha256>`
+(connection-held) → protected Root Entry `bundle-load <asset_set_sha256>`
 (Root re-derives the Set itself, runs the `/proc` `/dev/mem` `/dev/uio*`
 census, promotes the companion Manifest keeping the previous one, then the
 existing `download` and Identity `test`) → `active.json` is published only

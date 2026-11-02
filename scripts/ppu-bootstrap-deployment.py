@@ -34,7 +34,7 @@ SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active",
 # B3 fpga_load: fixed protected Root Entry and its root-owned source pin.
 # Neither path is ever taken from HTTP, the Bundle or the caller.
 ROOT_ENTRY = Path("/usr/local/libexec/plasma/z2-path2-root-entry")
-ROOT_SOURCE_PIN = Path("/root/plasma-path2-approved/.plasma-path2-source-commit")
+SYSTEMD_RUN = Path("/usr/bin/systemd-run")
 ROOT_STAGED_ASSET_SETS = Path("/opt/plasma/assets/staged")
 ROOT_BUNDLE_LOAD_TIMEOUT_S = 600
 B3_RECEIPT_SCHEMA = "plasma.ppu.b3-deployment-receipt.v2"
@@ -1134,30 +1134,29 @@ class DeploymentCoordinator:
 
 
 def run_root_bundle_load(asset_set_sha256: str) -> Mapping[str, Any]:
-    """Invoke the fixed protected Root Entry: bundle-load <pin> <set sha>.
+    """Invoke the fixed protected Root Entry: bundle-load <set sha>.
 
-    Classifies the result for the B3 journal. Anything that cannot be proven
-    to have stopped before the PL write is ``recovery_required``.
+    The Bootstrap service runs with ProtectHome, so the Root Entry and its
+    /root tree are invisible here. systemd-run starts the Root Entry as a
+    transient root unit outside this sandbox; it receives only the Set SHA.
+    Anything that cannot be proven to have stopped before the PL write is
+    ``recovery_required``.
     """
     if not _HEX64.fullmatch(asset_set_sha256):
         return {"result": "fpga_load_denied", "code": "ASSET_SET_SHA_INVALID"}
     try:
-        info = ROOT_SOURCE_PIN.lstat()
-        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
-                or info.st_mode & 0o022 or info.st_size > 64):
-            return {"result": "fpga_load_denied", "code": "ROOT_SOURCE_PIN_UNTRUSTED"}
-        pin = ROOT_SOURCE_PIN.read_text(encoding="ascii").strip()
         entry = ROOT_ENTRY.lstat()
-    except (OSError, UnicodeDecodeError):
+        runner = SYSTEMD_RUN.lstat()
+    except OSError:
         return {"result": "fpga_load_denied", "code": "ROOT_ENTRY_NOT_INSTALLED"}
-    if (not _HEX40.fullmatch(pin) or not stat.S_ISREG(entry.st_mode)
-            or entry.st_uid != 0 or entry.st_mode & 0o022):
+    if (not stat.S_ISREG(entry.st_mode) or entry.st_uid != 0 or entry.st_mode & 0o022
+            or not stat.S_ISREG(runner.st_mode) or runner.st_uid != 0):
         return {"result": "fpga_load_denied", "code": "ROOT_ENTRY_NOT_INSTALLED"}
     try:
         completed = subprocess.run(
-            [str(ROOT_ENTRY), "bundle-load", pin, asset_set_sha256],
+            root_bundle_load_argv(asset_set_sha256),
             check=False, capture_output=True, text=True,
-            timeout=ROOT_BUNDLE_LOAD_TIMEOUT_S,
+            timeout=ROOT_BUNDLE_LOAD_TIMEOUT_S + 60,
             env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"},
         )
     except subprocess.TimeoutExpired:
@@ -1165,6 +1164,15 @@ def run_root_bundle_load(asset_set_sha256: str) -> Mapping[str, Any]:
     except OSError as exc:
         return {"result": "fpga_load_denied", "code": "ROOT_ENTRY_EXEC_FAILED:" + type(exc).__name__}
     return classify_root_bundle_load(completed.returncode, completed.stdout, completed.stderr)
+
+
+def root_bundle_load_argv(asset_set_sha256: str) -> list[str]:
+    return [
+        str(SYSTEMD_RUN), "--wait", "--pipe", "--collect", "--quiet",
+        "--service-type=exec",
+        "--property=RuntimeMaxSec=%d" % ROOT_BUNDLE_LOAD_TIMEOUT_S,
+        str(ROOT_ENTRY), "bundle-load", asset_set_sha256,
+    ]
 
 
 def classify_root_bundle_load(returncode: int, stdout: str, stderr: str) -> Mapping[str, Any]:

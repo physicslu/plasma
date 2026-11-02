@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 from contextlib import ExitStack, contextmanager, nullcontext
 from pathlib import Path
@@ -329,11 +330,20 @@ def test_root_entry_output_classification(returncode, stdout, stderr, expected):
 
 
 def test_default_root_loader_denies_when_root_entry_not_installed(tmp_path):
-    with patch.object(engine, "ROOT_SOURCE_PIN", tmp_path / "missing"), \
+    with patch.object(engine, "ROOT_ENTRY", tmp_path / "missing"), \
          patch.object(engine.subprocess, "run") as run:
         result = engine.run_root_bundle_load("a" * 64)
     assert result == {"result": "fpga_load_denied", "code": "ROOT_ENTRY_NOT_INSTALLED"}
     run.assert_not_called()
+
+
+def test_root_loader_runs_entry_outside_bootstrap_sandbox_with_set_sha_only():
+    argv = engine.root_bundle_load_argv("a" * 64)
+    assert argv[0] == "/usr/bin/systemd-run"
+    assert {"--wait", "--pipe", "--collect"} <= set(argv)
+    assert argv[-3:] == ["/usr/local/libexec/plasma/z2-path2-root-entry",
+                         "bundle-load", "a" * 64]
+    assert not any(re.fullmatch(r"[0-9a-f]{40}", item) for item in argv)
 
 
 # --- Root Entry shell allowlist ------------------------------------------
@@ -345,16 +355,17 @@ SET = "b" * 64
 
 @pytest.mark.parametrize("argv,code", [
     (["bundle-load"], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
-    (["bundle-load", PIN], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
-    (["bundle-load", PIN, SET, "extra"], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
-    (["bundle-load", PIN, "/opt/plasma/assets/staged/" + SET], "PATH2_ASSET_SET_NOT_PINNED"),
-    (["bundle-load", PIN, "../" + SET[:61]], "PATH2_ASSET_SET_NOT_PINNED"),
-    (["bundle-load", PIN, SET.upper()], "PATH2_ASSET_SET_NOT_PINNED"),
-    (["bundle-load", "x" * 40, SET], "PATH2_REQUEST_NOT_PINNED"),
+    (["bundle-load", PIN, SET], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
+    (["bundle-load", SET, "extra"], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
+    (["bundle-load", "/opt/plasma/assets/staged/" + SET], "PATH2_ASSET_SET_NOT_PINNED"),
+    (["bundle-load", "../" + SET[:61]], "PATH2_ASSET_SET_NOT_PINNED"),
+    (["bundle-load", SET.upper()], "PATH2_ASSET_SET_NOT_PINNED"),
+    (["bundle-load", PIN], "PATH2_ASSET_SET_NOT_PINNED"),
+    (["download", "x" * 40], "PATH2_REQUEST_NOT_PINNED"),
     (["download", PIN, SET], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
     (["install", PIN], "PATH2_OPERATION_NOT_ALLOWLISTED"),
 ])
-def test_root_entry_bundle_load_accepts_only_pin_and_set_sha(argv, code):
+def test_root_entry_bundle_load_accepts_only_set_sha(argv, code):
     completed = subprocess.run(["bash", str(ENTRY), *argv], capture_output=True,
                                text=True, timeout=10, check=False)
     assert completed.returncode == 2
