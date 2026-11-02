@@ -80,6 +80,18 @@ def test_abi5_stlink_legacy_sampling_negative_control(tmp_path):
         + "                    if (bit_index + 9'd1 < phase_bits) begin",
         1,
     )
+    # Legacy RTL used the *live* SWDIO value for the third ACK bit and
+    # read parity because the clock-high sampling FF updates nonblocking
+    # on exactly the same FCLK edge as phase completion. Restore this too:
+    # reverting the sampling edge alone fabricates a different 000/BAD_ACK
+    # regression, not the observed 100/FAULT failure.
+    new_ack = "wire [2:0] complete_ack = ack_shift;"
+    old_ack = "wire [2:0] complete_ack = {swdio_in,ack_shift[1:0]};"
+    new_parity = "wire parity_read_mismatch = ((^read_q) != parity_sample_q);"
+    old_parity = "wire parity_read_mismatch = ((^read_q) != swdio_in);"
+    assert mutated.count(new_ack) == 1 and mutated.count(new_parity) == 1
+    mutated = mutated.replace(new_ack, old_ack, 1)
+    mutated = mutated.replace(new_parity, old_parity, 1)
     assert mutated != source
     fixture = tmp_path / "abi5-old-high-end-sampling.sv"
     fixture.write_text(mutated)
