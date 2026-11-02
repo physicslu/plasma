@@ -34,16 +34,17 @@ ELECTRICAL_DIR = Path("/root/plasma-swd-electrical")
 RECORD_TTL_S = 300
 SCHEMA = "plasma.swd.ps-admission.v1"
 ATTESTATION_SCHEMA = "plasma.swd.owner-electrical-attestation.v1"
-# The protected Root tree this record may be issued from (reviewed pin).
+# The protected Root tree this record may be issued from (reviewed pin
+# f56f85fd7224a56876e5a8f9dfe20035702734f1).
 PROTECTED_FILES = {
     ".plasma-path2-source-commit":
-        "a9026c4a700d5f1400c304f2f6a2aa2a18de73904a01efd62970f646bceacaa6",
+        "863628649dde755cc404bc63a3b399aedc729c6386cfa4d5523a91962762c072",
     "pl/hil/fpga_image_admission.py":
-        "1142e5ca4c1af6b4bf33c7b254e91d4e10a08dcee901aec853541fabcfa65de5",
+        "4a2122043dd20721677f15d9c45aeed32fad45740eb9a70c7954067864f06c57",
     "pl/hil/fpga_image_guard.py":
         "30ae8c132033aaa5e6ed1ada90999f005778da344e5616951bebf225ba56384f",
     "pl/hil/fpga_image_root.py":
-        "34940230762e294ca46509cc558c32feaa6b4e8cb2be2b8299c63fbb749639ab",
+        "a1a44fda133893fd0e5a27da408d2f169a284c9e1937b315f74733f4ab39c5a0",
     "software/python/plasma_interfaces/linux_mmio.py":
         "5ad52c31cdbbb93aacc02d9b0518a9b16e23f318f63590cdf9f98dbafc3e002a",
 }
