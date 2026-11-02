@@ -1,0 +1,9 @@
+{
+  "schema": "plasma.ppu.b3-install-policy.v1",
+  "mode": "development",
+  "install_only": true,
+  "actions": [
+    "install",
+    "verify"
+  ]
+}
