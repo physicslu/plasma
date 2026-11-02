@@ -2,7 +2,7 @@
 
 > **Start here:** [PPU deployment start page](../deployment/ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
 
-> **Status:** owner-approved 2026-10-29, including revised Gate 1 Path 1 for PS Runtime API/Coordinator correlation; Draft PR, **NOT deployed or merged**. No SWPC/Z2 operation or Linux permission change. Original baseline `main e338083564c30dc6bdc24009f7b62a3984fb7023` has been reconciled with merged #1208 at `main 1fb0c4b6c95e9da8f746fc3571a160b5a8bf6390`. The Host-only Master role contract is not a deployed Principal/Root authorization boundary.
+> **Status:** owner-approved 2026-10-29, including revised Gate 1 Path 1 for PS Runtime API/Coordinator correlation; merged in main (PR #1209), **NOT deployed**. No SWPC/Z2 operation or Linux permission change. Original baseline `main e338083564c30dc6bdc24009f7b62a3984fb7023` has been reconciled with merged #1208 at `main 1fb0c4b6c95e9da8f746fc3571a160b5a8bf6390`. The Host-only Master role contract is not a deployed Principal/Root authorization boundary.
 
 > **Current-state note (2026-11-02):** the canonical deployment format is now [Bundle v3](ppu-canonical-bundle-packages.md); references below to `plasma.ppu.package.v1` or Bundle v2 are historical. Two different `fpga-image` notions appear in this document: the **typed deployment-plan kind** of the earlier PS Runtime route, which the client and Bootstrap server reject (§ Host-only SWPC API transport continuation), and the **Bundle v3 Package kind**, which is admitted and staged as an inert asset but never loaded into PL by deployment.
 

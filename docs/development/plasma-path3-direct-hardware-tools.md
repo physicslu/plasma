@@ -1,6 +1,8 @@
 # PLASMA Path 3 — Codex 原生工具，適用所有設備
 
-**2026-10-27 Gate 1 / Source-only 架構與相依盤點。** 本次不操作 SWPC、LA2016、Z2、FPGA 或 DUT；沒有新實機資格。實際硬體工作必須明列在經 Owner Gate 1 核准的 Work Order，遵循真實 Linux DAC/ACL、原生 Driver 占用結果、其他硬體資源互斥、電氣與 Root 安全。修改在 Draft PR 未合併前不是已部署的 Runner 行為。
+> **Historical (2026-11-02):** superseded as the Path 3 governance source by [plasma-path3-codex.md](plasma-path3-codex.md); retained because that contract and tests still reference it. LA2016 rules here remain the detailed reference.
+
+**2026-10-27 Source-only 架構與相依盤點（PR #1181／#1192，已合併）。** 本次不操作 SWPC、LA2016、Z2、FPGA 或 DUT；沒有新實機資格。實際硬體工作必須明列在經 Owner Gate 1 核准的 Work Order，遵循真實 Linux DAC/ACL、原生 Driver 占用結果、其他硬體資源互斥、電氣與 Root 安全。修改在 Draft PR 未合併前不是已部署的 Runner 行為。
 
 ## 現行呼叫鏈
 

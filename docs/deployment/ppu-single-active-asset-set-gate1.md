@@ -2,11 +2,11 @@
 
 > **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
 
-**State:** Draft implementation, Host-only / CI evidence only.
+**State:** Host-only implementation merged in main (PR #1246) / CI evidence only.
 **Dependencies:** [PR #1245](https://github.com/physicslu/plasma/pull/1245)
 (Generic Bundle B3 Install/Verify), plus the owner-approved architectural
 decision in [PR #1244](https://github.com/physicslu/plasma/pull/1244).
-This P1 PR is stacked on #1245, **not** yet merged into main.
+This P1 work built on #1245; both are merged.
 
 ## One Asset Set identity
 

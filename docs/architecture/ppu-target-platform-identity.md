@@ -1,8 +1,8 @@
-# ADR — PPU Target Platform Identity (Gate 1 draft)
+# ADR — PPU Target Platform Identity (proposal)
 
 > **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
 
-Status: Proposed in PR #1225; not approved for production deployment.
+Status: Proposed (merged as a proposal in PR #1225); not approved for production deployment.
 
 ## Observed evidence
 
