@@ -58,6 +58,8 @@ Select the smallest capable Path. Choosing a Path never grants additional author
 
 **Replace-by-Default.** New versions replace old versions directly across API, Schema, Protocol, Package, FPGA IP, Driver and tools. Migrate dependents (implementation, callers, tests, docs, CI) in the same change. Do not keep Compatibility Layers or dual-track architectures merely for old tests. Exceptions require explicit owner approval.
 
+**Deployment transport precedence:** **Production Mode = existing Bootstrap HTTP API only** (no SSH deployment fallback). **Engineering Mode = try existing Bootstrap HTTP API first, then existing trusted SSH/SCP only when the exact API action is unavailable/unsupported, the failed transaction is known safe, and the approved scope allows it.** Record the specific HTTP failure even when SSH succeeds; never bypass admission or retry an ambiguous write. See [PPU deployment transport policy](docs/deployment/ppu-bootstrap-factory-and-hil.md#engineering-only-http-first-ssh-fallback-production-http-only).
+
 **Source priority:** executable code/config > `scripts/plasmactl` > package manifests > tests > current docs > historical discussion. Inspect actual implementation; never infer support from metadata or mocks.
 
 **Evidence:** Hosted CI / mocks never prove Z2, FPGA load, DUT, voltage or real IC programming. Record authentic PASS / FAIL / NOT_RUN. Keep Loaded after proven successful FPGA Download is the default; functional FAIL alone is not a Golden Restore trigger. Details live in the FPGA and Embedded contracts.
