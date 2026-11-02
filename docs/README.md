@@ -123,7 +123,7 @@
 
 ## Deployment
 
-- **Current** — [PPU Deployment — Start Here](deployment/ppu-deployment-start-here.md)：PPU 只有兩條部署路線——**A. 正式部署**（Console → Bootstrap `POST /v1/deployments`，單一 Coordinator；Factory Bootstrap 為前置步驟、`plasmactl z2-ps` 為內部執行器、Bundle v3 為內容格式）與 **B. 工程部署**（SWPC `ppu-deploy` over SSH，僅供開發）——以及部署順序。
+- **Current** — [PPU Deployment — Start Here](deployment/ppu-deployment-start-here.md)：PPU 只有兩條部署路線——**A. 正式部署**（Console → Bootstrap API（`/v1/uploads` 上傳 → `POST /v1/deployments`），單一 Coordinator；Factory Bootstrap 為前置步驟、`plasmactl z2-ps` 為內部執行器、Bundle v3 為內容格式）與 **B. 工程部署**（SWPC `ppu-deploy` over SSH，僅供開發）——以及部署順序。
 - **Current** · `Host-only` · `PR #1245` — [Generic Bundle v3 B3 — one inert Asset Set staging path](deployment/ppu-bundle-v3-generic-assets-gate1.md)
 - **Current** · `Host-only` · `PR #1246` — [Single Active Asset Set P1 — Console SHA reconciliation & guarded Host-only activation](deployment/ppu-single-active-asset-set-gate1.md)
 - **Current** · `Host-only` · `PR #1248/#1249` — [FPGA Asset Handoff P2 — exact Active Image/Profile selection, no hardware load](deployment/ppu-fpga-asset-handoff-gate1.md): removes Smoke-only device allowlist; a staged digest is **not** an Active Set or FPGA load.
