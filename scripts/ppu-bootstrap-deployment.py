@@ -407,7 +407,8 @@ class DeploymentCoordinator:
             "package_order_plan": resolution["package_order"],
             "package_stage_plan": resolution["stage"],
             "package_reuse_plan": resolution["reuse"],
-            "per_package_install_executed": True,
+            "per_package_install_executed": False,
+            "per_package_host_only_staging_verified": True,
             "real_device_install_qualified": False,
         }
         receipt["b4_activate"] = {
