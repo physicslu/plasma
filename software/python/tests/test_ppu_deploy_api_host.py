@@ -286,11 +286,21 @@ def _admitted_bundle_record(upload_id, tx, *, actions=None):
         "transaction_id": tx, "upload_id": upload_id, "state": "admitted",
         "result": {
             "result": "PASS", "stage": "package_admission_only",
-            "install_qualified": False,
+            "install_qualified": False, "source_authorized": True,
             "plan": {
                 "kind": "bundle", "bundle_schema": "plasma.ppu.bundle.v3",
                 "purpose": "programming", "archive_sha256": "a" * 64,
                 "files": [], "execution_permitted": False,
+                "authorization": {
+                    "status": "MASTER_APPROVED",
+                    "method": "root-provisioned-exact-bundle-sha256",
+                    "archive_sha256": "a" * 64,
+                    "publisher": "test-master",
+                    "master_generation": 1,
+                    "policy_sha256": "b" * 64,
+                    "expires_epoch_s": 4102444800,
+                    "allowed_kinds": ["fpga-image"],
+                },
                 "requested_actions": ["install", "verify"] if actions is None else actions,
                 "packages": [{
                     "id": "custom-swd", "kind": "fpga-image",
@@ -417,3 +427,21 @@ def test_console_untrusted_active_identity_denies_transfer(record, tmp_path):
     with pytest.raises(client.DeploymentOutcomeUnknown, match="ASSET_SET_STATUS_UNTRUSTED"):
         api.reconcile_bundle_assets(b"archive-bytes")
     assert [item[1] for item in fake.calls] == ["/v1/assets"]
+
+
+def test_console_refuses_b2_receipt_without_independent_master_approval(tmp_path):
+    api, fake = make(tmp_path)
+    uid, tx = "a" * 32, "e" * 32
+    fake.override["/v1/deployments"] = (
+        200, json.dumps({"ok": True, "deployment": {
+            **_admitted_bundle_record(uid, tx),
+            "result": {
+                **_admitted_bundle_record(uid, tx)["result"],
+                "source_authorized": False,
+            },
+        }}).encode(),
+    )
+    with pytest.raises(client.DeploymentOutcomeUnknown,
+                       match="API_ADMISSION_RECEIPT_UNKNOWN"):
+        api.submit(kind="bundle", upload_id=uid)
+    assert len(fake.calls) == 1
