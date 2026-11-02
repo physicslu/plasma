@@ -54,7 +54,7 @@ Do not commit hand-maintained `TEST_REPORT.md` files that contain a test count o
 
 ## Document lifecycle
 
-Every entry in [the documentation index](../README.md) is written as `- **Status** · `tag` — [link](path): summary`, and Status is exactly one of:
+Every entry in [the documentation index](../README.md) is written as ``- **Status** · `tag` — <link>: summary`` (zero or more tags), and Status is exactly one of:
 
 - **Current** — implemented behavior or a contract that must be followed now.
 - **Reference** — background, work records, verification boundaries or maintenance notes; never overrides a Current contract.
