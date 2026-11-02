@@ -1134,6 +1134,7 @@ def install_verified_bundle_v3(
                 raise Z2InstallerError("B3_PREVIOUS_INSTALL_SYMLINK_DENIED")
 
     expected_files = {entry.path: entry for entry in verified.files}
+    manifest_digest: str | None = None
     resolved_package_order = []
     packages_by_id = {item.id: item for item in verified.packages}
     visiting: set[str] = set()
@@ -1171,11 +1172,15 @@ def install_verified_bundle_v3(
     if target.exists():
         # An installed Asset Set may be pinned by future Jobs; never destroy
         # or rewrite it during a repeated B3 transaction.
-        required = set(expected_files) | {"b3-install.json"}
+        required = set(expected_files) | {"b3-install.json", "manifest.json"}
         observed = {str(item.relative_to(target)) for item in target.rglob("*")
                     if not item.is_dir()}
         if observed != required or previous.get("files_verified") != len(expected_files):
             raise Z2InstallerError("B3_EXISTING_ASSET_SET_UNTRUSTED")
+        if (not (target / "manifest.json").is_file()
+                or (target / "manifest.json").is_symlink()
+                or previous.get("manifest_sha256") != _sha256(target / "manifest.json")):
+            raise Z2InstallerError("B3_EXISTING_MANIFEST_MISMATCH")
         for name, item in expected_files.items():
             file = target / name
             if (file.is_symlink() or not file.is_file()
@@ -1190,6 +1195,17 @@ def install_verified_bundle_v3(
         with zipfile.ZipFile(archive) as source:
             if set(source.namelist()) != set(expected_files) | {"manifest.json"}:
                 raise Z2InstallerError("B3_ARCHIVE_MEMBER_SET_CHANGED")
+            # Retain the canonical validated manifest so future Active Set
+            # resolution can be based on the exact staged Package inventory.
+            manifest_data = source.read("manifest.json")
+            if not 0 < len(manifest_data) <= 64 * 1024:
+                raise Z2InstallerError("B3_MANIFEST_SIZE_INVALID")
+            manifest_digest = hashlib.sha256(manifest_data).hexdigest()
+            with (candidate / "manifest.json").open("xb") as descriptor:
+                descriptor.write(manifest_data)
+                descriptor.flush()
+                os.fsync(descriptor.fileno())
+            (candidate / "manifest.json").chmod(0o444)
             for item in file_order:
                 out = candidate / item.path
                 out.parent.mkdir(parents=True, exist_ok=True)
@@ -1221,6 +1237,7 @@ def install_verified_bundle_v3(
             "bundle_version": verified.version,
             "source_commit": verified.source_commit,
             "archive_sha256": verified.archive_sha256,
+            "manifest_sha256": manifest_digest,
             "package_order": resolved_package_order,
             "files_verified": len(expected_files),
             "runtime_activation_executed": False,
