@@ -17,6 +17,7 @@ Console / authenticated paired Controller (private commissioning lab)
   -> existing Z2 Installer Core, verified Bundle v3 ZIP only
   -> /opt/plasma/assets/staged/<archive_sha256>/
        b3-install.json
+       manifest.json
        payload/packages/<package-id>/...
 ```
 
@@ -30,7 +31,8 @@ in Git history. Tests may continue using a harmless Python Smoke fixture.
 Programming Profile, firmware, etc.). B3 does not execute files, load PL,
 change /opt/plasma/current, switch an Asset Set or operate DUT. B3 verifies
 the exact archive content against B1/B2 metadata and canonical v3
-Manifest/target/dependency contract. Every staged Set is stored under its
+Manifest/target/dependency contract. Every staged Set retains the verified canonical `manifest.json`,
+with its own SHA256 included in the B3 receipt. Every staged Set is stored under its
 complete archive SHA256, not its display name. Reuse of an existing digest
 requires re-verifying every installed file and the exact file set; it must not
 overwrite that path. This provides Staging only, **not** Active Set activation.
