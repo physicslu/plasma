@@ -26,6 +26,8 @@ class EdgeBench:
         self.target_bits = []
         self.rising_edges = 0
         self.transmitted_request = []
+        self.observe_legacy_contention = False
+        self.legacy_contention = None
 
     async def tick(self, count=1):
         d = self.d
@@ -47,8 +49,16 @@ class EdgeBench:
                     rx_idx = idx - 8
                     # Only the target-driven turnaround/ACK/read response is
                     # Hi-Z on the host side; subsequent IDLE is host-owned.
-                    if rx_idx < len(self.target_bits):
-                        assert int(d.swdio_oe.value) == 0, ("target OE contention", idx)
+                    if rx_idx < len(self.target_bits) and int(d.swdio_oe.value):
+                        if self.observe_legacy_contention:
+                            # Deliberate broken-RTL diagnostic ONLY. Record
+                            # simultaneous target + host ownership; release
+                            # the simulated target to avoid fabricating an
+                            # electrical resolution after a contention.
+                            self.legacy_contention = (idx, int(d.resp_ack.value))
+                            self.target_bits = []
+                        else:
+                            raise AssertionError(("target OE contention", idx))
                     d.swdio_in.value = (self.target_bits[rx_idx]
                                         if rx_idx < len(self.target_bits) else 1)
                 self.transfer_edges += 1
