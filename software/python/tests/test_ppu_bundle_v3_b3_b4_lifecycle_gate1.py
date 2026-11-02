@@ -39,9 +39,12 @@ def test_b3_b4_authorized_host_only_receipt(tmp_path):
     assert receipt["result"] == "PASS"
     assert receipt["host_only"] is True
     assert receipt["install_qualified"] is False
-    assert receipt["b3_install"]["status"] == "NOT_QUALIFIED"
+    assert receipt["b3_install"]["status"] == "HOST_ONLY_VERIFIED"
     assert len(receipt["b3_install"]["package_order_plan"]) == 6
-    assert receipt["b3_install"]["per_package_install_executed"] is False
+    assert receipt["b3_install"]["per_package_install_executed"] is True
+    assert receipt["b3_install"]["real_device_install_qualified"] is False
+    assert receipt["operation"] == "install_only"
+    assert receipt["active_pointer_unchanged"] is True
     assert receipt["b4_activate"]["status"] == "NOT_QUALIFIED"
     assert receipt["b4_activate"]["runtime_activation_executed"] is False
     assert not co.paths.product_root.exists()
