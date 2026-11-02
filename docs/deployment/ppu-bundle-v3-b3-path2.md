@@ -1,4 +1,11 @@
-# PLASMA Bundle v3 B3 Install-only — Development Mode / Path 2
+# HISTORICAL — PLASMA Bundle v3 B3 Smoke-only Path 2 (PR #1241)
+
+> **Archived evidence only. DO NOT run these historical commands on a current PPU.**
+> The Smoke-only Path 2 scripts and pinned factory policy have been retired
+> by [Generic Bundle v3 B3 Gate 1](ppu-bundle-v3-generic-assets-gate1.md).
+> These records explain PR #1241 physical evidence but are NOT current
+> product deployment instructions or a current claim of hardware readiness.
+
 
 **Gate 1 scope (PR #1241):** existing Bootstrap API, single Coordinator,
 single Lock and Journal, existing Z2 PS Installer Core. No B4, previous-version
