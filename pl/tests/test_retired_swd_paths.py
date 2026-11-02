@@ -88,6 +88,7 @@ RETIRED_F1B_RUNTIME = (
     "scripts/plasma_path2_build_qualification.py",
     "scripts/plasma_path2_held_provider.py",
     "scripts/plasma_path2_bin_provenance.py",
+    "scripts/plasma_fpga_build_diagnostics.py",
 )
 
 
