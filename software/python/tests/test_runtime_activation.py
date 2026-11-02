@@ -273,3 +273,45 @@ def test_asset_set_runtime_socket_rejects_busy_ppu_then_does_not_leak_lease(tmp_
             await control.close()
             await manager.shutdown()
     asyncio.run(scenario())
+
+
+def test_p1_coordinator_integrates_real_runtime_socket_with_atomic_asset_set(tmp_path: Path) -> None:
+    """Host-only end-to-end B3 staged Set -> real UDS lease -> Active identity."""
+    from .test_ppu_b3_z2_install_gate1 import (
+        b3_request, build_generic_assets, make_coordinator,
+    )
+
+    async def scenario() -> None:
+        archive, sha = build_generic_assets(tmp_path / "asset-archive")
+        coordinator = make_coordinator(tmp_path)
+        b3 = coordinator.execute_bundle_v3_install(b3_request(archive, sha))
+        assert b3["stage"] == "bundle_install_only"
+        assert not (coordinator.paths.product_root / "assets/active.json").exists()
+        manager = SiteManager(config(tmp_path / "runtime"))
+        await manager.start()
+        directory = tmp_path / "runtime-control"
+        directory.mkdir(mode=0o700)
+        socket_path = directory / "control.sock"
+        control = RuntimeControlServer(manager, socket_path)
+        await control.start()
+        helper = _asset_helper()
+        try:
+            def activate():
+                return coordinator.activate_staged_asset_set(
+                    sha, quiescence_lease=lambda: helper.held_runtime_asset_lease(socket_path),
+                )
+            receipt = await asyncio.wait_for(asyncio.to_thread(activate), timeout=10)
+            assert receipt["result"] == "PASS" and receipt["stage"] == "asset_set_active"
+            assert receipt["asset_set_sha256"] == sha
+            assert receipt["fpga"] == "NOT_RUN" and receipt["ready"] is False
+            verified = helper.read_active(coordinator.paths.product_root)
+            assert verified["state"] == "ACTIVE" and verified["asset_set_sha256"] == sha
+            for _ in range(100):
+                if not manager.runtime_quiesce_snapshot()["active"]:
+                    break
+                await asyncio.sleep(0.01)
+            assert manager.runtime_quiesce_snapshot()["active"] is False
+        finally:
+            await control.close()
+            await manager.shutdown()
+    asyncio.run(scenario())
