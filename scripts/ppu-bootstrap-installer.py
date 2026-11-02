@@ -27,7 +27,19 @@ REQUIRED_SCRIPTS = (
     "ppu-bootstrap-deployment.py",
     "ppu-bootstrap-kit.py",
     "ppu_unified_deployment.py",
+    "ppu_bundle_authority.py",
+    "ppu_fpga_qualification.py",
+    "ppu-fpga-image-contracts.json",
     "ppu_asset_set.py",
+)
+
+# B2 static FPGA qualification reuses the ONE protected Root Image Manifest
+# parser. It ships beside the Bootstrap as <install_root>/pl/hil; importing it
+# has no FPGA, firmware or hardware side effect.
+ROOT_PARSER_FILES = (
+    "fpga_image_root.py",
+    "fpga_image_guard.py",
+    "fpga_image_admission.py",
 )
 
 # Generic Bundle v3 B3 capability ships inside the SAME Bootstrap layer.
@@ -60,12 +72,42 @@ def _load_base(path: Path):
     return module
 
 
+def _root_parser_source(source_root: Path) -> Path:
+    """Factory bundle layout first (<scripts>/pl/hil), then a source checkout."""
+    for base in (source_root, source_root.parent):
+        folder = base / "pl" / "hil"
+        if all((folder / name).is_file() for name in ROOT_PARSER_FILES):
+            return folder
+    raise BootstrapInstallError("factory bundle is missing the Root FPGA Image Manifest parser")
+
+
+def _copy_root_parser(source_root: Path, install_root: Path) -> None:
+    source = _root_parser_source(source_root)
+    destination_root = install_root / "pl" / "hil"
+    for folder in (install_root / "pl", destination_root):
+        if folder.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap destination symlink denied")
+        folder.mkdir(exist_ok=True)
+        folder.chmod(0o755)
+    for name in ROOT_PARSER_FILES:
+        if (source / name).is_symlink() or source.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap source symlink denied")
+        destination = destination_root / name
+        temporary = destination.with_name(destination.name + ".new")
+        if destination.is_symlink() or temporary.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap destination symlink denied")
+        shutil.copyfile(source / name, temporary)
+        temporary.chmod(0o644)
+        os.replace(temporary, destination)
+
+
 def _copy_scripts(source_root: Path, install_root: Path) -> None:
     source_root = source_root.resolve()
     # Reject an incomplete bundle before touching a previously installed service.
     for name in REQUIRED_SCRIPTS:
         if not (source_root / name).is_file():
             raise BootstrapInstallError(f"factory bundle is missing required script: {name}")
+    _root_parser_source(source_root)
     install_root.mkdir(parents=True, exist_ok=True)
     install_root.chmod(0o755)
     # The generic policy grants install-only for previously admitted
@@ -97,8 +139,15 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
         if temporary.is_symlink():
             raise BootstrapInstallError("factory Bootstrap temp symlink denied")
         shutil.copyfile(source, temporary)
-        temporary.chmod(0o600 if name.endswith("-policy.json") else 0o755)
+        if name.endswith("-policy.json"):
+            mode = 0o600
+        elif name.endswith(".json"):
+            mode = 0o644  # trusted read-only contract data, not a secret
+        else:
+            mode = 0o755
+        temporary.chmod(mode)
         os.replace(temporary, destination)
+    _copy_root_parser(source_root, install_root)
 
 
 def install_bootstrap(

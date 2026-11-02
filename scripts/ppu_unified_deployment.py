@@ -376,9 +376,11 @@ def _bundle_package_file_allowed(
             return not member.executable and suffix.endswith((".h", ".hpp"))
         return False
     if kind == "fpga-image":
+        # Z2 Root Loader contract: FPGA Manager BIN + HWH + paired
+        # plasma.fpga.image.v1 Manifest. A Vivado .bit is not loadable here.
         return (
             suffix.startswith("fpga/") and not member.executable
-            and suffix.endswith((".bit", ".bin", ".hwh", ".json"))
+            and suffix.endswith((".bin", ".hwh", ".json"))
         )
     # Open-ended RESOURCE kinds: firmware images, IC profiles, calibration data,
     # catalog files, ML models, OpenOCD configs, etc. No execution entitlement.
@@ -531,9 +533,13 @@ def verify_host_only_bundle(
                         and not any(f.executable for f in package_files)):
                     raise UnifiedDeploymentError("BUNDLE_NATIVE_BINARY_MISSING")
                 if entry["kind"] == "fpga-image":
-                    image = [f for f in package_files if f.path.endswith((".bit", ".bin"))]
+                    # Structure only. Static FPGA qualification (Root Manifest
+                    # parser, SHA pairing, trusted Target/ABI contract) is a
+                    # separate B2 step in ppu_fpga_qualification.py.
+                    image = [f for f in package_files if f.path.endswith(".bin")]
                     handoff = [f for f in package_files if f.path.endswith(".hwh")]
-                    if len(image) != 1 or len(handoff) != 1:
+                    image_manifest = [f for f in package_files if f.path.endswith(".json")]
+                    if len(image) != 1 or len(handoff) != 1 or len(image_manifest) != 1:
                         raise UnifiedDeploymentError("BUNDLE_FPGA_PAIR_DENIED")
                 packages.append(VerifiedBundlePackage(
                     entry["id"], entry["kind"], entry["version"],

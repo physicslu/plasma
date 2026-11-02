@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from .ppu_bundle_authority_fixture import provision_fixture_grant
+
 ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -220,10 +222,14 @@ def test_factory_installed_service_can_admit_package_without_installing(tmp_path
     paths = installed_service.ServicePaths(
         state_root=state_root, product_root=tmp_path / "runtime-untouched",
         package_target_file=profile,
+        bundle_authority_policy=tmp_path / "private-master-policy.json",
         bootstrap_script=install_root / "ppu-bootstrap.py",
         kit_tool=install_root / "ppu-bootstrap-kit.py",
     )
     uid, digest = _factory_python_upload(installed_service, paths, tmp_path)
+    provision_fixture_grant(
+        paths, installed_service._upload_paths(paths, uid).committed.read_bytes()
+    )
     server = installed_service.BootstrapHTTPServer(
         ("127.0.0.1", 0), paths=paths, base_module=object(),
         deployment_runner=lambda *_: pytest.fail("runtime deployment must not execute"),

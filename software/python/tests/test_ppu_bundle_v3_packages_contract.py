@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 from .test_ppu_package_receive_admission_pr1 import loopback  # noqa: F401
 from .test_ppu_package_receive_admission_pr1 import client
+from .ppu_fpga_qualification_fixture import synthetic_image
 
 ROOT = Path(__file__).resolve().parents[3]
 SOURCE = "a" * 40
@@ -55,10 +56,8 @@ PARTS = [
     ("firmware", "firmware-asset", ["flash-profile"], {
         "data/firmware.hex": b":00000001FF\\n",
     }),
-    ("fpga-addon", "fpga-image", ["bridge"], {
-        "fpga/addon.bit": b"FPGA NOT LOADED",
-        "fpga/addon.hwh": b"HWH HOST ONLY",
-    }),
+    # Synthetic BIN/HWH/Manifest triple; not a Vivado build (see fixture).
+    ("fpga-addon", "fpga-image", ["bridge"], synthetic_image()[0]),
 ]
 
 
@@ -386,9 +385,20 @@ def test_v3_migrated_undeclared_zip_member_fail_closed(tmp_path):
         )
 
 
-def test_v3_migrated_fpga_handoff_required(tmp_path):
+def test_v3_vivado_bit_is_not_a_z2_loader_asset(tmp_path):
     parts = [("fpga-addon", "fpga-image", [], {"fpga/addon.bit": b"no hardware access"})]
     archive, digest = bundle_v3(tmp_path, parts=parts)
+    with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_PACKAGE_FILE_KIND_DENIED"):
+        contract.verify_host_only_artifact(
+            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+        )
+
+
+@pytest.mark.parametrize("missing", [".bin", ".hwh", ".json"])
+def test_v3_fpga_package_requires_bin_hwh_manifest_triple(tmp_path, missing):
+    from .ppu_fpga_qualification_fixture import synthetic_image
+    files = {k: v for k, v in synthetic_image()[0].items() if not k.endswith(missing)}
+    archive, digest = bundle_v3(tmp_path, parts=[("fpga-addon", "fpga-image", [], files)])
     with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_FPGA_PAIR_DENIED"):
         contract.verify_host_only_artifact(
             archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET

@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from .ppu_bundle_authority_fixture import provision_fixture_grant
+
 from .test_ppu_bundle_v3_packages_contract import (
     ROOT, SOURCE, TARGET, contract, engine, load,
 )
@@ -139,6 +141,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
         state_root=tmp_path / "state",
         package_target_file=tmp_path / "trusted-target.json",
         bundle_install_policy=tmp_path / "trusted-policy.json",
+        bundle_authority_policy=tmp_path / "private-master-grant.json",
     )
     paths.package_target_file.write_text(json.dumps(TARGET))
     paths.package_target_file.chmod(0o600)
@@ -173,6 +176,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
         sha256=hashlib.sha256(raw).hexdigest(),
     )
     bootstrap.commit_upload(paths, upload_id)
+    provision_fixture_grant(paths, raw)
     b2 = srv.start_deployment({"kind": "bundle", "upload_id": upload_id})
     assert b2["state"] == "admitted"
     assert b2["result"]["plan"]["bundle_schema"] == contract.BUNDLE_SCHEMA
@@ -189,6 +193,17 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
                               "install_only": True})
     paths.bundle_install_policy.write_text(json.dumps(source_policy))
+
+    # B3 must not trust a past B2 receipt after the independent Master
+    # authorization file was revoked, even if committed ZIP bytes match.
+    master_grants = json.loads(paths.bundle_authority_policy.read_text())
+    withdrawn = json.loads(json.dumps(master_grants))
+    withdrawn["authorizations"][0]["archive_sha256"] = "f" * 64
+    paths.bundle_authority_policy.write_text(json.dumps(withdrawn))
+    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MASTER_AUTHORITY_DENIED"):
+        srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
+                              "install_only": True})
+    paths.bundle_authority_policy.write_text(json.dumps(master_grants))
 
     srv.start_deployment({"kind": "bundle", "upload_id": upload_id, "install_only": True})
     assert srv.deployment_thread is not None

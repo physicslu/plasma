@@ -286,6 +286,9 @@ def _admitted_bundle_record(upload_id, tx, *, actions=None):
         "transaction_id": tx, "upload_id": upload_id, "state": "admitted",
         "result": {
             "result": "PASS", "stage": "package_admission_only",
+            "source_authorized": True,
+            "fpga_static_qualification": "STATIC_QUALIFIED",
+            "fpga_loaded": False, "identity_readback": "NOT_RUN",
             "install_qualified": False,
             "plan": {
                 "kind": "bundle", "bundle_schema": "plasma.ppu.bundle.v3",
