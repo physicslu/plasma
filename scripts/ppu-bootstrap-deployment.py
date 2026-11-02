@@ -28,7 +28,7 @@ from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
-SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "bundle_installed", "rolled_back", "verify_failed"}
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -80,6 +80,20 @@ class EngineeringDeploymentRequest:
     source_commit: str
     artifact_sha256: str
 
+
+@dataclass(frozen=True)
+class BundleV3InstallRequest:
+    """Device-local B3 install, admitted by the existing Bootstrap API only.
+
+    Source, archive digest and target are PINNED by device-local policy; HTTP
+    can only refer to an already committed/admitted upload_id.
+    """
+
+    archive: Path
+    source_commit: str
+    artifact_sha256: str
+    target_profile: Mapping[str, str]
+    api_transaction_id: str
 
 @dataclass(frozen=True)
 class HostOnlyPackageRequest:
@@ -348,6 +362,131 @@ class DeploymentCoordinator:
                     "production authorization",
                     "hardware programming",
                 ],
+            }
+
+
+    def execute_bundle_v3_install(
+        self, request: BundleV3InstallRequest,
+    ) -> Mapping[str, Any]:
+        """Single locked PS Installer B3; no activation, backup or B4.
+
+        This is NOT the Host-only simulator. A factory provisioned local policy
+        and a matching B2 admission receipt must be checked by Bootstrap before
+        invoking this path. The Installer independently verifies ZIP content.
+        """
+        if not isinstance(request, BundleV3InstallRequest):
+            raise DeploymentError("B3_INSTALL_REQUEST_INVALID")
+        if (not _HEX40.fullmatch(request.source_commit)
+                or not _HEX64.fullmatch(request.artifact_sha256)
+                or not _API_TRANSACTION_ID.fullmatch(request.api_transaction_id)
+                or not isinstance(request.archive, Path)
+                or request.archive.is_symlink()
+                or not request.archive.is_file()):
+            raise DeploymentError("B3_INSTALL_PROVENANCE_INVALID")
+        if (not isinstance(request.target_profile, Mapping)
+                or set(request.target_profile) != {"platform", "board", "fpga_part"}):
+            raise DeploymentError("B3_INSTALL_TARGET_INVALID")
+        verify_contract = Path(__file__).with_name("ppu_unified_deployment.py")
+        spec = importlib.util.spec_from_file_location("plasma_b3_device_contract", verify_contract)
+        if spec is None or spec.loader is None:
+            raise DeploymentError("B3_VERIFIER_UNAVAILABLE")
+        contract = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = contract
+        spec.loader.exec_module(contract)
+        # Explicitly reuse the sole deployment lock and journal. Do not add
+        # another lock, daemon, process supervisor or recovery mechanism.
+        with self._deployment_lock():
+            install = getattr(self.installer, "install_verified_bundle_v3", None)
+            if not callable(install):
+                raise DeploymentError("B3_DEVICE_INSTALLER_NOT_QUALIFIED")
+            now = self.clock()
+            record = DeploymentRecord(
+                schema_version=SCHEMA_VERSION,
+                transaction_id=self.transaction_id_factory(),
+                state="received",
+                sequence=0,
+                started_at_epoch_s=now,
+                updated_at_epoch_s=now,
+                release_artifact=str(request.archive),
+                source_commit=request.source_commit,
+                api_transaction_id=request.api_transaction_id,
+                artifact_sha256=request.artifact_sha256,
+                kind="bundle",
+                package_kind="bundle",
+            )
+            self.journal.write(record, "received")
+            try:
+                self.journal.write(record, "verifying")
+                bundle = contract.verify_host_only_artifact(
+                    request.archive, expected_sha256=request.artifact_sha256,
+                    source_commit=request.source_commit,
+                    target_profile=request.target_profile,
+                )
+                if (not isinstance(bundle, contract.VerifiedBundle)
+                        or bundle.schema != contract.BUNDLE_SCHEMA
+                        or bundle.kind != "bundle"
+                        or bundle.actions != ("install", "verify")
+                        or bundle.name != "ppu-b3-smoke"
+                        or {(p.id, p.kind) for p in bundle.packages} != {
+                            ("ic-catalog", "ic-catalog"),
+                            ("programming-profile", "programming-profile"),
+                            ("python-smoke", "python"),
+                        }):
+                    raise DeploymentError("B3_SMOKE_BUNDLE_SCOPE_DENIED")
+                # Enforce a closed, reviewed DAG instead of arbitrary package
+                # execution rights. A generic installer can be qualified later.
+                requires = {p.id: p.requires for p in bundle.packages}
+                if requires != {
+                    "ic-catalog": (),
+                    "programming-profile": ("ic-catalog",),
+                    "python-smoke": ("programming-profile",),
+                }:
+                    raise DeploymentError("B3_SMOKE_DEPENDENCY_SCOPE_DENIED")
+                record.module = bundle.name
+                record.release_id = (bundle.version + "-" +
+                                     bundle.archive_sha256[:16])
+                self.journal.write(record, "verified")
+            except Exception as exc:
+                self.journal.write(
+                    record, "verify_failed",
+                    error_code="b3_bundle_verification_failed",
+                    error_message=type(exc).__name__,
+                )
+                raise DeploymentError("B3_BUNDLE_VERIFICATION_DENIED") from exc
+            try:
+                self.journal.write(record, "staging")
+                evidence = install(
+                    bundle, archive=request.archive, paths=self._installer_paths(),
+                )
+                if (not isinstance(evidence, Mapping)
+                        or evidence.get("result") != "PASS"
+                        or evidence.get("archive_sha256") != request.artifact_sha256
+                        or evidence.get("source_commit") != request.source_commit
+                        or evidence.get("bundle_name") != bundle.name):
+                    raise DeploymentError("B3_DEVICE_INSTALL_RECEIPT_INVALID")
+            except Exception as exc:
+                self.journal.write(
+                    record, "recovery_required",
+                    error_code="b3_install_outcome_uncertain",
+                    error_message=type(exc).__name__,
+                )
+                raise DeploymentError("B3_INSTALL_REQUIRES_RECOVERY") from exc
+            self.journal.write(record, "bundle_installed")
+            return {
+                "result": "PASS",
+                "schema": "plasma.ppu.b3-deployment-receipt.v1",
+                "stage": "bundle_install_only",
+                "transaction": asdict(record),
+                "bundle_name": bundle.name,
+                "archive_sha256": request.artifact_sha256,
+                "source_commit": request.source_commit,
+                "package_order": evidence["package_order"],
+                "files_verified": evidence["files_verified"],
+                "install_path": evidence["path"],
+                "per_package_install_executed": True,
+                "runtime_activation_executed": False,
+                "fpga": "NOT_RUN",
+                "dut": "NOT_RUN",
             }
 
     def execute_authorized_bundle_host_only(
