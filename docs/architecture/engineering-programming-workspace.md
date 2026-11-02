@@ -158,26 +158,42 @@ MockInterface
 
 Therefore E/P/V/R, job state, progress, cancellation, Read output and per-Site independence exercise the normal Plasma software execution model. Passing this path does not prove Z2, FPGA I/O, socket, voltage, timing or real IC programming.
 
-## Controller-driven Job execution and Bundle resource usage
+## Single Active Asset Set and Controller-driven Programming Jobs
 
-**Agreed architectural direction (2026-11-02):** The upper-level Controller
-(SWPC) initiates the programming operation and any sequence of Erase / Program /
-Verify / Read Jobs. Installed **Bundle v3 Packages are Assets/resources**,
-not self-starting workflows. On receipt of a Controller-initiated Job, the PPU
-PS resolves the required available Package/Asset resources according to that
-Job's operation, exact ICPN, trusted Programming Profile and backend
-qualification. It must not execute an unrelated Package or invent additional
-operations.
+**Accepted architecture direction (2026-11-02):** Each PPU exposes exactly
+**one Active Asset Set** at a time, containing its selected Firmware, Parser,
+Programming Profile, FPGA Image and other shared resources. A Bundle v3
+delivers Assets/Packages; it is never a command to execute those resources.
+Console chooses the **exact whole Asset Set** (binding exact FPGA Image and
+Programming Profile), compares its SHA256 with the PPU-reported current
+Active Set, and transfers the **whole selected Set** when the identities
+do not match. A matching digest does not prove FPGA Loaded/READY.
 
-This defines responsibility, not a new REST contract or a claim that the
-non-Mock RealPPUProvider, arbitrary Parser invocation or real-IC programming
-are already implemented. Firmware/Parser distribution, capability resolution,
-execution model and activation remain to be discussed.
+Controller still owns *when and in which sequence* E/P/V/R Jobs are
+submitted. The PPU PS admits each Job, verifies the selected Set, exact
+ICPN, Hardware ABI and operational qualification, then selects only the
+needed resources **within that Active Set**. It must not silently choose
+a different Image/Profile or combine resources from unrelated installed
+Bundles. Reconfiguration of the PL is a **separate, explicit Controller
+action**, coordinated by the single PPU Hardware Manager after all Sites
+and hardware consumers are quiesced. B3 Install/Verify does not
+automatically activate an Asset Set, load FPGA or execute Jobs.
 
-See [PPU Job-Driven Package Resolution](ppu-job-driven-package-resolution.md)
-and [Canonical Bundle v3](ppu-canonical-bundle-packages.md). The term
-"Bundle as Assets" does not redefine a Bundle as one `Programming Asset`:
-the latter is an individual input in the existing REST/domain model.
+**No Active Set replacement while Jobs are executing or cancelling**:
+Console updates may use an isolated Staging Set and an atomic Active
+Set transition at a safe point. The exact `Asset Set SHA256`
+canonicalization, state API, activation procedure, rollback/recovery and
+authoritative FPGA configuration proof are still **not implemented**.
+This is not a claim that `RealPPUProvider`, arbitrary Parsers or
+hardware programming are operational.
+
+Asset Set is **PPU-wide**; independent per-Site Serial Number,
+MAC, Calibration and related per-DUT data do not require eight different
+Sets. The existing `Programming Asset` type still means individual
+input data, and must not be confused with the whole Bundle/Asset Set.
+
+See [PPU Single Active Asset Set — Controller-Driven Architecture](ppu-job-driven-package-resolution.md)
+and [Canonical Bundle v3](ppu-canonical-bundle-packages.md).
 
 ## Programming data model
 
