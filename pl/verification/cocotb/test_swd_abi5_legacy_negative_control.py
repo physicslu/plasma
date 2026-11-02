@@ -1,0 +1,37 @@
+"""Negative control against the *real* archived ST-LINK ACK waveform.
+
+This test is ONLY run on an intentionally mutated copy of the ABI-v5 RTL,
+restoring the old SWCLK-HIGH-end sample point. It must produce the observed
+ACK=0b100/FAULT from a known-good 0b001/OK physical response. The normal
+(unmutated) ABI-v5 test independently requires ACK OK and the exact DPIDR.
+"""
+import cocotb
+
+from stlink_golden_trace import extract_reference
+from test_swd_abi5_edge_phase import EdgeBench
+
+
+@cocotb.test()
+async def old_high_end_sampling_reproduces_spurious_fault(dut):
+    golden = extract_reference()
+    frame = golden["dpidr"][0]
+    assert frame["data"] == 0x1BA01477
+
+    bench = EdgeBench(dut)
+    await bench.setup()
+    reset = await bench.command(sequence=True)
+    assert reset["status"] == 0 and reset["link"] == 1
+
+    bench.begin_target(ack=1)
+    bench.target_bits = list(frame["response_bits"])
+    # Only the deliberately broken legacy RTL uses this diagnostic. The
+    # production RTL test retains its strict zero-contention assertion.
+    bench.observe_legacy_contention = True
+    observed = await bench.command()
+    # The old RTL consumed ACK[0] during turnaround and sampled ACK[1],
+    # ACK[2] and DPIDR bit0, thereby returning FAULT=0b100.
+    assert bench.legacy_contention is not None, "broken edge must expose SWDIO OE overlap"
+    assert bench.legacy_contention[1] == 0b100, bench.legacy_contention
+    assert observed["ack"] == 0b100, observed
+    assert observed["status"] == 4, observed
+    assert not observed["valid"], observed

@@ -24,6 +24,9 @@ FIRMWARE = Path("/lib/firmware")
 # executor cannot both own/configure the same FPGA at once.
 OWNER_DIR = Path("/run/plasma-z2-swd05")
 GLOBAL_LOCK = OWNER_DIR / "supervisor.lock"
+# Additional additive fence: each SWD Site holds LOCK_SH, Root reload LOCK_EX.
+# Root Guard source-pin, provenance and supervisor.lock remain authoritative.
+PPU_RELOAD_FENCE = Path("/run/lock/plasma-mmio.lock")
 MANAGER = SYS / "class/fpga_manager/fpga0"
 
 
@@ -82,12 +85,21 @@ def record_json(path: Path, data: dict) -> None:
         os.close(directory)
 
 
-def run_child(args: list[str]) -> None:
+def run_child(args: list[str], *, reload_fence_fd: int | None = None) -> None:
     """Bound the MMIO subprocess and do not reload PL with an unreaped child."""
+    child_env = os.environ.copy()
+    child_env.pop("PLASMA_ROOT_RELOAD_FENCE_FD", None)
+    passed_fds: tuple[int, ...] = ()
+    if reload_fence_fd is not None:
+        need(type(reload_fence_fd) is int and reload_fence_fd >= 3,
+             "INVALID_ROOT_RELOAD_FENCE_FD")
+        child_env["PLASMA_ROOT_RELOAD_FENCE_FD"] = str(reload_fence_fd)
+        passed_fds = (reload_fence_fd,)
     proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL,
-                            start_new_session=True)
+                            start_new_session=True, env=child_env,
+                            pass_fds=passed_fds)
     try:
         status = proc.wait(timeout=35)
     except subprocess.TimeoutExpired as exc:
@@ -306,6 +318,7 @@ class RootZ2TargetPort:
         self._locked = False
         self._lock_owner_pid = None
         self._lock_owner_thread = None
+        self._reload_fence_fd: int | None = None
 
     def _require_locked(self) -> None:
         need(self._locked and self._lock_owner_pid == os.getpid() and
@@ -319,21 +332,44 @@ class RootZ2TargetPort:
         OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
         protected(GLOBAL_LOCK.parent, file=False)
         fd = os.open(GLOBAL_LOCK, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        fence_fd = None
         try:
             st = os.fstat(fd)
             need(stat.S_ISREG(st.st_mode) and st.st_uid == 0 and
                  st.st_nlink == 1 and st.st_mode & 0o077 == 0,
                  "GLOBAL_FPGA_LOCK_UNTRUSTED")
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # Existing exclusive Root Guard is held FIRST. The same PPU
+            # lock is held SH by all new per-Site SWD processes; reload
+            # cannot run until every cooperating Site releases. This is
+            # additive, not a substitute for provenance/Root checks.
+            fence_fd = os.open(PPU_RELOAD_FENCE,
+                               os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            st = os.fstat(fence_fd)
+            need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
+                 st.st_mode & 0o002 == 0,
+                 "PPU_RELOAD_FENCE_UNTRUSTED")
+            fcntl.flock(fence_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self._locked = True
             self._lock_owner_pid = os.getpid()
             self._lock_owner_thread = threading.get_ident()
+            self._reload_fence_fd = fence_fd
             yield self
         finally:
             self._locked = False
             self._lock_owner_pid = None
             self._lock_owner_thread = None
+            self._reload_fence_fd = None
+            if fence_fd is not None:
+                os.close(fence_fd)
             os.close(fd)
+
+    def inherited_reload_fence(self) -> int:
+        """Return the held Root flock FD only to a bounded identity child."""
+        self._require_locked()
+        need(self._reload_fence_fd is not None,
+             "ROOT_RELOAD_FENCE_NOT_HELD")
+        return self._reload_fence_fd
 
     def current_facts(self) -> dict:
         self._require_locked()

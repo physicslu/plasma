@@ -18,6 +18,12 @@
 | [ADR-0003](0003-runtime-fpga-driver-reconfiguration-boundary.md) | Superseded | Runtime FPGA Driver／UIO 選型候選與固定 Image 方向；Image 生命週期與 reload 立場已由 ADR-0004 取代，UIO／Driver 分析僅供參考。 |
 | [ADR-0004](0004-fpga-image-lifecycle-and-job-driven-loading.md) | Accepted | FPGA Image＋Manifest 配對、Keep Loaded、Golden 僅於明確選擇或故障時還原；Console 決定 FPGA Package 傳送，進入燒錄流程時由 PS FPGA Hardware Manager 在 PPU 層級比對並載入所需 bitstream（尚未實作）。 |
 
+| [ADR-0004](0004-project-isolated-fpga-build-path2-operator-cli.md) | **Accepted (Owner decision; PR #1189 pending merge)** | 新 FPGA Image／Board 對應獨立可重現 Vivado Project，正式 SWPC Build 採 Path 2 `operator-cli`；F1-B 專屬 Build Engine 進入分階段退役，尚未關閉。 |
+
+| [ADR-0005](0005-independent-swd-ip-guarded-bitbang.md) | **Superseded by ADR-0006** | 歷史 SWD Debug Bitbang 候選架構；非目前實作方向。 |
+| [ADR-0007](0007-ppu-reload-fence-per-site-locking.md) | **Accepted (Owner decision; PR #1189 Draft)** | PPU Image/Reload 共享／獨占 Fence 與 per-Site 獨占鎖；保留 protected Root supervisor.lock，Host-only 驗證並行與 Reload 拒絕，不宣稱實機驗證。 |
+| [ADR-0006](0006-independent-swd-engine-and-future-gpio-bus.md) | **Accepted (Owner decision; PR #1189 Draft)** | 雙獨立 SWD NORMAL Engine，移除 SWD Debug Bitbang／0x3C／0x40；只保留 OFF/NORMAL，未來 GPIO Bus 與 JTAG/SPI/UART/I²C 為獨立周邊，尚未實作。 |
+
 ## Maintenance rule
 
 新增或取代架構決策時：

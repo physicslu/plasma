@@ -35,6 +35,11 @@
 - **Historical** · `superseded by ADR-0004` — [ADR-0003: Runtime FPGA Driver 與固定映像候選責任邊界](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)：UIO-first Driver 選型候選、單一 PPU FPGA Configuration Owner、Linux 無須 Reboot 的 Bitstream 切換；尚待 Z2 Kernel／UIO／Bridge 證據，不是 Accepted Contract。
 - **Current** — [ADR-0004: FPGA Image lifecycle and programming-flow loading](adr/0004-fpga-image-lifecycle-and-job-driven-loading.md)：Image＋Manifest 配對、Keep Loaded、Golden 僅於明確選擇或故障時還原；Console 決定 FPGA Package 傳送，進入燒錄流程時由 PS FPGA Hardware Manager 載入所需 bitstream（尚未實作）。
 
+- **Plan** · `PR #1189 pending` — [ADR-0004: 新 FPGA Project 與 Path 2 operator-cli 標準](adr/0004-project-isolated-fpga-build-path2-operator-cli.md)：新 FPGA Image 與 Board target 各自擁有獨立、可重現的 Vivado Project；SWPC 正式 Host Build 透過 SHA-pinned Path 2 `operator-cli`；Build 不是部署。
+- **Historical** · `superseded by ADR-0006` — [ADR-0005: 獨立 SWD IP 與原 SWD Debug Bitbang 提案](adr/0005-independent-swd-ip-guarded-bitbang.md)：僅供歷史決策追溯。
+- **Plan** · `PR #1189 Draft` — [ADR-0006: 專用 SWD Engine 與未來通用 GPIO Bus](adr/0006-independent-swd-engine-and-future-gpio-bus.md)：SWD 只保留 OFF/NORMAL，未來 GPIO Bus、JTAG、SPI、UART、I²C 分別規劃，未宣稱實作或實機驗收。
+- **Plan** · `Host-only` — [ADR-0007: PPU Image/Reload 與每 Site 並行所有權](adr/0007-ppu-reload-fence-per-site-locking.md)：保留 Root Guard，PPU Fence 共享／獨占及每 Site 獨占鎖；不宣稱 Z2 或 8-Site HIL。
+
 ## PPU architecture and runtime
 
 - **Current** · `Bundle v3` · `PR #1225` — [Canonical Bundle v3: Bundle → Packages → Files](architecture/ppu-canonical-bundle-packages.md)：`packages[]`、Package DAG、SHA256 Admission；v1/v2 舊格式不作為 v3 相容介面。尚未完成 Z2 B2 驗收。
@@ -120,6 +125,11 @@
 - **Reference** · `Host-only model` · `M1 NO-GO` — [PPU Configuration Safety Contract Phase 2A.2](architecture/ppu-phase2a2-configuration-safety-contract.md)：驗證合成 Ownership／AXI Isolation／Mapping Retirement／Verification 證據之精確 Pin 與 fail-closed 條件；通過不授予 FPGA 載入或實體操作權限。
 - **Reference** · `internal loopback only` · `NO Z2 HIL` — [LT02 PS–PL MMIO Loopback ABI](development/mmio-lt02-ps-pl-loopback.md)：新增 FPGA AXI4-Lite Scratchpad／LinuxMMIO 分塊資料比對契約；五 Aperture Build 已由 SWPC 回報 PASS，LT02-05 Z2 HIL 尚未執行，PL UI Endpoint 仍停用。
 - **Reference** · `Host-only differential` — [SWD-06 RTL ↔ Python Differential Verification](development/swd06-rtl-python-differential.md)：由 SWD-05 Python Driver 操作 SWD-03 真實 RTL 的 Cocotb AXI4-Lite Bus，僅驗證模擬硬體，Z2 實機尚未執行。
+
+- **Plan** · `Host-only` · `NOT_DEPLOYED` — [SWD NORMAL OpenOCD/ARMv7 Boundary](architecture/swd-normal-openocd-armv7-gate1.md)：獨立 Site NORMAL 交易轉接契約與注入式 32-bit MMIO Window；OpenOCD `plasma_swd` Adapter 的 PS-local 綁定尚未實作（fail-closed），無 DUT 驗收。
+- **Plan** · `RTL simulation only` — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA、Site 2 = PMODB，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO 的新 ABI 候選。
+- **Reference** · `Host-only` · `ab79b04e` — [Independent SWD v5 Image Hardware Contract Audit](development/swd-independent-image-hardware-contract.md)：以 ab79b04e HWH 驗證雙 Site Identity 位址（`0x43C01000`／`0x43C02000`）與 GP0 連線，及 devmem Owner Admission 契約。
+- **Current** · `Engineering` · `Route B` — [ABI-v5 OpenOCD plasma_swd → Blue Pill DPIDR HIL Runbook](development/swd-abi5-openocd-dpidr-hil-runbook.md)：Build／部署／Root Admission／DPIDR 流程、失敗判讀、2026-11-02 取樣相位阻擋，以及修正後 FPGA 經 HTTP API 交付與載入的界線。
 
 ## Deployment
 
