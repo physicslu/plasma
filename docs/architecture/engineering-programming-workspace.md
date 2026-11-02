@@ -158,6 +158,27 @@ MockInterface
 
 Therefore E/P/V/R, job state, progress, cancellation, Read output and per-Site independence exercise the normal Plasma software execution model. Passing this path does not prove Z2, FPGA I/O, socket, voltage, timing or real IC programming.
 
+## Controller-driven Job execution and Bundle resource usage
+
+**Agreed architectural direction (2026-11-02):** The upper-level Controller
+(SWPC) initiates the programming operation and any sequence of Erase / Program /
+Verify / Read Jobs. Installed **Bundle v3 Packages are Assets/resources**,
+not self-starting workflows. On receipt of a Controller-initiated Job, the PPU
+PS resolves the required available Package/Asset resources according to that
+Job's operation, exact ICPN, trusted Programming Profile and backend
+qualification. It must not execute an unrelated Package or invent additional
+operations.
+
+This defines responsibility, not a new REST contract or a claim that the
+non-Mock RealPPUProvider, arbitrary Parser invocation or real-IC programming
+are already implemented. Firmware/Parser distribution, capability resolution,
+execution model and activation remain to be discussed.
+
+See [PPU Job-Driven Package Resolution](ppu-job-driven-package-resolution.md)
+and [Canonical Bundle v3](ppu-canonical-bundle-packages.md). The term
+"Bundle as Assets" does not redefine a Bundle as one `Programming Asset`:
+the latter is an individual input in the existing REST/domain model.
+
 ## Programming data model
 
 Plasma deliberately separates source inputs from execution instructions and target-memory data.
