@@ -349,7 +349,7 @@ def stage_bundle_fpga_files_only(
                 need(target.is_file() and target.stat().st_size == len(raw),
                      "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
                 with target.open("rb") as source:
-                    observed_sha = hashlib.file_digest(source, "sha256").hexdigest()
+                    observed_sha = hashlib.sha256(source.read()).hexdigest()
                 need(observed_sha == expected_sha,
                      "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
                 continue
@@ -387,7 +387,7 @@ def stage_bundle_fpga_files_only(
             target = guard.FIRMWARE / name
             guard.protected(target)
             with target.open("rb") as source:
-                digest = hashlib.file_digest(source, "sha256").hexdigest()
+                digest = hashlib.sha256(source.read()).hexdigest()
             need(digest == hashlib.sha256(data).hexdigest(),
                  "ROOT_HANDOFF_STAGED_FILE_CHANGED")
     return {
