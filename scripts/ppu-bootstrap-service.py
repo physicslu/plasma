@@ -71,6 +71,9 @@ class ServicePaths:
     # Independently root-provisioned exact Bundle grants. The HTTP/Bearer
     # pairing is NOT itself Publisher/Master source authority.
     bundle_authority_policy: Path = Path("/etc/plasma/ppu-bundle-authority.json")
+    # Factory-Bootstrap-shipped trusted FPGA Image Target/ABI contracts used by
+    # B2 static FPGA qualification. Never supplied by a Bundle or HTTP.
+    fpga_image_contracts: Path = Path("/opt/plasma/bootstrap/ppu-fpga-image-contracts.json")
 
     # Root-provisioned lab installation capability, independent of any
     # Bundle name, file SHA or test fixture; NEVER writable via HTTP.
@@ -708,6 +711,22 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     )
                 except authority.BundleAuthorityDenied as exc:
                     raise BootstrapServiceError(str(exc)) from exc
+            # FPGA Image is an ordinary Asset of the same Bundle; B2 PASS also
+            # requires its static qualification. No FPGA load, no readback.
+            fpga_qualification = None
+            if verified.kind == "bundle":
+                fpga = _load_script(
+                    Path(__file__).with_name("ppu_fpga_qualification.py"),
+                    "plasma_ppu_b2_fpga_static_qualification",
+                )
+                try:
+                    fpga_qualification = fpga.qualify_bundle_fpga(
+                        upload.committed, verified,
+                        contracts_path=self.bootstrap_paths.fpga_image_contracts,
+                        trusted_target=target,
+                    )
+                except fpga.FpgaQualificationDenied as exc:
+                    raise BootstrapServiceError(str(exc)) from exc
             transaction_id = uuid.uuid4().hex
             now = time.time()
             plan = {
@@ -724,6 +743,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             }
             if verified.kind == "bundle":
                 plan["authorization"] = authorization
+                plan["fpga_qualification"] = fpga_qualification
                 plan["purpose"] = verified.purpose
                 # Canonical Bundle v3 is the only active admission contract.
                 plan["packages"] = [
@@ -746,6 +766,12 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     "result": "PASS",
                     "stage": "package_admission_only",
                     "source_authorized": authorization is not None,
+                    "fpga_static_qualification": (
+                        "NOT_APPLICABLE" if fpga_qualification is None
+                        else fpga_qualification["result"]),
+                    # B2 PASS is NOT execution, FPGA load or Identity readback.
+                    "fpga_loaded": False,
+                    "identity_readback": "NOT_RUN",
                     "install_qualified": False,
                     "plan": plan,
                 },
@@ -817,6 +843,23 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             if (result.get("source_authorized") is not True
                     or plan.get("authorization") != trusted):
                 raise BootstrapServiceError("B3_ADMISSION_AUTHORITY_CHANGED")
+            # Re-qualify FPGA statically from the same bytes and CURRENT trusted
+            # contract; any drift since B2 fails closed.
+            fpga = _load_script(
+                Path(__file__).with_name("ppu_fpga_qualification.py"),
+                "plasma_ppu_b3_fpga_static_qualification",
+            )
+            try:
+                requalified = fpga.qualify_bundle_fpga(
+                    upload.committed, verified,
+                    contracts_path=self.bootstrap_paths.fpga_image_contracts,
+                    trusted_target=trusted_target,
+                )
+            except fpga.FpgaQualificationDenied as exc:
+                raise BootstrapServiceError("B3_FPGA_QUALIFICATION_DENIED") from exc
+            if ("fpga_qualification" not in plan
+                    or plan["fpga_qualification"] != requalified):
+                raise BootstrapServiceError("B3_FPGA_QUALIFICATION_CHANGED")
             previous_coordinator = _admit_coordinator_journal(self.bootstrap_paths)
             transaction_id = uuid.uuid4().hex
             record = {

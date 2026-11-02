@@ -107,7 +107,7 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
     if plan.get("bundle_schema") != "plasma.ppu.bundle.v3" or "components" in plan:
         return False
     packages = plan.get("packages")
-    return (
+    valid = (
         type(plan.get("purpose")) is str and bool(plan["purpose"])
         and type(packages) is list and 1 <= len(packages) <= 32
         and all(isinstance(package, dict)
@@ -118,6 +118,18 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
                 and type(package.get("files")) is list
                 for package in packages)
         and len({package["id"] for package in packages}) == len(packages)
+    )
+    if not valid:
+        return False
+    # B2 PASS = Master-authorized source + static Asset qualification only.
+    # It is never an FPGA load, Identity readback or execution grant.
+    has_fpga = any(package["kind"] == "fpga-image" for package in packages)
+    return (
+        result.get("source_authorized") is True
+        and result.get("fpga_loaded") is False
+        and result.get("identity_readback") == "NOT_RUN"
+        and result.get("fpga_static_qualification")
+        == ("STATIC_QUALIFIED" if has_fpga else "NOT_APPLICABLE")
     )
 
 
