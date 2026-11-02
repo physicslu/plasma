@@ -9,6 +9,8 @@ Read these documents before changing FPGA/PL behavior:
 - `docs/development/fpga-development-guide.md`
 - `docs/development/fpga-verification-guide.md`
 - `docs/development/fpga-systemverilog-style.md` (new RTL and substantive RTL changes)
+- `docs/development/plasma-fpga.md` (FPGA domain contract: Image + Manifest pairing, Keep Loaded) and `docs/development/plasma-embedded.md` when PS-facing ABI/MMIO changes
+- `docs/adr/0004-fpga-image-lifecycle-and-job-driven-loading.md` (FPGA image lifecycle decision)
 
 ## Physical SWD path selection
 

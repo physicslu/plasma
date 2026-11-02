@@ -302,7 +302,7 @@ sudo bash scripts/plasmactl install z2-ps \
   --python-sidecar artifacts/plasma-python-3.12.13-linux-armv7l.tar.gz.sha256 \
   --release-artifact artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz \
   --release-sidecar artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256 \
-  --gateway-host 192.168.2.99 \
+  --gateway-host <Z2_HOST> \
   --ppu-id z2-dev-01 \
   --facility-id lab
 ```
@@ -328,7 +328,7 @@ The profile never replaces `/usr/bin/python3` or the PYNQ Python environment.
 sudo bash scripts/plasmactl deploy z2-ps \
   --release-artifact artifacts/plasma-ppu-<new-release-id>-linux-armv7l.tar.gz \
   --release-sidecar artifacts/plasma-ppu-<new-release-id>-linux-armv7l.tar.gz.sha256 \
-  --gateway-host 192.168.2.99 \
+  --gateway-host <Z2_HOST> \
   --ppu-id z2-dev-01 \
   --facility-id lab
 ```

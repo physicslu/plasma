@@ -116,8 +116,8 @@ Use the existing owner Issue #981 Work Order, `execution_path=path2-cli`,
 `scripts/ppu_path2_bundle_v3_b3_acceptance.py`. Example source-bound arguments:
 
 ```text
---host 192.168.2.99
---device-id ppu-device-7ed4b30913a9bf6101da5a7a
+--host <Z2_HOST>
+--device-id <PPU_DEVICE_ID>
 --source-sha <exact current PR #1241 HEAD>
 ```
 

@@ -1,5 +1,7 @@
 # PYNQ-Z2 Fixed ABI Site1 PS7 integration
 
+> **RETIRED (owner decision 2026-11-02): F1-B is retired.** This project is not a current or candidate PL image route. The build records below are historical only.
+
 ## Latest F1-B Gate 1 Host-only qualification — 2026-10-20
 
 **PASS:** [new clean-build Run 39344221935](https://github.com/physicslu/plasma/actions/runs/39344221935) built exact source HEAD `00336106ad89eaa9fa0603dbe9e65024a27a6fe6` with Vivado 2026.1 from scratch. Synthesis, implementation, routing, bitstream generation, final DRC and methodology all PASS. WNS +1.829 ns, WHS +0.018 ns; TNS/THS zero, all twelve `check_timing` checks zero. HWH verifier passed on both original and delivered copies.
