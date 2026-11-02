@@ -13,7 +13,8 @@
 
 ## PPU deployment / physical admission evidence
 
-- [Generic Bundle v3 B3 — one inert Asset Set staging path (Gate 1 Draft)](deployment/ppu-bundle-v3-generic-assets-gate1.md): removes Smoke-only device allowlist; a staged digest is **not** an Active Set or FPGA load.
+- [Generic Bundle v3 B3 — one inert Asset Set staging path (Gate 1 Draft)](deployment/ppu-bundle-v3-generic-assets-gate1.md)
+- [Single Active Asset Set P1 — Console SHA reconciliation & guarded Host-only activation (Draft)](deployment/ppu-single-active-asset-set-gate1.md): removes Smoke-only device allowlist; a staged digest is **not** an Active Set or FPGA load.
 
 - **Gate 1 / PR #1241 / Path 2 B3 candidate** — [Bundle v3 B3 Install-only 與受控實機 Smoke](deployment/ppu-bundle-v3-b3-path2.md)：既有 Bootstrap、Coordinator、Installer 接線與 Exact SHA 的 Factory Policy；Host-only PASS 不等於 Z2 實機 PASS，實機 B1/B2/B3 均須獨立證據，無 B4／FPGA／DUT。
 - **Gate 1 Draft / PR #1225 / Host-only** — [Canonical Bundle v3: Bundle → Packages → Files](architecture/ppu-canonical-bundle-packages.md)：`packages[]`、Package DAG、SHA256 Admission；v1/v2 舊格式不作為 v3 相容介面。尚未完成 Z2 B2 驗收。
