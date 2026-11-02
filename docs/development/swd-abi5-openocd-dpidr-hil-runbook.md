@@ -133,3 +133,14 @@ B3 `fpga_load=true` over HTTP. The DPIDR procedure in §3 then runs with
 
 OpenOCD itself remains an engineering module. Packaging it into the Route A
 Runtime kit replaces the whole Runtime and is a separate decision.
+
+## 7. 2026-11-03 result: DPIDR PASS on Site 2
+
+Image `z2-independent-swd-v5-bd976140` was loaded through HTTP B1 → B2 → B3
+`fpga_load=true` (Identity PASS, Root pin `f56f85fd7`). The first OpenOCD run
+(binary `fa1dcb7a…`) read `SWD DPIDR 0x1ba01477` and then failed in `dap init`:
+OpenOCD `dap_dp_init()` queues a DP CTRL/STAT read with a NULL destination,
+which the FIFO core rejected at queue time (no wire transfer, so no `run rc=`
+line). After the fix (binary `800213ae…`, CI run 41484966257), Site 2 returned
+`SWD DPIDR 0x1ba01477` and `dpreg 0 = 0x1ba01477`, with
+`SAFE_OFF_MODE_OFF_VERIFIED`, the Journal unchanged and the record revoked.
