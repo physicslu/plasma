@@ -83,7 +83,7 @@ class RetiredRootRouteTests(unittest.TestCase):
         # fixed Dispatcher command list; image restoration remains independent.
         source = (ROOT / "scripts/z2/plasma-path2-root-entry").read_text()
         self.assertIn("pl.hil.fpga_image_root", source)
-        self.assertIn("PATH2_ROOT_REQUIRED", source)
+        self.assertIn("PPU_FPGA_ROOT_REQUIRED", source)
         self.assertNotIn("scripts/plasma_development_dispatch.py", source)
 
 
