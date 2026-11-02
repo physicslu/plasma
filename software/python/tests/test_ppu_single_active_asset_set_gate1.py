@@ -148,3 +148,14 @@ def test_p1_failed_quiescence_does_not_overwrite_previous_active(tmp_path):
         co.activate_staged_asset_set(sha, quiescence_lease=refuse)
     assert assets.read_active(co.paths.product_root)["state"] == "EMPTY"
     assert co.journal.read().state == "verify_failed"
+
+
+def test_p1_symlinked_nested_package_directory_denied_before_read(tmp_path):
+    co, sha, stage_root = stage(tmp_path)
+    package = stage_root / "payload/packages/custom-swd"
+    original = stage_root / "original"
+    package.rename(original)
+    package.symlink_to(original, target_is_directory=True)
+    with pytest.raises(assets.AssetSetError, match="ASSET_SET_PARENT_UNTRUSTED"):
+        assets.verify_staged(co.paths.product_root, sha)
+    assert assets.read_active(co.paths.product_root)["state"] == "EMPTY"
