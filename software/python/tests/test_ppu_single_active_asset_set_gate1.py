@@ -5,6 +5,8 @@ Never operate real Z2, PS/PL, FPGA Manager, network, root or DUT.
 from __future__ import annotations
 
 import json
+import threading
+import urllib.request
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
@@ -12,7 +14,7 @@ import pytest
 
 from .test_ppu_bundle_v3_packages_contract import load
 from .test_ppu_b3_z2_install_gate1 import (
-    b3_request, build_generic_assets, make_coordinator,
+    b3_request, build_generic_assets, make_coordinator, bootstrap,
 )
 
 assets = load("ppu_single_active_asset_set_gate1", "ppu_asset_set.py")
@@ -159,3 +161,33 @@ def test_p1_symlinked_nested_package_directory_denied_before_read(tmp_path):
     with pytest.raises(assets.AssetSetError, match="ASSET_SET_PARENT_UNTRUSTED"):
         assets.verify_staged(co.paths.product_root, sha)
     assert assets.read_active(co.paths.product_root)["state"] == "EMPTY"
+
+
+def test_p1_existing_bootstrap_serves_verified_asset_identity_over_local_get(tmp_path):
+    co, sha, _ = stage(tmp_path)
+    paths = bootstrap.ServicePaths(
+        product_root=co.paths.product_root,
+        state_root=co.paths.bootstrap_state_root,
+    )
+    server = bootstrap.BootstrapHTTPServer(
+        ("127.0.0.1", 0), paths=paths, base_module=object(),
+    )
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        base = "http://127.0.0.1:" + str(server.server_address[1]) + "/v1/assets"
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(base, timeout=5) as response:
+            empty = json.load(response)
+        assert empty["assets"]["state"] == "EMPTY"
+        co.activate_staged_asset_set(sha, quiescence_lease=nullcontext)
+        with opener.open(base, timeout=5) as response:
+            activated = json.load(response)
+        assert activated["ok"] is True
+        assert activated["assets"]["asset_set_sha256"] == sha
+        assert activated["assets"]["ready"] is False
+        assert activated["assets"]["fpga"] == "NOT_VERIFIED"
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=5)
