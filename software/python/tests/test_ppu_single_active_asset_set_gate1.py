@@ -38,12 +38,12 @@ def test_b3_never_activates_even_when_complete_and_verified(tmp_path):
     assert not (co.paths.product_root / "current").exists()
 
 
-def test_p1_refuses_activation_without_trusted_runtime_job_lease(tmp_path):
+def test_p1_refuses_activation_when_authoritative_runtime_socket_is_missing(tmp_path):
     co, sha, _ = stage(tmp_path)
-    with pytest.raises(Exception, match="ASSET_SET_RUNTIME_QUIESCE_NOT_QUALIFIED"):
+    with pytest.raises(Exception, match="ASSET_SET_QUIESCE_DENIED"):
         co.activate_staged_asset_set(sha)
     assert assets.read_active(co.paths.product_root)["state"] == "EMPTY"
-    assert co.journal.read().state == "bundle_installed"
+    assert co.journal.read().state == "verify_failed"
 
 
 def test_p1_guarded_atomic_activation_keeps_runtime_and_fpga_unmodified(tmp_path):
