@@ -27,6 +27,7 @@ REQUIRED_SCRIPTS = (
     "ppu-bootstrap-deployment.py",
     "ppu-bootstrap-kit.py",
     "ppu_unified_deployment.py",
+    "ppu_bundle_authority.py",
     "ppu_asset_set.py",
 )
 
