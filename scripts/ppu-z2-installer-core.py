@@ -1097,20 +1097,26 @@ def install_verified_bundle_v3(
         raise Z2InstallerError("B3_PRODUCT_ROOT_UNTRUSTED")
     if paths.product_root == Path("/opt/plasma") and os.geteuid() != 0:
         raise Z2InstallerError("B3_PRODUCT_ROOT_PRIVILEGE_DENIED")
-    base = paths.product_root / "bundles"
-    target = base / verified.name
-    candidate = base / ("." + verified.name + "." + verified.archive_sha256[:16] + ".staging")
-    if (not re.fullmatch(r"[a-z][a-z0-9_.-]{0,63}", verified.name)
-            or any(p.is_symlink() for p in (paths.product_root, base, target, candidate))
+    # Content-addressed immutable staging: no application name, FPGA profile
+    # or test fixture determines a product installation destination. B3 never
+    # replaces the single active Asset Set (activation is a separate operation).
+    assets_root = paths.product_root / "assets"
+    base = assets_root / "staged"
+    target = base / verified.archive_sha256
+    candidate = base / ("." + verified.archive_sha256 + ".staging")
+    if (not re.fullmatch(r"[0-9a-f]{64}", verified.archive_sha256)
+            or any(p.is_symlink() for p in (paths.product_root, assets_root, base,
+                                            target, candidate))
             or candidate.exists()):
         raise Z2InstallerError("B3_DESTINATION_UNTRUSTED_OR_RECOVERY_REQUIRED")
-    if base.exists() and not base.is_dir():
+    if (assets_root.exists() and not assets_root.is_dir()
+            or base.exists() and not base.is_dir()):
         raise Z2InstallerError("B3_DESTINATION_INVALID")
     if target.exists() and not target.is_dir():
         raise Z2InstallerError("B3_PREVIOUS_INSTALL_INVALID")
     marker = target / "b3-install.json"
     if target.exists():
-        # Never delete data not positively identified as a prior B3 installation.
+        # Only a verified identical set can be reused; no B3 overwrite.
         if marker.is_symlink() or not marker.is_file():
             raise Z2InstallerError("B3_PREVIOUS_INSTALL_NOT_OWNED")
         try:
@@ -1120,13 +1126,15 @@ def install_verified_bundle_v3(
         if (type(previous) is not dict
                 or previous.get("schema") != "plasma.ppu.b3-install.v1"
                 or previous.get("bundle_name") != verified.name
-                or not re.fullmatch(r"[0-9a-f]{64}", str(previous.get("archive_sha256", "")))):
+                or previous.get("source_commit") != verified.source_commit
+                or previous.get("archive_sha256") != verified.archive_sha256):
             raise Z2InstallerError("B3_PREVIOUS_INSTALL_RECEIPT_INVALID")
         for item in target.rglob("*"):
             if item.is_symlink():
                 raise Z2InstallerError("B3_PREVIOUS_INSTALL_SYMLINK_DENIED")
 
     expected_files = {entry.path: entry for entry in verified.files}
+    manifest_digest: str | None = None
     resolved_package_order = []
     packages_by_id = {item.id: item for item in verified.packages}
     visiting: set[str] = set()
@@ -1161,6 +1169,25 @@ def install_verified_bundle_v3(
     # Recheck content identity at write time, not only at B2/Coordinator.
     if _sha256(archive) != verified.archive_sha256:
         raise Z2InstallerError("B3_ARCHIVE_SHA256_CHANGED")
+    if target.exists():
+        # An installed Asset Set may be pinned by future Jobs; never destroy
+        # or rewrite it during a repeated B3 transaction.
+        required = set(expected_files) | {"b3-install.json", "manifest.json"}
+        observed = {str(item.relative_to(target)) for item in target.rglob("*")
+                    if not item.is_dir()}
+        if observed != required or previous.get("files_verified") != len(expected_files):
+            raise Z2InstallerError("B3_EXISTING_ASSET_SET_UNTRUSTED")
+        if (not (target / "manifest.json").is_file()
+                or (target / "manifest.json").is_symlink()
+                or previous.get("manifest_sha256") != _sha256(target / "manifest.json")):
+            raise Z2InstallerError("B3_EXISTING_MANIFEST_MISMATCH")
+        for name, item in expected_files.items():
+            file = target / name
+            if (file.is_symlink() or not file.is_file()
+                    or file.stat().st_size != item.size
+                    or _sha256(file) != item.sha256):
+                raise Z2InstallerError("B3_EXISTING_FILE_MISMATCH")
+        return {"result": "PASS", **previous, "path": str(target)}
     base.mkdir(parents=True, exist_ok=True)
     candidate.mkdir(mode=0o700)
     installed = False
@@ -1168,6 +1195,17 @@ def install_verified_bundle_v3(
         with zipfile.ZipFile(archive) as source:
             if set(source.namelist()) != set(expected_files) | {"manifest.json"}:
                 raise Z2InstallerError("B3_ARCHIVE_MEMBER_SET_CHANGED")
+            # Retain the canonical validated manifest so future Active Set
+            # resolution can be based on the exact staged Package inventory.
+            manifest_data = source.read("manifest.json")
+            if not 0 < len(manifest_data) <= 64 * 1024:
+                raise Z2InstallerError("B3_MANIFEST_SIZE_INVALID")
+            manifest_digest = hashlib.sha256(manifest_data).hexdigest()
+            with (candidate / "manifest.json").open("xb") as descriptor:
+                descriptor.write(manifest_data)
+                descriptor.flush()
+                os.fsync(descriptor.fileno())
+            (candidate / "manifest.json").chmod(0o444)
             for item in file_order:
                 out = candidate / item.path
                 out.parent.mkdir(parents=True, exist_ok=True)
@@ -1199,6 +1237,7 @@ def install_verified_bundle_v3(
             "bundle_version": verified.version,
             "source_commit": verified.source_commit,
             "archive_sha256": verified.archive_sha256,
+            "manifest_sha256": manifest_digest,
             "package_order": resolved_package_order,
             "files_verified": len(expected_files),
             "runtime_activation_executed": False,
@@ -1212,15 +1251,17 @@ def install_verified_bundle_v3(
             output.flush()
             os.fsync(output.fileno())
         marker_candidate.chmod(0o600)
-        # Staging remains private until verified. Once promoted, the
-        # explicitly reviewed smoke must be readable by an unprivileged Z2
-        # user; no package payload is auto-executed by this installer.
+        # Staging remains private until verified. Nonexecuting Package
+        # content can be read by the future unprivileged runtime only after
+        # a separately approved Active Set activation.
         for directory in candidate.rglob("*"):
             if directory.is_dir():
                 directory.chmod(0o755)
         candidate.chmod(0o755)
+        # A content-addressed destination is immutable: never replace or
+        # delete an existing set, even in development mode.
         if target.exists():
-            shutil.rmtree(target)  # Dev mode: remove prior B3 only; NO backup/B4.
+            raise Z2InstallerError("B3_STAGED_SET_CONFLICT")
         os.replace(candidate, target)
         installed = True
         for name, item in expected_files.items():

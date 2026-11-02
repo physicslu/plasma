@@ -251,7 +251,7 @@ class BootstrapAPIClient:
         display_name: str | None = None,
         module: str | None = None,
     ) -> DeploymentSubmission:
-        """Runtime deploy unchanged; generic packages are admission-only."""
+        """Runtime deploy unchanged; Bundle B2 remains admission-only until install_bundle()."""
         if kind == "engineering-module":
             raise DeploymentAPIError("ENGINEERING_INSTALL_NOT_QUALIFIED")
         if kind not in {"ppu-runtime", "python", "native-c", "fpga-image", "bundle"} or module is not None:
@@ -285,6 +285,43 @@ class BootstrapAPIClient:
         elif not _valid_package_admission(receipt, kind=kind):
             raise DeploymentOutcomeUnknown("API_ADMISSION_RECEIPT_UNKNOWN")
         return DeploymentSubmission(upload_id, tx, state)
+
+    def install_bundle(self, admitted: DeploymentSubmission) -> DeploymentSubmission:
+        """Explicit B3 install-only of the EXACT current B2 admitted Bundle.
+
+        No implicit B4 activation, FPGA download or package execution.
+        The admission receipt must be read back from the current device; a
+        prior arbitrary transaction or locally constructed claim is not an
+        install authorization. This method never auto-retries on uncertainty.
+        """
+        if (not isinstance(admitted, DeploymentSubmission)
+                or admitted.state != "admitted"
+                or not _HEX32.fullmatch(admitted.upload_id)
+                or not _HEX32.fullmatch(admitted.transaction_id)):
+            raise DeploymentAPIError("B3_VALID_B2_ADMISSION_REQUIRED")
+        b2 = self.deployment_state(admitted.transaction_id)
+        result = b2.get("result")
+        plan = result.get("plan") if isinstance(result, dict) else None
+        if (b2.get("upload_id") != admitted.upload_id
+                or not _valid_package_admission(b2, kind="bundle")
+                or not isinstance(plan, dict)
+                or plan.get("requested_actions") != ["install", "verify"]):
+            raise DeploymentOutcomeUnknown("B3_DEVICE_ADMISSION_CHANGED")
+        reply = self._call("POST", "/v1/deployments", {
+            "kind": "bundle", "upload_id": admitted.upload_id,
+            "install_only": True,
+        })
+        record = reply.get("deployment")
+        if (not isinstance(record, dict)
+                or record.get("upload_id") != admitted.upload_id
+                or type(record.get("transaction_id")) is not str
+                or not _HEX32.fullmatch(record["transaction_id"])
+                or record.get("transaction_id") == admitted.transaction_id
+                or record.get("state") not in _INFLIGHT):
+            raise DeploymentOutcomeUnknown("B3_INSTALL_SUBMISSION_UNKNOWN")
+        return DeploymentSubmission(
+            admitted.upload_id, record["transaction_id"], record["state"],
+        )
 
     def deployment_state(self, transaction_id: str) -> dict[str, Any]:
         """One read, no implicit retries, polling loop or automatic resubmit."""

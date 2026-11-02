@@ -9,7 +9,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import stat
 import threading
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -60,6 +62,10 @@ def test_real_installer_b3_stages_and_verifies_three_packages_without_activation
     root = Path(result["install_path"])
     assert root.is_dir() and root.is_relative_to(co.paths.product_root)
     assert (root / "b3-install.json").is_file()
+    assert (root / "manifest.json").is_file()
+    assert json.loads((root / "manifest.json").read_text())["schema"] == "plasma.ppu.bundle.v3"
+    assert root.parent.name == "staged"
+    assert root.name == digest
     # The installed smoke is executed by Z2 nobody, not the root installer.
     assert (root.stat().st_mode & 0o777) == 0o755
     assert ((root / "payload/packages/python-smoke").stat().st_mode & 0o777) == 0o755
@@ -70,7 +76,7 @@ def test_real_installer_b3_stages_and_verifies_three_packages_without_activation
     assert not (co.paths.product_root / "current").exists()
 
 
-def test_b3_repeat_install_direct_overwrite_without_backup_or_b4(tmp_path):
+def test_b3_repeat_install_reuses_immutable_content_without_backup_or_b4(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     co = make_coordinator(tmp_path)
     first = co.execute_bundle_v3_install(b3_request(archive, digest))
@@ -96,7 +102,7 @@ def test_b3_archive_hash_denied_without_product_mutation(tmp_path):
 def test_b3_existing_unowned_directory_is_never_deleted(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     co = make_coordinator(tmp_path)
-    dest = co.paths.product_root / "bundles" / "ppu-b3-smoke"
+    dest = co.paths.product_root / "assets" / "staged" / digest
     dest.mkdir(parents=True)
     (dest / "important.txt").write_text("unrelated")
     with pytest.raises(engine.DeploymentError, match="B3_INSTALL_REQUIRES_RECOVERY"):
@@ -108,7 +114,7 @@ def test_b3_existing_unowned_directory_is_never_deleted(tmp_path):
 def test_b3_existing_symlink_fail_closed(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     co = make_coordinator(tmp_path)
-    dest = co.paths.product_root / "bundles" / "ppu-b3-smoke"
+    dest = co.paths.product_root / "assets" / "staged" / digest
     dest.parent.mkdir(parents=True)
     external = tmp_path / "external"
     external.mkdir()
@@ -123,11 +129,9 @@ def test_b3_existing_symlink_fail_closed(tmp_path):
 def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     source_policy = {
-        "schema": "plasma.ppu.b3-factory-policy.v1",
-        "bundle_name": "ppu-b3-smoke",
-        "source_commit": SOURCE,
-        "archive_sha256": digest,
-        "target": dict(TARGET),
+        "schema": "plasma.ppu.b3-install-policy.v1",
+        "mode": "development",
+        "install_only": True,
         "actions": ["install", "verify"],
     }
     paths = bootstrap.ServicePaths(
@@ -179,9 +183,9 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
                               "install_only": True, "publisher": "caller"})
-    new = dict(source_policy, archive_sha256="f" * 64)
+    new = dict(source_policy, mode="untrusted")
     paths.bundle_install_policy.write_text(json.dumps(new))
-    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_ADMISSION_NOT_PINNED"):
+    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_POLICY_INVALID"):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
                               "install_only": True})
     paths.bundle_install_policy.write_text(json.dumps(source_policy))
@@ -196,3 +200,105 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     assert result["result"]["coordinator_receipt"]["coordinator_state"] == "bundle_installed"
     assert result["result"]["runtime_activation_executed"] is False
     assert not (paths.product_root / "current").exists()
+
+
+def build_generic_assets(tmp_path, *, bitstream=b"fpga-image-v1"):
+    """Canonical, nonexecuting multi-kind Bundle; unrelated to smoke fixture."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    archive = tmp_path / "assets.zip"
+    package_specs = [
+        ("swd-parser", "python", (), {"python/parse.py": b"raise RuntimeError('NOT_EXECUTED')\\n"}),
+        ("custom-swd", "fpga-image", (), {
+            "fpga/swd.bin": bitstream, "fpga/swd.hwh": b"<hwh/>",
+            "fpga/image.json": b'{"image_id":"custom-swd"}',
+        }),
+        ("stm32-profile", "programming-profile", ("custom-swd", "swd-parser"), {
+            "data/profile.json": b'{"icpn":"STM32F103C8T6"}',
+        }),
+    ]
+    files = {}
+    packages = []
+    for package_id, kind, requires, members in package_specs:
+        entries = []
+        for suffix, raw in members.items():
+            name = f"payload/packages/{package_id}/{suffix}"
+            entries.append({
+                "path": name, "sha256": hashlib.sha256(raw).hexdigest(),
+                "size": len(raw), "executable": False,
+            })
+            files[name] = raw
+        packages.append({
+            "id": package_id, "kind": kind, "version": "1.0.0",
+            "requires": list(requires), "files": entries,
+        })
+    manifest = {
+        "schema": "plasma.ppu.bundle.v3", "name": "general-assets",
+        "version": "1.0.0", "purpose": "programming", "source_commit": SOURCE,
+        "target": dict(TARGET), "actions": ["install", "verify"],
+        "packages": packages,
+    }
+    files["manifest.json"] = json.dumps(manifest, sort_keys=True).encode()
+    with zipfile.ZipFile(archive, "w") as dest:
+        for name, raw in sorted(files.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | 0o644) << 16
+            info.compress_type = zipfile.ZIP_STORED
+            dest.writestr(info, raw)
+    return archive, hashlib.sha256(archive.read_bytes()).hexdigest()
+
+
+def test_generic_b3_installs_python_fpga_profile_without_execution(tmp_path):
+    archive, sha = build_generic_assets(tmp_path / "new-archive")
+    co = make_coordinator(tmp_path)
+    evidence = co.execute_bundle_v3_install(b3_request(archive, sha))
+    assert evidence["result"] == "PASS"
+    assert evidence["package_order"] == ["swd-parser", "custom-swd", "stm32-profile"]
+    assert evidence["files_verified"] == 5  # Parser + BIN/HWH/JSON + Profile
+    assert evidence["runtime_activation_executed"] is False
+    assert evidence["fpga"] == "NOT_RUN" and evidence["dut"] == "NOT_RUN"
+    root = Path(evidence["install_path"])
+    assert root == co.paths.product_root / "assets" / "staged" / sha
+    assert (root / "payload/packages/custom-swd/fpga/swd.bin").read_bytes() == b"fpga-image-v1"
+    assert (root / "payload/packages/swd-parser/python/parse.py").is_file()
+    assert not (co.paths.product_root / "current").exists()
+    assert not (co.paths.product_root / "assets" / "active").exists()
+    assert not co.paths.systemd_root.exists()
+
+
+def test_generic_b3_same_bundle_name_different_content_stages_independently(tmp_path):
+    a, sa = build_generic_assets(tmp_path / "a")
+    b, sb = build_generic_assets(tmp_path / "b", bitstream=b"fpga-image-v2")
+    assert sa != sb
+    co = make_coordinator(tmp_path)
+    pa = Path(co.execute_bundle_v3_install(b3_request(a, sa))["install_path"])
+    pb = Path(co.execute_bundle_v3_install(b3_request(b, sb))["install_path"])
+    assert pa != pb and pa.is_dir() and pb.is_dir()
+    assert (pa / "payload/packages/custom-swd/fpga/swd.bin").read_bytes() == b"fpga-image-v1"
+    assert (pb / "payload/packages/custom-swd/fpga/swd.bin").read_bytes() == b"fpga-image-v2"
+
+
+def test_generic_b3_rejects_corrupted_existing_digest_stage(tmp_path):
+    archive, sha = build_generic_assets(tmp_path / "archive")
+    co = make_coordinator(tmp_path)
+    path = Path(co.execute_bundle_v3_install(b3_request(archive, sha))["install_path"])
+    damaged = path / "payload/packages/custom-swd/fpga/swd.bin"
+    damaged.chmod(0o600)
+    damaged.write_bytes(b"bad")
+    with pytest.raises(engine.DeploymentError, match="B3_INSTALL_REQUIRES_RECOVERY"):
+        co.execute_bundle_v3_install(b3_request(archive, sha))
+    assert damaged.read_bytes() == b"bad"
+    assert co.journal.read().state == "recovery_required"
+
+
+def test_generic_b3_rejects_symlinked_asset_root_without_external_write(tmp_path):
+    archive, digest = build_generic_assets(tmp_path / "archive")
+    co = make_coordinator(tmp_path)
+    external = tmp_path / "external"
+    external.mkdir()
+    co.paths.product_root.mkdir()
+    (co.paths.product_root / "assets").symlink_to(external, target_is_directory=True)
+    with pytest.raises(engine.DeploymentError, match="B3_INSTALL_REQUIRES_RECOVERY"):
+        co.execute_bundle_v3_install(b3_request(archive, digest))
+    assert not list(external.iterdir())
+    assert co.journal.read().state == "recovery_required"

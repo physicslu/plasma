@@ -29,12 +29,12 @@ REQUIRED_SCRIPTS = (
     "ppu_unified_deployment.py",
 )
 
-# The reviewed Bundle v3 B3 capability ships inside the SAME factory
-# Bootstrap layer, not as a second installer or a remotely writable policy.
+# Generic Bundle v3 B3 capability ships inside the SAME Bootstrap layer.
+# Root-owned development-mode policy is factory provisioned, not an HTTP grant.
 B3_FILES = (
     "ppu-z2-installer.py",
     "ppu-z2-installer-core.py",
-    "ppu-b3-smoke-policy.json",
+    "ppu-bundle-install-policy.json",
 )
 
 
@@ -67,24 +67,22 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
             raise BootstrapInstallError(f"factory bundle is missing required script: {name}")
     install_root.mkdir(parents=True, exist_ok=True)
     install_root.chmod(0o755)
-    # Fail closed on a partial B3 factory image; old factory-only tests may
-    # still install their unchanged original five-file fixture with B3 disabled.
-    # Repository source has the two Installer files but no pinned factory
-    # policy; this is a NOT_QUALIFIED source tree, not a partial factory kit.
-    policy_present = (source_root / "ppu-b3-smoke-policy.json").is_file()
+    # The generic policy grants install-only for previously admitted
+    # canonical Bundles in development mode; not arbitrary code execution.
+    policy_present = (source_root / "ppu-bundle-install-policy.json").is_file()
     b3_present = list(B3_FILES) if policy_present else []
     if policy_present and not all((source_root / name).is_file() for name in B3_FILES):
         raise BootstrapInstallError("factory B3 source set is incomplete")
     if policy_present:
         try:
-            policy = json.loads((source_root / "ppu-b3-smoke-policy.json").read_text())
+            policy = json.loads((source_root / "ppu-bundle-install-policy.json").read_text())
         except (OSError, ValueError) as exc:
             raise BootstrapInstallError("factory B3 policy unreadable") from exc
         if (type(policy) is not dict
-                or set(policy) != {"schema", "bundle_name", "source_commit",
-                                   "archive_sha256", "target", "actions"}
-                or policy.get("schema") != "plasma.ppu.b3-factory-policy.v1"
-                or policy.get("bundle_name") != "ppu-b3-smoke"
+                or set(policy) != {"schema", "mode", "install_only", "actions"}
+                or policy.get("schema") != "plasma.ppu.b3-install-policy.v1"
+                or policy.get("mode") != "development"
+                or policy.get("install_only") is not True
                 or policy.get("actions") != ["install", "verify"]):
             raise BootstrapInstallError("factory B3 policy invalid")
     for name in (*REQUIRED_SCRIPTS, *(B3_FILES if b3_present else ())):
@@ -126,8 +124,8 @@ def install_bootstrap(
                 and not paths.systemd_unit.is_symlink()
                 and paths.systemd_unit.is_file()):
             raise BootstrapInstallError("B3_REFRESH_REQUIRES_EXISTING_FACTORY")
-        if (source_root / "ppu-b3-smoke-policy.json").is_symlink() or not (
-                source_root / "ppu-b3-smoke-policy.json").is_file():
+        if (source_root / "ppu-bundle-install-policy.json").is_symlink() or not (
+                source_root / "ppu-bundle-install-policy.json").is_file():
             raise BootstrapInstallError("B3_REFRESH_SOURCE_POLICY_REQUIRED")
         _copy_scripts(source_root, paths.install_root)
         return {
