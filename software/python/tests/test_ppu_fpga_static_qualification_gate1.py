@@ -420,7 +420,7 @@ def test_b3_rejects_fpga_contract_or_master_grant_change_after_b2(tmp_path):
     write_contracts(paths.fpga_image_contracts, entry)
     b2 = srv.start_deployment({"kind": "bundle", "upload_id": upload_id})
     assert b2["result"]["fpga_static_qualification"] == "STATIC_QUALIFIED"
-    b3 = {"kind": "bundle", "upload_id": upload_id, "install_only": True}
+    b3 = {"kind": "bundle", "upload_id": upload_id, "fpga_load": False}
 
     # Contract withdrawn after B2.
     original = paths.fpga_image_contracts.read_bytes()

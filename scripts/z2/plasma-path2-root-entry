@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 # Protected Z2 operation entry: exact operation + SHA, no Stage/Profile.
 # The caller cannot select a Python module, Project or shell executable.
+#   download|test|restore <40-hex source pin>
+#   bundle-load <40-hex source pin> <64-hex installed B3 Asset Set SHA-256>
+# bundle-load accepts no path: Root locates the immutable B3 Set itself.
 set -euo pipefail
-[[ $# -eq 2 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
-case "$1" in
-  download|test|restore) operation="$1" ;;
+asset_set=''
+case "${1:-}" in
+  download|test|restore)
+    [[ $# -eq 2 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
+    operation="$1" ;;
+  bundle-load)
+    [[ $# -eq 3 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
+    operation="$1"
+    asset_set="$3"
+    [[ "$asset_set" =~ ^[0-9a-f]{64}$ ]] ||
+      { echo 'PATH2_ASSET_SET_NOT_PINNED' >&2; exit 2; } ;;
   *) echo 'PATH2_OPERATION_NOT_ALLOWLISTED' >&2; exit 2 ;;
 esac
 source_sha="$2"
@@ -102,4 +113,4 @@ done < <(/usr/bin/find "$root" -type f -print0)
 cd "$root"
 exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
   PYTHONPATH="$root" PYTHONDONTWRITEBYTECODE=1 \
-  "$python" -B -m "$module" "$operation"
+  "$python" -B -m "$module" "$operation" ${asset_set:+"$asset_set"}

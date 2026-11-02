@@ -50,7 +50,7 @@ This label has **three unrelated meanings**; documents using it carry a term not
 
 | Context | B1 | B2 | B3 | B4 |
 | --- | --- | --- | --- | --- |
-| **Bundle stages** ([Bundle v3 assets](deployment/ppu-bundle-v3-generic-assets-gate1.md)) | upload / commit (`POST /v1/uploads`) | admission (`POST /v1/deployments`, data-only receipt) | install / verify (`install_only`) | activation, incl. previous-version backup (not implemented) |
+| **Bundle stages** ([Bundle v3 assets](deployment/ppu-bundle-v3-generic-assets-gate1.md)) | upload / commit (`POST /v1/uploads`) | admission (`POST /v1/deployments`, data-only receipt) | install / verify; with explicit `fpga_load: true` also FPGA load + Active Set | activation, incl. previous-version backup (not implemented) |
 | **FPGA/UIO safety items** from PR #972 ([runtime FPGA architecture](architecture/runtime-fpga-architecture-v1.md)) | live Fabric UIO ownership handoff | retained-mmap guard | aperture Supervisor | – |
 | **Governance blocking decisions** (former development-blocking policy) | authorization and source | Z2 hardware safety / recovery | authentic receipt | – |
 

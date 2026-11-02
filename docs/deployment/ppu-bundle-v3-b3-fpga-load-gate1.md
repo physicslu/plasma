@@ -2,8 +2,8 @@
 
 > **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
 
-**State:** Gate 1 plan for owner approval. No implementation, Z2 change, FPGA
-load or DUT operation is authorized until it is approved.
+**State:** Gate 1 approved by the owner on 2026-11-02 (§3 implementation,
+§4 Host-only verification and §4 physical HIL). Gate 2 (merge) is separate.
 **Owner decision (2026-11-02):** an explicitly requested B3 of a Bundle that
 contains an `fpga-image` Package must also load that FPGA Image. It should not
 wait for a separate B4. This revises the boundary in
@@ -133,3 +133,35 @@ tree, Golden and the existing OpenOCD installs.
   Bootstrap refresh, and HTTP-triggered FPGA re-load of the known `ab79b04e`
   Image (no DUT).
 - Gate 2 (merge) remains separate.
+
+## 7. Implementation notes (as built)
+
+- HTTP request: `POST /v1/deployments` body is now exactly
+  `{"kind": "bundle", "upload_id": <32-hex>, "fpga_load": <bool>}`. The old
+  `install_only` field is retired (Replace-by-Default); `fpga_load: false` is
+  the install-only B3. The device-local `ppu-bundle-install-policy.json`
+  (v1) is unchanged and still enables B3 as a whole.
+- Coordinator journal states added: `fpga_loading`, `fpga_loaded`,
+  `fpga_load_denied`, `fpga_identity_failed`. The last three are safe restart
+  states; `fpga_loading`/`activating` interrupted by a crash become
+  `recovery_required`. Bootstrap reports `fpga_load_denied` and
+  `fpga_identity_failed` as API state `failed` with the Coordinator
+  `error_code`; anything it cannot prove stays `recovery_required`.
+- Root Entry output: one `PLASMA_BUNDLE_LOAD=<json>` line, exit 0 for
+  `fpga_loaded` and 3 for a classified failure. A shell-level `PATH2_*`
+  refusal (exit 2, before Python) is classified `fpga_load_denied`; any
+  other unparseable result or timeout is `recovery_required`.
+- Root stages files and promotes the Manifest (previous kept as
+  `plasma-image-manifest.json.previous`) before the full read-only admission
+  census; a census denial restores the previous Manifest before returning
+  `fpga_load_denied`. Staged firmware files remain (no-overwrite, same SHA).
+- `resolve_active_fpga_handoff` (Controller-selected, Active-only) is
+  replaced by `resolve_staged_fpga_handoff`.
+- Deviation from §4 step 4: a repeated identical `fpga_load=true` B3 is an
+  explicit request and therefore downloads again; the Active Set is not
+  re-published (`already_active=true`, same generation).
+- Deviation from §5: `runtime_site_readmission=REQUIRED` is reported in the
+  receipt and shown in the Console, but the Runtime has no existing per-Site
+  re-admission gate that blocks execution after a reload. Enforcing that
+  block is a Runtime change outside this Gate.
+

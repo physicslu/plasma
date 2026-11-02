@@ -247,3 +247,58 @@ def test_pr3_manager_rejects_untrusted_upstream_install_receipt(tmp_path):
     )
     with pytest.raises(BootstrapManagerError, match="not non-executing"):
         manager.start_deployment("z2", {"kind": "bundle", "upload_id": "a" * 32})
+
+
+def test_manager_forwards_explicit_b3_fpga_load_only(tmp_path):
+    FakeBootstrapClient.instances.clear()
+    creds = BootstrapCredentialStore(tmp_path / "credentials.json")
+    creds.set("z2", DEVICE_ID, TOKEN)
+
+    class B3Client(FakeBootstrapClient):
+        def start_deployment(self, token, body):
+            self.calls.append(("start_deployment", token, dict(body)))
+            return 200, {"ok": True, "deployment": {
+                "state": "queued", "upload_id": "a" * 32, "transaction_id": "c" * 32,
+            }}
+
+    manager = ManagerBootstrapCoordinator(
+        _registry(tmp_path), creds, 2.0, client_factory=B3Client,
+    )
+    status, body = manager.start_deployment(
+        "z2", {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True},
+    )
+    assert status == 200 and body["deployment"]["state"] == "queued"
+    calls = [c for c in B3Client.instances[-1].calls if c[0] == "start_deployment"]
+    assert calls == [("start_deployment", TOKEN,
+                      {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True})]
+
+
+@pytest.mark.parametrize("body", [
+    {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": "true"},
+    {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True, "idle": True},
+    {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True, "path": "/opt"},
+    {"kind": "bundle", "upload_id": "A" * 32, "fpga_load": False},
+])
+def test_manager_rejects_b3_extra_or_non_boolean_fields(tmp_path, body):
+    creds = BootstrapCredentialStore(tmp_path / "credentials.json")
+    creds.set("z2", DEVICE_ID, TOKEN)
+    manager = ManagerBootstrapCoordinator(
+        _registry(tmp_path), creds, 2.0, client_factory=FakeBootstrapClient,
+    )
+    with pytest.raises(BootstrapManagerError):
+        manager.start_deployment("z2", body)
+
+
+def test_manager_rejects_b3_reply_that_is_not_queued(tmp_path):
+    creds = BootstrapCredentialStore(tmp_path / "credentials.json")
+    creds.set("z2", DEVICE_ID, TOKEN)
+
+    class Odd(FakeBootstrapClient):
+        def start_deployment(self, token, body):
+            return 200, {"ok": True, "deployment": {"state": "succeeded", "upload_id": "a" * 32}}
+
+    manager = ManagerBootstrapCoordinator(
+        _registry(tmp_path), creds, 2.0, client_factory=Odd,
+    )
+    with pytest.raises(BootstrapManagerError, match="not a queued transaction"):
+        manager.start_deployment("z2", {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": False})

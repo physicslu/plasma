@@ -106,14 +106,25 @@ multi-version package co-installation. Existing v3 `packages[].requires`
 continues to describe **dependencies inside one delivered Bundle**, not
 the set of operations in a Job.
 
-B1/B2/B3 continue to mean Receive, Admission, and Install/Verify. Installation
-does NOT immediately activate the Set, reconfigure the FPGA, or execute
-a Programming Job. Future Set switching needs isolated Staging and an
-atomic effective Active Set transition without disrupting active Jobs;
-FPGA loading is a distinct, explicitly Controller-authorized,
-PPU Hardware Manager-controlled operation, with full Site quiescence
-and hardware ABI/identity/safety verification. A PPU is READY only
-after the selected Set and physical/runtime prerequisites are proven.
+B1/B2/B3 continue to mean Receive, Admission, and Install/Verify. A B3
+request without `fpga_load` installs files only: it does not activate the
+Set, reconfigure the FPGA, or execute a Programming Job.
+
+**B3 FPGA load (owner decision 2026-11-02, [Gate 1](../deployment/ppu-bundle-v3-b3-fpga-load-gate1.md)).**
+A B3 request with an explicit `"fpga_load": true` for a Bundle that contains
+exactly one `fpga-image` Package also loads that Image, in the same
+`deployment.lock` transaction: install/verify → Runtime Job Quiesce
+(connection-held) → protected Root Entry `bundle-load <pin> <asset_set_sha256>`
+(Root re-derives the Set itself, runs the `/proc` `/dev/mem` `/dev/uio*`
+census, promotes the companion Manifest keeping the previous one, then the
+existing `download` and Identity `test`) → `active.json` is published only
+after Identity PASS. Outcomes: `fpga_loaded`, `fpga_load_denied` (PL and
+Active Set unchanged), `recovery_required` (explicit `restore` only) and
+`fpga_identity_failed` (Image kept loaded; no automatic Golden Restore).
+The receipt is `plasma.ppu.b3-deployment-receipt.v2` and reports
+`runtime_site_readmission=REQUIRED`. It never triggers from upload or B2
+alone and never performs a DUT operation. A PPU is READY only after the
+selected Set and physical/runtime prerequisites are proven.
 
 The existing B3 install path `/opt/plasma/bundles/<bundle-name>` has
 **no generic Active Asset Set feature today**, and B3 physical acceptance
