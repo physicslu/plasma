@@ -43,6 +43,111 @@
 - **Reference** · `Host-only` · `PR #1208` — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。
 - **Plan** · `Host-only` · `product policy` — [PPU Z2 Monitor/Master/Engineer Privilege Boundary](architecture/ppu-privilege-boundary-gate1.md)：PPU 三級產品能力、Master 非 Linux Root 操作與部署、Engineer Root 維修、特權 Bridge 的預期邊界；僅 Host-only policy／tests，尚未接入 Runtime／Z2。
 - **Reference** · `Runtime` · `DEFAULT OFF` — [Reusable Engineering Runtime Dispatcher v1](architecture/plasma-engineering-runtime-dispatch-v1.md)：Path 2 SWPC CLI／Path 3 SWPC Codex 共用 Work Order、Capability、SHA 與一次性保護 Claim；PR 與 push 僅執行 GitHub-hosted 離線測試。尚未啟用 SWPC 執行，隔離 Runner／自動 Gate 1 Dispatch／真實 Publisher 未驗收，不代表可操作任何實體硬體。
+- **Accepted / Owner architectural policy, PR #1189 pending merge** — [ADR-0004: 新 FPGA Project 與 Path 2 operator-cli 標準](adr/0004-project-isolated-fpga-build-path2-operator-cli.md)：新 FPGA Image 與 Board target 必須各自擁有獨立、可重現的 Vivado Project；SWPC 正式 Host Build 透過 SHA-pinned Path 2 `operator-cli`；F1-B 專屬 Build Engine 標記 `F1B_BUILD_ENGINE_RETIREMENT_PENDING`，完整驗收及獨立 Gate 2 才真正退休，Build 不是部署。
+
+- **Superseded / Historical** — [ADR-0005: 獨立 SWD IP 與原 SWD Debug Bitbang 提案](adr/0005-independent-swd-ip-guarded-bitbang.md)：已由 ADR-0006 取代，僅供歷史決策追溯。
+- **Accepted / Owner architecture direction / PR #1189 Draft** — [ADR-0006: 專用 SWD Engine 與未來通用 GPIO Bus](adr/0006-independent-swd-engine-and-future-gpio-bus.md)：現在移除 SWD Debug Mode／Bitbang Bridge；SWD 只保留 OFF/NORMAL，未來 GPIO Bus、JTAG、SPI、UART、I²C 分別規劃，未宣稱實作或實機驗收。
+- **Plan / Gate 1 Draft** — [ADR-0007: PPU Image/Reload 與每 Site 並行所有權](adr/0007-ppu-reload-fence-per-site-locking.md)：保留 Root Guard，PPU Fence 共享／獨占及每 Site 獨占鎖；僅完成 Host-only 驗證，不宣稱 Z2 或 8-Site HIL。
+
+## Operator
+
+- **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
+
+## Codex context governance and on-demand Path instructions
+
+- **P1 Gate 1 / Host-only inventory** — [Repository-wide documentation governance and cleanup audit](development/plasma-codex-p1-gate1-inventory-2026-10-31.md)：盤點全 Repository 文件權威來源、重複與矛盾規範、歷史文件和引用關係；Codex／Path 3 僅為其中一類，Device Catalog Workflow 暫緩。
+
+- **Merged / PR #1226** — [Shared Desktop and Path 3 Codex context governance audit](development/plasma-codex-context-governance-gate1-audit.md)：文件權威性、共用上下文與 Token 量測規劃；尚未完成實測節省驗證。
+- **Current / Path 2 instructions / PR #1226** — [Path 2 on-demand execution rules](development/plasma-codex-path2-execution.md)：僅在選用 Path 2 時讀取，保留既有 CPU-only、operator-cli、Vivado 詳細規範。
+- **Current / Path 3 instructions / PR #1226** — [Path 3 on-demand execution rules](development/plasma-codex-path3-execution.md)：僅在選用 Path 3 時讀取，保留既有 Codex CLI、原生工具、硬體安全條款。
+
+## Domain engineering contracts
+
+- [Domain contract: plasma-fpga.md](development/plasma-fpga.md)
+- [Domain contract: plasma-embedded.md](development/plasma-embedded.md)
+- [Domain contract: plasma-manager.md](development/plasma-manager.md)
+- [Domain contract: plasma-web.md](development/plasma-web.md)
+
+## Engineering governance and execution paths
+
+- **Gate 1 Draft / Host-only / PR #1202** — [Root Guard 燒錄 Session 與 FPGA Configuration 准入分離](development/root-guard-runtime-program-split-2026-10-29.md)：正常燒錄取消全系統 `/proc` FD／VMA 完整掃描，保留裝置限定 `fuser`、全域 FPGA 鎖、Image／Boot／UIO Guard；FPGA Download／Test／Restore 持續嚴格掃描。尚未部署、合併或實機驗收，亦非八通道 Broker 已完成。
+
+
+
+- **Current / Path 2 guarded-hardware operator-cli** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：現行 Path 2 通用硬體 Work Order 使用 `capability: operator-cli`、`scope: guarded-hardware`、來源 SHA 綁定的 Python `script`、`argv` 與受限 `timeout_seconds`；在非 Root SWPC Runner 執行，不自動取得 sudo／Root 權限。Exit 69／77 是失敗的 NOT_RUN，Exit 0 僅為待審證據。CPU-only／Vivado Host Build 為各自獨立能力。
+- **Path 2 dynamic Vivado Host Build / PR #1210** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：工作單使用可信事件的 `main` 來源，或綁定開放 PR 精確 HEAD；專案建置契約與驗證器經真實 SWPC Path 2 建置驗收 `z2-identity`、`z2-control-waveform`。此能力只建置，不下載 FPGA 或操作 Z2；實際 `main` 狀態以 PR 是否合併為準。
+- **Historical / retired z2-root-operation Work Order; F1-B #1168 evidence** — [Path 2 受保護 Z2 Root Entry 歷史契約](development/path2-generic-fpga-image-loader.md)：舊 Dispatcher 固定 `download|test|restore` Work Order 已退役，現行 Dispatcher 明確拒絕；獨立兩參數 Protected Root Entry／底層 Transport 與來源、互斥、復原守衛仍保留。#1168 實機 PASS 僅涵蓋當時 Site 1 F1-B，不能推導 Blue Pill／其他 Programmer IP／八 Site 資格。
+
+- **Historical Gate 1 offline provider integration** — [Path 2 Real Provider Integration](architecture/plasma-path2-real-provider-integration-gate1.md)：原始 Gate 1 僅驗證 BIT/BIN、跨 Trigger Lease 與離線故障注入；Stage Transport／Protected Root Entry 為保留的底層受保護工具，不是現行 Path 2 Dispatcher 的 `z2-root-operation` Capability。實際硬體使用 `operator-cli` 時仍須逐次核對授權、映像 Hash、所有權及 Recovery 證據。
+
+- **Historical offline coordinator contract** — [Path 2 Three-Stage Build / Download / Testing Coordinator](architecture/plasma-path2-three-stage-gate1.md)：記錄舊 Build／Download／Testing 獨立 Trigger、自動銜接與離線 Adapter／Receipt 測試；現行通用 Path 2 硬體入口為 `operator-cli`，不會自動進入舊 Coordinator／Stage Transport。底層 Protected Root 權限與復原條件仍須獨立成立。
+
+- **Current after Gate 2 / Owner-approved Gate 1 design** — [PLASMA Three-Path Work Execution Model](development/plasma-three-path-execution-model.md)：Gate 1 由 ChatGPT 推薦並讓使用者選擇 Path 1（ChatGPT Direct Work）、Path 2（SWPC CLI Work）或 Path 3（SWPC Codex Work）；批准後在明確授權內自動執行，PR 準備妥當才請求 Gate 2 合併。包含三套流程圖、角色分工、Github Actions Dispatch 前提、證據／資安邊界與不需 PR 的純驗證任務。**這是規範，不代表通用 SWPC Dispatcher 已啟用或授權硬體操作。**
+
+- **Current / Development Mode** — [Three Shared BLOCKING Decisions](development/development-blocking-policy.md)：Path 2／Path 3 共用授權與來源、Z2 實機安全／復原、真實回執三個核心阻擋邊界；移除重複檢查，但不繞過裝置安全條件。
+
+## STM32F103 OpenOCD qualification version navigation
+
+| Version | Status and scope |
+| --- | --- |
+| [v1](architecture/openocd-software-qualification-v1.md) | Phase 2A reference cohort; preserve qualification provenance |
+| [v2](architecture/openocd-software-qualification-v2.md) | ST ordering-equivalent TR expansion |
+| [v3](architecture/openocd-software-qualification-v3.md) | Medium-density R/V expansion |
+| [v4](architecture/openocd-software-qualification-v4.md) | Medium-density T7 authority, referenced by v7 |
+| [v5](architecture/openocd-software-qualification-v5.md) | Historical; explicitly superseded by v6 |
+| [v6](architecture/openocd-software-qualification-v6.md) | Historical; explicitly superseded by v7 |
+| [v7](architecture/openocd-software-qualification-v7.md) | Current umbrella qualification authority for its bounded STM32F103 cohort; not a global catalog entitlement |
+
+This navigation table does not promote any ICPN or replace exact provider/manifest qualification evidence.
+
+## WEB / PS / PL developer documentation entrypoints
+
+This section is a navigation aid, not a new implementation contract. Follow root [AGENTS.md](../AGENTS.md) for agent instructions and load applicable detailed clauses on demand.
+
+| Domain | Start here | Boundary |
+| --- | --- | --- |
+| WEB | [Console developer README](../software/web/README.md), [REST v3 contract](architecture/web-rest-api-contract.md), [Product Modes](architecture/web-product-modes.md), [Web runtime hygiene](deployment/web-runtime-hygiene.md) | Browser UI, REST API, product behavior and SWPC runtime are separate concerns |
+| PS | [Z2 PS release kit and installer](deployment/z2-ps-installer.md), [Runtime data-root CI contract](architecture/runtime-data-root-contract-v1.md), [SWD legacy retirement map](development/swd-legacy-path-retirement.md) | Installer acceptance is not proof of physical Z2 qualification; retired SWD-03 is not current external SWD |
+| PL | [Fixed FPGA ABI proposal](architecture/fixed-fpga-hardware-abi-v1-gate1.md), [Site 1 RTL feasibility](architecture/fixed-fpga-swd-site1-rtl-gate1.md), [FPGA build diagnostics proposal](architecture/plasma-unified-fpga-build-diagnostics-v1.md), [ADR-0003 proposed driver boundary](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md) | Proposed/M1 NO-GO and host-only evidence must not be mistaken for accepted or HIL-qualified hardware |
+
+Historical PS-only reference: [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md) documents a retired internal SWD-03 fixture, not the current Blue Pill runbook.
+
+## Architecture and contracts
+- **Gate 1 / Draft PR #1225 / Host-only** — [PPU Canonical Bundle v3 套件部署契約](architecture/ppu-canonical-bundle-packages.md)：`Bundle → Packages → Files`、相依／SHA256 驗證與 Admission；Install／Verify／Activate／Rollback 僅在 Host-only 沙盒模擬，不代表真實部署。
+- **Gate 1 / Path 1 / PR3 Host-only** — [PPU 通用 Bundle v2 統一部署整合](architecture/ppu-pr3-unified-hostonly-integration.md)：多元件 DAG/Inventory/Publisher+Master fail-closed Host-only 契約、既有 Coordinator 的回復模擬、Manager/BFF/Web Console 共用 Bootstrap Admission；未部署、未操作實機。
+- **Gate 1 / Path 1 / Draft / Host-only** — [PPU 單一安裝入口收斂](architecture/ppu-unified-deployment-gate1.md)：唯一 Bootstrap Deployment API、共用 Coordinator Lock/Journal 目標與 SWPC `ppu-deploy` 三模組過渡驗證；現有 SSH 工程安裝未退役、工程/FPGA Image 的新 API 仍未取得安裝資格，未部署。
+- **Gate 1 / Path 1 / Host-only / Draft** — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。
+- **Gate 1 / Path 1 / Host-only / Product policy candidate** — [PPU Z2 Monitor/Master/Engineer Privilege Boundary](architecture/ppu-privilege-boundary-gate1.md)：PPU 三級產品能力、Master 非 Linux Root 操作與部署、Engineer Root 維修、特權 Bridge 的預期邊界；僅 Host-only policy／tests，尚未接入 Runtime／Z2。
+- **Gate 1 / Path 1 / Source audit** — [Z2 Root Guard Rule Necessity Audit](development/z2-root-guard-rule-audit-gate1.md)：逐項核對 Root Guard、Source Pin、UIO／MMIO Owner、/proc 掃描、PPU Reload Fence、Job Lease 與 UNCERTAIN，標明必要保留、維護專用、重複候選及尚未合併的 Draft；本次不刪除受保護程式。
+
+
+
+- **Gate 1 Draft / Host-only / NOT_DEPLOYED** — [SWD NORMAL OpenOCD/ARMv7 Boundary](architecture/swd-normal-openocd-armv7-gate1.md)：新增獨立 Site NORMAL 的交易轉接契約與注入式 32-bit MMIO Window、負向測試；未實作真正 OpenOCD C Adapter／ARMv7 LDR/STR，也沒有新 Vivado／Z2／DUT 驗收。
+
+- **Gate 1 / Clean-sheet dual-Site SWD / source-and-RTL simulation only / NOT_DEPLOYED** — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA Y18/Y19、Site 2 = PMODB W14/Y14，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO、可擴充 8-Site 的新 ABI 候選；目前僅有初步雙 Site RTL core Source，尚無 RTL 模擬 PASS、AXI-Lite/FIFO 整合、Bitstream、OpenOCD Native Adapter 或實機 HIL PASS，舊單 Site Remote Bitbang 保留歷史診斷用途，不因本文件被更改或部署。
+
+- **Proposed / Documentation-only / M1 NO-GO** — [PLASMA Verification Platform v1](architecture/plasma-verification-platform-v1.md)：統一 FPGA SIM-0～SIM-4 的工具與平台、PS Driver→AXI→RTL 驗證矩陣、可信任 SWPC 邊界及未來證據格式；本 PR 不變更 CI 或授權任何硬體操作。
+
+- **Gate 1 Draft / GitHub-hosted only** — [Unified FPGA Build & Diagnostic Engine v1.0](architecture/plasma-unified-fpga-build-diagnostics-v1.md)：Path 2／Path 3 共用 Vivado Driver、階段式錯誤診斷、License／目錄前置檢查、SHA256 Artifact；本次僅驗證離線測試，未在 SWPC 重新建置，硬體 M1 NO-GO。
+- **Historical Gate 1 fixed host-build capability** — [Fixed CLI Host Build Capability](architecture/plasma-path2-fixed-host-build-capability.md)：原始 Gate 1 規範 SWPC Vivado 固定 CLI 與 Capability 審核；該歷史文件的 NOT_RUN 標記不代表現有 Path 2 執行狀態。當前 Build／Download／Testing 仍依 Work Order、受信任來源及各階段安全守衛判定。
+- **Gate 1 / Runtime candidate / DEFAULT OFF** — [Reusable Engineering Runtime Dispatcher v1](architecture/plasma-engineering-runtime-dispatch-v1.md)：Path 2 SWPC CLI／Path 3 SWPC Codex 共用 Work Order、Capability、SHA 與一次性保護 Claim；PR 與 push 僅執行 GitHub-hosted 離線測試。尚未啟用 SWPC 執行，隔離 Runner／自動 Gate 1 Dispatch／真實 Publisher 未驗收，不代表可操作任何實體硬體。
+- **Plan / Offline-only Gate 1A** — [Unified Engineering Dispatch v1](architecture/plasma-engineering-dispatch-v1.md)：定義 versioned Work Order、SHA256 owner approval、Capability Policy、離線授權及去重契約；所有既有 Codex Workflows 不修改，僅在未來派工時逐條遷移，**尚未部署或啟用新的 Runtime Dispatcher**。
+- **Plan / Offline software-pr Gate 1** — [PLASMA Software-only PR Candidate + Mock Publisher Pilot](development/plasma-engineering-software-pr-pilot.md)：Issue #981 的受控 Work Order、離線檔案變更、SHA256 證據與 Mock PR Publisher；GitHub-hosted FAKE Codex 驗證，不代表已運行真實 Codex、自動建立 PR 或啟用 Dispatcher。
+- **Gate 1 / Dormant Claim Canary** — [PLASMA Engineering Protected Claim One-shot Canary](development/plasma-engineering-claim-canary.md)：Issue #981 GitHub Claim Ruleset 的實際 create/replay/update/delete/readback 驗證程式；僅 Owner 未來單次精確指令才能觸發，現在只執行離線契約測試，**未建立任何真實 Claim、未啟用 Dispatcher**。
+- **Gate 1 / SWPC Codex software-only MVP / not yet live** — [Software-only Codex → PR MVP](development/plasma-codex-software-mvp.md)：Issue #981 單次 Owner 指令、真實 Codex Worker、獨立受限 Publisher 與 Gate 2 人工合併；未完成實際 Codex 執行前不得宣稱上線。
+- **Gate 1 / SWPC device-node diagnostic (not executed)** — [Codex Software-only Device Permission Read-only Diagnosis](development/plasma-codex-device-permission-diagnostic.md)：針對 Run #39190291831 之硬體節點存取 NO-GO，僅提案裝置節點權限中繼資料、Linux User／Group 與 ACL 唯讀蒐集；PR 合併不會自動啟動 SWPC，實機取證另需明確批准。
+- **Gate 1 / Unified AXI / M1 NO-GO** — [Fixed PPU Unified 64KiB AXI Site1](architecture/fixed-ppu-unified-axi-site1-gate1.md)：AXI AW/W 配對、Identity + Site1 同一入口、Global Fault 連動及虛擬 SWD E2E；Host-only，尚未實機驗證。
+- **Gate 1 / PPU Identity / M1 NO-GO** — [PPU Global Identity & Resource Admission](architecture/fixed-ppu-global-identity-resource-admission-gate1.md)：隔離 AXI-Lite Identity、Host-only Board Descriptor／UIO Resource Discovery／Broker Site 准入與負向測試；未授權真實硬體。
+- **Gate 1 / Semantic Convergence / M1 NO-GO** — [Fixed FPGA ABI v1 SWD Semantic Convergence](architecture/fixed-fpga-swd-semantics-gate1.md)：SWD 64-clock Reset、半週期、ACK／Error、FAULT ACK、Sequence／Driver 競態；Host-only，尚未實機驗證。
+- **Gate 1 / Simulation-only / M1 NO-GO** — [Fixed FPGA SWD Site 1 RTL Vertical Slice](architecture/fixed-fpga-swd-site1-rtl-gate1.md)：隔離的 AXI-Lite／SWD Site 1 RTL 與模擬 Driver，Cocotb 虛擬 DPIDR 測試；不代表實體 FPGA／UIO／八通道已驗收。
+- **Gate 1 / Fixed Image M1 NO-GO** — [Zynq-7020 Universal Fixed Image ABI v1](architecture/fixed-fpga-hardware-abi-v1-gate1.md)：以 SWD／SPI PIO 定義完整最小 Command／FIFO／Site 1–8／Response 契約；[機器可驗證 ABI](../pl/verification/fixed_image_abi_v1_gate1.json) 為提案，**RTL 尚未實作**。
+- **Gate 1 / Host-only** — [Fixed Image UIO Driver Contract](development/fixed-fpga-uio-driver-contract-gate1.md)：依 Kernel／Device Tree／Physical Resource 唯一辨識 UIO，而非固定 uio0；不授權真實 /dev/uio*。
+- **Gate 1 / Host-only** — [Single Hardware Broker + Eight-Site Ownership](architecture/fixed-fpga-hardware-broker-eight-site-gate1.md)：Execution Owner／Hardware Broker／Site Lease／獨立 DUT Power Reset 分工。
+- **Gate 1 / M1 NO-GO** — [Fixed FPGA M1 Freeze Acceptance](architecture/fixed-fpga-m1-gate1-acceptance.md)：技術缺口、RTL/Driver/電氣驗證及下階段分工。
+- **Plan / Proposed** — [Runtime FPGA Architecture v1.0](architecture/runtime-fpga-architecture-v1.md)：記錄一台 PPU 同批次相同 IC、多 Site 獨立執行、切換介面不重啟 Linux 的架構前提，以及 Driver／Hardware ABI／動態 FPGA Switching、HIL Phase、相依性與 Gate 邊界；**尚未實作，也不授權實機操作**。
+- **Plan / Proposed** — [Runtime FPGA Hardware ABI v1](architecture/runtime-fpga-hardware-abi-v1.md)：定義 PPU 64-KiB／8-Site 候選 AXI Map、Identity／Capability、Major/Minor，相容性與現有 MS01 的語意落差；**不代表真實 RTL 已實作**。
+- **Host-only review / M1 NO-GO** — [Zynq FPGA Manager Isolation and Runtime Ownership Review](architecture/zynq-fpga-manager-isolation-ownership-review.md)：以 Z2 唯讀盤點、Kernel/DT 綁定與明確標示的 Xilinx 參考原始碼，審查 UIO Ownership、PS–PL 隔離缺口及 PPU Configuration Owner；不授權 FPGA 載入或 HIL-B/C。
+- **Host-only evidence review / M1 NO-GO** — [PPU Phase 2B M1 Hardware Boundary](architecture/ppu-phase2b-m1-hardware-boundary.md)：以唯讀 UIO/Manager/Bridge Inventory 的離線 Gate 拒絕未經證實的 FPGA 重配置安全主張，列出 Kernel Source、AXI Drain、DMA/VMAs 與外部復原的硬體阻擋證據；不授權實機操作。
 - **Current** — [Facility / PPU / Site Domain Model](architecture/ppu-facility-sites.md)
 - **Current** — [PPU Execution Ownership](architecture/ppu-execution-ownership.md)
 - **Current** — [Domain Naming and Identity Policy](architecture/domain-naming-migration.md)
@@ -120,6 +225,42 @@
 - **Reference** · `Host-only model` · `M1 NO-GO` — [PPU Configuration Safety Contract Phase 2A.2](architecture/ppu-phase2a2-configuration-safety-contract.md)：驗證合成 Ownership／AXI Isolation／Mapping Retirement／Verification 證據之精確 Pin 與 fail-closed 條件；通過不授予 FPGA 載入或實體操作權限。
 - **Reference** · `internal loopback only` · `NO Z2 HIL` — [LT02 PS–PL MMIO Loopback ABI](development/mmio-lt02-ps-pl-loopback.md)：新增 FPGA AXI4-Lite Scratchpad／LinuxMMIO 分塊資料比對契約；五 Aperture Build 已由 SWPC 回報 PASS，LT02-05 Z2 HIL 尚未執行，PL UI Endpoint 仍停用。
 - **Reference** · `Host-only differential` — [SWD-06 RTL ↔ Python Differential Verification](development/swd06-rtl-python-differential.md)：由 SWD-05 Python Driver 操作 SWD-03 真實 RTL 的 Cocotb AXI4-Lite Bus，僅驗證模擬硬體，Z2 實機尚未執行。
+- **Reference / Operator-observed / HARDWARE NO-GO** — [2026-10-15 PYNQ-Z2 HIL Hardware Inventory](development/hil-hardware-inventory.md)：記錄 Transcend Hub Port 2／3／4、Z2 JTAG／UART 與 5V 供電主張、AX88179、KINGST LA2016、PL 執行環境及復原驗收缺口；不含操作端識別資料，也不取代即時安全預檢。
+- **Observed / LA-only functional PASS** — [2026-10-16 KINGST PWM1 → CH0 Loopback Evidence](evidence/la2016-pwm-loopback/2026-10-16/README.md)：保存 1 kHz／50% 與 2 kHz／25% 實測波形、OFF 對照、SHA256 與離線重算工具；不代表 Z2 或類比電壓驗收。
+- **Observed / ST-LINK SWD reference** — [2026-10-23 STM32F103 Blue Pill Golden Reference](evidence/stlink-stm32f103-swd-reference/2026-10-23/README.md)：保存三輪 ST-LINK Flash／讀回、六份 LA2016 原始 SWD 波形與離線驗證；CDC 首次 ID 與 SWCLK 時序差異仍未結案，不代表 Z2 燒錄能力。
+- **Observed / Z2 DPIDR FAIL** — [2026-10-26 Z2 PS OpenOCD + LA2016 Blue Pill Evidence](evidence/bluepill-z2-dpidr-la2016-2026-10-26/README.md)：保存已載入 FPGA 映像的 Identity PASS、兩份原始 LA2016 波形、PS-local Bridge／OpenOCD 失敗收據與測後狀態；第二次擷取的 CH0／SWCLK 全程無邊緣，根因未定。
+- **Observed / Z2 SWD + page-18 Flash + CDC PASS** — [2026-10-27 實驗步驟與證據](evidence/bluepill-z2-flash-2026-10-27/README.md)、[繁體中文摘要](evidence/bluepill-z2-flash-2026-10-27/SUMMARY.md)、[Step 1–2 原始紀錄](evidence/bluepill-z2-flash-2026-10-27/receipts/step12-result.md)：保存 FPGA BIN/Manifest、PS-local OpenOCD 程式、LA2016 波形、約 3.6 kHz SWCLK 實測、page-18 同內容擦寫讀回及 SWD reset 後 USB CDC heartbeat；未知內容的最後一頁沒有擦除或公開。
+- **Observed / Z2 Blue Pill v0.1 erase/write FAIL → no-erase write PASS** — [2026-10-28 v0.1/v0.2 實驗紀錄](evidence/bluepill-z2-ab-flash-failure-2026-10-28/README.md)：首次 v0.1 擦除後寫入演算法逾時，全片讀回確認前 19 頁全 `0xFF`；之後不擦除直接寫回 v0.1，獨立讀回、同步 LA2016 活動及 reset 後 CDC heartbeat PASS。v0.2 未執行；私有 Flash/波形未公開。
+- **Reference / Operator-observed Tool Runbook** — [ST-LINK SWD 工具操作手冊](development/stlink-swd-tool-operations.md)：整理已驗證的 st-info/st-flash 操作、ST-LINK 排他接線、VTref、Flash Write + 獨立 Readback／SHA256，以及 Reset/NRST 未驗證限制；文件本身不授權實機操作。
+- **Current / Path 3 direct tools** — [Path 3 Codex 直接操作 LA2016／Z2 PS](development/plasma-path3-direct-hardware-tools.md)：不透過固定 JSON Host Supervisor，沿用 sigrok CLI、既有 SSH、Z2 PS OpenOCD／WordPort，保留實體互斥、電氣、Manifest 與 Root Guard。原 Issue #981 LA-only workflow 已退役；本次無實機執行。
+- **Reference / Operator-observed Tool Runbook** — [KINGST LA2016 工具操作手冊](development/la2016-tool-operations.md)：實測 sigrok AppImage 與 firmware resource 初始化、被動 SWD 抓波形、成功 Golden Reference、PWM1→CH0 Loopback、PWM OFF 波形驗證；區分歷史成功與當次裝置狀態。
+- **Host-only / HARDWARE NO-GO** — [PSPL-02 / SWD-00 Internal Waveform HIL](development/pspl02-swd00-hil-runbook.md)：三區段 baseline 專用的產物校驗、預檢、受限 MMIO 與原映像復原程序；現場獨立復原及 privileged ownership 尚待確認。
+- **Plan / Accepted Policy** — [SWD-04 Z2 PS/PL HIL Runbook](development/swd04-z2-hil-runbook.md)：以獨立 Preflight、白名單 AXI MMIO、DPIDR、ABORT 與恢復原 PYNQ 系統的 Host-only 安全契約，實機驗證尚未執行。
+- **Host-only / Execution Preparation** — [SWD-04 Offline Execution Checklist](development/swd04-offline-execution-checklist.md)：真實 Artifact、BIN 格式、離線工具包、服務隔離與 HIL／Recovery 操作單；缺少復原檔案時禁止載入。
+- **Host-only software integration** — [SWD-05 Linux PS SWD Transaction Driver](development/swd05-linux-swd-transaction-driver.md)：基於 SWD-03 AXI ABI 的單 Site Driver、注入式 MMIO、Response ACK、WAIT/FAULT/ABORT、posted AP read 與故障隔離；目前無 Z2 實機資格。
+- **Gate 1 / Host-only** — [Independent SWD v5 Image Hardware Contract Audit](development/swd-independent-image-hardware-contract.md)：以 ab79b04e 實際 HWH 驗證雙 Site Identity 位址與 GP0 連線，修正 UIO Owner Admission 契約；Device Tree Owner 與 Z2 HIL 尚未驗證。
+- **HIL-A1.5 / GitHub-hosted QEMU / SWPC NOT RUN / M1 NO-GO** — [ARMv7 Barrier Frozen Artifact QEMU Validation](development/hil-a15-qemu-armv7.md)：以固定 GitHub A1 Run/Artifact、SHA256、ARMv7 QEMU `ctypes` 1,000 次呼叫做 CPU-only 模擬驗證；SWPC 常駐 QEMU 僅建立受控執行方案，實體 Z2 A2 仍 NOT RUN。
+- **HIL-A2 / Path 2 Gate 1 preparation / Z2 NOT RUN / M1 NO-GO** — [Cortex-A9 CPU-only Native DMB Contract](development/hil-a2-cpu-only.md)：沿用共用 Dispatcher 與固定 A1 Artifact，定義預設關閉的實機 CPU-only Capability、Work Order、離線驗證及獨立 Evidence；不授權 SWPC／Z2 實機執行。
+- **HIL-A1 / GitHub-hosted cross-build / M1 NO-GO** — [ARMv7 Barrier SWPC A1 / Z2 A2](development/armv7-barrier-hil-a.md)：A1 於 GitHub-hosted 以固定 Debian OCI／APT Snapshot 交叉編譯 ARMv7 ELF、驗證 `dmb sy` 並上傳 SHA256 Artifact；原 SWPC A1 實測因工具鏈缺失 FAIL；A2 Z2 執行仍為 NOT RUN。
+- **P0 / Host-only / M1 NO-GO** — [Fixed ABI Site 1 Native-Word MMIO Adapter + ARMv7 DMB Candidate](development/p0-fixed-abi-site1-mmio-adapter-host.md)：沿用 LinuxMMIO 的 Site lease、嚴格 ABI 讀寫白名單、要求 Write Barrier 並驗證 COMMIT 順序；原生 ARMv7 Library、實體 Z2／DUT 尚未合格。
+- **Gate 1 / Paths 1+3 / Draft** — [Native C WordPort Bridge](development/native-c-wordport-gate1-host.md)：在既有 Z2 PS 受保護 Python Owner／Site lease 與本機 UNIX Socket 內，以 SHA-pinned ARMv7 C 處理 Remote Bitbang GPIO/MMIO/DMB；原始 Protocol A/B 為 Host-only 測試，後續經核准實測 DPIDR、v0.1 Flash 與 heartbeat。總 session alarm 600 秒、socket idle 60 秒；[公開執行腳本與操作索引](evidence/native-c-wordport-2026-10-28/README.md)保存可審查來源，原始波形及 Flash 讀回保留於私有工作目錄。
+- **Gate 1 / Host-only candidate / Path 2** — [Image-agnostic Native C WordPort Programming](development/image-agnostic-wordport-path2.md)：每次 Work Order 動態選擇原始 BIN 與獨立 SHA256，依 exact ICPN Programming Profile／Flash Geometry 計算 Erase；OpenOCD Verify 必要、完整 Readback 選用，使用既有 Z2 PS OpenOCD／PL WordPort；目前只准 STM32F103C8T6 Site 1，尚未部署及執行新的實機驗證。
+- **Gate 1 / Draft PR #1207 / Host-only** — [通用 PPU 工程模組部署 `ppu-deploy`](development/ppu-deploy-engineering-modules.md)：Z2 PS WordPort／OpenOCD Python 整合與 SWPC A/B Runner 由同一來源版本協調部署，包含 SHA、互斥、啟用驗證與回滾；目前只有 Host-only 測試，不代表 GitHub PR 已合併或 Z2／SWPC 已部署。
+- **Gate 1 / Path 2 guarded-hardware / Draft** — [Native C WordPort v0.2 SWPC→Z2／Z2 Direct](development/native-wordport-v02-path2.md)：重用 PR #1199 PS-local Native C Bridge，新增固定入口與來源 SHA、v0.2 62,800-byte 一次性 Erase／Program／Verify／Readback，失敗時於同一 OpenOCD 工作階段先讀 DHCSR／FIFO／FLASH 狀態再 Halt 讀 PC／xPSR。GitHub-hosted 僅 Host-only 測試；SWPC／Z2／DUT 執行仍 NOT_RUN，禁止自動重試、Reset 或部署。
+- **Gate 1 / Draft / PR #1203** — [SWD Performance Baseline 與階段量測](development/swd-performance-baseline-2026-10-29.md)：紀錄既有 A/B 原始證據、monotonic 階段時間與 Native C／WordPort 計數器對帳；實機新 A/B 量測須符合 Owner/SHA 與 Site 1 安全授權。
+- **Gate 1A / GitHub-hosted SIM-1／SIM-2** — [Fixed ABI v1 Dual-Site RTL + Protocol-neutral PS↔PL Driver](development/fixed-abi-dual-site-gate1a.md)：Site1／Site2 真實 RTL 模擬引擎、正式 PS SWD Controller 閉環及負向隔離；不代表 Z2／DUT／八 Site 實體驗證。
+- **Host-only software integration** — [Linux MMIO Backend v1](development/linux-mmio-backend-v1.md)：正式 Python 模組使用 native 32-bit mmap 存取、Register Allowlist、Site Lease、Thread Safety 與生命週期保護；已完成 SWD-03 Development HIL（2026-10-16），但未涵蓋 LT02 新 IP。
+- **Host-only candidate / NO REAL UIO HIL** — [UIO Runtime Backend Phase 2A](development/uio-runtime-backend-host-v1.md)：實作 Fake sysfs／Regular File 專用 UIO mapN、精確物理資源 Pin、Site Lease、Mapping Generation、Failure Injection；**拒絕開啟 `/dev/uioX` Character Device**，M1 仍 NO-GO。
+- **Host-only model / M1 NO-GO** — [PPU Configuration Owner Phase 2A.1](development/ppu-configuration-owner-phase2a1-host.md)：單一 PPU Admission Gate、同 IC 批次、Quiesce、Synthetic Ownership/Safe-IO 模擬、Lease／Mapping Generation、Fault Injection；**不具實體 FPGA/Kernel 隔離資格**。
+- **Host-only interlock / M1 NO-GO** — [PPU Configuration Owner Phase 2A.3](development/ppu-configuration-owner-phase2a3-interlock-host.md)：以相同 Boot／Source／Resource／Owner Epoch／Mapping Generation 將 Phase 2A.2 Safety Contract 接入 Ownership、Isolation、Retirement、Verification 與 Mapping Generation 狀態門禁；合成 PASS **不**授權真實 FPGA 載入。
+- **Host-only model / M1 NO-GO** — [PPU Configuration Safety Contract Phase 2A.2](architecture/ppu-phase2a2-configuration-safety-contract.md)：驗證合成 Ownership／AXI Isolation／Mapping Retirement／Verification 證據之精確 Pin 與 fail-closed 條件；通過不授予 FPGA 載入或實體操作權限。
+- **Implementation candidate / NO Z2 HIL** — [LT02 PS–PL MMIO Loopback ABI](development/mmio-lt02-ps-pl-loopback.md)：新增 FPGA AXI4-Lite Scratchpad／LinuxMMIO 分塊資料比對契約；五 Aperture Build 已由 SWPC 回報 PASS，LT02-05 Z2 HIL 尚未執行，PL UI Endpoint 仍停用。
+- **HIL preparation / NOT RUN** — [LT02-05 Z2 native LinuxMMIO development HIL runner](../pl/hil/lt02/README.md)：使用正式 Python Driver + ARMv7 native LinuxMMIO；當次 image 身分、五 Aperture 檢查與原始 FPGA 恢復各自驗證，不等於 HIL PASS。
+- **Host-only differential** — [SWD-06 RTL ↔ Python Differential Verification](development/swd06-rtl-python-differential.md)：由 SWD-05 Python Driver 操作 SWD-03 真實 RTL 的 Cocotb AXI4-Lite Bus，僅驗證模擬硬體，Z2 實機尚未執行。
+- **Reference** — [Mock Runtime Foundation Notes](development/mock-runtime-foundation-notes.md)
+- **Plan** — [Device Support Catalog Implementation Plan](development/device-support-implementation-plan.md)
+- **Plan** — [OpenOCD Part-number Expansion Plan](development/openocd-part-number-expansion-plan.md)
+- **Plan** — [Development Debt Register](development/todo.md)
 
 ## Deployment
 

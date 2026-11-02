@@ -1,0 +1,87 @@
+name: PL independent SWD ABI-v5 host verification
+
+on:
+  pull_request:
+    paths:
+      - "pl/hil/fpga_image_*.py"
+      - "pl/hil/swd_independent_image_contract.py"
+      - "pl/projects/z2-swd-independent/**"
+      - "pl/rtl/swd/**"
+      - "pl/rtl/mpe/**"
+      - "pl/tests/test_swd_independent_*.py"
+      - "pl/tests/test_independent_swd_ip_adr.py"
+      - "pl/tests/fixtures/swd-independent-ab79b04e/**"
+      - "pl/verification/test_mpe_*"
+      - "pl/verification/test_swd_independent_axi_rtl.py"
+      - "pl/verification/cocotb/test_mpe_*"
+      - "pl/verification/cocotb/test_swd_independent_axi.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
+      - "software/python/plasma_interfaces/swd_native_linux_mmio.py"
+      - "software/python/tests/test_swd_native_linux_mmio.py"
+      - "scripts/swd_abi5_path2_readonly_preflight.py"
+      - "scripts/tests/test_swd_abi5_path2_readonly_preflight.py"
+      - ".github/workflows/pl-swd-independent-v5.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pl/hil/fpga_image_*.py"
+      - "pl/hil/swd_independent_image_contract.py"
+      - "pl/projects/z2-swd-independent/**"
+      - "pl/rtl/swd/**"
+      - "pl/rtl/mpe/**"
+      - "pl/tests/test_swd_independent_*.py"
+      - "pl/tests/test_independent_swd_ip_adr.py"
+      - "pl/tests/fixtures/swd-independent-ab79b04e/**"
+      - "pl/verification/test_mpe_*"
+      - "pl/verification/test_swd_independent_axi_rtl.py"
+      - "pl/verification/cocotb/test_mpe_*"
+      - "pl/verification/cocotb/test_swd_independent_axi.py"
+      - "software/python/plasma_interfaces/linux_mmio.py"
+      - "software/python/plasma_interfaces/swd_native_linux_mmio.py"
+      - "software/python/tests/test_swd_native_linux_mmio.py"
+      - "scripts/swd_abi5_path2_readonly_preflight.py"
+      - "scripts/tests/test_swd_abi5_path2_readonly_preflight.py"
+      - ".github/workflows/pl-swd-independent-v5.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  independent-swd-v5-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install host-only simulator and tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends iverilog
+          python -m pip install 'pytest==8.4.2' 'pytest-asyncio==0.26.0' \
+            'PyYAML==6.0.3' 'cocotb==1.9.2' 'cocotb-test==0.2.6'
+      - name: Verify exact Image, HWH, Manifest, Owner and native MMIO contracts
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m pytest -q \
+            pl/tests/test_swd_independent_image_contract.py \
+            pl/tests/test_swd_independent_fpga_project.py \
+            pl/tests/test_independent_swd_ip_adr.py \
+            software/python/tests/test_swd_native_linux_mmio.py \
+            scripts/tests/test_swd_abi5_path2_readonly_preflight.py
+      - name: Simulate independent dual Site and archival MPE RTL
+        run: |
+          python -m pytest -vv -s \
+            pl/verification/test_mpe_dual_swd_core_rtl.py \
+            pl/verification/test_mpe_swd_axi_rtl.py \
+            pl/verification/test_mpe_swd_virtual_target_rtl.py \
+            pl/verification/test_swd_independent_axi_rtl.py
+      - name: Acceptance boundary
+        run: |
+          echo 'Independent SWD ABI-v5 Host-only verification PASS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real Linux MMIO owner, Root load, Site Identity and Blue Pill DPIDR: NOT_RUN.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'External SWD I/O timing qualification is outside this functional gate.' >> "$GITHUB_STEP_SUMMARY"
