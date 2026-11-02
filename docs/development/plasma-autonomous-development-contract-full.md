@@ -3,6 +3,11 @@
 This is the stable compatibility entry for the former monolithic detailed contract. **The normative clauses are preserved in the linked documents**, not duplicated here. Root [AGENTS.md](../../AGENTS.md) remains the mandatory entrypoint; do not load all linked files by default.
 
 - [Shared development contract](plasma-development-common.md): Gate 1 / Gate 2, Git, CI, architecture, source-of-truth, evidence, safety, credentials and recovery. Read only relevant sections on demand.
+- Domain contracts (load only for the interfaces actually changed):
+  - [FPGA / PL](plasma-fpga.md): RTL, XDC, timing, bitstream, PL ABI, MMIO.
+  - [Embedded / PPU](plasma-embedded.md): Z2 Linux, OpenOCD, PS drivers, credentials, recovery.
+  - [Manager / backend](plasma-manager.md): Manager, Gateway, Controller, backend REST, Site routing.
+  - [Web / frontend](plasma-web.md): Web UI, frontend and REST client.
 - [Path 2 — SWPC CLI](plasma-path2-cli.md): bounded SWPC CLI, operator-cli, CPU-only, owner Work Order, native execution and receipts. Load only for Path 2 work.
 - [Path 3 — SWPC Codex](plasma-path3-codex.md): Codex CLI, sandbox, native tools, SSH/sudo, iterative fix/test and CI. Load only for Path 3 work.
 
