@@ -7,7 +7,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import subprocess
+import sys
+import tarfile
+import uuid
 from pathlib import Path
 
 import pytest
@@ -135,3 +140,65 @@ def test_b3_refresh_refuses_enable_now_and_partial_source(tmp_path):
             refresh_only=True,
         )
     assert (paths.install_root / "ppu-bootstrap-service.py").read_bytes() == old
+
+
+refresh = load("ppu_b3_incremental_refresh_transport_test", "ppu_path2_b3_factory_refresh.py")
+
+
+def test_b3_refresh_package_binds_exact_source_and_bundle_sha(tmp_path):
+    path = tmp_path / "b3-source.tar.gz"
+    transfer_hash, bundle_hash = refresh.make_source_tar(path, SOURCE)
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == transfer_hash
+    with tarfile.open(path, "r:gz") as archive:
+        assert {item.name for item in archive.getmembers()} == refresh.ALLOWED_FILES
+        policy = json.loads(archive.extractfile(
+            "scripts/ppu-b3-smoke-policy.json").read())
+        assert policy["source_commit"] == SOURCE
+        assert policy["target"] == TARGET
+        assert policy["archive_sha256"] == bundle_hash
+        assert policy["actions"] == ["install", "verify"]
+        assert (hashlib.sha256(archive.extractfile(
+            "artifacts/ppu-b3-smoke.zip").read()).hexdigest() == bundle_hash)
+
+
+def test_b3_remote_stage_verifier_rejects_wrong_source_without_product_write(tmp_path):
+    archive = tmp_path / "b3-source.tar.gz"
+    digest, bundle = refresh.make_source_tar(archive, SOURCE)
+    stage = Path("/tmp") / (
+        f"plasma-b3-refresh-{SOURCE[:12]}-{uuid.uuid4().hex[:8]}")
+    stage.mkdir(mode=0o700)
+    try:
+        # Exact remote verifier, executing only against a private Host-only
+        # staging directory. It cannot modify /opt/plasma or any real device.
+        argv = [
+            sys.executable, "-I", "-c", refresh.REMOTE_VERIFY_EXTRACT,
+            str(archive), str(stage / "extracted"), SOURCE, bundle,
+            json.dumps(sorted(refresh.ALLOWED_FILES)),
+        ]
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=20)
+        assert result.returncode == 0, result.stderr
+        assert "B3_REMOTE_VERIFIED_SHA256_PASS" in result.stdout
+        installed_policy = stage / "extracted/scripts/ppu-b3-smoke-policy.json"
+        assert installed_policy.stat().st_mode & 0o777 == 0o600
+        assert (stage / "extracted/artifacts/ppu-b3-smoke.zip").is_file()
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def test_b3_remote_verifier_fails_closed_on_wrong_policy_digest(tmp_path):
+    archive = tmp_path / "b3-source.tar.gz"
+    _transfer, bundle = refresh.make_source_tar(archive, SOURCE)
+    stage = Path("/tmp") / (
+        f"plasma-b3-refresh-{SOURCE[:12]}-{uuid.uuid4().hex[:8]}")
+    stage.mkdir(mode=0o700)
+    try:
+        result = subprocess.run([
+            sys.executable, "-I", "-c", refresh.REMOTE_VERIFY_EXTRACT,
+            str(archive), str(stage / "extracted"), SOURCE, "0" * 64,
+            json.dumps(sorted(refresh.ALLOWED_FILES)),
+        ], capture_output=True, text=True, timeout=20)
+        assert result.returncode != 0
+        assert not (stage / "extracted/scripts/ppu-b3-smoke-policy.json").exists() or (
+            stage / "extracted/scripts/ppu-b3-smoke-policy.json").stat().st_mode & 0o777 == 0o600
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
