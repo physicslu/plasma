@@ -5,7 +5,7 @@ on:
     branches:
       - "**"
     paths:
-      - "release/**"
+      - "release/product.json"
       - "scripts/product-release.py"
       - "software/python/pyproject.toml"
       - "software/python/tests/test_product_release.py"
@@ -13,7 +13,7 @@ on:
       - ".github/workflows/product-release.yml"
   pull_request:
     paths:
-      - "release/**"
+      - "release/product.json"
       - "scripts/product-release.py"
       - "software/python/pyproject.toml"
       - "software/python/tests/test_product_release.py"

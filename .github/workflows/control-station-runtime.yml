@@ -22,7 +22,7 @@ on:
       - "software/python/tests/test_control_station_runtime.py"
       - "software/python/tests/test_control_station_release.py"
       - "software/python/tests/test_render_deployment.py"
-      - "release/**"
+      - "release/product.json"
       - ".github/workflows/control-station-runtime.yml"
   pull_request:
     paths:
@@ -44,7 +44,7 @@ on:
       - "software/python/tests/test_control_station_runtime.py"
       - "software/python/tests/test_control_station_release.py"
       - "software/python/tests/test_render_deployment.py"
-      - "release/**"
+      - "release/product.json"
       - ".github/workflows/control-station-runtime.yml"
 
 concurrency:
