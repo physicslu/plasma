@@ -129,6 +129,7 @@
 - **Plan** · `Host-only` · `NOT_DEPLOYED` — [SWD NORMAL OpenOCD/ARMv7 Boundary](architecture/swd-normal-openocd-armv7-gate1.md)：獨立 Site NORMAL 交易轉接契約與注入式 32-bit MMIO Window；OpenOCD `plasma_swd` Adapter 的 PS-local 綁定尚未實作（fail-closed），無 DUT 驗收。
 - **Plan** · `RTL simulation only` — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA、Site 2 = PMODB，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO 的新 ABI 候選。
 - **Reference** · `Host-only` · `ab79b04e` — [Independent SWD v5 Image Hardware Contract Audit](development/swd-independent-image-hardware-contract.md)：以 ab79b04e HWH 驗證雙 Site Identity 位址（`0x43C01000`／`0x43C02000`）與 GP0 連線，及 devmem Owner Admission 契約。
+- **Plan** · `Gate 1` · `PR #1265 Draft` · `Host-only` — [OpenOCD 5088 ARMv7 CI Build Cache Optimization](development/openocd5088-armv7-ci-build-cache.md)：依實際編譯輸入內容建立快取，保留每次驗證、重新封裝及最新 HEAD Evidence；未合併、不部署、不操作實機。
 - **Current** · `Engineering` · `Route B` — [ABI-v5 OpenOCD plasma_swd → Blue Pill DPIDR HIL Runbook](development/swd-abi5-openocd-dpidr-hil-runbook.md)：Build／部署／Root Admission／DPIDR 流程、失敗判讀、2026-11-02 取樣相位阻擋，以及修正後 FPGA 經 HTTP API 交付與載入的界線。
 
 ## Deployment
