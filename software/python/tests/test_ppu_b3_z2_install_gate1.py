@@ -287,3 +287,16 @@ def test_generic_b3_rejects_corrupted_existing_digest_stage(tmp_path):
         co.execute_bundle_v3_install(b3_request(archive, sha))
     assert damaged.read_bytes() == b"bad"
     assert co.journal.read().state == "recovery_required"
+
+
+def test_generic_b3_rejects_symlinked_asset_root_without_external_write(tmp_path):
+    archive, digest = build_generic_assets(tmp_path / "archive")
+    co = make_coordinator(tmp_path)
+    external = tmp_path / "external"
+    external.mkdir()
+    co.paths.product_root.mkdir()
+    (co.paths.product_root / "assets").symlink_to(external, target_is_directory=True)
+    with pytest.raises(engine.DeploymentError, match="B3_INSTALL_REQUIRES_RECOVERY"):
+        co.execute_bundle_v3_install(b3_request(archive, digest))
+    assert not list(external.iterdir())
+    assert co.journal.read().state == "recovery_required"
