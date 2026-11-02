@@ -17,6 +17,7 @@ on:
       - "scripts/ppu-z2-installer-core.py"
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
+      - "scripts/ppu_bundle_authority.py"
       - "scripts/plasmactl-z2-ps"
       - "docs/deployment/ppu-bootstrap-factory-and-hil.md"
       - "docs/deployment/port-profile-matrix.md"
@@ -27,6 +28,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
+      - "software/python/tests/test_ppu_bundle_authority_gate1.py"
       - "software/python/tests/test_ppu_b3_factory_refresh_gate1.py"
       - "software/python/tests/test_ppu_single_active_asset_set_gate1.py"
       - "software/python/tests/test_ppu_active_fpga_handoff_gate1.py"
@@ -51,6 +53,7 @@ on:
       - "scripts/ppu-z2-installer-core.py"
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
+      - "scripts/ppu_bundle_authority.py"
       - "scripts/plasmactl-z2-ps"
       - "docs/deployment/ppu-bootstrap-factory-and-hil.md"
       - "docs/deployment/port-profile-matrix.md"
@@ -61,6 +64,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
+      - "software/python/tests/test_ppu_bundle_authority_gate1.py"
       - "software/python/tests/test_ppu_b3_factory_refresh_gate1.py"
       - "software/python/tests/test_ppu_single_active_asset_set_gate1.py"
       - "software/python/tests/test_ppu_active_fpga_handoff_gate1.py"
@@ -99,6 +103,7 @@ jobs:
           scripts/ppu-bootstrap-installer.py
           scripts/ppu_unified_deployment.py
           scripts/ppu_asset_set.py
+          scripts/ppu_bundle_authority.py
           pl/hil/fpga_image_root.py
       - name: Install test runner
         run: python -m pip install pytest
@@ -109,6 +114,7 @@ jobs:
           software/python/tests/test_ppu_bootstrap_deployment.py
           software/python/tests/test_ppu_deploy_api_host.py
           software/python/tests/test_ppu_b3_z2_install_gate1.py
+          software/python/tests/test_ppu_bundle_authority_gate1.py
           software/python/tests/test_ppu_b3_factory_refresh_gate1.py
           software/python/tests/test_ppu_single_active_asset_set_gate1.py
           software/python/tests/test_ppu_active_fpga_handoff_gate1.py
@@ -144,6 +150,7 @@ jobs:
             scripts/ppu-z2-installer.py \
             scripts/ppu-z2-installer-core.py \
             scripts/ppu_asset_set.py \
+            scripts/ppu_bundle_authority.py \
             "$root/scripts/"
           # Generic B3 capability belongs to Bootstrap, not any test ZIP.
           cp scripts/ppu-bundle-install-policy.json "$root/scripts/"
