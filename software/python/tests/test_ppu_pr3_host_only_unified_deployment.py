@@ -194,8 +194,15 @@ def test_pr3_manager_bundle_admission_uses_same_authenticated_api(tmp_path):
                     "result": {
                         "stage": "package_admission_only",
                         "install_qualified": False,
+                        "source_authorized": True,
                         "plan": {
                             "kind": "bundle", "execution_permitted": False,
+                            "archive_sha256": "b" * 64,
+                            "authorization": {
+                                "status": "MASTER_APPROVED",
+                                "method": "root-provisioned-exact-bundle-sha256",
+                                "archive_sha256": "b" * 64,
+                            },
                         },
                     },
                 },
@@ -245,5 +252,5 @@ def test_pr3_manager_rejects_untrusted_upstream_install_receipt(tmp_path):
     manager = ManagerBootstrapCoordinator(
         _registry(tmp_path), creds, 2.0, client_factory=CompromisedClient,
     )
-    with pytest.raises(BootstrapManagerError, match="not non-executing"):
+    with pytest.raises(BootstrapManagerError, match="not Master-authorized and non-executing"):
         manager.start_deployment("z2", {"kind": "bundle", "upload_id": "a" * 32})
