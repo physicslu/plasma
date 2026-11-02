@@ -52,8 +52,9 @@ def extract_reference(name=VERIFY_CAPTURE):
                     "round-03-verify.sr"):
         raise ValueError("Only approved ST-LINK Verify captures are admissible")
     path = GOLDEN_DIR / name
-    manifest = dict(line.rstrip("\n").split("  ", 1)
-                    for line in (GOLDEN_DIR / "SHA256SUMS").read_text().splitlines())
+    manifest = {name: digest for digest, name in
+                (line.rstrip("\n").split("  ", 1)
+                 for line in (GOLDEN_DIR / "SHA256SUMS").read_text().splitlines())}
     expected = manifest[name]
     actual = _sha256(path)
     if actual != expected:
