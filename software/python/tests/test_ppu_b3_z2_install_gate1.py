@@ -166,7 +166,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     srv.bundle_install_runner = runner
     # Without B2, B3 is forbidden and cannot stage software.
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MATCHING_B2_ADMISSION_REQUIRED"):
-        srv.start_deployment({"kind": "bundle", "upload_id": "a" * 32, "install_only": True})
+        srv.start_deployment({"kind": "bundle", "upload_id": "a" * 32, "fpga_load": False})
     raw = archive.read_bytes()
     upload = bootstrap.create_upload(paths, size=len(raw), sha256=digest)
     upload_id = upload["upload_id"]
@@ -186,12 +186,12 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     # Policy is supplied from the factory root, never an HTTP caller field.
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
-                              "install_only": True, "publisher": "caller"})
+                              "fpga_load": False, "publisher": "caller"})
     new = dict(source_policy, mode="untrusted")
     paths.bundle_install_policy.write_text(json.dumps(new))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_POLICY_INVALID"):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
-                              "install_only": True})
+                              "fpga_load": False})
     paths.bundle_install_policy.write_text(json.dumps(source_policy))
 
     # B3 must not trust a past B2 receipt after the independent Master
@@ -202,10 +202,10 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     paths.bundle_authority_policy.write_text(json.dumps(withdrawn))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MASTER_AUTHORITY_DENIED"):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
-                              "install_only": True})
+                              "fpga_load": False})
     paths.bundle_authority_policy.write_text(json.dumps(master_grants))
 
-    srv.start_deployment({"kind": "bundle", "upload_id": upload_id, "install_only": True})
+    srv.start_deployment({"kind": "bundle", "upload_id": upload_id, "fpga_load": False})
     assert srv.deployment_thread is not None
     srv.deployment_thread.join(timeout=10)
     assert not srv.deployment_thread.is_alive()

@@ -324,7 +324,7 @@ def test_console_generic_bundle_b2_then_explicit_b3_no_implicit_execution(tmp_pa
     assert submission.state == "queued"
     assert fake.calls[-2][1] == "/v1/deployment"
     assert fake.calls[-1] == ("POST", "/v1/deployments", {
-        "kind": "bundle", "upload_id": uploaded, "install_only": True,
+        "kind": "bundle", "upload_id": uploaded, "fpga_load": False,
     })
 
 
@@ -375,7 +375,7 @@ def test_console_asset_set_mismatch_uploads_whole_bundle_then_b2_b3(tmp_path):
         body = json.loads(raw) if raw is not None else None
         if path == "/v1/deployments":
             fake.calls.append((method, path, body))
-            if body.get("install_only") is True:
+            if body.get("fpga_load") is False:
                 receipt = {
                     "transaction_id": "d"*32, "upload_id": fake.upload_id,
                     "state": "queued", "result": None,
@@ -400,7 +400,7 @@ def test_console_asset_set_mismatch_uploads_whole_bundle_then_b2_b3(tmp_path):
     assert [body for _method, path, body in fake.calls
             if path == "/v1/deployments"] == [
                 {"kind": "bundle", "upload_id": fake.upload_id},
-                {"kind": "bundle", "upload_id": fake.upload_id, "install_only": True},
+                {"kind": "bundle", "upload_id": fake.upload_id, "fpga_load": False},
             ]
 
 

@@ -1,7 +1,8 @@
 """FPGA Image + companion Manifest: hash-matched download, identity, restore.
 
 No protocol/IP-specific handler, runtime Project/Profile selector or Flash write.
-Production operations retain the existing two-argument protected Root Entry.
+download/test/restore keep the two-argument protected Root Entry; B3
+``bundle-load <asset_set_sha256>`` takes only the installed Set SHA-256.
 """
 from __future__ import annotations
 
@@ -255,19 +256,24 @@ def validate_bundle_fpga_handoff(
          handoff.get("root_hardware_validation") == "NOT_RUN",
          "ROOT_HANDOFF_NOT_BOUND_TO_ACTIVE_SET")
     selected = handoff.get("fpga_image")
+    # A Programming Profile is optional: an FPGA-only Bundle is valid.
     profile = handoff.get("programming_profile")
-    need(type(selected) is dict and type(profile) is dict,
+    need(type(selected) is dict and (profile is None or type(profile) is dict),
          "ROOT_HANDOFF_SELECTION_MISSING")
     image_id = selected.get("image_id")
     package_id = selected.get("package_id")
     package_version = selected.get("package_version")
+    names = [image_id, package_id, package_version]
+    if profile is not None:
+        names += [profile.get("package_id"), profile.get("package_version")]
     need(all(type(item) is str and
              re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item) is not None
-             for item in (image_id, package_id, package_version,
-                          profile.get("package_id"), profile.get("package_version"))),
+             for item in names),
          "ROOT_HANDOFF_SELECTION_INVALID")
-    need(type(profile.get("package_identity_sha256")) is str and
-         re.fullmatch(r"[0-9a-f]{64}", profile["package_identity_sha256"]) is not None,
+    need(profile is None or
+         (type(profile.get("package_identity_sha256")) is str and
+          re.fullmatch(r"[0-9a-f]{64}",
+                       profile["package_identity_sha256"]) is not None),
          "ROOT_HANDOFF_PROFILE_IDENTITY_INVALID")
     need(type(bin_bytes) is bytes and 0 < len(bin_bytes) <= 16_000_000 and
          type(hwh_bytes) is bytes and 0 < len(hwh_bytes) <= 4_000_000,
@@ -321,7 +327,7 @@ def validate_bundle_fpga_handoff(
         "fpga_hwh_sha256": selected["hwh_sha256"],
         "fpga_manifest_sha256": selected["manifest_sha256"],
         "programming_profile_identity_sha256":
-            profile["package_identity_sha256"],
+            None if profile is None else profile["package_identity_sha256"],
         "board_id": manifest.board_id,
         "fpga_part": manifest.fpga_part,
         "abi_version": manifest.abi_version,
@@ -354,9 +360,18 @@ def stage_bundle_fpga_files_only(
         manifest_bytes=manifest_bytes, bin_bytes=bin_bytes, hwh_bytes=hwh_bytes,
     )
     trusted_local()
-    guard.protected(guard.FIRMWARE, file=False)
     release = parse_image_manifest_bytes(manifest_bytes)
     port = guard.RootZ2TargetPort(release=release)
+    with port.exclusive():
+        _stage_files_locked(release, manifest_bytes=manifest_bytes,
+                            bin_bytes=bin_bytes, hwh_bytes=hwh_bytes)
+    return _staged_receipt(preflight, release)
+
+
+def _stage_files_locked(release: ImageManifest, *, manifest_bytes: bytes,
+                        bin_bytes: bytes, hwh_bytes: bytes) -> None:
+    """Files-only staging; the caller holds the exclusive FPGA owner lock."""
+    guard.protected(guard.FIRMWARE, file=False)
     # The name comes only from the Root-validated basename, not from a
     # Console-provided path. Each individual file is installed no-overwrite.
     files = (
@@ -364,69 +379,71 @@ def stage_bundle_fpga_files_only(
         (release.firmware_name + ".hwh", hwh_bytes),
         (release.firmware_name + ".manifest.json", manifest_bytes),
     )
-    with port.exclusive():
-        # Golden is separate from any Asset Set and cannot be replaced by it.
-        guard.sha_file(
-            guard.FIRMWARE / release.recovery_name,
-            release.recovery_sha256,
-        )
-        # Recheck the intended bytes and ensure no filename can escape Root
-        # firmware storage even if an API consumer supplies malformed input.
-        for name, raw in files:
-            need(_basename(name) and name != release.recovery_name and
-                 name != MANIFEST_FILE.name and
-                 (guard.FIRMWARE / name).parent == guard.FIRMWARE,
-                 "ROOT_HANDOFF_FIRMWARE_FILENAME_DENIED")
-            target = guard.FIRMWARE / name
-            expected_sha = hashlib.sha256(raw).hexdigest()
-            if target.is_symlink():
-                raise ImageDeploymentDenied("ROOT_HANDOFF_EXISTING_SYMLINK")
-            if target.exists():
-                guard.protected(target)
-                need(target.is_file() and target.stat().st_size == len(raw),
-                     "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
-                with target.open("rb") as source:
-                    observed_sha = hashlib.sha256(source.read()).hexdigest()
-                need(observed_sha == expected_sha,
-                     "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
-                continue
-            fd, temp_name = tempfile.mkstemp(
-                prefix=".plasma-fpga-asset.", dir=guard.FIRMWARE
-            )
-            temp = Path(temp_name)
-            try:
-                with os.fdopen(fd, "wb") as destination:
-                    destination.write(raw)
-                    destination.flush()
-                    os.fsync(destination.fileno())
-                temp.chmod(0o600)
-                # link() fails if target exists; do not use os.replace()
-                # because it would silently overwrite a potentially
-                # held firmware file under the same logical name.
-                os.link(temp, target, follow_symlinks=False)
-            except FileExistsError as exc:
-                raise ImageDeploymentDenied(
-                    "ROOT_HANDOFF_FIRMWARE_NAME_COLLISION"
-                ) from exc
-            finally:
-                if temp.exists():
-                    temp.unlink()
-        folder = os.open(
-            guard.FIRMWARE, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-        )
-        try:
-            os.fsync(folder)
-        finally:
-            os.close(folder)
-        # Rehash all installed files; the canonical Root Image Manifest
-        # remains untouched until an independently approved configuration.
-        for name, data in files:
-            target = guard.FIRMWARE / name
+    # Golden is separate from any Asset Set and cannot be replaced by it.
+    guard.sha_file(
+        guard.FIRMWARE / release.recovery_name,
+        release.recovery_sha256,
+    )
+    # Recheck the intended bytes and ensure no filename can escape Root
+    # firmware storage even if an API consumer supplies malformed input.
+    for name, raw in files:
+        need(_basename(name) and name != release.recovery_name and
+             name != MANIFEST_FILE.name and
+             (guard.FIRMWARE / name).parent == guard.FIRMWARE,
+             "ROOT_HANDOFF_FIRMWARE_FILENAME_DENIED")
+        target = guard.FIRMWARE / name
+        expected_sha = hashlib.sha256(raw).hexdigest()
+        if target.is_symlink():
+            raise ImageDeploymentDenied("ROOT_HANDOFF_EXISTING_SYMLINK")
+        if target.exists():
             guard.protected(target)
+            need(target.is_file() and target.stat().st_size == len(raw),
+                 "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
             with target.open("rb") as source:
-                digest = hashlib.sha256(source.read()).hexdigest()
-            need(digest == hashlib.sha256(data).hexdigest(),
-                 "ROOT_HANDOFF_STAGED_FILE_CHANGED")
+                observed_sha = hashlib.sha256(source.read()).hexdigest()
+            need(observed_sha == expected_sha,
+                 "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
+            continue
+        fd, temp_name = tempfile.mkstemp(
+            prefix=".plasma-fpga-asset.", dir=guard.FIRMWARE
+        )
+        temp = Path(temp_name)
+        try:
+            with os.fdopen(fd, "wb") as destination:
+                destination.write(raw)
+                destination.flush()
+                os.fsync(destination.fileno())
+            temp.chmod(0o600)
+            # link() fails if target exists; do not use os.replace()
+            # because it would silently overwrite a potentially
+            # held firmware file under the same logical name.
+            os.link(temp, target, follow_symlinks=False)
+        except FileExistsError as exc:
+            raise ImageDeploymentDenied(
+                "ROOT_HANDOFF_FIRMWARE_NAME_COLLISION"
+            ) from exc
+        finally:
+            if temp.exists():
+                temp.unlink()
+    folder = os.open(
+        guard.FIRMWARE, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    )
+    try:
+        os.fsync(folder)
+    finally:
+        os.close(folder)
+    # Rehash all installed files; the canonical Root Image Manifest
+    # remains untouched until an independently approved configuration.
+    for name, data in files:
+        target = guard.FIRMWARE / name
+        guard.protected(target)
+        with target.open("rb") as source:
+            digest = hashlib.sha256(source.read()).hexdigest()
+        need(digest == hashlib.sha256(data).hexdigest(),
+             "ROOT_HANDOFF_STAGED_FILE_CHANGED")
+
+
+def _staged_receipt(preflight: dict, release: ImageManifest) -> dict:
     return {
         **preflight,
         "result": "ROOT_FILES_STAGED_NOT_ACTIVATED",
@@ -656,98 +673,383 @@ def run(operation: str) -> dict:
     release = read_image_manifest()
     port = guard.RootZ2TargetPort(release=release)
     with port.exclusive():
-        record, current = _confirm_current(port, release,
-                                           read_state(release), operation)
-        if operation == "download":
-            record.update(status="DOWNLOAD_IN_FLIGHT", last_error="")
-            write_state(record)
-            try:
-                need(manifest_sha256() == record["manifest_sha256"],
-                     "MANIFEST_CHANGED_IN_FLIGHT")
-                guard.manager_write(release.firmware_name)
-                after = live_report(port, release, release.firmware_name,
-                                    require_mmio=False)
-                record.update(status="IMAGE", image=release.firmware_name,
-                              download_count=record["download_count"] + 1,
-                              evidence_sha256=_digest(after))
-                write_state(record)
-            except BaseException as exc:
-                record.update(status="UNKNOWN", last_error=type(exc).__name__)
-                write_state(record)
-                raise
-            return {"stage": operation, "result": "LOADED_AND_HELD",
-                    "download_count": record["download_count"],
-                    "lease_id": record["session_id"], "boot_id": record["boot_id"],
-                    "auto_test": False}
-        if operation == "test":
-            if CHILD.exists():
-                guard.protected(CHILD)
-                CHILD.unlink()
-            record.update(status="TEST_IN_FLIGHT", last_error="")
-            write_state(record)
-            try:
-                need(manifest_sha256() == record["manifest_sha256"],
-                     "MANIFEST_CHANGED_IN_FLIGHT")
-                guard.run_child([sys.executable, "-m",
-                                    "pl.hil.fpga_image_root", "--identity-child"],
-                                reload_fence_fd=port.inherited_reload_fence())
-                result = json.loads(CHILD.read_text())
-                need(type(result) is dict and
-                     set(result) == {"observed"} and
-                     type(result["observed"]) is dict and
-                     set(result["observed"]) ==
-                     {str(offset) for offset, _, _ in release.identity_words},
-                     "IDENTITY_CHILD_RECEIPT_DENIED")
-                for offset, expected, mask in release.identity_words:
-                    value = result["observed"][str(offset)]
-                    need(type(value) is int and 0 <= value <= 0xFFFFFFFF and
-                         value & mask == expected & mask,
-                         "IDENTITY_CHILD_VALUE_MISMATCH")
-                need(result["observed"][str(release.abi_offset)] ==
-                     release.abi_version, "IDENTITY_CHILD_ABI_MISMATCH")
-                if release.site_bitmap_offset is not None:
-                    need(result["observed"][str(release.site_bitmap_offset)] ==
-                         release.site_bitmap, "IDENTITY_CHILD_SITE_MISMATCH")
-                need(manifest_sha256() == record["manifest_sha256"],
-                     "MANIFEST_CHANGED_IN_FLIGHT")
-                after = live_report(port, release, release.firmware_name,
-                                    require_mmio=True)
-                record.update(status="IMAGE", test_count=record["test_count"] + 1,
-                              evidence_sha256=_digest({"target": after,
-                                                       "identity": result}))
-                write_state(record)
-            except BaseException as exc:
-                record.update(status="UNKNOWN", last_error=type(exc).__name__)
-                write_state(record)
-                raise
-            return {"stage": operation, "result": "IDENTITY_PASS",
-                    "test_count": record["test_count"],
-                    "read32_count": len(release.identity_words),
-                    "write32_count": 0, "lease_id": record["session_id"],
-                    "boot_id": record["boot_id"], "auto_restore": False}
-        if record["status"] == "RECOVERY":
-            return {"stage": operation, "result": "ALREADY_RESTORED",
-                    "restore_count": record["restore_count"],
-                    "lease_id": record["session_id"], "boot_id": record["boot_id"]}
-        record.update(status="RESTORE_IN_FLIGHT", last_error="")
+        return _run_locked(operation, port, release)
+
+
+def _run_locked(operation: str, port: guard.RootZ2TargetPort,
+                release: ImageManifest) -> dict:
+    """download/test/restore; the caller holds the exclusive owner lock."""
+    record, current = _confirm_current(port, release,
+                                       read_state(release), operation)
+    if operation == "download":
+        record.update(status="DOWNLOAD_IN_FLIGHT", last_error="")
         write_state(record)
         try:
             need(manifest_sha256() == record["manifest_sha256"],
                  "MANIFEST_CHANGED_IN_FLIGHT")
-            guard.manager_write(release.recovery_name)
-            after = live_report(port, release, release.recovery_name,
+            guard.manager_write(release.firmware_name)
+            after = live_report(port, release, release.firmware_name,
                                 require_mmio=False)
-            record.update(status="RECOVERY", image=release.recovery_name,
-                          restore_count=record["restore_count"] + 1,
+            record.update(status="IMAGE", image=release.firmware_name,
+                          download_count=record["download_count"] + 1,
                           evidence_sha256=_digest(after))
             write_state(record)
         except BaseException as exc:
             record.update(status="UNKNOWN", last_error=type(exc).__name__)
             write_state(record)
             raise
-        return {"stage": operation, "result": "RESTORED_VERIFIED",
+        return {"stage": operation, "result": "LOADED_AND_HELD",
+                "download_count": record["download_count"],
+                "lease_id": record["session_id"], "boot_id": record["boot_id"],
+                "auto_test": False}
+    if operation == "test":
+        if CHILD.exists():
+            guard.protected(CHILD)
+            CHILD.unlink()
+        record.update(status="TEST_IN_FLIGHT", last_error="")
+        write_state(record)
+        try:
+            need(manifest_sha256() == record["manifest_sha256"],
+                 "MANIFEST_CHANGED_IN_FLIGHT")
+            guard.run_child([sys.executable, "-m",
+                                "pl.hil.fpga_image_root", "--identity-child"],
+                            reload_fence_fd=port.inherited_reload_fence())
+            result = json.loads(CHILD.read_text())
+            need(type(result) is dict and
+                 set(result) == {"observed"} and
+                 type(result["observed"]) is dict and
+                 set(result["observed"]) ==
+                 {str(offset) for offset, _, _ in release.identity_words},
+                 "IDENTITY_CHILD_RECEIPT_DENIED")
+            for offset, expected, mask in release.identity_words:
+                value = result["observed"][str(offset)]
+                need(type(value) is int and 0 <= value <= 0xFFFFFFFF and
+                     value & mask == expected & mask,
+                     "IDENTITY_CHILD_VALUE_MISMATCH")
+            need(result["observed"][str(release.abi_offset)] ==
+                 release.abi_version, "IDENTITY_CHILD_ABI_MISMATCH")
+            if release.site_bitmap_offset is not None:
+                need(result["observed"][str(release.site_bitmap_offset)] ==
+                     release.site_bitmap, "IDENTITY_CHILD_SITE_MISMATCH")
+            need(manifest_sha256() == record["manifest_sha256"],
+                 "MANIFEST_CHANGED_IN_FLIGHT")
+            after = live_report(port, release, release.firmware_name,
+                                require_mmio=True)
+            record.update(status="IMAGE", test_count=record["test_count"] + 1,
+                          evidence_sha256=_digest({"target": after,
+                                                   "identity": result}))
+            write_state(record)
+        except BaseException as exc:
+            record.update(status="UNKNOWN", last_error=type(exc).__name__)
+            write_state(record)
+            raise
+        return {"stage": operation, "result": "IDENTITY_PASS",
+                "test_count": record["test_count"],
+                "read32_count": len(release.identity_words),
+                "write32_count": 0, "lease_id": record["session_id"],
+                "boot_id": record["boot_id"], "auto_restore": False}
+    if record["status"] == "RECOVERY":
+        return {"stage": operation, "result": "ALREADY_RESTORED",
                 "restore_count": record["restore_count"],
                 "lease_id": record["session_id"], "boot_id": record["boot_id"]}
+    record.update(status="RESTORE_IN_FLIGHT", last_error="")
+    write_state(record)
+    try:
+        need(manifest_sha256() == record["manifest_sha256"],
+             "MANIFEST_CHANGED_IN_FLIGHT")
+        guard.manager_write(release.recovery_name)
+        after = live_report(port, release, release.recovery_name,
+                            require_mmio=False)
+        record.update(status="RECOVERY", image=release.recovery_name,
+                      restore_count=record["restore_count"] + 1,
+                      evidence_sha256=_digest(after))
+        write_state(record)
+    except BaseException as exc:
+        record.update(status="UNKNOWN", last_error=type(exc).__name__)
+        write_state(record)
+        raise
+    return {"stage": operation, "result": "RESTORED_VERIFIED",
+            "restore_count": record["restore_count"],
+            "lease_id": record["session_id"], "boot_id": record["boot_id"]}
+
+
+STAGED_ASSET_SETS = Path("/opt/plasma/assets/staged")
+STAGED_OWNER_UID = 0
+MANIFEST_PREVIOUS = guard.FIRMWARE / "plasma-image-manifest.json.previous"
+BUNDLE_LOAD_OUTCOMES = ("fpga_loaded", "fpga_load_denied",
+                        "recovery_required", "fpga_identity_failed")
+
+
+class BundleLoadOutcome(RuntimeError):
+    """Classified bundle-load failure: whether the PL may have been written."""
+
+    def __init__(self, outcome: str, code: str) -> None:
+        super().__init__(code)
+        self.outcome = outcome
+        self.code = code
+
+
+def _failure_code(exc: BaseException) -> str:
+    text = str(exc)
+    if re.fullmatch(r"[A-Z0-9_]{3,96}", text):
+        return text
+    return type(exc).__name__
+
+
+def _read_staged_bytes(path: Path, max_bytes: int) -> bytes:
+    """Root-owned regular file read once; the returned bytes are what is used."""
+    guard.protected(path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    with os.fdopen(fd, "rb") as stream:
+        info = os.fstat(stream.fileno())
+        need(info.st_uid == STAGED_OWNER_UID and info.st_mode & 0o022 == 0 and
+             0 < info.st_size <= max_bytes, "BUNDLE_STAGED_FILE_UNTRUSTED")
+        raw = stream.read(max_bytes + 1)
+    need(0 < len(raw) <= max_bytes, "BUNDLE_STAGED_FILE_UNTRUSTED")
+    return raw
+
+
+def _staged_json(raw: bytes) -> dict:
+    try:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs,
+                           parse_constant=lambda _: need(False, "BUNDLE_JSON_NONFINITE"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ImageDeploymentDenied("BUNDLE_STAGED_JSON_DENIED") from exc
+    need(type(value) is dict, "BUNDLE_STAGED_JSON_DENIED")
+    return value
+
+
+def read_staged_fpga_handoff(asset_set_sha256: str, *,
+                             staged_root: Path | None = None
+                             ) -> tuple[dict, bytes, bytes, bytes]:
+    """Root re-derivation of the FPGA handoff from an immutable B3 Set.
+
+    The caller supplies only the Set SHA-256. Root locates the Set itself,
+    requires a root-owned non-writable tree, binds b3-install.json to the
+    exact manifest.json bytes and rehashes each FPGA file it will use.
+    """
+    need(type(asset_set_sha256) is str and
+         re.fullmatch(r"[0-9a-f]{64}", asset_set_sha256) is not None,
+         "BUNDLE_ASSET_SET_SHA_INVALID")
+    base = STAGED_ASSET_SETS if staged_root is None else staged_root
+    target = base / asset_set_sha256
+    guard.protected(base, file=False)
+    guard.protected(target, file=False)
+    manifest_raw = _read_staged_bytes(target / "manifest.json", 1_048_576)
+    receipt = _staged_json(_read_staged_bytes(target / "b3-install.json", 65536))
+    manifest = _staged_json(manifest_raw)
+    need(receipt.get("schema") == "plasma.ppu.b3-install.v1" and
+         receipt.get("archive_sha256") == asset_set_sha256 and
+         receipt.get("manifest_sha256") ==
+         hashlib.sha256(manifest_raw).hexdigest() and
+         manifest.get("schema") == "plasma.ppu.bundle.v3" and
+         type(manifest.get("target")) is dict and
+         manifest["target"].get("board") == "pynq-z2" and
+         manifest["target"].get("fpga_part") == "xc7z020clg400-1" and
+         type(manifest.get("packages")) is list and
+         1 <= len(manifest["packages"]) <= 32,
+         "BUNDLE_STAGED_SET_INVALID")
+    packages = manifest["packages"]
+    need(all(type(item) is dict for item in packages), "BUNDLE_STAGED_SET_INVALID")
+    fpga = [item for item in packages if item.get("kind") == "fpga-image"]
+    profiles = [item for item in packages if item.get("kind") == "programming-profile"]
+    need(len(fpga) == 1, "BUNDLE_FPGA_IMAGE_PACKAGE_NOT_UNIQUE")
+    need(len(profiles) <= 1, "BUNDLE_PROGRAMMING_PROFILE_NOT_UNIQUE")
+    fpga = fpga[0]
+    need(type(fpga.get("id")) is str and _basename(fpga["id"]) and
+         type(fpga.get("version")) is str and _basename(fpga["version"]) and
+         type(fpga.get("files")) is list, "BUNDLE_FPGA_IMAGE_PACKAGE_INVALID")
+
+    def load(entry: dict) -> bytes:
+        name = entry.get("path")
+        need(type(name) is str and
+             name.startswith("payload/packages/" + fpga["id"] + "/fpga/") and
+             _basename(name.rsplit("/", 1)[1]) and
+             type(entry.get("sha256")) is str and
+             re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]) is not None and
+             type(entry.get("size")) is int,
+             "BUNDLE_FPGA_FILE_DESCRIPTOR_INVALID")
+        path = target / name
+        parent = target
+        for part in Path(name).parts[:-1]:
+            parent = parent / part
+            guard.protected(parent, file=False)
+        raw = _read_staged_bytes(path, 16_000_000)
+        need(len(raw) == entry["size"] and
+             hashlib.sha256(raw).hexdigest() == entry["sha256"],
+             "BUNDLE_FPGA_FILE_CHANGED")
+        return raw
+
+    entries = [item for item in fpga["files"] if type(item) is dict]
+    need(len(entries) == len(fpga["files"]), "BUNDLE_FPGA_FILE_DESCRIPTOR_INVALID")
+    binaries = [e for e in entries if str(e.get("path", "")).endswith(".bin")]
+    hwhs = [e for e in entries if str(e.get("path", "")).endswith(".hwh")]
+    need(len(binaries) == 1 and len(hwhs) == 1 and
+         not any(str(e.get("path", "")).endswith(".bit") for e in entries),
+         "BUNDLE_FPGA_REQUIRES_PREBUILT_BIN_AND_HWH")
+    candidates = []
+    for entry in entries:
+        if str(entry.get("path", "")).endswith(".json"):
+            raw = load(entry)
+            if _staged_json(raw).get("schema") == "plasma.fpga.image.v1":
+                candidates.append((entry, raw))
+    need(len(candidates) == 1, "BUNDLE_FPGA_MANIFEST_NOT_UNIQUE")
+    manifest_entry, manifest_bytes = candidates[0]
+    bin_bytes = load(binaries[0])
+    hwh_bytes = load(hwhs[0])
+    paired = parse_image_manifest_bytes(manifest_bytes)
+    profile = None
+    if profiles:
+        item = profiles[0]
+        need(type(item.get("files")) is list and
+             all(type(f) is dict for f in item["files"]),
+             "BUNDLE_PROGRAMMING_PROFILE_INVALID")
+        descriptor = {
+            "id": item.get("id"), "kind": item.get("kind"),
+            "version": item.get("version"), "requires": item.get("requires"),
+            "files": sorted(({
+                "path": f.get("path"), "sha256": f.get("sha256"),
+                "size": f.get("size"), "executable": f.get("executable"),
+            } for f in item["files"]), key=lambda f: str(f["path"])),
+        }
+        profile = {
+            "package_id": item.get("id"),
+            "package_version": item.get("version"),
+            "package_identity_sha256": hashlib.sha256(json.dumps(
+                descriptor, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest(),
+        }
+    handoff = {
+        "schema": "plasma.ppu.fpga-asset-handoff.v1",
+        "status": "VERIFIED_NOT_LOADED",
+        "asset_set_sha256": asset_set_sha256,
+        "fpga_image": {
+            "package_id": fpga["id"],
+            "package_version": fpga["version"],
+            "image_id": paired.image_id,
+            "bin_relative_path": binaries[0]["path"],
+            "bin_sha256": binaries[0]["sha256"],
+            "hwh_relative_path": hwhs[0]["path"],
+            "hwh_sha256": hwhs[0]["sha256"],
+            "manifest_relative_path": manifest_entry["path"],
+            "manifest_sha256": manifest_entry["sha256"],
+            "board_id": manifest["target"]["board"],
+            "fpga_part": manifest["target"]["fpga_part"],
+            "abi_version_claim": paired.abi_version,
+        },
+        "programming_profile": profile,
+        "root_hardware_validation": "NOT_RUN",
+        "fpga_install": "NOT_RUN",
+        "fpga_load": "NOT_RUN",
+        "dut": "NOT_RUN",
+        "ready": False,
+    }
+    return handoff, manifest_bytes, bin_bytes, hwh_bytes
+
+
+def _write_firmware_file(path: Path, raw: bytes) -> None:
+    """Atomic replace of a Root-owned metadata file in /lib/firmware."""
+    fd, temp_name = tempfile.mkstemp(prefix=".plasma-manifest.", dir=guard.FIRMWARE)
+    temp = Path(temp_name)
+    try:
+        with os.fdopen(fd, "wb") as destination:
+            destination.write(raw)
+            destination.flush()
+            os.fsync(destination.fileno())
+        temp.chmod(0o644)
+        os.replace(temp, path)
+    finally:
+        if temp.exists():
+            temp.unlink()
+    folder = os.open(guard.FIRMWARE, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(folder)
+    finally:
+        os.close(folder)
+
+
+def _promote_manifest(manifest_bytes: bytes) -> bytes | None:
+    """Make the Bundle companion the active Root Image Manifest.
+
+    Returns the previous bytes when the Manifest changed (kept on disk as
+    MANIFEST_PREVIOUS), or None when it was already identical.
+    """
+    previous = None
+    if MANIFEST_FILE.exists() or MANIFEST_FILE.is_symlink():
+        guard.protected(MANIFEST_FILE)
+        previous = MANIFEST_FILE.read_bytes()
+        if previous == manifest_bytes:
+            return None
+        if MANIFEST_PREVIOUS.exists() or MANIFEST_PREVIOUS.is_symlink():
+            guard.protected(MANIFEST_PREVIOUS)
+        _write_firmware_file(MANIFEST_PREVIOUS, previous)
+    _write_firmware_file(MANIFEST_FILE, manifest_bytes)
+    need(MANIFEST_FILE.read_bytes() == manifest_bytes, "MANIFEST_PROMOTION_FAILED")
+    return previous if previous is not None else b""
+
+
+def _undo_promotion(previous: bytes | None) -> None:
+    if previous is None:
+        return
+    if previous == b"":
+        MANIFEST_FILE.unlink()
+    else:
+        _write_firmware_file(MANIFEST_FILE, previous)
+
+
+def bundle_load(asset_set_sha256: str) -> dict:
+    """B3 FPGA load of an installed Set: stage, promote, download, Identity.
+
+    Only the Set SHA-256 crosses the privilege boundary. Every denial up to
+    the first PL write leaves the FPGA and the active Root Manifest unchanged.
+    """
+    try:
+        trusted_local()
+        handoff, manifest_bytes, bin_bytes, hwh_bytes = \
+            read_staged_fpga_handoff(asset_set_sha256)
+        preflight = validate_bundle_fpga_handoff(
+            handoff, expected_active_set_sha256=asset_set_sha256,
+            manifest_bytes=manifest_bytes, bin_bytes=bin_bytes,
+            hwh_bytes=hwh_bytes)
+        release = parse_image_manifest_bytes(manifest_bytes)
+        port = guard.RootZ2TargetPort(release=release)
+    except BaseException as exc:
+        raise BundleLoadOutcome("fpga_load_denied", _failure_code(exc)) from exc
+    with port.exclusive():
+        try:
+            _stage_files_locked(release, manifest_bytes=manifest_bytes,
+                                bin_bytes=bin_bytes, hwh_bytes=hwh_bytes)
+            previous = _promote_manifest(manifest_bytes)
+            try:
+                # Full read-only admission (boot, Golden, FPGA Manager,
+                # /proc /dev/mem /dev/uio* census) before any PL write.
+                _confirm_current(port, release, read_state(release), "download")
+            except BaseException:
+                _undo_promotion(previous)
+                raise
+        except BaseException as exc:
+            raise BundleLoadOutcome("fpga_load_denied", _failure_code(exc)) from exc
+        try:
+            download = _run_locked("download", port, release)
+        except BaseException as exc:
+            raise BundleLoadOutcome("recovery_required", _failure_code(exc)) from exc
+        try:
+            test = _run_locked("test", port, release)
+        except BaseException as exc:
+            raise BundleLoadOutcome("fpga_identity_failed", _failure_code(exc)) from exc
+    return {
+        "stage": "bundle-load", "result": "fpga_loaded",
+        "asset_set_sha256": asset_set_sha256,
+        "fpga_image_id": release.image_id,
+        "fpga_bin_sha256": release.firmware_sha256,
+        "fpga_manifest_sha256": preflight["fpga_manifest_sha256"],
+        "manifest_promoted": previous is not None,
+        "download_count": download["download_count"],
+        "test_count": test["test_count"],
+        "identity": test["result"],
+        "lease_id": test["lease_id"], "boot_id": test["boot_id"],
+        "auto_restore": False, "dut": "NOT_RUN",
+    }
 
 
 def _expected_identity(release: ImageManifest) -> dict[int, int]:
@@ -794,6 +1096,19 @@ def identity_child() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    if len(argv) == 2 and argv[0] == "bundle-load":
+        try:
+            result = bundle_load(argv[1])
+        except BundleLoadOutcome as exc:
+            result = {"stage": "bundle-load", "result": exc.outcome,
+                      "code": exc.code, "asset_set_sha256": argv[1]
+                      if re.fullmatch(r"[0-9a-f]{64}", argv[1]) else None}
+            print("PLASMA_BUNDLE_LOAD=" + json.dumps(
+                result, sort_keys=True, separators=(",", ":")), flush=True)
+            return 3
+        print("PLASMA_BUNDLE_LOAD=" + json.dumps(
+            result, sort_keys=True, separators=(",", ":")), flush=True)
+        return 0
     need(len(argv) == 1, "ONE_OPERATION_REQUIRED")
     if argv[0] == "--identity-child":
         return identity_child()

@@ -1,4 +1,4 @@
-"""P2 Host-only FPGA Handoff: exact Active Set/Image/Profile, no hardware."""
+"""Host-only FPGA Handoff from an installed B3 Set: unique Image, no hardware."""
 from __future__ import annotations
 
 import hashlib
@@ -51,31 +51,23 @@ def fixture(tmp_path: Path):
     return co, digest, data["firmware_sha256"], profile_sha, root
 
 
-def resolve(co, digest, image_sha, profile_sha, **overrides):
-    params = {
-        "expected_asset_set_sha256": digest,
-        "fpga_package_id": FPGA_PACKAGE_ID,
-        "fpga_package_version": "1.0.0",
-        "fpga_image_id": IMAGE_ID,
-        "fpga_bin_sha256": image_sha,
-        "programming_profile_id": PROFILE_ID,
-        "programming_profile_version": "1.0.0",
-        "programming_profile_sha256": profile_sha,
-    }
-    params.update(overrides)
-    return assets.resolve_active_fpga_handoff(co.paths.product_root, **params)
+def resolve(co, digest, image_sha=None, profile_sha=None):
+    """The Bundle selects its own unique FPGA Image; the Set need not be Active."""
+    return assets.resolve_staged_fpga_handoff(co.paths.product_root, digest)
 
 
 def test_p2_exact_fpga_handoff_returns_inert_plan_not_loaded(tmp_path: Path):
     co, sha, bin_sha, profile_sha, path = fixture(tmp_path)
-    result = resolve(co, sha, bin_sha, profile_sha)
+    result = resolve(co, sha)
     assert result["status"] == "VERIFIED_NOT_LOADED"
     assert result["asset_set_sha256"] == sha
+    assert result["fpga_image"]["package_id"] == FPGA_PACKAGE_ID
     assert result["fpga_image"]["image_id"] == IMAGE_ID
     assert result["fpga_image"]["bin_sha256"] == bin_sha
     assert result["fpga_image"]["bin_relative_path"] == "payload/packages/custom-swd/fpga/swd.bin"
     assert result["fpga_image"]["hwh_relative_path"] == "payload/packages/custom-swd/fpga/swd.hwh"
     assert result["fpga_image"]["manifest_relative_path"] == "payload/packages/custom-swd/fpga/image.json"
+    assert result["programming_profile"]["package_id"] == PROFILE_ID
     assert result["programming_profile"]["package_identity_sha256"] == profile_sha
     assert result["fpga_install"] == "NOT_RUN"
     assert result["fpga_load"] == "NOT_RUN"
@@ -86,22 +78,20 @@ def test_p2_exact_fpga_handoff_returns_inert_plan_not_loaded(tmp_path: Path):
     assert assets.read_active(co.paths.product_root)["asset_set_sha256"] == sha
 
 
-@pytest.mark.parametrize("field,bad,error", [
-    ("expected_asset_set_sha256", "a"*64, "ASSET_HANDOFF_ACTIVE_IDENTITY_MISMATCH"),
-    ("fpga_package_id", "unknown-fpga", "ASSET_HANDOFF_PACKAGE_NOT_UNIQUE_OR_MISSING"),
-    ("fpga_package_version", "9.9.9", "ASSET_HANDOFF_PACKAGE_NOT_UNIQUE_OR_MISSING"),
-    ("fpga_image_id", "forged-image", "ASSET_HANDOFF_FPGA_MANIFEST_INCOMPATIBLE"),
-    ("fpga_bin_sha256", "b"*64, "ASSET_HANDOFF_IMAGE_DIGEST_MISMATCH"),
-    ("programming_profile_id", "wrong-profile", "ASSET_HANDOFF_PACKAGE_NOT_UNIQUE_OR_MISSING"),
-    ("programming_profile_version", "1.0.1", "ASSET_HANDOFF_PACKAGE_NOT_UNIQUE_OR_MISSING"),
-    ("programming_profile_sha256", "f"*64, "ASSET_HANDOFF_PROFILE_IDENTITY_MISMATCH"),
-])
-def test_p2_wrong_controller_selection_fails_closed(
-    tmp_path: Path, field: str, bad: str, error: str,
-):
-    co, sha, bin_sha, profile_sha, _ = fixture(tmp_path)
-    with pytest.raises(assets.AssetSetError, match=error):
-        resolve(co, sha, bin_sha, profile_sha, **{field: bad})
+def test_p2_handoff_resolves_installed_set_before_activation(tmp_path: Path):
+    # B3 fpga_load resolves the just-installed Set; active.json is published
+    # only after Root Identity PASS.
+    co, sha, bin_sha, _profile_sha, _ = fixture(tmp_path)
+    (co.paths.product_root / "assets" / "active.json").unlink()
+    result = resolve(co, sha)
+    assert result["fpga_image"]["bin_sha256"] == bin_sha
+    assert assets.read_active(co.paths.product_root)["state"] == "EMPTY"
+
+
+def test_p2_handoff_rejects_unknown_or_unstaged_set(tmp_path: Path):
+    co, _sha, _bin_sha, _profile_sha, _ = fixture(tmp_path)
+    with pytest.raises(assets.AssetSetError, match="ASSET_SET_NOT_STAGED"):
+        resolve(co, "a" * 64)
 
 
 def test_p2_tampered_bin_prevents_handoff_even_if_active_pointer_matches(tmp_path: Path):
@@ -121,11 +111,4 @@ def test_p2_tampered_fpga_manifest_prevents_handoff(tmp_path: Path):
     data["firmware_sha256"] = "f" * 64
     metadata.write_text(json.dumps(data))
     with pytest.raises(assets.AssetSetError, match="ASSET_SET_FILE_MISMATCH"):
-        resolve(co, sha, bin_sha, profile_sha)
-
-
-def test_p2_handoff_requires_active_identity_not_only_staged_bundle(tmp_path: Path):
-    co, sha, bin_sha, profile_sha, _ = fixture(tmp_path)
-    (co.paths.product_root / "assets" / "active.json").unlink()
-    with pytest.raises(assets.AssetSetError, match="ASSET_HANDOFF_ACTIVE_IDENTITY_MISMATCH"):
         resolve(co, sha, bin_sha, profile_sha)
