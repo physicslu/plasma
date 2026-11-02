@@ -459,6 +459,31 @@ class ManagerBootstrapCoordinator:
         _normalized, record, client, _payload, _device_id, token = self._authenticated(alias)
         # A Bundle uses the same authenticated Bootstrap transaction endpoint,
         # but does NOT acquire install authority from the Manager pairing token.
+        if body.get("kind") == "bundle" and "fpga_load" in body:
+            # B3 of the device's current B2-admitted Bundle. The PPU re-checks
+            # B2, Master authority and FPGA qualification; Manager forwards
+            # only the explicit owner choice, never a path or idle claim.
+            if set(body) != {"kind", "upload_id", "fpga_load"}:
+                raise BootstrapManagerError("Bundle B3 requires only kind, upload_id and fpga_load")
+            upload_id = body["upload_id"]
+            if (type(upload_id) is not str or len(upload_id) != 32
+                    or any(ch not in "0123456789abcdef" for ch in upload_id)):
+                raise BootstrapManagerError("generic Bundle upload_id is invalid")
+            if type(body["fpga_load"]) is not bool:
+                raise BootstrapManagerError("Bundle B3 fpga_load must be a boolean")
+            status, response = client.start_deployment(token, {
+                "kind": "bundle", "upload_id": upload_id,
+                "fpga_load": body["fpga_load"],
+            })
+            deployment = response.get("deployment") if isinstance(response, dict) else None
+            if (
+                status != 200 or response.get("ok") is not True
+                or not isinstance(deployment, dict)
+                or deployment.get("upload_id") != upload_id
+                or deployment.get("state") not in {"queued", "running"}
+            ):
+                raise BootstrapManagerError("Bundle B3 submission response is not a queued transaction")
+            return status, response
         if body.get("kind") == "bundle":
             if set(body) != {"kind", "upload_id"}:
                 raise BootstrapManagerError("generic Bundle requires only kind and upload_id")

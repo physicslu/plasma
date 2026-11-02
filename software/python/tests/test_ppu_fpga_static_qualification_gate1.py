@@ -32,38 +32,8 @@ SHIPPED = ROOT / "scripts" / "ppu-fpga-image-contracts.json"
 # pl/tests/fixtures/swd-independent-ab79b04e/plasma-image-manifest.json
 # (draft; NOT merged, deployed or HIL-qualified). Used only to prove the shipped
 # contract pins that Manifest and that the Root parser accepts it.
-PR1247_MANIFEST = b'''{
-  "schema": "plasma.fpga.image.v1",
-  "image_id": "z2-independent-swd-v5-ab79b04e",
-  "board_id": "pynq-z2",
-  "fpga_part": "xc7z020clg400-1",
-  "soc_compatible": "xlnx,zynq-7000",
-  "firmware_name": "plasma-swd-independent-ab79b04e.bin",
-  "firmware_sha256": "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773",
-  "recovery_name": "base.bin",
-  "recovery_sha256": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
-  "abi_version": 327681,
-  "abi_offset": 0,
-  "identity_words": [
-    [0, 327681, 4294967295],
-    [4096, 327682, 4294967295]
-  ],
-  "site_bitmap": 3,
-  "site_bitmap_offset": null,
-  "axi_base": 1136660480,
-  "axi_bytes": 8192,
-  "owner_base": 1136656384,
-  "owner_bytes": 65536,
-  "uio_name": "uio1",
-  "expected_uio": {
-    "uio": "uio1",
-    "driver": "uio_pdrv_genirq",
-    "maps": [[1136656384, 65536]],
-    "runtime": "suspended",
-    "irq_counts": [0, 0]
-  }
-}
-'''
+# The reviewed devmem Manifest the Z2 Root uses for ab79b04e (Identity PASS).
+DEVMEM_MANIFEST = (ROOT / "pl/hil/releases/swd-independent-ab79b04e/plasma-image-manifest.json").read_bytes()
 
 
 def fpga_bundle(tmp_path, files=None, *, mutate=None):
@@ -111,12 +81,12 @@ def test_shipped_contract_is_abi5_ab79b04e_two_site(tmp_path):
     assert "static" in entry["evidence"] and "hil" not in entry["evidence"].lower()
 
 
-def test_shipped_contract_pins_pr1247_manifest_parsed_by_root_parser():
+def test_shipped_contract_pins_devmem_manifest_parsed_by_root_parser():
     entry = json.loads(SHIPPED.read_text())["contracts"][0]
-    assert hashlib.sha256(PR1247_MANIFEST).hexdigest() == entry["manifest_sha256"]
+    assert hashlib.sha256(DEVMEM_MANIFEST).hexdigest() == entry["manifest_sha256"]
     root = qualification.load_root_manifest_parser()
     assert Path(root.__file__).resolve() == (ROOT / "pl/hil/fpga_image_root.py").resolve()
-    parsed = root.parse_image_manifest_bytes(PR1247_MANIFEST)
+    parsed = root.parse_image_manifest_bytes(DEVMEM_MANIFEST)
     assert parsed.image_id == entry["image_id"]
     assert parsed.firmware_name == entry["firmware_name"]
     assert parsed.firmware_sha256 == entry["bin_sha256"]
@@ -420,7 +390,7 @@ def test_b3_rejects_fpga_contract_or_master_grant_change_after_b2(tmp_path):
     write_contracts(paths.fpga_image_contracts, entry)
     b2 = srv.start_deployment({"kind": "bundle", "upload_id": upload_id})
     assert b2["result"]["fpga_static_qualification"] == "STATIC_QUALIFIED"
-    b3 = {"kind": "bundle", "upload_id": upload_id, "install_only": True}
+    b3 = {"kind": "bundle", "upload_id": upload_id, "fpga_load": False}
 
     # Contract withdrawn after B2.
     original = paths.fpga_image_contracts.read_bytes()

@@ -14,6 +14,7 @@ export type BootstrapDeploymentRecord = {
   started_at_epoch_s: number;
   updated_at_epoch_s: number;
   error: string | null;
+  error_code?: string | null;
   result: Record<string, unknown> | null;
 };
 
@@ -245,6 +246,28 @@ export function admitManagerPpuBundle(
         approval?.method !== "root-provisioned-exact-bundle-sha256" ||
         approval?.archive_sha256 !== plan?.archive_sha256) {
       throw new Error("Bundle B2 receipt lacks approved Master source authority or non-execution guarantee");
+    }
+    return receipt;
+  });
+}
+
+export function installManagerPpuBundle(
+  alias: string,
+  uploadId: string,
+  fpgaLoad: boolean,
+): Promise<DeploymentPayload> {
+  if (!/^[0-9a-f]{32}$/.test(uploadId)) {
+    return Promise.reject(new Error("Invalid Bundle upload ID"));
+  }
+  // B3 of the PPU's current B2-admitted Bundle. The only owner choice is
+  // whether to also load its FPGA Image; never a path, idle claim or token.
+  return jsonRequest<DeploymentPayload>(`${root(alias)}/deployments`, {
+    method: "POST",
+    body: JSON.stringify({ kind: "bundle", upload_id: uploadId, fpga_load: fpgaLoad }),
+  }).then(receipt => {
+    const state = receipt.deployment?.state;
+    if (receipt.deployment?.upload_id !== uploadId || (state !== "queued" && state !== "running")) {
+      throw new Error("Bundle B3 submission was not queued");
     }
     return receipt;
   });

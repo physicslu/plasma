@@ -1,6 +1,8 @@
 # PPU FPGA Image Asset Handoff — P2 Gate 1 (Host-only)
 
-**Decision:** Console explicitly selects one PPU Active Asset Set, an exact FPGA Image, and a Programming Profile. PPU validates the choice; it must never silently select a different Image or Profile. Bundle is an Assets delivery container, never a programming or FPGA-load command.
+**Superseded in part (2026-11-02):** [B3 FPGA load Gate 1](ppu-bundle-v3-b3-fpga-load-gate1.md) replaces `resolve_active_fpga_handoff` with `resolve_staged_fpga_handoff(product_root, asset_set_sha256)`: the Bundle selects its own Image (exactly one `fpga-image` Package; the Programming Profile is optional), the Set need not be Active yet, and an explicit B3 `fpga_load=true` request is the FPGA-load authorization. `stage_bundle_fpga_files_only` is now reached through the Root Entry `bundle-load` operation. The text below records the original P2 decision.
+
+**Decision (P2, historical):** Console explicitly selects one PPU Active Asset Set, an exact FPGA Image, and a Programming Profile. PPU validates the choice; it must never silently select a different Image or Profile. Bundle is an Assets delivery container, never a programming or FPGA-load command.
 
 **Dependencies:** [P0 PR #1245](https://github.com/physicslu/plasma/pull/1245) → [P1 PR #1246](https://github.com/physicslu/plasma/pull/1246) → this P2 (PR #1248/#1249); all merged in main.
 

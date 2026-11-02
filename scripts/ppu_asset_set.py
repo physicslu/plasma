@@ -217,76 +217,64 @@ def held_runtime_asset_lease(
         yield record["result"]
 
 
-def resolve_active_fpga_handoff(
-    product_root: Path, *,
-    expected_asset_set_sha256: str,
-    fpga_package_id: str,
-    fpga_package_version: str,
-    fpga_image_id: str,
-    fpga_bin_sha256: str,
-    programming_profile_id: str,
-    programming_profile_version: str,
-    programming_profile_sha256: str,
+def bundle_has_fpga_image(product_root: Path, asset_set_sha256: str) -> bool:
+    """True when the verified staged Set carries an ``fpga-image`` Package."""
+    verify_staged(product_root, asset_set_sha256)
+    _, staged, _ = _root(product_root)
+    manifest = _json_file(staged / asset_set_sha256 / "manifest.json")
+    return any(type(p) is dict and p.get("kind") == "fpga-image"
+               for p in manifest["packages"])
+
+
+def resolve_staged_fpga_handoff(
+    product_root: Path, asset_set_sha256: str,
 ) -> dict[str, Any]:
-    """Strict Controller-selected FPGA/Profile resolution; NO installation/load.
+    """Resolve the FPGA handoff of a just-installed immutable B3 Set.
 
-    For an already verified single Active Set, return an internal *read-only*
-    handoff plan for the existing protected FPGA Loader. The caller must
-    separately obtain explicit Controller FPGA configuration authority and
-    let the existing Root Guard validate the hardware, image, MMIO/ABI and
-    Golden Recovery. Never pass Bundle-defined absolute paths to Root.
+    The Bundle itself selects the Image: exactly one ``fpga-image`` Package
+    and at most one ``programming-profile`` Package (optional). The Set need
+    not be Active yet: B3 ``fpga_load`` publishes ``active.json`` only after
+    Root Identity PASS. This performs NO installation or load; the protected
+    Root re-derives and re-verifies everything independently from the Set
+    SHA-256 alone. Never pass Bundle-defined absolute paths to Root.
     """
-    for label, value in (
-        ("fpga_package_id", fpga_package_id),
-        ("fpga_package_version", fpga_package_version),
-        ("fpga_image_id", fpga_image_id),
-        ("programming_profile_id", programming_profile_id),
-        ("programming_profile_version", programming_profile_version),
-    ):
-        if (type(value) is not str or not 0 < len(value) <= 128
-                or not re.fullmatch(r"[A-Za-z0-9_.-]+", value)):
-            raise AssetSetError("ASSET_HANDOFF_IDENTITY_INVALID:" + label)
-    for value in (expected_asset_set_sha256, fpga_bin_sha256,
-                  programming_profile_sha256):
-        if type(value) is not str or not HEX64.fullmatch(value):
-            raise AssetSetError("ASSET_HANDOFF_DIGEST_INVALID")
-    current = read_active(product_root)
-    if (current["state"] != "ACTIVE"
-            or current["asset_set_sha256"] != expected_asset_set_sha256):
-        raise AssetSetError("ASSET_HANDOFF_ACTIVE_IDENTITY_MISMATCH")
-
-    stage = verify_staged(product_root, expected_asset_set_sha256)
+    stage = verify_staged(product_root, asset_set_sha256)
     _, staged, _ = _root(product_root)
     target = staged / stage["asset_set_sha256"]
     manifest = _json_file(target / "manifest.json")
     packages = manifest["packages"]
-
-    def selected(name: str, version: str, kind: str) -> dict[str, Any]:
-        matches = [p for p in packages if
-                   type(p) is dict and p.get("id") == name
-                   and p.get("version") == version and p.get("kind") == kind]
-        if len(matches) != 1:
-            raise AssetSetError("ASSET_HANDOFF_PACKAGE_NOT_UNIQUE_OR_MISSING")
-        return matches[0]
-
-    fpga = selected(fpga_package_id, fpga_package_version, "fpga-image")
-    profile = selected(programming_profile_id, programming_profile_version,
-                       "programming-profile")
-    # Bind Profile identity to the full canonical manifest descriptor, not
-    # only a file name or caller-provided semantic version.
-    descriptor = {
-        "id": profile["id"], "kind": profile["kind"],
-        "version": profile["version"], "requires": profile["requires"],
-        "files": sorted(({
-            "path": item["path"], "sha256": item["sha256"],
-            "size": item["size"], "executable": item["executable"],
-        } for item in profile["files"]), key=lambda item: item["path"]),
-    }
-    calculated = hashlib.sha256(
-        json.dumps(descriptor, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
-    if calculated != programming_profile_sha256:
-        raise AssetSetError("ASSET_HANDOFF_PROFILE_IDENTITY_MISMATCH")
+    fpga_packages = [p for p in packages if type(p) is dict and p.get("kind") == "fpga-image"]
+    profiles = [p for p in packages
+                if type(p) is dict and p.get("kind") == "programming-profile"]
+    if len(fpga_packages) != 1:
+        raise AssetSetError("ASSET_HANDOFF_FPGA_PACKAGE_NOT_UNIQUE_OR_MISSING")
+    if len(profiles) > 1:
+        raise AssetSetError("ASSET_HANDOFF_PROFILE_NOT_UNIQUE")
+    fpga = fpga_packages[0]
+    for value in (fpga.get("id"), fpga.get("version")):
+        if (type(value) is not str or not 0 < len(value) <= 128
+                or not re.fullmatch(r"[A-Za-z0-9_.-]+", value)):
+            raise AssetSetError("ASSET_HANDOFF_IDENTITY_INVALID")
+    profile_identity = None
+    if profiles:
+        profile = profiles[0]
+        # Bind Profile identity to the full canonical manifest descriptor,
+        # not only a file name or semantic version.
+        descriptor = {
+            "id": profile["id"], "kind": profile["kind"],
+            "version": profile["version"], "requires": profile["requires"],
+            "files": sorted(({
+                "path": item["path"], "sha256": item["sha256"],
+                "size": item["size"], "executable": item["executable"],
+            } for item in profile["files"]), key=lambda item: item["path"]),
+        }
+        profile_identity = {
+            "package_id": profile["id"],
+            "package_version": profile["version"],
+            "package_identity_sha256": hashlib.sha256(json.dumps(
+                descriptor, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest(),
+        }
 
     def files_with_suffix(suffix: str) -> list[dict[str, Any]]:
         return [item for item in fpga["files"]
@@ -300,9 +288,7 @@ def resolve_active_fpga_handoff(
         raise AssetSetError("ASSET_HANDOFF_REQUIRES_PREBUILT_BIN_AND_HWH")
     image = binaries[0]
     hwh = hwhs[0]
-    if image.get("sha256") != fpga_bin_sha256:
-        raise AssetSetError("ASSET_HANDOFF_IMAGE_DIGEST_MISMATCH")
-    if _digest(target / image["path"]) != fpga_bin_sha256:
+    if _digest(target / image["path"]) != image["sha256"]:
         raise AssetSetError("ASSET_HANDOFF_IMAGE_CHANGED")
 
     candidates = []
@@ -313,9 +299,10 @@ def resolve_active_fpga_handoff(
     if len(candidates) != 1:
         raise AssetSetError("ASSET_HANDOFF_FPGA_MANIFEST_NOT_UNIQUE_OR_MISSING")
     entry, paired = candidates[0]
-    if (paired.get("image_id") != fpga_image_id
+    if (type(paired.get("image_id")) is not str
+            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", paired["image_id"])
             or paired.get("firmware_name") != Path(image["path"]).name
-            or paired.get("firmware_sha256") != fpga_bin_sha256
+            or paired.get("firmware_sha256") != image["sha256"]
             or paired.get("board_id") != manifest["target"]["board"]
             or paired.get("fpga_part") != manifest["target"]["fpga_part"]
             or paired.get("recovery_name") != "base.bin"
@@ -334,13 +321,13 @@ def resolve_active_fpga_handoff(
     return {
         "schema": "plasma.ppu.fpga-asset-handoff.v1",
         "status": "VERIFIED_NOT_LOADED",
-        "asset_set_sha256": expected_asset_set_sha256,
+        "asset_set_sha256": asset_set_sha256,
         "fpga_image": {
-            "package_id": fpga_package_id,
-            "package_version": fpga_package_version,
-            "image_id": fpga_image_id,
+            "package_id": fpga["id"],
+            "package_version": fpga["version"],
+            "image_id": paired["image_id"],
             "bin_relative_path": image["path"],
-            "bin_sha256": fpga_bin_sha256,
+            "bin_sha256": image["sha256"],
             "hwh_relative_path": hwh["path"],
             "hwh_sha256": hwh["sha256"],
             "manifest_relative_path": entry["path"],
@@ -349,11 +336,7 @@ def resolve_active_fpga_handoff(
             "fpga_part": paired["fpga_part"],
             "abi_version_claim": paired["abi_version"],
         },
-        "programming_profile": {
-            "package_id": programming_profile_id,
-            "package_version": programming_profile_version,
-            "package_identity_sha256": calculated,
-        },
+        "programming_profile": profile_identity,
         "root_hardware_validation": "NOT_RUN",
         "fpga_install": "NOT_RUN",
         "fpga_load": "NOT_RUN",

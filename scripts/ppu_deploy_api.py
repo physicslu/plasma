@@ -314,10 +314,15 @@ class BootstrapAPIClient:
             raise DeploymentOutcomeUnknown("API_ADMISSION_RECEIPT_UNKNOWN")
         return DeploymentSubmission(upload_id, tx, state)
 
-    def install_bundle(self, admitted: DeploymentSubmission) -> DeploymentSubmission:
-        """Explicit B3 install-only of the EXACT current B2 admitted Bundle.
+    def install_bundle(
+        self, admitted: DeploymentSubmission, *, fpga_load: bool = False,
+    ) -> DeploymentSubmission:
+        """Explicit B3 of the EXACT current B2 admitted Bundle.
 
-        No implicit B4 activation, FPGA download or package execution.
+        Without ``fpga_load`` this installs files only. With an explicit
+        ``fpga_load=True`` the PPU also loads the Bundle's FPGA Image through
+        its protected Root Entry and publishes the Active Set only after
+        Identity PASS. Never a package execution or DUT operation.
         The admission receipt must be read back from the current device; a
         prior arbitrary transaction or locally constructed claim is not an
         install authorization. This method never auto-retries on uncertainty.
@@ -327,6 +332,8 @@ class BootstrapAPIClient:
                 or not _HEX32.fullmatch(admitted.upload_id)
                 or not _HEX32.fullmatch(admitted.transaction_id)):
             raise DeploymentAPIError("B3_VALID_B2_ADMISSION_REQUIRED")
+        if type(fpga_load) is not bool:
+            raise DeploymentAPIError("B3_FPGA_LOAD_FLAG_INVALID")
         b2 = self.deployment_state(admitted.transaction_id)
         result = b2.get("result")
         plan = result.get("plan") if isinstance(result, dict) else None
@@ -337,7 +344,7 @@ class BootstrapAPIClient:
             raise DeploymentOutcomeUnknown("B3_DEVICE_ADMISSION_CHANGED")
         reply = self._call("POST", "/v1/deployments", {
             "kind": "bundle", "upload_id": admitted.upload_id,
-            "install_only": True,
+            "fpga_load": fpga_load,
         })
         record = reply.get("deployment")
         if (not isinstance(record, dict)

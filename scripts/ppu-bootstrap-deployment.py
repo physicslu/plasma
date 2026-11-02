@@ -12,11 +12,13 @@ import argparse
 import fcntl
 import hashlib
 import re
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import importlib.util
 import json
 import os
 import shutil
+import stat
+import subprocess
 import sys
 import tempfile
 import time
@@ -28,7 +30,18 @@ from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
-SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "bundle_installed", "asset_set_active", "rolled_back", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "bundle_installed", "asset_set_active", "rolled_back", "verify_failed", "fpga_loaded", "fpga_load_denied", "fpga_identity_failed"}
+# B3 fpga_load: fixed protected Root Entry and its root-owned source pin.
+# Neither path is ever taken from HTTP, the Bundle or the caller.
+ROOT_ENTRY = Path("/usr/local/libexec/plasma/z2-path2-root-entry")
+SYSTEMD_RUN = Path("/usr/bin/systemd-run")
+ROOT_STAGED_ASSET_SETS = Path("/opt/plasma/assets/staged")
+ROOT_BUNDLE_LOAD_TIMEOUT_S = 600
+B3_RECEIPT_SCHEMA = "plasma.ppu.b3-deployment-receipt.v2"
+_BUNDLE_LOAD_OUTCOMES = frozenset({
+    "fpga_loaded", "fpga_load_denied", "recovery_required", "fpga_identity_failed",
+})
+_PATH2_DENIAL = re.compile(r"PATH2_[A-Z0-9_]{3,80}\Z")
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -94,6 +107,8 @@ class BundleV3InstallRequest:
     artifact_sha256: str
     target_profile: Mapping[str, str]
     api_transaction_id: str
+    # Explicit owner request: also load the Bundle's FPGA Image (B3 v2).
+    fpga_load: bool = False
 
 @dataclass(frozen=True)
 class HostOnlyPackageRequest:
@@ -196,12 +211,18 @@ class DeploymentCoordinator:
         installer: ModuleType,
         clock: Callable[[], float] = time.time,
         transaction_id_factory: Callable[[], str] = lambda: str(uuid.uuid4()),
+        root_bundle_loader: Callable[[str], Mapping[str, Any]] | None = None,
+        quiescence_lease: Callable[[], Any] | None = None,
     ) -> None:
         self.paths = paths
         self.installer = installer
         self.clock = clock
         self.transaction_id_factory = transaction_id_factory
         self.journal = Journal(paths.journal, clock)
+        # Host-only tests inject fakes; production uses the fixed Root Entry
+        # and the Runtime's connection-held Job quiesce lease.
+        self.root_bundle_loader = root_bundle_loader
+        self.quiescence_lease = quiescence_lease
 
     def _installer_paths(self):
         return self.installer.InstallPaths(
@@ -386,6 +407,8 @@ class DeploymentCoordinator:
         if (not isinstance(request.target_profile, Mapping)
                 or set(request.target_profile) != {"platform", "board", "fpga_part"}):
             raise DeploymentError("B3_INSTALL_TARGET_INVALID")
+        if type(request.fpga_load) is not bool:
+            raise DeploymentError("B3_FPGA_LOAD_FLAG_INVALID")
         verify_contract = Path(__file__).with_name("ppu_unified_deployment.py")
         spec = importlib.util.spec_from_file_location("plasma_b3_device_contract", verify_contract)
         if spec is None or spec.loader is None:
@@ -435,8 +458,18 @@ class DeploymentCoordinator:
                 record.module = bundle.name
                 record.release_id = (bundle.version + "-" +
                                      bundle.archive_sha256[:16])
+                if request.fpga_load and not any(
+                        package.kind == "fpga-image" for package in bundle.packages):
+                    raise DeploymentError("B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE")
                 self.journal.write(record, "verified")
             except Exception as exc:
+                if str(exc) == "B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE":
+                    self.journal.write(
+                        record, "verify_failed",
+                        error_code="b3_fpga_load_requires_fpga_image",
+                        error_message=type(exc).__name__,
+                    )
+                    raise
                 self.journal.write(
                     record, "verify_failed",
                     error_code="b3_bundle_verification_failed",
@@ -462,10 +495,17 @@ class DeploymentCoordinator:
                 )
                 raise DeploymentError("B3_INSTALL_REQUIRES_RECOVERY") from exc
             self.journal.write(record, "bundle_installed")
+            fpga_load: dict[str, Any] = {"requested": False, "result": "NOT_RUN"}
+            active: Mapping[str, Any] | None = None
+            if request.fpga_load:
+                fpga_load, active = self._b3_fpga_load_locked(
+                    record, request.artifact_sha256, Path(evidence["path"]),
+                )
             return {
                 "result": "PASS",
-                "schema": "plasma.ppu.b3-deployment-receipt.v1",
-                "stage": "bundle_install_only",
+                "schema": B3_RECEIPT_SCHEMA,
+                "stage": ("bundle_install_and_fpga_load" if request.fpga_load
+                          else "bundle_install_only"),
                 "transaction": asdict(record),
                 "bundle_name": bundle.name,
                 "archive_sha256": request.artifact_sha256,
@@ -475,9 +515,121 @@ class DeploymentCoordinator:
                 "install_path": evidence["path"],
                 "per_package_install_executed": True,
                 "runtime_activation_executed": False,
-                "fpga": "NOT_RUN",
+                "fpga": "LOADED" if request.fpga_load else "NOT_RUN",
+                "fpga_load": fpga_load,
+                "active_asset_set": None if active is None else dict(active),
+                # The Runtime's view of the PL is stale after a reload; Site
+                # execution needs a fresh Site admission (not done in B3).
+                "runtime_site_readmission": (
+                    "REQUIRED" if request.fpga_load else "NOT_REQUIRED"),
                 "dut": "NOT_RUN",
             }
+
+    def _asset_helper(self) -> ModuleType:
+        helper_path = Path(__file__).with_name("ppu_asset_set.py")
+        spec = importlib.util.spec_from_file_location("plasma_ppu_active_asset_set", helper_path)
+        if spec is None or spec.loader is None:
+            raise DeploymentError("ASSET_SET_MANAGER_UNAVAILABLE")
+        helper = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = helper
+        spec.loader.exec_module(helper)
+        return helper
+
+    def _b3_fpga_load_locked(
+        self, record: DeploymentRecord, asset_set_sha256: str, install_path: Path,
+    ) -> tuple[dict[str, Any], Mapping[str, Any]]:
+        """B3 v2: Quiesce -> Root bundle-load -> publish active.json.
+
+        Runs under the caller's deployment.lock. Journal outcomes:
+        fpga_loaded | fpga_load_denied (PL untouched) | recovery_required |
+        fpga_identity_failed (Image kept loaded, no automatic Golden Restore).
+        active.json changes only after Root Identity PASS.
+        """
+        def deny(code: str, exc: BaseException | None = None) -> DeploymentError:
+            self.journal.write(record, "fpga_load_denied", error_code=code,
+                               error_message=type(exc).__name__ if exc else code)
+            return DeploymentError("B3_FPGA_LOAD_DENIED:" + code)
+
+        helper = self._asset_helper()
+        loader = self.root_bundle_loader
+        if loader is None:
+            # The protected Root locates the Set under its fixed product root.
+            if install_path != ROOT_STAGED_ASSET_SETS / asset_set_sha256:
+                raise deny("b3_fpga_load_install_path_not_canonical")
+            loader = run_root_bundle_load
+        try:
+            handoff = helper.resolve_staged_fpga_handoff(
+                self.paths.product_root, asset_set_sha256)
+        except Exception as exc:
+            raise deny("b3_fpga_handoff_denied", exc) from exc
+        lease = self.quiescence_lease or helper.held_runtime_asset_lease
+        hold = ExitStack()
+        try:
+            # Connection-held for the whole load + active.json publish.
+            hold.enter_context(lease())
+        except Exception as exc:
+            raise deny("b3_runtime_quiesce_denied", exc) from exc
+        with hold:
+            self.journal.write(record, "fpga_loading")
+            try:
+                outcome = dict(loader(asset_set_sha256))
+            except Exception as exc:
+                outcome = {"result": "recovery_required",
+                           "code": "ROOT_ENTRY_OUTCOME_UNKNOWN:" + type(exc).__name__}
+            result = outcome.get("result")
+            code = outcome.get("code")
+            code = code if isinstance(code, str) and code else str(result)
+            if result not in _BUNDLE_LOAD_OUTCOMES:
+                result, code = "recovery_required", "ROOT_ENTRY_OUTCOME_INVALID"
+            if result == "fpga_loaded" and (
+                    outcome.get("asset_set_sha256") != asset_set_sha256
+                    or outcome.get("fpga_image_id") != handoff["fpga_image"]["image_id"]
+                    or outcome.get("fpga_bin_sha256") != handoff["fpga_image"]["bin_sha256"]
+                    or outcome.get("identity") != "IDENTITY_PASS"):
+                # PL was written but the Root receipt does not match the Set.
+                result, code = "recovery_required", "ROOT_RECEIPT_MISMATCH"
+            if result == "fpga_load_denied":
+                raise deny(code[:200])
+            if result == "fpga_identity_failed":
+                self.journal.write(record, "fpga_identity_failed",
+                                   error_code="b3_fpga_identity_failed",
+                                   error_message=code[:200])
+                raise DeploymentError("B3_FPGA_IDENTITY_FAILED:" + code[:200])
+            if result == "recovery_required":
+                self.journal.write(record, "recovery_required",
+                                   error_code="b3_fpga_download_outcome_uncertain",
+                                   error_message=code[:200])
+                raise DeploymentError("B3_FPGA_LOAD_REQUIRES_RECOVERY:" + code[:200])
+            self.journal.write(record, "activating")
+            try:
+                active = helper.activate_verified(
+                    self.paths.product_root, asset_set_sha256, runtime_quiesced=True,
+                )
+                if (active.get("result") != "PASS"
+                        or active.get("asset_set_sha256") != asset_set_sha256):
+                    raise DeploymentError("ASSET_SET_ACTIVATION_RECEIPT_INVALID")
+            except Exception as exc:
+                self.journal.write(record, "recovery_required",
+                                   error_code="b3_active_set_publish_uncertain",
+                                   error_message=type(exc).__name__)
+                raise DeploymentError("B3_ACTIVE_SET_PUBLISH_REQUIRES_RECOVERY") from exc
+            self.journal.write(record, "fpga_loaded")
+        return ({
+            "requested": True, "result": "fpga_loaded",
+            "fpga_image_id": outcome["fpga_image_id"],
+            "fpga_bin_sha256": outcome["fpga_bin_sha256"],
+            "fpga_manifest_sha256": outcome.get("fpga_manifest_sha256"),
+            "manifest_promoted": outcome.get("manifest_promoted"),
+            "download_count": outcome.get("download_count"),
+            "identity": outcome["identity"],
+            "boot_id": outcome.get("boot_id"),
+            "auto_restore": False,
+            "programming_profile": handoff["programming_profile"],
+        }, {
+            "asset_set_sha256": active["asset_set_sha256"],
+            "generation": active["generation"],
+            "already_active": active["already_active"],
+        })
 
     def activate_staged_asset_set(
         self, asset_set_sha256: str, *,
@@ -981,6 +1133,71 @@ class DeploymentCoordinator:
         }
 
 
+def run_root_bundle_load(asset_set_sha256: str) -> Mapping[str, Any]:
+    """Invoke the fixed protected Root Entry: bundle-load <set sha>.
+
+    The Bootstrap service runs with ProtectHome, so the Root Entry and its
+    /root tree are invisible here. systemd-run starts the Root Entry as a
+    transient root unit outside this sandbox; it receives only the Set SHA.
+    Anything that cannot be proven to have stopped before the PL write is
+    ``recovery_required``.
+    """
+    if not _HEX64.fullmatch(asset_set_sha256):
+        return {"result": "fpga_load_denied", "code": "ASSET_SET_SHA_INVALID"}
+    try:
+        entry = ROOT_ENTRY.lstat()
+        runner = SYSTEMD_RUN.lstat()
+    except OSError:
+        return {"result": "fpga_load_denied", "code": "ROOT_ENTRY_NOT_INSTALLED"}
+    if (not stat.S_ISREG(entry.st_mode) or entry.st_uid != 0 or entry.st_mode & 0o022
+            or not stat.S_ISREG(runner.st_mode) or runner.st_uid != 0):
+        return {"result": "fpga_load_denied", "code": "ROOT_ENTRY_NOT_INSTALLED"}
+    try:
+        completed = subprocess.run(
+            root_bundle_load_argv(asset_set_sha256),
+            check=False, capture_output=True, text=True,
+            timeout=ROOT_BUNDLE_LOAD_TIMEOUT_S + 60,
+            env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"},
+        )
+    except subprocess.TimeoutExpired:
+        return {"result": "recovery_required", "code": "ROOT_ENTRY_TIMEOUT"}
+    except OSError as exc:
+        return {"result": "fpga_load_denied", "code": "ROOT_ENTRY_EXEC_FAILED:" + type(exc).__name__}
+    return classify_root_bundle_load(completed.returncode, completed.stdout, completed.stderr)
+
+
+def root_bundle_load_argv(asset_set_sha256: str) -> list[str]:
+    return [
+        str(SYSTEMD_RUN), "--wait", "--pipe", "--collect", "--quiet",
+        "--service-type=exec",
+        "--property=RuntimeMaxSec=%d" % ROOT_BUNDLE_LOAD_TIMEOUT_S,
+        str(ROOT_ENTRY), "bundle-load", asset_set_sha256,
+    ]
+
+
+def classify_root_bundle_load(returncode: int, stdout: str, stderr: str) -> Mapping[str, Any]:
+    """Map Root Entry output to a B3 outcome; unknown is never 'denied'."""
+    receipts = [line[len("PLASMA_BUNDLE_LOAD="):] for line in stdout.splitlines()
+                if line.startswith("PLASMA_BUNDLE_LOAD=")]
+    if len(receipts) == 1:
+        try:
+            outcome = json.loads(receipts[0])
+        except ValueError:
+            outcome = None
+        if (isinstance(outcome, dict)
+                and outcome.get("result") in _BUNDLE_LOAD_OUTCOMES
+                and (returncode == 0) == (outcome["result"] == "fpga_loaded")
+                and returncode in (0, 3)):
+            return outcome
+        return {"result": "recovery_required", "code": "ROOT_ENTRY_RECEIPT_INVALID"}
+    lines = stderr.strip().splitlines()
+    if (not receipts and returncode == 2 and lines
+            and _PATH2_DENIAL.fullmatch(lines[-1].strip())):
+        # The shell Root Entry refused before starting Python: no PL access.
+        return {"result": "fpga_load_denied", "code": lines[-1].strip()}
+    return {"result": "recovery_required", "code": "ROOT_ENTRY_OUTCOME_UNKNOWN"}
+
+
 def _load_installer(path: Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location("plasma_ppu_z2_installer_for_bootstrap", path)
     if spec is None or spec.loader is None:
@@ -1023,6 +1240,8 @@ def _parser() -> argparse.ArgumentParser:
     b3.add_argument("--board", required=True)
     b3.add_argument("--fpga-part", required=True)
     b3.add_argument("--api-transaction-id", required=True)
+    b3.add_argument("--fpga-load", action="store_true",
+                    help="also load the Bundle's FPGA Image via the protected Root Entry")
 
     deploy.add_argument(
         "--qualification-fail-health-check",
@@ -1056,6 +1275,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "fpga_part": args.fpga_part,
             },
             api_transaction_id=args.api_transaction_id,
+            fpga_load=bool(args.fpga_load),
         )
         try:
             result = DeploymentCoordinator(paths=paths, installer=installer).execute_bundle_v3_install(request)

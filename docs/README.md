@@ -138,6 +138,7 @@
 - **Plan** · `Gate 1` · `Host-only` · `PR #1252 Draft` — [One typed Package/Asset Execution Layer — Python, Native C, FPGA](deployment/ppu-common-asset-execution-gate1.md)：共用身分、授權與 dispatch seam；真實 Executor、FPGA Load 接線與 HIL 尚未驗證。
 - **Plan** · `Gate 1` · `PR #1262 superseded by #1252` — [Non-root Package Action privilege model](architecture/ppu-rootless-package-action-gate1.md)：owner-operated PPU 的非 root 執行方向、現有 Root Guard 及 Z2 權限稽核缺口；不宣稱已具備 rootless FPGA。
 - **Current** · `Host-only` · `PR #1245` — [Generic Bundle v3 B3 — one inert Asset Set staging path](deployment/ppu-bundle-v3-generic-assets-gate1.md)
+- **Plan** · `Gate 1` · `Owner decision 2026-11-02` — [Bundle v3 B3 — Install, Activate and Load the FPGA Image in One Transaction](deployment/ppu-bundle-v3-b3-fpga-load-gate1.md)：明確 `fpga_load=true` 的 B3 於同一 Coordinator 交易內安裝、Root `bundle-load`（download＋Identity）並切換 Active Set；待核准，未實作。
 - **Current** · `Host-only` · `PR #1246` — [Single Active Asset Set P1 — Console SHA reconciliation & guarded Host-only activation](deployment/ppu-single-active-asset-set-gate1.md)
 - **Current** · `Host-only` · `PR #1248/#1249` — [FPGA Asset Handoff P2 — exact Active Image/Profile selection, no hardware load](deployment/ppu-fpga-asset-handoff-gate1.md): removes Smoke-only device allowlist; a staged digest is **not** an Active Set or FPGA load.
 - **Current** · `Host-only` · `PR #1217` — [Z2 FPGA six-check admission](deployment/z2-minimal-six-check-admission.md)：FPGA Manager 載入與 MMIO admission 分時檢查；真實 Owner、ABI 與 HIL 尚未驗收。

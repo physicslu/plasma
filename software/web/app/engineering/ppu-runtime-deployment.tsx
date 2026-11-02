@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ManagerRegistryEntry } from "./ppu-registry-api";
 import {
   admitManagerPpuBundle,
+  installManagerPpuBundle,
   appendManagerPpuBootstrapChunk,
   bytesToBase64,
   commitManagerPpuBootstrapUpload,
@@ -47,13 +48,14 @@ export default function PpuRuntimeDeployment({
   const [status, setStatus] = useState<ManagerBootstrapStatus | null>(null);
   const [platformCapability, setPlatformCapability] = useState<"checking" | "supported" | "unsupported">("checking");
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"pair" | "deploy" | "bundle" | "loopback" | null>(null);
+  const [busy, setBusy] = useState<"pair" | "deploy" | "bundle" | "b3" | "loopback" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pairingToken, setPairingToken] = useState("");
   const [kit, setKit] = useState<File | null>(null);
   const [sidecar, setSidecar] = useState<File | null>(null);
   const [bundleFile, setBundleFile] = useState<File | null>(null);
+  const [admittedUploadId, setAdmittedUploadId] = useState<string | null>(null);
   const [ppuId, setPpuId] = useState(alias);
   const [facilityId, setFacilityId] = useState("lab");
   const [displayName, setDisplayName] = useState(alias || "Plasma PPU");
@@ -137,6 +139,16 @@ export default function PpuRuntimeDeployment({
     && !hasActiveExecution && !recoveryRequired && busy === null
     && deployment?.state !== "queued" && deployment?.state !== "running",
   );
+  const canInstallBundle = Boolean(
+    alias && admittedUploadId
+    && deployment?.state === "admitted" && deployment?.upload_id === admittedUploadId
+    && pairing?.paired && pairing.device_match
+    && !hasActiveExecution && !recoveryRequired && busy === null,
+  );
+  const b3Result = deployment?.result && typeof deployment.result === "object"
+    ? deployment.result as Record<string, unknown> : null;
+  const b3FpgaLoad = b3Result?.fpga_load && typeof b3Result.fpga_load === "object"
+    ? b3Result.fpga_load as Record<string, unknown> : null;
   const deploymentTone = useMemo(() => {
     if (!deployment) return "neutral";
     if (deployment.state === "succeeded") return "success";
@@ -242,12 +254,32 @@ export default function PpuRuntimeDeployment({
       }
       await commitManagerPpuBootstrapUpload(alias, created.upload.upload_id);
       const receipt = await admitManagerPpuBundle(alias, created.upload.upload_id);
+      setAdmittedUploadId(created.upload.upload_id);
       setNotice(`Bundle admitted only (not installed/activated). Transaction: ${receipt.deployment.transaction_id}`);
       await refresh(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Bundle Admission failed");
     } finally {
       setUploadProgress(null);
+      setBusy(null);
+    }
+  }
+
+  async function installBundle(fpgaLoad: boolean) {
+    if (!canInstallBundle || !admittedUploadId) return;
+    setBusy("b3");
+    setError(null);
+    setNotice(null);
+    try {
+      const receipt = await installManagerPpuBundle(alias, admittedUploadId, fpgaLoad);
+      setAdmittedUploadId(null);
+      setNotice(fpgaLoad
+        ? `Install and FPGA load queued. Transaction: ${receipt.deployment.transaction_id}`
+        : `Install queued (no FPGA load). Transaction: ${receipt.deployment.transaction_id}`);
+      await refresh(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Bundle install failed");
+    } finally {
       setBusy(null);
     }
   }
@@ -469,6 +501,17 @@ export default function PpuRuntimeDeployment({
           </button>
         </div>
         <p className="ppuPlatformSectionNote">Admission produces a Receipt only. Publisher trust, Master authorization and device Install/Activate are not qualified.</p>
+        <div className="ppuPlatformDeploymentForm">
+          <button className="operatorButton" type="button"
+            disabled={!canInstallBundle} onClick={() => void installBundle(false)}>
+            {busy === "b3" ? "Submitting" : "Install Only"}
+          </button>
+          <button className="operatorButton ppuPlatformDeployButton" type="button"
+            disabled={!canInstallBundle} onClick={() => void installBundle(true)}>
+            {busy === "b3" ? "Submitting" : "Install and Load FPGA"}
+          </button>
+        </div>
+        <p className="ppuPlatformSectionNote">Install and Load FPGA reloads the PL through the PPU&apos;s protected Root Entry after Runtime Job quiesce, then makes this Bundle the Active Set only if Identity passes. Sites need re-admission afterwards. No DUT operation.</p>
       </section>
 
       <section className="ppuPlatformDeploymentStatus" aria-label="Platform deployment status" data-tone={deploymentTone}>
@@ -480,6 +523,18 @@ export default function PpuRuntimeDeployment({
           <small>TRANSACTION</small>
           <span className="ppuPlatformMonoValue">{deployment?.transaction_id ?? "No deployment transaction"}</span>
         </div>
+        {b3FpgaLoad?.requested === true && (
+          <div>
+            <small>FPGA LOAD</small>
+            <span className="ppuPlatformMonoValue">
+              {String(b3FpgaLoad.result)} · {String(b3FpgaLoad.fpga_image_id)} · {String(b3FpgaLoad.identity)}
+            </span>
+          </div>
+        )}
+        {b3Result?.runtime_site_readmission === "REQUIRED" && (
+          <p className="ppuRegistryMessage">Runtime Site re-admission is required after the FPGA reload.</p>
+        )}
+        {deployment?.error_code && <p className="ppuRegistryMessage error">{deployment.error_code}</p>}
         {deployment?.error && <p className="ppuRegistryMessage error">{deployment.error}</p>}
       </section>
         </>

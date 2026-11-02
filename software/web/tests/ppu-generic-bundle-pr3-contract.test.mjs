@@ -54,3 +54,14 @@ test("PR3 preserves single Manager deployment operation gate and PPU internal ow
   assert.doesNotMatch(api, /Bearer /);
   assert.doesNotMatch(ui, /Bearer /);
 });
+
+test("B3 Console control sends only the explicit fpga_load choice through the BFF", async () => {
+  const [api, ui, manager] = await Promise.all([read("api"), read("ui"), read("manager")]);
+  assert.match(api, /export function installManagerPpuBundle/);
+  assert.match(api, /kind: "bundle", upload_id: uploadId, fpga_load: fpgaLoad/);
+  assert.match(ui, /Install and Load FPGA/);
+  assert.match(ui, /installManagerPpuBundle\(alias, admittedUploadId, fpgaLoad\)/);
+  assert.match(ui, /runtime_site_readmission === "REQUIRED"/);
+  assert.doesNotMatch(ui, /install_only/);
+  assert.match(manager, /Bundle B3 requires only kind, upload_id and fpga_load/);
+});

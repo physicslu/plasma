@@ -37,8 +37,10 @@ Console sends complete Bundle v3
     -> B2 PASS with source_authorized=true; execution_permitted=false
     -> B3 reverify same ZIP, current Master authority and current
        FPGA static qualification (any drift since B2 fails closed)
-    -> Install-only immutable Staging
-    -> [separate controlled Active Set activation]
+    -> immutable Staging (install/verify)
+    -> only with explicit fpga_load=true: Runtime Quiesce -> Root
+       bundle-load (stage, promote, download, Identity) -> active.json
+       (see ppu-bundle-v3-b3-fpga-load-gate1.md)
     -> [separate explicit Asset execution request]
 ```
 

@@ -31,9 +31,12 @@ signature, Master approval or device authorization.
   without upload; otherwise uploads the **whole Bundle** through B1,
   obtains B2, and explicitly requests B3 Install-only. It returns
   \`B3_INSTALL_QUEUED\`, **not** \`ACTIVE\` or \`READY\`.
-- B3 still verifies every Package and installs without changing the
-  Active pointer, rebooting a service, running a Python Parser, loading
-  an FPGA or touching a DUT.
+- B3 without `fpga_load` still verifies every Package and installs without
+  changing the Active pointer, rebooting a service, running a Python Parser,
+  loading an FPGA or touching a DUT. B3 with an explicit `fpga_load=true`
+  loads the Bundle's FPGA Image and publishes `active.json` under the same
+  Runtime Job Quiesce, only after Root Identity PASS
+  ([B3 FPGA load Gate 1](ppu-bundle-v3-b3-fpga-load-gate1.md)).
 
 ## Activation and authoritative cross-process Job Quiescence
 
