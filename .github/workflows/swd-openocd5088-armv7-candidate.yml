@@ -39,7 +39,7 @@ jobs:
           apt-get update -qq
           apt-get install -y --no-install-recommends \
             ca-certificates git autoconf automake libtool pkg-config make \
-            gcc g++ python3 binutils libusb-1.0-0-dev libftdi1-dev libhidapi-dev
+            gcc g++ python3 binutils libusb-1.0-0-dev
           git init /tmp/openocd
           git -C /tmp/openocd remote add origin https://github.com/openocd-org/openocd.git
           git -C /tmp/openocd fetch --no-tags --depth 1 origin \
@@ -85,6 +85,13 @@ jobs:
           ldd src/openocd > /artifacts/linked-libraries.txt
           if grep -q 'not found' /artifacts/linked-libraries.txt; then
             echo 'Missing ARMv7 shared library' >&2
+            exit 1
+          fi
+          # Z2 PYNQ Linux 3.0 ships libusb-1.0 but NOT libftdi1/hidapi:
+          # only libc-family + libusb may be linked, or the binary cannot run.
+          if grep -Ev '^[[:space:]]*(linux-vdso|/lib/ld-linux-armhf|(libc|libm|libpthread|libdl|librt|libgcc_s|libudev|libusb-1\.0)\.so)' \
+              /artifacts/linked-libraries.txt; then
+            echo 'ARMv7 binary links a library not present on Z2' >&2
             exit 1
           fi
           cp src/openocd /artifacts/openocd
