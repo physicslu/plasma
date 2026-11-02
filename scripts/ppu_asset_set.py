@@ -105,6 +105,13 @@ def verify_staged(product_root: Path, asset_set_sha256: str) -> dict[str, Any]:
                     or type(size) is not int or size < 0 or name in expected):
                 raise AssetSetError("ASSET_SET_FILE_DESCRIPTOR_INVALID")
             dest = target / name
+            # Reject symlinked intermediate directories BEFORE reading any
+            # content; a leaf-only symlink check would be insufficient.
+            parent = target
+            for part in Path(name).parts[:-1]:
+                parent = parent / part
+                if parent.is_symlink() or not parent.is_dir():
+                    raise AssetSetError("ASSET_SET_PARENT_UNTRUSTED")
             if (dest.is_symlink() or not dest.is_file()
                     or dest.stat().st_size != size or _digest(dest) != checksum):
                 raise AssetSetError("ASSET_SET_FILE_MISMATCH")
