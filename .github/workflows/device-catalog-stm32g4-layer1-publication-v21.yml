@@ -8,8 +8,6 @@ on:
       - 'data/device-catalog/research/validate_stm32g4_layer1_publication_v21.py'
       - 'data/device-catalog/research/STM32G4_LAYER1_PRODUCTION_PUBLICATION_V21.md'
       - 'scripts/device-catalog-family-ci.py'
-      - 'data/ic-support/test_coverage_inventory.py'
-      - 'software/python/tests/test_device_catalog.py'
       - '.github/workflows/device-catalog-stm32g4-layer1-publication-v21.yml'
 
 permissions:

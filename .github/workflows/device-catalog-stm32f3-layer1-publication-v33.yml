@@ -7,7 +7,6 @@ on:
       - 'data/device-catalog/research/stm32f3-layer1-production-publication-v3.3.json'
       - 'data/device-catalog/research/validate_stm32f3_layer1_publication_v33.py'
       - 'data/device-catalog/research/STM32F3_LAYER1_PRODUCTION_PUBLICATION_V33.md'
-      - 'data/ic-support/test_coverage_inventory.py'
       - 'scripts/device-catalog-family-ci.py'
       - 'software/python/tests/test_device_catalog_stm32f3.py'
       - '.github/workflows/device-catalog-stm32f3-layer1-publication-v33.yml'
