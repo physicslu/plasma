@@ -45,3 +45,51 @@ def test_abi5_swd_edge_phase_against_independent_target():
         python_search=[str(PL / "verification/cocotb")],
         sim_build=str(PL / "build/swd-independent-edge-phase/rtl-sim"),
     )
+
+
+def test_abi5_stlink_legacy_sampling_negative_control(tmp_path):
+    """Prove the ST-LINK trace detects the original HIGH-end ACK phase bug.
+
+    Restore only the old sampling edge in an isolated *temporary* RTL copy;
+    never modify the production RTL or bitstream to run the control.
+    """
+    source = (PL / "rtl/swd/plasma_swd_transaction_engine.sv").read_text()
+    low_capture = (
+        "                    if (phase == PH_ACK)\n"
+        "                        ack_shift[bit_index[1:0]] <= swdio_in;\n"
+        "                    if (phase == PH_DATA && read_direction_q)\n"
+        "                        read_q[bit_index[4:0]] <= swdio_in;\n"
+        "                    if (phase == PH_PARITY && read_direction_q)\n"
+        "                        parity_sample_q <= swdio_in;\n"
+    )
+    low_anchor = low_capture + "                    swclk <= 1'b1;"
+    high_anchor = (
+        "                    swclk <= 1'b0;\n"
+        "                    timer <= half_q - 16'd1;\n"
+        "                    if (bit_index + 9'd1 < phase_bits) begin"
+    )
+    if source.count(low_anchor) != 1 or source.count(high_anchor) != 1:
+        raise AssertionError("P0 SWD sample structure changed: re-review negative control")
+    mutated = source.replace(
+        low_anchor, "                    swclk <= 1'b1;", 1
+    ).replace(
+        high_anchor,
+        "                    swclk <= 1'b0;\n"
+        "                    timer <= half_q - 16'd1;\n"
+        + low_capture
+        + "                    if (bit_index + 9'd1 < phase_bits) begin",
+        1,
+    )
+    assert mutated != source
+    fixture = tmp_path / "abi5-old-high-end-sampling.sv"
+    fixture.write_text(mutated)
+    run(
+        simulator="icarus",
+        verilog_sources=[str(fixture)],
+        toplevel="plasma_swd_transaction_engine",
+        module="test_swd_abi5_legacy_negative_control",
+        compile_args=["-g2012"],
+        timescale="1ns/1ps",
+        python_search=[str(PL / "verification/cocotb")],
+        sim_build=str(tmp_path / "mutated-sim"),
+    )
