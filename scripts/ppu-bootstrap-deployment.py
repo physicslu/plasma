@@ -485,16 +485,18 @@ class DeploymentCoordinator:
     ) -> Mapping[str, Any]:
         """P1 Host-only integration seam; never a Console-supplied idle bool.
 
-        The caller must inject a trusted contextmanager that prevents new
-        Site Jobs and waits for *all* in-flight/cancelling Jobs, including
-        hardware users, for the entire transaction. Until real PS Runtime
-        implements that lease, production activation is denied.
+        By default, the existing PPU Runtime's root-only Unix control
+        socket grants a connection-held Job-admission quiesce lease. An
+        absent Runtime, a busy/cancelling Site, or an untrusted socket fails
+        closed. The existing Hardware Manager remains a separate P2 guard
+        before any FPGA configuration or real IC programming.
         """
         if (type(asset_set_sha256) is not str
                 or not _HEX64.fullmatch(asset_set_sha256)):
             raise DeploymentError("ASSET_SET_SHA_INVALID")
-        if quiescence_lease is None:
-            raise DeploymentError("ASSET_SET_RUNTIME_QUIESCE_NOT_QUALIFIED")
+        # An omitted lease is NOT an idle authorization. It must use the
+        # existing Runtime's private connection-held Job admission gate.
+        # Host-only tests can inject an equivalent trusted lease explicitly.
         helper_path = Path(__file__).with_name("ppu_asset_set.py")
         spec = importlib.util.spec_from_file_location("plasma_ppu_active_asset_set", helper_path)
         if spec is None or spec.loader is None:
@@ -502,6 +504,8 @@ class DeploymentCoordinator:
         helper = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = helper
         spec.loader.exec_module(helper)
+        if quiescence_lease is None:
+            quiescence_lease = helper.held_runtime_asset_lease
         with self._deployment_lock():
             now = self.clock()
             record = DeploymentRecord(
