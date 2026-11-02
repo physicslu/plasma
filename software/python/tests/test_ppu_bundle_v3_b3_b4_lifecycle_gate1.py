@@ -41,7 +41,8 @@ def test_b3_b4_authorized_host_only_receipt(tmp_path):
     assert receipt["install_qualified"] is False
     assert receipt["b3_install"]["status"] == "HOST_ONLY_VERIFIED"
     assert len(receipt["b3_install"]["package_order_plan"]) == 6
-    assert receipt["b3_install"]["per_package_install_executed"] is True
+    assert receipt["b3_install"]["per_package_install_executed"] is False
+    assert receipt["b3_install"]["per_package_host_only_staging_verified"] is True
     assert receipt["b3_install"]["real_device_install_qualified"] is False
     assert receipt["operation"] == "install_only"
     assert receipt["active_pointer_unchanged"] is True
