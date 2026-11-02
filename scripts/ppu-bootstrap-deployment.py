@@ -28,7 +28,7 @@ from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
-SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "bundle_installed", "rolled_back", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "bundle_installed", "asset_set_active", "rolled_back", "verify_failed"}
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -477,6 +477,78 @@ class DeploymentCoordinator:
                 "runtime_activation_executed": False,
                 "fpga": "NOT_RUN",
                 "dut": "NOT_RUN",
+            }
+
+    def activate_staged_asset_set(
+        self, asset_set_sha256: str, *,
+        quiescence_lease: Callable[[], Any] | None = None,
+    ) -> Mapping[str, Any]:
+        """P1 Host-only integration seam; never a Console-supplied idle bool.
+
+        The caller must inject a trusted contextmanager that prevents new
+        Site Jobs and waits for *all* in-flight/cancelling Jobs, including
+        hardware users, for the entire transaction. Until real PS Runtime
+        implements that lease, production activation is denied.
+        """
+        if (type(asset_set_sha256) is not str
+                or not _HEX64.fullmatch(asset_set_sha256)):
+            raise DeploymentError("ASSET_SET_SHA_INVALID")
+        if quiescence_lease is None:
+            raise DeploymentError("ASSET_SET_RUNTIME_QUIESCE_NOT_QUALIFIED")
+        helper_path = Path(__file__).with_name("ppu_asset_set.py")
+        spec = importlib.util.spec_from_file_location("plasma_ppu_active_asset_set", helper_path)
+        if spec is None or spec.loader is None:
+            raise DeploymentError("ASSET_SET_MANAGER_UNAVAILABLE")
+        helper = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = helper
+        spec.loader.exec_module(helper)
+        with self._deployment_lock():
+            now = self.clock()
+            record = DeploymentRecord(
+                schema_version=SCHEMA_VERSION,
+                transaction_id=self.transaction_id_factory(),
+                state="received", sequence=0,
+                started_at_epoch_s=now, updated_at_epoch_s=now,
+                release_artifact=str(self.paths.product_root / "assets" / "staged" / asset_set_sha256),
+                artifact_sha256=asset_set_sha256,
+                kind="asset-set",
+            )
+            self.journal.write(record, "received")
+            try:
+                self.journal.write(record, "verifying")
+                helper.verify_staged(self.paths.product_root, asset_set_sha256)
+                self.journal.write(record, "verified")
+            except Exception as exc:
+                self.journal.write(
+                    record, "verify_failed", error_code="asset_set_verification_failed",
+                    error_message=type(exc).__name__,
+                )
+                raise DeploymentError("ASSET_SET_NOT_VERIFIED") from exc
+            try:
+                with quiescence_lease():
+                    self.journal.write(record, "activating")
+                    result = helper.activate_verified(
+                        self.paths.product_root, asset_set_sha256,
+                        runtime_quiesced=True,
+                    )
+                    if (result.get("result") != "PASS"
+                            or result.get("asset_set_sha256") != asset_set_sha256
+                            or result.get("ready") is not False
+                            or result.get("fpga") != "NOT_RUN"):
+                        raise DeploymentError("ASSET_SET_ACTIVATION_RECEIPT_INVALID")
+            except Exception as exc:
+                self.journal.write(
+                    record, "recovery_required",
+                    error_code="asset_set_activation_outcome_uncertain",
+                    error_message=type(exc).__name__,
+                )
+                raise DeploymentError("ASSET_SET_ACTIVATION_REQUIRES_RECOVERY") from exc
+            self.journal.write(record, "asset_set_active")
+            return {
+                "result": "PASS", "stage": "asset_set_active",
+                "transaction": asdict(record), **dict(result),
+                "runtime_activation_executed": False,
+                "fpga": "NOT_RUN", "dut": "NOT_RUN",
             }
 
     def execute_authorized_bundle_host_only(
