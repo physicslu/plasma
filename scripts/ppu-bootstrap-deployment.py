@@ -940,6 +940,15 @@ def _parser() -> argparse.ArgumentParser:
     deploy.add_argument("--facility-id", required=True)
     deploy.add_argument("--display-name", default="Plasma PPU")
     deploy.add_argument("--api-transaction-id", help="optional Bootstrap API correlation ID; not authority")
+    b3 = sub.add_parser("install-bundle", help="B3 canonical v3 PS file installation ONLY")
+    b3.add_argument("--release-artifact", type=Path, required=True)
+    b3.add_argument("--source-commit", required=True)
+    b3.add_argument("--artifact-sha256", required=True)
+    b3.add_argument("--platform", required=True)
+    b3.add_argument("--board", required=True)
+    b3.add_argument("--fpga-part", required=True)
+    b3.add_argument("--api-transaction-id", required=True)
+
     deploy.add_argument(
         "--qualification-fail-health-check",
         action="store_true",
@@ -962,6 +971,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         systemd_root=args.systemd_root,
     )
     installer = _load_installer(args.installer)
+    if args.command == "install-bundle":
+        request = BundleV3InstallRequest(
+            archive=args.release_artifact,
+            source_commit=args.source_commit,
+            artifact_sha256=args.artifact_sha256,
+            target_profile={
+                "platform": args.platform, "board": args.board,
+                "fpga_part": args.fpga_part,
+            },
+            api_transaction_id=args.api_transaction_id,
+        )
+        try:
+            result = DeploymentCoordinator(paths=paths, installer=installer).execute_bundle_v3_install(request)
+        except DeploymentError as exc:
+            print("ppu-bootstrap-deployment: B3 install denied: " + str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     release_artifact = args.release_artifact.resolve()
     sidecar = (args.sidecar or Path(str(release_artifact) + ".sha256")).resolve()
     request = DeploymentRequest(
