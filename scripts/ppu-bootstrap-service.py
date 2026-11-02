@@ -69,9 +69,9 @@ class ServicePaths:
     kit_tool: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap-kit.py")
     package_target_file: Path = Path("/etc/plasma/ppu-package-target.json")
 
-    # Factory-installed policy is pinned to the same reviewed factory build.
-    # Never create or update it from a network request or a device pairing token.
-    bundle_install_policy: Path = Path("/opt/plasma/bootstrap/ppu-b3-smoke-policy.json")
+    # Root-provisioned lab installation capability, independent of any
+    # Bundle name, file SHA or test fixture; NEVER writable via HTTP.
+    bundle_install_policy: Path = Path("/opt/plasma/bootstrap/ppu-bundle-install-policy.json")
     deployment_engine_script: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap-deployment.py")
     z2_installer_script: Path = Path("/opt/plasma/bootstrap/ppu-z2-installer.py")
 
@@ -522,30 +522,30 @@ def _trusted_package_target(paths: ServicePaths) -> dict[str, str]:
 
 
 def _trusted_b3_install_policy(paths: ServicePaths) -> dict[str, Any]:
-    """Root/factory-provisioned exact ZIP authority; never from HTTP or ZIP."""
+    """Device-local generic B3 enablement, not publisher authentication.
+
+    Development mode trusts the authenticated, paired Console to *request*
+    installation of the exact committed/admitted Bundle. This grant does not
+    permit any Package execution, FPGA load or DUT operation. Product publisher
+    and Master qualification must independently precede production enablement.
+    """
     path = paths.bundle_install_policy
     if path.is_symlink():
-        raise BootstrapServiceError("B3_FACTORY_POLICY_UNTRUSTED")
+        raise BootstrapServiceError("B3_INSTALL_POLICY_UNTRUSTED")
     try:
         info = path.stat()
     except OSError as exc:
-        raise BootstrapServiceError("B3_FACTORY_POLICY_NOT_INSTALLED") from exc
+        raise BootstrapServiceError("B3_INSTALL_POLICY_NOT_INSTALLED") from exc
     if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077
             or info.st_uid != os.geteuid()):
-        raise BootstrapServiceError("B3_FACTORY_POLICY_UNTRUSTED")
+        raise BootstrapServiceError("B3_INSTALL_POLICY_UNTRUSTED")
     policy = _read_private_json(path)
-    if (set(policy) != {"schema", "bundle_name", "source_commit",
-                        "archive_sha256", "target", "actions"}
-            or policy.get("schema") != "plasma.ppu.b3-factory-policy.v1"
-            or policy.get("bundle_name") != "ppu-b3-smoke"
-            or not isinstance(policy.get("source_commit"), str)
-            or not re.fullmatch(r"[0-9a-f]{40}", policy["source_commit"])
-            or not isinstance(policy.get("archive_sha256"), str)
-            or not HEX64_RE.fullmatch(policy["archive_sha256"])
-            or policy.get("actions") != ["install", "verify"]
-            or type(policy.get("target")) is not dict
-            or policy["target"] != _trusted_package_target(paths)):
-        raise BootstrapServiceError("B3_FACTORY_POLICY_INVALID")
+    if (set(policy) != {"schema", "mode", "install_only", "actions"}
+            or policy.get("schema") != "plasma.ppu.b3-install-policy.v1"
+            or policy.get("mode") != "development"
+            or policy.get("install_only") is not True
+            or policy.get("actions") != ["install", "verify"]):
+        raise BootstrapServiceError("B3_INSTALL_POLICY_INVALID")
     return policy
 
 
@@ -563,18 +563,26 @@ def run_bundle_install_subprocess(
                    paths.z2_installer_script.with_name("ppu-z2-installer-core.py")):
         if script.is_symlink() or not script.is_file():
             raise BootstrapServiceError("B3_INSTALLED_ENGINE_NOT_QUALIFIED")
-    policy = _trusted_b3_install_policy(paths)
+    _trusted_b3_install_policy(paths)
+    if (set(request) != {"api_transaction_id", "source_commit", "archive_sha256", "target"}
+            or type(request.get("source_commit")) is not str
+            or not re.fullmatch(r"[0-9a-f]{40}", request["source_commit"])
+            or type(request.get("archive_sha256")) is not str
+            or not HEX64_RE.fullmatch(request["archive_sha256"])
+            or type(request.get("target")) is not dict
+            or request["target"] != _trusted_package_target(paths)):
+        raise BootstrapServiceError("B3_INTERNAL_ADMISSION_IDENTITY_DENIED")
     argv = [
         sys.executable, str(paths.deployment_engine_script),
         "--installer", str(paths.z2_installer_script),
         "--bootstrap-state-root", str(paths.state_root),
         "--product-root", str(paths.product_root),
         "install-bundle", "--release-artifact", str(upload.committed),
-        "--artifact-sha256", policy["archive_sha256"],
-        "--source-commit", policy["source_commit"],
-        "--platform", policy["target"]["platform"],
-        "--board", policy["target"]["board"],
-        "--fpga-part", policy["target"]["fpga_part"],
+        "--artifact-sha256", request["archive_sha256"],
+        "--source-commit", request["source_commit"],
+        "--platform", request["target"]["platform"],
+        "--board", request["target"]["board"],
+        "--fpga-part", request["target"]["fpga_part"],
         "--api-transaction-id", identity,
     ]
     completed = subprocess.run(
@@ -589,8 +597,8 @@ def run_bundle_install_subprocess(
         raise BootstrapServiceError("B3_DEVICE_INSTALL_RECEIPT_INVALID") from exc
     if (type(result) is not dict or result.get("result") != "PASS"
             or result.get("stage") != "bundle_install_only"
-            or result.get("archive_sha256") != policy["archive_sha256"]
-            or result.get("source_commit") != policy["source_commit"]):
+            or result.get("archive_sha256") != request["archive_sha256"]
+            or result.get("source_commit") != request["source_commit"]):
         raise BootstrapServiceError("B3_DEVICE_INSTALL_RECEIPT_INVALID")
     return result
 
@@ -743,23 +751,28 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             result = earlier.get("result")
             plan = result.get("plan") if type(result) is dict else None
             policy = _trusted_b3_install_policy(self.bootstrap_paths)
+            trusted_target = _trusted_package_target(self.bootstrap_paths)
             if (type(plan) is not dict
                     or result.get("stage") != "package_admission_only"
                     or plan.get("bundle_schema") != "plasma.ppu.bundle.v3"
                     or plan.get("kind") != "bundle"
-                    or plan.get("package") != policy["bundle_name"]
-                    or plan.get("source_commit") != policy["source_commit"]
-                    or plan.get("archive_sha256") != policy["archive_sha256"]
-                    or plan.get("target") != policy["target"]
+                    or type(plan.get("source_commit")) is not str
+                    or not re.fullmatch(r"[0-9a-f]{40}", plan["source_commit"])
+                    or type(plan.get("archive_sha256")) is not str
+                    or not HEX64_RE.fullmatch(plan["archive_sha256"])
+                    or type(plan.get("packages")) is not list
+                    or not plan["packages"]
+                    or plan.get("target") != trusted_target
                     or plan.get("requested_actions") != policy["actions"]):
-                raise BootstrapServiceError("B3_ADMISSION_NOT_PINNED_TO_FACTORY_POLICY")
+                raise BootstrapServiceError("B3_ADMISSION_NOT_QUALIFIED")
             upload = _upload_paths(self.bootstrap_paths, upload_id)
             metadata = _read_json(upload.meta)
             if (metadata.get("state") != "committed"
-                    or metadata.get("sha256") != policy["archive_sha256"]
+                    or metadata.get("upload_id") != upload_id
+                    or metadata.get("sha256") != plan["archive_sha256"]
                     or not upload.committed.is_file()
                     or upload.committed.is_symlink()
-                    or _sha256(upload.committed) != policy["archive_sha256"]):
+                    or _sha256(upload.committed) != plan["archive_sha256"]):
                 raise BootstrapServiceError("B3_UPLOADED_ARCHIVE_CHANGED")
             previous_coordinator = _admit_coordinator_journal(self.bootstrap_paths)
             transaction_id = uuid.uuid4().hex
@@ -780,7 +793,10 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     runner = getattr(self, "bundle_install_runner", run_bundle_install_subprocess)
                     evidence = dict(runner(
                         self.bootstrap_paths, upload_id,
-                        {"api_transaction_id": transaction_id},
+                        {"api_transaction_id": transaction_id,
+                         "source_commit": plan["source_commit"],
+                         "archive_sha256": plan["archive_sha256"],
+                         "target": dict(trusted_target)},
                     ))
                     correlation = _reconcile_b3_install_result(
                         self.bootstrap_paths, api_transaction_id=transaction_id,
@@ -969,10 +985,7 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                         pass
                 payload["capabilities"]["bundle_v3_b3_install"] = b3_policy is not None
                 if b3_policy is not None:
-                    # Public commit/digest are preflight hints only; actual
-                    # B3 still checks the owner-provisioned private policy.
-                    payload["capabilities"]["bundle_v3_b3_source_commit"] = b3_policy["source_commit"]
-                    payload["capabilities"]["bundle_v3_b3_archive_sha256"] = b3_policy["archive_sha256"]
+                    payload["capabilities"]["bundle_v3_b3_mode"] = b3_policy["mode"]
                 payload["security"] = {
                     "control_token_provisioned": self.owner.bootstrap_paths.token_file.is_file(),
                     "transport_confidentiality": "not_qualified",
