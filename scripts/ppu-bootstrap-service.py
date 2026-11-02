@@ -951,7 +951,7 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     self.owner.bootstrap_paths.token_file.is_file()
                     and self.owner.bootstrap_paths.kit_tool.is_file()
                 )
-                payload["capabilities"]["bundle_v3_b3_install"] = all(
+                factory_files_ready = all(
                     path.is_file() and not path.is_symlink() for path in (
                         self.owner.bootstrap_paths.bundle_install_policy,
                         self.owner.bootstrap_paths.deployment_engine_script,
@@ -961,6 +961,18 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                         ),
                     )
                 )
+                b3_policy = None
+                if factory_files_ready:
+                    try:
+                        b3_policy = _trusted_b3_install_policy(self.owner.bootstrap_paths)
+                    except BootstrapServiceError:
+                        pass
+                payload["capabilities"]["bundle_v3_b3_install"] = b3_policy is not None
+                if b3_policy is not None:
+                    # Public commit/digest are preflight hints only; actual
+                    # B3 still checks the owner-provisioned private policy.
+                    payload["capabilities"]["bundle_v3_b3_source_commit"] = b3_policy["source_commit"]
+                    payload["capabilities"]["bundle_v3_b3_archive_sha256"] = b3_policy["archive_sha256"]
                 payload["security"] = {
                     "control_token_provisioned": self.owner.bootstrap_paths.token_file.is_file(),
                     "transport_confidentiality": "not_qualified",
