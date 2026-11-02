@@ -33,6 +33,40 @@ The existing PPU Asset Set helper now supports read-only FPGA Handoff resolution
 
 The last three transitions are **NOT IMPLEMENTED** in this PR.
 
+## Protected Root Loader compatibility (next Host-only integration slice)
+
+The existing `pl/hil/fpga_image_root.py` now exposes its **same full Image
+Manifest parser** as `parse_image_manifest_bytes()`. Its ordinary
+`read_image_manifest()` continues to enforce the root-owned, protected
+`/lib/firmware/plasma-image-manifest.json` path and then calls this same
+parser. The parser still enforces exact board, FPGA part, AXI aperture,
+ABI/Identity words, UIO layout, expected maps and Recovery metadata;
+there is no second, weaker FPGA format validator.
+
+A new **read-only** `validate_bundle_fpga_handoff()` accepts the PPU
+Active Set selection receipt and exact BIN/HWH/Manifest bytes. It checks
+the bound Asset Set SHA, Image ID, Package identity, selected Profile
+identity, relative file roles, all three byte hashes and the *entire*
+Root Image Manifest schema, returning
+`ROOT_FORMAT_VERIFIED_NOT_INSTALLED`. It **does not** change the root
+manifest, copy files to protected firmware storage, touch FPGA Manager,
+run any privileged operation or claim hardware READY.
+
+A future explicit Controller-authorized installation still needs a
+protected privileged bridge into the existing Root Loader, with atomic
+and crash-safe candidate staging, firmware-name collision prevention,
+permission/ownership checks, Golden `base.bin` protection, existing
+global FPGA lock and verified Site/PS/PL quiescence. An arbitrary file
+path supplied by Console or Bundle must never be treated as Root
+authority. The current protected Root Entry's `download|test|restore`
+allowlist is **unchanged**; this PR is not a new Root command.
+
+Host-only positive/negative tests cross the **actual** P2 Active Set
+resolver with the **existing** Root parser and check bad ABI, UIO,
+unexpected Image/Profile/Set IDs, symlink-style path traversal, manifest
+duplicates and SHA mismatches. Tests assert neither FPGA Manager
+nor protected Root hardware calls execute.
+
 ## Reuse the existing protected FPGA Loader
 
 - pl/hil/fpga_image_root.py: protected FPGA Download, full Image Manifest checks, Identity Test, guarded Restore.
