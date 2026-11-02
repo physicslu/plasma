@@ -67,9 +67,36 @@ def test_loopback_and_fixed_abi_are_not_external_swd():
     for name in ("pl.hil.pspl02.runner", "pl.hil.lt02.native",
                  "z2-fixed-unified-site1", "scripts/plasma-z2-smoke.sh"):
         assert name in inventory
-    for name in ("pl/hil/fpga_image_root.py", "pl/hil/path2_z2_target_guard.py",
+    for name in ("pl/hil/fpga_image_root.py",
                  "pl/hil/swd04/one_shot.py", "scripts/bluepill-wordport-session.py"):
         assert (ROOT / name).is_file()
+
+
+RETIRED_F1B_RUNTIME = (
+    "pl/hil/f1b.py",
+    "pl/hil/f1b_owner_once.py",
+    "pl/hil/path2_f1b_minimal_stage.py",
+    "pl/hil/path2_f1b_dev_risk.py",
+    "pl/hil/path2_z2_target_guard.py",
+    "pl/hil/approved-fpga-image.json",
+    "scripts/plasma-z2-smoke.sh",
+    "scripts/z2/plasma-z2-ssh-smoke-target.sh",
+)
+
+
+def test_f1b_legacy_runtime_is_retired_and_root_chain_is_independent():
+    """Host-only: F1-B runtime stays removed; ABI v5 Root chain never imports it."""
+    for name in RETIRED_F1B_RUNTIME:
+        assert not (ROOT / name).exists(), name
+    for name in ("pl/hil/fpga_image_root.py", "pl/hil/fpga_image_guard.py",
+                 "pl/hil/fpga_image_admission.py",
+                 "scripts/z2/plasma-path2-root-entry"):
+        source = (ROOT / name).read_text()
+        for retired in ("pl.hil.f1b", "import f1b", "path2_f1b_",
+                        "path2_z2_target_guard", "approved-fpga-image.json"):
+            assert retired not in source, (name, retired)
+    inventory = (ROOT / "docs/development/swd-legacy-path-retirement.md").read_text()
+    assert "F1-B runtime RETIRED" in inventory
 
 
 @pytest.mark.parametrize("module,tag", [
