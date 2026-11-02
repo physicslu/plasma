@@ -41,8 +41,11 @@ class EdgeBench:
                     assert int(d.swdio_oe.value) == 1, ("request OE", idx)
                 else:
                     # First incoming bit begins at the turnaround rising edge.
-                    assert int(d.swdio_oe.value) == 0, ("target OE contention", idx)
                     rx_idx = idx - 8
+                    # Only the target-driven turnaround/ACK/read response is
+                    # Hi-Z on the host side; subsequent IDLE is host-owned.
+                    if rx_idx < len(self.target_bits):
+                        assert int(d.swdio_oe.value) == 0, ("target OE contention", idx)
                     d.swdio_in.value = (self.target_bits[rx_idx]
                                         if rx_idx < len(self.target_bits) else 1)
                 self.transfer_edges += 1
