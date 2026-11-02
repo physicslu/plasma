@@ -1100,14 +1100,17 @@ def install_verified_bundle_v3(
     # Content-addressed immutable staging: no application name, FPGA profile
     # or test fixture determines a product installation destination. B3 never
     # replaces the single active Asset Set (activation is a separate operation).
-    base = paths.product_root / "assets" / "staged"
+    assets_root = paths.product_root / "assets"
+    base = assets_root / "staged"
     target = base / verified.archive_sha256
     candidate = base / ("." + verified.archive_sha256 + ".staging")
     if (not re.fullmatch(r"[0-9a-f]{64}", verified.archive_sha256)
-            or any(p.is_symlink() for p in (paths.product_root, base, target, candidate))
+            or any(p.is_symlink() for p in (paths.product_root, assets_root, base,
+                                            target, candidate))
             or candidate.exists()):
         raise Z2InstallerError("B3_DESTINATION_UNTRUSTED_OR_RECOVERY_REQUIRED")
-    if base.exists() and not base.is_dir():
+    if (assets_root.exists() and not assets_root.is_dir()
+            or base.exists() and not base.is_dir()):
         raise Z2InstallerError("B3_DESTINATION_INVALID")
     if target.exists() and not target.is_dir():
         raise Z2InstallerError("B3_PREVIOUS_INSTALL_INVALID")
