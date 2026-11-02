@@ -252,7 +252,7 @@ def test_generic_b3_installs_python_fpga_profile_without_execution(tmp_path):
     evidence = co.execute_bundle_v3_install(b3_request(archive, sha))
     assert evidence["result"] == "PASS"
     assert evidence["package_order"] == ["swd-parser", "custom-swd", "stm32-profile"]
-    assert evidence["files_verified"] == 4
+    assert evidence["files_verified"] == 5  # Parser + BIN/HWH/JSON + Profile
     assert evidence["runtime_activation_executed"] is False
     assert evidence["fpga"] == "NOT_RUN" and evidence["dut"] == "NOT_RUN"
     root = Path(evidence["install_path"])
