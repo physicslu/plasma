@@ -12,7 +12,7 @@ Facility
 
 Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。
 
-目前純軟體/Mock path 有自動測試；OpenOCD、STM32F103C8T6 與 Z2/FPGA 的完整實機 programming validation 仍是獨立階段。
+自動測試涵蓋 Mock path，以及 OpenOCD plan／executor、WordPort／RemoteBitbang、LinuxMMIO 等 host-only 契約；這些都不是實機證據。OpenOCD、STM32F103C8T6 與 Z2/FPGA 的實機 programming 必須以真實 HIL 證據為準（目前 main 上的實體 PoC 為 Z2 PS OpenOCD → WordPort → PL SWD image 的 Blue Pill 路徑，見 [`AGENTS.md`](../../AGENTS.md)）。
 
 ## Canonical contracts
 
@@ -349,8 +349,8 @@ logs/YYYY-MM-DD/
 - Job persistence 仍以檔案為主；高工作量需重新評估資料層。
 - TCP 目前一個 request 對一個 connection，沒有長連線 multiplexing/server-push。
 - 只有 raw binary Image Asset normalization 已實作。
-- Programming Recipe/Package 尚未成為 executable contract。
+- 燒錄用的 Programming Recipe/Package 尚未成為 executable contract（與 PPU 佈署用的 [Bundle v3 Packages](../../docs/architecture/ppu-canonical-bundle-packages.md) 是不同概念，見[術語表](../../docs/glossary.md)）。
 - Server restart 可辨識未完成 Job，但不會自動重做 programming。
 - Manager 的 managed routing 是明確 allowlist，不是 generic proxy，也不是 central scheduler；automatic discovery、central auth policy、HA/cluster 與 PL/IC diagnostics 仍未實作。
 - OpenOCD binary staging、adapter isolation 與實體 target 尚未完整驗證。
-- FPGA register map、AXI/FIFO、SWD engine、power-good 與安全關電仍屬後續硬體整合。
+- 目前的 Blue Pill PL image 只提供 SWD 腳位 word port（由 PS 上的 OpenOCD remote_bitbang 驅動），PL 內 SWD engine、AXI/FIFO data plane、power-good 與安全關電仍未完成實機整合。

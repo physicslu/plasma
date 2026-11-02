@@ -1,6 +1,8 @@
 # PLASMA Path 3 — Codex 原生工具，適用所有設備
 
-**2026-10-27 Gate 1 / Source-only 架構與相依盤點。** 本次不操作 SWPC、LA2016、Z2、FPGA 或 DUT；沒有新實機資格。實際硬體工作必須明列在經 Owner Gate 1 核准的 Work Order，遵循真實 Linux DAC/ACL、原生 Driver 占用結果、其他硬體資源互斥、電氣與 Root 安全。修改在 Draft PR 未合併前不是已部署的 Runner 行為。
+> **Historical (2026-11-02):** superseded as the Path 3 governance source by [plasma-path3-codex.md](plasma-path3-codex.md); retained because that contract and tests still reference it. LA2016 rules here remain the detailed reference.
+
+**2026-10-27 Source-only 架構與相依盤點（PR #1181／#1192，已合併）。** 本次不操作 SWPC、LA2016、Z2、FPGA 或 DUT；沒有新實機資格。實際硬體工作必須明列在經 Owner Gate 1 核准的 Work Order，遵循真實 Linux DAC/ACL、原生 Driver 占用結果、其他硬體資源互斥、電氣與 Root 安全。修改在 Draft PR 未合併前不是已部署的 Runner 行為。
 
 ## 現行呼叫鏈
 
@@ -29,7 +31,7 @@ Owner Gate 1 / signed-off Work Order and pinned SHA
 | Cross-Job `plasma_path3_cross_job_resume.py` and `development-codex-resume` | Optional fixture-only two-Job runtime branch | Delete runtime Adapter and Job; historical standalone CPU-only `plasma_path3_session_resume_probe.py` is **not** on Path 3 call chain |
 | `plasma-codex-pilot`, `z2-login`, `z2-readiness`, `swpc-preflight`, `hil-tool-inventory`, `software-mvp` Workflows | Historical standalone launchers or hosted contract tests | `on:` has only `pull_request` / `push`; old `issue_comment` jobs are inert and **must not** be used as Path 3 middleware. Existing offline tests and separately used SSH helper are not called by the shared Path 3 execution chain |
 | `plasma-codex-hardware-parity.py` | Installation/readiness parity diagnostics | Independent maintenance tooling, not a required runtime Probe Gate |
-| `plasma_development_stage_transport.py` / `plasma_path2_runtime_integration.py` | Retained lower-level protected transport and legacy integration helpers | Keep for explicitly authorized protected operations and compatibility; neither is mandatory for generic Path 2 `operator-cli`, and Path 3 does not route through them |
+| `plasma_development_stage_transport.py` | Retained lower-level protected transport (`plasma_path2_runtime_integration.py` deleted 2026-11-02) | Keep for explicitly authorized protected operations and compatibility; it is not mandatory for generic Path 2 `operator-cli`, and Path 3 does not route through them |
 | `pl/hil/fpga_image_root.py`, protected Root Entry / Manifest, Linux locks | Actual privilege, image and resource safety boundaries | Retain unchanged; unknown hardware state requires explicit safe recovery |
 
 The inventory distinguishes dead standalone programs from a live mandatory intermediary: deleting a diagnostic tool used outside Path 3 would not make Codex more direct, but could break independent offline contracts. New Path 3 device-specific dispatch paths are prohibited. This scope does **not** replace Linux DAC, SSH host authentication, FPGA root-owned guards or other hardware's required locks. For LA2016 only, native Driver Open/Claim is the availability decision rather than a separate PLASMA lock.

@@ -17,7 +17,7 @@ No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approve
 
 **Default mode: DEVELOPMENT MODE — owner-operated prototype.** Optimize Build → Run → Observe → Fix and the smallest meaningful real result. This does not remove electrical, OS permission, hardware ownership or recovery guards. PASS/FAIL/NOT_RUN must correspond to observed execution.
 
-**PPU Bundle v3 (PR #1225 / Gate 1 Draft):** Canonical deployment hierarchy is **Bundle → Packages → Files**: `plasma.ppu.bundle.v3`, manifest `packages[]` (1–32), `payload/packages/<package-id>/...`, with package `id`, `kind`, `version`, `requires`, `files`. Retired Bundle v2 `components` and Package v1 are not new accepted wire formats; do not confuse these with legitimate FPGA/UI components. See [Bundle v3 contract](docs/architecture/ppu-canonical-bundle-packages.md) and [Target Platform Identity proposal](docs/architecture/ppu-target-platform-identity.md). This does not authorize deployment, FPGA/DUT operation, or bypass Gate 2.
+**PPU Bundle v3 (PR #1225):** Canonical deployment hierarchy is **Bundle → Packages → Files**: `plasma.ppu.bundle.v3`, manifest `packages[]` (1–32), `payload/packages/<package-id>/...`, with package `id`, `kind`, `version`, `requires`, `files`. Retired Bundle v2 `components` and Package v1 are not new accepted wire formats; do not confuse these with legitimate FPGA/UI components. See [Bundle v3 contract](docs/architecture/ppu-canonical-bundle-packages.md) and [Target Platform Identity proposal](docs/architecture/ppu-target-platform-identity.md). This does not authorize deployment, FPGA/DUT operation, or bypass Gate 2.
 
 ## Project purpose and hard boundaries
 

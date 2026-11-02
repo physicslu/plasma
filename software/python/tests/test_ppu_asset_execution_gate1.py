@@ -177,9 +177,10 @@ def test_asset_execution_rechecks_current_master_revocation_after_b2_b3(tmp_path
 def test_asset_execution_corrupted_active_files_cannot_launch_any_kind(tmp_path):
     co, requests, policy, _archive = _ready_fixture(tmp_path)
     staged = co.paths.product_root / "assets" / "staged"
-    image = staged / requests["fpga-image"].asset_set_sha256 / (
-        "payload/packages/fpga-addon/fpga/addon.bit"
+    package_root = staged / requests["fpga-image"].asset_set_sha256 / (
+        "payload/packages/fpga-addon"
     )
+    image = next(path for path in package_root.rglob("*.bin") if path.is_file())
     image.chmod(0o600)
     image.write_bytes(b"mutated")
     with pytest.raises(Exception, match="ASSET_SET_FILE_MISMATCH"):

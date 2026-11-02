@@ -217,7 +217,7 @@ Reviewed tracked source on pinned `main`, not just Markdown filenames.
 | PS secure gateway wiring | `software/python/plasma_web/secure_gateway_app.py` | Imports `SecurePlasmaWebHandler`, gateway phase mixins and security/runtime activation components. Do not treat PS installer documentation as the sole runtime API source. |
 | PL proposed fixed-image ABI | `pl/verification/fixed_image_abi_v1_gate1.json` | Explicit machine-readable `status=review_candidate_not_implemented`, `sites_physically_verified=0`, `site_count_ceiling=8`; ceiling is **not** eight verified physical channels. |
 | PL AXI identity RTL | `pl/rtl/bus/fixed_fpga_ppu_global_identity_axi_lite.sv` | Explicitly host-simulation-only and not connected to physical decoder, UIO, FPGA Manager or pins; build parameter examples are not identity evidence. |
-| PL integrated fixture RTL | `pl/projects/z2-fixed-unified-site1/rtl/fixed_ppu_z2_internal_fixture_axi.sv` | Explicitly internal synthetic SWD responder with no external PMOD/SWD/JTAG/DUT. Never use its simulated response as external DUT proof. |
+| PL integrated fixture RTL | `pl/projects/z2-fixed-unified-site1/rtl/fixed_ppu_z2_internal_fixture_axi.sv` (deleted 2026-11-02) | Explicitly internal synthetic SWD responder with no external PMOD/SWD/JTAG/DUT. Never use its simulated response as external DUT proof. |
 
 ### Cross-domain authority map (initial, subject to tests)
 

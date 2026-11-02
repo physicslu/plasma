@@ -1,6 +1,6 @@
 # PPU — One Asset Execution Layer (Python / Native C / FPGA)
 
-**Gate 1 Host-only.** Depends on [B2 common Master authority PR #1251](https://github.com/physicslu/plasma/pull/1251), which is not merged into main. All execution callbacks are Host-only mocks in this PR. No Root/hardware operation is authorized.
+**Gate 1 Host-only.** Depends on [B2 common Master authority PR #1251](https://github.com/physicslu/plasma/pull/1251), which is already merged into main. All execution callbacks are Host-only mocks in this PR. No Root/hardware operation is authorized.
 
 ## Shared execution contract
 
@@ -11,7 +11,7 @@ Console chooses complete Asset Set (SHA) and explicit operation
 Existing B2 Master approval (ONE whole-Bundle grant, all Package kinds)
    |
    v
-B3 immutable Install/Verify → Single Active Asset Set
+B3 immutable Install/Verify → Single Active Asset Set (FPGA load only by explicit fpga_load=true in #1261)
    |
    v
 One internal PPU Asset Execution Layer
@@ -70,3 +70,11 @@ not import or run a Bundle File just because its hash matches.
   NOT_QUALIFIED**. No implementation here modifies Root Entry
   `download|test|restore` or clears the SWD v5 MMIO Owner problem.
 - No merge, deployment, SWPC/Z2 access, FPGA loading or DUT operation.
+
+## #1261 integration seam (not yet wired)
+
+PR #1261 independently implements explicit HTTP B3 `fpga_load=true` with protected Root Entry, deployment.lock, Runtime Quiesce, image identity, `plasma.ppu.b3-deployment-receipt.v2`, and recovery/unknown-outcome handling. This Draft #1252 MUST NOT introduce a second FPGA Configuration Owner or a second FPGA Manager sysfs writer. A future FPGA executor adapter shall delegate to the already-qualified #1261 owner/transaction semantics after exact Active/Package identity and current authority checks; a Host-only Python callback is not HIL proof. The legacy #1252 internal `execute` request is a selector, not a second HTTP B3 deployment API. Asset dispatch receipt cannot replace the B3 receipt until a producer/consumer migration is qualified.
+
+## Privilege design and open evidence
+
+The shared typed action contract is cross-kind; OS process identity is not. Python/Native C should use qualified non-root processes; FPGA Manager writes remain mediated by the current Root Guard unless a Z2 read-only permission matrix and later explicit HIL prove a narrower non-root path. Keep `/root`-backed recovery and `ProtectHome` boundaries until a separate evidence-backed migration. See [rootless Package Action design](../architecture/ppu-rootless-package-action-gate1.md) (merged from #1262). The Z2 rootless FPGA feasibility audit, real executor adapters, journal harmonization and HIL all remain **NOT_RUN / UNQUALIFIED** in this Gate 1 PR.

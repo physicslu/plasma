@@ -1,5 +1,7 @@
 # Development Mode — Three Shared BLOCKING Decisions (current Path 2 / Path 3)
 
+> **Historical (2026-11-02):** superseded by [plasma-development-common.md](plasma-development-common.md), [plasma-path2-cli.md](plasma-path2-cli.md) and [plasma-path3-codex.md](plasma-path3-codex.md). Retained because tests still read it; it is not a current governance source. The governance "B1/B2/B3" defined here is listed in the [glossary](../glossary.md#b1b2b3).
+
 Paths 2 and 3 share owner/SHA-gated trusted Dispatcher admission and may
 share the SWPC Runner, but **do not share a mandatory hardware Stage Transport
 or fixed Stage allowlist**. Path 2 guarded-hardware Work Orders use
@@ -73,9 +75,9 @@ remains separate, not a generic execution gate.
 
 **Retired Path 2 Work Order:** `z2-root-operation` is rejected by the live
 Dispatcher (`RETIRED_PATH2_ROOT_OPERATION`). The historical
-`plasma_path2_runtime_integration.direct_root_operation()` helper and
-`plasma_development_stage_transport.py` remain for compatibility/offline
-tests and explicitly scoped lower-level protected use. Neither is a
+`plasma_path2_runtime_integration.direct_root_operation()` helper was deleted
+(2026-11-02). `plasma_development_stage_transport.py` remains for
+offline tests and explicitly scoped lower-level protected use; it is not a
 mandatory intermediary for `operator-cli`. The independent two-argument
 Z2 Protected Root Entry retains its OS/sudo, source-commit SHA, companion
 Image/Manifest, ownership, current-boot, receipt and recovery checks.

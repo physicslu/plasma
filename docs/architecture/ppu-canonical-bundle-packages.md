@@ -1,6 +1,8 @@
 # PLASMA Universal Bundle — Canonical Naming and Wire Schema
 
-**Architecture Decision (2026-10-31, Gate 1 Draft):** One deployment format, **Bundle → Packages → Files**. This document defines the only canonical vocabulary for future PLASMA PPU packaging. It does not grant install, activation, publisher authority, FPGA, DUT, or production-security qualification.
+> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+
+**Architecture Decision (2026-10-31, merged in PR #1225):** One deployment format, **Bundle → Packages → Files**. This document defines the only canonical vocabulary for future PLASMA PPU packaging. It does not grant install, activation, publisher authority, FPGA, DUT, or production-security qualification.
 
 ## Terminology (normative)
 
@@ -77,7 +79,7 @@ Changing `components` to `packages` on an existing `plasma.ppu.bundle.v2` is **i
 - The Python model exposes `VerifiedBundle.packages: tuple[VerifiedBundlePackage]`, `MAX_BUNDLE_PACKAGES=32`, `bundle_package_identity`, and Package-based DAG resolution. Legacy attribute/function aliases remain narrowly for v2 consumers and cannot be used for new schema authoring.
 - New v3 Bundle Resolution emits `schema=plasma.ppu.bundle-resolution.v2`, `package_order`, `package_sha256`; v2 continues the old `component_order` and `component_sha256` Receipt shape.
 - Host-only transaction returns a top-level `bundle` envelope containing `packages` for v3; legacy v2 and Package v1 continue to return their historical `package` envelope. This is only a simulated transaction Receipt, not proof of device installation.
-- Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions; opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
+- Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions (`fpga-image` = exactly one BIN + HWH + `plasma.fpga.image.v1` Manifest, statically qualified at B2 per [Master Authority and FPGA Static Qualification](../deployment/ppu-bundle-v3-master-authority-gate1.md)); opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
 - Component/Package hashing only establishes content identity; a Bearer token, checksum or Manifest `source_commit` does not prove Publisher/Master authorization.
 
 ## Asset-only Bundle semantics and single Active Asset Set

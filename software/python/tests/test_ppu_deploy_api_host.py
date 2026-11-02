@@ -286,7 +286,10 @@ def _admitted_bundle_record(upload_id, tx, *, actions=None):
         "transaction_id": tx, "upload_id": upload_id, "state": "admitted",
         "result": {
             "result": "PASS", "stage": "package_admission_only",
-            "install_qualified": False, "source_authorized": True,
+            "source_authorized": True,
+            "fpga_static_qualification": "STATIC_QUALIFIED",
+            "fpga_loaded": False, "identity_readback": "NOT_RUN",
+            "install_qualified": False,
             "plan": {
                 "kind": "bundle", "bundle_schema": "plasma.ppu.bundle.v3",
                 "purpose": "programming", "archive_sha256": "a" * 64,
@@ -428,18 +431,13 @@ def test_console_untrusted_active_identity_denies_transfer(record, tmp_path):
         api.reconcile_bundle_assets(b"archive-bytes")
     assert [item[1] for item in fake.calls] == ["/v1/assets"]
 
-
 def test_console_refuses_b2_receipt_without_independent_master_approval(tmp_path):
     api, fake = make(tmp_path)
     uid, tx = "a" * 32, "e" * 32
+    admission = _admitted_bundle_record(uid, tx)
+    admission["result"]["plan"]["authorization"]["status"] = "UNAUTHORIZED"
     fake.override["/v1/deployments"] = (
-        200, json.dumps({"ok": True, "deployment": {
-            **_admitted_bundle_record(uid, tx),
-            "result": {
-                **_admitted_bundle_record(uid, tx)["result"],
-                "source_authorized": False,
-            },
-        }}).encode(),
+        200, json.dumps({"ok": True, "deployment": admission}).encode(),
     )
     with pytest.raises(client.DeploymentOutcomeUnknown,
                        match="API_ADMISSION_RECEIPT_UNKNOWN"):

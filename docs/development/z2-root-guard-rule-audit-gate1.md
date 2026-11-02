@@ -1,7 +1,7 @@
 # Z2 Root Guard rule necessity audit — Gate 1 (read-only evidence)
 
 > **Status:** 2026-10-29, Gate 1 Path 1 **Host-only source audit**. This is a recommendation ledger, not a deletion list, source modification, installed-Z2 observation, permission change or hardware clearance.
-> Source baseline at PR creation: `main 11a67ed526bbc999e6ffbb1abfdb6e57abf34e61`. Read-only latest-main delta review: `main e32deb1b78cbd64054bfeb9e820fa9e90f278dd5` (11 additional commits; **not yet merged into this PR branch**). Related [PPU product privilege contract](../architecture/ppu-privilege-boundary-gate1.md). Root Guard Program Session split is already merged on main via PR #1202. The Z2 installed Root/Bridge versions, if different, remain unverified.
+> Source baseline at PR creation: `main 11a67ed526bbc999e6ffbb1abfdb6e57abf34e61`. Read-only latest-main delta review: `main e32deb1b78cbd64054bfeb9e820fa9e90f278dd5` (11 additional commits at audit time). The audit itself was merged in PR #1205. Related [PPU product privilege contract](../architecture/ppu-privilege-boundary-gate1.md). Root Guard Program Session split is already merged on main via PR #1202. The Z2 installed Root/Bridge versions, if different, remain unverified.
 
 ## 1. Responsibilities and audit rule
 

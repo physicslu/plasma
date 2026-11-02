@@ -154,7 +154,6 @@ class Z2LoginContracts(unittest.TestCase):
                 self.assertFalse((HERE / path).exists())
         for needed in (
             "pl/hil/swd04/one_shot.py",
-            "pl/hil/path2_z2_target_guard.py",
             "scripts/z2/plasma-path2-root-entry",
             "scripts/plasma_development_stage_transport.py",
             "software/python/plasma_interfaces/swd_transaction.py",

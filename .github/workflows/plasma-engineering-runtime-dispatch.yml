@@ -27,34 +27,15 @@ on:
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/tests/test_plasma_development_blocking.py"
       - "scripts/plasma_vivado_host_build.py"
-      - "scripts/plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_licensed_f1b.py"
-      - "scripts/plasma_path2_build_qualification.py"
-      - "scripts/plasma_path2_runtime_integration.py"
-      - "scripts/tests/test_plasma_path2_runtime_integration.py"
+      - "scripts/tests/test_plasma_vivado_host_build_contracts.py"
       - "scripts/plasma_path2_persistent_lease.py"
-      - "scripts/plasma_path2_bin_provenance.py"
-      - "scripts/plasma_path2_held_provider.py"
-      - "scripts/tests/test_plasma_path2_held_provider.py"
-      - "pl/hil/path2_z2_target_guard.py"
-      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
-      - "pl/hil/path2_f1b_dev_risk.py"
-      - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
       - "scripts/z2/plasma-path2-root-entry"
       - "pl/hil/fpga_image_root.py"
       - "pl/hil/fpga_image_guard.py"
       - "pl/hil/fpga_image_admission.py"
-      - "pl/hil/approved-fpga-image.json"
       - "scripts/tests/test_fpga_image_root.py"
-      - "pl/hil/path2_f1b_minimal_stage.py"
-      - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
       - "scripts/plasma_development_stage_transport.py"
       - "scripts/tests/test_plasma_path2_root_direct.py"
-      - "scripts/plasma-z2-smoke.sh"
-      - "scripts/z2/plasma-z2-ssh-smoke-target.sh"
-      - "scripts/tests/test_plasma_z2_ssh_smoke.py"
-      - "scripts/z2/plasma-path2-f1b-root-entry"
       - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "scripts/tests/test_plasma_development_stage_transport.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
@@ -76,34 +57,15 @@ on:
       - "scripts/tests/test_plasma_development_dispatch.py"
       - "scripts/tests/test_plasma_development_blocking.py"
       - "scripts/plasma_vivado_host_build.py"
-      - "scripts/plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_licensed_f1b.py"
-      - "scripts/plasma_path2_build_qualification.py"
-      - "scripts/plasma_path2_runtime_integration.py"
-      - "scripts/tests/test_plasma_path2_runtime_integration.py"
+      - "scripts/tests/test_plasma_vivado_host_build_contracts.py"
       - "scripts/plasma_path2_persistent_lease.py"
-      - "scripts/plasma_path2_bin_provenance.py"
-      - "scripts/plasma_path2_held_provider.py"
-      - "scripts/tests/test_plasma_path2_held_provider.py"
-      - "pl/hil/path2_z2_target_guard.py"
-      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
-      - "pl/hil/path2_f1b_dev_risk.py"
-      - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
       - "scripts/z2/plasma-path2-root-entry"
       - "pl/hil/fpga_image_root.py"
       - "pl/hil/fpga_image_guard.py"
       - "pl/hil/fpga_image_admission.py"
-      - "pl/hil/approved-fpga-image.json"
       - "scripts/tests/test_fpga_image_root.py"
-      - "pl/hil/path2_f1b_minimal_stage.py"
-      - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
       - "scripts/plasma_development_stage_transport.py"
       - "scripts/tests/test_plasma_path2_root_direct.py"
-      - "scripts/plasma-z2-smoke.sh"
-      - "scripts/z2/plasma-z2-ssh-smoke-target.sh"
-      - "scripts/tests/test_plasma_z2_ssh_smoke.py"
-      - "scripts/z2/plasma-path2-f1b-root-entry"
       - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "scripts/tests/test_plasma_development_stage_transport.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
@@ -144,28 +106,15 @@ jobs:
           python3 scripts/tests/test_plasma_path2_operator_cli.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
-          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_licensed_f1b.py scripts/tests/test_plasma_generic_vivado_host_build.py pl/projects/z2-identity/verify_hwh.py pl/projects/z2-control-waveform/verify_hwh.py
+          python3 -m py_compile scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_vivado_host_build_contracts.py scripts/tests/test_plasma_generic_vivado_host_build.py pl/projects/z2-identity/verify_hwh.py pl/projects/z2-control-waveform/verify_hwh.py
           python3 scripts/tests/test_plasma_generic_vivado_host_build.py
-          python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
-          python3 scripts/tests/test_plasma_licensed_f1b.py
-          python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
-          python3 scripts/tests/test_plasma_path2_runtime_integration.py
-          python3 -m py_compile scripts/plasma_path2_bin_provenance.py scripts/plasma_path2_held_provider.py scripts/tests/test_plasma_path2_held_provider.py
-          python3 scripts/tests/test_plasma_path2_held_provider.py
-          python3 -m py_compile pl/hil/path2_z2_target_guard.py scripts/tests/test_plasma_path2_z2_target_guard.py
-          python3 scripts/tests/test_plasma_path2_z2_target_guard.py
-          python3 -m py_compile pl/hil/path2_f1b_dev_risk.py scripts/tests/test_plasma_path2_f1b_dev_risk.py
-          python3 scripts/tests/test_plasma_path2_f1b_dev_risk.py
-          python3 -m py_compile pl/hil/path2_f1b_minimal_stage.py scripts/tests/test_plasma_path2_f1b_minimal_stage.py
+          python3 scripts/tests/test_plasma_vivado_host_build_contracts.py
           python3 -m py_compile pl/hil/fpga_image_root.py pl/hil/fpga_image_guard.py pl/hil/fpga_image_admission.py scripts/tests/test_fpga_image_root.py
           python3 scripts/tests/test_fpga_image_root.py
-          python3 scripts/tests/test_plasma_path2_f1b_minimal_stage.py
           python3 -m py_compile scripts/plasma_development_stage_transport.py scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_development_stage_transport.py
           python3 scripts/tests/test_plasma_path2_root_direct.py
-          python3 scripts/tests/test_plasma_z2_ssh_smoke.py
-          bash scripts/plasma-z2-smoke.sh --target z2-ci-offline --plan
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
@@ -549,8 +498,6 @@ jobs:
             ${{ runner.temp }}/plasma-path2-stdout.txt
             ${{ runner.temp }}/plasma-path2-stderr.txt
             ${{ runner.temp }}/plasma-path2-process.json
-            ${{ runner.temp }}/plasma-fpga-build-diagnostics.json
-            ${{ runner.temp }}/plasma-fpga-build-diagnostics.json.sha256
             ${{ runner.temp }}/plasma-path2-vivado-host-receipt.json
             candidate/pl/build/**/*.log
             candidate/pl/build/**/*.rpt

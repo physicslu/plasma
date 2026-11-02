@@ -1,6 +1,6 @@
 # PLASMA Root Guard: Program Session vs FPGA Configuration Admission
 
-Status: **Gate 1 Draft — Host-only implementation candidate, 2026-10-29**.
+Status: **Host-only implementation, merged in main (PR #1202), 2026-10-29**.
 Source: [PR #1202](https://github.com/physicslu/plasma/pull/1202).
 No SWPC/Z2 deployment, no FPGA/MMIO/DUT operation, no hardware HIL
 acceptance, and no merge authorization from this documentation.

@@ -15,7 +15,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import plasma_development_dispatch as dispatch
-import plasma_path2_runtime_integration as runtime
+import plasma_development_stage_transport as transport
 
 SHA = "a" * 40
 REGISTRY = json.loads(
@@ -70,7 +70,7 @@ class RetiredRootRouteTests(unittest.TestCase):
                     dispatch.authorize(event, context(), REGISTRY)
 
     def test_old_root_task_cannot_bypass_dynamic_parser(self):
-        with patch.object(runtime, "direct_root_operation") as old:
+        with patch.object(transport, "execute_operation") as old:
             with self.assertRaisesRegex(
                     dispatch.Denied, "RETIRED_PATH2_ROOT_OPERATION"):
                 dispatch.run_task(

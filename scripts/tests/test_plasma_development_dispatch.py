@@ -21,9 +21,9 @@ import plasma_development_dispatch as dev
 
 WORKFLOW=ROOT/".github/workflows/plasma-engineering-runtime-dispatch.yml"
 REGISTRY=ROOT/"specs/engineering-dispatch/development-tasks-v1.json"
-F1_LEGACY_PROJECT = {
+HOST_BUILD_PROJECT = {
     "execution_path": "path2-cli", "capability": "vivado-host-build",
-    "project": "pl/projects/z2-fixed-unified-site1", "toolchain": "2026.1",
+    "project": "pl/projects/z2-identity", "toolchain": "2026.1",
     "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07",
 }
 
@@ -1072,13 +1072,13 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         # Stub-only contract: no Vivado or physical device is invoked by CI.
         task={
             "execution_path":"path3-codex",
-            "objective":"Complete actual Vivado 2026.1 F1-B implementation, "
+            "objective":"Complete actual Vivado 2026.1 project implementation, "
                         "record all errors/fixes and real BIT HWH timing DRC evidence.",
         }
         dev.task_by_id({
             "schema_version":dev.VERSION, "mode":"development",
-            "tasks":{"f1b-vivado-development":task},
-        },"f1b-vivado-development")
+            "tasks":{"vivado-development":task},
+        },"vivado-development")
         with tempfile.TemporaryDirectory() as td:
             work=Path(td)
             rtl=work/"pl/rtl/host_fixture.sv"
@@ -1099,7 +1099,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                 return Result()
             receipt=dev.run_codex_task(task,workspace=work,
                                        executor=fake_codex,
-                                       task_id="f1b-path3-codex-vivado-build")
+                                       task_id="vivado-development")
             self.assertEqual(receipt["status"],"EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertNotIn("source_path",receipt)
             self.assertIn("engineering_report_sha256",receipt)
@@ -1133,12 +1133,12 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
 
 class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
-    """Retained fixed F1-B builder utility tests, not live Path 2 routing."""
+    """Generic host-build utility and retired fixed-build routing tests."""
 
     @classmethod
     def setUpClass(cls):
         cls.registry=json.loads(REGISTRY.read_text())
-        cls.task=F1_LEGACY_PROJECT
+        cls.task=HOST_BUILD_PROJECT
 
     def event(self):
         e=DevelopmentPath2Contracts().event()
@@ -1324,7 +1324,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
             output.mkdir(parents=True)
             folder = build.prepare_host_build_dir(work)
             self.assertEqual(folder.parent, output)
-            self.assertTrue(folder.name.startswith("fixed-f1-"))
+            self.assertTrue(folder.name.startswith("vivado-"))
             self.assertTrue((folder / "reports").is_dir())
             self.assertFalse(str(folder).startswith("/storage/projects/plasma/"))
             self.assertTrue(folder.resolve().is_relative_to(work.resolve()))
@@ -1381,7 +1381,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         src=(ROOT/"scripts/plasma_vivado_host_build.py").read_text()
         self.assertIn("resolve_board_repository(task, workspace=workspace",src)
         self.assertIn('"GIT_TERMINAL_PROMPT": "0"',src)
-        self.assertIn('actual_board_sha == plan["board_sha"]',src)
+        self.assertIn('board_sha == task["board_repo_sha"], "BUILD_BOARD_SHA_MISMATCH"',src)
         self.assertIn('BUILD_BOARD_REPO_DIRTY',src)
         self.assertNotIn("git clone",src)
         self.assertIn("BUILD_BOARD_PREPARE_FAILED",src)
@@ -1547,7 +1547,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
 
     def test_dynamic_vivado_host_build_uses_project_contract(self):
         import plasma_vivado_host_build as build
-        fixed = F1_LEGACY_PROJECT
+        fixed = HOST_BUILD_PROJECT
         order = self._order("path2-cli",
                             capability="vivado-host-build",
                             project="pl/projects/z2-identity",
@@ -1588,7 +1588,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
 
     def test_dynamic_vivado_host_build_uses_trusted_main_contract(self):
         import plasma_vivado_host_build as build
-        fixed = F1_LEGACY_PROJECT
+        fixed = HOST_BUILD_PROJECT
         order = self._order("path2-cli", capability="vivado-host-build",
                             project="pl/projects/z2-identity",
                             toolchain=fixed["toolchain"],
@@ -1622,7 +1622,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
             driver.assert_called_once()
 
     def test_dynamic_vivado_host_build_negative_contracts(self):
-        fixed = F1_LEGACY_PROJECT
+        fixed = HOST_BUILD_PROJECT
         order = self._order("path2-cli",
                             capability="vivado-host-build",
                             project="pl/projects/z2-identity",
@@ -1704,7 +1704,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 order | {"acceptance": "A different unauthorized requirement."}))
 
     def test_dynamic_vivado_candidate_head_requires_exact_pr_and_driver(self):
-        fixed = F1_LEGACY_PROJECT
+        fixed = HOST_BUILD_PROJECT
         order = self._order("path2-cli", capability="vivado-host-build",
                             project=fixed["project"],
                             toolchain=fixed["toolchain"],
@@ -1831,7 +1831,9 @@ class GenericWorkOrderContracts(unittest.TestCase):
 
     def test_retired_root_route_never_reaches_transport(self):
         # Old fixed operation is not an authorized Path 2 Work Order.
-        with patch("plasma_path2_runtime_integration.direct_root_operation") as protected:
+        import plasma_development_stage_transport as transport
+        self.assertFalse((ROOT / "scripts/plasma_path2_runtime_integration.py").exists())
+        with patch.object(transport, "execute_operation") as protected:
             with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_ROOT_OPERATION"):
                 dev.run_task(
                     {"capability": "z2-root-operation", "operation": "download"},
@@ -1841,7 +1843,6 @@ class GenericWorkOrderContracts(unittest.TestCase):
         protected.assert_not_called()
 
     def test_path2_documentation_does_not_restore_retired_root_work_order(self):
-        import plasma_path2_runtime_integration as integration
         dispatcher = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
         loader = (ROOT / "docs/development/path2-generic-fpga-image-loader.md").read_text()
         policy = (ROOT / "docs/development/development-blocking-policy.md").read_text()
@@ -1854,9 +1855,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn("**Retired Path 2 Work Order:**", policy)
         self.assertIn("**Current Path 3:**", policy)
         self.assertNotIn("Both Paths use the same fixed\nstage allowlist", policy)
-        self.assertIn("Current / Path 2 guarded-hardware operator-cli", index)
-        self.assertIn("Historical / retired z2-root-operation Work Order", index)
-        self.assertIn("RETIRED FROM LIVE WORK ORDERS", integration.direct_root_operation.__doc__)
+        self.assertIn("**Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli", index)
+        self.assertIn("**Historical** · `retired z2-root-operation Work Order`", index)
 
     def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):
         base = self._order("path2-cli")
@@ -2104,8 +2104,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
                           pr_info=pr | {"head": pr["head"] | {"sha": "c" * 40}})
 
     def test_deleted_automatic_hardware_progression_is_absent(self):
-        import plasma_path2_runtime_integration as integration
-        self.assertFalse(hasattr(integration, "path3_shared_hardware_stages"))
+        # The whole retired Path 2 runtime integration module is deleted.
+        self.assertFalse((ROOT / "scripts/plasma_path2_runtime_integration.py").exists())
         execute = WORKFLOW.read_text().split("  development-execute:", 1)[1].split(
             "  development-codex:", 1)[0]
         self.assertNotIn("codex-guarded-hardware", execute)
