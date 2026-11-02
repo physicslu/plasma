@@ -28,7 +28,7 @@ from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
-SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "installed", "rolled_back", "verify_failed"}
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
