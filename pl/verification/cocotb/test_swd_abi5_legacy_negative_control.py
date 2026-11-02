@@ -24,9 +24,14 @@ async def old_high_end_sampling_reproduces_spurious_fault(dut):
 
     bench.begin_target(ack=1)
     bench.target_bits = list(frame["response_bits"])
+    # Only the deliberately broken legacy RTL uses this diagnostic. The
+    # production RTL test retains its strict zero-contention assertion.
+    bench.observe_legacy_contention = True
     observed = await bench.command()
     # The old RTL consumed ACK[0] during turnaround and sampled ACK[1],
     # ACK[2] and DPIDR bit0, thereby returning FAULT=0b100.
+    assert bench.legacy_contention is not None, "broken edge must expose SWDIO OE overlap"
+    assert bench.legacy_contention[1] == 0b100, bench.legacy_contention
     assert observed["ack"] == 0b100, observed
     assert observed["status"] == 4, observed
     assert not observed["valid"], observed
