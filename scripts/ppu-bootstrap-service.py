@@ -951,6 +951,16 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     self.owner.bootstrap_paths.token_file.is_file()
                     and self.owner.bootstrap_paths.kit_tool.is_file()
                 )
+                payload["capabilities"]["bundle_v3_b3_install"] = all(
+                    path.is_file() and not path.is_symlink() for path in (
+                        self.owner.bootstrap_paths.bundle_install_policy,
+                        self.owner.bootstrap_paths.deployment_engine_script,
+                        self.owner.bootstrap_paths.z2_installer_script,
+                        self.owner.bootstrap_paths.z2_installer_script.with_name(
+                            "ppu-z2-installer-core.py"
+                        ),
+                    )
+                )
                 payload["security"] = {
                     "control_token_provisioned": self.owner.bootstrap_paths.token_file.is_file(),
                     "transport_confidentiality": "not_qualified",
