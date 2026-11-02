@@ -107,6 +107,22 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
     if plan.get("bundle_schema") != "plasma.ppu.bundle.v3" or "components" in plan:
         return False
     packages = plan.get("packages")
+    authorization = plan.get("authorization")
+    # Bundle B2 PASS now means independent Master approval of the *entire*
+    # Bundle, not merely successful ZIP parsing. Refuse stale/forged B2
+    # receipts at the Console even though the PPU also rechecks at B3.
+    if (result.get("source_authorized") is not True
+            or type(authorization) is not dict
+            or authorization.get("status") != "MASTER_APPROVED"
+            or authorization.get("method") != "root-provisioned-exact-bundle-sha256"
+            or authorization.get("archive_sha256") != plan["archive_sha256"]
+            or type(authorization.get("master_generation")) is not int
+            or authorization["master_generation"] <= 0
+            or type(authorization.get("policy_sha256")) is not str
+            or _HEX64.fullmatch(authorization["policy_sha256"]) is None
+            or type(authorization.get("expires_epoch_s")) is not int
+            or type(authorization.get("allowed_kinds")) is not list):
+        return False
     return (
         type(plan.get("purpose")) is str and bool(plan["purpose"])
         and type(packages) is list and 1 <= len(packages) <= 32
@@ -118,6 +134,8 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
                 and type(package.get("files")) is list
                 for package in packages)
         and len({package["id"] for package in packages}) == len(packages)
+        and set(package["kind"] for package in packages)
+            <= set(authorization["allowed_kinds"])
     )
 
 
