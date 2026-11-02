@@ -76,9 +76,10 @@ module plasma_swd_transaction_engine (
     logic op_q, ap_q, read_direction_q;
     logic [3:0] address_q, result_q;
     logic [2:0] ack_shift;
+    logic parity_sample_q;
     wire is_dpidr = !ap_q && read_direction_q && address_q == 4'b0000;
-    wire [2:0] complete_ack = {swdio_in,ack_shift[1:0]};
-    wire parity_read_mismatch = ((^read_q) != swdio_in);
+    wire [2:0] complete_ack = ack_shift;
+    wire parity_read_mismatch = ((^read_q) != parity_sample_q);
 
     assign cmd_ready = rst_n && !cmd_abort && !busy && !resp_valid;
 
@@ -172,6 +173,7 @@ module plasma_swd_transaction_engine (
             address_q <= 4'd0;
             result_q <= ST_OK;
             ack_shift <= 3'd0;
+            parity_sample_q <= 1'b0;
         end else begin
             if (resp_valid && resp_ready)
                 resp_valid <= 1'b0;
@@ -198,6 +200,7 @@ module plasma_swd_transaction_engine (
                 resp_rdata <= 32'd0;
                 resp_data_valid <= 1'b0;
                 ack_shift <= 3'd0;
+                parity_sample_q <= 1'b0;
                 swclk <= 1'b0;
                 if (cmd_half_period < MIN_HALF_PERIOD ||
                     cmd_turnaround != 3'd1 ||
@@ -249,17 +252,25 @@ module plasma_swd_transaction_engine (
                 end else if (timer != 0) begin
                     timer <= timer - 16'd1;
                 end else if (!swclk) begin
-                    swclk <= 1'b1;
-                    timer <= half_q - 16'd1;
-                end else begin
-                    // End of SWCLK HIGH: sample target near falling edge,
-                    // before choosing the next bit and direction.
-                    swclk <= 1'b0;
-                    timer <= half_q - 16'd1;
+                    // Sample while SWCLK is still LOW, immediately BEFORE its
+                    // next rising edge. The target updates SWDIO on the rising
+                    // edge, so HIGH-end sampling can observe the *next* bit
+                    // (including ACK[0] during the turnaround clock).
+                    // Mirror OpenOCD bitbang.c: write SWCLK=0, sample, then
+                    // write SWCLK=1. Phase/index advance only on falling.
                     if (phase == PH_ACK)
                         ack_shift[bit_index[1:0]] <= swdio_in;
                     if (phase == PH_DATA && read_direction_q)
                         read_q[bit_index[4:0]] <= swdio_in;
+                    if (phase == PH_PARITY && read_direction_q)
+                        parity_sample_q <= swdio_in;
+                    swclk <= 1'b1;
+                    timer <= half_q - 16'd1;
+                end else begin
+                    // End of SWCLK HIGH: advance bit/phase and update output
+                    // while clock is returning LOW. No SWDIO sampling here.
+                    swclk <= 1'b0;
+                    timer <= half_q - 16'd1;
                     if (bit_index + 9'd1 < phase_bits) begin
                         bit_index <= bit_index + 9'd1;
                         swdio_out <= tx_bit(phase, bit_index + 9'd1,
