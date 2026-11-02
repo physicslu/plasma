@@ -14,6 +14,7 @@ from pathlib import Path
 import platform
 import re
 import sys
+import tempfile
 import uuid
 
 from pl.hil import fpga_image_guard as guard
@@ -82,12 +83,24 @@ def manifest_sha256() -> str:
 
 
 def read_image_manifest() -> ImageManifest:
-    """Parse the paired Image Manifest, never a per-Image approval record."""
+    """Parse the root-owned paired Manifest used by the live Root Loader."""
     guard.protected(MANIFEST_FILE)
     need(MANIFEST_FILE.is_file() and 0 < MANIFEST_FILE.stat().st_size <= 8192,
          "IMAGE_MANIFEST_FILE_DENIED")
+    return parse_image_manifest_bytes(MANIFEST_FILE.read_bytes())
+
+
+def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
+    """One shared, full Root schema/ABI parser; no filesystem/hardware effects.
+
+    The canonical Root Loader still independently enforces ownership of
+    MANIFEST_FILE, the live FPGA Manager, Runtime and Golden Recovery.
+    This pure parser is reusable by the future Bundle Asset Handoff.
+    """
+    need(type(raw) is bytes and 0 < len(raw) <= 8192,
+         "IMAGE_MANIFEST_FILE_DENIED")
     try:
-        data = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"),
+        data = json.loads(raw.decode("utf-8"),
                           object_pairs_hook=_pairs,
                           parse_constant=lambda _: need(False, "IMAGE_MANIFEST_NONFINITE"))
     except (UnicodeError, json.JSONDecodeError) as e:
@@ -173,6 +186,224 @@ def read_image_manifest() -> ImageManifest:
         axi_base=data["axi_base"], axi_bytes=data["axi_bytes"],
         owner_base=data["owner_base"], owner_bytes=data["owner_bytes"],
         uio_name=data["uio_name"], expected_uio=uio)
+
+
+def validate_bundle_fpga_handoff(
+    handoff: dict, *,
+    expected_active_set_sha256: str,
+    manifest_bytes: bytes,
+    bin_bytes: bytes,
+    hwh_bytes: bytes,
+) -> dict:
+    """Host-only Root compatibility verification of a PPU-selected Asset.
+
+    Reuses the exact production Root Image Manifest parser (including
+    Identity, AXI/ABI and UIO geometry), but grants *no* privilege and does
+    not modify /lib/firmware, invoke FPGA Manager or access DUT.
+
+    This check is an additional input/format gate, NOT proof of an
+    authorized Controller request, signed publisher, live hardware,
+    Root source pin or Golden Recovery. Later privileged installation
+    must revalidate from the immutable Active Set under exclusive locks.
+    """
+    need(type(expected_active_set_sha256) is str and
+         re.fullmatch(r"[0-9a-f]{64}", expected_active_set_sha256) is not None,
+         "ROOT_HANDOFF_ACTIVE_IDENTITY_INVALID")
+    need(type(handoff) is dict and
+         handoff.get("schema") == "plasma.ppu.fpga-asset-handoff.v1" and
+         handoff.get("status") == "VERIFIED_NOT_LOADED" and
+         handoff.get("asset_set_sha256") == expected_active_set_sha256 and
+         handoff.get("ready") is False and
+         handoff.get("fpga_install") == "NOT_RUN" and
+         handoff.get("fpga_load") == "NOT_RUN" and
+         handoff.get("root_hardware_validation") == "NOT_RUN",
+         "ROOT_HANDOFF_NOT_BOUND_TO_ACTIVE_SET")
+    selected = handoff.get("fpga_image")
+    profile = handoff.get("programming_profile")
+    need(type(selected) is dict and type(profile) is dict,
+         "ROOT_HANDOFF_SELECTION_MISSING")
+    image_id = selected.get("image_id")
+    package_id = selected.get("package_id")
+    package_version = selected.get("package_version")
+    need(all(type(item) is str and
+             re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item) is not None
+             for item in (image_id, package_id, package_version,
+                          profile.get("package_id"), profile.get("package_version"))),
+         "ROOT_HANDOFF_SELECTION_INVALID")
+    need(type(profile.get("package_identity_sha256")) is str and
+         re.fullmatch(r"[0-9a-f]{64}", profile["package_identity_sha256"]) is not None,
+         "ROOT_HANDOFF_PROFILE_IDENTITY_INVALID")
+    need(type(bin_bytes) is bytes and 0 < len(bin_bytes) <= 16_000_000 and
+         type(hwh_bytes) is bytes and 0 < len(hwh_bytes) <= 4_000_000,
+         "ROOT_HANDOFF_IMAGE_SIZE_INVALID")
+    manifest = parse_image_manifest_bytes(manifest_bytes)
+    prefix = "payload/packages/" + package_id + "/fpga/"
+    names = {
+        "bin": selected.get("bin_relative_path"),
+        "hwh": selected.get("hwh_relative_path"),
+        "manifest": selected.get("manifest_relative_path"),
+    }
+    need(all(type(name) is str and
+             name.startswith(prefix) and
+             re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", name[len(prefix):]) is not None
+             for name in names.values()),
+         "ROOT_HANDOFF_RELATIVE_PATH_INVALID")
+    need(names["bin"] == prefix + manifest.firmware_name and
+         names["bin"].endswith(".bin") and
+         names["hwh"].endswith(".hwh") and
+         names["manifest"].endswith(".json") and
+         len(set(names.values())) == 3,
+         "ROOT_HANDOFF_FILE_ROLE_INVALID")
+    checks = (
+        ("bin_sha256", bin_bytes, manifest.firmware_sha256),
+        ("hwh_sha256", hwh_bytes, None),
+        ("manifest_sha256", manifest_bytes, None),
+    )
+    for field, data, paired in checks:
+        expected = selected.get(field)
+        need(type(expected) is str and
+             re.fullmatch(r"[0-9a-f]{64}", expected) is not None,
+             "ROOT_HANDOFF_HASH_INVALID")
+        actual = hashlib.sha256(data).hexdigest()
+        need(actual == expected and (paired is None or actual == paired),
+             "ROOT_HANDOFF_HASH_MISMATCH")
+    need(manifest.image_id == image_id and
+         selected.get("board_id") == manifest.board_id and
+         selected.get("fpga_part") == manifest.fpga_part and
+         selected.get("abi_version_claim") == manifest.abi_version and
+         manifest.recovery_name == "base.bin",
+         "ROOT_HANDOFF_IMAGE_IDENTITY_MISMATCH")
+    # Golden is not part of the incoming Bundle; Root must independently
+    # prove its SHA and current-boot manager/ownership state before load.
+    return {
+        "schema": "plasma.ppu.fpga-root-handoff-preflight.v1",
+        "result": "ROOT_FORMAT_VERIFIED_NOT_INSTALLED",
+        "asset_set_sha256": expected_active_set_sha256,
+        "fpga_image_id": manifest.image_id,
+        "fpga_bin_name": manifest.firmware_name,
+        "fpga_bin_sha256": manifest.firmware_sha256,
+        "fpga_hwh_sha256": selected["hwh_sha256"],
+        "fpga_manifest_sha256": selected["manifest_sha256"],
+        "programming_profile_identity_sha256":
+            profile["package_identity_sha256"],
+        "board_id": manifest.board_id,
+        "fpga_part": manifest.fpga_part,
+        "abi_version": manifest.abi_version,
+        "golden_recovery": "NOT_VERIFIED",
+        "root_source_pin": "NOT_VERIFIED",
+        "hardware_ownership": "NOT_VERIFIED",
+        "fpga_installed": False,
+        "fpga_loaded": False,
+        "dut": "NOT_RUN",
+        "ready": False,
+    }
+
+
+def stage_bundle_fpga_files_only(
+    handoff: dict, *,
+    expected_active_set_sha256: str,
+    manifest_bytes: bytes,
+    bin_bytes: bytes,
+    hwh_bytes: bytes,
+) -> dict:
+    """Privileged *files-only* staging via the EXISTING protected Root owner.
+
+    This is an internal primitive, deliberately NOT an allowed Root Entry
+    command. Its caller must later provide independent Controller and
+    Runtime authorization for any configuration or manifest activation.
+    Staged companions never replace the active Root Image Manifest.
+    """
+    preflight = validate_bundle_fpga_handoff(
+        handoff, expected_active_set_sha256=expected_active_set_sha256,
+        manifest_bytes=manifest_bytes, bin_bytes=bin_bytes, hwh_bytes=hwh_bytes,
+    )
+    trusted_local()
+    guard.protected(guard.FIRMWARE, file=False)
+    release = parse_image_manifest_bytes(manifest_bytes)
+    port = guard.RootZ2TargetPort(release=release)
+    # The name comes only from the Root-validated basename, not from a
+    # Console-provided path. Each individual file is installed no-overwrite.
+    files = (
+        (release.firmware_name, bin_bytes),
+        (release.firmware_name + ".hwh", hwh_bytes),
+        (release.firmware_name + ".manifest.json", manifest_bytes),
+    )
+    with port.exclusive():
+        # Golden is separate from any Asset Set and cannot be replaced by it.
+        guard.sha_file(
+            guard.FIRMWARE / release.recovery_name,
+            release.recovery_sha256,
+        )
+        # Recheck the intended bytes and ensure no filename can escape Root
+        # firmware storage even if an API consumer supplies malformed input.
+        for name, raw in files:
+            need(_basename(name) and name != release.recovery_name and
+                 name != MANIFEST_FILE.name and
+                 (guard.FIRMWARE / name).parent == guard.FIRMWARE,
+                 "ROOT_HANDOFF_FIRMWARE_FILENAME_DENIED")
+            target = guard.FIRMWARE / name
+            expected_sha = hashlib.sha256(raw).hexdigest()
+            if target.is_symlink():
+                raise ImageDeploymentDenied("ROOT_HANDOFF_EXISTING_SYMLINK")
+            if target.exists():
+                guard.protected(target)
+                need(target.is_file() and target.stat().st_size == len(raw),
+                     "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
+                with target.open("rb") as source:
+                    observed_sha = hashlib.sha256(source.read()).hexdigest()
+                need(observed_sha == expected_sha,
+                     "ROOT_HANDOFF_EXISTING_FILE_CONFLICT")
+                continue
+            fd, temp_name = tempfile.mkstemp(
+                prefix=".plasma-fpga-asset.", dir=guard.FIRMWARE
+            )
+            temp = Path(temp_name)
+            try:
+                with os.fdopen(fd, "wb") as destination:
+                    destination.write(raw)
+                    destination.flush()
+                    os.fsync(destination.fileno())
+                temp.chmod(0o600)
+                # link() fails if target exists; do not use os.replace()
+                # because it would silently overwrite a potentially
+                # held firmware file under the same logical name.
+                os.link(temp, target, follow_symlinks=False)
+            except FileExistsError as exc:
+                raise ImageDeploymentDenied(
+                    "ROOT_HANDOFF_FIRMWARE_NAME_COLLISION"
+                ) from exc
+            finally:
+                if temp.exists():
+                    temp.unlink()
+        folder = os.open(
+            guard.FIRMWARE, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        )
+        try:
+            os.fsync(folder)
+        finally:
+            os.close(folder)
+        # Rehash all installed files; the canonical Root Image Manifest
+        # remains untouched until an independently approved configuration.
+        for name, data in files:
+            target = guard.FIRMWARE / name
+            guard.protected(target)
+            with target.open("rb") as source:
+                digest = hashlib.sha256(source.read()).hexdigest()
+            need(digest == hashlib.sha256(data).hexdigest(),
+                 "ROOT_HANDOFF_STAGED_FILE_CHANGED")
+    return {
+        **preflight,
+        "result": "ROOT_FILES_STAGED_NOT_ACTIVATED",
+        "firmware_files_staged": True,
+        "fpga_installed": False,
+        "fpga_loaded": False,
+        "golden_recovery": "SHA_VERIFIED",
+        "root_hardware_activation": "NOT_RUN",
+        "ready": False,
+        "firmware_name": release.firmware_name,
+        "manifest_companion_name": release.firmware_name + ".manifest.json",
+        "hwh_companion_name": release.firmware_name + ".hwh",
+    }
 
 
 def read_identity(read32, release: ImageManifest) -> dict[int, int]:

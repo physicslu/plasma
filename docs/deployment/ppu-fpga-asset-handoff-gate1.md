@@ -33,6 +33,56 @@ The existing PPU Asset Set helper now supports read-only FPGA Handoff resolution
 
 The last three transitions are **NOT IMPLEMENTED** in this PR.
 
+## Protected Root Loader compatibility (next Host-only integration slice)
+
+The existing `pl/hil/fpga_image_root.py` now exposes its **same full Image
+Manifest parser** as `parse_image_manifest_bytes()`. Its ordinary
+`read_image_manifest()` continues to enforce the root-owned, protected
+`/lib/firmware/plasma-image-manifest.json` path and then calls this same
+parser. The parser still enforces exact board, FPGA part, AXI aperture,
+ABI/Identity words, UIO layout, expected maps and Recovery metadata;
+there is no second, weaker FPGA format validator.
+
+A new **read-only** `validate_bundle_fpga_handoff()` accepts the PPU
+Active Set selection receipt and exact BIN/HWH/Manifest bytes. It checks
+the bound Asset Set SHA, Image ID, Package identity, selected Profile
+identity, relative file roles, all three byte hashes and the *entire*
+Root Image Manifest schema, returning
+`ROOT_FORMAT_VERIFIED_NOT_INSTALLED`. It **does not** change the root
+manifest, copy files to protected firmware storage, touch FPGA Manager,
+run any privileged operation or claim hardware READY.
+
+The same protected Root Loader also now has an **internal,
+privileged, files-only staging primitive**:
+`stage_bundle_fpga_files_only()`. After the full handoff validation,
+it retains the existing trusted Root source checks and **single global
+FPGA lock**, verifies protected Golden `base.bin` SHA, and copies the
+exact BIN, HWH and Image Manifest into root-owned firmware storage
+using complete-file, no-overwrite creation. Identical files may be
+reused; a different SHA under the same firmware filename is refused.
+The active `plasma-image-manifest.json` and FPGA Manager are never
+touched. The receipt is `ROOT_FILES_STAGED_NOT_ACTIVATED` with
+`firmware_files_staged=true`, `fpga_installed=false`,
+`fpga_loaded=false` and `ready=false`.
+
+**This internal primitive is not currently reachable through a
+protected Root Entry command or a Console API.** The current protected
+Root Entry's `download|test|restore` allowlist is unchanged.
+A future explicit Controller-authorized configuration operation still
+needs to independently revalidate the selected PPU Active Set inside
+the Root privilege boundary, atomically select/promote the staged
+Image Manifest, prove both Job/PS–PL/driver quiescence and current-boot
+ownership, and perform the existing guarded Root Download/Identity
+sequence. Source and Package SHAs identify content; they are not
+independent approval to load an FPGA. An arbitrary file path
+supplied by Console or Bundle must never become Root authority.
+
+Host-only positive/negative tests cross the **actual** P2 Active Set
+resolver with the **existing** Root parser and check bad ABI, UIO,
+unexpected Image/Profile/Set IDs, symlink-style path traversal, manifest
+duplicates and SHA mismatches. Tests assert neither FPGA Manager
+nor protected Root hardware calls execute.
+
 ## Reuse the existing protected FPGA Loader
 
 - pl/hil/fpga_image_root.py: protected FPGA Download, full Image Manifest checks, Identity Test, guarded Restore.
