@@ -40,6 +40,27 @@ required factory scripts and local policy files are present. This Boolean
 is a **preflight hint**, not cryptographic qualification: B3 rechecks all
 trusted authorization and archive evidence.
 
+## Reuse of the existing physical baseline
+
+- The physical Z2 Factory Bootstrap / Runtime baseline and the previously
+  successful B1 Upload/Commit and B2 Admission tests are historical evidence.
+  An unchanged hardware/network/credential environment does not require
+  repeating their negative/fault-injection acceptance suites.
+- **New code still needs to be installed once.** The original factory
+  Bootstrap can remain healthy while lacking the B3 `install_only` handler.
+  Treat enabling that new handler through the **existing** factory installer
+  as a versioned incremental B3 software update, not a fresh factory
+  provisioning or device re-enrollment. Preserve existing pairing, device
+  target, Factory Recovery, and Runtime. No second SSH writer.
+- The **new smoke ZIP requires one B1 upload and one B2 Admission** in
+  the same current transaction because the B3 guard binds `upload_id`,
+  `source_commit`, `archive_sha256`, target and local policy. An old
+  unrelated ZIP Receipt cannot authorize this new archive; this is transaction
+  integrity, not repeating qualification.
+- If the installed Bootstrap lacks `capabilities.bundle_v3_b3_install`,
+  or source/ZIP hashes do not match the approved candidate, stop and report
+  the exact version/deployment blocker. Do not silently repin or proceed.
+
 ## Path 2 execution
 
 Use the existing owner Issue #981 Work Order, `execution_path=path2-cli`,
@@ -55,9 +76,13 @@ Use the existing owner Issue #981 Work Order, `execution_path=path2-cli`,
 
 The script uses existing enrolled SWPC→Z2 SSH and pinned host key, keeps the
 Bootstrap token in memory, and checks the actual device, safe state, installed
-Factory B3 capability, B1 negative/positive SHA, canonical v3 B2 Receipt,
-same-upload B3 Receipt + Journal correlation, and explicit unprivileged Python
-Smoke output. The exact runner Run/Job and archive SHA must be retained.
+B3 capability, the **single positive upload/commit of the new smoke ZIP**,
+its matching canonical v3 B2 Admission Receipt, same-upload B3 Receipt +
+Journal correlation, and explicit unprivileged Python Smoke output. The
+previous B1/B2 qualification baseline is **reused**; negative chunk-SHA,
+baseline fault injection, prior factory reinstall and the full admission
+acceptance suite are **not repeated**. The exact runner Run/Job and
+archive SHA must be retained.
 
 **Do not dispatch B3 while Factory B3 is absent, B1/B2 have not passed,
 the device has recovery_required, the SHA pin is mismatched, or the owner
