@@ -24,6 +24,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 import time
 from pathlib import Path
@@ -59,20 +60,34 @@ def _private_root_file(path: Path) -> os.stat_result:
 
 
 def verify_protected_tree(root: Path = PROTECTED_ROOT) -> str:
-    """Only Linux root-owned, non-writable installed code is trusted at use time.
+    """Check fixed, Linux-root-owned installed sources, without runtime rehash.
 
-    Full inventory SHA256 verification already happened during installation.
-    Native C uses the root-owned manifest's immutable stat identity to
-    invalidate a prior Site admission on any local source replacement.
+    File SHA256 qualification belongs to the install-time provisioner.
+    SWD retains code-manifest stat identity and hardware owner locks.
     """
-    guard.protected(root, file=False)
-    info = _private_root_file(root / ".plasma-privileged-code.json")
-    need(info.st_size <= 16384, "PRIVILEGED_CODE_MANIFEST_INVALID")
-    for name in ("pl/hil/fpga_image_root.py", "pl/hil/fpga_image_guard.py",
-                 "pl/hil/fpga_image_admission.py",
-                 "software/python/plasma_interfaces/linux_mmio.py"):
-        guard.protected(root / name)
-    return hashlib.sha256((root / ".plasma-privileged-code.json").read_bytes()).hexdigest()
+    need(root.is_absolute() and ".." not in root.parts,
+         "PRIVILEGED_CODE_ROOT_INVALID")
+    def require_owned(path: Path, directory: bool) -> os.stat_result:
+        info = path.lstat()
+        need((stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode))
+             and info.st_uid == 0 and info.st_mode & 0o022 == 0,
+             "PRIVILEGED_CODE_SOURCE_UNTRUSTED")
+        return info
+
+    for directory in (*reversed(root.parents), root):
+        require_owned(directory, True)
+    for relative in ("pl/hil/fpga_image_root.py", "pl/hil/fpga_image_guard.py",
+                     "pl/hil/fpga_image_admission.py",
+                     "software/python/plasma_interfaces/linux_mmio.py"):
+        current = root
+        for part in Path(relative).parts[:-1]:
+            current = current / part
+            require_owned(current, True)
+        require_owned(root / relative, False)
+    private = root / ".plasma-privileged-code.json"
+    info = _private_root_file(private)
+    need(0 < info.st_size <= 16384, "PRIVILEGED_CODE_MANIFEST_INVALID")
+    return hashlib.sha256(private.read_bytes()).hexdigest()
 
 
 def load_attestation(site: int, now: float) -> tuple[Path, os.stat_result, int, dict]:

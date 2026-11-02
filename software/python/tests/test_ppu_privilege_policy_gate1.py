@@ -148,7 +148,7 @@ def test_existing_root_entry_remains_narrow_privileged_source_verified() -> None
     root_entry = (repo_root / "scripts/z2/plasma-path2-root-entry").read_text()
     assert 'download|test|restore' in root_entry
     assert "PPU_FPGA_ROOT_REQUIRED" in root_entry
-    assert "PPU_FPGA_CODE_INTEGRITY_DENIED" in root_entry
+    assert "PPU_FPGA_TRUSTED_EXECUTOR_NOT_INSTALLED" in root_entry
     assert "ppu_privileged_source.py" in root_entry
     assert ".plasma-path2-source-commit" not in root_entry
 

@@ -338,5 +338,5 @@ def test_existing_install_root_code_requires_hashes_and_rollback() -> None:
     assert "sha256" in installer and "rollback" in installer
     assert "download|test|restore" in protected
     assert "PPU_FPGA_ROOT_REQUIRED" in protected
-    assert "PPU_FPGA_CODE_INTEGRITY_DENIED" in protected
+    assert "PPU_FPGA_TRUSTED_EXECUTOR_NOT_INSTALLED" in protected
     assert 'os.geteuid() != 0' in wordport

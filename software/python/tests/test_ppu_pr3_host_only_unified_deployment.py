@@ -237,7 +237,7 @@ def test_pr3_manager_rejects_untrusted_upstream_install_receipt(tmp_path):
     manager = ManagerBootstrapCoordinator(
         _registry(tmp_path), creds, 2.0, client_factory=CompromisedClient,
     )
-    with pytest.raises(BootstrapManagerError, match="not Master-authorized and non-executing"):
+    with pytest.raises(BootstrapManagerError, match="not locally approved and non-executing"):
         manager.start_deployment("z2", {"kind": "bundle", "upload_id": "a" * 32})
 
 
