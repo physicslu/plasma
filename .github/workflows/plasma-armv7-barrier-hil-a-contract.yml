@@ -12,7 +12,6 @@ on:
       - 'scripts/tests/test-armv7-barrier-hil-a.py'
       - 'software/python/native/armv7_mmio_barrier.c'
       - 'docs/development/armv7-barrier-hil-a.md'
-      - 'docs/README.md'
 
 permissions:
   contents: read

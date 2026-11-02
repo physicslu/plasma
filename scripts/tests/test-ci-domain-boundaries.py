@@ -164,9 +164,88 @@ def validate_catalog_family_trigger_parity() -> None:
     if ".github/workflows/device-catalog-stm32u5-hil-observer-debug-readiness-validation.yml" in u5:
         raise SystemExit("STM32U5 governance trigger still refers to a missing workflow")
 
+def validate_p1_path_filter_contracts() -> None:
+    """Keep targeted CI noise reductions without losing cross-layer acceptance."""
+    poc = "software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
+    # The compatibility PoC is independently tested by python-tests; it is not
+    # a Product/PPU/Browser/QEMU runtime dependency. Preserve positive filters
+    # for real runtime modules and require ordered exclusions for both events.
+    for name, positive, occurrences in (
+        ("mock-cd.yml", "software/python/**", 2),
+        ("mock-cd-browser.yml", "software/python/**", 2),
+        ("ppu-release.yml", "software/python/plasma_web/**", 1),
+        ("z2-ps-release.yml", "software/python/plasma_web/**", 2),
+        ("z2like-demo-qemu.yml", "software/python/plasma_web/**", 2),
+    ):
+        source = read(name)
+        owner = f"P1 research-only PoC routing: {name}"
+        positive_marker = f'"{positive}"'
+        negative_marker = f'"!{poc}"'
+        require_count(source, positive_marker, occurrences, owner=owner)
+        require_count(source, negative_marker, occurrences, owner=owner)
+        cursor = 0
+        for _ in range(occurrences):
+            start = source.find(positive_marker, cursor)
+            exclusion = source.find(negative_marker, start)
+            next_positive = source.find(positive_marker, start + len(positive_marker))
+            if start < 0 or exclusion < start or (
+                next_positive >= 0 and exclusion > next_positive
+            ):
+                raise SystemExit(f"{owner}: ordered paths exclusion was lost")
+            cursor = exclusion + len(negative_marker)
+
+    # The repository-wide docs contract owns docs/README.md. These dedicated
+    # jobs do not consume that file; retain their own domain document triggers.
+    for name in (
+        "device-catalog-st-c5-host-loader-table-v1.yml",
+        "kl25-installed-backend-lock-root-v1.yml",
+        "plasma-armv7-barrier-hil-a-contract.yml",
+        "plasma-codex-hardware-parity.yml",
+        "plasma-codex-swpc-preflight.yml",
+        "plasma-codex-z2-login.yml",
+        "plasma-codex-z2-readiness.yml",
+        "plasma-hil-a15-armv7-qemu.yml",
+    ):
+        forbid(read(name), "docs/README.md", owner=f"P1 docs trigger: {name}")
+
+    # Product release version changes require packaging acceptance. Research
+    # qualification data under release/ must not rebuild Control Station.
+    for name in ("control-station-runtime.yml", "product-release.yml"):
+        source = read(name)
+        require_count(source, '"release/product.json"', 2, owner=f"P1 release: {name}")
+        forbid(source, '"release/**"', owner=f"P1 release: {name}")
+
+    # Changes to every P1-owned workflow must exercise this guard.
+    repository_contracts = read("repository-contracts.yml")
+    for name in (
+        "mock-cd.yml",
+        "mock-cd-browser.yml",
+        "control-station-runtime.yml",
+        "product-release.yml",
+        "kl25-installed-backend-lock-root-v1.yml",
+        "plasma-armv7-barrier-hil-a-contract.yml",
+        "plasma-codex-hardware-parity.yml",
+        "plasma-codex-swpc-preflight.yml",
+        "plasma-codex-z2-login.yml",
+        "plasma-codex-z2-readiness.yml",
+        "plasma-hil-a15-armv7-qemu.yml",
+    ):
+        require_count(
+            repository_contracts, f'".github/workflows/{name}"', 2,
+            owner=f"P1 CI trigger governance: {name}",
+        )
+    require(repository_contracts, '"**/*.md"', owner="REPO docs contract")
+    require(
+        read("openocd-software-qualification.yml"),
+        '"release/openocd-qualification/**"',
+        owner="OpenOCD qualification remains independent",
+    )
+
+
 def main() -> int:
     validate_catalog_family_trigger_parity()
     validate_workstream_registry()
+    validate_p1_path_filter_contracts()
 
     python_tests = read("python-tests.yml")
     pl_host = read("pl-z2-swd-gpio.yml")

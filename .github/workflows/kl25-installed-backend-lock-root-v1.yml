@@ -9,7 +9,6 @@ on:
       - 'software/python/tests/test_kl25_runtime_root_contract_v1.py'
       - '.github/workflows/kl25-installed-backend-lock-root-v1.yml'
       - 'docs/architecture/kl25-runtime-backend-lock-root-v1.md'
-      - 'docs/README.md'
   workflow_dispatch:
 permissions:
   contents: read

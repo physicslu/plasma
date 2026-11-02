@@ -37,6 +37,7 @@ on:
       - "software/python/plasma_client/**"
       - "software/python/plasma_manager/**"
       - "software/python/plasma_web/**"
+      - "!software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_armv7_runtime_acceptance.py"
       - "software/python/tests/test_ppu_armv7_runtime_lab.py"
