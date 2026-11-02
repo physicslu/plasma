@@ -28,7 +28,7 @@ from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
-SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "installed", "rolled_back", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "engineering_active", "package_active", "rolled_back", "verify_failed"}
 ENGINEERING_MODULES = frozenset({"wordport", "openocd-integration", "abtest"})
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -201,6 +201,16 @@ class DeploymentCoordinator:
     def _admit_previous_transaction(self) -> None:
         previous = self.journal.read()
         if previous is None or previous.state in SAFE_RESTART_STATES:
+            return
+        # "installed" is terminal for a verified B3 Host-only sandbox ONLY.
+        # Do not admit this state for runtime/engineering/Bootstrap HTTP:
+        # those paths have their own activation and recovery contract.
+        if (previous.state == "installed" and previous.kind == "host-only-package"
+                and self.paths.bootstrap_state_root != DeploymentPaths().bootstrap_state_root
+                and self.paths.bootstrap_state_root.is_absolute()
+                and not self.paths.bootstrap_state_root.is_symlink()
+                and self.paths.bootstrap_state_root.resolve().is_relative_to(
+                    Path(tempfile.gettempdir()).resolve())):
             return
         if previous.state == "recovery_required":
             raise DeploymentError(
