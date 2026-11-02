@@ -78,3 +78,21 @@ PR #1261 independently implements explicit HTTP B3 `fpga_load=true` with protect
 ## Privilege design and open evidence
 
 The shared typed action contract is cross-kind; OS process identity is not. Python/Native C should use qualified non-root processes; FPGA Manager writes remain mediated by the current Root Guard unless a Z2 read-only permission matrix and later explicit HIL prove a narrower non-root path. Keep `/root`-backed recovery and `ProtectHome` boundaries until a separate evidence-backed migration. See [rootless Package Action design](../architecture/ppu-rootless-package-action-gate1.md) (merged from #1262). The Z2 rootless FPGA feasibility audit, real executor adapters, journal harmonization and HIL all remain **NOT_RUN / UNQUALIFIED** in this Gate 1 PR.
+
+
+## B3 FPGA receipt read-only binding (Host-only)
+
+\`validate_fpga_b3_receipt()\` now reconciles a trusted #1261 B3 v2 receipt with
+the **exact selected FPGA Package** from the existing Active Set. It checks
+the B3 transaction's loaded state, installed Set SHA, identity PASS,
+current Runtime Site re-admission requirement and re-derived staged BIN /
+Manifest SHA and Image ID. It does **not** call Root, change the Active Set,
+open FPGA Manager, or create another Load API. Host-only cross-PR tests
+exercise the real #1261 Coordinator with injected fake Root/lease and
+negative receipt mutations.
+
+The returned \`RECEIPT_MATCHED_ONLY\` is **not** a second FPGA approval,
+independent MMIO readback, non-root proof, Runtime ready status or an
+indication that this validator is wired into the live #1261 API. Actual
+typed Runtime Executor wiring and full cross-kind Journal/Receipt remain
+separately unqualified.

@@ -202,3 +202,117 @@ def test_asset_execution_denies_forged_adapter_receipt(tmp_path):
             execution_scope=nullcontext,
             trusted_executors={"fpga-image": dishonest},
         )
+
+
+def _b3_fpga_receipt_fixture(tmp_path):
+    """Exercise #1261's actual B3 Coordinator with a mock Root loader."""
+    from .test_ppu_b3_fpga_load_gate1 import (
+        Harness, fpga_bundle, load_request, loaded, assets,
+    )
+
+    archive, digest, bin_sha, _manifest = fpga_bundle(tmp_path)
+    h = Harness(tmp_path)
+    h.outcome = lambda sha: {
+        **loaded(sha, bin_sha),
+        "fpga_manifest_sha256": assets.resolve_staged_fpga_handoff(
+            h.co.paths.product_root, sha,
+        )["fpga_image"]["manifest_sha256"],
+    }
+    receipt = h.co.execute_bundle_v3_install(load_request(archive, digest))
+    assert h.events.count("root:bundle-load") == 1
+    assert receipt["fpga_load"]["result"] == "fpga_loaded"
+
+    class Local:
+        bundle_authority_policy = tmp_path / "master-authority-for-b3.json"
+
+    provision_fixture_grant(Local, archive.read_bytes())
+    bundle = contract.verify_host_only_artifact(
+        archive, expected_sha256=digest,
+        source_commit=SOURCE, target_profile=TARGET,
+    )
+    fpga = next(p for p in bundle.packages if p.kind == "fpga-image")
+    request = execution.AssetExecutionRequest(
+        asset_set_sha256=digest,
+        package_id=fpga.id,
+        package_version=fpga.version,
+        package_kind=fpga.kind,
+        package_identity_sha256=contract.bundle_package_identity(fpga),
+    )
+    plan = execution.prepare_asset_execution(
+        h.co.paths.product_root, Local.bundle_authority_policy, request,
+    )
+    return h, plan, receipt
+
+
+def test_asset_execution_binds_existing_b3_receipt_not_a_second_loader(tmp_path):
+    h, plan, receipt = _b3_fpga_receipt_fixture(tmp_path)
+    binding = execution.validate_fpga_b3_receipt(
+        h.co.paths.product_root, plan, receipt,
+    )
+    assert binding["status"] == "RECEIPT_MATCHED_ONLY"
+    assert binding["package_identity_sha256"] == plan["package_identity_sha256"]
+    assert binding["asset_set_sha256"] == plan["asset_set_sha256"]
+    assert binding["hardware_evidence"] == "NOT_INDEPENDENTLY_VERIFIED"
+    assert binding["runtime_site_readmission"] == "REQUIRED"
+    assert binding["ready"] is False
+    # Receipt validation must not cause another FPGA Manager/Root invocation.
+    assert h.events.count("root:bundle-load") == 1
+
+
+@pytest.mark.parametrize("field,value", [
+    ("schema", "plasma.ppu.b3-deployment-receipt.v1"),
+    ("stage", "bundle_install_only"),
+    ("result", "FAIL"),
+    ("archive_sha256", "f" * 64),
+    ("runtime_site_readmission", "NOT_REQUIRED"),
+    ("dut", "PASS"),
+    ("fpga", "NOT_RUN"),
+])
+def test_asset_execution_refuses_nonmatching_b3_envelope(
+    tmp_path, field, value,
+):
+    h, plan, receipt = _b3_fpga_receipt_fixture(tmp_path)
+    forged = dict(receipt)
+    forged[field] = value
+    with pytest.raises(
+        execution.AssetExecutionDenied, match="ASSET_EXECUTION_B3_RECEIPT_MISMATCH",
+    ):
+        execution.validate_fpga_b3_receipt(h.co.paths.product_root, plan, forged)
+
+
+@pytest.mark.parametrize("part,key,value", [
+    ("fpga_load", "identity", "NOT_RUN"),
+    ("fpga_load", "requested", False),
+    ("fpga_load", "result", "recovery_required"),
+    ("fpga_load", "auto_restore", True),
+    ("fpga_load", "fpga_image_id", "spoofed"),
+    ("fpga_load", "fpga_bin_sha256", "f" * 64),
+    ("fpga_load", "fpga_manifest_sha256", "f" * 64),
+    ("active_asset_set", "asset_set_sha256", "f" * 64),
+    ("active_asset_set", "generation", 0),
+    ("transaction", "state", "recovery_required"),
+])
+def test_asset_execution_refuses_forged_b3_image_and_journal(
+    tmp_path, part, key, value,
+):
+    h, plan, receipt = _b3_fpga_receipt_fixture(tmp_path)
+    forged = {**receipt, part: {**receipt[part], key: value}}
+    code = ("ASSET_EXECUTION_B3_IMAGE_MISMATCH"
+            if key in {"fpga_image_id", "fpga_bin_sha256", "fpga_manifest_sha256"}
+            else "ASSET_EXECUTION_B3_RECEIPT_MISMATCH")
+    with pytest.raises(execution.AssetExecutionDenied, match=code):
+        execution.validate_fpga_b3_receipt(h.co.paths.product_root, plan, forged)
+
+
+def test_asset_execution_b3_binding_requires_authorized_fpga_plan(tmp_path):
+    h, plan, receipt = _b3_fpga_receipt_fixture(tmp_path)
+    for changed in (
+        {**plan, "status": "NOT_AUTHORIZED"},
+        {**plan, "package_kind": "python"},
+        {**plan, "action": "shell"},
+    ):
+        with pytest.raises(execution.AssetExecutionDenied,
+                           match="ASSET_EXECUTION_B3_PLAN_INVALID"):
+            execution.validate_fpga_b3_receipt(
+                h.co.paths.product_root, changed, receipt,
+            )

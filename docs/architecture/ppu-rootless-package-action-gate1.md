@@ -50,3 +50,14 @@ Not included here: changing or merging #1261; loading FPGA; testing Blue Pill DP
 ## Consolidation tracking
 
 This design is carried by Draft PR #1252 (superseding Draft PR #1262 without merging #1262). Host-only CI does not validate actual Z2 uid/gid/ACL, firmware loader access, `/dev/mem`, UIO, `/proc`/dmesg, current boot or hardware recovery. Each remains **NOT_RUN** pending a separately authorized Z2 permission assessment. PR #1261 remains untouched and its `fpga_load=true` path is the sole existing owner of the explicit B3 FPGA load transaction.
+
+
+## Current implementation cross-check (after #1261 merged)
+
+PR #1261 has subsequently **merged into main** with the existing B3 v2
+FPGA-load receipt and protected Root Loader. PR #1252 reuses that contract
+through a host-only, read-only receipt-binding validator; no second FPGA
+Writer or privileged bridge is introduced. The #1262 plan remains carried
+in #1252. A fully unprivileged Z2 FPGA Manager write, safe Root Guard
+replacement and real non-root Python/Native execution have **NOT_RUN**
+evidence; do not infer capability from the new Host-only tests.

@@ -160,6 +160,72 @@ def prepare_asset_execution(
     }
 
 
+
+def validate_fpga_b3_receipt(
+    product_root: Path, plan: Mapping[str, Any], receipt: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind a #1261 B3 result to a previously authorized FPGA Package plan.
+
+    This is read-only receipt reconciliation. It does NOT initiate an FPGA
+    load, validate physical readback independently, or mark a Site READY.
+    The existing B3 Coordinator/Root Guard remain the only execution owner.
+    """
+    _require(isinstance(plan, Mapping)
+             and plan.get("schema") == "plasma.ppu.asset-execution-plan.v1"
+             and plan.get("status") == "AUTHORIZED_NOT_EXECUTED"
+             and plan.get("package_kind") == "fpga-image"
+             and plan.get("action") == ACTION
+             and type(plan.get("asset_set_sha256")) is str
+             and SHA64.fullmatch(plan["asset_set_sha256"]),
+             "ASSET_EXECUTION_B3_PLAN_INVALID")
+    digest = plan["asset_set_sha256"]
+    _require(isinstance(receipt, Mapping)
+             and receipt.get("schema") == "plasma.ppu.b3-deployment-receipt.v2"
+             and receipt.get("result") == "PASS"
+             and receipt.get("stage") == "bundle_install_and_fpga_load"
+             and receipt.get("archive_sha256") == digest
+             and receipt.get("fpga") == "LOADED"
+             and receipt.get("runtime_site_readmission") == "REQUIRED"
+             and receipt.get("dut") == "NOT_RUN",
+             "ASSET_EXECUTION_B3_RECEIPT_MISMATCH")
+    active = receipt.get("active_asset_set")
+    loaded = receipt.get("fpga_load")
+    transaction = receipt.get("transaction")
+    _require(isinstance(active, Mapping)
+             and active.get("asset_set_sha256") == digest
+             and type(active.get("generation")) is int
+             and active["generation"] > 0
+             and isinstance(loaded, Mapping)
+             and loaded.get("requested") is True
+             and loaded.get("result") == "fpga_loaded"
+             and loaded.get("identity") == "IDENTITY_PASS"
+             and loaded.get("auto_restore") is False
+             and isinstance(transaction, Mapping)
+             and transaction.get("state") == "fpga_loaded",
+             "ASSET_EXECUTION_B3_RECEIPT_MISMATCH")
+    # Re-derive the handoff from the immutable staged inventory, rather than
+    # trusting an image ID, BIN filename or SHA echoed by a Console receipt.
+    assets = _trusted_module("ppu_asset_set.py")
+    handoff = assets.resolve_staged_fpga_handoff(product_root, digest)
+    image = handoff["fpga_image"]
+    _require(image["package_id"] == plan.get("package_id")
+             and image["package_version"] == plan.get("package_version")
+             and loaded.get("fpga_image_id") == image["image_id"]
+             and loaded.get("fpga_bin_sha256") == image["bin_sha256"]
+             and loaded.get("fpga_manifest_sha256") == image["manifest_sha256"],
+             "ASSET_EXECUTION_B3_IMAGE_MISMATCH")
+    return {
+        "schema": "plasma.ppu.fpga-b3-receipt-binding.v1",
+        "status": "RECEIPT_MATCHED_ONLY",
+        "asset_set_sha256": digest,
+        "package_identity_sha256": plan["package_identity_sha256"],
+        "fpga_image_id": image["image_id"],
+        "runtime_site_readmission": "REQUIRED",
+        "hardware_evidence": "NOT_INDEPENDENTLY_VERIFIED",
+        "ready": False,
+    }
+
+
 def dispatch_asset_execution(
     product_root: Path,
     policy_path: Path,
