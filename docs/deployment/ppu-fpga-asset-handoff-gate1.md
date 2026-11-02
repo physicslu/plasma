@@ -52,14 +52,30 @@ Root Image Manifest schema, returning
 manifest, copy files to protected firmware storage, touch FPGA Manager,
 run any privileged operation or claim hardware READY.
 
-A future explicit Controller-authorized installation still needs a
-protected privileged bridge into the existing Root Loader, with atomic
-and crash-safe candidate staging, firmware-name collision prevention,
-permission/ownership checks, Golden `base.bin` protection, existing
-global FPGA lock and verified Site/PS/PL quiescence. An arbitrary file
-path supplied by Console or Bundle must never be treated as Root
-authority. The current protected Root Entry's `download|test|restore`
-allowlist is **unchanged**; this PR is not a new Root command.
+The same protected Root Loader also now has an **internal,
+privileged, files-only staging primitive**:
+`stage_bundle_fpga_files_only()`. After the full handoff validation,
+it retains the existing trusted Root source checks and **single global
+FPGA lock**, verifies protected Golden `base.bin` SHA, and copies the
+exact BIN, HWH and Image Manifest into root-owned firmware storage
+using complete-file, no-overwrite creation. Identical files may be
+reused; a different SHA under the same firmware filename is refused.
+The active `plasma-image-manifest.json` and FPGA Manager are never
+touched. The receipt is `ROOT_FILES_STAGED_NOT_ACTIVATED` with
+`firmware_files_staged=true`, `fpga_installed=false`,
+`fpga_loaded=false` and `ready=false`.
+
+**This internal primitive is not currently reachable through a
+protected Root Entry command or a Console API.** The current protected
+Root Entry's `download|test|restore` allowlist is unchanged.
+A future explicit Controller-authorized configuration operation still
+needs to independently revalidate the selected PPU Active Set inside
+the Root privilege boundary, atomically select/promote the staged
+Image Manifest, prove both Job/PS–PL/driver quiescence and current-boot
+ownership, and perform the existing guarded Root Download/Identity
+sequence. Source and Package SHAs identify content; they are not
+independent approval to load an FPGA. An arbitrary file path
+supplied by Console or Bundle must never become Root authority.
 
 Host-only positive/negative tests cross the **actual** P2 Active Set
 resolver with the **existing** Root parser and check bad ABI, UIO,
