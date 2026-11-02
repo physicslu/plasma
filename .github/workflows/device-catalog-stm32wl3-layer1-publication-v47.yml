@@ -8,7 +8,6 @@ on:
       - 'data/device-catalog/research/validate_stm32wl3_layer1_publication_v47.py'
       - 'data/device-catalog/research/STM32WL3_LAYER1_PRODUCTION_PUBLICATION_V47.md'
       - 'data/device-catalog/research/validate_stm32c5_layer1_publication_v44.py'
-      - 'data/ic-support/test_coverage_inventory.py'
       - 'software/python/tests/test_device_catalog_stm32wl3.py'
       - '.github/workflows/device-catalog-stm32wl3-layer1-publication-v47.yml'
 
