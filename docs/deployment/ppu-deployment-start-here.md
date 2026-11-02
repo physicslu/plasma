@@ -11,7 +11,7 @@ There are exactly two PPU deployment routes. Everything else listed below is a p
 | Route | Purpose | Entry | Transaction | Authoritative document |
 | --- | --- | --- | --- | --- |
 | **A. Product deployment** | Install / upgrade / roll back the PPU Runtime + OpenOCD and deliver Bundle v3 Asset Sets. | Console (EMode → PPU Sites → Runtime Deployment) → Console BFF → Plasma Manager → Bootstrap on `:18081`: upload (`POST /v1/uploads`, `…/chunks`, `…/commit`), then `POST /v1/deployments` | One Bootstrap Deployment Coordinator: one `deployment.lock`, one `deployment.json` journal | [Bootstrap factory and HIL](ppu-bootstrap-factory-and-hil.md#console-first-install--upgrade-path) |
-| **B. Engineering deployment** | Development-only installation of engineering modules (for example WordPort / OpenOCD Python integration, SWPC A/B Runner). Not a product install path and carries no product qualification. | SWPC `scripts/ppu-deploy` over SSH | Its own SSH transaction (SHA pinning, mutual exclusion, verify, rollback) | [ppu-deploy](../development/ppu-deploy-engineering-modules.md) |
+| **B. Engineering deployment** | **Engineering Mode only**; development-only installation of engineering modules (for example WordPort / OpenOCD Python integration, SWPC A/B Runner). Not a product install path and carries no product qualification. | SWPC `scripts/ppu-deploy` over SSH | Its own SSH transaction (SHA pinning, mutual exclusion, verify, rollback) | [ppu-deploy](../development/ppu-deploy-engineering-modules.md) |
 
 ### What sits inside Route A
 
@@ -23,6 +23,14 @@ There are exactly two PPU deployment routes. Everything else listed below is a p
 | **Single deployment entry** | **Design record** of Route A: the decision for one installation endpoint and one Coordinator lock/journal. Reference only; it is realized by Route A. | [Single deployment entry](../architecture/ppu-unified-deployment-gate1.md) |
 
 The Runtime release kit (`plasma-z2-ps-kit-*.tar.gz`) and Bundle v3 are currently two payload formats accepted by the same Route A Bootstrap API: both are uploaded via `/v1/uploads` and then submitted to `POST /v1/deployments`, which dispatches by request body (`scripts/ppu-bootstrap-service.py` `start_deployment`). Unifying them into one format is a separate decision and is not part of this page.
+
+### Transport policy by operating mode
+
+- **Production Mode:** only Route A's existing authenticated **Bootstrap HTTP API** is permitted for normal Runtime/OpenOCD/Bundle deployment, upgrade and rollback. If HTTP fails, report or use its authorized API recovery path; **never switch to SSH** as a production installer.
+- **Engineering Mode:** for an explicitly approved prototype operation, attempt the **existing SWPC → Z2 Bootstrap HTTP API first** when it supports the exact action. Record the observed HTTP failure or `API_CAPABILITY_NOT_SUPPORTED`. Only when there is no unresolved/in-progress write, no recovery-required condition and no authorization/safety denial, use the **existing trusted SSH/SCP** as an engineering-only fallback and verify SHA256 before/after transfer.
+- A **Z2 → SWPC temporary HTTP file download** is not the product Bootstrap API. Do not invent an endpoint/server or interpret a Bundle v3 B3 install-only receipt as OpenOCD runtime activation. Keep HTTP failure evidence even if an approved engineering SSH fallback later succeeds.
+
+Full authoritative procedure, error categories and fail-closed conditions: [Bootstrap deployment — Engineering-only HTTP-first SSH fallback; production HTTP-only](ppu-bootstrap-factory-and-hil.md#engineering-only-http-first-ssh-fallback-production-http-only).
 
 ## Provisioning order for a PPU
 
