@@ -158,6 +158,43 @@ MockInterface
 
 Therefore E/P/V/R, job state, progress, cancellation, Read output and per-Site independence exercise the normal Plasma software execution model. Passing this path does not prove Z2, FPGA I/O, socket, voltage, timing or real IC programming.
 
+## Single Active Asset Set and Controller-driven Programming Jobs
+
+**Accepted architecture direction (2026-11-02):** Each PPU exposes exactly
+**one Active Asset Set** at a time, containing its selected Firmware, Parser,
+Programming Profile, FPGA Image and other shared resources. A Bundle v3
+delivers Assets/Packages; it is never a command to execute those resources.
+Console chooses the **exact whole Asset Set** (binding exact FPGA Image and
+Programming Profile), compares its SHA256 with the PPU-reported current
+Active Set, and transfers the **whole selected Set** when the identities
+do not match. A matching digest does not prove FPGA Loaded/READY.
+
+Controller still owns *when and in which sequence* E/P/V/R Jobs are
+submitted. The PPU PS admits each Job, verifies the selected Set, exact
+ICPN, Hardware ABI and operational qualification, then selects only the
+needed resources **within that Active Set**. It must not silently choose
+a different Image/Profile or combine resources from unrelated installed
+Bundles. Reconfiguration of the PL is a **separate, explicit Controller
+action**, coordinated by the single PPU Hardware Manager after all Sites
+and hardware consumers are quiesced. B3 Install/Verify does not
+automatically activate an Asset Set, load FPGA or execute Jobs.
+
+**No Active Set replacement while Jobs are executing or cancelling**:
+Console updates may use an isolated Staging Set and an atomic Active
+Set transition at a safe point. The exact `Asset Set SHA256`
+canonicalization, state API, activation procedure, rollback/recovery and
+authoritative FPGA configuration proof are still **not implemented**.
+This is not a claim that `RealPPUProvider`, arbitrary Parsers or
+hardware programming are operational.
+
+Asset Set is **PPU-wide**; independent per-Site Serial Number,
+MAC, Calibration and related per-DUT data do not require eight different
+Sets. The existing `Programming Asset` type still means individual
+input data, and must not be confused with the whole Bundle/Asset Set.
+
+See [PPU Single Active Asset Set — Controller-Driven Architecture](ppu-job-driven-package-resolution.md)
+and [Canonical Bundle v3](ppu-canonical-bundle-packages.md).
+
 ## Programming data model
 
 Plasma deliberately separates source inputs from execution instructions and target-memory data.

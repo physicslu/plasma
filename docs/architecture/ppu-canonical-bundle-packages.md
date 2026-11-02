@@ -80,6 +80,53 @@ Changing `components` to `packages` on an existing `plasma.ppu.bundle.v2` is **i
 - Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions; opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
 - Component/Package hashing only establishes content identity; a Bearer token, checksum or Manifest `source_commit` does not prove Publisher/Master authorization.
 
+## Asset-only Bundle semantics and single Active Asset Set
+
+**Owner decision (2026-11-02):** Bundle is an **Assets delivery container**;
+it is NOT a Programming Recipe, self-starting workflow, FPGA load command
+or authority to execute included Python/Native code. A PPU shall have
+**one effective Active Asset Set at any instant**. That logical Set may
+contain multiple Packages (data, Parser, Profile, FPGA Image, Firmware);
+"one Set" does **not** mean one physical file.
+
+**Console selects the exact Asset Set** and its bound FPGA Image and
+Programming Profile, then owns E/P/V/R operation initiation and sequencing.
+Before Jobs, Console compares the required Set identity/SHA256 against
+the PPU's reported Active Set. On mismatch or untrusted/missing identity,
+Console transfers the **complete selected Set**, not a mix of convenient
+Packages already present on the PPU. A match skips redundant transfer,
+not runtime/FPGA qualification.
+
+The PPU shall resolve needed resources **only within the single Active
+Set**; no cross-Bundle automatic Package version negotiation, independent
+fallback to an alternate Profile/Image, or requirement for long-term
+multi-version package co-installation. Existing v3 `packages[].requires`
+continues to describe **dependencies inside one delivered Bundle**, not
+the set of operations in a Job.
+
+B1/B2/B3 continue to mean Receive, Admission, and Install/Verify. Installation
+does NOT immediately activate the Set, reconfigure the FPGA, or execute
+a Programming Job. Future Set switching needs isolated Staging and an
+atomic effective Active Set transition without disrupting active Jobs;
+FPGA loading is a distinct, explicitly Controller-authorized,
+PPU Hardware Manager-controlled operation, with full Site quiescence
+and hardware ABI/identity/safety verification. A PPU is READY only
+after the selected Set and physical/runtime prerequisites are proven.
+
+The existing B3 install path `/opt/plasma/bundles/<bundle-name>` has
+**no generic Active Asset Set feature today**, and B3 physical acceptance
+covers only the approved Smoke Bundle from PR #1241. The canonical Set
+identity algorithm, activation API, persistence and recovery remain
+unimplemented, despite this architecture choice.
+
+**Terminology:** Bundle-as-Assets is a system-level classification; a
+Bundle is **not identical to one** `Programming Asset` object from
+the REST/domain model. A Per-Site Serial Number/MAC/Calibration input
+may remain independent of the common PPU-wide Active Set.
+
+See [PPU Single Active Asset Set — Controller-Driven Architecture](ppu-job-driven-package-resolution.md)
+for ownership, update sequence, FPGA boundaries and non-goals.
+
 ## Execution and migration boundaries
 
 Only new v3 Bundles should be produced. Do **not** convert historical on-device v2 bytes in place; generate a new v3 ZIP with updated path, Manifest, hashes and provenance. Keep legacy v1/v2 parsers until all old callers and archived evidence are accounted for. Package installation, activation, recovery, trust signing and real PPU v3 admission remain separate qualification gates. No FPGA or DUT operation is authorized by the naming migration.
