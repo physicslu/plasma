@@ -24,7 +24,7 @@ static int fake_read(void *ctx, uint32_t address, uint32_t *v)
     switch (off) {
     case 0x00u: *v = PLASMA_SWD_ABI_V5 |
         (f->base == PLASMA_SWD_SITE1_BASE ? 1u : 2u); break;
-    case 0x04u: *v = f->status; break;
+    case 0x04u: *v = f->status | (f->mode << 4); break;
     case 0x18u: *v = f->meta; break;
     case 0x1Cu: *v = f->rx; break;
     case 0x24u: *v = f->levels; break;
@@ -218,6 +218,57 @@ static void test_new_fifo_rejects_prior_normal_mode_and_unknown_completion(void)
            == PLASMA_SWD_NOT_READY);
 }
 
+static void test_line_reset_encoding_and_stale_recover_off(void)
+{
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 1u);
+    /* LINE_RESET is the dedicated RTL encoding: bit8 set, zero length. */
+    assert(plasma_swd_fifo_queue_line_reset(&s) == 0);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(f.pushed_cmd == 0x100u && f.push_count == 1u);
+
+    /* Already OFF: no write at all. */
+    struct fake_bus off = {0};
+    struct plasma_swd_fifo o;
+    int recovered = -1;
+    off.base = PLASMA_SWD_SITE1_BASE;
+    const struct plasma_swd_word_io io_off = {
+        .ctx = &off, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(&o, &io_off, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_recover_off(&o, &recovered) == 0);
+    assert(recovered == 0 && off.word_writes == 0u);
+
+    /* Stale NORMAL, idle, one retained completion: pop, disable, OFF. */
+    struct fake_bus st = {0};
+    st.base = PLASMA_SWD_SITE1_BASE;
+    st.mode = 1u; st.status = 1u; st.levels = 2u; st.meta = 7u << 16;
+    const struct plasma_swd_word_io io_st = {
+        .ctx = &st, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(&o, &io_st, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_recover_off(&o, &recovered) == 0);
+    assert(recovered == 1 && st.mode == 0u && st.status == 0u &&
+           st.levels == 0u && st.push_count == 0u);
+    assert(plasma_swd_fifo_admit(&o) == 0); /* clean re-admission */
+
+    /* Busy engine: refuse without any write. */
+    struct fake_bus busy = {0};
+    busy.base = PLASMA_SWD_SITE1_BASE;
+    busy.mode = 1u; busy.status = 3u;
+    const struct plasma_swd_word_io io_b = {
+        .ctx = &busy, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(&o, &io_b, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_recover_off(&o, &recovered) ==
+           PLASMA_SWD_NOT_READY);
+    assert(busy.word_writes == 0u && busy.mode == 1u);
+}
+
 int main(void)
 {
     test_two_sites_ordered_reads_and_writes();
@@ -225,6 +276,7 @@ int main(void)
     test_wait_fault_no_replay_and_pointer_safety();
     test_fifo_queue_bounds_and_tags();
     test_new_fifo_rejects_prior_normal_mode_and_unknown_completion();
+    test_line_reset_encoding_and_stale_recover_off();
     puts("PLASMA_NATIVE_SWD_C_HOST_ONLY_PASS");
     return 0;
 }

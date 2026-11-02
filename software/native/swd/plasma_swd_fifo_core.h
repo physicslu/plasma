@@ -50,6 +50,9 @@ struct plasma_swd_fifo {
     uint32_t count;
     bool admitted;
     bool blocked;
+    /* Diagnostics of the last completion that ended a run (not authority). */
+    uint32_t last_meta;
+    uint32_t last_levels;
     struct plasma_swd_queue_op pending[PLASMA_SWD_MAX_QUEUE];
 };
 
@@ -70,6 +73,19 @@ int plasma_swd_fifo_queue_write(struct plasma_swd_fifo *s, uint8_t cmd,
 /* Full source-defined LSB-first SWJ payload; no arbitrary GPIO toggles. */
 int plasma_swd_fifo_queue_swj(struct plasma_swd_fifo *s,
                              const uint8_t *payload, uint16_t count);
+
+/* Hardware line reset (CMD_PUSH bit8, length 0: 64 x SWDIO=1 + 8 idle).
+ * This is the ONLY way the RTL engine leaves link_state 0; afterwards the
+ * engine admits exactly a DPIDR read. Arbitrary SWJ bit sequences reset the
+ * link to NEED_RESET instead. */
+int plasma_swd_fifo_queue_line_reset(struct plasma_swd_fifo *s);
+
+/* Return ONE Site, already owned by the caller under its Site lock and Root
+ * admission, to MODE=OFF. Requires the engine not busy. A latched fault is
+ * cleared only by discarding (never replaying) queued commands; retained
+ * completions of the previous owner are popped and discarded. Returns OK
+ * when MODE reads 0 afterwards (or already was). Never enables the Site. */
+int plasma_swd_fifo_recover_off(struct plasma_swd_fifo *s, int *recovered);
 
 /* Complete bounded ordered transfers; no auto-retry, no ACK fabrication. */
 int plasma_swd_fifo_run(struct plasma_swd_fifo *s);

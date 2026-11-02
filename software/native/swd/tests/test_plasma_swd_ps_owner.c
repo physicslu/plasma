@@ -194,15 +194,19 @@ int main(int argc, char **argv)
     CHECK(put(P.boot_id, boot, 0644) == 0);
     CHECK(plasma_swd_openocd5088_owner_ready() != 0); /* terminal */
 
-    /* Safe-off refuses on a revoked/blocked Site: no MMIO. */
+    /* Revoked live evidence => safe-off performs NO MMIO at all. */
     CHECK(plasma_swd_ps_owner_safe_off(why, sizeof(why)) != PLASMA_SWD_OK);
     CHECK(devmem_word(0x28) == 1u && devmem_word(0x38) == 1u);
+    CHECK(strcmp(why, "SAFE_OFF_UNCERTAIN") == 0);
     plasma_swd_openocd5088_unbind();
     plasma_swd_ps_owner_detach();
 
-    /* Fresh session: MODE already NORMAL (not OFF) => refuse to admit. */
+    /* Fresh session: stale MODE=NORMAL whose OFF cannot be proven => the
+     * Site is left as is and attach is refused. */
     CHECK(plasma_swd_ps_owner_select_site(1) == PLASMA_SWD_OK);
     CHECK(plasma_swd_ps_owner_attach(why, sizeof(why)) != PLASMA_SWD_OK);
+    CHECK(strcmp(why, "PS_OWNER_STALE_SITE_NOT_RECOVERABLE") == 0);
+    CHECK(devmem_word(0x38) == 1u);
 
     /* Clean session; a regular file cannot emulate CONTROL acknowledgement,
      * so safe-off must stop after CONTROL=0 and NOT write MODE=0. */
@@ -210,6 +214,7 @@ int main(int argc, char **argv)
     CHECK(plasma_swd_ps_owner_attach(why, sizeof(why)) == PLASMA_SWD_OK);
     CHECK(plasma_swd_ps_owner_safe_off(why, sizeof(why)) == PLASMA_SWD_IO_UNCERTAIN);
     CHECK(devmem_word(0x28) == 0u && devmem_word(0x38) == 1u);
+    CHECK(strcmp(why, "SAFE_OFF_UNCERTAIN") == 0);
     plasma_swd_openocd5088_unbind();
     plasma_swd_ps_owner_detach();
 

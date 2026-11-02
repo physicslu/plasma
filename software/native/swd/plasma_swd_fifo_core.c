@@ -138,6 +138,74 @@ int plasma_swd_fifo_queue_write(struct plasma_swd_fifo *s, uint8_t cmd,
     return queue_transfer(s, cmd, false, value, NULL, hint);
 }
 
+int plasma_swd_fifo_queue_line_reset(struct plasma_swd_fifo *s)
+{
+    if (!s || !s->admitted || s->blocked)
+        return PLASMA_SWD_NOT_READY;
+    if (s->count == PLASMA_SWD_MAX_QUEUE)
+        return PLASMA_SWD_QUEUE_FULL;
+    struct plasma_swd_queue_op *op = &s->pending[s->count++];
+    memset(op, 0, sizeof(*op));
+    op->is_swj = true;
+    op->bit_count = 0; /* RTL 64-clock line-reset encoding */
+    return PLASMA_SWD_OK;
+}
+
+int plasma_swd_fifo_recover_off(struct plasma_swd_fifo *s, int *recovered)
+{
+    uint32_t status = 0, levels = 0, meta = 0, mode = 0;
+    if (recovered)
+        *recovered = 0;
+    if (!s || !s->io.read32 || !s->io.write32 || !s->io.write_barrier)
+        return PLASMA_SWD_BAD_ARG;
+    s->count = 0; /* software queue is discarded, never replayed */
+    if (s->io.read32(s->io.ctx, s->base + R_MODE, &mode))
+        return PLASMA_SWD_IO_UNCERTAIN;
+    if (mode == 0u)
+        return PLASMA_SWD_OK; /* already OFF: no write at all */
+    if (mode != 1u ||
+        s->io.read32(s->io.ctx, s->base + R_STATUS, &status) ||
+        ((status >> 4) & 3u) != 1u || (status & 2u))
+        return PLASMA_SWD_NOT_READY; /* invalid, uncertain or busy */
+    if (recovered)
+        *recovered = 1;
+    if ((status & 8u) &&
+        (s->io.write32(s->io.ctx, s->base + R_CONTROL, 4u) ||
+         s->io.write_barrier(s->io.ctx)))
+        return PLASMA_SWD_IO_UNCERTAIN; /* fault-only command discard */
+    for (unsigned int i = 0; i <= PLASMA_SWD_MAX_QUEUE; ++i) {
+        if (s->io.read32(s->io.ctx, s->base + R_LEVELS, &levels))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        if (!(levels & 2u))
+            break;
+        if (i == PLASMA_SWD_MAX_QUEUE ||
+            s->io.read32(s->io.ctx, s->base + R_META, &meta) ||
+            s->io.write32(s->io.ctx, s->base + R_POP, meta >> 16) ||
+            s->io.write_barrier(s->io.ctx))
+            return PLASMA_SWD_IO_UNCERTAIN;
+    }
+    if (levels != 0u)
+        return PLASMA_SWD_NOT_READY;
+    if ((status & 8u) &&
+        (s->io.write32(s->io.ctx, s->base + R_ERROR, 1u) ||
+         s->io.write_barrier(s->io.ctx)))
+        return PLASMA_SWD_IO_UNCERTAIN;
+    if (s->io.write32(s->io.ctx, s->base + R_CONTROL, 0u) ||
+        s->io.write_barrier(s->io.ctx) ||
+        s->io.read32(s->io.ctx, s->base + R_STATUS, &status))
+        return PLASMA_SWD_IO_UNCERTAIN;
+    /* MODE is written only after STATUS proves NORMAL, disabled, idle,
+     * no retained response and no latched fault. */
+    if ((status & 0x3Fu) != 0x10u)
+        return PLASMA_SWD_IO_UNCERTAIN;
+    if (s->io.write32(s->io.ctx, s->base + R_MODE, 0u) ||
+        s->io.write_barrier(s->io.ctx) ||
+        s->io.read32(s->io.ctx, s->base + R_MODE, &mode) || mode != 0u)
+        return PLASMA_SWD_IO_UNCERTAIN;
+    s->admitted = false;
+    return PLASMA_SWD_OK;
+}
+
 int plasma_swd_fifo_queue_swj(struct plasma_swd_fifo *s,
                              const uint8_t *payload, uint16_t count)
 {
@@ -202,10 +270,15 @@ static int take_one(struct plasma_swd_fifo *s,
         if (levels & 2u)
             break;
     }
-    if (n == s->max_polls)
+    if (n == s->max_polls) {
+        s->last_meta = 0xFFFFFFFFu; /* no completion observed */
+        s->last_levels = levels;
         return fault(s, PLASMA_SWD_BAD_RESPONSE);
+    }
     if (read_word(s, R_META, &meta) || read_word(s, R_RX, &raw_data))
         return PLASMA_SWD_IO_UNCERTAIN;
+    s->last_meta = meta;
+    s->last_levels = levels;
     if ((meta >> 16) != tag)
         return fault(s, PLASMA_SWD_BAD_RESPONSE);
     if (!op->is_swj) {

@@ -9,7 +9,12 @@
 #include "plasma_swd_openocd5088_binding.h"
 
 #include <jtag/swd.h>
+#ifndef PLASMA_SWD_HOST_TEST
+#include <helper/log.h>
+#endif
 
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -159,19 +164,21 @@ static int plasma_swj(enum swd_special_seq seq)
 {
     const uint8_t *bits = NULL;
     unsigned int count = 0;
+    bool then_line_reset = false;
     if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
     switch (seq) {
-    case LINE_RESET: bits = swd_seq_line_reset;
-        count = swd_seq_line_reset_len; break;
+    case LINE_RESET:
+        /* RTL contract: only the dedicated encoding re-arms the link. */
+        return core_result(plasma_swd_fifo_queue_line_reset(active_site));
     case JTAG_TO_SWD: bits = swd_seq_jtag_to_swd;
-        count = swd_seq_jtag_to_swd_len; break;
+        count = swd_seq_jtag_to_swd_len; then_line_reset = true; break;
     case SWD_TO_JTAG: bits = swd_seq_swd_to_jtag;
         count = swd_seq_swd_to_jtag_len; break;
     case SWD_TO_DORMANT: bits = swd_seq_swd_to_dormant;
         count = swd_seq_swd_to_dormant_len; break;
     case DORMANT_TO_SWD: bits = swd_seq_dormant_to_swd;
-        count = swd_seq_dormant_to_swd_len; break;
+        count = swd_seq_dormant_to_swd_len; then_line_reset = true; break;
     case JTAG_TO_DORMANT: bits = swd_seq_jtag_to_dormant;
         count = swd_seq_jtag_to_dormant_len; break;
     case DORMANT_TO_JTAG: bits = swd_seq_dormant_to_jtag;
@@ -180,15 +187,29 @@ static int plasma_swj(enum swd_special_seq seq)
     }
     if (count > 256u)
         return ERROR_FAIL;
-    return core_result(plasma_swd_fifo_queue_swj(active_site, bits,
-                                                  (uint16_t)count));
+    int rc = plasma_swd_fifo_queue_swj(active_site, bits, (uint16_t)count);
+    /* The selection sequence ends in a line reset + idle on the wire; the
+     * engine still needs its own line-reset command before DPIDR. An extra
+     * ADI line reset before the first DPIDR read is protocol-legal. */
+    if (rc == PLASMA_SWD_OK && then_line_reset)
+        rc = plasma_swd_fifo_queue_line_reset(active_site);
+    return core_result(rc);
 }
 
 static int plasma_run(void)
 {
     if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
-    return core_result(plasma_swd_fifo_run(active_site));
+    const int rc = plasma_swd_fifo_run(active_site);
+#ifndef PLASMA_SWD_HOST_TEST
+    if (rc != PLASMA_SWD_OK)
+        LOG_ERROR("plasma_swd: run rc=%d meta=0x%08" PRIx32 " levels=0x%08"
+                  PRIx32 " (status=%u ack=%u)", rc, active_site->last_meta,
+                  active_site->last_levels,
+                  (unsigned int)(active_site->last_meta & 0xFu),
+                  (unsigned int)((active_site->last_meta >> 4) & 7u));
+#endif
+    return core_result(rc);
 }
 
 /* Source-locked OpenOCD 5088db4c struct swd_driver callback signatures.

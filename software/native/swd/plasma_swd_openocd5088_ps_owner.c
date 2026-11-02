@@ -17,10 +17,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#define R_STATUS 0x04u
-#define R_LEVELS 0x24u
-#define R_CONTROL 0x28u
-#define R_MODE 0x38u
 
 #ifdef PLASMA_SWD_HOST_TEST
 #define TRUSTED_UID geteuid() /* Host-only: unprivileged test fixtures */
@@ -495,6 +491,13 @@ int plasma_swd_ps_owner_attach(char *err, size_t err_len)
         release_all();
         return PLASMA_SWD_NOT_READY;
     }
+    int recovered = 0;
+    if (plasma_swd_fifo_recover_off(&g.fifo, &recovered) != PLASMA_SWD_OK) {
+        /* Busy, invalid mode or uncertain MMIO: leave the Site untouched. */
+        set_err(err, err_len, "PS_OWNER_STALE_SITE_NOT_RECOVERABLE");
+        release_all();
+        return PLASMA_SWD_NOT_READY;
+    }
     int rc = plasma_swd_fifo_admit(&g.fifo);
     if (rc) {
         /* MODE may already be NORMAL: uncertain; no further MMIO. */
@@ -511,37 +514,27 @@ int plasma_swd_ps_owner_attach(char *err, size_t err_len)
         return PLASMA_SWD_NOT_READY;
     }
     g.attached = true;
-    set_err(err, err_len, "PS_OWNER_ATTACHED");
+    set_err(err, err_len, recovered ? "PS_OWNER_ATTACHED_AFTER_STALE_OFF"
+                                    : "PS_OWNER_ATTACHED");
     return PLASMA_SWD_OK;
 }
 
 int plasma_swd_ps_owner_safe_off(char *err, size_t err_len)
 {
-    uint32_t status = 0, levels = 0, mode = 0;
-    struct plasma_swd_word_io *io = &g.fifo.io;
-    if (!g.attached || !g.fifo.admitted || g.fifo.blocked || g.fifo.count) {
-        set_err(err, err_len, "SAFE_OFF_SKIPPED_SITE_NOT_CLEAN");
+    int recovered = 0;
+    if (!g.attached) {
+        set_err(err, err_len, "SAFE_OFF_SKIPPED_NOT_ATTACHED");
         return PLASMA_SWD_NOT_READY;
     }
-    const uint32_t base = g.fifo.base;
-    if (io->read32(io->ctx, base + R_STATUS, &status) ||
-        io->read32(io->ctx, base + R_LEVELS, &levels)) {
-        set_err(err, err_len, "SAFE_OFF_STATUS_READ_UNCERTAIN");
-        return PLASMA_SWD_IO_UNCERTAIN;
+    /* Still under this process's Site lock + live admission. The FIFO may
+     * be software-blocked after a failed transfer; the hardware state is
+     * what decides: not busy -> discard (never replay) and switch OFF. */
+    const int rc = plasma_swd_fifo_recover_off(&g.fifo, &recovered);
+    if (rc != PLASMA_SWD_OK) {
+        set_err(err, err_len, rc == PLASMA_SWD_IO_UNCERTAIN
+                ? "SAFE_OFF_UNCERTAIN" : "SAFE_OFF_SKIPPED_SITE_BUSY_OR_INVALID");
+        return rc;
     }
-    /* Exactly idle NORMAL: enabled, not busy, no response, no fault. */
-    if ((status & 0x3Fu) != 0x11u || levels != 0u) {
-        set_err(err, err_len, "SAFE_OFF_SKIPPED_SITE_NOT_IDLE");
-        return PLASMA_SWD_NOT_READY;
-    }
-    if (io->write32(io->ctx, base + R_CONTROL, 0u) || io->write_barrier(io->ctx) ||
-        io->read32(io->ctx, base + R_STATUS, &status) || (status & 0x3Fu) != 0x10u ||
-        io->write32(io->ctx, base + R_MODE, 0u) || io->write_barrier(io->ctx) ||
-        io->read32(io->ctx, base + R_MODE, &mode) || mode != 0u) {
-        set_err(err, err_len, "SAFE_OFF_UNCERTAIN");
-        return PLASMA_SWD_IO_UNCERTAIN;
-    }
-    g.fifo.admitted = false;
     set_err(err, err_len, "SAFE_OFF_MODE_OFF_VERIFIED");
     return PLASMA_SWD_OK;
 }
