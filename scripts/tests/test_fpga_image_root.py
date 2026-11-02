@@ -30,6 +30,10 @@ class FakePort:
     def exclusive(self):
         return nullcontext()
 
+    def inherited_reload_fence(self):
+        # Host-only token: the real Root returns its held OS flock FD.
+        return 123
+
     def report(self, port, release, image, *, previous_image=None,
                require_mmio=False):
         if image != self.image:
@@ -43,7 +47,8 @@ class FakePort:
             raise RuntimeError("INJECTED_FPGA_MANAGER_FAILURE")
         self.image = filename
 
-    def child(self, argv):
+    def child(self, argv, *, reload_fence_fd=None):
+        assert reload_fence_fd == self.inherited_reload_fence()
         assert argv[-3:] == ["pl.hil.fpga_image_root", "--identity-child"] or (
             argv[-3:] == ["-m", "pl.hil.fpga_image_root", "--identity-child"])
         guard.record_json(stage.CHILD, {"observed": {

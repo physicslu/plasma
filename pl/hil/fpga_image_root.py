@@ -112,15 +112,19 @@ def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
               "abi_offset", "identity_words", "site_bitmap",
               "site_bitmap_offset", "axi_base", "axi_bytes", "owner_base",
               "owner_bytes", "uio_name", "expected_uio"}
-    need(type(data) is dict and set(data) == fields and
+    need(type(data) is dict and set(data) in (fields, fields - {"uio_name"}) and
          data["schema"] == "plasma.fpga.image.v1",
          "IMAGE_MANIFEST_SCHEMA_DENIED")
     # This is the Z2 prototype Root. Manifest claims cannot change its board.
     need(data["board_id"] == "pynq-z2" and
          data["fpga_part"] == "xc7z020clg400-1",
          "IMAGE_BOARD_PART_MISMATCH")
-    for key in ("image_id", "board_id", "fpga_part", "soc_compatible", "uio_name"):
+    for key in ("image_id", "board_id", "fpga_part", "soc_compatible"):
         need(type(data[key]) is str and 0 < len(data[key]) <= 128,
+             "IMAGE_RELEASE_VALUE_DENIED")
+    if "uio_name" in data:
+        need(type(data["uio_name"]) is str and
+             re.fullmatch(r"uio[0-9]+", data["uio_name"]) is not None,
              "IMAGE_RELEASE_VALUE_DENIED")
     need(_basename(data["firmware_name"]) and _basename(data["recovery_name"]) and
          data["firmware_name"] != data["recovery_name"] and
@@ -163,16 +167,48 @@ def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
                  w[1] == data["site_bitmap"] and w[2] == 0xFFFFFFFF
                  for w in words), "IMAGE_RELEASE_SITE_IDENTITY_DENIED")
     uio = data["expected_uio"]
-    need(type(uio) is dict and set(uio) ==
-         {"uio", "driver", "maps", "runtime", "irq_counts"} and
-         uio["uio"] == data["uio_name"] and
+    devmem = (type(uio) is dict and
+              uio.get("backend") == "devmem")
+    need(type(uio) is dict and
+         ("backend" not in uio or uio["backend"] == "devmem") and
+         set(uio) in (
+         {"uio", "driver", "maps", "runtime", "irq_counts"},
+         {"platform_node", "driver", "maps", "runtime"},
+         {"backend", "platform_node", "driver", "maps", "runtime"}) and
+         (("uio" in uio and "uio_name" in data and
+           uio["uio"] == data["uio_name"]) or
+          ("platform_node" in uio and
+           "uio_name" not in data and
+           type(uio["platform_node"]) is str and
+           re.fullmatch(r"[0-9a-fA-F]+\.[A-Za-z0-9_.-]+",
+                        uio["platform_node"]) is not None and
+           int(uio["platform_node"].split(".", 1)[0], 16) ==
+           data["owner_base"])) and
          type(uio["driver"]) is str and
          type(uio["runtime"]) is str and
          uio["maps"] == [[data["owner_base"], data["owner_bytes"]]] and
-         type(uio["irq_counts"]) is list and
-         len(uio["irq_counts"]) == 2 and
-         all(type(n) is int and 0 <= n <= 0xFFFFFFFF
-             for n in uio["irq_counts"]), "IMAGE_RELEASE_UIO_DENIED")
+         ("irq_counts" not in uio or
+          (type(uio["irq_counts"]) is list and
+           len(uio["irq_counts"]) == 2 and
+           all(type(n) is int and 0 <= n <= 0xFFFFFFFF
+               for n in uio["irq_counts"]))), "IMAGE_RELEASE_UIO_DENIED")
+    if devmem:
+        # /dev/mem is an opt-in engineering backend, not evidence that a
+        # covering UIO node owns the SWD IP. Restrict it to the one pinned
+        # independent Image + both HWH-proven Site identity word locations.
+        need(data["image_id"] == "z2-independent-swd-v5-ab79b04e" and
+             data["firmware_sha256"] ==
+             "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773" and
+             data["axi_base"] == 0x43C01000 and
+             data["axi_bytes"] == 0x2000 and
+             data["abi_version"] == 0x00050001 and
+             words == [[0, 0x00050001, 0xFFFFFFFF],
+                       [0x1000, 0x00050002, 0xFFFFFFFF]] and
+             data["site_bitmap"] == 3 and
+             data["site_bitmap_offset"] is None and
+             uio["driver"] == "uio_pdrv_genirq" and
+             uio["runtime"] == "suspended",
+             "DEVMEM_INDEPENDENT_IMAGE_CONTRACT_DENIED")
     return ImageManifest(
         image_id=data["image_id"], board_id=data["board_id"],
         fpga_part=data["fpga_part"], soc_compatible=data["soc_compatible"],
@@ -186,7 +222,7 @@ def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
         site_bitmap_offset=data["site_bitmap_offset"],
         axi_base=data["axi_base"], axi_bytes=data["axi_bytes"],
         owner_base=data["owner_base"], owner_bytes=data["owner_bytes"],
-        uio_name=data["uio_name"], expected_uio=uio)
+        uio_name=data.get("uio_name", ""), expected_uio=uio)
 
 
 def validate_bundle_fpga_handoff(
@@ -676,7 +712,8 @@ def _run_locked(operation: str, port: guard.RootZ2TargetPort,
             need(manifest_sha256() == record["manifest_sha256"],
                  "MANIFEST_CHANGED_IN_FLIGHT")
             guard.run_child([sys.executable, "-m",
-                                "pl.hil.fpga_image_root", "--identity-child"])
+                                "pl.hil.fpga_image_root", "--identity-child"],
+                            reload_fence_fd=port.inherited_reload_fence())
             result = json.loads(CHILD.read_text())
             need(type(result) is dict and
                  set(result) == {"observed"} and
@@ -1021,6 +1058,12 @@ def _expected_identity(release: ImageManifest) -> dict[int, int]:
 
 def identity_child() -> int:
     trusted_local()
+    # This FD is inherited from the currently locked Root parent, not opened
+    # by pathname in the child. Otherwise LinuxMMIO would contend with the
+    # parent's exclusive reload fence before reaching the identity register.
+    inherited_fd = os.environ.pop("PLASMA_ROOT_RELOAD_FENCE_FD", "")
+    need(re.fullmatch(r"[3-9][0-9]*", inherited_fd) is not None,
+         "IDENTITY_CHILD_RELOAD_FENCE_REQUIRED")
     release = read_image_manifest()
     state = read_state(release)
     need(state is not None and state["status"] == "TEST_IN_FLIGHT" and
@@ -1041,7 +1084,8 @@ def identity_child() -> int:
     offsets = frozenset(_expected_identity(release))
     aperture = driver.MMIOAperture(
         release.axi_base, offsets, frozenset(), release.axi_bytes)
-    with driver.LinuxMMIO((aperture,), readonly=True) as mmio:
+    with driver.LinuxMMIO((aperture,), readonly=True,
+                          inherited_owner_lock_fd=int(inherited_fd)) as mmio:
         observed = read_identity(mmio.read32, release)
         stats = mmio.stats()
         need(stats.read32 == len(release.identity_words) and stats.write32 == 0,

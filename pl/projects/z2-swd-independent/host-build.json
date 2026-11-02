@@ -1,0 +1,16 @@
+{
+  "schema": "plasma.vivado-host-project.v1",
+  "vivado_project": "z2_swd_independent",
+  "build_env": "PLASMA_SWD_BUILD",
+  "success_marker": "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED",
+  "reports": [
+    "timing_summary.rpt",
+    "drc.rpt",
+    "methodology.rpt",
+    "utilization.rpt",
+    "check_timing.rpt",
+    "datasheet_io.rpt",
+    "io_pad_configuration.rpt"
+  ],
+  "prepare_artifact": false
+}
