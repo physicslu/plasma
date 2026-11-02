@@ -82,12 +82,24 @@ def manifest_sha256() -> str:
 
 
 def read_image_manifest() -> ImageManifest:
-    """Parse the paired Image Manifest, never a per-Image approval record."""
+    """Parse the root-owned paired Manifest used by the live Root Loader."""
     guard.protected(MANIFEST_FILE)
     need(MANIFEST_FILE.is_file() and 0 < MANIFEST_FILE.stat().st_size <= 8192,
          "IMAGE_MANIFEST_FILE_DENIED")
+    return parse_image_manifest_bytes(MANIFEST_FILE.read_bytes())
+
+
+def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
+    """One shared, full Root schema/ABI parser; no filesystem/hardware effects.
+
+    The canonical Root Loader still independently enforces ownership of
+    MANIFEST_FILE, the live FPGA Manager, Runtime and Golden Recovery.
+    This pure parser is reusable by the future Bundle Asset Handoff.
+    """
+    need(type(raw) is bytes and 0 < len(raw) <= 8192,
+         "IMAGE_MANIFEST_FILE_DENIED")
     try:
-        data = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"),
+        data = json.loads(raw.decode("utf-8"),
                           object_pairs_hook=_pairs,
                           parse_constant=lambda _: need(False, "IMAGE_MANIFEST_NONFINITE"))
     except (UnicodeError, json.JSONDecodeError) as e:
