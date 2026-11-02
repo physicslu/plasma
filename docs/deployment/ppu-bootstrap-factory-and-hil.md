@@ -1,5 +1,7 @@
 # PPU Bootstrap Factory Provisioning and Z2 HIL
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+
 Status: physical PYNQ-Z2 PS first install, Runtime verification, reboot persistence, normal upgrade, controlled activation-failure rollback and reboot-after-rollback are evidenced. FPGA/PL, Site electrical behavior, target power, real IC programming and physical multi-Site concurrency remain separate qualification domains.
 
 ## Responsibility boundary
@@ -23,7 +25,7 @@ On the real `z2-ps` profile:
 <Z2-LAN-IP>:18081  independent Bootstrap / recovery service
 ```
 
-This is profile-specific. SWPC Z2-like `:18081` remains its restricted diagnostics/status ingress and is not the Bootstrap service.
+This is profile-specific. The former SWPC host `127.0.0.1:18081` diagnostics/status ingress is retired (Issue #549) and must stay unused; see the [port profile matrix](port-profile-matrix.md).
 
 Bootstrap HTTP is currently qualified only for a controlled private commissioning link. Transport confidentiality and publisher authenticity are **not qualified**. SHA-256 proves integrity only.
 

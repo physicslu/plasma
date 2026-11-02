@@ -1,5 +1,7 @@
 # `plasmactl` Deployment Profiles
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+
 ## Status
 
 **Current deployment control-plane contract.**

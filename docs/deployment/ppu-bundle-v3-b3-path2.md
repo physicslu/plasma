@@ -1,5 +1,7 @@
 # HISTORICAL — PLASMA Bundle v3 B3 Smoke-only Path 2 (PR #1241)
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
+
 > **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
 
 > **Archived evidence only. DO NOT run these historical commands on a current PPU.**
