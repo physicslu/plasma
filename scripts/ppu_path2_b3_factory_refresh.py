@@ -342,6 +342,7 @@ def run(host: str, device_id: str, sha: str) -> dict:
                 evidence["reason"] = "B3_REMOTE_STAGE_VERIFICATION_FAILED"
                 return evidence
             evidence["source_staging"] = "SHA256_VERIFIED"
+            evidence["b3_factory_refresh"] = "INSTALL_ATTEMPTED"
             refresh_result = remote(helper, credentials, known_hosts, [
                 "python3", "-I",
                 extracted + "/scripts/ppu-bootstrap-installer.py",
@@ -378,10 +379,16 @@ def run(host: str, device_id: str, sha: str) -> dict:
                 time.sleep(1)
             evidence["reason"] = "B3_REFRESH_STATUS_NOT_VERIFIED"
             return evidence
-        finally:
-            # A failed refresh retains its private staging/evidence for
-            # recovery; no deletion or unapproved rollback of Z2 files.
-            pass
+        except Exception as exc:
+            # Factory Installer may have copied a subset of scripts before a
+            # failure; never report an attempted refresh as preflight NOT_RUN.
+            attempted = evidence["b3_factory_refresh"] != "NOT_RUN"
+            evidence["result"] = "FAIL" if attempted else "BLOCKED"
+            evidence["reason"] = (
+                "B3_FACTORY_REFRESH_OUTCOME_UNCERTAIN"
+                if attempted else "B3_SOURCE_TRANSFER_OR_VALIDATION_FAILED"
+            )
+            return evidence
     return evidence
 
 
@@ -417,7 +424,11 @@ def main(argv=None):
     print("PLASMA_PPU_B3_FACTORY_REFRESH_JSON=" + json.dumps(
         result, sort_keys=True, separators=(",", ":")
     ))
-    return 0 if result.get("result") == "PASS" else 69
+    return (
+        0 if result.get("result") == "PASS"
+        else 2 if result.get("result") == "FAIL"
+        else 69
+    )
 
 
 if __name__ == "__main__":
