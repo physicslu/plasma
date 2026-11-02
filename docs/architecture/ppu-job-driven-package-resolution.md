@@ -4,20 +4,39 @@
 **Status:** Agreed architectural principles; detailed execution contracts and implementation **NOT DECIDED / NOT IMPLEMENTED**.  
 **Scope:** PLASMA PPU PS programming resource selection after Bundle v3 delivery. This document does **not** authorize runtime changes, deployment, activation, FPGA/DUT operation, or a new Gate 1.
 
-## Core decision
+## Core decision — Bundle = Assets, Controller = actions
 
-**Installing a Package is not a command to execute its contents.** PLASMA's
-upper-level controller (SWPC) initiates Erase / Program / Verify / Read through
-the existing Programming Job model. When the Z2 PS accepts such a Job, **the
-PPU—not the upper-level controller and not the Package itself—determines which
-resources from the available Packages it needs for that specific operation**.
+**An incoming Bundle represents Assets, not a runnable workflow.** A Bundle
+is a transport/inventory grouping of resource Packages and Files. Source code,
+Parser implementations, Firmware Images, Programming Profiles, IC metadata,
+and other payloads remain **assets/resources** merely by being packaged or
+installed. A code-bearing Package is not an instruction to execute that code.
+
+**The Controller owns initiation and sequencing of programming operations.**
+In PLASMA's current intended control-plane placement, the SWPC upper-level
+Controller (or its approved job/batch orchestration) initiates a Programming
+Job with explicit operation intent and Site/PPU context. The Controller,
+not the Bundle, controls *whether and when* to Erase / Program / Verify / Read
+and any separately defined sequence or cancellation.
+
+**The PPU PS owns resource selection and authorized execution of each admitted
+command.** Once the Controller has sent a Job, the PS resolves *only the
+necessary available Assets/Packages* for that operation, validates their
+compatibility and execution qualifications, and performs the requested action
+through the qualified Programming Route. Resolving assets **must not invent
+extra operations or an autonomous workflow**; for example, a PROGRAM Job
+does not implicitly authorize ERASE or VERIFY.
+
+This is a separation of authority: **Controller → Job intent/sequence;
+Bundle → Assets; PPU → resolve Assets and execute admitted Job**. It is a
+design decision, not an assertion that a complete hardware runtime exists.
 
 The intent is to keep the programming control plane *Job-driven*:
 
 ```text
 Resource delivery / availability                   Programming operation
 ──────────────────────────────────                  ──────────────────────────
-SWPC / controlled source                            SWPC: ERASE / PROGRAM /
+SWPC / controlled source                            Controller: ERASE / PROGRAM /
          |                                                VERIFY / READ
          v                                                     |
 Bundle v3 / other agreed input mechanism                      v
@@ -47,9 +66,11 @@ non-Mock execution is already operational.
 | **B1 Receive** | Receive a concrete Bundle/archive and verify transfer integrity | Do not select the programming operation or execute a payload |
 | **B2 Admission** | Validate canonical Bundle v3 manifest, files, hashes, target and dependency DAG | Admission does not authorize execution or device programming |
 | **B3 Install/Verify** | Make the specifically authorized Package files available and verify installation | Do not automatically invoke Parser, Program, Verify or FPGA operations |
-| **PPU resource inventory** | Represent the available, qualified resources and their identities/versions | Mere presence of a resource does not grant runtime or hardware authority |
-| **Programming Job Admission** | Accept an upper-level command, target exact ICPN, selected PPU/Sites and the required execution ownership | Do not infer unsupported route capability from a Package claim |
-| **Job-driven Package/resource resolution (future)** | Determine the minimal appropriate resources *for that Job*, resolve compatible versions and identities, reject missing/conflicting/unsupported resources | Not the same thing as Bundle admission or installation dependency ordering |
+| **Bundle / installed Assets** | Deliver and inventory resource Packages/Files (data or code-bearing assets), with identity/version and provenance | No workflow/action owner; no automatic Parser invocation or PROGRAM trigger |
+| **Controller (SWPC orchestration)** | Initiate an explicit operation and, where applicable, sequence of Jobs for selected PPU/Sites | Does not infer execution authority from Bundle content or substitute for PS qualification checks |
+| **PPU resource inventory** | Represent available assets, their identities/versions and their reviewed qualifications | Mere presence of an asset does not grant runtime or hardware authority |
+| **Programming Job Admission** | Validate a Controller-initiated command, target exact ICPN, selected PPU/Sites and required execution ownership | Do not invent operations or infer unsupported route capability from a Package claim |
+| **Job-driven Package/resource resolution (future)** | Find the minimal eligible Assets/Packages *for the Controller-requested Job*, resolve compatible versions and identities, reject missing/conflicting/unsupported resources | Cannot change the Controller's requested operation/sequence; not Bundle admission or installation ordering |
 | **Programming Runtime (future integration)** | Parse/normalize only when required, select a qualified Programming Profile/Backend, carry out admitted Site operations, report per-Site results | Must not let user-provided Parser/Package bypass the qualified route or electrical guards |
 
 **Deployment dependency vs. Job requirement are different contracts.**
@@ -73,7 +94,17 @@ on-wire `Job Requirements` schema. The canonical `R` operation currently means
 **Read Entire Main Flash**; do not silently include option, OTP, security or
 other special regions.
 
-## Programming Asset and normalized execution data
+## Asset vocabulary and normalized execution data
+
+**Bundle-as-Assets is an architectural classification, not a schema rename.**
+Canonical wire format stays `plasma.ppu.bundle.v3` with
+`Bundle → Packages → Files`. The existing `Programming Asset` REST/domain
+object is an individual source-input concept (`image`, `key`, `option`,
+`serial_number`, `calibration`). Bundled resource files may be consumed as
+Programming Assets through a future explicit mapping, but they do not
+automatically become a Programming Asset record, a trusted Parser, a Recipe,
+or an executable Job. **Programming Recipe** remains separate control-plane
+instructions, not an Asset.
 
 PLASMA already distinguishes:
 
@@ -126,6 +157,10 @@ capability complete.
 7. **Concurrency:** eight-Site scheduling and which shared resources need
    PPU-wide serialization vs independent per-Site execution, consistent with
    current ownership and image-leasing invariants.
+
+The ownership model above leaves the exact Controller API, Job/Recipe sequencing
+contract and PS resource-resolution mechanism open; the existing E/P/V/R
+semantics and real PPU hardware gates remain authoritative.
 
 No new API fields, `kind` strings, Manifest keys, execution permissions, or
 wire schemas are established by this architecture note.
