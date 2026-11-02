@@ -1,0 +1,135 @@
+name: PLASMA OpenOCD 5088 ARMv7 SWD candidate (CI only)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/swd-openocd5088-armv7-candidate.yml"
+      - "scripts/ci/inject-plasma-openocd5088-native.py"
+      - "software/native/swd/**"
+
+permissions:
+  contents: read
+
+jobs:
+  armv7-source-locked-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout PR source (no persistent credentials)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Enable ARMv7 user-space emulation on hosted runner
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: Build source-locked OpenOCD 5088 + plasma_swd on ARMv7
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/plasma-openocd5088-armv7"
+          docker run --rm -i --platform linux/arm/v7 \
+            --volume "$GITHUB_WORKSPACE:/plasma:ro" \
+            --volume "$RUNNER_TEMP/plasma-openocd5088-armv7:/artifacts" \
+            arm32v7/ubuntu:22.04 bash -euo pipefail -s <<'ARMV7'
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            ca-certificates git autoconf automake libtool pkg-config make \
+            gcc g++ python3 binutils libusb-1.0-0-dev libftdi1-dev libhidapi-dev
+          git init /tmp/openocd
+          git -C /tmp/openocd remote add origin https://github.com/openocd-org/openocd.git
+          git -C /tmp/openocd fetch --no-tags --depth 1 origin \
+            5088db4c9154ca833c6d558381074b33672e127a
+          git -C /tmp/openocd checkout --detach FETCH_HEAD
+          test "$(git -C /tmp/openocd rev-parse HEAD)" = \
+            5088db4c9154ca833c6d558381074b33672e127a
+          git -C /tmp/openocd submodule update --init --depth 1 jimtcl
+          python3 /plasma/scripts/ci/inject-plasma-openocd5088-native.py \
+            --openocd /tmp/openocd --plasma /plasma
+          cd /tmp/openocd
+          ./bootstrap
+          ./configure --disable-werror --enable-internal-jimtcl \
+            --disable-internal-libjaylink
+          make -j2
+          test -x src/openocd
+          readelf -h src/openocd > /artifacts/elf-header.txt
+          grep -Eq 'Class:[[:space:]]+ELF32' /artifacts/elf-header.txt
+          grep -Eq 'Machine:[[:space:]]+ARM' /artifacts/elf-header.txt
+          src/openocd -s tcl -c 'adapter list' -c shutdown \
+            > /artifacts/adapter-list.log 2>&1
+          grep -q plasma_swd /artifacts/adapter-list.log
+          src/openocd -s tcl -c 'adapter driver plasma_swd' \
+            -c 'transport select swd' -c shutdown \
+            > /artifacts/adapter-select.log 2>&1
+          set +e
+          src/openocd -s tcl -c 'adapter driver plasma_swd' \
+            -c 'transport select swd' -c init -c shutdown \
+            > /artifacts/unowned-init-denied.log 2>&1
+          unowned_exit=$?
+          set -e
+          test "$unowned_exit" -ne 0
+          ldd src/openocd > /artifacts/linked-libraries.txt
+          if grep -q 'not found' /artifacts/linked-libraries.txt; then
+            echo 'Missing ARMv7 shared library' >&2
+            exit 1
+          fi
+          cp src/openocd /artifacts/openocd
+          cp -a tcl /artifacts/tcl
+          cd /artifacts
+          sha256sum openocd > openocd.sha256
+          printf '%s\n' \
+            'Upstream OpenOCD 5088db4c9154ca833c6d558381074b33672e127a' \
+            'Platform: ARMv7 ubuntu:22.04 QEMU user-space build' \
+            'PLASMA plasma_swd source-locked adapter candidate' \
+            'Real PS Root/Owner/Voltage binding: NOT_IMPLEMENTED / NOT_QUALIFIED' \
+            'Z2 HIL / Blue Pill DPIDR: NOT_RUN' \
+            'DO NOT DEPLOY as a qualified production runtime' \
+            > PROVENANCE.txt
+          ARMV7
+          python3 - "$RUNNER_TEMP/plasma-openocd5088-armv7" "$GITHUB_SHA" <<'PY'
+          import hashlib, json, pathlib, sys
+          folder = pathlib.Path(sys.argv[1])
+          digest = hashlib.sha256((folder / "openocd").read_bytes()).hexdigest()
+          receipt = {
+              "schema": "plasma.openocd.armv7.candidate-evidence.v1",
+              "plasma_source_sha": sys.argv[2],
+              "openocd_source_sha": "5088db4c9154ca833c6d558381074b33672e127a",
+              "openocd_binary_sha256": digest,
+              "architecture": "ARMv7",
+              "adapter_discovery": "PASS",
+              "unowned_adapter_init": "DENIED",
+              "hardware_runtime_ready": False,
+              "ps_local_owner_binding": "NOT_IMPLEMENTED",
+              "z2_hil": "NOT_RUN",
+              "bluepill_dpidr": "NOT_RUN",
+          }
+          (folder / "candidate-evidence.json").write_text(
+              json.dumps(receipt, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+          tar -C "$RUNNER_TEMP/plasma-openocd5088-armv7" -czf \
+            "$RUNNER_TEMP/plasma-openocd5088-armv7-candidate.tar.gz" \
+            openocd openocd.sha256 tcl adapter-list.log adapter-select.log \
+            unowned-init-denied.log elf-header.txt linked-libraries.txt \
+            candidate-evidence.json PROVENANCE.txt
+          cd "$RUNNER_TEMP"
+          sha256sum plasma-openocd5088-armv7-candidate.tar.gz \
+            > plasma-openocd5088-armv7-candidate.tar.gz.sha256
+          mkdir -p "$GITHUB_WORKSPACE/_ci_armv7_artifacts"
+          cp plasma-openocd5088-armv7-candidate.tar.gz \
+            plasma-openocd5088-armv7-candidate.tar.gz.sha256 \
+            "$GITHUB_WORKSPACE/_ci_armv7_artifacts/"
+
+      - name: Publish unqualified ARMv7 candidate evidence (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-openocd5088-armv7-candidate
+          path: |
+            _ci_armv7_artifacts/plasma-openocd5088-armv7-candidate.tar.gz
+            _ci_armv7_artifacts/plasma-openocd5088-armv7-candidate.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 7
