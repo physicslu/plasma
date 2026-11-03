@@ -157,6 +157,55 @@ journal, receipt or FPGA loader.
   itself (e.g. ptrace, its control socket). Not deployed; no Z2/OpenOCD/DUT
   execution; Sites 3–8 not qualified; no SPI/I²C.
 
+## Stage C production integration candidate (Host-only)
+
+**Two-identity model.** Runtime = `plasma` (existing `plasma-server.service`,
+unchanged unit + drop-in). Package Actions = `plasma-package`. Site Worker =
+root (Site admission + PS-local OpenOCD need root; the Worker maps no MMIO).
+
+- **UID switch** (`ppu_package_units.py`, renderers only; installer untouched):
+  a non-root process cannot switch uid or signal another uid, so the Package
+  runs in the fixed template `plasma-package@<32hex>.service`: `User=` /
+  `ExecStart=` / sandbox are in the root-owned unit (NoNewPrivileges, empty
+  capability set, PrivateDevices, PrivateNetwork + AF_UNIX only, ProtectSystem
+  strict, ProtectHome, InaccessiblePaths over Runtime / Bootstrap / Root /
+  Worker-control resources, syscall filter, cgroup kill, Tasks/Memory/AS/NOFILE
+  limits). A polkit JS rule lets **only** uid `plasma` start / stop / kill
+  instances matching `^plasma-package@[0-9a-f]{32}\.service$`. No sudoers,
+  no root command executor. Requires polkit ≥ 0.106: on 0.105 (`.pkla`) the
+  unit-name restriction is impossible and this mechanism must NOT be enabled.
+- **C-2 unchanged in substance:** `make_package_executor(..., spawner=)` only
+  swaps the process primitive. `LocalProcessSpawner` (default) is the exact
+  C-2 behaviour; `SystemdUnitSpawner` writes a job spec
+  (`plasma.ppu.package-unit-spec.v1`) into the Runtime-owned world-readable
+  `/run/plasma-package-specs`, starts the unit, polls / kills / stops it and
+  reads output from the unit RuntimeDirectory. Identity validation, timeout
+  and cancel decisions, journal and receipt stay in the C-2 launcher.
+- **Fixed entry** `ppu_package_entry.py` (runs as plasma-package): re-validates
+  the spec (exact fields, not group/other-writable), the entry (regular, no
+  symlink component, inside `/opt/plasma/assets/staged/<sha>/payload/packages/<id>/`,
+  `python/main.py` or one `bin/` file, SHA-256 match), clean env, no inherited
+  fds, records exit status so the unit stays `active (exited)`.
+- **Worker** (`ppu_site_worker_service.py`): `control.sock` root:plasma 0660
+  accepts only control ops; `transport.sock` root:plasma-package 0660 accepts
+  only transport ops. A Runtime restart (new MainPID) ends the open session.
+- **Runtime composition** `plasma_server.package_actions.PackageActionRuntime`:
+  C-1 scope → dispatch → C-2 executor (+ systemd spawner, + optional Worker
+  client); `reconcile_on_start()` stops leftover Package units and lists
+  interrupted journals. No public API endpoint added.
+- **Seal Operator Recovery** `ppu_site_recovery.py` (root CLI, not IPC):
+  `diagnose` (read-only) and `recover --operator` require: well-formed seal
+  marker, Worker stopped, no active Runtime lease (or Runtime down), no
+  OpenOCD / admission record, Root journal `IMAGE` of the expected Image, then
+  adapter `verify_safe_off` and an unchanged re-check. Every attempt writes a
+  0600 evidence record; success MOVES the marker into evidence; any failure
+  leaves the Site sealed.
+
+NOT_QUALIFIED until Z2: `plasma-package` account, polkit version / rule,
+systemd sandbox and cgroup behaviour, Runtime control socket DAC against the
+Package uid, Worker capability needs, Root Guard interplay, real OpenOCD /
+DUT. Not installed, enabled or deployed.
+
 ## Host-only acceptance / outstanding
 
 - All three kinds have identical authority/identity/dispatch rules.

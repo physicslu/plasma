@@ -93,6 +93,7 @@ class _Session:
     uid: int
     expires: float
     identity: Mapping[str, Any]
+    runtime_pid: int = 0
     cancel: threading.Event = field(default_factory=threading.Event)
     closed: bool = False
     sealed_during: set[int] = field(default_factory=set)
@@ -154,11 +155,29 @@ class SiteWorkerCore:
         self._persist_seal(site, code)
 
     # --- dispatch ------------------------------------------------------------------
-    def handle(self, request: object, peer: tuple[int, int, int]) -> dict[str, Any]:
+    def _drop_if_runtime_restarted(self) -> None:
+        """A session belongs to ONE Runtime process; a Runtime restart ends it."""
+        current = self.runtime_pid()
+        with self._lock:
+            s = self._session
+            if s is not None and s.runtime_pid != current:
+                s.closed = True
+                s.cancel.set()
+                self._session = None
+
+    def handle(self, request: object, peer: tuple[int, int, int],
+               role: str | None = None) -> dict[str, Any]:
         try:
             _require(isinstance(request, dict) and request.get("protocol") == PROTOCOL
                      and type(request.get("op")) is str, "REQUEST_INVALID")
             op = request["op"]
+            # Production uses two sockets: control (Runtime group) and
+            # transport (Package group). Each accepts only its own class.
+            if role == "control":
+                _require(op in CONTROL_OPS, "OPERATION_DENIED_ON_CONTROL_SOCKET")
+            elif role == "transport":
+                _require(op not in CONTROL_OPS, "CONTROL_PEER_DENIED")
+            self._drop_if_runtime_restarted()
             if op in CONTROL_OPS:
                 return {"ok": True, "result": self._control(op, request, peer)}
             return {"ok": True, "result": self._transport(op, request, peer)}
@@ -213,7 +232,8 @@ class SiteWorkerCore:
             _require(self._session is None, "SESSION_ALREADY_ACTIVE")
             _require(not (set(sites) & self._sealed), "SITE_SEALED")
             s = _Session(secrets.token_hex(16), job, frozenset(sites), request["pgid"],
-                         request["uid"], self.clock() + request["max_runtime_s"], identity)
+                         request["uid"], self.clock() + request["max_runtime_s"], identity,
+                         runtime_pid=pid)
             self._session = s
         return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites)}
 
@@ -274,7 +294,10 @@ class SiteWorkerServer:
     """Threaded Unix-socket front end. The socket file is the only endpoint."""
 
     def __init__(self, core: SiteWorkerCore, socket_path: Path, *, mode: int = 0o660,
-                 group: int | None = None) -> None:
+                 group: int | None = None, role: str | None = None) -> None:
+        if role not in (None, "control", "transport"):
+            raise ValueError("role must be control or transport")
+        self.role = role
         self.core = core
         self.socket_path = Path(socket_path)
         self.mode = mode
@@ -324,7 +347,7 @@ class SiteWorkerServer:
                         request = json.loads(data.decode("utf-8"))
                     except (ValueError, UnicodeDecodeError):
                         request = None
-                    response = self.core.handle(request, peer)
+                    response = self.core.handle(request, peer, self.role)
                 conn.sendall((json.dumps(response, sort_keys=True) + "\n").encode())
             except OSError:
                 pass
@@ -384,24 +407,30 @@ def systemd_main_pid(unit: str = "plasma-server.service") -> Callable[[], int | 
     return provider
 
 
+def runtime_lease_snapshot(control_socket: Path, timeout_s: float = 5.0) -> dict | None:
+    """Read-only C-1 ``execution_lease`` snapshot; None if the Runtime is unreachable."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout_s)
+            sock.connect(str(control_socket))
+            sock.sendall(b'{"operation":"execution_lease"}\n')
+            data = b""
+            while not data.endswith(b"\n"):
+                chunk = sock.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+        reply = json.loads(data.decode("utf-8"))
+    except (OSError, ValueError):
+        return None
+    lease = reply.get("result") if isinstance(reply, dict) and reply.get("ok") else None
+    return lease if isinstance(lease, dict) else None
+
+
 def runtime_lease_verifier(control_socket: Path, timeout_s: float = 5.0) -> Callable[[str], bool]:
     """Ask the Runtime (C-1 SiteManager) whether job_id holds the Package Action lease."""
     def verify(job_id: str) -> bool:
-        try:
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-                sock.settimeout(timeout_s)
-                sock.connect(str(control_socket))
-                sock.sendall(b'{"operation":"execution_lease"}\n')
-                data = b""
-                while not data.endswith(b"\n"):
-                    chunk = sock.recv(65536)
-                    if not chunk:
-                        break
-                    data += chunk
-            reply = json.loads(data.decode("utf-8"))
-        except (OSError, ValueError):
-            return False
-        lease = reply.get("result") if isinstance(reply, dict) and reply.get("ok") else None
+        lease = runtime_lease_snapshot(control_socket, timeout_s)
         return (isinstance(lease, dict) and lease.get("busy") is True
                 and lease.get("owner_kind") == "package_action" and lease.get("owner_id") == job_id)
     return verify
