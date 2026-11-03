@@ -187,6 +187,24 @@ class SiteExecutionRouter:
 
     def _resolve_openocd(self, request: JobRequest) -> JobRequest:
         programming_profile_id, support, support_payload = self._resolved_support(request)
+        # REST read offsets are relative to main Flash; the canonical compiler
+        # only accepts absolute target addresses. Normalize before admission.
+        if request.operation is Operation.READ and request.map_data:
+            sections = request.map_data.get("sections")
+            if isinstance(sections, list):
+                flash_start = int(str(support.memory_geometry_profile.data["main_flash_start"]), 0)
+                normalized = [
+                    {**entry, "address": flash_start + entry["address"]}
+                    if isinstance(entry, dict)
+                    and type(entry.get("address")) is int
+                    and 0 <= entry["address"] < flash_start
+                    else entry
+                    for entry in sections
+                ]
+                request = replace(
+                    request,
+                    map_data={**request.map_data, "sections": normalized},
+                )
         selection = self.compiler_registry.select(support.icpn, request.operation)
         plan = selection.compiler.compile(
             support,
