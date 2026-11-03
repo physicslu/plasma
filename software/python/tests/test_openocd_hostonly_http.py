@@ -54,7 +54,7 @@ class FlashSimulator:
                     break
                 self.memory[:] = bytes([0xFF]) * FLASH_BYTES
             elif command.startswith(("flash write_image ", "flash verify_image ")):
-                staged = re.search(r"\\{([^{}]+)\\}", command)
+                staged = re.search(r"\{([^{}]+)\}", command)
                 if staged is None:
                     rc = 3
                     break
@@ -68,7 +68,7 @@ class FlashSimulator:
                     rc = 5
                     break
             elif command.startswith("dump_image "):
-                staged = re.search(r"\\{([^{}]+)\\}", command)
+                staged = re.search(r"\{([^{}]+)\}", command)
                 if staged is None:
                     rc = 6
                     break
