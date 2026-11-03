@@ -442,3 +442,52 @@ async def atomic_256bit_swj_lsb_first_and_staging_snapshot(d):
     else:
         raise AssertionError("Line reset completion absent")
     assert await write(d, 0, 0x20, 42) == 0
+
+
+@cocotb.test()
+async def idle_cycles_register_is_snapshotted_and_reset_by_mode_off(d):
+    """0x68 IDLE_CYCLES: OpenOCD AP memaccess delay without an SWJ link drop."""
+    await start(d)
+    assert await write(d, 0, 0x68, 20) == 2  # MODE OFF: denied
+    await expect(d, 0, 0x68, 8)
+    assert await write(d, 0, 0x38, 1) == 0
+    await expect(d, 0, 0x68, 8)
+    for bad in (0, 7, 0x100, 0x80000010):
+        assert await write(d, 0, 0x68, bad) == 2
+        await expect(d, 0, 0x68, 8)
+    assert await write(d, 0, 0x68, 20, strb=1) == 2
+    assert await write(d, 0, 0x08, 4) == 0
+    assert await write(d, 0, 0x28, 1) == 0
+    assert await write(d, 0, 0x10, 0x5) == 0
+    observed = []
+
+    async def watch():
+        while True:
+            await RisingEdge(d.g_sites[0].u_site.engine_clk)
+            await Timer(1, units="ns")
+            observed.append(int(d.g_sites[0].u_site.engine_out.value))
+
+    async def complete(tag):
+        for _ in range(200):
+            if (await read(d, 0, 0x24))[1] & 2:
+                break
+        else:
+            raise AssertionError("completion absent")
+        meta = (await read(d, 0, 0x18))[1]
+        assert meta >> 16 == tag and (meta & 15) == 0
+        assert await write(d, 0, 0x20, tag) == 0
+
+    # 3-bit SWJ (101) + 20 idle; the 0x68 write after PUSH must not alter it.
+    assert await write(d, 0, 0x68, 20) == 0
+    await expect(d, 0, 0x68, 20)
+    watcher = cocotb.start_soon(watch())
+    assert await write(d, 0, 0x14, (7 << 16) | encode_swj(3)) == 0
+    assert await write(d, 0, 0x68, 255) == 0
+    await complete(7)
+    watcher.kill()
+    # Exactly 3 sequence bits + 20 snapshotted idle clocks, not 8 or 255.
+    assert observed == [1, 0, 1] + [0] * 20
+    await expect(d, 0, 0x68, 255)
+    assert await write(d, 0, 0x28, 0) == 0
+    assert await write(d, 0, 0x38, 0) == 0
+    await expect(d, 0, 0x68, 8)  # MODE OFF restores the default

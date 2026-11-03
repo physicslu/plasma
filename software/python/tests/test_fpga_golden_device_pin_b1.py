@@ -23,7 +23,7 @@ from .test_ppu_fpga_static_qualification_gate1 import (
 )
 
 GOLDEN = "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c"
-RELEASE = ROOT / "pl/hil/releases/swd-independent-bd976140/plasma-image-manifest.json"
+RELEASE = ROOT / "pl/hil/releases/swd-independent-d0add58c/plasma-image-manifest.json"
 
 
 def _manifest(**changes) -> bytes:
@@ -40,7 +40,7 @@ def test_device_golden_is_the_pynq_z2_factory_base_bin():
 def test_every_shipped_manifest_restates_the_device_golden():
     shipped = [
         RELEASE,
-        ROOT / "pl/tests/fixtures/swd-independent-bd976140/plasma-image-manifest.json",
+        ROOT / "pl/tests/fixtures/swd-independent-d0add58c/plasma-image-manifest.json",
         ROOT / "pl/projects/z2-bluepill-rbb/image-manifest.json",
         ROOT / "pl/hil/bluepill-swd-image-release.candidate.json",
     ]

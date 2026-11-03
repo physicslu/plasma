@@ -50,6 +50,8 @@ def test_exact_read_write_register_policy_excludes_retired_debug():
     assert 0x14 in a.writable and 0x14 not in a.readable
     assert 0x18 in a.readable and 0x18 not in a.writable
     assert 0x44 in a.writable and 0x44 not in a.readable
+    assert 0x68 in a.readable and 0x68 in a.writable  # IDLE_CYCLES (d0add58c)
+    assert 0x6C not in a.readable | a.writable
     for retired in (0x3C, 0x40):
         assert retired not in a.readable | a.writable
         assert retired not in b.readable | b.writable

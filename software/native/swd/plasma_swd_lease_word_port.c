@@ -35,7 +35,7 @@ static bool offset_ok(const struct plasma_swd_lease_word_port *p,
         case 0x08: case 0x0c: case 0x10: case 0x14: case 0x20:
         case 0x28: case 0x2c: case 0x30: case 0x34: case 0x38:
         case 0x44: case 0x48: case 0x4c: case 0x50: case 0x54:
-        case 0x58: case 0x5c: case 0x60: case 0x64:
+        case 0x58: case 0x5c: case 0x60: case 0x64: case 0x68:
             return true;
         default: return false;
         }
@@ -43,7 +43,7 @@ static bool offset_ok(const struct plasma_swd_lease_word_port *p,
     switch (off) {
     case 0x00: case 0x04: case 0x08: case 0x0c: case 0x18:
     case 0x1c: case 0x24: case 0x28: case 0x2c: case 0x30:
-    case 0x34: case 0x38:
+    case 0x34: case 0x38: case 0x68:
         return true;
     default: return false;
     }

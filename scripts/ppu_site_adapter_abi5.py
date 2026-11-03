@@ -13,7 +13,7 @@ operation it composes ONLY existing, reviewed owners:
 
 Operations (allowlist): ``probe`` = OpenOCD ``dap init`` + ``dpreg 0`` with a
 fixed argv (no target, flash, erase, program or reset). Sites: 1 and 2 only
-(the ABI-v5 bd976140 two-Site geometry with a real hardware baseline).
+(the ABI-v5 d0add58c two-Site geometry with a real hardware baseline).
 """
 from __future__ import annotations
 

@@ -8,6 +8,7 @@
 #endif
 #include <helper/command.h>
 #include <jtag/interface.h>
+#include <jtag/adapter.h>
 #include "plasma_swd_openocd5088_ps_owner.h"
 
 COMMAND_HANDLER(plasma_swd_handle_site_command)
@@ -18,6 +19,11 @@ COMMAND_HANDLER(plasma_swd_handle_site_command)
     COMMAND_PARSE_NUMBER(uint, CMD_ARGV[0], site);
     if (plasma_swd_ps_owner_select_site(site) != PLASMA_SWD_OK)
         return ERROR_COMMAND_ARGUMENT_INVALID;
+    /* Default SWCLK 500 kHz unless "adapter speed" was already given; a
+     * later "adapter speed" (e.g. a target cfg) still overrides it. */
+    if (adapter_get_speed_khz() == 0)
+        return command_run_linef(CMD_CTX, "adapter speed %u",
+                                 PLASMA_SWD_DEFAULT_KHZ);
     return ERROR_OK;
 }
 

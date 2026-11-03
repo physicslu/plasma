@@ -544,58 +544,8 @@ def test_ps_mapping_requires_external_preopened_fd_and_production_char_device():
         assert forbidden not in c
 
 
-def test_native_root_observation_is_continuously_compared_host_only(tmp_path):
-    """Real C observer ↔ Native MMIO chain, deliberately synthetic Root.
-
-    Real protected Root currently reports active_image_attestation and
-    axi_isolation_evidence as UNPROVEN, so no physical admittance is claimed.
-    """
-    cc = shutil.which("cc")
-    assert cc, "GitHub-hosted C compiler required"
-    binary = tmp_path / "swd-ps-owner-evidence"
-    compile_args = [
-        cc, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-pedantic",
-        "-DPLASMA_SWD_HOST_TEST=1", "-I", str(SRC),
-        str(SRC / "plasma_swd_owner_evidence.c"),
-        str(SRC / "plasma_swd_fifo_core.c"),
-        str(SRC / "plasma_swd_native_words.c"),
-        str(SRC / "plasma_swd_lease_word_port.c"),
-        str(SRC / "plasma_swd_owner_lock.c"),
-        str(SRC / "tests/test_plasma_swd_owner_evidence.c"),
-        "-o", str(binary),
-    ]
-    build = subprocess.run(compile_args, capture_output=True, text=True,
-                           timeout=30, check=False)
-    assert build.returncode == 0, build.stdout + build.stderr
-    run = subprocess.run([str(binary)], capture_output=True, text=True,
-                         timeout=30, check=False)
-    assert run.returncode == 0, run.stdout + run.stderr
-    assert "PLASMA_PSNATIVE_LIVE_EVIDENCE_HOST_ONLY_PASS" in run.stdout
-
-
-def test_native_owner_evidence_never_treats_root_journal_as_loaded_image_proof():
-    owner = (SRC / "plasma_swd_owner_evidence.c").read_text()
-    contract = (SRC / "plasma_swd_owner_evidence.h").read_text()
-    # Existing protected Root journal/session remains only a reference,
-    # never a per-Image approval token or independent proof of PL bits.
-    assert "root_image_session_id" in contract
-    assert "active_image_attested" in owner
-    assert "axi_isolation_proven" in owner
-    assert "trusted_code_verified" in owner
-    assert "trusted_code_sha256" in owner
-    assert "loaded_image_sha256" in owner
-    assert "image_manifest_sha256" in owner
-    assert "voltage_qualified" in owner
-    assert "plasma_swd_owner_evidence_authorize" in owner
-    for prohibited in (
-        "mmap(", 'open("/dev/mem"', "socket(", "remote_bitbang",
-        "runtime_admitted", "approved-fpga-image.json", "MODE_DEBUG",
-    ):
-        assert prohibited not in owner
-
-
-def test_ps_owner_root_admission_live_revocation_host_only(tmp_path):
-    """PS-local OpenOCD owner: record/journal/boot/attestation fail closed.
+def test_ps_owner_lock_and_loaded_image_host_only(tmp_path):
+    """PS-local OpenOCD owner: Site lock + loaded-Image precheck, no per-word file I/O.
 
     Fixture files stand in for /proc, sysfs, Root journal and /dev/mem.
     Host-only; NOT Z2, FPGA or DUT evidence.
@@ -606,7 +556,7 @@ def test_ps_owner_root_admission_live_revocation_host_only(tmp_path):
     sources = [
         "plasma_swd_fifo_core.c", "plasma_swd_native_words.c",
         "plasma_swd_owner_lock.c", "plasma_swd_lease_word_port.c",
-        "plasma_swd_ps_mapping.c", "plasma_swd_owner_evidence.c",
+        "plasma_swd_ps_mapping.c",
         "plasma_swd_openocd5088_callbacks.c",
         "plasma_swd_openocd5088_ps_owner.c",
         "tests/test_plasma_swd_ps_owner.c",
@@ -633,8 +583,10 @@ def test_ps_owner_production_paths_and_no_host_relaxation():
     assert "PLASMA_SWD_MMIO_OWNER_LOCK" in src
     assert "plasma_swd_owner_lock_acquire_site" in src
     assert "/var/lib/plasma-privileged/fpga-deployment-state.json" in src
-    # Voltage is an attestation, never claimed as a measurement.
-    assert "NOT a voltage measurement" in src
+    # Policy (which Image, electrical conditions) belongs to the caller: the
+    # adapter reads neither an admission record nor an attestation.
+    for gone in ("swd-site", "electrical", "attestation", "read_live"):
+        assert gone not in src
     drv = (SRC / "plasma_swd_openocd5088_driver.c").read_text()
     assert "plasma_swd_ps_owner_attach" in drv
     assert "plasma_swd_ps_owner_safe_off" in drv
@@ -650,19 +602,23 @@ def _site_admission_module():
     return module
 
 
-def test_site_admission_record_matches_c_parser_keys():
-    """Host-only: Python Root record writer and C PS owner parser agree."""
-    import re
+def test_site_admission_record_fields_are_complete_and_validated():
+    """Host-only: the Python Root record writer rejects malformed records."""
     adm = _site_admission_module()
-    c_src = (SRC / "plasma_swd_openocd5088_ps_owner.c").read_text()
-    block = c_src.split("static const char *const KEYS[] = {", 1)[1].split("};", 1)[0]
-    c_keys = re.findall(r'"([a-z0-9_]+)"', block)
-    fields = {k: "1" for k in c_keys}
+    keys = ["schema", "site_id", "boot_id", "trusted_code_sha256",
+            "image_manifest_sha256", "loaded_image_sha256", "image_id",
+            "root_image_session_id", "abi_version", "site_bitmap",
+            "trusted_code_verified", "manager_operating", "active_image_attested",
+            "axi_isolation_proven", "owner_scan_complete",
+            "recovery_available", "journal_dev", "journal_ino", "journal_size",
+            "journal_mtime_ns", "record_expires_epoch",
+            "code_manifest_dev", "code_manifest_ino", "code_manifest_size",
+            "code_manifest_mtime_ns"]
+    fields = {k: "1" for k in keys}
     fields["schema"] = adm.SCHEMA
     text = adm.render_record(fields)
-    assert [line.split("=", 1)[0] for line in text.splitlines()] == c_keys
-    assert f'#define SCHEMA "{adm.SCHEMA}"' in c_src
-    for bad in ({**fields, "boot_id": "a\nvoltage_qualified=1"},
+    assert [line.split("=", 1)[0] for line in text.splitlines()] == keys
+    for bad in ({**fields, "boot_id": "a\nx=1"},
                 {**fields, "boot_id": ""}, {**fields, "x": "1"},
                 {k: v for k, v in fields.items() if k != "site_id"}):
         with pytest.raises(adm.SiteAdmissionDenied):
@@ -681,17 +637,8 @@ def test_site_admission_fails_closed_without_root_or_args(capsys):
         assert '"result": "DENIED"' in out and "ROOT_REQUIRED" in out
 
 
-def test_site_admission_attestation_and_tree_negative(tmp_path, monkeypatch):
-    import json
-    import os
+def test_site_admission_protected_tree_negative(tmp_path, monkeypatch):
     adm = _site_admission_module()
-    att = tmp_path / "site1-attestation.json"
-    att.write_text(json.dumps({"schema": adm.ATTESTATION_SCHEMA}))
-    os.chmod(att, 0o600)
-    monkeypatch.setattr(adm, "ELECTRICAL_DIR", tmp_path)
-    if os.geteuid() != 0:  # non-root owner is never a trusted attestation
-        with pytest.raises(adm.SiteAdmissionDenied, match="NOT_ROOT_PRIVATE"):
-            adm.load_attestation(1, 0.0)
     tree = tmp_path / "tree"
     tree.mkdir()
     # Missing Linux-protected installed source fails closed, no repeated hash.
@@ -707,4 +654,4 @@ def test_site_admission_never_loads_fpga_or_writes_journal():
                       "LinuxMMIO", "/dev/mem", "record_json"):
         assert forbidden not in text
     assert "require_mmio=True" in text and "port.exclusive()" in text
-    assert "OWNER_ON_SITE_ATTESTATION_NOT_MEASUREMENT" in text
+    assert '"voltage_source": "NOT_MEASURED"' in text

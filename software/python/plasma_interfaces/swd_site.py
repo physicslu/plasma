@@ -108,6 +108,7 @@ class SwdSiteController:
     MODE = 0x38
     SWJ_WORD0 = 0x44
     SWJ_LENGTH = 0x64
+    IDLE_CYCLES = 0x68
 
     def __init__(self, port: SiteWordAccess, *, site_id: int,
                  max_polls: int = 100_000) -> None:

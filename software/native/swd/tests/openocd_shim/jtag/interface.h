@@ -12,6 +12,9 @@ struct adapter_driver {
     unsigned int transport_preferred_id;
     int (*init)(void);
     int (*quit)(void);
+    int (*speed)(int speed);
+    int (*khz)(int khz, int *jtag_speed);
+    int (*speed_div)(int speed, int *khz);
     const struct swd_driver *swd_ops;
 };
 #endif
