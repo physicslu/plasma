@@ -99,7 +99,13 @@ class OpenOCDPlanExecutor:
         self,
         support: ResolvedICSupport,
         request: JobRequest,
+        *,
+        flash_cycle: bool = False,
     ) -> OpenOCDExecutionPlan:
+        if flash_cycle:
+            return self._compiler.compile_flash_cycle(
+                support, request, configured_target_config=self.target_cfg
+            )
         return self._compiler.compile(
             support,
             request,
@@ -230,11 +236,13 @@ class OpenOCDPlanExecutor:
         plan: OpenOCDExecutionPlan,
         support: ResolvedICSupport,
         request: JobRequest,
+        *,
+        flash_cycle: bool = False,
     ) -> OpenOCDExecutionResult:
-        """Execute only a canonical plan through an explicitly injected launcher."""
+        """Execute a canonical plan through an explicitly injected launcher."""
         launcher = self._require_software_validation_launcher()
         self._validate_runtime_options()
-        canonical = self._canonical_plan(support, request)
+        canonical = self._canonical_plan(support, request, flash_cycle=flash_cycle)
         self._validate_plan_identity(plan, canonical)
 
         with tempfile.TemporaryDirectory(prefix="plasma-openocd-plan-") as temp_root:
@@ -314,6 +322,21 @@ class OpenOCDPlanExecutor:
                         },
                     )
                 read_sections[section_name] = payload
+
+            if flash_cycle:
+                observed = read_sections.get("flash_readback")
+                if observed is None or observed != request.image:
+                    raise PlasmaError(
+                        ErrorCode.INTERFACE_FAILURE,
+                        "OpenOCD Flash readback does not match the Programming Image",
+                        context={
+                            "expected_sha256": request.image_sha256,
+                            "readback_sha256": (
+                                hashlib.sha256(observed).hexdigest()
+                                if observed is not None else None
+                            ),
+                        },
+                    )
 
             return OpenOCDExecutionResult(
                 stdout=stdout,
