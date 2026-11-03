@@ -1,6 +1,6 @@
 # PPU Bundle v3 — Generic Asset Set B3 (Gate 1)
 
-> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+> **Terminology update (2026-11-03):** Current Bundle stages are **B1 Receive → B2 Admission → B3 Install/Verify**. The former **B4** means historical/internal Active Set selection and recovery, **not a separate operator step**. See [Install → Run → Result](../architecture/ppu-install-run-result.md) and the [glossary](../glossary.md#b1b2b3).
 
 **Status:** merged in main (PR #1245), 2026-11-02. Host-only CI / Test only.
 **Baseline:** latest main plus owner-approved Single Active Asset Set architecture
@@ -29,7 +29,7 @@ hardcoded Packages.** The legacy PR #1241 Smoke-only real-HIL control scripts
 are retired from the executable product tree; their evidence remains preserved
 in Git history. Tests may continue using a harmless Python Smoke fixture.
 
-**All Packages remain inert Assets** (Python, Native C, FPGA Image BIN/HWH,
+**For the documented `fpga_load:false` install-only B3**, all Packages remain inert Assets (Python, Native C, FPGA Image BIN/HWH,
 Programming Profile, firmware, etc.). B3 does not execute files, load PL,
 change /opt/plasma/current, switch an Asset Set or operate DUT. B3 verifies
 the exact archive content against B1/B2 metadata and canonical v3
@@ -37,7 +37,7 @@ Manifest/target/dependency contract. Every staged Set retains the verified canon
 with its own SHA256 included in the B3 receipt. Every staged Set is stored under its
 complete archive SHA256, not its display name. Reuse of an existing digest
 requires re-verifying every installed file and the exact file set; it must not
-overwrite that path. This provides Staging only, **not** Active Set activation.
+overwrite that path. This provides Staging only, **not** Active Set selection. A separately authorized B3 `fpga_load:true` may load FPGA and publish a verified Active Set after Root Identity PASS; this was implemented after this PR's original Host-only baseline. See [B3 FPGA load](ppu-bundle-v3-b3-fpga-load-gate1.md).
 
 ## Installation authority and trust levels
 
