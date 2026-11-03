@@ -21,6 +21,7 @@ import pytest
 
 from pl.hil import fpga_image_guard as protected_guard
 from pl.hil import fpga_image_root as protected_root
+from pl.hil import fpga_image_admission as protected_admission
 
 from .test_ppu_bundle_v3_packages_contract import ROOT, engine, load
 from .test_ppu_b3_z2_install_gate1 import (
@@ -480,6 +481,43 @@ def test_root_bundle_load_census_denial_restores_manifest_and_never_downloads(tm
     assert denied.value.code == "PROC_CONSUMER_CONFLICT"
     assert "run:download" not in events
     assert (firmware / "plasma-image-manifest.json").read_bytes() == b"old-manifest"
+
+
+def test_root_bundle_load_census_incomplete_keeps_bounded_detail(tmp_path):
+    """A pre-load census denial must report WHY (status, pid, phase, error)."""
+    staged, digest, _bin_sha, _ = installed_set(tmp_path)
+    code = "PROC_SCAN_INCOMPLETE:VANISHED_PID_RESCAN_EXHAUSTED:1234:MAPS:FileNotFoundError"
+
+    def incomplete():
+        raise protected_admission.AdmissionDenied(code)
+
+    with root_sandbox(tmp_path, staged, confirm=incomplete) as (firmware, events):
+        with pytest.raises(protected_root.BundleLoadOutcome) as denied:
+            protected_root.bundle_load(digest)
+    assert denied.value.outcome == "fpga_load_denied"
+    assert denied.value.code == code
+    assert "run:download" not in events
+    assert (firmware / "plasma-image-manifest.json").read_bytes() == b"old-manifest"
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("PROC_CONSUMER_CONFLICT", "PROC_CONSUMER_CONFLICT"),
+    ("PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:88:FD:PermissionError",
+     "PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:88:FD:PermissionError"),
+    ("PROC_SCAN_INCOMPLETE:UNKNOWN:UNKNOWN:UNKNOWN:UNKNOWN",
+     "PROC_SCAN_INCOMPLETE:UNKNOWN:UNKNOWN:UNKNOWN:UNKNOWN"),
+    # Free-form text never crosses the Root boundary.
+    ("fpga manager", "AdmissionDenied"),
+    ("PROC_SCAN_INCOMPLETE:/proc/1/cmdline", "AdmissionDenied"),
+    ("PROC_SCAN_INCOMPLETE:python3 -c secret", "AdmissionDenied"),
+    ("PROC_SCAN_INCOMPLETE:a:b:c:d:e", "AdmissionDenied"),          # > 4 detail fields
+    ("PROC_SCAN_INCOMPLETE:" + "x" * 41, "AdmissionDenied"),        # over-long token
+    ("lowercase_code", "AdmissionDenied"),
+    ("PROC_SCAN_INCOMPLETE:", "AdmissionDenied"),
+])
+def test_root_failure_code_is_bounded_and_token_only(text, expected):
+    exc = protected_admission.AdmissionDenied(text)
+    assert protected_root._failure_code(exc) == expected
 
 
 def test_root_bundle_load_tampered_staged_bin_denied_before_lock(tmp_path):
