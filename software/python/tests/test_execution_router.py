@@ -334,11 +334,11 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
             commands_seen.extend(commands)
             for command in commands:
                 if command.startswith("flash write_image ") or command.startswith("flash verify_image "):
-                    staged = re.search(r"\\{([^{}]+)\\}", command)
+                    staged = re.search(r"\{([^{}]+)\}", command)
                     assert staged is not None
                     assert Path(staged.group(1)).read_bytes() == image
                 if command.startswith("dump_image "):
-                    staged = re.search(r"\\{([^{}]+)\\}", command)
+                    staged = re.search(r"\{([^{}]+)\}", command)
                     assert staged is not None
                     Path(staged.group(1)).write_bytes(image)
             return FakeOpenOCDProcess()
