@@ -111,7 +111,7 @@ result = {
     'manager_state': file_text('/sys/class/fpga_manager/fpga0/state'),
     'manager_last_firmware': last_firmware(),
     'uio_overlaps': overlaps(), 'platform_overlaps': platform(),
-    'candidate_sha256': firmware_sha('plasma-swd-independent-ab79b04e.bin'),
+    'candidate_sha256': firmware_sha('plasma-swd-independent-bd976140.bin'),
     'golden_sha256': firmware_sha('base.bin'),
     'root_source_commit': file_text('/root/plasma-path2-approved/.plasma-path2-source-commit'),
     'native_python_present': Path('/opt/plasma/python/3.12.13/bin/python3').is_file(),

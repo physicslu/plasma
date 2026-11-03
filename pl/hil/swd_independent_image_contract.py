@@ -1,4 +1,4 @@
-"""Host-only checks for the ab79b04e two-Site Image and its HWH.
+"""Host-only checks for the bd976140 two-Site Image and its HWH (ab79b04e retired).
 
 This does not authorize a Linux MMIO owner or a physical FPGA operation.
 """
@@ -10,11 +10,11 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 
-SOURCE_SHA = "ab79b04efb2c38401103876043e39d4745284163"
-BIT_SHA = "ac89d58b41bbfa1eafd4b51a389b7953186fc8e2ed8b1629bfc0a92f51797e88"
-HWH_SHA = "5309c05beb8a17c9b13e8e2ba3d3c23d8264ca4adc38649bab6391e896577eb6"
-BIN_SHA = "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773"
-MANIFEST_SHA = "b3a3643f46ac6eb861c288ae20dc78abe62852281709f1a5d94705acc1856669"
+SOURCE_SHA = "bd976140e7b76b907db48e9f344be1301a502d49"
+BIT_SHA = "6f7c562f269319af058c874f401ca44c9fa3b46dcdb0e9de9f026ec5fd7ce21c"  # Vivado run 41469421780
+HWH_SHA = "042892bb59fa8f0d62b54ae6ab47806a592151820c2d9fd9288d21215690010b"
+BIN_SHA = "19143158b47e79569b673660315e58cd0765b52c7e60e6258422c437aea3da40"
+MANIFEST_SHA = "857228ddff88458edaad040a75a757729b5f2b667c57da7e2c5d245d28fe5222"
 SITES = {"swd_site1": (0x43C01000, 0x00050001),
          "swd_site2": (0x43C02000, 0x00050002)}
 
@@ -43,7 +43,7 @@ def verify(hwh: Path, manifest: Path, *, bit: Path | None = None,
         require(sha256(firmware) == BIN_SHA, "BIN_SHA_MISMATCH")
     data = json.loads(manifest.read_text(encoding="utf-8"))
     require(data["firmware_sha256"] == BIN_SHA and
-            data["image_id"] == "z2-independent-swd-v5-ab79b04e",
+            data["image_id"] == "z2-independent-swd-v5-bd976140",
             "IMAGE_PAIR_MISMATCH")
     root = ET.parse(hwh).getroot()
     modules = {m.get("INSTANCE"): m for m in root.iter("MODULE")}

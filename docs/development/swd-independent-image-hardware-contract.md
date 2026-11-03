@@ -5,18 +5,29 @@ Device Tree change, DUT operation or deployment authority.
 
 ## Pinned provenance
 
-- Vivado 2026.1, project `pl/projects/z2-swd-independent`, source
-  `ab79b04efb2c38401103876043e39d4745284163` (Draft PR #1189).
-- BIT SHA256 `ac89d58b41bbfa1eafd4b51a389b7953186fc8e2ed8b1629bfc0a92f51797e88`.
-- HWH SHA256 `5309c05beb8a17c9b13e8e2ba3d3c23d8264ca4adc38649bab6391e896577eb6`.
-- BIN SHA256 `d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773`.
-- Host-only Manifest SHA256 `b3a3643f46ac6eb861c288ae20dc78abe62852281709f1a5d94705acc1856669`.
+Current audited Image (since 2026-11-03; `ab79b04e` retired under
+Replace-by-Default — removed from the Root devmem table, B2 contracts,
+releases and fixtures):
 
-The exact HWH and original Manifest are retained as CI fixtures. The Host-only
-verifier checks their bytes and topology. The BIT/BIN digests are pinned
-provenance from the SWPC Build and Bootgen receipt; these large files are not
-bundled into this PR. Their bytes must be checked against the digests before
-any future staging. An SHA match does not prove live FPGA configuration.
+- Vivado Host Build run 41469421780, project `pl/projects/z2-swd-independent`,
+  source `bd976140e7b76b907db48e9f344be1301a502d49` (PR #1255 head; SWDIO
+  sampled before the SWCLK rising edge).
+- BIT SHA256 `6f7c562f269319af058c874f401ca44c9fa3b46dcdb0e9de9f026ec5fd7ce21c`.
+- HWH SHA256 `042892bb59fa8f0d62b54ae6ab47806a592151820c2d9fd9288d21215690010b`.
+- BIN SHA256 `19143158b47e79569b673660315e58cd0765b52c7e60e6258422c437aea3da40`.
+- devmem release Manifest SHA256 `857228ddff88458edaad040a75a757729b5f2b667c57da7e2c5d245d28fe5222`
+  (`pl/hil/releases/swd-independent-bd976140/`).
+
+The exact HWH and release Manifest are retained as CI fixtures
+(`pl/tests/fixtures/swd-independent-bd976140/`). The Host-only verifier checks
+their bytes and topology. The BIT/BIN digests are pinned provenance from the
+Vivado run; these large files are not bundled. An SHA match does not prove live
+FPGA configuration.
+
+Historical: the first audit (this document's original version) used
+`ab79b04efb2c38401103876043e39d4745284163` (Draft PR #1189, HWH `5309c05b…`,
+BIN `d3b65a81…`, uio-variant Manifest `b3a3643f…`). That Image is no longer
+trusted anywhere.
 
 ## Address contract and the SIGBUS
 
@@ -36,7 +47,7 @@ admission, and must not retry the faulting `0x43C00000` read.
 
 ## Linux owner and admission
 
-The original Host-only Manifest assumes `uio1` covers `0x43C00000/64KiB`.
+The original (retired ab79b04e) Host-only Manifest assumed `uio1` covers `0x43C00000/64KiB`.
 The reported Z2 state instead maps `uio0` to `43c00000.audio-codec-ctrl` and
 `uio1` to `40000000.fabric`. This is a **kernel-resource observation**, not
 proof that `audio-codec-ctrl` owns the SWD IP or is available to the Driver.

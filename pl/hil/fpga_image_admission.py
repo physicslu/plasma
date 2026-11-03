@@ -16,8 +16,6 @@ from pl.hil import fpga_image_guard as guard
 # engineering backend: image_id -> paired BIN SHA-256. Every entry shares the
 # same HWH-proven two-Site geometry checked by the Root Manifest parser.
 DEVMEM_INDEPENDENT_IMAGES = {
-    "z2-independent-swd-v5-ab79b04e":
-        "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773",
     # PR #1255 head bd976140e: SWDIO sampled before the SWCLK rising edge.
     "z2-independent-swd-v5-bd976140":
         "19143158b47e79569b673660315e58cd0765b52c7e60e6258422c437aea3da40",
