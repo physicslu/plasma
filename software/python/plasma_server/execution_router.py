@@ -10,6 +10,7 @@ from plasma_core.models import ExecutionOutput, JobRequest
 from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
+from plasma_interfaces.openocd import OpenOCDInterface
 from plasma_interfaces.compiler_registry import (
     CompilerBinding,
     CompilerRegistry,
@@ -206,8 +207,17 @@ class SiteExecutionRouter:
                 "compiler_id": selection.admission.compiler_id,
                 "backend_id": selection.admission.backend_id,
                 "backend_lock_digest": selection.admission.backend_lock_digest,
-                "backend_implementation_state": "plan_compiled_not_executable",
+                "backend_implementation_state": (
+                    "host_only_process_injected"
+                    if isinstance(self.interface, OpenOCDInterface)
+                    and self.interface.software_validation_ready
+                    else "plan_compiled_not_executable"
+                ),
                 "openocd_execution_plan": plan.to_dict(),
+                "software_validation_runtime_ready": (
+                    isinstance(self.interface, OpenOCDInterface)
+                    and self.interface.software_validation_ready
+                ),
                 "hardware_runtime_ready": False,
             },
         )
@@ -245,7 +255,11 @@ class SiteExecutionRouter:
         route = self._route_payload(resolved)
         if route.get("mode") == MOCK_ROUTE:
             return resolved
-        if route.get("hardware_runtime_ready") is not True:
+        host_only = (
+            route.get("mode") == OPENOCD_ROUTE
+            and route.get("software_validation_runtime_ready") is True
+        )
+        if route.get("hardware_runtime_ready") is not True and not host_only:
             raise PlasmaError(
                 ErrorCode.INTERFACE_NOT_CONFIGURED,
                 "resolved hardware backend is not runtime-ready",
@@ -265,7 +279,11 @@ class SiteExecutionRouter:
         mode = route.get("mode")
         if mode == MOCK_ROUTE:
             return self._generic_handler
-        if route.get("hardware_runtime_ready") is not True:
+        host_only = (
+            mode == OPENOCD_ROUTE
+            and route.get("software_validation_runtime_ready") is True
+        )
+        if route.get("hardware_runtime_ready") is not True and not host_only:
             raise PlasmaError(
                 ErrorCode.INTERNAL_ERROR,
                 "non-ready hardware route reached SiteWorker",
