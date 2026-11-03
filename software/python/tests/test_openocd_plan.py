@@ -89,6 +89,40 @@ class OpenOCDPlanCompilerTests(unittest.TestCase):
         self.assertEqual(plan.artifacts[0].sha256, hashlib.sha256(image).hexdigest())
         self.assertEqual(plan.artifacts[0].direction, "input")
 
+    def test_full_flash_cycle_reuses_resolved_geometry_and_reads_back_every_byte(self) -> None:
+        image = bytes(range(64))
+        request = JobRequest(
+            site_id=2, operation=Operation.PROGRAM,
+            target="STM32F103C8T6", image=image,
+        )
+        plan = self.compiler.compile_flash_cycle(
+            self.c8, request, configured_target_config=TARGET_CFG
+        )
+        self.assertEqual(plan.commands, (
+            "init",
+            "reset init",
+            "flash erase_address 0x08000000 0x00010000",
+            f"flash write_image {IMAGE_ARTIFACT_TOKEN} 0x08000000 bin",
+            f"flash verify_image {IMAGE_ARTIFACT_TOKEN} 0x08000000 bin",
+            "dump_image ${PLASMA_READ_000_BIN} 0x08000000 0x00000040",
+            "shutdown",
+        ))
+        self.assertEqual(len(plan.artifacts), 2)
+        self.assertEqual(plan.artifacts[0].sha256, hashlib.sha256(image).hexdigest())
+        self.assertEqual(plan.artifacts[1].section_name, "flash_readback")
+        self.assertEqual(plan.artifacts[1].size_bytes, len(image))
+        self.assertTrue(plan.to_dict()["plan_only"])
+        self.assertFalse(plan.to_dict()["hardware_runtime_ready"])
+
+    def test_full_flash_cycle_rejects_non_program_job(self) -> None:
+        with self.assertRaises(PlasmaError) as caught:
+            self.compiler.compile_flash_cycle(
+                self.c8,
+                JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103C8T6"),
+                configured_target_config=TARGET_CFG,
+            )
+        self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
+
     def test_verify_plan_is_separate_from_program_and_does_not_erase(self) -> None:
         plan = self.compile(
             self.c8,
