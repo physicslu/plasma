@@ -18,7 +18,6 @@ fixed argv (no target, flash, erase, program or reset). Sites: 1 and 2 only
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import signal
@@ -43,8 +42,7 @@ class Abi5OpenocdAdapter:
     supported_sites = frozenset({1, 2})
     operations = frozenset({"probe", "flash_cycle"})
 
-    def __init__(self, *, openocd_root: Path, python: Path, expected_image_id: str,
-                 journal: Path = Path("/var/lib/plasma-privileged/fpga-deployment-state.json"),
+    def __init__(self, *, openocd_root: Path, python: Path,
                  record_dir: Path = Path("/run/plasma-z2-swd05"),
                  run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
                  popen: Callable[..., Any] = subprocess.Popen,
@@ -52,8 +50,6 @@ class Abi5OpenocdAdapter:
                  poll_s: float = 0.05) -> None:
         self.openocd_root = Path(openocd_root)
         self.python = Path(python)
-        self.expected_image_id = expected_image_id
-        self.journal = Path(journal)
         self.record_dir = Path(record_dir)
         self._run = run
         self._popen = popen
@@ -76,18 +72,6 @@ class Abi5OpenocdAdapter:
 
     def _record(self, site: int) -> Path:
         return self.record_dir / f"swd-site{site}-admission"
-
-    # --- identity (FPGA reload detection) -------------------------------------------
-    def identity(self) -> Mapping[str, Any]:
-        try:
-            raw = self.journal.read_bytes()
-            state = json.loads(raw)
-        except (OSError, ValueError):
-            return {"state": "UNREADABLE"}
-        return {"journal_sha256": hashlib.sha256(raw).hexdigest(),
-                "status": state.get("status"), "image_id": state.get("image_id"),
-                "session_id": state.get("session_id"), "boot_id": state.get("boot_id"),
-                "firmware_sha256": state.get("firmware_sha256")}
 
     def startup_sealed_sites(self) -> set[int]:
         """A leftover admission record or any running OpenOCD is an unknown owner."""
@@ -197,9 +181,6 @@ class Abi5OpenocdAdapter:
     def _session(self, site: int, *, deadline: float, cancel: threading.Event,
                  argv: list[str] | None = None,
                  max_duration_s: float = OPENOCD_MAX_S) -> tuple[str, Any]:
-        ident = self.identity()
-        if ident.get("status") != "IMAGE" or ident.get("image_id") != self.expected_image_id:
-            raise TransportDenied("FPGA_IMAGE_NOT_EXPECTED")
         # Single hardware owner: refuse while any other OpenOCD / admission exists.
         if self._openocd_running() or os.path.lexists(self._record(site)):
             raise TransportDenied("EXTERNAL_SITE_OWNER_PRESENT")
