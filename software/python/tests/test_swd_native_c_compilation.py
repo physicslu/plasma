@@ -37,7 +37,9 @@ def test_native_c_core_compiles_cleanly_and_blocks_uncertain_replay(tmp_path):
 def test_c_core_is_separate_from_hardware_and_retired_debug_mode():
     c = (SRC / "plasma_swd_fifo_core.c").read_text(encoding="utf-8")
     h = (SRC / "plasma_swd_fifo_core.h").read_text(encoding="utf-8")
-    assert "PLASMA_SWD_ABI_V5" in h and "PLASMA_SWD_MAX_QUEUE 16u" in h
+    assert "PLASMA_SWD_ABI_V5" in h and "PLASMA_SWD_MAX_QUEUE 256u" in h
+    # Outstanding commands never exceed the 16-deep RTL command FIFO.
+    assert "PLASMA_SWD_PIPELINE_DEPTH 16u" in h
     for forbidden in (
         "/dev/mem\"", "open(", "mmap(", "ioctl(", "system(",
         "MODE_DEBUG", "remote_bitbang", "socket(", "execve(",
