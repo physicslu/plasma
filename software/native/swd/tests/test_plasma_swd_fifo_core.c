@@ -138,12 +138,28 @@ static void test_exact_atomic_swj_and_negative_inputs(void)
            PLASMA_SWD_BAD_ARG); /* parity/direction mismatch */
     assert(plasma_swd_fifo_queue_read(&site, 0x25u, &f.rx, 0u) ==
            PLASMA_SWD_BAD_ARG);
-    assert(plasma_swd_fifo_queue_read(&site, 0x24u, NULL, 0u) ==
-           PLASMA_SWD_BAD_ARG);
     assert(plasma_swd_fifo_queue_read(&site, 0x24u, &f.rx, 1u) ==
            PLASMA_SWD_UNSUPPORTED);
     assert(plasma_swd_fifo_queue_write(&site, 0x18u, 1u, 0u) ==
            PLASMA_SWD_UNSUPPORTED); /* DP TARGETSEL no-ACK */
+}
+
+static void test_discarded_read_runs_on_wire_without_publication(void)
+{
+    /* OpenOCD dap_dp_init(): dap_queue_dp_read(dap, DP_CTRL_STAT, NULL). */
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    uint32_t kept = 0u;
+    assert(plasma_swd_fifo_queue_read(&s, 0x24u, NULL, 0u) == 0);
+    assert(plasma_swd_fifo_queue_read(&s, 0x24u, &kept, 0u) == 0);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(f.push_count == 2u); /* the discarded read was a real transfer */
+    assert(kept == 0x1BA01477u);
+    f.ack = 4u;
+    f.completion_status = 4u;
+    assert(plasma_swd_fifo_queue_read(&s, 0x24u, NULL, 0u) == 0);
+    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_ACK_FAULT); /* still checked */
 }
 
 static void test_wait_fault_no_replay_and_pointer_safety(void)
@@ -273,6 +289,7 @@ int main(void)
 {
     test_two_sites_ordered_reads_and_writes();
     test_exact_atomic_swj_and_negative_inputs();
+    test_discarded_read_runs_on_wire_without_publication();
     test_wait_fault_no_replay_and_pointer_safety();
     test_fifo_queue_bounds_and_tags();
     test_new_fifo_rejects_prior_normal_mode_and_unknown_completion();
