@@ -205,7 +205,7 @@ class OpenOCDPlanCompiler:
         """Compose a single-DUT Erase/Program/Verify/full Readback host-test plan.
 
         This only compiles commands. It does not launch OpenOCD or promote any
-        physical hardware route. Geometry and firmware admission reuse compile().
+        physical hardware route. Geometry and Programming Image validation reuse compile().
         """
         if request.operation is not Operation.PROGRAM:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Flash cycle requires a PROGRAM Job")
