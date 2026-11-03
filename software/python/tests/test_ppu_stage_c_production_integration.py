@@ -198,7 +198,7 @@ def test_entry_survives_sigterm_and_records_signaled_package(tmp_path):
     write_spec(tmp_path / "specs", path)
     p, out = run_entry(tmp_path, staged, wait=False)
     time.sleep(0.8)
-    os.killpg(p.pid, signal.SIGTERM)       # systemctl kill --kill-whom=all
+    os.killpg(p.pid, signal.SIGTERM)       # systemctl kill --kill-who=all
     assert p.wait(15) == 0
     assert json.loads((out / "status.json").read_text()) == {
         "result": "SIGNALED", "exit_code": None, "signal": signal.SIGTERM}
@@ -218,8 +218,8 @@ def test_entry_refuses_root(tmp_path, monkeypatch):
 class FakeSystemd:
     """Minimal systemd emulation: start/show/kill/stop/list-units of one template."""
 
-    def __init__(self, tmp_path, staged, *, start_rc=0):
-        self.tmp, self.staged, self.start_rc = tmp_path, staged, start_rc
+    def __init__(self, tmp_path, staged, *, start_rc=0, kill="normal"):
+        self.tmp, self.staged, self.start_rc, self.kill = tmp_path, staged, start_rc, kill
         self.procs: dict[str, subprocess.Popen] = {}
         self.calls: list[tuple] = []
 
@@ -255,7 +255,14 @@ class FakeSystemd:
                 state = "ActiveState=failed\nSubState=failed"
             return subprocess.CompletedProcess(
                 args, 0, f"{state}\nMainPID={p.pid if rc is None else 0}\nTasksCurrent={1 if alive else 0}\n", "")
-        if verb == "kill" and p is not None:
+        if verb == "kill":
+            # systemd 249 (Z2) only accepts --kill-who= (verified on device 2026-11-03).
+            if any(a.startswith("--kill-whom") for a in args):
+                return subprocess.CompletedProcess(args, 1, "", "systemctl: unrecognized option '--kill-whom=all'")
+            if self.kill == "fail":
+                return subprocess.CompletedProcess(args, 1, "", "Failed to kill unit")
+            if self.kill == "noop" or p is None:
+                return ok
             sig = int([a for a in args if a.startswith("--signal=")][0].split("=")[1])
             try:
                 os.killpg(p.pid, sig)
@@ -605,3 +612,37 @@ def test_package_action_runtime_composes_c1_c2_and_reconciles(tmp_path):
         finally:
             await manager.shutdown()
     asyncio.run(scenario())
+
+
+def test_systemd_spawner_kill_uses_systemd_249_option_and_really_kills(tmp_path):
+    co, req, owner, spawner, fake = systemd_rig(tmp_path, b"import time\ntime.sleep(60)\n", runtime=1)
+    t0 = time.monotonic()
+    receipt = dispatch(co, req, owner, tmp_path, spawner)["executor_result"]
+    assert receipt["result"] == "TIMEOUT" and time.monotonic() - t0 < 20
+    kills = [c for c in fake.calls if c[0] == "kill"]
+    assert kills and all("--kill-who=all" in c for c in kills)
+    assert not any("--kill-whom" in a for c in fake.calls for a in c)
+
+
+@pytest.mark.parametrize("mode,code", [("fail", "PACKAGE_UNIT_KILL_FAILED"),
+                                       ("noop", "PACKAGE_ACTION_KILL_UNCONFIRMED")])
+def test_unconfirmed_kill_is_outcome_unknown_and_unit_is_stopped(tmp_path, monkeypatch, mode, code):
+    monkeypatch.setattr(launcher, "KILL_REAP_TIMEOUT_S", 1.0)
+    co, req, owner, spawner, fake = systemd_rig(tmp_path, b"import time\ntime.sleep(60)\n", runtime=1)
+    fake.kill = mode
+    t0 = time.monotonic()
+    with pytest.raises(launcher.PackageLaunchDenied, match=code):
+        dispatch(co, req, owner, tmp_path, spawner)
+    assert time.monotonic() - t0 < 20                                     # never waits for the Package
+    assert json.loads((tmp_path / "actions" / f"{JOB}.json").read_text())["state"] == "outcome_unknown"
+    assert (f"stop", f"plasma-package@{JOB}.service") in fake.calls and fake.procs == {}
+
+
+def test_no_systemd_252_only_kill_option_in_control_plane():
+    for name in ("ppu_package_launcher.py", "ppu_package_unit_helper.py"):
+        code = [l for l in (ROOT / "scripts" / name).read_text().splitlines() if not l.strip().startswith("#")]
+        assert not any('"--kill-whom' in l or "'--kill-whom" in l for l in code), name
+
+
+def test_unit_has_no_invalid_documentation_url():
+    assert "Documentation=" not in units.package_unit()
