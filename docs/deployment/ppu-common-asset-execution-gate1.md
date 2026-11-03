@@ -79,8 +79,35 @@ not import or run a Bundle File just because its hash matches.
   `asset.execute` authorization; the parsed bytes must match the verified
   SHA-256. Dispatch denies any declared Site outside the lease
   (`ASSET_EXECUTION_SITE_NOT_LEASED`).
-- No executor, process launcher, Site transport, timeout enforcement or
-  child-process cancellation is wired yet (Stage C-2 / C-3). No Z2/DUT run.
+- Planner adds a fixed `entrypoint` {path, sha256}: python = exactly
+  `python/main.py`; native-c = the single executable under `bin/`
+  (`ASSET_EXECUTION_ENTRYPOINT_INVALID` otherwise). No request argv/path.
+
+## Stage C-2: non-root Package process executor (Host-only)
+
+`scripts/ppu_package_launcher.py::make_package_executor()` is the python /
+native-c `trusted_executors` adapter, called by the non-root Runtime inside
+`package_action_scope`:
+
+- Refuses to run as root; refuses Packages declaring any Site
+  (`PACKAGE_SITE_TRANSPORT_NOT_WIRED`) until the Site Transport broker
+  (C-3); never opens `/dev/mem`, `/dev/uio*`, FPGA Manager or MMIO.
+- Re-hashes the planned entrypoint before spawn; argv is fixed
+  (`<python> -I -B -S main.py` or the single `bin/` file).
+- Child: own session/process group, clean env (PATH, LANG, HOME, job and
+  package IDs only), private 0700 work dir (removed afterwards),
+  stdin=/dev/null, close_fds, stdout/stderr captured and bounded to 64 KiB,
+  rlimits CPU=max_runtime_s+1, AS 512 MiB, NOFILE 64, FSIZE 16 MiB, no core.
+- `max_runtime_s` timeout and the Runtime cancel event SIGTERM then SIGKILL
+  the whole process group (grandchildren included); reaping is verified.
+- Durable journal `<state_root>/<job_id>.json`: `running` before spawn →
+  `succeeded|failed|timeout|cancelled` (or `outcome_unknown`);
+  `interrupted_actions()` lists non-terminal records after a restart. One
+  launch per `job_id`. Receipt `plasma.ppu.package-action-receipt.v1`.
+- **Deliberately not a root `systemd-run` unit** (rootless design step 5):
+  dedicated per-Package UID, network namespace and syscall filter are
+  `NOT_QUALIFIED` and need a privileged helper or the Z2 permission matrix
+  (separate owner decision). Z2 / DUT: NOT_RUN.
 
 ## Host-only acceptance / outstanding
 
