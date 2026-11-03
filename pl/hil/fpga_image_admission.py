@@ -40,7 +40,7 @@ def check_exact(*, release, passive: dict, uio: dict,
          passive.get("observation_kind") == "LIVE_ROOT_READ_ONLY" and
          passive.get("root") is True and bool(passive.get("boot_id")) and
          passive.get("manager_state") == "operating" and
-         passive.get("recovery_sha256") == release.recovery_sha256 and
+         passive.get("recovery_sha256") == guard.GOLDEN_RECOVERY_SHA256 and
          passive.get("candidate_sha256") == release.firmware_sha256,
          "INCOMPLETE_ROOT_OR_PROCESS_FACTS")
     need(type(runtime_program_session) is bool, "INVALID_PROCESS_SCAN_POLICY")
@@ -111,7 +111,7 @@ def check_exact(*, release, passive: dict, uio: dict,
          bool(re.fullmatch(r"[0-9a-fA-F]+\.[A-Za-z0-9_.-]+",
                            passive["platform_overlaps"][0])),
          "BOUND_PLATFORM_EXCEPTION_NOT_ISOLATED")
-    need(expected_firmware in (release.recovery_name, release.firmware_name) or
+    need(expected_firmware in (guard.GOLDEN_RECOVERY_NAME, release.firmware_name) or
          (previous_firmware is not None and expected_firmware == previous_firmware),
          "MANAGER_FIRMWARE_NOT_ALLOWLISTED")
     need(type(original_manager_load) is str and
@@ -122,7 +122,7 @@ def check_exact(*, release, passive: dict, uio: dict,
         "target_boot_id": passive["boot_id"],
         "image_id": release.image_id,
         "bin_sha256": release.firmware_sha256,
-        "recovery_sha256": release.recovery_sha256,
+        "recovery_sha256": guard.GOLDEN_RECOVERY_SHA256,
         "current_uio": uio if require_mmio else None,
         "mmio_backend": ("devmem" if require_mmio and
                          release.expected_uio.get("backend") == "devmem"

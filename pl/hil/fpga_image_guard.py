@@ -20,6 +20,13 @@ import threading
 SYS = Path("/sys")
 PROC = Path("/proc")
 FIRMWARE = Path("/lib/firmware")
+# Device Golden recovery Image: the PYNQ-Z2 factory PL ``base.bin`` that every
+# protected Restore returns to. Pinned in this protected privileged tree and
+# NEVER taken from an Image Manifest, Bundle or request: a user-supplied
+# Manifest cannot redefine what "recovery" means. Changing it requires a
+# reviewed privileged-source update (Root code Manifest re-provisioning).
+GOLDEN_RECOVERY_NAME = "base.bin"
+GOLDEN_RECOVERY_SHA256 = "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c"
 # Retain the historic on-disk lock path so legacy SWD04 and this generic
 # executor cannot both own/configure the same FPGA at once.
 OWNER_DIR = Path("/run/plasma-z2-swd05")
@@ -275,13 +282,13 @@ def read_live_z2_facts(*, release, runtime_program_session: bool = False) -> dic
     need(type(runtime_program_session) is bool, "INVALID_PROCESS_SCAN_POLICY")
     need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
     candidate = FIRMWARE / release.firmware_name
-    recovery = FIRMWARE / release.recovery_name
+    recovery = FIRMWARE / GOLDEN_RECOVERY_NAME
     need(candidate != recovery and candidate.parent == FIRMWARE and
          recovery.parent == FIRMWARE, "UNREVIEWED_FIRMWARE_PATH")
     boot_before = (PROC / "sys/kernel/random/boot_id").read_text().strip()
     need(bool(boot_before), "BOOT_ID_UNAVAILABLE")
     candidate_sha = sha_file(candidate, release.firmware_sha256)
-    recovery_sha = sha_file(recovery, release.recovery_sha256)
+    recovery_sha = sha_file(recovery, GOLDEN_RECOVERY_SHA256)
     compatible = (PROC / "device-tree/compatible").read_bytes().split(b"\0")
     need(release.soc_compatible.encode("ascii") in compatible,
          "SOC_FAMILY_MISMATCH")
@@ -385,7 +392,7 @@ class RootZ2TargetPort:
         self._require_locked()
         need(which in ("candidate", "recovery"), "IMAGE_NAME_DENIED")
         filename = (self.release.firmware_name if which == "candidate"
-                    else self.release.recovery_name)
+                    else GOLDEN_RECOVERY_NAME)
         expected = (self.release.firmware_sha256 if which == "candidate"
-                    else self.release.recovery_sha256)
+                    else GOLDEN_RECOVERY_SHA256)
         return sha_file(FIRMWARE / filename, expected)

@@ -560,11 +560,11 @@ class RootAdmissionFailureClassificationTests(unittest.TestCase):
     def facts(self):
         from types import SimpleNamespace
         release = SimpleNamespace(
-            recovery_sha256="b" * 64,
+            recovery_sha256=guard.GOLDEN_RECOVERY_SHA256,
             firmware_sha256="a" * 64,
             expected_uio={"uio": "uio1"},
             uio_name="uio1", firmware_name="candidate.bin",
-            recovery_name="recovery.bin", site_bitmap=1, image_id="test")
+            recovery_name=guard.GOLDEN_RECOVERY_NAME, site_bitmap=1, image_id="test")
         passive = {
             "observation_kind": "LIVE_ROOT_READ_ONLY", "root": True,
             "boot_id": "fixed-test-boot", "manager_state": "operating",
@@ -771,8 +771,8 @@ class ProgramSessionProcScanSplitTests(unittest.TestCase):
         self.firmware = self.work / "firmware"
         self.firmware.mkdir()
         self.release = SimpleNamespace(
-            firmware_name="candidate.bin", recovery_name="golden.bin",
-            firmware_sha256="a" * 64, recovery_sha256="b" * 64,
+            firmware_name="candidate.bin", recovery_name=guard.GOLDEN_RECOVERY_NAME,
+            firmware_sha256="a" * 64, recovery_sha256=guard.GOLDEN_RECOVERY_SHA256,
             soc_compatible="test,zynq", owner_base=0x40000000,
             owner_bytes=0x10000, uio_name="uio1",
             expected_uio={"uio": "uio1"},

@@ -69,6 +69,13 @@ class ImageManifest:
     uio_name: str
     expected_uio: dict
 
+    def __post_init__(self) -> None:
+        # Recovery is a device fact, not a Manifest claim: every Manifest
+        # object (parsed, staged or constructed) must name the device Golden.
+        need(self.recovery_name == guard.GOLDEN_RECOVERY_NAME and
+             self.recovery_sha256 == guard.GOLDEN_RECOVERY_SHA256,
+             "IMAGE_RECOVERY_NOT_DEVICE_GOLDEN")
+
 
 def _pairs(items):
     result = {}
@@ -139,6 +146,11 @@ def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
              re.fullmatch(r"[a-f0-9]{64}", data[k]) is not None
              for k in ("firmware_sha256", "recovery_sha256")),
          "IMAGE_RELEASE_FIRMWARE_DENIED")
+    # A Manifest may only *restate* the device-pinned Golden; it can never
+    # choose, rename or re-hash the recovery Image.
+    need(data["recovery_name"] == guard.GOLDEN_RECOVERY_NAME and
+         data["recovery_sha256"] == guard.GOLDEN_RECOVERY_SHA256,
+         "IMAGE_RECOVERY_NOT_DEVICE_GOLDEN")
     for key in ("abi_version", "abi_offset", "site_bitmap",
                 "axi_base", "axi_bytes", "owner_base", "owner_bytes"):
         need(type(data[key]) is int and 0 <= data[key] <= 0xFFFFFFFF,
@@ -387,8 +399,8 @@ def _stage_files_locked(release: ImageManifest, *, manifest_bytes: bytes,
     )
     # Golden is separate from any Asset Set and cannot be replaced by it.
     guard.sha_file(
-        guard.FIRMWARE / release.recovery_name,
-        release.recovery_sha256,
+        guard.FIRMWARE / guard.GOLDEN_RECOVERY_NAME,
+        guard.GOLDEN_RECOVERY_SHA256,
     )
     # Recheck the intended bytes and ensure no filename can escape Root
     # firmware storage even if an API consumer supplies malformed input.
@@ -607,7 +619,7 @@ def live_report(port: guard.RootZ2TargetPort, release: ImageManifest,
                                     require_mmio=require_mmio)
     need(report["expected_manager_firmware"] == image and
          port.image_sha256("candidate") == release.firmware_sha256 and
-         port.image_sha256("recovery") == release.recovery_sha256,
+         port.image_sha256("recovery") == guard.GOLDEN_RECOVERY_SHA256,
          "CURRENT_IMAGE_OR_RECOVERY_CHANGED")
     return report
 
@@ -626,7 +638,7 @@ def live_program_session_report(port: guard.RootZ2TargetPort,
         runtime_program_session=True)
     need(report["expected_manager_firmware"] == release.firmware_name and
          port.image_sha256("candidate") == release.firmware_sha256 and
-         port.image_sha256("recovery") == release.recovery_sha256,
+         port.image_sha256("recovery") == guard.GOLDEN_RECOVERY_SHA256,
          "CURRENT_IMAGE_OR_RECOVERY_CHANGED")
     return report
 

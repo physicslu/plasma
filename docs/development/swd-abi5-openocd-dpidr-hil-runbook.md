@@ -127,6 +127,7 @@ admits only reviewed Images:
 | B2 static qualification | `scripts/ppu-fpga-image-contracts.json` (Bootstrap) | BIN/HWH/Manifest SHA-256, identities, geometry |
 | Root devmem backend | `DEVMEM_INDEPENDENT_IMAGES` in `pl/hil/fpga_image_admission.py` (protected tree) | `image_id` → BIN SHA-256 |
 | Site admission | `scripts/z2/plasma_swd_site_admission.py` | reads the same table from the privileged code root |
+| Golden recovery | `GOLDEN_RECOVERY_*` in `pl/hil/fpga_image_guard.py` (protected tree) | nothing: the Manifest must restate `base.bin` / `c6768695…e19c` exactly (Stage B-1) |
 | B2/B3 operation authorization | per-request `plasma.ppu.owner-operation-authorization.v1` from the paired client | nothing pre-listed; each request binds device, exact Bundle SHA-256, transaction and action |
 
 The fixed sample-point Image is `z2-independent-swd-v5-bd976140` (PR #1255
