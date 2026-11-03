@@ -7,7 +7,7 @@ BASE="/opt/plasma/programming-engines/openocd"
 DEST=f"{BASE}/0.12.0-5088db4c9154-plasma-swd-{BIN_SHA[:12]}"
 KEEP={"0.12.0-5088db4c9154":"20690fc154bf7c76ad2ce46a33bee2e3038623a2f951c698425be13133f3b640",
       "0.12.0-9ea7f3d647c8":"70d638eb1fce16627188b7e73935d81f2fa34685ef206550c7b5d0e7af6a3513"}
-ENTRY=("/usr/local/libexec/plasma/z2-path2-root-entry","57bd8df7a089e5523ceb858c7d0993e06aef4fa2b54b9d93be9f046ac422afee")
+ENTRY=("/usr/local/libexec/plasma/z2-path2-root-entry","@ENTRY_SHA@")  # installed Root Entry, from z2_state_ro.py
 def H(b): return hashlib.sha256(b).hexdigest()
 def F(p): return H(open(p,"rb").read())
 out={"dest":DEST}

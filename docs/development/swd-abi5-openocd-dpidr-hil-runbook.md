@@ -1,8 +1,9 @@
 # ABI-v5 OpenOCD `plasma_swd` → Blue Pill DPIDR HIL Runbook
 
 Status: engineering runbook (Direct Execution / Route B). It records the
-procedure first executed on 2026-11-02 and how to repeat it after the FPGA
-sample-point fix. It grants no Gate 1 scope, FPGA load, Flash operation or
+procedure first executed on 2026-11-02, how to repeat it after the FPGA
+sample-point fix, and (§8) the #1252/#1266 privileged-code-root contract that
+the templates follow since 2026-11-03. It grants no Gate 1 scope, FPGA load, Flash operation or
 production qualification by itself.
 
 ## 1. Architecture under test
@@ -10,7 +11,7 @@ production qualification by itself.
 ```text
 SWPC (CI artifact, SSH helper)
   └─ Route B engineering SSH ──► Z2 PS (root)
-        plasma_swd_site_admission.py  ── protected Root tree (pin) G5 live admission
+        plasma_swd_site_admission.py  ── privileged code root + Root journal G5 live admission
               │ writes /run/plasma-z2-swd05/swd-site<N>-admission (0600, 300 s)
               ▼
         OpenOCD 5088db4c + plasma_swd (PS-local owner)
@@ -32,9 +33,12 @@ The development Blue Pill is wired to **PMODB = Site 2** (owner confirmed
 - The FPGA Image is loaded and held by the protected Root Loader: Root Journal
   `status=IMAGE`, current Boot ID, FPGA Manager `operating`, and the Root
   `test` identity check passes for both Sites (`0x00050001`, `0x00050002`).
-- The protected Root tree's hashes match `PROTECTED_FILES` in
-  `scripts/z2/plasma_swd_site_admission.py`. When the Root pin changes, update
-  those constants in a reviewed commit **before** the next run.
+- The #1252 privileged code root `/opt/plasma/privileged/fpga-root` is
+  installed and `ppu_privileged_source.py` reports `VERIFIED_NOT_EXECUTED`
+  (file SHA256 is checked at install time; there is no Git source pin or
+  `PROTECTED_FILES` table any more). The Root journal is
+  `/var/lib/plasma-privileged/fpga-deployment-state.json` and every ancestor
+  is root-owned and not group/other writable (#1266).
 - No `openocd` process is running, and no stale `swd-site<N>-admission` record exists.
 - The owner has confirmed DUT supply, common ground, 3.3 V signalling and the
   exact connector.
@@ -54,13 +58,16 @@ Fill them with `sed` into a separate evidence directory. Never edit them in plac
    then `sha256sum -c` the tarball sidecar, then check `openocd.sha256` and
    `candidate-evidence.json`.
 3. **Read-only state.** Run `z2run.py z2_state_ro.py` and save the result. It
-   records Boot, Manager, Journal, Root pin, tree hashes and the installed OpenOCDs.
+   records Boot, Manager, Root journal and its ancestor chain, Root Entry,
+   privileged code manifest and verification, Bundle Authority v2 and the
+   installed OpenOCDs.
 4. **Transfer (Route B).** Z2 cannot pull HTTP from SWPC. Repack the artifact
    (`gzip -dc … | xz -9e > payload.tar.xz`), then run `upload.py payload.tar.xz`.
    The upload is chunked base64 into `/root/.plasma-swd-upload`, and Z2 verifies
    the SHA256.
 5. **Side-by-side install.** Fill `deploy_tpl.py` (payload SHA, binary SHA,
-   admission SHA, PLASMA SHA, CI run). Install to
+   admission SHA, PLASMA SHA, CI run, and `@ENTRY_SHA@` = the installed Root
+   Entry from step 3). Install to
    `/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154-plasma-swd-<sha12>`.
    The script refuses to overwrite and rechecks the existing `5088db4c`,
    `9ea7f3d` and Root Entry hashes before and after. It then runs Z2 negatives:
@@ -118,7 +125,8 @@ admits only reviewed Images:
 |---|---|---|
 | B2 static qualification | `scripts/ppu-fpga-image-contracts.json` (Bootstrap) | BIN/HWH/Manifest SHA-256, identities, geometry |
 | Root devmem backend | `DEVMEM_INDEPENDENT_IMAGES` in `pl/hil/fpga_image_admission.py` (protected tree) | `image_id` → BIN SHA-256 |
-| Site admission | `scripts/z2/plasma_swd_site_admission.py` | reads the same table; `PROTECTED_FILES` = the Root pin |
+| Site admission | `scripts/z2/plasma_swd_site_admission.py` | reads the same table from the privileged code root |
+| B2 Bundle authority | `/etc/plasma/ppu-bundle-authority.json` (`plasma.ppu.bundle-authority.v2`) | the exact Bundle archive SHA-256 (not the Image) |
 
 The fixed sample-point Image is `z2-independent-swd-v5-bd976140` (PR #1255
 head `bd976140e`, Vivado Host Build run 41469421780). Its paired Manifest is
@@ -126,9 +134,9 @@ head `bd976140e`, Vivado Host Build run 41469421780). Its paired Manifest is
 is the bootgen-equivalent Zynq word-swapped payload of the run's
 `system_wrapper.bit` plus the trailing `0x20000000` NOP word.
 
-To load a newly listed Image: install the Root tree at the reviewed pin
-(Route B), refresh the Bootstrap so it gets the contracts, then run B1 → B2 →
-B3 `fpga_load=true` over HTTP. The DPIDR procedure in §3 then runs with
+To load a newly listed Image: refresh the Bootstrap and re-provision the
+privileged code root from it (§8), add the exact Bundle SHA-256 to Bundle
+Authority v2, then run B1 → B2 → B3 `fpga_load=true` over HTTP. The DPIDR procedure in §3 then runs with
 `@IMAGE_ID@` set to the loaded Image.
 
 OpenOCD itself remains an engineering module. Packaging it into the Route A
@@ -144,3 +152,52 @@ which the FIFO core rejected at queue time (no wire transfer, so no `run rc=`
 line). After the fix (binary `800213ae…`, CI run 41484966257), Site 2 returned
 `SWD DPIDR 0x1ba01477` and `dpreg 0 = 0x1ba01477`, with
 `SAFE_OFF_MODE_OFF_VERIFIED`, the Journal unchanged and the record revoked.
+That run used the retired Root pin `f56f85fd7`; see §8 for the current contract.
+
+## 8. #1252 / #1266 contract and 2026-11-03 migration
+
+PR #1252 retired the Path 2 Git source pin (`/root/plasma-path2-approved`,
+`.plasma-path2-source-commit`, `PROTECTED_FILES`). PR #1266 moved the Root
+journal out of the runtime-owned `/var/lib/plasma` (uid `plasma`), whose owner
+could otherwise rename or replace a root-owned child directory.
+
+| Item | Path / value |
+|---|---|
+| Root Entry | `/usr/local/libexec/plasma/z2-path2-root-entry`: `download\|test\|restore` (no argument), `bundle-load <asset_set_sha256>` |
+| Privileged code root | `/opt/plasma/privileged/fpga-root`, `.plasma-privileged-code.json` (root `0600`), 5 code files |
+| Root journal | `/var/lib/plasma-privileged/fpga-deployment-state.json` (dir root `0700`, file `0600`) |
+| Bundle authority | `/etc/plasma/ppu-bundle-authority.json`, schema v2 `{schema, generation, approved_bundle_sha256[]}`; v1 fails closed |
+| Site admission record | schema `plasma.swd.ps-admission.v2` (`trusted_code_sha256`, code-manifest stat identity) |
+| OpenOCD | must be built from a tree containing #1266 (ps_owner reads the new journal path) |
+
+Migration order used on 2026-11-03 (Route B, one root script with automatic
+rollback; evidence `.work/z2-1252-migration-20261103/`):
+
+1. Read-only preflight (old pin/tree/entry/journal, Manifest, Golden, no
+   `/dev/mem`/uio/fence holders, no OpenOCD, Bootstrap idle, ancestors root).
+2. Back up Root Entry, Bundle Authority v1, `/opt/plasma/bootstrap` and the old
+   journal under `/var/backups/plasma-1252-migration-<ts>/` (root `0700`).
+3. Bootstrap refresh-only from the CI factory kit (all files == SHA256SUMS).
+4. Bundle Authority v2, generation 1, empty list (deny by default).
+5. `ppu-privileged-source-install.py` (refuses to overwrite) and
+   `ppu_privileged_source.py` → `VERIFIED_NOT_EXECUTED`.
+6. Create `/var/lib/plasma-privileged` and **copy** the old journal (the old
+   tree is kept for rollback, never deleted in this step).
+7. Install the new Root Entry from the Bootstrap copy.
+8. Validate the new Root reads the copied journal; old entry syntax denied;
+   restart `plasma-bootstrap`.
+9. Install the new OpenOCD side by side (`deploy_tpl.py`).
+
+Rollback: restore the backed-up Root Entry, Bundle Authority v1 and Bootstrap,
+then restart `plasma-bootstrap`. The old tree and its journal are intact, but
+the new journal is authoritative after the first new-contract FPGA operation.
+
+Result (main `7746822f4`, Bootstrap kit run 41568139965, OpenOCD `954344c5…`
+from run 41565552942): all migration steps PASS; B2 of an unapproved Bundle was
+denied with `BUNDLE_AUTHORITY_DIGEST_NOT_APPROVED`; HTTP B1 → B2
+`STATIC_QUALIFIED` → B3 `fpga_load=true` reloaded `z2-independent-swd-v5-bd976140`
+with `IDENTITY_PASS`, receipt v2 and Active Set generation 3; Site 2 admission
+v2 + OpenOCD read `SWD DPIDR 0x1ba01477` and `dpreg 0 = 0x1ba01477` with
+`SAFE_OFF_MODE_OFF_VERIFIED`, journal unchanged and record revoked. No Flash
+operation or Golden Restore. Electrical state is an owner on-site attestation,
+not a measurement.
