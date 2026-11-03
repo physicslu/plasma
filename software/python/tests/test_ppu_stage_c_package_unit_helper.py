@@ -196,7 +196,7 @@ def test_helper_unit_static_contract():
     text = units.package_control_helper_unit()
     d = directives(text)
     assert d["User"] == ["root"] and d["Group"] == ["plasma"]
-    assert d["ExecStart"] == ["/opt/plasma/python/3.12.13/bin/python3 -I -B -S "
+    assert d["ExecStart"] == [f"{sys.executable} -I -B -S "
                               "/opt/plasma/bootstrap/ppu_package_unit_helper.py"]
     for key, want in {"PrivateNetwork": "yes", "RestrictAddressFamilies": "AF_UNIX",
                       "ProtectSystem": "strict", "ProtectHome": "yes", "PrivateDevices": "yes",

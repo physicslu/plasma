@@ -266,6 +266,10 @@ Standalone/local inline Program/Verify may submit one materialized Asset directl
 
 The Gateway validates the Asset and normalizes it before creating the wire-level `JobRequest.image`.
 
+**Complete Flash programming** is the explicit operation `flash_cycle` (same inline Asset fields, PPU Gateway only): Erase (image rounded up to erase units) → Program → Verify → full Readback compare as **one** Job, with the readback SHA256 in `result.details.flash_cycle`. `program` remains write-only; the two never substitute for each other. On a Site configured with the C-3 Site Worker (`openocd.site_worker_socket`) `flash_cycle` is the only accepted operation.
+
+**Target (exact ICPN).** A Job may carry `"target": "<ICPN>"`; otherwise the operator's explicit Site `target` is used. A real-hardware Job with neither is rejected `E1001 INVALID_ARGUMENT`; there is no product default ICPN (the Mock workflow simulator needs none).
+
 A direct REST Job may declare an execution-owner token:
 
 ```json

@@ -51,16 +51,20 @@ def compile_flash_cycle(
         section_name="flash_readback",
     )
     base = f"0x{program.main_flash_start:08X}"
-    size = f"0x{program.main_flash_size_bytes:08X}"
+    # Erase only the image's whole erase units (as the HIL-proven sequence),
+    # never more than main Flash; the compiler already bounded the image.
+    unit = program.erase_granularity_bytes
+    erase = min(-(-request.image_size // unit) * unit, program.main_flash_size_bytes)
     return replace(
         program,
         commands=(
             "init",
-            "reset init",
-            f"flash erase_address {base} {size}",
+            "halt",
+            f"flash erase_address {base} 0x{erase:08X}",
             f"flash write_image {IMAGE_ARTIFACT_TOKEN} {base} bin",
             f"flash verify_image {IMAGE_ARTIFACT_TOKEN} {base} bin",
             f"dump_image {readback.token} {base} 0x{request.image_size:08X}",
+            "reset run",
             "shutdown",
         ),
         artifacts=(*program.artifacts, readback),

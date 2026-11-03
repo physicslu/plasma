@@ -55,7 +55,9 @@ def directives(text: str) -> dict[str, list[str]]:
 def test_package_unit_runs_as_dedicated_uid_with_fixed_entry_and_no_privilege():
     d = directives(units.package_unit())
     assert d["User"] == ["plasma-package"] and d["Group"] == ["plasma-package"]
-    assert d["ExecStart"] == ["/opt/plasma/python/3.12.13/bin/python3 -I -B -S "
+    # The Active Python that renders the unit (no versioned interpreter path).
+    assert units.PYTHON == sys.executable
+    assert d["ExecStart"] == [f"{units.PYTHON} -I -B -S "
                               "/opt/plasma/bootstrap/ppu_package_entry.py %i"]
     for key, want in {"NoNewPrivileges": "yes", "PrivateDevices": "yes", "PrivateNetwork": "yes",
                       "RestrictAddressFamilies": "AF_UNIX", "ProtectSystem": "strict",
@@ -80,7 +82,7 @@ def test_site_worker_unit_is_local_only_and_not_a_network_service():
     assert d["RestrictAddressFamilies"] == ["AF_UNIX"] and d["IPAddressDeny"] == ["any"]
     assert d["ProtectSystem"] == ["strict"] and d["NoNewPrivileges"] == ["yes"]
     assert "ListenStream" not in units.site_worker_unit() and "Port" not in units.site_worker_unit()
-    assert d["ExecStart"] == ["/opt/plasma/python/3.12.13/bin/python3 -I -B -S "
+    assert d["ExecStart"] == [f"{units.PYTHON} -I -B -S "
                               "/opt/plasma/bootstrap/ppu_site_worker_service.py"]
 
 
@@ -416,7 +418,7 @@ def test_worker_service_builds_two_role_restricted_sockets(tmp_path):
     lease = {JOB}
     core, control, transport = worker_service.build(
         tmp_path / "run", tmp_path / "state", adapter=adapter, runtime_pid=os.getpid,
-        lease_verifier=lambda j: j in lease, control_gid=os.getgid(), transport_gid=os.getgid())
+        lease_verifier=lambda j, kind: j in lease, control_gid=os.getgid(), transport_gid=os.getgid())
     (tmp_path / "run").mkdir()
     control.start(); transport.start()
     try:
@@ -442,7 +444,7 @@ def test_runtime_restart_invalidates_session_and_allows_new_runtime(tmp_path):
     current = {"pid": os.getpid()}
     adapter = MockAdapter()
     core = worker.SiteWorkerCore(adapter, runtime_pid=lambda: current["pid"],
-                                 lease_verifier=lambda j: True, seal_dir=tmp_path / "s")
+                                 lease_verifier=lambda j, kind: True, seal_dir=tmp_path / "s")
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"], start_new_session=True)
     try:
         me = (os.getpid(), os.getuid(), os.getgid())
@@ -506,7 +508,7 @@ class RecoveryAdapter(MockAdapter):
 def sealed_rig(tmp_path):
     adapter = RecoveryAdapter()
     seals = tmp_path / "seals"
-    core = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j: True,
+    core = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j, kind: True,
                                  seal_dir=seals)
     core._seal(2, "SAFE_OFF_NOT_VERIFIED")
     return adapter, seals
@@ -531,7 +533,7 @@ def test_recovery_positive_moves_marker_into_evidence_and_worker_unseals(tmp_pat
     evidence = json.loads(Path(out["evidence"]).read_text())
     assert evidence["schema"] == "plasma.ppu.site-seal-recovery.v1" and evidence["operator"] == "owner"
     assert oct(Path(out["evidence"]).stat().st_mode & 0o777) == "0o600"
-    restarted = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j: True,
+    restarted = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j, kind: True,
                                       seal_dir=seals)
     assert restarted._sealed == set()
 
@@ -561,7 +563,7 @@ def test_recovery_stays_sealed_if_safe_off_unproven(tmp_path, verify):
     adapter.verify_result = verify
     out = do_recover(adapter, seals, tmp_path)
     assert out["result"] == "DENIED_STILL_SEALED" and (seals / "site2.sealed").exists()
-    restarted = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j: True,
+    restarted = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j, kind: True,
                                       seal_dir=seals)
     assert restarted._sealed == {2}
 

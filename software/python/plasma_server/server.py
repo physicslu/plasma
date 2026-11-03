@@ -426,6 +426,11 @@ class PlasmaServer:
             "execution_image_ref",
             "wait_for_completion",
         }
+        # Exact ICPN: the Job's own target, else (None) the operator's
+        # explicit Site selection resolved by SiteManager. No product default.
+        target = metadata.get("target")
+        if target is not None and not isinstance(target, str):
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "target must be a string")
         job_id_raw = metadata.get("job_id")
         if job_id_raw is not None and not isinstance(job_id_raw, str):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "job_id must be a string")
@@ -443,7 +448,7 @@ class PlasmaServer:
             max_retries=max_retries,
             retry_backoff_s=retry_backoff_s,
             client_id=str(metadata.get("client_id") or peer),
-            target=str(metadata.get("target", "STM32F103C8T6")),
+            target=target,
             metadata={key: value for key, value in metadata.items() if key not in known},
         )
         future = self.manager.enqueue(request)

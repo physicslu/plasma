@@ -11,7 +11,8 @@ from plasma_core.models import ExecutionOutput, JobRequest
 from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
-from plasma_interfaces.openocd import OpenOCDInterface
+from plasma_interfaces.openocd import OpenOCDInterface, as_program_request
+from plasma_interfaces.openocd_executor import compile_flash_cycle
 from plasma_interfaces.compiler_registry import (
     CompilerBinding,
     CompilerRegistry,
@@ -206,11 +207,40 @@ class SiteExecutionRouter:
                     request,
                     map_data={**request.map_data, "sections": normalized},
                 )
-        selection = self.compiler_registry.select(support.icpn, request.operation)
-        plan = selection.compiler.compile(
-            support,
-            request,
-            configured_target_config=self.site.openocd.get("target_cfg"),
+        openocd = self.interface if isinstance(self.interface, OpenOCDInterface) else None
+        target_config = (
+            openocd.target_config_for(support)
+            if openocd is not None
+            else self.site.openocd.get("target_cfg")
+        )
+        if request.operation is Operation.FLASH_CYCLE:
+            # One complete cycle = every component operation must be admitted
+            # for this exact ICPN; the plan is composed from the PROGRAM plan.
+            selections = {
+                operation: self.compiler_registry.select(support.icpn, operation)
+                for operation in (
+                    Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ
+                )
+            }
+            selection = selections[Operation.PROGRAM]
+            plan = compile_flash_cycle(
+                selection.compiler,
+                support,
+                as_program_request(request),
+                configured_target_config=target_config,
+            )
+        else:
+            selection = self.compiler_registry.select(support.icpn, request.operation)
+            plan = selection.compiler.compile(
+                support,
+                request,
+                configured_target_config=target_config,
+            )
+        software_validation = openocd is not None and openocd.software_validation_ready
+        site_worker = (
+            openocd is not None
+            and openocd.site_worker_ready
+            and request.operation is Operation.FLASH_CYCLE
         )
         return self._decorate(
             request,
@@ -227,17 +257,17 @@ class SiteExecutionRouter:
                 "backend_id": selection.admission.backend_id,
                 "backend_lock_digest": selection.admission.backend_lock_digest,
                 "backend_implementation_state": (
-                    "host_only_process_injected"
-                    if isinstance(self.interface, OpenOCDInterface)
-                    and self.interface.software_validation_ready
+                    "c3_site_worker"
+                    if site_worker
+                    else "host_only_process_injected"
+                    if software_validation
                     else "plan_compiled_not_executable"
                 ),
                 "openocd_execution_plan": plan.to_dict(),
-                "software_validation_runtime_ready": (
-                    isinstance(self.interface, OpenOCDInterface)
-                    and self.interface.software_validation_ready
-                ),
-                "hardware_runtime_ready": False,
+                "software_validation_runtime_ready": software_validation,
+                # C-3 owns admission/OpenOCD/SAFE_OFF; it refuses explicitly
+                # (ENGINE_NOT_READY, Site sealed, lease) at execution time.
+                "hardware_runtime_ready": site_worker,
             },
         )
 

@@ -16,9 +16,17 @@ Programming Site. It is deliberately small:
     group is the registered Package Action process group, with the same uid;
 * operations are an adapter-declared allowlist (no shell, executable path or
   raw MMIO read/write API); one in-flight operation per Site;
+* the trusted Runtime may also open a session for its own REST Job
+  (``open_job_session``) and run an allowlisted operation on the control
+  socket (``run``); such a session has no Package peer;
 * fail-closed: an adapter outcome that cannot be proven safe seals the Site
-  (persisted marker, never auto-retried); expiry / cancel / close end
-  the session. FPGA Image management belongs to the PPU Loader.
+  (persisted marker, never auto-retried); an FPGA identity change invalidates
+  the session; expiry / cancel / close end the session. FPGA Image management
+  belongs to the PPU Loader.
+
+The target (OpenOCD target config, Flash geometry) of a Flash operation is
+resolved by the Runtime from the exact-ICPN IC Support and bound per session;
+this core holds no IC, image ID, build or versioned path.
 
 Hardware specifics live behind a replaceable adapter (see
 ``ppu_site_adapter_abi5.py``); this core knows no FPGA, address or register.
@@ -42,11 +50,16 @@ from typing import Any, Callable, Mapping, Protocol
 
 PROTOCOL = "plasma.ppu.site-worker.v1"
 MAX_REQUEST = 4096
-JOB_ID = re.compile(r"[0-9a-f]{32}\Z")
+# Same canonical Job ID rule as plasma_core.models.JOB_ID_PATTERN (REST Jobs
+# and Package Action Jobs share it; a test keeps the two in lockstep).
+JOB_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 SESSION_ID = re.compile(r"[0-9a-f]{32}\Z")
-CONTROL_OPS = frozenset({"open_session", "close_session", "status", "bind_image"})
-MAX_FLASH_IMAGE_BYTES = 64 * 1024  # First exact target: STM32F103C8T6
+CONTROL_OPS = frozenset({"open_session", "open_job_session", "close_session", "status",
+                         "bind_image", "run"})
+TARGET_CONFIG = re.compile(r"target/[A-Za-z0-9_][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9_][A-Za-z0-9._-]{0,63}){0,3}\.cfg\Z")
 MAX_SESSION_S = 3600
+OWNER_PACKAGE = "package_action"
+OWNER_REST_JOB = "rest_job"
 
 
 class SiteWorkerDenied(Exception):
@@ -72,10 +85,46 @@ class TransportUnknown(Exception):
 
 
 @dataclass(frozen=True)
-class FlashImage:
+class FlashProfile:
+    """Runtime-resolved exact-ICPN Flash target, bound once per session."""
     icpn: str
+    target_config: str
+    flash_base: int
+    flash_size: int
+    erase_granularity: int
+
+    def erase_length(self, size: int) -> int:
+        """Image size rounded up to whole erase units."""
+        unit = self.erase_granularity
+        return -(-size // unit) * unit
+
+
+@dataclass(frozen=True)
+class FlashImage:
+    profile: FlashProfile
     payload: bytes
     sha256: str
+
+    @property
+    def icpn(self) -> str:
+        return self.profile.icpn
+
+
+def parse_flash_profile(raw: object) -> FlashProfile:
+    """Validate the Runtime-supplied profile shape; raises SiteWorkerDenied."""
+    _require(isinstance(raw, dict) and set(raw) == {
+        "icpn", "target_config", "flash_base", "flash_size", "erase_granularity"},
+        "PROFILE_INVALID")
+    icpn, cfg = raw["icpn"], raw["target_config"]
+    base, size, unit = raw["flash_base"], raw["flash_size"], raw["erase_granularity"]
+    _require(type(icpn) is str and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}", icpn)
+             is not None, "PROFILE_ICPN_INVALID")
+    _require(type(cfg) is str and TARGET_CONFIG.fullmatch(cfg) is not None
+             and ".." not in cfg.split("/"), "PROFILE_TARGET_CONFIG_INVALID")
+    _require(all(type(v) is int for v in (base, size, unit)) and base >= 0 and size > 0
+             and unit > 0 and unit & (unit - 1) == 0 and size % unit == 0
+             and base % unit == 0 and base + size <= 1 << 32, "PROFILE_GEOMETRY_INVALID")
+    return FlashProfile(icpn, cfg, base, size, unit)
 
 
 class SiteTransportAdapter(Protocol):
@@ -83,6 +132,7 @@ class SiteTransportAdapter(Protocol):
     supported_sites: frozenset[int]
     operations: frozenset[str]
 
+    def identity(self) -> Mapping[str, Any]: ...
     def startup_sealed_sites(self) -> set[int]: ...
     def run(self, site: int, operation: str, *, deadline: float,
             cancel: threading.Event, image: FlashImage | None = None) -> Mapping[str, Any]: ...
@@ -98,9 +148,11 @@ class _Session:
     session_id: str
     job_id: str
     sites: frozenset[int]
-    pgid: int
-    uid: int
+    pgid: int | None  # None: Runtime-owned REST Job session (no Package peer)
+    uid: int | None
     expires: float
+    identity: Mapping[str, Any]
+    owner_kind: str = OWNER_PACKAGE
     runtime_pid: int = 0
     cancel: threading.Event = field(default_factory=threading.Event)
     closed: bool = False
@@ -118,7 +170,7 @@ def proc_peer(pid: int, proc_root: Path = Path("/proc")) -> tuple[int, int]:
 class SiteWorkerCore:
     def __init__(self, adapter: SiteTransportAdapter, *,
                  runtime_pid: Callable[[], int | None],
-                 lease_verifier: Callable[[str], bool],
+                 lease_verifier: Callable[[str, str], bool],
                  seal_dir: Path,
                  image_root: Path = Path("/run/plasma-server/normalized-images"),
                  clock: Callable[[], float] = time.monotonic,
@@ -207,18 +259,19 @@ class SiteWorkerCore:
                         "supported_sites": sorted(self.adapter.supported_sites),
                         "operations": sorted(self.adapter.operations),
                         "sealed_sites": sorted(self._sealed),
-                        "session": None if s is None else {"job_id": s.job_id, "sites": sorted(s.sites)}}
+                        "not_ready": getattr(self.adapter, "not_ready", None),
+                        "session": None if s is None else {"job_id": s.job_id, "sites": sorted(s.sites),
+                                                            "owner_kind": s.owner_kind}}
         if op == "bind_image":
             _require(set(request) == {
-                "protocol", "op", "session_id", "icpn", "image_sha256", "image_size"
+                "protocol", "op", "session_id", "profile", "image_sha256", "image_size"
             }, "REQUEST_INVALID")
             _require(type(request["session_id"]) is str
-                     and type(request["icpn"]) is str
                      and type(request["image_sha256"]) is str
                      and type(request["image_size"]) is int, "REQUEST_INVALID")
-            _require(request["icpn"] == "STM32F103C8T6", "TARGET_NOT_SUPPORTED")
+            profile = parse_flash_profile(request["profile"])
             size = request["image_size"]
-            _require(0 < size <= MAX_FLASH_IMAGE_BYTES, "IMAGE_SIZE_INVALID")
+            _require(0 < size <= profile.flash_size, "IMAGE_SIZE_INVALID")
             digest = request["image_sha256"]
             _require(re.fullmatch(r"[0-9a-f]{64}", digest) is not None, "IMAGE_SHA256_INVALID")
             with self._lock:
@@ -242,9 +295,21 @@ class SiteWorkerCore:
                     raise SiteWorkerDenied("IMAGE_NOT_STAGED") from exc
                 _require(len(payload) == size, "IMAGE_SIZE_MISMATCH")
                 _require(hashlib.sha256(payload).hexdigest() == digest, "IMAGE_SHA256_MISMATCH")
-                s.image = FlashImage(request["icpn"], payload, digest)
-                return {"job_id": s.job_id, "icpn": s.image.icpn,
+                s.image = FlashImage(profile, payload, digest)
+                return {"job_id": s.job_id, "icpn": profile.icpn,
+                        "target_config": profile.target_config,
                         "image_sha256": digest, "image_size": size, "bound": True}
+        if op == "run":
+            _require(set(request) == {"protocol", "op", "session_id", "site", "operation"}
+                     and type(request["session_id"]) is str and type(request["site"]) is int
+                     and type(request["operation"]) is str, "REQUEST_INVALID")
+            with self._lock:
+                s = self._session
+                _require(s is not None and not s.closed
+                         and secrets.compare_digest(s.session_id, request["session_id"]),
+                         "SESSION_UNKNOWN")
+                _require(s.owner_kind == OWNER_REST_JOB, "SESSION_NOT_RUNTIME_OWNED")
+            return self._execute(s, request["site"], request["operation"])
         if op == "close_session":
             _require(set(request) == {"protocol", "op", "session_id"}
                      and type(request["session_id"]) is str, "REQUEST_INVALID")
@@ -262,27 +327,38 @@ class SiteWorkerCore:
                 lock.release()
             return {"session_id": s.session_id, "closed": True,
                     "sealed_sites": sorted(s.sealed_during)}
-        # open_session
-        fields = {"protocol", "op", "job_id", "sites", "pgid", "uid", "max_runtime_s"}
+        # open_session (Package Action peer) / open_job_session (Runtime REST Job)
+        package = op == "open_session"
+        fields = {"protocol", "op", "job_id", "sites", "max_runtime_s"}
+        if package:
+            fields |= {"pgid", "uid"}
         _require(set(request) == fields, "REQUEST_INVALID")
         job, sites = request["job_id"], request["sites"]
         _require(type(job) is str and JOB_ID.fullmatch(job) is not None
                  and type(sites) is list and 0 < len(sites) <= 8
                  and all(type(x) is int for x in sites) and sites == sorted(set(sites))
-                 and type(request["pgid"]) is int and request["pgid"] > 1
-                 and type(request["uid"]) is int and request["uid"] > 0
                  and type(request["max_runtime_s"]) is int
                  and 0 < request["max_runtime_s"] <= MAX_SESSION_S, "REQUEST_INVALID")
+        if package:
+            _require(type(request["pgid"]) is int and request["pgid"] > 1
+                     and type(request["uid"]) is int and request["uid"] > 0, "REQUEST_INVALID")
+        not_ready = getattr(self.adapter, "not_ready", None)
+        _require(not not_ready, f"ENGINE_NOT_READY:{not_ready}")
         _require(set(sites) <= self.adapter.supported_sites, "SITE_NOT_SUPPORTED")
-        _require(self.lease_verifier(job), "JOB_LEASE_NOT_HELD")
+        owner_kind = OWNER_PACKAGE if package else OWNER_REST_JOB
+        _require(self.lease_verifier(job, owner_kind), "JOB_LEASE_NOT_HELD")
+        identity = dict(self.adapter.identity())
         with self._lock:
             _require(self._session is None, "SESSION_ALREADY_ACTIVE")
             _require(not (set(sites) & self._sealed), "SITE_SEALED")
-            s = _Session(secrets.token_hex(16), job, frozenset(sites), request["pgid"],
-                         request["uid"], self.clock() + request["max_runtime_s"],
-                         runtime_pid=pid)
+            s = _Session(secrets.token_hex(16), job, frozenset(sites),
+                         request["pgid"] if package else None,
+                         request["uid"] if package else None,
+                         self.clock() + request["max_runtime_s"], identity,
+                         owner_kind=owner_kind, runtime_pid=pid)
             self._session = s
-        return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites)}
+        return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites),
+                "owner_kind": owner_kind}
 
     def _transport(self, op: str, request: dict, peer: tuple[int, int, int]) -> dict[str, Any]:
         pid, uid, _gid = peer
@@ -296,14 +372,26 @@ class SiteWorkerCore:
             raise SiteWorkerDenied("PEER_UNVERIFIABLE") from None
         with self._lock:
             s = self._session
-            _require(s is not None and not s.closed and pgid == s.pgid and uid == s.uid,
-                     "NO_SESSION_FOR_PEER")
+            _require(s is not None and not s.closed and s.owner_kind == OWNER_PACKAGE
+                     and pgid == s.pgid and uid == s.uid, "NO_SESSION_FOR_PEER")
+        return self._execute(s, site, op)
+
+    def _execute(self, s: _Session, site: int, op: str) -> dict[str, Any]:
+        _require(op in self.adapter.operations, "OPERATION_DENIED")
+        with self._lock:
+            _require(not s.closed, "SESSION_CLOSED")
             _require(self.clock() < s.expires, "SESSION_EXPIRED")
             _require(site in s.sites, "SITE_NOT_AUTHORIZED")
             _require(site not in self._sealed, "SITE_SEALED")
             if op == "flash_cycle":
                 _require(s.image is not None, "IMAGE_NOT_BOUND")
-        _require(self.lease_verifier(s.job_id), "JOB_LEASE_NOT_HELD")
+        _require(self.lease_verifier(s.job_id, s.owner_kind), "JOB_LEASE_NOT_HELD")
+        if dict(self.adapter.identity()) != s.identity:
+            with self._lock:
+                if self._session is s:
+                    s.closed = True
+                    s.cancel.set()
+            raise SiteWorkerDenied("SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED")
         lock = self._site_locks[site]
         _require(lock.acquire(blocking=False), "SITE_BUSY")
         try:
@@ -325,6 +413,9 @@ class SiteWorkerCore:
             except Exception as exc:  # any adapter bug is an unknown hardware outcome
                 self._seal(site, type(exc).__name__, s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + type(exc).__name__) from None
+            if dict(self.adapter.identity()) != s.identity:
+                self._seal(site, "FPGA_IDENTITY_CHANGED_DURING_OPERATION", s)
+                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION")
             return {"site": site, "operation": op, "adapter": self.adapter.name, **result}
         finally:
             lock.release()
@@ -440,11 +531,19 @@ class SiteWorkerClient:
     def close_session(self, session_id: str) -> dict[str, Any]:
         return self.call("close_session", session_id=session_id)
 
+    def open_job_session(self, *, job_id: str, sites: list[int],
+                         max_runtime_s: int) -> dict[str, Any]:
+        return self.call("open_job_session", job_id=job_id, sites=sites,
+                         max_runtime_s=max_runtime_s)
+
     def bind_image(
-        self, session_id: str, *, icpn: str, image_sha256: str, image_size: int
+        self, session_id: str, *, profile: Mapping[str, Any], image_sha256: str, image_size: int
     ) -> dict[str, Any]:
-        return self.call("bind_image", session_id=session_id, icpn=icpn,
+        return self.call("bind_image", session_id=session_id, profile=dict(profile),
                          image_sha256=image_sha256, image_size=image_size)
+
+    def run(self, session_id: str, *, site: int, operation: str) -> dict[str, Any]:
+        return self.call("run", session_id=session_id, site=site, operation=operation)
 
 
 # --- production trust providers ----------------------------------------------------
@@ -480,10 +579,21 @@ def runtime_lease_snapshot(control_socket: Path, timeout_s: float = 5.0) -> dict
     return lease if isinstance(lease, dict) else None
 
 
-def runtime_lease_verifier(control_socket: Path, timeout_s: float = 5.0) -> Callable[[str], bool]:
-    """Ask the Runtime (C-1 SiteManager) whether job_id holds the Package Action lease."""
-    def verify(job_id: str) -> bool:
+def runtime_lease_verifier(control_socket: Path,
+                           timeout_s: float = 5.0) -> Callable[[str, str], bool]:
+    """Ask the Runtime (C-1 SiteManager) whether job_id holds the PPU execution lease.
+
+    ``package_action``: the lease owner is exactly that Package Action Job.
+    ``rest_job``: a Runtime Site Job (REST, batch or client owner) that is one
+    of the lease's active Jobs; a Package Action lease never qualifies.
+    """
+    def verify(job_id: str, owner_kind: str) -> bool:
         lease = runtime_lease_snapshot(control_socket, timeout_s)
-        return (isinstance(lease, dict) and lease.get("busy") is True
-                and lease.get("owner_kind") == "package_action" and lease.get("owner_id") == job_id)
+        if not (isinstance(lease, dict) and lease.get("busy") is True):
+            return False
+        if owner_kind == OWNER_PACKAGE:
+            return lease.get("owner_kind") == OWNER_PACKAGE and lease.get("owner_id") == job_id
+        jobs = lease.get("job_ids")
+        return (owner_kind == OWNER_REST_JOB and lease.get("owner_kind") != OWNER_PACKAGE
+                and isinstance(jobs, list) and job_id in jobs)
     return verify

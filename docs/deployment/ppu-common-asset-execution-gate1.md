@@ -143,9 +143,41 @@ journal, receipt or FPGA loader.
   (`dap init` + `dpreg 0`, fixed argv; no target/flash/erase/program/reset)
   → revoke (always). **Single hardware owner**: the adapter never maps MMIO
   or takes the ADR-0007 locks; OpenOCD's ps_owner does, as today. Refuses
-  while another OpenOCD or admission record exists, or the Root journal is
-  not `IMAGE` of the expected Image. SAFE_OFF not verified, kill, revoke
+  while another OpenOCD or admission record exists (no expected Image ID).
+  SAFE_OFF not verified, kill, revoke
   failure or uncertain admission → `TransportUnknown`.
+- **Runtime REST Job sessions (PR #1286, Host-only).** The trusted Runtime may
+  also open a session for its own Site Job: `open_job_session {job_id, sites,
+  max_runtime_s}` (no Package peer; the Job must be one of the C-1 lease's
+  active `job_ids`, never a Package Action lease) → `bind_image {session_id,
+  profile, image_sha256, image_size}` → control op `run {session_id, site,
+  operation}` (Runtime-owned sessions only; transport peers can never use
+  them) → `close_session`. Job IDs follow the canonical
+  `plasma_core.models.JOB_ID_PATTERN` (REST and Package Action IDs alike).
+- **Flash profile, not constants.** `profile = {icpn, target_config,
+  flash_base, flash_size, erase_granularity}` is resolved by plasma-server
+  from the Job's exact-ICPN IC Support and shape-checked by C-3
+  (`target/<name>.cfg`, no `..`/absolute/Tcl; power-of-two erase unit; image
+  ≤ flash). The adapter additionally requires the cfg to be a regular file
+  inside the selected engine's scripts root. `flash_cycle` = `-f <cfg>`,
+  `adapter speed <engine kHz>` (overrides the cfg's own speed), `init`,
+  `halt`, erase of the image rounded up to whole erase units, write, verify,
+  full `dump_image` compare, `reset run`. Raw paths/Tcl are never accepted.
+- **OpenOCD engine selection (no versioned path).** `ppu_site_worker_service`
+  reads the deployment-written, root-owned `/etc/plasma/site-worker-engine.json`
+  (`plasma.ppu.site-worker-engine.v1`: `openocd_root` directly under
+  `/opt/plasma/programming-engines/openocd/`, `openocd_sha256`,
+  `admission_sha256`, `adapter_driver` = `plasma_swd`, `driver_abi` = 5,
+  `adapter_khz`). It is verified at startup (root-owned, not group/world
+  writable, not a symlink, digests match) and pinned for the process life; a
+  new selection needs a service restart behind the Runtime quiesce. Missing or
+  invalid → the Worker serves `status` (`not_ready`) and refuses every session
+  `ENGINE_NOT_READY:<code>`; there is no fallback to another install. Python =
+  the interpreter systemd started (`sys.executable`). A Bundle v3 Package kind
+  for engines/Python and a stable launcher are a separate Gate 1.
+- **FPGA identity = change detection, not a pin.** The core snapshots the
+  adapter's Root-journal identity at session open and compares it before and
+  after every operation; any loaded image is accepted at open.
 - C-2 wiring: `make_package_executor(..., site_worker=None)`. Default stays
   `PACKAGE_SITE_TRANSPORT_NOT_WIRED`. With a Worker client, the session is
   opened for (job, declared Sites, child process group, uid, max_runtime_s)

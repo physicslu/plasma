@@ -99,15 +99,28 @@ class OpenOCDPlanCompilerTests(unittest.TestCase):
         plan = compile_flash_cycle(
             self.compiler, self.c8, request, configured_target_config=TARGET_CFG
         )
+        # Erase = image rounded up to whole 1 KiB pages (HIL-proven sequence).
         self.assertEqual(plan.commands, (
             "init",
-            "reset init",
-            "flash erase_address 0x08000000 0x00010000",
+            "halt",
+            "flash erase_address 0x08000000 0x00000400",
             f"flash write_image {IMAGE_ARTIFACT_TOKEN} 0x08000000 bin",
             f"flash verify_image {IMAGE_ARTIFACT_TOKEN} 0x08000000 bin",
             "dump_image ${PLASMA_READ_000_BIN} 0x08000000 0x00000040",
+            "reset run",
             "shutdown",
         ))
+
+    def test_full_flash_cycle_erase_rounds_to_erase_units_not_whole_flash(self) -> None:
+        image = bytes(1025)
+        request = JobRequest(
+            site_id=2, operation=Operation.PROGRAM,
+            target="STM32F103C8T6", image=image,
+        )
+        plan = compile_flash_cycle(
+            self.compiler, self.c8, request, configured_target_config=TARGET_CFG
+        )
+        self.assertIn("flash erase_address 0x08000000 0x00000800", plan.commands)
         self.assertEqual(len(plan.artifacts), 2)
         self.assertEqual(plan.artifacts[0].sha256, hashlib.sha256(image).hexdigest())
         self.assertEqual(plan.artifacts[1].section_name, "flash_readback")

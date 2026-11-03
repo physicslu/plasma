@@ -12,12 +12,20 @@ operation it composes ONLY existing, reviewed owners:
   barriers)  ->  revoke.
 
 Operations (allowlist): ``probe`` = OpenOCD ``dap init`` + ``dpreg 0`` with a
-fixed argv (no target, flash, erase, program or reset). Sites: 1 and 2 only
-(the ABI-v5 d0add58c two-Site geometry with a real hardware baseline).
+fixed argv (no target, flash, erase, program or reset); ``flash_cycle`` =
+erase (image rounded up to erase units) -> write -> verify -> full readback
+compare -> ``reset run`` for the session-bound, Runtime-resolved Flash profile
+(target config + geometry). Sites: 1 and 2 only (the ABI-v5 two-Site
+geometry with a real hardware baseline; deriving Sites from the loaded PL is a
+separate Root/FPGA change).
+
+The OpenOCD install is the deployment-selected engine (see
+``ppu_site_worker_service.load_engine``), never a versioned constant here.
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import signal
@@ -42,7 +50,9 @@ class Abi5OpenocdAdapter:
     supported_sites = frozenset({1, 2})
     operations = frozenset({"probe", "flash_cycle"})
 
-    def __init__(self, *, openocd_root: Path, python: Path,
+    def __init__(self, *, openocd_root: Path, python: Path, adapter_khz: int,
+                 adapter_driver: str = "plasma_swd",
+                 journal: Path = Path("/var/lib/plasma-privileged/fpga-deployment-state.json"),
                  record_dir: Path = Path("/run/plasma-z2-swd05"),
                  run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
                  popen: Callable[..., Any] = subprocess.Popen,
@@ -50,6 +60,13 @@ class Abi5OpenocdAdapter:
                  poll_s: float = 0.05) -> None:
         self.openocd_root = Path(openocd_root)
         self.python = Path(python)
+        if type(adapter_khz) is not int or not 0 < adapter_khz <= 100_000:
+            raise ValueError("adapter_khz invalid")
+        if re.fullmatch(r"[a-z][a-z0-9_]{0,31}", adapter_driver) is None:
+            raise ValueError("adapter_driver invalid")
+        self.adapter_khz = adapter_khz
+        self.adapter_driver = adapter_driver
+        self.journal = Path(journal)
         self.record_dir = Path(record_dir)
         self._run = run
         self._popen = popen
@@ -63,6 +80,24 @@ class Abi5OpenocdAdapter:
     @property
     def admission(self) -> Path:
         return self.openocd_root / "libexec" / "plasma_swd_site_admission.py"
+
+    @property
+    def scripts_root(self) -> Path:
+        return self.openocd_root / "share" / "openocd" / "scripts"
+
+    # --- identity (FPGA reload detection; change detection, not a version pin) ---
+    def identity(self) -> Mapping[str, Any]:
+        try:
+            raw = self.journal.read_bytes()
+            state = json.loads(raw)
+        except (OSError, ValueError):
+            return {"state": "UNREADABLE"}
+        if not isinstance(state, dict):
+            return {"state": "UNREADABLE"}
+        return {"journal_sha256": hashlib.sha256(raw).hexdigest(),
+                "status": state.get("status"), "image_id": state.get("image_id"),
+                "session_id": state.get("session_id"), "boot_id": state.get("boot_id"),
+                "firmware_sha256": state.get("firmware_sha256")}
 
     @staticmethod
     def _pgrep_openocd() -> bool:
@@ -81,40 +116,53 @@ class Abi5OpenocdAdapter:
 
     # --- operations ---------------------------------------------------------------
     def _argv(self, site: int) -> list[str]:
-        scripts = self.openocd_root / "share" / "openocd" / "scripts"
-        return [str(self.openocd), "-s", str(scripts), "-d2",
-                "-c", "adapter driver plasma_swd", "-c", f"plasma_swd site {site}",
+        return [str(self.openocd), "-s", str(self.scripts_root), "-d2",
+                "-c", f"adapter driver {self.adapter_driver}",
+                "-c", f"{self.adapter_driver} site {site}",
                 "-c", "transport select swd", "-c", "gdb port disabled",
                 "-c", "tcl port disabled", "-c", "telnet port disabled",
                 "-c", "swd newdap bp cpu", "-c", "dap create bp.dap -chain-position bp.cpu",
                 "-c", "init", "-c", "echo PLASMA_DPREG0=[bp.dap dpreg 0]", "-c", "shutdown"]
 
-    def _flash_argv(self, site: int, image: Path, readback: Path, size: int) -> list[str]:
-        """Fixed STM32F103C8T6 full-Flash sequence, no caller-supplied Tcl."""
+    def _target_config(self, image: FlashImage) -> str:
+        """The bound target config must be a regular file inside this engine's
+        scripts root (no symlink escape); the name was shape-checked at bind."""
+        root = self.scripts_root.resolve()
+        path = (root / image.profile.target_config).resolve()
+        if root not in path.parents or not path.is_file():
+            raise TransportDenied("TARGET_CONFIG_NOT_FOUND")
+        return image.profile.target_config
+
+    def _flash_argv(self, site: int, image: FlashImage, staged: Path, readback: Path) -> list[str]:
+        """Flash sequence for the session-bound profile; no caller-supplied Tcl."""
         def tcl_path(path: Path) -> str:
             raw = path.resolve().as_posix()
             if "{" in raw or "}" in raw or any(ord(ch) < 32 for ch in raw):
                 raise TransportDenied("IMAGE_PATH_INVALID")
             return "{" + raw + "}"
 
-        scripts = self.openocd_root / "share" / "openocd" / "scripts"
-        source = tcl_path(image)
-        output = tcl_path(readback)
+        profile, size = image.profile, len(image.payload)
+        base = f"0x{profile.flash_base:08x}"
+        source, output = tcl_path(staged), tcl_path(readback)
         return [
-            str(self.openocd), "-s", str(scripts), "-d2",
-            "-c", "adapter driver plasma_swd",
-            "-c", f"plasma_swd site {site}",
+            str(self.openocd), "-s", str(self.scripts_root), "-d2",
+            "-c", f"adapter driver {self.adapter_driver}",
+            "-c", f"{self.adapter_driver} site {site}",
             "-c", "transport select swd",
             "-c", "gdb port disabled",
             "-c", "tcl port disabled",
             "-c", "telnet port disabled",
-            "-f", "target/stm32f1x.cfg",
+            "-f", self._target_config(image),
+            # Target configs may force their own SWCLK (stm32f1x.cfg: 1000 kHz);
+            # the selected engine's qualified adapter speed wins.
+            "-c", f"adapter speed {self.adapter_khz}",
             "-c", "init",
-            "-c", "reset init",
-            "-c", "flash erase_address 0x08000000 0x00010000",
-            "-c", f"flash write_image {source} 0x08000000 bin",
-            "-c", f"flash verify_image {source} 0x08000000 bin",
-            "-c", f"dump_image {output} 0x08000000 0x{size:08x}",
+            "-c", "halt",
+            "-c", f"flash erase_address {base} 0x{profile.erase_length(size):08x}",
+            "-c", f"flash write_image {source} {base} bin",
+            "-c", f"flash verify_image {source} {base} bin",
+            "-c", f"dump_image {output} {base} 0x{size:08x}",
+            "-c", "reset run",
             "-c", "shutdown",
         ]
 
@@ -131,8 +179,8 @@ class Abi5OpenocdAdapter:
         if site not in self.supported_sites or operation not in self.operations:
             raise TransportDenied("OPERATION_OR_SITE_NOT_SUPPORTED")
         if operation == "flash_cycle":
-            if (image is None or image.icpn != "STM32F103C8T6"
-                    or not (0 < len(image.payload) <= 64 * 1024)
+            if (image is None
+                    or not (0 < len(image.payload) <= image.profile.flash_size)
                     or hashlib.sha256(image.payload).hexdigest() != image.sha256):
                 raise TransportDenied("FLASH_IMAGE_NOT_BOUND")
             with tempfile.TemporaryDirectory(prefix="plasma-c3-flash-") as directory:
@@ -142,7 +190,7 @@ class Abi5OpenocdAdapter:
                 staged.chmod(0o600)
                 log, rc = self._session(
                     site, deadline=deadline, cancel=cancel,
-                    argv=self._flash_argv(site, staged, readback, len(image.payload)),
+                    argv=self._flash_argv(site, image, staged, readback),
                     max_duration_s=300,
                 )
                 if rc != 0:
@@ -158,6 +206,8 @@ class Abi5OpenocdAdapter:
                             "openocd_rc": rc, "expected_sha256": image.sha256,
                             "readback_sha256": observed_sha, "safe_off": True}
                 return {"result": "PASS", "icpn": image.icpn,
+                        "target_config": image.profile.target_config,
+                        "adapter_khz": self.adapter_khz,
                         "bytes_verified": len(observed),
                         "readback_sha256": observed_sha,
                         "openocd_rc": 0, "safe_off": True}

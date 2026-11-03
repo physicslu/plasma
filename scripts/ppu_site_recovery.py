@@ -139,7 +139,14 @@ def main(argv: list[str]) -> int:  # pragma: no cover - thin production wiring
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
         return 64
     site = int(argv[1])
-    adapter = Abi5OpenocdAdapter(openocd_root=svc.OPENOCD_ROOT, python=svc.PYTHON)
+    try:
+        engine = svc.load_engine()
+    except svc.EngineNotReady as exc:
+        print(f"SITE_WORKER_ENGINE_NOT_READY:{exc.code}", file=sys.stderr)
+        return 1
+    adapter = Abi5OpenocdAdapter(openocd_root=engine.openocd_root, python=svc.PYTHON,
+                                 adapter_khz=engine.adapter_khz,
+                                 adapter_driver=engine.adapter_driver)
 
     def worker_active() -> bool | None:
         r = subprocess.run(["systemctl", "is-active", "plasma-site-worker.service"],

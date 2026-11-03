@@ -5,7 +5,7 @@ import re
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from plasma_core.config import PlasmaConfig, SiteConfig
@@ -46,6 +46,9 @@ class PPUExecutionLease:
             "owner_kind": self.owner_kind,
             "owner_id": self.owner_id,
             "active_job_count": len(self.job_ids),
+            # The local Site Worker (C-3) admits a Runtime Site Job session
+            # only for a Job that currently holds this lease.
+            "job_ids": sorted(self.job_ids),
         }
 
 
@@ -402,6 +405,19 @@ class SiteManager:
         if request.operation in {Operation.STATUS, Operation.CANCEL}:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "status/cancel are control operations")
         worker = self._resolve_site(request.site_id)
+        site_config = self._site_configs[request.site_id]
+        if request.target is None and site_config.interface != "mock":
+            # Real hardware: explicit Job target or the operator's explicit
+            # Site selection only; never a product default. (The Mock
+            # workflow simulator claims no IC support and needs no ICPN.)
+            site_target = site_config.target
+            if not site_target:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "target (exact ICPN) is required: set the Job target or select a Site target",
+                    context={"site_id": request.site_id},
+                )
+            request = replace(request, target=site_target)
         request = self.execution_routers[request.site_id].admit(request)
         if worker.queue.full():
             raise PlasmaError(

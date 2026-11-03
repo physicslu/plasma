@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import math
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -10,16 +12,27 @@ from plasma_core.ic_support import ICSupportResolver, get_default_ic_support_res
 from plasma_core.models import JobRequest
 
 from .base import BaseInterface, ProgressCallback
-from .openocd_executor import OpenOCDPlanExecutor, ProcessLauncher
-from .openocd_plan import OpenOCDPlanCompiler
+from .openocd_executor import OpenOCDPlanExecutor, ProcessLauncher, compile_flash_cycle
+from .openocd_plan import OpenOCDPlanCompiler, normalize_openocd_target_config
+from .site_worker_c3 import (
+    DEFAULT_IMAGE_ROOT,
+    C3FlashProfile,
+    SiteWorkerControlClient,
+    run_flash_cycle,
+)
 
 
 class OpenOCDInterface(BaseInterface):
-    """Per-Site OpenOCD interface; only an explicit injected launcher may execute.
+    """Per-Site OpenOCD interface with two explicit execution backends.
 
-    Host-only integration exercises actual Job/Handler/Executor plumbing using
-    fake processes. The default runtime has no process launcher and remains
-    incapable of launching OpenOCD on the device.
+    * ``site_worker_socket`` (Z2 product path): the complete Flash cycle runs
+      through the local Stage C-3 Site Worker, which owns Site admission and
+      the PS-local OpenOCD. Only ``flash_cycle`` is offered; the target config
+      and Flash geometry come from the Job's exact-ICPN IC Support.
+    * an injected ``process_launcher`` (Host-only software validation with
+      fake processes).
+
+    Without either, the interface cannot execute anything.
     """
 
     def __init__(
@@ -36,6 +49,13 @@ class OpenOCDInterface(BaseInterface):
         self.work_dir = Path(options.get("work_dir", ".")).resolve()
         self.command_timeout_s = float(options.get("command_timeout_s", 30.0))
         self._configured = bool(self.interface_cfg and self.target_cfg)
+        socket_path = options.get("site_worker_socket")
+        self._site_worker = (
+            SiteWorkerControlClient(Path(str(socket_path))) if socket_path else None
+        )
+        self.normalized_image_root = Path(
+            str(options.get("normalized_image_root", DEFAULT_IMAGE_ROOT))
+        )
         self._process_launcher = process_launcher
         self._resolver = resolver
         self._compiler = OpenOCDPlanCompiler()
@@ -49,8 +69,13 @@ class OpenOCDInterface(BaseInterface):
         """Readiness is an internal injected capability, never a config key."""
         return self._configured and self._process_launcher is not None
 
+    @property
+    def site_worker_ready(self) -> bool:
+        """Configured for the C-3 Site Worker product path (no fake launcher)."""
+        return self._site_worker is not None and self._process_launcher is None
+
     def _require_ready(self) -> None:
-        if not self.software_validation_ready:
+        if not (self.software_validation_ready or self.site_worker_ready):
             raise PlasmaError(
                 ErrorCode.INTERFACE_NOT_CONFIGURED,
                 "OpenOCD hardware runtime is not enabled; use the software-validation compiled-plan executor only",
@@ -60,12 +85,33 @@ class OpenOCDInterface(BaseInterface):
         resolver = self._resolver or get_default_ic_support_resolver()
         return resolver.require_exact(target)
 
+    def target_config_for(self, support) -> object:
+        """Site-configured target cfg (cross-checked by the compiler) or, on
+        the C-3 path, the exact-ICPN IC Support selection itself."""
+        if self.target_cfg:
+            return self.target_cfg
+        return support.openocd_target_config if self.site_worker_ready else None
+
     def prepare_request(self, request: JobRequest) -> None:
         self._require_ready()
+        if self.site_worker_ready and request.operation is not Operation.FLASH_CYCLE:
+            raise PlasmaError(
+                ErrorCode.OPERATION_UNSUPPORTED,
+                "the C-3 Site Worker path offers only the complete flash_cycle operation",
+                context={"operation": request.operation.value},
+            )
         # The Job is already resolved by SiteExecutionRouter, but recompile
-        # from the canonical support before any injected fake process executes.
+        # from the canonical support before anything executes.
         support = self._support(request.target)
-        self._compiler.compile(support, request, configured_target_config=self.target_cfg)
+        if request.operation is Operation.FLASH_CYCLE:
+            compile_flash_cycle(
+                self._compiler, support, as_program_request(request),
+                configured_target_config=self.target_config_for(support),
+            )
+        else:
+            self._compiler.compile(
+                support, request, configured_target_config=self.target_config_for(support)
+            )
         self._request = request
 
     def _prepared(self, operation: Operation) -> JobRequest:
@@ -140,6 +186,77 @@ class OpenOCDInterface(BaseInterface):
             await progress(len(payload), len(payload))
         return payload
 
+    async def flash_cycle(
+        self,
+        image: bytes,
+        progress: ProgressCallback | None = None,
+    ) -> dict[str, object]:
+        request = self._prepared(Operation.FLASH_CYCLE)
+        if image != request.image or not image:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "OpenOCD Job image mismatch")
+        support = self._support(request.target)
+        program = as_program_request(request)
+        if self.site_worker_ready:
+            assert self._site_worker is not None
+            evidence = await run_flash_cycle(
+                self._site_worker,
+                job_id=request.job_id,
+                site_id=request.site_id,
+                profile=c3_flash_profile(support),
+                image=image,
+                image_root=self.normalized_image_root,
+                max_runtime_s=max(1, min(3600, math.ceil(request.timeout_s))),
+            )
+        else:
+            plan = compile_flash_cycle(
+                self._compiler, support, program,
+                configured_target_config=self.target_config_for(support),
+            )
+            result = await self._executor.execute(plan, support, program, flash_cycle=True)
+            readback = result.read_sections["flash_readback"]
+            evidence = {
+                "result": "PASS",
+                "backend": "host_only_injected_process",
+                "bytes_verified": len(readback),
+                "readback_sha256": hashlib.sha256(readback).hexdigest(),
+            }
+        if progress:
+            await progress(len(image), len(image))
+        return evidence
+
     async def safe_shutdown(self) -> None:
         # OpenOCDPlanExecutor owns its subprocess and awaits its exit/kill.
         self._request = None
+
+
+def as_program_request(request: JobRequest) -> JobRequest:
+    """The Flash cycle is compiled from the canonical PROGRAM plan (the
+    source-locked compiler has no FLASH_CYCLE operation)."""
+    return replace(request, operation=Operation.PROGRAM)
+
+
+def c3_flash_profile(support) -> C3FlashProfile:
+    """Exact-ICPN Flash profile for the C-3 Site Worker, from IC Support only."""
+    target = normalize_openocd_target_config(support.openocd_target_config)
+    data = support.memory_geometry_profile.data
+    try:
+        profile = C3FlashProfile(
+            icpn=support.icpn,
+            target_config=str(target),
+            flash_base=int(str(data["main_flash_start"]), 0),
+            flash_size=int(data["main_flash_size_bytes"]),
+            erase_granularity=int(data["erase_granularity_bytes"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PlasmaError(
+            ErrorCode.OPERATION_UNSUPPORTED,
+            "IC Support has no complete Flash geometry for the C-3 Flash cycle",
+            context={"target": support.icpn},
+        ) from exc
+    if target is None or not target.startswith("target/"):
+        raise PlasmaError(
+            ErrorCode.OPERATION_UNSUPPORTED,
+            "IC Support has no OpenOCD target config for the C-3 Flash cycle",
+            context={"target": support.icpn},
+        )
+    return profile

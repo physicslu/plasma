@@ -25,6 +25,13 @@ import ppu_site_adapter_abi5 as abi5  # noqa: E402
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux") or os.geteuid() == 0,
                                 reason="Linux SO_PEERCRED, non-root")
 JOB = "1" * 32
+F103 = {"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
+        "flash_base": 0x08000000, "flash_size": 0x10000, "erase_granularity": 1024}
+
+
+def flash_image(payload: bytes, profile=None, digest=None):
+    return worker.FlashImage(worker.parse_flash_profile(dict(profile or F103)), payload,
+                             digest or hashlib.sha256(payload).hexdigest())
 
 
 class MockAdapter:
@@ -38,11 +45,16 @@ class MockAdapter:
         self.gate = threading.Event()
         self.started = threading.Event()
         self.startup = set()
+        # Root journal snapshot as the C3 core sees it (change detection only).
+        self.ident = {"image_id": "any-compatible-image", "session_id": "s1"}
+
+    def identity(self):
+        return dict(self.ident)
 
     def startup_sealed_sites(self):
         return set(self.startup)
 
-    def run(self, site, operation, *, deadline, cancel):
+    def run(self, site, operation, *, deadline, cancel, image=None):
         self.calls.append((site, operation))
         self.started.set()
         b = self.behaviour
@@ -75,7 +87,7 @@ class Rig:
 
     def start(self):
         self.core = worker.SiteWorkerCore(
-            self.adapter, runtime_pid=os.getpid, lease_verifier=lambda j: j in self.lease,
+            self.adapter, runtime_pid=os.getpid, lease_verifier=lambda j, kind: j in self.lease,
             seal_dir=self.seals, image_root=self.image_root)
         self.server = worker.SiteWorkerServer(self.core, self.sock, mode=0o600)
         self.server.start()
@@ -294,20 +306,43 @@ def test_denied_before_hardware_keeps_site_usable(rig):
     assert rig.client.call("status")["sealed_sites"] == []
 
 
-def test_c3_does_not_consult_fpga_image_identity(tmp_path):
-    class ImageBlindAdapter(MockAdapter):
-        def identity(self):
-            raise AssertionError("C3 must not read FPGA Image ID or deployment Journal")
+def test_c3_accepts_any_image_id_but_detects_reload_within_a_session(tmp_path):
+    """No static FPGA Image pin: any loaded image is accepted at session open,
+    but a Root journal change (FPGA reload) inside the session invalidates it."""
+    adapter = MockAdapter()
+    adapter.ident = {"image_id": "z2-some-other-build-0123abcd", "session_id": "s9"}
+    r = Rig(tmp_path, adapter)
+    try:
+        child = r.package(PROBE2 + "sys.stdout.flush(); sys.stdin.readline()\n" + PROBE2)
+        session = r.open(child)
+        child.stdin.write("go\n"); child.stdin.flush()
+        first = json.loads(child.stdout.readline())
+        assert first["ok"] is True and first["result"]["result"] == "PASS"
+        adapter.ident = {"image_id": "z2-some-other-build-0123abcd", "session_id": "s10"}
+        child.stdin.write("again\n"); child.stdin.flush()
+        second = json.loads(child.stdout.readline())
+        assert second == {"ok": False, "error": "SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED"}
+        assert adapter.calls == [(2, "probe")]
+        assert r.client.close_session(session["session_id"])["sealed_sites"] == []
+        r.reap(child)
+    finally:
+        r.close()
 
-    adapter = ImageBlindAdapter()
+
+def test_fpga_reload_during_operation_seals_the_site(tmp_path):
+    class ReloadingAdapter(MockAdapter):
+        def run(self, site, operation, *, deadline, cancel, image=None):
+            self.ident = {"image_id": "reloaded", "session_id": "s2"}
+            return super().run(site, operation, deadline=deadline, cancel=cancel)
+
+    adapter = ReloadingAdapter()
     r = Rig(tmp_path, adapter)
     try:
         child = r.package(PROBE2)
         session = r.open(child)
-        [reply] = r.go(child)
-        assert reply["ok"] is True and reply["result"]["result"] == "PASS"
-        assert adapter.calls == [(2, "probe")]
-        assert r.client.close_session(session["session_id"])["closed"]
+        assert r.go(child) == [{"ok": False, "error":
+                                "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION"}]
+        assert r.client.close_session(session["session_id"])["sealed_sites"] == [2]
     finally:
         r.close()
 
@@ -362,6 +397,7 @@ class FlashMockAdapter(MockAdapter):
             return super().run(site, operation, deadline=deadline, cancel=cancel)
         assert image is not None
         self.calls.append((site, operation, image.icpn, image.sha256, image.payload))
+        self.profiles = getattr(self, "profiles", []) + [image.profile]
         return {"result": "PASS", "bytes_verified": len(image.payload),
                 "readback_sha256": image.sha256, "safe_off": True}
 
@@ -376,10 +412,11 @@ def test_c3_binds_exact_firmware_bytes_for_flash_cycle(tmp_path):
         child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
         session = r.open(child)
         binding = r.client.bind_image(
-            session["session_id"], icpn="STM32F103C8T6",
+            session["session_id"], profile=F103,
             image_sha256=digest, image_size=len(payload)
         )
         assert binding == {"job_id": JOB, "icpn": "STM32F103C8T6",
+                           "target_config": "target/stm32f1x.cfg",
                            "image_sha256": digest, "image_size": len(payload),
                            "bound": True}
         # The already-bound immutable bytes do not depend on subsequent file changes.
@@ -403,7 +440,7 @@ def test_c3_rejects_unbound_or_mismatched_firmware(tmp_path):
         session = r.open(child)
         with pytest.raises(worker.SiteWorkerDenied, match="IMAGE_SHA256_MISMATCH"):
             r.client.bind_image(
-                session["session_id"], icpn="STM32F103C8T6",
+                session["session_id"], profile=F103,
                 image_sha256="0" * 64, image_size=len(payload),
             )
         [result] = r.go(child)
@@ -455,7 +492,11 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
                     Path(path_match.group(1)).write_bytes(flash_readback)
         return FakeProc(log, rc, hang)
 
+    scripts = tmp_path / "ocd" / "share" / "openocd" / "scripts" / "target"
+    scripts.mkdir(parents=True)
+    (scripts / "stm32f1x.cfg").write_text("# fake target config\n")
     a = abi5.Abi5OpenocdAdapter(openocd_root=tmp_path / "ocd", python=Path("/usr/bin/python3"),
+                                adapter_khz=500, journal=journal,
                                 record_dir=tmp_path / "rec", run=run, popen=popen,
                                 openocd_running=lambda: openocd, poll_s=0.01)
     (tmp_path / "rec").mkdir()
@@ -473,19 +514,26 @@ def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
         tmp_path, log=GOOD, flash_readback=image
     )
     result = a.run(
-        2, "flash_cycle", image=worker.FlashImage("STM32F103C8T6", image, digest),
+        2, "flash_cycle", image=flash_image(image),
         deadline=time.monotonic() + 30, cancel=threading.Event(),
     )
     assert result == {"result": "PASS", "icpn": "STM32F103C8T6",
+                      "target_config": "target/stm32f1x.cfg", "adapter_khz": 500,
                       "bytes_verified": len(image), "readback_sha256": digest,
                       "openocd_rc": 0, "safe_off": True}
     argv = calls["popen"][0]
     assert argv[argv.index("-f") + 1] == "target/stm32f1x.cfg"
     assert "plasma_swd site 2" in argv
     commands = [argv[i + 1] for i, arg in enumerate(argv[:-1]) if arg == "-c"]
+    # The engine's qualified SWCLK overrides the target config's own speed.
+    assert commands.index("adapter speed 500") < commands.index("init")
+    assert argv.index("-f") < argv.index("adapter speed 500")
+    assert [v for v in commands if v.startswith("flash ")][0] == (
+        "flash erase_address 0x08000000 0x00000400")  # 20 B -> one 1 KiB page
     assert [v.split()[1] for v in commands if v.startswith("flash ")] == [
         "erase_address", "write_image", "verify_image"
     ]
+    assert commands[-2:] == ["reset run", "shutdown"]
     assert any(v.startswith("dump_image ") for v in commands)
     assert not any(v.startswith("swd newdap bp") for v in commands)
     assert calls["run"] == [["admit", "2"], ["revoke", "2"]]
@@ -498,7 +546,7 @@ def test_abi5_flash_cycle_rejects_wrong_readback_with_safe_shutdown(tmp_path):
     )
     result = a.run(
         2, "flash_cycle",
-        image=worker.FlashImage("STM32F103C8T6", image, hashlib.sha256(image).hexdigest()),
+        image=flash_image(image),
         deadline=time.monotonic() + 30, cancel=threading.Event(),
     )
     assert result["result"] == "FAIL" and result["code"] == "READBACK_MISMATCH"
@@ -580,16 +628,24 @@ def test_runtime_lease_verifier_uses_c1_execution_lease(tmp_path):
         try:
             verify = worker.runtime_lease_verifier(tmp_path / "control.sock")
             loop = asyncio.get_running_loop()
-            assert await loop.run_in_executor(None, verify, JOB) is False
-            m.snap = {"busy": True, "owner_kind": "package_action", "owner_id": JOB}
-            assert await loop.run_in_executor(None, verify, JOB) is True
-            assert await loop.run_in_executor(None, verify, "2" * 32) is False
-            m.snap = {"busy": True, "owner_kind": "batch", "owner_id": JOB}
-            assert await loop.run_in_executor(None, verify, JOB) is False
+            pkg, rest = "package_action", "rest_job"
+            assert await loop.run_in_executor(None, verify, JOB, pkg) is False
+            m.snap = {"busy": True, "owner_kind": "package_action", "owner_id": JOB,
+                      "job_ids": [JOB]}
+            assert await loop.run_in_executor(None, verify, JOB, pkg) is True
+            assert await loop.run_in_executor(None, verify, "2" * 32, pkg) is False
+            # A Package Action lease never authorizes a Runtime REST Job session.
+            assert await loop.run_in_executor(None, verify, JOB, rest) is False
+            m.snap = {"busy": True, "owner_kind": "batch", "owner_id": "b-1",
+                      "job_ids": [JOB]}
+            assert await loop.run_in_executor(None, verify, JOB, pkg) is False
+            assert await loop.run_in_executor(None, verify, JOB, rest) is True
+            assert await loop.run_in_executor(None, verify, "job-other", rest) is False
+            assert await loop.run_in_executor(None, verify, JOB, "client") is False
         finally:
             await server.close()
     asyncio.run(scenario())
-    assert worker.runtime_lease_verifier(tmp_path / "missing.sock")(JOB) is False
+    assert worker.runtime_lease_verifier(tmp_path / "missing.sock")(JOB, "package_action") is False
 
 
 def test_c2_launcher_package_uses_site_worker_end_to_end(tmp_path, rig):

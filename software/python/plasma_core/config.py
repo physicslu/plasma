@@ -34,7 +34,9 @@ class SiteConfig:
     id: int
     enabled: bool = False
     interface: str = "mock"
-    target: str = "STM32F103C8T6"
+    # The operator-selected exact ICPN for this Site; no product default.
+    # A Job without its own target uses this explicit Site selection only.
+    target: str | None = None
     operation_timeout_s: float = 30.0
     max_retries: int = 0
     retry_backoff_s: float = 0.05
