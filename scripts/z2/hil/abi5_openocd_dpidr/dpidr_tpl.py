@@ -2,7 +2,7 @@
 # Admission -> OpenOCD (dap init + dpreg 0, no target, no flash) -> revoke.
 import hashlib, json, os, re, subprocess, time
 SITE="@SITE@"; DEST="@DEST@"; ADM_SHA="@ADM_SHA@"; BIN_SHA="@BIN_SHA@"; IMAGE_ID="@IMAGE_ID@"
-R="/root/plasma-path2-approved"; J=R+"/.plasma-fpga-image-deployment-state.json"
+J="/var/lib/plasma-privileged/fpga-deployment-state.json"  # #1252/#1266 Root journal
 REC=f"/run/plasma-z2-swd05/swd-site{SITE}-admission"; PY="/opt/plasma/python/3.12.13/bin/python3"
 ADM=DEST+"/libexec/plasma_swd_site_admission.py"; B=DEST+"/bin/openocd"; S=DEST+"/share/openocd/scripts"
 def F(p): return hashlib.sha256(open(p,"rb").read()).hexdigest()

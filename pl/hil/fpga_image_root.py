@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import stat
 import sys
 import tempfile
 import uuid
@@ -23,10 +24,13 @@ from pl.hil import fpga_image_admission as admission
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_FILE = guard.FIRMWARE / "plasma-image-manifest.json"
-STATE = Path("/var/lib/plasma/privileged/fpga-deployment-state.json")
+STATE = Path("/var/lib/plasma-privileged/fpga-deployment-state.json")
 # Never write mutable journal/state into the immutable privileged code root.
-# The root-protected state directory must be independently provisioned and
-# migration from old Path 2 state qualified before any Z2 FPGA action.
+# The state directory is a dedicated root-owned 0700 directory whose every
+# ancestor up to / is root-owned and not group/other writable. It must NOT
+# live under a runtime-account directory such as /var/lib/plasma (uid plasma):
+# that owner could rename/replace a root-owned child and drop or roll back
+# this journal. It is provisioned and migrated before any Z2 FPGA action.
 CHILD = guard.OWNER_DIR / "fpga-image-identity.json"
 SCHEMA = "plasma.fpga.image-deployment.v3"
 LEGACY_SCHEMA = "plasma.fpga.image-deployment.v1"
@@ -499,7 +503,31 @@ def trusted_local() -> None:
     guard.protected(guard.OWNER_DIR, file=False)
 
 
-def _state_file_trusted() -> None:
+def _state_dir_trusted(state: Path = STATE, *, uid: int = 0) -> None:
+    """Whole ancestor chain of the journal must be root-protected.
+
+    guard.protected() checks only the immediate parent; a writable
+    grandparent would still let a non-root owner swap the state directory.
+    """
+    need(state.is_absolute() and ".." not in state.parts,
+         "STATE_PATH_INVALID")
+    for directory in (*reversed(state.parent.parents), state.parent):
+        try:
+            info = os.lstat(directory)
+        except FileNotFoundError as exc:
+            raise ImageDeploymentDenied("STATE_DIRECTORY_NOT_PROVISIONED") from exc
+        need(stat.S_ISDIR(info.st_mode) and info.st_uid == uid and
+             info.st_mode & 0o022 == 0,
+             "STATE_ANCESTOR_NOT_ROOT_PROTECTED")
+    need(os.lstat(state.parent).st_mode & 0o077 == 0,
+         "STATE_DIRECTORY_NOT_PRIVATE")
+
+
+def _state_file_trusted(*, require_file: bool = True) -> None:
+    _state_dir_trusted()
+    if not require_file:
+        need(not STATE.is_symlink(), "STATE_SYMLINK_DENIED")
+        return
     guard.protected(STATE)
     need(STATE.stat().st_mode & 0o077 == 0 and STATE.stat().st_size <= 4096,
          "STATE_FILE_NOT_PRIVATE")
@@ -507,7 +535,7 @@ def _state_file_trusted() -> None:
 
 def read_state(release: ImageManifest) -> dict | None:
     if not STATE.exists():
-        need(not STATE.is_symlink(), "STATE_SYMLINK_DENIED")
+        _state_file_trusted(require_file=False)
         return None
     _state_file_trusted()
     data = json.loads(STATE.read_text())
@@ -542,8 +570,7 @@ def read_state(release: ImageManifest) -> dict | None:
 def write_state(data: dict) -> None:
     raw = (json.dumps(data, sort_keys=True, separators=(",", ":")) + "\n").encode()
     need(len(raw) <= 4096, "STATE_TOO_LARGE")
-    if STATE.exists():
-        _state_file_trusted()
+    _state_file_trusted(require_file=STATE.exists())
     temp = STATE.with_name(STATE.name + "." + uuid.uuid4().hex + ".tmp")
     fd = os.open(temp, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
     try:

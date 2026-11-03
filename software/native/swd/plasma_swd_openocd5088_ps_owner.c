@@ -332,7 +332,7 @@ void plasma_swd_ps_default_paths(struct plasma_swd_ps_paths *p)
     strcpy(p->boot_id, "/proc/sys/kernel/random/boot_id");
     strcpy(p->manager_state, "/sys/class/fpga_manager/fpga0/state");
     strcpy(p->root_journal,
-           "/var/lib/plasma/privileged/fpga-deployment-state.json");
+           "/var/lib/plasma-privileged/fpga-deployment-state.json");
     strcpy(p->code_manifest,
            "/opt/plasma/privileged/fpga-root/.plasma-privileged-code.json");
     strcpy(p->record_dir, "/run/plasma-z2-swd05");
