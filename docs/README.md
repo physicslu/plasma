@@ -197,6 +197,7 @@
 - **Current** — [Operator Acceptance Test Matrix](development/operator-acceptance-test-matrix.md)
 - **Current** — [Programming Image Observability Test Plan](development/programming-image-observability-test-plan.md)
 - **Reference** — [Mock Runtime Foundation Notes](development/mock-runtime-foundation-notes.md)
+- **Plan** · `M0–M4 roadmap` — [PLASMA B/C, SWD Driver and OpenOCD Architecture Simplification Roadmap](development/plasma-m0-m4-architecture-simplification-roadmap-2026-11-03.md)：先完成 Z2 D5/Runtime 安全驗收，再盤點、精簡、實際單 Site 燒錄與八 Site 並行；文件不授權實作或部署。
 - **Current** · `debt register` — [Development Debt Register](development/todo.md)
 
 ## Operator and acceptance

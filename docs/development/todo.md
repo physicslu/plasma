@@ -6,6 +6,21 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ## High Priority
 
+### PLASMA M0–M4 — 安裝／執行／OpenOCD 架構精簡與八通道燒錄路線圖
+
+**Status:** PLANNED — 2026-11-03 Owner roadmap recorded; **no Gate 1 implementation scope or Gate 2 merge approval granted by this documentation item**.
+
+**Single source of plan:** [PLASMA M0–M4 B/C, SWD Driver and OpenOCD Roadmap](plasma-m0-m4-architecture-simplification-roadmap-2026-11-03.md).
+
+- **M0 / P0:** PR #1280 systemd 249 kill fix is merged, but real Z2 D5 timeout/cgroup re-acceptance still requires evidence. Resume D6 Site 2 Probe and D7 seal recovery **only after D5 PASS**. Separately fix Runtime upgrade stale-process [Issue #1263](https://github.com/physicslu/plasma/issues/1263).
+- **M1 / P0:** Read-only Gap Audit across B1–B3, C1–C3, Root, native `plasma_swd` Driver, OpenOCD Tcl RPC and physical Site ownership. Produce a responsibility matrix and minimal separately scoped change list.
+- **M2 / P1:** OpenOCD owns SWD/DP/AP/Flash protocol; Driver retains minimal hardware transport and non-bypassable safety. B3 Install success selects Active; FPGA Image default load **requires explicit authorization**; no independent B4. Simplify C1/C2/C3, reuse existing RPC Worker and keep systemd sandbox for special Package executors.
+- **M3 / P1:** One real STM32F103 Site 2 `Probe → Erase → Program → Verify → Readback → Result` with exact target/electrical qualification and SWPC-observable evidence.
+- **M4 / P2:** C1 Per-Site Job management and C3 independent hardware operation, first two Sites concurrently, then eight-Site measured hardware HIL. FPGA image switch still PPU-wide fenced.
+- **Higher-priority dependencies from the existing TODO:** electrical programming and Site voltage/power compatibility (especially before multi-IC automation), recovery/uncertain outcomes, and authenticated physical programming. **Defer** DMA/data-plane/UI polish unless measured blocking evidence arises.
+
+**Scope boundary:** documentation only; no source/runtime modification, PR merge, Z2/SWPC/DUT operation or implied HIL result. Do **not** change WBS counts until individually reconciled. Follow the exact Gate 1/Gate 2 boundaries in [AGENTS.md](../../AGENTS.md).
+
 ### IC Electrical Programming Profile / Voltage Capability Database
 
 **Status:** TODO / required before physical multi-IC programming qualification
