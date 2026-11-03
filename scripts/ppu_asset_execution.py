@@ -23,6 +23,14 @@ JOB_ID = re.compile(r"[0-9a-f]{32}\Z")
 NAME = re.compile(r"[a-z][a-z0-9_.-]{0,63}\Z")
 VERSION = re.compile(r"[A-Za-z0-9_.+-]{1,128}\Z")
 ACTION = "execute"
+# Declarative per-Package resource manifest, required to execute Python and
+# Native C. It is a Package file, so it is bound into the Package identity
+# and the owner's asset.execute authorization; never a runtime claim.
+RESOURCES_SUFFIX = "config/plasma-package-resources.json"
+RESOURCES_SCHEMA = "plasma.ppu.package-resources.v1"
+RESOURCE_KINDS = frozenset({"python", "native-c"})
+MAX_RUNTIME_S = 3600
+MAX_SITES = 8
 EXECUTORS = {
     "python": "trusted-python-runtime",
     "native-c": "trusted-native-runtime",
@@ -77,6 +85,43 @@ def _trusted_module(filename: str):
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def validate_package_resources(raw: bytes) -> dict[str, Any]:
+    """Strict, pure ``plasma.ppu.package-resources.v1`` parser.
+
+    ``sites``: one-based Site IDs the Package may drive through the Runtime
+    Site Transport (empty = no programming hardware). ``max_runtime_s``:
+    hard wall-clock bound the executor must enforce. Nothing here grants
+    /dev/mem, FPGA Manager, network, shell or Root access.
+    """
+    _require(type(raw) is bytes and 0 < len(raw) <= 4096, "ASSET_EXECUTION_RESOURCES_INVALID")
+    try:
+        data = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs,
+                          parse_constant=lambda _: _require(False, "ASSET_EXECUTION_RESOURCES_INVALID"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        if isinstance(exc, AssetExecutionDenied):
+            raise
+        raise AssetExecutionDenied("ASSET_EXECUTION_RESOURCES_INVALID") from exc
+    sites = data.get("sites") if type(data) is dict else None
+    _require(type(data) is dict and set(data) == {"schema", "sites", "max_runtime_s"}
+             and data["schema"] == RESOURCES_SCHEMA
+             and type(sites) is list and len(sites) <= MAX_SITES
+             and all(type(s) is int and 1 <= s <= 64 for s in sites)
+             and sites == sorted(set(sites))
+             and type(data["max_runtime_s"]) is int
+             and 1 <= data["max_runtime_s"] <= MAX_RUNTIME_S,
+             "ASSET_EXECUTION_RESOURCES_INVALID")
+    return {"schema": RESOURCES_SCHEMA, "sites": list(sites),
+            "max_runtime_s": data["max_runtime_s"]}
+
+
+def _unique_pairs(items):
+    out = {}
+    for key, value in items:
+        _require(key not in out, "ASSET_EXECUTION_RESOURCES_INVALID")
+        out[key] = value
+    return out
 
 
 def prepare_asset_execution(
@@ -140,6 +185,19 @@ def prepare_asset_execution(
     ).encode("utf-8")).hexdigest()
     _require(actual_identity == request.package_identity_sha256,
              "ASSET_EXECUTION_PACKAGE_IDENTITY_MISMATCH")
+    resources = None
+    if request.package_kind in RESOURCE_KINDS:
+        entry = [f for f in descriptor["files"]
+                 if f["path"] == f"payload/packages/{selected['id']}/{RESOURCES_SUFFIX}"]
+        _require(len(entry) == 1 and entry[0]["executable"] is False,
+                 "ASSET_EXECUTION_RESOURCES_REQUIRED")
+        path = staged / entry[0]["path"]
+        _require(not path.is_symlink() and path.is_file(), "ASSET_EXECUTION_RESOURCES_REQUIRED")
+        raw = path.read_bytes()
+        # Bytes actually parsed must be the verified, identity-bound ones.
+        _require(hashlib.sha256(raw).hexdigest() == entry[0]["sha256"],
+                 "ASSET_EXECUTION_RESOURCES_CHANGED")
+        resources = validate_package_resources(raw)
     # The owner's execute authorization must bind THIS device, the CURRENT
     # Active Set, this exact Package identity and this Runtime Job.
     _require(isinstance(owner_credential, OwnerCredential),
@@ -167,6 +225,7 @@ def prepare_asset_execution(
         "job_id": request.job_id,
         "trusted_executor": EXECUTORS[request.package_kind],
         "relative_files": [f["path"] for f in descriptor["files"]],
+        "resources": resources,
         "dependencies": list(selected["requires"]),
         "owner_authorization": authorized,
         "hardware_admission": "NOT_RUN",
@@ -255,7 +314,8 @@ def dispatch_asset_execution(
 
     Caller-owned Runtime execution_scope must pin Site/PPU ownership
     throughout selected executor operation and yield its Job lease as a
-    Mapping whose ``job_id`` equals the authorized Job; a busy PPU/Site
+    Mapping whose ``job_id`` equals the authorized Job and whose
+    ``site_ids`` cover every Site the Package declares; a busy PPU/Site
     must raise instead of yielding. FPGA executor additionally
     enforces hardware quiescence, protected Linux Root source, Golden and FPGA Manager
     checks; no Bundle can name arbitrary executables or commands.
@@ -279,6 +339,11 @@ def dispatch_asset_execution(
             product_root, request,
             authorization=authorization, owner_credential=owner_credential,
         )
+        if plan["resources"] is not None:
+            leased = lease.get("site_ids")
+            _require(type(leased) in (list, tuple, set, frozenset)
+                     and set(plan["resources"]["sites"]) <= set(leased),
+                     "ASSET_EXECUTION_SITE_NOT_LEASED")
         result = executor(plan)
         _require(isinstance(result, Mapping)
                  and result.get("asset_set_sha256") == plan["asset_set_sha256"]

@@ -62,6 +62,26 @@ qualified for arbitrary uploaded code. Future adapters must use
 separately qualified, sandboxed/product-controlled execution methods,
 not import or run a Bundle File just because its hash matches.
 
+## Stage C-1: Runtime Job lease adapter and Package resources (Host-only)
+
+- `SiteManager.package_action_scope(job_id)` is the trusted `execution_scope`.
+  It uses the SAME execution lock, PPU lease and Runtime quiesce as Site
+  programming Jobs: PPU-exclusive owner `package_action:<job_id>`; raises
+  `PPU_BUSY` while any Job, other Package Action or quiesce is active; while
+  held, Site Jobs and Runtime/Asset-Set quiesce are refused; always released,
+  including on executor failure. It yields `{job_id, owner_kind, site_ids}`
+  (enabled one-based Sites) and grants no hardware access by itself.
+- `plasma.ppu.package-resources.v1` (`config/plasma-package-resources.json`,
+  required for `python` / `native-c` execution, absent for `fpga-image`):
+  exactly `{schema, sites, max_runtime_s}`; `sites` sorted unique one-based
+  IDs (≤ 8, empty = no programming hardware), `max_runtime_s` 1..3600. The
+  file is part of the Package identity, so it is covered by the owner
+  `asset.execute` authorization; the parsed bytes must match the verified
+  SHA-256. Dispatch denies any declared Site outside the lease
+  (`ASSET_EXECUTION_SITE_NOT_LEASED`).
+- No executor, process launcher, Site transport, timeout enforcement or
+  child-process cancellation is wired yet (Stage C-2 / C-3). No Z2/DUT run.
+
 ## Host-only acceptance / outstanding
 
 - All three kinds have identical authority/identity/dispatch rules.

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -339,6 +341,47 @@ class SiteManager:
                 owner_kind=released[0],
                 owner_id=released[1],
             )
+
+    @contextmanager
+    def package_action_scope(self, job_id: str) -> Iterator[dict[str, Any]]:
+        """PPU-exclusive Job lease for ONE authorized Package Action.
+
+        The ``execution_scope`` adapter for ``ppu_asset_execution.dispatch``.
+        It uses the same execution lock, lease and Runtime quiesce as Site
+        programming Jobs: it raises PPU_BUSY instead of yielding while any
+        Job or quiesce is active, and while held every other Job, a second
+        Package Action and Runtime/Asset Set quiesce are refused. Yields the
+        authorized ``job_id`` and all enabled one-based Site IDs; it never
+        grants hardware access by itself.
+        """
+        if not isinstance(job_id, str) or re.fullmatch(r"[0-9a-f]{32}", job_id) is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "package action job_id must be 32 lowercase hex")
+        if not self._started:
+            raise PlasmaError(ErrorCode.INTERNAL_ERROR, "site manager is not started")
+        with self._execution_lock:
+            if self._runtime_quiesce.active():
+                raise PlasmaError(
+                    ErrorCode.PPU_BUSY, "PPU is quiesced for controlled runtime activation",
+                    recoverable=True, context={"runtime_activation": self._runtime_quiesce.snapshot()},
+                )
+            if self._execution_lease is not None:
+                raise PlasmaError(
+                    ErrorCode.PPU_BUSY, "PPU execution is active; Package Action cannot start",
+                    recoverable=True, context={"execution": self._execution_lease.snapshot()},
+                )
+            self._execution_lease = PPUExecutionLease(
+                owner_kind="package_action", owner_id=job_id, job_ids={job_id},
+            )
+        self.server_log.event(
+            "INFO", "ppu_execution_lease_acquired",
+            ppu_id=self.config.ppu.id, facility_id=self.config.ppu.facility_id,
+            owner_kind="package_action", owner_id=job_id,
+        )
+        try:
+            yield {"job_id": job_id, "owner_kind": "package_action",
+                   "site_ids": sorted(self.workers)}
+        finally:
+            self._release_execution_job(job_id)
 
     def execution_lease_snapshot(self) -> dict[str, Any]:
         with self._execution_lock:
