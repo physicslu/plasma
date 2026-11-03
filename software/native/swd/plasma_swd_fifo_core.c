@@ -22,6 +22,7 @@
 #define R_MODE 0x38u
 #define R_SWJ_WORD0 0x44u
 #define R_SWJ_LENGTH 0x64u
+#define R_IDLE_CYCLES 0x68u
 
 static int fault(struct plasma_swd_fifo *s, int code)
 {
@@ -60,6 +61,7 @@ int plasma_swd_fifo_init(struct plasma_swd_fifo *s,
     s->base = site_id == 1u ? PLASMA_SWD_SITE1_BASE : PLASMA_SWD_SITE2_BASE;
     s->max_polls = max_polls;
     s->next_tag = 1;
+    s->idle_cycles = PLASMA_SWD_IDLE_DEFAULT;
     return PLASMA_SWD_OK;
 }
 
@@ -80,12 +82,13 @@ int plasma_swd_fifo_admit(struct plasma_swd_fifo *s)
     if (read_word(s, R_MODE, &mode) || read_word(s, R_STATUS, &status) ||
         mode != 1u || !(status & 1u))
         return fault(s, PLASMA_SWD_BAD_RESPONSE);
+    /* MODE was 0 before this admission: the RTL restored IDLE_CYCLES=8. */
+    s->idle_cycles = PLASMA_SWD_IDLE_DEFAULT;
     s->admitted = true;
     return PLASMA_SWD_OK;
 }
 
-static int decode_swd(uint8_t cmd, bool read, uint32_t delay,
-                      uint8_t *private_cmd)
+static int decode_swd(uint8_t cmd, bool read, uint8_t *private_cmd)
 {
     uint8_t x = cmd & 0x1Eu;
     unsigned int parity = 0;
@@ -94,8 +97,6 @@ static int decode_swd(uint8_t cmd, bool read, uint32_t delay,
     if ((cmd & 0xC1u) || ((cmd >> 5) & 1u) != parity ||
         (bool)(cmd & 4u) != read)
         return PLASMA_SWD_BAD_ARG;
-    if (delay)
-        return PLASMA_SWD_UNSUPPORTED;
     const uint8_t ap = (cmd >> 1) & 1u;
     const uint8_t address_index = (cmd >> 3) & 3u;
     if (!ap && !read && address_index == 3u)
@@ -113,9 +114,15 @@ static int queue_transfer(struct plasma_swd_fifo *s, uint8_t cmd, bool read,
     /* OpenOCD swd_driver.read_reg() may pass value == NULL to discard a
      * read (e.g. dap_dp_init's DP CTRL/STAT read). The transfer still runs
      * with full ACK/parity checking; only publication is skipped. */
-    int status = decode_swd(cmd, read, hint, &private_cmd);
+    int status = decode_swd(cmd, read, &private_cmd);
     if (status)
         return status;
+    /* OpenOCD passes ap->memaccess_tck (default 255; Cortex-M examine sets
+     * 8) for every AP transfer and 0 for DP. Each command already ends with
+     * the RTL's IDLE_CYCLES clocks, so request max(8, hint), saturated. */
+    uint8_t idle = PLASMA_SWD_IDLE_DEFAULT;
+    if ((private_cmd & 1u) && hint > PLASMA_SWD_IDLE_DEFAULT)
+        idle = hint > PLASMA_SWD_IDLE_MAX ? PLASMA_SWD_IDLE_MAX : (uint8_t)hint;
     if (s->count == PLASMA_SWD_MAX_QUEUE)
         return PLASMA_SWD_QUEUE_FULL;
     struct plasma_swd_queue_op *op = &s->pending[s->count++];
@@ -124,6 +131,7 @@ static int queue_transfer(struct plasma_swd_fifo *s, uint8_t cmd, bool read,
     op->read = read;
     op->value = data;
     op->destination = dst;
+    op->idle_cycles = idle;
     return PLASMA_SWD_OK;
 }
 
@@ -149,6 +157,7 @@ int plasma_swd_fifo_queue_line_reset(struct plasma_swd_fifo *s)
     memset(op, 0, sizeof(*op));
     op->is_swj = true;
     op->bit_count = 0; /* RTL 64-clock line-reset encoding */
+    op->idle_cycles = PLASMA_SWD_IDLE_DEFAULT;
     return PLASMA_SWD_OK;
 }
 
@@ -223,6 +232,7 @@ int plasma_swd_fifo_queue_swj(struct plasma_swd_fifo *s,
     memset(op, 0, sizeof(*op));
     op->is_swj = true;
     op->bit_count = count;
+    op->idle_cycles = PLASMA_SWD_IDLE_DEFAULT;
     op->private_command = 0x00; /* SWJ has bit8 enabled at PUSH */
     memcpy(op->swj_bytes, payload, len);
     return PLASMA_SWD_OK;
@@ -233,6 +243,13 @@ static int push_one(struct plasma_swd_fifo *s,
 {
     uint32_t data = op->value;
     uint32_t command = op->private_command;
+    /* Snapshotted by the RTL at PUSH; write only on change, so a session that
+     * never needs more than 8 never touches the register. */
+    if (op->idle_cycles != s->idle_cycles) {
+        if (write_word(s, R_IDLE_CYCLES, op->idle_cycles))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        s->idle_cycles = op->idle_cycles;
+    }
     if (op->is_swj) {
         command = 0x100u | (op->bit_count & 0xFFu);
         if (op->bit_count <= 32u) {

@@ -13,6 +13,7 @@ struct fake_bus {
     uint32_t swj_len, stage[8], push_count, word_writes, barriers;
     uint32_t fail_barrier, fail_read, ack, completion_status;
     uint32_t fail_write_on_push;
+    uint32_t idle, idle_writes, idle_at_push[8];
 };
 
 static int fake_read(void *ctx, uint32_t address, uint32_t *v)
@@ -29,6 +30,7 @@ static int fake_read(void *ctx, uint32_t address, uint32_t *v)
     case 0x1Cu: *v = f->rx; break;
     case 0x24u: *v = f->levels; break;
     case 0x38u: *v = f->mode; break;
+    case 0x68u: *v = f->idle; break;
     default: *v = 0; break;
     }
     return 0;
@@ -43,8 +45,16 @@ static int fake_write(void *ctx, uint32_t address, uint32_t v)
     if (f->fail_write_on_push && off == 0x14u)
         return -1;
     ++f->word_writes;
-    if (off == 0x38u)
+    if (off == 0x38u) {
         f->mode = v;
+        if (v == 0u)
+            f->idle = 8u; /* RTL: MODE OFF restores the default */
+    }
+    if (off == 0x68u) {
+        assert(f->mode == 1u && v >= 8u && v <= 255u);
+        f->idle = v;
+        ++f->idle_writes;
+    }
     if (off == 0x28u)
         f->status = v & 1u;
     if (off == 0x64u)
@@ -53,6 +63,8 @@ static int fake_write(void *ctx, uint32_t address, uint32_t v)
         f->stage[(off - 0x44u) / 4u] = v;
     if (off == 0x14u) {
         f->pushed_cmd = v & 0x1FFu;
+        if (f->push_count < 8u)
+            f->idle_at_push[f->push_count] = f->idle;
         ++f->push_count;
         const bool swj = (v & 0x100u) != 0;
         const bool reading = !swj && (v & 2u) != 0;
@@ -80,6 +92,7 @@ static void setup(struct fake_bus *f, struct plasma_swd_fifo *s,
                   unsigned int site)
 {
     memset(f, 0, sizeof(*f));
+    f->idle = 8u;
     f->base = site == 1u ? PLASMA_SWD_SITE1_BASE : PLASMA_SWD_SITE2_BASE;
     const struct plasma_swd_word_io ops = {
         .ctx = f, .read32 = fake_read,
@@ -138,10 +151,39 @@ static void test_exact_atomic_swj_and_negative_inputs(void)
            PLASMA_SWD_BAD_ARG); /* parity/direction mismatch */
     assert(plasma_swd_fifo_queue_read(&site, 0x25u, &f.rx, 0u) ==
            PLASMA_SWD_BAD_ARG);
-    assert(plasma_swd_fifo_queue_read(&site, 0x24u, &f.rx, 1u) ==
-           PLASMA_SWD_UNSUPPORTED);
     assert(plasma_swd_fifo_queue_write(&site, 0x18u, 1u, 0u) ==
            PLASMA_SWD_UNSUPPORTED); /* DP TARGETSEL no-ACK */
+}
+
+static void test_ap_delay_hint_programs_idle_cycles_only_on_change(void)
+{
+    /* OpenOCD 5088: AP transfers carry ap->memaccess_tck (default 255,
+     * Cortex-M examine sets 8); DP transfers carry 0. Regression for the
+     * Z2 Blue Pill "Could not find MEM-AP" failure (hint was rejected). */
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    uint32_t idr = 0u, rd = 0u;
+    assert(plasma_swd_fifo_queue_read(&s, 0x24u, NULL, 0u) == 0);  /* DP */
+    assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &idr, 255u) == 0); /* AP IDR */
+    assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &idr, 1000u) == 0);/* saturate */
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 0x5u, 8u) == 0);  /* AP DRW */
+    assert(plasma_swd_fifo_queue_read(&s, 0x06u, &rd, 4u) == 0);   /* AP <8 */
+    assert(plasma_swd_fifo_queue_read(&s, 0x3Cu, &rd, 0u) == 0);   /* DP RDBUFF */
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(f.push_count == 6u);
+    const uint32_t want[6] = {8u, 255u, 255u, 8u, 8u, 8u};
+    for (unsigned int i = 0; i < 6u; ++i)
+        assert(f.idle_at_push[i] == want[i]);
+    assert(f.idle_writes == 2u); /* 255 once, back to 8 once */
+    /* A hint <= 8 session never touches the register (old-Image safe). */
+    struct fake_bus g;
+    struct plasma_swd_fifo t;
+    setup(&g, &t, 1);
+    assert(plasma_swd_fifo_queue_read(&t, 0x1Eu, &idr, 8u) == 0);
+    assert(plasma_swd_fifo_queue_write(&t, 0x3Au, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_run(&t) == 0);
+    assert(g.idle_writes == 0u && g.push_count == 2u);
 }
 
 static void test_discarded_read_runs_on_wire_without_publication(void)
@@ -289,6 +331,7 @@ int main(void)
 {
     test_two_sites_ordered_reads_and_writes();
     test_exact_atomic_swj_and_negative_inputs();
+    test_ap_delay_hint_programs_idle_cycles_only_on_change();
     test_discarded_read_runs_on_wire_without_publication();
     test_wait_fault_no_replay_and_pointer_safety();
     test_fifo_queue_bounds_and_tags();
