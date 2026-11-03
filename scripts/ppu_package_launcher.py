@@ -118,12 +118,17 @@ def make_package_executor(
     cancel_event: threading.Event | None = None,
     geteuid: Callable[[], int] = os.geteuid,
     poll_s: float = 0.05,
+    site_worker: Any | None = None,
 ) -> Callable[[Mapping[str, Any]], dict[str, Any]]:
     """Return the python / native-c executor for ``dispatch_asset_execution``.
 
     ``state_root`` holds the durable Package Action journal (``<job_id>.json``)
     and per-job private work directories. ``cancel_event`` is the Runtime
-    Job's cancellation signal.
+    Job's cancellation signal. ``site_worker`` (Stage C-3) is the only way a
+    Package declaring Sites can run: without it such Packages are refused
+    (``PACKAGE_SITE_TRANSPORT_NOT_WIRED``). With it, a Worker session bound
+    to this Job, its declared Sites and the child process group is opened
+    after spawn and always closed afterwards.
     """
     product_root = Path(product_root)
     python_executable = Path(python_executable)
@@ -144,7 +149,9 @@ def make_package_executor(
                  and type(entry.get("path")) is str and type(entry.get("sha256")) is str
                  and SHA64.fullmatch(entry["sha256"]),
                  "PACKAGE_LAUNCH_PLAN_INVALID")
-        _require(resources.get("sites") == [], "PACKAGE_SITE_TRANSPORT_NOT_WIRED")
+        sites = resources.get("sites")
+        _require(type(sites) is list and (sites == [] or site_worker is not None),
+                 "PACKAGE_SITE_TRANSPORT_NOT_WIRED")
         package_root = f"payload/packages/{plan['package_id']}/"
         _require(entry["path"].startswith(package_root) and ".." not in entry["path"].split("/"),
                  "PACKAGE_LAUNCH_ENTRYPOINT_DENIED")
@@ -174,6 +181,10 @@ def make_package_executor(
         stdout_path, stderr_path = work / ".stdout", work / ".stderr"
         env = {"PATH": "/usr/bin:/bin", "LANG": "C", "HOME": str(work),
                "PLASMA_JOB_ID": plan["job_id"], "PLASMA_PACKAGE_ID": plan["package_id"]}
+        if sites:
+            env["PLASMA_SITE_WORKER_SOCKET"] = str(site_worker.socket_path)
+        session = None
+        transport: dict[str, Any] = {"sites": list(sites), "session": "NOT_USED"}
         limit = resources["max_runtime_s"]
         result, exit_code, killed_signal = "FAILED", None, None
         started = time.monotonic()
@@ -186,6 +197,16 @@ def make_package_executor(
             pgid = child.pid
             deadline = started + limit
             reason = None
+            if sites:
+                try:
+                    session = site_worker.open_session(
+                        job_id=plan["job_id"], sites=list(sites), pgid=pgid,
+                        uid=geteuid(), max_runtime_s=limit)
+                    transport["session"] = "OPENED"
+                except Exception as exc:
+                    transport.update(session="DENIED", error=str(exc)[:120])
+                    reason = "SITE_SESSION_DENIED"
+                    _kill_group(pgid, signal.SIGKILL)
             while child.poll() is None:
                 if cancel_event is not None and cancel_event.is_set():
                     reason = "CANCELLED"
@@ -201,6 +222,13 @@ def make_package_executor(
                 time.sleep(poll_s)
             # Always kill and reap the whole group: no orphaned grandchildren.
             _kill_group(pgid, signal.SIGKILL)
+            if session is not None:
+                try:
+                    closed = site_worker.close_session(session["session_id"])
+                    transport.update(session="CLOSED", sealed_sites=closed.get("sealed_sites", []))
+                except Exception as exc:
+                    transport.update(session="CLOSE_FAILED", error=str(exc)[:120])
+                session = None
             child.wait()
             for _ in range(int(KILL_GRACE_S / poll_s)):
                 if not _group_alive(pgid):
@@ -210,7 +238,13 @@ def make_package_executor(
             exit_code = child.returncode
             if exit_code is not None and exit_code < 0:
                 killed_signal, exit_code = -exit_code, None
-            result = reason or ("SUCCEEDED" if exit_code == 0 else "FAILED")
+            result = ("FAILED" if reason == "SITE_SESSION_DENIED"
+                      else reason or ("SUCCEEDED" if exit_code == 0 else "FAILED"))
+            # Unknown hardware outcome: a sealed Site or an unconfirmed close.
+            hardware = ("NONE" if not sites else
+                        "UNKNOWN_SITE_SEALED" if transport.get("sealed_sites") else
+                        "UNKNOWN_SESSION_NOT_CLOSED" if transport["session"] == "CLOSE_FAILED" else
+                        "SITE_WORKER")
             receipt = {
                 "schema": RECEIPT_SCHEMA, **identity, "result": result,
                 "exit_code": exit_code, "signal": killed_signal,
@@ -220,14 +254,20 @@ def make_package_executor(
                 "launcher": "non-root-process-group", "uid": geteuid(),
                 "isolation": {"dedicated_uid": "NOT_QUALIFIED", "network": "NOT_QUALIFIED",
                               "syscall_filter": "NOT_QUALIFIED", "rlimits": "APPLIED"},
-                "site_ids": [], "hardware": "NONE",
+                "site_ids": list(sites), "hardware": hardware, "site_transport": transport,
             }
             _require(group_reaped, "PACKAGE_ACTION_PROCESS_GROUP_NOT_REAPED")
             final = {**record, "state": result.lower(), "finished_epoch_s": time.time(),
+                     "hardware": hardware,
                      "receipt_sha256": hashlib.sha256(json.dumps(receipt, sort_keys=True).encode()).hexdigest()}
             _atomic_json(record_path, final)
             return receipt
         except BaseException as exc:
+            if session is not None:
+                try:
+                    site_worker.close_session(session["session_id"])
+                except Exception:
+                    pass
             _atomic_json(record_path, {**record, "state": "outcome_unknown",
                                        "error": type(exc).__name__, "finished_epoch_s": time.time()})
             raise

@@ -109,6 +109,54 @@ native-c `trusted_executors` adapter, called by the non-root Runtime inside
   `NOT_QUALIFIED` and need a privileged helper or the Z2 permission matrix
   (separate owner decision). Z2 / DUT: NOT_RUN.
 
+## Stage C-3: single-appliance Site Worker (Host-only)
+
+Architecture: C-1 Job lease / authorization / quiesce → C-2 non-root Package
+executor → **one local Site Worker** → replaceable Hardware Adapter → PL.
+No broker framework, network service, session database, second Job engine,
+journal, receipt or FPGA loader.
+
+- `scripts/ppu_site_worker.py` (core): one Unix stream socket, one JSON line
+  request/response, protocol `plasma.ppu.site-worker.v1`. Peer identity is
+  `SO_PEERCRED` + kernel `/proc/<pid>/stat`, never a request claim.
+  - Control (`open_session`, `close_session`, `status`): ONLY the trusted
+    Runtime process (production: `plasma-server.service` MainPID), and
+    `open_session` requires the C-1 lease to be held by that `job_id`
+    (read-only Runtime control op `execution_lease`).
+  - Transport: ONLY a peer in the registered Package process group with the
+    same uid; a descendant that `setsid()`s out loses access. Request is
+    exactly `{protocol, op, site}`; `op` must be in the adapter allowlist;
+    the Site must be in the session, supported and not sealed; the lease is
+    re-checked; one in-flight operation per Site (`SITE_BUSY`).
+  - One session at a time (the C-1 Package Action lease is PPU-exclusive);
+    sessions are in memory only, so a Worker crash invalidates them.
+  - Fail-closed: adapter `TransportUnknown`, any adapter exception, timeout,
+    Runtime cancel (`close_session`) during an operation, or an FPGA identity
+    change during an operation **seal** the Site (persisted
+    `<seal_dir>/site<N>.sealed`, survives Worker restart, never auto-retried;
+    clearing is a separate operator recovery, not an IPC operation). An
+    identity change between operations invalidates the session. Startup
+    seals Sites with a leftover admission record, or all Sites while any
+    OpenOCD runs.
+- `scripts/ppu_site_adapter_abi5.py` (Hardware Adapter, Sites 1/2, op
+  `probe`): existing root Site admission → PS-local OpenOCD `plasma_swd`
+  (`dap init` + `dpreg 0`, fixed argv; no target/flash/erase/program/reset)
+  → revoke (always). **Single hardware owner**: the adapter never maps MMIO
+  or takes the ADR-0007 locks; OpenOCD's ps_owner does, as today. Refuses
+  while another OpenOCD or admission record exists, or the Root journal is
+  not `IMAGE` of the expected Image. SAFE_OFF not verified, kill, revoke
+  failure or uncertain admission → `TransportUnknown`.
+- C-2 wiring: `make_package_executor(..., site_worker=None)`. Default stays
+  `PACKAGE_SITE_TRANSPORT_NOT_WIRED`. With a Worker client, the session is
+  opened for (job, declared Sites, child process group, uid, max_runtime_s)
+  right after spawn (the Package retries `NO_SESSION_FOR_PEER` briefly) and
+  always closed; a refused session kills the Package (`FAILED`); a sealed
+  Site sets receipt `hardware: UNKNOWN_SITE_SEALED`.
+- Residual risk: Package and Runtime share uid `plasma` (C-2 dedicated UID
+  NOT_QUALIFIED), so a hostile Package could still attack the Runtime process
+  itself (e.g. ptrace, its control socket). Not deployed; no Z2/OpenOCD/DUT
+  execution; Sites 3–8 not qualified; no SPI/I²C.
+
 ## Host-only acceptance / outstanding
 
 - All three kinds have identical authority/identity/dispatch rules.
