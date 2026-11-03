@@ -108,6 +108,12 @@ static void test_native_word_access(void)
     assert(io1.read32(io1.ctx, PLASMA_SWD_SITE1_BASE + 0x3c, &id) != 0);
     assert(io1.write32(io1.ctx, PLASMA_SWD_SITE1_BASE + 0x40, 1) != 0);
     assert(a.checks == before); /* rejected before touching mapped memory */
+    /* 0x68 IDLE_CYCLES (PR #1285) is a whitelisted RW register. */
+    assert(io1.write32(io1.ctx, PLASMA_SWD_SITE1_BASE + 0x68, 20) == 0);
+    assert(page1[0x68/4] == 20);
+    assert(io1.read32(io1.ctx, PLASMA_SWD_SITE1_BASE + 0x68, &id) == 0 && id == 20);
+    assert(io1.write32(io1.ctx, PLASMA_SWD_SITE1_BASE + 0x6c, 1) != 0);
+    before = a.checks;
     assert(!plasma_swd_native_words_armv7_dmb());
 
     /* Each access must re-evaluate authority; no cached Root/voltage bit. */
