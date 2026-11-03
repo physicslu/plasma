@@ -17,6 +17,7 @@
 #ifndef PLASMA_SWD_OPENOCD5088_PS_OWNER_H
 #define PLASMA_SWD_OPENOCD5088_PS_OWNER_H
 
+#include "plasma_swd_fifo_core.h" /* PLASMA_SWD_* result codes */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
