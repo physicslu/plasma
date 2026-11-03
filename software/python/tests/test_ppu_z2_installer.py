@@ -42,12 +42,16 @@ def _fake_release(
     with zipfile.ZipFile(app, "w") as archive:
         archive.writestr("__main__.py", "print('ok')\n")
     catalog.write_text('{"schema_version":1}\n', encoding="utf-8")
+    ic_profiles = runtime / "data" / "ic-support" / "profiles"
+    ic_profiles.mkdir(parents=True)
+    (ic_profiles / "README.md").write_text("fixture\n", encoding="utf-8")
 
     runtime_manifest = {
         "schema_version": 1,
         "role": "ppu",
         "data": {
-            "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json"
+            "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json",
+            "ic_support_root": "data/ic-support",
         },
         "hardware_boundary": hardware_boundary
         if hardware_boundary is not None
@@ -230,8 +234,11 @@ def test_systemd_units_bind_absolute_isolated_python_and_keep_ps_only_boundary(t
         state_root=paths.state_root,
         log_root=paths.log_root,
     )
-    assert "sites: []" in config
+    assert "sites: []" not in config
     assert "max_supported_sites: 8" in config
+    ic_root = paths.current / "runtime" / "data" / "ic-support"
+    assert f"Environment=PLASMA_IC_SUPPORT_ROOT={ic_root}" in server
+    assert f"Environment=PLASMA_IC_SUPPORT_ROOT={ic_root}" in gateway
 
 
 def test_gateway_bind_is_explicit_and_not_wildcard() -> None:
@@ -387,3 +394,117 @@ def test_bootstrap_source_does_not_import_project_or_python311_only_tomllib() ->
     assert "--plasma-python" in source
     assert "release >= 3.11" in source
     assert "releaselevel" in source
+
+
+def test_rendered_config_lists_every_supported_site_disabled(tmp_path: Path) -> None:
+    # The Python 3.10 installer-only CI job runs without the Plasma package;
+    # the full suite (Python >= 3.11) validates with the real config loader.
+    try:
+        from plasma_core.config import load_config
+    except ImportError as exc:  # Python 3.10 bootstrap job: no Plasma package
+        pytest.skip(f"Plasma config loader unavailable: {exc}")
+
+    config_path = tmp_path / "ppu.yaml"
+    config_path.write_text(
+        installer.render_ppu_config(
+            ppu_id="z2-dev-01",
+            facility_id="lab",
+            display_name="Plasma Z2 PS",
+            state_root=tmp_path / "state",
+            log_root=tmp_path / "log",
+        ),
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    config.validate()
+    assert [site.id for site in config.sites] == list(range(1, 9))
+    assert all(site.enabled is False for site in config.sites)
+    assert {site.interface for site in config.sites} == {"mock"}
+    assert {site.target for site in config.sites} == {"STM32F103C8T6"}
+
+
+def _install_paths(tmp_path: Path):
+    return installer.InstallPaths(
+        product_root=tmp_path / "opt" / "plasma",
+        config_root=tmp_path / "etc" / "plasma",
+        state_root=tmp_path / "var" / "lib" / "plasma",
+        log_root=tmp_path / "var" / "log" / "plasma",
+        systemd_root=tmp_path / "etc" / "systemd" / "system",
+    )
+
+
+def _run_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, paths) -> list[tuple[str, ...]]:
+    artifact = _fake_release(tmp_path)
+    verified = installer.verify_release(artifact, extract_to=tmp_path / "verified")
+    monkeypatch.setattr(installer, "_chown_tree", lambda *args: None)
+    monkeypatch.setattr(installer.os, "chown", lambda *args: None)
+    monkeypatch.setattr(installer.pwd, "getpwnam", lambda name: types.SimpleNamespace(pw_uid=1001, pw_gid=1001))
+    monkeypatch.setattr(installer.grp, "getgrnam", lambda name: types.SimpleNamespace(gr_gid=1001))
+    calls: list[tuple[str, ...]] = []
+    installer.install_release(
+        verified,
+        python_runtime=installer.PythonRuntime(
+            paths.product_root / "python" / "3.12.13" / "bin" / "python3", "3.12.13", "armv7l"
+        ),
+        gateway_host="192.168.2.99",
+        paths=paths,
+        ppu_id="z2-dev-01",
+        facility_id="lab",
+        display_name="Plasma Z2 PS",
+        systemctl=lambda *args: calls.append(args),
+        health_check=lambda host: {"gateway": "alive", "execution": "ready"},
+        ensure_service_account=lambda: None,
+    )
+    return calls
+
+
+def test_upgrade_restarts_running_services_and_migrates_legacy_empty_sites(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _install_paths(tmp_path)
+    previous = paths.releases_root / "0.0.9-previous"
+    previous.mkdir(parents=True)
+    paths.current.symlink_to(previous)
+    paths.config_root.mkdir(parents=True)
+    legacy = installer.render_ppu_config(
+        ppu_id="kept-id", facility_id="lab", display_name="Kept",
+        state_root=paths.state_root, log_root=paths.log_root,
+    ).replace(installer._core.render_default_sites(), "sites: []\n")
+    assert "sites: []\n" in legacy
+    (paths.config_root / "ppu.yaml").write_text(legacy, encoding="utf-8")
+
+    calls = _run_install(tmp_path, monkeypatch, paths)
+
+    enable = calls.index(("enable", "--now", "plasma-web.service"))
+    assert calls[enable + 1:enable + 3] == [("restart", "plasma-server.service"), ("restart", "plasma-web.service")]
+    migrated = (paths.config_root / "ppu.yaml").read_text(encoding="utf-8")
+    assert "sites: []" not in migrated
+    assert 'id: "kept-id"' in migrated  # identity preserved, not re-rendered
+    evidence = json.loads((paths.install_root / "last-install.json").read_text(encoding="utf-8"))
+    assert evidence["site_desired_state"]["empty_sites_migrated_to_defaults"] is True
+
+
+def test_fresh_install_does_not_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _run_install(tmp_path, monkeypatch, _install_paths(tmp_path))
+    assert ("enable", "--now", "plasma-server.service") in calls
+    assert not [call for call in calls if call[0] == "restart"]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "sites:\n  - {id: 2, enabled: true, interface: openocd, target: STM32F103C8T6}\n",
+        "sites: []\nsites: []\n",
+        "  sites: []\n",
+        "sites: [] # operator\n",
+    ],
+)
+def test_empty_sites_migration_only_touches_the_exact_legacy_line(content: str) -> None:
+    assert installer.migrate_empty_sites(content.encode()) is None
+
+
+def test_empty_sites_migration_replaces_exact_legacy_line() -> None:
+    migrated = installer.migrate_empty_sites(b"ppu:\n  id: a\n\nsites: []\n")
+    assert migrated is not None
+    assert migrated.startswith("ppu:\n  id: a\n\nsites:\n  - {id: 1, enabled: false")
+    assert migrated.count("enabled: false") == 8

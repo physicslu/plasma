@@ -49,6 +49,9 @@ RELEASE_ROOT = "plasma-release"
 SERVICE_USER = "plasma"
 SERVICE_GROUP = "plasma"
 CONFIG_ROOT_MODE = 0o770
+MAX_SUPPORTED_SITES = 8
+DEFAULT_SITE_TARGET = "STM32F103C8T6"
+IC_SUPPORT_RELATIVE_ROOT = "data/ic-support"
 
 
 class Z2InstallerError(RuntimeError):
@@ -440,6 +443,11 @@ def _verify_runtime(root: Path) -> dict[str, object]:
         raise Z2InstallerError("PPU runtime Device Catalog manifest path is unsafe")
     if not (runtime / Path(*pure.parts)).is_file():
         raise Z2InstallerError("PPU runtime production Device Catalog manifest is missing")
+    ic_support_rel = data.get("ic_support_root")
+    if ic_support_rel != IC_SUPPORT_RELATIVE_ROOT:
+        raise Z2InstallerError("PPU runtime IC Support root must be data/ic-support")
+    if not (runtime / Path(*PurePosixPath(ic_support_rel).parts) / "profiles").is_dir():
+        raise Z2InstallerError("PPU runtime IC Support data is missing")
     return manifest
 
 
@@ -589,7 +597,7 @@ def render_ppu_config(
             "server:",
             "  host: 127.0.0.1",
             "  port: 9900",
-            "  max_supported_sites: 8",
+            f"  max_supported_sites: {MAX_SUPPORTED_SITES}",
             "  max_concurrent_jobs: 1",
             "  max_queue_depth_per_site: 16",
             f"  output_root: {state_root / 'output'}",
@@ -598,10 +606,20 @@ def render_ppu_config(
             "  max_map_bytes: 1048576",
             "  max_binary_bytes: 67108864",
             "",
-            "sites: []",
-            "",
+            render_default_sites(),
         ]
     )
+
+
+def render_default_sites(max_supported_sites: int = MAX_SUPPORTED_SITES) -> str:
+    """Every supported Site exists, disabled, so the Gateway desired-state path
+    (which edits existing Sites only) can enable and configure any of them."""
+    lines = ["sites:"]
+    for site_id in range(1, max_supported_sites + 1):
+        lines.append(
+            f'  - {{id: {site_id}, enabled: false, interface: "mock", target: "{DEFAULT_SITE_TARGET}"}}'
+        )
+    return "\n".join(lines) + "\n"
 
 
 def render_systemd_units(
@@ -626,6 +644,7 @@ def render_systemd_units(
         "ProtectSystem=strict",
         "Environment=PYTHONUNBUFFERED=1",
         f"Environment=PLASMA_DEVICE_CATALOG_MANIFEST={catalog}",
+        f"Environment=PLASMA_IC_SUPPORT_ROOT={current_runtime / Path(*PurePosixPath(IC_SUPPORT_RELATIVE_ROOT).parts)}",
     ]
     server = "\n".join(
         [
@@ -1006,6 +1025,11 @@ def install_release(
         systemctl("daemon-reload")
         systemctl("enable", "--now", "plasma-server.service")
         systemctl("enable", "--now", "plasma-web.service")
+        if previous is not None:
+            # enable --now does not restart an already running service; an
+            # upgrade must actually run the new release before health_check.
+            systemctl("restart", "plasma-server.service")
+            systemctl("restart", "plasma-web.service")
         readiness = dict(health_check(gateway_host))
     except Exception as activation_exc:
         try:

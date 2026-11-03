@@ -203,6 +203,10 @@ class Journal:
             os.close(directory_fd)
 
 
+class _RuntimeQuiesceDenied(DeploymentError):
+    """The running Runtime refused (or could not grant) its upgrade quiesce gate."""
+
+
 class DeploymentCoordinator:
     def __init__(
         self,
@@ -213,6 +217,7 @@ class DeploymentCoordinator:
         transaction_id_factory: Callable[[], str] = lambda: str(uuid.uuid4()),
         root_bundle_loader: Callable[[str], Mapping[str, Any]] | None = None,
         quiescence_lease: Callable[[], Any] | None = None,
+        runtime_restart_quiesce: Callable[[], Any] | None = None,
     ) -> None:
         self.paths = paths
         self.installer = installer
@@ -223,6 +228,7 @@ class DeploymentCoordinator:
         # and the Runtime's connection-held Job quiesce lease.
         self.root_bundle_loader = root_bundle_loader
         self.quiescence_lease = quiescence_lease
+        self.runtime_restart_quiesce = runtime_restart_quiesce
 
     def _installer_paths(self):
         return self.installer.InstallPaths(
@@ -1089,6 +1095,15 @@ class DeploymentCoordinator:
                         raise RuntimeError(QUALIFICATION_HEALTH_FAILURE)
                     return self.installer._health_ready(host)
 
+                if previous is not None:
+                    # The upgrade restarts the running Runtime: take its bounded
+                    # quiesce (refused while any Site executes) right before
+                    # activation so no Job/Package is admitted and then killed.
+                    quiesce = self.runtime_restart_quiesce or self._asset_helper().quiesce_runtime_for_restart
+                    try:
+                        quiesce()
+                    except Exception as exc:
+                        raise _RuntimeQuiesceDenied(str(exc)) from exc
                 self.journal.write(record, "activating")
                 evidence = self.installer.install_release(
                     verified,
@@ -1100,6 +1115,11 @@ class DeploymentCoordinator:
                     display_name=request.display_name,
                     health_check=health_check,
                 )
+            except _RuntimeQuiesceDenied as exc:
+                self.journal.write(
+                    record, "verify_failed", error_code="runtime_quiesce_denied", error_message=str(exc),
+                )
+                raise DeploymentError(f"runtime upgrade quiesce denied: {exc}") from exc
             except Exception as exc:
                 message = str(exc)
                 if "rollback also failed" in message:

@@ -226,18 +226,42 @@ The helper is `PartOf=plasma-web.service`; Gateway `Requires=` it. It is not ind
 
 ## First install versus upgrade
 
-A first install may create the fail-closed PS bootstrap topology:
+A first install creates every supported Site, **disabled**:
 
 ```yaml
 server:
   max_supported_sites: 8
 
-sites: []
+sites:
+  - {id: 1, enabled: false, interface: "mock", target: "STM32F103C8T6"}
+  # ... through id: 8
 ```
 
-This means capacity ceiling 8 and configured Site count 0; it does not create `SITE0` and does not hard-code eight Sites into the Web/API topology.
+The Gateway Site desired-state path (`POST /api/settings/sites/{id}` with a
+strong `If-Match` ETag, then runtime activation) edits **existing** Sites
+only, so every Site the PPU supports must exist in the canonical file. A
+disabled Site executes nothing; `site_id` stays one-based and `SITE0` remains
+invalid.
 
-An **upgrade is different**. Existing `/etc/plasma/ppu.yaml` is persisted product state and may contain operator-approved Site Desired records. P3 therefore preserves the existing canonical file instead of regenerating first-install `sites: []`. The release/service wiring changes; the canonical Desired content survives.
+An **upgrade is different**. Existing `/etc/plasma/ppu.yaml` is persisted product state and may contain operator-approved Site Desired records. P3 therefore preserves the existing canonical file. The single exception is a one-time migration: a file whose only Site list is the exact former first-install line `sites: []` gets that line replaced by the disabled default Sites above (evidence: `site_desired_state.empty_sites_migrated_to_defaults`). Any other Site list is preserved byte for byte.
+
+An upgrade also **restarts** `plasma-server.service` and `plasma-web.service`
+after `enable --now` (which never restarts a running unit), so the health check
+observes the new release. Before activation the Bootstrap deployment takes the
+running Runtime's bounded TTL quiesce (`quiesce`, 60 s); it is refused while any
+Site executes, and the upgrade then ends `verify_failed`
+(`runtime_quiesce_denied`) without mutating the installation.
+
+## IC Support data
+
+The Runtime kit ships the repository-owned IC Support **data** (`*.json`,
+`*.md`, `*.txt` under `data/ic-support`; no Python tooling) at
+`runtime/data/ic-support`, recorded as `data.ic_support_root` in
+`ppu-runtime.json`. Both `plasma-server.service` and `plasma-web.service` set
+`PLASMA_IC_SUPPORT_ROOT=/opt/plasma/current/runtime/data/ic-support`. Without
+it an enabled non-mock Site makes the Runtime fail closed at start
+(`ICSupportIntegrityError`), and Gateway device search cannot resolve IC
+Support.
 
 ## Site Desired versus Runtime
 
