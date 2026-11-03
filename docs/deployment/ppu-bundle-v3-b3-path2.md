@@ -2,7 +2,7 @@
 
 > **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) explains how this route relates to the other PPU deployment routes.
 
-> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+> **Terminology update (2026-11-03):** Current Bundle stages are **B1 Receive → B2 Admission → B3 Install/Verify**. The former **B4** means historical/internal Active Set selection and recovery, **not a separate operator step**. See [Install → Run → Result](../architecture/ppu-install-run-result.md) and the [glossary](../glossary.md#b1b2b3).
 
 > **Archived evidence only. DO NOT run these historical commands on a current PPU.**
 > The Smoke-only Path 2 scripts and pinned factory policy have been retired
