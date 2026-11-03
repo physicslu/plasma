@@ -371,7 +371,7 @@ def test_c3_binds_exact_firmware_bytes_for_flash_cycle(tmp_path):
         payload = b"PLASMA-C3-FIRMWARE"
         digest = hashlib.sha256(payload).hexdigest()
         (r.image_root / (JOB + ".bin")).write_bytes(payload)
-        child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\\n")
+        child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
         session = r.open(child)
         binding = r.client.bind_image(
             session["session_id"], icpn="STM32F103C8T6",
@@ -397,7 +397,7 @@ def test_c3_rejects_unbound_or_mismatched_firmware(tmp_path):
     try:
         payload = b"GOOD-FIRMWARE"
         (r.image_root / (JOB + ".bin")).write_bytes(payload)
-        child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\\n")
+        child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
         session = r.open(child)
         with pytest.raises(worker.SiteWorkerDenied, match="IMAGE_SHA256_MISMATCH"):
             r.client.bind_image(
