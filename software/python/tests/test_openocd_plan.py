@@ -8,6 +8,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.models import ExecutionImageRef, JobRequest
 from plasma_interfaces.openocd import OpenOCDInterface
+from plasma_interfaces.openocd_executor import compile_flash_cycle
 from plasma_interfaces.openocd_plan import IMAGE_ARTIFACT_TOKEN, OpenOCDPlanCompiler
 
 
@@ -95,8 +96,8 @@ class OpenOCDPlanCompilerTests(unittest.TestCase):
             site_id=2, operation=Operation.PROGRAM,
             target="STM32F103C8T6", image=image,
         )
-        plan = self.compiler.compile_flash_cycle(
-            self.c8, request, configured_target_config=TARGET_CFG
+        plan = compile_flash_cycle(
+            self.compiler, self.c8, request, configured_target_config=TARGET_CFG
         )
         self.assertEqual(plan.commands, (
             "init",
@@ -116,7 +117,8 @@ class OpenOCDPlanCompilerTests(unittest.TestCase):
 
     def test_full_flash_cycle_rejects_non_program_job(self) -> None:
         with self.assertRaises(PlasmaError) as caught:
-            self.compiler.compile_flash_cycle(
+            compile_flash_cycle(
+                self.compiler,
                 self.c8,
                 JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103C8T6"),
                 configured_target_config=TARGET_CFG,
