@@ -216,7 +216,8 @@ ADI policy (reconnect, sticky-error handling, posted reads) stays in OpenOCD.
 
 | Duty | Behaviour |
 |---|---|
-| `read_reg`/`write_reg` | Queued (16 entries); a full queue is executed immediately, its failure is also returned by the next `run()` |
+| `read_reg`/`write_reg` | Queued (256 entries, one 1-KiB TAR block); a full queue is executed immediately, its failure is also returned by the next `run()` |
+| `run()` (PR #1287) | Pipelined: up to 16 commands outstanding in the RTL command FIFO, completions consumed in order. Mid-batch WAIT: drain, ABORT, re-push from the waited command (relies on ORUNDETECT; a later OK completion is reported, never retried). PARITY/TIMEOUT/ABORT: `CONTROL=4` discards unexecuted commands before RW1C `ERROR` |
 | `ap_delay_hint` | AP transfers use `max(8, hint)` (≤ 255) trailing idle clocks via `0x68 IDLE_CYCLES`, written only on change |
 | ACK WAIT | Completion popped, DP ABORT `0x1E`, same transfer retried (64 max, then blocked) |
 | ACK FAULT, no ACK, NEED_RESET | Completion popped, error returned, Site stays usable so OpenOCD can reconnect |
@@ -249,3 +250,31 @@ reset. LA2016 + sigrok SWD decode: every request ACK OK, 0 WAIT/FAULT,
 54 clocks per transaction, 2.000 µs period, SWCLK active ~76 % during
 write/read (ST-LINK reference: 1,288 WAIT, 86 %). Evidence (local):
 `.work/z2-bluepill-heartbeat-flash-20261103/`.
+
+## 10. 2026-11-04: pipelined adapter and `reset halt` (PR #1287) — PASS
+
+Whole flow in **one** OpenOCD session (`flow_tpl.py`), LA2016 recording the
+entire flow continuously (`la_full.py`, 50 MHz, 8 s, ~1.6 MB `.sr`):
+`init; reset halt; poll off; flash probe` → DPIDR → erase → write → verify →
+read → `reset run`, separated by 300 ms SWCLK-idle gaps.
+
+**Use `reset halt`, not `halt`.** With `halt` the write failed whenever the
+heartbeat firmware was running when halted (100 % correlation over 13 runs,
+pipelined and non-pipelined alike): the stm32f1x async algorithm never
+started (`rp` stayed at the FIFO start, `timeout waiting for algorithm`), with
+the application's clocks/peripherals still configured. After a SYSRESETREQ
+`reset halt` it passed 5/5 from a running firmware. CPU then runs at 8 MHz
+HSI, so on-target write/verify algorithms are slower than after `halt`.
+
+Same flow, 500 kHz, SWCLK active fraction per action (LA, sigrok-decoded,
+every request ACK OK):
+
+| Action | Non-pipelined `b916b9f3` | Pipelined `b8a7db67` |
+|---|---|---|
+| erase | 453 ms | 436 ms (Flash BSY polling dominates) |
+| write 18,768 B | 755 ms, 77 % | **686 ms, 93 %** |
+| verify | 291 ms, 75 % | 286 ms, 84 % |
+| read (dump) | 665 ms, 77 % | **530 ms, 96 %** |
+| requests / ACK | 13,398, all OK | 14,146, all OK |
+
+ST-LINK reference: 86 % (program), 94 % (verify) at 100 kHz.
