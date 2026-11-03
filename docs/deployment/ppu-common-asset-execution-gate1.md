@@ -1,5 +1,7 @@
 # PPU — One Asset Execution Layer (Python / Native C / FPGA)
 
+**Operator lifecycle (2026-11-03):** [Install → Run → Result](../architecture/ppu-install-run-result.md). Stage B stops at B3 and has no separate B4 operator action; C-1/C-2/C-3 are internal modules beneath Run Job. This is an operator-interface decision, not a claim that Runtime Trigger or Z2 HIL is complete.
+
 **Gate 1 Host-only.** Authorization follows [Owner Operation Authorization](ppu-owner-operation-authorization.md) (replaces the PR #1251 per-Bundle Master allowlist). All execution callbacks are Host-only mocks in this PR. No Root/hardware operation is authorized.
 
 ## Shared execution contract
