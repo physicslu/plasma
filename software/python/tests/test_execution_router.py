@@ -397,7 +397,7 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
                     map_data={
                         "sections": [{
                             "name": "full_image",
-                            "address": 0x08000000,
+                            "address": 0,
                             "length": len(image),
                         }],
                     },
