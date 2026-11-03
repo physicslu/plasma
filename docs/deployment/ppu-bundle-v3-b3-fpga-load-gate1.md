@@ -1,16 +1,16 @@
-# Bundle v3 B3 — Install, Activate and Load the FPGA Image in One Transaction (Gate 1 plan)
+# Bundle v3 B3 — Install/Verify with Explicit FPGA Load and Active Set Selection
 
-> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+> **Terminology update (2026-11-03):** Current Bundle stages are **B1 Receive → B2 Admission → B3 Install/Verify**. The former **B4** means historical/internal Active Set selection and recovery, **not a separate operator step**. See [Install → Run → Result](../architecture/ppu-install-run-result.md) and the [glossary](../glossary.md#b1b2b3).
 
 **State:** Gate 1 approved by the owner on 2026-11-02 (§3 implementation,
 §4 Host-only verification and §4 physical HIL). Gate 2 (merge) is separate.
-**Owner decision (2026-11-02):** an explicitly requested B3 of a Bundle that
-contains an `fpga-image` Package must also load that FPGA Image. It should not
-wait for a separate B4. This revises the boundary in
+**Owner decision (2026-11-02):** the explicit B3 `fpga_load:true` request for a Bundle containing an `fpga-image` Package loads that Image and, only after Identity PASS, publishes its Active Set in the same transaction. B3 `fpga_load:false` remains install-only. No separate B4 operator request is required. This revises the boundary in
 [Bundle → Packages → Files](../architecture/ppu-canonical-bundle-packages.md)
 (PR #1225), where B3 never reconfigures the FPGA.
 **Out of scope:** the ABI-v5 SWD RTL sample-point fix (separate Gate 1), DUT
 operations, Flash, OpenOCD packaging, publisher signing.
+
+**Operator workflow update (2026-11-03):** This document records the B3 FPGA-load implementation and its prior Gate evidence. The current product interface is [Install → Run → Result](../architecture/ppu-install-run-result.md), not B1 → B2 → B3 → B4. Internal atomic Set selection, Quiesce, Root Guard and failure recovery remain mandatory.
 
 ## 1. Problem
 
