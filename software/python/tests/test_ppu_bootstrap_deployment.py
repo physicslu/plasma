@@ -262,3 +262,35 @@ def test_fresh_install_needs_no_runtime_quiesce(tmp_path: Path):
     result = _coordinator(tmp_path, installer, runtime_restart_quiesce=must_not_run).execute(_request(tmp_path))
     assert result["result"] == "PASS"
     assert "quiesce" not in installer.calls
+
+
+def test_kit_standalone_upgrade_without_runtime_socket_is_terminal_not_recovery(tmp_path: Path, monkeypatch):
+    """Regression for Z2 #1282 D2: the Runtime upgrade runs this module from the
+    Z2 PS kit scripts/ directory (no sibling helpers). A missing helper or an
+    unavailable Runtime gate must end verify_failed, never recovery_required."""
+    import importlib.util
+    import shutil
+    import sys
+
+    kit_scripts = tmp_path / "kit-scripts"
+    kit_scripts.mkdir()
+    target = kit_scripts / "ppu-bootstrap-deployment.py"
+    shutil.copyfile(Path(deployment.__file__), target)
+    spec = importlib.util.spec_from_file_location("plasma_kit_standalone_deployment_tx", target)
+    standalone = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = standalone
+    spec.loader.exec_module(standalone)
+    monkeypatch.setattr(standalone, "RUNTIME_CONTROL_SOCKET", tmp_path / "absent" / "control.sock")
+
+    installer = FakeInstaller()
+    counter = iter([100.0 + i for i in range(30)])
+    coordinator = standalone.DeploymentCoordinator(
+        paths=_paths(tmp_path), installer=installer,
+        clock=lambda: next(counter), transaction_id_factory=lambda: "tx-kit",
+    )
+    with pytest.raises(standalone.DeploymentError, match="RUNTIME_CONTROL_SOCKET_UNAVAILABLE"):
+        coordinator.execute(_request(tmp_path))
+    assert "activate" not in installer.calls
+    journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
+    assert journal["state"] == "verify_failed"
+    assert journal["error_code"] == "runtime_quiesce_denied"
