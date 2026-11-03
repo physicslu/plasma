@@ -16,7 +16,7 @@ import pytest
 from .ppu_owner_authorization_fixture import OWNER_TOKEN, owner as owner_module
 from .test_ppu_b3_z2_install_gate1 import b3_request, make_coordinator
 from .test_ppu_bundle_v3_packages_contract import (
-    ROOT, bundle_v3, contract, TARGET, SOURCE,
+    PARTS, ROOT, bundle_v3, contract, TARGET, SOURCE,
 )
 
 modpath = ROOT / "scripts" / "ppu_asset_execution.py"
@@ -50,17 +50,30 @@ class Owner:
                 "owner_credential": self.credential}
 
 
-def lease(request):
+RESOURCES = b'{"schema":"plasma.ppu.package-resources.v1","sites":[2],"max_runtime_s":120}'
+
+
+def with_resources(parts, raw=RESOURCES, kinds=("python", "native-c")):
+    """Executable Packages declare their Sites/timeout (Stage C-1)."""
+    out = []
+    for package_id, kind, requires, files in parts:
+        if kind in kinds:
+            files = {**files, "config/plasma-package-resources.json": raw}
+        out.append((package_id, kind, requires, files))
+    return out
+
+
+def lease(request, site_ids=(1, 2)):
     """Runtime Job lease for exactly this authorized Job."""
     @contextmanager
     def scope():
-        yield {"job_id": request.job_id}
+        yield {"job_id": request.job_id, "site_ids": list(site_ids)}
     return scope
 
 
-def _ready_fixture(tmp_path):
+def _ready_fixture(tmp_path, parts=None):
     archive, digest = bundle_v3(
-        tmp_path / "source",
+        tmp_path / "source", parts=with_resources(PARTS) if parts is None else parts,
         mutate=lambda m: m.__setitem__("actions", ["install", "verify"]),
     )
     co = make_coordinator(tmp_path)
@@ -130,7 +143,7 @@ def test_one_dispatch_contract_requires_trusted_runtime_lease_and_adapter(
         assert hold["held"] is False
         hold["held"] = True
         try:
-            yield {"job_id": JOB}
+            yield {"job_id": JOB, "site_ids": [1, 2]}
         finally:
             hold["held"] = False
 
