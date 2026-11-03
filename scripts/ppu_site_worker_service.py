@@ -26,15 +26,13 @@ STATE = Path(os.environ.get("STATE_DIRECTORY", "/var/lib/plasma-site-worker"))
 RUNTIME_CONTROL = Path("/run/plasma-server/control.sock")
 OPENOCD_ROOT = Path("/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154-plasma-swd-954344c5717a")
 PYTHON = Path("/opt/plasma/python/3.12.13/bin/python3")
-EXPECTED_IMAGE = "z2-independent-swd-v5-bd976140"
 
 
 def build(run_dir: Path = RUN, state_dir: Path = STATE, *, adapter=None,
           runtime_pid=None, lease_verifier=None, control_gid=None, transport_gid=None):
     if os.geteuid() != 0 and adapter is None:
         raise SystemExit("SITE_WORKER_REQUIRES_ROOT")
-    adapter = adapter or Abi5OpenocdAdapter(openocd_root=OPENOCD_ROOT, python=PYTHON,
-                                            expected_image_id=EXPECTED_IMAGE)
+    adapter = adapter or Abi5OpenocdAdapter(openocd_root=OPENOCD_ROOT, python=PYTHON)
     core = worker.SiteWorkerCore(
         adapter,
         runtime_pid=runtime_pid or worker.systemd_main_pid("plasma-server.service"),
