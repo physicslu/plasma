@@ -10,7 +10,7 @@
 **Out of scope:** the ABI-v5 SWD RTL sample-point fix (separate Gate 1), DUT
 operations, Flash, OpenOCD packaging, publisher signing.
 
-**Operator workflow update (2026-11-03):** This document records the B3 FPGA-load implementation and its prior Gate evidence. The current product interface is [Install → Run → Result](../architecture/ppu-install-run-result.md), not B1 → B2 → B3 → B4. Internal atomic Set selection, Quiesce, Root Guard and failure recovery remain mandatory.
+**Operator workflow update (2026-11-03, revised):** This document records the originally approved explicit B3 FPGA-load mechanism and its evidence. The **new target** [Install → Run → Result](../architecture/ppu-install-run-result.md) makes a successful standard B3 Install select Active; for Bundles with an FPGA Image the caller **requests authorized FPGA load by default**, without a separate operator action. For non-FPGA Bundles, target B3 selects Active without PL loading; that path is not yet implemented. No B4, no implicit load from omitted wire fields, and all existing Quiesce, Root Guard, Identity and recovery guards remain mandatory.
 
 ## 1. Problem
 
