@@ -41,7 +41,7 @@ B1/B2/B3 and C-1/C-2/C-3 are **internal components**, not six operator actions. 
 - **C-1:** authoritative PPU-exclusive Package Action lease, Site resource declaration, Runtime quiescence and authorization.
 - **C-2:** controlled Python/native-C Package lifecycle, dedicated-UID integration design, timeout/cancel, journal and receipt.
 - **C-3:** local Site Worker with a restricted Hardware Adapter. The present ABI-v5 adapter is **Site 1/2 `probe` only**, not Package-driven Flash Erase/Program/Verify.
-- Stage C production integration is present in source, but the formal `plasma-server` Runtime trigger/caller and Z2 deployment/qualification are separate outstanding tasks. Eight-Site concurrent execution is not qualified.
+- Stage C Runtime trigger/caller has **subsequently been added on main as Host-only integration**, but is disabled without its explicit Runtime configuration. The installed Z2 Runtime still predates the Stage C release until independently updated; real UID/systemd/Worker/OpenOCD/DUT integration remains **NOT_QUALIFIED**. Eight-Site concurrent execution is not qualified.
 
 ## Result, rollout and non-goals
 
