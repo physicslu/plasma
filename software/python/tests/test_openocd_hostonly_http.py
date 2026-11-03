@@ -39,7 +39,7 @@ class FlashSimulator:
     """Fake process launcher used only through the explicit test injection."""
 
     def __init__(self) -> None:
-        self.memory = bytearray(b"\\xff" * FLASH_BYTES)
+        self.memory = bytearray(bytes([0xFF]) * FLASH_BYTES)
         self.commands: list[str] = []
 
     async def launch(self, *argv, **_kwargs):
@@ -52,7 +52,7 @@ class FlashSimulator:
                 if int(start, 0) != FLASH_BASE or int(length, 0) != FLASH_BYTES:
                     rc = 2
                     break
-                self.memory[:] = b"\\xff" * FLASH_BYTES
+                self.memory[:] = bytes([0xFF]) * FLASH_BYTES
             elif command.startswith(("flash write_image ", "flash verify_image ")):
                 staged = re.search(r"\\{([^{}]+)\\}", command)
                 if staged is None:
