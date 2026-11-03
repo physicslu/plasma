@@ -19,6 +19,9 @@ DEVMEM_INDEPENDENT_IMAGES = {
     # PR #1255 head bd976140e: SWDIO sampled before the SWCLK rising edge.
     "z2-independent-swd-v5-bd976140":
         "19143158b47e79569b673660315e58cd0765b52c7e60e6258422c437aea3da40",
+    # PR #1285 head d0add58c3: 0x68 IDLE_CYCLES (OpenOCD AP memaccess delay).
+    "z2-independent-swd-v5-d0add58c":
+        "0d99ecafcb570c39217aa39723ccfcf593ae2021158599085a01436665374bc7",
 }
 
 

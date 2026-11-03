@@ -32,7 +32,22 @@ def test_deploy_manifest_pinned_bytes():
 def test_retired_image_is_not_released_or_trusted():
     assert not (ROOT / "pl/hil/releases/swd-independent-ab79b04e").exists()
     assert set(admission.DEVMEM_INDEPENDENT_IMAGES) == {
-        "z2-independent-swd-v5-bd976140"}
+        "z2-independent-swd-v5-bd976140", "z2-independent-swd-v5-d0add58c"}
+
+
+def test_d0add58c_release_pairs_with_root_table():
+    """PR #1285 IDLE_CYCLES Image (Vivado run 41648270405): same geometry."""
+    rel = ROOT / "pl/hil/releases/swd-independent-d0add58c/plasma-image-manifest.json"
+    assert hashlib.sha256(rel.read_bytes()).hexdigest() == (
+        "4e33fee583611f70c60d30f971cc8499c165486b4621119a6b219da6fd3f1d78")
+    release = root.parse_image_manifest_bytes(rel.read_bytes())
+    assert release.image_id == "z2-independent-swd-v5-d0add58c"
+    assert admission.DEVMEM_INDEPENDENT_IMAGES[release.image_id] == (
+        release.firmware_sha256)
+    old = json.loads(DEPLOY.read_text())
+    new = json.loads(rel.read_text())
+    differ = {k for k in old if old[k] != new[k]}
+    assert differ == {"image_id", "firmware_name", "firmware_sha256"}
 
 
 def test_devmem_owner_declaration():

@@ -56,7 +56,7 @@ def contract_file(tmp_path, *entries):
 
 # --- shipped trusted contracts (ABI v5 independent: bd976140; ab79b04e retired) ----
 
-SHIPPED_BUILDS = ("bd976140",)
+SHIPPED_BUILDS = ("bd976140", "d0add58c")
 RETIRED_BUILDS = ("ab79b04e",)
 
 
