@@ -106,9 +106,7 @@ multi-version package co-installation. Existing v3 `packages[].requires`
 continues to describe **dependencies inside one delivered Bundle**, not
 the set of operations in a Job.
 
-B1/B2/B3 continue to mean Receive, Admission, and Install/Verify. A B3
-request without `fpga_load` installs files only: it does not activate the
-Set, reconfigure the FPGA, or execute a Programming Job.
+B1/B2/B3 continue to mean Receive, Admission and Install/Verify. **Current code:** a B3 request with `fpga_load:false` installs/stages files only and does not select Active, reconfigure FPGA or execute a Job. **New product target (2026-11-03):** successful standard B3 Install selects the verified Active Set. A Bundle **without** an FPGA Image selects Active without loading PL; a Bundle **with** an FPGA Image requests guarded FPGA loading by default, with explicit per-operation owner authorization, and publishes Active only after Image Identity PASS. This does not change the current wire default or silently grant FPGA-load authority. See [Install → Run → Result](ppu-install-run-result.md).
 
 **B3 FPGA load (owner decision 2026-11-02, [Gate 1](../deployment/ppu-bundle-v3-b3-fpga-load-gate1.md)).**
 A B3 request with an explicit `"fpga_load": true` for a Bundle that contains
@@ -126,11 +124,7 @@ The receipt is `plasma.ppu.b3-deployment-receipt.v2` and reports
 alone and never performs a DUT operation. A PPU is READY only after the
 selected Set and physical/runtime prerequisites are proven.
 
-The existing B3 install path `/opt/plasma/bundles/<bundle-name>` has
-**no generic Active Asset Set feature today**, and B3 physical acceptance
-covers only the approved Smoke Bundle from PR #1241. The canonical Set
-identity algorithm, activation API, persistence and recovery remain
-unimplemented, despite this architecture choice.
+**Historical PR #1241 physical baseline:** B3 used `/opt/plasma/bundles/<bundle-name>` and the reviewed Smoke Bundle. Later verified content-addressed staging, single Active Set and explicit B3 FPGA-load/Active publishing were implemented separately. The target no-FPGA B3 automatic Active selection and default authorized FPGA-load caller behavior **remain implementation gaps**, and real Z2 qualification remains independent; do not infer qualification from the old baseline.
 
 **Terminology:** Bundle-as-Assets is a system-level classification; a
 Bundle is **not identical to one** `Programming Asset` object from
