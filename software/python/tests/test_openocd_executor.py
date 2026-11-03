@@ -17,7 +17,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.models import JobRequest
 from plasma_interfaces.openocd import OpenOCDInterface
-from plasma_interfaces.openocd_executor import OpenOCDPlanExecutor
+from plasma_interfaces.openocd_executor import OpenOCDPlanExecutor, compile_flash_cycle
 from plasma_interfaces.openocd_plan import OpenOCDPlanCompiler
 
 
@@ -180,8 +180,8 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
         selected_plan = plan or (
-            self.compiler.compile_flash_cycle(
-                self.support, request, configured_target_config=TARGET_CFG
+            compile_flash_cycle(
+                self.compiler, self.support, request, configured_target_config=TARGET_CFG
             )
             if flash_cycle else self._plan(request)
         )
