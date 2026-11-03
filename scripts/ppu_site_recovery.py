@@ -9,8 +9,9 @@ procedure is the ONLY way back, and only when every precondition is proven:
   2. the Site Worker service is NOT running (no in-memory owner of the seal);
   3. the Runtime reports no active execution lease (or the Runtime is down);
   4. no OpenOCD process and no Site admission record (single owner absent);
-  5. the Root journal is ``IMAGE`` of the expected FPGA Image (current boot);
-  6. the Hardware Adapter re-verifies SAFE_OFF for that Site.
+  5. the Hardware Adapter re-verifies SAFE_OFF for that Site.
+
+FPGA Image lifecycle is owned by the PPU Loader, never by Site recovery.
 
 Every attempt writes a root-private evidence record. On success the marker is
 MOVED into the evidence directory (never deleted); on any failure the Site
@@ -44,7 +45,7 @@ def _marker(seal_dir: Path, site: int) -> tuple[Path, dict | None]:
 
 
 def checks(site: int, *, adapter, seal_dir: Path, worker_active: Callable[[], bool | None],
-           runtime_lease: Callable[[], str], expected_image_id: str) -> dict[str, Any]:
+           runtime_lease: Callable[[], str]) -> dict[str, Any]:
     """Read-only precondition matrix. Values: PASS / FAIL / UNKNOWN."""
     path, marker = _marker(seal_dir, site)
     out: dict[str, Any] = {"site": site, "marker_path": str(path), "marker": marker}
@@ -63,12 +64,8 @@ def checks(site: int, *, adapter, seal_dir: Path, worker_active: Callable[[], bo
     except Exception as exc:
         out["no_external_owner"] = "UNKNOWN"
         out["owner_error"] = type(exc).__name__
-    ident = dict(adapter.identity())
-    out["identity"] = ident
-    out["fpga_identity"] = ("PASS" if ident.get("status") == "IMAGE"
-                            and ident.get("image_id") == expected_image_id else "FAIL")
     keys = ("seal_present", "site_supported", "worker_stopped", "no_active_job",
-            "no_external_owner", "fpga_identity")
+            "no_external_owner")
     out["preconditions"] = "PASS" if all(out[k] == "PASS" for k in keys) else "BLOCKED"
     return out
 
@@ -93,11 +90,11 @@ def _write_evidence(evidence_dir: Path, site: int, outcome: str, payload: Mappin
 
 def recover(site: int, *, operator: str, adapter, seal_dir: Path, evidence_dir: Path,
             worker_active: Callable[[], bool | None], runtime_lease: Callable[[], str],
-            expected_image_id: str, timeout_s: float = 60.0) -> dict[str, Any]:
+            timeout_s: float = 60.0) -> dict[str, Any]:
     if not re.fullmatch(r"[A-Za-z0-9_.@-]{1,64}", operator or ""):
         raise SystemExit("OPERATOR_NAME_REQUIRED")
     pre = checks(site, adapter=adapter, seal_dir=seal_dir, worker_active=worker_active,
-                 runtime_lease=runtime_lease, expected_image_id=expected_image_id)
+                 runtime_lease=runtime_lease)
     record: dict[str, Any] = {"operator": operator, "time": time.time(), "checks": pre}
     if pre["preconditions"] != "PASS":
         record["result"] = "DENIED_STILL_SEALED"
@@ -112,9 +109,9 @@ def recover(site: int, *, operator: str, adapter, seal_dir: Path, evidence_dir: 
         return record
     # Re-check after the hardware step: nothing may have changed meanwhile.
     post = checks(site, adapter=adapter, seal_dir=seal_dir, worker_active=worker_active,
-                  runtime_lease=runtime_lease, expected_image_id=expected_image_id)
+                  runtime_lease=runtime_lease)
     record.update(safe_off=verify, post_checks=post)
-    if post["preconditions"] != "PASS" or post["identity"] != pre["identity"]:
+    if post["preconditions"] != "PASS":
         record["result"] = "DENIED_STILL_SEALED"
         record["evidence"] = str(_write_evidence(evidence_dir, site, "denied", record))
         return record
@@ -142,8 +139,7 @@ def main(argv: list[str]) -> int:  # pragma: no cover - thin production wiring
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
         return 64
     site = int(argv[1])
-    adapter = Abi5OpenocdAdapter(openocd_root=svc.OPENOCD_ROOT, python=svc.PYTHON,
-                                 expected_image_id=svc.EXPECTED_IMAGE)
+    adapter = Abi5OpenocdAdapter(openocd_root=svc.OPENOCD_ROOT, python=svc.PYTHON)
 
     def worker_active() -> bool | None:
         r = subprocess.run(["systemctl", "is-active", "plasma-site-worker.service"],
@@ -159,7 +155,7 @@ def main(argv: list[str]) -> int:  # pragma: no cover - thin production wiring
         return "unknown" if snap is None else "busy" if snap.get("busy") else "idle"
 
     common = dict(adapter=adapter, seal_dir=svc.STATE / "seals", worker_active=worker_active,
-                  runtime_lease=runtime_lease, expected_image_id=svc.EXPECTED_IMAGE)
+                  runtime_lease=runtime_lease)
     if argv[0] == "diagnose":
         out = checks(site, **common)
     else:
