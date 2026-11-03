@@ -3,7 +3,7 @@
 > **Terminology update (2026-11-03):** Current Bundle stages are **B1 Receive → B2 Admission → B3 Install/Verify**. The former **B4** means historical/internal Active Set selection and recovery, **not a separate operator step**. See [Install → Run → Result](ppu-install-run-result.md) and the [glossary](../glossary.md#b1b2b3).
 
 **Decision recorded:** 2026-11-02 (owner discussion).  
-**Status:** Owner-approved architecture decision (2026-11-02), **updated for the 2026-11-03 Install → Run → Result simplification**. Portions of B3 / Active Set and Stage C are implemented Host-only; Console reconciliation, non-FPGA Set selection without a separate activation step, Runtime trigger and full hardware qualification remain **NOT_QUALIFIED / NOT_IMPLEMENTED as applicable**.  
+**Status:** Owner-approved architecture decision (2026-11-02), **updated for the 2026-11-03 Install → Run → Result simplification**. Portions of B3 / Active Set and Stage C are implemented Host-only; Console reconciliation, B3 auto-selection for non-FPGA Sets, caller-default authorized FPGA loading, Runtime trigger and full hardware qualification remain **NOT_QUALIFIED / NOT_IMPLEMENTED as applicable**.  
 **Scope:** PLASMA PPU PS programming resource selection after Bundle v3 delivery. This document does **not** authorize runtime changes, deployment, activation, FPGA/DUT operation, or a new Gate 1.
 
 ## Accepted decision — one Active Asset Set per PPU
@@ -54,7 +54,7 @@ or allow Jobs to mix assets from several installed sets.
 4. PPU performs **B1 Receive → B2 Admission → B3 Install/Verify** in an
    isolated staging/install area; failure leaves the existing Active Set
    unchanged and records the real error/recovery state.
-5. An authorized B3 `fpga_load:true` transaction may publish exactly one verified Set Active **only after** Root FPGA Identity PASS and authoritative Job quiescence. B3 `fpga_load:false` only stages files and does not select an Active Set. The desired operator flow has **no separate B4 action**; selecting a non-FPGA/install-only Set remains an implementation gap. Any internal Set switch must be atomic from the perspective of readers and Jobs: never overwrite live files or switch the pointer mid-Job.
+5. **Target (2026-11-03):** successful standard B3 Install selects exactly one newly verified Set Active after authoritative Job quiescence. **When the Bundle includes an FPGA Image, the caller requests guarded FPGA load by default with fresh operation-specific authorization**, and Active publication follows proven Root Image Identity PASS. **Without an FPGA Image, B3 selects Active without FPGA reconfiguration**, but still checks loaded-Image compatibility at Run Job. **Current behavior:** B3 `fpga_load:false` stages only and does not select Active; the non-FPGA activation and new caller default are implementation gaps. There is no separate B4 operator action. Every internal Set switch must be atomic from the perspective of readers and Jobs; never overwrite live files or switch the pointer mid-Job.
 6. **Asset activation is not FPGA reconfiguration.** Per
    [ADR-0004](../adr/0004-fpga-image-lifecycle-and-job-driven-loading.md),
    when a programming flow starts and the FPGA Image required by the Job is
@@ -70,7 +70,7 @@ or allow Jobs to mix assets from several installed sets.
    if independent isolation can be guaranteed; **activation/configuration
    switching is prohibited while Jobs are active**.
 
-These are required **architecture invariants**, not claims that every Bundle type already supports in-B3 Set selection, Console reconciliation, programming-flow FPGA loading or real hardware execution. The
+These are required **architecture invariants**, not claims that every Bundle type already supports B3 auto-selection/default authorized FPGA loading, Console reconciliation, programming-flow FPGA loading or real hardware execution. The
 exact canonical Set SHA construction, activation API, state persistence and
 crash recovery mechanism need subsequent implementation decisions.
 
@@ -142,7 +142,7 @@ a different Asset Set per device.
 | --- | --- | --- |
 | **Console/Controller** | Select exact Asset Set, compare identity, transfer entire Set on mismatch, choose the FPGA Package delivered in the Set, initiate operations and sequencing | Never treat mere transfer as a PROGRAM command |
 | **Bundle v3 / Packages** | Carry a complete logical Asset Set with file hashes, typed resources and dependency declarations | Does not own a workflow, activation, FPGA configuration or job execution |
-| **B1/B2/B3 on PPU** | Receive, admit and install/verify the authorized incoming Set; explicit B3 FPGA load can select Active only after Root Identity PASS | Install-only B3 is not Active/READY and never executes a Parser; no implicit load or B4 user operation |
+| **B1/B2/B3 on PPU** | Receive, admit, install/verify; target successful standard B3 selects Active, and if an FPGA Image exists, the caller requests authorized load by default | Current install-only B3 still stages without Active publication; neither implicit hardware authority nor a B4 operator action is allowed; install never runs a Parser |
 | **Asset Set manager (future)** | Enforce one Active Set, isolated Staging and safe atomic activation; publish exact identity/state | Cannot overwrite running Jobs or synthesize a hybrid set |
 | **PPU Programming Runtime** | Verify the requested Job against Active Set and exact ICPN, select *necessary resources within it* | No independent search for alternate versions/Profiles/FPGA Images across Bundles |
 | **FPGA Hardware Manager** | Sole configuration owner; when a programming flow starts, compare the loaded image with the Job's required image and load it if different, with ABI/capability and safety validation (ADR-0004) | Never reloads the FPGA from inside a SiteWorker; never substitutes another image |
