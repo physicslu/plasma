@@ -8,6 +8,9 @@ class Operation(StrEnum):
     PROGRAM = "program"
     VERIFY = "verify"
     READ = "read"
+    # Complete Flash programming: Erase -> Program -> Verify -> full Readback
+    # compare as one Job. PROGRAM stays write-only; the two never substitute.
+    FLASH_CYCLE = "flash_cycle"
     STATUS = "status"
     CANCEL = "cancel"
 

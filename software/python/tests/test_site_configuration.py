@@ -74,7 +74,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
             self.assertRegex(site["desired_revision"], r"^sha256:[0-9a-f]{64}$")
         self.assertEqual(self.controller.current()["sites"][0]["desired_revision"], current["sites"][0]["desired_revision"])
 
-    def test_current_expands_effective_defaults_when_yaml_omits_target(self) -> None:
+    def test_current_reports_no_target_when_yaml_omits_target(self) -> None:
         self.path.write_text(
             textwrap.dedent(CONFIG).lstrip().replace(
                 "  - id: 2\n    enabled: false\n    interface: mock\n    target: TARGET-B\n",
@@ -85,7 +85,8 @@ class SiteConfigurationControllerTests(unittest.TestCase):
 
         current = SiteConfigurationController(self.path).current()
 
-        self.assertEqual(current["sites"][1]["target"], "STM32F103C8T6")
+        # No product default ICPN: an unselected Site target stays unselected.
+        self.assertIsNone(current["sites"][1]["target"])
         self.assertRegex(current["sites"][1]["desired_revision"], r"^sha256:[0-9a-f]{64}$")
 
     def test_update_persists_only_writable_site_fields(self) -> None:

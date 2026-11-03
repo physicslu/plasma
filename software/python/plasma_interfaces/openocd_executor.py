@@ -7,20 +7,68 @@ import os
 import re
 import tempfile
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import ResolvedICSupport
 from plasma_core.models import JobRequest
 
-from .openocd_plan import OpenOCDExecutionPlan, OpenOCDPlanCompiler
+from .openocd_plan import (
+    IMAGE_ARTIFACT_TOKEN,
+    READ_ARTIFACT_TOKEN_TEMPLATE,
+    OpenOCDExecutionPlan,
+    OpenOCDPlanArtifact,
+    OpenOCDPlanCompiler,
+)
 
 
 ProcessLauncher = Callable[..., Awaitable[asyncio.subprocess.Process]]
 _PLAN_TOKEN_PATTERN = re.compile(r"\$\{PLASMA_[A-Z0-9_]+\}")
 _SAFE_ADAPTER_SERIAL_PATTERN = re.compile(r"^[A-Za-z0-9._:+/-]+$")
+
+
+def compile_flash_cycle(
+    compiler: OpenOCDPlanCompiler,
+    support: ResolvedICSupport,
+    request: JobRequest,
+    *,
+    configured_target_config: object,
+) -> OpenOCDExecutionPlan:
+    """Compose a host-only Flash cycle without changing the source-locked compiler."""
+    if request.operation is not Operation.PROGRAM:
+        raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Flash cycle requires a PROGRAM Job")
+    program = compiler.compile(
+        support, request, configured_target_config=configured_target_config
+    )
+    readback = OpenOCDPlanArtifact(
+        role="read_output",
+        token=READ_ARTIFACT_TOKEN_TEMPLATE % 0,
+        direction="output",
+        size_bytes=request.image_size,
+        section_name="flash_readback",
+    )
+    base = f"0x{program.main_flash_start:08X}"
+    # Erase only the image's whole erase units (as the HIL-proven sequence),
+    # never more than main Flash; the compiler already bounded the image.
+    unit = program.erase_granularity_bytes
+    erase = min(-(-request.image_size // unit) * unit, program.main_flash_size_bytes)
+    return replace(
+        program,
+        commands=(
+            "init",
+            "halt",
+            f"flash erase_address {base} 0x{erase:08X}",
+            f"flash write_image {IMAGE_ARTIFACT_TOKEN} {base} bin",
+            f"flash verify_image {IMAGE_ARTIFACT_TOKEN} {base} bin",
+            f"dump_image {readback.token} {base} 0x{request.image_size:08X}",
+            "reset run",
+            "shutdown",
+        ),
+        artifacts=(*program.artifacts, readback),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,7 +147,13 @@ class OpenOCDPlanExecutor:
         self,
         support: ResolvedICSupport,
         request: JobRequest,
+        *,
+        flash_cycle: bool = False,
     ) -> OpenOCDExecutionPlan:
+        if flash_cycle:
+            return compile_flash_cycle(
+                self._compiler, support, request, configured_target_config=self.target_cfg
+            )
         return self._compiler.compile(
             support,
             request,
@@ -230,11 +284,13 @@ class OpenOCDPlanExecutor:
         plan: OpenOCDExecutionPlan,
         support: ResolvedICSupport,
         request: JobRequest,
+        *,
+        flash_cycle: bool = False,
     ) -> OpenOCDExecutionResult:
-        """Execute only a canonical plan through an explicitly injected launcher."""
+        """Execute a canonical plan through an explicitly injected launcher."""
         launcher = self._require_software_validation_launcher()
         self._validate_runtime_options()
-        canonical = self._canonical_plan(support, request)
+        canonical = self._canonical_plan(support, request, flash_cycle=flash_cycle)
         self._validate_plan_identity(plan, canonical)
 
         with tempfile.TemporaryDirectory(prefix="plasma-openocd-plan-") as temp_root:
@@ -314,6 +370,21 @@ class OpenOCDPlanExecutor:
                         },
                     )
                 read_sections[section_name] = payload
+
+            if flash_cycle:
+                observed = read_sections.get("flash_readback")
+                if observed is None or observed != request.image:
+                    raise PlasmaError(
+                        ErrorCode.INTERFACE_FAILURE,
+                        "OpenOCD Flash readback does not match the Programming Image",
+                        context={
+                            "expected_sha256": request.image_sha256,
+                            "readback_sha256": (
+                                hashlib.sha256(observed).hexdigest()
+                                if observed is not None else None
+                            ),
+                        },
+                    )
 
             return OpenOCDExecutionResult(
                 stdout=stdout,

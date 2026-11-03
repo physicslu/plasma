@@ -4,7 +4,9 @@ Mock hardware adapters only. No Z2, MMIO, FPGA, OpenOCD or DUT is touched.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import os
 import subprocess
 import sys
@@ -23,6 +25,13 @@ import ppu_site_adapter_abi5 as abi5  # noqa: E402
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux") or os.geteuid() == 0,
                                 reason="Linux SO_PEERCRED, non-root")
 JOB = "1" * 32
+F103 = {"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
+        "flash_base": 0x08000000, "flash_size": 0x10000, "erase_granularity": 1024}
+
+
+def flash_image(payload: bytes, profile=None, digest=None):
+    return worker.FlashImage(worker.parse_flash_profile(dict(profile or F103)), payload,
+                             digest or hashlib.sha256(payload).hexdigest())
 
 
 class MockAdapter:
@@ -31,12 +40,13 @@ class MockAdapter:
     operations = frozenset({"probe"})
 
     def __init__(self):
-        self.ident = {"image": "A"}
         self.calls = []
         self.behaviour = "pass"
         self.gate = threading.Event()
         self.started = threading.Event()
         self.startup = set()
+        # Root journal snapshot as the C3 core sees it (change detection only).
+        self.ident = {"image_id": "any-compatible-image", "session_id": "s1"}
 
     def identity(self):
         return dict(self.ident)
@@ -44,7 +54,7 @@ class MockAdapter:
     def startup_sealed_sites(self):
         return set(self.startup)
 
-    def run(self, site, operation, *, deadline, cancel):
+    def run(self, site, operation, *, deadline, cancel, image=None):
         self.calls.append((site, operation))
         self.started.set()
         b = self.behaviour
@@ -61,8 +71,6 @@ class MockAdapter:
             raise worker.TransportUnknown("SAFE_OFF_NOT_VERIFIED")
         if b == "crash":
             raise RuntimeError("adapter bug")
-        if b == "reload":
-            self.ident = {"image": "B"}
         return {"result": "PASS", "dpidr": "0x1ba01477", "safe_off": True}
 
 
@@ -70,6 +78,8 @@ class Rig:
     def __init__(self, tmp_path, adapter=None):
         self.tmp = tmp_path
         self.adapter = adapter or MockAdapter()
+        self.image_root = tmp_path / "normalized-images"
+        self.image_root.mkdir(parents=True, exist_ok=True)
         self.lease = {JOB}
         self.sock = tmp_path / "w.sock"
         self.seals = tmp_path / "seals"
@@ -77,8 +87,8 @@ class Rig:
 
     def start(self):
         self.core = worker.SiteWorkerCore(
-            self.adapter, runtime_pid=os.getpid, lease_verifier=lambda j: j in self.lease,
-            seal_dir=self.seals)
+            self.adapter, runtime_pid=os.getpid, lease_verifier=lambda j, kind: j in self.lease,
+            seal_dir=self.seals, image_root=self.image_root)
         self.server = worker.SiteWorkerServer(self.core, self.sock, mode=0o600)
         self.server.start()
         self.client = worker.SiteWorkerClient(self.sock, timeout_s=20)
@@ -275,7 +285,6 @@ def test_cancel_by_runtime_close_stops_in_flight_operation_and_seals(rig):
 @pytest.mark.parametrize("behaviour,error", [
     ("unknown", "OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED"),
     ("crash", "OUTCOME_UNKNOWN_SITE_SEALED:RuntimeError"),
-    ("reload", "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION"),
 ])
 def test_unknown_hardware_outcomes_seal_and_never_retry(rig, behaviour, error):
     rig.adapter.behaviour = behaviour
@@ -297,13 +306,45 @@ def test_denied_before_hardware_keeps_site_usable(rig):
     assert rig.client.call("status")["sealed_sites"] == []
 
 
-def test_fpga_reload_between_operations_invalidates_session(rig):
-    child = rig.package("time.sleep(0.5)\n" + PROBE2)
-    rig.open(child)
-    rig.adapter.ident = {"image": "reloaded"}
-    [reply] = rig.go(child)
-    assert reply == {"ok": False, "error": "SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED"}
-    assert rig.adapter.calls == []
+def test_c3_accepts_any_image_id_but_detects_reload_within_a_session(tmp_path):
+    """No static FPGA Image pin: any loaded image is accepted at session open,
+    but a Root journal change (FPGA reload) inside the session invalidates it."""
+    adapter = MockAdapter()
+    adapter.ident = {"image_id": "z2-some-other-build-0123abcd", "session_id": "s9"}
+    r = Rig(tmp_path, adapter)
+    try:
+        child = r.package(PROBE2 + "sys.stdout.flush(); sys.stdin.readline()\n" + PROBE2)
+        session = r.open(child)
+        child.stdin.write("go\n"); child.stdin.flush()
+        first = json.loads(child.stdout.readline())
+        assert first["ok"] is True and first["result"]["result"] == "PASS"
+        adapter.ident = {"image_id": "z2-some-other-build-0123abcd", "session_id": "s10"}
+        child.stdin.write("again\n"); child.stdin.flush()
+        second = json.loads(child.stdout.readline())
+        assert second == {"ok": False, "error": "SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED"}
+        assert adapter.calls == [(2, "probe")]
+        assert r.client.close_session(session["session_id"])["sealed_sites"] == []
+        r.reap(child)
+    finally:
+        r.close()
+
+
+def test_fpga_reload_during_operation_seals_the_site(tmp_path):
+    class ReloadingAdapter(MockAdapter):
+        def run(self, site, operation, *, deadline, cancel, image=None):
+            self.ident = {"image_id": "reloaded", "session_id": "s2"}
+            return super().run(site, operation, deadline=deadline, cancel=cancel)
+
+    adapter = ReloadingAdapter()
+    r = Rig(tmp_path, adapter)
+    try:
+        child = r.package(PROBE2)
+        session = r.open(child)
+        assert r.go(child) == [{"ok": False, "error":
+                                "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION"}]
+        assert r.client.close_session(session["session_id"])["sealed_sites"] == [2]
+    finally:
+        r.close()
 
 
 def test_worker_crash_invalidates_sessions(rig):
@@ -347,6 +388,68 @@ def test_malformed_requests_rejected(rig, raw):
     assert reply == {"ok": False, "error": "REQUEST_INVALID"}
 
 
+
+class FlashMockAdapter(MockAdapter):
+    operations = frozenset({"probe", "flash_cycle"})
+
+    def run(self, site, operation, *, deadline, cancel, image=None):
+        if operation != "flash_cycle":
+            return super().run(site, operation, deadline=deadline, cancel=cancel)
+        assert image is not None
+        self.calls.append((site, operation, image.icpn, image.sha256, image.payload))
+        self.profiles = getattr(self, "profiles", []) + [image.profile]
+        return {"result": "PASS", "bytes_verified": len(image.payload),
+                "readback_sha256": image.sha256, "safe_off": True}
+
+
+def test_c3_binds_exact_firmware_bytes_for_flash_cycle(tmp_path):
+    adapter = FlashMockAdapter()
+    r = Rig(tmp_path, adapter)
+    try:
+        payload = b"PLASMA-C3-FIRMWARE"
+        digest = hashlib.sha256(payload).hexdigest()
+        (r.image_root / (JOB + ".bin")).write_bytes(payload)
+        child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
+        session = r.open(child)
+        binding = r.client.bind_image(
+            session["session_id"], profile=F103,
+            image_sha256=digest, image_size=len(payload)
+        )
+        assert binding == {"job_id": JOB, "icpn": "STM32F103C8T6",
+                           "target_config": "target/stm32f1x.cfg",
+                           "image_sha256": digest, "image_size": len(payload),
+                           "bound": True}
+        # The already-bound immutable bytes do not depend on subsequent file changes.
+        (r.image_root / (JOB + ".bin")).write_bytes(b"CORRUPTED-AFTER-BIND")
+        [result] = r.go(child)
+        assert result["ok"] and result["result"]["result"] == "PASS"
+        assert result["result"]["readback_sha256"] == digest
+        assert adapter.calls == [(2, "flash_cycle", "STM32F103C8T6", digest, payload)]
+        assert r.client.close_session(session["session_id"])["closed"]
+    finally:
+        r.close()
+
+
+def test_c3_rejects_unbound_or_mismatched_firmware(tmp_path):
+    adapter = FlashMockAdapter()
+    r = Rig(tmp_path, adapter)
+    try:
+        payload = b"GOOD-FIRMWARE"
+        (r.image_root / (JOB + ".bin")).write_bytes(payload)
+        child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
+        session = r.open(child)
+        with pytest.raises(worker.SiteWorkerDenied, match="IMAGE_SHA256_MISMATCH"):
+            r.client.bind_image(
+                session["session_id"], profile=F103,
+                image_sha256="0" * 64, image_size=len(payload),
+            )
+        [result] = r.go(child)
+        assert result == {"ok": False, "error": "IMAGE_NOT_BOUND"}
+        assert adapter.calls == []
+    finally:
+        r.close()
+
+
 # --- ABI-v5 OpenOCD adapter (fake processes; no hardware) ---------------------------
 
 class FakeProc:
@@ -367,11 +470,10 @@ class FakeProc:
         return -9
 
 
-def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=False):
+def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=False,
+              flash_readback=None):
     tmp_path.mkdir(parents=True, exist_ok=True)
     journal = tmp_path / "journal.json"
-    journal.write_text(json.dumps({"status": "IMAGE", "image_id": "z2-independent-swd-v5-d0add58c",
-                                   "session_id": "s", "boot_id": "b", "firmware_sha256": "f"}))
     calls = {"run": [], "popen": []}
 
     def run(argv, **kw):
@@ -381,10 +483,20 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
 
     def popen(argv, **kw):
         calls["popen"].append(argv)
+        for index, part in enumerate(argv[:-1]):
+            if part == "-c" and argv[index + 1].startswith("dump_image "):
+                command = argv[index + 1]
+                path_match = re.search(r"\{([^{}]+)\}", command)
+                assert path_match is not None
+                if flash_readback is not None:
+                    Path(path_match.group(1)).write_bytes(flash_readback)
         return FakeProc(log, rc, hang)
 
+    scripts = tmp_path / "ocd" / "share" / "openocd" / "scripts" / "target"
+    scripts.mkdir(parents=True)
+    (scripts / "stm32f1x.cfg").write_text("# fake target config\n")
     a = abi5.Abi5OpenocdAdapter(openocd_root=tmp_path / "ocd", python=Path("/usr/bin/python3"),
-                                expected_image_id="z2-independent-swd-v5-d0add58c", journal=journal,
+                                adapter_khz=500, journal=journal,
                                 record_dir=tmp_path / "rec", run=run, popen=popen,
                                 openocd_running=lambda: openocd, poll_s=0.01)
     (tmp_path / "rec").mkdir()
@@ -392,6 +504,62 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
 
 
 GOOD = b"Info : SWD DPIDR 0x1ba01477\nPLASMA_DPREG0=0x1ba01477\nSAFE_OFF_MODE_OFF_VERIFIED\n"
+
+
+
+def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
+    image = b"FLASH-WRITE-READBACK"
+    digest = hashlib.sha256(image).hexdigest()
+    a, calls, _ = make_abi5(
+        tmp_path, log=GOOD, flash_readback=image
+    )
+    result = a.run(
+        2, "flash_cycle", image=flash_image(image),
+        deadline=time.monotonic() + 30, cancel=threading.Event(),
+    )
+    assert result == {"result": "PASS", "icpn": "STM32F103C8T6",
+                      "target_config": "target/stm32f1x.cfg", "adapter_khz": 500,
+                      "bytes_verified": len(image), "readback_sha256": digest,
+                      "openocd_rc": 0, "safe_off": True}
+    argv = calls["popen"][0]
+    assert argv[argv.index("-f") + 1] == "target/stm32f1x.cfg"
+    assert "plasma_swd site 2" in argv
+    commands = [argv[i + 1] for i, arg in enumerate(argv[:-1]) if arg == "-c"]
+    # The engine's qualified SWCLK overrides the target config's own speed.
+    assert commands.index("adapter speed 500") < commands.index("init")
+    assert argv.index("-f") < argv.index("adapter speed 500")
+    assert [v for v in commands if v.startswith("flash ")][0] == (
+        "flash erase_address 0x08000000 0x00000400")  # 20 B -> one 1 KiB page
+    assert [v.split()[1] for v in commands if v.startswith("flash ")] == [
+        "erase_address", "write_image", "verify_image"
+    ]
+    assert commands[-2:] == ["reset run", "shutdown"]
+    assert any(v.startswith("dump_image ") for v in commands)
+    assert not any(v.startswith("swd newdap bp") for v in commands)
+    assert calls["run"] == [["admit", "2"], ["revoke", "2"]]
+
+
+def test_abi5_flash_cycle_rejects_wrong_readback_with_safe_shutdown(tmp_path):
+    image = b"INTENDED-FIRMWARE"
+    a, calls, _ = make_abi5(
+        tmp_path, log=GOOD, flash_readback=b"BAD-READBACK",
+    )
+    result = a.run(
+        2, "flash_cycle",
+        image=flash_image(image),
+        deadline=time.monotonic() + 30, cancel=threading.Event(),
+    )
+    assert result["result"] == "FAIL" and result["code"] == "READBACK_MISMATCH"
+    assert result["safe_off"] is True
+    assert calls["run"][-1] == ["revoke", "2"]
+
+
+def test_abi5_flash_cycle_requires_bound_image_before_admission(tmp_path):
+    a, calls, _ = make_abi5(tmp_path, log=GOOD)
+    with pytest.raises(worker.TransportDenied, match="FLASH_IMAGE_NOT_BOUND"):
+        a.run(2, "flash_cycle", deadline=time.monotonic() + 30,
+              cancel=threading.Event())
+    assert calls["run"] == []
 
 
 def test_abi5_probe_uses_existing_admission_and_fixed_openocd_argv(tmp_path):
@@ -403,7 +571,7 @@ def test_abi5_probe_uses_existing_admission_and_fixed_openocd_argv(tmp_path):
     assert argv[0].endswith("/bin/openocd") and "plasma_swd site 2" in argv
     for banned in ("program", "flash", "reset", "mww", "exec", "halt"):
         assert not any(banned in item for item in argv)
-    assert a.supported_sites == {1, 2} and a.operations == {"probe"}
+    assert a.supported_sites == {1, 2} and a.operations == {"probe", "flash_cycle"}
 
 
 @pytest.mark.parametrize("kw,exc,code", [
@@ -420,13 +588,19 @@ def test_abi5_fail_closed_paths(tmp_path, kw, exc, code):
         assert calls["run"][-1] == ["revoke", "2"]     # always revoked
 
 
-def test_abi5_identity_detects_reload_and_wrong_image(tmp_path):
-    a, _calls, journal = make_abi5(tmp_path, log=GOOD)
-    before = a.identity()
-    journal.write_text(json.dumps({"status": "IMAGE", "image_id": "other", "session_id": "t"}))
-    assert a.identity() != before
-    with pytest.raises(worker.TransportDenied, match="FPGA_IMAGE_NOT_EXPECTED"):
-        a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+def test_abi5_probe_is_independent_of_root_journal_and_image_id(tmp_path):
+    a, calls, journal = make_abi5(tmp_path, log=GOOD)
+    # A missing or unrelated Root journal must not block a valid C3 operation.
+    assert not journal.exists()
+    first = a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+    assert first["result"] == "PASS"
+    journal.write_text('{"status":"IMAGE","image_id":"other-fpga-build"}')
+    second = a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+    assert second["result"] == "PASS"
+    journal.write_text("not-json")
+    third = a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+    assert third["result"] == "PASS"
+    assert len(calls["popen"]) == 3
 
 
 def test_abi5_startup_seals_on_leftover_record_or_running_openocd(tmp_path):
@@ -454,16 +628,24 @@ def test_runtime_lease_verifier_uses_c1_execution_lease(tmp_path):
         try:
             verify = worker.runtime_lease_verifier(tmp_path / "control.sock")
             loop = asyncio.get_running_loop()
-            assert await loop.run_in_executor(None, verify, JOB) is False
-            m.snap = {"busy": True, "owner_kind": "package_action", "owner_id": JOB}
-            assert await loop.run_in_executor(None, verify, JOB) is True
-            assert await loop.run_in_executor(None, verify, "2" * 32) is False
-            m.snap = {"busy": True, "owner_kind": "batch", "owner_id": JOB}
-            assert await loop.run_in_executor(None, verify, JOB) is False
+            pkg, rest = "package_action", "rest_job"
+            assert await loop.run_in_executor(None, verify, JOB, pkg) is False
+            m.snap = {"busy": True, "owner_kind": "package_action", "owner_id": JOB,
+                      "job_ids": [JOB]}
+            assert await loop.run_in_executor(None, verify, JOB, pkg) is True
+            assert await loop.run_in_executor(None, verify, "2" * 32, pkg) is False
+            # A Package Action lease never authorizes a Runtime REST Job session.
+            assert await loop.run_in_executor(None, verify, JOB, rest) is False
+            m.snap = {"busy": True, "owner_kind": "batch", "owner_id": "b-1",
+                      "job_ids": [JOB]}
+            assert await loop.run_in_executor(None, verify, JOB, pkg) is False
+            assert await loop.run_in_executor(None, verify, JOB, rest) is True
+            assert await loop.run_in_executor(None, verify, "job-other", rest) is False
+            assert await loop.run_in_executor(None, verify, JOB, "client") is False
         finally:
             await server.close()
     asyncio.run(scenario())
-    assert worker.runtime_lease_verifier(tmp_path / "missing.sock")(JOB) is False
+    assert worker.runtime_lease_verifier(tmp_path / "missing.sock")(JOB, "package_action") is False
 
 
 def test_c2_launcher_package_uses_site_worker_end_to_end(tmp_path, rig):

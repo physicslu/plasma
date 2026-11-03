@@ -8,6 +8,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.models import ExecutionImageRef, JobRequest
 from plasma_interfaces.openocd import OpenOCDInterface
+from plasma_interfaces.openocd_executor import compile_flash_cycle
 from plasma_interfaces.openocd_plan import IMAGE_ARTIFACT_TOKEN, OpenOCDPlanCompiler
 
 
@@ -88,6 +89,54 @@ class OpenOCDPlanCompilerTests(unittest.TestCase):
         self.assertEqual(plan.artifacts[0].size_bytes, len(image))
         self.assertEqual(plan.artifacts[0].sha256, hashlib.sha256(image).hexdigest())
         self.assertEqual(plan.artifacts[0].direction, "input")
+
+    def test_full_flash_cycle_reuses_resolved_geometry_and_reads_back_every_byte(self) -> None:
+        image = bytes(range(64))
+        request = JobRequest(
+            site_id=2, operation=Operation.PROGRAM,
+            target="STM32F103C8T6", image=image,
+        )
+        plan = compile_flash_cycle(
+            self.compiler, self.c8, request, configured_target_config=TARGET_CFG
+        )
+        # Erase = image rounded up to whole 1 KiB pages (HIL-proven sequence).
+        self.assertEqual(plan.commands, (
+            "init",
+            "halt",
+            "flash erase_address 0x08000000 0x00000400",
+            f"flash write_image {IMAGE_ARTIFACT_TOKEN} 0x08000000 bin",
+            f"flash verify_image {IMAGE_ARTIFACT_TOKEN} 0x08000000 bin",
+            "dump_image ${PLASMA_READ_000_BIN} 0x08000000 0x00000040",
+            "reset run",
+            "shutdown",
+        ))
+
+    def test_full_flash_cycle_erase_rounds_to_erase_units_not_whole_flash(self) -> None:
+        image = bytes(1025)
+        request = JobRequest(
+            site_id=2, operation=Operation.PROGRAM,
+            target="STM32F103C8T6", image=image,
+        )
+        plan = compile_flash_cycle(
+            self.compiler, self.c8, request, configured_target_config=TARGET_CFG
+        )
+        self.assertIn("flash erase_address 0x08000000 0x00000800", plan.commands)
+        self.assertEqual(len(plan.artifacts), 2)
+        self.assertEqual(plan.artifacts[0].sha256, hashlib.sha256(image).hexdigest())
+        self.assertEqual(plan.artifacts[1].section_name, "flash_readback")
+        self.assertEqual(plan.artifacts[1].size_bytes, len(image))
+        self.assertTrue(plan.to_dict()["plan_only"])
+        self.assertFalse(plan.to_dict()["hardware_runtime_ready"])
+
+    def test_full_flash_cycle_rejects_non_program_job(self) -> None:
+        with self.assertRaises(PlasmaError) as caught:
+            compile_flash_cycle(
+                self.compiler,
+                self.c8,
+                JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103C8T6"),
+                configured_target_config=TARGET_CFG,
+            )
+        self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
 
     def test_verify_plan_is_separate_from_program_and_does_not_erase(self) -> None:
         plan = self.compile(

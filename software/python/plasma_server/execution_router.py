@@ -4,12 +4,15 @@ from dataclasses import replace
 from typing import Any
 
 from plasma_core.config import SiteConfig
+from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import ICSupportResolver, ResolvedICSupport
 from plasma_core.models import ExecutionOutput, JobRequest
 from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
+from plasma_interfaces.openocd import OpenOCDInterface, as_program_request
+from plasma_interfaces.openocd_executor import compile_flash_cycle
 from plasma_interfaces.compiler_registry import (
     CompilerBinding,
     CompilerRegistry,
@@ -186,11 +189,58 @@ class SiteExecutionRouter:
 
     def _resolve_openocd(self, request: JobRequest) -> JobRequest:
         programming_profile_id, support, support_payload = self._resolved_support(request)
-        selection = self.compiler_registry.select(support.icpn, request.operation)
-        plan = selection.compiler.compile(
-            support,
-            request,
-            configured_target_config=self.site.openocd.get("target_cfg"),
+        # REST read offsets are relative to main Flash; the canonical compiler
+        # only accepts absolute target addresses. Normalize before admission.
+        if request.operation is Operation.READ and request.map_data:
+            sections = request.map_data.get("sections")
+            if isinstance(sections, list):
+                flash_start = int(str(support.memory_geometry_profile.data["main_flash_start"]), 0)
+                normalized = [
+                    {**entry, "address": flash_start + entry["address"]}
+                    if isinstance(entry, dict)
+                    and type(entry.get("address")) is int
+                    and 0 <= entry["address"] < flash_start
+                    else entry
+                    for entry in sections
+                ]
+                request = replace(
+                    request,
+                    map_data={**request.map_data, "sections": normalized},
+                )
+        openocd = self.interface if isinstance(self.interface, OpenOCDInterface) else None
+        target_config = (
+            openocd.target_config_for(support)
+            if openocd is not None
+            else self.site.openocd.get("target_cfg")
+        )
+        if request.operation is Operation.FLASH_CYCLE:
+            # One complete cycle = every component operation must be admitted
+            # for this exact ICPN; the plan is composed from the PROGRAM plan.
+            selections = {
+                operation: self.compiler_registry.select(support.icpn, operation)
+                for operation in (
+                    Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ
+                )
+            }
+            selection = selections[Operation.PROGRAM]
+            plan = compile_flash_cycle(
+                selection.compiler,
+                support,
+                as_program_request(request),
+                configured_target_config=target_config,
+            )
+        else:
+            selection = self.compiler_registry.select(support.icpn, request.operation)
+            plan = selection.compiler.compile(
+                support,
+                request,
+                configured_target_config=target_config,
+            )
+        software_validation = openocd is not None and openocd.software_validation_ready
+        site_worker = (
+            openocd is not None
+            and openocd.site_worker_ready
+            and request.operation is Operation.FLASH_CYCLE
         )
         return self._decorate(
             request,
@@ -206,9 +256,18 @@ class SiteExecutionRouter:
                 "compiler_id": selection.admission.compiler_id,
                 "backend_id": selection.admission.backend_id,
                 "backend_lock_digest": selection.admission.backend_lock_digest,
-                "backend_implementation_state": "plan_compiled_not_executable",
+                "backend_implementation_state": (
+                    "c3_site_worker"
+                    if site_worker
+                    else "host_only_process_injected"
+                    if software_validation
+                    else "plan_compiled_not_executable"
+                ),
                 "openocd_execution_plan": plan.to_dict(),
-                "hardware_runtime_ready": False,
+                "software_validation_runtime_ready": software_validation,
+                # C-3 owns admission/OpenOCD/SAFE_OFF; it refuses explicitly
+                # (ENGINE_NOT_READY, Site sealed, lease) at execution time.
+                "hardware_runtime_ready": site_worker,
             },
         )
 
@@ -245,7 +304,11 @@ class SiteExecutionRouter:
         route = self._route_payload(resolved)
         if route.get("mode") == MOCK_ROUTE:
             return resolved
-        if route.get("hardware_runtime_ready") is not True:
+        host_only = (
+            route.get("mode") == OPENOCD_ROUTE
+            and route.get("software_validation_runtime_ready") is True
+        )
+        if route.get("hardware_runtime_ready") is not True and not host_only:
             raise PlasmaError(
                 ErrorCode.INTERFACE_NOT_CONFIGURED,
                 "resolved hardware backend is not runtime-ready",
@@ -265,7 +328,11 @@ class SiteExecutionRouter:
         mode = route.get("mode")
         if mode == MOCK_ROUTE:
             return self._generic_handler
-        if route.get("hardware_runtime_ready") is not True:
+        host_only = (
+            mode == OPENOCD_ROUTE
+            and route.get("software_validation_runtime_ready") is True
+        )
+        if route.get("hardware_runtime_ready") is not True and not host_only:
             raise PlasmaError(
                 ErrorCode.INTERNAL_ERROR,
                 "non-ready hardware route reached SiteWorker",

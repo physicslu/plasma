@@ -24,6 +24,8 @@ _OPERATION_PERMISSIONS = {
     Operation.PROGRAM: Permission.PPU_PROGRAM,
     Operation.VERIFY: Permission.PPU_VERIFY,
     Operation.READ: Permission.PPU_READ,
+    # Complete cycle writes the device: same authority as PROGRAM.
+    Operation.FLASH_CYCLE: Permission.PPU_PROGRAM,
 }
 
 

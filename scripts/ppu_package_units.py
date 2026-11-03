@@ -20,7 +20,12 @@ Sockets (AF_UNIX only, no TCP/HTTP):
 """
 from __future__ import annotations
 
-PYTHON = "/opt/plasma/python/3.12.13/bin/python3"
+import sys
+
+# The interpreter that renders these units is the Active Python Runtime (the
+# installer runs under it); units therefore launch that same interpreter. A
+# stable, atomically switched launcher path is a separate deployment change.
+PYTHON = sys.executable
 # Control plane ships in the factory Bootstrap kit (root-owned, code only;
 # the Bootstrap credential lives in /var/lib/plasma-bootstrap, kept inaccessible).
 RUNTIME_DIR = "/opt/plasma/bootstrap"

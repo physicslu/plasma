@@ -104,6 +104,28 @@ class ProgrammingOperationHandler(BaseHandler):
                 details={"stages": ["program"], "bytes_programmed": request.image_size}
             )
 
+        if operation is Operation.FLASH_CYCLE:
+            if not request.image:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT, "flash_cycle requires a non-empty inline image"
+                )
+            evidence = await self._stage(
+                "flash_cycle",
+                stage_callback,
+                lambda progress: self.interface.flash_cycle(request.image, progress),
+                stage_index=0,
+                stage_count=1,
+                byte_progress=True,
+            )
+            return ExecutionOutput(
+                details={
+                    "stages": ["erase", "program", "verify", "readback"],
+                    "bytes_programmed": request.image_size,
+                    "image_sha256": request.image_sha256,
+                    "flash_cycle": dict(evidence or {}),
+                }
+            )
+
         if operation is Operation.VERIFY:
             if not request.has_image:
                 raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "verify requires a non-empty reference image")

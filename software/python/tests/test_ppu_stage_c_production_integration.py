@@ -55,7 +55,9 @@ def directives(text: str) -> dict[str, list[str]]:
 def test_package_unit_runs_as_dedicated_uid_with_fixed_entry_and_no_privilege():
     d = directives(units.package_unit())
     assert d["User"] == ["plasma-package"] and d["Group"] == ["plasma-package"]
-    assert d["ExecStart"] == ["/opt/plasma/python/3.12.13/bin/python3 -I -B -S "
+    # The Active Python that renders the unit (no versioned interpreter path).
+    assert units.PYTHON == sys.executable
+    assert d["ExecStart"] == [f"{units.PYTHON} -I -B -S "
                               "/opt/plasma/bootstrap/ppu_package_entry.py %i"]
     for key, want in {"NoNewPrivileges": "yes", "PrivateDevices": "yes", "PrivateNetwork": "yes",
                       "RestrictAddressFamilies": "AF_UNIX", "ProtectSystem": "strict",
@@ -80,7 +82,7 @@ def test_site_worker_unit_is_local_only_and_not_a_network_service():
     assert d["RestrictAddressFamilies"] == ["AF_UNIX"] and d["IPAddressDeny"] == ["any"]
     assert d["ProtectSystem"] == ["strict"] and d["NoNewPrivileges"] == ["yes"]
     assert "ListenStream" not in units.site_worker_unit() and "Port" not in units.site_worker_unit()
-    assert d["ExecStart"] == ["/opt/plasma/python/3.12.13/bin/python3 -I -B -S "
+    assert d["ExecStart"] == [f"{units.PYTHON} -I -B -S "
                               "/opt/plasma/bootstrap/ppu_site_worker_service.py"]
 
 
@@ -416,7 +418,7 @@ def test_worker_service_builds_two_role_restricted_sockets(tmp_path):
     lease = {JOB}
     core, control, transport = worker_service.build(
         tmp_path / "run", tmp_path / "state", adapter=adapter, runtime_pid=os.getpid,
-        lease_verifier=lambda j: j in lease, control_gid=os.getgid(), transport_gid=os.getgid())
+        lease_verifier=lambda j, kind: j in lease, control_gid=os.getgid(), transport_gid=os.getgid())
     (tmp_path / "run").mkdir()
     control.start(); transport.start()
     try:
@@ -442,7 +444,7 @@ def test_runtime_restart_invalidates_session_and_allows_new_runtime(tmp_path):
     current = {"pid": os.getpid()}
     adapter = MockAdapter()
     core = worker.SiteWorkerCore(adapter, runtime_pid=lambda: current["pid"],
-                                 lease_verifier=lambda j: True, seal_dir=tmp_path / "s")
+                                 lease_verifier=lambda j, kind: True, seal_dir=tmp_path / "s")
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"], start_new_session=True)
     try:
         me = (os.getpid(), os.getuid(), os.getgid())
@@ -490,38 +492,38 @@ def test_worker_down_or_socket_permission_wrong_fails_closed(tmp_path, problem):
 class RecoveryAdapter(MockAdapter):
     def __init__(self):
         super().__init__()
-        self.ident = {"status": "IMAGE", "image_id": "img-v5"}
         self.verify_result = "ok"
         self.verified = []
+
+    def identity(self):
+        raise AssertionError("Site recovery must not read FPGA Image or Journal identity")
 
     def verify_safe_off(self, site, *, deadline):
         self.verified.append(site)
         if self.verify_result == "unknown":
             raise worker.TransportUnknown("SAFE_OFF_NOT_VERIFIED")
-        if self.verify_result == "reload":
-            self.ident = {"status": "IMAGE", "image_id": "img-v5", "session_id": "new"}
         return {"result": "SAFE_OFF_VERIFIED", "log_sha256": "a" * 64}
 
 
 def sealed_rig(tmp_path):
     adapter = RecoveryAdapter()
     seals = tmp_path / "seals"
-    core = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j: True,
+    core = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j, kind: True,
                                  seal_dir=seals)
     core._seal(2, "SAFE_OFF_NOT_VERIFIED")
     return adapter, seals
 
 
-def do_recover(adapter, seals, tmp_path, *, worker_active=False, lease="idle", image="img-v5"):
+def do_recover(adapter, seals, tmp_path, *, worker_active=False, lease="idle"):
     return recovery.recover(2, operator="owner", adapter=adapter, seal_dir=seals,
                             evidence_dir=tmp_path / "evidence", worker_active=lambda: worker_active,
-                            runtime_lease=lambda: lease, expected_image_id=image)
+                            runtime_lease=lambda: lease)
 
 
 def test_recovery_positive_moves_marker_into_evidence_and_worker_unseals(tmp_path):
     adapter, seals = sealed_rig(tmp_path)
     diag = recovery.checks(2, adapter=adapter, seal_dir=seals, worker_active=lambda: False,
-                           runtime_lease=lambda: "idle", expected_image_id="img-v5")
+                           runtime_lease=lambda: "idle")
     assert diag["preconditions"] == "PASS" and adapter.verified == []   # diagnose is read-only
     assert (seals / "site2.sealed").exists()
     out = do_recover(adapter, seals, tmp_path)
@@ -531,7 +533,7 @@ def test_recovery_positive_moves_marker_into_evidence_and_worker_unseals(tmp_pat
     evidence = json.loads(Path(out["evidence"]).read_text())
     assert evidence["schema"] == "plasma.ppu.site-seal-recovery.v1" and evidence["operator"] == "owner"
     assert oct(Path(out["evidence"]).stat().st_mode & 0o777) == "0o600"
-    restarted = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j: True,
+    restarted = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j, kind: True,
                                       seal_dir=seals)
     assert restarted._sealed == set()
 
@@ -541,7 +543,6 @@ def test_recovery_positive_moves_marker_into_evidence_and_worker_unseals(tmp_pat
     ({"worker_active": None}, None, "worker_stopped"),
     ({"lease": "busy"}, None, "no_active_job"),
     ({"lease": "unknown"}, None, "no_active_job"),
-    ({"image": "other-image"}, None, "fpga_identity"),
     ({}, lambda a, s: setattr(a, "startup", {2}), "no_external_owner"),
     ({}, lambda a, s: (s / "site2.sealed").write_text("{bad"), "seal_present"),
     ({}, lambda a, s: (s / "site2.sealed").unlink(), "seal_present"),
@@ -556,13 +557,13 @@ def test_recovery_denied_when_any_precondition_unproven(tmp_path, kw, setup, fie
     assert Path(out["evidence"]).name.endswith("-denied.json")
 
 
-@pytest.mark.parametrize("verify", ["unknown", "reload"])
-def test_recovery_stays_sealed_if_safe_off_unproven_or_identity_changes(tmp_path, verify):
+@pytest.mark.parametrize("verify", ["unknown"])
+def test_recovery_stays_sealed_if_safe_off_unproven(tmp_path, verify):
     adapter, seals = sealed_rig(tmp_path)
     adapter.verify_result = verify
     out = do_recover(adapter, seals, tmp_path)
     assert out["result"] == "DENIED_STILL_SEALED" and (seals / "site2.sealed").exists()
-    restarted = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j: True,
+    restarted = worker.SiteWorkerCore(adapter, runtime_pid=lambda: 1, lease_verifier=lambda j, kind: True,
                                       seal_dir=seals)
     assert restarted._sealed == {2}
 
@@ -571,7 +572,7 @@ def test_recovery_requires_operator_name(tmp_path):
     adapter, seals = sealed_rig(tmp_path)
     with pytest.raises(SystemExit, match="OPERATOR_NAME_REQUIRED"):
         recovery.recover(2, operator="", adapter=adapter, seal_dir=seals, evidence_dir=tmp_path / "e",
-                         worker_active=lambda: False, runtime_lease=lambda: "idle", expected_image_id="img-v5")
+                         worker_active=lambda: False, runtime_lease=lambda: "idle")
 
 
 # --- 6. Runtime composition --------------------------------------------------------------

@@ -451,18 +451,26 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "asset_sha256",
                 "asset_base64",
                 "session_id",
+                "target",
             },
             required={"site_id", "operation"},
             label="job request",
         )
         operation = Operation(str(body["operation"]))
-        if operation not in {Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ}:
-            raise ValueError("web gateway supports erase, program, verify, and read")
+        if operation not in {
+            Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ,
+            Operation.FLASH_CYCLE,
+        }:
+            raise ValueError("web gateway supports erase, program, verify, read and flash_cycle")
+        target = body.get("target")
+        if target is not None and (not isinstance(target, str) or not target):
+            raise ValueError("target must be a non-empty exact ICPN string")
 
-        common_fields = {"site_id", "operation", "timeout_s", "map_data"}
+        common_fields = {"site_id", "operation", "timeout_s", "map_data", "target"}
+        image_operations = {Operation.PROGRAM, Operation.VERIFY, Operation.FLASH_CYCLE}
         if operation is Operation.READ:
             allowed_fields = common_fields | {"offset", "length"}
-        elif operation in {Operation.PROGRAM, Operation.VERIFY}:
+        elif operation in image_operations:
             if allow_inline_asset:
                 allowed_fields = common_fields | {
                     "asset_name",
@@ -494,7 +502,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         else:
             allowed_fields = common_fields
 
-        if operation not in {Operation.PROGRAM, Operation.VERIFY}:
+        if operation not in image_operations:
             _require_declared_keys(
                 body,
                 allowed=allowed_fields,
@@ -508,7 +516,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         site_id = _parse_site_id(body["site_id"])
         image = b""
         metadata: dict[str, Any] = {}
-        if operation in {Operation.PROGRAM, Operation.VERIFY} and allow_inline_asset:
+        if operation in image_operations and allow_inline_asset:
             asset = self._inline_asset(body)
             normalized = asset.normalize_image()
             image = normalized.data
@@ -526,6 +534,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             map_data=map_data,
             timeout_s=float(body.get("timeout_s", default_timeout_s)),
             client_id=client_id,
+            target=target,
             metadata=metadata,
         )
 
@@ -682,6 +691,10 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                         allow_inline_asset=False,
                     )
                     operation = request.operation
+                    if operation is Operation.FLASH_CYCLE:
+                        raise ValueError(
+                            "flash_cycle is accepted only by the PPU Gateway with an inline asset"
+                        )
                     session_id = (
                         body["session_id"]
                         if operation in {Operation.PROGRAM, Operation.VERIFY}
