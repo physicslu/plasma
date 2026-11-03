@@ -4,13 +4,12 @@ Runs on Z2 as root with the native ARMv7 Python 3.12.13. It grants nothing by
 itself: it re-runs the *protected, source-pinned* Root G5 live admission
 (``pl.hil.fpga_image_root.live_report`` with ``require_mmio=True``) while
 holding the Root reload fence, and only then writes a short-lived,
-root-private ``key=value`` record that ``plasma_swd_openocd5088_ps_owner.c``
-re-validates on every MMIO word.
+root-private ``key=value`` record for the Runtime Site adapter. The OpenOCD
+``plasma_swd`` adapter itself does not read it (it only holds the Site lock
+and checks that PL holds a loaded Image).
 
 It never loads FPGA, never writes the Root journal, never maps MMIO and never
-touches the DUT. Voltage is NOT measured here: ``voltage_qualified=1`` is
-only written when a root-private owner on-site electrical attestation for the
-same Site exists and is unexpired; it is recorded as an attestation.
+touches the DUT. DUT voltage is neither measured nor attested here.
 
 ``axi_isolation_proven=1`` means the protected Root admission accepted the
 current AXI policy (``UNPROVEN_ACCEPTED_FOR_SOURCE_BOUND_DEVELOPMENT``); the
@@ -31,10 +30,8 @@ from pathlib import Path
 
 PROTECTED_ROOT = Path("/opt/plasma/privileged/fpga-root")
 RECORD_DIR = Path("/run/plasma-z2-swd05")
-ELECTRICAL_DIR = Path("/root/plasma-swd-electrical")
 RECORD_TTL_S = 300
-SCHEMA = "plasma.swd.ps-admission.v2"
-ATTESTATION_SCHEMA = "plasma.swd.owner-electrical-attestation.v1"
+SCHEMA = "plasma.swd.ps-admission.v3"
 AXI_POLICY = "UNPROVEN_ACCEPTED_FOR_SOURCE_BOUND_DEVELOPMENT"
 
 
@@ -90,32 +87,15 @@ def verify_protected_tree(root: Path = PROTECTED_ROOT) -> str:
     return hashlib.sha256(private.read_bytes()).hexdigest()
 
 
-def load_attestation(site: int, now: float) -> tuple[Path, os.stat_result, int, dict]:
-    path = ELECTRICAL_DIR / f"site{site}-attestation.json"
-    st = _private_root_file(path)
-    data = json.loads(path.read_text())
-    need(type(data) is dict and data.get("schema") == ATTESTATION_SCHEMA and
-         data.get("site_id") == site and data.get("kind") == "OWNER_ON_SITE_ATTESTATION" and
-         data.get("measurement") is False and
-         data.get("dut_supply_ok") is True and data.get("common_ground_ok") is True and
-         data.get("signal_level_v") == 3.3 and data.get("wiring_ok") is True and
-         type(data.get("expires_epoch")) is int,
-         "ELECTRICAL_ATTESTATION_INCOMPLETE")
-    need(now < data["expires_epoch"], "ELECTRICAL_ATTESTATION_EXPIRED")
-    return path, st, data["expires_epoch"], data
-
-
 def render_record(fields: dict) -> str:
     order = (
         "schema", "site_id", "boot_id", "trusted_code_sha256",
         "image_manifest_sha256", "loaded_image_sha256", "image_id",
         "root_image_session_id", "abi_version", "site_bitmap",
         "trusted_code_verified", "manager_operating", "active_image_attested",
-        "axi_isolation_proven", "owner_scan_complete", "voltage_qualified",
+        "axi_isolation_proven", "owner_scan_complete",
         "recovery_available", "journal_dev", "journal_ino", "journal_size",
-        "journal_mtime_ns", "electrical_path", "electrical_ino",
-        "electrical_mtime_ns", "electrical_expires_epoch",
-        "record_expires_epoch",
+        "journal_mtime_ns", "record_expires_epoch",
         "code_manifest_dev", "code_manifest_ino", "code_manifest_size",
         "code_manifest_mtime_ns")
     need(set(fields) == set(order), "RECORD_FIELDS_INCOMPLETE")
@@ -182,7 +162,6 @@ def admit(site: int) -> dict:
              report["bin_sha256"] == release.firmware_sha256,
              "ROOT_REPORT_NOT_DEVMEM_ADMITTED")
         js = _private_root_file(root.STATE)
-        epath, est, eexp, edata = load_attestation(site, now)
         record = render_record({
             "schema": SCHEMA, "site_id": site,
             "boot_id": state["boot_id"], "trusted_code_sha256": code_sha256,
@@ -193,13 +172,10 @@ def admit(site: int) -> dict:
             "abi_version": 5, "site_bitmap": release.site_bitmap,
             "trusted_code_verified": 1, "manager_operating": 1,
             "active_image_attested": 1, "axi_isolation_proven": 1,
-            "owner_scan_complete": 1, "voltage_qualified": 1,
+            "owner_scan_complete": 1,
             "recovery_available": 1,
             "journal_dev": js.st_dev, "journal_ino": js.st_ino,
             "journal_size": js.st_size, "journal_mtime_ns": js.st_mtime_ns,
-            "electrical_path": str(epath), "electrical_ino": est.st_ino,
-            "electrical_mtime_ns": est.st_mtime_ns,
-            "electrical_expires_epoch": eexp,
             "record_expires_epoch": int(now) + RECORD_TTL_S,
             "code_manifest_dev": source_info.st_dev,
             "code_manifest_ino": source_info.st_ino,
@@ -218,8 +194,7 @@ def admit(site: int) -> dict:
         "image_id": state["image_id"],
         "axi_isolation_policy": report["axi_isolation"],
         "production_qualification": report["production_qualification"],
-        "voltage_source": "OWNER_ON_SITE_ATTESTATION_NOT_MEASUREMENT",
-        "electrical_attestation_sha256": _sha(epath),
+        "voltage_source": "NOT_MEASURED",
         "record_expires_epoch": int(now) + RECORD_TTL_S,
     }
 

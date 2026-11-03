@@ -20,6 +20,9 @@
 // 3C/40 retired diagnostic offsets; reads/writes always SLVERR.
 // 44..60 SWJ_DATA0..7 (8 x 32-bit staging), 64 SWJ_LENGTH (0 or 33..256).
 // SWJ_LENGTH=0 uses the old <=32-bit TX_DATA / 64-clock line-reset encoding.
+// 68 IDLE_CYCLES (RW, NORMAL only, 8..255, reset/MODE-OFF value 8): trailing
+// SWDIO-low idle clocks after each command; snapshotted at CMD_PUSH like
+// HALF_PERIOD (serves OpenOCD's AP memaccess delay without an SWJ link drop).
 // Extended SWJ snapshots all 256 bits on CMD_PUSH and disarms staging.
 // All writes full word WSTRB=F; invalid/forbidden reads/writes -> SLVERR.
 // No live DUT/HIL or Vivado results asserted by synthesizable source.
@@ -102,6 +105,7 @@ module plasma_swd_site_axi_lite #(
     logic [31:0] timeout_q, data_q;
     logic [255:0] swj_stage_q;
     logic [8:0] swj_length_q;
+    logic [7:0] idle_cycles_q;
 
     localparam integer FIFO_DEPTH = 16;
     typedef struct packed {
@@ -112,6 +116,7 @@ module plasma_swd_site_axi_lite #(
         logic [8:0] sequence_bits;
         logic [15:0] half_period;
         logic [31:0] timeout;
+        logic [7:0] idle_cycles;
     } command_entry_t;
     typedef struct packed {
         logic [15:0] tag;
@@ -188,7 +193,7 @@ module plasma_swd_site_axi_lite #(
         .cmd_wdata(cmd_head.data),
         .cmd_half_period(cmd_head.half_period),
         .cmd_turnaround(3'd1),
-        .cmd_idle_cycles(8'd8), .cmd_max_retries(8'd0),
+        .cmd_idle_cycles(cmd_head.idle_cycles), .cmd_max_retries(8'd0),
         .cmd_error_data_phase(1'b0),
         .cmd_timeout_cycles(cmd_head.timeout),
         .busy(busy), .link_state(link_state),
@@ -223,6 +228,7 @@ module plasma_swd_site_axi_lite #(
             half_q <= 16'd500; timeout_q <= 32'd1000000;
             data_q <= 32'd0; active_tag <= 16'd0;
             swj_stage_q <= 256'd0; swj_length_q <= 9'd0;
+            idle_cycles_q <= 8'd8;
         end else begin
             abort_q <= 1'b0; consume_q <= 1'b0;
             // A completion is copied into a separate retained response FIFO
@@ -233,7 +239,7 @@ module plasma_swd_site_axi_lite #(
                     data_q,
                     (swj_length_q != 0 ? swj_stage_q : {224'd0,data_q}),
                     (swj_length_q != 0 ? swj_length_q : {1'b0,data_w[7:0]}),
-                    half_q,timeout_q};
+                    half_q,timeout_q,idle_cycles_q};
                 cmd_wr_q <= cmd_wr_q + 4'd1;
                 if (data_w[8]) swj_length_q <= 9'd0;
             end
@@ -340,6 +346,10 @@ module plasma_swd_site_axi_lite #(
                             swj_length_q <= data_w[8:0];
                             s_axi_bresp <= OKAY;
                         end
+                        8'h68: if (mode_q == MODE_NORMAL &&
+                                   data_w[31:8] == 0 && data_w[7:0] >= 8'd8) begin
+                            idle_cycles_q <= data_w[7:0]; s_axi_bresp <= OKAY;
+                        end
                         8'h14: if (cmd_enqueue) s_axi_bresp <= OKAY;
                         8'h20: if (resp_dequeue) s_axi_bresp <= OKAY;
                         8'h28: if (cmd_flush) begin
@@ -374,6 +384,8 @@ module plasma_swd_site_axi_lite #(
                                    cmd_empty && resp_empty &&
                                    !normal_enable_q) begin
                             mode_q <= data_w[0] ? MODE_NORMAL : MODE_OFF;
+                            // Every owner session starts at the 8-clock default.
+                            if (!data_w[0]) idle_cycles_q <= 8'd8;
                             s_axi_bresp <= OKAY;
                         end
                         default: s_axi_bresp <= SLVERR;
@@ -433,6 +445,10 @@ module plasma_swd_site_axi_lite #(
                         end
                         8'h38: begin
                             s_axi_rdata <= {30'd0,mode_q}; s_axi_rresp <= OKAY;
+                        end
+                        8'h68: begin
+                            s_axi_rdata <= {24'd0,idle_cycles_q};
+                            s_axi_rresp <= OKAY;
                         end
                         default: s_axi_rresp <= SLVERR;
                     endcase

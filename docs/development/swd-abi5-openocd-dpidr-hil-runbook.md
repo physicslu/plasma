@@ -3,19 +3,18 @@
 Status: engineering runbook (Direct Execution / Route B). It records the
 procedure first executed on 2026-11-02, how to repeat it after the FPGA
 sample-point fix, and (§8) the #1252/#1266 privileged-code-root contract that
-the templates follow since 2026-11-03. It grants no Gate 1 scope, FPGA load, Flash operation or
-production qualification by itself.
+the templates follow since 2026-11-03, and (§9) the Blue Pill Flash procedure
+and adapter contract of PR #1285. It grants no Gate 1 scope, FPGA load, Flash
+operation or production qualification by itself.
 
 ## 1. Architecture under test
 
 ```text
 SWPC (CI artifact, SSH helper)
   └─ Route B engineering SSH ──► Z2 PS (root)
-        plasma_swd_site_admission.py  ── privileged code root + Root journal G5 live admission
-              │ writes /run/plasma-z2-swd05/swd-site<N>-admission (0600, 300 s)
-              ▼
         OpenOCD 5088db4c + plasma_swd (PS-local owner)
-              │ reload fence LOCK_SH + Site lock, record + live facts per MMIO word
+              │ reload fence LOCK_SH + Site lock; once: FPGA Manager operating +
+              │ Root journal IMAGE in this boot; Site ID; no per-word file checks
               ▼ /dev/mem one 4 KiB Site page
         PL ABI-v5 Site N engine ──► PMOD ──► Blue Pill SWD
 ```
@@ -39,9 +38,10 @@ The development Blue Pill is wired to **PMODB = Site 2** (owner confirmed
   `PROTECTED_FILES` table any more). The Root journal is
   `/var/lib/plasma-privileged/fpga-deployment-state.json` and every ancestor
   is root-owned and not group/other writable (#1266).
-- No `openocd` process is running, and no stale `swd-site<N>-admission` record exists.
+- No `openocd` process is running.
 - The owner has confirmed DUT supply, common ground, 3.3 V signalling and the
-  exact connector.
+  exact connector. Since PR #1285 this is an operator step only: no attestation
+  file is written or checked, and DUT voltage is not measured.
 
 ## 3. Procedure
 
@@ -71,11 +71,9 @@ Fill them with `sed` into a separate evidence directory. Never edit them in plac
    Entry from step 3). Install to
    `/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154-plasma-swd-<sha12>`.
    The script refuses to overwrite and rechecks the existing `5088db4c`,
-   `9ea7f3d` and Root Entry hashes before and after. It then runs Z2 negatives:
-   no Site, no record, non-root and Site 3 must all be denied.
-6. **Owner attestation.** Fill `attest_tpl.py` with the Site, connector and
-   owner statement. It writes `/root/plasma-swd-electrical/site<N>-attestation.json`
-   (0600, 4 h). This is an attestation, never a measurement.
+   `9ea7f3d` and Root Entry hashes before and after. It then runs Z2 negatives
+   that never reach Site MMIO: no Site, non-root and Site 3 must all be denied.
+6. *(Retired by PR #1285: the owner electrical attestation file.)*
 7. **One bounded DPIDR.** Fill `dpidr_tpl.py` (Site, install dir, SHAs). It runs
    the precheck, the admission (`admit <N>`), then OpenOCD with no target, no
    ports, `dap init` and `dpreg 0`, under a 45 s timeout. It then revokes the
@@ -97,7 +95,7 @@ On a failed run, `plasma_swd` logs
 | status 2 (NEED_RESET), ACK 0 | DPIDR was sent before the RTL line-reset command. Fixed in `737834890`. |
 | status 5, ACK `0b111` | SWDIO high during ACK: no target on that Site/connector, unpowered, or not wired. |
 | status 4, ACK `0b100` on the first DPIDR | A valid OK ACK sampled one bit late (see §5). |
-| `PS_OWNER_*` denial | Admission, lock or live-fact failure before MMIO. The code names the failed check. |
+| `PS_OWNER_*` denial | Lock or loaded-Image precheck failure before MMIO (`PS_OWNER_PL_IMAGE_NOT_LOADED`, `PS_OWNER_SITE_LOCK_UNAVAILABLE`, …). The code names the failed check. |
 | `PS_OWNER_STALE_SITE_NOT_RECOVERABLE` | The Site is busy, invalid or uncertain and was left untouched. Manual review required. |
 
 `SAFE_OFF_MODE_OFF_VERIFIED` must appear at the end of every run.
@@ -130,11 +128,14 @@ admits only reviewed Images:
 | Golden recovery | `GOLDEN_RECOVERY_*` in `pl/hil/fpga_image_guard.py` (protected tree) | nothing: the Manifest must restate `base.bin` / `c6768695…e19c` exactly (Stage B-1) |
 | B2/B3 operation authorization | per-request `plasma.ppu.owner-operation-authorization.v1` from the paired client | nothing pre-listed; each request binds device, exact Bundle SHA-256, transaction and action |
 
-The fixed sample-point Image is `z2-independent-swd-v5-bd976140` (PR #1255
-head `bd976140e`, Vivado Host Build run 41469421780). Its paired Manifest is
-`pl/hil/releases/swd-independent-bd976140/plasma-image-manifest.json`. The BIN
+The current Image is `z2-independent-swd-v5-d0add58c` (PR #1285 head
+`d0add58c3`, Vivado Host Build run 41648270405: adds `0x68 IDLE_CYCLES`).
+Its paired Manifest is
+`pl/hil/releases/swd-independent-d0add58c/plasma-image-manifest.json`. The BIN
 is the bootgen-equivalent Zynq word-swapped payload of the run's
-`system_wrapper.bit` plus the trailing `0x20000000` NOP word.
+`system_wrapper.bit` plus the trailing `0x20000000` NOP word. The earlier
+sample-point Image `bd976140` (PR #1255) is retired: the current adapter
+writes `0x68`, which that Image rejects.
 
 To load a newly listed Image: refresh the Bootstrap and re-provision the
 privileged code root from it (§8), then run B1 → B2 → B3 `fpga_load=true` over
@@ -205,3 +206,46 @@ v2 + OpenOCD read `SWD DPIDR 0x1ba01477` and `dpreg 0 = 0x1ba01477` with
 `SAFE_OFF_MODE_OFF_VERIFIED`, journal unchanged and record revoked. No Flash
 operation or Golden Restore. Electrical state is an owner on-site attestation,
 not a measurement.
+
+## 9. 2026-11-03: Blue Pill Flash through `plasma_swd` (PR #1285) — PASS
+
+### Adapter contract (OpenOCD 5088 `struct swd_driver`)
+
+The adapter executes what OpenOCD queues and reports the exact outcome;
+ADI policy (reconnect, sticky-error handling, posted reads) stays in OpenOCD.
+
+| Duty | Behaviour |
+|---|---|
+| `read_reg`/`write_reg` | Queued (16 entries); a full queue is executed immediately, its failure is also returned by the next `run()` |
+| `ap_delay_hint` | AP transfers use `max(8, hint)` (≤ 255) trailing idle clocks via `0x68 IDLE_CYCLES`, written only on change |
+| ACK WAIT | Completion popped, DP ABORT `0x1E`, same transfer retried (64 max, then blocked) |
+| ACK FAULT, no ACK, NEED_RESET | Completion popped, error returned, Site stays usable so OpenOCD can reconnect |
+| PARITY / TIMEOUT / ABORT | As above, plus RW1C `ERROR` to clear the RTL fault latch |
+| No completion, tag mismatch, CONFIG, MMIO failure | Fail closed (Site blocked) |
+| `adapter speed` | `HALF_PERIOD = ceil(50000 / kHz)` (4…65535); default 500 kHz from `plasma_swd site N` unless set. `target/stm32f1x.cfg` sets 1000, so pass `adapter speed 500` after sourcing it |
+| Completion tags | 16-bit, wrap 65535 → 1 (one command in flight) |
+
+### Procedure
+
+Templates in `scripts/z2/hil/abi5_openocd_flash/`:
+
+- `act_tpl.py` (Z2, root): one OpenOCD session per action
+  (`dpidr|erase|write|verify|read`), `init; halt; poll off; sleep 300; <action>;
+  sleep 300; shutdown`. The two SWCLK-idle gaps mark the action. `read` dumps
+  the Flash, then `reset run`.
+- `la_action.py` (SWPC): arms the LA2016 (50 MHz, CH0 rising trigger, 3 s),
+  runs one action through `z2run.py`, and crops exactly 200 ms starting 1 ms
+  before the first CH0 edge after the first ≥ 250 ms gap.
+
+Run order: DPIDR → erase `0x08000000 0x4c00` → write → verify → read + reset
+→ USB CDC heartbeat on SWPC (`cdc_heartbeat.py after_reset`).
+
+### Result
+
+Image `d0add58c`, OpenOCD `plasma-swd-b916b9f3f9bd` (CI run 41663509036,
+source `4f107b10d`), 500 kHz: DPIDR `0x1ba01477`; erase 0.454 s; write 18,768 B
+0.758 s; verify 0.062 s; readback `8d3ffb02…`; 14 heartbeats in 6 s after
+reset. LA2016 + sigrok SWD decode: every request ACK OK, 0 WAIT/FAULT,
+54 clocks per transaction, 2.000 µs period, SWCLK active ~76 % during
+write/read (ST-LINK reference: 1,288 WAIT, 86 %). Evidence (local):
+`.work/z2-bluepill-heartbeat-flash-20261103/`.

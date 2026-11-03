@@ -9,9 +9,18 @@
 #include <stdint.h>
 
 #define PLASMA_SWD_MAX_QUEUE 16u
+#define PLASMA_SWD_WAIT_RETRIES 64u /* ACK WAIT retries per transfer */
 #define PLASMA_SWD_ABI_V5 0x00050000u
 #define PLASMA_SWD_SITE1_BASE 0x43C01000u
 #define PLASMA_SWD_SITE2_BASE 0x43C02000u
+/* RTL trailing SWDIO-low idle clocks per command: reset/MODE-OFF default and
+ * maximum of the 0x68 IDLE_CYCLES register. */
+#define PLASMA_SWD_IDLE_DEFAULT 8u
+/* SWCLK = 100 MHz FCLK0 / (2 * HALF_PERIOD); RTL minimum 4 (12.5 MHz). */
+#define PLASMA_SWD_HALF_MIN 4u
+#define PLASMA_SWD_HALF_MAX 65535u
+#define PLASMA_SWD_DEFAULT_KHZ 500u
+#define PLASMA_SWD_IDLE_MAX 255u
 
 enum plasma_swd_result {
     PLASMA_SWD_OK = 0,
@@ -39,6 +48,7 @@ struct plasma_swd_queue_op {
     uint32_t value;
     uint32_t *destination;
     uint16_t bit_count;
+    uint8_t idle_cycles; /* trailing idle clocks for this command */
     uint8_t swj_bytes[32];
 };
 
@@ -48,6 +58,8 @@ struct plasma_swd_fifo {
     uint32_t max_polls;
     uint32_t next_tag;
     uint32_t count;
+    uint32_t idle_cycles; /* last value programmed into IDLE_CYCLES */
+    int deferred_rc; /* failure of an automatic full-queue flush */
     bool admitted;
     bool blocked;
     /* Diagnostics of the last completion that ended a run (not authority). */
@@ -64,11 +76,17 @@ int plasma_swd_fifo_init(struct plasma_swd_fifo *s,
 /* Caller must ALREADY own the Image/Manifest, electrical and Site lease. */
 int plasma_swd_fifo_admit(struct plasma_swd_fifo *s);
 
-/* OpenOCD swd_cmd() v5088 layout, NOT the FPGA 9-bit command. */
+/* OpenOCD swd_cmd() v5088 layout, NOT the FPGA 9-bit command.
+ * ap_delay_hint (OpenOCD memaccess_tck) is honoured for AP transfers as
+ * max(8, hint) trailing idle clocks (saturated at 255) via IDLE_CYCLES;
+ * a hint of 8 or less needs no register write (RTL default is 8). */
 int plasma_swd_fifo_queue_read(struct plasma_swd_fifo *s, uint8_t cmd,
                               uint32_t *destination, uint32_t ap_delay_hint);
 int plasma_swd_fifo_queue_write(struct plasma_swd_fifo *s, uint8_t cmd,
                                uint32_t value, uint32_t ap_delay_hint);
+
+/* Program SWCLK HALF_PERIOD (0x08) between runs; queue must be empty. */
+int plasma_swd_fifo_set_half_period(struct plasma_swd_fifo *s, uint32_t half);
 
 /* Full source-defined LSB-first SWJ payload; no arbitrary GPIO toggles. */
 int plasma_swd_fifo_queue_swj(struct plasma_swd_fifo *s,

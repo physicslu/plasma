@@ -10,6 +10,7 @@
 
 #define R_ID 0x00u
 #define R_STATUS 0x04u
+#define R_HALF_PERIOD 0x08u
 #define R_TX 0x10u
 #define R_PUSH 0x14u
 #define R_META 0x18u
@@ -22,6 +23,16 @@
 #define R_MODE 0x38u
 #define R_SWJ_WORD0 0x44u
 #define R_SWJ_LENGTH 0x64u
+/* RTL completion status (plasma_swd_transaction_engine.sv ST_*). */
+#define ST_OK 0u
+#define ST_NEED_RESET 2u
+#define ST_WAIT 3u
+#define ST_FAULT 4u
+#define ST_BAD_ACK 5u
+#define ST_PARITY 6u
+#define ST_TIMEOUT 7u
+#define ST_ABORT 8u
+#define R_IDLE_CYCLES 0x68u
 
 static int fault(struct plasma_swd_fifo *s, int code)
 {
@@ -60,6 +71,7 @@ int plasma_swd_fifo_init(struct plasma_swd_fifo *s,
     s->base = site_id == 1u ? PLASMA_SWD_SITE1_BASE : PLASMA_SWD_SITE2_BASE;
     s->max_polls = max_polls;
     s->next_tag = 1;
+    s->idle_cycles = PLASMA_SWD_IDLE_DEFAULT;
     return PLASMA_SWD_OK;
 }
 
@@ -80,12 +92,13 @@ int plasma_swd_fifo_admit(struct plasma_swd_fifo *s)
     if (read_word(s, R_MODE, &mode) || read_word(s, R_STATUS, &status) ||
         mode != 1u || !(status & 1u))
         return fault(s, PLASMA_SWD_BAD_RESPONSE);
+    /* MODE was 0 before this admission: the RTL restored IDLE_CYCLES=8. */
+    s->idle_cycles = PLASMA_SWD_IDLE_DEFAULT;
     s->admitted = true;
     return PLASMA_SWD_OK;
 }
 
-static int decode_swd(uint8_t cmd, bool read, uint32_t delay,
-                      uint8_t *private_cmd)
+static int decode_swd(uint8_t cmd, bool read, uint8_t *private_cmd)
 {
     uint8_t x = cmd & 0x1Eu;
     unsigned int parity = 0;
@@ -94,14 +107,25 @@ static int decode_swd(uint8_t cmd, bool read, uint32_t delay,
     if ((cmd & 0xC1u) || ((cmd >> 5) & 1u) != parity ||
         (bool)(cmd & 4u) != read)
         return PLASMA_SWD_BAD_ARG;
-    if (delay)
-        return PLASMA_SWD_UNSUPPORTED;
     const uint8_t ap = (cmd >> 1) & 1u;
     const uint8_t address_index = (cmd >> 3) & 3u;
     if (!ap && !read && address_index == 3u)
         return PLASMA_SWD_UNSUPPORTED; /* DPv2 TARGETSEL: no ACK */
     *private_cmd = ap | ((uint8_t)read << 1) | (address_index << 2);
     return PLASMA_SWD_OK;
+}
+
+/* OpenOCD queues whole memory blocks (hundreds of transfers) before one
+ * run(). When the software queue is full, execute it now, as bitbang and
+ * CMSIS-DAP adapters do; a failure is also reported by the next run(). */
+static int reserve(struct plasma_swd_fifo *s)
+{
+    if (s->count < PLASMA_SWD_MAX_QUEUE)
+        return PLASMA_SWD_OK;
+    const int rc = plasma_swd_fifo_run(s);
+    if (rc)
+        s->deferred_rc = rc;
+    return rc;
 }
 
 static int queue_transfer(struct plasma_swd_fifo *s, uint8_t cmd, bool read,
@@ -113,18 +137,42 @@ static int queue_transfer(struct plasma_swd_fifo *s, uint8_t cmd, bool read,
     /* OpenOCD swd_driver.read_reg() may pass value == NULL to discard a
      * read (e.g. dap_dp_init's DP CTRL/STAT read). The transfer still runs
      * with full ACK/parity checking; only publication is skipped. */
-    int status = decode_swd(cmd, read, hint, &private_cmd);
+    int status = decode_swd(cmd, read, &private_cmd);
     if (status)
         return status;
-    if (s->count == PLASMA_SWD_MAX_QUEUE)
-        return PLASMA_SWD_QUEUE_FULL;
+    /* OpenOCD passes ap->memaccess_tck (default 255; Cortex-M examine sets
+     * 8) for every AP transfer and 0 for DP. Each command already ends with
+     * the RTL's IDLE_CYCLES clocks, so request max(8, hint), saturated. */
+    uint8_t idle = PLASMA_SWD_IDLE_DEFAULT;
+    if ((private_cmd & 1u) && hint > PLASMA_SWD_IDLE_DEFAULT)
+        idle = hint > PLASMA_SWD_IDLE_MAX ? PLASMA_SWD_IDLE_MAX : (uint8_t)hint;
+    status = reserve(s);
+    if (status)
+        return status;
     struct plasma_swd_queue_op *op = &s->pending[s->count++];
     memset(op, 0, sizeof(*op));
     op->private_command = private_cmd;
     op->read = read;
     op->value = data;
     op->destination = dst;
+    op->idle_cycles = idle;
     return PLASMA_SWD_OK;
+}
+
+int plasma_swd_fifo_set_half_period(struct plasma_swd_fifo *s, uint32_t half)
+{
+    if (!s || !s->admitted || s->blocked)
+        return PLASMA_SWD_NOT_READY;
+    if (half < PLASMA_SWD_HALF_MIN || half > PLASMA_SWD_HALF_MAX)
+        return PLASMA_SWD_BAD_ARG;
+    if (s->count || s->deferred_rc) {
+        /* Queued transfers run at the old speed, as already requested. */
+        const int rc = plasma_swd_fifo_run(s);
+        if (rc)
+            return rc;
+    }
+    /* Snapshotted per CMD_PUSH by the RTL; only NORMAL mode accepts it. */
+    return write_word(s, R_HALF_PERIOD, half);
 }
 
 int plasma_swd_fifo_queue_read(struct plasma_swd_fifo *s, uint8_t cmd,
@@ -143,12 +191,14 @@ int plasma_swd_fifo_queue_line_reset(struct plasma_swd_fifo *s)
 {
     if (!s || !s->admitted || s->blocked)
         return PLASMA_SWD_NOT_READY;
-    if (s->count == PLASMA_SWD_MAX_QUEUE)
-        return PLASMA_SWD_QUEUE_FULL;
+    const int status = reserve(s);
+    if (status)
+        return status;
     struct plasma_swd_queue_op *op = &s->pending[s->count++];
     memset(op, 0, sizeof(*op));
     op->is_swj = true;
     op->bit_count = 0; /* RTL 64-clock line-reset encoding */
+    op->idle_cycles = PLASMA_SWD_IDLE_DEFAULT;
     return PLASMA_SWD_OK;
 }
 
@@ -217,12 +267,14 @@ int plasma_swd_fifo_queue_swj(struct plasma_swd_fifo *s,
     const uint16_t len = (count + 7u) / 8u;
     if ((count & 7u) && (payload[len - 1u] >> (count & 7u)))
         return PLASMA_SWD_BAD_ARG;
-    if (s->count == PLASMA_SWD_MAX_QUEUE)
-        return PLASMA_SWD_QUEUE_FULL;
+    const int status = reserve(s);
+    if (status)
+        return status;
     struct plasma_swd_queue_op *op = &s->pending[s->count++];
     memset(op, 0, sizeof(*op));
     op->is_swj = true;
     op->bit_count = count;
+    op->idle_cycles = PLASMA_SWD_IDLE_DEFAULT;
     op->private_command = 0x00; /* SWJ has bit8 enabled at PUSH */
     memcpy(op->swj_bytes, payload, len);
     return PLASMA_SWD_OK;
@@ -233,6 +285,13 @@ static int push_one(struct plasma_swd_fifo *s,
 {
     uint32_t data = op->value;
     uint32_t command = op->private_command;
+    /* Snapshotted by the RTL at PUSH; write only on change, so a session that
+     * never needs more than 8 never touches the register. */
+    if (op->idle_cycles != s->idle_cycles) {
+        if (write_word(s, R_IDLE_CYCLES, op->idle_cycles))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        s->idle_cycles = op->idle_cycles;
+    }
     if (op->is_swj) {
         command = 0x100u | (op->bit_count & 0xFFu);
         if (op->bit_count <= 32u) {
@@ -282,16 +341,33 @@ static int take_one(struct plasma_swd_fifo *s,
     s->last_levels = levels;
     if ((meta >> 16) != tag)
         return fault(s, PLASMA_SWD_BAD_RESPONSE);
-    if (!op->is_swj) {
-        const uint32_t ack = (meta >> 4) & 7u;
-        if (ack == 2u && (meta & 0xFu) == 3u)
-            return fault(s, PLASMA_SWD_ACK_WAIT);
-        if (ack == 4u && (meta & 0xFu) == 4u)
-            return fault(s, PLASMA_SWD_ACK_FAULT);
-        if (ack != 1u)
-            return fault(s, PLASMA_SWD_BAD_RESPONSE);
+    const uint32_t status = meta & 0xFu, ack = (meta >> 4) & 7u;
+    /* Target-side protocol outcomes are recoverable: OpenOCD reconnects
+     * (line reset, DPIDR, ABORT) on the next operation after any error, so
+     * the Site must stay usable. Release the completion, clear the RTL
+     * fault latch where the engine set one, report the error. */
+    if (status != ST_OK || (!op->is_swj && ack != 1u)) {
+        int rc;
+        bool latched = false;
+        if (status == ST_WAIT && ack == 2u && !op->is_swj)
+            rc = PLASMA_SWD_ACK_WAIT; /* not accepted; caller may retry */
+        else if (status == ST_FAULT && ack == 4u && !op->is_swj)
+            rc = PLASMA_SWD_ACK_FAULT;
+        else if (status == ST_NEED_RESET || status == ST_BAD_ACK)
+            rc = PLASMA_SWD_BAD_RESPONSE;
+        else if (status == ST_PARITY || status == ST_TIMEOUT ||
+                 status == ST_ABORT) {
+            rc = PLASMA_SWD_BAD_RESPONSE;
+            latched = true; /* RTL fault_q stops dispatch until RW1C */
+        } else
+            return fault(s, PLASMA_SWD_BAD_RESPONSE); /* CONFIG / unknown */
+        if (write_word(s, R_POP, tag))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        if (latched && write_word(s, R_ERROR, 1u))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        return rc;
     }
-    if ((meta & 0xFu) != 0u || (bool)(meta & 0x80u) != op->read)
+    if ((bool)(meta & 0x80u) != op->read)
         return fault(s, PLASMA_SWD_BAD_RESPONSE);
     if (write_word(s, R_POP, tag))
         return PLASMA_SWD_IO_UNCERTAIN;
@@ -299,25 +375,63 @@ static int take_one(struct plasma_swd_fifo *s,
     return PLASMA_SWD_OK;
 }
 
+/* 16-bit nonzero completion tags; one command is in flight at a time, so
+ * wrapping 65535 -> 1 cannot alias a retained completion. */
+static uint32_t take_tag(struct plasma_swd_fifo *s)
+{
+    const uint32_t tag = s->next_tag;
+    s->next_tag = tag >= 65535u ? 1u : tag + 1u;
+    return tag;
+}
+
+/* One transfer; on ACK WAIT clear sticky/overrun via DP ABORT
+ * (ORUNERRCLR|WDERRCLR|STKERRCLR|STKCMPCLR) and retry, like OpenOCD's
+ * bitbang adapter. The waited transfer was never accepted: no replay. */
+static int exec_one(struct plasma_swd_fifo *s,
+                    const struct plasma_swd_queue_op *op, uint32_t *data)
+{
+    static const struct plasma_swd_queue_op abort_op = {
+        .private_command = 0x00u, .read = false, .value = 0x1Eu,
+        .idle_cycles = PLASMA_SWD_IDLE_DEFAULT,
+    };
+    for (unsigned int attempt = 0;; ++attempt) {
+        uint32_t tag = take_tag(s);
+        if (push_one(s, op, tag))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        const int rc = take_one(s, op, tag, data);
+        if (rc != PLASMA_SWD_ACK_WAIT)
+            return rc;
+        if (attempt == PLASMA_SWD_WAIT_RETRIES)
+            return fault(s, PLASMA_SWD_ACK_WAIT);
+        uint32_t ignored = 0;
+        tag = take_tag(s);
+        if (push_one(s, &abort_op, tag))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        const int arc = take_one(s, &abort_op, tag, &ignored);
+        if (arc)
+            return arc == PLASMA_SWD_ACK_WAIT ? fault(s, arc) : arc;
+    }
+}
+
 int plasma_swd_fifo_run(struct plasma_swd_fifo *s)
 {
     uint32_t read_values[PLASMA_SWD_MAX_QUEUE] = {0};
     if (!s || !s->admitted || s->blocked)
         return PLASMA_SWD_NOT_READY;
+    if (s->deferred_rc) {
+        const int rc = s->deferred_rc;
+        s->deferred_rc = 0;
+        s->count = 0;
+        return rc;
+    }
     const uint32_t count = s->count;
     s->count = 0; /* consume immediately, never replay accepted commands */
-    if (count && s->next_tag + count - 1u > 65535u)
-        return fault(s, PLASMA_SWD_NOT_READY);
     for (uint32_t i = 0; i < count; ++i) {
-        const struct plasma_swd_queue_op *op = &s->pending[i];
-        const uint32_t tag = s->next_tag++;
-        uint32_t dummy = 0;
-        if (push_one(s, op, tag))
-            return PLASMA_SWD_IO_UNCERTAIN;
-        const int rc = take_one(s, op, tag, &dummy);
+        uint32_t value = 0;
+        const int rc = exec_one(s, &s->pending[i], &value);
         if (rc)
             return rc;
-        read_values[i] = dummy;
+        read_values[i] = value;
     }
     /* Result pointers are published only if the WHOLE queue succeeded. */
     for (uint32_t i = 0; i < count; ++i)

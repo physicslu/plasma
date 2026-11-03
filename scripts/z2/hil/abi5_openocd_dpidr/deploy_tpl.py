@@ -64,16 +64,15 @@ out["ldd"]=subprocess.run(["ldd",B],capture_output=True,text=True).stdout
 out["version"]=run(["--version"])
 out["adapter_list"]=run(["-c","adapter list","-c","shutdown"])
 need("plasma_swd" in out["adapter_list"]["out"],"PLASMA_SWD_NOT_LISTED")
-rec="/run/plasma-z2-swd05/swd-site1-admission"
-need(not os.path.exists(rec),"STALE_RECORD_PRESENT")
+# Negatives never reach Site MMIO: no Site selected, non-root, invalid Site.
+# (A root init with a valid Site would attach that Site for real.)
 base=["-c","adapter driver plasma_swd"]+NOPORT
 out["neg_no_site"]=run(base+["-c","transport select swd","-c","init","-c","shutdown"])
-out["neg_site1_no_record"]=run(base+["-c","plasma_swd site 1","-c","transport select swd","-c","init","-c","shutdown"])
 out["neg_nonroot"]=run(base+["-c","plasma_swd site 1","-c","transport select swd","-c","init","-c","shutdown"],user=True)
 out["neg_site3"]=run(base+["-c","plasma_swd site 3","-c","transport select swd","-c","init","-c","shutdown"])
-checks={"neg_no_site":"PS_OWNER_SITE_NOT_SELECTED","neg_site1_no_record":"PS_OWNER_ADMISSION_RECORD_INVALID","neg_nonroot":"PS_OWNER_ROOT_REQUIRED","neg_site3":""}
+checks={"neg_no_site":"PS_OWNER_SITE_NOT_SELECTED","neg_nonroot":"PS_OWNER_ROOT_REQUIRED","neg_site3":""}
 out["negatives"]={k:(out[k]["rc"]!=0 and v in out[k]["out"]) for k,v in checks.items()}
-out["result"]="DEPLOYED_AND_UNADMITTED_DENIED" if all(out["negatives"].values()) else "DEPLOYED_NEGATIVE_CHECK_FAILED"
+out["result"]="DEPLOYED_AND_NEGATIVES_DENIED" if all(out["negatives"].values()) else "DEPLOYED_NEGATIVE_CHECK_FAILED"
 print("Z2JSON="+json.dumps(out))
 
 os.remove(UP)

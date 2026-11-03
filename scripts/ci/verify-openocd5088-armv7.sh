@@ -36,7 +36,7 @@ set +e
 unadmitted_exit=$?
 set -e
 test "$unadmitted_exit" -ne 0
-grep -Eq 'PS_OWNER_(SITE_LOCK_UNAVAILABLE|ADMISSION_RECORD_INVALID)' \
+grep -Eq 'PS_OWNER_(SITE_LOCK_UNAVAILABLE|PL_IMAGE_NOT_LOADED|ROOT_REQUIRED)' \
   /artifacts/unadmitted-site1-init-denied.log
 ldd /cache/openocd > /artifacts/linked-libraries.txt
 if grep -q 'not found' /artifacts/linked-libraries.txt; then

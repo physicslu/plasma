@@ -44,6 +44,42 @@ static int plasma_swd_adapter_init(void)
     return plasma_swd_openocd5088_owner_ready();
 }
 
+/* OpenOCD speed is the RTL HALF_PERIOD: SWCLK = 100 MHz / (2 * HALF).
+ * Rounded so the real clock never exceeds the request; no RCLK. */
+static int plasma_swd_khz(int khz, int *speed)
+{
+    if (khz <= 0)
+        return ERROR_FAIL;
+    unsigned int half = (50000u + (unsigned int)khz - 1u) / (unsigned int)khz;
+    if (half < PLASMA_SWD_HALF_MIN)
+        half = PLASMA_SWD_HALF_MIN;
+    if (half > PLASMA_SWD_HALF_MAX)
+        half = PLASMA_SWD_HALF_MAX;
+    *speed = (int)half;
+    return ERROR_OK;
+}
+
+static int plasma_swd_speed_div(int speed, int *khz)
+{
+    if (speed < (int)PLASMA_SWD_HALF_MIN)
+        return ERROR_FAIL;
+    *khz = 50000 / speed;
+    return ERROR_OK;
+}
+
+static int plasma_swd_speed(int speed)
+{
+#ifndef PLASMA_SWD_HOST_TEST
+    if (plasma_swd_ps_owner_set_half_period((uint32_t)speed) != PLASMA_SWD_OK) {
+        LOG_ERROR("plasma_swd: cannot set SWCLK half period %d", speed);
+        return ERROR_FAIL;
+    }
+#else
+    (void)speed;
+#endif
+    return ERROR_OK;
+}
+
 static int plasma_swd_adapter_quit(void)
 {
 #ifndef PLASMA_SWD_HOST_TEST
@@ -60,7 +96,8 @@ static int plasma_swd_adapter_quit(void)
     return ERROR_OK;
 }
 
-/* SWCLK is hardware generated within one independent Site NORMAL Engine.
+/* SWCLK is hardware generated within one independent Site NORMAL Engine
+ * (adapter speed -> HALF_PERIOD; default 500 kHz, see plasma_swd site).
  * No SWD GPIO/remote_bitbang fallback, no JTAG executor.
  */
 struct adapter_driver plasma_swd_adapter_driver = {
@@ -72,5 +109,8 @@ struct adapter_driver plasma_swd_adapter_driver = {
 #endif
     .init = plasma_swd_adapter_init,
     .quit = plasma_swd_adapter_quit,
+    .speed = plasma_swd_speed,
+    .khz = plasma_swd_khz,
+    .speed_div = plasma_swd_speed_div,
     .swd_ops = &plasma_swd_openocd5088_ops,
 };

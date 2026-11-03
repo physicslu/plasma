@@ -24,9 +24,9 @@ from ppu_site_adapter_abi5 import Abi5OpenocdAdapter  # noqa: E402
 RUN = Path(os.environ.get("RUNTIME_DIRECTORY", "/run/plasma-site-worker"))
 STATE = Path(os.environ.get("STATE_DIRECTORY", "/var/lib/plasma-site-worker"))
 RUNTIME_CONTROL = Path("/run/plasma-server/control.sock")
-OPENOCD_ROOT = Path("/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154-plasma-swd-954344c5717a")
+OPENOCD_ROOT = Path("/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154-plasma-swd-b916b9f3f9bd")
 PYTHON = Path("/opt/plasma/python/3.12.13/bin/python3")
-EXPECTED_IMAGE = "z2-independent-swd-v5-bd976140"
+EXPECTED_IMAGE = "z2-independent-swd-v5-d0add58c"
 
 
 def build(run_dir: Path = RUN, state_dir: Path = STATE, *, adapter=None,

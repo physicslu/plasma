@@ -1,4 +1,4 @@
-"""Host-only adversarial checks for the exact bd976140 HWH/Manifest pair (ab79b04e retired)."""
+"""Host-only adversarial checks for the exact d0add58c HWH/Manifest pair (ab79b04e, bd976140 retired)."""
 from __future__ import annotations
 
 import hashlib
@@ -18,7 +18,7 @@ from pl.hil import fpga_image_guard as guard
 from pl.hil import swd_independent_image_contract as contract
 
 
-FIXTURE = Path(__file__).parent / "fixtures/swd-independent-bd976140"
+FIXTURE = Path(__file__).parent / "fixtures/swd-independent-d0add58c"
 
 
 def test_exact_build_pair_and_site_addresses():
