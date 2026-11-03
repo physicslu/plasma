@@ -28,11 +28,6 @@ bootstrap = load("ppu_fpga_static_qualification_service", "ppu-bootstrap-service
 
 SHIPPED = ROOT / "scripts" / "ppu-fpga-image-contracts.json"
 
-# Byte-exact copy of PR #1247 draft fixture
-# pl/tests/fixtures/swd-independent-ab79b04e/plasma-image-manifest.json
-# (draft; NOT merged, deployed or HIL-qualified). Used only to prove the shipped
-# contract pins that Manifest and that the Root parser accepts it.
-# The reviewed devmem Manifest the Z2 Root uses for ab79b04e (Identity PASS).
 
 
 def fpga_bundle(tmp_path, files=None, *, mutate=None):
@@ -59,9 +54,10 @@ def contract_file(tmp_path, *entries):
     return write_contracts(tmp_path / "factory" / "contracts.json", *entries)
 
 
-# --- shipped trusted contracts (ABI v5 independent: ab79b04e, bd976140) ----
+# --- shipped trusted contracts (ABI v5 independent: bd976140; ab79b04e retired) ----
 
-SHIPPED_BUILDS = ("ab79b04e", "bd976140")
+SHIPPED_BUILDS = ("bd976140",)
+RETIRED_BUILDS = ("ab79b04e",)
 
 
 def _release_manifest(build: str) -> bytes:
@@ -449,3 +445,12 @@ def test_b3_rejects_fpga_contract_or_master_grant_change_after_b2(tmp_path):
     srv.deployment_thread.join(timeout=10)
     assert len(calls) == 1
     assert not (paths.product_root / "current").exists()
+
+
+@pytest.mark.parametrize("build", RETIRED_BUILDS)
+def test_retired_image_not_trusted_anywhere(build):
+    root = qualification.load_root_manifest_parser()
+    shipped = json.loads(SHIPPED.read_text())
+    assert not any(build in json.dumps(c) for c in shipped["contracts"])
+    assert f"z2-independent-swd-v5-{build}" not in root.admission.DEVMEM_INDEPENDENT_IMAGES
+    assert not (ROOT / f"pl/hil/releases/swd-independent-{build}").exists()

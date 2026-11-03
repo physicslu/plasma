@@ -1,4 +1,4 @@
-"""Host-only adversarial checks for the exact ab79b04e HWH/Manifest pair."""
+"""Host-only adversarial checks for the exact bd976140 HWH/Manifest pair (ab79b04e retired)."""
 from __future__ import annotations
 
 import hashlib
@@ -18,7 +18,7 @@ from pl.hil import fpga_image_guard as guard
 from pl.hil import swd_independent_image_contract as contract
 
 
-FIXTURE = Path(__file__).parent / "fixtures/swd-independent-ab79b04e"
+FIXTURE = Path(__file__).parent / "fixtures/swd-independent-bd976140"
 
 
 def test_exact_build_pair_and_site_addresses():
@@ -176,7 +176,7 @@ def test_platform_owner_admission_is_index_independent_and_fail_closed():
 
 def test_new_manifest_requires_explicit_platform_owner_not_uio_index(tmp_path):
     data = json.loads((FIXTURE / "plasma-image-manifest.json").read_text())
-    data.pop("uio_name")
+    data.pop("uio_name", None)  # devmem release Manifest has no uio_name
     data["owner_base"] = 0x43C01000
     data["owner_bytes"] = 0x2000
     data["expected_uio"] = {"platform_node": "43c01000.plasma-swd",
@@ -273,7 +273,7 @@ def test_live_resolver_binds_platform_resource_regardless_of_uio_ordinal(tmp_pat
 def test_explicit_devmem_engineering_owner_is_not_inferred_from_covering_uio(tmp_path):
     """Only a source-pinned ABI-v5 Manifest and live owner facts admit MMIO."""
     data = json.loads((FIXTURE / "plasma-image-manifest.json").read_text())
-    data.pop("uio_name")  # The historical uio1 assumption is false on Z2.
+    data.pop("uio_name", None)  # The historical uio1 assumption is false on Z2.
     data["expected_uio"] = {
         "backend": "devmem",
         "platform_node": "43c00000.audio-codec-ctrl",
