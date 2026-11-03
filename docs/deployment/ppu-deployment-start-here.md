@@ -2,7 +2,7 @@
 
 Entry page for how a PYNQ-Z2 PPU is provisioned and updated today. It links the authoritative documents and adds no rules. When this page disagrees with a linked document or the code, the linked document/code wins.
 
-**Operator workflow: [Install Bundle → Run Job → Get Result](../architecture/ppu-install-run-result.md).** Inside Install, B1 admission prerequisites, B2 validation and B3 installation remain distinct proofs. B3 with `fpga_load:false` stages only; explicit authorized `fpga_load:true` may load FPGA and atomically publish the verified Active Set after Root Identity PASS. Neither install nor Active means a Programming Job ran. There is **no separate B4 operator stage**.
+**Operator workflow: [Install Bundle → Run Job → Get Result](../architecture/ppu-install-run-result.md).** Inside Install, B1 Receive, B2 Admission and B3 Install/Verify remain distinct proofs. B3 with `fpga_load:false` stages only; explicit authorized `fpga_load:true` may load FPGA and atomically publish the verified Active Set after Root Identity PASS. Neither install nor Active means a Programming Job ran. There is **no separate B4 operator stage**.
 
 ## Two deployment routes
 
