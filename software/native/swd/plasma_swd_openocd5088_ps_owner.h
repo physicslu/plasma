@@ -32,7 +32,7 @@ struct plasma_swd_ps_paths {
     char boot_id[256];
     char manager_state[256];
     char root_journal[256];
-    char root_pin[256];
+    char code_manifest[256];
     char record_dir[256];   /* record: <dir>/swd-site<N>-admission */
     char lock[256];         /* PPU reload fence path */
     char devmem[256];
@@ -44,6 +44,8 @@ struct plasma_swd_ps_admission {
     unsigned int site_id;
     char firmware_sha256[65];
     uint64_t journal_dev, journal_ino, journal_size;
+    uint64_t code_manifest_dev, code_manifest_ino, code_manifest_size;
+    int64_t code_manifest_mtime_ns;
     int64_t journal_mtime_ns;
     uint64_t electrical_ino;
     int64_t electrical_mtime_ns;

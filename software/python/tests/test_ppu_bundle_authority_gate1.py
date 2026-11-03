@@ -23,59 +23,57 @@ sys.modules[spec.name] = authority
 spec.loader.exec_module(authority)
 
 
-def test_b2_one_master_grant_covers_python_native_c_and_fpga(tmp_path):
+def test_b2_one_local_approval_covers_exact_bundle(tmp_path):
     archive, digest = bundle_v3(tmp_path / "input")
     class Paths:
-        bundle_authority_policy = tmp_path / "master-grants.json"
-    data = provision_fixture_grant(Paths, archive.read_bytes())
+        bundle_authority_policy = tmp_path / "local-approved-bundles.json"
+    policy = provision_fixture_grant(Paths, archive.read_bytes())
     verified = contract.verify_host_only_artifact(
         archive, expected_sha256=digest, source_commit=None, target_profile=TARGET
     )
     result = authority.approve_verified_bundle(
-        verified, policy_path=Paths.bundle_authority_policy, now_epoch_s=123,
+        verified, policy_path=Paths.bundle_authority_policy,
     )
-    assert result["status"] == "MASTER_APPROVED"
-    assert result["method"] == "root-provisioned-exact-bundle-sha256"
-    assert result["archive_sha256"] == digest
-    assert {"python", "native-c", "fpga-image"} <= set(result["allowed_kinds"])
-    assert result["publisher"] == data["authorizations"][0]["publisher"]
-    assert result["master_generation"] == 1
+    assert result == {
+        "status": "LOCAL_APPROVED",
+        "method": "device-local-exact-bundle-sha256",
+        "archive_sha256": digest,
+        "generation": 1,
+        "policy_sha256": result["policy_sha256"],
+    }
+    assert policy["approved_bundle_sha256"] == [digest]
 
 
 @pytest.mark.parametrize("mutation,code", [
-    (lambda p: p["authorizations"][0].__setitem__("archive_sha256", "f"*64),
+    (lambda p: p.__setitem__("approved_bundle_sha256", ["f"*64]),
      "BUNDLE_AUTHORITY_DIGEST_NOT_APPROVED"),
-    (lambda p: p["authorizations"][0].__setitem__("source_commit", "f"*40),
-     "BUNDLE_AUTHORITY_SCOPE_MISMATCH"),
-    (lambda p: p["authorizations"][0].__setitem__("purpose", "other"),
-     "BUNDLE_AUTHORITY_SCOPE_MISMATCH"),
-    (lambda p: p["authorizations"][0]["target"].__setitem__("board", "other-board"),
-     "BUNDLE_AUTHORITY_SCOPE_MISMATCH"),
-    (lambda p: p["authorizations"][0].__setitem__("allowed_kinds", ["python"]),
-     "BUNDLE_AUTHORITY_KIND_DENIED"),
-    (lambda p: p["authorizations"][0].__setitem__("expires_epoch_s", 1),
-     "BUNDLE_AUTHORITY_EXPIRED"),
-    (lambda p: p["authorizations"].append(dict(p["authorizations"][0])),
-     "BUNDLE_AUTHORITY_DUPLICATE_GRANT"),
-    (lambda p: p.__setitem__("master_generation", 0),
+    (lambda p: p.__setitem__("approved_bundle_sha256", []),
+     "BUNDLE_AUTHORITY_DIGEST_NOT_APPROVED"),
+    (lambda p: p.__setitem__("approved_bundle_sha256", ["f"*64,"f"*64]),
+     "BUNDLE_AUTHORITY_POLICY_INVALID"),
+    (lambda p: p.__setitem__("generation", 0),
+     "BUNDLE_AUTHORITY_POLICY_INVALID"),
+    (lambda p: p.__setitem__("publisher", "forged"),
+     "BUNDLE_AUTHORITY_POLICY_INVALID"),
+    (lambda p: p.__setitem__("expires_epoch_s", 4102444800),
+     "BUNDLE_AUTHORITY_POLICY_INVALID"),
+    (lambda p: p.__setitem__("approved_bundle_sha256", ["x"*64]),
      "BUNDLE_AUTHORITY_POLICY_INVALID"),
 ])
-def test_b2_policy_exact_digest_source_scope_kind_and_expiration_fail_closed(
+def test_b2_exact_local_approval_and_policy_rejects_bad_claims(
     tmp_path, mutation, code
 ):
     archive, digest = bundle_v3(tmp_path / "input")
     class Paths:
-        bundle_authority_policy = tmp_path / "master-grants.json"
-    data = provision_fixture_grant(Paths, archive.read_bytes())
-    mutation(data)
-    Paths.bundle_authority_policy.write_text(json.dumps(data))
+        bundle_authority_policy = tmp_path / "local-approved-bundles.json"
+    policy = provision_fixture_grant(Paths, archive.read_bytes())
+    mutation(policy)
+    Paths.bundle_authority_policy.write_text(json.dumps(policy))
     verified = contract.verify_host_only_artifact(
         archive, expected_sha256=digest, source_commit=None, target_profile=TARGET
     )
     with pytest.raises(authority.BundleAuthorityDenied, match=code):
-        authority.approve_verified_bundle(
-            verified, policy_path=Paths.bundle_authority_policy, now_epoch_s=123
-        )
+        authority.approve_verified_bundle(verified, policy_path=Paths.bundle_authority_policy)
 
 
 def test_b2_policy_missing_or_world_readable_cannot_grant_execution(tmp_path):
@@ -87,13 +85,13 @@ def test_b2_policy_missing_or_world_readable_cannot_grant_execution(tmp_path):
     )
     with pytest.raises(authority.BundleAuthorityDenied, match="BUNDLE_AUTHORITY_NOT_PROVISIONED"):
         authority.approve_verified_bundle(
-            verified, policy_path=Paths.bundle_authority_policy, now_epoch_s=123
+            verified, policy_path=Paths.bundle_authority_policy
         )
     provision_fixture_grant(Paths, archive.read_bytes())
     Paths.bundle_authority_policy.chmod(0o644)
     with pytest.raises(authority.BundleAuthorityDenied, match="BUNDLE_AUTHORITY_POLICY_UNTRUSTED"):
         authority.approve_verified_bundle(
-            verified, policy_path=Paths.bundle_authority_policy, now_epoch_s=123
+            verified, policy_path=Paths.bundle_authority_policy
         )
 
 
@@ -110,16 +108,16 @@ def test_b2_policy_symlink_and_duplicate_json_fields_denied(tmp_path):
     )
     with pytest.raises(authority.BundleAuthorityDenied, match="BUNDLE_AUTHORITY_POLICY_UNTRUSTED"):
         authority.approve_verified_bundle(
-            verified, policy_path=Paths.bundle_authority_policy, now_epoch_s=123
+            verified, policy_path=Paths.bundle_authority_policy
         )
     Paths.bundle_authority_policy.unlink()
     Paths.bundle_authority_policy.write_text(
-        '{"schema":"x","schema":"plasma.ppu.bundle-authority.v1"}'
+        '{"schema":"x","schema":"plasma.ppu.bundle-authority.v2"}'
     )
     Paths.bundle_authority_policy.chmod(0o600)
     with pytest.raises(authority.BundleAuthorityDenied, match="BUNDLE_AUTHORITY_DUPLICATE_FIELD"):
         authority.approve_verified_bundle(
-            verified, policy_path=Paths.bundle_authority_policy, now_epoch_s=123
+            verified, policy_path=Paths.bundle_authority_policy
         )
 
 
@@ -144,9 +142,9 @@ def test_real_b2_receipt_separates_source_legality_from_runtime_execution(loopba
     assert b2["result"]["install_qualified"] is False
     assert b2["result"]["plan"]["execution_permitted"] is False
     auth = b2["result"]["plan"]["authorization"]
-    assert auth["status"] == "MASTER_APPROVED"
+    assert auth["status"] == "LOCAL_APPROVED"
     assert auth["archive_sha256"] == digest
-    assert "fpga-image" in auth["allowed_kinds"]
+    assert auth["generation"] == 1
     assert not paths.product_root.exists()
 
 
@@ -156,7 +154,7 @@ def test_b2_bearer_and_manifest_do_not_supply_master_authority(loopback, tmp_pat
     upload_id = api.upload(archive.read_bytes())
     data = json.loads(paths.bundle_authority_policy.read_text())
     # Wrong complete-archive hash with same Manifest source cannot authorize.
-    data["authorizations"][0]["archive_sha256"] = hashlib.sha256(b"other").hexdigest()
+    data["approved_bundle_sha256"] = [hashlib.sha256(b"other").hexdigest()]
     paths.bundle_authority_policy.write_text(json.dumps(data))
     with pytest.raises(Exception, match="BUNDLE_AUTHORITY_DIGEST_NOT_APPROVED"):
         server.admit_package({"kind": "bundle", "upload_id": upload_id})

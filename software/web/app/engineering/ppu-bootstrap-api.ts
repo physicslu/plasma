@@ -234,12 +234,18 @@ export function admitManagerPpuBundle(
     const result = deployment?.result;
     const plan = result && typeof result === "object"
       ? (result.plan as Record<string, unknown> | undefined) : undefined;
+    const approval = plan?.authorization && typeof plan.authorization === "object"
+      ? (plan.authorization as Record<string, unknown>) : undefined;
     if (deployment?.state !== "admitted" ||
         result?.stage !== "package_admission_only" ||
         result?.install_qualified !== false ||
+        result?.source_authorized !== true ||
         plan?.kind !== "bundle" ||
-        plan?.execution_permitted !== false) {
-      throw new Error("Bundle admission receipt does not prove non-execution");
+        plan?.execution_permitted !== false ||
+        approval?.status !== "LOCAL_APPROVED" ||
+        approval?.method !== "device-local-exact-bundle-sha256" ||
+        approval?.archive_sha256 !== plan?.archive_sha256) {
+      throw new Error("Bundle B2 receipt lacks device-local approval or non-execution guarantee");
     }
     return receipt;
   });

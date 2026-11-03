@@ -29,18 +29,20 @@
 /* ------------------------------------------------------------------ */
 
 static const char *const KEYS[] = {
-    "schema", "site_id", "boot_id", "root_source_commit",
+    "schema", "site_id", "boot_id", "trusted_code_sha256",
     "image_manifest_sha256", "loaded_image_sha256", "image_id",
     "root_image_session_id", "abi_version", "site_bitmap",
-    "root_source_pinned", "manager_operating", "active_image_attested",
+    "trusted_code_verified", "manager_operating", "active_image_attested",
     "axi_isolation_proven", "owner_scan_complete", "voltage_qualified",
     "recovery_available", "journal_dev", "journal_ino", "journal_size",
     "journal_mtime_ns", "electrical_path", "electrical_ino",
     "electrical_mtime_ns", "electrical_expires_epoch",
     "record_expires_epoch",
+    "code_manifest_dev", "code_manifest_ino",
+    "code_manifest_size", "code_manifest_mtime_ns",
 };
 #define NKEYS (sizeof(KEYS) / sizeof(KEYS[0]))
-#define SCHEMA "plasma.swd.ps-admission.v1"
+#define SCHEMA "plasma.swd.ps-admission.v2"
 
 static bool copy_str(char *dst, size_t cap, const char *v, size_t vlen)
 {
@@ -115,8 +117,8 @@ int plasma_swd_ps_admission_parse(const char *text, size_t len,
         case 1: ok = parse_u64(v, vlen, &n) && (n == 1 || n == 2);
             a->site_id = (unsigned int)n; break;
         case 2: ok = copy_str(id->boot_id, sizeof(id->boot_id), v, vlen); break;
-        case 3: ok = copy_str(id->root_source_commit,
-                              sizeof(id->root_source_commit), v, vlen); break;
+        case 3: ok = copy_str(id->trusted_code_sha256,
+                              sizeof(id->trusted_code_sha256), v, vlen); break;
         case 4: ok = copy_str(id->image_manifest_sha256,
                               sizeof(id->image_manifest_sha256), v, vlen); break;
         case 5: ok = copy_str(id->loaded_image_sha256,
@@ -130,7 +132,7 @@ int plasma_swd_ps_admission_parse(const char *text, size_t len,
             id->abi_version = (unsigned int)n; break;
         case 9: ok = parse_u64(v, vlen, &n) && n > 0 && n <= 0xFFu;
             id->site_bitmap = (uint32_t)n; break;
-        case 10: ok = parse_flag(v, vlen, &id->root_source_pinned); break;
+        case 10: ok = parse_flag(v, vlen, &id->trusted_code_verified); break;
         case 11: ok = parse_flag(v, vlen, &id->manager_operating); break;
         case 12: ok = parse_flag(v, vlen, &id->active_image_attested); break;
         case 13: ok = parse_flag(v, vlen, &id->axi_isolation_proven); break;
@@ -151,6 +153,11 @@ int plasma_swd_ps_admission_parse(const char *text, size_t len,
             a->electrical_expires_epoch = (int64_t)n; break;
         case 25: ok = parse_u64(v, vlen, &n) && n <= INT64_MAX;
             a->record_expires_epoch = (int64_t)n; break;
+        case 26: ok = parse_u64(v, vlen, &a->code_manifest_dev); break;
+        case 27: ok = parse_u64(v, vlen, &a->code_manifest_ino); break;
+        case 28: ok = parse_u64(v, vlen, &a->code_manifest_size); break;
+        case 29: ok = parse_u64(v, vlen, &n) && n <= INT64_MAX;
+            a->code_manifest_mtime_ns = (int64_t)n; break;
         default: ok = false;
         }
         if (!ok)
@@ -286,14 +293,20 @@ int plasma_swd_ps_read_live(void *opaque, struct plasma_swd_observed_identity *l
            sizeof(live->loaded_image_sha256));
     memcpy(live->image_id, a->identity.image_id, sizeof(live->image_id));
 
-    /* 5. Protected Root source pin unchanged. */
-    if (read_file(c->paths.root_pin, buf, sizeof(buf), &len, false, true, NULL) ||
-        len != 41 || buf[40] != '\n')
+    /* 5. Root-issued exact code SHA256 is pinned to a root-private
+     * manifest inode/size/mtime. The issuer already verified every file;
+     * the native per-word guard rechecks immutability, not Git Commit SHA.
+     * A changed file cannot be accepted from a non-root writer. */
+    if (read_file(c->paths.code_manifest, buf, sizeof(buf), &len,
+                  true, true, &st) ||
+        (uint64_t)st.st_dev != a->code_manifest_dev ||
+        (uint64_t)st.st_ino != a->code_manifest_ino ||
+        (uint64_t)st.st_size != a->code_manifest_size ||
+        mtime_ns(&st) != a->code_manifest_mtime_ns)
         return -1;
-    buf[40] = '\0';
-    memcpy(live->root_source_commit, buf, 41);
-    live->root_source_pinned =
-        strcmp(live->root_source_commit, a->identity.root_source_commit) == 0;
+    memcpy(live->trusted_code_sha256, a->identity.trusted_code_sha256,
+           sizeof(live->trusted_code_sha256));
+    live->trusted_code_verified = true;
 
     /* 6. Owner on-site electrical attestation: same root-private file,
      * not expired. This is an attestation, NOT a voltage measurement. */
@@ -319,8 +332,9 @@ void plasma_swd_ps_default_paths(struct plasma_swd_ps_paths *p)
     strcpy(p->boot_id, "/proc/sys/kernel/random/boot_id");
     strcpy(p->manager_state, "/sys/class/fpga_manager/fpga0/state");
     strcpy(p->root_journal,
-           "/root/plasma-path2-approved/.plasma-fpga-image-deployment-state.json");
-    strcpy(p->root_pin, "/root/plasma-path2-approved/.plasma-path2-source-commit");
+           "/var/lib/plasma/privileged/fpga-deployment-state.json");
+    strcpy(p->code_manifest,
+           "/opt/plasma/privileged/fpga-root/.plasma-privileged-code.json");
     strcpy(p->record_dir, "/run/plasma-z2-swd05");
     strcpy(p->lock, PLASMA_SWD_MMIO_OWNER_LOCK);
     strcpy(p->devmem, "/dev/mem");

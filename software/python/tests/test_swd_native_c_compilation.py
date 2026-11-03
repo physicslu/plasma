@@ -581,8 +581,8 @@ def test_native_owner_evidence_never_treats_root_journal_as_loaded_image_proof()
     assert "root_image_session_id" in contract
     assert "active_image_attested" in owner
     assert "axi_isolation_proven" in owner
-    assert "root_source_pinned" in owner
-    assert "root_source_commit" in owner
+    assert "trusted_code_verified" in owner
+    assert "trusted_code_sha256" in owner
     assert "loaded_image_sha256" in owner
     assert "image_manifest_sha256" in owner
     assert "voltage_qualified" in owner
@@ -632,7 +632,7 @@ def test_ps_owner_production_paths_and_no_host_relaxation():
     assert "#define TRUSTED_UID 0u" in src
     assert "PLASMA_SWD_MMIO_OWNER_LOCK" in src
     assert "plasma_swd_owner_lock_acquire_site" in src
-    assert ".plasma-fpga-image-deployment-state.json" in src
+    assert "/var/lib/plasma/privileged/fpga-deployment-state.json" in src
     # Voltage is an attestation, never claimed as a measurement.
     assert "NOT a voltage measurement" in src
     drv = (SRC / "plasma_swd_openocd5088_driver.c").read_text()
@@ -693,10 +693,11 @@ def test_site_admission_attestation_and_tree_negative(tmp_path, monkeypatch):
         with pytest.raises(adm.SiteAdmissionDenied, match="NOT_ROOT_PRIVATE"):
             adm.load_attestation(1, 0.0)
     tree = tmp_path / "tree"
-    for rel in adm.PROTECTED_FILES:
-        (tree / rel).parent.mkdir(parents=True, exist_ok=True)
-        (tree / rel).write_text("tampered\n")
-    with pytest.raises(adm.SiteAdmissionDenied):
+    tree.mkdir()
+    # Missing Linux-protected installed source fails closed, no repeated hash.
+    monkeypatch.setattr(adm, "PROTECTED_ROOT", tree)
+    # New source-closure issuer must fail before importing any untrusted code.
+    with pytest.raises((adm.SiteAdmissionDenied, OSError)):
         adm.verify_protected_tree(tree)
 
 

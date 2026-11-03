@@ -235,30 +235,20 @@ class Contracts(unittest.TestCase):
             self.assertEqual(proc.wait.call_count,2)
 
 
-    def test_generic_root_entry_is_pinned_and_syntax_valid(self):
+    def test_generic_root_entry_validates_privileged_code_not_commit_pin(self):
         path = Path(__file__).resolve().parents[1] / 'z2/plasma-path2-root-entry'
         code = path.read_text()
-        self.assertNotIn('plasma-path2-f1b-site1-approved', code)
-        self.assertIn('module="pl.hil.fpga_image_root"', code)
-        self.assertIn('pl/hil/fpga_image_guard.py', code)
-        self.assertIn('pl/hil/fpga_image_admission.py', code)
-        self.assertNotIn('path2_f1b', code.lower())
-        self.assertNotIn('PLASMA_DEV_RISK_ACK', code)
-        self.assertNotIn('.plasma-path2-profile', code)
-        self.assertIn('.plasma-path2-source-commit', code)
-        self.assertIn('PATH2_APPROVED_SOURCE_SHA_MISMATCH', code)
-        self.assertIn('sha256sum --check --status', code)
-        self.assertIn('find "$root" -type f -print0', code)
-        self.assertIn('PATH2_UNPINNED_BYTECODE_DENIED', code)
+        self.assertIn('module=pl.hil.fpga_image_root', code)
+        self.assertIn('root=/opt/plasma/privileged/fpga-root', code)
+        self.assertNotIn('verifier=/opt/plasma/bootstrap/ppu_privileged_source.py', code)
+        self.assertNotIn('.plasma-path2-source-commit', code)
+        self.assertNotIn('.plasma-path2-source-sha256', code)
+        self.assertIn('PPU_FPGA_TRUSTED_EXECUTOR_NOT_INSTALLED', code)
         self.assertIn('PYTHONDONTWRITEBYTECODE=1', code)
         self.assertIn('"$python" -B -m "$module" "$operation"', code)
-        self.assertIn('PATH2_SOURCE_WRITABLE_BY_OTHERS', code)
-        self.assertIn("PATH2_REQUIRED_SOURCE_NOT_PINNED", code)
-        self.assertIn('find "$root" -type l', code)
-        self.assertIn('find "$root" -type d', code)
         self.assertIn('exec /usr/bin/env -i', code)
         subprocess.run(['/usr/bin/bash', '-n', str(path)], check=True)
-        for args in [[], ['download'], ['test', '../escape', SHA],
+        for args in [[], ['download', SHA], ['test', '../escape', SHA],
                      ['test', PROJECT, 'bad'], ['arbitrary', PROJECT, SHA],
                      ['test', 'bad'], ['test', '../escape']]:
             result = subprocess.run(['/usr/bin/bash', str(path), *args],

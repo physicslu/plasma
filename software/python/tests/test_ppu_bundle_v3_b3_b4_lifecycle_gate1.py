@@ -15,21 +15,8 @@ from .test_ppu_bundle_v3_packages_contract import (
 def test_b3_b4_authorized_host_only_receipt(tmp_path):
     archive, digest = bundle_v3(tmp_path / "input")
     co = coordinator(tmp_path)
-    policy = {
-        "schema": "plasma.ppu.host-policy.v1",
-        "publisher": "fixture-publisher",
-        "source_commit": SOURCE,
-        "archive_sha256": digest,
-        "target": TARGET,
-        "purpose": "programming",
-        "master_generation": 1,
-        "active_master_generation": 1,
-        "allowed_kinds": [
-            "ic-catalog", "programming-profile", "python",
-            "native-c", "firmware-asset", "fpga-image",
-        ],
-        "expires_epoch_s": 200,
-    }
+    policy = {"schema": "plasma.ppu.bundle-authority.v2",
+              "generation": 1, "approved_bundle_sha256": [digest]}
     receipt = co.execute_authorized_bundle_host_only(
         request(archive, digest),
         trusted_policy=policy,

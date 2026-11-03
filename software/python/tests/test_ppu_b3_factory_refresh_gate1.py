@@ -44,6 +44,13 @@ def generic_factory_sources(tmp_path):
     (source / "pl" / "hil").mkdir(parents=True)
     for name in installer.ROOT_PARSER_FILES:
         shutil.copyfile(ROOT / "pl" / "hil" / name, source / "pl" / "hil" / name)
+    (source / "software/python/plasma_interfaces").mkdir(parents=True)
+    for name in ("__init__.py", "linux_mmio.py"):
+        shutil.copyfile(ROOT / "software/python/plasma_interfaces" / name,
+                        source / "software/python/plasma_interfaces" / name)
+    (source / "z2").mkdir()
+    shutil.copyfile(ROOT / "scripts/z2/plasma-path2-root-entry",
+                    source / "z2/plasma-path2-root-entry")
     return source
 
 

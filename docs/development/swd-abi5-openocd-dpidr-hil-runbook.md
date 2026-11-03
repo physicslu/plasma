@@ -108,26 +108,39 @@ samples before the rising edge. Fixing this needs an RTL sample-point change,
 a matching fix to the RTL simulation target model, a new Vivado BIN/HWH/Manifest,
 and an FPGA reload under a revised Gate 1.
 
-## 6. After the FPGA fix: can it be loaded through the HTTP API?
+## 6. Loading the fixed Image through the HTTP API (B3 `fpga_load`)
 
-**Delivery yes, load no (today).**
+Since PR #1261, Bundle v3 B3 with `fpga_load=true` loads an FPGA Image through
+the protected Root Entry (`bundle-load <asset_set_sha256>`). The Root still
+admits only reviewed Images:
 
-| Step | HTTP Bootstrap API (Route A) today | Notes |
+| Trust point | File | What must list the Image |
 |---|---|---|
-| B1 upload/commit | Yes | `fpga-image` Package: exactly one BIN, one HWH and one `plasma.fpga.image.v1` Manifest |
-| B2 admission | Yes (static) | Needs a reviewed entry for the new image in `ppu-fpga-image-contracts.json`. B2 never loads the FPGA. |
-| B3 install/verify | Yes (files only) | Files land in `/opt/plasma/bundles/<name>`. No Active Asset Set. |
-| B4 activation / FPGA load | **Not implemented** | `validate_bundle_fpga_handoff` is Host-only and has no production caller |
+| B2 static qualification | `scripts/ppu-fpga-image-contracts.json` (Bootstrap) | BIN/HWH/Manifest SHA-256, identities, geometry |
+| Root devmem backend | `DEVMEM_INDEPENDENT_IMAGES` in `pl/hil/fpga_image_admission.py` (protected tree) | `image_id` → BIN SHA-256 |
+| Site admission | `scripts/z2/plasma_swd_site_admission.py` | reads the same table; `PROTECTED_FILES` = the Root pin |
 
-The fixed FPGA can therefore be delivered and statically qualified through the
-HTTP API. The actual load still goes through the protected Root FPGA Loader:
-install the reviewed Manifest + BIN into the protected tree, update the Root pin,
-then run `z2-path2-root-entry download <pin>` and `test <pin>`. That path uses
-Route B (engineering SSH) until a separate Gate 1 implements a Controller-authorized
-B4 activation that calls the Root Loader from the immutable Bundle install,
-under full Site quiescence and Golden recovery. When the image hash changes,
-also update the admission record's expected image identity (the `RELEASE_NOT_ABI5_INDEPENDENT`
-check in `plasma_swd_site_admission.py`) in the same reviewed change.
+The fixed sample-point Image is `z2-independent-swd-v5-bd976140` (PR #1255
+head `bd976140e`, Vivado Host Build run 41469421780). Its paired Manifest is
+`pl/hil/releases/swd-independent-bd976140/plasma-image-manifest.json`. The BIN
+is the bootgen-equivalent Zynq word-swapped payload of the run's
+`system_wrapper.bit` plus the trailing `0x20000000` NOP word.
+
+To load a newly listed Image: install the Root tree at the reviewed pin
+(Route B), refresh the Bootstrap so it gets the contracts, then run B1 → B2 →
+B3 `fpga_load=true` over HTTP. The DPIDR procedure in §3 then runs with
+`@IMAGE_ID@` set to the loaded Image.
 
 OpenOCD itself remains an engineering module. Packaging it into the Route A
 Runtime kit replaces the whole Runtime and is a separate decision.
+
+## 7. 2026-11-03 result: DPIDR PASS on Site 2
+
+Image `z2-independent-swd-v5-bd976140` was loaded through HTTP B1 → B2 → B3
+`fpga_load=true` (Identity PASS, Root pin `f56f85fd7`). The first OpenOCD run
+(binary `fa1dcb7a…`) read `SWD DPIDR 0x1ba01477` and then failed in `dap init`:
+OpenOCD `dap_dp_init()` queues a DP CTRL/STAT read with a NULL destination,
+which the FIFO core rejected at queue time (no wire transfer, so no `run rc=`
+line). After the fix (binary `800213ae…`, CI run 41484966257), Site 2 returned
+`SWD DPIDR 0x1ba01477` and `dpreg 0 = 0x1ba01477`, with
+`SAFE_OFF_MODE_OFF_VERIFIED`, the Journal unchanged and the record revoked.

@@ -24,29 +24,17 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 import time
 from pathlib import Path
 
-PROTECTED_ROOT = Path("/root/plasma-path2-approved")
+PROTECTED_ROOT = Path("/opt/plasma/privileged/fpga-root")
 RECORD_DIR = Path("/run/plasma-z2-swd05")
 ELECTRICAL_DIR = Path("/root/plasma-swd-electrical")
 RECORD_TTL_S = 300
-SCHEMA = "plasma.swd.ps-admission.v1"
+SCHEMA = "plasma.swd.ps-admission.v2"
 ATTESTATION_SCHEMA = "plasma.swd.owner-electrical-attestation.v1"
-# The protected Root tree this record may be issued from (reviewed pin).
-PROTECTED_FILES = {
-    ".plasma-path2-source-commit":
-        "a9026c4a700d5f1400c304f2f6a2aa2a18de73904a01efd62970f646bceacaa6",
-    "pl/hil/fpga_image_admission.py":
-        "1142e5ca4c1af6b4bf33c7b254e91d4e10a08dcee901aec853541fabcfa65de5",
-    "pl/hil/fpga_image_guard.py":
-        "30ae8c132033aaa5e6ed1ada90999f005778da344e5616951bebf225ba56384f",
-    "pl/hil/fpga_image_root.py":
-        "34940230762e294ca46509cc558c32feaa6b4e8cb2be2b8299c63fbb749639ab",
-    "software/python/plasma_interfaces/linux_mmio.py":
-        "5ad52c31cdbbb93aacc02d9b0518a9b16e23f318f63590cdf9f98dbafc3e002a",
-}
 AXI_POLICY = "UNPROVEN_ACCEPTED_FOR_SOURCE_BOUND_DEVELOPMENT"
 
 
@@ -72,15 +60,34 @@ def _private_root_file(path: Path) -> os.stat_result:
 
 
 def verify_protected_tree(root: Path = PROTECTED_ROOT) -> str:
-    for rel, digest in PROTECTED_FILES.items():
-        path = root / rel
-        st = os.lstat(path)
-        need(not path.is_symlink() and st.st_uid == 0 and
-             st.st_mode & 0o022 == 0, "PROTECTED_FILE_UNTRUSTED:" + rel)
-        need(_sha(path) == digest, "PROTECTED_FILE_HASH_MISMATCH:" + rel)
-    pin = (root / ".plasma-path2-source-commit").read_text()
-    need(re.fullmatch(r"[0-9a-f]{40}\n", pin) is not None, "SOURCE_PIN_INVALID")
-    return pin.strip()
+    """Check fixed, Linux-root-owned installed sources, without runtime rehash.
+
+    File SHA256 qualification belongs to the install-time provisioner.
+    SWD retains code-manifest stat identity and hardware owner locks.
+    """
+    need(root.is_absolute() and ".." not in root.parts,
+         "PRIVILEGED_CODE_ROOT_INVALID")
+    def require_owned(path: Path, directory: bool) -> os.stat_result:
+        info = path.lstat()
+        need((stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode))
+             and info.st_uid == 0 and info.st_mode & 0o022 == 0,
+             "PRIVILEGED_CODE_SOURCE_UNTRUSTED")
+        return info
+
+    for directory in (*reversed(root.parents), root):
+        require_owned(directory, True)
+    for relative in ("pl/hil/fpga_image_root.py", "pl/hil/fpga_image_guard.py",
+                     "pl/hil/fpga_image_admission.py",
+                     "software/python/plasma_interfaces/linux_mmio.py"):
+        current = root
+        for part in Path(relative).parts[:-1]:
+            current = current / part
+            require_owned(current, True)
+        require_owned(root / relative, False)
+    private = root / ".plasma-privileged-code.json"
+    info = _private_root_file(private)
+    need(0 < info.st_size <= 16384, "PRIVILEGED_CODE_MANIFEST_INVALID")
+    return hashlib.sha256(private.read_bytes()).hexdigest()
 
 
 def load_attestation(site: int, now: float) -> tuple[Path, os.stat_result, int, dict]:
@@ -100,15 +107,17 @@ def load_attestation(site: int, now: float) -> tuple[Path, os.stat_result, int, 
 
 def render_record(fields: dict) -> str:
     order = (
-        "schema", "site_id", "boot_id", "root_source_commit",
+        "schema", "site_id", "boot_id", "trusted_code_sha256",
         "image_manifest_sha256", "loaded_image_sha256", "image_id",
         "root_image_session_id", "abi_version", "site_bitmap",
-        "root_source_pinned", "manager_operating", "active_image_attested",
+        "trusted_code_verified", "manager_operating", "active_image_attested",
         "axi_isolation_proven", "owner_scan_complete", "voltage_qualified",
         "recovery_available", "journal_dev", "journal_ino", "journal_size",
         "journal_mtime_ns", "electrical_path", "electrical_ino",
         "electrical_mtime_ns", "electrical_expires_epoch",
-        "record_expires_epoch")
+        "record_expires_epoch",
+        "code_manifest_dev", "code_manifest_ino", "code_manifest_size",
+        "code_manifest_mtime_ns")
     need(set(fields) == set(order), "RECORD_FIELDS_INCOMPLETE")
     out = []
     for key in order:
@@ -130,10 +139,20 @@ def _write_private(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
+def guard_images() -> dict:
+    """Reviewed devmem Image table from the root-owned protected tree."""
+    from pl.hil import fpga_image_admission as admission  # noqa: E402
+    need(Path(admission.__file__).resolve() ==
+         PROTECTED_ROOT / "pl/hil/fpga_image_admission.py",
+         "ADMISSION_MODULE_NOT_PROTECTED")
+    return admission.DEVMEM_INDEPENDENT_IMAGES
+
+
 def admit(site: int) -> dict:
     need(site in (1, 2), "SITE_INVALID")
     need(os.geteuid() == 0, "ROOT_REQUIRED")
-    pin = verify_protected_tree()
+    code_sha256 = verify_protected_tree()
+    source_info = _private_root_file(PROTECTED_ROOT / ".plasma-privileged-code.json")
     sys.path.insert(0, str(PROTECTED_ROOT))
     from pl.hil import fpga_image_guard as guard  # noqa: E402 (protected tree)
     from pl.hil import fpga_image_root as root  # noqa: E402
@@ -141,7 +160,7 @@ def admit(site: int) -> dict:
          PROTECTED_ROOT / "pl/hil/fpga_image_root.py", "ROOT_MODULE_NOT_PROTECTED")
     root.trusted_local()
     release = root.read_image_manifest()
-    need(release.image_id == "z2-independent-swd-v5-ab79b04e" and
+    need(guard_images().get(release.image_id) == release.firmware_sha256 and
          release.abi_version == 0x00050001 and release.site_bitmap == 3 and
          release.axi_base == 0x43C01000 and release.axi_bytes == 0x2000,
          "RELEASE_NOT_ABI5_INDEPENDENT")
@@ -166,13 +185,13 @@ def admit(site: int) -> dict:
         epath, est, eexp, edata = load_attestation(site, now)
         record = render_record({
             "schema": SCHEMA, "site_id": site,
-            "boot_id": state["boot_id"], "root_source_commit": pin,
+            "boot_id": state["boot_id"], "trusted_code_sha256": code_sha256,
             "image_manifest_sha256": state["manifest_sha256"],
             "loaded_image_sha256": state["firmware_sha256"],
             "image_id": state["image_id"],
             "root_image_session_id": state["session_id"],
             "abi_version": 5, "site_bitmap": release.site_bitmap,
-            "root_source_pinned": 1, "manager_operating": 1,
+            "trusted_code_verified": 1, "manager_operating": 1,
             "active_image_attested": 1, "axi_isolation_proven": 1,
             "owner_scan_complete": 1, "voltage_qualified": 1,
             "recovery_available": 1,
@@ -182,6 +201,10 @@ def admit(site: int) -> dict:
             "electrical_mtime_ns": est.st_mtime_ns,
             "electrical_expires_epoch": eexp,
             "record_expires_epoch": int(now) + RECORD_TTL_S,
+            "code_manifest_dev": source_info.st_dev,
+            "code_manifest_ino": source_info.st_ino,
+            "code_manifest_size": source_info.st_size,
+            "code_manifest_mtime_ns": source_info.st_mtime_ns,
         })
         guard.protected(RECORD_DIR, file=False)
         target = RECORD_DIR / f"swd-site{site}-admission"
@@ -190,7 +213,7 @@ def admit(site: int) -> dict:
         "result": "SITE_ADMISSION_RECORD_ISSUED", "site_id": site,
         "record": str(target),
         "record_sha256": hashlib.sha256(record.encode()).hexdigest(),
-        "boot_id": state["boot_id"], "root_source_commit": pin,
+        "boot_id": state["boot_id"], "trusted_code_sha256": code_sha256,
         "root_image_session_id": state["session_id"],
         "image_id": state["image_id"],
         "axi_isolation_policy": report["axi_isolation"],

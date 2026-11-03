@@ -33,7 +33,6 @@ SHIPPED = ROOT / "scripts" / "ppu-fpga-image-contracts.json"
 # (draft; NOT merged, deployed or HIL-qualified). Used only to prove the shipped
 # contract pins that Manifest and that the Root parser accepts it.
 # The reviewed devmem Manifest the Z2 Root uses for ab79b04e (Identity PASS).
-DEVMEM_MANIFEST = (ROOT / "pl/hil/releases/swd-independent-ab79b04e/plasma-image-manifest.json").read_bytes()
 
 
 def fpga_bundle(tmp_path, files=None, *, mutate=None):
@@ -60,33 +59,43 @@ def contract_file(tmp_path, *entries):
     return write_contracts(tmp_path / "factory" / "contracts.json", *entries)
 
 
-# --- shipped trusted contract (ABI v5 / ab79b04e) -------------------------
+# --- shipped trusted contracts (ABI v5 independent: ab79b04e, bd976140) ----
 
-def test_shipped_contract_is_abi5_ab79b04e_two_site(tmp_path):
+SHIPPED_BUILDS = ("ab79b04e", "bd976140")
+
+
+def _release_manifest(build: str) -> bytes:
+    return (ROOT / f"pl/hil/releases/swd-independent-{build}/plasma-image-manifest.json").read_bytes()
+
+
+def test_shipped_contracts_are_abi5_independent_two_site(tmp_path):
     copy = tmp_path / "shipped.json"
     copy.write_bytes(SHIPPED.read_bytes())
     copy.chmod(0o644)
     contracts, _ = qualification.read_trusted_contracts(copy)
-    assert list(contracts) == ["z2-independent-swd-v5-ab79b04e"]
-    entry = contracts["z2-independent-swd-v5-ab79b04e"]
-    assert entry["build"] == "ab79b04e"
-    assert entry["source_commit"].startswith("ab79b04e")
-    assert entry["target"] == TARGET
-    assert entry["site_identities"] == [
-        {"site_id": 1, "offset": 0x0000, "identity": 0x00050001},
-        {"site_id": 2, "offset": 0x1000, "identity": 0x00050002},
-    ]
-    assert entry["abi_version"] == 0x00050001 and entry["site_bitmap"] == 0b11
-    # The contract is a static expectation; it never claims readback/HIL.
-    assert "static" in entry["evidence"] and "hil" not in entry["evidence"].lower()
+    assert list(contracts) == [f"z2-independent-swd-v5-{b}" for b in SHIPPED_BUILDS]
+    for build in SHIPPED_BUILDS:
+        entry = contracts[f"z2-independent-swd-v5-{build}"]
+        assert entry["build"] == build
+        assert entry["source_commit"].startswith(build)
+        assert entry["target"] == TARGET
+        assert entry["site_identities"] == [
+            {"site_id": 1, "offset": 0x0000, "identity": 0x00050001},
+            {"site_id": 2, "offset": 0x1000, "identity": 0x00050002},
+        ]
+        assert entry["abi_version"] == 0x00050001 and entry["site_bitmap"] == 0b11
+        # The contract is a static expectation; it never claims readback/HIL.
+        assert "static" in entry["evidence"] and "hil" not in entry["evidence"].lower()
 
 
-def test_shipped_contract_pins_devmem_manifest_parsed_by_root_parser():
-    entry = json.loads(SHIPPED.read_text())["contracts"][0]
-    assert hashlib.sha256(DEVMEM_MANIFEST).hexdigest() == entry["manifest_sha256"]
+@pytest.mark.parametrize("index,build", list(enumerate(SHIPPED_BUILDS)))
+def test_shipped_contract_pins_devmem_manifest_parsed_by_root_parser(index, build):
+    entry = json.loads(SHIPPED.read_text())["contracts"][index]
+    manifest = _release_manifest(build)
+    assert hashlib.sha256(manifest).hexdigest() == entry["manifest_sha256"]
     root = qualification.load_root_manifest_parser()
     assert Path(root.__file__).resolve() == (ROOT / "pl/hil/fpga_image_root.py").resolve()
-    parsed = root.parse_image_manifest_bytes(DEVMEM_MANIFEST)
+    parsed = root.parse_image_manifest_bytes(manifest)
     assert parsed.image_id == entry["image_id"]
     assert parsed.firmware_name == entry["firmware_name"]
     assert parsed.firmware_sha256 == entry["bin_sha256"]
@@ -94,6 +103,23 @@ def test_shipped_contract_pins_devmem_manifest_parsed_by_root_parser():
                                      (0x1000, 0x00050002, 0xFFFFFFFF))
     assert (parsed.axi_base, parsed.axi_bytes, parsed.owner_base, parsed.owner_bytes) == (
         entry["axi_base"], entry["axi_bytes"], entry["owner_base"], entry["owner_bytes"])
+
+
+def test_root_devmem_image_table_matches_shipped_contracts():
+    root = qualification.load_root_manifest_parser()
+    shipped = {c["image_id"]: c["bin_sha256"]
+               for c in json.loads(SHIPPED.read_text())["contracts"]}
+    assert root.admission.DEVMEM_INDEPENDENT_IMAGES == shipped
+
+
+def test_root_devmem_denies_unlisted_image_and_mismatched_bin():
+    root = qualification.load_root_manifest_parser()
+    base = json.loads(_release_manifest("bd976140"))
+    for change in ({"image_id": "z2-independent-swd-v5-deadbeef"},
+                   {"firmware_sha256": "0" * 64}):
+        data = dict(base, **change)
+        with pytest.raises(Exception, match="DEVMEM_INDEPENDENT_IMAGE_CONTRACT_DENIED"):
+            root.parse_image_manifest_bytes(json.dumps(data).encode())
 
 
 def test_shipped_contract_rejects_synthetic_image(tmp_path):
@@ -406,13 +432,13 @@ def test_b3_rejects_fpga_contract_or_master_grant_change_after_b2(tmp_path):
 
     # Master grant changed (new generation) after B2.
     grants = json.loads(paths.bundle_authority_policy.read_text())
-    paths.bundle_authority_policy.write_text(json.dumps(dict(grants, master_generation=2)))
+    paths.bundle_authority_policy.write_text(json.dumps(dict(grants, generation=2)))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_ADMISSION_AUTHORITY_CHANGED"):
         srv.start_deployment(b3)
-    # Master grant expired after B2.
-    expired = json.loads(json.dumps(grants))
-    expired["authorizations"][0]["expires_epoch_s"] = 1
-    paths.bundle_authority_policy.write_text(json.dumps(expired))
+    # Local Bundle approval revoked after B2.
+    withdrawn = json.loads(json.dumps(grants))
+    withdrawn["approved_bundle_sha256"] = []
+    paths.bundle_authority_policy.write_text(json.dumps(withdrawn))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MASTER_AUTHORITY_DENIED"):
         srv.start_deployment(b3)
     paths.bundle_authority_policy.write_text(json.dumps(grants))

@@ -23,7 +23,10 @@ from pl.hil import fpga_image_admission as admission
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_FILE = guard.FIRMWARE / "plasma-image-manifest.json"
-STATE = ROOT / ".plasma-fpga-image-deployment-state.json"
+STATE = Path("/var/lib/plasma/privileged/fpga-deployment-state.json")
+# Never write mutable journal/state into the immutable privileged code root.
+# The root-protected state directory must be independently provisioned and
+# migration from old Path 2 state qualified before any Z2 FPGA action.
 CHILD = guard.OWNER_DIR / "fpga-image-identity.json"
 SCHEMA = "plasma.fpga.image-deployment.v3"
 LEGACY_SCHEMA = "plasma.fpga.image-deployment.v1"
@@ -194,11 +197,10 @@ def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
                for n in uio["irq_counts"]))), "IMAGE_RELEASE_UIO_DENIED")
     if devmem:
         # /dev/mem is an opt-in engineering backend, not evidence that a
-        # covering UIO node owns the SWD IP. Restrict it to the one pinned
-        # independent Image + both HWH-proven Site identity word locations.
-        need(data["image_id"] == "z2-independent-swd-v5-ab79b04e" and
-             data["firmware_sha256"] ==
-             "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773" and
+        # covering UIO node owns the SWD IP. Restrict it to the pinned
+        # independent Images + both HWH-proven Site identity word locations.
+        need(admission.DEVMEM_INDEPENDENT_IMAGES.get(data["image_id"]) ==
+             data["firmware_sha256"] and
              data["axi_base"] == 0x43C01000 and
              data["axi_bytes"] == 0x2000 and
              data["abi_version"] == 0x00050001 and

@@ -110,8 +110,9 @@ static int queue_transfer(struct plasma_swd_fifo *s, uint8_t cmd, bool read,
     uint8_t private_cmd = 0;
     if (!s || !s->admitted || s->blocked)
         return PLASMA_SWD_NOT_READY;
-    if (read && !dst)
-        return PLASMA_SWD_BAD_ARG;
+    /* OpenOCD swd_driver.read_reg() may pass value == NULL to discard a
+     * read (e.g. dap_dp_init's DP CTRL/STAT read). The transfer still runs
+     * with full ACK/parity checking; only publication is skipped. */
     int status = decode_swd(cmd, read, hint, &private_cmd);
     if (status)
         return status;
@@ -320,7 +321,7 @@ int plasma_swd_fifo_run(struct plasma_swd_fifo *s)
     }
     /* Result pointers are published only if the WHOLE queue succeeded. */
     for (uint32_t i = 0; i < count; ++i)
-        if (s->pending[i].read)
+        if (s->pending[i].read && s->pending[i].destination)
             *s->pending[i].destination = read_values[i];
     return PLASMA_SWD_OK;
 }
