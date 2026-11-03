@@ -109,7 +109,7 @@ class Abi5OpenocdAdapter:
         """Fixed STM32F103C8T6 full-Flash sequence, no caller-supplied Tcl."""
         def tcl_path(path: Path) -> str:
             raw = path.resolve().as_posix()
-            if any(ch in raw for ch in "{}\\n\\r\\x00"):
+            if "{" in raw or "}" in raw or any(ord(ch) < 32 for ch in raw):
                 raise TransportDenied("IMAGE_PATH_INVALID")
             return "{" + raw + "}"
 
