@@ -37,7 +37,7 @@ Manifest/target/dependency contract. Every staged Set retains the verified canon
 with its own SHA256 included in the B3 receipt. Every staged Set is stored under its
 complete archive SHA256, not its display name. Reuse of an existing digest
 requires re-verifying every installed file and the exact file set; it must not
-overwrite that path. This provides Staging only, **not** Active Set selection. A separately authorized B3 `fpga_load:true` may load FPGA and publish a verified Active Set after Root Identity PASS; this was implemented after this PR's original Host-only baseline. See [B3 FPGA load](ppu-bundle-v3-b3-fpga-load-gate1.md).
+overwrite that path. This provides Staging only, **not** Active Set selection. A separately authorized B3 `fpga_load:true` may load FPGA and publish a verified Active Set after Root Identity PASS; this was implemented after this PR's original Host-only baseline. **New operator target:** successful standard B3 Install always selects Active, with FPGA loading requested by default when the Bundle contains an FPGA Image; non-FPGA Bundles select Active without reloading. The current `fpga_load:false` staging-only behavior still needs an implementation migration before that target is met. See [B3 FPGA load](ppu-bundle-v3-b3-fpga-load-gate1.md).
 
 ## Installation authority and trust levels
 
