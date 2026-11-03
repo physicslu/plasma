@@ -881,5 +881,83 @@ class ProgramSessionProcScanSplitTests(unittest.TestCase):
 
 
 
+class RootStateAncestorTests(unittest.TestCase):
+    """Root journal must not sit under a runtime-account-owned directory."""
+
+    STATE = Path("/var/lib/plasma-privileged/fpga-deployment-state.json")
+
+    def fake_lstat(self, table):
+        import os as _os
+        import stat as _stat
+
+        def lstat(path):
+            key = str(path)
+            if key not in table:
+                raise FileNotFoundError(key)
+            uid, mode = table[key]
+            return _os.stat_result((_stat.S_IFDIR | mode, 0, 0, 2, uid, uid,
+                                    4096, 0, 0, 0))
+        return lstat
+
+    def chain(self, **overrides):
+        table = {"/": (0, 0o755), "/var": (0, 0o755), "/var/lib": (0, 0o755),
+                 "/var/lib/plasma-privileged": (0, 0o700)}
+        table.update(overrides)
+        return table
+
+    def check(self, table):
+        with patch.object(stage.os, "lstat", self.fake_lstat(table)):
+            stage._state_dir_trusted(self.STATE)
+
+    def test_production_state_is_dedicated_root_directory(self):
+        self.assertEqual(stage.STATE, self.STATE)
+        self.assertNotIn("/var/lib/plasma/", str(stage.STATE))
+        native = (ROOT / "software/native/swd/"
+                  "plasma_swd_openocd5088_ps_owner.c").read_text()
+        self.assertIn(str(self.STATE), native)
+        self.assertNotIn("/var/lib/plasma/privileged", native)
+
+    def test_root_owned_private_chain_accepted(self):
+        self.check(self.chain())
+
+    def test_runtime_owned_grandparent_denied(self):
+        # Z2 observed: /var/lib/plasma is uid 999 0755. Placing the journal
+        # anywhere beneath it must fail closed even if the parent is root.
+        state = Path("/var/lib/plasma/privileged/fpga-deployment-state.json")
+        table = self.chain(**{"/var/lib/plasma": (999, 0o755),
+                              "/var/lib/plasma/privileged": (0, 0o700)})
+        with patch.object(stage.os, "lstat", self.fake_lstat(table)):
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "STATE_ANCESTOR_NOT_ROOT_PROTECTED"):
+                stage._state_dir_trusted(state)
+
+    def test_group_or_other_writable_ancestor_denied(self):
+        for mode in (0o775, 0o757, 0o1777):
+            with self.subTest(mode=oct(mode)):
+                with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                            "STATE_ANCESTOR_NOT_ROOT_PROTECTED"):
+                    self.check(self.chain(**{"/var/lib": (0, mode)}))
+
+    def test_state_directory_must_be_private(self):
+        with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                    "STATE_DIRECTORY_NOT_PRIVATE"):
+            self.check(self.chain(**{"/var/lib/plasma-privileged": (0, 0o755)}))
+
+    def test_missing_state_directory_fails_closed(self):
+        table = self.chain()
+        del table["/var/lib/plasma-privileged"]
+        with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                    "STATE_DIRECTORY_NOT_PROVISIONED"):
+            self.check(table)
+
+    def test_missing_state_file_still_checks_directory_chain(self):
+        table = self.chain(**{"/var/lib": (999, 0o755)})
+        with patch.object(stage.os, "lstat", self.fake_lstat(table)), \
+                patch.object(stage, "STATE", self.STATE):
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "STATE_ANCESTOR_NOT_ROOT_PROTECTED"):
+                stage._state_file_trusted(require_file=False)
+
+
 if __name__ == "__main__":
     unittest.main()

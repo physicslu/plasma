@@ -632,7 +632,7 @@ def test_ps_owner_production_paths_and_no_host_relaxation():
     assert "#define TRUSTED_UID 0u" in src
     assert "PLASMA_SWD_MMIO_OWNER_LOCK" in src
     assert "plasma_swd_owner_lock_acquire_site" in src
-    assert "/var/lib/plasma/privileged/fpga-deployment-state.json" in src
+    assert "/var/lib/plasma-privileged/fpga-deployment-state.json" in src
     # Voltage is an attestation, never claimed as a measurement.
     assert "NOT a voltage measurement" in src
     drv = (SRC / "plasma_swd_openocd5088_driver.c").read_text()

@@ -47,9 +47,18 @@ an identification value, not a second file-content integrity gate.
 - New local Bundle authority v2 must be provisioned explicitly; no
   compatibility reader for v1 is permitted.
 - Immutable code and mutable FPGA journal under
-  `/var/lib/plasma/privileged/fpga-deployment-state.json` need an atomic
+  `/var/lib/plasma-privileged/fpga-deployment-state.json` need an atomic
   Z2 install/rollback procedure. Production service, interpreter, Root
   Entry and state path must be reconciled together.
+- The journal directory `/var/lib/plasma-privileged` is root-owned `0700`
+  and **every ancestor up to `/` must be root-owned and not group/other
+  writable** (Root `_state_dir_trusted`, fail closed with
+  `STATE_ANCESTOR_NOT_ROOT_PROTECTED` / `STATE_DIRECTORY_NOT_PROVISIONED`).
+  It must never be placed under a runtime-account directory: the
+  2026-11-03 Z2 read-only preflight observed `/var/lib/plasma` owned by
+  uid 999 (`0755`), whose owner could rename/replace a root-owned child
+  and drop or roll back the Root journal. Native `plasma_swd` re-checks
+  the journal by device/inode/size/mtime recorded at Site admission.
 - Any Host-only test claiming Code Verified/Identity PASS is simulated
   evidence only, **not** a Z2 FPGA or IC operation.
 - On-device UIDs, firmware manager, `/dev/mem`, systemd confinement,
