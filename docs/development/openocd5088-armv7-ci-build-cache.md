@@ -40,5 +40,15 @@ and does not defeat a malicious trusted cache producer. hardware_runtime_ready
 stays false; Z2 HIL and Blue Pill DPIDR remain NOT_RUN. No SWPC, Z2, FPGA,
 DUT, deployment, merge or production qualification is authorized.
 
+## Concurrent PR push race
+
+GitHub may start another PR run before the first run has finished saving its
+cache. In that case two jobs can both miss the *same* exact key and perform
+duplicate builds; the later cache-save may report an already-reserved key.
+That does not establish a cache HIT. For acceptance, run a subsequent
+documentation-only PR push **after** the first run has completed and saved the
+cache, and check the logs show the exact key restored and compilation skipped.
+Keep the integrity, QEMU negative checks, and per-HEAD evidence mandatory.
+
 This PR is independent of #1264. It must pass separate Gate 2 merge approval
 before its workflow can speed subsequent #1264 PR pushes.
