@@ -4,6 +4,7 @@ from dataclasses import replace
 from typing import Any
 
 from plasma_core.config import SiteConfig
+from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import ICSupportResolver, ResolvedICSupport
 from plasma_core.models import ExecutionOutput, JobRequest
