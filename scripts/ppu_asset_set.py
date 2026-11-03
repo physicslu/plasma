@@ -182,46 +182,6 @@ def _require_trusted_control_socket(socket_path: Path) -> None:
         raise AssetSetError("ASSET_SET_CONTROL_SOCKET_UNTRUSTED")
 
 
-RUNTIME_RESTART_QUIESCE_TTL_S = 60
-
-
-def quiesce_runtime_for_restart(
-    socket_path: Path = Path("/run/plasma-server/control.sock"),
-    ttl_s: int = RUNTIME_RESTART_QUIESCE_TTL_S,
-) -> dict[str, Any]:
-    """Acquire the running Runtime's bounded TTL quiesce before a restart.
-
-    Same gate as the runtime-activation helper: refused while any execution
-    lease exists; blocks new Job/Package admission until the TTL expires or
-    the process restarts. Unlike the connection-held lease it leaves no open
-    connection that would stall the Runtime's graceful shutdown.
-    """
-    _require_trusted_control_socket(socket_path)
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as control:
-        control.settimeout(5)
-        try:
-            control.connect(str(socket_path))
-            control.sendall(json.dumps({"operation": "quiesce", "ttl_s": ttl_s}).encode() + b"\n")
-            buffer = bytearray()
-            while b"\n" not in buffer:
-                chunk = control.recv(4096)
-                if not chunk or len(buffer) + len(chunk) > 8192:
-                    raise AssetSetError("RUNTIME_RESTART_QUIESCE_REPLY_INVALID")
-                buffer.extend(chunk)
-            record = json.loads(bytes(buffer).split(b"\n", 1)[0])
-        except (OSError, ValueError, UnicodeDecodeError) as exc:
-            raise AssetSetError("RUNTIME_RESTART_QUIESCE_TRANSPORT_UNAVAILABLE") from exc
-    if (not isinstance(record, dict) or record.get("ok") is not True
-            or not isinstance(record.get("result"), dict)
-            or record["result"].get("ttl_s") != ttl_s
-            or type(record["result"].get("token")) is not str):
-        message = ""
-        if isinstance(record, dict) and isinstance(record.get("error"), dict):
-            message = str(record["error"].get("message") or "")[:200]
-        raise AssetSetError("RUNTIME_RESTART_QUIESCE_NOT_GRANTED" + (f": {message}" if message else ""))
-    return dict(record["result"])
-
-
 @contextmanager
 def held_runtime_asset_lease(
     socket_path: Path = Path("/run/plasma-server/control.sock"),

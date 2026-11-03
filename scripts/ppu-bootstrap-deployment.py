@@ -18,6 +18,7 @@ import json
 import os
 import shutil
 import stat
+import socket
 import subprocess
 import sys
 import tempfile
@@ -205,6 +206,61 @@ class Journal:
 
 class _RuntimeQuiesceDenied(DeploymentError):
     """The running Runtime refused (or could not grant) its upgrade quiesce gate."""
+
+
+RUNTIME_CONTROL_SOCKET = Path("/run/plasma-server/control.sock")
+RUNTIME_RESTART_QUIESCE_TTL_S = 60
+
+
+def quiesce_runtime_for_restart(
+    socket_path: Path | None = None,
+    ttl_s: int = RUNTIME_RESTART_QUIESCE_TTL_S,
+) -> dict[str, Any]:
+    """Acquire the running Runtime's bounded TTL quiesce before an upgrade restart.
+
+    Self-contained on purpose: the Runtime upgrade runs this module from the
+    Z2 PS kit ``scripts/`` directory, which ships no sibling helper modules.
+    Same gate as the runtime-activation helper: refused while any execution
+    lease exists; blocks new Job/Package admission until the TTL expires or
+    the process restarts. It leaves no open connection, so it cannot stall the
+    Runtime's graceful shutdown (Python >= 3.12.1 Server.wait_closed()).
+    """
+    path = RUNTIME_CONTROL_SOCKET if socket_path is None else socket_path
+    if (not isinstance(path, Path) or not path.is_absolute()
+            or path.is_symlink() or path.parent.is_symlink()):
+        raise _RuntimeQuiesceDenied("RUNTIME_CONTROL_SOCKET_UNTRUSTED")
+    try:
+        node = path.stat()
+        directory = path.parent.stat()
+    except OSError as exc:
+        raise _RuntimeQuiesceDenied("RUNTIME_CONTROL_SOCKET_UNAVAILABLE") from exc
+    if (not stat.S_ISSOCK(node.st_mode) or node.st_mode & 0o077
+            or not stat.S_ISDIR(directory.st_mode) or directory.st_mode & 0o022
+            or node.st_uid != directory.st_uid):
+        raise _RuntimeQuiesceDenied("RUNTIME_CONTROL_SOCKET_UNTRUSTED")
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as control:
+        control.settimeout(5)
+        try:
+            control.connect(str(path))
+            control.sendall(json.dumps({"operation": "quiesce", "ttl_s": ttl_s}).encode() + b"\n")
+            buffer = bytearray()
+            while b"\n" not in buffer:
+                chunk = control.recv(4096)
+                if not chunk or len(buffer) + len(chunk) > 8192:
+                    raise _RuntimeQuiesceDenied("RUNTIME_RESTART_QUIESCE_REPLY_INVALID")
+                buffer.extend(chunk)
+            record = json.loads(bytes(buffer).split(b"\n", 1)[0])
+        except (OSError, ValueError, UnicodeDecodeError) as exc:
+            raise _RuntimeQuiesceDenied("RUNTIME_RESTART_QUIESCE_TRANSPORT_UNAVAILABLE") from exc
+    if (not isinstance(record, dict) or record.get("ok") is not True
+            or not isinstance(record.get("result"), dict)
+            or record["result"].get("ttl_s") != ttl_s
+            or type(record["result"].get("token")) is not str):
+        message = ""
+        if isinstance(record, dict) and isinstance(record.get("error"), dict):
+            message = str(record["error"].get("message") or "")[:200]
+        raise _RuntimeQuiesceDenied("RUNTIME_RESTART_QUIESCE_NOT_GRANTED" + (f": {message}" if message else ""))
+    return dict(record["result"])
 
 
 class DeploymentCoordinator:
@@ -1099,9 +1155,8 @@ class DeploymentCoordinator:
                     # The upgrade restarts the running Runtime: take its bounded
                     # quiesce (refused while any Site executes) right before
                     # activation so no Job/Package is admitted and then killed.
-                    quiesce = self.runtime_restart_quiesce or self._asset_helper().quiesce_runtime_for_restart
                     try:
-                        quiesce()
+                        (self.runtime_restart_quiesce or quiesce_runtime_for_restart)()
                     except Exception as exc:
                         raise _RuntimeQuiesceDenied(str(exc)) from exc
                 self.journal.write(record, "activating")
