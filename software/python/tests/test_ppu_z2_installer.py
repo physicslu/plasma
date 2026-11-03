@@ -397,7 +397,9 @@ def test_bootstrap_source_does_not_import_project_or_python311_only_tomllib() ->
 
 
 def test_rendered_config_lists_every_supported_site_disabled(tmp_path: Path) -> None:
-    from plasma_core.config import load_config
+    # The Python 3.10 installer-only CI job runs without the Plasma package;
+    # the full suite (Python >= 3.11) validates with the real config loader.
+    load_config = pytest.importorskip("plasma_core.config").load_config
 
     config_path = tmp_path / "ppu.yaml"
     config_path.write_text(
