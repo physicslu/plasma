@@ -154,6 +154,12 @@ class RuntimeControlServer:
                     if set(request) != {"operation"}:
                         raise RuntimeControlError("status request fields are invalid")
                     result = self.manager.runtime_quiesce_snapshot()
+                elif operation == "execution_lease":
+                    # Read-only C-1 lease snapshot for the local Site Worker
+                    # (Stage C-3) to confirm a Package Action Job holds it.
+                    if set(request) != {"operation"}:
+                        raise RuntimeControlError("execution_lease request fields are invalid")
+                    result = self.manager.execution_lease_snapshot()
                 elif operation == "release":
                     if set(request) != {"operation", "token"} or not isinstance(request.get("token"), str):
                         raise RuntimeControlError("release request fields are invalid")

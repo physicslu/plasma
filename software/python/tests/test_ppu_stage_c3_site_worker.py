@@ -1,0 +1,519 @@
+"""Stage C-3: single-appliance Site Worker (Host-only; real Unix socket + processes).
+
+Mock hardware adapters only. No Z2, MMIO, FPGA, OpenOCD or DUT is touched.
+"""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+import pytest
+
+from .test_ppu_bundle_v3_packages_contract import ROOT
+
+sys.path.insert(0, str(ROOT / "scripts"))
+import ppu_site_worker as worker  # noqa: E402
+import ppu_site_adapter_abi5 as abi5  # noqa: E402
+
+pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux") or os.geteuid() == 0,
+                                reason="Linux SO_PEERCRED, non-root")
+JOB = "1" * 32
+
+
+class MockAdapter:
+    name = "mock-swd"
+    supported_sites = frozenset({1, 2})
+    operations = frozenset({"probe"})
+
+    def __init__(self):
+        self.ident = {"image": "A"}
+        self.calls = []
+        self.behaviour = "pass"
+        self.gate = threading.Event()
+        self.started = threading.Event()
+        self.startup = set()
+
+    def identity(self):
+        return dict(self.ident)
+
+    def startup_sealed_sites(self):
+        return set(self.startup)
+
+    def run(self, site, operation, *, deadline, cancel):
+        self.calls.append((site, operation))
+        self.started.set()
+        b = self.behaviour
+        if b == "block":   # waits for gate, cancel or deadline
+            while not self.gate.is_set():
+                if cancel.is_set():
+                    raise worker.TransportUnknown("CANCELLED_DURING_OPERATION")
+                if time.monotonic() >= deadline:
+                    raise worker.TransportUnknown("OPERATION_TIMEOUT")
+                time.sleep(0.01)
+        if b == "deny":
+            raise worker.TransportDenied("ADMISSION_DENIED")
+        if b == "unknown":
+            raise worker.TransportUnknown("SAFE_OFF_NOT_VERIFIED")
+        if b == "crash":
+            raise RuntimeError("adapter bug")
+        if b == "reload":
+            self.ident = {"image": "B"}
+        return {"result": "PASS", "dpidr": "0x1ba01477", "safe_off": True}
+
+
+class Rig:
+    def __init__(self, tmp_path, adapter=None):
+        self.tmp = tmp_path
+        self.adapter = adapter or MockAdapter()
+        self.lease = {JOB}
+        self.sock = tmp_path / "w.sock"
+        self.seals = tmp_path / "seals"
+        self.start()
+
+    def start(self):
+        self.core = worker.SiteWorkerCore(
+            self.adapter, runtime_pid=os.getpid, lease_verifier=lambda j: j in self.lease,
+            seal_dir=self.seals)
+        self.server = worker.SiteWorkerServer(self.core, self.sock, mode=0o600)
+        self.server.start()
+        self.client = worker.SiteWorkerClient(self.sock, timeout_s=20)
+
+    def restart(self):  # Worker crash + restart: in-memory sessions are lost
+        self.server.close()
+        self.start()
+
+    def package(self, body: str, *, new_session=True):
+        """A real Package-like process speaking the raw JSON line protocol."""
+        code = ("import json,socket,sys,time\n"
+                f"S={str(self.sock)!r}\n"
+                "def call(req):\n"
+                " s=socket.socket(socket.AF_UNIX); s.connect(S)\n"
+                " s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v1',**req))+'\\n').encode())\n"
+                " d=b''\n"
+                " while not d.endswith(b'\\n'):\n"
+                "  c=s.recv(65536)\n"
+                "  if not c: break\n"
+                "  d+=c\n"
+                " return json.loads(d)\n"
+                "sys.stdin.readline()\n" + body)
+        return subprocess.Popen([sys.executable, "-I", "-c", code], stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, text=True, start_new_session=new_session)
+
+    def open(self, child, sites=(2,), runtime=30):
+        return self.client.open_session(job_id=JOB, sites=list(sites), pgid=os.getpgid(child.pid),
+                                        uid=os.getuid(), max_runtime_s=runtime)
+
+    @staticmethod
+    def reap(*children):
+        for child in children:
+            child.kill()
+            child.wait()
+            for stream in (child.stdin, child.stdout):
+                if stream:
+                    stream.close()
+
+    @staticmethod
+    def go(child):
+        child.stdin.write("go\n"); child.stdin.flush()
+        out, _ = child.communicate(timeout=30)
+        return [json.loads(line) for line in out.splitlines() if line.strip()]
+
+    def close(self):
+        self.server.close()
+
+
+@pytest.fixture
+def rig(tmp_path):
+    r = Rig(tmp_path)
+    yield r
+    r.close()
+
+
+PROBE2 = "print(json.dumps(call({'op':'probe','site':2})))\n"
+
+
+def test_authorized_package_probe_succeeds(rig):
+    child = rig.package(PROBE2)
+    s = rig.open(child)
+    assert s["sites"] == [2] and len(s["session_id"]) == 32
+    [reply] = rig.go(child)
+    assert reply == {"ok": True, "result": {"adapter": "mock-swd", "dpidr": "0x1ba01477",
+                                            "operation": "probe", "result": "PASS",
+                                            "safe_off": True, "site": 2}}
+    assert rig.client.close_session(s["session_id"]) == {
+        "closed": True, "session_id": s["session_id"], "sealed_sites": []}
+
+
+def test_process_outside_the_session_group_is_denied(rig):
+    member = rig.package("import time; time.sleep(30)\n")
+    rig.open(member)
+    stranger = rig.package(PROBE2)          # same uid, different process group
+    [reply] = rig.go(stranger)
+    assert reply == {"ok": False, "error": "NO_SESSION_FOR_PEER"}
+    rig.reap(member)
+    assert rig.adapter.calls == []
+
+
+def test_package_that_escapes_its_session_loses_access(rig):
+    # A forked descendant that leaves the registered process group via setsid().
+    child = rig.package("import os\npid = os.fork()\nif pid == 0:\n    os.setsid()\n"
+                        "    print(json.dumps(call({'op':'probe','site':2})), flush=True)\n"
+                        "    os._exit(0)\nos.waitpid(pid, 0)\n")
+    rig.open(child)
+    [reply] = rig.go(child)
+    assert reply == {"ok": False, "error": "NO_SESSION_FOR_PEER"}
+
+
+def test_site_outside_session_and_unsupported_site_denied(rig):
+    child = rig.package("print(json.dumps(call({'op':'probe','site':1})))\n"
+                        "print(json.dumps(call({'op':'probe','site':3})))\n")
+    rig.open(child, sites=(2,))
+    replies = rig.go(child)
+    assert [r["error"] for r in replies] == ["SITE_NOT_AUTHORIZED", "SITE_NOT_AUTHORIZED"]
+    other = rig.package("import time; time.sleep(5)\n")
+    with pytest.raises(worker.SiteWorkerDenied, match="SITE_NOT_SUPPORTED"):
+        rig.client.open_session(job_id=JOB, sites=[3], pgid=os.getpgid(other.pid),
+                                uid=os.getuid(), max_runtime_s=10)
+    rig.reap(other)
+
+
+@pytest.mark.parametrize("op", ["mmio_write", "mmio_read", "shell", "exec", "reload_fpga", "program"])
+def test_operation_outside_adapter_allowlist_denied(rig, op):
+    child = rig.package(f"print(json.dumps(call({{'op':{op!r},'site':2}})))\n")
+    rig.open(child)
+    [reply] = rig.go(child)
+    assert reply == {"ok": False, "error": "OPERATION_DENIED"}
+    assert rig.adapter.calls == []
+
+
+def test_extra_claims_in_transport_request_denied(rig):
+    child = rig.package("print(json.dumps(call({'op':'probe','site':2,'job_id':'9'*32})))\n"
+                        "print(json.dumps(call({'op':'probe','site':2,'address':0x43C01000})))\n")
+    rig.open(child)
+    assert [r["error"] for r in rig.go(child)] == ["REQUEST_INVALID", "REQUEST_INVALID"]
+
+
+def test_control_operations_only_from_trusted_runtime_pid(rig):
+    body = ("print(json.dumps(call({'op':'open_session','job_id':'1'*32,'sites':[2],"
+            "'pgid':os.getpgid(0),'uid':os.getuid(),'max_runtime_s':10})))\n"
+            "print(json.dumps(call({'op':'status'})))\n")
+    child = rig.package("import os\n" + body)
+    replies = rig.go(child)
+    assert [r["error"] for r in replies] == ["CONTROL_PEER_DENIED", "CONTROL_PEER_DENIED"]
+
+
+def test_job_lease_required_at_open_and_rechecked_per_operation(rig):
+    rig.lease.clear()
+    child = rig.package(PROBE2)
+    with pytest.raises(worker.SiteWorkerDenied, match="JOB_LEASE_NOT_HELD"):
+        rig.open(child)
+    rig.lease.add(JOB)
+    rig.open(child)
+    rig.lease.clear()                 # C-1 lease released / job expired
+    [reply] = rig.go(child)
+    assert reply == {"ok": False, "error": "JOB_LEASE_NOT_HELD"}
+    assert rig.adapter.calls == []
+
+
+def test_session_expiry_denies_operations(rig):
+    child = rig.package("import time\ntime.sleep(1.3)\n" + PROBE2)
+    rig.open(child, runtime=1)
+    [reply] = rig.go(child)
+    assert reply == {"ok": False, "error": "SESSION_EXPIRED"}
+
+
+def test_concurrent_operation_on_same_site_is_busy(rig):
+    rig.adapter.behaviour = "block"
+    child = rig.package("import threading\nout=[]\n"
+                        "t=threading.Thread(target=lambda: out.append(call({'op':'probe','site':2})))\n"
+                        "t.start(); time.sleep(0.5)\n"
+                        "print(json.dumps(call({'op':'probe','site':2})))\n"
+                        "t.join(); print(json.dumps(out[0]))\n")
+    rig.open(child)
+    threading.Timer(1.5, rig.adapter.gate.set).start()
+    first, second = rig.go(child)
+    assert first == {"ok": False, "error": "SITE_BUSY"}
+    assert second["ok"] is True
+
+
+def test_timeout_seals_site_and_seal_survives_worker_restart(rig):
+    rig.adapter.behaviour = "block"
+    child = rig.package(PROBE2 + PROBE2)
+    s = rig.open(child, runtime=1)
+    first, second = rig.go(child)
+    assert first == {"ok": False, "error": "OUTCOME_UNKNOWN_SITE_SEALED:OPERATION_TIMEOUT"}
+    assert second["error"] in ("SITE_SEALED", "SESSION_EXPIRED")
+    assert rig.client.close_session(s["session_id"])["sealed_sites"] == [2]
+    rig.restart()
+    assert rig.client.call("status")["sealed_sites"] == [2]
+    again = rig.package("import time; time.sleep(5)\n")
+    with pytest.raises(worker.SiteWorkerDenied, match="SITE_SEALED"):
+        rig.open(again)
+    rig.reap(again)
+    assert (rig.seals / "site2.sealed").is_file()
+
+
+def test_cancel_by_runtime_close_stops_in_flight_operation_and_seals(rig):
+    rig.adapter.behaviour = "block"
+    child = rig.package(PROBE2)
+    s = rig.open(child, runtime=60)
+    result = {}
+    t = threading.Thread(target=lambda: result.setdefault("r", rig.go(child)))
+    t.start()
+    assert rig.adapter.started.wait(10)
+    closed = rig.client.close_session(s["session_id"])
+    t.join(30)
+    assert closed["sealed_sites"] == [2]
+    assert result["r"] == [{"ok": False, "error": "OUTCOME_UNKNOWN_SITE_SEALED:CANCELLED_DURING_OPERATION"}]
+
+
+@pytest.mark.parametrize("behaviour,error", [
+    ("unknown", "OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED"),
+    ("crash", "OUTCOME_UNKNOWN_SITE_SEALED:RuntimeError"),
+    ("reload", "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION"),
+])
+def test_unknown_hardware_outcomes_seal_and_never_retry(rig, behaviour, error):
+    rig.adapter.behaviour = behaviour
+    child = rig.package(PROBE2 + PROBE2)
+    rig.open(child)
+    first, second = rig.go(child)
+    assert first == {"ok": False, "error": error}
+    assert second["ok"] is False
+    assert len(rig.adapter.calls) == 1        # no automatic retry
+    assert 2 in rig.client.call("status")["sealed_sites"]
+
+
+def test_denied_before_hardware_keeps_site_usable(rig):
+    rig.adapter.behaviour = "deny"
+    child = rig.package(PROBE2)
+    s = rig.open(child)
+    assert rig.go(child) == [{"ok": False, "error": "TRANSPORT_DENIED:ADMISSION_DENIED"}]
+    assert rig.client.close_session(s["session_id"])["sealed_sites"] == []
+    assert rig.client.call("status")["sealed_sites"] == []
+
+
+def test_fpga_reload_between_operations_invalidates_session(rig):
+    child = rig.package("time.sleep(0.5)\n" + PROBE2)
+    rig.open(child)
+    rig.adapter.ident = {"image": "reloaded"}
+    [reply] = rig.go(child)
+    assert reply == {"ok": False, "error": "SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED"}
+    assert rig.adapter.calls == []
+
+
+def test_worker_crash_invalidates_sessions(rig):
+    child = rig.package(PROBE2)
+    rig.open(child)
+    rig.restart()
+    assert rig.go(child) == [{"ok": False, "error": "NO_SESSION_FOR_PEER"}]
+
+
+def test_startup_unknown_owner_state_seals_sites(tmp_path):
+    adapter = MockAdapter()
+    adapter.startup = {1}
+    r = Rig(tmp_path, adapter)
+    try:
+        assert r.client.call("status")["sealed_sites"] == [1]
+    finally:
+        r.close()
+
+
+def test_one_session_at_a_time_and_cleanup(rig):
+    a = rig.package("import time; time.sleep(5)\n")
+    s = rig.open(a)
+    b = rig.package("import time; time.sleep(5)\n")
+    with pytest.raises(worker.SiteWorkerDenied, match="SESSION_ALREADY_ACTIVE"):
+        rig.open(b)
+    rig.client.close_session(s["session_id"])
+    with pytest.raises(worker.SiteWorkerDenied, match="SESSION_UNKNOWN"):
+        rig.client.close_session(s["session_id"])
+    rig.client.close_session(rig.open(b)["session_id"])
+    rig.reap(a, b)
+
+
+@pytest.mark.parametrize("raw", [b"not json\n", b"[]\n", b'{"op":"probe","site":2}\n',
+                                 b"x" * 5000 + b"\n", b'{"protocol":"plasma.ppu.site-worker.v1"}\n'])
+def test_malformed_requests_rejected(rig, raw):
+    import socket as s
+    with s.socket(s.AF_UNIX) as sock:
+        sock.connect(str(rig.sock))
+        sock.sendall(raw)
+        reply = json.loads(sock.makefile().readline())
+    assert reply == {"ok": False, "error": "REQUEST_INVALID"}
+
+
+# --- ABI-v5 OpenOCD adapter (fake processes; no hardware) ---------------------------
+
+class FakeProc:
+    def __init__(self, log: bytes, rc=0, hang=False):
+        self.pid = 999999
+        self._rc, self._hang = rc, hang
+        self.stdout = __import__("io").BytesIO(log)
+        self.returncode = None
+
+    def poll(self):
+        if self._hang:
+            return None
+        self.returncode = self._rc
+        return self._rc
+
+    def wait(self):
+        self.returncode = -9
+        return -9
+
+
+def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=False):
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    journal = tmp_path / "journal.json"
+    journal.write_text(json.dumps({"status": "IMAGE", "image_id": "z2-independent-swd-v5-bd976140",
+                                   "session_id": "s", "boot_id": "b", "firmware_sha256": "f"}))
+    calls = {"run": [], "popen": []}
+
+    def run(argv, **kw):
+        calls["run"].append(argv[-2:])
+        out = "SITE_ADMISSION_RECORD_ISSUED" if (argv[-2] == "admit" and admit_ok) else "revoked"
+        return subprocess.CompletedProcess(argv, 0 if (admit_ok or argv[-2] == "revoke") else 1, out, "")
+
+    def popen(argv, **kw):
+        calls["popen"].append(argv)
+        return FakeProc(log, rc, hang)
+
+    a = abi5.Abi5OpenocdAdapter(openocd_root=tmp_path / "ocd", python=Path("/usr/bin/python3"),
+                                expected_image_id="z2-independent-swd-v5-bd976140", journal=journal,
+                                record_dir=tmp_path / "rec", run=run, popen=popen,
+                                openocd_running=lambda: openocd, poll_s=0.01)
+    (tmp_path / "rec").mkdir()
+    return a, calls, journal
+
+
+GOOD = b"Info : SWD DPIDR 0x1ba01477\nPLASMA_DPREG0=0x1ba01477\nSAFE_OFF_MODE_OFF_VERIFIED\n"
+
+
+def test_abi5_probe_uses_existing_admission_and_fixed_openocd_argv(tmp_path):
+    a, calls, _ = make_abi5(tmp_path, log=GOOD)
+    out = a.run(2, "probe", deadline=time.monotonic() + 30, cancel=threading.Event())
+    assert out == {"result": "PASS", "dpidr": "0x1ba01477", "safe_off": True}
+    assert calls["run"] == [["admit", "2"], ["revoke", "2"]]
+    argv = calls["popen"][0]
+    assert argv[0].endswith("/bin/openocd") and "plasma_swd site 2" in argv
+    for banned in ("program", "flash", "reset", "mww", "exec", "halt"):
+        assert not any(banned in item for item in argv)
+    assert a.supported_sites == {1, 2} and a.operations == {"probe"}
+
+
+@pytest.mark.parametrize("kw,exc,code", [
+    ({"openocd": True}, worker.TransportDenied, "EXTERNAL_SITE_OWNER_PRESENT"),
+    ({"admit_ok": False}, worker.TransportDenied, "ADMISSION_DENIED"),
+    ({"log": b"SWD DPIDR 0x1ba01477\n"}, worker.TransportUnknown, "SAFE_OFF_NOT_VERIFIED"),
+    ({"hang": True}, worker.TransportUnknown, "OPERATION_TIMEOUT"),
+])
+def test_abi5_fail_closed_paths(tmp_path, kw, exc, code):
+    a, calls, _ = make_abi5(tmp_path, **kw)
+    with pytest.raises(exc, match=code):
+        a.run(2, "probe", deadline=time.monotonic() + 0.3, cancel=threading.Event())
+    if calls["run"] and calls["run"][0] == ["admit", "2"]:
+        assert calls["run"][-1] == ["revoke", "2"]     # always revoked
+
+
+def test_abi5_identity_detects_reload_and_wrong_image(tmp_path):
+    a, _calls, journal = make_abi5(tmp_path, log=GOOD)
+    before = a.identity()
+    journal.write_text(json.dumps({"status": "IMAGE", "image_id": "other", "session_id": "t"}))
+    assert a.identity() != before
+    with pytest.raises(worker.TransportDenied, match="FPGA_IMAGE_NOT_EXPECTED"):
+        a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+
+
+def test_abi5_startup_seals_on_leftover_record_or_running_openocd(tmp_path):
+    a, _c, _j = make_abi5(tmp_path)
+    (tmp_path / "rec" / "swd-site1-admission").write_text("x")
+    assert a.startup_sealed_sites() == {1}
+    b, _c, _j = make_abi5(tmp_path / "b", openocd=True)
+    assert b.startup_sealed_sites() == {1, 2}
+
+
+# --- C-1 lease op and C-2 wiring ------------------------------------------------------
+
+def test_runtime_lease_verifier_uses_c1_execution_lease(tmp_path):
+    import asyncio
+    from plasma_server.runtime_control import RuntimeControlServer
+
+    class Manager:
+        def __init__(self): self.snap = {"busy": False, "owner_kind": None, "owner_id": None}
+        def execution_lease_snapshot(self): return dict(self.snap)
+
+    async def scenario():
+        m = Manager()
+        server = RuntimeControlServer(m, tmp_path / "control.sock")
+        await server.start()
+        try:
+            verify = worker.runtime_lease_verifier(tmp_path / "control.sock")
+            loop = asyncio.get_running_loop()
+            assert await loop.run_in_executor(None, verify, JOB) is False
+            m.snap = {"busy": True, "owner_kind": "package_action", "owner_id": JOB}
+            assert await loop.run_in_executor(None, verify, JOB) is True
+            assert await loop.run_in_executor(None, verify, "2" * 32) is False
+            m.snap = {"busy": True, "owner_kind": "batch", "owner_id": JOB}
+            assert await loop.run_in_executor(None, verify, JOB) is False
+        finally:
+            await server.close()
+    asyncio.run(scenario())
+    assert worker.runtime_lease_verifier(tmp_path / "missing.sock")(JOB) is False
+
+
+def test_c2_launcher_package_uses_site_worker_end_to_end(tmp_path, rig):
+    from .test_ppu_asset_execution_gate1 import _ready_fixture, execution
+    from contextlib import contextmanager
+
+    main = ("import json, os, socket, time\n"
+            "S = os.environ['PLASMA_SITE_WORKER_SOCKET']\n"
+            "def call(req):\n"
+            "    s = socket.socket(socket.AF_UNIX); s.connect(S)\n"
+            "    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v1', **req)) + '\\n').encode())\n"
+            "    return json.loads(s.makefile().readline())\n"
+            "for _ in range(100):\n"
+            "    r = call({'op': 'probe', 'site': 2})\n"
+            "    if r.get('error') != 'NO_SESSION_FOR_PEER': break\n"
+            "    time.sleep(0.02)\n"
+            "print(json.dumps(r))\n").encode()
+    res = b'{"schema":"plasma.ppu.package-resources.v1","sites":[2],"max_runtime_s":20}'
+    parts = [("tool", "python", [], {"python/main.py": main, "config/plasma-package-resources.json": res})]
+    co, requests, owner, _ = _ready_fixture(tmp_path / "set", parts=parts)
+    req = requests["python"]
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import ppu_package_launcher as launcher
+
+    @contextmanager
+    def lease():
+        yield {"job_id": req.job_id, "site_ids": [1, 2]}
+
+    runs = []
+
+    def dispatch(site_worker):
+        runs.append(1)
+        executor = launcher.make_package_executor(
+            co.paths.product_root, python_executable=Path(sys.executable),
+            state_root=tmp_path / f"actions-{len(runs)}", site_worker=site_worker)
+        return execution.dispatch_asset_execution(
+            co.paths.product_root, req, **owner.kw(req), execution_scope=lease,
+            trusted_executors={"python": executor})
+
+    # Default remains fail-closed without a Site Worker.
+    with pytest.raises(launcher.PackageLaunchDenied, match="PACKAGE_SITE_TRANSPORT_NOT_WIRED"):
+        dispatch(None)
+    receipt = dispatch(rig.client)["executor_result"]
+    assert receipt["result"] == "SUCCEEDED" and receipt["hardware"] == "SITE_WORKER"
+    assert receipt["site_ids"] == [2] and receipt["site_transport"]["session"] == "CLOSED"
+    out = json.loads(receipt["stdout"]["tail"])
+    assert out["ok"] is True and out["result"]["dpidr"] == "0x1ba01477"
+    assert rig.core._session is None
+
+    # Worker refuses the session (lease not held): the Package is killed, FAILED.
+    rig.lease.clear()
+    receipt = dispatch(rig.client)["executor_result"]
+    assert receipt["result"] == "FAILED" and receipt["site_transport"]["session"] == "DENIED"
