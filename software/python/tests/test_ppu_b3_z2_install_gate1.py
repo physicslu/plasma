@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from .ppu_bundle_authority_fixture import provision_fixture_grant
+from .ppu_owner_authorization_fixture import admit_body, install_body, machine_id_file
 
 from .test_ppu_bundle_v3_packages_contract import (
     ROOT, SOURCE, TARGET, contract, engine, load,
@@ -141,7 +141,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
         state_root=tmp_path / "state",
         package_target_file=tmp_path / "trusted-target.json",
         bundle_install_policy=tmp_path / "trusted-policy.json",
-        bundle_authority_policy=tmp_path / "private-master-grant.json",
+        machine_id_path=machine_id_file(tmp_path),
     )
     paths.package_target_file.write_text(json.dumps(TARGET))
     paths.package_target_file.chmod(0o600)
@@ -166,7 +166,8 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     srv.bundle_install_runner = runner
     # Without B2, B3 is forbidden and cannot stage software.
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MATCHING_B2_ADMISSION_REQUIRED"):
-        srv.start_deployment({"kind": "bundle", "upload_id": "a" * 32, "fpga_load": False})
+        srv.start_deployment({"kind": "bundle", "upload_id": "a" * 32, "fpga_load": False,
+                              "authorization": {}})
     raw = archive.read_bytes()
     upload = bootstrap.create_upload(paths, size=len(raw), sha256=digest)
     upload_id = upload["upload_id"]
@@ -176,8 +177,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
         sha256=hashlib.sha256(raw).hexdigest(),
     )
     bootstrap.commit_upload(paths, upload_id)
-    provision_fixture_grant(paths, raw)
-    b2 = srv.start_deployment({"kind": "bundle", "upload_id": upload_id})
+    b2 = srv.start_deployment(admit_body(paths, "bundle", upload_id))
     assert b2["state"] == "admitted"
     assert b2["result"]["plan"]["bundle_schema"] == contract.BUNDLE_SCHEMA
     assert b2["result"]["install_qualified"] is False
@@ -185,27 +185,23 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
 
     # Policy is supplied from the factory root, never an HTTP caller field.
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
-        srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
-                              "fpga_load": False, "publisher": "caller"})
+        srv.start_deployment({**install_body(paths, b2, fpga_load=False),
+                              "publisher": "caller"})
     new = dict(source_policy, mode="untrusted")
     paths.bundle_install_policy.write_text(json.dumps(new))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_POLICY_INVALID"):
-        srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
-                              "fpga_load": False})
+        srv.start_deployment(install_body(paths, b2, fpga_load=False))
     paths.bundle_install_policy.write_text(json.dumps(source_policy))
 
-    # B3 must not trust a past B2 receipt after the independent Master
-    # authorization file was revoked, even if committed ZIP bytes match.
-    master_grants = json.loads(paths.bundle_authority_policy.read_text())
-    withdrawn = json.loads(json.dumps(master_grants))
-    withdrawn["approved_bundle_sha256"] = ["f" * 64]
-    paths.bundle_authority_policy.write_text(json.dumps(withdrawn))
-    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MASTER_AUTHORITY_DENIED"):
-        srv.start_deployment({"kind": "bundle", "upload_id": upload_id,
-                              "fpga_load": False})
-    paths.bundle_authority_policy.write_text(json.dumps(master_grants))
+    # B3 never treats the B2 receipt as install authority: the B2 admit
+    # authorization cannot be replayed as a B3 install authorization.
+    replay = install_body(paths, b2, fpga_load=False)
+    replay["authorization"] = admit_body(paths, "bundle", upload_id)["authorization"]
+    with pytest.raises(bootstrap.BootstrapServiceError,
+                       match="OWNER_AUTHORIZATION_ACTION_MISMATCH"):
+        srv.start_deployment(replay)
 
-    srv.start_deployment({"kind": "bundle", "upload_id": upload_id, "fpga_load": False})
+    srv.start_deployment(install_body(paths, b2, fpga_load=False))
     assert srv.deployment_thread is not None
     srv.deployment_thread.join(timeout=10)
     assert not srv.deployment_thread.is_alive()

@@ -72,10 +72,10 @@ schema replaces the old one for all callers; there is no second B3 path.
 | B3 Coordinator | `scripts/ppu-bootstrap-deployment.py`, `scripts/ppu-bootstrap-service.py`, `scripts/ppu_deploy_api.py` | `fpga_load` request field, journal states in §2, call the Root Entry by fixed path with a timeout, new receipt `plasma.ppu.b3-deployment-receipt.v2`. |
 | Active Set | Bootstrap Asset Set helper | Publish `active.json` only after Identity PASS, inside the same Quiesce hold. |
 | Manager / Console BFF / Web | Manager bootstrap REST, Console Runtime Deployment / Assets view | An explicit "Install and load FPGA" control; show the v2 receipt (FPGA image, Identity words, journal state). Console never sends `idle=true` or a path. |
-| Contracts and docs | `docs/architecture/ppu-canonical-bundle-packages.md`, `docs/deployment/ppu-bundle-v3-master-authority-gate1.md`, `ppu-fpga-asset-handoff-gate1.md`, `ppu-single-active-asset-set-gate1.md`, glossary B1B2B3 | Replace "B3 never loads FPGA" with the §2 rule. |
+| Contracts and docs | `docs/architecture/ppu-canonical-bundle-packages.md`, `docs/deployment/ppu-owner-operation-authorization.md`, `ppu-fpga-asset-handoff-gate1.md`, `ppu-single-active-asset-set-gate1.md`, glossary B1B2B3 | Replace "B3 never loads FPGA" with the §2 rule. |
 | Tests / CI | `software/python/tests/test_ppu_*`, `scripts/tests/test_fpga_image_root.py`, Root Entry allowlist tests | See §4. |
 
-Unchanged: B1/B2, Master Authority, FPGA static qualification, Root source-pin
+Unchanged: B1/B2 (authorization now per-operation, see `ppu-owner-operation-authorization.md`), FPGA static qualification, Root source-pin
 model, Golden handling, `download|test|restore` semantics, OpenOCD,
 ABI-v5 admission.
 
@@ -115,7 +115,8 @@ tree, Golden and the existing OpenOCD installs.
 ## 5. Risks and safeguards
 
 - **HTTP-triggered PL reconfiguration.** It requires an explicit `fpga_load` field,
-  the device-bound Bootstrap pairing, a matching B2 Master grant and the
+  the device-bound Bootstrap pairing, a fresh owner `bundle.install-fpga-load`
+  authorization bound to the current B2 admission, and the
   protected Root pin. It never triggers from upload alone.
 - **Active Jobs or OpenOCD during reload.** Runtime Quiesce covers Jobs, and the Root
   `collect_live` census covers `/dev/mem`, `/dev/uio*` and the FPGA device holders.
@@ -137,7 +138,8 @@ tree, Golden and the existing OpenOCD installs.
 ## 7. Implementation notes (as built)
 
 - HTTP request: `POST /v1/deployments` body is now exactly
-  `{"kind": "bundle", "upload_id": <32-hex>, "fpga_load": <bool>}`. The old
+  `{"kind": "bundle", "upload_id": <32-hex>, "fpga_load": <bool>, "authorization": <owner-operation-authorization>}`
+  (authorization added by Stage A, see `ppu-owner-operation-authorization.md`). The old
   `install_only` field is retired (Replace-by-Default); `fpga_load: false` is
   the install-only B3. The device-local `ppu-bundle-install-policy.json`
   (v1) is unchanged and still enables B3 as a whole.

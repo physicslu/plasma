@@ -595,7 +595,7 @@ def verify_host_only_artifact(
 # PR3: deterministic capability resolution and authority simulation.
 # These functions accept trusted test fixtures injected by a host-only caller;
 # they never turn a package claim, pairing token or HTTP request into authority.
-BUNDLE_POLICY_SCHEMA = "plasma.ppu.bundle-authority.v2"
+OWNER_AUTHORIZATION_SCHEMA = "plasma.ppu.owner-operation-authorization.v1"
 
 
 def bundle_package_identity(package: VerifiedBundlePackage) -> str:
@@ -690,35 +690,30 @@ def resolve_host_only_bundle(
     }
 
 
-def evaluate_host_only_bundle_authority(
-    bundle: VerifiedBundle, *, trusted_policy: Mapping[str, object],
-    now_epoch_s: int,
+def evaluate_host_only_owner_authorization(
+    bundle: VerifiedBundle, *, owner_authorization: Mapping[str, object],
 ) -> dict[str, object]:
-    """Host-only fixture for single-device approved exact Bundle SHA256.
+    """Host-only binding of a verified owner install authorization summary.
 
-    Does not grant physical installation or hardware execution.
+    ``owner_authorization`` is the receipt returned by
+    ``ppu_owner_authorization.verify`` (never a caller claim). There is no
+    per-Bundle allowlist. Does not grant physical installation or hardware
+    execution.
     """
-    if not isinstance(bundle, VerifiedBundle) or type(now_epoch_s) is not int:
-        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_INPUT_INVALID")
-    required = {"schema", "generation", "approved_bundle_sha256"}
-    if not isinstance(trusted_policy, Mapping) or set(trusted_policy) != required:
-        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_NOT_PROVISIONED")
-    approved = trusted_policy["approved_bundle_sha256"]
-    if (trusted_policy["schema"] != "plasma.ppu.bundle-authority.v2"
-            or type(trusted_policy["generation"]) is not int
-            or trusted_policy["generation"] <= 0
-            or type(approved) is not list
-            or len(approved) > 128
-            or any(type(x) is not str or SHA64.fullmatch(x) is None
-                   for x in approved)
-            or len(set(approved)) != len(approved)):
-        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_POLICY_INVALID")
-    if bundle.archive_sha256 not in approved:
-        raise UnifiedDeploymentError("BUNDLE_AUTHORITY_DIGEST_NOT_APPROVED")
+    if not isinstance(bundle, VerifiedBundle) or not isinstance(owner_authorization, Mapping):
+        raise UnifiedDeploymentError("OWNER_AUTHORIZATION_INPUT_INVALID")
+    if (owner_authorization.get("status") != "OWNER_AUTHORIZED"
+            or owner_authorization.get("schema") != OWNER_AUTHORIZATION_SCHEMA
+            or owner_authorization.get("action") not in {
+                "bundle.install", "bundle.install-fpga-load"}):
+        raise UnifiedDeploymentError("OWNER_AUTHORIZATION_REQUIRED")
+    if owner_authorization.get("subject_sha256") != bundle.archive_sha256:
+        raise UnifiedDeploymentError("OWNER_AUTHORIZATION_SUBJECT_MISMATCH")
     return {
-        "method": "device-local-exact-bundle-sha256",
-        "generation": trusted_policy["generation"],
+        "method": owner_authorization.get("method"),
+        "action": owner_authorization["action"],
         "archive_sha256": bundle.archive_sha256,
+        "transaction_id": owner_authorization.get("transaction_id"),
         "scope": "host-only-fixture",
         "device_install_authorized": False,
     }

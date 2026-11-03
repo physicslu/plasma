@@ -57,6 +57,9 @@ COORDINATOR_SAFE_RESTART_STATES = {
 # Coordinator B3 terminal states that are a *known* failure, not uncertainty.
 B3_KNOWN_FAILURE_STATES = {"verify_failed", "fpga_load_denied", "fpga_identity_failed"}
 MAX_COORDINATOR_JOURNAL_BYTES = 1024 * 1024
+# A B2 admission is a short-lived, device-clock transaction. B3 must name the
+# CURRENT admission and start within this window; otherwise re-run B2.
+B2_ADMISSION_TTL_S = 3600
 
 
 class BootstrapServiceError(RuntimeError):
@@ -71,9 +74,6 @@ class ServicePaths:
     bootstrap_script: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap.py")
     kit_tool: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap-kit.py")
     package_target_file: Path = Path("/etc/plasma/ppu-package-target.json")
-    # Independently root-provisioned exact Bundle grants. The HTTP/Bearer
-    # pairing is NOT itself Publisher/Master source authority.
-    bundle_authority_policy: Path = Path("/etc/plasma/ppu-bundle-authority.json")
     # Factory-Bootstrap-shipped trusted FPGA Image Target/ABI contracts used by
     # B2 static FPGA qualification. Never supplied by a Bundle or HTTP.
     fpga_image_contracts: Path = Path("/opt/plasma/bootstrap/ppu-fpga-image-contracts.json")
@@ -510,6 +510,39 @@ def _deployment_request(body: Mapping[str, Any]) -> dict[str, str]:
 
 
 
+def _owner_operation(
+    paths: ServicePaths, authorization: object, *, action: str,
+    subject_sha256: str, transaction_id: str,
+) -> dict[str, Any]:
+    """Verify ONE explicit owner operation against device-derived facts.
+
+    The paired credential, device identity, archive SHA256 and transaction
+    are all read from this PPU, never from the request carrying the
+    authorization. There is no per-Bundle allowlist.
+    """
+    module = _load_script(
+        Path(__file__).with_name("ppu_owner_authorization.py"),
+        "plasma_ppu_owner_authorization",
+    )
+    identity = _load_script(
+        Path(__file__).with_name("ppu-bootstrap.py"),
+        "plasma_ppu_bootstrap_device_identity",
+    )
+    try:
+        device_id = identity._machine_device_id(paths.machine_id_path)
+    except Exception as exc:
+        raise BootstrapServiceError("OWNER_AUTHORIZATION_DEVICE_IDENTITY_UNAVAILABLE") from exc
+    credential = load_token(paths.token_file)
+    try:
+        return module.verify(
+            authorization, credential=credential, action=action,
+            device_id=device_id, subject_sha256=subject_sha256,
+            transaction_id=transaction_id,
+        )
+    except module.OwnerAuthorizationDenied as exc:
+        raise BootstrapServiceError(str(exc)) from exc
+
+
 def _trusted_package_target(paths: ServicePaths) -> dict[str, str]:
     """Local PPU target identity, not data accepted from the uploaded manifest."""
     path = paths.package_target_file
@@ -533,12 +566,11 @@ def _trusted_package_target(paths: ServicePaths) -> dict[str, str]:
 def _trusted_b3_install_policy(paths: ServicePaths) -> dict[str, Any]:
     """Device-local generic B3 enablement, not publisher authentication.
 
-    Development mode trusts the authenticated, paired Console to *request*
-    installation of the exact committed/admitted Bundle and, only with an
-    explicit ``fpga_load: true``, the load of its FPGA Image through the
-    protected Root Entry. It never permits Package execution or DUT operation.
-    Product publisher and Master qualification must independently precede
-    production enablement.
+    Generic, Bundle-independent device capability (no per-Bundle SHA list).
+    Each B3 additionally needs a fresh owner ``bundle.install`` /
+    ``bundle.install-fpga-load`` authorization from the paired Console for
+    the exact admitted Bundle. B3 never permits Package execution or DUT
+    operation; FPGA load still passes the protected Root Entry.
     """
     path = paths.bundle_install_policy
     if path.is_symlink():
@@ -702,8 +734,12 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         super().__init__(address, BootstrapHandler)
 
     def admit_package(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        """Receive -> verify -> plan only. NEVER dispatch the runtime Installer."""
-        if set(body) != {"kind", "upload_id"}:
+        """Receive -> verify -> plan only. NEVER dispatch the runtime Installer.
+
+        Requires an explicit owner ``bundle.admit`` authorization bound to
+        this device, the committed upload and its exact SHA256.
+        """
+        if set(body) != {"kind", "upload_id", "authorization"}:
             raise BootstrapServiceError("PACKAGE_REQUEST_FIELDS_DENIED")
         kind, upload_id = body["kind"], body["upload_id"]
         if type(kind) is not str or kind not in {"python", "native-c", "fpga-image", "bundle"}:
@@ -724,6 +760,10 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     or type(meta.get("sha256")) is not str
                     or not HEX64_RE.fullmatch(meta["sha256"])):
                 raise BootstrapServiceError("PACKAGE_UPLOAD_NOT_COMMITTED")
+            owner = _owner_operation(
+                self.bootstrap_paths, body["authorization"], action="bundle.admit",
+                subject_sha256=meta["sha256"], transaction_id=upload_id,
+            )
             target = _trusted_package_target(self.bootstrap_paths)
             contract = _load_script(
                 Path(__file__).with_name("ppu_unified_deployment.py"),
@@ -738,21 +778,8 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 raise BootstrapServiceError(str(exc)) from exc
             if verified.kind != kind:
                 raise BootstrapServiceError("PACKAGE_KIND_MISMATCH")
-            # All executable Asset kinds share ONE Bundle authority. B2 PASS
-            # for a canonical Bundle is allowed only after independent
-            # Master approval of these *exact* complete archive bytes.
-            authorization = None
-            if verified.kind == "bundle":
-                authority = _load_script(
-                    Path(__file__).with_name("ppu_bundle_authority.py"),
-                    "plasma_ppu_bundle_b2_master_authority",
-                )
-                try:
-                    authorization = authority.approve_verified_bundle(
-                        verified, policy_path=self.bootstrap_paths.bundle_authority_policy,
-                    )
-                except authority.BundleAuthorityDenied as exc:
-                    raise BootstrapServiceError(str(exc)) from exc
+            if verified.archive_sha256 != owner["subject_sha256"]:
+                raise BootstrapServiceError("OWNER_AUTHORIZATION_SUBJECT_MISMATCH")
             # FPGA Image is an ordinary Asset of the same Bundle; B2 PASS also
             # requires its static qualification. No FPGA load, no readback.
             fpga_qualification = None
@@ -782,9 +809,9 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 "target": dict(verified.target),
                 "requested_actions": list(verified.actions),
                 "execution_permitted": False,
+                "owner_authorization": owner,
             }
             if verified.kind == "bundle":
-                plan["authorization"] = authorization
                 plan["fpga_qualification"] = fpga_qualification
                 plan["purpose"] = verified.purpose
                 # Canonical Bundle v3 is the only active admission contract.
@@ -807,7 +834,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 "result": {
                     "result": "PASS",
                     "stage": "package_admission_only",
-                    "source_authorized": authorization is not None,
+                    "owner_authorized": True,
                     "fpga_static_qualification": (
                         "NOT_APPLICABLE" if fpga_qualification is None
                         else fpga_qualification["result"]),
@@ -822,8 +849,9 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             return record
 
     def start_bundle_install(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        """B3 only after exact B2 admission on this device and local policy pin."""
-        if (type(body) is not dict or set(body) != {"kind", "upload_id", "fpga_load"}
+        """B3 only for the CURRENT B2 admission and a fresh owner install action."""
+        if (type(body) is not dict
+                or set(body) != {"kind", "upload_id", "fpga_load", "authorization"}
                 or body["kind"] != "bundle" or type(body["fpga_load"]) is not bool):
             raise BootstrapServiceError("B3_INSTALL_REQUEST_FIELDS_DENIED")
         fpga_load = body["fpga_load"]
@@ -837,6 +865,10 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             if (earlier is None or earlier.get("state") != "admitted"
                     or earlier.get("upload_id") != upload_id):
                 raise BootstrapServiceError("B3_MATCHING_B2_ADMISSION_REQUIRED")
+            admitted_at = earlier.get("started_at_epoch_s")
+            age = time.time() - admitted_at if type(admitted_at) in (int, float) else -1
+            if not 0 <= age <= B2_ADMISSION_TTL_S:
+                raise BootstrapServiceError("B3_B2_ADMISSION_EXPIRED")
             result = earlier.get("result")
             plan = result.get("plan") if type(result) is dict else None
             policy = _trusted_b3_install_policy(self.bootstrap_paths)
@@ -852,7 +884,10 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     or type(plan.get("packages")) is not list
                     or not plan["packages"]
                     or plan.get("target") != trusted_target
-                    or plan.get("requested_actions") != policy["actions"]):
+                    or plan.get("requested_actions") != policy["actions"]
+                    or result.get("owner_authorized") is not True
+                    or type(plan.get("owner_authorization")) is not dict
+                    or plan["owner_authorization"].get("subject_sha256") != plan["archive_sha256"]):
                 raise BootstrapServiceError("B3_ADMISSION_NOT_QUALIFIED")
             upload = _upload_paths(self.bootstrap_paths, upload_id)
             metadata = _read_json(upload.meta)
@@ -863,29 +898,26 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     or upload.committed.is_symlink()
                     or _sha256(upload.committed) != plan["archive_sha256"]):
                 raise BootstrapServiceError("B3_UPLOADED_ARCHIVE_CHANGED")
-            # Re-admit independent Master authority at B3 to reject grant
-            # revocation/expiry or source-policy swaps after a B2 PASS.
+            # A fresh, B3-specific owner authorization bound to THIS device,
+            # these exact bytes and the CURRENT B2 transaction. The B2 receipt
+            # is never accepted as install authority.
+            owner = _owner_operation(
+                self.bootstrap_paths, body["authorization"],
+                action="bundle.install-fpga-load" if fpga_load else "bundle.install",
+                subject_sha256=plan["archive_sha256"],
+                transaction_id=earlier["transaction_id"],
+            )
             contract = _load_script(
                 Path(__file__).with_name("ppu_unified_deployment.py"),
-                "plasma_ppu_b3_authority_verifier",
-            )
-            authority = _load_script(
-                Path(__file__).with_name("ppu_bundle_authority.py"),
-                "plasma_ppu_b3_master_authority",
+                "plasma_ppu_b3_bundle_verifier",
             )
             try:
                 verified = contract.verify_host_only_artifact(
                     upload.committed, expected_sha256=plan["archive_sha256"],
                     source_commit=plan["source_commit"], target_profile=trusted_target,
                 )
-                trusted = authority.approve_verified_bundle(
-                    verified, policy_path=self.bootstrap_paths.bundle_authority_policy,
-                )
-            except (contract.UnifiedDeploymentError, authority.BundleAuthorityDenied) as exc:
-                raise BootstrapServiceError("B3_MASTER_AUTHORITY_DENIED") from exc
-            if (result.get("source_authorized") is not True
-                    or plan.get("authorization") != trusted):
-                raise BootstrapServiceError("B3_ADMISSION_AUTHORITY_CHANGED")
+            except contract.UnifiedDeploymentError as exc:
+                raise BootstrapServiceError("B3_BUNDLE_REVERIFY_DENIED") from exc
             # Re-qualify FPGA statically from the same bytes and CURRENT trusted
             # contract; any drift since B2 fails closed.
             fpga = _load_script(
@@ -916,6 +948,8 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 "updated_at_epoch_s": time.time(),
                 "error_code": None, "error": None, "result": None,
                 "fpga_load": fpga_load,
+                "admission_transaction_id": earlier["transaction_id"],
+                "owner_authorization": owner,
             }
             _atomic_json(self.bootstrap_paths.deployment_record, record)
             previous_id = previous_coordinator["transaction_id"] if previous_coordinator else None
@@ -1151,6 +1185,7 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     "control_token_provisioned": self.owner.bootstrap_paths.token_file.is_file(),
                     "transport_confidentiality": "not_qualified",
                     "publisher_authenticity": "not_qualified",
+                    "operation_authorization": "plasma.ppu.owner-operation-authorization.v1",
                 }
                 payload["deployment"] = _deployment_api_record(self.owner.bootstrap_paths)
                 self._json(HTTPStatus.OK, payload)

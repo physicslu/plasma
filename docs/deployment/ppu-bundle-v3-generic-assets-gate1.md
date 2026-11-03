@@ -13,8 +13,8 @@ authorized by this PR.
 ```text
 Console / authenticated paired Controller (private commissioning lab)
   -> POST /v1/uploads (chunks, commit with SHA256)
-  -> POST /v1/deployments  {"kind":"bundle","upload_id":"..."}  [B2]
-  -> POST /v1/deployments  {"kind":"bundle","upload_id":"...","install_only":true} [B3]
+  -> POST /v1/deployments  {"kind":"bundle","upload_id":"...","authorization":{bundle.admit}}  [B2]
+  -> POST /v1/deployments  {"kind":"bundle","upload_id":"...","fpga_load":false,"authorization":{bundle.install}} [B3]
   -> existing Bootstrap DeploymentCoordinator lock and journal
   -> existing Z2 Installer Core, verified Bundle v3 ZIP only
   -> /opt/plasma/assets/staged/<archive_sha256>/

@@ -1,6 +1,6 @@
 # PPU — One Asset Execution Layer (Python / Native C / FPGA)
 
-**Gate 1 Host-only.** Depends on [B2 common Master authority PR #1251](https://github.com/physicslu/plasma/pull/1251), which is already merged into main. All execution callbacks are Host-only mocks in this PR. No Root/hardware operation is authorized.
+**Gate 1 Host-only.** Authorization follows [Owner Operation Authorization](ppu-owner-operation-authorization.md) (replaces the PR #1251 per-Bundle Master allowlist). All execution callbacks are Host-only mocks in this PR. No Root/hardware operation is authorized.
 
 ## Shared execution contract
 
@@ -8,15 +8,16 @@
 Console chooses complete Asset Set (SHA) and explicit operation
    |
    v
-Existing B2 Master approval (ONE whole-Bundle grant, all Package kinds)
+B2 owner `bundle.admit` authorization for the exact Bundle SHA (no device allowlist)
    |
    v
-B3 immutable Install/Verify → Single Active Asset Set (FPGA load only by explicit fpga_load=true in #1261)
+B3 owner `bundle.install[-fpga-load]` authorization → immutable Install/Verify → Single Active Asset Set
    |
    v
 One internal PPU Asset Execution Layer
    |  exact Active Set SHA, exact Package ID/version/kind/descriptor SHA
-   |  current Master grant, no fallback, trusted Runtime owner/Job scope
+   |  fresh owner `asset.execute` authorization bound to device, Active Set,
+   |  Package identity and Job ID; Job lease must match; no fallback
    |
    +-- python     → qualified Python runtime executor [NOT WIRED]
    +-- native-c   → qualified Native process executor [NOT WIRED]
@@ -34,13 +35,17 @@ The existing Bootstrap factory scripts now include
 `scripts/ppu_asset_execution.py`. It exposes:
 
 - `AssetExecutionRequest`: immutable Active Set SHA, Package ID, Version,
-  Kind, exact canonical Package descriptor SHA, and action `execute`.
+  Kind, exact canonical Package descriptor SHA, Runtime `job_id` and action
+  `execute`. `OwnerCredential` (device ID + paired credential) is supplied
+  by the trusted Runtime only.
 - `prepare_asset_execution()`: rechecks full verified installed Active Set,
-  exact Package identity and current device-local Master authorization.
+  exact Package identity and a fresh owner `asset.execute` authorization
+  (B2/B3 receipts are never execute authority).
   `AUTHORIZED_NOT_EXECUTED` is a **selection result only**, never READY.
 - `dispatch_asset_execution()`: a single typed dispatch seam for all
   supported executable kinds. It requires a **trusted Runtime owner/Job
-  context** and a **registered, trusted Executor adapter** supplied by
+  context** whose lease yields the authorized `job_id` (a busy PPU/Site
+  raises) and a **registered, trusted Executor adapter** supplied by
   local code. It repeats source and Active checks INSIDE the held scope.
   Missing or forged Executor/lease and mismatched execution receipts are
   rejected. No default executable adapters exist; no HTTP user can select
@@ -63,7 +68,8 @@ not import or run a Bundle File just because its hash matches.
 - Positive tests use fake trusted local adapters under a held, bounded
   owner scope, never actual Shell, Python process launch or FPGA Manager.
 - Negative tests cover missing owner, missing adapter, forged/stale digest,
-  wrong Package Kind/ID/Version, revoked Master approval, changed staged
+  wrong Package Kind/ID/Version, forged / wrong-device / wrong-Job / wrong-
+  Package / wrong-stage owner authorization, busy or foreign Job lease, changed staged
   bytes and untrusted execution receipts.
 - Production Runtime adapter wiring, user-facing Console command,
   current-boot hardware checks and live Z2 execution remain **NOT_RUN /

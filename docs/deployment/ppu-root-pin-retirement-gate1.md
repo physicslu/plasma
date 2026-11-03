@@ -29,8 +29,9 @@ operation. It only accepts a fixed command allowlist, fixed source path,
 fixed interpreter and Linux root-owned non-writable path protections.
 A Bundle cannot supply an executable path to the Root Entry.
 
-The local Bundle admission file is a distinct exact SHA256 allowlist:
-`plasma.ppu.bundle-authority.v2` under device service control, with no
+Bundle admission no longer uses a device SHA256 allowlist: each B2/B3/
+Runtime operation carries a fresh Owner Operation Authorization from the
+paired Console (see `ppu-owner-operation-authorization.md`), with no
 Publisher/expiry/Git Commit Pin. FPGA image Target/ABI/Identity and
 Owner Lock, per-Site SWD safeguards, Root recovery and Runtime quiescence
 are **not removed**.

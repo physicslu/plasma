@@ -1,7 +1,10 @@
 """Bounded SWPC HTTP API transport for the *existing* PPU Bootstrap service.
 
-No SSH, subprocess, Root or devices. A generic package may be submitted for
-manifest/SHA256 admission only; this never authorizes install or FPGA loading.
+No SSH, subprocess, Root or devices. As the paired owner client, every B2/B3
+request carries a fresh Owner Operation Authorization bound to the PPU's
+device identity, the exact archive SHA256 the operator chose and the
+transaction (B1 upload / current B2 admission). B2 never installs; B3 never
+executes a Package or operates a DUT.
 Legacy engineering-module installation remains explicitly unqualified.
 
 HTTPS with validated server certificates is required. Today's Bootstrap
@@ -11,10 +14,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import importlib.util
 import json
 import re
 import ssl
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -37,6 +43,18 @@ class DeploymentAPIError(RuntimeError):
 
 class DeploymentOutcomeUnknown(DeploymentAPIError):
     """Write or activation outcome is unknown; do not automatically retry."""
+
+
+def _owner_authorization_module():
+    # Same single producer/verifier as the PPU; never loaded from a Bundle.
+    src = Path(__file__).with_name("ppu_owner_authorization.py")
+    spec = importlib.util.spec_from_file_location("plasma_swpc_owner_authorization", src)
+    if spec is None or spec.loader is None or src.is_symlink() or not src.is_file():
+        raise DeploymentAPIError("OWNER_AUTHORIZATION_MODULE_UNAVAILABLE")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 class _RejectRedirect(HTTPRedirectHandler):
@@ -107,17 +125,15 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
     if plan.get("bundle_schema") != "plasma.ppu.bundle.v3" or "components" in plan:
         return False
     packages = plan.get("packages")
-    authorization = plan.get("authorization")
-    # Local approval is independent of caller, Bundle metadata and B2 receipt.
-    if (type(authorization) is not dict
-            or set(authorization) != {"status", "method", "archive_sha256", "generation", "policy_sha256"}
-            or authorization.get("status") != "LOCAL_APPROVED"
-            or authorization.get("method") != "device-local-exact-bundle-sha256"
-            or authorization.get("archive_sha256") != plan.get("archive_sha256")
-            or type(authorization.get("generation")) is not int
-            or authorization["generation"] <= 0
-            or type(authorization.get("policy_sha256")) is not str
-            or _HEX64.fullmatch(authorization["policy_sha256"]) is None):
+    owner = plan.get("owner_authorization")
+    # The PPU verified an explicit owner admit action for THESE exact bytes.
+    if (type(owner) is not dict
+            or owner.get("status") != "OWNER_AUTHORIZED"
+            or owner.get("method") != "paired-console-operation-hmac-sha256"
+            or owner.get("action") != "bundle.admit"
+            or owner.get("subject_sha256") != plan.get("archive_sha256")
+            or owner.get("transaction_id") != receipt.get("upload_id")
+            or "mac" in owner):
         return False
     valid = (
         type(plan.get("purpose")) is str and bool(plan["purpose"])
@@ -133,11 +149,11 @@ def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = N
     )
     if not valid:
         return False
-    # B2 PASS = locally approved Bundle + static Asset qualification only.
+    # B2 PASS = owner-authorized admission + static Asset qualification only.
     # It is never an FPGA load, Identity readback or execution grant.
     has_fpga = any(package["kind"] == "fpga-image" for package in packages)
     return (
-        result.get("source_authorized") is True
+        result.get("owner_authorized") is True
         and result.get("fpga_loaded") is False
         and result.get("identity_readback") == "NOT_RUN"
         and result.get("fpga_static_qualification")
@@ -150,10 +166,11 @@ class DeploymentSubmission:
     upload_id: str
     transaction_id: str
     state: str
+    archive_sha256: str | None = None
 
 
 class BootstrapAPIClient:
-    """API client only; NOT a PPU authority, installer or Master identity."""
+    """Paired owner API client; NOT an installer, Root or a per-Bundle allowlist."""
 
     def __init__(
         self,
@@ -224,7 +241,39 @@ class BootstrapAPIClient:
             ) from None
         if status < 200 or status >= 300:
             raise DeploymentAPIError(f"API_HTTP_REJECTED:{status}")
-        return _bounded_json(raw)
+        # The PPU status_document has no top-level ``ok`` flag.
+        return _bounded_json(raw, expected=path != "/v1/status")
+
+    def _device_id(self) -> str:
+        """The PPU's own Bootstrap identity; authorization is bound to it."""
+        identity = self.status().get("identity")
+        device_id = identity.get("device_id") if isinstance(identity, dict) else None
+        if type(device_id) is not str or not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", device_id):
+            raise DeploymentAPIError("API_DEVICE_IDENTITY_UNTRUSTED")
+        return device_id
+
+    def _authorize(self, action: str, subject_sha256: str, transaction_id: str) -> dict[str, Any]:
+        owner = _owner_authorization_module()
+        try:
+            return owner.issue(
+                credential=self._token, action=action, device_id=self._device_id(),
+                subject_sha256=subject_sha256, transaction_id=transaction_id,
+            )
+        except owner.OwnerAuthorizationDenied as exc:
+            raise DeploymentAPIError(str(exc)) from None
+
+    def _admission_body(self, kind: str, upload_id: str, archive_sha256: str) -> dict[str, Any]:
+        return {"kind": kind, "upload_id": upload_id,
+                "authorization": self._authorize("bundle.admit", archive_sha256, upload_id)}
+
+    def _install_body(self, admitted: "DeploymentSubmission", fpga_load: bool) -> dict[str, Any]:
+        return {
+            "kind": "bundle", "upload_id": admitted.upload_id, "fpga_load": fpga_load,
+            "authorization": self._authorize(
+                "bundle.install-fpga-load" if fpga_load else "bundle.install",
+                admitted.archive_sha256, admitted.transaction_id,
+            ),
+        }
 
     def upload(self, archive: bytes) -> str:
         """Reuses existing /v1/uploads chunk protocol with no new server API."""
@@ -274,8 +323,13 @@ class BootstrapAPIClient:
         facility_id: str | None = None,
         display_name: str | None = None,
         module: str | None = None,
+        archive_sha256: str | None = None,
     ) -> DeploymentSubmission:
-        """Runtime deploy unchanged; Bundle B2 remains admission-only until install_bundle()."""
+        """Runtime deploy unchanged; Bundle B2 remains admission-only until install_bundle().
+
+        A generic B2 requires the exact ``archive_sha256`` the operator chose;
+        it is sent only inside a fresh ``bundle.admit`` owner authorization.
+        """
         if kind == "engineering-module":
             raise DeploymentAPIError("ENGINEERING_INSTALL_NOT_QUALIFIED")
         if kind not in {"ppu-runtime", "python", "native-c", "fpga-image", "bundle"} or module is not None:
@@ -295,7 +349,9 @@ class BootstrapAPIClient:
             if any(value is not None for value in
                    (gateway_host, ppu_id, facility_id, display_name)):
                 raise DeploymentAPIError("API_GENERIC_CALLER_AUTHORITY_DENIED")
-            body = {"kind": kind, "upload_id": upload_id}
+            if type(archive_sha256) is not str or not _HEX64.fullmatch(archive_sha256):
+                raise DeploymentAPIError("API_OWNER_ARCHIVE_SHA256_REQUIRED")
+            body = self._admission_body(kind, upload_id, archive_sha256)
         response = self._call("POST", "/v1/deployments", body)
         receipt = response.get("deployment")
         if not isinstance(receipt, dict):
@@ -306,9 +362,12 @@ class BootstrapAPIClient:
         if kind == "ppu-runtime":
             if state not in _INFLIGHT:
                 raise DeploymentOutcomeUnknown("API_SUBMISSION_RECEIPT_UNKNOWN")
-        elif not _valid_package_admission(receipt, kind=kind):
+        elif (not _valid_package_admission(receipt, kind=kind)
+              or receipt["result"]["plan"]["archive_sha256"] != archive_sha256):
             raise DeploymentOutcomeUnknown("API_ADMISSION_RECEIPT_UNKNOWN")
-        return DeploymentSubmission(upload_id, tx, state)
+        return DeploymentSubmission(
+            upload_id, tx, state, archive_sha256 if kind != "ppu-runtime" else None,
+        )
 
     def install_bundle(
         self, admitted: DeploymentSubmission, *, fpga_load: bool = False,
@@ -319,14 +378,18 @@ class BootstrapAPIClient:
         ``fpga_load=True`` the PPU also loads the Bundle's FPGA Image through
         its protected Root Entry and publishes the Active Set only after
         Identity PASS. Never a package execution or DUT operation.
-        The admission receipt must be read back from the current device; a
-        prior arbitrary transaction or locally constructed claim is not an
-        install authorization. This method never auto-retries on uncertainty.
+        The admission receipt must be read back from the current device and
+        match the operator's archive SHA256; a fresh ``bundle.install`` /
+        ``bundle.install-fpga-load`` owner authorization is bound to that
+        SHA256 and the CURRENT B2 transaction. A B2 receipt is never install
+        authority. This method never auto-retries on uncertainty.
         """
         if (not isinstance(admitted, DeploymentSubmission)
                 or admitted.state != "admitted"
                 or not _HEX32.fullmatch(admitted.upload_id)
-                or not _HEX32.fullmatch(admitted.transaction_id)):
+                or not _HEX32.fullmatch(admitted.transaction_id)
+                or type(admitted.archive_sha256) is not str
+                or not _HEX64.fullmatch(admitted.archive_sha256)):
             raise DeploymentAPIError("B3_VALID_B2_ADMISSION_REQUIRED")
         if type(fpga_load) is not bool:
             raise DeploymentAPIError("B3_FPGA_LOAD_FLAG_INVALID")
@@ -336,12 +399,10 @@ class BootstrapAPIClient:
         if (b2.get("upload_id") != admitted.upload_id
                 or not _valid_package_admission(b2, kind="bundle")
                 or not isinstance(plan, dict)
+                or plan.get("archive_sha256") != admitted.archive_sha256
                 or plan.get("requested_actions") != ["install", "verify"]):
             raise DeploymentOutcomeUnknown("B3_DEVICE_ADMISSION_CHANGED")
-        reply = self._call("POST", "/v1/deployments", {
-            "kind": "bundle", "upload_id": admitted.upload_id,
-            "fpga_load": fpga_load,
-        })
+        reply = self._call("POST", "/v1/deployments", self._install_body(admitted, fpga_load))
         record = reply.get("deployment")
         if (not isinstance(record, dict)
                 or record.get("upload_id") != admitted.upload_id
@@ -352,6 +413,7 @@ class BootstrapAPIClient:
             raise DeploymentOutcomeUnknown("B3_INSTALL_SUBMISSION_UNKNOWN")
         return DeploymentSubmission(
             admitted.upload_id, record["transaction_id"], record["state"],
+            admitted.archive_sha256,
         )
 
     def deployment_state(self, transaction_id: str) -> dict[str, Any]:
@@ -405,7 +467,7 @@ class BootstrapAPIClient:
                 "ready": False, "b3": None, "fpga": "NOT_RUN",
             }
         uploaded = self.upload(archive)
-        b2 = self.submit(kind="bundle", upload_id=uploaded)
+        b2 = self.submit(kind="bundle", upload_id=uploaded, archive_sha256=digest)
         b3 = self.install_bundle(b2)
         return {
             "result": "B3_INSTALL_QUEUED", "asset_set_sha256": digest,

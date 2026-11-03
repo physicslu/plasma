@@ -6,17 +6,18 @@ import http.client
 import json
 import threading
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 from .test_ppu_generic_package_host_only_gate1 import load, package, SAMPLES, TARGET
-from .ppu_bundle_authority_fixture import maybe_provision_fixture_grant
+from .ppu_owner_authorization_fixture import machine_id_file
 from .ppu_fpga_qualification_fixture import provision_default_contract
 
 service = load("ppu_package_receive_service_pr1", "ppu-bootstrap-service.py")
+base = load("ppu_package_receive_base_pr1", "ppu-bootstrap.py")
 client = load("ppu_package_receive_client_pr1", "ppu_deploy_api.py")
 TOKEN = "t" * 48
+STATUS = {"identity": {"device_id": "ppu-device-" + "0" * 24}}
 
 
 @pytest.fixture
@@ -28,14 +29,14 @@ def loopback(tmp_path: Path):
     paths = service.ServicePaths(
         state_root=state, product_root=tmp_path / "product-untouched",
         package_target_file=target_file,
-        bundle_authority_policy=tmp_path / "master-approved-bundles.json",
+        machine_id_path=machine_id_file(tmp_path),
         fpga_image_contracts=tmp_path / "factory" / "ppu-fpga-image-contracts.json",
     )
     # Simulates the factory-Bootstrap-shipped trusted FPGA contract.
     provision_default_contract(paths)
     service.provision_token(paths.token_file, token=TOKEN)
     server = service.BootstrapHTTPServer(
-        ("127.0.0.1", 0), paths=paths, base_module=SimpleNamespace(),
+        ("127.0.0.1", 0), paths=paths, base_module=base,
         deployment_runner=lambda *_: pytest.fail("unexpected deployment runner"),
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -53,14 +54,19 @@ def loopback(tmp_path: Path):
     api = client.BootstrapAPIClient(
         "https://ppu.host-only.invalid:18081", TOKEN, transport=transport,
     )
-    # These older positive tests focus on ZIP/HTTP parser behavior. The
-    # trusted Master provisioning is performed *out of band* by this test
-    # fixture; it is NEVER a field accepted from uploaded Bundle/HTTP data.
-    original_upload = api.upload
-    def upload_from_test_master(raw: bytes):
-        maybe_provision_fixture_grant(paths, raw)
-        return original_upload(raw)
-    api.upload = upload_from_test_master
+    # The operator explicitly chose these exact bytes: B2 sends their SHA256
+    # inside a fresh owner authorization (no per-Bundle device allowlist).
+    original_upload, original_submit = api.upload, api.submit
+    chosen: dict[str, str] = {}
+    def upload_chosen(raw: bytes):
+        upload_id = original_upload(raw)
+        chosen[upload_id] = hashlib.sha256(raw).hexdigest()
+        return upload_id
+    def submit_chosen(*, kind, upload_id, **kwargs):
+        if kind != "ppu-runtime":
+            kwargs.setdefault("archive_sha256", chosen.get(upload_id))
+        return original_submit(kind=kind, upload_id=upload_id, **kwargs)
+    api.upload, api.submit = upload_chosen, submit_chosen
     try:
         yield api, paths, server
     finally:
@@ -230,6 +236,8 @@ def test_client_rejects_admission_without_a_nonexecuting_plan():
                 "plan": {"kind": "python", "execution_permitted": True},
             },
         }
+        if path == "/v1/status":
+            return 200, json.dumps(STATUS).encode()
         if path in ("/v1/deployments", "/v1/deployment"):
             return 200, json.dumps({"ok": True, "deployment": receipt}).encode()
         raise AssertionError(path)
@@ -238,7 +246,7 @@ def test_client_rejects_admission_without_a_nonexecuting_plan():
         "https://ppu.host-only.invalid:18081", TOKEN, transport=fake_transport,
     )
     with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_RECEIPT_UNKNOWN"):
-        api.submit(kind="python", upload_id=upload_id)
+        api.submit(kind="python", upload_id=upload_id, archive_sha256="f" * 64)
     with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_EVIDENCE_MISSING"):
         api.deployment_state(transaction_id)
 
@@ -260,10 +268,12 @@ def test_client_rejects_incorrect_kind_in_admission_receipt():
                 },
             },
         }
+        if path == "/v1/status":
+            return 200, json.dumps(STATUS).encode()
         return 200, json.dumps({"ok": True, "deployment": receipt}).encode()
 
     api = client.BootstrapAPIClient(
         "https://ppu.host-only.invalid:18081", TOKEN, transport=fake_transport,
     )
     with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_RECEIPT_UNKNOWN"):
-        api.submit(kind="python", upload_id=upload_id)
+        api.submit(kind="python", upload_id=upload_id, archive_sha256="f" * 64)
