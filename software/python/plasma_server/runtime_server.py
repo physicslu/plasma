@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 from pathlib import Path
 
 from plasma_core.config import load_config
@@ -46,8 +47,13 @@ def main() -> None:
     parser.add_argument("--package-actions-config", type=Path,
                         help="Stage C plasma.ppu.package-actions-config.v1 (default: disabled)")
     args = parser.parse_args()
+    # The Runtime installer owns ExecStart; the Stage C drop-in enables
+    # package actions through this environment variable instead.
+    package_actions = args.package_actions_config
+    if package_actions is None and os.environ.get("PLASMA_PACKAGE_ACTIONS_CONFIG"):
+        package_actions = Path(os.environ["PLASMA_PACKAGE_ACTIONS_CONFIG"])
     try:
-        asyncio.run(_run(args.config, args.runtime_control_socket, args.package_actions_config))
+        asyncio.run(_run(args.config, args.runtime_control_socket, package_actions))
     except KeyboardInterrupt:
         pass
 

@@ -88,12 +88,14 @@ def test_runtime_dropin_and_tmpfiles_only_add_spec_dir_and_worker_dependency():
     d = directives(units.runtime_dropin())
     assert d == {"Wants": ["plasma-site-worker.service plasma-package-control.service"],
                  "After": ["plasma-site-worker.service plasma-package-control.service"],
-                 "ReadWritePaths": ["/run/plasma-package-specs"]}
+                 "ReadWritePaths": ["/run/plasma-package-specs"],
+                 "Environment": ["PLASMA_PACKAGE_ACTIONS_CONFIG=/etc/plasma/ppu-package-actions.json"]}
     assert "d /run/plasma-package-specs 0755 plasma plasma -" in units.tmpfiles()
     assert set(units.render_all()) == {
         "/etc/systemd/system/plasma-package@.service", "/etc/systemd/system/plasma-site-worker.service",
         "/etc/systemd/system/plasma-server.service.d/50-package-actions.conf",
-        "/etc/tmpfiles.d/plasma-package.conf", "/etc/systemd/system/plasma-package-control.service"}
+        "/etc/tmpfiles.d/plasma-package.conf", "/etc/systemd/system/plasma-package-control.service",
+        "/etc/plasma/ppu-package-actions.json"}
     assert not any("polkit" in path for path in units.render_all())
 
 

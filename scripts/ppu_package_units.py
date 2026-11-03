@@ -133,6 +133,9 @@ def site_worker_unit() -> str:
     ])
 
 
+PACKAGE_ACTIONS_CONFIG = "/etc/plasma/ppu-package-actions.json"
+
+
 def runtime_dropin() -> str:
     """plasma-server.service.d/50-package-actions.conf (existing unit unchanged)."""
     return "\n".join([
@@ -142,8 +145,24 @@ def runtime_dropin() -> str:
         "",
         "[Service]",
         f"ReadWritePaths={SPEC_DIR}",
+        f"Environment=PLASMA_PACKAGE_ACTIONS_CONFIG={PACKAGE_ACTIONS_CONFIG}",
         "",
     ])
+
+
+def package_actions_config(*, site_worker: bool = True) -> str:
+    """/etc/plasma/ppu-package-actions.json (root:plasma 0640)."""
+    import json
+    return json.dumps({
+        "schema": "plasma.ppu.package-actions-config.v1",
+        "control_plane": RUNTIME_DIR,
+        "product_root": "/opt/plasma",
+        "state_root": "/var/lib/plasma/package-actions",
+        "python": PYTHON,
+        "package_user": PACKAGE_USER,
+        "helper_socket": "/run/plasma-package-control/helper.sock",
+        "site_worker_control_socket": f"{WORKER_RUN}/control.sock" if site_worker else None,
+    }, indent=1, sort_keys=True) + "\n"
 
 
 def tmpfiles() -> str:
@@ -203,5 +222,6 @@ def render_all() -> dict[str, str]:
         "/etc/systemd/system/plasma-site-worker.service": site_worker_unit(),
         "/etc/systemd/system/plasma-server.service.d/50-package-actions.conf": runtime_dropin(),
         "/etc/tmpfiles.d/plasma-package.conf": tmpfiles(),
+        PACKAGE_ACTIONS_CONFIG: package_actions_config(),
         "/etc/systemd/system/plasma-package-control.service": package_control_helper_unit(),
     }
