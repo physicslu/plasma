@@ -33,15 +33,11 @@ class MockAdapter:
     operations = frozenset({"probe"})
 
     def __init__(self):
-        self.ident = {"image": "A"}
         self.calls = []
         self.behaviour = "pass"
         self.gate = threading.Event()
         self.started = threading.Event()
         self.startup = set()
-
-    def identity(self):
-        return dict(self.ident)
 
     def startup_sealed_sites(self):
         return set(self.startup)
@@ -63,8 +59,6 @@ class MockAdapter:
             raise worker.TransportUnknown("SAFE_OFF_NOT_VERIFIED")
         if b == "crash":
             raise RuntimeError("adapter bug")
-        if b == "reload":
-            self.ident = {"image": "B"}
         return {"result": "PASS", "dpidr": "0x1ba01477", "safe_off": True}
 
 
@@ -279,7 +273,6 @@ def test_cancel_by_runtime_close_stops_in_flight_operation_and_seals(rig):
 @pytest.mark.parametrize("behaviour,error", [
     ("unknown", "OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED"),
     ("crash", "OUTCOME_UNKNOWN_SITE_SEALED:RuntimeError"),
-    ("reload", "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION"),
 ])
 def test_unknown_hardware_outcomes_seal_and_never_retry(rig, behaviour, error):
     rig.adapter.behaviour = behaviour
@@ -301,13 +294,22 @@ def test_denied_before_hardware_keeps_site_usable(rig):
     assert rig.client.call("status")["sealed_sites"] == []
 
 
-def test_fpga_reload_between_operations_invalidates_session(rig):
-    child = rig.package("time.sleep(0.5)\n" + PROBE2)
-    rig.open(child)
-    rig.adapter.ident = {"image": "reloaded"}
-    [reply] = rig.go(child)
-    assert reply == {"ok": False, "error": "SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED"}
-    assert rig.adapter.calls == []
+def test_c3_does_not_consult_fpga_image_identity(tmp_path):
+    class ImageBlindAdapter(MockAdapter):
+        def identity(self):
+            raise AssertionError("C3 must not read FPGA Image ID or deployment Journal")
+
+    adapter = ImageBlindAdapter()
+    r = Rig(tmp_path, adapter)
+    try:
+        child = r.package(PROBE2)
+        session = r.open(child)
+        [reply] = r.go(child)
+        assert reply["ok"] is True and reply["result"]["result"] == "PASS"
+        assert adapter.calls == [(2, "probe")]
+        assert r.client.close_session(session["session_id"])["closed"]
+    finally:
+        r.close()
 
 
 def test_worker_crash_invalidates_sessions(rig):
@@ -435,8 +437,6 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
               flash_readback=None):
     tmp_path.mkdir(parents=True, exist_ok=True)
     journal = tmp_path / "journal.json"
-    journal.write_text(json.dumps({"status": "IMAGE", "image_id": "z2-independent-swd-v5-bd976140",
-                                   "session_id": "s", "boot_id": "b", "firmware_sha256": "f"}))
     calls = {"run": [], "popen": []}
 
     def run(argv, **kw):
@@ -456,7 +456,6 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
         return FakeProc(log, rc, hang)
 
     a = abi5.Abi5OpenocdAdapter(openocd_root=tmp_path / "ocd", python=Path("/usr/bin/python3"),
-                                expected_image_id="z2-independent-swd-v5-bd976140", journal=journal,
                                 record_dir=tmp_path / "rec", run=run, popen=popen,
                                 openocd_running=lambda: openocd, poll_s=0.01)
     (tmp_path / "rec").mkdir()
@@ -541,13 +540,19 @@ def test_abi5_fail_closed_paths(tmp_path, kw, exc, code):
         assert calls["run"][-1] == ["revoke", "2"]     # always revoked
 
 
-def test_abi5_identity_detects_reload_and_wrong_image(tmp_path):
-    a, _calls, journal = make_abi5(tmp_path, log=GOOD)
-    before = a.identity()
-    journal.write_text(json.dumps({"status": "IMAGE", "image_id": "other", "session_id": "t"}))
-    assert a.identity() != before
-    with pytest.raises(worker.TransportDenied, match="FPGA_IMAGE_NOT_EXPECTED"):
-        a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+def test_abi5_probe_is_independent_of_root_journal_and_image_id(tmp_path):
+    a, calls, journal = make_abi5(tmp_path, log=GOOD)
+    # A missing or unrelated Root journal must not block a valid C3 operation.
+    assert not journal.exists()
+    first = a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+    assert first["result"] == "PASS"
+    journal.write_text('{"status":"IMAGE","image_id":"other-fpga-build"}')
+    second = a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+    assert second["result"] == "PASS"
+    journal.write_text("not-json")
+    third = a.run(1, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+    assert third["result"] == "PASS"
+    assert len(calls["popen"]) == 3
 
 
 def test_abi5_startup_seals_on_leftover_record_or_running_openocd(tmp_path):
