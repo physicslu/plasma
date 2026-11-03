@@ -107,10 +107,199 @@ def _group_alive(pgid: int) -> bool:
 
 
 def _output(path: Path) -> dict[str, Any]:
-    raw = path.read_bytes()[: OUTPUT_LIMIT + 1]
+    try:
+        raw = path.read_bytes()[: OUTPUT_LIMIT + 1]
+    except FileNotFoundError:  # e.g. the systemd entry was SIGKILLed
+        raw = b""
     return {"bytes": min(len(raw), OUTPUT_LIMIT), "truncated": len(raw) > OUTPUT_LIMIT,
             "sha256": hashlib.sha256(raw[:OUTPUT_LIMIT]).hexdigest(),
             "tail": raw[:OUTPUT_LIMIT][-TAIL_BYTES:].decode("utf-8", "replace")}
+
+
+class LocalProcessSpawner:
+    """Default (development / Host) process primitive: same uid as the Runtime.
+
+    Keeps the exact Stage C-2 behaviour. ``dedicated_uid`` is NOT_QUALIFIED.
+    """
+
+    launcher = "non-root-process-group"
+    isolation = {"dedicated_uid": "NOT_QUALIFIED", "network": "NOT_QUALIFIED",
+                 "syscall_filter": "NOT_QUALIFIED", "rlimits": "APPLIED"}
+
+    def __init__(self, geteuid: Callable[[], int] = os.geteuid) -> None:
+        self._geteuid = geteuid
+
+    def spawn(self, *, job_id: str, package_id: str, kind: str, argv: list[str],
+              entry: Path, entry_sha256: str, env: dict[str, str], work: Path,
+              limit: int) -> "_LocalHandle":
+        stdout_path, stderr_path = work / ".stdout", work / ".stderr"
+        with stdout_path.open("wb") as out, stderr_path.open("wb") as err:
+            child = subprocess.Popen(
+                argv, cwd=work, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                close_fds=True, start_new_session=True, preexec_fn=_limits(limit + 1),
+            )
+        return _LocalHandle(child, self._geteuid(), stdout_path, stderr_path)
+
+
+class _LocalHandle:
+    def __init__(self, child, uid, stdout_path, stderr_path):
+        self.child, self.uid = child, uid
+        self.pgid = child.pid
+        self.stdout_path, self.stderr_path = stdout_path, stderr_path
+
+    def poll(self):
+        return self.child.poll()
+
+    def signal_group(self, sig: int) -> None:
+        _kill_group(self.pgid, sig)
+
+    def wait(self, timeout: float | None = None):
+        return self.child.wait(timeout=timeout)
+
+    def group_alive(self) -> bool:
+        return _group_alive(self.pgid)
+
+    @property
+    def returncode(self):
+        return self.child.returncode
+
+    def finish(self) -> None:
+        pass
+
+
+PACKAGE_UNIT = "plasma-package@{job}.service"
+UNIT_SPEC_SCHEMA = "plasma.ppu.package-unit-spec.v1"
+
+
+def run_systemctl(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["/usr/bin/systemctl", *args], capture_output=True, text=True,
+                          timeout=30, env={"PATH": "/usr/bin:/bin", "LANG": "C"})
+
+
+class SystemdUnitSpawner:
+    """Production process primitive: run the Package as ``plasma-package``.
+
+    The Runtime (uid plasma) may only start / stop / kill instances of the
+    fixed template ``plasma-package@<32hex>.service`` (polkit rule); user,
+    sandbox and ExecStart (``ppu_package_entry.py``) are fixed in the unit.
+    The only data passed is a job spec in the Runtime-owned spec directory.
+    systemd's cgroup bounds every Package process, including setsid escapes.
+    """
+
+    launcher = "systemd-unit:plasma-package@"
+    isolation = {"dedicated_uid": "CONFIGURED_NOT_QUALIFIED_ON_Z2",
+                 "network": "PRIVATE_NETWORK_CONFIGURED_NOT_QUALIFIED_ON_Z2",
+                 "syscall_filter": "CONFIGURED_NOT_QUALIFIED_ON_Z2",
+                 "rlimits": "CONFIGURED_NOT_QUALIFIED_ON_Z2"}
+
+    def __init__(self, *, package_uid: int,
+                 spec_dir: Path = Path("/run/plasma-package-specs"),
+                 output_root: Path = Path("/run/plasma-package"),
+                 systemctl: Callable[..., subprocess.CompletedProcess] = run_systemctl) -> None:
+        _require(type(package_uid) is int and package_uid > 0, "PACKAGE_UID_INVALID")
+        self.package_uid = package_uid
+        self.spec_dir = Path(spec_dir)
+        self.output_root = Path(output_root)
+        self.systemctl = systemctl
+
+    def spawn(self, *, job_id: str, package_id: str, kind: str, argv: list[str],
+              entry: Path, entry_sha256: str, env: dict[str, str], work: Path,
+              limit: int) -> "_UnitHandle":
+        _require(JOB_ID.fullmatch(job_id) is not None, "PACKAGE_LAUNCH_PLAN_INVALID")
+        _require(package_id != "" and kind in ("python", "native-c"), "PACKAGE_LAUNCH_PLAN_INVALID")
+        if self.package_uid == os.geteuid():
+            raise PackageLaunchDenied("PACKAGE_UID_EQUALS_RUNTIME_UID")
+        unit = PACKAGE_UNIT.format(job=job_id)
+        spec = {"schema": UNIT_SPEC_SCHEMA, "job_id": job_id, "package_id": package_id,
+                "kind": kind, "entry_path": str(entry), "entry_sha256": entry_sha256,
+                "env": {k: v for k, v in env.items() if k == "PLASMA_SITE_WORKER_SOCKET"}}
+        path = self.spec_dir / f"{job_id}.json"
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(spec, stream, sort_keys=True)
+        os.chmod(path, 0o644)
+        started = self.systemctl("start", unit)
+        handle = _UnitHandle(self, unit, job_id, path)
+        if started.returncode != 0:
+            handle.finish()
+            raise PackageLaunchDenied("PACKAGE_UNIT_START_DENIED")
+        props = handle.show()
+        pid = int(props.get("MainPID", "0") or 0)
+        if pid <= 1:
+            handle.finish()
+            raise PackageLaunchDenied("PACKAGE_UNIT_NO_MAIN_PID")
+        handle.pgid = pid  # systemd makes the main process a session leader
+        return handle
+
+    def stop_leftover(self) -> list[str]:
+        """Runtime restart: stop every remaining Package unit (outcome unknown)."""
+        listed = self.systemctl("list-units", "--all", "--plain", "--no-legend", "plasma-package@*")
+        stopped = []
+        for line in listed.stdout.splitlines():
+            unit = line.split()[0] if line.split() else ""
+            if re.fullmatch(r"plasma-package@[0-9a-f]{32}\.service", unit):
+                self.systemctl("stop", unit)
+                stopped.append(unit)
+        return stopped
+
+
+class _UnitHandle:
+    def __init__(self, spawner: SystemdUnitSpawner, unit: str, job_id: str, spec_path: Path):
+        self.spawner, self.unit, self.spec_path = spawner, unit, spec_path
+        self.uid = spawner.package_uid
+        self.pgid = 0
+        out = spawner.output_root / job_id
+        self.stdout_path, self.stderr_path, self.status_path = out / "stdout", out / "stderr", out / "status.json"
+        self.returncode = None
+
+    def show(self) -> dict[str, str]:
+        r = self.spawner.systemctl("show", "--property=ActiveState,SubState,MainPID,TasksCurrent", self.unit)
+        return dict(line.split("=", 1) for line in r.stdout.splitlines() if "=" in line)
+
+    def poll(self):
+        if self.returncode is not None:
+            return self.returncode
+        props = self.show()
+        state, sub = props.get("ActiveState"), props.get("SubState")
+        if state == "active" and sub == "exited":
+            try:
+                status = json.loads(self.status_path.read_text())
+            except (OSError, ValueError):
+                status = {"result": "UNKNOWN"}
+            if status.get("result") == "EXITED" and type(status.get("exit_code")) is int:
+                self.returncode = status["exit_code"]
+            elif status.get("result") == "SIGNALED" and type(status.get("signal")) is int:
+                self.returncode = -status["signal"]
+            else:  # entry denied the spec, or status unreadable
+                self.returncode = 126
+        elif state in ("failed", "inactive"):
+            self.returncode = -signal.SIGKILL
+        return self.returncode
+
+    def signal_group(self, sig: int) -> None:
+        self.spawner.systemctl("kill", f"--signal={int(sig)}", "--kill-whom=all", self.unit)
+
+    def wait(self, timeout: float | None = None):
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while self.poll() is None:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(self.unit, timeout)
+            time.sleep(0.05)
+        return self.returncode
+
+    def group_alive(self) -> bool:
+        props = self.show()
+        tasks = props.get("TasksCurrent", "")
+        if tasks.isdigit():
+            return int(tasks) > 0
+        return props.get("ActiveState") == "active" and props.get("SubState") == "running"
+
+    def finish(self) -> None:
+        self.spawner.systemctl("stop", self.unit)
+        try:
+            os.unlink(self.spec_path)
+        except FileNotFoundError:
+            pass
 
 
 def make_package_executor(
@@ -119,6 +308,7 @@ def make_package_executor(
     geteuid: Callable[[], int] = os.geteuid,
     poll_s: float = 0.05,
     site_worker: Any | None = None,
+    spawner: Any | None = None,
 ) -> Callable[[Mapping[str, Any]], dict[str, Any]]:
     """Return the python / native-c executor for ``dispatch_asset_execution``.
 
@@ -128,11 +318,15 @@ def make_package_executor(
     Package declaring Sites can run: without it such Packages are refused
     (``PACKAGE_SITE_TRANSPORT_NOT_WIRED``). With it, a Worker session bound
     to this Job, its declared Sites and the child process group is opened
-    after spawn and always closed afterwards.
+    after spawn and always closed afterwards. ``spawner`` is only the process
+    primitive (default ``LocalProcessSpawner``; production
+    ``SystemdUnitSpawner`` runs the Package as ``plasma-package``); identity
+    validation, timeout / cancel decisions, journal and receipt stay here.
     """
     product_root = Path(product_root)
     python_executable = Path(python_executable)
     state_root = Path(state_root)
+    spawner = spawner if spawner is not None else LocalProcessSpawner(geteuid)
 
     def execute(plan: Mapping[str, Any]) -> dict[str, Any]:
         _require(geteuid() != 0, "PACKAGE_LAUNCHER_MUST_NOT_RUN_AS_ROOT")
@@ -178,7 +372,6 @@ def make_package_executor(
         _atomic_json(record_path, record)
         work = Path(tempfile.mkdtemp(prefix=f"job-{plan['job_id']}-", dir=state_root))
         os.chmod(work, 0o700)
-        stdout_path, stderr_path = work / ".stdout", work / ".stderr"
         env = {"PATH": "/usr/bin:/bin", "LANG": "C", "HOME": str(work),
                "PLASMA_JOB_ID": plan["job_id"], "PLASMA_PACKAGE_ID": plan["package_id"]}
         if sites:
@@ -188,32 +381,31 @@ def make_package_executor(
         limit = resources["max_runtime_s"]
         result, exit_code, killed_signal = "FAILED", None, None
         started = time.monotonic()
+        child = None
         try:
-            with stdout_path.open("wb") as out, stderr_path.open("wb") as err:
-                child = subprocess.Popen(
-                    argv, cwd=work, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
-                    close_fds=True, start_new_session=True, preexec_fn=_limits(limit + 1),
-                )
-            pgid = child.pid
+            child = spawner.spawn(job_id=plan["job_id"], package_id=plan["package_id"],
+                                  kind=plan["package_kind"], argv=argv, entry=target,
+                                  entry_sha256=entry["sha256"], env=env, work=work, limit=limit)
+            pgid = child.pgid
             deadline = started + limit
             reason = None
             if sites:
                 try:
                     session = site_worker.open_session(
                         job_id=plan["job_id"], sites=list(sites), pgid=pgid,
-                        uid=geteuid(), max_runtime_s=limit)
+                        uid=child.uid, max_runtime_s=limit)
                     transport["session"] = "OPENED"
                 except Exception as exc:
                     transport.update(session="DENIED", error=str(exc)[:120])
                     reason = "SITE_SESSION_DENIED"
-                    _kill_group(pgid, signal.SIGKILL)
+                    child.signal_group(signal.SIGKILL)
             while child.poll() is None:
                 if cancel_event is not None and cancel_event.is_set():
                     reason = "CANCELLED"
                 elif time.monotonic() >= deadline:
                     reason = "TIMEOUT"
                 if reason:
-                    _kill_group(pgid, signal.SIGTERM)
+                    child.signal_group(signal.SIGTERM)
                     try:
                         child.wait(timeout=KILL_GRACE_S)
                     except subprocess.TimeoutExpired:
@@ -221,7 +413,7 @@ def make_package_executor(
                     break
                 time.sleep(poll_s)
             # Always kill and reap the whole group: no orphaned grandchildren.
-            _kill_group(pgid, signal.SIGKILL)
+            child.signal_group(signal.SIGKILL)
             if session is not None:
                 try:
                     closed = site_worker.close_session(session["session_id"])
@@ -231,10 +423,10 @@ def make_package_executor(
                 session = None
             child.wait()
             for _ in range(int(KILL_GRACE_S / poll_s)):
-                if not _group_alive(pgid):
+                if not child.group_alive():
                     break
                 time.sleep(poll_s)
-            group_reaped = not _group_alive(pgid)
+            group_reaped = not child.group_alive()
             exit_code = child.returncode
             if exit_code is not None and exit_code < 0:
                 killed_signal, exit_code = -exit_code, None
@@ -250,10 +442,9 @@ def make_package_executor(
                 "exit_code": exit_code, "signal": killed_signal,
                 "duration_s": round(time.monotonic() - started, 3),
                 "max_runtime_s": limit, "process_group_reaped": group_reaped,
-                "stdout": _output(stdout_path), "stderr": _output(stderr_path),
-                "launcher": "non-root-process-group", "uid": geteuid(),
-                "isolation": {"dedicated_uid": "NOT_QUALIFIED", "network": "NOT_QUALIFIED",
-                              "syscall_filter": "NOT_QUALIFIED", "rlimits": "APPLIED"},
+                "stdout": _output(child.stdout_path), "stderr": _output(child.stderr_path),
+                "launcher": spawner.launcher, "uid": geteuid(), "package_uid": child.uid,
+                "isolation": dict(spawner.isolation),
                 "site_ids": list(sites), "hardware": hardware, "site_transport": transport,
             }
             _require(group_reaped, "PACKAGE_ACTION_PROCESS_GROUP_NOT_REAPED")
@@ -272,6 +463,11 @@ def make_package_executor(
                                        "error": type(exc).__name__, "finished_epoch_s": time.time()})
             raise
         finally:
+            if child is not None:
+                try:
+                    child.finish()
+                except Exception:
+                    pass
             shutil.rmtree(work, ignore_errors=True)
 
     return execute

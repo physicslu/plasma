@@ -116,6 +116,24 @@ class Abi5OpenocdAdapter:
             cancel: threading.Event) -> Mapping[str, Any]:
         if site not in self.supported_sites or operation not in self.operations:
             raise TransportDenied("OPERATION_OR_SITE_NOT_SUPPORTED")
+        log, rc = self._session(site, deadline=deadline, cancel=cancel)
+        connect, dpreg = DPIDR.findall(log), DPREG0.findall(log)
+        values = {int(v, 16) for v in connect + dpreg}
+        if rc == 0 and connect and dpreg and len(values) == 1:
+            return {"result": "PASS", "dpidr": "0x%08x" % values.pop(), "safe_off": True}
+        return {"result": "FAIL", "code": "DPIDR_NOT_READ", "openocd_rc": rc, "safe_off": True}
+
+    def verify_safe_off(self, site: int, *, deadline: float) -> Mapping[str, Any]:
+        """Operator recovery evidence: one admitted OpenOCD session (read-only
+        ``dap init``) that ends with the ps_owner SAFE_OFF verification.
+        Raises TransportDenied / TransportUnknown exactly like ``run``."""
+        if site not in self.supported_sites:
+            raise TransportDenied("OPERATION_OR_SITE_NOT_SUPPORTED")
+        log, rc = self._session(site, deadline=deadline, cancel=threading.Event())
+        return {"result": "SAFE_OFF_VERIFIED", "openocd_rc": rc,
+                "log_sha256": hashlib.sha256(log.encode()).hexdigest()}
+
+    def _session(self, site: int, *, deadline: float, cancel: threading.Event) -> tuple[str, Any]:
         ident = self.identity()
         if ident.get("status") != "IMAGE" or ident.get("image_id") != self.expected_image_id:
             raise TransportDenied("FPGA_IMAGE_NOT_EXPECTED")
@@ -165,8 +183,4 @@ class Abi5OpenocdAdapter:
             raise TransportUnknown("ADMISSION_REVOKE_FAILED")
         if SAFE_OFF not in log:
             raise TransportUnknown("SAFE_OFF_NOT_VERIFIED")
-        connect, dpreg = DPIDR.findall(log), DPREG0.findall(log)
-        values = {int(v, 16) for v in connect + dpreg}
-        if rc == 0 and connect and dpreg and len(values) == 1:
-            return {"result": "PASS", "dpidr": "0x%08x" % values.pop(), "safe_off": True}
-        return {"result": "FAIL", "code": "DPIDR_NOT_READ", "openocd_rc": rc, "safe_off": True}
+        return log, rc
