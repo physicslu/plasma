@@ -114,6 +114,7 @@ def _qualification_coordinator(tmp_path: Path, installer: QualificationInstaller
         ),
         installer=installer,
         transaction_id_factory=lambda: "qualification-tx",
+        runtime_restart_quiesce=lambda: {"token": "quiesce-test", "ttl_s": 60},
     )
 
 

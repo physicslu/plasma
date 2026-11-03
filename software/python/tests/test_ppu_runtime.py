@@ -81,3 +81,76 @@ def test_validate_runtime_rejects_open_hardware_boundary(tmp_path: Path) -> None
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(runtime.PPURuntimePackagingError, match="hardware boundary"):
         runtime.validate_runtime(output)
+
+
+def test_runtime_ships_ic_support_data_only_and_enabled_openocd_site_starts(tmp_path: Path) -> None:
+    """Regression for Z2 D6: an enabled non-mock Site crash-looped the installed
+    Runtime with ICSupportIntegrityError because no IC Support data shipped."""
+    output = tmp_path / "runtime"
+    runtime.build_runtime(repo_root=ROOT, output_dir=output)
+    manifest = json.loads((output / "ppu-runtime.json").read_text(encoding="utf-8"))
+    assert manifest["data"]["ic_support_root"] == "data/ic-support"
+    ic_root = output / "data" / "ic-support"
+    shipped = {p.relative_to(ic_root).as_posix() for p in ic_root.rglob("*") if p.is_file()}
+    assert "socket-profiles/stm32f103c8t6-lqfp48-swd-v1.json" in shipped
+    assert "manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.lock.json" in shipped
+    assert "benchmarks/nxp-kl25/backend-implementation-lock.json" in shipped
+    assert not [name for name in shipped if name.endswith(".py")]
+
+    config = tmp_path / "ppu.yaml"
+    config.write_text(
+        "ppu: {id: z2-test, facility_id: lab, model: PYNQ-Z2, display_name: Z2}\n"
+        f"server: {{output_root: {tmp_path / 'out'}, log_root: {tmp_path / 'log'}}}\n"
+        "sites:\n"
+        '  - {id: 2, enabled: true, interface: "openocd", target: "STM32F103C8T6"}\n',
+        encoding="utf-8",
+    )
+    probe = (
+        "import sys\n"
+        "from plasma_core.config import load_config\n"
+        "from plasma_server.site_manager import SiteManager\n"
+        "manager = SiteManager(load_config(sys.argv[1]))\n"
+        "assert manager.ic_support_resolver is not None\n"
+        "print(sorted(manager.interfaces))\n"
+    )
+    environment = {"PATH": "/usr/bin:/bin", "PLASMA_IC_SUPPORT_ROOT": str(ic_root)}
+    completed = subprocess.run(
+        [sys.executable, "-I", "-B", "-c",
+         f"import sys; sys.path.insert(0, {str(output / 'ppu' / 'ppu.pyz')!r}); exec({probe!r})", str(config)],
+        cwd=tmp_path, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "[2]"
+
+    # Negative control: the same zipapp without shipped data fails closed.
+    import shutil
+
+    isolated = tmp_path / "isolated" / "runtime" / "ppu" / "ppu.pyz"
+    isolated.parent.mkdir(parents=True)
+    shutil.copyfile(output / "ppu" / "ppu.pyz", isolated)
+    del environment["PLASMA_IC_SUPPORT_ROOT"]
+    failed = subprocess.run(
+        [sys.executable, "-I", "-B", "-c",
+         f"import sys; sys.path.insert(0, {str(isolated)!r}); exec({probe!r})", str(config)],
+        cwd=tmp_path, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60,
+    )
+    assert failed.returncode != 0
+    assert "PLASMA_IC_SUPPORT_ROOT" in failed.stderr
+
+
+def test_validate_runtime_rejects_missing_ic_support(tmp_path: Path) -> None:
+    import shutil
+
+    output = tmp_path / "runtime"
+    runtime.build_runtime(repo_root=ROOT, output_dir=output)
+    shutil.rmtree(output / "data" / "ic-support" / "bindings")
+    with pytest.raises(runtime.PPURuntimePackagingError, match="IC Support data is incomplete"):
+        runtime.validate_runtime(output)
+
+
+def test_validate_runtime_rejects_python_tooling_in_ic_support(tmp_path: Path) -> None:
+    output = tmp_path / "runtime"
+    runtime.build_runtime(repo_root=ROOT, output_dir=output)
+    (output / "data" / "ic-support" / "validate.py").write_text("print(1)\n", encoding="utf-8")
+    with pytest.raises(runtime.PPURuntimePackagingError, match="must not contain Python tooling"):
+        runtime.validate_runtime(output)

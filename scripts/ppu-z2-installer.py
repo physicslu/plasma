@@ -10,8 +10,10 @@ probing remains explicitly proxy-free through
 its sibling core are one bootstrap unit and release packaging must ship and verify
 both files together.
 
-* successful upgrades preserve an existing canonical `/etc/plasma/ppu.yaml`
-  instead of regenerating `sites: []`;
+* successful upgrades preserve an existing canonical `/etc/plasma/ppu.yaml`;
+  the only rewrite is the one-time migration of the formerly installer-rendered
+  empty `sites: []` line to the disabled default Sites 1..N, so the Gateway
+  desired-state path (which edits existing Sites only) can enable a Site;
 * Plasma Server exposes a local authoritative quiesce socket;
 * Plasma Gateway receives only the bounded runtime-activation helper socket;
 * a root helper exposes exactly one operation: restart `plasma-server.service`.
@@ -126,6 +128,26 @@ def render_systemd_units(*, paths, python_runtime, gateway_host: str, catalog_re
     }
 
 
+def migrate_empty_sites(content: bytes) -> str | None:
+    """Return the config with the legacy empty Site list replaced, else None.
+
+    Only the exact installer-rendered top-level line ``sites: []`` qualifies;
+    any other (operator- or Gateway-maintained) Site list is preserved as is.
+    """
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    lines = text.splitlines(keepends=True)
+    matches = [index for index, line in enumerate(lines) if line.rstrip("\r\n") == "sites: []"]
+    if len(matches) != 1 or any(
+        line.startswith("sites") for index, line in enumerate(lines) if index != matches[0]
+    ):
+        return None
+    lines[matches[0]] = _core.render_default_sites()
+    return "".join(lines)
+
+
 def install_release(
     verified,
     *,
@@ -157,9 +179,17 @@ def install_release(
     original_writer = _core._write_text_atomic
     original_renderer = _core.render_systemd_units
 
+    migrated_sites = False
+
     def preserving_writer(path: Path, content: str, mode: int = 0o644) -> None:
+        nonlocal migrated_sites
         if path == config_path and existing_config.existed:
-            path.chmod(0o640)
+            migrated = migrate_empty_sites(existing_config.content or b"")
+            if migrated is None:
+                path.chmod(0o640)
+                return
+            migrated_sites = True
+            original_writer(path, migrated, 0o640)
             return
         original_writer(path, content, mode)
 
@@ -213,6 +243,7 @@ def install_release(
         site_state["runtime_activation_socket"] = str(RUNTIME_ACTIVATION_SOCKET)
         site_state["server_control_socket"] = str(SERVER_CONTROL_SOCKET)
         site_state["upgrade_preserves_existing_config"] = True
+        site_state["empty_sites_migrated_to_defaults"] = migrated_sites
     evidence["runtime_activation"] = {
         "service": RUNTIME_ACTIVATION_SERVICE,
         "lifecycle_owner": "plasma-web.service",

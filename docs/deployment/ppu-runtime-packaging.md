@@ -104,16 +104,20 @@ The bootstrap remains Python-3.10-compatible. The installed Plasma runtime requi
 
 ## First-install versus upgrade configuration ownership
 
-A clean first installation may generate the fail-closed PS-only canonical topology:
+A clean first installation generates every supported Site (1..`max_supported_sites`), disabled, so the Gateway desired-state path can enable any of them:
 
 ```yaml
 server:
   max_supported_sites: 8
 
-sites: []
+sites:
+  - {id: 1, enabled: false, interface: "mock", target: "STM32F103C8T6"}
+  # ... through id: 8
 ```
 
-That is a bootstrap state only. On an **upgrade**, `/etc/plasma/ppu.yaml` is operator/runtime state and must not be regenerated from first-install defaults. P3 therefore preserves the entire existing canonical file, including Site Desired records, while updating release/service wiring.
+On an **upgrade**, `/etc/plasma/ppu.yaml` is operator/runtime state and must not be regenerated from first-install defaults. P3 preserves the existing canonical file, including Site Desired records, while updating release/service wiring; the only rewrite is the one-time migration of the exact former first-install line `sites: []` to the disabled defaults. See [Z2 PS installer](z2-ps-installer.md).
+
+The runtime payload also carries the IC Support data at `data/ic-support` (`data.ic_support_root` in `ppu-runtime.json`); `validate` loads it with the shipped zipapp through `PLASMA_IC_SUPPORT_ROOT`.
 
 The topology semantics remain:
 

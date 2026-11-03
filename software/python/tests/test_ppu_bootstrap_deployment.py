@@ -107,11 +107,16 @@ def _request(tmp_path: Path):
     )
 
 
-def _coordinator(tmp_path: Path, installer):
+def _coordinator(tmp_path: Path, installer, runtime_restart_quiesce=None):
     counter = iter([100.0 + i for i in range(30)])
+    if runtime_restart_quiesce is None:
+        def runtime_restart_quiesce():
+            installer.calls.append("quiesce")
+            return {"token": "quiesce-test", "ttl_s": 60}
     return deployment.DeploymentCoordinator(
         paths=_paths(tmp_path), installer=installer,
         clock=lambda: next(counter), transaction_id_factory=lambda: "tx-001",
+        runtime_restart_quiesce=runtime_restart_quiesce,
     )
 
 
@@ -137,7 +142,7 @@ def test_successful_transaction_orders_verify_stage_activate_health(tmp_path: Pa
     assert result["transaction"]["state"] == "runtime_active"
     assert result["transaction"]["api_transaction_id"] is None  # Local CLI remains independent.
     assert result["capabilities"]["fpga_update"] is False
-    assert installer.calls == ["verify", "python", "baseline", "previous", "stage", "activate", "health"]
+    assert installer.calls == ["verify", "python", "baseline", "previous", "stage", "quiesce", "activate", "health"]
     journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
     assert journal["state"] == "runtime_active"
     assert coordinator.paths.journal.stat().st_mode & 0o077 == 0
@@ -223,3 +228,37 @@ def test_corrupt_or_overpermissive_journal_fails_closed(tmp_path: Path):
     _write_journal(tmp_path, state="runtime_active", mode=0o644)
     with pytest.raises(deployment.DeploymentError, match="permissions are too broad"):
         _coordinator(tmp_path, FakeInstaller()).execute(_request(tmp_path))
+
+
+def test_upgrade_quiesce_denial_is_terminal_before_activation(tmp_path: Path):
+    installer = FakeInstaller()
+
+    def busy():
+        installer.calls.append("quiesce")
+        raise RuntimeError("RUNTIME_RESTART_QUIESCE_NOT_GRANTED: PPU execution is active")
+
+    coordinator = _coordinator(tmp_path, installer, runtime_restart_quiesce=busy)
+    with pytest.raises(deployment.DeploymentError, match="runtime upgrade quiesce denied"):
+        coordinator.execute(_request(tmp_path))
+    assert installer.calls == ["verify", "python", "baseline", "previous", "stage", "quiesce"]
+    journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
+    assert journal["state"] == "verify_failed"
+    assert journal["error_code"] == "runtime_quiesce_denied"
+    # A refused upgrade leaves the PPU deployable again (no recovery_required).
+    assert deployment.DeploymentCoordinator(paths=_paths(tmp_path), installer=FakeInstaller(), runtime_restart_quiesce=lambda: {}).execute(_request(tmp_path))["result"] == "PASS"
+
+
+def test_fresh_install_needs_no_runtime_quiesce(tmp_path: Path):
+    class FreshInstaller(FakeInstaller):
+        def _previous_current(self, current):
+            self.calls.append("previous")
+            return None
+
+    installer = FreshInstaller()
+
+    def must_not_run():
+        raise AssertionError("fresh install has no running Runtime to quiesce")
+
+    result = _coordinator(tmp_path, installer, runtime_restart_quiesce=must_not_run).execute(_request(tmp_path))
+    assert result["result"] == "PASS"
+    assert "quiesce" not in installer.calls

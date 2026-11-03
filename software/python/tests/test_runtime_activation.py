@@ -315,3 +315,45 @@ def test_p1_coordinator_integrates_real_runtime_socket_with_atomic_asset_set(tmp
             await control.close()
             await manager.shutdown()
     asyncio.run(scenario())
+
+
+def test_runtime_restart_quiesce_blocks_jobs_without_holding_a_connection(tmp_path: Path) -> None:
+    """Runtime upgrade gate: TTL quiesce via the real control socket.
+
+    It must be refused while execution is active, must block new Jobs once
+    granted, and must leave no open connection (Python >= 3.12.1
+    Server.wait_closed() waits for open connections, which would stall the
+    Runtime's graceful shutdown during the upgrade restart).
+    """
+    async def scenario() -> None:
+        manager = SiteManager(config(tmp_path))
+        await manager.start()
+        directory = tmp_path / "runtime-control"
+        directory.mkdir(mode=0o700)
+        socket_path = directory / "control.sock"
+        control = RuntimeControlServer(manager, socket_path)
+        await control.start()
+        helper = _asset_helper()
+        try:
+            with manager._execution_lock:
+                manager._execution_lease = PPUExecutionLease(
+                    owner_kind="batch", owner_id="active-batch", job_ids={"job-running"},
+                )
+            with pytest.raises(helper.AssetSetError, match="RUNTIME_RESTART_QUIESCE_NOT_GRANTED"):
+                await asyncio.to_thread(helper.quiesce_runtime_for_restart, socket_path)
+            assert manager.runtime_quiesce_snapshot()["active"] is False
+            with manager._execution_lock:
+                manager._execution_lease = None
+
+            granted = await asyncio.to_thread(helper.quiesce_runtime_for_restart, socket_path)
+            assert granted["ttl_s"] == helper.RUNTIME_RESTART_QUIESCE_TTL_S
+            assert manager.runtime_quiesce_snapshot()["active"] is True
+            with pytest.raises(PlasmaError) as error:
+                manager.enqueue(JobRequest(site_id=1, operation=Operation.READ, job_id="upgrade-1"))
+            assert error.value.code is ErrorCode.PPU_BUSY
+            # No connection is left open: graceful close completes promptly.
+            await asyncio.wait_for(control.close(), timeout=2)
+        finally:
+            await control.close()
+            await manager.shutdown()
+    asyncio.run(scenario())

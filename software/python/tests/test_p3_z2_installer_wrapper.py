@@ -40,7 +40,8 @@ def verified():
     return SimpleNamespace(
         runtime_manifest={
             "data": {
-                "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json"
+                "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json",
+                "ic_support_root": "data/ic-support",
             }
         }
     )
@@ -105,6 +106,7 @@ def test_successful_upgrade_preserves_existing_canonical_site_desired_state(
     assert ("enable", "--now", installer.RUNTIME_ACTIVATION_SERVICE) not in calls
     persisted_evidence = json.loads((install_paths.install_root / "last-install.json").read_text())
     assert persisted_evidence["site_desired_state"]["upgrade_preserves_existing_config"] is True
+    assert evidence["site_desired_state"]["empty_sites_migrated_to_defaults"] is False
 
 
 def test_failed_activation_restores_previous_helper_unit(
