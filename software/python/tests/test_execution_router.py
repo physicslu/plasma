@@ -404,6 +404,8 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
                 )
                 read_result = await manager.submit(read_request)
                 self.assertTrue(read_result.success, read_result.error)
+                self.assertEqual(len(read_result.output_files), 1)
+                self.assertEqual(Path(read_result.output_files[0]).read_bytes(), image)
                 self.assertTrue(any(cmd.startswith("flash erase_address ") for cmd in commands_seen))
                 self.assertTrue(any(cmd.startswith("flash write_image ") for cmd in commands_seen))
                 self.assertTrue(any(cmd.startswith("flash verify_image ") for cmd in commands_seen))
