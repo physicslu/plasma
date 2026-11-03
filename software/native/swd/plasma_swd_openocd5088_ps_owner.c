@@ -266,6 +266,13 @@ int plasma_swd_ps_owner_attach(char *err, size_t err_len)
     return PLASMA_SWD_OK;
 }
 
+int plasma_swd_ps_owner_set_half_period(uint32_t half)
+{
+    if (!g.attached)
+        return PLASMA_SWD_NOT_READY;
+    return plasma_swd_fifo_set_half_period(&g.fifo, half);
+}
+
 int plasma_swd_ps_owner_safe_off(char *err, size_t err_len)
 {
     int recovered = 0;

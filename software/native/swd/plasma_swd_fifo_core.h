@@ -16,6 +16,10 @@
 /* RTL trailing SWDIO-low idle clocks per command: reset/MODE-OFF default and
  * maximum of the 0x68 IDLE_CYCLES register. */
 #define PLASMA_SWD_IDLE_DEFAULT 8u
+/* SWCLK = 100 MHz FCLK0 / (2 * HALF_PERIOD); RTL minimum 4 (12.5 MHz). */
+#define PLASMA_SWD_HALF_MIN 4u
+#define PLASMA_SWD_HALF_MAX 65535u
+#define PLASMA_SWD_DEFAULT_KHZ 500u
 #define PLASMA_SWD_IDLE_MAX 255u
 
 enum plasma_swd_result {
@@ -80,6 +84,9 @@ int plasma_swd_fifo_queue_read(struct plasma_swd_fifo *s, uint8_t cmd,
                               uint32_t *destination, uint32_t ap_delay_hint);
 int plasma_swd_fifo_queue_write(struct plasma_swd_fifo *s, uint8_t cmd,
                                uint32_t value, uint32_t ap_delay_hint);
+
+/* Program SWCLK HALF_PERIOD (0x08) between runs; queue must be empty. */
+int plasma_swd_fifo_set_half_period(struct plasma_swd_fifo *s, uint32_t half);
 
 /* Full source-defined LSB-first SWJ payload; no arbitrary GPIO toggles. */
 int plasma_swd_fifo_queue_swj(struct plasma_swd_fifo *s,

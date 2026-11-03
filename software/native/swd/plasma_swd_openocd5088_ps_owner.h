@@ -38,6 +38,8 @@ void plasma_swd_ps_default_paths(struct plasma_swd_ps_paths *paths);
 int plasma_swd_ps_owner_select_site(unsigned int site_id);
 unsigned int plasma_swd_ps_owner_selected_site(void);
 int plasma_swd_ps_owner_attach(char *err, size_t err_len);
+/* SWCLK half period of the attached Site (OpenOCD adapter speed). */
+int plasma_swd_ps_owner_set_half_period(uint32_t half);
 /* Idle-only OFF: CONTROL=0 then MODE=0, only after STATUS/LEVELS prove the
  * engine idle and fault-free; otherwise performs NO MMIO. */
 int plasma_swd_ps_owner_safe_off(char *err, size_t err_len);

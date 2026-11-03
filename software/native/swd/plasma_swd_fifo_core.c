@@ -10,6 +10,7 @@
 
 #define R_ID 0x00u
 #define R_STATUS 0x04u
+#define R_HALF_PERIOD 0x08u
 #define R_TX 0x10u
 #define R_PUSH 0x14u
 #define R_META 0x18u
@@ -147,6 +148,16 @@ static int queue_transfer(struct plasma_swd_fifo *s, uint8_t cmd, bool read,
     op->destination = dst;
     op->idle_cycles = idle;
     return PLASMA_SWD_OK;
+}
+
+int plasma_swd_fifo_set_half_period(struct plasma_swd_fifo *s, uint32_t half)
+{
+    if (!s || !s->admitted || s->blocked || s->count)
+        return PLASMA_SWD_NOT_READY;
+    if (half < PLASMA_SWD_HALF_MIN || half > PLASMA_SWD_HALF_MAX)
+        return PLASMA_SWD_BAD_ARG;
+    /* Snapshotted per CMD_PUSH by the RTL; only NORMAL mode accepts it. */
+    return write_word(s, R_HALF_PERIOD, half);
 }
 
 int plasma_swd_fifo_queue_read(struct plasma_swd_fifo *s, uint8_t cmd,

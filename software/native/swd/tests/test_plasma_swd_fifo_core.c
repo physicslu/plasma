@@ -218,6 +218,22 @@ static void test_wait_is_retried_after_dp_abort(void)
     assert(s.blocked && f.aborts == PLASMA_SWD_WAIT_RETRIES);
 }
 
+static void test_half_period_program_and_bounds(void)
+{
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    const uint32_t before = f.word_writes;
+    assert(plasma_swd_fifo_set_half_period(&s, 100u) == 0); /* 500 kHz */
+    assert(f.word_writes == before + 1u);
+    assert(plasma_swd_fifo_set_half_period(&s, 3u) == PLASMA_SWD_BAD_ARG);
+    assert(plasma_swd_fifo_set_half_period(&s, 65536u) == PLASMA_SWD_BAD_ARG);
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 1u, 0u) == 0);
+    assert(plasma_swd_fifo_set_half_period(&s, 25u) == PLASMA_SWD_NOT_READY);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(plasma_swd_fifo_set_half_period(&s, 25u) == 0);
+}
+
 static void test_discarded_read_runs_on_wire_without_publication(void)
 {
     /* OpenOCD dap_dp_init(): dap_queue_dp_read(dap, DP_CTRL_STAT, NULL). */
@@ -376,6 +392,7 @@ int main(void)
     test_exact_atomic_swj_and_negative_inputs();
     test_ap_delay_hint_programs_idle_cycles_only_on_change();
     test_wait_is_retried_after_dp_abort();
+    test_half_period_program_and_bounds();
     test_discarded_read_runs_on_wire_without_publication();
     test_wait_fault_no_replay_and_pointer_safety();
     test_fifo_queue_bounds_and_tags();
