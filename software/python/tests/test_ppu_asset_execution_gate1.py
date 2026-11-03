@@ -59,6 +59,8 @@ def with_resources(parts, raw=RESOURCES, kinds=("python", "native-c")):
     for package_id, kind, requires, files in parts:
         if kind in kinds:
             files = {**files, "config/plasma-package-resources.json": raw}
+            if kind == "python":
+                files.setdefault("python/main.py", b"print('NOT_EXECUTED_IN_C1')\n")
         out.append((package_id, kind, requires, files))
     return out
 
@@ -100,7 +102,8 @@ def _ready_fixture(tmp_path, parts=None):
         )
         for kind, p in by_kind.items()
     }
-    assert set(requests) == {"python", "native-c", "fpga-image"}
+    if parts is None:
+        assert set(requests) == {"python", "native-c", "fpga-image"}
     return co, requests, Owner(), archive
 
 

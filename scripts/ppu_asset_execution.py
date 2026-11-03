@@ -198,6 +198,17 @@ def prepare_asset_execution(
         _require(hashlib.sha256(raw).hexdigest() == entry[0]["sha256"],
                  "ASSET_EXECUTION_RESOURCES_CHANGED")
         resources = validate_package_resources(raw)
+    entrypoint = None
+    if request.package_kind in RESOURCE_KINDS:
+        prefix = f"payload/packages/{selected['id']}/"
+        if request.package_kind == "python":
+            # Fixed entry; the request never names a file, module or argv.
+            entries = [f for f in descriptor["files"] if f["path"] == prefix + "python/main.py"]
+        else:
+            entries = [f for f in descriptor["files"]
+                       if f["path"].startswith(prefix + "bin/") and f["executable"] is True]
+        _require(len(entries) == 1, "ASSET_EXECUTION_ENTRYPOINT_INVALID")
+        entrypoint = {"path": entries[0]["path"], "sha256": entries[0]["sha256"]}
     # The owner's execute authorization must bind THIS device, the CURRENT
     # Active Set, this exact Package identity and this Runtime Job.
     _require(isinstance(owner_credential, OwnerCredential),
@@ -226,6 +237,7 @@ def prepare_asset_execution(
         "trusted_executor": EXECUTORS[request.package_kind],
         "relative_files": [f["path"] for f in descriptor["files"]],
         "resources": resources,
+        "entrypoint": entrypoint,
         "dependencies": list(selected["requires"]),
         "owner_authorization": authorized,
         "hardware_admission": "NOT_RUN",
