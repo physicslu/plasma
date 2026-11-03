@@ -830,9 +830,16 @@ class BundleLoadOutcome(RuntimeError):
         self.code = code
 
 
+# A Root denial code, optionally followed by up to four short, token-only
+# detail fields (e.g. PROC_SCAN_INCOMPLETE:<status>:<pid>:<phase>:<error>).
+# Tokens cannot carry spaces, paths or command lines; anything else is reduced
+# to the exception class name so no free-form text leaves the Root.
+_FAILURE_CODE = re.compile(r"[A-Z0-9_]{3,96}(?::[A-Za-z0-9_]{1,40}){0,4}")
+
+
 def _failure_code(exc: BaseException) -> str:
     text = str(exc)
-    if re.fullmatch(r"[A-Z0-9_]{3,96}", text):
+    if _FAILURE_CODE.fullmatch(text):
         return text
     return type(exc).__name__
 
