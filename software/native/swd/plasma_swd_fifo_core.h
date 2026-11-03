@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #define PLASMA_SWD_MAX_QUEUE 16u
+#define PLASMA_SWD_WAIT_RETRIES 64u /* ACK WAIT retries per transfer */
 #define PLASMA_SWD_ABI_V5 0x00050000u
 #define PLASMA_SWD_SITE1_BASE 0x43C01000u
 #define PLASMA_SWD_SITE2_BASE 0x43C02000u
@@ -54,6 +55,7 @@ struct plasma_swd_fifo {
     uint32_t next_tag;
     uint32_t count;
     uint32_t idle_cycles; /* last value programmed into IDLE_CYCLES */
+    int deferred_rc; /* failure of an automatic full-queue flush */
     bool admitted;
     bool blocked;
     /* Diagnostics of the last completion that ended a run (not authority). */

@@ -14,6 +14,7 @@ struct fake_bus {
     uint32_t fail_barrier, fail_read, ack, completion_status;
     uint32_t fail_write_on_push;
     uint32_t idle, idle_writes, idle_at_push[8];
+    uint32_t wait_left, aborts; /* WAIT the next N non-ABORT transfers */
 };
 
 static int fake_read(void *ctx, uint32_t address, uint32_t *v)
@@ -68,9 +69,18 @@ static int fake_write(void *ctx, uint32_t address, uint32_t v)
         ++f->push_count;
         const bool swj = (v & 0x100u) != 0;
         const bool reading = !swj && (v & 2u) != 0;
-        const uint32_t ack = f->ack ? f->ack : (swj ? 0u : 1u);
+        const bool abort = !swj && (v & 0xFFu) == 0u; /* DP write ABORT */
+        if (abort)
+            ++f->aborts;
+        uint32_t ack = f->ack ? f->ack : (swj ? 0u : 1u);
+        uint32_t status = f->completion_status;
+        if (!swj && !abort && f->wait_left) {
+            --f->wait_left;
+            ack = 2u;
+            status = 3u;
+        }
         f->meta = (v & 0xFFFF0000u) | (uint32_t)(reading ? 0x80u : 0u) |
-                 (ack << 4) | f->completion_status;
+                 (ack << 4) | status;
         f->rx = 0x1BA01477u;
         f->levels = 2u;
     }
@@ -186,6 +196,28 @@ static void test_ap_delay_hint_programs_idle_cycles_only_on_change(void)
     assert(g.idle_writes == 0u && g.push_count == 2u);
 }
 
+static void test_wait_is_retried_after_dp_abort(void)
+{
+    /* STM32 AHB-AP may answer WAIT while the bus is busy: the transfer was
+     * not accepted, so clear sticky/overrun (ABORT 0x1E) and retry it. */
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    uint32_t v = 0u;
+    f.wait_left = 3u;
+    assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &v, 8u) == 0);
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 7u, 8u) == 0);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(v == 0x1BA01477u && !s.blocked);
+    assert(f.aborts == 3u && f.push_count == 2u + 3u * 2u);
+    /* Persistent WAIT: bounded retries, then the Site is blocked. */
+    f.wait_left = 1000u;
+    f.aborts = 0u;
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 8u, 8u) == 0);
+    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_ACK_WAIT);
+    assert(s.blocked && f.aborts == PLASMA_SWD_WAIT_RETRIES);
+}
+
 static void test_discarded_read_runs_on_wire_without_publication(void)
 {
     /* OpenOCD dap_dp_init(): dap_queue_dp_read(dap, DP_CTRL_STAT, NULL). */
@@ -218,9 +250,10 @@ static void test_wait_fault_no_replay_and_pointer_safety(void)
         assert(plasma_swd_fifo_run(&s) ==
                (mode ? PLASMA_SWD_ACK_FAULT : PLASMA_SWD_ACK_WAIT));
         assert(read_result == 0xC0FFEEu); /* not published on failure */
-        assert(f.push_count == 1u);
+        /* WAIT: the transfer, then one DP ABORT that itself WAITs -> block. */
+        assert(f.push_count == (mode ? 1u : 2u));
         assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_NOT_READY);
-        assert(f.push_count == 1u);
+        assert(f.push_count == (mode ? 1u : 2u));
     }
     struct fake_bus f;
     struct plasma_swd_fifo s;
@@ -238,18 +271,28 @@ static void test_fifo_queue_bounds_and_tags(void)
     struct fake_bus f;
     struct plasma_swd_fifo s;
     setup(&f, &s, 1);
-    for (unsigned int i = 0; i < 16; ++i)
-        assert(plasma_swd_fifo_queue_write(&s, 0x3Au, i, 0u) == 0);
-    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 33, 0u) ==
-           PLASMA_SWD_QUEUE_FULL);
+    /* OpenOCD block writes queue far more than 16: a full queue flushes. */
+    uint32_t rd[40];
+    for (unsigned int i = 0; i < 40; ++i)
+        assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &rd[i], 8u) == 0);
+    assert(f.push_count == 32u && s.count == 8u);
+    assert(rd[0] == 0x1BA01477u && rd[31] == 0x1BA01477u);
     assert(plasma_swd_fifo_run(&s) == 0);
-    assert(f.push_count == 16u);
+    assert(f.push_count == 40u && rd[39] == 0x1BA01477u);
+    /* Tags wrap 65535 -> 1 (never 0, never stalls a long session). */
     s.next_tag = 65535u;
     assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 0u, 0u) == 0);
     assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 1u, 0u) == 0);
-    const uint32_t before = f.push_count;
-    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_NOT_READY);
-    assert(f.push_count == before);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(s.next_tag == 2u && f.push_count == 42u);
+    /* A failed automatic flush is reported by the next run(). */
+    for (unsigned int i = 0; i < 16; ++i)
+        assert(plasma_swd_fifo_queue_write(&s, 0x3Au, i, 0u) == 0);
+    f.ack = 4u;
+    f.completion_status = 4u;
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 99u, 0u) ==
+           PLASMA_SWD_ACK_FAULT);
+    assert(s.blocked && plasma_swd_fifo_run(&s) == PLASMA_SWD_NOT_READY);
 }
 
 static void test_new_fifo_rejects_prior_normal_mode_and_unknown_completion(void)
@@ -332,6 +375,7 @@ int main(void)
     test_two_sites_ordered_reads_and_writes();
     test_exact_atomic_swj_and_negative_inputs();
     test_ap_delay_hint_programs_idle_cycles_only_on_change();
+    test_wait_is_retried_after_dp_abort();
     test_discarded_read_runs_on_wire_without_publication();
     test_wait_fault_no_replay_and_pointer_safety();
     test_fifo_queue_bounds_and_tags();
