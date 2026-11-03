@@ -48,11 +48,13 @@ The initial, locally installed PPU Bootstrap service (Installer Core, verifier a
 ### B1/B2/B3
 This label has **three unrelated meanings**; documents using it carry a term note saying which one applies.
 
-| Context | B1 | B2 | B3 | B4 |
-| --- | --- | --- | --- | --- |
-| **Bundle stages** ([Bundle v3 assets](deployment/ppu-bundle-v3-generic-assets-gate1.md)) | upload / commit (`POST /v1/uploads`) | admission (`POST /v1/deployments`, data-only receipt) | install / verify; with explicit `fpga_load: true` also FPGA load + Active Set | activation, incl. previous-version backup (not implemented) |
-| **FPGA/UIO safety items** from PR #972 ([runtime FPGA architecture](architecture/runtime-fpga-architecture-v1.md)) | live Fabric UIO ownership handoff | retained-mmap guard | aperture Supervisor | – |
-| **Governance blocking decisions** (former development-blocking policy) | authorization and source | Z2 hardware safety / recovery | authentic receipt | – |
+| Context | B1 | B2 | B3 |
+| --- | --- | --- | --- |
+| **Bundle stages** ([Bundle v3 assets](deployment/ppu-bundle-v3-generic-assets-gate1.md)) | Receive: upload / commit | Admission: validate Bundle and authorization | Install / Verify; `fpga_load: false` stages only, explicitly authorized `fpga_load: true` may also load FPGA and publish the verified Active Set |
+| **FPGA/UIO safety items** from PR #972 ([runtime FPGA architecture](architecture/runtime-fpga-architecture-v1.md)) | live Fabric UIO ownership handoff | retained-mmap guard | aperture Supervisor |
+| **Governance blocking decisions** (former development-blocking policy) | authorization and source | Z2 hardware safety / recovery | authentic receipt |
+
+**No standalone Bundle B4 stage:** The operator lifecycle is [Install Bundle → Run Job → Get Result](architecture/ppu-install-run-result.md). Old `B4` labels denote superseded plans or historical receipts, not a separate mandatory action. Preserve internal atomic Active Set selection and recovery guards; staging-only B3 is **not** automatically Active or READY.
 
 The governance meaning came from a policy document that has been retired; it survives only in older text such as [todo.md](development/todo.md).
 
