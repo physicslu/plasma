@@ -144,11 +144,33 @@ int plasma_swd_openocd5088_owner_ready(void)
     return ERROR_FAIL;
 }
 
+/* Every non-OK result is visible in the OpenOCD log (a full-queue flush can
+ * fail inside read_reg/write_reg, not only in run()). ACK FAULT/WAIT are
+ * normal recoverable target answers; OpenOCD reconnects after them. */
+static int report(const char *where, int rc)
+{
+#ifndef PLASMA_SWD_HOST_TEST
+    if (rc != PLASMA_SWD_OK && active_site) {
+        const uint32_t meta = active_site->last_meta;
+        if (rc == PLASMA_SWD_ACK_FAULT || rc == PLASMA_SWD_ACK_WAIT)
+            LOG_DEBUG("plasma_swd: %s rc=%d meta=0x%08" PRIx32, where, rc, meta);
+        else
+            LOG_ERROR("plasma_swd: %s rc=%d meta=0x%08" PRIx32 " levels=0x%08"
+                      PRIx32 " (status=%u ack=%u)", where, rc, meta,
+                      active_site->last_levels, (unsigned int)(meta & 0xFu),
+                      (unsigned int)((meta >> 4) & 7u));
+    }
+#else
+    (void)where;
+#endif
+    return core_result(rc);
+}
+
 static int plasma_read(uint8_t cmd, uint32_t *value, uint32_t ap_delay_hint)
 {
     if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
-    return core_result(plasma_swd_fifo_queue_read(
+    return report("read", plasma_swd_fifo_queue_read(
         active_site, cmd, value, ap_delay_hint));
 }
 
@@ -156,7 +178,7 @@ static int plasma_write(uint8_t cmd, uint32_t value, uint32_t ap_delay_hint)
 {
     if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
-    return core_result(plasma_swd_fifo_queue_write(
+    return report("write", plasma_swd_fifo_queue_write(
         active_site, cmd, value, ap_delay_hint));
 }
 
@@ -170,7 +192,7 @@ static int plasma_swj(enum swd_special_seq seq)
     switch (seq) {
     case LINE_RESET:
         /* RTL contract: only the dedicated encoding re-arms the link. */
-        return core_result(plasma_swd_fifo_queue_line_reset(active_site));
+        return report("line_reset", plasma_swd_fifo_queue_line_reset(active_site));
     case JTAG_TO_SWD: bits = swd_seq_jtag_to_swd;
         count = swd_seq_jtag_to_swd_len; then_line_reset = true; break;
     case SWD_TO_JTAG: bits = swd_seq_swd_to_jtag;
@@ -193,23 +215,14 @@ static int plasma_swj(enum swd_special_seq seq)
      * ADI line reset before the first DPIDR read is protocol-legal. */
     if (rc == PLASMA_SWD_OK && then_line_reset)
         rc = plasma_swd_fifo_queue_line_reset(active_site);
-    return core_result(rc);
+    return report("swj", rc);
 }
 
 static int plasma_run(void)
 {
     if (plasma_swd_openocd5088_owner_ready() != ERROR_OK)
         return ERROR_FAIL;
-    const int rc = plasma_swd_fifo_run(active_site);
-#ifndef PLASMA_SWD_HOST_TEST
-    if (rc != PLASMA_SWD_OK)
-        LOG_ERROR("plasma_swd: run rc=%d meta=0x%08" PRIx32 " levels=0x%08"
-                  PRIx32 " (status=%u ack=%u)", rc, active_site->last_meta,
-                  active_site->last_levels,
-                  (unsigned int)(active_site->last_meta & 0xFu),
-                  (unsigned int)((active_site->last_meta >> 4) & 7u));
-#endif
-    return core_result(rc);
+    return report("run", plasma_swd_fifo_run(active_site));
 }
 
 /* Source-locked OpenOCD 5088db4c struct swd_driver callback signatures.

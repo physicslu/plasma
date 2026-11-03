@@ -23,6 +23,15 @@
 #define R_MODE 0x38u
 #define R_SWJ_WORD0 0x44u
 #define R_SWJ_LENGTH 0x64u
+/* RTL completion status (plasma_swd_transaction_engine.sv ST_*). */
+#define ST_OK 0u
+#define ST_NEED_RESET 2u
+#define ST_WAIT 3u
+#define ST_FAULT 4u
+#define ST_BAD_ACK 5u
+#define ST_PARITY 6u
+#define ST_TIMEOUT 7u
+#define ST_ABORT 8u
 #define R_IDLE_CYCLES 0x68u
 
 static int fault(struct plasma_swd_fifo *s, int code)
@@ -152,10 +161,16 @@ static int queue_transfer(struct plasma_swd_fifo *s, uint8_t cmd, bool read,
 
 int plasma_swd_fifo_set_half_period(struct plasma_swd_fifo *s, uint32_t half)
 {
-    if (!s || !s->admitted || s->blocked || s->count)
+    if (!s || !s->admitted || s->blocked)
         return PLASMA_SWD_NOT_READY;
     if (half < PLASMA_SWD_HALF_MIN || half > PLASMA_SWD_HALF_MAX)
         return PLASMA_SWD_BAD_ARG;
+    if (s->count || s->deferred_rc) {
+        /* Queued transfers run at the old speed, as already requested. */
+        const int rc = plasma_swd_fifo_run(s);
+        if (rc)
+            return rc;
+    }
     /* Snapshotted per CMD_PUSH by the RTL; only NORMAL mode accepts it. */
     return write_word(s, R_HALF_PERIOD, half);
 }
@@ -326,21 +341,33 @@ static int take_one(struct plasma_swd_fifo *s,
     s->last_levels = levels;
     if ((meta >> 16) != tag)
         return fault(s, PLASMA_SWD_BAD_RESPONSE);
-    if (!op->is_swj) {
-        const uint32_t ack = (meta >> 4) & 7u;
-        if (ack == 2u && (meta & 0xFu) == 3u) {
-            /* WAIT: the transfer was not accepted; the caller may retry.
-             * Release the retained completion first. */
-            if (write_word(s, R_POP, tag))
-                return PLASMA_SWD_IO_UNCERTAIN;
-            return PLASMA_SWD_ACK_WAIT;
-        }
-        if (ack == 4u && (meta & 0xFu) == 4u)
-            return fault(s, PLASMA_SWD_ACK_FAULT);
-        if (ack != 1u)
-            return fault(s, PLASMA_SWD_BAD_RESPONSE);
+    const uint32_t status = meta & 0xFu, ack = (meta >> 4) & 7u;
+    /* Target-side protocol outcomes are recoverable: OpenOCD reconnects
+     * (line reset, DPIDR, ABORT) on the next operation after any error, so
+     * the Site must stay usable. Release the completion, clear the RTL
+     * fault latch where the engine set one, report the error. */
+    if (status != ST_OK || (!op->is_swj && ack != 1u)) {
+        int rc;
+        bool latched = false;
+        if (status == ST_WAIT && ack == 2u && !op->is_swj)
+            rc = PLASMA_SWD_ACK_WAIT; /* not accepted; caller may retry */
+        else if (status == ST_FAULT && ack == 4u && !op->is_swj)
+            rc = PLASMA_SWD_ACK_FAULT;
+        else if (status == ST_NEED_RESET || status == ST_BAD_ACK)
+            rc = PLASMA_SWD_BAD_RESPONSE;
+        else if (status == ST_PARITY || status == ST_TIMEOUT ||
+                 status == ST_ABORT) {
+            rc = PLASMA_SWD_BAD_RESPONSE;
+            latched = true; /* RTL fault_q stops dispatch until RW1C */
+        } else
+            return fault(s, PLASMA_SWD_BAD_RESPONSE); /* CONFIG / unknown */
+        if (write_word(s, R_POP, tag))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        if (latched && write_word(s, R_ERROR, 1u))
+            return PLASMA_SWD_IO_UNCERTAIN;
+        return rc;
     }
-    if ((meta & 0xFu) != 0u || (bool)(meta & 0x80u) != op->read)
+    if ((bool)(meta & 0x80u) != op->read)
         return fault(s, PLASMA_SWD_BAD_RESPONSE);
     if (write_word(s, R_POP, tag))
         return PLASMA_SWD_IO_UNCERTAIN;

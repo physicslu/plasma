@@ -15,6 +15,7 @@ struct fake_bus {
     uint32_t fail_write_on_push;
     uint32_t idle, idle_writes, idle_at_push[8];
     uint32_t wait_left, aborts; /* WAIT the next N non-ABORT transfers */
+    uint32_t error_clears;
 };
 
 static int fake_read(void *ctx, uint32_t address, uint32_t *v)
@@ -60,6 +61,8 @@ static int fake_write(void *ctx, uint32_t address, uint32_t v)
         f->status = v & 1u;
     if (off == 0x64u)
         f->swj_len = v;
+    if (off == 0x2Cu && v == 1u)
+        ++f->error_clears;
     if (off >= 0x44u && off <= 0x60u)
         f->stage[(off - 0x44u) / 4u] = v;
     if (off == 0x14u) {
@@ -228,10 +231,10 @@ static void test_half_period_program_and_bounds(void)
     assert(f.word_writes == before + 1u);
     assert(plasma_swd_fifo_set_half_period(&s, 3u) == PLASMA_SWD_BAD_ARG);
     assert(plasma_swd_fifo_set_half_period(&s, 65536u) == PLASMA_SWD_BAD_ARG);
+    const uint32_t pushes = f.push_count;
     assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 1u, 0u) == 0);
-    assert(plasma_swd_fifo_set_half_period(&s, 25u) == PLASMA_SWD_NOT_READY);
-    assert(plasma_swd_fifo_run(&s) == 0);
-    assert(plasma_swd_fifo_set_half_period(&s, 25u) == 0);
+    assert(plasma_swd_fifo_set_half_period(&s, 25u) == 0); /* flushes first */
+    assert(s.count == 0u && f.push_count == pushes + 1u);
 }
 
 static void test_discarded_read_runs_on_wire_without_publication(void)
@@ -266,10 +269,47 @@ static void test_wait_fault_no_replay_and_pointer_safety(void)
         assert(plasma_swd_fifo_run(&s) ==
                (mode ? PLASMA_SWD_ACK_FAULT : PLASMA_SWD_ACK_WAIT));
         assert(read_result == 0xC0FFEEu); /* not published on failure */
-        /* WAIT: the transfer, then one DP ABORT that itself WAITs -> block. */
+        /* Never replayed: the queued write after the failed read is dropped. */
         assert(f.push_count == (mode ? 1u : 2u));
-        assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_NOT_READY);
-        assert(f.push_count == (mode ? 1u : 2u));
+        if (mode) {
+            /* FAULT is target-side: the Site stays usable so OpenOCD can
+             * reconnect (line reset + DPIDR + ABORT). */
+            assert(!s.blocked && f.levels == 0u);
+            f.ack = 0u;
+            f.completion_status = 0u;
+            assert(plasma_swd_fifo_queue_line_reset(&s) == 0);
+            assert(plasma_swd_fifo_queue_read(&s, 0x24u, &read_result, 0u) == 0);
+            assert(plasma_swd_fifo_run(&s) == 0 && read_result == 0x1BA01477u);
+        } else {
+            /* WAIT on the DP ABORT itself is not recoverable -> blocked. */
+            assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_NOT_READY);
+            assert(f.push_count == 2u);
+        }
+    }
+    /* No-ACK / parity / timeout: completion released, RTL latch cleared
+     * (RW1C ERROR) only for the latched statuses, Site still usable. */
+    const uint32_t statuses[4] = {5u, 6u, 7u, 8u};
+    for (unsigned int i = 0; i < 4u; ++i) {
+        struct fake_bus f;
+        struct plasma_swd_fifo s;
+        setup(&f, &s, 1);
+        f.ack = statuses[i] == 5u ? 7u : 1u;
+        f.completion_status = statuses[i];
+        uint32_t v = 0u;
+        assert(plasma_swd_fifo_queue_read(&s, 0x24u, &v, 0u) == 0);
+        assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_BAD_RESPONSE);
+        assert(!s.blocked && f.levels == 0u);
+        assert(f.error_clears == (statuses[i] == 5u ? 0u : 1u));
+    }
+    {
+        /* CONFIG (driver bug) remains fail-closed. */
+        struct fake_bus f;
+        struct plasma_swd_fifo s;
+        setup(&f, &s, 1);
+        f.completion_status = 1u;
+        assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 1u, 0u) == 0);
+        assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_BAD_RESPONSE);
+        assert(s.blocked);
     }
     struct fake_bus f;
     struct plasma_swd_fifo s;
@@ -308,7 +348,9 @@ static void test_fifo_queue_bounds_and_tags(void)
     f.completion_status = 4u;
     assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 99u, 0u) ==
            PLASMA_SWD_ACK_FAULT);
-    assert(s.blocked && plasma_swd_fifo_run(&s) == PLASMA_SWD_NOT_READY);
+    assert(!s.blocked && s.count == 0u); /* the triggering op is not queued */
+    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_ACK_FAULT); /* deferred */
+    assert(s.count == 0u && plasma_swd_fifo_run(&s) == 0);
 }
 
 static void test_new_fifo_rejects_prior_normal_mode_and_unknown_completion(void)
