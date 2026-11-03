@@ -46,6 +46,14 @@ HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 SAFE_PATH = re.compile(r"/[A-Za-z0-9_./-]+\Z")
 
 
+# Device Golden recovery (mirrors pl/hil/fpga_image_guard.GOLDEN_RECOVERY_*;
+# equality is CI-enforced). Never read from the on-device Image Manifest.
+GOLDEN_RECOVERY = (
+    "base.bin",
+    "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+)
+
+
 class NotRun(Exception):
     def __init__(self, status: int, message: str):
         self.status = status
@@ -578,7 +586,7 @@ def z2_preflight(args):
             Path("/sys/class/fpga_manager/fpga0/state").read_text().strip() != "operating"):
         raise NotRun(69, "HELD_IMAGE_CHECKPOINT_MISMATCH")
     for name, expected in ((manifest["firmware_name"], manifest["firmware_sha256"]),
-                           (manifest["recovery_name"], manifest["recovery_sha256"])):
+                           GOLDEN_RECOVERY):
         if sha(file_at("/lib/firmware/" + name)) != expected:
             raise NotRun(77, "FPGA_OR_GOLDEN_SHA_MISMATCH")
     for dev in ("/dev/mem", "/dev/uio1"):

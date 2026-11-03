@@ -107,7 +107,9 @@ def test_root_handoff_rejects_wrong_hardware_or_path_claim(
     ("axi_bytes", 0, "IMAGE_RELEASE_APERTURE_DENIED"),
     ("abi_offset", 12, "IMAGE_RELEASE_ABI_DENIED"),
     ("uio_name", "uio7", "IMAGE_RELEASE_UIO_DENIED"),
-    ("recovery_name", "forged.bin", "ROOT_HANDOFF_IMAGE_IDENTITY_MISMATCH"),
+    # Golden is a device fact: a Bundle Manifest cannot rename or re-hash it.
+    ("recovery_name", "forged.bin", "IMAGE_RECOVERY_NOT_DEVICE_GOLDEN"),
+    ("recovery_sha256", "d" * 64, "IMAGE_RECOVERY_NOT_DEVICE_GOLDEN"),
 ])
 def test_root_full_loader_contract_rejects_bad_manifest_claim(
     tmp_path: Path, field: str, value, expected: str

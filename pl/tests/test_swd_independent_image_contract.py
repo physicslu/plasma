@@ -129,7 +129,7 @@ def test_root_identity_uses_axi_base_not_owner_base():
 
 def test_platform_owner_admission_is_index_independent_and_fail_closed():
     class Release:
-        recovery_sha256 = "b" * 64
+        recovery_sha256 = guard.GOLDEN_RECOVERY_SHA256
         firmware_sha256 = "a" * 64
         expected_uio = {"platform_node": "43c01000.plasma-swd",
                         "driver": "uio_pdrv_genirq",
@@ -211,7 +211,7 @@ def test_live_resolver_binds_platform_resource_regardless_of_uio_ordinal(tmp_pat
                         "driver": "uio_pdrv_genirq",
                         "maps": [[0x43C01000, 0x2000]], "runtime": "suspended"}
         uio_name = ""
-        recovery_sha256 = "b" * 64
+        recovery_sha256 = guard.GOLDEN_RECOVERY_SHA256
         firmware_sha256 = "a" * 64
         firmware_name = "candidate.bin"
         recovery_name = "base.bin"
