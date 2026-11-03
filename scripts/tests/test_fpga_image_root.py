@@ -91,9 +91,11 @@ class GenericImageRootTests(unittest.TestCase):
 
     def test_root_entry_does_not_name_any_single_image_handler(self):
         shell = (ROOT / "scripts/z2/plasma-path2-root-entry").read_text()
-        self.assertIn('module="pl.hil.fpga_image_root"', shell)
-        self.assertIn('pl/hil/fpga_image_guard.py', shell)
-        self.assertIn('pl/hil/fpga_image_admission.py', shell)
+        self.assertIn('module=pl.hil.fpga_image_root', shell)
+        self.assertNotIn('verifier=/opt/plasma/bootstrap/ppu_privileged_source.py', shell)
+        validator = (ROOT / "scripts/ppu_privileged_source.py").read_text()
+        self.assertIn('pl/hil/fpga_image_guard.py', validator)
+        self.assertIn('pl/hil/fpga_image_admission.py', validator)
         self.assertNotIn('pl/hil/approved-fpga-image.json', shell)
         self.assertIn("plasma-image-manifest.json", (ROOT / "pl/hil/fpga_image_root.py").read_text())
         self.assertIn('download|test|restore', shell)

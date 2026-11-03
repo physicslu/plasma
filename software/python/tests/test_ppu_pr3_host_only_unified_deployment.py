@@ -31,18 +31,9 @@ def verified(tmp_path: Path):
 
 
 def trusted_policy(artifact):
-    return {
-        "schema": contract.BUNDLE_POLICY_SCHEMA,
-        "publisher": "approved-lab-publisher",
-        "source_commit": artifact.source_commit,
-        "archive_sha256": artifact.archive_sha256,
-        "target": dict(artifact.target),
-        "purpose": artifact.purpose,
-        "master_generation": 3,
-        "active_master_generation": 3,
-        "allowed_kinds": [c.kind for c in artifact.packages],
-        "expires_epoch_s": NOW + 3600,
-    }
+    return {"schema": "plasma.ppu.bundle-authority.v2",
+            "generation": 3,
+            "approved_bundle_sha256": [artifact.archive_sha256]}
 
 
 def test_pr3_versioned_dag_and_staged_components(tmp_path):
@@ -130,17 +121,11 @@ def test_pr3_exact_authority_gate_accepts_only_host_only_scope(tmp_path):
 
 
 @pytest.mark.parametrize("change,reason", [
-    ({"schema": "unknown"}, "BUNDLE_AUTHORITY_MISMATCH"),
-    ({"publisher": ""}, "BUNDLE_AUTHORITY_MISMATCH"),
-    ({"source_commit": "b" * 40}, "BUNDLE_AUTHORITY_MISMATCH"),
-    ({"archive_sha256": "0" * 64}, "BUNDLE_AUTHORITY_MISMATCH"),
-    ({"target": {"platform": "other"}}, "BUNDLE_AUTHORITY_MISMATCH"),
-    ({"purpose": "system"}, "BUNDLE_AUTHORITY_MISMATCH"),
-    ({"master_generation": 2}, "BUNDLE_AUTHORITY_REVOKED_OR_EXPIRED"),
-    ({"active_master_generation": 4}, "BUNDLE_AUTHORITY_REVOKED_OR_EXPIRED"),
-    ({"expires_epoch_s": NOW}, "BUNDLE_AUTHORITY_REVOKED_OR_EXPIRED"),
-    ({"allowed_kinds": ["python"]}, "BUNDLE_PACKAGE_KIND_NOT_AUTHORIZED"),
-    ({"allowed_kinds": []}, "BUNDLE_PACKAGE_KIND_NOT_AUTHORIZED"),
+    ({"schema": "unknown"}, "BUNDLE_AUTHORITY_POLICY_INVALID"),
+    ({"generation": 0}, "BUNDLE_AUTHORITY_POLICY_INVALID"),
+    ({"approved_bundle_sha256": ["0" * 64]}, "BUNDLE_AUTHORITY_DIGEST_NOT_APPROVED"),
+    ({"approved_bundle_sha256": ["f" * 64, "f" * 64]}, "BUNDLE_AUTHORITY_POLICY_INVALID"),
+    ({"publisher": "untrusted"}, "BUNDLE_AUTHORITY_NOT_PROVISIONED"),
 ])
 def test_pr3_authority_denials_have_no_journal_or_installs(tmp_path, change, reason):
     archive, digest, artifact = verified(tmp_path)
@@ -194,8 +179,15 @@ def test_pr3_manager_bundle_admission_uses_same_authenticated_api(tmp_path):
                     "result": {
                         "stage": "package_admission_only",
                         "install_qualified": False,
+                        "source_authorized": True,
                         "plan": {
                             "kind": "bundle", "execution_permitted": False,
+                            "archive_sha256": "b" * 64,
+                            "authorization": {
+                                "status": "LOCAL_APPROVED",
+                                "method": "device-local-exact-bundle-sha256",
+                                "archive_sha256": "b" * 64,
+                            },
                         },
                     },
                 },
@@ -245,7 +237,7 @@ def test_pr3_manager_rejects_untrusted_upstream_install_receipt(tmp_path):
     manager = ManagerBootstrapCoordinator(
         _registry(tmp_path), creds, 2.0, client_factory=CompromisedClient,
     )
-    with pytest.raises(BootstrapManagerError, match="not non-executing"):
+    with pytest.raises(BootstrapManagerError, match="not locally approved and non-executing"):
         manager.start_deployment("z2", {"kind": "bundle", "upload_id": "a" * 32})
 
 

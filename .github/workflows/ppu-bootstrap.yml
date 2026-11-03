@@ -18,6 +18,11 @@ on:
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_bundle_authority.py"
+      - "scripts/ppu_asset_execution.py"
+      - "scripts/ppu_privileged_source.py"
+      - "scripts/ppu-privileged-source-install.py"
+      - "scripts/z2/plasma-path2-root-entry"
+      - "software/python/tests/test_ppu_privileged_source_gate1.py"
       - "scripts/ppu_fpga_qualification.py"
       - "scripts/ppu-fpga-image-contracts.json"
       - "pl/hil/fpga_image_guard.py"
@@ -33,6 +38,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
       - "software/python/tests/test_ppu_bundle_authority_gate1.py"
+      - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
       - "software/python/tests/ppu_fpga_qualification_fixture.py"
       - "software/python/tests/test_ppu_bundle_v3_packages_contract.py"
@@ -62,6 +68,11 @@ on:
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_bundle_authority.py"
+      - "scripts/ppu_asset_execution.py"
+      - "scripts/ppu_privileged_source.py"
+      - "scripts/ppu-privileged-source-install.py"
+      - "scripts/z2/plasma-path2-root-entry"
+      - "software/python/tests/test_ppu_privileged_source_gate1.py"
       - "scripts/ppu_fpga_qualification.py"
       - "scripts/ppu-fpga-image-contracts.json"
       - "pl/hil/fpga_image_guard.py"
@@ -77,6 +88,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
       - "software/python/tests/test_ppu_bundle_authority_gate1.py"
+      - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
       - "software/python/tests/ppu_fpga_qualification_fixture.py"
       - "software/python/tests/test_ppu_bundle_v3_packages_contract.py"
@@ -120,6 +132,9 @@ jobs:
           scripts/ppu_unified_deployment.py
           scripts/ppu_asset_set.py
           scripts/ppu_bundle_authority.py
+          scripts/ppu_asset_execution.py
+          scripts/ppu_privileged_source.py
+          scripts/ppu-privileged-source-install.py
           scripts/ppu_fpga_qualification.py
           pl/hil/fpga_image_root.py
           pl/hil/fpga_image_guard.py
@@ -134,6 +149,8 @@ jobs:
           software/python/tests/test_ppu_deploy_api_host.py
           software/python/tests/test_ppu_b3_z2_install_gate1.py
           software/python/tests/test_ppu_bundle_authority_gate1.py
+          software/python/tests/test_ppu_asset_execution_gate1.py
+          software/python/tests/test_ppu_privileged_source_gate1.py
           software/python/tests/test_ppu_fpga_static_qualification_gate1.py
           software/python/tests/test_ppu_bundle_v3_packages_contract.py
           software/python/tests/test_ppu_package_receive_admission_pr1.py
@@ -173,6 +190,9 @@ jobs:
             scripts/ppu-z2-installer-core.py \
             scripts/ppu_asset_set.py \
             scripts/ppu_bundle_authority.py \
+            scripts/ppu_asset_execution.py \
+            scripts/ppu_privileged_source.py \
+            scripts/ppu-privileged-source-install.py \
             scripts/ppu_fpga_qualification.py \
             scripts/ppu-fpga-image-contracts.json \
             "$root/scripts/"
@@ -183,6 +203,12 @@ jobs:
             pl/hil/fpga_image_guard.py \
             pl/hil/fpga_image_admission.py \
             "$root/scripts/pl/hil/"
+          # Immutable privileged Root source is shipped as source-only data.
+          mkdir -p "$root/scripts/software/python/plasma_interfaces" "$root/scripts/z2"
+          cp software/python/plasma_interfaces/__init__.py \
+             software/python/plasma_interfaces/linux_mmio.py \
+             "$root/scripts/software/python/plasma_interfaces/"
+          cp scripts/z2/plasma-path2-root-entry "$root/scripts/z2/"
           # Generic B3 capability belongs to Bootstrap, not any test ZIP.
           cp scripts/ppu-bundle-install-policy.json "$root/scripts/"
           python - "$root/manifest.json" "$version" "$GITHUB_SHA" <<'PY'

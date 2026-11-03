@@ -41,18 +41,8 @@ def build_smoke(tmp_path: Path) -> tuple[Path, str]:
 
 
 def policy_for(digest: str) -> dict:
-    return {
-        "schema": "plasma.ppu.host-policy.v1",
-        "publisher": "fixture-publisher",
-        "source_commit": SOURCE,
-        "archive_sha256": digest,
-        "target": TARGET,
-        "purpose": "programming",
-        "master_generation": 1,
-        "active_master_generation": 1,
-        "allowed_kinds": ["ic-catalog", "programming-profile", "python"],
-        "expires_epoch_s": 200,
-    }
+    return {"schema": "plasma.ppu.bundle-authority.v2",
+            "generation": 1, "approved_bundle_sha256": [digest]}
 
 
 def stage_smoke(tmp_path: Path):

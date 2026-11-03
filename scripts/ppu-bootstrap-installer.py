@@ -31,6 +31,9 @@ REQUIRED_SCRIPTS = (
     "ppu_fpga_qualification.py",
     "ppu-fpga-image-contracts.json",
     "ppu_asset_set.py",
+    "ppu_asset_execution.py",
+    "ppu_privileged_source.py",
+    "ppu-privileged-source-install.py",
 )
 
 # B2 static FPGA qualification reuses the ONE protected Root Image Manifest
@@ -101,6 +104,40 @@ def _copy_root_parser(source_root: Path, install_root: Path) -> None:
         os.replace(temporary, destination)
 
 
+def _copy_privileged_source_inputs(source_root: Path, install_root: Path) -> None:
+    """Ship immutable FPGA Source inputs; NOT a root-loader activation.
+
+    Provisioning under /opt/plasma/privileged is an explicit step after an
+    operator qualifies the Z2 runtime, Root Guard and recovery boundary.
+    """
+    for relative in (
+        "software/python/plasma_interfaces/__init__.py",
+        "software/python/plasma_interfaces/linux_mmio.py",
+        "z2/plasma-path2-root-entry",
+    ):
+        sources = [
+            source_root / relative,
+            source_root.parent / relative,
+        ]
+        src = next((item for item in sources if item.is_file() and
+                    not item.is_symlink()), None)
+        if src is None:
+            raise BootstrapInstallError("factory privileged code source missing: " + relative)
+        dst = install_root / relative
+        for directory in reversed((dst.parent, *dst.parent.parents)):
+            if directory == install_root.parent:
+                break
+            if directory.is_symlink():
+                raise BootstrapInstallError("factory privileged destination symlink denied")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dst.with_name(dst.name + ".new")
+        if dst.is_symlink() or tmp.is_symlink():
+            raise BootstrapInstallError("factory privileged destination symlink denied")
+        shutil.copyfile(src, tmp)
+        tmp.chmod(0o644 if relative.endswith(".py") else 0o755)
+        os.replace(tmp, dst)
+
+
 def _copy_scripts(source_root: Path, install_root: Path) -> None:
     source_root = source_root.resolve()
     # Reject an incomplete bundle before touching a previously installed service.
@@ -148,6 +185,7 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
         temporary.chmod(mode)
         os.replace(temporary, destination)
     _copy_root_parser(source_root, install_root)
+    _copy_privileged_source_inputs(source_root, install_root)
 
 
 def install_bootstrap(

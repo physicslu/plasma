@@ -135,6 +135,9 @@
 
 - **Current** — [PPU Deployment — Start Here](deployment/ppu-deployment-start-here.md)：PPU 只有兩條部署路線——**A. 正式部署**（Console → Bootstrap API（`/v1/uploads` 上傳 → `POST /v1/deployments`），單一 Coordinator；Factory Bootstrap 為前置步驟、`plasmactl z2-ps` 為內部執行器、Bundle v3 為內容格式）與 **B. 工程部署**（SWPC `ppu-deploy` over SSH，僅供開發）——以及部署順序。
 - **Current** · `Host-only` · `PR #1251` — [Bundle v3 B2 Master Authority — one source authorization and FPGA static qualification for all Asset kinds](deployment/ppu-bundle-v3-master-authority-gate1.md)：device-local exact complete Bundle SHA256 Master grant、FPGA BIN/HWH/Manifest 靜態資格；B2/B3 fail-closed，`execution_permitted=false`，不載入 FPGA。
+- **Plan** · `Gate 1` · `Host-only` · `PR #1252 Draft` — [One typed Package/Asset Execution Layer — Python, Native C, FPGA](deployment/ppu-common-asset-execution-gate1.md)：共用身分、授權與 dispatch seam；真實 Executor、FPGA Load 接線與 HIL 尚未驗證。
+- **Plan** · `Gate 1` · `Host-only` · `PR #1252 Draft` — [Privileged FPGA Source / Root Pin Retirement](deployment/ppu-root-pin-retirement-gate1.md)：新 root-owned 程式完整性驗證與退役相依盤點；Z2／SWD Site Admission／Native C 串接與 Recovery HIL 尚未驗證。
+- **Plan** · `Gate 1` · `PR #1262 superseded by #1252` — [Non-root Package Action privilege model](architecture/ppu-rootless-package-action-gate1.md)：owner-operated PPU 的非 root 執行方向、現有 Root Guard 及 Z2 權限稽核缺口；不宣稱已具備 rootless FPGA。
 - **Current** · `Host-only` · `PR #1245` — [Generic Bundle v3 B3 — one inert Asset Set staging path](deployment/ppu-bundle-v3-generic-assets-gate1.md)
 - **Plan** · `Gate 1` · `Owner decision 2026-11-02` — [Bundle v3 B3 — Install, Activate and Load the FPGA Image in One Transaction](deployment/ppu-bundle-v3-b3-fpga-load-gate1.md)：明確 `fpga_load=true` 的 B3 於同一 Coordinator 交易內安裝、Root `bundle-load`（download＋Identity）並切換 Active Set；待核准，未實作。
 - **Current** · `Host-only` · `PR #1246` — [Single Active Asset Set P1 — Console SHA reconciliation & guarded Host-only activation](deployment/ppu-single-active-asset-set-gate1.md)

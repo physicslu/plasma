@@ -19,6 +19,9 @@ test("PR3 Console Bundle uses the existing BFF/Manager Bootstrap API, never a ne
   assert.match(api, /export function admitManagerPpuBundle/);
   assert.match(api, /kind: "bundle", upload_id: uploadId/);
   assert.match(api, /execution_permitted !== false/);
+  assert.match(api, /source_authorized !== true/);
+  assert.match(api, /LOCAL_APPROVED/);
+  assert.match(api, /approval\?\.archive_sha256 !== plan\?\.archive_sha256/);
   assert.match(api, /package_admission_only/);
   assert.match(ui, /Verify & Admit Bundle \(No Install\)/);
   assert.match(ui, /admitManagerPpuBundle\(alias, created.upload.upload_id\)/);
@@ -40,7 +43,9 @@ test("PR3 preserves single Manager deployment operation gate and PPU internal ow
   assert.match(manager, /if body.get\("kind"\) == "bundle":/);
   assert.match(manager, /generic Bundle requires only kind and upload_id/);
   assert.match(manager, /"kind": "bundle", "upload_id": upload_id/);
-  assert.match(manager, /generic Bundle admission response is not non-executing/);
+  assert.match(manager, /generic Bundle admission response is not locally approved and non-executing/);
+  assert.match(manager, /source_authorized/);
+  assert.match(manager, /LOCAL_APPROVED/);
   assert.match(server, /gate.try_begin_platform_launch\(alias\)/);
   assert.match(server, /_bootstrap_mutation_allowed\(alias\)/);
   assert.match(server, /coordinator.start_deployment\(alias, body\)/);

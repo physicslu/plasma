@@ -349,21 +349,21 @@ def test_root_loader_runs_entry_outside_bootstrap_sandbox_with_set_sha_only():
 # --- Root Entry shell allowlist ------------------------------------------
 
 ENTRY = ROOT / "scripts/z2/plasma-path2-root-entry"
-PIN = "a" * 40
+PIN = "a" * 40  # explicitly retired; no longer a Root Entry argument
 SET = "b" * 64
 
 
 @pytest.mark.parametrize("argv,code", [
-    (["bundle-load"], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
-    (["bundle-load", PIN, SET], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
-    (["bundle-load", SET, "extra"], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
-    (["bundle-load", "/opt/plasma/assets/staged/" + SET], "PATH2_ASSET_SET_NOT_PINNED"),
-    (["bundle-load", "../" + SET[:61]], "PATH2_ASSET_SET_NOT_PINNED"),
-    (["bundle-load", SET.upper()], "PATH2_ASSET_SET_NOT_PINNED"),
-    (["bundle-load", PIN], "PATH2_ASSET_SET_NOT_PINNED"),
-    (["download", "x" * 40], "PATH2_REQUEST_NOT_PINNED"),
-    (["download", PIN, SET], "PATH2_OPERATION_ARGUMENT_REQUIRED"),
-    (["install", PIN], "PATH2_OPERATION_NOT_ALLOWLISTED"),
+    (["bundle-load"], "PPU_FPGA_OPERATION_ARGUMENT_REQUIRED"),
+    (["bundle-load", PIN, SET], "PPU_FPGA_OPERATION_ARGUMENT_REQUIRED"),
+    (["bundle-load", SET, "extra"], "PPU_FPGA_OPERATION_ARGUMENT_REQUIRED"),
+    (["bundle-load", "/opt/plasma/assets/staged/" + SET], "PPU_FPGA_ASSET_SET_SHA_INVALID"),
+    (["bundle-load", "../" + SET[:61]], "PPU_FPGA_ASSET_SET_SHA_INVALID"),
+    (["bundle-load", SET.upper()], "PPU_FPGA_ASSET_SET_SHA_INVALID"),
+    (["bundle-load", PIN], "PPU_FPGA_ASSET_SET_SHA_INVALID"),
+    (["download", PIN], "PPU_FPGA_OPERATION_ARGUMENT_REQUIRED"),
+    (["download", PIN, SET], "PPU_FPGA_OPERATION_ARGUMENT_REQUIRED"),
+    (["install", PIN], "PPU_FPGA_OPERATION_NOT_ALLOWLISTED"),
 ])
 def test_root_entry_bundle_load_accepts_only_set_sha(argv, code):
     completed = subprocess.run(["bash", str(ENTRY), *argv], capture_output=True,
@@ -372,10 +372,15 @@ def test_root_entry_bundle_load_accepts_only_set_sha(argv, code):
     assert completed.stderr.strip() == code
 
 
-def test_root_entry_passes_set_sha_only_to_bundle_load():
+def test_root_entry_trusts_immutable_code_not_git_commit_pin():
     shell = ENTRY.read_text()
     assert 'bundle-load)' in shell
+    assert 'root=/opt/plasma/privileged/fpga-root' in shell
+    assert 'for file in "$python"; do' in shell
+    assert '"$python" -B "$verifier"' not in shell
     assert '"$python" -B -m "$module" "$operation" ${asset_set:+"$asset_set"}' in shell
+    assert ".plasma-path2-source-commit" not in shell
+    assert "/root/plasma-path2-approved" not in shell.splitlines()[-35:]
 
 
 # --- Protected Root bundle_load ------------------------------------------

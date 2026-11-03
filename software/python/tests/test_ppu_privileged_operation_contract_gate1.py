@@ -326,7 +326,7 @@ def test_no_flexible_argv_command_or_root_override_in_request() -> None:
         PrivilegedRequest(PPUAction.TARGET_PROGRAM, run_as_root=True)  # type: ignore[call-arg]
 
 
-def test_existing_install_root_code_unchanged_and_requires_hashes_and_rollback() -> None:
+def test_existing_install_root_code_requires_hashes_and_rollback() -> None:
     repository = Path(__file__).resolve().parents[3]
     deployment = (repository / "scripts/ppu-bootstrap-deployment.py").read_text()
     installer = (repository / "scripts/ppu-z2-installer-core.py").read_text()
@@ -337,5 +337,6 @@ def test_existing_install_root_code_unchanged_and_requires_hashes_and_rollback()
     assert "recovery_required" in deployment and "rolled_back" in deployment
     assert "sha256" in installer and "rollback" in installer
     assert "download|test|restore" in protected
-    assert "PATH2_ROOT_REQUIRED" in protected
+    assert "PPU_FPGA_ROOT_REQUIRED" in protected
+    assert "PPU_FPGA_TRUSTED_EXECUTOR_NOT_INSTALLED" in protected
     assert 'os.geteuid() != 0' in wordport

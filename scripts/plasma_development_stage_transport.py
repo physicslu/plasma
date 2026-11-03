@@ -218,8 +218,10 @@ def execute(stage: str, source_sha: str, project: str | None = None) -> dict:
         raise Blocked("LOCAL_ENROLLMENT_DENIED") from None
     # Remote command is fixed; only the three bounded stage tokens vary.
     # Root-side executable itself checks protected code/firmware manifest.
-    remote = ("sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " +
-              stage + " " + (source_sha if direct else project + " " + source_sha))
+    # Git source_sha remains an operator/PR audit tag; privileged Root
+    # authenticates the installed executable closure by its own manifest.
+    # No Git Commit Pin, Project, or path is forwarded to Root.
+    remote = "sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " + stage
     argv = [
         "/usr/bin/ssh", "-F", "/dev/null", "-T",
         "-o", "StrictHostKeyChecking=yes",

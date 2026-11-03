@@ -198,7 +198,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     # authorization file was revoked, even if committed ZIP bytes match.
     master_grants = json.loads(paths.bundle_authority_policy.read_text())
     withdrawn = json.loads(json.dumps(master_grants))
-    withdrawn["authorizations"][0]["archive_sha256"] = "f" * 64
+    withdrawn["approved_bundle_sha256"] = ["f" * 64]
     paths.bundle_authority_policy.write_text(json.dumps(withdrawn))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MASTER_AUTHORITY_DENIED"):
         srv.start_deployment({"kind": "bundle", "upload_id": upload_id,

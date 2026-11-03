@@ -17,14 +17,14 @@
 
 struct plasma_swd_observed_identity {
     char boot_id[37];                /* exact Linux boot UUID */
-    char root_source_commit[41];     /* protected Root Git SHA40 source pin */
+    char trusted_code_sha256[65];     /* root-verified code manifest SHA256 */
     char image_manifest_sha256[65];  /* paired Manifest content hash */
     char loaded_image_sha256[65];    /* physically attested current PL Image */
     char image_id[32];              /* ABI-v5 FPGA Image identity */
     char root_image_session_id[38];/* existing Root image journal session ID */
     unsigned int abi_version;
     uint32_t site_bitmap;
-    bool root_source_pinned;
+    bool trusted_code_verified;
     bool manager_operating;
     bool active_image_attested;
     bool axi_isolation_proven;

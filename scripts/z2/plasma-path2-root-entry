@@ -1,123 +1,46 @@
 #!/usr/bin/env bash
-# Protected Z2 operation entry: exact operation + SHA, no Stage/Profile.
-# The caller cannot select a Python module, Project or shell executable.
-#   download|test|restore <40-hex source pin>
-#   bundle-load <64-hex installed B3 Asset Set SHA-256>
-# bundle-load accepts no path or pin: Root locates the immutable B3 Set itself
-# and runs the root-owned pinned source. The B3 Coordinator starts it through
-# systemd-run because the Bootstrap service cannot see /root (ProtectHome).
+# Protected FPGA Package Action entry (filename retained pending Z2 migration).
+# No Git Source Commit Pin, /root/plasma-path2-approved, dynamic executable
+# name, project selection, shell command or Bundle-selected script.
+# The installed privileged Python closure is independently root-owned and
+# provisioned/verified at install time before the existing Root FPGA Loader.
 set -euo pipefail
 asset_set=''
 case "${1:-}" in
   download|test|restore)
-    [[ $# -eq 2 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
+    [[ $# -eq 1 ]] || { echo 'PPU_FPGA_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
     operation="$1" ;;
   bundle-load)
-    [[ $# -eq 2 ]] || { echo 'PATH2_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
+    [[ $# -eq 2 ]] || { echo 'PPU_FPGA_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
     operation="$1"
     asset_set="$2"
     [[ "$asset_set" =~ ^[0-9a-f]{64}$ ]] ||
-      { echo 'PATH2_ASSET_SET_NOT_PINNED' >&2; exit 2; } ;;
-  *) echo 'PATH2_OPERATION_NOT_ALLOWLISTED' >&2; exit 2 ;;
+      { echo 'PPU_FPGA_ASSET_SET_SHA_INVALID' >&2; exit 2; } ;;
+  *) echo 'PPU_FPGA_OPERATION_NOT_ALLOWLISTED' >&2; exit 2 ;;
 esac
-source_sha=''
-if [[ -z "$asset_set" ]]; then
-  source_sha="$2"
-  [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] ||
-    { echo 'PATH2_REQUEST_NOT_PINNED' >&2; exit 2; }
-fi
-[[ "$(id -u)" == '0' ]] || { echo 'PATH2_ROOT_REQUIRED' >&2; exit 2; }
+[[ "$(id -u)" == '0' ]] || { echo 'PPU_FPGA_ROOT_REQUIRED' >&2; exit 2; }
 
-root=/root/plasma-path2-approved
+root=/opt/plasma/privileged/fpga-root
 python=/opt/plasma/python/3.12.13/bin/python3
-manifest="$root/.plasma-path2-source-sha256"
-commit_pin="$root/.plasma-path2-source-commit"
-[[ -d "$root" && ! -L "$root" && -f "$manifest" && ! -L "$manifest" &&
-   -f "$commit_pin" && ! -L "$commit_pin" ]] ||
-  { echo 'PATH2_APPROVED_ROOT_SOURCE_NOT_INSTALLED' >&2; exit 2; }
-[[ -f "$python" && -x "$python" ]] ||
-  { echo 'PATH2_PINNED_PYTHON_NOT_INSTALLED' >&2; exit 2; }
+module=pl.hil.fpga_image_root
 
-# Source provenance is one root-owned SHA256-pinned commit, not a Profile.
-# The entrypoint chooses its reviewed implementation; caller cannot supply
-# a Python module, Project, image or other executable resource.
-[[ "$(wc -l < "$commit_pin")" -eq 1 ]] ||
-  { echo 'PATH2_APPROVED_COMMIT_PIN_INVALID' >&2; exit 2; }
-installed_sha="$(cat "$commit_pin")"
-# bundle-load runs whatever reviewed source is pinned in the root-owned tree.
-[[ -n "$asset_set" ]] && source_sha="$installed_sha"
-[[ "$installed_sha" =~ ^[0-9a-f]{40}$ &&
-   "$installed_sha" == "$source_sha" ]] ||
-  { echo 'PATH2_APPROVED_SOURCE_SHA_MISMATCH' >&2; exit 2; }
-module="pl.hil.fpga_image_root"
-module_file="pl/hil/fpga_image_root.py"
-
-# Only root-installed, hash-checked source may run under sudo.
-# Every import-path ancestor is root-owned, so a non-root account cannot
-# swap a checked Python module or a package directory between verification
-# and interpreter startup.
-for file in /root "$root" "$root/pl" "$root/pl/hil" \
-  "$root/software" "$root/software/python" \
-  "$root/software/python/plasma_interfaces" \
-  "$manifest" "$commit_pin" "$root/$module_file"; do
-  [[ -e "$file" && ! -L "$file" && "$(stat -c '%u' "$file")" == '0' ]] ||
-    { echo 'PATH2_SOURCE_NOT_ROOT_OWNED' >&2; exit 2; }
-  perm="$(stat -c '%a' "$file")"
-  (( (8#$perm & 0022) == 0 )) ||
-    { echo 'PATH2_SOURCE_WRITABLE_BY_OTHERS' >&2; exit 2; }
+# Do not permit a non-root account to substitute the verifier/entrypoint
+# while Root is about to import the protected FPGA hardware implementation.
+for dir in /opt /opt/plasma /opt/plasma/bootstrap /opt/plasma/privileged "$root"; do
+  [[ -d "$dir" && ! -L "$dir" && "$(stat -c '%u' "$dir")" == '0' ]] ||
+    { echo 'PPU_FPGA_TRUSTED_SOURCE_NOT_INSTALLED' >&2; exit 2; }
+  mode="$(stat -c '%a' "$dir")"
+  (( (8#$mode & 0022) == 0 )) ||
+    { echo 'PPU_FPGA_TRUSTED_SOURCE_WRITABLE' >&2; exit 2; }
 done
-for required in \
-  .plasma-path2-source-commit \
-  "$module_file" \
-  pl/hil/fpga_image_guard.py \
-  pl/hil/fpga_image_admission.py \
-  software/python/plasma_interfaces/linux_mmio.py; do
-  /usr/bin/awk -v path="$required" '$2 == path && length($1) == 64 && $1 ~ /^[0-9a-f]+$/ {found = 1} END {exit !found}' "$manifest" ||
-    { echo 'PATH2_REQUIRED_SOURCE_NOT_PINNED' >&2; exit 2; }
+for file in "$python"; do
+  [[ -f "$file" && ! -L "$file" && "$(stat -c '%u' "$file")" == '0' ]] ||
+    { echo 'PPU_FPGA_TRUSTED_EXECUTOR_NOT_INSTALLED' >&2; exit 2; }
+  mode="$(stat -c '%a' "$file")"
+  (( (8#$mode & 0022) == 0 )) ||
+    { echo 'PPU_FPGA_TRUSTED_EXECUTOR_WRITABLE' >&2; exit 2; }
 done
-# A generic module can import other Python files; do not reproduce the
-# historical omission where only the entry module (not its dependencies)
-# was required in the SHA256 manifest. Protect the complete installed
-# Python source closure, independent of project name or test implementation.
-while IFS= read -r -d '' node; do
-  [[ ! -L "$node" && "$(stat -c '%u' "$node")" == '0' ]] ||
-    { echo 'PATH2_SOURCE_NOT_ROOT_OWNED' >&2; exit 2; }
-  perm="$(stat -c '%a' "$node")"
-  (( (8#$perm & 0022) == 0 )) ||
-    { echo 'PATH2_SOURCE_WRITABLE_BY_OTHERS' >&2; exit 2; }
-done < <(/usr/bin/find "$root" -type d -print0)
-
-# Reject unreviewed import-path symlinks (including packages outside tree).
-[[ -z "$(/usr/bin/find "$root" -type l -print -quit)" ]] ||
-  { echo 'PATH2_SOURCE_NOT_ROOT_OWNED' >&2; exit 2; }
-
-# A pinned .py is insufficient if an import dependency is writable or
-# Python loads an unpinned .pyc. Check all files and never execute cached
-# bytecode from this protected source tree.
-while IFS= read -r -d '' source; do
-  [[ "$(stat -c '%u' "$source")" == '0' ]] ||
-    { echo 'PATH2_SOURCE_NOT_ROOT_OWNED' >&2; exit 2; }
-  perm="$(stat -c '%a' "$source")"
-  (( (8#$perm & 0022) == 0 )) ||
-    { echo 'PATH2_SOURCE_WRITABLE_BY_OTHERS' >&2; exit 2; }
-  case "$source" in
-    *.pyc|*.pyo)
-      echo 'PATH2_UNPINNED_BYTECODE_DENIED' >&2; exit 2 ;;
-    *.py)
-      relative="${source#"$root/"}"
-      /usr/bin/awk -v path="$relative" '$2 == path && length($1) == 64 && $1 ~ /^[0-9a-f]+$/ {found = 1} END {exit !found}' "$manifest" ||
-        { echo 'PATH2_REQUIRED_SOURCE_NOT_PINNED' >&2; exit 2; } ;;
-  esac
-done < <(/usr/bin/find "$root" -type f -print0)
-
-(cd "$root" && /usr/bin/sha256sum --check --status .plasma-path2-source-sha256) ||
-  { echo 'PATH2_APPROVED_SOURCE_HASH_MISMATCH' >&2; exit 2; }
-
-# The pinned *code* remains protected independently of runtime Image data.
-# The companion Manifest lives beside its BIN in the root-owned firmware area;
-# it is checked by the generic Root, not added to the code SHA allowlist.
-# B2/B3, Golden recovery and the FPGA owner lock remain mandatory.
 cd "$root"
-exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
+exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/var/empty \
   PYTHONPATH="$root" PYTHONDONTWRITEBYTECODE=1 \
   "$python" -B -m "$module" "$operation" ${asset_set:+"$asset_set"}
