@@ -2,7 +2,7 @@
 
 > **Terminology update (2026-11-03):** Current Bundle stages are **B1 Receive → B2 Admission → B3 Install/Verify**. The former **B4** means historical/internal Active Set selection and recovery, **not a separate operator step**. See [Install → Run → Result](../architecture/ppu-install-run-result.md) and the [glossary](../glossary.md#b1b2b3).
 
-**State:** P1 Host-only implementation merged in main (PR #1246) / CI evidence only. This document retains the original P1 internal activation design. Subsequent B3 `fpga_load:true` integration can publish the Active Set in the same authorized Coordinator transaction; B3 `fpga_load:false` remains staging-only. **No separate B4 operator step** ([current lifecycle](../architecture/ppu-install-run-result.md)).
+**State:** P1 Host-only implementation merged in main (PR #1246) / CI evidence only. This document retains the original P1 internal activation design. Subsequent B3 `fpga_load:true` integration can publish the Active Set in the same authorized Coordinator transaction; B3 `fpga_load:false` remains staging-only. **New target (2026-11-03):** a successful standard B3 Install also selects Active; FPGA Image Bundles request authorized load by default, while non-FPGA Bundles select Active without loading FPGA. This is **not yet implemented for the install-only/no-FPGA case**. No separate B4 operator step ([lifecycle](../architecture/ppu-install-run-result.md)).
 **Dependencies:** [PR #1245](https://github.com/physicslu/plasma/pull/1245)
 (Generic Bundle B3 Install/Verify), plus the owner-approved architectural
 decision in [PR #1244](https://github.com/physicslu/plasma/pull/1244).
@@ -43,7 +43,7 @@ signature, Master approval or device authorization.
 The existing `DeploymentCoordinator` owns `deployment.lock` and
 `deployment.json` for B3 and Asset Set activation, with one atomic
 `assets/active.json` pointer swap and durable `fsync`. This is a
-**explicitly authorized internal operation**, not a new public B4 stage. The original P1 helper may be called as part of a verified B3 `fpga_load:true` transaction; install-only B3 never switches the Active pointer.
+**explicitly authorized internal operation**, not a new public B4 stage. The original P1 helper may be called as part of a verified B3 `fpga_load:true` transaction; **current** install-only B3 does not switch the Active pointer; **target** successful non-FPGA standard Install must switch it without FPGA loading, requiring separate implementation/CI qualification.
 
 The PPU Runtime already has a private Unix control socket
 (`/run/plasma-server/control.sock`) and a `SiteManager` execution
