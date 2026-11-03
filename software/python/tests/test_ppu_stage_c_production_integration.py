@@ -490,16 +490,16 @@ def test_worker_down_or_socket_permission_wrong_fails_closed(tmp_path, problem):
 class RecoveryAdapter(MockAdapter):
     def __init__(self):
         super().__init__()
-        self.ident = {"status": "IMAGE", "image_id": "img-v5"}
         self.verify_result = "ok"
         self.verified = []
+
+    def identity(self):
+        raise AssertionError("Site recovery must not read FPGA Image or Journal identity")
 
     def verify_safe_off(self, site, *, deadline):
         self.verified.append(site)
         if self.verify_result == "unknown":
             raise worker.TransportUnknown("SAFE_OFF_NOT_VERIFIED")
-        if self.verify_result == "reload":
-            self.ident = {"status": "IMAGE", "image_id": "img-v5", "session_id": "new"}
         return {"result": "SAFE_OFF_VERIFIED", "log_sha256": "a" * 64}
 
 
@@ -512,16 +512,16 @@ def sealed_rig(tmp_path):
     return adapter, seals
 
 
-def do_recover(adapter, seals, tmp_path, *, worker_active=False, lease="idle", image="img-v5"):
+def do_recover(adapter, seals, tmp_path, *, worker_active=False, lease="idle"):
     return recovery.recover(2, operator="owner", adapter=adapter, seal_dir=seals,
                             evidence_dir=tmp_path / "evidence", worker_active=lambda: worker_active,
-                            runtime_lease=lambda: lease, expected_image_id=image)
+                            runtime_lease=lambda: lease)
 
 
 def test_recovery_positive_moves_marker_into_evidence_and_worker_unseals(tmp_path):
     adapter, seals = sealed_rig(tmp_path)
     diag = recovery.checks(2, adapter=adapter, seal_dir=seals, worker_active=lambda: False,
-                           runtime_lease=lambda: "idle", expected_image_id="img-v5")
+                           runtime_lease=lambda: "idle")
     assert diag["preconditions"] == "PASS" and adapter.verified == []   # diagnose is read-only
     assert (seals / "site2.sealed").exists()
     out = do_recover(adapter, seals, tmp_path)
@@ -541,7 +541,6 @@ def test_recovery_positive_moves_marker_into_evidence_and_worker_unseals(tmp_pat
     ({"worker_active": None}, None, "worker_stopped"),
     ({"lease": "busy"}, None, "no_active_job"),
     ({"lease": "unknown"}, None, "no_active_job"),
-    ({"image": "other-image"}, None, "fpga_identity"),
     ({}, lambda a, s: setattr(a, "startup", {2}), "no_external_owner"),
     ({}, lambda a, s: (s / "site2.sealed").write_text("{bad"), "seal_present"),
     ({}, lambda a, s: (s / "site2.sealed").unlink(), "seal_present"),
@@ -556,8 +555,8 @@ def test_recovery_denied_when_any_precondition_unproven(tmp_path, kw, setup, fie
     assert Path(out["evidence"]).name.endswith("-denied.json")
 
 
-@pytest.mark.parametrize("verify", ["unknown", "reload"])
-def test_recovery_stays_sealed_if_safe_off_unproven_or_identity_changes(tmp_path, verify):
+@pytest.mark.parametrize("verify", ["unknown"])
+def test_recovery_stays_sealed_if_safe_off_unproven(tmp_path, verify):
     adapter, seals = sealed_rig(tmp_path)
     adapter.verify_result = verify
     out = do_recover(adapter, seals, tmp_path)
@@ -571,7 +570,7 @@ def test_recovery_requires_operator_name(tmp_path):
     adapter, seals = sealed_rig(tmp_path)
     with pytest.raises(SystemExit, match="OPERATOR_NAME_REQUIRED"):
         recovery.recover(2, operator="", adapter=adapter, seal_dir=seals, evidence_dir=tmp_path / "e",
-                         worker_active=lambda: False, runtime_lease=lambda: "idle", expected_image_id="img-v5")
+                         worker_active=lambda: False, runtime_lease=lambda: "idle")
 
 
 # --- 6. Runtime composition --------------------------------------------------------------
