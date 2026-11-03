@@ -44,6 +44,7 @@ JOB_ID = re.compile(r"[0-9a-f]{32}\Z")
 OUTPUT_LIMIT = 64 * 1024
 TAIL_BYTES = 4096
 KILL_GRACE_S = 2.0
+KILL_REAP_TIMEOUT_S = 10.0
 MEMORY_LIMIT = 512 * 1024 * 1024
 OPEN_FILES_LIMIT = 64
 FILE_SIZE_LIMIT = 16 * 1024 * 1024
@@ -279,7 +280,10 @@ class _UnitHandle:
         return self.returncode
 
     def signal_group(self, sig: int) -> None:
-        self.spawner.systemctl("kill", f"--signal={int(sig)}", "--kill-whom=all", self.unit)
+        # Fail closed: an unconfirmed kill must never be treated as delivered.
+        r = self.spawner.systemctl("kill", f"--signal={int(sig)}", "--kill-who=all", self.unit)
+        if r.returncode != 0:
+            raise PackageLaunchDenied("PACKAGE_UNIT_KILL_FAILED")
 
     def wait(self, timeout: float | None = None):
         deadline = None if timeout is None else time.monotonic() + timeout
@@ -423,7 +427,11 @@ def make_package_executor(
                 except Exception as exc:
                     transport.update(session="CLOSE_FAILED", error=str(exc)[:120])
                 session = None
-            child.wait()
+            try:
+                # Bounded: a kill that does not take effect is an unknown outcome.
+                child.wait(timeout=KILL_REAP_TIMEOUT_S)
+            except subprocess.TimeoutExpired:
+                raise PackageLaunchDenied("PACKAGE_ACTION_KILL_UNCONFIRMED") from None
             for _ in range(int(KILL_GRACE_S / poll_s)):
                 if not child.group_alive():
                     break

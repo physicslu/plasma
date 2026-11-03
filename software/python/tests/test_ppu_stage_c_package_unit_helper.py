@@ -89,8 +89,8 @@ def P(**kw):
 def test_helper_builds_fixed_systemctl_argv_for_each_allowed_op(rig):
     rig.spec()
     assert rig.client("start", UNIT).returncode == 0
-    assert rig.client("kill", "--signal=15", "--kill-whom=all", UNIT).returncode == 0
-    assert rig.client("kill", "--signal=9", "--kill-whom=all", UNIT).returncode == 0
+    assert rig.client("kill", "--signal=15", "--kill-who=all", UNIT).returncode == 0
+    assert rig.client("kill", "--signal=9", "--kill-who=all", UNIT).returncode == 0
     shown = rig.client("show", "--property=ActiveState,SubState,MainPID,TasksCurrent", UNIT)
     assert dict(line.split("=", 1) for line in shown.stdout.splitlines()) == {
         "ActiveState": "active", "SubState": "running", "MainPID": "4242", "TasksCurrent": "1"}
@@ -99,8 +99,8 @@ def test_helper_builds_fixed_systemctl_argv_for_each_allowed_op(rig):
     assert listed.stdout == f"{UNIT} loaded\n"         # foreign units never reported
     assert rig.systemctl.calls == [
         ("start", UNIT),
-        ("kill", "--signal=15", "--kill-whom=all", UNIT),
-        ("kill", "--signal=9", "--kill-whom=all", UNIT),
+        ("kill", "--signal=15", "--kill-who=all", UNIT),
+        ("kill", "--signal=9", "--kill-who=all", UNIT),
         ("show", "--property=ActiveState,SubState,MainPID,TasksCurrent", UNIT),
         ("stop", UNIT),
         ("list-units", "--all", "--plain", "--no-legend", "plasma-package@*"),

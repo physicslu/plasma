@@ -102,7 +102,9 @@ class PackageUnitHelper:
             if op == "kill":
                 _require(type(request["signal"]) is int and request["signal"] in SIGNALS,
                          "SIGNAL_DENIED")
-                r = self.systemctl("kill", f"--signal={request['signal']}", "--kill-whom=all", unit)
+                # --kill-who= : the only spelling systemd 249 (Z2) accepts; newer
+                # systemd keeps it as an alias of --kill-whom=.
+                r = self.systemctl("kill", f"--signal={request['signal']}", "--kill-who=all", unit)
                 return {"ok": True, "rc": r.returncode}
             r = self.systemctl("show", f"--property={SHOW_PROPERTIES}", unit)
             props = dict(line.split("=", 1) for line in r.stdout.splitlines() if "=" in line)
@@ -214,7 +216,7 @@ class HelperSystemctl:
             elif len(args) == 2 and args[0] in ("start", "stop"):
                 reply = self._call({"op": args[0], "job_id": self._job(args[1])})
                 out = ""
-            elif (len(args) == 4 and args[0] == "kill" and args[2] == "--kill-whom=all"
+            elif (len(args) == 4 and args[0] == "kill" and args[2] == "--kill-who=all"
                   and args[1].startswith("--signal=") and args[1][9:].isdigit()):
                 reply = self._call({"op": "kill", "job_id": self._job(args[3]), "signal": int(args[1][9:])})
                 out = ""

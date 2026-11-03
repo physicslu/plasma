@@ -43,7 +43,6 @@ def package_unit() -> str:
     return "\n".join([
         "[Unit]",
         "Description=PLASMA Package Action %i (non-root, fixed entry)",
-        "Documentation=docs/deployment/ppu-common-asset-execution-gate1.md",
         "",
         "[Service]",
         "Type=exec",
