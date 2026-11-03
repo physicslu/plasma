@@ -3,7 +3,7 @@
 Covers the plasma-package UID unit contract, the fixed entry stub, the systemd
 spawner (with a fake systemctl that really runs the entry), Site Worker socket
 roles / Runtime restart, fail-closed wiring and Seal Operator Recovery.
-Real Linux UID separation, systemd, polkit and Z2 hardware are NOT_QUALIFIED.
+Real Linux UID separation, systemd and Z2 hardware are NOT_QUALIFIED.
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def directives(text: str) -> dict[str, list[str]]:
     return out
 
 
-# --- 1. unit / polkit / tmpfiles static contract -----------------------------------
+# --- 1. unit / tmpfiles static contract -----------------------------------
 
 def test_package_unit_runs_as_dedicated_uid_with_fixed_entry_and_no_privilege():
     d = directives(units.package_unit())
@@ -86,52 +86,20 @@ def test_site_worker_unit_is_local_only_and_not_a_network_service():
 
 def test_runtime_dropin_and_tmpfiles_only_add_spec_dir_and_worker_dependency():
     d = directives(units.runtime_dropin())
-    assert d == {"Wants": ["plasma-site-worker.service"], "After": ["plasma-site-worker.service"],
+    assert d == {"Wants": ["plasma-site-worker.service plasma-package-control.service"],
+                 "After": ["plasma-site-worker.service plasma-package-control.service"],
                  "ReadWritePaths": ["/run/plasma-package-specs"]}
     assert "d /run/plasma-package-specs 0755 plasma plasma -" in units.tmpfiles()
     assert set(units.render_all()) == {
         "/etc/systemd/system/plasma-package@.service", "/etc/systemd/system/plasma-site-worker.service",
         "/etc/systemd/system/plasma-server.service.d/50-package-actions.conf",
-        "/etc/tmpfiles.d/plasma-package.conf", "/etc/polkit-1/rules.d/50-plasma-package.rules"}
+        "/etc/tmpfiles.d/plasma-package.conf", "/etc/systemd/system/plasma-package-control.service"}
+    assert not any("polkit" in path for path in units.render_all())
 
 
 def test_installer_does_not_install_the_units_yet():
     core = (ROOT / "scripts/ppu-z2-installer-core.py").read_text()
     assert "ppu_package_units" not in core and "plasma-package@" not in core
-
-
-NODE = shutil.which("node")
-
-
-@pytest.mark.skipif(NODE is None, reason="node not installed")
-@pytest.mark.parametrize("user,unit,verb,want", [
-    ("plasma", "plasma-package@" + "a" * 32 + ".service", "start", "yes"),
-    ("plasma", "plasma-package@" + "a" * 32 + ".service", "stop", "yes"),
-    ("plasma", "plasma-package@" + "a" * 32 + ".service", "kill", "yes"),
-    ("plasma", "plasma-package@" + "a" * 32 + ".service", "restart", "not_handled"),
-    ("plasma-package", "plasma-package@" + "a" * 32 + ".service", "start", "not_handled"),
-    ("plasma", "plasma-site-worker.service", "stop", "not_handled"),
-    ("plasma", "plasma-server.service", "start", "not_handled"),
-    ("plasma", "plasma-package@" + "A" * 32 + ".service", "start", "not_handled"),
-    ("plasma", "plasma-package@x.service", "start", "not_handled"),
-    ("plasma", "plasma-package@" + "a" * 32 + ".service.d", "start", "not_handled"),
-    ("plasma", "ssh.service", "start", "not_handled"),
-])
-def test_polkit_rule_grants_only_the_package_template(tmp_path, user, unit, verb, want):
-    rule = tmp_path / "rule.js"
-    rule.write_text(units.polkit_rule())
-    harness = f"""
-var rule; var polkit = {{Result: {{YES: "yes", NOT_HANDLED: "not_handled"}},
-  addRule: function(f) {{ rule = f; }}}};
-eval(require("fs").readFileSync({json.dumps(str(rule))}, "utf8"));
-var details = {{unit: {json.dumps(unit)}, verb: {json.dumps(verb)}}};
-var action = {{id: "org.freedesktop.systemd1.manage-units", lookup: function(k) {{ return details[k]; }}}};
-process.stdout.write(rule(action, {{user: {json.dumps(user)}}}));
-var other = {{id: "org.freedesktop.login1.reboot", lookup: function() {{ return null; }}}};
-process.stdout.write("," + rule(other, {{user: "plasma"}}));
-"""
-    out = subprocess.run([NODE, "-e", harness], capture_output=True, text=True, check=True).stdout
-    assert out == f"{want},not_handled"
 
 
 # --- 2. fixed entry stub ---------------------------------------------------------------

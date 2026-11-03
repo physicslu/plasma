@@ -180,7 +180,9 @@ class SystemdUnitSpawner:
     """Production process primitive: run the Package as ``plasma-package``.
 
     The Runtime (uid plasma) may only start / stop / kill instances of the
-    fixed template ``plasma-package@<32hex>.service`` (polkit rule); user,
+    fixed template ``plasma-package@<32hex>.service`` through the fixed-purpose
+    root helper ``ppu_package_unit_helper.py`` (pass ``HelperSystemctl`` as
+    ``systemctl``); user,
     sandbox and ExecStart (``ppu_package_entry.py``) are fixed in the unit.
     The only data passed is a job spec in the Runtime-owned spec directory.
     systemd's cgroup bounds every Package process, including setsid escapes.

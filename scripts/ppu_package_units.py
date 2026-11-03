@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage C production integration: systemd / polkit / tmpfiles renderers.
+"""Stage C production integration: systemd / tmpfiles renderers.
 
 Pure text renderers only. Nothing here installs or enables units, and the
 existing Z2 installer does not reference this module yet (Z2 Gate step).
@@ -13,6 +13,8 @@ Identity model:
 Sockets (AF_UNIX only, no TCP/HTTP):
   /run/plasma-site-worker/control.sock    root:plasma          0660
   /run/plasma-site-worker/transport.sock  root:plasma-package  0660
+  /run/plasma-package-control/helper.sock root:plasma          0660 (fixed-purpose
+                                           unit control; Runtime MainPID only)
   /run/plasma-server/control.sock         plasma 0600 (unchanged; the Package
                                            uid cannot connect)
 """
@@ -133,8 +135,8 @@ def runtime_dropin() -> str:
     """plasma-server.service.d/50-package-actions.conf (existing unit unchanged)."""
     return "\n".join([
         "[Unit]",
-        "Wants=plasma-site-worker.service",
-        "After=plasma-site-worker.service",
+        "Wants=plasma-site-worker.service plasma-package-control.service",
+        "After=plasma-site-worker.service plasma-package-control.service",
         "",
         "[Service]",
         f"ReadWritePaths={SPEC_DIR}",
@@ -148,25 +150,47 @@ def tmpfiles() -> str:
             "d /run/plasma-package 0755 root root -\n")
 
 
-def polkit_rule() -> str:
-    """Allow ONLY the Runtime uid to start/stop/kill the fixed Package template.
+def package_control_helper_unit() -> str:
+    """Fixed-purpose root helper (replaces the rejected polkit rule: Z2 runs
+    polkit 0.105, which cannot restrict manage-units by unit name).
 
-    Requires polkit with JavaScript rules (>= 0.106). On polkit 0.105 (.pkla)
-    a unit-name restriction is impossible: do NOT grant manage-units there.
+    Same shape as the existing plasma-runtime-activation helper: root, group
+    plasma for the socket directory, AF_UNIX only, no network, read-only FS.
     """
     return "\n".join([
-        "// PLASMA: Runtime may manage only plasma-package@<32 hex>.service instances.",
-        "polkit.addRule(function(action, subject) {",
-        '    if (action.id !== "org.freedesktop.systemd1.manage-units") { return polkit.Result.NOT_HANDLED; }',
-        f'    if (subject.user !== "{RUNTIME_USER}") {{ return polkit.Result.NOT_HANDLED; }}',
-        '    var unit = action.lookup("unit");',
-        '    var verb = action.lookup("verb");',
-        '    if (unit && /^plasma-package@[0-9a-f]{32}\\.service$/.test(unit) &&',
-        '        (verb === "start" || verb === "stop" || verb === "kill")) {',
-        "        return polkit.Result.YES;",
-        "    }",
-        "    return polkit.Result.NOT_HANDLED;",
-        "});",
+        "[Unit]",
+        "Description=PLASMA Package unit control helper (plasma-package@ only)",
+        "Before=plasma-server.service",
+        "",
+        "[Service]",
+        "Type=simple",
+        "User=root",
+        f"Group={RUNTIME_USER}",
+        f"ExecStart={PYTHON} -I -B -S {RUNTIME_DIR}/ppu_package_unit_helper.py",
+        "RuntimeDirectory=plasma-package-control",
+        "RuntimeDirectoryMode=0750",
+        "UMask=0077",
+        "NoNewPrivileges=yes",
+        "PrivateNetwork=yes",
+        "IPAddressDeny=any",
+        "RestrictAddressFamilies=AF_UNIX",
+        "ProtectSystem=strict",
+        "ProtectHome=yes",
+        "PrivateTmp=yes",
+        "PrivateDevices=yes",
+        "ProtectKernelTunables=yes",
+        "ProtectKernelModules=yes",
+        "ProtectKernelLogs=yes",
+        "ProtectClock=yes",
+        "ProtectHostname=yes",
+        "RestrictNamespaces=yes",
+        "LockPersonality=yes",
+        "RestrictSUIDSGID=yes",
+        "Restart=on-failure",
+        "RestartSec=2",
+        "",
+        "[Install]",
+        "WantedBy=multi-user.target",
         "",
     ])
 
@@ -177,5 +201,5 @@ def render_all() -> dict[str, str]:
         "/etc/systemd/system/plasma-site-worker.service": site_worker_unit(),
         "/etc/systemd/system/plasma-server.service.d/50-package-actions.conf": runtime_dropin(),
         "/etc/tmpfiles.d/plasma-package.conf": tmpfiles(),
-        "/etc/polkit-1/rules.d/50-plasma-package.rules": polkit_rule(),
+        "/etc/systemd/system/plasma-package-control.service": package_control_helper_unit(),
     }
