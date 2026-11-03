@@ -34,6 +34,16 @@ REQUIRED_SCRIPTS = (
     "ppu_asset_execution.py",
     "ppu_privileged_source.py",
     "ppu-privileged-source-install.py",
+    # Stage C control plane (code only; units are rendered, not installed here).
+    "ppu_package_launcher.py",
+    "ppu_package_entry.py",
+    "ppu_package_unit_helper.py",
+    "ppu_package_units.py",
+    "ppu_package_action.py",
+    "ppu_site_worker.py",
+    "ppu_site_worker_service.py",
+    "ppu_site_adapter_abi5.py",
+    "ppu_site_recovery.py",
 )
 
 # B2 static FPGA qualification reuses the ONE protected Root Image Manifest

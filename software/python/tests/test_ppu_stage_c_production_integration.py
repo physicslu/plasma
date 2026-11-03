@@ -56,7 +56,7 @@ def test_package_unit_runs_as_dedicated_uid_with_fixed_entry_and_no_privilege():
     d = directives(units.package_unit())
     assert d["User"] == ["plasma-package"] and d["Group"] == ["plasma-package"]
     assert d["ExecStart"] == ["/opt/plasma/python/3.12.13/bin/python3 -I -B -S "
-                              "/opt/plasma/runtime/ppu_package_entry.py %i"]
+                              "/opt/plasma/bootstrap/ppu_package_entry.py %i"]
     for key, want in {"NoNewPrivileges": "yes", "PrivateDevices": "yes", "PrivateNetwork": "yes",
                       "RestrictAddressFamilies": "AF_UNIX", "ProtectSystem": "strict",
                       "ProtectHome": "yes", "CapabilityBoundingSet": "", "AmbientCapabilities": "",
@@ -81,7 +81,7 @@ def test_site_worker_unit_is_local_only_and_not_a_network_service():
     assert d["ProtectSystem"] == ["strict"] and d["NoNewPrivileges"] == ["yes"]
     assert "ListenStream" not in units.site_worker_unit() and "Port" not in units.site_worker_unit()
     assert d["ExecStart"] == ["/opt/plasma/python/3.12.13/bin/python3 -I -B -S "
-                              "/opt/plasma/runtime/ppu_site_worker_service.py"]
+                              "/opt/plasma/bootstrap/ppu_site_worker_service.py"]
 
 
 def test_runtime_dropin_and_tmpfiles_only_add_spec_dir_and_worker_dependency():

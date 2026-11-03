@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import socket
+import struct
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -101,11 +104,26 @@ class RuntimeQuiesceGate:
         }
 
 
+class PackageActionFailed(RuntimeError):
+    pass
+
+
+def _peer_uid(writer: asyncio.StreamWriter) -> int | None:
+    sock = writer.get_extra_info("socket")
+    try:
+        raw = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+    except (AttributeError, OSError):
+        return None
+    return struct.unpack("3i", raw)[1]
+
+
 class RuntimeControlServer:
     """Local Unix-socket control plane for authoritative quiesce operations."""
 
-    def __init__(self, manager: Any, socket_path: Path) -> None:
+    def __init__(self, manager: Any, socket_path: Path, package_actions: Any | None = None) -> None:
         self.manager = manager
+        # Optional Stage C PackageActionRuntime; None keeps the op disabled.
+        self.package_actions = package_actions
         self.socket_path = socket_path.expanduser().resolve()
         self._server: asyncio.AbstractServer | None = None
 
@@ -127,6 +145,38 @@ class RuntimeControlServer:
             self.socket_path.unlink()
         except FileNotFoundError:
             pass
+
+    async def _package_action(self, request: dict, reader: asyncio.StreamReader,
+                              writer: asyncio.StreamWriter) -> Any:
+        """Stage C: run ONE Package Action for a local ROOT operator.
+
+        Only a root peer (SO_PEERCRED uid 0; the root operator CLI that
+        already verified the owner asset.execute authorization with the
+        Bootstrap credential) may call this. The Runtime receives a one-time
+        credential bound to this job, never the Bootstrap token. Closing the
+        connection cancels the action.
+        """
+        if self.package_actions is None:
+            raise RuntimeControlError("package actions are not enabled on this Runtime")
+        if _peer_uid(writer) != 0:
+            raise RuntimeControlError("package_action requires the local root operator")
+        if set(request) != {"operation", "request", "authorization", "ephemeral_credential", "device_id"}:
+            raise RuntimeControlError("package_action request fields are invalid")
+        cancel = threading.Event()
+        loop = asyncio.get_running_loop()
+        work = loop.run_in_executor(None, self.package_actions.run_control,
+                                    request["request"], request["authorization"],
+                                    request["ephemeral_credential"], request["device_id"], cancel)
+        eof = asyncio.ensure_future(reader.read(1))
+        done, _ = await asyncio.wait({work, eof}, return_when=asyncio.FIRST_COMPLETED)
+        if work not in done:
+            cancel.set()          # operator disconnected: cancel, then report
+        if not eof.done():
+            eof.cancel()
+        try:
+            return await work
+        except Exception as exc:  # deny / launch errors become a structured failure
+            raise PackageActionFailed(str(exc)[:200] or type(exc).__name__) from None
 
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         held_token: str | None = None
@@ -160,6 +210,8 @@ class RuntimeControlServer:
                     if set(request) != {"operation"}:
                         raise RuntimeControlError("execution_lease request fields are invalid")
                     result = self.manager.execution_lease_snapshot()
+                elif operation == "package_action":
+                    result = await self._package_action(request, reader, writer)
                 elif operation == "release":
                     if set(request) != {"operation", "token"} or not isinstance(request.get("token"), str):
                         raise RuntimeControlError("release request fields are invalid")
@@ -168,7 +220,8 @@ class RuntimeControlServer:
                 else:
                     raise RuntimeControlError("unsupported runtime control operation")
                 payload = {"ok": True, "result": result}
-            except (UnicodeDecodeError, json.JSONDecodeError, RuntimeControlError, PlasmaError) as exc:
+            except (UnicodeDecodeError, json.JSONDecodeError, RuntimeControlError, PlasmaError,
+                    PackageActionFailed) as exc:
                 payload = {
                     "ok": False,
                     "error": {

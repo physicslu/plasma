@@ -215,6 +215,39 @@ systemd sandbox and cgroup behaviour, Runtime control socket DAC against the
 Package uid, Worker capability needs, Root Guard interplay, real OpenOCD /
 DUT. Not installed, enabled or deployed.
 
+## Stage C Runtime trigger (Host-only)
+
+Z2 Runtime release `296a0265` predates C-1, and nothing called
+`PackageActionRuntime`; the Worker and unit helper trust only the
+plasma-server MainPID, so a trigger inside the Runtime is required.
+
+- **Root operator CLI** `ppu_package_action.py run --request R --authorization A`
+  (root only, local, no network API): verifies the owner `asset.execute`
+  authorization with the paired Bootstrap credential against THIS device
+  (`/etc/machine-id` derivation), the requested Active Set, Package identity
+  and `job_id`; mints a one-time random credential; re-issues the same claims
+  under it; sends `{operation: package_action, request, authorization,
+  ephemeral_credential, device_id}` to `/run/plasma-server/control.sock`.
+  The Runtime never receives the Bootstrap token.
+- **Runtime control op `package_action`**: disabled unless plasma-server is
+  started with `--package-actions-config` (`plasma.ppu.package-actions-config.v1`:
+  control_plane, product_root, state_root, python, package_user,
+  helper_socket, site_worker_control_socket|null). Accepted only from a root
+  peer (`SO_PEERCRED` uid 0); exact fields; runs
+  `PackageActionRuntime.run_control` (C-1 scope → dispatch → C-2 executor with
+  `SystemdUnitSpawner` via `HelperSystemctl`, optional Worker). Disconnecting
+  the operator cancels the action. One launch per `job_id` (C-2 journal).
+- **Readable Active identity**: `assets/active.json` and staged
+  `b3-install.json` are now written root-owned **0444** (were 0600) so the
+  non-root Runtime can re-verify the Active Set; they hold only SHA/
+  generation metadata, like the existing 0444 `manifest.json`. Root
+  `protected()` still accepts them (no group/other write). Existing Z2 Sets
+  keep 0600 until the next B3.
+- **Delivery**: the Stage C control-plane scripts ship in the factory
+  Bootstrap kit (`/opt/plasma/bootstrap`, root-owned code, SHA256SUMS);
+  unit renderers point there. Units / account / drop-in are still installed
+  only by a separately approved Z2 Gate.
+
 ## Host-only acceptance / outstanding
 
 - All three kinds have identical authority/identity/dispatch rules.
