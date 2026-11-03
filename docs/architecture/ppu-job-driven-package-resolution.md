@@ -3,7 +3,7 @@
 > **Terminology update (2026-11-03):** Current Bundle stages are **B1 Receive → B2 Admission → B3 Install/Verify**. The former **B4** means historical/internal Active Set selection and recovery, **not a separate operator step**. See [Install → Run → Result](ppu-install-run-result.md) and the [glossary](../glossary.md#b1b2b3).
 
 **Decision recorded:** 2026-11-02 (owner discussion).  
-**Status:** Owner-approved architecture decision (2026-11-02), **updated for the 2026-11-03 Install → Run → Result simplification**. Portions of B3 / Active Set and Stage C are implemented Host-only; Console reconciliation, B3 auto-selection for non-FPGA Sets, caller-default authorized FPGA loading, Runtime trigger and full hardware qualification remain **NOT_QUALIFIED / NOT_IMPLEMENTED as applicable**.  
+**Status:** Owner-approved architecture decision (2026-11-02), **updated for the 2026-11-03 Install → Run → Result simplification**. Portions of B3 / Active Set and Stage C are implemented Host-only; Console reconciliation, B3 auto-selection for non-FPGA Sets, caller-default authorized FPGA loading, Runtime trigger is available Host-only; its Z2 installation and full hardware qualification remain **NOT_QUALIFIED**.  
 **Scope:** PLASMA PPU PS programming resource selection after Bundle v3 delivery. This document does **not** authorize runtime changes, deployment, activation, FPGA/DUT operation, or a new Gate 1.
 
 ## Accepted decision — one Active Asset Set per PPU
