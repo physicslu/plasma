@@ -250,3 +250,31 @@ def test_runtime_server_requires_control_socket_for_package_actions(tmp_path, mo
     monkeypatch.setattr(rs, "load_config", lambda _p: config(tmp_path))
     with pytest.raises(SystemExit, match="requires --runtime-control-socket"):
         asyncio.run(rs._run(tmp_path / "cfg", None, tmp_path / "pa.json"))
+
+
+def test_rendered_package_actions_config_is_accepted_by_from_config(tmp_path, monkeypatch):
+    import pwd
+    import ppu_package_units as units
+    cfg = json.loads(units.package_actions_config())
+    assert cfg["control_plane"] == "/opt/plasma/bootstrap" and cfg["package_user"] == "plasma-package"
+    cfg.update(control_plane=str(ROOT / "scripts"), package_user=pwd.getpwuid(os.getuid()).pw_name)
+    path = tmp_path / "pa.json"
+    path.write_text(json.dumps(cfg))
+    rt = from_config(object(), path)
+    assert type(rt.site_worker).__name__ == "SiteWorkerClient"
+
+
+def test_runtime_server_reads_package_actions_env(tmp_path, monkeypatch):
+    import plasma_server.runtime_server as rs
+    seen = {}
+
+    async def fake_run(config, control, package_actions):
+        seen.update(config=config, control=control, package_actions=package_actions)
+    monkeypatch.setattr(rs, "_run", fake_run)
+    monkeypatch.setattr(sys, "argv", ["ppu", "--config", "c.yaml", "--runtime-control-socket", "s.sock"])
+    monkeypatch.setenv("PLASMA_PACKAGE_ACTIONS_CONFIG", "/etc/plasma/ppu-package-actions.json")
+    rs.main()
+    assert seen["package_actions"] == Path("/etc/plasma/ppu-package-actions.json")
+    monkeypatch.delenv("PLASMA_PACKAGE_ACTIONS_CONFIG")
+    rs.main()
+    assert seen["package_actions"] is None
