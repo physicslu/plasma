@@ -17,8 +17,8 @@ Programming Site. It is deliberately small:
 * operations are an adapter-declared allowlist (no shell, executable path or
   raw MMIO read/write API); one in-flight operation per Site;
 * fail-closed: an adapter outcome that cannot be proven safe seals the Site
-  (persisted marker, never auto-retried); an FPGA identity change invalidates
-  the session; expiry / cancel / close end the session.
+  (persisted marker, never auto-retried); expiry / cancel / close end
+  the session. FPGA Image management belongs to the PPU Loader.
 
 Hardware specifics live behind a replaceable adapter (see
 ``ppu_site_adapter_abi5.py``); this core knows no FPGA, address or register.
@@ -83,7 +83,6 @@ class SiteTransportAdapter(Protocol):
     supported_sites: frozenset[int]
     operations: frozenset[str]
 
-    def identity(self) -> Mapping[str, Any]: ...
     def startup_sealed_sites(self) -> set[int]: ...
     def run(self, site: int, operation: str, *, deadline: float,
             cancel: threading.Event, image: FlashImage | None = None) -> Mapping[str, Any]: ...
@@ -102,7 +101,6 @@ class _Session:
     pgid: int
     uid: int
     expires: float
-    identity: Mapping[str, Any]
     runtime_pid: int = 0
     cancel: threading.Event = field(default_factory=threading.Event)
     closed: bool = False
@@ -277,12 +275,11 @@ class SiteWorkerCore:
                  and 0 < request["max_runtime_s"] <= MAX_SESSION_S, "REQUEST_INVALID")
         _require(set(sites) <= self.adapter.supported_sites, "SITE_NOT_SUPPORTED")
         _require(self.lease_verifier(job), "JOB_LEASE_NOT_HELD")
-        identity = dict(self.adapter.identity())
         with self._lock:
             _require(self._session is None, "SESSION_ALREADY_ACTIVE")
             _require(not (set(sites) & self._sealed), "SITE_SEALED")
             s = _Session(secrets.token_hex(16), job, frozenset(sites), request["pgid"],
-                         request["uid"], self.clock() + request["max_runtime_s"], identity,
+                         request["uid"], self.clock() + request["max_runtime_s"],
                          runtime_pid=pid)
             self._session = s
         return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites)}
@@ -307,12 +304,6 @@ class SiteWorkerCore:
             if op == "flash_cycle":
                 _require(s.image is not None, "IMAGE_NOT_BOUND")
         _require(self.lease_verifier(s.job_id), "JOB_LEASE_NOT_HELD")
-        if dict(self.adapter.identity()) != s.identity:
-            with self._lock:
-                if self._session is s:
-                    s.closed = True
-                    s.cancel.set()
-            raise SiteWorkerDenied("SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED")
         lock = self._site_locks[site]
         _require(lock.acquire(blocking=False), "SITE_BUSY")
         try:
@@ -334,9 +325,6 @@ class SiteWorkerCore:
             except Exception as exc:  # any adapter bug is an unknown hardware outcome
                 self._seal(site, type(exc).__name__, s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + type(exc).__name__) from None
-            if dict(self.adapter.identity()) != s.identity:
-                self._seal(site, "FPGA_IDENTITY_CHANGED_DURING_OPERATION", s)
-                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION")
             return {"site": site, "operation": op, "adapter": self.adapter.name, **result}
         finally:
             lock.release()
