@@ -8,7 +8,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define PLASMA_SWD_MAX_QUEUE 16u
+/* Software queue (OpenOCD queues a whole 1-KiB TAR block, 256 words) and
+ * the commands kept outstanding in the 16-deep RTL command FIFO. */
+#define PLASMA_SWD_MAX_QUEUE 256u
+#define PLASMA_SWD_PIPELINE_DEPTH 16u
 #define PLASMA_SWD_WAIT_RETRIES 64u /* ACK WAIT retries per transfer */
 #define PLASMA_SWD_ABI_V5 0x00050000u
 #define PLASMA_SWD_SITE1_BASE 0x43C01000u
@@ -60,6 +63,7 @@ struct plasma_swd_fifo {
     uint32_t count;
     uint32_t idle_cycles; /* last value programmed into IDLE_CYCLES */
     int deferred_rc; /* failure of an automatic full-queue flush */
+    bool discarded; /* a latched RTL error discarded unexecuted commands */
     bool admitted;
     bool blocked;
     /* Diagnostics of the last completion that ended a run (not authority). */

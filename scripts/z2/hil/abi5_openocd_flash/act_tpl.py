@@ -1,7 +1,9 @@
 # Template (fill @...@, run via abi5_openocd_dpidr/z2run.py). Root on Z2: ONE OpenOCD
 # plasma_swd session on Site 2 for ACTION=@ACTION@ (dpidr|erase|write|verify|read).
 # Upload the firmware to FW first; IMAGE_ID / FW_SHA / FW_LEN are this HIL's values.
-# Layout: init [+ halt, poll off] ; sleep GAP ; ACTION ; sleep GAP ; shutdown.
+# Layout: init [+ reset halt, poll off] ; sleep GAP ; ACTION ; sleep GAP ; shutdown.
+# reset halt (not halt): flashing while the application left its clocks and
+# peripherals running made the stm32f1x write algorithm never start.
 # The two SWCLK-idle gaps mark the action for the SWPC LA2016 crop.
 import hashlib, json, os, re, subprocess, time
 ACTION = "@ACTION@"; SITE = "2"; GAP = 300
@@ -19,7 +21,7 @@ BASE = ["-c", "adapter driver plasma_swd", "-c", f"plasma_swd site {SITE}", "-c"
         "-c", "gdb port disabled", "-c", "tcl port disabled", "-c", "telnet port disabled"]
 # target/stm32f1x.cfg sets "adapter speed 1000": override to the 500 kHz default.
 TGT = ["-c", "source [find target/stm32f1x.cfg]", "-c", "adapter speed 500",
-       "-c", "init", "-c", "halt", "-c", "poll off"]
+       "-c", "init", "-c", "reset halt", "-c", "poll off"]
 G = ["-c", f"sleep {GAP}"]
 MARK = lambda n: ["-c", f"echo PLASMA_{n}_T=[clock milliseconds]"]
 ACT = {

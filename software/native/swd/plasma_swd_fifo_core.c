@@ -224,12 +224,12 @@ int plasma_swd_fifo_recover_off(struct plasma_swd_fifo *s, int *recovered)
         (s->io.write32(s->io.ctx, s->base + R_CONTROL, 4u) ||
          s->io.write_barrier(s->io.ctx)))
         return PLASMA_SWD_IO_UNCERTAIN; /* fault-only command discard */
-    for (unsigned int i = 0; i <= PLASMA_SWD_MAX_QUEUE; ++i) {
+    for (unsigned int i = 0; i <= PLASMA_SWD_PIPELINE_DEPTH; ++i) {
         if (s->io.read32(s->io.ctx, s->base + R_LEVELS, &levels))
             return PLASMA_SWD_IO_UNCERTAIN;
         if (!(levels & 2u))
             break;
-        if (i == PLASMA_SWD_MAX_QUEUE ||
+        if (i == PLASMA_SWD_PIPELINE_DEPTH ||
             s->io.read32(s->io.ctx, s->base + R_META, &meta) ||
             s->io.write32(s->io.ctx, s->base + R_POP, meta >> 16) ||
             s->io.write_barrier(s->io.ctx))
@@ -363,8 +363,13 @@ static int take_one(struct plasma_swd_fifo *s,
             return fault(s, PLASMA_SWD_BAD_RESPONSE); /* CONFIG / unknown */
         if (write_word(s, R_POP, tag))
             return PLASMA_SWD_IO_UNCERTAIN;
-        if (latched && write_word(s, R_ERROR, 1u))
-            return PLASMA_SWD_IO_UNCERTAIN;
+        if (latched) {
+            /* The RTL stopped dispatch: commands still in its FIFO were never
+             * executed. Discard them (CONTROL=4), then clear the latch. */
+            if (write_word(s, R_CONTROL, 4u) || write_word(s, R_ERROR, 1u))
+                return PLASMA_SWD_IO_UNCERTAIN;
+            s->discarded = true;
+        }
         return rc;
     }
     if ((bool)(meta & 0x80u) != op->read)
@@ -375,7 +380,8 @@ static int take_one(struct plasma_swd_fifo *s,
     return PLASMA_SWD_OK;
 }
 
-/* 16-bit nonzero completion tags; one command is in flight at a time, so
+/* 16-bit nonzero completion tags. At most PLASMA_SWD_PIPELINE_DEPTH (16)
+ * commands are outstanding and completions are consumed in order, so
  * wrapping 65535 -> 1 cannot alias a retained completion. */
 static uint32_t take_tag(struct plasma_swd_fifo *s)
 {
@@ -384,38 +390,39 @@ static uint32_t take_tag(struct plasma_swd_fifo *s)
     return tag;
 }
 
-/* One transfer; on ACK WAIT clear sticky/overrun via DP ABORT
- * (ORUNERRCLR|WDERRCLR|STKERRCLR|STKCMPCLR) and retry, like OpenOCD's
- * bitbang adapter. The waited transfer was never accepted: no replay. */
-static int exec_one(struct plasma_swd_fifo *s,
-                    const struct plasma_swd_queue_op *op, uint32_t *data)
+/* DP ABORT: ORUNERRCLR|WDERRCLR|STKERRCLR|STKCMPCLR. */
+static const struct plasma_swd_queue_op abort_op = {
+    .private_command = 0x00u, .read = false, .value = 0x1Eu,
+    .idle_cycles = PLASMA_SWD_IDLE_DEFAULT,
+};
+
+static int clear_overrun(struct plasma_swd_fifo *s)
 {
-    static const struct plasma_swd_queue_op abort_op = {
-        .private_command = 0x00u, .read = false, .value = 0x1Eu,
-        .idle_cycles = PLASMA_SWD_IDLE_DEFAULT,
-    };
-    for (unsigned int attempt = 0;; ++attempt) {
-        uint32_t tag = take_tag(s);
-        if (push_one(s, op, tag))
-            return PLASMA_SWD_IO_UNCERTAIN;
-        const int rc = take_one(s, op, tag, data);
-        if (rc != PLASMA_SWD_ACK_WAIT)
-            return rc;
-        if (attempt == PLASMA_SWD_WAIT_RETRIES)
-            return fault(s, PLASMA_SWD_ACK_WAIT);
-        uint32_t ignored = 0;
-        tag = take_tag(s);
-        if (push_one(s, &abort_op, tag))
-            return PLASMA_SWD_IO_UNCERTAIN;
-        const int arc = take_one(s, &abort_op, tag, &ignored);
-        if (arc)
-            return arc == PLASMA_SWD_ACK_WAIT ? fault(s, arc) : arc;
-    }
+    uint32_t ignored = 0;
+    const uint32_t tag = take_tag(s);
+    if (push_one(s, &abort_op, tag))
+        return PLASMA_SWD_IO_UNCERTAIN;
+    const int rc = take_one(s, &abort_op, tag, &ignored);
+    return rc == PLASMA_SWD_ACK_WAIT ? fault(s, rc) : rc;
 }
 
+/* Pipelined execution: keep up to PLASMA_SWD_PIPELINE_DEPTH commands in the
+ * RTL FIFO so SWCLK runs back-to-back, and consume completions in order.
+ *
+ * Error at command k, while k+1.. may already be on the wire:
+ * - PARITY/TIMEOUT/ABORT: the RTL stopped dispatch; take_one() discarded the
+ *   unexecuted commands. Report.
+ * - WAIT: drain the outstanding completions. With OpenOCD's ORUNDETECT the DP
+ *   answers WAIT to every later transfer without executing it; then ABORT
+ *   clears the overrun and k.. is pushed again (64 retries per command). If
+ *   any later transfer was answered OK it executed out of order: report an
+ *   error instead of retrying (never replay).
+ * - FAULT / no ACK / NEED_RESET: drain, report; OpenOCD reconnects. */
 int plasma_swd_fifo_run(struct plasma_swd_fifo *s)
 {
     uint32_t read_values[PLASMA_SWD_MAX_QUEUE] = {0};
+    uint32_t tags[PLASMA_SWD_MAX_QUEUE] = {0};
+    uint8_t retries[PLASMA_SWD_MAX_QUEUE] = {0};
     if (!s || !s->admitted || s->blocked)
         return PLASMA_SWD_NOT_READY;
     if (s->deferred_rc) {
@@ -426,12 +433,44 @@ int plasma_swd_fifo_run(struct plasma_swd_fifo *s)
     }
     const uint32_t count = s->count;
     s->count = 0; /* consume immediately, never replay accepted commands */
-    for (uint32_t i = 0; i < count; ++i) {
+    s->discarded = false;
+    uint32_t head = 0, tail = 0; /* next to consume / next to push */
+    while (head < count) {
+        while (tail < count && tail - head < PLASMA_SWD_PIPELINE_DEPTH) {
+            tags[tail] = take_tag(s);
+            if (push_one(s, &s->pending[tail], tags[tail]))
+                return PLASMA_SWD_IO_UNCERTAIN;
+            ++tail;
+        }
         uint32_t value = 0;
-        const int rc = exec_one(s, &s->pending[i], &value);
-        if (rc)
+        const int rc = take_one(s, &s->pending[head], tags[head], &value);
+        if (rc == PLASMA_SWD_OK) {
+            read_values[head++] = value;
+            continue;
+        }
+        if (s->blocked || s->discarded)
             return rc;
-        read_values[i] = value;
+        bool later_ok = false;
+        for (uint32_t j = head + 1; j < tail; ++j) {
+            uint32_t ignored = 0;
+            const int r2 = take_one(s, &s->pending[j], tags[j], &ignored);
+            if (r2 == PLASMA_SWD_OK)
+                later_ok = true;
+            if (s->blocked)
+                return r2;
+            if (s->discarded)
+                break; /* the rest was never executed */
+        }
+        if (rc != PLASMA_SWD_ACK_WAIT || s->discarded)
+            return rc;
+        if (later_ok)
+            return PLASMA_SWD_BAD_RESPONSE; /* executed past a WAIT */
+        if (retries[head]++ == PLASMA_SWD_WAIT_RETRIES)
+            return fault(s, PLASMA_SWD_ACK_WAIT);
+        const int arc = clear_overrun(s);
+        if (arc)
+            return arc;
+        tail = head; /* re-push the waited command and everything after it */
     }
     /* Result pointers are published only if the WHOLE queue succeeded. */
     for (uint32_t i = 0; i < count; ++i)
