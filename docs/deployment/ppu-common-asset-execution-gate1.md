@@ -170,10 +170,19 @@ root (Site admission + PS-local OpenOCD need root; the Worker maps no MMIO).
   capability set, PrivateDevices, PrivateNetwork + AF_UNIX only, ProtectSystem
   strict, ProtectHome, InaccessiblePaths over Runtime / Bootstrap / Root /
   Worker-control resources, syscall filter, cgroup kill, Tasks/Memory/AS/NOFILE
-  limits). A polkit JS rule lets **only** uid `plasma` start / stop / kill
-  instances matching `^plasma-package@[0-9a-f]{32}\.service$`. No sudoers,
-  no root command executor. Requires polkit ≥ 0.106: on 0.105 (`.pkla`) the
-  unit-name restriction is impossible and this mechanism must NOT be enabled.
+  limits). The Runtime manages those instances **only** through the
+  fixed-purpose root helper `ppu_package_unit_helper.py`
+  (`plasma-package-control.service`, socket
+  `/run/plasma-package-control/helper.sock` root:plasma 0660, same pattern as
+  the existing `plasma-runtime-activation` helper): peer must be the
+  `plasma-server` MainPID with uid `plasma`; ops `start|stop|show|kill|list`
+  only; the helper builds every systemctl argv itself from a 32-hex job_id
+  (no unit name, path, property or command from the caller); `kill` allows
+  SIGTERM/SIGKILL only; `start` requires the Runtime-owned job spec (regular,
+  not group/other-writable). `HelperSystemctl` is the Runtime-side drop-in for
+  `SystemdUnitSpawner(systemctl=...)`. No sudoers, no polkit grant. (A polkit
+  JS rule was rejected: Z2 runs polkit 0.105, `.pkla` only, which cannot
+  restrict `manage-units` by unit name — read-only matrix 2026-11-03.)
 - **C-2 unchanged in substance:** `make_package_executor(..., spawner=)` only
   swaps the process primitive. `LocalProcessSpawner` (default) is the exact
   C-2 behaviour; `SystemdUnitSpawner` writes a job spec
@@ -201,7 +210,7 @@ root (Site admission + PS-local OpenOCD need root; the Worker maps no MMIO).
   0600 evidence record; success MOVES the marker into evidence; any failure
   leaves the Site sealed.
 
-NOT_QUALIFIED until Z2: `plasma-package` account, polkit version / rule,
+NOT_QUALIFIED until Z2: `plasma-package` account, unit-control helper,
 systemd sandbox and cgroup behaviour, Runtime control socket DAC against the
 Package uid, Worker capability needs, Root Guard interplay, real OpenOCD /
 DUT. Not installed, enabled or deployed.
