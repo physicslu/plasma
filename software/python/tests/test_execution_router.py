@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +12,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.models import JobRequest
 from plasma_interfaces.base import BaseInterface, ProgressCallback
+from plasma_interfaces.openocd import OpenOCDInterface
 from plasma_server.execution_router import (
     MOCK_ROUTE,
     OPENOCD_ROUTE,
@@ -314,6 +317,97 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual(manager.registry.all(), [])
                 self.assertFalse(manager.execution_lease_snapshot()["busy"])
+            finally:
+                await manager.shutdown()
+
+    async def test_host_only_injected_openocd_executes_site_jobs_without_hardware_claim(self) -> None:
+        image = b"HOST-ONLY-IMAGE"
+        commands_seen: list[str] = []
+        class FakeOpenOCDProcess:
+            returncode = 0
+
+            async def communicate(self):
+                return b"fake-openocd-PASS", b""
+
+        async def launcher(*argv, **_kwargs):
+            commands = [argv[index + 1] for index, value in enumerate(argv[:-1]) if value == "-c"]
+            commands_seen.extend(commands)
+            for command in commands:
+                if command.startswith("flash write_image ") or command.startswith("flash verify_image "):
+                    staged = re.search(r"\\{([^{}]+)\\}", command)
+                    assert staged is not None
+                    assert Path(staged.group(1)).read_bytes() == image
+                if command.startswith("dump_image "):
+                    staged = re.search(r"\\{([^{}]+)\\}", command)
+                    assert staged is not None
+                    Path(staged.group(1)).write_bytes(image)
+            return FakeOpenOCDProcess()
+
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            cfg = PlasmaConfig(
+                server=ServerConfig(
+                    output_root=root_path / "output",
+                    log_root=root_path / "logs",
+                    max_supported_sites=2,
+                    max_concurrent_jobs=1,
+                ),
+                sites=[SiteConfig(
+                    id=2,
+                    enabled=True,
+                    interface="openocd",
+                    target="STM32F103C8T6",
+                    openocd={
+                        "executable": "fake-openocd",
+                        "interface_cfg": "interface/cmsis-dap.cfg",
+                        "target_cfg": "target/stm32f1x.cfg",
+                        "work_dir": str(root_path),
+                    },
+                )],
+            )
+            manager = SiteManager(
+                cfg,
+                interface_factory=lambda site: OpenOCDInterface(
+                    site.openocd,
+                    process_launcher=launcher,
+                    resolver=self.resolver,
+                ),
+                ic_support_resolver=self.resolver,
+            )
+            route = manager.execution_routers[2].resolve_route(JobRequest(
+                site_id=2, operation=Operation.ERASE, target="STM32F103C8T6"
+            )).metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
+            self.assertTrue(route["software_validation_runtime_ready"])
+            self.assertFalse(route["hardware_runtime_ready"])
+            await manager.start()
+            try:
+                for operation in (Operation.ERASE, Operation.PROGRAM, Operation.VERIFY):
+                    request = JobRequest(
+                        site_id=2,
+                        operation=operation,
+                        target="STM32F103C8T6",
+                        image=image if operation in {Operation.PROGRAM, Operation.VERIFY} else b"",
+                    )
+                    result = await manager.submit(request)
+                    self.assertTrue(result.success, (operation, result.error))
+                read_request = JobRequest(
+                    site_id=2,
+                    operation=Operation.READ,
+                    target="STM32F103C8T6",
+                    map_data={
+                        "sections": [{
+                            "name": "full_image",
+                            "address": 0x08000000,
+                            "length": len(image),
+                        }],
+                    },
+                )
+                read_result = await manager.submit(read_request)
+                self.assertTrue(read_result.success, read_result.error)
+                self.assertTrue(any(cmd.startswith("flash erase_address ") for cmd in commands_seen))
+                self.assertTrue(any(cmd.startswith("flash write_image ") for cmd in commands_seen))
+                self.assertTrue(any(cmd.startswith("flash verify_image ") for cmd in commands_seen))
+                self.assertTrue(any(cmd.startswith("dump_image ") for cmd in commands_seen))
             finally:
                 await manager.shutdown()
 
