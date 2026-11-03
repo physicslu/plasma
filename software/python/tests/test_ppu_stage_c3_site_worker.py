@@ -449,7 +449,7 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
         for index, part in enumerate(argv[:-1]):
             if part == "-c" and argv[index + 1].startswith("dump_image "):
                 command = argv[index + 1]
-                path_match = re.search(r"\\{([^{}]+)\\}", command)
+                path_match = re.search(r"\{([^{}]+)\}", command)
                 assert path_match is not None
                 if flash_readback is not None:
                     Path(path_match.group(1)).write_bytes(flash_readback)
