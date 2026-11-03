@@ -71,7 +71,7 @@ def test_real_installer_b3_stages_and_verifies_three_packages_without_activation
     # The installed smoke is executed by Z2 nobody, not the root installer.
     assert (root.stat().st_mode & 0o777) == 0o755
     assert ((root / "payload/packages/python-smoke").stat().st_mode & 0o777) == 0o755
-    assert ((root / "b3-install.json").stat().st_mode & 0o777) == 0o600
+    assert ((root / "b3-install.json").stat().st_mode & 0o777) == 0o444
     assert run_fixture(root).stdout.strip().endswith("PASS")
     assert not co.paths.systemd_root.exists()
     assert not co.paths.config_root.exists()

@@ -386,7 +386,9 @@ def activate_verified(
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
-        temp.chmod(0o600)
+        # Root-owned, read-only for everyone: the non-root Runtime (Stage C
+        # Package Actions) must read the Active identity; nothing secret here.
+        temp.chmod(0o444)
         if active.is_symlink():
             raise AssetSetError("ASSET_SET_ACTIVE_SYMLINK_DENIED")
         os.replace(temp, active)

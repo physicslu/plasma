@@ -18,6 +18,15 @@ on:
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_owner_authorization.py"
+      - "scripts/ppu_package_launcher.py"
+      - "scripts/ppu_package_entry.py"
+      - "scripts/ppu_package_unit_helper.py"
+      - "scripts/ppu_package_units.py"
+      - "scripts/ppu_package_action.py"
+      - "scripts/ppu_site_worker.py"
+      - "scripts/ppu_site_worker_service.py"
+      - "scripts/ppu_site_adapter_abi5.py"
+      - "scripts/ppu_site_recovery.py"
       - "scripts/ppu_asset_execution.py"
       - "scripts/ppu_privileged_source.py"
       - "scripts/ppu-privileged-source-install.py"
@@ -71,6 +80,15 @@ on:
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_owner_authorization.py"
+      - "scripts/ppu_package_launcher.py"
+      - "scripts/ppu_package_entry.py"
+      - "scripts/ppu_package_unit_helper.py"
+      - "scripts/ppu_package_units.py"
+      - "scripts/ppu_package_action.py"
+      - "scripts/ppu_site_worker.py"
+      - "scripts/ppu_site_worker_service.py"
+      - "scripts/ppu_site_adapter_abi5.py"
+      - "scripts/ppu_site_recovery.py"
       - "scripts/ppu_asset_execution.py"
       - "scripts/ppu_privileged_source.py"
       - "scripts/ppu-privileged-source-install.py"
@@ -142,6 +160,15 @@ jobs:
           scripts/ppu_privileged_source.py
           scripts/ppu-privileged-source-install.py
           scripts/ppu_fpga_qualification.py
+          scripts/ppu_package_launcher.py
+          scripts/ppu_package_entry.py
+          scripts/ppu_package_unit_helper.py
+          scripts/ppu_package_units.py
+          scripts/ppu_package_action.py
+          scripts/ppu_site_worker.py
+          scripts/ppu_site_worker_service.py
+          scripts/ppu_site_adapter_abi5.py
+          scripts/ppu_site_recovery.py
           pl/hil/fpga_image_root.py
           pl/hil/fpga_image_guard.py
           pl/hil/fpga_image_admission.py
@@ -200,6 +227,15 @@ jobs:
             scripts/ppu_asset_execution.py \
             scripts/ppu_privileged_source.py \
             scripts/ppu-privileged-source-install.py \
+            scripts/ppu_package_launcher.py \
+            scripts/ppu_package_entry.py \
+            scripts/ppu_package_unit_helper.py \
+            scripts/ppu_package_units.py \
+            scripts/ppu_package_action.py \
+            scripts/ppu_site_worker.py \
+            scripts/ppu_site_worker_service.py \
+            scripts/ppu_site_adapter_abi5.py \
+            scripts/ppu_site_recovery.py \
             scripts/ppu_fpga_qualification.py \
             scripts/ppu-fpga-image-contracts.json \
             "$root/scripts/"

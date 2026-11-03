@@ -21,7 +21,9 @@ Sockets (AF_UNIX only, no TCP/HTTP):
 from __future__ import annotations
 
 PYTHON = "/opt/plasma/python/3.12.13/bin/python3"
-RUNTIME_DIR = "/opt/plasma/runtime"
+# Control plane ships in the factory Bootstrap kit (root-owned, code only;
+# the Bootstrap credential lives in /var/lib/plasma-bootstrap, kept inaccessible).
+RUNTIME_DIR = "/opt/plasma/bootstrap"
 PACKAGE_USER = "plasma-package"
 RUNTIME_USER = "plasma"
 SPEC_DIR = "/run/plasma-package-specs"
@@ -32,7 +34,7 @@ WORKER_RUN = "/run/plasma-site-worker"
 PACKAGE_INACCESSIBLE = (
     "/run/plasma-server", "/var/lib/plasma", "/var/lib/plasma-bootstrap",
     "/var/lib/plasma-privileged", "/var/lib/plasma-site-worker", "/etc/plasma",
-    "/opt/plasma/privileged", "/opt/plasma/bootstrap", "/run/plasma-z2-swd05",
+    "/opt/plasma/privileged", "/run/plasma-z2-swd05",
     f"{WORKER_RUN}/control.sock", "/root",
 )
 

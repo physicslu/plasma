@@ -1250,10 +1250,10 @@ def install_verified_bundle_v3(
             output.write("\n")
             output.flush()
             os.fsync(output.fileno())
-        marker_candidate.chmod(0o600)
-        # Staging remains private until verified. Nonexecuting Package
-        # content can be read by the future unprivileged runtime only after
-        # a separately approved Active Set activation.
+        # Root-owned, read-only (0444) like manifest.json: the non-root
+        # Runtime re-verifies the staged Set before a Package Action. Staged
+        # content still becomes Active only through the B3 activation.
+        marker_candidate.chmod(0o444)
         for directory in candidate.rglob("*"):
             if directory.is_dir():
                 directory.chmod(0o755)

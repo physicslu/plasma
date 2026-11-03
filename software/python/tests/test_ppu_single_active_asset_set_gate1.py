@@ -58,7 +58,7 @@ def test_p1_guarded_atomic_activation_keeps_runtime_and_fpga_unmodified(tmp_path
     current = assets.read_active(co.paths.product_root)
     assert current["state"] == "ACTIVE" and current["asset_set_sha256"] == sha
     assert current["ready"] is False and current["fpga"] == "NOT_VERIFIED"
-    assert (co.paths.product_root / "assets" / "active.json").stat().st_mode & 0o777 == 0o600
+    assert (co.paths.product_root / "assets" / "active.json").stat().st_mode & 0o777 == 0o444
     assert not (co.paths.product_root / "current").exists()
     assert not co.paths.systemd_root.exists()
 
