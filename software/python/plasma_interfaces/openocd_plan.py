@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from plasma_core.enums import Operation
@@ -193,6 +193,45 @@ class OpenOCDPlanCompiler:
             program_granularity_bytes=geometry.program_granularity_bytes,
             commands=tuple(commands),
             artifacts=tuple(artifacts),
+        )
+
+    def compile_flash_cycle(
+        self,
+        support: ResolvedICSupport,
+        request: JobRequest,
+        *,
+        configured_target_config: object,
+    ) -> OpenOCDExecutionPlan:
+        """Compose a single-DUT Erase/Program/Verify/full Readback host-test plan.
+
+        This only compiles commands. It does not launch OpenOCD or promote any
+        physical hardware route. Geometry and firmware admission reuse compile().
+        """
+        if request.operation is not Operation.PROGRAM:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Flash cycle requires a PROGRAM Job")
+        program = self.compile(
+            support, request, configured_target_config=configured_target_config
+        )
+        readback = OpenOCDPlanArtifact(
+            role="read_output",
+            token=READ_ARTIFACT_TOKEN_TEMPLATE % 0,
+            direction="output",
+            size_bytes=request.image_size,
+            section_name="flash_readback",
+        )
+        base = _hex32(program.main_flash_start)
+        return replace(
+            program,
+            commands=(
+                "init",
+                "reset init",
+                f"flash erase_address {base} {_hex32(program.main_flash_size_bytes)}",
+                f"flash write_image {IMAGE_ARTIFACT_TOKEN} {base} bin",
+                f"flash verify_image {IMAGE_ARTIFACT_TOKEN} {base} bin",
+                f"dump_image {readback.token} {base} {_hex32(request.image_size)}",
+                "shutdown",
+            ),
+            artifacts=(*program.artifacts, readback),
         )
 
     @staticmethod
