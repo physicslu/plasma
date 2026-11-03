@@ -65,6 +65,8 @@ for command in commands:
             with open(path, "wb") as handle:
                 if os.environ.get("FAKE_OPENOCD_WRONG_OUTPUT_SIZE") == "1":
                     handle.write(b"x")
+                elif os.environ.get("FAKE_OPENOCD_READBACK_FROM_INPUT") == "1":
+                    handle.write(open(record["inputs"][0]["path"], "rb").read()[:size])
                 else:
                     handle.write(bytes(index % 251 for index in range(size)))
 
@@ -156,6 +158,7 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
         env: dict[str, str] | None = None,
         synchronize_process_start: bool = False,
         processes: list[asyncio.subprocess.Process] | None = None,
+        flash_cycle: bool = False,
     ):
         script = root / "fake_openocd.py"
         script.write_text(textwrap.dedent(FAKE_OPENOCD), encoding="utf-8")
@@ -176,10 +179,17 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
                 processes=processes,
             ),
         )
-        selected_plan = plan or self._plan(request)
+        selected_plan = plan or (
+            self.compiler.compile_flash_cycle(
+                self.support, request, configured_target_config=TARGET_CFG
+            )
+            if flash_cycle else self._plan(request)
+        )
         process_env = {"FAKE_OPENOCD_LOG": str(log), **(env or {})}
         with patch.dict(os.environ, process_env):
-            result = await executor.execute(selected_plan, self.support, request)
+            result = await executor.execute(
+                selected_plan, self.support, request, flash_cycle=flash_cycle
+            )
         return result, launched, json.loads(log.read_text(encoding="utf-8"))
 
     async def test_program_materializes_sha_bound_image_and_cleans_workspace(self) -> None:
@@ -202,6 +212,37 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(record["inputs"][0]["sha256"], hashlib.sha256(image).hexdigest())
             self.assertIsNotNone(record["workspace"])
             self.assertFalse(Path(record["workspace"]).exists())
+
+    async def test_flash_cycle_fake_process_verifies_full_readback(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            image = bytes(range(64))
+            result, launched, record = await self._execute(
+                Path(root),
+                self._request(Operation.PROGRAM, image=image),
+                flash_cycle=True,
+                env={"FAKE_OPENOCD_READBACK_FROM_INPUT": "1"},
+            )
+            self.assertEqual(result.read_sections["flash_readback"], image)
+            self.assertEqual(len(launched), 1)
+            self.assertEqual(len(record["outputs"]), 1)
+            self.assertEqual(record["inputs"][0]["sha256"], hashlib.sha256(image).hexdigest())
+            self.assertEqual(
+                [command.split()[1] for command in record["commands"]
+                 if command.startswith("flash ")],
+                ["erase_address", "write_image", "verify_image"],
+            )
+            self.assertFalse(Path(record["workspace"]).exists())
+
+    async def test_flash_cycle_rejects_wrong_readback(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaises(PlasmaError) as caught:
+                await self._execute(
+                    Path(root),
+                    self._request(Operation.PROGRAM, image=b"\xaa" * 32),
+                    flash_cycle=True,
+                )
+            self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_FAILURE)
+            self.assertIn("Flash readback does not match", caught.exception.message)
 
     async def test_read_collects_exact_section_payload_then_cleans_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as root:
