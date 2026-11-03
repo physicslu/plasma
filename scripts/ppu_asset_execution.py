@@ -14,11 +14,12 @@ import json
 import re
 import sys
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
+JOB_ID = re.compile(r"[0-9a-f]{32}\Z")
 NAME = re.compile(r"[a-z][a-z0-9_.-]{0,63}\Z")
 VERSION = re.compile(r"[A-Za-z0-9_.+-]{1,128}\Z")
 ACTION = "execute"
@@ -40,7 +41,20 @@ class AssetExecutionRequest:
     package_version: str
     package_kind: str
     package_identity_sha256: str
+    job_id: str
     action: str = ACTION
+
+
+@dataclass(frozen=True)
+class OwnerCredential:
+    """Device-side verifier input, supplied by the trusted Runtime only.
+
+    ``device_id`` is this PPU's derived Bootstrap identity and
+    ``credential`` the paired control credential; neither ever comes from
+    the Console request or the Bundle.
+    """
+    device_id: str
+    credential: str = field(repr=False)
 
 
 def _require(ok: bool, code: str) -> None:
@@ -66,13 +80,16 @@ def _trusted_module(filename: str):
 
 
 def prepare_asset_execution(
-    product_root: Path, policy_path: Path, request: AssetExecutionRequest,
+    product_root: Path, request: AssetExecutionRequest, *,
+    authorization: Mapping[str, Any], owner_credential: OwnerCredential,
 ) -> dict[str, Any]:
-    """Plan an action only from ONE verified Active Asset Set and live grant.
+    """Plan an action only from ONE verified Active Asset Set and a fresh,
+    explicit owner ``asset.execute`` authorization for this exact Job.
 
     Same controls for Python, Native C and FPGA. A PASS is authorization
     to *request* dispatch to a qualified Executor, not a license to launch
-    arbitrary installed Python/C or access FPGA Manager.
+    arbitrary installed Python/C or access FPGA Manager. No per-Bundle
+    allowlist exists; earlier B2/B3 receipts are never execute authority.
     """
     _require(isinstance(request, AssetExecutionRequest)
              and type(request.asset_set_sha256) is str
@@ -85,6 +102,8 @@ def prepare_asset_execution(
              and VERSION.fullmatch(request.package_version)
              and type(request.package_kind) is str
              and request.package_kind in EXECUTORS
+             and type(request.job_id) is str
+             and JOB_ID.fullmatch(request.job_id)
              and request.action == ACTION,
              "ASSET_EXECUTION_REQUEST_DENIED")
     assets = _trusted_module("ppu_asset_set.py")
@@ -121,16 +140,21 @@ def prepare_asset_execution(
     ).encode("utf-8")).hexdigest()
     _require(actual_identity == request.package_identity_sha256,
              "ASSET_EXECUTION_PACKAGE_IDENTITY_MISMATCH")
-    # Current Master authorization must still be valid, even if an older
-    # B2 receipt was once PASS and the B3 ZIP was correctly staged.
-    authority = _trusted_module("ppu_bundle_authority.py")
+    # The owner's execute authorization must bind THIS device, the CURRENT
+    # Active Set, this exact Package identity and this Runtime Job.
+    _require(isinstance(owner_credential, OwnerCredential),
+             "ASSET_EXECUTION_OWNER_CREDENTIAL_REQUIRED")
+    owner = _trusted_module("ppu_owner_authorization.py")
     try:
-        authorized = authority.approve_identity(
-            archive_sha256=request.asset_set_sha256,
-            policy_path=policy_path,
+        authorized = owner.verify(
+            authorization, credential=owner_credential.credential,
+            action=owner.EXECUTE, device_id=owner_credential.device_id,
+            subject_sha256=active["asset_set_sha256"],
+            transaction_id=request.job_id,
+            package_identity_sha256=actual_identity,
         )
-    except authority.BundleAuthorityDenied as exc:
-        raise AssetExecutionDenied("ASSET_EXECUTION_MASTER_AUTHORITY_DENIED") from exc
+    except owner.OwnerAuthorizationDenied as exc:
+        raise AssetExecutionDenied(f"ASSET_EXECUTION_{exc}") from exc
     return {
         "schema": "plasma.ppu.asset-execution-plan.v1",
         "status": "AUTHORIZED_NOT_EXECUTED",
@@ -140,14 +164,11 @@ def prepare_asset_execution(
         "package_kind": request.package_kind,
         "package_identity_sha256": actual_identity,
         "action": request.action,
+        "job_id": request.job_id,
         "trusted_executor": EXECUTORS[request.package_kind],
         "relative_files": [f["path"] for f in descriptor["files"]],
         "dependencies": list(selected["requires"]),
-        "master_authority": {
-            "generation": authorized["generation"],
-            "archive_sha256": authorized["archive_sha256"],
-            "policy_sha256": authorized["policy_sha256"],
-        },
+        "owner_authorization": authorized,
         "hardware_admission": "NOT_RUN",
         "asset_executed": False,
         "fpga_loaded": False,
@@ -223,16 +244,19 @@ def validate_fpga_b3_receipt(
 
 def dispatch_asset_execution(
     product_root: Path,
-    policy_path: Path,
     request: AssetExecutionRequest,
     *,
+    authorization: Mapping[str, Any],
+    owner_credential: OwnerCredential,
     execution_scope: Callable[[], AbstractContextManager] | None = None,
     trusted_executors: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Common typed entry, with NO default runnable/FPGA executor.
 
     Caller-owned Runtime execution_scope must pin Site/PPU ownership
-    throughout selected executor operation. FPGA executor additionally
+    throughout selected executor operation and yield its Job lease as a
+    Mapping whose ``job_id`` equals the authorized Job; a busy PPU/Site
+    must raise instead of yielding. FPGA executor additionally
     enforces hardware quiescence, protected Linux Root source, Golden and FPGA Manager
     checks; no Bundle can name arbitrary executables or commands.
     """
@@ -248,8 +272,13 @@ def dispatch_asset_execution(
         raise AssetExecutionDenied("ASSET_EXECUTION_TRUSTED_EXECUTOR_REQUIRED")
     # Every check takes place INSIDE the trusted runtime lease: no time gap
     # where a different Asset Set can become active before adapter delivery.
-    with execution_scope():
-        plan = prepare_asset_execution(product_root, policy_path, request)
+    with execution_scope() as lease:
+        _require(isinstance(lease, Mapping) and lease.get("job_id") == request.job_id,
+                 "ASSET_EXECUTION_JOB_LEASE_MISMATCH")
+        plan = prepare_asset_execution(
+            product_root, request,
+            authorization=authorization, owner_credential=owner_credential,
+        )
         result = executor(plan)
         _require(isinstance(result, Mapping)
                  and result.get("asset_set_sha256") == plan["asset_set_sha256"]
@@ -262,6 +291,8 @@ def dispatch_asset_execution(
             "package_identity_sha256": plan["package_identity_sha256"],
             "package_kind": plan["package_kind"],
             "action": plan["action"],
+            "job_id": plan["job_id"],
+            "owner_authorization_sha256": plan["owner_authorization"]["authorization_sha256"],
             "executor_result": dict(result),
             # No fabricated status: a callback may still report NOT_RUN.
         }

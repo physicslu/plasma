@@ -1,4 +1,4 @@
-"""PR3 host-only capability resolution, independent policy and Manager API.
+"""PR3 host-only capability resolution, Owner Authorization and Manager API.
 
 No real PPU, SWPC, FPGA Manager, systemd, product file, network or DUT.
 """
@@ -19,8 +19,7 @@ from .test_manager_bootstrap import (
 from plasma_manager.bootstrap import (
     BootstrapCredentialStore, BootstrapManagerError, ManagerBootstrapCoordinator,
 )
-
-NOW = 1793448000
+from .ppu_owner_authorization_fixture import install_summary, owner as owner_module
 
 
 def verified(tmp_path: Path):
@@ -30,10 +29,8 @@ def verified(tmp_path: Path):
     )
 
 
-def trusted_policy(artifact):
-    return {"schema": "plasma.ppu.bundle-authority.v2",
-            "generation": 3,
-            "approved_bundle_sha256": [artifact.archive_sha256]}
+def owner_install(artifact):
+    return install_summary(artifact.archive_sha256)
 
 
 def test_pr3_versioned_dag_and_staged_components(tmp_path):
@@ -97,22 +94,22 @@ def test_pr3_unknown_inventory_component_denied(tmp_path):
         contract.resolve_host_only_bundle(artifact, trusted_inventory={"phantom": {}})
 
 
-def test_pr3_exact_authority_gate_accepts_only_host_only_scope(tmp_path):
+def test_pr3_owner_install_authorization_accepts_only_host_only_scope(tmp_path):
     archive, digest, artifact = verified(tmp_path)
-    approved = trusted_policy(artifact)
-    result = contract.evaluate_host_only_bundle_authority(
-        artifact, trusted_policy=approved, now_epoch_s=NOW,
+    approved = owner_install(artifact)
+    result = contract.evaluate_host_only_owner_authorization(
+        artifact, owner_authorization=approved,
     )
     assert result["scope"] == "host-only-fixture"
     assert result["device_install_authorized"] is False
     co = coordinator(tmp_path)
     receipt = co.execute_authorized_bundle_host_only(
-        request(archive, digest), trusted_policy=approved,
-        trusted_inventory={}, now_epoch_s=NOW,
+        request(archive, digest), owner_authorization=approved, trusted_inventory={},
     )
     assert receipt["result"] == "PASS"
     assert receipt["host_only"] is True
     assert receipt["authorization"]["device_install_authorized"] is False
+    assert receipt["authorization"]["action"] == "bundle.install"
     assert len(receipt["resolution"]["stage"]) == 6
     assert co.journal.read().state == "installed"
     assert receipt["operation"] == "install_only"
@@ -121,20 +118,19 @@ def test_pr3_exact_authority_gate_accepts_only_host_only_scope(tmp_path):
 
 
 @pytest.mark.parametrize("change,reason", [
-    ({"schema": "unknown"}, "BUNDLE_AUTHORITY_POLICY_INVALID"),
-    ({"generation": 0}, "BUNDLE_AUTHORITY_POLICY_INVALID"),
-    ({"approved_bundle_sha256": ["0" * 64]}, "BUNDLE_AUTHORITY_DIGEST_NOT_APPROVED"),
-    ({"approved_bundle_sha256": ["f" * 64, "f" * 64]}, "BUNDLE_AUTHORITY_POLICY_INVALID"),
-    ({"publisher": "untrusted"}, "BUNDLE_AUTHORITY_NOT_PROVISIONED"),
+    ({"status": "LOCAL_APPROVED"}, "OWNER_AUTHORIZATION_REQUIRED"),
+    ({"schema": "plasma.ppu.bundle-authority.v2"}, "OWNER_AUTHORIZATION_REQUIRED"),
+    ({"action": "bundle.admit"}, "OWNER_AUTHORIZATION_REQUIRED"),
+    ({"action": "asset.execute"}, "OWNER_AUTHORIZATION_REQUIRED"),
+    ({"subject_sha256": "0" * 64}, "OWNER_AUTHORIZATION_SUBJECT_MISMATCH"),
 ])
 def test_pr3_authority_denials_have_no_journal_or_installs(tmp_path, change, reason):
     archive, digest, artifact = verified(tmp_path)
-    policy = {**trusted_policy(artifact), **change}
+    summary = {**owner_install(artifact), **change}
     co = coordinator(tmp_path)
     with pytest.raises(engine.DeploymentError, match=reason):
         co.execute_authorized_bundle_host_only(
-            request(archive, digest), trusted_policy=policy,
-            trusted_inventory={}, now_epoch_s=NOW,
+            request(archive, digest), owner_authorization=summary, trusted_inventory={},
         )
     assert not co.paths.journal.exists()
     assert not co.paths.product_root.exists()
@@ -143,23 +139,22 @@ def test_pr3_authority_denials_have_no_journal_or_installs(tmp_path, change, rea
 def test_pr3_missing_authority_is_not_inferred_from_manifest_or_token(tmp_path):
     archive, digest, artifact = verified(tmp_path)
     co = coordinator(tmp_path)
-    with pytest.raises(engine.DeploymentError, match="BUNDLE_AUTHORITY_NOT_PROVISIONED"):
+    with pytest.raises(engine.DeploymentError, match="OWNER_AUTHORIZATION_REQUIRED"):
         co.execute_authorized_bundle_host_only(
-            request(archive, digest), trusted_policy={},
-            trusted_inventory={}, now_epoch_s=NOW,
+            request(archive, digest), owner_authorization={}, trusted_inventory={},
         )
     assert not co.paths.journal.exists()
 
 
 def test_pr3_host_only_install_only_rejects_activation_faults(tmp_path):
     archive, digest, artifact = verified(tmp_path / "release")
-    policy = trusted_policy(artifact)
+    approved = owner_install(artifact)
     co = coordinator(tmp_path)
     for fault in ("after_activate", "rollback_unknown"):
         with pytest.raises(engine.DeploymentError, match="INSTALL_ONLY_ACTIVATION_FAILURE_SELECTOR_DENIED"):
             co.execute_authorized_bundle_host_only(
-                request(archive, digest), trusted_policy=policy, trusted_inventory={},
-                now_epoch_s=NOW, inject_failure=fault,
+                request(archive, digest), owner_authorization=approved, trusted_inventory={},
+                inject_failure=fault,
             )
     assert not co.paths.journal.exists()
     assert not co.paths.product_root.exists()
@@ -179,14 +174,15 @@ def test_pr3_manager_bundle_admission_uses_same_authenticated_api(tmp_path):
                     "result": {
                         "stage": "package_admission_only",
                         "install_qualified": False,
-                        "source_authorized": True,
+                        "owner_authorized": True,
                         "plan": {
                             "kind": "bundle", "execution_permitted": False,
                             "archive_sha256": "b" * 64,
-                            "authorization": {
-                                "status": "LOCAL_APPROVED",
-                                "method": "device-local-exact-bundle-sha256",
-                                "archive_sha256": "b" * 64,
+                            "owner_authorization": {
+                                "status": "OWNER_AUTHORIZED",
+                                "action": "bundle.admit",
+                                "subject_sha256": "b" * 64,
+                                "transaction_id": "a" * 32,
                             },
                         },
                     },
@@ -197,19 +193,40 @@ def test_pr3_manager_bundle_admission_uses_same_authenticated_api(tmp_path):
         _registry(tmp_path), creds, 2.0, client_factory=AdmissionClient,
     )
     status, body = manager.start_deployment(
-        "z2", {"kind": "bundle", "upload_id": "a" * 32},
+        "z2", {"kind": "bundle", "upload_id": "a" * 32, "archive_sha256": "b" * 64},
     )
     assert status == 200 and body["deployment"]["state"] == "admitted"
     calls = [c for c in AdmissionClient.instances[-1].calls if c[0] == "start_deployment"]
-    assert calls == [("start_deployment", TOKEN, {"kind": "bundle", "upload_id": "a" * 32})]
-    assert "gateway_host" not in calls[0][2]
+    assert len(calls) == 1 and calls[0][1] == TOKEN
+    sent = calls[0][2]
+    assert set(sent) == {"kind", "upload_id", "authorization"}
+    assert "gateway_host" not in sent and "archive_sha256" not in sent
+    # Producer/consumer contract: the PPU-side verifier accepts the Manager's
+    # device-bound authorization for exactly this archive and upload.
+    verified_owner = owner_module.verify(
+        sent["authorization"], credential=TOKEN, action="bundle.admit",
+        device_id=DEVICE_ID, subject_sha256="b" * 64, transaction_id="a" * 32,
+    )
+    assert verified_owner["status"] == "OWNER_AUTHORIZED"
+    for wrong in ({"subject_sha256": "c" * 64}, {"device_id": "ppu-device-" + "f" * 24},
+                  {"transaction_id": "d" * 32}, {"action": "bundle.install"}):
+        args = dict(credential=TOKEN, action="bundle.admit", device_id=DEVICE_ID,
+                    subject_sha256="b" * 64, transaction_id="a" * 32)
+        args.update(wrong)
+        with pytest.raises(owner_module.OwnerAuthorizationDenied):
+            owner_module.verify(sent["authorization"], **args)
 
 
 @pytest.mark.parametrize("body", [
-    {"kind": "bundle", "upload_id": "A" * 32},
-    {"kind": "bundle", "upload_id": "a" * 32, "activate": True},
-    {"kind": "bundle", "upload_id": "a" * 32, "publisher": "self"},
-    {"kind": "bundle", "upload_id": "a" * 32, "gateway_host": "evil"},
+    {"kind": "bundle", "upload_id": "A" * 32, "archive_sha256": "b" * 64},
+    {"kind": "bundle", "upload_id": "a" * 32},
+    {"kind": "bundle", "upload_id": "a" * 32, "archive_sha256": "B" * 64},
+    {"kind": "bundle", "upload_id": "a" * 32, "archive_sha256": "b" * 64, "activate": True},
+    {"kind": "bundle", "upload_id": "a" * 32, "archive_sha256": "b" * 64, "publisher": "self"},
+    {"kind": "bundle", "upload_id": "a" * 32, "archive_sha256": "b" * 64, "gateway_host": "evil"},
+    # Caller may not supply its own (possibly forged) authorization object.
+    {"kind": "bundle", "upload_id": "a" * 32, "archive_sha256": "b" * 64,
+     "authorization": {"mac": "0" * 64}},
 ])
 def test_pr3_manager_rejects_caller_authority(tmp_path, body):
     creds = BootstrapCredentialStore(tmp_path / "credentials.json")
@@ -237,8 +254,13 @@ def test_pr3_manager_rejects_untrusted_upstream_install_receipt(tmp_path):
     manager = ManagerBootstrapCoordinator(
         _registry(tmp_path), creds, 2.0, client_factory=CompromisedClient,
     )
-    with pytest.raises(BootstrapManagerError, match="not locally approved and non-executing"):
-        manager.start_deployment("z2", {"kind": "bundle", "upload_id": "a" * 32})
+    with pytest.raises(BootstrapManagerError, match="not owner-authorized and non-executing"):
+        manager.start_deployment("z2", {"kind": "bundle", "upload_id": "a" * 32,
+                                        "archive_sha256": "b" * 64})
+
+
+B3_BODY = {"kind": "bundle", "upload_id": "a" * 32, "archive_sha256": "b" * 64,
+           "admission_transaction_id": "e" * 32}
 
 
 def test_manager_forwards_explicit_b3_fpga_load_only(tmp_path):
@@ -249,27 +271,46 @@ def test_manager_forwards_explicit_b3_fpga_load_only(tmp_path):
     class B3Client(FakeBootstrapClient):
         def start_deployment(self, token, body):
             self.calls.append(("start_deployment", token, dict(body)))
-            return 200, {"ok": True, "deployment": {
+            # The real PPU answers a queued B3 with HTTP 202 Accepted.
+            return 202, {"ok": True, "deployment": {
                 "state": "queued", "upload_id": "a" * 32, "transaction_id": "c" * 32,
+                "admission_transaction_id": "e" * 32,
+                "owner_authorization": {
+                    "status": "OWNER_AUTHORIZED", "action": "bundle.install-fpga-load",
+                    "subject_sha256": "b" * 64,
+                },
             }}
 
     manager = ManagerBootstrapCoordinator(
         _registry(tmp_path), creds, 2.0, client_factory=B3Client,
     )
-    status, body = manager.start_deployment(
-        "z2", {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True},
-    )
-    assert status == 200 and body["deployment"]["state"] == "queued"
+    status, body = manager.start_deployment("z2", {**B3_BODY, "fpga_load": True})
+    assert status == 202 and body["deployment"]["state"] == "queued"
     calls = [c for c in B3Client.instances[-1].calls if c[0] == "start_deployment"]
-    assert calls == [("start_deployment", TOKEN,
-                      {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True})]
+    assert len(calls) == 1 and calls[0][1] == TOKEN
+    sent = calls[0][2]
+    assert set(sent) == {"kind", "upload_id", "fpga_load", "authorization"}
+    assert sent["fpga_load"] is True
+    # FPGA load is a distinct action bound to the CURRENT B2 transaction.
+    owner_module.verify(
+        sent["authorization"], credential=TOKEN, action="bundle.install-fpga-load",
+        device_id=DEVICE_ID, subject_sha256="b" * 64, transaction_id="e" * 32,
+    )
+    with pytest.raises(owner_module.OwnerAuthorizationDenied, match="ACTION_MISMATCH"):
+        owner_module.verify(
+            sent["authorization"], credential=TOKEN, action="bundle.install",
+            device_id=DEVICE_ID, subject_sha256="b" * 64, transaction_id="e" * 32,
+        )
 
 
 @pytest.mark.parametrize("body", [
-    {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": "true"},
-    {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True, "idle": True},
-    {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True, "path": "/opt"},
-    {"kind": "bundle", "upload_id": "A" * 32, "fpga_load": False},
+    {**B3_BODY, "fpga_load": "true"},
+    {**B3_BODY, "fpga_load": True, "idle": True},
+    {**B3_BODY, "fpga_load": True, "path": "/opt"},
+    {**B3_BODY, "upload_id": "A" * 32, "fpga_load": False},
+    {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": True},
+    {**B3_BODY, "admission_transaction_id": "x" * 32, "fpga_load": False},
+    {**B3_BODY, "fpga_load": False, "authorization": {"mac": "0" * 64}},
 ])
 def test_manager_rejects_b3_extra_or_non_boolean_fields(tmp_path, body):
     creds = BootstrapCredentialStore(tmp_path / "credentials.json")
@@ -293,4 +334,4 @@ def test_manager_rejects_b3_reply_that_is_not_queued(tmp_path):
         _registry(tmp_path), creds, 2.0, client_factory=Odd,
     )
     with pytest.raises(BootstrapManagerError, match="not a queued transaction"):
-        manager.start_deployment("z2", {"kind": "bundle", "upload_id": "a" * 32, "fpga_load": False})
+        manager.start_deployment("z2", {**B3_BODY, "fpga_load": False})

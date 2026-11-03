@@ -226,6 +226,18 @@ class DirectSSHAuthenticatedBootstrap:
             self, kind=kind, upload_id=upload_id, **kwargs,
         )
 
+    # Direct paired client issues its own Owner Operation Authorization.
+    def _device_id(self):
+        return self.module.BootstrapAPIClient._device_id(self)
+
+    def _authorize(self, action, subject_sha256, transaction_id):
+        return self.module.BootstrapAPIClient._authorize(
+            self, action, subject_sha256, transaction_id)
+
+    def _admission_body(self, kind, upload_id, archive_sha256):
+        return self.module.BootstrapAPIClient._admission_body(
+            self, kind, upload_id, archive_sha256)
+
     def deployment_state(self, transaction_id):
         return self.module.BootstrapAPIClient.deployment_state(self, transaction_id)
 
@@ -369,6 +381,11 @@ class ManagerAdmissionClient:
         return self.module.BootstrapAPIClient.submit(
             self, kind=kind, upload_id=upload_id, **kwargs,
         )
+
+    def _admission_body(self, kind: str, upload_id: str, archive_sha256: str) -> dict[str, Any]:
+        # The paired Manager issues the device-bound owner authorization;
+        # this client never holds or forwards the Bootstrap credential.
+        return {"kind": kind, "upload_id": upload_id, "archive_sha256": archive_sha256}
 
     def deployment_state(self, transaction_id: str) -> dict[str, Any]:
         return self.module.BootstrapAPIClient.deployment_state(self, transaction_id)
@@ -750,7 +767,7 @@ def b1_upload(api, client_module, data: bytes) -> dict[str, Any]:
 
 def b2_admission(api, uid: str, source_sha: str, target: Mapping[str, str],
                  digest: str, *, kind: str) -> dict[str, Any]:
-    submission = api.submit(kind=kind, upload_id=uid)
+    submission = api.submit(kind=kind, upload_id=uid, archive_sha256=digest)
     if submission.state != "admitted":
         raise BaselineError("B2_NOT_ADMITTED")
     r = api.deployment_state(submission.transaction_id)

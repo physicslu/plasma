@@ -720,9 +720,8 @@ class DeploymentCoordinator:
         self,
         request: HostOnlyPackageRequest,
         *,
-        trusted_policy: Mapping[str, object],
+        owner_authorization: Mapping[str, object],
         trusted_inventory: Mapping[str, Mapping[str, object]],
-        now_epoch_s: int,
         inject_failure: str | None = None,
     ) -> Mapping[str, Any]:
         """PR3 policy/resolution -> the SAME Host-only Engine Lock/Journal.
@@ -750,8 +749,8 @@ class DeploymentCoordinator:
             if (not isinstance(bundle, contract.VerifiedBundle)
                     or bundle.schema != contract.BUNDLE_SCHEMA):
                 raise contract.UnifiedDeploymentError("BUNDLE_V3_REQUIRED")
-            authority = contract.evaluate_host_only_bundle_authority(
-                bundle, trusted_policy=trusted_policy, now_epoch_s=now_epoch_s,
+            authority = contract.evaluate_host_only_owner_authorization(
+                bundle, owner_authorization=owner_authorization,
             )
             resolution = contract.resolve_host_only_bundle(
                 bundle, trusted_inventory=trusted_inventory,

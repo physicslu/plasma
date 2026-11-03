@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 
+from .ppu_owner_authorization_fixture import install_summary
 from .test_ppu_bundle_v3_packages_contract import (
     SOURCE, TARGET, bundle_v3, coordinator, request,
 )
@@ -15,13 +16,10 @@ from .test_ppu_bundle_v3_packages_contract import (
 def test_b3_b4_authorized_host_only_receipt(tmp_path):
     archive, digest = bundle_v3(tmp_path / "input")
     co = coordinator(tmp_path)
-    policy = {"schema": "plasma.ppu.bundle-authority.v2",
-              "generation": 1, "approved_bundle_sha256": [digest]}
     receipt = co.execute_authorized_bundle_host_only(
         request(archive, digest),
-        trusted_policy=policy,
+        owner_authorization=install_summary(digest),
         trusted_inventory={},
-        now_epoch_s=123,
     )
     assert receipt["result"] == "PASS"
     assert receipt["host_only"] is True

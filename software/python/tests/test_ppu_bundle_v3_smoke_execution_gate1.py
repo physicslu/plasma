@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from .ppu_owner_authorization_fixture import install_summary
 from .test_ppu_bundle_v3_packages_contract import (
     ROOT, SOURCE, TARGET, contract, coordinator, engine, request,
 )
@@ -40,17 +41,14 @@ def build_smoke(tmp_path: Path) -> tuple[Path, str]:
     return target, digest
 
 
-def policy_for(digest: str) -> dict:
-    return {"schema": "plasma.ppu.bundle-authority.v2",
-            "generation": 1, "approved_bundle_sha256": [digest]}
 
 
 def stage_smoke(tmp_path: Path):
     archive, digest = build_smoke(tmp_path / "archive")
     co = coordinator(tmp_path)
     receipt = co.execute_authorized_bundle_host_only(
-        request(archive, digest), trusted_policy=policy_for(digest),
-        trusted_inventory={}, now_epoch_s=123,
+        request(archive, digest), owner_authorization=install_summary(digest),
+        trusted_inventory={},
     )
     root = (co.paths.bootstrap_state_root / "host-only-packages"
             / "releases" / "ppu-b3-smoke" / receipt["release_id"])

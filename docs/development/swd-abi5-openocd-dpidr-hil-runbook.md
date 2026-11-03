@@ -59,8 +59,9 @@ Fill them with `sed` into a separate evidence directory. Never edit them in plac
    `candidate-evidence.json`.
 3. **Read-only state.** Run `z2run.py z2_state_ro.py` and save the result. It
    records Boot, Manager, Root journal and its ancestor chain, Root Entry,
-   privileged code manifest and verification, Bundle Authority v2 and the
-   installed OpenOCDs.
+   privileged code manifest and verification, the installed Bootstrap's
+   Owner Operation Authorization module (and any leftover retired Bundle
+   Authority v2 file) and the installed OpenOCDs.
 4. **Transfer (Route B).** Z2 cannot pull HTTP from SWPC. Repack the artifact
    (`gzip -dc … | xz -9e > payload.tar.xz`), then run `upload.py payload.tar.xz`.
    The upload is chunked base64 into `/root/.plasma-swd-upload`, and Z2 verifies
@@ -126,7 +127,7 @@ admits only reviewed Images:
 | B2 static qualification | `scripts/ppu-fpga-image-contracts.json` (Bootstrap) | BIN/HWH/Manifest SHA-256, identities, geometry |
 | Root devmem backend | `DEVMEM_INDEPENDENT_IMAGES` in `pl/hil/fpga_image_admission.py` (protected tree) | `image_id` → BIN SHA-256 |
 | Site admission | `scripts/z2/plasma_swd_site_admission.py` | reads the same table from the privileged code root |
-| B2 Bundle authority | `/etc/plasma/ppu-bundle-authority.json` (`plasma.ppu.bundle-authority.v2`) | the exact Bundle archive SHA-256 (not the Image) |
+| B2/B3 operation authorization | per-request `plasma.ppu.owner-operation-authorization.v1` from the paired client | nothing pre-listed; each request binds device, exact Bundle SHA-256, transaction and action |
 
 The fixed sample-point Image is `z2-independent-swd-v5-bd976140` (PR #1255
 head `bd976140e`, Vivado Host Build run 41469421780). Its paired Manifest is
@@ -135,8 +136,9 @@ is the bootgen-equivalent Zynq word-swapped payload of the run's
 `system_wrapper.bit` plus the trailing `0x20000000` NOP word.
 
 To load a newly listed Image: refresh the Bootstrap and re-provision the
-privileged code root from it (§8), add the exact Bundle SHA-256 to Bundle
-Authority v2, then run B1 → B2 → B3 `fpga_load=true` over HTTP. The DPIDR procedure in §3 then runs with
+privileged code root from it (§8), then run B1 → B2 → B3 `fpga_load=true` over
+HTTP with the paired client (`BootstrapAPIClient` issues a fresh owner
+authorization for each stage; no Bundle SHA-256 is pre-listed on the device). The DPIDR procedure in §3 then runs with
 `@IMAGE_ID@` set to the loaded Image.
 
 OpenOCD itself remains an engineering module. Packaging it into the Route A
@@ -166,7 +168,7 @@ could otherwise rename or replace a root-owned child directory.
 | Root Entry | `/usr/local/libexec/plasma/z2-path2-root-entry`: `download\|test\|restore` (no argument), `bundle-load <asset_set_sha256>` |
 | Privileged code root | `/opt/plasma/privileged/fpga-root`, `.plasma-privileged-code.json` (root `0600`), 5 code files |
 | Root journal | `/var/lib/plasma-privileged/fpga-deployment-state.json` (dir root `0700`, file `0600`) |
-| Bundle authority | `/etc/plasma/ppu-bundle-authority.json`, schema v2 `{schema, generation, approved_bundle_sha256[]}`; v1 fails closed |
+| Bundle authority | Retired after this contract: per-request Owner Operation Authorization (`ppu-owner-operation-authorization.md`). The Z2 file `/etc/plasma/ppu-bundle-authority.json` (v2) stays in place but unused until an approved Bootstrap refresh |
 | Site admission record | schema `plasma.swd.ps-admission.v2` (`trusted_code_sha256`, code-manifest stat identity) |
 | OpenOCD | must be built from a tree containing #1266 (ps_owner reads the new journal path) |
 
@@ -178,7 +180,8 @@ rollback; evidence `.work/z2-1252-migration-20261103/`):
 2. Back up Root Entry, Bundle Authority v1, `/opt/plasma/bootstrap` and the old
    journal under `/var/backups/plasma-1252-migration-<ts>/` (root `0700`).
 3. Bootstrap refresh-only from the CI factory kit (all files == SHA256SUMS).
-4. Bundle Authority v2, generation 1, empty list (deny by default).
+4. Bundle Authority v2, generation 1, empty list (deny by default). *(Historical:
+   superseded by Owner Operation Authorization; not part of future migrations.)*
 5. `ppu-privileged-source-install.py` (refuses to overwrite) and
    `ppu_privileged_source.py` → `VERIFIED_NOT_EXECUTED`.
 6. Create `/var/lib/plasma-privileged` and **copy** the old journal (the old

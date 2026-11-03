@@ -14,6 +14,13 @@ from urllib.parse import urlsplit, urlunsplit
 from .client import PPUHTTPError, PPUHttpClient
 from .config import normalize_endpoint
 from .registry import PPURegistryStore, RegistryEntryNotFound, normalize_registry_alias
+from .owner_authorization import (
+    ADMIT,
+    INSTALL,
+    INSTALL_FPGA_LOAD,
+    OwnerAuthorizationError,
+    issue_bundle_operation,
+)
 
 # Profile-scoped contract: real z2-ps owns Bootstrap on :18081. SWPC z2-like
 # already uses :18081 for restricted diagnostics and is not a Bootstrap target.
@@ -381,6 +388,23 @@ class BootstrapHttpClient:
         return self._json("POST", "/v1/deployments", token=token, body=body, timeout_s=10.0)
 
 
+def _hex_field(value: object, length: int, label: str) -> str:
+    if (type(value) is not str or len(value) != length
+            or any(ch not in "0123456789abcdef" for ch in value)):
+        raise BootstrapManagerError(f"{label} is invalid")
+    return value
+
+
+def _issue(token: str, action: str, device_id: str, digest: str, transaction_id: str) -> dict[str, Any]:
+    try:
+        return issue_bundle_operation(
+            credential=token, action=action, device_id=device_id,
+            subject_sha256=digest, transaction_id=transaction_id,
+        )
+    except OwnerAuthorizationError as exc:
+        raise BootstrapManagerError(str(exc)) from exc
+
+
 class ManagerBootstrapCoordinator:
     """Exact Manager policy boundary for PPU Bootstrap operations."""
 
@@ -456,47 +480,61 @@ class ManagerBootstrapCoordinator:
         return client.commit_upload(token, upload_id)
 
     def start_deployment(self, alias: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        _normalized, record, client, _payload, _device_id, token = self._authenticated(alias)
-        # A Bundle uses the same authenticated Bootstrap transaction endpoint,
-        # but does NOT acquire install authority from the Manager pairing token.
+        _normalized, record, client, _payload, device_id, token = self._authenticated(alias)
+        # Generic Bundle B2/B3: the Console's explicit request names the exact
+        # archive SHA256 (and, for B3, the B2 transaction) the user confirmed.
+        # The Manager turns that ONE choice into a device-bound Owner Operation
+        # Authorization; the PPU re-derives every bound fact and re-checks B2,
+        # Target, Package DAG, FPGA qualification and its own locks.
         if body.get("kind") == "bundle" and "fpga_load" in body:
-            # B3 of the device's current B2-admitted Bundle. The PPU re-checks
-            # B2, Master authority and FPGA qualification; Manager forwards
-            # only the explicit owner choice, never a path or idle claim.
-            if set(body) != {"kind", "upload_id", "fpga_load"}:
-                raise BootstrapManagerError("Bundle B3 requires only kind, upload_id and fpga_load")
-            upload_id = body["upload_id"]
-            if (type(upload_id) is not str or len(upload_id) != 32
-                    or any(ch not in "0123456789abcdef" for ch in upload_id)):
-                raise BootstrapManagerError("generic Bundle upload_id is invalid")
+            if set(body) != {"kind", "upload_id", "archive_sha256",
+                             "admission_transaction_id", "fpga_load"}:
+                raise BootstrapManagerError(
+                    "Bundle B3 requires kind, upload_id, archive_sha256, "
+                    "admission_transaction_id and fpga_load")
+            upload_id = _hex_field(body["upload_id"], 32, "generic Bundle upload_id")
+            digest = _hex_field(body["archive_sha256"], 64, "Bundle archive_sha256")
+            admission = _hex_field(body["admission_transaction_id"], 32,
+                                   "Bundle admission_transaction_id")
             if type(body["fpga_load"]) is not bool:
                 raise BootstrapManagerError("Bundle B3 fpga_load must be a boolean")
+            authorization = _issue(
+                token, INSTALL_FPGA_LOAD if body["fpga_load"] else INSTALL,
+                device_id, digest, admission,
+            )
             status, response = client.start_deployment(token, {
                 "kind": "bundle", "upload_id": upload_id,
-                "fpga_load": body["fpga_load"],
+                "fpga_load": body["fpga_load"], "authorization": authorization,
             })
             deployment = response.get("deployment") if isinstance(response, dict) else None
+            owner = deployment.get("owner_authorization") if isinstance(deployment, dict) else None
             if (
-                status != 200 or response.get("ok") is not True
+                status not in (200, 202) or response.get("ok") is not True
                 or not isinstance(deployment, dict)
                 or deployment.get("upload_id") != upload_id
                 or deployment.get("state") not in {"queued", "running"}
+                or deployment.get("admission_transaction_id") != admission
+                or not isinstance(owner, dict)
+                or owner.get("status") != "OWNER_AUTHORIZED"
+                or owner.get("action") != authorization["action"]
+                or owner.get("subject_sha256") != digest
             ):
                 raise BootstrapManagerError("Bundle B3 submission response is not a queued transaction")
             return status, response
         if body.get("kind") == "bundle":
-            if set(body) != {"kind", "upload_id"}:
-                raise BootstrapManagerError("generic Bundle requires only kind and upload_id")
-            upload_id = body["upload_id"]
-            if (type(upload_id) is not str or len(upload_id) != 32
-                    or any(ch not in "0123456789abcdef" for ch in upload_id)):
-                raise BootstrapManagerError("generic Bundle upload_id is invalid")
+            if set(body) != {"kind", "upload_id", "archive_sha256"}:
+                raise BootstrapManagerError(
+                    "generic Bundle requires only kind, upload_id and archive_sha256")
+            upload_id = _hex_field(body["upload_id"], 32, "generic Bundle upload_id")
+            digest = _hex_field(body["archive_sha256"], 64, "Bundle archive_sha256")
             status, response = client.start_deployment(token, {
                 "kind": "bundle", "upload_id": upload_id,
+                "authorization": _issue(token, ADMIT, device_id, digest, upload_id),
             })
             deployment = response.get("deployment") if isinstance(response, dict) else None
             result = deployment.get("result") if isinstance(deployment, dict) else None
             plan = result.get("plan") if isinstance(result, dict) else None
+            owner = plan.get("owner_authorization") if isinstance(plan, dict) else None
             if (
                 status != 200 or response.get("ok") is not True
                 or not isinstance(deployment, dict)
@@ -507,14 +545,16 @@ class ManagerBootstrapCoordinator:
                 or not isinstance(plan, dict)
                 or plan.get("kind") != "bundle"
                 or plan.get("execution_permitted") is not False
-                or result.get("source_authorized") is not True
-                or not isinstance(plan.get("authorization"), dict)
-                or plan["authorization"].get("status") != "LOCAL_APPROVED"
-                or plan["authorization"].get("method") != "device-local-exact-bundle-sha256"
-                or plan["authorization"].get("archive_sha256") != plan.get("archive_sha256")
+                or plan.get("archive_sha256") != digest
+                or result.get("owner_authorized") is not True
+                or not isinstance(owner, dict)
+                or owner.get("status") != "OWNER_AUTHORIZED"
+                or owner.get("action") != ADMIT
+                or owner.get("subject_sha256") != digest
+                or owner.get("transaction_id") != upload_id
             ):
                 raise BootstrapManagerError(
-                    "generic Bundle admission response is not locally approved and non-executing"
+                    "generic Bundle admission response is not owner-authorized and non-executing"
                 )
             return status, response
 

@@ -28,7 +28,9 @@ backup, Runtime service restart, FPGA load or DUT operations.
    **data-only** canonical v3 Admission Receipt; it is not an install grant (B2).
 4. **Only after matching B2 Admission** does an explicit
    `POST /v1/deployments` request with
-   `{"kind":"bundle","upload_id":"<previously-admitted-id>","install_only":true}`
+   `{"kind":"bundle","upload_id":"<previously-admitted-id>","fpga_load":false,"authorization":{…}}`
+   (current form: `install_only` retired by #1261; per-operation owner
+   authorization per `ppu-owner-operation-authorization.md`)
    enter B3. A device-local factory policy must match the **same ZIP**,
    source SHA and trusted target. The Bootstrap worker invokes the existing
    Coordinator CLI in `install-bundle` mode; that single Coordinator controls

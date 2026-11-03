@@ -568,7 +568,7 @@ def test_root_handoff_accepts_fpga_only_bundle_without_profile(tmp_path):
 
 # --- Bootstrap HTTP service ------------------------------------------------
 
-from .ppu_bundle_authority_fixture import provision_fixture_grant  # noqa: E402
+from .ppu_owner_authorization_fixture import admit_body, install_body  # noqa: E402
 from .test_ppu_fpga_static_qualification_gate1 import (  # noqa: E402
     _b3_server, _commit, bootstrap, bundle_v3, synthetic_image, write_contracts,
 )
@@ -580,16 +580,20 @@ def admitted_fpga_bundle(tmp_path):
         "actions", ["install", "verify"]))
     raw = archive.read_bytes()
     upload_id = _commit(paths, raw)
-    provision_fixture_grant(paths, raw)
     _, entry = synthetic_image()
     write_contracts(paths.fpga_image_contracts, entry)
-    srv.start_deployment({"kind": "bundle", "upload_id": upload_id})
+    srv.start_deployment(admit_body(paths, "bundle", upload_id))
     return srv, paths, calls, upload_id
 
 
+def b3(paths, *, fpga_load=True):
+    """Fresh owner B3 authorization for the device's CURRENT B2 admission."""
+    return install_body(paths, bootstrap._deployment_api_record(paths), fpga_load=fpga_load)
+
+
 def test_service_forwards_explicit_fpga_load_to_coordinator(tmp_path):
-    srv, _paths, calls, upload_id = admitted_fpga_bundle(tmp_path)
-    srv.start_deployment({"kind": "bundle", "upload_id": upload_id, "fpga_load": True})
+    srv, paths, calls, upload_id = admitted_fpga_bundle(tmp_path)
+    srv.start_deployment(b3(paths))
     srv.deployment_thread.join(timeout=10)
     assert len(calls) == 1
     assert calls[0][2]["fpga_load"] is True
@@ -603,9 +607,9 @@ def test_service_forwards_explicit_fpga_load_to_coordinator(tmp_path):
     {"fpga_load": True, "idle": True},
 ])
 def test_service_rejects_non_boolean_or_extra_b3_fields(tmp_path, body):
-    srv, _paths, calls, upload_id = admitted_fpga_bundle(tmp_path)
+    srv, paths, calls, upload_id = admitted_fpga_bundle(tmp_path)
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
-        srv.start_deployment({"kind": "bundle", "upload_id": upload_id, **body})
+        srv.start_deployment({**b3(paths), **body})
     assert calls == []
 
 
@@ -621,10 +625,9 @@ def test_service_rejects_fpga_load_for_bundle_without_fpga_image(tmp_path):
     archive, _digest = build_smoke(tmp_path / "bundle")
     raw = archive.read_bytes()
     upload_id = _commit(paths, raw)
-    provision_fixture_grant(paths, raw)
-    srv.start_deployment({"kind": "bundle", "upload_id": upload_id})
+    srv.start_deployment(admit_body(paths, "bundle", upload_id))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE"):
-        srv.start_deployment({"kind": "bundle", "upload_id": upload_id, "fpga_load": True})
+        srv.start_deployment(b3(paths))
     assert calls == []
 
 
@@ -650,7 +653,7 @@ def test_service_reconciles_known_b3_failures_from_coordinator_journal(
         raise bootstrap.BootstrapServiceError("B3_DEVICE_INSTALL_SUBPROCESS_FAILED")
 
     srv.bundle_install_runner = runner
-    srv.start_deployment({"kind": "bundle", "upload_id": upload_id, "fpga_load": True})
+    srv.start_deployment(b3(paths))
     srv.deployment_thread.join(timeout=10)
     record = bootstrap._deployment_api_record(paths)
     assert record["state"] == api_state

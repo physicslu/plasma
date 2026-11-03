@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from .ppu_bundle_authority_fixture import provision_fixture_grant
+from .ppu_owner_authorization_fixture import admit_body, install_body, machine_id_file
 from .ppu_fpga_qualification_fixture import (
     synthetic_image, write_contracts, provision_default_contract,
 )
@@ -292,28 +292,28 @@ def test_static_qualification_never_touches_root_loader(tmp_path, monkeypatch):
 
 # --- service B2 over real loopback HTTP ------------------------------------
 
-def _post_deployment(api, upload_id):
+def _post_deployment(api, paths, upload_id):
     """Raw HTTP so the fail-closed error code in the 409 body stays visible."""
     status, raw = api._transport(
         "POST", "/v1/deployments",
-        json.dumps({"kind": "bundle", "upload_id": upload_id}).encode(),
+        json.dumps(admit_body(paths, "bundle", upload_id)).encode(),
         {"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"},
     )
     return status, json.loads(raw)
 
 
-def _b2(api, raw):
-    return _post_deployment(api, api.upload(raw))
+def _b2(api, paths, raw):
+    return _post_deployment(api, paths, api.upload(raw))
 
 
-def test_service_b2_pass_requires_master_and_fpga_static_qualification(loopback, tmp_path):
+def test_service_b2_pass_requires_owner_and_fpga_static_qualification(loopback, tmp_path):
     api, paths, server = loopback
     archive, digest = fpga_bundle(tmp_path / "ok")
-    status, body = _b2(api, archive.read_bytes())
+    status, body = _b2(api, paths, archive.read_bytes())
     assert status == 200, body
     result = body["deployment"]["result"]
     assert result["result"] == "PASS"
-    assert result["source_authorized"] is True
+    assert result["owner_authorized"] is True
     assert result["fpga_static_qualification"] == "STATIC_QUALIFIED"
     assert result["fpga_loaded"] is False
     assert result["identity_readback"] == "NOT_RUN"
@@ -321,7 +321,8 @@ def test_service_b2_pass_requires_master_and_fpga_static_qualification(loopback,
     plan = result["plan"]
     assert plan["execution_permitted"] is False
     assert plan["fpga_qualification"]["archive_sha256"] == digest
-    assert plan["authorization"]["archive_sha256"] == digest
+    assert plan["owner_authorization"]["subject_sha256"] == digest
+    assert plan["owner_authorization"]["action"] == "bundle.admit"
     assert not paths.product_root.exists()
     # The SWPC client accepts this receipt as a valid B2 admission.
     assert client._valid_package_admission(body["deployment"], kind="bundle")
@@ -331,13 +332,16 @@ def test_client_rejects_b2_receipt_claiming_fpga_load_or_missing_qualification(
         loopback, tmp_path):
     api, paths, server = loopback
     archive, _ = fpga_bundle(tmp_path / "ok")
-    _status, body = _b2(api, archive.read_bytes())
+    _status, body = _b2(api, paths, archive.read_bytes())
     receipt = body["deployment"]
     for mutate in (
         lambda r: r["result"].__setitem__("fpga_static_qualification", "NOT_APPLICABLE"),
         lambda r: r["result"].__setitem__("fpga_loaded", True),
         lambda r: r["result"].__setitem__("identity_readback", "PASS"),
-        lambda r: r["result"].__setitem__("source_authorized", False),
+        lambda r: r["result"].__setitem__("owner_authorized", False),
+        lambda r: r["result"]["plan"]["owner_authorization"].__setitem__("action", "bundle.install"),
+        lambda r: r["result"]["plan"]["owner_authorization"].__setitem__("subject_sha256", "f" * 64),
+        lambda r: r["result"]["plan"].__delitem__("owner_authorization"),
         lambda r: r["result"]["plan"].__setitem__("execution_permitted", True),
     ):
         changed = json.loads(json.dumps(receipt))
@@ -349,20 +353,24 @@ def test_service_b2_fpga_unqualified_is_not_admitted(loopback, tmp_path):
     api, paths, server = loopback
     files, _ = synthetic_image(b"OTHER SYNTHETIC BIN WITH NO CONTRACT")
     archive, _digest = fpga_bundle(tmp_path / "bad", files)
-    status, body = _b2(api, archive.read_bytes())
+    status, body = _b2(api, paths, archive.read_bytes())
     assert status == 409 and "FPGA_IMAGE_CONTRACT_UNKNOWN" in json.dumps(body)
     record = bootstrap._deployment_api_record(paths)
     assert record is None or record.get("state") != "admitted"
 
 
-def test_service_b2_without_master_grant_fails_before_fpga(loopback, tmp_path):
+def test_service_b2_without_owner_authorization_fails_before_fpga(loopback, tmp_path):
     api, paths, server = loopback
     archive, _ = fpga_bundle(tmp_path / "x")
     raw = archive.read_bytes()
     upload_id = api.upload(raw)
-    paths.bundle_authority_policy.unlink()  # unprovisioned / revoked device
-    status, body = _post_deployment(api, upload_id)
-    assert status == 409 and "BUNDLE_AUTHORITY_NOT_PROVISIONED" in json.dumps(body)
+    status, raw_body = api._transport(
+        "POST", "/v1/deployments",
+        json.dumps({"kind": "bundle", "upload_id": upload_id}).encode(),
+        {"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"},
+    )
+    assert status == 409 and "PACKAGE_REQUEST_FIELDS_DENIED" in raw_body.decode()
+    assert not paths.deployment_record.exists()
 
 
 # --- B3 must re-qualify against the CURRENT trusted state ------------------
@@ -372,7 +380,7 @@ def _b3_server(tmp_path):
         product_root=tmp_path / "product", state_root=tmp_path / "state",
         package_target_file=tmp_path / "trusted-target.json",
         bundle_install_policy=tmp_path / "trusted-policy.json",
-        bundle_authority_policy=tmp_path / "private-master-grant.json",
+        machine_id_path=machine_id_file(tmp_path),
         fpga_image_contracts=tmp_path / "factory" / "ppu-fpga-image-contracts.json",
     )
     paths.package_target_file.write_text(json.dumps(TARGET))
@@ -401,18 +409,17 @@ def _commit(paths, raw):
     return upload_id
 
 
-def test_b3_rejects_fpga_contract_or_master_grant_change_after_b2(tmp_path):
+def test_b3_rejects_fpga_contract_or_owner_authorization_change_after_b2(tmp_path):
     srv, paths, calls = _b3_server(tmp_path)
     archive, digest = bundle_v3(tmp_path / "bundle", mutate=lambda m: m.__setitem__(
         "actions", ["install", "verify"]))
     raw = archive.read_bytes()
     upload_id = _commit(paths, raw)
-    provision_fixture_grant(paths, raw)
     _, entry = synthetic_image()
     write_contracts(paths.fpga_image_contracts, entry)
-    b2 = srv.start_deployment({"kind": "bundle", "upload_id": upload_id})
+    b2 = srv.start_deployment(admit_body(paths, "bundle", upload_id))
     assert b2["result"]["fpga_static_qualification"] == "STATIC_QUALIFIED"
-    b3 = {"kind": "bundle", "upload_id": upload_id, "fpga_load": False}
+    b3 = install_body(paths, b2, fpga_load=False)
 
     # Contract withdrawn after B2.
     original = paths.fpga_image_contracts.read_bytes()
@@ -426,18 +433,18 @@ def test_b3_rejects_fpga_contract_or_master_grant_change_after_b2(tmp_path):
         srv.start_deployment(b3)
     paths.fpga_image_contracts.write_bytes(original)
 
-    # Master grant changed (new generation) after B2.
-    grants = json.loads(paths.bundle_authority_policy.read_text())
-    paths.bundle_authority_policy.write_text(json.dumps(dict(grants, generation=2)))
-    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_ADMISSION_AUTHORITY_CHANGED"):
+    # Pairing credential rotated after the owner signed the B3 request:
+    # every outstanding authorization is invalid.
+    original_token = paths.token_file.read_text()
+    paths.token_file.write_text("rotated-paired-credential-" + "z" * 24 + "\n")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="OWNER_AUTHORIZATION_INVALID"):
         srv.start_deployment(b3)
-    # Local Bundle approval revoked after B2.
-    withdrawn = json.loads(json.dumps(grants))
-    withdrawn["approved_bundle_sha256"] = []
-    paths.bundle_authority_policy.write_text(json.dumps(withdrawn))
-    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MASTER_AUTHORITY_DENIED"):
-        srv.start_deployment(b3)
-    paths.bundle_authority_policy.write_text(json.dumps(grants))
+    paths.token_file.write_text(original_token)
+    # FPGA load is a distinct owner action: an install-only authorization
+    # cannot be widened into an FPGA load.
+    widened = dict(b3, fpga_load=True)
+    with pytest.raises(bootstrap.BootstrapServiceError, match="OWNER_AUTHORIZATION_ACTION_MISMATCH"):
+        srv.start_deployment(widened)
     assert calls == []
 
     # Unchanged trusted state: B3 proceeds to the (stubbed) install-only runner.

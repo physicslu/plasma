@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from .ppu_bundle_authority_fixture import provision_fixture_grant
+from .ppu_owner_authorization_fixture import admit_body
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -222,20 +222,18 @@ def test_factory_installed_service_can_admit_package_without_installing(tmp_path
     paths = installed_service.ServicePaths(
         state_root=state_root, product_root=tmp_path / "runtime-untouched",
         package_target_file=profile,
-        bundle_authority_policy=tmp_path / "private-master-policy.json",
+        machine_id_path=_machine_id(tmp_path),
         bootstrap_script=install_root / "ppu-bootstrap.py",
         kit_tool=install_root / "ppu-bootstrap-kit.py",
     )
     uid, digest = _factory_python_upload(installed_service, paths, tmp_path)
-    provision_fixture_grant(
-        paths, installed_service._upload_paths(paths, uid).committed.read_bytes()
-    )
     server = installed_service.BootstrapHTTPServer(
         ("127.0.0.1", 0), paths=paths, base_module=object(),
         deployment_runner=lambda *_: pytest.fail("runtime deployment must not execute"),
     )
     try:
-        result = server.admit_package({"kind": "bundle", "upload_id": uid})
+        # Paired owner admits their own Bundle: no per-Bundle pre-approval.
+        result = server.admit_package(admit_body(paths, "bundle", uid))
         assert result["state"] == "admitted"
         receipt = result["result"]
         assert receipt["result"] == "PASS"
@@ -279,6 +277,7 @@ def test_factory_admission_without_device_owned_target_is_denied(tmp_path: Path)
     paths = installed_service.ServicePaths(
         state_root=state_root, product_root=tmp_path / "runtime-untouched",
         package_target_file=tmp_path / "never-provisioned-target.json",
+        machine_id_path=_machine_id(tmp_path),
     )
     uid, _ = _factory_python_upload(installed_service, paths, tmp_path)
     server = installed_service.BootstrapHTTPServer(
@@ -288,7 +287,7 @@ def test_factory_admission_without_device_owned_target_is_denied(tmp_path: Path)
     try:
         with pytest.raises(installed_service.BootstrapServiceError,
                            match="PACKAGE_TARGET_PROFILE_UNAVAILABLE"):
-            server.admit_package({"kind": "python", "upload_id": uid})
+            server.admit_package(admit_body(paths, "python", uid))
         assert not paths.deployment_record.exists()
         assert not paths.coordinator_journal.exists()
         assert not paths.product_root.exists()

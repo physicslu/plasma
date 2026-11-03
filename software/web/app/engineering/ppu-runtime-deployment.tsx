@@ -16,6 +16,7 @@ import {
   runManagerPpuPlatformPsLoopback,
   sha256Hex,
   startManagerPpuBootstrapDeployment,
+  type AdmittedBundle,
   type ManagerBootstrapStatus,
   type PlatformPsLoopbackPayload,
 } from "./ppu-bootstrap-api";
@@ -55,7 +56,7 @@ export default function PpuRuntimeDeployment({
   const [kit, setKit] = useState<File | null>(null);
   const [sidecar, setSidecar] = useState<File | null>(null);
   const [bundleFile, setBundleFile] = useState<File | null>(null);
-  const [admittedUploadId, setAdmittedUploadId] = useState<string | null>(null);
+  const [admitted, setAdmitted] = useState<AdmittedBundle | null>(null);
   const [ppuId, setPpuId] = useState(alias);
   const [facilityId, setFacilityId] = useState("lab");
   const [displayName, setDisplayName] = useState(alias || "Plasma PPU");
@@ -140,8 +141,9 @@ export default function PpuRuntimeDeployment({
     && deployment?.state !== "queued" && deployment?.state !== "running",
   );
   const canInstallBundle = Boolean(
-    alias && admittedUploadId
-    && deployment?.state === "admitted" && deployment?.upload_id === admittedUploadId
+    alias && admitted
+    && deployment?.state === "admitted" && deployment?.upload_id === admitted.uploadId
+    && deployment?.transaction_id === admitted.admissionTransactionId
     && pairing?.paired && pairing.device_match
     && !hasActiveExecution && !recoveryRequired && busy === null,
   );
@@ -253,8 +255,12 @@ export default function PpuRuntimeDeployment({
         setUploadProgress(Math.round((offset / bundleFile.size) * 100));
       }
       await commitManagerPpuBootstrapUpload(alias, created.upload.upload_id);
-      const receipt = await admitManagerPpuBundle(alias, created.upload.upload_id);
-      setAdmittedUploadId(created.upload.upload_id);
+      const receipt = await admitManagerPpuBundle(alias, created.upload.upload_id, digest);
+      setAdmitted({
+        uploadId: created.upload.upload_id,
+        archiveSha256: digest,
+        admissionTransactionId: receipt.deployment.transaction_id,
+      });
       setNotice(`Bundle admitted only (not installed/activated). Transaction: ${receipt.deployment.transaction_id}`);
       await refresh(true);
     } catch (reason) {
@@ -266,13 +272,13 @@ export default function PpuRuntimeDeployment({
   }
 
   async function installBundle(fpgaLoad: boolean) {
-    if (!canInstallBundle || !admittedUploadId) return;
+    if (!canInstallBundle || !admitted) return;
     setBusy("b3");
     setError(null);
     setNotice(null);
     try {
-      const receipt = await installManagerPpuBundle(alias, admittedUploadId, fpgaLoad);
-      setAdmittedUploadId(null);
+      const receipt = await installManagerPpuBundle(alias, admitted, fpgaLoad);
+      setAdmitted(null);
       setNotice(fpgaLoad
         ? `Install and FPGA load queued. Transaction: ${receipt.deployment.transaction_id}`
         : `Install queued (no FPGA load). Transaction: ${receipt.deployment.transaction_id}`);
@@ -485,13 +491,13 @@ export default function PpuRuntimeDeployment({
         <header className="ppuPlatformSectionHeader">
           <div>
             <small>BUNDLE ADMISSION ONLY</small>
-            <h4 id="platform-bundle-admission-heading">Generic Bundle v2</h4>
-            <p>Accept verified multi-component packages and opaque resources. Does not install, execute or load FPGA.</p>
+            <h4 id="platform-bundle-admission-heading">User Bundle v3</h4>
+            <p>Upload your own verified Bundle v3 Packages. Admission does not install, execute or load FPGA.</p>
           </div>
         </header>
         <div className="ppuPlatformDeploymentForm">
           <label className="operatorField ppuPlatformFileField">
-            <span>Bundle v2 ZIP (max 32 MiB)</span>
+            <span>Bundle v3 ZIP (max 32 MiB)</span>
             <input type="file" accept=".zip" disabled={busy !== null}
               onChange={event => setBundleFile(event.target.files?.[0] ?? null)} />
           </label>
@@ -500,7 +506,7 @@ export default function PpuRuntimeDeployment({
             {busy === "bundle" ? `Admitting${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Verify & Admit Bundle (No Install)"}
           </button>
         </div>
-        <p className="ppuPlatformSectionNote">Admission produces a Receipt only. Publisher trust, Master authorization and device Install/Activate are not qualified.</p>
+        <p className="ppuPlatformSectionNote">Each step is authorized by you as the paired owner for this exact file SHA-256; no per-Bundle pre-approval is needed. Admission produces a Receipt only. Format, integrity, Target, FPGA qualification and device locks are still enforced by the PPU.</p>
         <div className="ppuPlatformDeploymentForm">
           <button className="operatorButton" type="button"
             disabled={!canInstallBundle} onClick={() => void installBundle(false)}>
