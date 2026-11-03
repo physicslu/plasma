@@ -370,7 +370,7 @@ class FakeProc:
 def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=False):
     tmp_path.mkdir(parents=True, exist_ok=True)
     journal = tmp_path / "journal.json"
-    journal.write_text(json.dumps({"status": "IMAGE", "image_id": "z2-independent-swd-v5-bd976140",
+    journal.write_text(json.dumps({"status": "IMAGE", "image_id": "z2-independent-swd-v5-d0add58c",
                                    "session_id": "s", "boot_id": "b", "firmware_sha256": "f"}))
     calls = {"run": [], "popen": []}
 
@@ -384,7 +384,7 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
         return FakeProc(log, rc, hang)
 
     a = abi5.Abi5OpenocdAdapter(openocd_root=tmp_path / "ocd", python=Path("/usr/bin/python3"),
-                                expected_image_id="z2-independent-swd-v5-bd976140", journal=journal,
+                                expected_image_id="z2-independent-swd-v5-d0add58c", journal=journal,
                                 record_dir=tmp_path / "rec", run=run, popen=popen,
                                 openocd_running=lambda: openocd, poll_s=0.01)
     (tmp_path / "rec").mkdir()

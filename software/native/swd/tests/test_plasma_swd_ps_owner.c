@@ -23,7 +23,7 @@ static const char *BOOT = "4cefdc0c-f586-4d19-b126-1d8e1108c8f1";
 static const char *MAN = "f470a4fac8accd0b1fcfb50243d4d663e1ddee209bc1c506e8e587c1f5ff859c";
 static const char *FW = "d3b65a818c03ef1f73a3f0026357d6ed6a9fd903f2f041bc09b89d6b6ba3b773";
 static const char *SID = "fpga-e412210dbd8e4d49b54f043ea697cb21";
-static const char *IMG = "z2-independent-swd-v5-bd976140";
+static const char *IMG = "z2-independent-swd-v5-d0add58c";
 
 static void path(char *out, const char *name)
 {
@@ -46,7 +46,7 @@ static void journal_text(char *buf, size_t cap, const char *status)
 {
     snprintf(buf, cap,
              "{\"boot_id\":\"%s\",\"download_count\":1,\"firmware_sha256\":\"%s\","
-             "\"image\":\"plasma-swd-independent-bd976140.bin\",\"image_id\":\"%s\","
+             "\"image\":\"plasma-swd-independent-d0add58c.bin\",\"image_id\":\"%s\","
              "\"manifest_sha256\":\"%s\",\"session_id\":\"%s\",\"status\":\"%s\"}\n",
              BOOT, FW, IMG, MAN, SID, status);
 }

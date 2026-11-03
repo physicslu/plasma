@@ -16,7 +16,7 @@ SYNTHETIC_BIN = b"SYNTHETIC HOST-ONLY FPGA BIN - NOT A BITSTREAM"
 SYNTHETIC_HWH = b"<!-- SYNTHETIC HOST-ONLY HWH - NOT A VIVADO HANDOFF -->"
 TARGET = {"platform": "linux-armv7", "board": "pynq-z2", "fpga_part": "xc7z020clg400-1"}
 
-# ABI-v5-shaped geometry (same layout as the bd976140 contract), synthetic SHAs.
+# ABI-v5-shaped geometry (same layout as the d0add58c contract), synthetic SHAs.
 SITES = ({"site_id": 1, "offset": 0, "identity": 0x00050001},
          {"site_id": 2, "offset": 0x1000, "identity": 0x00050002})
 GEOMETRY = {"axi_base": 0x43C01000, "axi_bytes": 0x2000,

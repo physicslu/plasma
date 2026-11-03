@@ -54,10 +54,10 @@ def contract_file(tmp_path, *entries):
     return write_contracts(tmp_path / "factory" / "contracts.json", *entries)
 
 
-# --- shipped trusted contracts (ABI v5 independent: bd976140; ab79b04e retired) ----
+# --- shipped trusted contracts (ABI v5 independent: d0add58c; ab79b04e, bd976140 retired) ----
 
-SHIPPED_BUILDS = ("bd976140", "d0add58c")
-RETIRED_BUILDS = ("ab79b04e",)
+SHIPPED_BUILDS = ("d0add58c",)
+RETIRED_BUILDS = ("ab79b04e", "bd976140")
 
 
 def _release_manifest(build: str) -> bytes:
@@ -110,7 +110,7 @@ def test_root_devmem_image_table_matches_shipped_contracts():
 
 def test_root_devmem_denies_unlisted_image_and_mismatched_bin():
     root = qualification.load_root_manifest_parser()
-    base = json.loads(_release_manifest("bd976140"))
+    base = json.loads(_release_manifest("d0add58c"))
     for change in ({"image_id": "z2-independent-swd-v5-deadbeef"},
                    {"firmware_sha256": "0" * 64}):
         data = dict(base, **change)

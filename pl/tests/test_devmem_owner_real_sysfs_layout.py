@@ -21,7 +21,7 @@ from pl.hil import fpga_image_admission as admission  # noqa: E402
 from pl.hil import fpga_image_guard as guard  # noqa: E402
 from pl.hil import fpga_image_root as root  # noqa: E402
 
-DEPLOY = ROOT / "pl/hil/releases/swd-independent-bd976140/plasma-image-manifest.json"
+DEPLOY = ROOT / "pl/hil/releases/swd-independent-d0add58c/plasma-image-manifest.json"
 NODE = "43c00000.audio-codec-ctrl"
 
 

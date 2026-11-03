@@ -3,6 +3,14 @@
 **PR #1189 Draft.** This is a source-only integration contract, **not** an
 actual OpenOCD C adapter, Linux driver, deployed Image or DUT qualification.
 
+> **Superseded for the implemented adapter (PR #1285, 2026-11-03).** The
+> OpenOCD `plasma_swd` adapter no longer re-validates Root/Image/voltage
+> attestation per MMIO word or reads an admission record; it holds the Site
+> lock, checks once that PL holds a loaded Image, and reports SWD outcomes to
+> OpenOCD. See the runbook §9 adapter contract:
+> [swd-abi5-openocd-dpidr-hil-runbook.md](../development/swd-abi5-openocd-dpidr-hil-runbook.md).
+> The sections below are kept as design history.
+
 ## NORMAL transaction compatibility contract
 
 `software/python/plasma_interfaces/swd_native_normal_contract.py` models
