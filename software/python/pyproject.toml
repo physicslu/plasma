@@ -25,6 +25,7 @@ plasma-manager = "plasma_manager.bootstrap_server:main"
 packages = [
   "plasma_core",
   "plasma_interfaces",
+  "plasma_opf",
   "plasma_handlers",
   "plasma_server",
   "plasma_client",
