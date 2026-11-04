@@ -29,7 +29,7 @@ def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fp
         "sites": [1, 2], "transport": transport,
         "driver_abi": "example-swd-abi" if transport == "fpga" else None,
         "fpga_package": "example-fpga" if transport == "fpga" else None,
-        "max_image_bytes": 4096, "max_runtime_s": 30,
+        "max_image_bytes": 4096,
     }
     if descriptor_change:
         descriptor.update(descriptor_change)
@@ -96,6 +96,7 @@ def test_two_provider_routes_use_one_bundle_job_contract_without_catalog(tmp_pat
     ({"operations": ["program"]}, "OPERATION_UNSUPPORTED"),
     ({"provider_package": "missing"}, "PROVIDER_PACKAGE_INVALID"),
     ({"max_image_bytes": 4}, "IMAGE_OUT_OF_BOUNDS"),
+    ({"max_runtime_s": 30}, "PROVIDER_DESCRIPTOR_INVALID"),
 ])
 def test_incomplete_provider_contract_fails_closed(tmp_path, change, code):
     root, digest, _ = staged_provider(tmp_path, descriptor_change=change)
