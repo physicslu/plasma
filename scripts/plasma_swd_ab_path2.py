@@ -16,10 +16,12 @@ import json
 import os
 from pathlib import Path
 import re
+import select
 import shutil
 import subprocess
 import sys
 import tempfile
+import termios
 import time
 import uuid
 
@@ -239,19 +241,90 @@ def stage_images(helper, creds, hosts, images: dict[str, bytes], token: str) -> 
     return output
 
 
-def cdc_port() -> str:
-    try:
-        from serial.tools import list_ports
-    except ImportError:
-        raise NotRun("PY_SERIAL_NOT_INSTALLED") from None
-    matches = [p.device for p in list_ports.comports()
-               if p.vid == 0xCAFE and p.pid == 0x4001]
+def cdc_port(sys_tty: Path = Path("/sys/class/tty"),
+             device_root: str = "/dev") -> str:
+    # Linux USB sysfs is authoritative and needs no extra Python packages.
+    matches = []
+    for tty in sys_tty.glob("ttyACM*"):
+        dev = tty / "device"
+        if not dev.exists():
+            continue
+        tree = dev.resolve()
+        for ancestor in (tree, *tree.parents):
+            vendor, product = ancestor / "idVendor", ancestor / "idProduct"
+            if vendor.is_file() and product.is_file():
+                try:
+                    if int(vendor.read_text().strip(), 16) == 0xCAFE and \
+                            int(product.read_text().strip(), 16) == 0x4001:
+                        matches.append(device_root.rstrip("/") + "/" + tty.name)
+                except (OSError, ValueError):
+                    pass
+                break
     if len(matches) != 1:
         raise NotRun("BLUE_PILL_CDC_NOT_UNIQUE_OR_MISSING")
     return matches[0]
 
 
+class PosixCDC:
+    """Minimal Linux CDC ACM transport, using only stdlib termios/select."""
+
+    def __init__(self, path: str):
+        self.fd = os.open(path, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK | os.O_CLOEXEC)
+        self.pending = bytearray()
+        try:
+            attrs = termios.tcgetattr(self.fd)
+            attrs[0] = attrs[1] = attrs[3] = 0
+            attrs[2] &= ~(termios.CSIZE | termios.PARENB | termios.CSTOPB |
+                          getattr(termios, "CRTSCTS", 0))
+            attrs[2] |= termios.CS8 | termios.CLOCAL | termios.CREAD
+            attrs[4] = attrs[5] = termios.B115200
+            attrs[6][termios.VMIN] = 0
+            attrs[6][termios.VTIME] = 0
+            termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
+            termios.tcflush(self.fd, termios.TCIFLUSH)
+        except Exception:
+            self.close()
+            raise
+
+    def close(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+    def readline(self, timeout=0.1) -> bytes:
+        end = time.monotonic() + timeout
+        while True:
+            nl = self.pending.find(b"\n")
+            if nl >= 0:
+                line = bytes(self.pending[:nl + 1])
+                del self.pending[:nl + 1]
+                return line
+            if len(self.pending) > 512:
+                raise ValueError("CDC_LINE_TOO_LONG")
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                return b""
+            readable, _, _ = select.select([self.fd], [], [], remaining)
+            if readable:
+                data = os.read(self.fd, 4096)
+                if data:
+                    self.pending.extend(data)
+
+    def write(self, message: bytes):
+        if os.write(self.fd, message) != len(message):
+            raise OSError("CDC_SHORT_WRITE")
+
+
 def cdc_check(version: str, duration: int) -> dict:
+    # Reuse the previously validated heartbeat/ID acceptance contract;
+    # only the serial transport is supplied by Python's standard library.
+    probe = _load(CDC_PROBE, "ab_existing_cdc_probe")
     deadline = time.monotonic() + 6
     port = None
     while time.monotonic() < deadline:
@@ -262,17 +335,40 @@ def cdc_check(version: str, duration: int) -> dict:
             time.sleep(0.3)
     if port is None:
         return {"result": "FAIL", "reason": "CDC_NOT_FOUND_AFTER_RESET"}
-    cmd = [sys.executable, str(CDC_PROBE), "--port", port, "--version",
-           EXPECTED[version]["version"], "--duration", str(duration)]
+    period = 0.5 if version == "v0.1" else 1.0
+    monitor = probe.HeartbeatMonitor(period=period, tolerance=0.2,
+                                     version=EXPECTED[version]["version"])
+    observed_id = False
+    sent_id = False
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True,
-                                timeout=duration + 15, check=False)
-    except subprocess.TimeoutExpired:
-        return {"result": "FAIL", "reason": "CDC_PROBE_TIMEOUT"}
-    return {"result": "PASS" if result.returncode == 0 and "PASS:" in result.stdout else "FAIL",
-            "port": port, "probe_rc": result.returncode,
-            "probe_tail": result.stdout[-400:] if result.returncode == 0 else
-            (result.stdout + result.stderr)[-500:]}
+        with PosixCDC(port) as device:
+            started = time.monotonic()
+            window = probe.ReceptionWindow(started, duration, period=period)
+            deadline = started + duration
+            while time.monotonic() < deadline:
+                line = device.readline().decode("ascii", errors="strict").strip()
+                now = time.monotonic()
+                window.check(min(now, deadline))
+                if now > deadline:
+                    break
+                if line.startswith("HB "):
+                    if not monitor.observe(line, now):
+                        raise ValueError("CDC_HEARTBEAT_INVALID")
+                    window.heartbeat(now)
+                elif probe.is_firmware_id(line, EXPECTED[version]["version"]):
+                    observed_id = True
+                if monitor.samples and not sent_id:
+                    device.write(b"ID\n")
+                    sent_id = True
+            window.finish(deadline, monitor.samples)
+            if not observed_id:
+                raise ValueError("CDC_ID_MISSING")
+    except (OSError, ValueError, AssertionError, UnicodeDecodeError) as exc:
+        return {"result": "FAIL", "reason": "CDC_" + type(exc).__name__,
+                "port": port, "heartbeats": monitor.samples,
+                "id_observed": observed_id}
+    return {"result": "PASS", "port": port, "heartbeats": monitor.samples,
+            "id_observed": observed_id, "period_s": period}
 
 
 def print_receipt(stage: str, value: dict):
@@ -316,12 +412,17 @@ def execute(args) -> int:
     if creds.get("ssh_host") != args.host:
         raise NotRun("Z2_ENROLLED_HOST_MISMATCH", 77)
 
-    # CDC must be available before any Z2 filesystem mutation or MCU reset.
+    # CDC must be available, free and passing the known baseline before any
+    # Z2 filesystem mutation or MCU reset / Flash erase.
     port = cdc_port()
     owner = subprocess.run(["fuser", "-s", port], capture_output=True,
                            timeout=5, check=False)
     if owner.returncode != 1:
         raise NotRun("BLUE_PILL_SERIAL_OWNER_BUSY_OR_UNKNOWN")
+    baseline_cdc = cdc_check("v0.1", args.cdc_duration)
+    print_receipt("CDC_BASELINE", baseline_cdc)
+    if baseline_cdc["result"] != "PASS":
+        return 1
 
     base = {"openocd_dir": args.openocd_dir, "openocd_sha256": args.openocd_sha,
             "image_id": args.image_id, "site": 2, "speed_khz": 5000}

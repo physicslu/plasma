@@ -1,7 +1,9 @@
 """Host-only A/B tests: never contact SWPC, Z2, FPGA, USB or DUT."""
 import hashlib
 import importlib.util
+import os
 from pathlib import Path
+import pty
 import tempfile
 import unittest
 from unittest import mock
@@ -83,11 +85,45 @@ class ABPath2Test(unittest.TestCase):
             ab.remote_stage(helper, {}, Path("/unused"), "reviewed code")
 
     def test_cdc_wrong_version_or_timeout_fails(self):
+        device = mock.MagicMock()
+        device.__enter__.return_value = device
+        device.readline.return_value = b"HB version=0.1 seq=1 uptime_ms=500\n"
         with mock.patch.object(ab, "cdc_port", return_value="/dev/ttyACM0"), \
-                mock.patch.object(ab.subprocess, "run", return_value=mock.Mock(
-                    returncode=1, stdout="HB version=0.1", stderr="wrong version")):
+                mock.patch.object(ab, "PosixCDC", return_value=device):
             out = ab.cdc_check("v0.2", 12)
         self.assertEqual(out["result"], "FAIL")
+
+    def test_cdc_sysfs_exact_usb_identity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            portdir = root / "sys/class/tty"
+            portdir.mkdir(parents=True)
+            usb = root / "devices/1-1"
+            usb.mkdir(parents=True)
+            (usb / "idVendor").write_text("cafe\n")
+            (usb / "idProduct").write_text("4001\n")
+            interface = usb / "1-1:1.0/tty/ttyACM0"
+            interface.mkdir(parents=True)
+            tty = portdir / "ttyACM0"
+            tty.mkdir()
+            (tty / "device").symlink_to(interface, target_is_directory=True)
+            self.assertEqual(ab.cdc_port(portdir, "/dev"), "/dev/ttyACM0")
+            (usb / "idProduct").write_text("4002\n")
+            with self.assertRaisesRegex(ab.NotRun, "CDC_NOT_UNIQUE_OR_MISSING"):
+                ab.cdc_port(portdir, "/dev")
+
+    def test_posix_cdc_line_framing_on_host_pty(self):
+        master, slave = pty.openpty()
+        try:
+            with ab.PosixCDC(os.ttyname(slave)) as dev:
+                os.write(master, b"HB version=0.1 seq=10 uptime_ms=5000\r\n")
+                self.assertEqual(dev.readline(timeout=1),
+                                 b"HB version=0.1 seq=10 uptime_ms=5000\r\n")
+                dev.write(b"ID\n")
+                self.assertEqual(os.read(master, 3), b"ID\n")
+        finally:
+            os.close(slave)
+            os.close(master)
 
     def test_expected_sha_is_content_not_filename(self):
         self.assertNotEqual(ab.EXPECTED["v0.1"]["sha256"],
