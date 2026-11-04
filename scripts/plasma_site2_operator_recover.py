@@ -28,6 +28,9 @@ import json,os,pathlib,stat,subprocess,sys,time
 P=pathlib.Path
 UNIT="plasma-site-worker.service"
 RECOVERY=P("/opt/plasma/bootstrap/ppu_site_recovery.py")
+# The protected G5 Admission requires the native ARMv7 CPython 3.12.13.
+# Recovery invokes the Adapter's child admission with sys.executable.
+NATIVE=P("/opt/plasma/python/3.12.13/bin/python3")
 SEAL=P("/var/lib/plasma-site-worker/seals/site2.sealed")
 def command(args,timeout=20):
     try:
@@ -46,6 +49,7 @@ out={"schema":"plasma.site2.operator-recovery.v1","status":"NOT_RUN",
      "evidence_path":"NOT_AVAILABLE","error":"NOT_RUN"}
 try:
     if os.geteuid()!=0:raise RuntimeError("ROOT_REQUIRED")
+    if not NATIVE.is_file():raise RuntimeError("NATIVE_ARMV7_PYTHON_MISSING")
     if not RECOVERY.is_file() or RECOVERY.is_symlink():raise RuntimeError("INSTALLED_RECOVERY_MISSING")
     st=RECOVERY.stat()
     if st.st_uid!=0 or st.st_mode&0o022:raise RuntimeError("RECOVERY_SCRIPT_NOT_TRUSTED")
@@ -62,7 +66,7 @@ try:
     stopped=command(["/bin/systemctl","stop",UNIT],20)
     if stopped is None or stopped.returncode!=0 or service_active():
         raise RuntimeError("WORKER_STOP_FAILED")
-    result=command(["/usr/bin/python3",str(RECOVERY),
+    result=command([str(NATIVE),str(RECOVERY),
                     "recover","2","--operator","plasma-site2-owner"],130)
     if result is None:raise RuntimeError("RECOVERY_TIMEOUT_OR_EXEC_ERROR")
     try:
@@ -84,7 +88,7 @@ try:
 except Exception as exc:
     out["status"]="BLOCKED"
     code=str(exc)
-    allowed={"ROOT_REQUIRED","INSTALLED_RECOVERY_MISSING","RECOVERY_SCRIPT_NOT_TRUSTED",
+    allowed={"ROOT_REQUIRED","NATIVE_ARMV7_PYTHON_MISSING","INSTALLED_RECOVERY_MISSING","RECOVERY_SCRIPT_NOT_TRUSTED",
              "SITE2_SEAL_NOT_PRESENT_OR_UNTRUSTED","SITE2_SEAL_MALFORMED",
              "WORKER_NOT_ACTIVE","WORKER_STOP_FAILED","RECOVERY_TIMEOUT_OR_EXEC_ERROR",
              "RECOVERY_RECEIPT_INVALID"}
