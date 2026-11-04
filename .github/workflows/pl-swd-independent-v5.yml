@@ -24,6 +24,8 @@ on:
       - "pl/verification/cocotb/swd_c_core_abi.c"
       - "pl/verification/models/virtual_swd_target.py"
       - "pl/sim/swd_c_core_site_tb.sv"
+      - "pl/sim/swd_two_site_axi_tb.sv"
+      - "pl/verification/sva/plasma_swd_site_checks.sv"
       - "software/native/swd/plasma_swd_fifo_core.c"
       - "software/native/swd/plasma_swd_fifo_core.h"
       - "software/python/plasma_interfaces/linux_mmio.py"
@@ -56,6 +58,8 @@ on:
       - "pl/verification/cocotb/swd_c_core_abi.c"
       - "pl/verification/models/virtual_swd_target.py"
       - "pl/sim/swd_c_core_site_tb.sv"
+      - "pl/sim/swd_two_site_axi_tb.sv"
+      - "pl/verification/sva/plasma_swd_site_checks.sv"
       - "software/native/swd/plasma_swd_fifo_core.c"
       - "software/native/swd/plasma_swd_fifo_core.h"
       - "software/python/plasma_interfaces/linux_mmio.py"
@@ -105,6 +109,7 @@ jobs:
       - name: Acceptance boundary
         run: |
           echo 'Independent SWD ABI-v5 Host-only verification PASS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'plasma_swd_site_checks (Icarus immediate assertions, no bind/concurrent SVA) ran on every Site regression; 6 RTL mutations each reported by name.' >> "$GITHUB_STEP_SUMMARY"
           echo 'Production C FIFO core (plasma_swd adapter) drove the Site RTL via an AXI BFM: host RTL transaction simulation only, not ARMv7/PS7 MMIO.' >> "$GITHUB_STEP_SUMMARY"
           echo 'Real Linux MMIO owner, Root load, Site Identity and Blue Pill DPIDR: NOT_RUN.' >> "$GITHUB_STEP_SUMMARY"
           echo 'External SWD I/O timing qualification is outside this functional gate.' >> "$GITHUB_STEP_SUMMARY"

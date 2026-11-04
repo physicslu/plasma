@@ -66,7 +66,8 @@
    - **發現（未修，範圍外）**：OpenOCD 的 `dap_dp_init` 會設 ORUNDETECT；ADIv5 規定此時 WAIT/FAULT 後 host 仍須送 33 clock 資料相位，但 engine 把 `cmd_error_data_phase` 固定為 0。模擬中 target 把後續 idle + 下一個 request 當成寫入資料吃掉（WDATAERR），下一筆 BAD_ACK、其餘 NEED_RESET；C 的 WAIT → ABORT → 重送路徑走不到，整批失敗但不亂序、不重送，重連可恢復。測試 `wait_with_orundetect_has_no_data_phase_and_desynchronises` 記錄現況。這可能也是 5 MHz HIL 那次 WAIT 的實際恢復方式（未證實）。修正需 RTL 支援 ORUNDETECT 資料相位（新 Image）或 adapter 不設 ORUNDETECT，見第 6 項。
 2. **分辨 7.1 MHz 失敗是 DUT 還是接線**：7.143 與 10 MHz 各做兩種只讀測試，(a) `halt`（HCLK 72 MHz）(b) `reset halt`（HCLK 8 MHz）。若只有 (b) 失敗 → 跟 DUT HCLK 有關；兩者都失敗 → 偏向 I/O 時序。不寫 Flash；結束後用 2 MHz `reset run` 恢復。
 3. **TIMING-18**：依第 2 項結果決定是否補外部 I/O 約束或在 runbook 固定上限。
-4. **`IDLE_CYCLES` 與 pipeline 相關的 SVA**（`pl/AGENTS.md` §3）。
+4. ~~**`IDLE_CYCLES` 與 pipeline 相關的 SVA**~~ **完成（2026-11-04，host-only）**：`pl/verification/sva/plasma_swd_site_checks.sv` 掛在兩個 Site 測試平台上，所有 Site 回歸（8 + 11 個 cocotb 案例）每個 FCLK 都檢查。Icarus 11 不支援 `bind` 與 concurrent `assert property`，因此全部是 immediate assertion + 歷史暫存 + shadow 佇列，不宣稱 temporal SVA 語意。規則：FIFO 深度上限、`IDLE_CYCLES` 範圍與 MODE OFF 預設 8、非 NORMAL+enable 時 pad 釋放、MODE 只在靜止時切換、`fault_q` 只由 PARITY/TIMEOUT/ABORT 鎖住、鎖住時不派送、只在清空後解鎖、discard 只在 fault 時且清空 FIFO、派送與 completion 依 push 順序、retained response 不變、`IDLE_CYCLES`／`HALF_PERIOD` 在 PUSH 時鎖定、idle 相位 SWDIO 拉低且 clock 數 = 鎖定值、SWCLK HIGH = 半週期、engine 回應穩定與有界完成。6 個 RTL 暫存副本突變各自被對應規則抓到（`test_site_checker_reports_mutated_rule`）。只證明測試走過的路徑；形式驗證（SymbiYosys）未做。
+   - **觀察（未修）**：MODE OFF 不清 `fault_q`，`recover_off()` 在 MODE 已是 0 時直接返回、`admit()` 也不檢查 STATUS bit3。若有程式沒清 `ERROR` 就關 MODE，下一個 owner 派送被鎖、輪詢逾時回報 BAD_RESPONSE。正常路徑（adapter 的 `take_one`／`recover_off`）不會發生。
 5. **Site 1（PMODA）實機**：目前只有 Site 2 有 DUT；兩個 Site 同時運作也沒測過（需 owner 接線與 Gate 1）。
 6. **RTL 的 ORUNDETECT 資料相位**（由第 1 項發現升級）：WAIT/FAULT 後依 CTRL/STAT.ORUNDETECT 送 33 clock 資料相位，或讓 WAIT / FAULT 也停止派送；需要新 Image 與 Gate 1。
 7. （選擇性）IRQ（RTL 已有完成中斷，PS7 GIC 未接，adapter 目前輪詢）。
