@@ -38,6 +38,8 @@ class FakePPU:
         self.job_state = "success"
         self.fail_post = False
         self.fail_observation = False
+        self.latest_job = None
+        self.reconciliation_job = None
 
     def request(self, method, path, body=None):
         self.calls.append((method, path, body))
@@ -57,7 +59,7 @@ class FakePPU:
                 "site_id": self.site_id, "enabled": self.site_enabled,
                 "interface": self.interface, "target": self.target,
                 "state": self.site_state, "current_job_id": self.current_job,
-                "queued_jobs": self.queued,
+                "queued_jobs": self.queued, "latest_job": self.latest_job,
             }]}
         if path == "/api/jobs":
             if self.fail_post:
@@ -68,6 +70,8 @@ class FakePPU:
             self.expected = body
             return {"job": {"job_id": "job-host-only-1"}}
         if path == "/api/status?job=job-host-only-1":
+            if self.reconciliation_job is not None:
+                return {"job": self.reconciliation_job}
             if self.fail_observation:
                 raise script.PreflightError("STATUS_CONNECTION_CLOSED")
             cycle = {"result": "PASS", "safe_off": True,
@@ -137,6 +141,66 @@ class Path2RestFlashHostOnlyTests(unittest.TestCase):
                     "--image-file", "fake.bin", "--image-sha256", "a" * 64])
             self.assertEqual(code, 69)
             self.assertIn("EXPLICIT_FLASH_CONFIRMATION_REQUIRED", stderr.getvalue())
+            self.assertFalse(ppu.posted)
+
+    def test_unknown_post_reconcile_no_latest_job_does_not_imply_no_flash(self):
+        ppu = FakePPU()
+        digest = "a" * 64
+        receipt = script.reconcile_latest_job(
+            ppu, site=2, ppu_id=ppu.ppu_id, target=ppu.target,
+            expected_sha256=digest)
+        self.assertFalse(receipt["latest_job_observed"])
+        self.assertTrue(receipt["original_post_outcome_still_unknown"])
+        self.assertFalse(receipt["safe_to_retry"])
+        self.assertFalse(receipt["correlated_to_original_post"])
+        self.assertEqual([q[0] for q in ppu.calls], ["GET", "GET"])
+        self.assertFalse(ppu.posted)
+
+    def test_read_only_reconcile_reports_exact_matching_latest_job_not_causality(self):
+        ppu = FakePPU()
+        digest = "1" * 64
+        ppu.latest_job = {
+            "job_id": "job-host-only-1", "operation": "flash_cycle",
+            "created_at": "2026-11-04T05:57:29Z",
+        }
+        ppu.reconciliation_job = {
+            "job_id": "job-host-only-1", "operation": "flash_cycle",
+            "state": "success", "created_at": "2026-11-04T05:57:29Z",
+            "result": {"image_sha256": digest, "details": {"flash_cycle": {
+                "result": "PASS", "readback_sha256": digest,
+                "bytes_verified": 18768, "safe_off": True}}},
+        }
+        receipt = script.reconcile_latest_job(
+            ppu, site=2, ppu_id=ppu.ppu_id, target=ppu.target,
+            expected_sha256=digest)
+        self.assertTrue(receipt["latest_job_observed"])
+        self.assertTrue(receipt["latest_job_matches_expected_sha"])
+        self.assertFalse(receipt["correlated_to_original_post"])
+        self.assertFalse(receipt["safe_to_retry"])
+        self.assertEqual(receipt["latest_flash_bytes_verified"], 18768)
+        self.assertEqual([q[0] for q in ppu.calls], ["GET", "GET", "GET"])
+        self.assertFalse(ppu.posted)
+        ppu.calls.clear()
+        ppu.reconciliation_job["result"]["details"]["flash_cycle"]["readback_sha256"] = "0" * 64
+        observed = script.reconcile_latest_job(
+            ppu, site=2, ppu_id=ppu.ppu_id, target=ppu.target,
+            expected_sha256=digest)
+        self.assertFalse(observed["latest_job_matches_expected_sha"])
+
+    def test_reconcile_cli_is_get_only_and_cannot_use_destructive_arguments(self):
+        ppu = FakePPU()
+        args = ["--url", "http://127.0.0.1:8000", "--site-id", "2",
+                "--target", ppu.target, "--reconcile", "--image-sha256", "a" * 64]
+        with patch.object(script, "RestClient", return_value=ppu):
+            with redirect_stdout(io.StringIO()) as stdout:
+                code = script.main(args)
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(stdout.getvalue())["result"], "READ_ONLY_RECONCILIATION")
+            self.assertFalse(ppu.posted)
+            with redirect_stderr(io.StringIO()) as stderr:
+                code = script.main(args + ["--execute-flash", "--confirm-site", "2"])
+            self.assertEqual(code, 69)
+            self.assertIn("RECONCILE_READ_ONLY_ARGS_REQUIRED", stderr.getvalue())
             self.assertFalse(ppu.posted)
 
     def test_wrong_ppu_site_target_busy_quiesced_and_disabled_deny_without_post(self):
