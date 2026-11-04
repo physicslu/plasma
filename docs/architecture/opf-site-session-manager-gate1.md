@@ -52,8 +52,12 @@ Therefore two simultaneously active C-3 REST Sessions were impossible.
 6. A deadline, unexpected adapter exception or unknown SAFE_OFF result uses
    the *existing* seal and fail-closed path. A sealed Site is not reassigned
    or automatically recovered.
-7. This PR deliberately does **not** change root guards, OpenOCD/Driver,
-   Active Bundle v3 selection, PPU-wide same-target/firmware concurrency policy,
+7. For concurrent Flash Jobs, the existing Worker now rejects a second
+   bound image unless the firmware SHA256 **and the complete trusted Flash
+   Profile** match the first Session. A PPU Execution Lease by itself only
+   proves a logical owner, not that the selected MCU and firmware match.
+8. This PR deliberately does **not** change root guards, OpenOCD/Driver,
+   Active Bundle v3 selection, the requirement for one target/firmware per PPU,
    or claim 8-Site physical parallelism.
 
 ## Host-only acceptance
@@ -62,6 +66,8 @@ Therefore two simultaneously active C-3 REST Sessions were impossible.
 - Duplicate Site admission is denied, and a Package Session reserving multiple
   Sites denies any partial overlap.
 - Cancel/unknown Site 1 seals Site 1 without ending or sealing Site 2.
+- Concurrent Flash bindings require identical Profile and firmware SHA256;
+  different target or firmware is rejected before the adapter executes.
 - Existing lease, identity, expiry, peer authentication, close, restart, seal,
   ABI-v5 adapter, install and production wiring tests continue to pass.
 - CI is a Host-only simulation; no real SWPC Path 2, Z2, MMIO, FPGA, DUT,
