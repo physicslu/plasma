@@ -188,8 +188,13 @@ def execute_flash(client: RestClient, *, site: int, ppu_id: str, target: str,
         if job.get("job_id") != job_id:
             raise FlashExecutionError("JOB_ID_MISMATCH_AFTER_POST")
         if job.get("state") in TERMINAL:
-            result = _dict(job.get("result"), "JOB_RESULT") if job.get("state") == "success" else {}
-            cycle = _dict(result.get("details", {}).get("flash_cycle"), "FLASH_CYCLE") if result else {}
+            try:
+                result = (_dict(job.get("result"), "JOB_RESULT")
+                          if job.get("state") == "success" else {})
+                details = _dict(result.get("details"), "JOB_DETAILS") if result else {}
+                cycle = _dict(details.get("flash_cycle"), "FLASH_CYCLE") if details else {}
+            except PreflightError as exc:
+                raise FlashExecutionError("JOB_RECEIPT_MALFORMED:" + job_id) from exc
             verified = (
                 job.get("state") == "success"
                 and cycle.get("result") == "PASS"
