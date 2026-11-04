@@ -151,7 +151,13 @@ def resolve(
               and entry["executable"] is True for entry in selected_provider["files"])),
           "PROVIDER_ENTRYPOINT_MISSING")
     _need(operation in desc["operations"], "OPERATION_UNSUPPORTED")
-    _need(site_id in desc["sites"] and site_id in hardware.get("sites", ()),
+    observed_sites = hardware.get("sites")
+    _need(type(observed_sites) in (list, tuple)
+          and all(type(observed_site) is int and observed_site >= 1
+                  for observed_site in observed_sites)
+          and len(observed_sites) == len(set(observed_sites)),
+          "HARDWARE_SITES_INVALID")
+    _need(site_id in desc["sites"] and site_id in observed_sites,
           "SITE_NOT_SUPPORTED")
     _need(image_size <= desc["max_image_bytes"], "IMAGE_OUT_OF_BOUNDS")
     _need(hardware.get("platform") == manifest["target"]["platform"]
