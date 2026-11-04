@@ -263,6 +263,15 @@ def run(host: str,source_sha: str,*,helper=None,baseline=None,rest=None) -> dict
         raise RuntimeError("REMOTE_RECEIPT_INVALID")
     blockers=[]
     if z["engine"].get("status")!="VERIFIED": blockers.append("ENGINE_SELECTION_NOT_VERIFIED")
+    if z["engine"].get("abi")!=5: blockers.append("ENGINE_DRIVER_ABI_NOT_V5")
+    if z["engine"].get("driver")!="plasma_swd": blockers.append("ENGINE_DRIVER_NOT_PLASMA_SWD")
+    if z["release"].get("valid_target") is not True: blockers.append("RUNTIME_RELEASE_UNVERIFIED")
+    if z["bootstrap_renderer"].get("present") is not True: blockers.append("BOOTSTRAP_RENDERER_UNAVAILABLE")
+    for entry in ("site_worker_control_socket","site_worker_transport_socket","runtime_control_socket"):
+        if z[entry].get("socket") is not True:
+            blockers.append("SOCKET_MISSING_"+entry)
+        elif not z[entry].get("root_owned") or z[entry].get("mode") not in ("0660","0600","0640","0644"):
+            blockers.append("SOCKET_PERMISSION_REVIEW_"+entry)
     if z["fpga"].get("status")!="IMAGE" or not z["fpga"].get("boot_match"): blockers.append("FPGA_IDENTITY_OR_BOOT_UNVERIFIED")
     if z["fpga"].get("manager_state")!="operating":blockers.append("FPGA_MANAGER_NOT_OPERATING")
     if z["site2_seal"].get("present"): blockers.append("SITE2_SEALED")
