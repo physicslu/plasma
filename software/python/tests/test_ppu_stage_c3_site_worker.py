@@ -512,6 +512,45 @@ class FlashMockAdapter(MockAdapter):
                 "readback_sha256": image.sha256, "safe_off": True}
 
 
+def test_parallel_flash_sessions_reject_different_image_or_mcu(tmp_path):
+    adapter = FlashMockAdapter()
+    rig = Rig(tmp_path, adapter)
+    other_job = "2" * 32
+    rig.lease.add(other_job)
+    payload = b"FIRMWARE-A"
+    other_payload = b"FIRMWARE-B"
+    digest = hashlib.sha256(payload).hexdigest()
+    other_digest = hashlib.sha256(other_payload).hexdigest()
+    (rig.image_root / (JOB + ".bin")).write_bytes(payload)
+    (rig.image_root / (other_job + ".bin")).write_bytes(other_payload)
+    try:
+        first = rig.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30)
+        second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30)
+        rig.client.bind_image(first["session_id"], profile=F103,
+                              image_sha256=digest, image_size=len(payload))
+        with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
+            rig.client.bind_image(second["session_id"], profile=F103,
+                                  image_sha256=other_digest, image_size=len(other_payload))
+        (rig.image_root / (other_job + ".bin")).write_bytes(payload)
+        different_target = {**F103, "icpn": "STM32F101C8T6"}
+        with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
+            rig.client.bind_image(second["session_id"], profile=different_target,
+                                  image_sha256=digest, image_size=len(payload))
+        accepted = rig.client.bind_image(second["session_id"], profile=F103,
+                                         image_sha256=digest, image_size=len(payload))
+        assert accepted["bound"] is True
+        rig.client.close_session(first["session_id"])
+        rig.client.close_session(second["session_id"])
+        # No active Site sessions: another Job may now select another firmware.
+        third = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30)
+        (rig.image_root / (other_job + ".bin")).write_bytes(other_payload)
+        rig.client.bind_image(third["session_id"], profile=different_target,
+                              image_sha256=other_digest, image_size=len(other_payload))
+        assert rig.client.close_session(third["session_id"])["sealed_sites"] == []
+    finally:
+        rig.close()
+
+
 def test_c3_binds_exact_firmware_bytes_for_flash_cycle(tmp_path):
     adapter = FlashMockAdapter()
     r = Rig(tmp_path, adapter)
@@ -807,7 +846,8 @@ def test_c2_launcher_package_uses_site_worker_end_to_end(tmp_path, rig):
     assert receipt["site_ids"] == [2] and receipt["site_transport"]["session"] == "CLOSED"
     out = json.loads(receipt["stdout"]["tail"])
     assert out["ok"] is True and out["result"]["dpidr"] == "0x1ba01477"
-    assert rig.core._session is None
+    assert rig.core._sessions == {}
+    assert rig.core._site_owners == {}
 
     # Worker refuses the session (lease not held): the Package is killed, FAILED.
     rig.lease.clear()
