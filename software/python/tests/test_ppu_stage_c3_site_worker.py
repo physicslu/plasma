@@ -354,6 +354,58 @@ def test_worker_crash_invalidates_sessions(rig):
     assert rig.go(child) == [{"ok": False, "error": "NO_SESSION_FOR_PEER"}]
 
 
+def test_runtime_restart_keeps_in_flight_site_reserved(tmp_path):
+    """Do not re-admit an old Runtime's Site while an adapter is still running."""
+    class DelayedSafeAdapter(MockAdapter):
+        def __init__(self):
+            super().__init__()
+            self.release = threading.Event()
+
+        def run(self, site, operation, *, deadline, cancel, image=None):
+            self.started.set()
+            # Simulate an uninterruptible adapter which finishes with proven
+            # SAFE_OFF even after the former Runtime loses ownership.
+            assert self.release.wait(10), "adapter did not reach SAFE_OFF"
+            return {"result": "PASS", "safe_off": True}
+
+    adapter = DelayedSafeAdapter()
+    rig = Rig(tmp_path, adapter)
+    child = rig.package(PROBE2)
+    current = os.getpid()
+    new_runtime = current + 9999
+    thread = None
+    try:
+        rig.open(child, sites=(2,))
+        thread = threading.Thread(target=lambda: rig.go(child))
+        thread.start()
+        assert adapter.started.wait(8)
+        rig.core.runtime_pid = lambda: new_runtime
+        req = {"protocol": worker.PROTOCOL, "op": "open_job_session",
+               "job_id": JOB, "sites": [2], "max_runtime_s": 30}
+        peer = (new_runtime, os.getuid(), os.getgid())
+        denied = rig.core.handle(req, peer, "control")
+        assert denied == {"ok": False, "error": "SITE_BUSY"}
+        assert rig.core._site_owners and len(rig.core._sessions) == 1
+        adapter.release.set()
+        thread.join(10)
+        assert not thread.is_alive()
+        opened = rig.core.handle(req, peer, "control")
+        assert opened["ok"] is True
+        assert list(rig.core._site_owners) == [2]
+        closed = rig.core.handle(
+            {"protocol": worker.PROTOCOL, "op": "close_session",
+             "session_id": opened["result"]["session_id"]}, peer, "control")
+        assert closed["result"]["sealed_sites"] == []
+        assert not rig.core._site_owners
+    finally:
+        adapter.release.set()
+        if thread is not None:
+            thread.join(10)
+        rig.close()
+        if child.poll() is None:
+            rig.reap(child)
+
+
 def test_startup_unknown_owner_state_seals_sites(tmp_path):
     adapter = MockAdapter()
     adapter.startup = {1}
