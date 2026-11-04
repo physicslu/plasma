@@ -74,6 +74,9 @@ def test_single_site_recovery_routes_only_protected_root_cli():
     assert '"/bin/systemctl","stop",UNIT' in remote
     assert '"/bin/systemctl","start",UNIT' in remote
     assert '"recover","2","--operator","plasma-site2-owner"' in remote
+    assert 'NATIVE=P("/opt/plasma/python/3.12.13/bin/python3")' in remote
+    assert 'result=command([str(NATIVE),str(RECOVERY)' in remote
+    assert 'result=command(["/usr/bin/python3",str(RECOVERY)' not in remote
     for banned in ["os.remove(", "unlink(", "rm -", '"erase"', '"flash_cycle"',
                    '"fpga-reload"', '"/dev/mem"', '"plasma-server.service"']:
         assert banned not in remote
