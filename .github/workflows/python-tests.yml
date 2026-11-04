@@ -10,6 +10,7 @@ on:
       - "software/python/**"
       - "software/native/swd/**"
       - "scripts/plasma_path2_rest_flash.py"
+      - "scripts/plasma_path2_gateway_log_readonly.py"
       - "scripts/ci/inject-plasma-openocd5088-native.py"
       - "scripts/z2/plasma_swd_site_admission.py"
       - "scripts/ppu_asset_execution.py"
@@ -44,6 +45,7 @@ on:
       - "software/python/**"
       - "software/native/swd/**"
       - "scripts/plasma_path2_rest_flash.py"
+      - "scripts/plasma_path2_gateway_log_readonly.py"
       - "scripts/ci/inject-plasma-openocd5088-native.py"
       - "scripts/z2/plasma_swd_site_admission.py"
       - "scripts/ppu_asset_execution.py"
@@ -109,7 +111,7 @@ jobs:
       - name: Run pytest (PS / Python only; PL covered by pl-*.yml)
         run: python -m pytest -q software/python/tests
       - name: Run Path 2 REST Flash host-only tests (no hardware)
-        run: python -m unittest scripts.tests.test_plasma_path2_rest_flash -v
+        run: python -m unittest scripts.tests.test_plasma_path2_rest_flash scripts.tests.test_plasma_path2_gateway_log_readonly -v
 
 
   # Existing hosted source-test workflow; source-locked native OpenOCD
