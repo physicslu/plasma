@@ -326,13 +326,28 @@ class PosixCDC:
                 return b""
             readable, _, _ = select.select([self.fd], [], [], remaining)
             if readable:
-                data = os.read(self.fd, 4096)
+                try:
+                    data = os.read(self.fd, 4096)
+                except BlockingIOError:
+                    # Linux ttyACM O_NONBLOCK may race select() at a packet
+                    # boundary. EAGAIN means no bytes, not a DUT failure.
+                    continue
                 if data:
                     self.pending.extend(data)
 
     def write(self, message: bytes):
-        if os.write(self.fd, message) != len(message):
-            raise OSError("CDC_SHORT_WRITE")
+        pending = memoryview(message)
+        deadline = time.monotonic() + 1.0
+        while pending:
+            try:
+                wrote = os.write(self.fd, pending)
+            except BlockingIOError:
+                wrote = 0
+            pending = pending[wrote:]
+            if pending:
+                wait = deadline - time.monotonic()
+                if wait <= 0 or not select.select([], [self.fd], [], wait)[1]:
+                    raise TimeoutError("CDC_WRITE_TIMEOUT")
 
 
 def cdc_check(version: str, duration: int) -> dict:

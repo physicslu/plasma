@@ -1,6 +1,7 @@
 """Host-only A/B tests: never contact SWPC, Z2, FPGA, USB or DUT."""
 import hashlib
 import importlib.util
+import errno
 import os
 from pathlib import Path
 import pty
@@ -117,9 +118,33 @@ class ABPath2Test(unittest.TestCase):
         try:
             with ab.PosixCDC(os.ttyname(slave)) as dev:
                 os.write(master, b"HB version=0.1 seq=10 uptime_ms=5000\r\n")
-                self.assertEqual(dev.readline(timeout=1),
-                                 b"HB version=0.1 seq=10 uptime_ms=5000\r\n")
-                dev.write(b"ID\n")
+                original_read = os.read
+                injected = False
+
+                def transient_eagain(fd, length):
+                    nonlocal injected
+                    if fd == dev.fd and not injected:
+                        injected = True
+                        raise BlockingIOError(errno.EAGAIN, "try again")
+                    return original_read(fd, length)
+
+                with mock.patch.object(ab.os, "read", side_effect=transient_eagain):
+                    self.assertEqual(dev.readline(timeout=1),
+                                     b"HB version=0.1 seq=10 uptime_ms=5000\r\n")
+                self.assertTrue(injected)
+                original_write = os.write
+                injected_write = False
+
+                def transient_write_eagain(fd, data):
+                    nonlocal injected_write
+                    if fd == dev.fd and not injected_write:
+                        injected_write = True
+                        raise BlockingIOError(errno.EAGAIN, "try again")
+                    return original_write(fd, data)
+
+                with mock.patch.object(ab.os, "write", side_effect=transient_write_eagain):
+                    dev.write(b"ID\n")
+                self.assertTrue(injected_write)
                 self.assertEqual(os.read(master, 3), b"ID\n")
         finally:
             os.close(slave)
