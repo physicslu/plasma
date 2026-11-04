@@ -25,7 +25,13 @@ independent complete-cycle evidence from the executor; advertising it alone
 does not prove it. The descriptor is not a Job, authority to execute a Package,
 or authority to access Root, MMIO or the DUT.
 
-Job execution time is governed by a **single** OPF `timeout_ms` selection\n(PPU default, or Bundle override within a PPU safety ceiling); the Provider\ncapability descriptor does not define an independent runtime timeout. See\n[OPF-1 Architecture and Timeout Policy](opf-architecture.md) (PR #1302).\nThe two Draft PRs remain independently reviewed until coordinated integration.\n\nHost-only `ppu_provider_contract.resolve` independently re-verifies the Active
+Job execution time is governed by a **single** OPF `timeout_ms` selection
+(PPU default, or Bundle override within a PPU safety ceiling); the Provider
+capability descriptor does not define an independent runtime timeout. See
+[OPF-1 Architecture and Timeout Policy](opf-architecture.md) (PR #1302).
+The two Draft PRs remain independently reviewed until coordinated integration.
+
+Host-only `ppu_provider_contract.resolve` independently re-verifies the Active
 Set, binds its ZIP SHA, exact target, operation, Site, image size, Provider and
 Profile Package, and compares Bundle target and declared transport against a
 trusted device-side capability observation. FPGA use additionally requires
