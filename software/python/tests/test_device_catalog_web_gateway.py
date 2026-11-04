@@ -8,7 +8,10 @@ from http.server import ThreadingHTTPServer
 from urllib.parse import quote
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import PlasmaWebHandler, _parse_target_device, _reject_unmapped_microchip_raw_job_target
+from plasma_web.gateway import PlasmaWebHandler, _parse_target_device
+from plasma_server.execution_router import _default_compiler_registry
+from plasma_core.enums import Operation
+from plasma_core.errors import PlasmaError
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
@@ -487,27 +490,30 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32g0x.cfg")
         self.assertEqual(result["physical_validation"]["engineering_status"], "no_evidence")
 
-    def test_microchip_phase1_identity_rejected_from_job_batch_target(self) -> None:
+    def test_microchip_phase1_catalog_is_lookup_only_but_cannot_gate_programming_job(self) -> None:
+        # Catalog is still a research/Console selector. REST Job admission
+        # never loads it. Actual Runtime operation capabilities are separate.
         catalog = get_default_device_catalog()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
         self.assertEqual(len(rows), 1015)
+        registry = _default_compiler_registry()
         for row in rows:
             with self.subTest(icpn=row.identifier):
-                with self.assertRaisesRegex(ValueError, "no executable programming mapping"):
-                    _parse_target_device(
-                        {"vendor": "Microchip", "identifier": row.identifier},
-                        label="Engineering target_device")
-        with self.assertRaisesRegex(ValueError, "canonical Device Catalog"):
-            _parse_target_device(
-                {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
-                label="Batch target_device")
-        # Untyped Job.target string cannot bypass target_device's same guard.
-        for row in rows:
-            with self.subTest(raw_target=row.identifier):
-                with self.assertRaisesRegex(ValueError, "lookup-only"):
-                    _reject_unmapped_microchip_raw_job_target(row.identifier)
-        for other in ("STM32F103C8T6", "ATSAML10E16A-MZTVAO", None):
-            _reject_unmapped_microchip_raw_job_target(other)
+                selected = _parse_target_device(
+                    {"vendor": "Microchip", "identifier": row.identifier},
+                    label="Engineering target_device")
+                self.assertEqual(selected.icpn, row.identifier)
+                self.assertEqual(selected.identifier_kind, "unverified_exact_target_claim")
+                # The target metadata is not authorization; no Microchip
+                # compiler/operation is currently admitted in this Runtime.
+                with self.assertRaises(PlasmaError):
+                    registry.select(row.identifier, Operation.PROGRAM)
+        unknown = _parse_target_device(
+            {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
+            label="Batch target_device")
+        self.assertEqual(unknown.icpn, "ATSAML10E16A-MZTVAO")
+        with self.assertRaises(PlasmaError):
+            registry.select(unknown.icpn, Operation.PROGRAM)
 
     def test_microchip_official_saml1x_route_is_l1_visible_but_never_executable(self) -> None:
         catalog = get_default_device_catalog()
