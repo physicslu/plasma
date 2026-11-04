@@ -454,6 +454,11 @@ class SiteWorkerCore:
             if dict(self.adapter.identity()) != s.identity:
                 self._seal(site, "FPGA_IDENTITY_CHANGED_DURING_OPERATION", s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION")
+            # A cancelled or invalidated Session must not claim Job PASS even
+            # when its adapter eventually completes with proven SAFE_OFF.
+            # Serialize the final decision against close/restart invalidation.
+            with self._lock:
+                _require(not s.closed and not s.cancel.is_set(), "SESSION_CLOSED")
             return {"site": site, "operation": op, "adapter": self.adapter.name, **result}
         finally:
             lock.release()
