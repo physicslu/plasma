@@ -114,6 +114,7 @@ jobs:
           python3 -m py_compile scripts/plasma_development_stage_transport.py scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_development_stage_transport.py
+          python3 scripts/tests/test_plasma_path2_trusted_z2_artifact.py
           python3 scripts/tests/test_plasma_path2_root_direct.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
@@ -434,6 +435,48 @@ jobs:
           name: plasma-armv7-hil-a1-pr-39192248348
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/plasma-hil-a2-source
+      # The new bridge is a ONE-SOURCE trusted step, not a candidate credential.
+      # No GH_TOKEN/GITHUB_TOKEN is passed to the operator-cli process.
+      - name: Qualify pinned Z2 Runtime Kit metadata (trusted)
+        id: z2kit
+        if: >-
+          needs.development-authorize.outputs.task_id == 'path2-work-order' &&
+          needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
+          needs.development-authorize.outputs.pr_number == '1299' &&
+          needs.development-authorize.outputs.pinned_sha == '9a6831c8cd863fa89ea4819d7c7cfc53b07b382d'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method GET /repos/physicslu/plasma/actions/runs/41792402221 \
+            > "$RUNNER_TEMP/plasma-z2-kit-run.json"
+          gh api --method GET /repos/physicslu/plasma/actions/runs/41792402221/artifacts \
+            > "$RUNNER_TEMP/plasma-z2-kit-artifacts.json"
+          python3 trusted/scripts/plasma_path2_trusted_z2_artifact.py verify-metadata \
+            --run-json "$RUNNER_TEMP/plasma-z2-kit-run.json" \
+            --artifacts-json "$RUNNER_TEMP/plasma-z2-kit-artifacts.json" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Download pinned Z2 Runtime Kit (trusted)
+        if: ${{ steps.z2kit.outcome == 'success' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          repository: physicslu/plasma
+          run-id: ${{ steps.z2kit.outputs.run_id }}
+          name: ${{ steps.z2kit.outputs.artifact_name }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/plasma-z2-kit-source
+      - name: Verify pinned Z2 Runtime Kit bytes (trusted)
+        if: ${{ steps.z2kit.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 trusted/scripts/plasma_path2_trusted_z2_artifact.py verify-archive \
+            --directory "$RUNNER_TEMP/plasma-z2-kit-source" \
+            --receipt "$RUNNER_TEMP/plasma-z2-kit-trusted-receipt.json"
+          python3 trusted/scripts/ppu-bootstrap-kit.py verify \
+            "$RUNNER_TEMP/plasma-z2-kit-source/plasma-z2-ps-kit-0.2.1-7ef3509265bc.tar.gz" \
+            --sidecar "$RUNNER_TEMP/plasma-z2-kit-source/plasma-z2-ps-kit-0.2.1-7ef3509265bc.tar.gz.sha256"
       - name: Execute candidate CLI using trusted dispatcher
         shell: bash
         env:
@@ -450,6 +493,7 @@ jobs:
           PLASMA_HIL_A2_CLAIM_REF: ${{ needs.development-claim.outputs.claim_ref }}
           PLASMA_HIL_A2_WORK_ORDER_SHA256: ${{ needs.development-claim.outputs.work_order_sha256 }}
           PLASMA_HIL_A2_ARTIFACT_DIR: ${{ runner.temp }}/plasma-hil-a2-source
+          PLASMA_Z2_KIT_ARTIFACT_DIR: ${{ runner.temp }}/plasma-z2-kit-source
         run: |
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
@@ -499,6 +543,7 @@ jobs:
             ${{ runner.temp }}/plasma-path2-stderr.txt
             ${{ runner.temp }}/plasma-path2-process.json
             ${{ runner.temp }}/plasma-path2-vivado-host-receipt.json
+            ${{ runner.temp }}/plasma-z2-kit-trusted-receipt.json
             candidate/pl/build/**/*.log
             candidate/pl/build/**/*.rpt
             candidate/pl/build/**/*.bit
