@@ -73,6 +73,19 @@ Therefore two simultaneously active C-3 REST Sessions were impossible.
 - CI is a Host-only simulation; no real SWPC Path 2, Z2, MMIO, FPGA, DUT,
   8-Site hardware load, or true independent 8-Channel timing is claimed.
 
+## Verified hardware-adapter concurrency blocker (not changed here)
+
+The existing `Abi5OpenocdAdapter._session` refuses entry when
+`_openocd_running()` detects **any** OpenOCD process, including one that may
+already be legitimately owned by another Site. Therefore **passing C-3
+Session-level concurrency does not establish concurrent real OpenOCD sessions**.
+Future integration must distinguish authorised per-Site native OpenOCD owners
+from unrelated external processes through the existing audited admission
+records, Root Guard and PPU Reload Fence. Do **not** merely remove the global
+process check or bypass those hardware safety gates. The current FPGA image
+supports two physical SWD Sites; eight real Sites are a separate qualification
+target.
+
 ## Follow-up OPF-3B
 
 Only after this initial Host-only change is reviewed: feed OPF-1's effective
