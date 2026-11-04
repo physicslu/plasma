@@ -225,7 +225,9 @@ class SiteWorkerCore:
         current = self.runtime_pid()
         with self._lock:
             for session_id, sess in list(self._sessions.items()):
-                if sess.runtime_pid == current and not sess.closed:
+                # A closed Session in the *current* Runtime is retained
+                # until its explicit close_session can return the seal receipt.
+                if sess.runtime_pid == current:
                     continue
                 sess.closed = True
                 sess.cancel.set()
@@ -308,6 +310,14 @@ class SiteWorkerCore:
                     raise SiteWorkerDenied("IMAGE_NOT_STAGED") from exc
                 _require(len(payload) == size, "IMAGE_SIZE_MISMATCH")
                 _require(hashlib.sha256(payload).hexdigest() == digest, "IMAGE_SHA256_MISMATCH")
+                # One PPU may flash only the same MCU/firmware while its
+                # concurrently admitted Site Sessions are active. The
+                # existing Runtime owner lease alone does not prove this.
+                _require(all(
+                    other is s or other.image is None
+                    or (other.image.sha256 == digest and other.image.profile == profile)
+                    for other in self._sessions.values()
+                ), "PPU_IMAGE_OR_TARGET_CONFLICT")
                 s.image = FlashImage(profile, payload, digest)
                 return {"job_id": s.job_id, "icpn": profile.icpn,
                         "target_config": profile.target_config,
