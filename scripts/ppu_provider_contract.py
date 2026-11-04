@@ -146,7 +146,7 @@ def resolve(
     _need((selected_provider["kind"] == "python" and provider_prefix + "python/main.py" in provider_paths)
           or (selected_provider["kind"] == "native-c" and any(
               entry["path"].startswith(provider_prefix + "bin/")
-              and entry["executable"] is True for entry in provider["files"])),
+              and entry["executable"] is True for entry in selected_provider["files"])),
           "PROVIDER_ENTRYPOINT_MISSING")
     _need(operation in desc["operations"], "OPERATION_UNSUPPORTED")
     _need(site_id in desc["sites"] and site_id in hardware.get("sites", ()),
