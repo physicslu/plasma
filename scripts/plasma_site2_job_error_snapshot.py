@@ -49,6 +49,52 @@ def safe_text(value):
     if re.fullmatch(r"[A-Za-z0-9_.:/ +-]{1,150}",value):
         return value
     return "REDACTED"
+def error_observation(value):
+    """Project diagnostic codes only; never publish free text or raw context."""
+    error=value if type(value) is dict else {}
+    context=error.get("context") if type(error.get("context")) is dict else {}
+    worker_result=context.get("site_worker_result") if type(context.get("site_worker_result")) is dict else {}
+    return {
+        "error_code":safe_text(error.get("error_code",error.get("code"))),
+        "error_type":safe_text(error.get("error_type",error.get("type"))),
+        "failure_source":safe_text(error.get("failure_source")),
+        "site_worker_stage":safe_text(context.get("site_worker_stage")),
+        "site_worker_code":safe_text(context.get("site_worker_code")),
+        "outcome_unknown":context.get("outcome_unknown") if type(context.get("outcome_unknown")) is bool else "NOT_RECORDED",
+        "site_worker_result":{
+            "result":safe_text(worker_result.get("result")),
+            "code":safe_text(worker_result.get("code")),
+            "safe_off":worker_result.get("safe_off") if type(worker_result.get("safe_off")) is bool else "NOT_RECORDED",
+        },
+    }
+def attempt_observations(value):
+    if type(value) is not list:return []
+    return [{"attempt":item.get("attempt") if type(item.get("attempt")) is int else "NOT_RECORDED",
+             "state":safe_text(item.get("state")),
+             "retry_scheduled":item.get("retry_scheduled") if type(item.get("retry_scheduled")) is bool else "NOT_RECORDED",
+             "error":error_observation(item.get("error"))}
+            for item in value if type(item) is dict]
+def job_observation(job_id,job):
+    result=job.get("result") if type(job.get("result")) is dict else {}
+    error=job.get("error") if type(job.get("error")) is dict else {}
+    reason=job.get("reason") if type(job.get("reason")) is dict else {}
+    return {
+        "job_id":job_id,
+        "state":safe_text(job.get("state")),
+        "operation":safe_text(job.get("operation")),
+        "stage":safe_text(job.get("stage")),
+        "stage_state":safe_text(job.get("stage_state")),
+        "error_code":safe_text(error.get("error_code",error.get("code",job.get("error_code")))),
+        "error_type":safe_text(error.get("error_type",error.get("type",job.get("error_type")))),
+        "failure_source":safe_text(error.get("failure_source",job.get("failure_source"))),
+        "result_code":safe_text(result.get("code",result.get("error_code"))),
+        "reason_code":safe_text(reason.get("code")),
+        "result_error":error_observation(result.get("error")),
+        "attempt_history":attempt_observations(job.get("attempt_history")),
+        "result_attempt_history":attempt_observations(result.get("attempt_history")),
+        "job_keys":sorted(k for k in job if type(k) is str and len(k)<=64),
+        "result_keys":sorted(k for k in result if type(k) is str and len(k)<=64),
+    }
 def run(host,sha,job_id,*,helper=None,preflight=None):
     cur=subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,
                        capture_output=True,text=True,check=True,timeout=6).stdout.strip()
@@ -69,21 +115,7 @@ def run(host,sha,job_id,*,helper=None,preflight=None):
         raise RuntimeError("JOB_RESPONSE_INVALID")
     job=payload["job"]
     if job.get("job_id")!=job_id:raise RuntimeError("JOB_ID_MISMATCH")
-    result=job.get("result") if type(job.get("result")) is dict else {}
-    error=job.get("error") if type(job.get("error")) is dict else {}
-    reason=job.get("reason") if type(job.get("reason")) is dict else {}
-    job_result={
-        "job_id":job_id,
-        "state":safe_text(job.get("state")),
-        "operation":safe_text(job.get("operation")),
-        "error_code":safe_text(error.get("error_code",error.get("code",job.get("error_code")))),
-        "error_type":safe_text(error.get("error_type",error.get("type",job.get("error_type")))),
-        "failure_source":safe_text(error.get("failure_source",job.get("failure_source"))),
-        "result_code":safe_text(result.get("code",result.get("error_code"))),
-        "reason_code":safe_text(reason.get("code")),
-        "job_keys":sorted(k for k in job if type(k) is str and len(k)<=64),
-        "result_keys":sorted(k for k in result if type(k) is str and len(k)<=64),
-    }
+    job_result=job_observation(job_id,job)
     if preflight is None:preflight=load("scripts/plasma_site2_path2_preflight.py","plasma_job_provenance")
     site=preflight.run(host,sha)
     if helper is None:helper=load("scripts/plasma_wordport_program.py","plasma_job_enrolled_ssh")
