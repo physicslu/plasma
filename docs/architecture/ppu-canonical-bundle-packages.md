@@ -143,3 +143,29 @@ for ownership, update sequence, FPGA boundaries and non-goals.
 ## Execution and migration boundaries
 
 Only new v3 Bundles should be produced. Do **not** convert historical on-device v2 bytes in place; generate a new v3 ZIP with updated path, Manifest, hashes and provenance. Keep legacy v1/v2 parsers until all old callers and archived evidence are accounted for. Package installation, activation, recovery, trust signing and real PPU v3 admission remain separate qualification gates. No FPGA or DUT operation is authorized by the naming migration.
+
+## Programming execution boundary (owner decision 2026-11-04)
+
+See [Unified Bundle-driven Programming Execution](unified-bundle-driven-programming-decision-2026-11-04.md).
+**Bundle v3 is not an OpenOCD bundle** and its `python`, `native-c`,
+`fpga-image` and opaque-data kinds are not intended as a fixed list of
+programming technologies. Third-party FPGA/Driver/Provider and PS-only
+programmers must be supportable by a standard, capability-declared Plugin
+interface without editing PLASMA Core. A verified Bundle is not by itself
+an entitlement to execute arbitrary code or hardware operations.
+
+Engineering and Production use **the same programming execution pipeline**,
+while retaining their existing distinct policies and approval requirements.
+Console owns Bundle selection, target/operation policy admission and
+delivery. PPU validates received bytes, selected Active Set identity,
+applicability and the actual hardware safety/compatibility state; PPU
+must not gate the Job on a central Device Catalog, a pre-registered ICPN,
+a hardcoded Compiler/Backend/Image ID, or OpenOCD availability when the
+selected valid Provider does not require it.
+
+**Current implementation is incomplete:** existing B2 factory FPGA
+contracts, static Runtime operation-admission projection and OpenOCD-only
+Site adapter remain until replaced by trusted Bundle-derived equivalents.
+This paragraph does **not** declare current Bundle v3 Parser capable of
+executing an opaque Resource Package or bypass B1/B2/B3 and local safety gates.
+
