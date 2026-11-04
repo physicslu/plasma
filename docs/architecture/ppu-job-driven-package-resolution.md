@@ -271,3 +271,28 @@ Existing E/P/V/R and Hardware Guard contracts continue to apply.
 - [Web REST API Programming Job shape](web-rest-api-contract.md)
 - [Bundle v3 B3 real PS Install-only evidence](../deployment/ppu-bundle-v3-b3-path2.md)
 - [Root autonomous development and approval boundaries](../../AGENTS.md)
+
+## Owner decision addendum (2026-11-04): one programming flow, provider-neutral
+
+**Normative decision:** [Unified Bundle-driven Programming Execution](unified-bundle-driven-programming-decision-2026-11-04.md).
+The **programming execution path** is identical in Engineering and Production;
+other policies and mode distinctions are **not** changed by this decision.
+The Console is the policy decision point for Bundle/Job release, before
+delivery. After authorized delivery, the PPU may refuse only a failed
+cryptographic/identity/binding validation, a missing or incompatible requested
+operation/selected Provider or a **real** runtime/hardware-safety condition;
+it must not re-run a central Device Catalog, L0/L1/L2 or pre-registered
+Compiler/Image qualification gate. The PPU derives route resources from the
+single selected Active Asset Set, not the installed repository source tree.
+Missing catalog data is never evidence that the delivered selected
+Profile/Provider cannot execute. OpenOCD and ABI v5 are reference plugins,
+not universal infrastructure requirements.
+
+**Implementation gap:** Current `SiteExecutionRouter` and
+`CompilerRegistry` still load fixed ICPN/operation admissions,
+`ppu_fpga_qualification.py` requires a factory Image Contract, and the
+existing C3 adapter is OpenOCD/ABI-v5/2-Site specific. These are backlog
+migration blockers, **not** proof that the architecture is already implemented.
+Do not weaken Site Lock, lease, physical compatibility, memory bounds, tamper
+detection or SAFE_OFF checks when removing static registry dependencies.
+
