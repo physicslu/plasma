@@ -1,67 +1,67 @@
-"""Host-only regression: a selected ST Job is not gated by Microchip Catalog.
+"""Host-only regression: Catalog is search metadata, never Job/Batch admission.
 
-Device Catalog is required for Device discovery and Microchip Level 0 denial;
-it is not a programming-runtime prerequisite for unrelated exact ICPNs.
-No PPU, Z2, USB, FPGA, OpenOCD or DUT is accessed.
+An unverified target_device snapshot is not an execution grant.
+The Runtime Provider must validate the selected target and operations.
+No Z2, FPGA, Driver, OpenOCD or DUT access.
 """
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
+from plasma_core.enums import Operation
+from plasma_core.errors import PlasmaError
+from plasma_server.execution_router import _default_compiler_registry
 from plasma_web import gateway
 from plasma_web.device_catalog import DeviceCatalogIntegrityError
 
 
 def _catalog_unavailable():
-    raise DeviceCatalogIntegrityError("production Device Catalog absent in slim PPU")
+    raise DeviceCatalogIntegrityError("Production Catalog omitted from slim PPU")
 
 
-def test_exact_st_target_does_not_open_unrelated_microchip_catalog(monkeypatch):
-    # Use the actual installed IC Support contract; no hardcoded target bypass.
-    resolved = gateway.get_default_ic_support_resolver().require_exact("STM32F103C8T6")
-    assert resolved.expected_catalog["manufacturer"] == "STMicroelectronics"
+@pytest.mark.parametrize("vendor,target", [
+    ("STMicroelectronics", "STM32F103C8T6"),
+    ("Microchip", "ATSAML10E16A-MZTVAO"),
+    ("NXP Semiconductors", "MCXN236VKLT"),
+    ("Independent Device", "thirdparty-mcu-v1"),
+])
+def test_target_device_is_unverified_claim_without_catalog(monkeypatch, vendor, target):
     monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
-    gateway._reject_unmapped_microchip_raw_job_target("STM32F103C8T6")
+    selected = gateway._parse_target_device({"vendor": vendor, "identifier": target})
+    assert selected.vendor == vendor
+    assert selected.identifier == target
+    assert selected.icpn == target
+    assert selected.family == ""
+    assert selected.identifier_kind == "unverified_exact_target_claim"
 
 
-@pytest.mark.parametrize("vendor", ["STMicroelectronics", "NXP Semiconductors"])
-def test_vendor_neutral_short_circuit_comes_from_resolved_ic_support(monkeypatch, vendor):
-    called = []
-    class Resolver:
-        def resolve_exact(self, icpn):
-            called.append(icpn)
-            return SimpleNamespace(expected_catalog={"manufacturer": vendor})
-    monkeypatch.setattr(gateway, "get_default_ic_support_resolver", Resolver)
+def test_microchip_l0_cannot_bypass_runtime_operation_admission_when_catalog_missing(monkeypatch):
     monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
-    gateway._reject_unmapped_microchip_raw_job_target("arbitrary-selected-exact-icpn")
-    assert called == ["arbitrary-selected-exact-icpn"]
+    raw_icpn = "ATSAML10E16A-MZTVAO"
+    claim = gateway._parse_target_device({"vendor": "Microchip", "identifier": raw_icpn})
+    assert claim.icpn == raw_icpn
+    # The current default Runtime has no admitted Compiler for this Microchip
+    # target; the Backend must reject it regardless of any Catalog contents.
+    registry = _default_compiler_registry()
+    for operation in (Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ):
+        with pytest.raises(PlasmaError, match="no admitted compiler binding"):
+            registry.select(claim.icpn, operation)
 
 
-@pytest.mark.parametrize("manufacturer", [None, "Microchip"])
-def test_microchip_or_unresolved_target_retains_full_catalog_gate(monkeypatch, manufacturer):
-    class Resolver:
-        def resolve_exact(self, icpn):
-            if manufacturer is None:
-                return None
-            return SimpleNamespace(expected_catalog={"manufacturer": manufacturer})
-    monkeypatch.setattr(gateway, "get_default_ic_support_resolver", Resolver)
+@pytest.mark.parametrize("value", [
+    {"vendor": "", "identifier": "MCU"},
+    {"vendor": "Third Party", "identifier": ""},
+    {"vendor": "Third Party", "identifier": "../../etc/passwd"},
+    {"vendor": "Third Party", "identifier": "NAME\nBAD"},
+    {"vendor": "Third Party", "identifier": "*"},
+])
+def test_invalid_target_snapshot_rejected_without_catalog(monkeypatch, value):
     monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
-    with pytest.raises(DeviceCatalogIntegrityError, match="Production Catalog absent|Device Catalog absent"):
-        gateway._reject_unmapped_microchip_raw_job_target("PIC32MX270F256B-I/SP")
+    with pytest.raises(ValueError):
+        gateway._parse_target_device(value)
 
 
-def test_microchip_no_mapping_remains_rejected_without_fake_success(monkeypatch):
-    class Resolver:
-        def resolve_exact(self, _):
-            return SimpleNamespace(expected_catalog={"manufacturer": "Microchip"})
-    class Catalog:
-        def resolve(self, vendor, target):
-            assert vendor == "Microchip"
-            assert target == "MICROCHIP-EXACT-ICPN"
-            return SimpleNamespace(mapping_status="no_mapping")
-    monkeypatch.setattr(gateway, "get_default_ic_support_resolver", Resolver)
-    monkeypatch.setattr(gateway, "get_default_device_catalog", lambda: Catalog())
-    with pytest.raises(ValueError, match="lookup-only"):
-        gateway._reject_unmapped_microchip_raw_job_target("MICROCHIP-EXACT-ICPN")
+def test_catalog_still_required_for_catalog_search_not_programming(monkeypatch):
+    monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
+    with pytest.raises(DeviceCatalogIntegrityError):
+        gateway._device_search_payload("STM32", 5, 0)
