@@ -420,7 +420,32 @@ def test_rendered_config_lists_every_supported_site_disabled(tmp_path: Path) -> 
     assert [site.id for site in config.sites] == list(range(1, 9))
     assert all(site.enabled is False for site in config.sites)
     assert {site.interface for site in config.sites} == {"mock"}
-    assert {site.target for site in config.sites} == {"STM32F103C8T6"}
+    # No product default ICPN: the exact target is an explicit operator choice.
+    assert {site.target for site in config.sites} == {None}
+    assert "STM32" not in (tmp_path / "ppu.yaml").read_text()
+
+
+def test_install_refreshes_only_already_installed_stage_c_units_with_plasma_python(tmp_path):
+    paths = _install_paths(tmp_path)
+    runtime = installer.PythonRuntime(path=Path("/opt/plasma/python/9.8.7/bin/python3"),
+                                      version="9.8.7", architecture="armv7l",
+                                      releaselevel="final")
+    # Stage C not enabled: an install creates nothing.
+    assert installer.render_stage_c_refresh(paths=paths, python_runtime=runtime) == []
+    paths.systemd_root.mkdir(parents=True)
+    paths.config_root.mkdir(parents=True)
+    for name in ("plasma-site-worker.service", "plasma-package@.service"):
+        (paths.systemd_root / name).write_text("ExecStart=/opt/plasma/python/3.12.13/bin/python3 x\n")
+    (paths.config_root / "ppu-package-actions.json").write_text(
+        '{"site_worker_control_socket": "/run/plasma-site-worker/control.sock"}')
+    out = {path.name: text for path, text, _mode in
+           installer.render_stage_c_refresh(paths=paths, python_runtime=runtime)}
+    assert set(out) == {"plasma-site-worker.service", "plasma-package@.service",
+                        "ppu-package-actions.json"}  # helper unit absent -> not created
+    assert all("/opt/plasma/python/9.8.7/bin/python3" in text for text in out.values())
+    assert all("3.12.13" not in text for text in out.values())
+    assert '"site_worker_control_socket": "/run/plasma-site-worker/control.sock"' in out[
+        "ppu-package-actions.json"]
 
 
 def _install_paths(tmp_path: Path):

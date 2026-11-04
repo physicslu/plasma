@@ -42,6 +42,7 @@ REQUIRED_SCRIPTS = (
     "ppu_package_action.py",
     "ppu_site_worker.py",
     "ppu_site_worker_service.py",
+    "ppu_site_engine.py",
     "ppu_site_adapter_abi5.py",
     "ppu_site_recovery.py",
 )

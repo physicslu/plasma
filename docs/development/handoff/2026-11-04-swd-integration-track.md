@@ -115,3 +115,14 @@ PR #1285 之後 adapter 不讀 admission record、不讀電氣確認紀錄，adm
 - 不新增任何阻擋性檢查、fail-closed 前置條件或核准步驟，除非 owner 要求（owner 2026-11-03 的明確指示）。
 - PASS / FAIL / NOT_RUN 必須對應實際觀察；host 測試、CI、mock 不等於 Z2 或 DUT 結果。
 - 只停止確定的 PID，不用 `pkill`/`killall`；刪除或覆寫前先看目標並備份；複製 root 檔案後要確認擁有者（曾發生 `ppu.yaml` 變成 root:root 讓 Runtime 失效）。
+
+## 8. 整合這一路的回覆（2026-11-04，G1-B 分支 `agent/g1b-engine-selection-20261104`）
+
+- §3.1 已改：`flash_cycle` 在 `init` 之後用 `reset halt`（C-3 adapter 與 Host-only 計畫一致）。
+- §3.2 改由工具完成：`ppu_site_engine.py install <artifact>` 接管已並排安裝的 `…-plasma-swd-b8a7db670649`，
+  再 `select <runtime_id> --adapter-khz 2000 --restart`。實際寫入 Z2 仍需部署核准。
+- §3.3 已修正 adapter 開頭的過時說明。
+- **給 Driver / FPGA 那一路的請求（不改你們的 CI，由你們決定）：** 在
+  `plasma-openocd5088-armv7-candidate` 的 `candidate-evidence.json` 加入
+  `adapter_driver`、`driver_abi`、`adapter_khz`（driver 預設值）、`openocd_version`。
+  有這四個欄位時安裝工具直接採用；沒有時由 operator 在 `install --declare-*` 聲明並記錄為 operator 聲明。

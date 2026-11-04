@@ -16,6 +16,7 @@ import argparse
 import grp
 import hashlib
 import ipaddress
+import importlib.util
 import json
 import os
 import platform
@@ -50,7 +51,6 @@ SERVICE_USER = "plasma"
 SERVICE_GROUP = "plasma"
 CONFIG_ROOT_MODE = 0o770
 MAX_SUPPORTED_SITES = 8
-DEFAULT_SITE_TARGET = "STM32F103C8T6"
 IC_SUPPORT_RELATIVE_ROOT = "data/ic-support"
 
 
@@ -617,7 +617,8 @@ def render_default_sites(max_supported_sites: int = MAX_SUPPORTED_SITES) -> str:
     lines = ["sites:"]
     for site_id in range(1, max_supported_sites + 1):
         lines.append(
-            f'  - {{id: {site_id}, enabled: false, interface: "mock", target: "{DEFAULT_SITE_TARGET}"}}'
+            # No target: the exact ICPN is an explicit operator selection.
+            f'  - {{id: {site_id}, enabled: false, interface: "mock"}}'
         )
     return "\n".join(lines) + "\n"
 
@@ -964,6 +965,52 @@ def _rollback_activation(
         raise Z2InstallerError("rollback incomplete: " + "; ".join(errors))
 
 
+STAGE_C_PYTHON_UNITS = {
+    "plasma-package@.service": "package_unit",
+    "plasma-site-worker.service": "site_worker_unit",
+    "plasma-package-control.service": "package_control_helper_unit",
+}
+
+
+def _stage_c_units_module():
+    path = Path(__file__).resolve().parent / "ppu_package_units.py"
+    spec = importlib.util.spec_from_file_location("ppu_package_units", path)
+    if spec is None or spec.loader is None:
+        raise Z2InstallerError(f"cannot load Stage C unit renderer: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def render_stage_c_refresh(
+    *, paths: InstallPaths, python_runtime: PythonRuntime
+) -> list[tuple[Path, str, int]]:
+    """Re-render already-installed Stage C files for the validated Python.
+
+    Stage C (accounts, first unit install) is enabled by a separate operator
+    step; an install only keeps its interpreter in step with
+    ``--plasma-python`` so no unit keeps a stale versioned path.
+    """
+    if not (paths.systemd_root / "plasma-site-worker.service").is_file():
+        return []
+    units = _stage_c_units_module()
+    python = str(python_runtime.path)
+    out = [
+        (paths.systemd_root / name, getattr(units, renderer)(python), 0o644)
+        for name, renderer in STAGE_C_PYTHON_UNITS.items()
+        if (paths.systemd_root / name).is_file()
+    ]
+    config = paths.config_root / "ppu-package-actions.json"
+    if config.is_file():
+        try:
+            current = json.loads(config.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise Z2InstallerError(f"unreadable Stage C config: {config}") from exc
+        site_worker = isinstance(current, dict) and current.get("site_worker_control_socket") is not None
+        out.append((config, units.package_actions_config(site_worker=site_worker, python=python), 0o640))
+    return out
+
+
 def install_release(
     verified: VerifiedRelease,
     *,
@@ -985,7 +1032,11 @@ def install_release(
     server_unit = paths.systemd_root / "plasma-server.service"
     gateway_unit = paths.systemd_root / "plasma-web.service"
     config_root_snapshot = _snapshot_directory(paths.config_root)
-    snapshots = tuple(_snapshot_file(path) for path in (config_path, server_unit, gateway_unit))
+    stage_c = render_stage_c_refresh(paths=paths, python_runtime=python_runtime)
+    snapshots = tuple(
+        _snapshot_file(path)
+        for path in (config_path, server_unit, gateway_unit, *(item[0] for item in stage_c))
+    )
 
     ensure_service_account()
     paths.releases_root.mkdir(parents=True, exist_ok=True)
@@ -1019,10 +1070,18 @@ def install_release(
     )
     _write_text_atomic(server_unit, units["plasma-server.service"])
     _write_text_atomic(gateway_unit, units["plasma-web.service"])
+    for path, text, mode in stage_c:
+        owner = path.stat()
+        _write_text_atomic(path, text, mode)
+        os.chown(path, owner.st_uid, owner.st_gid)
     _atomic_symlink(paths.current, release_target)
 
     try:
         systemctl("daemon-reload")
+        if stage_c:
+            # Keep the C-3 Worker / unit helper on the same Python as Runtime.
+            systemctl("restart", "plasma-package-control.service")
+            systemctl("restart", "plasma-site-worker.service")
         systemctl("enable", "--now", "plasma-server.service")
         systemctl("enable", "--now", "plasma-web.service")
         if previous is not None:

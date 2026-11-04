@@ -59,7 +59,7 @@ def compile_flash_cycle(
         program,
         commands=(
             "init",
-            "halt",
+            "reset halt",
             f"flash erase_address {base} 0x{erase:08X}",
             f"flash write_image {IMAGE_ARTIFACT_TOKEN} {base} bin",
             f"flash verify_image {IMAGE_ARTIFACT_TOKEN} {base} bin",

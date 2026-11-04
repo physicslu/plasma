@@ -44,7 +44,7 @@ PACKAGE_INACCESSIBLE = (
 )
 
 
-def package_unit() -> str:
+def package_unit(python: str = PYTHON) -> str:
     return "\n".join([
         "[Unit]",
         "Description=PLASMA Package Action %i (non-root, fixed entry)",
@@ -53,7 +53,7 @@ def package_unit() -> str:
         "Type=exec",
         f"User={PACKAGE_USER}",
         f"Group={PACKAGE_USER}",
-        f"ExecStart={PYTHON} -I -B -S {RUNTIME_DIR}/ppu_package_entry.py %i",
+        f"ExecStart={python} -I -B -S {RUNTIME_DIR}/ppu_package_entry.py %i",
         "RemainAfterExit=yes",
         "RuntimeDirectory=plasma-package/%i",
         "RuntimeDirectoryMode=0755",
@@ -98,7 +98,7 @@ def package_unit() -> str:
     ])
 
 
-def site_worker_unit() -> str:
+def site_worker_unit(python: str = PYTHON) -> str:
     return "\n".join([
         "[Unit]",
         "Description=PLASMA Site Worker (single local hardware transport)",
@@ -107,7 +107,7 @@ def site_worker_unit() -> str:
         "[Service]",
         "Type=simple",
         "User=root",
-        f"ExecStart={PYTHON} -I -B -S {RUNTIME_DIR}/ppu_site_worker_service.py",
+        f"ExecStart={python} -I -B -S {RUNTIME_DIR}/ppu_site_worker_service.py",
         "RuntimeDirectory=plasma-site-worker",
         "RuntimeDirectoryMode=0755",
         "StateDirectory=plasma-site-worker",
@@ -154,7 +154,7 @@ def runtime_dropin() -> str:
     ])
 
 
-def package_actions_config(*, site_worker: bool = True) -> str:
+def package_actions_config(*, site_worker: bool = True, python: str = PYTHON) -> str:
     """/etc/plasma/ppu-package-actions.json (root:plasma 0640)."""
     import json
     return json.dumps({
@@ -162,7 +162,7 @@ def package_actions_config(*, site_worker: bool = True) -> str:
         "control_plane": RUNTIME_DIR,
         "product_root": "/opt/plasma",
         "state_root": "/var/lib/plasma/package-actions",
-        "python": PYTHON,
+        "python": python,
         "package_user": PACKAGE_USER,
         "helper_socket": "/run/plasma-package-control/helper.sock",
         "site_worker_control_socket": f"{WORKER_RUN}/control.sock" if site_worker else None,
@@ -175,7 +175,7 @@ def tmpfiles() -> str:
             "d /run/plasma-package 0755 root root -\n")
 
 
-def package_control_helper_unit() -> str:
+def package_control_helper_unit(python: str = PYTHON) -> str:
     """Fixed-purpose root helper (replaces the rejected polkit rule: Z2 runs
     polkit 0.105, which cannot restrict manage-units by unit name).
 
@@ -191,7 +191,7 @@ def package_control_helper_unit() -> str:
         "Type=simple",
         "User=root",
         f"Group={RUNTIME_USER}",
-        f"ExecStart={PYTHON} -I -B -S {RUNTIME_DIR}/ppu_package_unit_helper.py",
+        f"ExecStart={python} -I -B -S {RUNTIME_DIR}/ppu_package_unit_helper.py",
         "RuntimeDirectory=plasma-package-control",
         "RuntimeDirectoryMode=0750",
         "UMask=0077",
@@ -220,12 +220,14 @@ def package_control_helper_unit() -> str:
     ])
 
 
-def render_all() -> dict[str, str]:
+def render_all(python: str = PYTHON) -> dict[str, str]:
+    """All Stage C files, launching ``python`` (the installer passes its
+    validated ``--plasma-python``; there is no versioned default)."""
     return {
-        "/etc/systemd/system/plasma-package@.service": package_unit(),
-        "/etc/systemd/system/plasma-site-worker.service": site_worker_unit(),
+        "/etc/systemd/system/plasma-package@.service": package_unit(python),
+        "/etc/systemd/system/plasma-site-worker.service": site_worker_unit(python),
         "/etc/systemd/system/plasma-server.service.d/50-package-actions.conf": runtime_dropin(),
         "/etc/tmpfiles.d/plasma-package.conf": tmpfiles(),
-        PACKAGE_ACTIONS_CONFIG: package_actions_config(),
-        "/etc/systemd/system/plasma-package-control.service": package_control_helper_unit(),
+        PACKAGE_ACTIONS_CONFIG: package_actions_config(python=python),
+        "/etc/systemd/system/plasma-package-control.service": package_control_helper_unit(python),
     }

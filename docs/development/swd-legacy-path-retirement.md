@@ -1,6 +1,8 @@
 # SWD Legacy Path Retirement — Current Blue Pill Selection & Dependencies
 
-**2026-10-26 decision.** For real external STM32 Blue Pill SWD select **Z2 PS-local OpenOCD -> PS-local UNIX WordPort/RemoteBitbang -> verified PL SWD Image -> PMOD SWCLK/SWDIO -> Blue Pill**. This is a source-selection invariant, not a fresh HIL PASS or hardware authorization. Retirement base: `0c11e3420272bed09e778182e9d6422c115f75d0`.
+**2026-11-04 update.** The product Blue Pill path is now **Z2 PS-local OpenOCD `plasma_swd` adapter → PL ABI-v5 SWD engine** (PR #1285 HIL, [runbook](swd-abi5-openocd-dpidr-hil-runbook.md) §9–§10), run by the Runtime through the C-3 Site Worker. The WordPort / RemoteBitbang path below is kept **only as an experiment/comparison path**: `scripts/plasma_wordport_program.py` (explicit `--openocd-root` remote_bitbang engine and `--z2-python`; no versioned path), `bluepill-wordport-session.py`, the native WordPort bridge and `pl/projects/z2-bluepill-rbb/image-manifest.json`. `scripts/plasma_native_wordport_v02.py` is **retired** (superseded by the generic tool). Note `software/native/swd/plasma_swd_lease_word_port.c` belongs to the current `plasma_swd` driver, not to this legacy path.
+
+**2026-10-26 decision (historical).** For real external STM32 Blue Pill SWD select **Z2 PS-local OpenOCD -> PS-local UNIX WordPort/RemoteBitbang -> verified PL SWD Image -> PMOD SWCLK/SWDIO -> Blue Pill**. This is a source-selection invariant, not a fresh HIL PASS or hardware authorization. Retirement base: `0c11e3420272bed09e778182e9d6422c115f75d0`.
 
 | Item | Status | Required distinction / dependency |
 | --- | --- | --- |
@@ -13,7 +15,7 @@
 | `pl/rtl/site/swd03_dpidr_responder.sv`, `pl/sim/swd03_axi_fixture_tb.sv` | **SYNTHETIC-only** RTL/fixture | Used by SWD-03/04/06, LT02 and Fixed ABI host regressions. Never treat synthetic ACK/data as Blue Pill. |
 | `pl/hil/swd04/`, SWD-05 source and `docs/development/swd04-*` | Historical **internal HIL** contracts | Some Root/target guard code still imports `pl/hil/swd04/one_shot.py` safety/owner-lock helpers. Do not delete locks, Root Guard, FPGA Manager safety or Golden recovery. |
 | `pl/projects/z2-fixed-unified-site1/` | Former fixed-ABI host candidate/internal fixture (F1-B) | **Deleted 2026-11-02**; never represented the current external Blue Pill image. |
-| `pl/projects/z2-bluepill-rbb/image-manifest.json`, `scripts/bluepill-wordport-session.py` | **Current selected Path 3 PoC source path** | Paired PL Image identity + PS-local WordPort bridge; still verify live boot/manager/ownership and real SWD before PASS. |
+| `pl/projects/z2-bluepill-rbb/image-manifest.json`, `scripts/bluepill-wordport-session.py` | **Experiment / comparison path only** (since 2026-11-04) | Paired PL Image identity + PS-local WordPort bridge; still verify live boot/manager/ownership and real SWD before PASS. |
 | `.github/workflows/swpc-vivado-bitstream-build.yml` | **REMOVED** | Manual persistent-runner action targeting old GPIO Image should not be offered. |
 | `.github/workflows/pl-z2-swd-gpio.yml`, `pl-swd03-axi.yml` | Offline regression only | Keep hosted PR/main tests for shared/fixture source; remove manual dispatch. No physical target qualification. |
 

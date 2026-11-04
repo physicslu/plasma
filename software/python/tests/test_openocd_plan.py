@@ -102,7 +102,7 @@ class OpenOCDPlanCompilerTests(unittest.TestCase):
         # Erase = image rounded up to whole 1 KiB pages (HIL-proven sequence).
         self.assertEqual(plan.commands, (
             "init",
-            "halt",
+            "reset halt",
             "flash erase_address 0x08000000 0x00000400",
             f"flash write_image {IMAGE_ARTIFACT_TOKEN} 0x08000000 bin",
             f"flash verify_image {IMAGE_ARTIFACT_TOKEN} 0x08000000 bin",

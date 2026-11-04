@@ -11,6 +11,7 @@ from pathlib import Path
 import socket
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from types import SimpleNamespace
@@ -266,7 +267,10 @@ class GenericSessionHostOnly(unittest.TestCase):
         args = SimpleNamespace(operation="program", icpn="STM32F103C8T6",
                                site_id=1, readback=readback_enabled)
         output = io.StringIO()
+        engine = "/opt/plasma/programming-engines/openocd/any-selected-rbb-engine"
         with patch.object(module, "BUNDLE", self.bundle), \
+             patch.object(module, "OPENOCD", engine + "/bin/openocd"), \
+             patch.object(module, "OPENOCD_SCRIPTS", engine + "/share/openocd/scripts"), \
              patch.object(module, "z2_preflight", return_value=(
                  image, self.directory / "native.so",
                  self.barrier, "mock-boot-id", "a" * 40,
@@ -681,7 +685,9 @@ class PasswordSSHContractHostOnly(unittest.TestCase):
     def test_swpc_routes_exact_command_and_preserves_exit_and_output(self):
         args = SimpleNamespace(operation="preflight", source_sha256="a" * 64,
                                owner_attested=False, firmware=None, image_sha256=None,
-                               icpn="STM32F103C8T6", site_id=1)
+                               icpn="STM32F103C8T6", site_id=1,
+                               z2_python="/opt/plasma/python/9.9.9/bin/python3",
+                               openocd_root="/opt/plasma/programming-engines/openocd/rbb-x")
         reply = '{"operation":"preflight","result":"PASS","hw_action":"NONE"}\n'
         printed = io.StringIO()
         with patch.object(module, "check_source"), \
@@ -693,8 +699,11 @@ class PasswordSSHContractHostOnly(unittest.TestCase):
             self.assertEqual(module.on_swpc(args), 0)
         self.assertEqual(printed.getvalue(), reply)
         argv = ssh.call_args.args[0]
-        self.assertEqual(argv[:4], [module.PYTHON, "-I", "-B",
+        # Interpreter and OpenOCD are the operator's explicit choices, forwarded.
+        self.assertEqual(argv[:4], ["/opt/plasma/python/9.9.9/bin/python3", "-I", "-B",
                                     str(module.Z2_ENTRY)])
+        self.assertEqual(argv[argv.index("--openocd-root") + 1],
+                         "/opt/plasma/programming-engines/openocd/rbb-x")
         self.assertEqual(argv[argv.index("--source-sha256")+1], "a"*64)
         self.assertNotIn("--owner-attested", argv)
         self.assertNotIn("MOCK_SSH_ONLY_NO_REAL_SECRET", argv)
@@ -780,3 +789,35 @@ class PasswordSSHContractHostOnly(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EngineSelectionHostOnly(unittest.TestCase):
+    """No versioned Python/OpenOCD path: both are explicit per run."""
+
+    def test_source_names_no_versioned_runtime_path(self):
+        source = Path(module.__file__).read_text()
+        self.assertNotIn("/opt/plasma/python/3.", source)
+        self.assertNotIn("programming-engines/openocd/0.", source)
+        self.assertIsNone(module.OPENOCD)
+        self.assertEqual(module.PYTHON, sys.executable)
+
+    def test_select_openocd_requires_an_installed_engine_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "openocd"
+            (base / "rbb-a" / "bin").mkdir(parents=True)
+            with patch.object(module, "ENGINE_BASE", base), \
+                 patch.object(module, "OPENOCD", None), patch.object(module, "OPENOCD_SCRIPTS", None):
+                module.select_openocd(str(base / "rbb-a"))
+                self.assertEqual(module.OPENOCD, str(base / "rbb-a" / "bin" / "openocd"))
+                for bad in (str(base / "missing"), "/usr", "relative/x",
+                            str(base / "rbb-a" / ".." / "rbb-a")):
+                    with self.assertRaises(module.NotRun):
+                        module.select_openocd(bad)
+
+    def test_z2_python_shape(self):
+        self.assertEqual(module.z2_python("/opt/plasma/python/3.13.1/bin/python3"),
+                         "/opt/plasma/python/3.13.1/bin/python3")
+        for bad in ("/usr/bin/python3", "python3", "/opt/plasma/python/../x/python3",
+                    "/opt/plasma/python/3/bin/sh"):
+            with self.assertRaises(module.NotRun):
+                module.z2_python(bad)

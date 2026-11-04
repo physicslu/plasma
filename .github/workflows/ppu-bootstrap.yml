@@ -25,6 +25,7 @@ on:
       - "scripts/ppu_package_action.py"
       - "scripts/ppu_site_worker.py"
       - "scripts/ppu_site_worker_service.py"
+      - "scripts/ppu_site_engine.py"
       - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/ppu_site_recovery.py"
       - "scripts/ppu_asset_execution.py"
@@ -60,7 +61,6 @@ on:
       - "scripts/tests/test_fpga_image_root.py"
       - "software/python/tests/test_fpga_golden_device_pin_b1.py"
       - "scripts/plasma_wordport_program.py"
-      - "scripts/plasma_native_wordport_v02.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_hil_artifact_provenance_contract.py"
   push:
@@ -87,6 +87,7 @@ on:
       - "scripts/ppu_package_action.py"
       - "scripts/ppu_site_worker.py"
       - "scripts/ppu_site_worker_service.py"
+      - "scripts/ppu_site_engine.py"
       - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/ppu_site_recovery.py"
       - "scripts/ppu_asset_execution.py"
@@ -122,7 +123,6 @@ on:
       - "scripts/tests/test_fpga_image_root.py"
       - "software/python/tests/test_fpga_golden_device_pin_b1.py"
       - "scripts/plasma_wordport_program.py"
-      - "scripts/plasma_native_wordport_v02.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_hil_artifact_provenance_contract.py"
 
@@ -167,6 +167,7 @@ jobs:
           scripts/ppu_package_action.py
           scripts/ppu_site_worker.py
           scripts/ppu_site_worker_service.py
+          scripts/ppu_site_engine.py
           scripts/ppu_site_adapter_abi5.py
           scripts/ppu_site_recovery.py
           pl/hil/fpga_image_root.py
@@ -234,6 +235,7 @@ jobs:
             scripts/ppu_package_action.py \
             scripts/ppu_site_worker.py \
             scripts/ppu_site_worker_service.py \
+            scripts/ppu_site_engine.py \
             scripts/ppu_site_adapter_abi5.py \
             scripts/ppu_site_recovery.py \
             scripts/ppu_fpga_qualification.py \

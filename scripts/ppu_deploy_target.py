@@ -20,8 +20,6 @@ import tempfile
 import zipfile
 
 ROOT = Path("/home/xilinx/plasma-swd-performance-20261029")
-OPENOCD = Path("/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/bin/openocd")
-OPENOCD_CFG = Path("/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/share/openocd/scripts/target/stm32f1x.cfg")
 NATIVE_BRIDGE = ROOT / "libplasma_wordport_armv7.so"
 NATIVE_BRIDGE_SHA = "66261cef851c9777469b393b7539c5b0f8c2b039a032f1a5b4cbf9e93460e447"
 ALLOWED = frozenset({
@@ -100,8 +98,8 @@ class Target:
         if self.enforce_host:
             if os.geteuid() != 0:
                 raise DeploymentError("Z2_ROOT_REQUIRED")
-            if not OPENOCD.is_file() or not os.access(OPENOCD, os.X_OK) or not OPENOCD_CFG.is_file():
-                raise DeploymentError("PINNED_OPENOCD_INTEGRATION_MISSING")
+            # The OpenOCD engine is chosen per run (plasma_wordport_program.py
+            # --openocd-root) and verified there; no version is pinned here.
             if not NATIVE_BRIDGE.is_file() or digest(NATIVE_BRIDGE.read_bytes()) != NATIVE_BRIDGE_SHA:
                 raise DeploymentError("PINNED_NATIVE_WORDPORT_BRIDGE_MISSING_OR_MISMATCH")
             if active_hardware_owner():
