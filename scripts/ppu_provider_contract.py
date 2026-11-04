@@ -18,6 +18,7 @@ SCHEMA = "plasma.ppu.provider-capabilities.v1"
 DESCRIPTOR = "data/plasma-provider.json"
 OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
+PACKAGE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 
 
 class ProviderDenied(ValueError):
@@ -54,7 +55,7 @@ class ProviderRoute:
 
 def resolve(
     product_root: Path, *, asset_set_sha256: str, target: str,
-    operation: str, site_id: int, image_size: int,
+    provider: str, profile: str, operation: str, site_id: int, image_size: int,
     hardware: Mapping[str, Any],
 ) -> ProviderRoute:
     """Resolve one route from verified bytes and observed capabilities.
@@ -67,6 +68,10 @@ def resolve(
           "ASSET_SET_IDENTITY_INVALID")
     _need(type(target) is str and bool(target) and len(target) <= 256,
           "TARGET_INVALID")
+    _need(type(provider) is str and PACKAGE_ID.fullmatch(provider) is not None,
+          "PROVIDER_REF_INVALID")
+    _need(type(profile) is str and PACKAGE_ID.fullmatch(profile) is not None,
+          "PROFILE_REF_INVALID")
     _need(type(operation) is str and operation in OPERATIONS
           and type(site_id) is int and site_id >= 1
           and type(image_size) is int and image_size >= 0,
@@ -87,6 +92,7 @@ def resolve(
         raise ProviderDenied("BUNDLE_MANIFEST_UNREADABLE") from exc
     _need(manifest.get("schema") == "plasma.ppu.bundle.v3", "BUNDLE_SCHEMA_INVALID")
     packages = {p["id"]: p for p in manifest["packages"]}
+    profile_id = profile
     matches: list[tuple[dict[str, Any], dict[str, Any], str]] = []
     for profile in manifest["packages"]:
         for entry in profile["files"]:
@@ -126,18 +132,19 @@ def resolve(
                   and type(desc["max_image_bytes"]) is int
                   and 0 < desc["max_image_bytes"] <= 512 * 1024 * 1024,
                   "PROVIDER_DESCRIPTOR_INVALID")
-            if desc["target"] == target:
+            if desc["target"] == target and profile["id"] == profile_id:
                 matches.append((profile, desc, entry["sha256"]))
     _need(len(matches) == 1, "PROFILE_MISSING_OR_AMBIGUOUS")
-    profile, desc, digest = matches[0]
-    provider = packages.get(desc["provider_package"])
-    _need(provider is not None and provider["id"] in profile["requires"]
-          and provider["kind"] in ("python", "native-c"),
+    selected_profile, desc, digest = matches[0]
+    _need(desc["provider_package"] == provider, "PROVIDER_SELECTION_MISMATCH")
+    selected_provider = packages.get(desc["provider_package"])
+    _need(selected_provider is not None and selected_provider["id"] in selected_profile["requires"]
+          and selected_provider["kind"] in ("python", "native-c"),
           "PROVIDER_PACKAGE_INVALID")
-    provider_paths = {entry["path"] for entry in provider["files"]}
-    provider_prefix = f"payload/packages/{provider['id']}/"
-    _need((provider["kind"] == "python" and provider_prefix + "python/main.py" in provider_paths)
-          or (provider["kind"] == "native-c" and any(
+    provider_paths = {entry["path"] for entry in selected_provider["files"]}
+    provider_prefix = f"payload/packages/{selected_provider['id']}/"
+    _need((selected_provider["kind"] == "python" and provider_prefix + "python/main.py" in provider_paths)
+          or (selected_provider["kind"] == "native-c" and any(
               entry["path"].startswith(provider_prefix + "bin/")
               and entry["executable"] is True for entry in provider["files"])),
           "PROVIDER_ENTRYPOINT_MISSING")
@@ -155,7 +162,7 @@ def resolve(
     else:
         fpga = packages.get(desc["fpga_package"])
         _need(fpga is not None and fpga["kind"] == "fpga-image"
-              and fpga["id"] in profile["requires"]
+              and fpga["id"] in selected_profile["requires"]
               and type(desc["driver_abi"]) is str and bool(desc["driver_abi"]),
               "FPGA_DRIVER_CONTRACT_INVALID")
         _need(hardware.get("fpga_part") == manifest["target"]["fpga_part"]
@@ -163,7 +170,7 @@ def resolve(
               and hardware.get("driver_abi") == desc["driver_abi"]
               and hardware.get("fpga_identity_proven") is True,
               "FPGA_DRIVER_UNVERIFIED")
-    return ProviderRoute(asset_set_sha256, provider["id"], profile["id"], digest,
+    return ProviderRoute(asset_set_sha256, selected_provider["id"], selected_profile["id"], digest,
                          target, operation, site_id, desc["transport"],
                          desc["driver_abi"], desc["fpga_package"],
                          desc["max_image_bytes"])
