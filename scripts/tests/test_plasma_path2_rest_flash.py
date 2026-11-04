@@ -35,6 +35,8 @@ class FakePPU:
         self.verified = True
         self.posted = False
         self.job_state = "success"
+        self.fail_post = False
+        self.fail_observation = False
 
     def request(self, method, path, body=None):
         self.calls.append((method, path, body))
@@ -57,12 +59,16 @@ class FakePPU:
                 "queued_jobs": self.queued,
             }]}
         if path == "/api/jobs":
+            if self.fail_post:
+                raise script.PreflightError("CONNECTION_CLOSED_DURING_POST")
             if method != "POST":
                 raise AssertionError("expected POST")
             self.posted = True
             self.expected = body
             return {"job": {"job_id": "job-host-only-1"}}
         if path == "/api/status?job=job-host-only-1":
+            if self.fail_observation:
+                raise script.PreflightError("STATUS_CONNECTION_CLOSED")
             cycle = {"result": "PASS", "safe_off": True,
                      "bytes_verified": self.expected["asset_size"],
                      "readback_sha256": self.expected["asset_sha256"]
@@ -172,6 +178,22 @@ class Path2RestFlashHostOnlyTests(unittest.TestCase):
                     image_file=source, image_sha256=hashlib.sha256(data).hexdigest(),
                     deadline_s=30, sleep=lambda _: None)
                 self.assertEqual(receipt["result"], "FLASH_UNPROVEN_OR_FAILED")
+
+    def test_post_network_failure_and_lost_job_observation_are_unknown_not_notrun(self):
+        for case in ("post", "observation"):
+            ppu = FakePPU()
+            ppu.fail_post = case == "post"
+            ppu.fail_observation = case == "observation"
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as td:
+                source = Path(td) / "test.bin"
+                source.write_bytes(b"ONE")
+                with self.assertRaisesRegex(script.FlashExecutionError,
+                                            "OUTCOME_UNKNOWN|OBSERVATION_UNKNOWN"):
+                    script.execute_flash(
+                        ppu, site=2, ppu_id=ppu.ppu_id, target=ppu.target,
+                        image_file=source,
+                        image_sha256=hashlib.sha256(b"ONE").hexdigest(),
+                        deadline_s=30, sleep=lambda _: None)
 
     def test_command_line_defaults_to_get_only_and_requires_explicit_consent(self):
         ppu = FakePPU()
