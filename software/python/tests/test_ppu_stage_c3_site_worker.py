@@ -364,17 +364,127 @@ def test_startup_unknown_owner_state_seals_sites(tmp_path):
         r.close()
 
 
-def test_one_session_at_a_time_and_cleanup(rig):
+def test_independent_site_sessions_and_overlap_denial(rig):
     a = rig.package("import time; time.sleep(5)\n")
-    s = rig.open(a)
     b = rig.package("import time; time.sleep(5)\n")
-    with pytest.raises(worker.SiteWorkerDenied, match="SESSION_ALREADY_ACTIVE"):
-        rig.open(b)
-    rig.client.close_session(s["session_id"])
-    with pytest.raises(worker.SiteWorkerDenied, match="SESSION_UNKNOWN"):
-        rig.client.close_session(s["session_id"])
-    rig.client.close_session(rig.open(b)["session_id"])
-    rig.reap(a, b)
+    c = rig.package("import time; time.sleep(5)\n")
+    try:
+        first = rig.open(a, sites=(1,))
+        second = rig.open(b, sites=(2,))
+        assert first["session_id"] != second["session_id"]
+        assert [x["sites"] for x in rig.client.call("status")["sessions"]] == [[1], [2]]
+        with pytest.raises(worker.SiteWorkerDenied, match="SITE_BUSY"):
+            rig.open(c, sites=(1,))
+        rig.client.close_session(first["session_id"])
+        with pytest.raises(worker.SiteWorkerDenied, match="SESSION_UNKNOWN"):
+            rig.client.close_session(first["session_id"])
+        third = rig.open(c, sites=(1,))
+        assert [x["sites"] for x in rig.client.call("status")["sessions"]] == [[1], [2]]
+        rig.client.close_session(third["session_id"])
+        rig.client.close_session(second["session_id"])
+        assert rig.client.call("status")["sessions"] == []
+    finally:
+        rig.reap(a, b, c)
+
+
+def test_multi_site_package_reserves_all_sites_atomically(rig):
+    a = rig.package("import time; time.sleep(5)\n")
+    b = rig.package("import time; time.sleep(5)\n")
+    try:
+        both = rig.open(a, sites=(1, 2))
+        with pytest.raises(worker.SiteWorkerDenied, match="SITE_BUSY"):
+            rig.open(b, sites=(2,))
+        with pytest.raises(worker.SiteWorkerDenied, match="SITE_BUSY"):
+            rig.open(b, sites=(1,))
+        assert rig.client.call("status")["sessions"][0]["sites"] == [1, 2]
+        rig.client.close_session(both["session_id"])
+        other = rig.open(b, sites=(2,))
+        rig.client.close_session(other["session_id"])
+    finally:
+        rig.reap(a, b)
+
+
+def test_independent_sites_can_execute_concurrently(tmp_path):
+    class OverlapAdapter(MockAdapter):
+        def __init__(self):
+            super().__init__()
+            self.arrivals = set()
+            self.both_started = threading.Event()
+            self.release = threading.Event()
+            self.guard = threading.Lock()
+
+        def run(self, site, operation, *, deadline, cancel, image=None):
+            with self.guard:
+                self.arrivals.add(site)
+                if self.arrivals == {1, 2}:
+                    self.both_started.set()
+            while not self.release.wait(0.01):
+                if cancel.is_set() or time.monotonic() >= deadline:
+                    raise worker.TransportUnknown("CONCURRENT_PROBE_ABORTED")
+            return {"result": "PASS", "safe_off": True}
+
+    adapter = OverlapAdapter()
+    rig = Rig(tmp_path, adapter)
+    a = rig.package("print(json.dumps(call({'op':'probe','site':1})))\n")
+    b = rig.package(PROBE2)
+    try:
+        one = rig.open(a, sites=(1,))
+        two = rig.open(b, sites=(2,))
+        out = {}
+        ta = threading.Thread(target=lambda: out.setdefault("one", rig.go(a)))
+        tb = threading.Thread(target=lambda: out.setdefault("two", rig.go(b)))
+        ta.start()
+        tb.start()
+        assert adapter.both_started.wait(8), "two independent Site operations did not overlap"
+        adapter.release.set()
+        ta.join(10)
+        tb.join(10)
+        assert out["one"][0]["ok"] is True
+        assert out["two"][0]["ok"] is True
+        assert rig.client.close_session(one["session_id"])["sealed_sites"] == []
+        assert rig.client.close_session(two["session_id"])["sealed_sites"] == []
+    finally:
+        adapter.release.set()
+        rig.close()
+        if a.poll() is None or b.poll() is None:
+            rig.reap(*(child for child in (a, b) if child.poll() is None))
+
+
+def test_cancel_one_site_does_not_cancel_unrelated_site(tmp_path):
+    class PerSiteAdapter(MockAdapter):
+        def __init__(self):
+            super().__init__()
+            self.site1_started = threading.Event()
+
+        def run(self, site, operation, *, deadline, cancel, image=None):
+            if site == 1:
+                self.site1_started.set()
+                while not cancel.is_set() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                raise worker.TransportUnknown("SITE1_CANCELLED")
+            return {"result": "PASS", "safe_off": True}
+
+    adapter = PerSiteAdapter()
+    rig = Rig(tmp_path, adapter)
+    a = rig.package("print(json.dumps(call({'op':'probe','site':1})))\n")
+    b = rig.package(PROBE2)
+    try:
+        one = rig.open(a, sites=(1,))
+        two = rig.open(b, sites=(2,))
+        out = {}
+        t = threading.Thread(target=lambda: out.setdefault("one", rig.go(a)))
+        t.start()
+        assert adapter.site1_started.wait(8)
+        assert rig.go(b)[0]["ok"] is True
+        assert rig.client.close_session(one["session_id"])["sealed_sites"] == [1]
+        t.join(10)
+        assert out["one"][0]["error"] == "OUTCOME_UNKNOWN_SITE_SEALED:SITE1_CANCELLED"
+        assert rig.client.call("status")["sealed_sites"] == [1]
+        assert rig.client.close_session(two["session_id"])["sealed_sites"] == []
+    finally:
+        rig.close()
+        if a.poll() is None or b.poll() is None:
+            rig.reap(*(child for child in (a, b) if child.poll() is None))
 
 
 @pytest.mark.parametrize("raw", [b"not json\n", b"[]\n", b'{"op":"probe","site":2}\n',
