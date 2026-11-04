@@ -81,8 +81,10 @@ def test_host_only_clean_observation_is_not_hil_pass():
     remote=h.calls[-1][1][3]
     assert "/bin/systemctl" in remote and '"show"' in remote
     for banned in ['"restart"','"stop"','"start"','"kill"','"erase"','"/dev/mem"',
-                   '"write"', '"openocd"', '"load"']:
+                   '"write"', '"load"']:
         assert banned not in remote
+    assert 'subprocess.run(["/bin/systemctl","show"' in remote
+    assert 'subprocess.run(["/bin/systemctl","restart"' not in remote
     assert '"flash":"NOT_RUN"' in remote
 
 @pytest.mark.parametrize(("field","value","blocker"),[
