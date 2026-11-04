@@ -8,13 +8,13 @@ Does NOT download, stage, install, restart, manipulate a device, or print secret
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import ipaddress
 import json
+import os
 from pathlib import Path
 import re
-import shutil
-import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,43 +31,57 @@ class ProbeError(Exception):
     pass
 
 
-def artifact_readability(*, runner=None, which=shutil.which) -> dict:
-    tool = which("gh")
-    if tool is None:
-        return {"artifact_fetch_qualified": False, "reason": "GH_CLI_MISSING"}
-    if runner is None:
-        runner = subprocess.run
-    args = [tool, "api", "--method", "GET",
-            f"/repos/{ARTIFACT_REPOSITORY}/actions/runs/{EXPECTED_RUN}/artifacts"]
+def artifact_readability(*, directory: Path | None = None) -> dict:
+    """Verify only bytes delivered by the trusted Workflow, never invoke gh.
+
+    A PR candidate must not inherit the GitHub credential used by the trusted
+    download step. A valid archive SHA is required in addition to the sidecar.
+    """
+    if directory is None:
+        supplied = os.environ.get("PLASMA_Z2_KIT_ARTIFACT_DIR", "")
+        if not supplied:
+            return {"artifact_fetch_qualified": False,
+                    "reason": "TRUSTED_ARTIFACT_NOT_DELIVERED"}
+        directory = Path(supplied)
+    if directory.is_symlink() or not directory.is_dir():
+        return {"artifact_fetch_qualified": False,
+                "reason": "TRUSTED_ARTIFACT_DIR_INVALID"}
+    archive = directory / (EXPECTED_ARTIFACT_NAME + ".tar.gz")
+    sidecar = directory / (archive.name + ".sha256")
+    if (archive.is_symlink() or sidecar.is_symlink() or
+            not archive.is_file() or not sidecar.is_file() or
+            archive.stat().st_size > 1_000_000_000 or
+            sidecar.stat().st_size > 256):
+        return {"artifact_fetch_qualified": False,
+                "reason": "PINNED_KIT_MISSING_OR_UNTRUSTED"}
     try:
-        result = runner(args, capture_output=True, text=True, timeout=25, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        return {"artifact_fetch_qualified": False, "reason": "GH_API_UNAVAILABLE"}
-    if result.returncode != 0:
-        # Never print gh stderr: it can contain owner auth/config diagnostics.
-        return {"artifact_fetch_qualified": False, "reason": "GH_ARTIFACT_ACCESS_DENIED"}
+        line = sidecar.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeError):
+        return {"artifact_fetch_qualified": False,
+                "reason": "KIT_SIDECAR_INVALID"}
+    if line != f"{EXPECTED_KIT_SHA256}  {archive.name}":
+        return {"artifact_fetch_qualified": False,
+                "reason": "KIT_SIDECAR_MISMATCH"}
+    digest = hashlib.sha256()
     try:
-        payload = json.loads(result.stdout)
-    except ValueError:
-        return {"artifact_fetch_qualified": False, "reason": "GH_API_JSON_INVALID"}
-    if not isinstance(payload, dict) or not isinstance(payload.get("artifacts"), list):
-        return {"artifact_fetch_qualified": False, "reason": "GH_API_FORMAT_INVALID"}
-    found = [
-        z for z in payload["artifacts"]
-        if isinstance(z, dict) and z.get("id") == EXPECTED_ARTIFACT_ID
-        and z.get("name") == EXPECTED_ARTIFACT_NAME and z.get("expired") is False
-        and z.get("workflow_run", {}).get("id", EXPECTED_RUN) == EXPECTED_RUN
-    ]
-    if len(found) != 1:
-        return {"artifact_fetch_qualified": False, "reason": "PINNED_ARTIFACT_NOT_FOUND"}
+        with archive.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return {"artifact_fetch_qualified": False,
+                "reason": "PINNED_KIT_UNREADABLE"}
+    if digest.hexdigest() != EXPECTED_KIT_SHA256:
+        return {"artifact_fetch_qualified": False,
+                "reason": "PINNED_KIT_SHA256_MISMATCH"}
     return {
         "artifact_fetch_qualified": True,
-        "artifact_id": EXPECTED_ARTIFACT_ID, "artifact_name": EXPECTED_ARTIFACT_NAME,
+        "artifact_id": EXPECTED_ARTIFACT_ID,
+        "artifact_name": EXPECTED_ARTIFACT_NAME,
         "source_merge_sha": EXPECTED_MERGE_COMMIT,
         "candidate_parent_sha": EXPECTED_PARENT_HEAD,
         "expected_kit_sha256": EXPECTED_KIT_SHA256,
+        "verification": "TRUSTED_DELIVERY_AND_SHA256",
     }
-
 
 # The remote script reads only PUBLIC METADATA and returns a sanitized JSON.
 # It does not examine PPU secrets, firmware or other operators' private files.
@@ -76,6 +90,12 @@ import json,os,pathlib
 base=pathlib.Path('/opt/plasma')
 current=base/'current'
 link=current.readlink().as_posix() if current.is_symlink() else None
+try:
+    target=current.resolve(strict=True) if current.is_symlink() else None
+except (OSError, RuntimeError):
+    target=None
+valid_target=bool(target is not None and target.is_dir() and
+                  target.parent==base/'releases')
 unit=pathlib.Path('/etc/systemd/system/plasma-site-worker.service')
 renderer=base/'bootstrap'/'ppu_package_units.py'
 engine=pathlib.Path('/etc/plasma/site-worker-engine.json')
@@ -83,6 +103,7 @@ res={
  'bootstrap_stage_c_renderer_available':renderer.is_file() and not renderer.is_symlink(),
  'site_worker_unit_installed':unit.is_file() and not unit.is_symlink(),
  'current_release_symlink':link,
+ 'current_release_target_valid':valid_target,
  'installed_openocd_engine_manifest':engine.is_file() and not engine.is_symlink(),
  'runtime_control_socket_present':pathlib.Path('/run/plasma-server/control.sock').is_socket(),
 }
@@ -130,19 +151,27 @@ def z2_readiness(host: str, *, helper=None, home=None) -> dict:
                 "bootstrap_stage_c_renderer_available",
                 "site_worker_unit_installed",
                 "current_release_symlink",
+                "current_release_target_valid",
                 "installed_openocd_engine_manifest",
                 "runtime_control_socket_present",
             }):
         raise ProbeError("REMOTE_RECEIPT_FIELDS_INVALID")
     for field in ("bootstrap_stage_c_renderer_available", "site_worker_unit_installed",
-                  "installed_openocd_engine_manifest", "runtime_control_socket_present"):
+                  "installed_openocd_engine_manifest", "runtime_control_socket_present",
+                  "current_release_target_valid"):
         if not isinstance(state[field], bool):
             raise ProbeError("REMOTE_BOOLEAN_INVALID")
     link = state["current_release_symlink"]
-    if link is not None and (not isinstance(link, str) or
-                             re.fullmatch(r"releases/[A-Za-z0-9._-]{1,90}", link) is None):
-        # Report only that a link exists, not any unexpected filesystem path.
-        state["current_release_symlink"] = "UNRECOGNIZED_SOURCE_PATH"
+    if link is not None:
+        # Installer creates an absolute /opt/plasma/releases/<id> link; older
+        # valid images may use releases/<id>. Canonicalize both for receipts.
+        match = (re.fullmatch(
+            r"(?:/opt/plasma/)?releases/([A-Za-z0-9._-]{1,90})", link)
+            if isinstance(link, str) else None)
+        if match is None or match.group(1) in (".", ".."):
+            state["current_release_symlink"] = "UNRECOGNIZED_SOURCE_PATH"
+        else:
+            state["current_release_symlink"] = "releases/" + match.group(1)
     return state
 
 
@@ -156,7 +185,8 @@ def run(host: str, *, artifact_probe=artifact_readability, z2_probe=z2_readiness
         remote["site_worker_unit_installed"] is True and
         remote["installed_openocd_engine_manifest"] is True and
         remote["current_release_symlink"] is not None and
-        remote["current_release_symlink"] != "UNRECOGNIZED_SOURCE_PATH"
+        remote["current_release_symlink"] != "UNRECOGNIZED_SOURCE_PATH" and
+        remote["current_release_target_valid"] is True
     )
     return {
         "result": "READ_ONLY_PREDEPLOY_READY" if qualified else "READ_ONLY_PREDEPLOY_BLOCKED",
