@@ -39,6 +39,7 @@ EXPECTED = {
 ERASE_BYTES = 63488
 CDC_POST_ENUM_SETTLE_S = 1.0
 CDC_ENUM_TIMEOUT_S = 6.0
+CDC_ID_RETRY_INTERVAL_S = 1.0
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
 SHA64 = re.compile(r"[a-f0-9]{64}\Z")
 DEVICE = re.compile(r"ppu-device-[a-f0-9]{16,64}\Z")
@@ -408,7 +409,10 @@ def cdc_check(version: str, duration: int, *, port: str | None = None) -> dict:
     monitor = probe.HeartbeatMonitor(period=period, tolerance=0.2,
                                      version=EXPECTED[version]["version"])
     observed_id = False
-    sent_id = False
+    id_requests = 0
+    last_id_request_at = None
+    first_id_request_uptime_ms = None
+    id_reply_uptime_ms = None
     first_uptime_ms = None
     first_seq = None
     try:
@@ -430,11 +434,20 @@ def cdc_check(version: str, duration: int, *, port: str | None = None) -> dict:
                     window.heartbeat(now)
                 elif probe.is_firmware_id(line, EXPECTED[version]["version"]):
                     observed_id = True
+                    id_reply_uptime_ms = monitor.previous[1] if monitor.previous else None
                 elif line.startswith("ID "):
                     raise ValueError("CDC_ID_WRONG_VERSION")
-                if monitor.samples and not sent_id:
+                # The first ID request can be lost while the freshly reset
+                # CDC RX endpoint comes up, even after HB is streaming.
+                # Reissue a bounded, idempotent ID query once a second until
+                # the valid reply arrives; never retry Flash or reset here.
+                if monitor.samples and not observed_id and (last_id_request_at is None or
+                        now - last_id_request_at >= CDC_ID_RETRY_INTERVAL_S):
                     device.write(b"ID\n")
-                    sent_id = True
+                    id_requests += 1
+                    last_id_request_at = now
+                    if first_id_request_uptime_ms is None:
+                        first_id_request_uptime_ms = monitor.previous[1]
             window.finish(deadline, monitor.samples)
             if not observed_id:
                 raise ValueError("CDC_ID_MISSING")
@@ -448,10 +461,16 @@ def cdc_check(version: str, duration: int, *, port: str | None = None) -> dict:
         return {"result": "FAIL", "reason": reason,
                 "port": port, "heartbeats": monitor.samples,
                 "id_observed": observed_id,
+                "id_requests": id_requests,
+                "first_id_request_uptime_ms": first_id_request_uptime_ms,
+                "id_reply_uptime_ms": id_reply_uptime_ms,
                 "first_seq": first_seq, "first_uptime_ms": first_uptime_ms,
                 "last_uptime_ms": monitor.previous[1] if monitor.previous else None}
     return {"result": "PASS", "port": port, "heartbeats": monitor.samples,
             "id_observed": observed_id, "period_s": period,
+            "id_requests": id_requests,
+            "first_id_request_uptime_ms": first_id_request_uptime_ms,
+            "id_reply_uptime_ms": id_reply_uptime_ms,
             "first_seq": first_seq, "first_uptime_ms": first_uptime_ms,
             "last_uptime_ms": monitor.previous[1] if monitor.previous else None}
 

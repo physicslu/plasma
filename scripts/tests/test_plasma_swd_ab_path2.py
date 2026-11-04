@@ -204,6 +204,83 @@ class ABPath2Test(unittest.TestCase):
         self.assertEqual(result["first_uptime_ms"], 500)
         self.assertEqual(result["last_uptime_ms"], 12000)
         self.assertEqual(result["first_seq"], 1)
+        self.assertEqual(result["id_requests"], 1)
+        self.assertEqual(result["first_id_request_uptime_ms"], 500)
+        self.assertEqual(result["id_reply_uptime_ms"], 500)
+
+    def test_cdc_retries_lost_initial_id_without_reset_or_flash(self):
+        clock = {"now": 100.0}
+
+        class FakeCDC:
+            seq = 0
+            id_requests = 0
+            id_pending = False
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                pass
+
+            def write(self, message):
+                self.id_requests += 1
+                self.id_pending = self.id_requests == 2 and message == b"ID\n"
+
+            def readline(self):
+                if self.id_pending:
+                    self.id_pending = False
+                    clock["now"] += 0.01
+                    return b"ID PLASMA_BLUE_PILL_CDC/0.1\r\n"
+                self.seq += 1
+                clock["now"] = 100.0 + self.seq * 0.5
+                return (f"HB version=0.1 seq={self.seq} "
+                        f"uptime_ms={self.seq * 500}\r\n").encode()
+
+        device = FakeCDC()
+        with mock.patch.object(ab, "cdc_port", return_value="/dev/ttyACM0"), \
+                mock.patch.object(ab, "PosixCDC", return_value=device), \
+                mock.patch.object(ab.time, "monotonic", side_effect=lambda: clock["now"]):
+            result = ab.cdc_check("v0.1", 12, port="/dev/ttyACM0")
+        self.assertEqual(result["result"], "PASS")
+        self.assertEqual(result["id_requests"], 2)
+        self.assertEqual(device.id_requests, 2)
+        self.assertEqual(result["id_reply_uptime_ms"], 1500)
+        self.assertEqual(result["heartbeats"], 24)
+
+    def test_cdc_missing_id_fails_after_bounded_retries(self):
+        clock = {"now": 100.0}
+
+        class HeartbeatOnlyCDC:
+            seq = 0
+            id_requests = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                pass
+
+            def write(self, message):
+                self.id_requests += 1
+                assert message == b"ID\n"
+
+            def readline(self):
+                self.seq += 1
+                clock["now"] = 100.0 + self.seq * 0.5
+                return (f"HB version=0.1 seq={self.seq} "
+                        f"uptime_ms={self.seq * 500}\r\n").encode()
+
+        device = HeartbeatOnlyCDC()
+        with mock.patch.object(ab, "cdc_port", return_value="/dev/ttyACM0"), \
+                mock.patch.object(ab, "PosixCDC", return_value=device), \
+                mock.patch.object(ab.time, "monotonic", side_effect=lambda: clock["now"]):
+            result = ab.cdc_check("v0.1", 12, port="/dev/ttyACM0")
+        self.assertEqual(result["result"], "FAIL")
+        self.assertEqual(result["reason"], "CDC_ID_MISSING")
+        self.assertFalse(result["id_observed"])
+        self.assertGreaterEqual(result["id_requests"], 2)
+        self.assertLessEqual(result["id_requests"], 12)
+        self.assertEqual(result["heartbeats"], 24)
 
     def test_cdc_sysfs_exact_usb_identity(self):
         with tempfile.TemporaryDirectory() as folder:
