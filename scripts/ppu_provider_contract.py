@@ -50,7 +50,6 @@ class ProviderRoute:
     driver_abi: str | None
     fpga_package: str | None
     max_image_bytes: int
-    max_runtime_s: int
 
 
 def resolve(
@@ -107,8 +106,8 @@ def resolve(
                 raise ProviderDenied("PROVIDER_DESCRIPTOR_INVALID") from exc
             _need(type(desc) is dict and set(desc) == {
                 "schema", "target", "provider_package", "operations", "sites",
-                "transport", "driver_abi", "fpga_package", "max_image_bytes",
-                "max_runtime_s"}, "PROVIDER_DESCRIPTOR_INVALID")
+                "transport", "driver_abi", "fpga_package", "max_image_bytes"},
+                  "PROVIDER_DESCRIPTOR_INVALID")
             _need(desc["schema"] == SCHEMA and type(desc["target"]) is str
                   and type(desc["provider_package"]) is str
                   and type(desc["operations"]) is list
@@ -125,9 +124,7 @@ def resolve(
                   and (desc["driver_abi"] is None or type(desc["driver_abi"]) is str)
                   and (desc["fpga_package"] is None or type(desc["fpga_package"]) is str)
                   and type(desc["max_image_bytes"]) is int
-                  and 0 < desc["max_image_bytes"] <= 512 * 1024 * 1024
-                  and type(desc["max_runtime_s"]) is int
-                  and 0 < desc["max_runtime_s"] <= 3600,
+                  and 0 < desc["max_image_bytes"] <= 512 * 1024 * 1024,
                   "PROVIDER_DESCRIPTOR_INVALID")
             if desc["target"] == target:
                 matches.append((profile, desc, entry["sha256"]))
@@ -169,4 +166,4 @@ def resolve(
     return ProviderRoute(asset_set_sha256, provider["id"], profile["id"], digest,
                          target, operation, site_id, desc["transport"],
                          desc["driver_abi"], desc["fpga_package"],
-                         desc["max_image_bytes"], desc["max_runtime_s"])
+                         desc["max_image_bytes"])
