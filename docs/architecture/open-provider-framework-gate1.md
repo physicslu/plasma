@@ -17,7 +17,7 @@ descriptor. Bundle install and Active Set activation remain separate.
 
 The descriptor has exactly these fields: `schema`, `target`,
 `provider_package`, `operations`, `sites`, `transport`, `driver_abi`,
-`fpga_package`, `max_image_bytes`, `max_runtime_s`. Operations are drawn from
+`fpga_package`, `max_image_bytes`. Operations are drawn from
 `erase`, `program`, `verify`, `read`, `flash_cycle`; a requested operation must
 be present. `transport` is `fpga` or `ps-only`. Capability strings and Package
 IDs are Bundle data, never Core allowlist entries. `flash_cycle` still requires
@@ -25,7 +25,7 @@ independent complete-cycle evidence from the executor; advertising it alone
 does not prove it. The descriptor is not a Job, authority to execute a Package,
 or authority to access Root, MMIO or the DUT.
 
-Host-only `ppu_provider_contract.resolve` independently re-verifies the Active
+Job execution time is governed by a **single** OPF `timeout_ms` selection\n(PPU default, or Bundle override within a PPU safety ceiling); the Provider\ncapability descriptor does not define an independent runtime timeout. See\n[OPF-1 Architecture and Timeout Policy](opf-architecture.md) (PR #1302).\nThe two Draft PRs remain independently reviewed until coordinated integration.\n\nHost-only `ppu_provider_contract.resolve` independently re-verifies the Active
 Set, binds its ZIP SHA, exact target, operation, Site, image size, Provider and
 Profile Package, and compares Bundle target and declared transport against a
 trusted device-side capability observation. FPGA use additionally requires
