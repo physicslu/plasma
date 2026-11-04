@@ -38,7 +38,7 @@ def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fp
                      else f"payload/packages/{provider_id}/python/main.py")
     profile_path = "payload/packages/profile/data/plasma-provider.json"
     payloads = {
-        provider_path: (b"\\x7fELFhost-only-fixture" if provider_kind == "native-c"
+        provider_path: (b"\x7fELFhost-only-fixture" if provider_kind == "native-c"
                         else b"raise RuntimeError('Provider execution is not part of route resolution')\n"),
         profile_path: json.dumps(descriptor, sort_keys=True).encode(),
     }
