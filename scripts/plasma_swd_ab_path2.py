@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import argparse
 import base64
+import errno
+import fcntl
 import hashlib
 import importlib.util
 import json
@@ -18,6 +20,7 @@ from pathlib import Path
 import re
 import select
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -282,6 +285,17 @@ class PosixCDC:
             attrs[6][termios.VTIME] = 0
             termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
             termios.tcflush(self.fd, termios.TCIFLUSH)
+            # pyserial enables DTR/RTS when opening the CDC ACM port. Match
+            # that previously successful host behavior without pyserial.
+            try:
+                fcntl.ioctl(self.fd, termios.TIOCMBIS,
+                            struct.pack("I", termios.TIOCM_DTR | termios.TIOCM_RTS))
+            except OSError as exc:
+                # Pseudoterminals in Host-only tests have no modem-control
+                # lines. A real CDC ACM failure remains fail-closed.
+                if not (exc.errno in (errno.ENOTTY, errno.EINVAL) and
+                        not path.startswith("/dev/ttyACM")):
+                    raise
         except Exception:
             self.close()
             raise
@@ -357,6 +371,8 @@ def cdc_check(version: str, duration: int) -> dict:
                     window.heartbeat(now)
                 elif probe.is_firmware_id(line, EXPECTED[version]["version"]):
                     observed_id = True
+                elif line.startswith("ID "):
+                    raise ValueError("CDC_ID_WRONG_VERSION")
                 if monitor.samples and not sent_id:
                     device.write(b"ID\n")
                     sent_id = True
@@ -364,7 +380,10 @@ def cdc_check(version: str, duration: int) -> dict:
             if not observed_id:
                 raise ValueError("CDC_ID_MISSING")
     except (OSError, ValueError, AssertionError, UnicodeDecodeError) as exc:
-        return {"result": "FAIL", "reason": "CDC_" + type(exc).__name__,
+        reason = (str(exc) if str(exc) in
+                  ("CDC_ID_MISSING", "CDC_ID_WRONG_VERSION", "CDC_LINE_TOO_LONG",
+                   "CDC_HEARTBEAT_INVALID") else "CDC_" + type(exc).__name__)
+        return {"result": "FAIL", "reason": reason,
                 "port": port, "heartbeats": monitor.samples,
                 "id_observed": observed_id}
     return {"result": "PASS", "port": port, "heartbeats": monitor.samples,
