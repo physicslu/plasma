@@ -97,18 +97,21 @@ def _only_site(payload: dict, site: int) -> dict:
     return record
 
 
-def preflight(client: RestClient, *, site: int, ppu_id: str, target: str) -> dict:
+def preflight(client: RestClient, *, site: int, ppu_id: str | None, target: str) -> dict:
     """Read-only. Does not claim C3, USB CDC, electrical or physical readiness."""
     health = client.request("GET", "/api/health/ready")
     if health.get("ok") is not True or health.get("execution") != "ready":
         raise PreflightError("PPU_GATEWAY_NOT_READY")
     node = client.request("GET", "/api/node")
     node_ppu = _dict(node.get("ppu"), "NODE_PPU")
-    if node_ppu.get("ppu_id") != ppu_id:
+    discovered_ppu_id = node_ppu.get("ppu_id")
+    if not isinstance(discovered_ppu_id, str) or not discovered_ppu_id:
+        raise PreflightError("PPU_ID_UNAVAILABLE")
+    if ppu_id is not None and discovered_ppu_id != ppu_id:
         raise PreflightError("WRONG_PPU")
     status = client.request("GET", "/api/status?site=" + str(site))
     ppu = _dict(status.get("ppu"), "STATUS_PPU")
-    if ppu.get("ppu_id") != ppu_id or ppu.get("ppu_id") != node_ppu["ppu_id"]:
+    if ppu.get("ppu_id") != discovered_ppu_id:
         raise PreflightError("STATUS_PPU_MISMATCH")
     lease = _dict(ppu.get("execution"), "EXECUTION_LEASE")
     if lease.get("busy") is not False or lease.get("active_job_count") != 0:
@@ -129,7 +132,9 @@ def preflight(client: RestClient, *, site: int, ppu_id: str, target: str) -> dic
     # REST/C3 route. It is advisory only, not a sufficient/required readiness proof.
     return {
         "result": "READ_ONLY_PREFLIGHT_PASS",
-        "ppu_id": ppu_id, "site_id": site, "target": target,
+        "ppu_id": discovered_ppu_id, "ppu_id_source": "live_node_and_status",
+        "ppu_id_expected_checked": ppu_id is not None,
+        "site_id": site, "target": target,
         "http_methods": ["GET"], "flash_submitted": False,
         "c3_engine_verified": False, "external_ssh_owner_verified": False,
         "usb_cdc_verified": False, "physical_hardware_verified": False,
@@ -158,6 +163,8 @@ def execute_flash(client: RestClient, *, site: int, ppu_id: str, target: str,
                   image_file: Path, image_sha256: str, deadline_s: float,
                   poll_s: float = 0.5, sleep=time.sleep, clock=time.monotonic) -> dict:
     """DESTRUCTIVE. Only invoke from an owner-approved guarded-hardware work order."""
+    if not isinstance(ppu_id, str) or not ppu_id:
+        raise PreflightError("EXPLICIT_PPU_ID_REQUIRED_FOR_FLASH")
     payload = _read_image(image_file, image_sha256)
     # Observe readiness again immediately before the only mutation (POST).
     preflight(client, site=site, ppu_id=ppu_id, target=target)
@@ -220,7 +227,8 @@ def execute_flash(client: RestClient, *, site: int, ppu_id: str, target: str,
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", required=True, help="PPU Gateway base URL with explicit port")
-    parser.add_argument("--ppu-id", required=True, help="Expected PPU ID read from current enrollment")
+    parser.add_argument("--ppu-id",
+                        help="Optional for GET-only discovery; REQUIRED for destructive Flash")
     parser.add_argument("--site-id", type=int, required=True)
     parser.add_argument("--target", required=True, help="Exact ICPN selected for this job")
     parser.add_argument("--execute-flash", action="store_true",
@@ -232,14 +240,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--job-timeout", type=float, default=120.0)
     args = parser.parse_args(argv)
     try:
-        if args.site_id < 1 or not args.ppu_id or not args.target:
+        if args.site_id < 1 or not args.target or args.ppu_id == "":
             raise PreflightError("INVALID_SELECTED_PPU_SITE_OR_TARGET")
         if not 5 <= args.job_timeout <= 3600:
             raise PreflightError("INVALID_JOB_TIMEOUT")
         client = RestClient(args.url)
         if args.execute_flash:
-            if (args.confirm_site != args.site_id or args.image_file is None
-                    or args.image_sha256 is None):
+            if (not args.ppu_id or args.confirm_site != args.site_id
+                    or args.image_file is None or args.image_sha256 is None):
                 raise PreflightError("EXPLICIT_FLASH_CONFIRMATION_REQUIRED")
             receipt = execute_flash(client, site=args.site_id, ppu_id=args.ppu_id,
                                     target=args.target, image_file=args.image_file,
