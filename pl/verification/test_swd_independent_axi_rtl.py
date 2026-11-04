@@ -4,9 +4,11 @@ Two Site registers/pads are separately instantiated. The eventual Vivado
 AXI Interconnect, ARMv7 MMIO and OpenOCD Bridge still require qualification.
 """
 from pathlib import Path
+import subprocess
 from cocotb_test.simulator import run
 
 PL = Path(__file__).resolve().parents[1]
+NATIVE_SWD = PL.parent / "software/native/swd"
 
 
 def test_two_independent_swd_axi_ips_normal_and_debug():
@@ -26,6 +28,38 @@ def test_two_independent_swd_axi_ips_normal_and_debug():
         python_search=[str(PL / "verification/cocotb"),
                        str(PL.parent / "software/python")],
         sim_build=str(PL / "build/swd-independent-two-site/axi-sim"),
+    )
+
+
+def test_production_c_fifo_core_drives_site_rtl():
+    """pl/AGENTS.md 4A: the OpenOCD adapter's C FIFO core, compiled
+    unmodified, issues every MMIO access through an AXI BFM to the RTL."""
+    build = PL / "build/swd-independent-c-core"
+    build.mkdir(parents=True, exist_ok=True)
+    library = build / "libplasma_swd_fifo_core.so"
+    subprocess.run([
+        "gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-O1", "-fPIC", "-shared", f"-I{NATIVE_SWD}",
+        str(NATIVE_SWD / "plasma_swd_fifo_core.c"),
+        str(PL / "verification/cocotb/swd_c_core_abi.c"),
+        "-o", str(library),
+    ], check=True)
+    run(
+        simulator="icarus",
+        verilog_sources=[str(PL / x) for x in (
+            "rtl/swd/plasma_swd_transaction_engine.sv",
+            "rtl/swd/plasma_swd_site_axi_lite.sv",
+            "sim/swd_c_core_site_tb.sv",
+            "sim/IOBUF.sv",
+            "sim/mpe_obuf_stub.sv",
+        )],
+        toplevel="swd_c_core_site_tb",
+        module="test_swd_c_fifo_core",
+        compile_args=["-g2012"],
+        timescale="1ns/1ps",
+        python_search=[str(PL / "verification/cocotb")],
+        extra_env={"PLASMA_SWD_C_CORE_SO": str(library)},
+        sim_build=str(build / "axi-sim"),
     )
 
 
