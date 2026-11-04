@@ -42,6 +42,11 @@ class ABPath2Test(unittest.TestCase):
         self.assertEqual(ab.baseline_version(10), "v0.2")
         self.assertEqual(ab.baseline_version(20), "v0.1")
         self.assertEqual(ab.baseline_version(30), "v0.2")
+        self.assertEqual(ab.sequence(39, 1), [(40, "v0.1")])
+        self.assertEqual(ab.baseline_version(39), "v0.2")
+        self.assertEqual(ab.selected_baseline_version(39, "v0.1"), "v0.1")
+        with self.assertRaises(ValueError):
+            ab.selected_baseline_version(39, "v0.3")
 
     def test_region_keeps_final_two_pages(self):
         self.assertEqual(ab.ERASE_BYTES, 62 * 1024)
@@ -116,24 +121,89 @@ class ABPath2Test(unittest.TestCase):
             out = ab.cdc_check("v0.2", 12)
         self.assertEqual(out["result"], "FAIL")
 
-    def test_three_second_post_reset_settle_precedes_cdc_probe(self):
+    def test_cdc_enumeration_then_one_second_settle_precedes_probe(self):
         events = []
+
+        def enumerate_usb():
+            events.append(("enumerated", "/dev/ttyACM1"))
+            return "/dev/ttyACM1", 0.7
 
         def pause(seconds):
             events.append(("sleep", seconds))
 
-        def probe(version, duration):
-            events.append(("cdc", version, duration))
-            return {"result": "PASS", "heartbeats": 24}
+        def probe(version, duration, *, port):
+            events.append(("cdc", version, duration, port))
+            return {"result": "PASS", "heartbeats": 24,
+                    "first_uptime_ms": 1500}
 
-        with mock.patch.object(ab.time, "monotonic", side_effect=[100.0, 103.006]), \
+        with mock.patch.object(ab, "wait_cdc_enumeration", side_effect=enumerate_usb), \
+                mock.patch.object(ab.time, "monotonic", side_effect=[100.0, 101.006]), \
                 mock.patch.object(ab.time, "sleep", side_effect=pause), \
                 mock.patch.object(ab, "cdc_check", side_effect=probe):
             result = ab.cdc_after_flash("v0.1", 12)
-        self.assertEqual(events, [("sleep", 3.0), ("cdc", "v0.1", 12)])
+        self.assertEqual(events, [("enumerated", "/dev/ttyACM1"),
+                                  ("sleep", 1.0), ("cdc", "v0.1", 12, "/dev/ttyACM1")])
         self.assertEqual(result["result"], "PASS")
-        self.assertEqual(result["post_reset_settle_requested_s"], 3.0)
-        self.assertEqual(result["post_reset_settle_elapsed_s"], 3.006)
+        self.assertEqual(result["post_enumeration_settle_requested_s"], 1.0)
+        self.assertEqual(result["post_enumeration_settle_elapsed_s"], 1.006)
+        self.assertEqual(result["enumeration_wait_s"], 0.7)
+        self.assertEqual(result["first_uptime_ms"], 1500)
+
+    def test_cdc_enumeration_failure_stops_without_probing(self):
+        with mock.patch.object(ab, "wait_cdc_enumeration",
+                               side_effect=ab.NotRun("not enumerated")), \
+                mock.patch.object(ab, "cdc_check") as probe:
+            result = ab.cdc_after_flash("v0.1", 12)
+        self.assertEqual(result["result"], "FAIL")
+        self.assertEqual(result["reason"], "CDC_NOT_ENUMERATED_AFTER_RESET")
+        probe.assert_not_called()
+
+    def test_enumeration_waits_for_exact_usb_cdc_identity(self):
+        attempts = [ab.NotRun("not found"), ab.NotRun("not found"), "/dev/ttyACM1"]
+        def observe():
+            v = attempts.pop(0)
+            if isinstance(v, Exception):
+                raise v
+            return v
+        with mock.patch.object(ab, "cdc_port", side_effect=observe), \
+                mock.patch.object(ab.time, "monotonic",
+                                  side_effect=[10.0, 10.0, 10.3, 10.6, 10.7]), \
+                mock.patch.object(ab.time, "sleep") as wait:
+            port, seconds = ab.wait_cdc_enumeration()
+        self.assertEqual((port, seconds), ("/dev/ttyACM1", 0.7))
+        self.assertEqual(wait.call_count, 2)
+        wait.assert_any_call(0.3)
+
+    def test_cdc_receipt_tracks_first_and_last_heartbeat_uptime(self):
+        clock = {"now": 100.0}
+        class FakeCDC:
+            seq = 0
+            id_pending = False
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                pass
+            def write(self, message):
+                self.id_pending = message == b"ID\n"
+            def readline(self):
+                if self.id_pending:
+                    self.id_pending = False
+                    clock["now"] += 0.01
+                    return b"ID PLASMA_BLUE_PILL_CDC/0.1\r\n"
+                self.seq += 1
+                clock["now"] = 100.0 + self.seq * 0.5
+                ms = self.seq * 500
+                return f"HB version=0.1 seq={self.seq} uptime_ms={ms}\r\n".encode()
+
+        with mock.patch.object(ab, "cdc_port", return_value="/dev/ttyACM1"), \
+                mock.patch.object(ab, "PosixCDC", return_value=FakeCDC()), \
+                mock.patch.object(ab.time, "monotonic", side_effect=lambda: clock["now"]):
+            result = ab.cdc_check("v0.1", 12, port="/dev/ttyACM1")
+        self.assertEqual(result["result"], "PASS")
+        self.assertEqual(result["heartbeats"], 24)
+        self.assertEqual(result["first_uptime_ms"], 500)
+        self.assertEqual(result["last_uptime_ms"], 12000)
+        self.assertEqual(result["first_seq"], 1)
 
     def test_cdc_sysfs_exact_usb_identity(self):
         with tempfile.TemporaryDirectory() as folder:

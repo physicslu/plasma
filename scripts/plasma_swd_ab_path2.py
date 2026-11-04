@@ -37,7 +37,8 @@ EXPECTED = {
     "v0.2": {"bytes": 62800, "sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c", "version": "0.2"},
 }
 ERASE_BYTES = 63488
-CDC_POST_RESET_SETTLE_S = 3.0
+CDC_POST_ENUM_SETTLE_S = 1.0
+CDC_ENUM_TIMEOUT_S = 6.0
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
 SHA64 = re.compile(r"[a-f0-9]{64}\Z")
 DEVICE = re.compile(r"ppu-device-[a-f0-9]{16,64}\Z")
@@ -73,6 +74,17 @@ def baseline_version(start: int) -> str:
     if not 0 <= start < 100:
         raise ValueError("INVALID_BASELINE_POSITION")
     return "v0.1" if start == 0 else ("v0.1", "v0.2", "v0.2", "v0.1")[(start - 1) % 4]
+
+
+def selected_baseline_version(start: int, override: str | None) -> str:
+    """An explicit, recorded override supports a failed-CDC Flash retry.
+
+    The failed attempt's BIN was already written, so the physical baseline
+    can differ from the preceding fully validated attempt's version.
+    """
+    if override is not None and override not in EXPECTED:
+        raise ValueError("UNRECOGNIZED_BASELINE_FIRMWARE")
+    return override or baseline_version(start)
 
 
 def firmware(path: Path, label: str) -> bytes:
@@ -363,25 +375,42 @@ class PosixCDC:
                     raise TimeoutError("CDC_WRITE_TIMEOUT")
 
 
-def cdc_check(version: str, duration: int) -> dict:
+def wait_cdc_enumeration(timeout_s: float = CDC_ENUM_TIMEOUT_S) -> tuple[str, float]:
+    """Wait for exactly one Linux USB CDC ACM device with the pinned VID/PID."""
+    started = time.monotonic()
+    deadline = started + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            return cdc_port(), round(time.monotonic() - started, 3)
+        except NotRun:
+            time.sleep(0.3)
+    raise NotRun("BLUE_PILL_CDC_NOT_ENUMERATED")
+
+
+def cdc_check(version: str, duration: int, *, port: str | None = None) -> dict:
     # Reuse the previously validated heartbeat/ID acceptance contract;
     # only the serial transport is supplied by Python's standard library.
     probe = _load(CDC_PROBE, "ab_existing_cdc_probe")
-    deadline = time.monotonic() + 6
-    port = None
-    while time.monotonic() < deadline:
-        try:
-            port = cdc_port()
-            break
-        except NotRun:
-            time.sleep(0.3)
     if port is None:
-        return {"result": "FAIL", "reason": "CDC_NOT_FOUND_AFTER_RESET"}
+        try:
+            port, _ = wait_cdc_enumeration()
+        except NotRun:
+            return {"result": "FAIL", "reason": "CDC_NOT_FOUND_AFTER_RESET"}
+    else:
+        try:
+            observed = cdc_port()
+        except NotRun:
+            observed = None
+        if observed != port:
+            return {"result": "FAIL", "reason": "CDC_PORT_CHANGED_DURING_SETTLE",
+                    "expected_port": port, "observed_port": observed}
     period = 0.5 if version == "v0.1" else 1.0
     monitor = probe.HeartbeatMonitor(period=period, tolerance=0.2,
                                      version=EXPECTED[version]["version"])
     observed_id = False
     sent_id = False
+    first_uptime_ms = None
+    first_seq = None
     try:
         with PosixCDC(port) as device:
             started = time.monotonic()
@@ -396,6 +425,8 @@ def cdc_check(version: str, duration: int) -> dict:
                 if line.startswith("HB "):
                     if not monitor.observe(line, now):
                         raise ValueError("CDC_HEARTBEAT_INVALID")
+                    if first_uptime_ms is None:
+                        first_seq, first_uptime_ms, _ = monitor.previous
                     window.heartbeat(now)
                 elif probe.is_firmware_id(line, EXPECTED[version]["version"]):
                     observed_id = True
@@ -416,24 +447,35 @@ def cdc_check(version: str, duration: int) -> dict:
             reason = "CDC_FIRST_HEARTBEAT_TIMEOUT"
         return {"result": "FAIL", "reason": reason,
                 "port": port, "heartbeats": monitor.samples,
-                "id_observed": observed_id}
+                "id_observed": observed_id,
+                "first_seq": first_seq, "first_uptime_ms": first_uptime_ms,
+                "last_uptime_ms": monitor.previous[1] if monitor.previous else None}
     return {"result": "PASS", "port": port, "heartbeats": monitor.samples,
-            "id_observed": observed_id, "period_s": period}
+            "id_observed": observed_id, "period_s": period,
+            "first_seq": first_seq, "first_uptime_ms": first_uptime_ms,
+            "last_uptime_ms": monitor.previous[1] if monitor.previous else None}
 
 
 def cdc_after_flash(version: str, duration: int) -> dict:
-    """Allow USB CDC to settle after a completed Z2 OpenOCD reset run.
+    """After reset-run, wait for CDC enumeration and one second of settling.
 
     Called only after the remote FLASH_PASS receipt, which is after OpenOCD
-    shutdown. Three seconds is a minimum additional wait, not a measured
-    reset-to-CDC interval or an extension of the 12-second probe window.
+    shutdown. A sysfs VID/PID match is the enumeration event; the one-second
+    settle is separate from the subsequent 12-second heartbeat/ID window.
+    Uptime is reported from firmware heartbeats as independent reset evidence.
     """
+    try:
+        port, enumeration_wait = wait_cdc_enumeration()
+    except NotRun:
+        return {"result": "FAIL", "reason": "CDC_NOT_ENUMERATED_AFTER_RESET",
+                "enumeration_timeout_s": CDC_ENUM_TIMEOUT_S}
     started = time.monotonic()
-    time.sleep(CDC_POST_RESET_SETTLE_S)
+    time.sleep(CDC_POST_ENUM_SETTLE_S)
     elapsed = round(time.monotonic() - started, 3)
-    return {"post_reset_settle_requested_s": CDC_POST_RESET_SETTLE_S,
-            "post_reset_settle_elapsed_s": elapsed,
-            **cdc_check(version, duration)}
+    return {"enumerated_port": port, "enumeration_wait_s": enumeration_wait,
+            "post_enumeration_settle_requested_s": CDC_POST_ENUM_SETTLE_S,
+            "post_enumeration_settle_elapsed_s": elapsed,
+            **cdc_check(version, duration, port=port)}
 
 
 def print_receipt(stage: str, value: dict):
@@ -456,6 +498,7 @@ def execute(args) -> int:
         print_receipt("CDC_READ_ONLY", {"version": args.cdc_version, **result})
         return 0 if result["result"] == "PASS" else 1
     planned = sequence(args.start, args.count)
+    baseline_label = selected_baseline_version(args.start, args.baseline_version)
     images = {"v0.1": firmware(Path(args.firmware_a), "v0.1"),
               "v0.2": None}
     if Path(args.firmware_b).is_file():
@@ -471,7 +514,8 @@ def execute(args) -> int:
                                  k: {"sha256": sha(v), "bytes": len(v),
                                      "region_sha256": expected_region_sha(v)}
                                  for k, v in images.items()},
-                             "expected_cdc_baseline": baseline_version(args.start)})
+                             "expected_cdc_baseline": baseline_label,
+                             "explicit_cdc_baseline_override": args.baseline_version is not None})
 
     baseline = _load(ROOT / "scripts/ppu_path2_hardware_baseline.py", "ab_existing_baseline")
     try:
@@ -496,14 +540,13 @@ def execute(args) -> int:
                            timeout=5, check=False)
     if owner.returncode != 1:
         raise NotRun("BLUE_PILL_SERIAL_OWNER_BUSY_OR_UNKNOWN")
-    baseline_cdc = cdc_check(baseline_version(args.start), args.cdc_duration)
+    baseline_cdc = cdc_check(baseline_label, args.cdc_duration)
     print_receipt("CDC_BASELINE", baseline_cdc)
     if baseline_cdc["result"] != "PASS":
         return 1
 
     base = {"openocd_dir": args.openocd_dir, "openocd_sha256": args.openocd_sha,
             "image_id": args.image_id, "site": 2, "speed_khz": 5000}
-    baseline_label = baseline_version(args.start)
     status_config = {**base, "mode": "status", "version": baseline_label, "attempt": args.start,
                      "firmware": "/root/.plasma-bluepill-ab/not-staged.bin",
                      "firmware_bytes": EXPECTED[baseline_label]["bytes"],
@@ -571,6 +614,8 @@ def main(argv=None) -> int:
     parser.add_argument("--start", type=int, required=True)
     parser.add_argument("--count", type=int, default=10)
     parser.add_argument("--cdc-duration", type=int, default=12)
+    parser.add_argument("--baseline-version", choices=("v0.1", "v0.2"),
+                        help="explicit observed firmware for a failed-CDC Flash retry")
     parser.add_argument("--read-only-cdc", action="store_true")
     parser.add_argument("--cdc-version", choices=("v0.1", "v0.2"), default="v0.1")
     args = parser.parse_args(argv)
