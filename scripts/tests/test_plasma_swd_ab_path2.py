@@ -1,4 +1,5 @@
 """Host-only A/B tests: never contact SWPC, Z2, FPGA, USB or DUT."""
+import argparse
 import hashlib
 import importlib.util
 import errno
@@ -93,6 +94,18 @@ class ABPath2Test(unittest.TestCase):
         helper.password_ssh_z2.return_value = (1, "denied")
         with self.assertRaises(RuntimeError):
             ab.remote_stage(helper, {}, Path("/unused"), "reviewed code")
+
+    def test_read_only_cdc_never_reads_firmware_or_contacts_z2(self):
+        args = argparse.Namespace(read_only_cdc=True, cdc_version="v0.1",
+                                  cdc_duration=12)
+        with mock.patch.object(ab, "verify_args"), \
+                mock.patch.object(ab, "cdc_port", return_value="/dev/ttyACM0"), \
+                mock.patch.object(ab.subprocess, "run", return_value=mock.Mock(returncode=1)), \
+                mock.patch.object(ab, "cdc_check", return_value={"result": "PASS"}) as check, \
+                mock.patch.object(ab, "firmware", side_effect=AssertionError("flash dependency accessed")), \
+                mock.patch.object(ab, "remote_call", side_effect=AssertionError("Z2 contacted")):
+            self.assertEqual(ab.execute(args), 0)
+            check.assert_called_once_with("v0.1", 12)
 
     def test_cdc_wrong_version_or_timeout_fails(self):
         device = mock.MagicMock()

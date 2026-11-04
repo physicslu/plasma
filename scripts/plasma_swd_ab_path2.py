@@ -410,6 +410,9 @@ def cdc_check(version: str, duration: int) -> dict:
         reason = (str(exc) if str(exc) in
                   ("CDC_ID_MISSING", "CDC_ID_WRONG_VERSION", "CDC_LINE_TOO_LONG",
                    "CDC_HEARTBEAT_INVALID") else "CDC_" + type(exc).__name__)
+        if isinstance(exc, AssertionError) and \
+                str(exc).startswith("first heartbeat startup timeout"):
+            reason = "CDC_FIRST_HEARTBEAT_TIMEOUT"
         return {"result": "FAIL", "reason": reason,
                 "port": port, "heartbeats": monitor.samples,
                 "id_observed": observed_id}
@@ -425,6 +428,17 @@ def print_receipt(stage: str, value: dict):
 
 def execute(args) -> int:
     verify_args(args)
+    if args.read_only_cdc:
+        # Read only the existing USB CDC stream and its ID query. This path
+        # never rebuilds firmware, connects to Z2 or issues SWD commands.
+        port = cdc_port()
+        owner = subprocess.run(["fuser", "-s", port], capture_output=True,
+                               timeout=5, check=False)
+        if owner.returncode != 1:
+            raise NotRun("BLUE_PILL_SERIAL_OWNER_BUSY_OR_UNKNOWN")
+        result = cdc_check(args.cdc_version, args.cdc_duration)
+        print_receipt("CDC_READ_ONLY", {"version": args.cdc_version, **result})
+        return 0 if result["result"] == "PASS" else 1
     planned = sequence(args.start, args.count)
     images = {"v0.1": firmware(Path(args.firmware_a), "v0.1"),
               "v0.2": None}
@@ -541,6 +555,8 @@ def main(argv=None) -> int:
     parser.add_argument("--start", type=int, required=True)
     parser.add_argument("--count", type=int, default=10)
     parser.add_argument("--cdc-duration", type=int, default=12)
+    parser.add_argument("--read-only-cdc", action="store_true")
+    parser.add_argument("--cdc-version", choices=("v0.1", "v0.2"), default="v0.1")
     args = parser.parse_args(argv)
     try:
         return execute(args)
