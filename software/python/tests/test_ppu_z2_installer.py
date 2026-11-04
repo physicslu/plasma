@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import shutil
 import sys
 import tarfile
 import types
@@ -434,6 +435,14 @@ def test_install_refreshes_only_already_installed_stage_c_units_with_plasma_pyth
     assert installer.render_stage_c_refresh(paths=paths, python_runtime=runtime) == []
     paths.systemd_root.mkdir(parents=True)
     paths.config_root.mkdir(parents=True)
+    (paths.systemd_root / "plasma-site-worker.service").write_text("x\n")
+    # The Runtime kit has no Stage C unit renderer. A missing Bootstrap
+    # renderer means no refresh, not an install failure.
+    assert installer.render_stage_c_refresh(paths=paths, python_runtime=runtime) == []
+    bootstrap = paths.product_root / "bootstrap"
+    bootstrap.mkdir(parents=True)
+    shutil.copy2(Path(installer.__file__).resolve().parent / "ppu_package_units.py",
+                 bootstrap / "ppu_package_units.py")
     for name in ("plasma-site-worker.service", "plasma-package@.service"):
         (paths.systemd_root / name).write_text("ExecStart=/opt/plasma/python/3.12.13/bin/python3 x\n")
     (paths.config_root / "ppu-package-actions.json").write_text(
@@ -533,3 +542,36 @@ def test_empty_sites_migration_replaces_exact_legacy_line() -> None:
     assert migrated is not None
     assert migrated.startswith("ppu:\n  id: a\n\nsites:\n  - {id: 1, enabled: false")
     assert migrated.count("enabled: false") == 8
+
+
+def test_installer_from_runtime_kit_uses_existing_bootstrap_unit_renderer(tmp_path):
+    """Regression from PR #1291: runtime installer cannot import a sibling
+    ppu_package_units.py because the delivered Runtime kit omits it."""
+    kit = tmp_path / "kit" / "scripts"
+    kit.mkdir(parents=True)
+    shutil.copy2(ROOT / "scripts" / "ppu-z2-installer-core.py", kit / "ppu-z2-installer-core.py")
+    spec = importlib.util.spec_from_file_location("installer_from_kit", kit / "ppu-z2-installer-core.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    paths = module.InstallPaths(
+        product_root=tmp_path / "opt" / "plasma",
+        config_root=tmp_path / "etc" / "plasma",
+        state_root=tmp_path / "state",
+        log_root=tmp_path / "log",
+        systemd_root=tmp_path / "systemd",
+    )
+    paths.systemd_root.mkdir(parents=True)
+    (paths.systemd_root / "plasma-site-worker.service").write_text("x\n")
+    (paths.product_root / "bootstrap").mkdir(parents=True)
+    shutil.copy2(Path(installer.__file__).resolve().parent / "ppu_package_units.py",
+                 paths.product_root / "bootstrap" / "ppu_package_units.py")
+    runtime = module.PythonRuntime(
+        path=Path("/opt/plasma/python/9.8.7/bin/python3"),
+        version="9.8.7",
+        architecture="armv7l",
+        releaselevel="final",
+    )
+    [(path, rendered, mode)] = module.render_stage_c_refresh(paths=paths, python_runtime=runtime)
+    assert path.name == "plasma-site-worker.service" and mode == 0o644
+    assert "ExecStart=/opt/plasma/python/9.8.7/bin/python3 " in rendered
