@@ -91,7 +91,7 @@ class TrustedKitTests(unittest.TestCase):
         self.assertIn("plasma_path2_trusted_z2_artifact.py verify-archive", content)
         self.assertIn("github-token: ${{ github.token }}", content)
         self.assertIn("needs.development-authorize.outputs.pr_number == '1299'", content)
-        self.assertIn("needs.development-authorize.outputs.pinned_sha == '9a6831c8cd863fa89ea4819d7c7cfc53b07b382d'", content)
+        self.assertIn("needs.development-authorize.outputs.pinned_sha == '1d2b0527928ee2ab58aca3a6f855916bceb3a648'", content)
         self.assertIn("PLASMA_Z2_KIT_ARTIFACT_DIR:", content)
         step = content.split("- name: Execute candidate CLI using trusted dispatcher", 1)[1].split("        run: |", 1)[0]
         self.assertNotIn("GH_TOKEN:", step)

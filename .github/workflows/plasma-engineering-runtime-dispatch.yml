@@ -443,7 +443,7 @@ jobs:
           needs.development-authorize.outputs.task_id == 'path2-work-order' &&
           needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
           needs.development-authorize.outputs.pr_number == '1299' &&
-          needs.development-authorize.outputs.pinned_sha == '9a6831c8cd863fa89ea4819d7c7cfc53b07b382d'
+          needs.development-authorize.outputs.pinned_sha == '1d2b0527928ee2ab58aca3a6f855916bceb3a648'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
