@@ -374,9 +374,10 @@ def test_runtime_restart_keeps_in_flight_site_reserved(tmp_path):
     current = os.getpid()
     new_runtime = current + 9999
     thread = None
+    result = {}
     try:
         rig.open(child, sites=(2,))
-        thread = threading.Thread(target=lambda: rig.go(child))
+        thread = threading.Thread(target=lambda: result.setdefault("reply", rig.go(child)))
         thread.start()
         assert adapter.started.wait(8)
         rig.core.runtime_pid = lambda: new_runtime
@@ -389,6 +390,7 @@ def test_runtime_restart_keeps_in_flight_site_reserved(tmp_path):
         adapter.release.set()
         thread.join(10)
         assert not thread.is_alive()
+        assert result["reply"][0]["ok"] is True
         opened = rig.core.handle(req, peer, "control")
         assert opened["ok"] is True
         assert list(rig.core._site_owners) == [2]
