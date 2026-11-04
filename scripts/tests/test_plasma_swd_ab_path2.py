@@ -116,6 +116,25 @@ class ABPath2Test(unittest.TestCase):
             out = ab.cdc_check("v0.2", 12)
         self.assertEqual(out["result"], "FAIL")
 
+    def test_three_second_post_reset_settle_precedes_cdc_probe(self):
+        events = []
+
+        def pause(seconds):
+            events.append(("sleep", seconds))
+
+        def probe(version, duration):
+            events.append(("cdc", version, duration))
+            return {"result": "PASS", "heartbeats": 24}
+
+        with mock.patch.object(ab.time, "monotonic", side_effect=[100.0, 103.006]), \
+                mock.patch.object(ab.time, "sleep", side_effect=pause), \
+                mock.patch.object(ab, "cdc_check", side_effect=probe):
+            result = ab.cdc_after_flash("v0.1", 12)
+        self.assertEqual(events, [("sleep", 3.0), ("cdc", "v0.1", 12)])
+        self.assertEqual(result["result"], "PASS")
+        self.assertEqual(result["post_reset_settle_requested_s"], 3.0)
+        self.assertEqual(result["post_reset_settle_elapsed_s"], 3.006)
+
     def test_cdc_sysfs_exact_usb_identity(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

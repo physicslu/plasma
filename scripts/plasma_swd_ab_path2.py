@@ -37,6 +37,7 @@ EXPECTED = {
     "v0.2": {"bytes": 62800, "sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c", "version": "0.2"},
 }
 ERASE_BYTES = 63488
+CDC_POST_RESET_SETTLE_S = 3.0
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
 SHA64 = re.compile(r"[a-f0-9]{64}\Z")
 DEVICE = re.compile(r"ppu-device-[a-f0-9]{16,64}\Z")
@@ -420,6 +421,21 @@ def cdc_check(version: str, duration: int) -> dict:
             "id_observed": observed_id, "period_s": period}
 
 
+def cdc_after_flash(version: str, duration: int) -> dict:
+    """Allow USB CDC to settle after a completed Z2 OpenOCD reset run.
+
+    Called only after the remote FLASH_PASS receipt, which is after OpenOCD
+    shutdown. Three seconds is a minimum additional wait, not a measured
+    reset-to-CDC interval or an extension of the 12-second probe window.
+    """
+    started = time.monotonic()
+    time.sleep(CDC_POST_RESET_SETTLE_S)
+    elapsed = round(time.monotonic() - started, 3)
+    return {"post_reset_settle_requested_s": CDC_POST_RESET_SETTLE_S,
+            "post_reset_settle_elapsed_s": elapsed,
+            **cdc_check(version, duration)}
+
+
 def print_receipt(stage: str, value: dict):
     # The Path 2 executor saves stdout (<= 64 KiB) as a GitHub Actions artifact.
     print("PLASMA_AB=" + json.dumps({"stage": stage, **value},
@@ -528,7 +544,7 @@ def execute(args) -> int:
                                     "safe_off", "journal_unchanged", "openocd_log_sha256")}})
         if remote.get("result") != "FLASH_PASS":
             return 1  # no automatic retry or MCU reset after failed Flash
-        cdc = cdc_check(version, args.cdc_duration)
+        cdc = cdc_after_flash(version, args.cdc_duration)
         print_receipt("CDC", {"index": index, "version": version, **cdc})
         if cdc["result"] != "PASS":
             return 1
