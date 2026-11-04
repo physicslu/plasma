@@ -401,43 +401,22 @@ def _parse_target_device(
         raise ValueError(f"{label} vendor is required")
     if not isinstance(identifier, str) or not identifier.strip():
         raise ValueError(f"{label} identifier is required")
-    record = get_default_device_catalog().resolve(vendor, identifier)
-    if record is None:
-        raise ValueError(f"{label} must resolve to one canonical Device Catalog record")
-    # Catalog identity is useful for Research/Engineering lookup, not an execution grant.
-    # This applies equally to Engineering Job and Batch target_device inputs.
-    if record.vendor == "Microchip" and record.mapping_status == "no_mapping":
-        raise ValueError(f"{label} Microchip Level 0 identity has no executable programming mapping")
+    # User-supplied target identity is a CLAIM, not Catalog qualification.
+    # No Catalog dependency is permitted in Programming Job / Batch submission.
+    # The selected Runtime Provider must separately resolve exact-target
+    # capabilities and refuse unsupported operations before any hardware I/O.
+    vendor = vendor.strip()
+    identifier = identifier.strip()
+    if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+/-]{0,127}", identifier)
+            or len(vendor) > 128 or any(ord(c) < 32 for c in vendor)):
+        raise ValueError(f"{label} target identity is invalid")
     return BatchTargetDeviceSnapshot(
-        vendor=record.vendor,
-        family=record.family,
-        identifier=record.identifier,
-        identifier_kind=record.identifier_kind,
-        icpn=record.icpn,
+        vendor=vendor,
+        family="",
+        identifier=identifier,
+        identifier_kind="unverified_exact_target_claim",
+        icpn=identifier,
     )
-
-
-def _reject_unmapped_microchip_raw_job_target(target: Any) -> None:
-    """Guard untyped Microchip Jobs without coupling other vendors to its Catalog.
-
-    The PPU Runtime resolves exact IC Support and the programming route after
-    this Gateway check. A non-Microchip exact IC Support binding cannot match
-    a Microchip-only lookup-only record, so it needs no Production Device
-    Catalog material here. Unknown and Microchip targets retain the complete
-    existing Catalog check (including integrity failures).
-    """
-    if not isinstance(target, str):
-        return
-    support = get_default_ic_support_resolver().resolve_exact(target)
-    if (support is not None
-            and support.expected_catalog.get("manufacturer") not in (None, "Microchip")):
-        return
-    record = get_default_device_catalog().resolve("Microchip", target)
-    if record is not None and record.mapping_status == "no_mapping":
-        raise ValueError(
-            "Microchip Level 0 exact ICPN is lookup-only; "
-            "no executable programming mapping exists"
-        )
 
 
 def _parse_asset(value: Any) -> ProgrammingAsset | None:
@@ -570,8 +549,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             default_timeout_s=default_timeout_s,
             allow_inline_asset=allow_inline_asset,
         )
-        # Reject a raw Job target even when target_device was omitted.
-        _reject_unmapped_microchip_raw_job_target(request.target)
         if execution_owner_id is not None:
             owner_kind = "engineering_session" if client_id == "plasma-web-engineering" else "rest_client"
             request = replace(
