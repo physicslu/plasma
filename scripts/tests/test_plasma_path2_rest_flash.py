@@ -22,6 +22,7 @@ class FakePPU:
     def __init__(self):
         self.calls = []
         self.ppu_id = "ppu-test-A"
+        self.status_ppu_id = None
         self.site_id = 2
         self.target = "EXACT-TARGET"
         self.execution_busy = False
@@ -46,7 +47,7 @@ class FakePPU:
             return {"ok": True, "ppu": {"ppu_id": self.ppu_id}}
         if path == "/api/status?site=2":
             return {"ppu": {
-                "ppu_id": self.ppu_id,
+                "ppu_id": self.status_ppu_id or self.ppu_id,
                 "execution": {"busy": self.execution_busy,
                               "active_job_count": 1 if self.execution_busy else 0},
                 "runtime_activation": {"active": self.activation_active},
@@ -92,6 +93,51 @@ class Path2RestFlashHostOnlyTests(unittest.TestCase):
         self.assertFalse(receipt["c3_engine_verified"])
         self.assertFalse(receipt["external_ssh_owner_verified"])
         self.assertEqual([x[0] for x in ppu.calls], ["GET", "GET", "GET"])
+
+    def test_readonly_discovers_live_ppu_identity_without_any_prebound_id(self):
+        ppu = FakePPU()
+        ppu.ppu_id = "not-an-installer-default"
+        receipt = script.preflight(ppu, site=2, ppu_id=None, target=ppu.target)
+        self.assertEqual(receipt["ppu_id"], ppu.ppu_id)
+        self.assertEqual(receipt["ppu_id_source"], "live_node_and_status")
+        self.assertFalse(receipt["ppu_id_expected_checked"])
+        self.assertEqual([m for m, _, _ in ppu.calls], ["GET", "GET", "GET"])
+        self.assertFalse(ppu.posted)
+
+    def test_dynamic_discovery_still_requires_node_and_status_identity_to_match(self):
+        ppu = FakePPU()
+        ppu.status_ppu_id = "another-hardware"
+        with self.assertRaisesRegex(script.PreflightError, "STATUS_PPU_MISMATCH"):
+            script.preflight(ppu, site=2, ppu_id=None, target=ppu.target)
+        self.assertFalse(ppu.posted)
+
+    def test_destructive_execution_requires_explicit_runtime_discovered_ppu(self):
+        ppu = FakePPU()
+        with tempfile.TemporaryDirectory() as td:
+            source = Path(td) / "fw.bin"
+            source.write_bytes(b"1")
+            with self.assertRaisesRegex(script.PreflightError, "EXPLICIT_PPU_ID_REQUIRED_FOR_FLASH"):
+                script.execute_flash(
+                    ppu, site=2, ppu_id=None, target=ppu.target,
+                    image_file=source, image_sha256=hashlib.sha256(b"1").hexdigest(),
+                    deadline_s=30)
+        self.assertEqual(ppu.calls, [])
+
+    def test_command_line_unpinned_readonly_is_allowed_but_flash_without_id_is_denied(self):
+        ppu = FakePPU()
+        base = ["--url", "http://127.0.0.1:8000", "--site-id", "2",
+                "--target", ppu.target]
+        with patch.object(script, "RestClient", return_value=ppu):
+            with redirect_stdout(io.StringIO()) as stdout:
+                code = script.main(base)
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(stdout.getvalue())["ppu_id"], ppu.ppu_id)
+            with redirect_stderr(io.StringIO()) as stderr:
+                code = script.main(base + ["--execute-flash", "--confirm-site", "2",
+                    "--image-file", "fake.bin", "--image-sha256", "a" * 64])
+            self.assertEqual(code, 69)
+            self.assertIn("EXPLICIT_FLASH_CONFIRMATION_REQUIRED", stderr.getvalue())
+            self.assertFalse(ppu.posted)
 
     def test_wrong_ppu_site_target_busy_quiesced_and_disabled_deny_without_post(self):
         for name, value, reason in (
