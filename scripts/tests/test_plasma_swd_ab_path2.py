@@ -18,8 +18,8 @@ spec.loader.exec_module(ab)
 
 class ABPath2Test(unittest.TestCase):
     def test_100_attempts_are_balanced(self):
-        runs = [p for start in (0, 20, 40, 60, 80)
-                for p in ab.sequence(start, 20)]
+        runs = [p for start in range(0, 100, 10)
+                for p in ab.sequence(start, 10)]
         self.assertEqual([n for n, _ in runs], list(range(1, 101)))
         self.assertEqual([v for _, v in runs].count("v0.1"), 50)
         self.assertEqual([v for _, v in runs].count("v0.2"), 50)
@@ -27,11 +27,20 @@ class ABPath2Test(unittest.TestCase):
                          ["v0.1", "v0.2", "v0.2", "v0.1"])
 
     def test_invalid_batches_rejected(self):
-        for start, count in [(-1, 20), (1, 20), (0, 0), (0, 21),
-                             (90, 20), (80, 10), (100, 20)]:
+        for start, count in [(-1, 10), (1, 10), (0, 0), (0, 11),
+                             (90, 20), (80, 9), (100, 10), (8, 10)]:
             with self.subTest(start=start, count=count):
                 with self.assertRaises(ValueError):
                     ab.sequence(start, count)
+
+    def test_recovery_to_exact_next_ten_boundary(self):
+        self.assertEqual(ab.sequence(8, 2), [(9, "v0.1"), (10, "v0.2")])
+        self.assertEqual(ab.sequence(13, 7)[0], (14, "v0.2"))
+        self.assertEqual(ab.sequence(13, 7)[-1], (20, "v0.1"))
+        self.assertEqual(ab.baseline_version(8), "v0.1")
+        self.assertEqual(ab.baseline_version(10), "v0.2")
+        self.assertEqual(ab.baseline_version(20), "v0.1")
+        self.assertEqual(ab.baseline_version(30), "v0.2")
 
     def test_region_keeps_final_two_pages(self):
         self.assertEqual(ab.ERASE_BYTES, 62 * 1024)

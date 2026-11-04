@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Source-pinned Path 2 Blue Pill v0.1/v0.2, 5 MHz, Site 2 A/B test.
 
-Each invocation performs at most 20 of the owner's 100 approved attempts.
+Each invocation stops at the next 10-attempt reporting boundary. An approved
+manual recovery may start inside that boundary; failed results are retained.
 No FPGA load, driver install, Runtime/Manager switch or automatic retry.
 The existing enrolled SWPC -> Z2 SSH/sudo helper runs reviewed root-side
 ABI-v5 OpenOCD code only. Use the trusted Issue #981 operator-cli dispatcher.
@@ -54,12 +55,23 @@ def sha(data: bytes) -> str:
 
 
 def sequence(start: int, count: int) -> list[tuple[int, str]]:
-    if not (0 <= start < 100 and 1 <= count <= 20 and start % 20 == 0
-            and start + count <= 100 and count == 20):
-        raise ValueError("BATCH_MUST_BE_20_AT_START_0_20_40_60_80")
+    if not (0 <= start < 100 and 1 <= count <= 10
+            and start + count <= 100 and (start + count) % 10 == 0):
+        raise ValueError("BATCH_MUST_END_AT_NEXT_10_ATTEMPT_BOUNDARY")
     # 25 ABBA blocks: 50 attempts per firmware, thermal/time drift balanced.
     order = ("v0.1", "v0.2", "v0.2", "v0.1") * 25
     return [(i + 1, order[i]) for i in range(start, start + count)]
+
+
+def baseline_version(start: int) -> str:
+    """Expect the final image from the prior verified attempt, not always A.
+
+    Resuming an attempt whose Flash passed but CDC failed requires confirming
+    the actual on-target image from the prior evidence first.
+    """
+    if not 0 <= start < 100:
+        raise ValueError("INVALID_BASELINE_POSITION")
+    return "v0.1" if start == 0 else ("v0.1", "v0.2", "v0.2", "v0.1")[(start - 1) % 4]
 
 
 def firmware(path: Path, label: str) -> bytes:
@@ -428,7 +440,8 @@ def execute(args) -> int:
                              "count": args.count, "firmware": {
                                  k: {"sha256": sha(v), "bytes": len(v),
                                      "region_sha256": expected_region_sha(v)}
-                                 for k, v in images.items()}})
+                                 for k, v in images.items()},
+                             "expected_cdc_baseline": baseline_version(args.start)})
 
     baseline = _load(ROOT / "scripts/ppu_path2_hardware_baseline.py", "ab_existing_baseline")
     try:
@@ -453,17 +466,18 @@ def execute(args) -> int:
                            timeout=5, check=False)
     if owner.returncode != 1:
         raise NotRun("BLUE_PILL_SERIAL_OWNER_BUSY_OR_UNKNOWN")
-    baseline_cdc = cdc_check("v0.1", args.cdc_duration)
+    baseline_cdc = cdc_check(baseline_version(args.start), args.cdc_duration)
     print_receipt("CDC_BASELINE", baseline_cdc)
     if baseline_cdc["result"] != "PASS":
         return 1
 
     base = {"openocd_dir": args.openocd_dir, "openocd_sha256": args.openocd_sha,
             "image_id": args.image_id, "site": 2, "speed_khz": 5000}
-    status_config = {**base, "mode": "status", "version": "v0.1", "attempt": args.start,
+    baseline_label = baseline_version(args.start)
+    status_config = {**base, "mode": "status", "version": baseline_label, "attempt": args.start,
                      "firmware": "/root/.plasma-bluepill-ab/not-staged.bin",
-                     "firmware_bytes": EXPECTED["v0.1"]["bytes"],
-                     "firmware_sha256": EXPECTED["v0.1"]["sha256"]}
+                     "firmware_bytes": EXPECTED[baseline_label]["bytes"],
+                     "firmware_sha256": EXPECTED[baseline_label]["sha256"]}
     initial = remote_call(helper, creds, hosts, make_remote(status_config), timeout=90)
     print_receipt("Z2_PREFLIGHT", {"result": initial.get("result"),
                                     "reason": initial.get("reason"),
@@ -525,7 +539,7 @@ def main(argv=None) -> int:
     parser.add_argument("--cube-root", default="/tmp/plasma-stm32cubef1")
     parser.add_argument("--arm-gcc-root", default="/tmp/plasma-arm-toolchain")
     parser.add_argument("--start", type=int, required=True)
-    parser.add_argument("--count", type=int, default=20)
+    parser.add_argument("--count", type=int, default=10)
     parser.add_argument("--cdc-duration", type=int, default=12)
     args = parser.parse_args(argv)
     try:
