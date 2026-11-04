@@ -418,8 +418,19 @@ def _parse_target_device(
 
 
 def _reject_unmapped_microchip_raw_job_target(target: Any) -> None:
-    """Guard raw Job target strings, independent from typed target_device."""
+    """Guard untyped Microchip Jobs without coupling other vendors to its Catalog.
+
+    The PPU Runtime resolves exact IC Support and the programming route after
+    this Gateway check. A non-Microchip exact IC Support binding cannot match
+    a Microchip-only lookup-only record, so it needs no Production Device
+    Catalog material here. Unknown and Microchip targets retain the complete
+    existing Catalog check (including integrity failures).
+    """
     if not isinstance(target, str):
+        return
+    support = get_default_ic_support_resolver().resolve_exact(target)
+    if (support is not None
+            and support.expected_catalog.get("manufacturer") not in (None, "Microchip")):
         return
     record = get_default_device_catalog().resolve("Microchip", target)
     if record is not None and record.mapping_status == "no_mapping":
