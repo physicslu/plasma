@@ -16,7 +16,7 @@
 | 這兩者的 host 測試、cocotb、Z2 HIL（直接以 root 跑 OpenOCD） | Bootstrap / Runtime kit 的部署流程 |
 | `scripts/z2/hil/abi5_openocd_*` 範本、runbook | `ppu_site_adapter_abi5.py` 的 argv（但要遵守 §6 的使用規則） |
 
-## 2. 目前狀態（main `8195f4082`）
+## 2. 目前狀態（main `8ab369f9d`，2026-11-04 更新）
 
 | 項目 | 值 |
 |---|---|
@@ -26,10 +26,10 @@
 | 前一版（逐筆） | `b916b9f3f9bd240699db83ac37c1f570cb0008876532bde0e2c97102f50db6ca`（run 41663509036，source `4f107b10d`） |
 | Z2 上的 OpenOCD 目錄 | `0.12.0-5088db4c9154`（上游）、`0.12.0-9ea7f3d647c8`（Runtime kit）、`…-plasma-swd-b916b9f3f9bd`、`…-plasma-swd-b8a7db670649` |
 | Z2 FPGA | `d0add58c`，Keep Loaded，Active Set gen 6 |
-| Z2 Bootstrap / privileged tree / Runtime | main `3d0f911c7`（code manifest `c30404a3…`，Runtime `0.2.1-3d0f911c7385`）。**#1286 尚未部署到 Z2** |
+| Z2 Bootstrap / privileged tree / Runtime | main `3d0f911c7`（code manifest `c30404a3…`，Runtime `0.2.1-3d0f911c7385`）。本路自那之後**沒有**再部署或操作 Z2；#1286 的部署屬整合那一路，以其交接文件為準 |
 | DUT | Blue Pill STM32F103C8T6 在 **Site 2（PMODB JB1/JB2）**，跑 CDC heartbeat 韌體 `8d3ffb02…`（SWPC `ttyACM0`，`cafe:4001`） |
 
-## 3. 已完成並在 Z2 驗證過的
+## 3. 已完成（Z2 驗證與 host 驗證分開列）
 
 ### RTL（`pl/rtl/swd/plasma_swd_site_axi_lite.sv`）
 - 每 Site 獨立 AXI4-Lite slave，16 筆 command FIFO + 16 筆 tagged response FIFO，engine 自動連續派送。
@@ -41,7 +41,7 @@
 完整契約見 [runbook §9/§10](../swd-abi5-openocd-dpidr-hil-runbook.md)。重點：
 - 只做硬體職責：root、reload fence + Site lock、attach 時一次確認 PL 有載入 Image、Site ID、MMIO 白名單、恢復 OFF / SAFE_OFF。**不讀 admission record，不讀電氣確認紀錄，MMIO 熱路徑上不讀任何檔案。**
 - `ap_delay_hint` → `IDLE_CYCLES`；queue 256，滿了自動送出；pipeline 最多 16 筆在 RTL 裡。
-- WAIT：ABORT 後重送；FAULT / no-ACK：照實回報、Site 保持可用，由 OpenOCD 重連；latched 錯誤：`CONTROL=4` 後 RW1C `ERROR`。
+- WAIT：ABORT 後重送——**只在 target 未設 ORUNDETECT 時走得到**；OpenOCD 會設 ORUNDETECT，實際上整批失敗、由 OpenOCD 重連（見 §3 host 驗證）。FAULT / no-ACK：照實回報、Site 保持可用，由 OpenOCD 重連；latched 錯誤：`CONTROL=4` 後 RW1C `ERROR`。
 - `adapter speed` → `HALF_PERIOD`，預設 500 kHz（`plasma_swd site N` 時若還沒設定）。
 
 ### HIL 結果（Site 2，`reset halt` 流程，LA2016 全程擷取 + sigrok 解碼）
@@ -51,7 +51,7 @@
 | 0.5 MHz（逐筆） | 755 ms，SWCLK 活動 77 % | 665 ms | 全 OK |
 | 0.5 MHz（pipeline） | 686 ms，93 % | 530 ms，96 % | 14,146 全 OK |
 | 1 / 2 MHz | 623 / 597 ms | 277 / 177 ms | 全 OK |
-| 3.846 / 5.0 MHz | 596 / 597 ms | 177 / 177 ms | 全 OK（5 MHz 有 1 次 WAIT，重送成功） |
+| 3.846 / 5.0 MHz | 596 / 597 ms | 177 / 177 ms | 全 OK（5 MHz 有 1 次 WAIT，之後恢復；恢復機制見 §3 host 驗證的 ORUNDETECT 發現，未證實是哪一層重試） |
 | 7.143 MHz（要求 8） | **FAIL**：init 時 link 斷（NEED_RESET），未 erase | — | — |
 
 - write 停在約 0.6 s：STM32 寫 Flash 本身的時間。read 在 2 MHz 以上停在 177 ms：PS 端瓶頸。
@@ -60,23 +60,44 @@
 
 證據（SWPC 本機，不在 Git）：`.work/z2-bluepill-heartbeat-flash-20261103/`、`.work/z2-swd-pipeline-flash-20261104/`、`.work/z2-main-3d0f911c7-deploy-20261104/`。
 
-## 4. 待辦（建議順序）
+### Host 驗證（2026-11-04，不是 Z2/HIL 結果）
 
-1. ~~**讓 C adapter 跑在 RTL 模擬上**~~ **完成（2026-11-04，host-only）**：`plasma_swd_fifo_core.c` 原封不動編成 `.so`，以 ctypes + `cocotb.external`／`cocotb.function` 把 `read32/write32/write_barrier` 接到 AXI BFM，驅動單 Site RTL（`pl/sim/swd_c_core_site_tb.sv`）與 ABI-v5 edge-phase 版 `VirtualSWDTarget`。11 個案例（`pl/verification/cocotb/test_swd_c_fifo_core.py`）：admit / line reset / DPIDR / `recover_off`、pipeline（RTL FIFO 同時 ≥ 8 筆）、256 筆 queue 自動送出、`ap_delay_hint` → `IDLE_CYCLES`、中段 FAULT、中段 PARITY（RTL 停止派送，`CONTROL=4` 後 RW1C）、TIMEOUT、無 ACK（BAD_ACK → NEED_RESET）、無 ORUNDETECT 的 WAIT（回報、不重送）、錯誤 Site 位址。只代表 C ↔ RTL 交易模擬，**不是** ARMv7/PS7 MMIO 或 HIL。
-   - **發現（未修，範圍外）**：OpenOCD 的 `dap_dp_init` 會設 ORUNDETECT；ADIv5 規定此時 WAIT/FAULT 後 host 仍須送 33 clock 資料相位，但 engine 把 `cmd_error_data_phase` 固定為 0。模擬中 target 把後續 idle + 下一個 request 當成寫入資料吃掉（WDATAERR），下一筆 BAD_ACK、其餘 NEED_RESET；C 的 WAIT → ABORT → 重送路徑走不到，整批失敗但不亂序、不重送，重連可恢復。測試 `wait_with_orundetect_has_no_data_phase_and_desynchronises` 記錄現況。這可能也是 5 MHz HIL 那次 WAIT 的實際恢復方式（未證實）。修正需 RTL 支援 ORUNDETECT 資料相位（新 Image）或 adapter 不設 ORUNDETECT，見第 6 項。
-2. **分辨 7.1 MHz 失敗是 DUT 還是接線**：7.143 與 10 MHz 各做兩種只讀測試，(a) `halt`（HCLK 72 MHz）(b) `reset halt`（HCLK 8 MHz）。若只有 (b) 失敗 → 跟 DUT HCLK 有關；兩者都失敗 → 偏向 I/O 時序。不寫 Flash；結束後用 2 MHz `reset run` 恢復。
-3. **TIMING-18**：依第 2 項結果決定是否補外部 I/O 約束或在 runbook 固定上限。
-4. ~~**`IDLE_CYCLES` 與 pipeline 相關的 SVA**~~ **完成（2026-11-04，host-only）**：`pl/verification/sva/plasma_swd_site_checks.sv` 掛在兩個 Site 測試平台上，所有 Site 回歸（8 + 11 個 cocotb 案例）每個 FCLK 都檢查。Icarus 11 不支援 `bind` 與 concurrent `assert property`，因此全部是 immediate assertion + 歷史暫存 + shadow 佇列，不宣稱 temporal SVA 語意。規則：FIFO 深度上限、`IDLE_CYCLES` 範圍與 MODE OFF 預設 8、非 NORMAL+enable 時 pad 釋放、MODE 只在靜止時切換、`fault_q` 只由 PARITY/TIMEOUT/ABORT 鎖住、鎖住時不派送、只在清空後解鎖、discard 只在 fault 時且清空 FIFO、派送與 completion 依 push 順序、retained response 不變、`IDLE_CYCLES`／`HALF_PERIOD` 在 PUSH 時鎖定、idle 相位 SWDIO 拉低且 clock 數 = 鎖定值、SWCLK HIGH = 半週期、engine 回應穩定與有界完成。6 個 RTL 暫存副本突變各自被對應規則抓到（`test_site_checker_reports_mutated_rule`）。只證明測試走過的路徑；形式驗證（SymbiYosys）未做。
-   - **觀察（未修）**：MODE OFF 不清 `fault_q`，`recover_off()` 在 MODE 已是 0 時直接返回、`admit()` 也不檢查 STATUS bit3。若有程式沒清 `ERROR` 就關 MODE，下一個 owner 派送被鎖、輪詢逾時回報 BAD_RESPONSE。正常路徑（adapter 的 `take_one`／`recover_off`）不會發生。
-5. **Site 1（PMODA）實機**：目前只有 Site 2 有 DUT；兩個 Site 同時運作也沒測過（需 owner 接線與 Gate 1）。
-6. **RTL 的 ORUNDETECT 資料相位**（由第 1 項發現升級）：WAIT/FAULT 後依 CTRL/STAT.ORUNDETECT 送 33 clock 資料相位，或讓 WAIT / FAULT 也停止派送；需要新 Image 與 Gate 1。
-7. （選擇性）IRQ（RTL 已有完成中斷，PS7 GIC 未接，adapter 目前輪詢）。
+**C adapter 跑在 RTL 模擬上**（PR #1290，`pl/AGENTS.md` §4A）
+- `plasma_swd_fifo_core.c` 原封不動編成 `.so`，以 ctypes + `cocotb.external`／`cocotb.function` 把 `read32/write32/write_barrier` 接到 AXI BFM，驅動單 Site RTL（`pl/sim/swd_c_core_site_tb.sv`）。
+- Target 用 `EdgePhaseTarget`（`pl/verification/cocotb/swd_c_core_bridge.py`）：原本的 `VirtualSWDTarget` ACK 晚一個 SWCLK 邊緣，不符合 ABI-v5 取樣時序，不能直接拿來接 ABI-v5 RTL。
+- 11 個案例（`pl/verification/cocotb/test_swd_c_fifo_core.py`）全 PASS：admit / line reset / DPIDR / `recover_off`、pipeline（RTL FIFO 同時 ≥ 8 筆）、256 筆 queue 自動送出、`ap_delay_hint` → `IDLE_CYCLES`、中段 FAULT、中段 PARITY（RTL 停止派送，`CONTROL=4` 後 RW1C）、TIMEOUT、無 ACK（BAD_ACK → NEED_RESET）、無 ORUNDETECT 的 WAIT（回報、不重送）、錯誤 Site 位址。
+
+**Site 規則 checker**（PR #1292，`pl/AGENTS.md` §3）
+- `pl/verification/sva/plasma_swd_site_checks.sv` 以階層參照掛在 `swd_two_site_axi_tb` 與 `swd_c_core_site_tb`，所有 Site 回歸（8 + 11 個案例）每個 FCLK 都檢查。
+- Icarus 11 不支援 `bind` 與 concurrent `assert property`：全部是 immediate assertion + 歷史暫存 + shadow 佇列，不宣稱 temporal SVA 語意。
+- 規則：FIFO 深度上限；`IDLE_CYCLES` 範圍與 MODE OFF 預設 8；非 NORMAL+enable 時 pad 釋放；MODE 只在靜止時切換；`fault_q` 只由 PARITY/TIMEOUT/ABORT 鎖住、鎖住時不派送、清空後才解鎖；discard 只在 fault 時且清空 FIFO；派送與 completion 依 push 順序；retained response 不變；`IDLE_CYCLES`／`HALF_PERIOD` 在 PUSH 時鎖定；idle 相位 SWDIO 拉低且 clock 數 = 鎖定值；SWCLK HIGH = 半週期；engine 回應穩定、有界完成。
+- 非空轉證明：`test_site_checker_reports_mutated_rule` 對 RTL **暫存副本**做 6 個突變，各自被對應規則名稱抓到。只證明測試走過的路徑；形式驗證（SymbiYosys）未做。
+
+**發現與觀察（都未修）**
+1. **ORUNDETECT 資料相位缺失（影響實機）**：OpenOCD 的 `dap_dp_init` 會設 ORUNDETECT；ADIv5 規定此時 WAIT/FAULT 後 host 仍須送 33 clock 資料相位，但 engine 把 `cmd_error_data_phase` 固定為 0。模擬中 target 把後續 idle + 下一個 request 當成寫入資料吃掉（WDATAERR），下一筆 BAD_ACK、其餘 NEED_RESET；C 的 WAIT → ABORT → 重送路徑走不到。整批失敗但不亂序、不重送，重連可恢復。現況由 `wait_with_orundetect_has_no_data_phase_and_desynchronises` 記錄，RTL 修好後要改這個測試。
+2. **`fault_q` 跨 MODE OFF 保留**：只有 `ERROR` RW1C（且 MODE NORMAL、engine 不忙、命令 FIFO 空、無未收回應）或 AXI reset 能解鎖；產品路徑上只有 adapter（`take_one()`、`recover_off()`）會寫。但 MODE OFF 不清 `fault_q`，`recover_off()` 在 MODE 已是 0 時直接返回，`admit()` 也不檢查 STATUS bit3。若有程式沒清 `ERROR` 就關 MODE，下一個 owner 派送被鎖、輪詢逾時回報 BAD_RESPONSE。
+3. TIMEOUT 若發生在讀取資料相位中途，target 仍在驅動 SWDIO，下一個 line reset 會短暫對打。預設預算 1,000,000 FCLK（10 ms）且 SWCLK 由 RTL 自己產生，正常不會發生。
+
+## 4. 待辦
+
+**Owner 2026-11-04 指示延後**（之後再排）：
+- **分辨 7.1 MHz 失敗是 DUT 還是接線**：7.143 與 10 MHz 各做兩種只讀測試，(a) `halt`（HCLK 72 MHz）(b) `reset halt`（HCLK 8 MHz）。只有 (b) 失敗 → 跟 DUT HCLK 有關；兩者都失敗 → 偏向 I/O 時序。不寫 Flash；結束後用 2 MHz `reset run` 恢復。需 Gate 1。
+- **TIMING-18**：依上一項結果決定補外部 I/O 約束或在 runbook 固定上限。
+
+**可接著做**（每項都需 Gate 1）：
+1. **RTL 的 ORUNDETECT 資料相位**（§3 發現 1）：WAIT/FAULT 後依 CTRL/STAT.ORUNDETECT 送 33 clock 資料相位，或讓 WAIT / FAULT 也停止派送；需要新 Image、信任登記、HIL。替代方案：adapter 不設 ORUNDETECT（但 OpenOCD 在 `dap_dp_init` 設定，需確認能否不改 OpenOCD 本體）。
+2. **`fault_q` 縫隙**（§3 發現 2）：選項有 RTL 在 MODE OFF 清 `fault_q`（新 Image），或 `admit()`／`recover_off()` 處理 MODE 0 + fault。需 owner 決定；注意不可新增阻擋性檢查。
+3. **Site 1（PMODA）實機**：目前只有 Site 2 有 DUT；兩個 Site 同時運作也沒測過（需 owner 接線）。
+4. （選擇性）IRQ（RTL 已有完成中斷，PS7 GIC 未接，adapter 目前輪詢）。
+5. （選擇性）形式驗證：SymbiYosys 未安裝，安裝前需 owner 同意。
 
 ## 5. 怎麼做（流程與工具）
 
 | 工作 | 方法 |
 |---|---|
-| RTL 模擬 | `PYTHONPATH=software/python pytest pl/verification/test_swd_independent_axi_rtl.py`（需 iverilog、cocotb 1.9.2） |
+| RTL 模擬 | `PYTHONPATH=software/python pytest pl/verification/test_swd_independent_axi_rtl.py`（需 iverilog 11、gcc、cocotb 1.9.2、cocotb-test 0.2.6、pytest 8.4.2）。內含雙 Site 測試、C core 測試（自動編 `.so`）、checker 突變測試，約 2 分鐘 |
+| 只跑 C core 單一案例 | `COCOTB_TESTCASE=<案例名> pytest … -k c_fifo_core`；cocotb 輸出要加 `-o log_cli=true -o log_cli_level=INFO` 才看得到 |
+| 新增 Site 規則 | 加在 `plasma_swd_site_checks.sv`（失敗訊息格式 `PLASMA_SVA <rule>`），並在 `CHECKER_MUTATIONS` 加一個會觸發它的 RTL 暫存副本突變；突變必須選一個真的會走到該路徑的測試案例 |
 | C host 測試 | `software/python/tests/test_swd_native_c_compilation.py`；直接編：`gcc -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined plasma_swd_fifo_core.c tests/test_plasma_swd_fifo_core.c`（fake bus 已模擬 RTL FIFO、fault latch、DP overrun） |
 | OpenOCD ARMv7 build | PR 觸發 `swd-openocd5088-armv7-candidate.yml`，artifact `plasma-openocd5088-armv7-candidate`；`candidate-evidence.json` 的 `plasma_source_sha` 要等於 PR HEAD |
 | Vivado Image | Issue #981 `/plasma-dispatch work-order 981`（`capability: vivado-host-build`、`project: pl/projects/z2-swd-independent`、`board_repo_sha e02d6a38…`）；BIT→BIN 為 bootgen 等效 word-swap + `0x20000000` NOP（`pl/hil/swd04/staging.py` 的 `verify_bin`） |

@@ -130,7 +130,7 @@
 - **Plan** · `RTL simulation only` — [PLASMA MPE Two Independent SWD Sites](architecture/plasma-mpe-dual-site-gate1.md)：PYNQ-Z2 Site 1 = PMODA、Site 2 = PMODB，FPGA 硬體自主 SWD 時序、獨立交易與 FIFO 的新 ABI 候選。
 - **Reference** · `Host-only` · `d0add58c` — [Independent SWD v5 Image Hardware Contract Audit](development/swd-independent-image-hardware-contract.md)：以 d0add58c HWH 驗證雙 Site Identity 位址（ab79b04e、bd976140 已退役）（`0x43C01000`／`0x43C02000`）與 GP0 連線，及 devmem Owner Admission 契約。
 - **Current** · `Engineering` · `Route B` — [ABI-v5 OpenOCD plasma_swd → Blue Pill DPIDR HIL Runbook](development/swd-abi5-openocd-dpidr-hil-runbook.md)：Build／部署／DPIDR 流程、失敗判讀、FPGA 經 HTTP API 交付與載入，以及 §9 Blue Pill Flash（erase／write／verify／read，500 kHz，LA2016 比對 ST-LINK）與 `plasma_swd` adapter 契約。
-- **Current** · `Handoff` · `2026-11-04` — [SWD Driver／FPGA 交接](development/handoff/2026-11-04-swd-driver-fpga-track.md)：雙路分工中 PL SWD IP 與 `plasma_swd` adapter 這一路的範圍、目前版本、實測結果（0.5–5 MHz）、待辦與兩路介面契約。
+- **Current** · `Handoff` · `2026-11-04` — [SWD Driver／FPGA 交接](development/handoff/2026-11-04-swd-driver-fpga-track.md)：雙路分工中 PL SWD IP 與 `plasma_swd` adapter 這一路的範圍、目前版本、實測結果（0.5–5 MHz）、C adapter 在 RTL 模擬與 Site 規則 checker（host）、ORUNDETECT／`fault_q` 發現、待辦與兩路介面契約。
 - **Current** · `Handoff` · `2026-11-04` — [SWD 整合交接](development/handoff/2026-11-04-swd-integration-track.md)：Runtime／Site Worker／REST `flash_cycle` 這一路的 Z2 狀態、P0（`reset halt`、engine selection、部署 #1286）、後續工作與兩路介面契約。
 - **Plan** · `Gate 1` · `PR #1265 Draft` · `Host-only` — [OpenOCD 5088 ARMv7 CI Build Cache Optimization](development/openocd5088-armv7-ci-build-cache.md)：依實際編譯輸入內容建立快取，保留每次驗證、重新封裝及最新 HEAD Evidence；未合併、不部署、不操作實機。
 
