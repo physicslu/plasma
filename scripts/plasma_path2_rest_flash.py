@@ -33,6 +33,10 @@ class PreflightError(Exception):
     """The read-only observation did not prove readiness; no Flash submitted."""
 
 
+class FlashExecutionError(Exception):
+    """A POST may have reached the PPU: NEVER classify as NOT_RUN or auto-retry."""
+
+
 class RestClient:
     def __init__(self, url: str, timeout: float = 10.0):
         parsed = urlsplit(url)
@@ -157,23 +161,32 @@ def execute_flash(client: RestClient, *, site: int, ppu_id: str, target: str,
     payload = _read_image(image_file, image_sha256)
     # Observe readiness again immediately before the only mutation (POST).
     preflight(client, site=site, ppu_id=ppu_id, target=target)
-    response = client.request("POST", "/api/jobs", {
+    try:
+        response = client.request("POST", "/api/jobs", {
         "site_id": site, "operation": "flash_cycle", "target": target,
         "timeout_s": deadline_s, "asset_name": image_file.name,
         "asset_type": "image", "asset_format": "binary",
         "asset_size": len(payload), "asset_sha256": image_sha256,
         "asset_base64": base64.b64encode(payload).decode("ascii"),
-    })
-    job = _dict(response.get("job"), "JOB_SUBMISSION")
-    job_id = job.get("job_id")
-    if not isinstance(job_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", job_id):
-        raise PreflightError("JOB_ID_INVALID_AFTER_POST")
+        })
+    except PreflightError as exc:
+        raise FlashExecutionError("FLASH_SUBMISSION_OUTCOME_UNKNOWN") from exc
+    try:
+        job = _dict(response.get("job"), "JOB_SUBMISSION")
+        job_id = job.get("job_id")
+        if not isinstance(job_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", job_id):
+            raise FlashExecutionError("JOB_ID_INVALID_AFTER_POST")
+    except PreflightError as exc:
+        raise FlashExecutionError("FLASH_JOB_RECEIPT_UNKNOWN") from exc
     stop_at = clock() + deadline_s + 10
     while clock() < stop_at:
-        obs = client.request("GET", "/api/status?job=" + quote(job_id, safe=""))
-        job = _dict(obs.get("job"), "JOB_STATUS")
+        try:
+            obs = client.request("GET", "/api/status?job=" + quote(job_id, safe=""))
+            job = _dict(obs.get("job"), "JOB_STATUS")
+        except PreflightError as exc:
+            raise FlashExecutionError("JOB_OBSERVATION_UNKNOWN:" + job_id) from exc
         if job.get("job_id") != job_id:
-            raise PreflightError("JOB_ID_MISMATCH")
+            raise FlashExecutionError("JOB_ID_MISMATCH_AFTER_POST")
         if job.get("state") in TERMINAL:
             result = _dict(job.get("result"), "JOB_RESULT") if job.get("state") == "success" else {}
             cycle = _dict(result.get("details", {}).get("flash_cycle"), "FLASH_CYCLE") if result else {}
@@ -196,7 +209,7 @@ def execute_flash(client: RestClient, *, site: int, ppu_id: str, target: str,
                 "external_ssh_owner_verified": False,
             }
         sleep(poll_s)
-    raise PreflightError("FLASH_RESULT_UNKNOWN_TIMEOUT_CHECK_JOB_BEFORE_RETRY")
+    raise FlashExecutionError("FLASH_RESULT_UNKNOWN_TIMEOUT_CHECK_JOB_BEFORE_RETRY:" + job_id)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -234,6 +247,10 @@ def main(argv: list[str] | None = None) -> int:
         receipt = preflight(client, site=args.site_id, ppu_id=args.ppu_id, target=args.target)
         print(json.dumps(receipt, sort_keys=True))
         return 0
+    except FlashExecutionError as exc:
+        print(json.dumps({"result": "FLASH_OUTCOME_UNKNOWN", "reason": str(exc),
+                          "must_reconcile_job_before_retry": True}), file=sys.stderr)
+        return 2
     except PreflightError as exc:
         print(json.dumps({"result": "NOT_READY_OR_FAILED", "reason": str(exc),
                           "flash_success": False}), file=sys.stderr)
