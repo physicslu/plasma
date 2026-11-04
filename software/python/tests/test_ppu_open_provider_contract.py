@@ -236,3 +236,15 @@ def test_non_programming_profile_resource_cannot_be_selected(tmp_path):
             provider="reference-provider", profile="profile",
             operation="flash_cycle", site_id=2, image_size=1024, hardware=observed(),
         )
+
+
+@pytest.mark.parametrize("sites", [None, 2, "2", [True], ["2"], [2, 2]])
+def test_malformed_trusted_hardware_site_observation_fails_closed(tmp_path, sites):
+    root, digest, _ = staged_provider(tmp_path)
+    with pytest.raises(providers.ProviderDenied, match="HARDWARE_SITES_INVALID"):
+        providers.resolve(
+            root, asset_set_sha256=digest, target="arbitrary-target",
+            provider="reference-provider", profile="profile",
+            operation="flash_cycle", site_id=2, image_size=1024,
+            hardware={**observed(), "sites": sites},
+        )
