@@ -141,6 +141,79 @@ def preflight(client: RestClient, *, site: int, ppu_id: str | None, target: str)
     }
 
 
+def reconcile_latest_job(client: RestClient, *, site: int, ppu_id: str | None,
+                         target: str, expected_sha256: str) -> dict:
+    """GET-only observation after an ambiguous POST. Never authorizes a retry.
+
+    A matching latest Job is evidence, not proof that this exact client POST
+    created it: the failed HTTP response did not provide a Job ID.
+    """
+    if SHA256.fullmatch(expected_sha256) is None:
+        raise PreflightError("EXPECTED_SHA256_INVALID")
+    node = client.request("GET", "/api/node")
+    observed_id = _dict(node.get("ppu"), "NODE_PPU").get("ppu_id")
+    if not isinstance(observed_id, str) or not observed_id:
+        raise PreflightError("PPU_ID_UNAVAILABLE")
+    if ppu_id is not None and ppu_id != observed_id:
+        raise PreflightError("WRONG_PPU")
+    status = client.request("GET", "/api/status?site=" + str(site))
+    ppu = _dict(status.get("ppu"), "STATUS_PPU")
+    if ppu.get("ppu_id") != observed_id:
+        raise PreflightError("STATUS_PPU_MISMATCH")
+    selected = _only_site(status, site)
+    if selected.get("target") != target:
+        raise PreflightError("SITE_TARGET_MISMATCH")
+    lease = _dict(ppu.get("execution"), "EXECUTION_LEASE")
+    out = {
+        "result": "READ_ONLY_RECONCILIATION",
+        "ppu_id": observed_id, "site_id": site, "target": target,
+        "site_state": selected.get("state"),
+        "current_job_id": selected.get("current_job_id"),
+        "active_job_count": lease.get("active_job_count"),
+        "execution_busy": lease.get("busy"),
+        "expected_image_sha256": expected_sha256,
+        "flash_submitted": False, "http_methods": ["GET"],
+        "original_post_outcome_still_unknown": True,
+        "safe_to_retry": False, "correlated_to_original_post": False,
+    }
+    latest = selected.get("latest_job")
+    if latest is None:
+        out["latest_job_observed"] = False
+        return out
+    latest = _dict(latest, "LATEST_JOB")
+    job_id = latest.get("job_id")
+    if not isinstance(job_id, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", job_id) is None:
+        raise PreflightError("LATEST_JOB_ID_INVALID")
+    observed = client.request("GET", "/api/status?job=" + quote(job_id, safe=""))
+    job = _dict(observed.get("job"), "JOB_STATUS")
+    if job.get("job_id") != job_id:
+        raise PreflightError("LATEST_JOB_ID_MISMATCH")
+    result = job.get("result") if isinstance(job.get("result"), dict) else {}
+    details = result.get("details") if isinstance(result.get("details"), dict) else {}
+    cycle = details.get("flash_cycle") if isinstance(details.get("flash_cycle"), dict) else {}
+    out.update({
+        "latest_job_observed": True,
+        "latest_job_id": job_id,
+        "latest_job_operation": job.get("operation", latest.get("operation")),
+        "latest_job_state": job.get("state"),
+        "latest_job_created_at": job.get("created_at", latest.get("created_at")),
+        "latest_job_updated_at": job.get("updated_at", latest.get("updated_at")),
+        "latest_result_image_sha256": result.get("image_sha256"),
+        "latest_flash_result": cycle.get("result"),
+        "latest_flash_readback_sha256": cycle.get("readback_sha256"),
+        "latest_flash_bytes_verified": cycle.get("bytes_verified"),
+        "latest_flash_safe_off": cycle.get("safe_off"),
+        "latest_job_matches_expected_sha": (
+            result.get("image_sha256") == expected_sha256
+            and cycle.get("readback_sha256") == expected_sha256
+            and job.get("state") == "success"
+            and cycle.get("result") == "PASS"
+            and cycle.get("safe_off") is True
+        ),
+    })
+    return out
+
+
 def _read_image(path: Path, sha256: str) -> bytes:
     if SHA256.fullmatch(sha256) is None:
         raise PreflightError("FIRMWARE_SHA256_INVALID")
@@ -177,7 +250,7 @@ def execute_flash(client: RestClient, *, site: int, ppu_id: str, target: str,
         "asset_base64": base64.b64encode(payload).decode("ascii"),
         })
     except PreflightError as exc:
-        raise FlashExecutionError("FLASH_SUBMISSION_OUTCOME_UNKNOWN") from exc
+        raise FlashExecutionError("FLASH_SUBMISSION_OUTCOME_UNKNOWN:" + str(exc)) from exc
     try:
         job = _dict(response.get("job"), "JOB_SUBMISSION")
         job_id = job.get("job_id")
@@ -231,6 +304,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Optional for GET-only discovery; REQUIRED for destructive Flash")
     parser.add_argument("--site-id", type=int, required=True)
     parser.add_argument("--target", required=True, help="Exact ICPN selected for this job")
+    parser.add_argument("--reconcile", action="store_true",
+                        help="GET-only latest Site/Job observation after unknown POST; no retries")
     parser.add_argument("--execute-flash", action="store_true",
                         help="DESTRUCTIVE; requires separate owner-approved Path 2 Work Order")
     parser.add_argument("--confirm-site", type=int, default=None,
@@ -245,6 +320,15 @@ def main(argv: list[str] | None = None) -> int:
         if not 5 <= args.job_timeout <= 3600:
             raise PreflightError("INVALID_JOB_TIMEOUT")
         client = RestClient(args.url)
+        if args.reconcile:
+            if (args.execute_flash or args.image_file is not None
+                    or args.confirm_site is not None or args.image_sha256 is None):
+                raise PreflightError("RECONCILE_READ_ONLY_ARGS_REQUIRED")
+            receipt = reconcile_latest_job(
+                client, site=args.site_id, ppu_id=args.ppu_id,
+                target=args.target, expected_sha256=args.image_sha256)
+            print(json.dumps(receipt, sort_keys=True))
+            return 0
         if args.execute_flash:
             if (not args.ppu_id or args.confirm_site != args.site_id
                     or args.image_file is None or args.image_sha256 is None):
@@ -255,7 +339,8 @@ def main(argv: list[str] | None = None) -> int:
                                     deadline_s=args.job_timeout)
             print(json.dumps(receipt, sort_keys=True))
             return 0 if receipt["result"] == "FLASH_READBACK_PASS" else 2
-        if args.confirm_site is not None or args.image_file is not None:
+        if (args.confirm_site is not None or args.image_file is not None
+                or args.image_sha256 is not None):
             raise PreflightError("FLASH_ARGUMENTS_REQUIRE_EXECUTE_FLAG")
         receipt = preflight(client, site=args.site_id, ppu_id=args.ppu_id, target=args.target)
         print(json.dumps(receipt, sort_keys=True))
