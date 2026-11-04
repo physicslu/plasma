@@ -390,7 +390,7 @@ def test_runtime_restart_keeps_in_flight_site_reserved(tmp_path):
         adapter.release.set()
         thread.join(10)
         assert not thread.is_alive()
-        assert result["reply"][0]["ok"] is True
+        assert result["reply"] == [{"ok": False, "error": "SESSION_CLOSED"}]
         opened = rig.core.handle(req, peer, "control")
         assert opened["ok"] is True
         assert list(rig.core._site_owners) == [2]
