@@ -7,8 +7,11 @@ remains separate. This contract does not authorize Z2 deployment or DUT work.
 
 ## Vertical slice
 
-One verified Bundle v3 is one Active Asset Set. A data Package may contain
-`data/plasma-provider.json` using `plasma.ppu.provider-capabilities.v1`. Its
+One verified Bundle v3 is one Active Asset Set. An explicitly selected
+`programming-profile` resource Package must contain
+`data/plasma-provider.json` using `plasma.ppu.provider-capabilities.v1`.
+An unrelated resource Package containing this filename is **not** an admitted
+Programming Profile. Its
 `provider_package` names a `python` or `native-c` Package in the same Bundle;
 the data Package must declare that Package in `requires`. An FPGA transport
 also requires one `fpga-image` Package in the same Bundle. The Provider's
@@ -28,8 +31,8 @@ or authority to access Root, MMIO or the DUT.
 Job execution time is governed by a **single** OPF `timeout_ms` selection
 (PPU default, or Bundle override within a PPU safety ceiling); the Provider
 capability descriptor does not define an independent runtime timeout. See
-[OPF-1 architecture / single-timeout proposal — Draft PR #1302](https://github.com/physicslu/plasma/pull/1302).
-The two Draft PRs remain independently reviewed until coordinated integration.
+[OPF-1 architecture and selection contract — merged PR #1302](opf-architecture.md).
+OPF-2 remains independently reviewed in this Draft PR and is not yet a Runtime grant.
 
 Host-only `ppu_provider_contract.resolve` independently re-verifies the Active
 Set, binds its ZIP SHA, exact target, **explicitly selected Provider and Profile
@@ -38,7 +41,12 @@ declared transport against a trusted device-side capability observation.
 Selection must be exact: two Profiles for the same target may coexist and are
 not chosen by list order, name guessing or a Core allowlist. A mismatch between
 the requested Provider and the selected Profile's Provider fails closed.
-The selected IDs are the `provider` and `profile` fields defined by OPF-1. FPGA use additionally requires
+The selected IDs are the `provider` and `profile` fields defined by OPF-1.
+OPF-1 parses the syntax and timeout policy; OPF-2 separately proves that the
+selected `programming-profile` Package, Provider dependency, Active Set bytes
+and observed hardware capabilities match. OPF-1 Provider Options are not an
+execution authorization and still need Provider-owned schema validation before
+Runtime integration. FPGA use additionally requires
 proven loaded image and matching Driver ABI at the point of use. No source-tree
 fallback, Catalog lookup, ICPN registry, fixed OpenOCD engine or fixed Image
 ID participates in this resolution. The runtime must supply the hardware
