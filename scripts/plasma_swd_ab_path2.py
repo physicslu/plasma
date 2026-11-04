@@ -409,6 +409,7 @@ def cdc_check(version: str, duration: int, *, port: str | None = None) -> dict:
     monitor = probe.HeartbeatMonitor(period=period, tolerance=0.2,
                                      version=EXPECTED[version]["version"])
     observed_id = False
+    id_status = "NOT_OBSERVED"  # informative; Flash acceptance is HB+readback
     id_requests = 0
     last_id_request_at = None
     first_id_request_uptime_ms = None
@@ -427,47 +428,59 @@ def cdc_check(version: str, duration: int, *, port: str | None = None) -> dict:
                 if now > deadline:
                     break
                 if line.startswith("HB "):
+                    prior_uptime_ms = monitor.previous[1] if monitor.previous else None
                     if not monitor.observe(line, now):
                         raise ValueError("CDC_HEARTBEAT_INVALID")
+                    if prior_uptime_ms is not None and monitor.previous[1] <= prior_uptime_ms:
+                        raise ValueError("CDC_UPTIME_NOT_ADVANCING")
                     if first_uptime_ms is None:
                         first_seq, first_uptime_ms, _ = monitor.previous
                     window.heartbeat(now)
                 elif probe.is_firmware_id(line, EXPECTED[version]["version"]):
                     observed_id = True
-                    id_reply_uptime_ms = monitor.previous[1] if monitor.previous else None
+                    if id_status != "WRONG_VERSION":
+                        id_status = "PASS"
+                        id_reply_uptime_ms = monitor.previous[1] if monitor.previous else None
                 elif line.startswith("ID "):
-                    raise ValueError("CDC_ID_WRONG_VERSION")
+                    # Distinguish a CDC command/response defect from SWD
+                    # programming success. The heartbeat carries the running
+                    # version and the 64 KiB readback verifies Flash bytes.
+                    id_status = "WRONG_VERSION"
                 # The first ID request can be lost while the freshly reset
                 # CDC RX endpoint comes up, even after HB is streaming.
                 # Reissue a bounded, idempotent ID query once a second until
                 # the valid reply arrives; never retry Flash or reset here.
-                if monitor.samples and not observed_id and (last_id_request_at is None or
+                if monitor.samples and id_status == "NOT_OBSERVED" and (last_id_request_at is None or
                         now - last_id_request_at >= CDC_ID_RETRY_INTERVAL_S):
-                    device.write(b"ID\n")
                     id_requests += 1
                     last_id_request_at = now
                     if first_id_request_uptime_ms is None:
                         first_id_request_uptime_ms = monitor.previous[1]
+                    try:
+                        device.write(b"ID\n")
+                    except (OSError, TimeoutError):
+                        id_status = "WRITE_ERROR"
             window.finish(deadline, monitor.samples)
-            if not observed_id:
-                raise ValueError("CDC_ID_MISSING")
+            if id_status == "NOT_OBSERVED":
+                id_status = "TIMEOUT"
     except (OSError, ValueError, AssertionError, UnicodeDecodeError) as exc:
         reason = (str(exc) if str(exc) in
-                  ("CDC_ID_MISSING", "CDC_ID_WRONG_VERSION", "CDC_LINE_TOO_LONG",
-                   "CDC_HEARTBEAT_INVALID") else "CDC_" + type(exc).__name__)
+                  ("CDC_LINE_TOO_LONG", "CDC_HEARTBEAT_INVALID",
+                   "CDC_UPTIME_NOT_ADVANCING")
+                  else "CDC_" + type(exc).__name__)
         if isinstance(exc, AssertionError) and \
                 str(exc).startswith("first heartbeat startup timeout"):
             reason = "CDC_FIRST_HEARTBEAT_TIMEOUT"
         return {"result": "FAIL", "reason": reason,
                 "port": port, "heartbeats": monitor.samples,
-                "id_observed": observed_id,
+                "id_observed": observed_id, "id_status": id_status,
                 "id_requests": id_requests,
                 "first_id_request_uptime_ms": first_id_request_uptime_ms,
                 "id_reply_uptime_ms": id_reply_uptime_ms,
                 "first_seq": first_seq, "first_uptime_ms": first_uptime_ms,
                 "last_uptime_ms": monitor.previous[1] if monitor.previous else None}
     return {"result": "PASS", "port": port, "heartbeats": monitor.samples,
-            "id_observed": observed_id, "period_s": period,
+            "id_observed": observed_id, "id_status": id_status, "period_s": period,
             "id_requests": id_requests,
             "first_id_request_uptime_ms": first_id_request_uptime_ms,
             "id_reply_uptime_ms": id_reply_uptime_ms,

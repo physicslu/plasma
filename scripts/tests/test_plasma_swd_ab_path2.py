@@ -207,6 +207,7 @@ class ABPath2Test(unittest.TestCase):
         self.assertEqual(result["id_requests"], 1)
         self.assertEqual(result["first_id_request_uptime_ms"], 500)
         self.assertEqual(result["id_reply_uptime_ms"], 500)
+        self.assertEqual(result["id_status"], "PASS")
 
     def test_cdc_retries_lost_initial_id_without_reset_or_flash(self):
         clock = {"now": 100.0}
@@ -245,9 +246,10 @@ class ABPath2Test(unittest.TestCase):
         self.assertEqual(result["id_requests"], 2)
         self.assertEqual(device.id_requests, 2)
         self.assertEqual(result["id_reply_uptime_ms"], 1500)
+        self.assertEqual(result["id_status"], "PASS")
         self.assertEqual(result["heartbeats"], 24)
 
-    def test_cdc_missing_id_fails_after_bounded_retries(self):
+    def test_cdc_missing_id_is_diagnostic_if_heartbeat_passes(self):
         clock = {"now": 100.0}
 
         class HeartbeatOnlyCDC:
@@ -275,12 +277,74 @@ class ABPath2Test(unittest.TestCase):
                 mock.patch.object(ab, "PosixCDC", return_value=device), \
                 mock.patch.object(ab.time, "monotonic", side_effect=lambda: clock["now"]):
             result = ab.cdc_check("v0.1", 12, port="/dev/ttyACM0")
-        self.assertEqual(result["result"], "FAIL")
-        self.assertEqual(result["reason"], "CDC_ID_MISSING")
+        self.assertEqual(result["result"], "PASS")
+        self.assertEqual(result["id_status"], "TIMEOUT")
         self.assertFalse(result["id_observed"])
         self.assertGreaterEqual(result["id_requests"], 2)
         self.assertLessEqual(result["id_requests"], 12)
         self.assertEqual(result["heartbeats"], 24)
+
+    def test_wrong_id_version_is_diagnostic_not_flash_failure(self):
+        clock = {"now": 100.0}
+
+        class WrongIdCDC:
+            seq = 0
+            id_pending = False
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                pass
+
+            def write(self, message):
+                assert message == b"ID\n"
+                self.id_pending = True
+
+            def readline(self):
+                if self.id_pending:
+                    self.id_pending = False
+                    clock["now"] += 0.01
+                    return b"ID PLASMA_BLUE_PILL_CDC/0.2\r\n"
+                self.seq += 1
+                clock["now"] = 100.0 + self.seq * 0.5
+                return (f"HB version=0.1 seq={self.seq} "
+                        f"uptime_ms={self.seq * 500}\r\n").encode()
+
+        with mock.patch.object(ab, "cdc_port", return_value="/dev/ttyACM0"), \
+                mock.patch.object(ab, "PosixCDC", return_value=WrongIdCDC()), \
+                mock.patch.object(ab.time, "monotonic", side_effect=lambda: clock["now"]):
+            result = ab.cdc_check("v0.1", 12, port="/dev/ttyACM0")
+        self.assertEqual(result["result"], "PASS")
+        self.assertEqual(result["id_status"], "WRONG_VERSION")
+        self.assertEqual(result["heartbeats"], 24)
+
+    def test_heartbeat_uptime_must_strictly_advance_even_without_id(self):
+        clock = {"now": 100.0}
+
+        class FrozenUptimeCDC:
+            seq = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                pass
+
+            def write(self, message):
+                assert message == b"ID\n"
+
+            def readline(self):
+                self.seq += 1
+                clock["now"] = 100.0 + self.seq * 0.5
+                return f"HB version=0.1 seq={self.seq} uptime_ms=1000\r\n".encode()
+
+        with mock.patch.object(ab, "cdc_port", return_value="/dev/ttyACM0"), \
+                mock.patch.object(ab, "PosixCDC", return_value=FrozenUptimeCDC()), \
+                mock.patch.object(ab.time, "monotonic", side_effect=lambda: clock["now"]):
+            result = ab.cdc_check("v0.1", 12, port="/dev/ttyACM0")
+        self.assertEqual(result["result"], "FAIL")
+        self.assertEqual(result["reason"], "CDC_UPTIME_NOT_ADVANCING")
 
     def test_cdc_sysfs_exact_usb_identity(self):
         with tempfile.TemporaryDirectory() as folder:
