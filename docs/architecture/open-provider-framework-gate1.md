@@ -32,9 +32,13 @@ capability descriptor does not define an independent runtime timeout. See
 The two Draft PRs remain independently reviewed until coordinated integration.
 
 Host-only `ppu_provider_contract.resolve` independently re-verifies the Active
-Set, binds its ZIP SHA, exact target, operation, Site, image size, Provider and
-Profile Package, and compares Bundle target and declared transport against a
-trusted device-side capability observation. FPGA use additionally requires
+Set, binds its ZIP SHA, exact target, **explicitly selected Provider and Profile
+Package IDs**, operation, Site and image size, and compares Bundle target and
+declared transport against a trusted device-side capability observation.
+Selection must be exact: two Profiles for the same target may coexist and are
+not chosen by list order, name guessing or a Core allowlist. A mismatch between
+the requested Provider and the selected Profile's Provider fails closed.
+The selected IDs are the `provider` and `profile` fields defined by OPF-1. FPGA use additionally requires
 proven loaded image and matching Driver ABI at the point of use. No source-tree
 fallback, Catalog lookup, ICPN registry, fixed OpenOCD engine or fixed Image
 ID participates in this resolution. The runtime must supply the hardware
