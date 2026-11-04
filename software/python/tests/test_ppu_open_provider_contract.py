@@ -19,7 +19,7 @@ import ppu_provider_contract as providers  # noqa: E402
 
 def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fpga",
                     target="arbitrary-target", descriptor_change=None,
-                    additional_provider=False):
+                    additional_provider=False, provider_kind="python"):
     source, _ = build_smoke(tmp_path / "source")
     with zipfile.ZipFile(source) as archive:
         manifest = json.loads(archive.read("manifest.json"))
@@ -34,14 +34,16 @@ def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fp
     }
     if descriptor_change:
         descriptor.update(descriptor_change)
-    provider_path = f"payload/packages/{provider_id}/python/main.py"
+    provider_path = (f"payload/packages/{provider_id}/bin/native-tool" if provider_kind == "native-c"
+                     else f"payload/packages/{provider_id}/python/main.py")
     profile_path = "payload/packages/profile/data/plasma-provider.json"
     payloads = {
-        provider_path: b"raise RuntimeError('Provider execution is not part of route resolution')\n",
+        provider_path: (b"\\x7fELFhost-only-fixture" if provider_kind == "native-c"
+                        else b"raise RuntimeError('Provider execution is not part of route resolution')\n"),
         profile_path: json.dumps(descriptor, sort_keys=True).encode(),
     }
     packages = [
-        {"id": provider_id, "kind": "python", "version": "1.0", "requires": [],
+        {"id": provider_id, "kind": provider_kind, "version": "1.0", "requires": [],
          "files": []},
         {"id": "profile", "kind": "programming-profile", "version": "1.0",
          "requires": [provider_id] + (["example-fpga"] if transport == "fpga" else []),
@@ -74,7 +76,8 @@ def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fp
         for path, raw in payloads.items():
             if path.startswith(prefix):
                 package["files"].append({"path": path, "sha256": hashlib.sha256(raw).hexdigest(),
-                                         "size": len(raw), "executable": False})
+                                         "size": len(raw),
+                                         "executable": package["kind"] == "native-c" and path == provider_path})
     manifest["packages"] = packages
     archive = tmp_path / "provider.zip"
     with zipfile.ZipFile(archive, "w") as output:
@@ -172,3 +175,13 @@ def test_explicit_selection_mismatch_denied(tmp_path, provider, profile, code):
             root, asset_set_sha256=digest, target="arbitrary-target",
             provider=provider, profile=profile, operation="flash_cycle",
             site_id=2, image_size=1024, hardware=observed())
+
+
+def test_native_c_provider_entrypoint_is_resolved_without_execution(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, provider_kind="native-c")
+    route = providers.resolve(
+        root, asset_set_sha256=digest, target="arbitrary-target",
+        provider="reference-provider", profile="profile", operation="flash_cycle",
+        site_id=2, image_size=1024, hardware=observed())
+    assert route.provider_package == "reference-provider"
+    assert route.transport == "fpga"
