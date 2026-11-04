@@ -134,18 +134,19 @@ class BatchWebGatewayTests(unittest.TestCase):
         self.assertEqual(status, 202)
         target = payload["batch"]["target_device"]
         self.assertEqual(target["vendor"], record.vendor)
-        self.assertEqual(target["family"], record.family)
+        self.assertEqual(target["family"], "")
         self.assertEqual(target["identifier"], record.identifier)
-        self.assertEqual(target["identifier_kind"], record.identifier_kind)
-        self.assertEqual(target["icpn"], record.icpn)
+        self.assertEqual(target["identifier_kind"], "unverified_exact_target_claim")
+        self.assertEqual(target["icpn"], record.identifier)
 
         final = self.wait_terminal(payload["batch"]["batch_id"])
         self.assertEqual(final["target_device"], target)
 
-    def test_batch_rejects_research_only_target_device_not_in_production_catalog(self):
+    def test_batch_target_snapshot_is_not_gated_by_catalog_membership(self):
+        # A Batch's declared target identity does not grant programming
+        # authority. Its selected Provider/PPU must independently admit it.
         status, payload = self.request(
-            "POST",
-            "/api/batches",
+            "POST", "/api/batches",
             {
                 "targets": [
                     {"facility_id": "facility-1", "ppu_id": "ppu-1", "site_ids": [1]},
@@ -162,9 +163,14 @@ class BatchWebGatewayTests(unittest.TestCase):
                 },
             },
         )
-        self.assertEqual(status, 400)
-        self.assertFalse(payload["ok"])
-        self.assertIn("canonical Device Catalog", payload["error"]["message"])
+        self.assertEqual(status, 202)
+        target = payload["batch"]["target_device"]
+        self.assertEqual(target["vendor"], "Analog Devices")
+        self.assertEqual(target["identifier"], "ADUC7019BCPZ62I")
+        self.assertEqual(target["identifier_kind"], "unverified_exact_target_claim")
+        self.assertEqual(target["icpn"], "ADUC7019BCPZ62I")
+        # This is the Mock Batch route: a 202 does NOT claim real Provider
+        # support, a valid electrical target or successful physical erase.
 
     def test_program_batch_accepts_one_asset_snapshot(self):
         image = b"batch-rest-image" * 16
