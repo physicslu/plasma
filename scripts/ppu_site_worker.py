@@ -185,7 +185,9 @@ class SiteWorkerCore:
         self.epoch = secrets.token_hex(16)
         self._lock = threading.Lock()
         self._site_locks = {site: threading.Lock() for site in adapter.supported_sites}
-        self._session: _Session | None = None
+        # Reuse the existing Worker, lease, per-Site locks, and persistent seals.
+        self._sessions: dict[str, _Session] = {}
+        self._site_owners: dict[int, str] = {}
         self.seal_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         self._sealed: set[int] = set(self._persisted_seals()) | set(adapter.startup_sealed_sites())
         for site in sorted(self._sealed):
@@ -219,14 +221,21 @@ class SiteWorkerCore:
 
     # --- dispatch ------------------------------------------------------------------
     def _drop_if_runtime_restarted(self) -> None:
-        """A session belongs to ONE Runtime process; a Runtime restart ends it."""
+        """Cancel stale Runtime sessions without releasing an in-flight Site."""
         current = self.runtime_pid()
         with self._lock:
-            s = self._session
-            if s is not None and s.runtime_pid != current:
-                s.closed = True
-                s.cancel.set()
-                self._session = None
+            for session_id, sess in list(self._sessions.items()):
+                if sess.runtime_pid == current and not sess.closed:
+                    continue
+                sess.closed = True
+                sess.cancel.set()
+                # Do not re-admit this Site before its adapter has exited.
+                if any(self._site_locks[site].locked() for site in sess.sites):
+                    continue
+                for site in sess.sites:
+                    if self._site_owners.get(site) == session_id:
+                        del self._site_owners[site]
+                del self._sessions[session_id]
 
     def handle(self, request: object, peer: tuple[int, int, int],
                role: str | None = None) -> dict[str, Any]:
@@ -254,14 +263,20 @@ class SiteWorkerCore:
         if op == "status":
             _require(set(request) == {"protocol", "op"}, "REQUEST_INVALID")
             with self._lock:
-                s = self._session
+                sessions = [
+                    {"job_id": sess.job_id, "sites": sorted(sess.sites),
+                     "owner_kind": sess.owner_kind}
+                    for sess in sorted(
+                        self._sessions.values(), key=lambda x: (min(x.sites), x.job_id)
+                    )
+                ]
                 return {"epoch": self.epoch, "adapter": self.adapter.name,
                         "supported_sites": sorted(self.adapter.supported_sites),
                         "operations": sorted(self.adapter.operations),
                         "sealed_sites": sorted(self._sealed),
                         "not_ready": getattr(self.adapter, "not_ready", None),
-                        "session": None if s is None else {"job_id": s.job_id, "sites": sorted(s.sites),
-                                                            "owner_kind": s.owner_kind}}
+                        "sessions": sessions,
+                        "session": sessions[0] if len(sessions) == 1 else None}
         if op == "bind_image":
             _require(set(request) == {
                 "protocol", "op", "session_id", "profile", "image_sha256", "image_size"
@@ -275,10 +290,8 @@ class SiteWorkerCore:
             digest = request["image_sha256"]
             _require(re.fullmatch(r"[0-9a-f]{64}", digest) is not None, "IMAGE_SHA256_INVALID")
             with self._lock:
-                s = self._session
-                _require(s is not None and not s.closed
-                         and secrets.compare_digest(s.session_id, request["session_id"]),
-                         "SESSION_UNKNOWN")
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None and not s.closed, "SESSION_UNKNOWN")
                 _require(s.image is None, "IMAGE_ALREADY_BOUND")
                 _require(self.clock() < s.expires, "SESSION_EXPIRED")
                 # Only the trusted Runtime stages this exact Job-owned image.
@@ -304,27 +317,30 @@ class SiteWorkerCore:
                      and type(request["session_id"]) is str and type(request["site"]) is int
                      and type(request["operation"]) is str, "REQUEST_INVALID")
             with self._lock:
-                s = self._session
-                _require(s is not None and not s.closed
-                         and secrets.compare_digest(s.session_id, request["session_id"]),
-                         "SESSION_UNKNOWN")
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None and not s.closed, "SESSION_UNKNOWN")
                 _require(s.owner_kind == OWNER_REST_JOB, "SESSION_NOT_RUNTIME_OWNED")
             return self._execute(s, request["site"], request["operation"])
         if op == "close_session":
             _require(set(request) == {"protocol", "op", "session_id"}
                      and type(request["session_id"]) is str, "REQUEST_INVALID")
             with self._lock:
-                s = self._session
-                _require(s is not None and secrets.compare_digest(s.session_id, request["session_id"]),
-                         "SESSION_UNKNOWN")
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None, "SESSION_UNKNOWN")
                 s.closed = True
                 s.cancel.set()
-                self._session = None
-            # Wait for any in-flight operation to stop (adapter honours cancel).
+            # Ownership must outlive an in-flight operation and its SAFE_OFF
+            # verification, even when close races a cancellation.
             for site in sorted(s.sites):
                 lock = self._site_locks[site]
                 lock.acquire()
                 lock.release()
+            with self._lock:
+                if self._sessions.get(s.session_id) is s:
+                    del self._sessions[s.session_id]
+                    for site in s.sites:
+                        if self._site_owners.get(site) == s.session_id:
+                            del self._site_owners[site]
             return {"session_id": s.session_id, "closed": True,
                     "sealed_sites": sorted(s.sealed_during)}
         # open_session (Package Action peer) / open_job_session (Runtime REST Job)
@@ -349,14 +365,22 @@ class SiteWorkerCore:
         _require(self.lease_verifier(job, owner_kind), "JOB_LEASE_NOT_HELD")
         identity = dict(self.adapter.identity())
         with self._lock:
-            _require(self._session is None, "SESSION_ALREADY_ACTIVE")
             _require(not (set(sites) & self._sealed), "SITE_SEALED")
+            _require(not (set(sites) & self._site_owners.keys()), "SITE_BUSY")
+            if package:
+                _require(not any(
+                    other.owner_kind == OWNER_PACKAGE
+                    and other.pgid == request["pgid"] and other.uid == request["uid"]
+                    for other in self._sessions.values()
+                ), "PACKAGE_SESSION_ALREADY_ACTIVE")
             s = _Session(secrets.token_hex(16), job, frozenset(sites),
                          request["pgid"] if package else None,
                          request["uid"] if package else None,
                          self.clock() + request["max_runtime_s"], identity,
                          owner_kind=owner_kind, runtime_pid=pid)
-            self._session = s
+            self._sessions[s.session_id] = s
+            for site in sites:
+                self._site_owners[site] = s.session_id
         return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites),
                 "owner_kind": owner_kind}
 
@@ -371,9 +395,13 @@ class SiteWorkerCore:
         except (OSError, ValueError, IndexError):
             raise SiteWorkerDenied("PEER_UNVERIFIABLE") from None
         with self._lock:
-            s = self._session
-            _require(s is not None and not s.closed and s.owner_kind == OWNER_PACKAGE
-                     and pgid == s.pgid and uid == s.uid, "NO_SESSION_FOR_PEER")
+            matches = [
+                candidate for candidate in self._sessions.values()
+                if not candidate.closed and candidate.owner_kind == OWNER_PACKAGE
+                and pgid == candidate.pgid and uid == candidate.uid
+            ]
+            _require(len(matches) == 1, "NO_SESSION_FOR_PEER")
+            s = matches[0]
         return self._execute(s, site, op)
 
     def _execute(self, s: _Session, site: int, op: str) -> dict[str, Any]:
@@ -388,7 +416,7 @@ class SiteWorkerCore:
         _require(self.lease_verifier(s.job_id, s.owner_kind), "JOB_LEASE_NOT_HELD")
         if dict(self.adapter.identity()) != s.identity:
             with self._lock:
-                if self._session is s:
+                if self._sessions.get(s.session_id) is s:
                     s.closed = True
                     s.cancel.set()
             raise SiteWorkerDenied("SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED")
