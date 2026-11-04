@@ -62,12 +62,13 @@
 
 ## 4. 待辦（建議順序）
 
-1. **讓 C adapter 跑在 RTL 模擬上**（`pl/AGENTS.md` §4A）。目前 cocotb 跑的是 Python 的 `swd_site.py`，OpenOCD 用的是 C 的 `plasma_swd_fifo_core.c`，兩份各自實作。做法建議：把 C FIFO core 編成 shared library，以 `read32/write32/write_barrier` 注入 cocotb 的 AXI BFM；用它驗證 pipeline 中段 WAIT / FAULT / PARITY / TIMEOUT 的實際 RTL 行為（目前只有 C fake bus 測過）。
+1. ~~**讓 C adapter 跑在 RTL 模擬上**~~ **完成（2026-11-04，host-only）**：`plasma_swd_fifo_core.c` 原封不動編成 `.so`，以 ctypes + `cocotb.external`／`cocotb.function` 把 `read32/write32/write_barrier` 接到 AXI BFM，驅動單 Site RTL（`pl/sim/swd_c_core_site_tb.sv`）與 ABI-v5 edge-phase 版 `VirtualSWDTarget`。11 個案例（`pl/verification/cocotb/test_swd_c_fifo_core.py`）：admit / line reset / DPIDR / `recover_off`、pipeline（RTL FIFO 同時 ≥ 8 筆）、256 筆 queue 自動送出、`ap_delay_hint` → `IDLE_CYCLES`、中段 FAULT、中段 PARITY（RTL 停止派送，`CONTROL=4` 後 RW1C）、TIMEOUT、無 ACK（BAD_ACK → NEED_RESET）、無 ORUNDETECT 的 WAIT（回報、不重送）、錯誤 Site 位址。只代表 C ↔ RTL 交易模擬，**不是** ARMv7/PS7 MMIO 或 HIL。
+   - **發現（未修，範圍外）**：OpenOCD 的 `dap_dp_init` 會設 ORUNDETECT；ADIv5 規定此時 WAIT/FAULT 後 host 仍須送 33 clock 資料相位，但 engine 把 `cmd_error_data_phase` 固定為 0。模擬中 target 把後續 idle + 下一個 request 當成寫入資料吃掉（WDATAERR），下一筆 BAD_ACK、其餘 NEED_RESET；C 的 WAIT → ABORT → 重送路徑走不到，整批失敗但不亂序、不重送，重連可恢復。測試 `wait_with_orundetect_has_no_data_phase_and_desynchronises` 記錄現況。這可能也是 5 MHz HIL 那次 WAIT 的實際恢復方式（未證實）。修正需 RTL 支援 ORUNDETECT 資料相位（新 Image）或 adapter 不設 ORUNDETECT，見第 6 項。
 2. **分辨 7.1 MHz 失敗是 DUT 還是接線**：7.143 與 10 MHz 各做兩種只讀測試，(a) `halt`（HCLK 72 MHz）(b) `reset halt`（HCLK 8 MHz）。若只有 (b) 失敗 → 跟 DUT HCLK 有關；兩者都失敗 → 偏向 I/O 時序。不寫 Flash；結束後用 2 MHz `reset run` 恢復。
 3. **TIMING-18**：依第 2 項結果決定是否補外部 I/O 約束或在 runbook 固定上限。
 4. **`IDLE_CYCLES` 與 pipeline 相關的 SVA**（`pl/AGENTS.md` §3）。
 5. **Site 1（PMODA）實機**：目前只有 Site 2 有 DUT；兩個 Site 同時運作也沒測過（需 owner 接線與 Gate 1）。
-6. （選擇性）RTL 讓 WAIT / FAULT 也停止派送，降低對 ORUNDETECT 的依賴；需要新 Image。
+6. **RTL 的 ORUNDETECT 資料相位**（由第 1 項發現升級）：WAIT/FAULT 後依 CTRL/STAT.ORUNDETECT 送 33 clock 資料相位，或讓 WAIT / FAULT 也停止派送；需要新 Image 與 Gate 1。
 7. （選擇性）IRQ（RTL 已有完成中斷，PS7 GIC 未接，adapter 目前輪詢）。
 
 ## 5. 怎麼做（流程與工具）
