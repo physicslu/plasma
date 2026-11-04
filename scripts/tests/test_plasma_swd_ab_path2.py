@@ -95,6 +95,11 @@ class ABPath2Test(unittest.TestCase):
         self.assertNotEqual(ab.EXPECTED["v0.1"]["bytes"],
                             ab.EXPECTED["v0.2"]["bytes"])
 
+    def test_build_fallback_does_not_download_or_install_dependencies(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ab.NotRun, "BUILD_DEPENDENCIES_MISSING"):
+                ab.build_v02_from_locked_source(Path(folder), Path(folder))
+
 
 if __name__ == "__main__":
     unittest.main()

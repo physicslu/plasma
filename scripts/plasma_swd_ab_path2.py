@@ -16,8 +16,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 
@@ -63,6 +65,42 @@ def firmware(path: Path, label: str) -> bytes:
     if len(data) != expected["bytes"] or sha(data) != expected["sha256"]:
         raise NotRun("FIRMWARE_SIZE_OR_SHA_MISMATCH:" + label, 77)
     return data
+
+
+def build_v02_from_locked_source(cube_root: Path, arm_root: Path) -> bytes:
+    """Host-only fallback; never modify source, install packages or use a DUT.
+
+    The checked-in CMake contract rejects unpinned CubeF1 and dependency SHAs.
+    The resulting BIN must additionally match the historical CI SHA exactly.
+    """
+    if (not shutil.which("cmake") or not shutil.which("ninja")
+            or not (cube_root / "Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal.h").is_file()
+            or not (arm_root / "usr/bin/arm-none-eabi-gcc").is_file()
+            or not (arm_root / "usr/bin/arm-none-eabi-objdump").is_file()):
+        raise NotRun("LOCKED_FIRMWARE_BUILD_DEPENDENCIES_MISSING")
+    if cube_root.is_symlink() or arm_root.is_symlink():
+        raise NotRun("LOCKED_BUILD_DEPENDENCY_SYMLINK_DENIED", 77)
+    with tempfile.TemporaryDirectory(prefix="plasma-bluepill-ab-v02-") as folder:
+        build = Path(folder) / "build"
+        source = ROOT / "firmware/blue-pill-usb-cdc"
+        commands = [
+            ["cmake", "-S", str(source), "-B", str(build), "-G", "Ninja",
+             "-DCMAKE_TOOLCHAIN_FILE=" + str(source / "cmake/arm-none-eabi.cmake"),
+             "-DARM_GCC_ROOT=" + str(arm_root),
+             "-DSTM32CUBE_F1_ROOT=" + str(cube_root)],
+            ["cmake", "--build", str(build)],
+            [sys.executable, str(source / "host/check_artifacts.py"), str(build),
+             str(arm_root / "usr/bin"), "--variant", "v0.2"],
+        ]
+        for cmd in commands:
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True,
+                                        timeout=240, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                raise NotRun("LOCKED_FIRMWARE_BUILD_UNAVAILABLE") from None
+            if result.returncode != 0:
+                raise NotRun("LOCKED_FIRMWARE_BUILD_OR_STATIC_CHECK_FAILED")
+        return firmware(build / "plasma-blue-pill-cdc-v0.2.bin", "v0.2")
 
 
 def expected_region_sha(data: bytes) -> str:
@@ -217,7 +255,14 @@ def execute(args) -> int:
     verify_args(args)
     planned = sequence(args.start, args.count)
     images = {"v0.1": firmware(Path(args.firmware_a), "v0.1"),
-              "v0.2": firmware(Path(args.firmware_b), "v0.2")}
+              "v0.2": None}
+    if Path(args.firmware_b).is_file():
+        images["v0.2"] = firmware(Path(args.firmware_b), "v0.2")
+    elif args.build_b_if_missing:
+        images["v0.2"] = build_v02_from_locked_source(
+            Path(args.cube_root), Path(args.arm_gcc_root))
+    else:
+        raise NotRun("FIRMWARE_NOT_AVAILABLE:v0.2")
     print_receipt("SOURCE", {"source_sha": args.source_sha, "batch_start": args.start,
                              "count": args.count, "firmware": {
                                  k: {"sha256": sha(v), "bytes": len(v),
@@ -309,6 +354,9 @@ def main(argv=None) -> int:
     parser.add_argument("--openocd-sha", required=True)
     parser.add_argument("--firmware-a", required=True)
     parser.add_argument("--firmware-b", required=True)
+    parser.add_argument("--build-b-if-missing", action="store_true")
+    parser.add_argument("--cube-root", default="/tmp/plasma-stm32cubef1")
+    parser.add_argument("--arm-gcc-root", default="/tmp/plasma-arm-toolchain")
     parser.add_argument("--start", type=int, required=True)
     parser.add_argument("--count", type=int, default=20)
     parser.add_argument("--cdc-duration", type=int, default=12)
