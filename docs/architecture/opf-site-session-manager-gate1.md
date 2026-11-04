@@ -46,9 +46,10 @@ Therefore two simultaneously active C-3 REST Sessions were impossible.
    persists while that Site's adapter is running; no early release can create
    a new hardware execution owner.
 5. Worker status can list disjoint Sessions. Existing single-session `session`
-   status remains readable for a single active Session; multi-session state
-   uses the `sessions` array. Replace-by-Default migration will evaluate
-   the exact status consumer before eliminating the old single-key view.
+   status remains non-null whenever **any** Session is active (never reports
+   false idle), while the complete multi-session state uses the `sessions`
+   array. Replace-by-Default migration will evaluate the exact status consumer
+   before eliminating the old single-key view.
 6. A deadline, unexpected adapter exception or unknown SAFE_OFF result uses
    the *existing* seal and fail-closed path. A sealed Site is not reassigned
    or automatically recovered.
