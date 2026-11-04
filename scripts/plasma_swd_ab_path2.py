@@ -67,7 +67,8 @@ def firmware(path: Path, label: str) -> bytes:
     return data
 
 
-def build_v02_from_locked_source(cube_root: Path, arm_root: Path) -> bytes:
+def build_v02_from_locked_source(cube_root: Path, arm_root: Path,
+                                 *, fetch_locked_cube: bool = False) -> bytes:
     """Host-only fallback; never modify source, install packages or use a DUT.
 
     The checked-in CMake contract rejects unpinned CubeF1 and dependency SHAs.
@@ -80,30 +81,55 @@ def build_v02_from_locked_source(cube_root: Path, arm_root: Path) -> bytes:
         raise NotRun("LOCKED_FIRMWARE_BUILD_DEPENDENCIES_MISSING")
     if cube_root.is_symlink() or arm_root.is_symlink():
         raise NotRun("LOCKED_BUILD_DEPENDENCY_SYMLINK_DENIED", 77)
+    def checked(cmd, stage, timeout=240):
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True,
+                                    timeout=timeout, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            raise NotRun("LOCKED_FIRMWARE_" + stage + "_UNAVAILABLE") from None
+        if result.returncode == 0:
+            return
+        observed = result.stdout + "\n" + result.stderr
+        hint = ("SOURCE_REVISION_MISMATCH" if "dependency revision mismatch" in observed
+                else "MISSING_SOURCE_FILE" if "No such file or directory" in observed
+                else "CMAKE_OR_TOOLCHAIN_FAILURE")
+        raise NotRun("LOCKED_FIRMWARE_" + stage + "_FAILED:" + hint)
+
     with tempfile.TemporaryDirectory(prefix="plasma-bluepill-ab-v02-") as folder:
         build = Path(folder) / "build"
         source = ROOT / "firmware/blue-pill-usb-cdc"
-        commands = [
-            ["cmake", "-S", str(source), "-B", str(build), "-G", "Ninja",
+        def configure(target_cube):
+            checked(["cmake", "-S", str(source), "-B", str(build), "-G", "Ninja",
              "-DCMAKE_TOOLCHAIN_FILE=" + str(source / "cmake/arm-none-eabi.cmake"),
              "-DARM_GCC_ROOT=" + str(arm_root),
-             "-DSTM32CUBE_F1_ROOT=" + str(cube_root)],
-            ["cmake", "--build", str(build)],
-            [sys.executable, str(source / "host/check_artifacts.py"), str(build),
-             str(arm_root / "usr/bin"), "--variant", "v0.2"],
-        ]
-        for stage, cmd in zip(("CONFIGURE", "BUILD", "CHECK_ARTIFACT"), commands):
-            try:
-                result = subprocess.run(cmd, capture_output=True, text=True,
-                                        timeout=240, check=False)
-            except (OSError, subprocess.TimeoutExpired):
-                raise NotRun("LOCKED_FIRMWARE_" + stage + "_UNAVAILABLE") from None
-            if result.returncode != 0:
-                observed = result.stdout + "\n" + result.stderr
-                hint = ("SOURCE_REVISION_MISMATCH" if "dependency revision mismatch" in observed
-                        else "MISSING_SOURCE_FILE" if "No such file or directory" in observed
-                        else "CMAKE_OR_TOOLCHAIN_FAILURE")
-                raise NotRun("LOCKED_FIRMWARE_" + stage + "_FAILED:" + hint)
+             "-DSTM32CUBE_F1_ROOT=" + str(target_cube)], "CONFIGURE")
+
+        try:
+            configure(cube_root)
+        except NotRun as exc:
+            if (not fetch_locked_cube or
+                    str(exc) != "LOCKED_FIRMWARE_CONFIGURE_FAILED:SOURCE_REVISION_MISMATCH"):
+                raise
+            # Never checkout/update the operator's existing CubeF1 tree.
+            # Fetch public ST sources into this single disposable directory.
+            # The checked-in CMake then verifies every exact submodule SHA.
+            locked = Path(folder) / "STM32CubeF1"
+            checked(["git", "clone", "--filter=blob:none", "--no-checkout",
+                     "https://github.com/STMicroelectronics/STM32CubeF1.git",
+                     str(locked)], "CLONE_PINNED_CUBE", timeout=360)
+            checked(["git", "-C", str(locked), "checkout",
+                     "c7656f1fee178058be2f8ebfc8df9eaf91dc565e"],
+                    "CHECKOUT_PINNED_CUBE", timeout=240)
+            checked(["git", "-C", str(locked), "submodule", "update", "--init",
+                     "Drivers/CMSIS/Device/ST/STM32F1xx",
+                     "Drivers/STM32F1xx_HAL_Driver",
+                     "Middlewares/ST/STM32_USB_Device_Library"],
+                    "PINNED_SUBMODULES", timeout=420)
+            build = Path(folder) / "build-locked"
+            configure(locked)
+        checked(["cmake", "--build", str(build)], "BUILD")
+        checked([sys.executable, str(source / "host/check_artifacts.py"), str(build),
+                 str(arm_root / "usr/bin"), "--variant", "v0.2"], "CHECK_ARTIFACT")
         return firmware(build / "plasma-blue-pill-cdc-v0.2.bin", "v0.2")
 
 
@@ -264,7 +290,8 @@ def execute(args) -> int:
         images["v0.2"] = firmware(Path(args.firmware_b), "v0.2")
     elif args.build_b_if_missing:
         images["v0.2"] = build_v02_from_locked_source(
-            Path(args.cube_root), Path(args.arm_gcc_root))
+            Path(args.cube_root), Path(args.arm_gcc_root),
+            fetch_locked_cube=args.fetch_locked_cube)
     else:
         raise NotRun("FIRMWARE_NOT_AVAILABLE:v0.2")
     print_receipt("SOURCE", {"source_sha": args.source_sha, "batch_start": args.start,
@@ -359,6 +386,7 @@ def main(argv=None) -> int:
     parser.add_argument("--firmware-a", required=True)
     parser.add_argument("--firmware-b", required=True)
     parser.add_argument("--build-b-if-missing", action="store_true")
+    parser.add_argument("--fetch-locked-cube", action="store_true")
     parser.add_argument("--cube-root", default="/tmp/plasma-stm32cubef1")
     parser.add_argument("--arm-gcc-root", default="/tmp/plasma-arm-toolchain")
     parser.add_argument("--start", type=int, required=True)

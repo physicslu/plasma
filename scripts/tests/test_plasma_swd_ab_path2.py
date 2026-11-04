@@ -100,6 +100,43 @@ class ABPath2Test(unittest.TestCase):
             with self.assertRaisesRegex(ab.NotRun, "BUILD_DEPENDENCIES_MISSING"):
                 ab.build_v02_from_locked_source(Path(folder), Path(folder))
 
+    def test_locked_source_fetch_requires_explicit_flag_and_fails_closed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            cube = base / "existing-cube"
+            header = cube / "Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal.h"
+            header.parent.mkdir(parents=True)
+            header.touch()
+            arm = base / "arm"
+            bindir = arm / "usr/bin"
+            bindir.mkdir(parents=True)
+            (bindir / "arm-none-eabi-gcc").touch()
+            (bindir / "arm-none-eabi-objdump").touch()
+
+            configure_rejects = mock.Mock(returncode=1, stdout="",
+                                         stderr="dependency revision mismatch")
+            git_succeeds = mock.Mock(returncode=0, stdout="", stderr="")
+            submodules_reject = mock.Mock(returncode=1, stdout="",
+                                          stderr="network unavailable")
+            with mock.patch.object(ab.shutil, "which", return_value="/usr/bin/tool"), \
+                    mock.patch.object(ab.subprocess, "run", return_value=configure_rejects) as run:
+                with self.assertRaisesRegex(ab.NotRun, "SOURCE_REVISION_MISMATCH"):
+                    ab.build_v02_from_locked_source(cube, arm)
+                self.assertEqual(run.call_count, 1)
+
+            with mock.patch.object(ab.shutil, "which", return_value="/usr/bin/tool"), \
+                    mock.patch.object(ab.subprocess, "run", side_effect=[
+                        configure_rejects, git_succeeds, git_succeeds, submodules_reject]) as run:
+                with self.assertRaisesRegex(ab.NotRun, "PINNED_SUBMODULES_FAILED"):
+                    ab.build_v02_from_locked_source(cube, arm, fetch_locked_cube=True)
+                commands = [call.args[0] for call in run.call_args_list]
+                self.assertEqual(commands[1][:2], ["git", "clone"])
+                self.assertEqual(commands[2][0:2], ["git", "-C"])
+                self.assertEqual(commands[2][3], "checkout")
+                self.assertEqual(commands[2][4], "c7656f1fee178058be2f8ebfc8df9eaf91dc565e")
+                self.assertNotEqual(commands[2][2], str(cube))
+                self.assertNotIn(["cmake", "--build"], commands)
+
 
 if __name__ == "__main__":
     unittest.main()
