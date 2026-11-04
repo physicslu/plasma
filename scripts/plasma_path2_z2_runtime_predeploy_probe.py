@@ -153,7 +153,10 @@ def run(host: str, *, artifact_probe=artifact_readability, z2_probe=z2_readiness
         artifact.get("artifact_fetch_qualified") is True and
         remote["bootstrap_stage_c_renderer_available"] is True and
         remote["runtime_control_socket_present"] is True and
-        remote["current_release_symlink"] is not None
+        remote["site_worker_unit_installed"] is True and
+        remote["installed_openocd_engine_manifest"] is True and
+        remote["current_release_symlink"] is not None and
+        remote["current_release_symlink"] != "UNRECOGNIZED_SOURCE_PATH"
     )
     return {
         "result": "READ_ONLY_PREDEPLOY_READY" if qualified else "READ_ONLY_PREDEPLOY_BLOCKED",
