@@ -9,6 +9,8 @@ from contextlib import nullcontext
 
 import pytest
 
+from plasma_opf import OPF_PROGRAMMING_SCHEMA, TimeoutPolicy, parse_programming_selection
+
 from .test_ppu_bundle_v3_packages_contract import ROOT, TARGET
 from .test_ppu_b3_z2_install_gate1 import b3_request, make_coordinator
 from .test_ppu_bundle_v3_smoke_execution_gate1 import build_smoke
@@ -19,7 +21,8 @@ import ppu_provider_contract as providers  # noqa: E402
 
 def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fpga",
                     target="arbitrary-target", descriptor_change=None,
-                    additional_provider=False, provider_kind="python"):
+                    additional_provider=False, provider_kind="python",
+                    profile_kind="programming-profile"):
     source, _ = build_smoke(tmp_path / "source")
     with zipfile.ZipFile(source) as archive:
         manifest = json.loads(archive.read("manifest.json"))
@@ -45,7 +48,7 @@ def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fp
     packages = [
         {"id": provider_id, "kind": provider_kind, "version": "1.0", "requires": [],
          "files": []},
-        {"id": "profile", "kind": "programming-profile", "version": "1.0",
+        {"id": "profile", "kind": profile_kind, "version": "1.0",
          "requires": [provider_id] + (["example-fpga"] if transport == "fpga" else []),
          "files": []},
     ]
@@ -185,3 +188,51 @@ def test_native_c_provider_entrypoint_is_resolved_without_execution(tmp_path):
         site_id=2, image_size=1024, hardware=observed())
     assert route.provider_package == "reference-provider"
     assert route.transport == "fpga"
+
+
+def test_opf1_selection_binds_to_opf2_active_bundle_route(tmp_path):
+    """OPF-1 parses syntax; OPF-2 independently grants only an exact verified route."""
+    selection = parse_programming_selection(
+        {"schema": OPF_PROGRAMMING_SCHEMA, "provider": "alternate-provider",
+         "profile": "alternate-profile", "timeout_ms": 45000,
+         "options": {"vendor_option": {"mode": "mock", "enabled": True}}},
+        policy=TimeoutPolicy(default_timeout_ms=10000, maximum_timeout_ms=60000),
+    )
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    route = providers.resolve(
+        root, asset_set_sha256=digest, target="arbitrary-target",
+        provider=selection.provider, profile=selection.profile,
+        operation="flash_cycle", site_id=2, image_size=1024,
+        hardware=observed(transport="ps-only"),
+    )
+    assert (route.provider_package, route.profile_package, route.transport) == (
+        "alternate-provider", "alternate-profile", "ps-only"
+    )
+    assert selection.timeout_ms == 45000 and selection.timeout_source == "bundle_override"
+    assert not hasattr(route, "timeout_ms")  # One Job authority, not another Provider timer.
+
+
+def test_opf1_well_formed_selection_cannot_override_bundle_provider_binding(tmp_path):
+    selection = parse_programming_selection(
+        {"schema": OPF_PROGRAMMING_SCHEMA, "provider": "reference-provider",
+         "profile": "alternate-profile", "options": {"claim_verified": True}},
+        policy=TimeoutPolicy(default_timeout_ms=10000, maximum_timeout_ms=60000),
+    )
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    with pytest.raises(providers.ProviderDenied, match="PROVIDER_SELECTION_MISMATCH"):
+        providers.resolve(
+            root, asset_set_sha256=digest, target="arbitrary-target",
+            provider=selection.provider, profile=selection.profile,
+            operation="flash_cycle", site_id=2, image_size=1024,
+            hardware=observed(transport="ps-only"),
+        )
+
+
+def test_non_programming_profile_resource_cannot_be_selected(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, profile_kind="unrelated-data")
+    with pytest.raises(providers.ProviderDenied, match="PROFILE_PACKAGE_INVALID"):
+        providers.resolve(
+            root, asset_set_sha256=digest, target="arbitrary-target",
+            provider="reference-provider", profile="profile",
+            operation="flash_cycle", site_id=2, image_size=1024, hardware=observed(),
+        )
