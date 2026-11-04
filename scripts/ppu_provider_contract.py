@@ -92,11 +92,13 @@ def resolve(
         raise ProviderDenied("BUNDLE_MANIFEST_UNREADABLE") from exc
     _need(manifest.get("schema") == "plasma.ppu.bundle.v3", "BUNDLE_SCHEMA_INVALID")
     packages = {p["id"]: p for p in manifest["packages"]}
-    profile_id = profile
     matches: list[tuple[dict[str, Any], dict[str, Any], str]] = []
-    for profile in manifest["packages"]:
-        for entry in profile["files"]:
-            if entry["path"] != f"payload/packages/{profile['id']}/{DESCRIPTOR}":
+    for package in manifest["packages"]:
+        if package["id"] != profile:
+            continue
+        _need(package["kind"] == "programming-profile", "PROFILE_PACKAGE_INVALID")
+        for entry in package["files"]:
+            if entry["path"] != f"payload/packages/{package['id']}/{DESCRIPTOR}":
                 continue
             _need(entry["executable"] is False and entry["size"] <= 8192,
                   "PROVIDER_DESCRIPTOR_INVALID")
@@ -132,8 +134,8 @@ def resolve(
                   and type(desc["max_image_bytes"]) is int
                   and 0 < desc["max_image_bytes"] <= 512 * 1024 * 1024,
                   "PROVIDER_DESCRIPTOR_INVALID")
-            if desc["target"] == target and profile["id"] == profile_id:
-                matches.append((profile, desc, entry["sha256"]))
+            if desc["target"] == target:
+                matches.append((package, desc, entry["sha256"]))
     _need(len(matches) == 1, "PROFILE_MISSING_OR_AMBIGUOUS")
     selected_profile, desc, digest = matches[0]
     _need(desc["provider_package"] == provider, "PROVIDER_SELECTION_MISMATCH")
