@@ -925,7 +925,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
 
-    def test_engineering_job_target_device_resolves_to_admitted_exact_icpn(self) -> None:
+    def test_engineering_job_target_device_preserves_unverified_icpn_claim(self) -> None:
         record = get_default_device_catalog().search("STM32F407VGT6", limit=1)[0]
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
         request = handler._job_request(
@@ -940,21 +940,27 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(request.target, "STM32F407VGT6")
         self.assertEqual(request.metadata["target_device"]["vendor"], record.vendor)
         self.assertEqual(request.metadata["target_device"]["identifier"], record.identifier)
-        self.assertEqual(request.metadata["target_device"]["identifier_kind"], "manufacturer_part_number")
+        self.assertEqual(request.metadata["target_device"]["identifier_kind"], "unverified_exact_target_claim")
         self.assertEqual(request.metadata["target_device"]["icpn"], "STM32F407VGT6")
 
-    def test_engineering_job_target_device_fails_closed_when_not_admitted(self) -> None:
+    def test_engineering_job_target_device_does_not_depend_on_catalog_admission(self) -> None:
+        # A syntactically valid selected Target is a Job request claim; Runtime
+        # Provider remains the only programming capability authority.
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
-        with self.assertRaisesRegex(ValueError, "canonical Device Catalog record"):
-            handler._job_request(
-                {
-                    "site_id": 1,
-                    "operation": "erase",
-                    "target_device": {"vendor": "Analog Devices", "identifier": "ADUC7019BCPZ62I"},
-                },
-                client_id="plasma-web-engineering",
-                allow_inline_asset=False,
-            )
+        request = handler._job_request(
+            {
+                "site_id": 1,
+                "operation": "erase",
+                "target_device": {"vendor": "Analog Devices", "identifier": "ADUC7019BCPZ62I"},
+            },
+            client_id="plasma-web-engineering",
+            allow_inline_asset=False,
+        )
+        self.assertEqual(request.target, "ADUC7019BCPZ62I")
+        self.assertEqual(
+            request.metadata["target_device"]["identifier_kind"],
+            "unverified_exact_target_claim",
+        )
 
 
 if __name__ == "__main__":
