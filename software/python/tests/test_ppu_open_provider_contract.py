@@ -18,7 +18,8 @@ import ppu_provider_contract as providers  # noqa: E402
 
 
 def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fpga",
-                    target="arbitrary-target", descriptor_change=None):
+                    target="arbitrary-target", descriptor_change=None,
+                    additional_provider=False):
     source, _ = build_smoke(tmp_path / "source")
     with zipfile.ZipFile(source) as archive:
         manifest = json.loads(archive.read("manifest.json"))
@@ -53,6 +54,21 @@ def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fp
         payloads[prefix + "image.json"] = b"{}"
         packages.append({"id": "example-fpga", "kind": "fpga-image", "version": "1.0",
                          "requires": [], "files": []})
+    if additional_provider:
+        alternate = {**descriptor, "provider_package": "alternate-provider",
+                     "transport": "ps-only", "driver_abi": None, "fpga_package": None}
+        payloads["payload/packages/alternate-provider/python/main.py"] = (
+            b"raise RuntimeError('provider code must never execute in resolver')\n"
+        )
+        payloads["payload/packages/alternate-profile/data/plasma-provider.json"] = (
+            json.dumps(alternate, sort_keys=True).encode()
+        )
+        packages.extend([
+            {"id": "alternate-provider", "kind": "python", "version": "1.0",
+             "requires": [], "files": []},
+            {"id": "alternate-profile", "kind": "programming-profile", "version": "1.0",
+             "requires": ["alternate-provider"], "files": []},
+        ])
     for package in packages:
         prefix = f"payload/packages/{package['id']}/"
         for path, raw in payloads.items():
@@ -85,6 +101,7 @@ def test_two_provider_routes_use_one_bundle_job_contract_without_catalog(tmp_pat
         root, digest, _ = staged_provider(tmp_path / provider_id,
                                           provider_id=provider_id, transport=transport)
         route = providers.resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                                  provider=provider_id, profile="profile",
                                   operation="flash_cycle", site_id=2, image_size=1024,
                                   hardware=observed(transport=transport))
         assert route.provider_package == provider_id
@@ -94,7 +111,7 @@ def test_two_provider_routes_use_one_bundle_job_contract_without_catalog(tmp_pat
 
 @pytest.mark.parametrize("change,code", [
     ({"operations": ["program"]}, "OPERATION_UNSUPPORTED"),
-    ({"provider_package": "missing"}, "PROVIDER_PACKAGE_INVALID"),
+    ({"provider_package": "missing"}, "PROVIDER_SELECTION_MISMATCH"),
     ({"max_image_bytes": 4}, "IMAGE_OUT_OF_BOUNDS"),
     ({"max_runtime_s": 30}, "PROVIDER_DESCRIPTOR_INVALID"),
 ])
@@ -102,6 +119,7 @@ def test_incomplete_provider_contract_fails_closed(tmp_path, change, code):
     root, digest, _ = staged_provider(tmp_path, descriptor_change=change)
     with pytest.raises(providers.ProviderDenied, match=code):
         providers.resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                          provider="reference-provider", profile="profile",
                           operation="flash_cycle", site_id=2, image_size=1024,
                           hardware=observed())
 
@@ -110,6 +128,7 @@ def test_actual_hardware_and_active_bytes_must_still_match(tmp_path):
     root, digest, _ = staged_provider(tmp_path)
     with pytest.raises(providers.ProviderDenied, match="FPGA_DRIVER_UNVERIFIED"):
         providers.resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                          provider="reference-provider", profile="profile",
                           operation="program", site_id=2, image_size=1024,
                           hardware={**observed(), "driver_abi": "other"})
     descriptor = root / "assets" / "staged" / digest / "payload/packages/profile/data/plasma-provider.json"
@@ -117,5 +136,39 @@ def test_actual_hardware_and_active_bytes_must_still_match(tmp_path):
     descriptor.write_text("{}")
     with pytest.raises(providers.ProviderDenied, match="ACTIVE_SET_UNTRUSTED"):
         providers.resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                          provider="reference-provider", profile="profile",
                           operation="program", site_id=2, image_size=1024,
                           hardware=observed())
+
+
+def test_explicit_provider_profile_selection_allows_same_target_multi_provider(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    reference = providers.resolve(
+        root, asset_set_sha256=digest, target="arbitrary-target",
+        provider="reference-provider", profile="profile", operation="flash_cycle",
+        site_id=2, image_size=1024, hardware=observed())
+    alternative = providers.resolve(
+        root, asset_set_sha256=digest, target="arbitrary-target",
+        provider="alternate-provider", profile="alternate-profile",
+        operation="flash_cycle", site_id=2, image_size=1024,
+        hardware=observed(transport="ps-only"))
+    assert (reference.provider_package, reference.profile_package) == (
+        "reference-provider", "profile")
+    assert (alternative.provider_package, alternative.profile_package) == (
+        "alternate-provider", "alternate-profile")
+
+
+@pytest.mark.parametrize(("provider", "profile", "code"), [
+    ("alternate-provider", "profile", "PROVIDER_SELECTION_MISMATCH"),
+    ("reference-provider", "alternate-profile", "PROVIDER_SELECTION_MISMATCH"),
+    ("reference-provider", "not-in-this-set", "PROFILE_MISSING_OR_AMBIGUOUS"),
+    ("../escape", "profile", "PROVIDER_REF_INVALID"),
+    ("reference-provider", "/escape", "PROFILE_REF_INVALID"),
+])
+def test_explicit_selection_mismatch_denied(tmp_path, provider, profile, code):
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    with pytest.raises(providers.ProviderDenied, match=code):
+        providers.resolve(
+            root, asset_set_sha256=digest, target="arbitrary-target",
+            provider=provider, profile=profile, operation="flash_cycle",
+            site_id=2, image_size=1024, hardware=observed())
