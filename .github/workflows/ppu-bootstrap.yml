@@ -60,7 +60,6 @@ on:
       - "scripts/tests/test_fpga_image_root.py"
       - "software/python/tests/test_fpga_golden_device_pin_b1.py"
       - "scripts/plasma_wordport_program.py"
-      - "scripts/plasma_native_wordport_v02.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_hil_artifact_provenance_contract.py"
   push:
@@ -122,7 +121,6 @@ on:
       - "scripts/tests/test_fpga_image_root.py"
       - "software/python/tests/test_fpga_golden_device_pin_b1.py"
       - "scripts/plasma_wordport_program.py"
-      - "scripts/plasma_native_wordport_v02.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_hil_artifact_provenance_contract.py"
 

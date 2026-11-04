@@ -6,15 +6,15 @@ takes the ADR-0007 fence / Site lock and never drives SWD itself. Per
 operation it composes ONLY existing, reviewed owners:
 
   root Site admission (plasma_swd_site_admission.py admit <site>; Root G5 live
-  admission + owner electrical attestation)  ->  PS-local OpenOCD
-  ``plasma_swd`` (its ps_owner takes the fence + Site lock, validates the
-  admission record per MMIO word, uses the native word port and ARMv7
-  barriers)  ->  revoke.
+  admission, record schema v3, ``voltage_source: NOT_MEASURED``)  ->  PS-local
+  OpenOCD ``plasma_swd`` (its ps_owner takes the fence + Site lock, requires a
+  loaded PL Image on this boot, uses the native word port and ARMv7 barriers;
+  it reads no admission record and no electrical attestation)  ->  revoke.
 
 Operations (allowlist): ``probe`` = OpenOCD ``dap init`` + ``dpreg 0`` with a
 fixed argv (no target, flash, erase, program or reset); ``flash_cycle`` =
-erase (image rounded up to erase units) -> write -> verify -> full readback
-compare -> ``reset run`` for the session-bound, Runtime-resolved Flash profile
+``reset halt`` -> erase (image rounded up to erase units) -> write -> verify
+-> full readback compare -> ``reset run`` for the session-bound, Runtime-resolved Flash profile
 (target config + geometry). Sites: 1 and 2 only (the ABI-v5 two-Site
 geometry with a real hardware baseline; deriving Sites from the loaded PL is a
 separate Root/FPGA change).
@@ -157,7 +157,10 @@ class Abi5OpenocdAdapter:
             # the selected engine's qualified adapter speed wins.
             "-c", f"adapter speed {self.adapter_khz}",
             "-c", "init",
-            "-c", "halt",
+            # A plain ``halt`` of running firmware leaves the stm32f1x write
+            # algorithm stuck after the erase (Driver track HIL 2026-11-04,
+            # runbook section 10): every Flash operation starts from reset.
+            "-c", "reset halt",
             "-c", f"flash erase_address {base} 0x{profile.erase_length(size):08x}",
             "-c", f"flash write_image {source} {base} bin",
             "-c", f"flash verify_image {source} {base} bin",

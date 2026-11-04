@@ -128,7 +128,7 @@ def test_admission_requires_observed_device_golden_not_release_claim():
 
 
 @pytest.mark.parametrize("script", [
-    "plasma_wordport_program.py", "plasma_native_wordport_v02.py",
+    "plasma_wordport_program.py",
 ])
 def test_wordport_tools_pin_the_same_device_golden(script):
     module = load(f"golden_pin_{script.replace('.', '_')}", script)

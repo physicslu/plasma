@@ -534,6 +534,10 @@ def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
         "erase_address", "write_image", "verify_image"
     ]
     assert commands[-2:] == ["reset run", "shutdown"]
+    # Flash work always starts from reset (a running DUT breaks the write algorithm).
+    assert commands.index("reset halt") < commands.index(
+        "flash erase_address 0x08000000 0x00000400")
+    assert "halt" not in commands
     assert any(v.startswith("dump_image ") for v in commands)
     assert not any(v.startswith("swd newdap bp") for v in commands)
     assert calls["run"] == [["admit", "2"], ["revoke", "2"]]

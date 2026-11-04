@@ -163,8 +163,21 @@ journal, receipt or FPGA loader.
   `adapter speed <engine kHz>` (overrides the cfg's own speed), `init`,
   `halt`, erase of the image rounded up to whole erase units, write, verify,
   full `dump_image` compare, `reset run`. Raw paths/Tcl are never accepted.
+- **Engine install / select tool.** `scripts/ppu_site_engine.py` (Bootstrap
+  kit, root on Z2) is the only writer of the selection record: `install
+  ARTIFACT` verifies a CI `plasma-openocd5088-armv7-candidate` artifact
+  (sidecar, internal SHA, ELF32 ARM, evidence) and installs or adopts an
+  identical side-by-side install under
+  `/opt/plasma/programming-engines/openocd/<runtime_id>/` with
+  `plasma-engine.json` (engine fields from artifact evidence, or
+  `--declare-*` by the operator, recorded as such); `select RUNTIME_ID
+  [--adapter-khz N] [--restart]` re-verifies and atomically writes the record
+  (Runtime SWCLK may differ from the driver default) and restarts the Worker
+  only while holding the Runtime Job-admission gate; `list` shows engines.
+  An install of the Runtime re-renders already-installed Stage C units with
+  the validated `--plasma-python`.
 - **OpenOCD engine selection (no versioned path).** `ppu_site_worker_service`
-  reads the deployment-written, root-owned `/etc/plasma/site-worker-engine.json`
+  reads the root-owned `/etc/plasma/site-worker-engine.json`
   (`plasma.ppu.site-worker-engine.v1`: `openocd_root` directly under
   `/opt/plasma/programming-engines/openocd/`, `openocd_sha256`,
   `admission_sha256`, `adapter_driver` = `plasma_swd`, `driver_abi` = 5,

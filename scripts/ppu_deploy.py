@@ -22,6 +22,7 @@ import zipfile
 
 REPO = Path(__file__).resolve().parents[1]
 TARGET_HELPER = REPO / "scripts/ppu_deploy_target.py"
+Z2_SYSTEM_PYTHON = "/usr/bin/python3"
 ENGINE = REPO / "scripts/plasma_wordport_program.py"
 LOCAL_ROOT = Path.home() / ".local/share/plasma/engineering"
 Z2_FILES = (
@@ -183,7 +184,9 @@ class Deployer:
         encoded = base64.b64encode(payload).decode("ascii")
         if len(encoded) > 90_000:
             raise DeploymentError("DEPLOYMENT_PACKAGE_EXCEEDS_BOUNDED_SSH_COMMAND")
-        command = [engine.PYTHON, "-I", "-c", TARGET_HELPER.read_text(),
+        # The stdlib-only helper runs under the Z2 OS interpreter (a fixed system
+        # interface, not a versioned Plasma runtime path).
+        command = [Z2_SYSTEM_PYTHON, "-I", "-c", TARGET_HELPER.read_text(),
                    action, "--payload", encoded]
         try:
             status, output = engine.password_ssh_z2(command, credentials, hosts, timeout=180)

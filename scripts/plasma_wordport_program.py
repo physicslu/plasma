@@ -12,7 +12,7 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shlex
 import stat
@@ -23,9 +23,34 @@ import time
 BUNDLE = Path("/home/xilinx/plasma-swd-performance-20261029")
 Z2_ENTRY = BUNDLE / "scripts/plasma_wordport_program.py"
 ROOT = Path("/root/plasma-path2-approved")
-PYTHON = "/opt/plasma/python/3.12.13/bin/python3"
-OPENOCD = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/bin/openocd"
-OPENOCD_SCRIPTS = "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/share/openocd/scripts"
+# No versioned paths: on Z2 the bridge runs under the interpreter that runs
+# this tool; the OpenOCD install is the operator-selected ``--openocd-root``
+# (a remote_bitbang-capable engine under ENGINE_BASE). SWPC forwards both.
+PYTHON = sys.executable
+ENGINE_BASE = Path("/opt/plasma/programming-engines/openocd")
+Z2_PYTHON_BASE = PurePosixPath("/opt/plasma/python")
+OPENOCD: str | None = None
+OPENOCD_SCRIPTS: str | None = None
+
+
+def select_openocd(root: str) -> None:
+    """Bind this run to one explicitly selected, installed OpenOCD engine."""
+    global OPENOCD, OPENOCD_SCRIPTS
+    path = Path(root)
+    if (not path.is_absolute() or ".." in path.parts or path.parent != ENGINE_BASE
+            or path.is_symlink() or not path.is_dir()):
+        raise NotRun(69, "OPENOCD_ROOT_NOT_INSTALLED")
+    OPENOCD = str(path / "bin" / "openocd")
+    OPENOCD_SCRIPTS = str(path / "share" / "openocd" / "scripts")
+
+
+def z2_python(value: str) -> str:
+    """Shape check of the Plasma-owned Z2 interpreter named by the operator."""
+    pure = PurePosixPath(value)
+    if (not pure.is_absolute() or ".." in pure.parts or pure.name not in {"python3", "python"}
+            or not str(pure).startswith(str(Z2_PYTHON_BASE) + "/")):
+        raise NotRun(64, "Z2_PYTHON_INVALID")
+    return str(pure)
 NATIVE_SHA = "66261cef851c9777469b393b7539c5b0f8c2b039a032f1a5b4cbf9e93460e447"
 SESSION_SHA = "5e2e0781a66c541377e262325a26789ff55499e27cc433e399becf0fcf59b811"
 PY_MODULE_SHA = "9eb8a5e90f11132e46a0b67a69f5694d0c56e1ade47d1bec6f682fec77f19ab1"
@@ -1030,9 +1055,10 @@ def on_swpc(args):
     if args.operation != "preflight" and not args.owner_attested:
         raise NotRun(77, "OWNER_ATTESTATION_REQUIRED_FOR_HARDWARE")
     credentials, hosts = z2_login_credentials(Path.home())
-    command = [PYTHON, "-I", "-B", str(Z2_ENTRY), "--role", "z2",
+    command = [z2_python(args.z2_python), "-I", "-B", str(Z2_ENTRY), "--role", "z2",
                "--operation", args.operation, "--icpn", args.icpn,
                "--site-id", str(args.site_id),
+               "--openocd-root", args.openocd_root,
                "--source-sha256", args.source_sha256]
     if args.firmware:
         command += ["--firmware", args.firmware,
@@ -1059,12 +1085,20 @@ def main():
     parser.add_argument("--readback", action="store_true",
                         help="Opt in to full independent Flash dump and SHA256 comparison (default: skip)")
     parser.add_argument("--source-sha256", required=True)
+    parser.add_argument("--openocd-root", required=True,
+                        help="Selected remote_bitbang OpenOCD install under " + str(ENGINE_BASE))
+    parser.add_argument("--z2-python",
+                        help="(--role swpc) Plasma-owned Z2 interpreter under " + str(Z2_PYTHON_BASE))
     parser.add_argument("--owner-attested", action="store_true",
                         help="Explicit owner-approved hardware command (not repeated sensor/fixture validation)")
     args = parser.parse_args()
     if args.readback and args.operation != "program":
         parser.error("--readback is only valid with --operation program")
+    if args.role == "swpc" and not args.z2_python:
+        parser.error("--z2-python is required with --role swpc")
     try:
+        if args.role == "z2":
+            select_openocd(args.openocd_root)
         return on_swpc(args) if args.role == "swpc" else on_z2(args)
     except NotRun as exc:
         print(json.dumps({"result": "NOT_RUN", "reason": str(exc)}), file=sys.stderr)
