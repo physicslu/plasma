@@ -278,7 +278,7 @@ class SiteWorkerCore:
                         "sealed_sites": sorted(self._sealed),
                         "not_ready": getattr(self.adapter, "not_ready", None),
                         "sessions": sessions,
-                        "session": sessions[0] if len(sessions) == 1 else None}
+                        "session": sessions[0] if sessions else None}
         if op == "bind_image":
             _require(set(request) == {
                 "protocol", "op", "session_id", "profile", "image_sha256", "image_size"
