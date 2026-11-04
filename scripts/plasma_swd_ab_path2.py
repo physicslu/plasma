@@ -92,14 +92,18 @@ def build_v02_from_locked_source(cube_root: Path, arm_root: Path) -> bytes:
             [sys.executable, str(source / "host/check_artifacts.py"), str(build),
              str(arm_root / "usr/bin"), "--variant", "v0.2"],
         ]
-        for cmd in commands:
+        for stage, cmd in zip(("CONFIGURE", "BUILD", "CHECK_ARTIFACT"), commands):
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True,
                                         timeout=240, check=False)
             except (OSError, subprocess.TimeoutExpired):
-                raise NotRun("LOCKED_FIRMWARE_BUILD_UNAVAILABLE") from None
+                raise NotRun("LOCKED_FIRMWARE_" + stage + "_UNAVAILABLE") from None
             if result.returncode != 0:
-                raise NotRun("LOCKED_FIRMWARE_BUILD_OR_STATIC_CHECK_FAILED")
+                observed = result.stdout + "\n" + result.stderr
+                hint = ("SOURCE_REVISION_MISMATCH" if "dependency revision mismatch" in observed
+                        else "MISSING_SOURCE_FILE" if "No such file or directory" in observed
+                        else "CMAKE_OR_TOOLCHAIN_FAILURE")
+                raise NotRun("LOCKED_FIRMWARE_" + stage + "_FAILED:" + hint)
         return firmware(build / "plasma-blue-pill-cdc-v0.2.bin", "v0.2")
 
 
