@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import stat
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest import mock
@@ -184,6 +185,48 @@ class PayloadTests(unittest.TestCase):
             with self.assertRaisesRegex(mod.ArtifactDenied, "ARTIFACT_ADMISSION_INVALID"):
                 mod.verify_download(zip_path, receipt, base / "verified",
                                     helper=base / "fake.py")
+
+
+    def test_nested_ppu_manifest_binds_full_source_sha_and_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            fake_helper = base / "fake-kit-verifier.py"
+            release = base / "ppu.tar.gz"
+            fake_helper.write_text(
+                "from pathlib import Path\\n"
+                "from types import SimpleNamespace\\n"
+                "def verify_kit(artifact, *, sidecar, extract_to):\\n"
+                f"    return SimpleNamespace(root=Path({ARTIFACT_NAME!r}), "
+                f"ppu_artifact=Path({str(release)!r}))\\n",
+                encoding="utf-8")
+            for variant in ("pass", "wrong-source", "wrong-version", "wrong-target"):
+                manifest = {
+                    "git_sha": SOURCE, "role": "ppu",
+                    "target": "linux-armv7l", "product_version": "0.2.1",
+                }
+                if variant == "wrong-source":
+                    manifest["git_sha"] = "0" * 40
+                elif variant == "wrong-version":
+                    manifest["product_version"] = "0.9.9"
+                elif variant == "wrong-target":
+                    manifest["target"] = "linux-x86_64"
+                payload = json.dumps(manifest).encode()
+                with tarfile.open(release, "w:gz") as archive:
+                    info = tarfile.TarInfo("plasma-release/release.json")
+                    info.size = len(payload)
+                    archive.addfile(info, io.BytesIO(payload))
+                kwargs = dict(
+                    artifact=base / "fake-kit.tar.gz",
+                    sidecar=base / "fake-kit.tar.gz.sha256",
+                    source_sha=SOURCE,
+                    artifact_name=ARTIFACT_NAME,
+                    helper=fake_helper,
+                )
+                if variant == "pass":
+                    mod.verify_kit_source(**kwargs)
+                else:
+                    with self.subTest(variant=variant), self.assertRaises(mod.ArtifactDenied):
+                        mod.verify_kit_source(**kwargs)
 
 
 if __name__ == "__main__":
