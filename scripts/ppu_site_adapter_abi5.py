@@ -29,6 +29,7 @@ import json
 import os
 import re
 import signal
+import stat
 import subprocess
 import tempfile
 import threading
@@ -57,7 +58,8 @@ class Abi5OpenocdAdapter:
                  run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
                  popen: Callable[..., Any] = subprocess.Popen,
                  openocd_running: Callable[[], bool] | None = None,
-                 poll_s: float = 0.05) -> None:
+                 poll_s: float = 0.05,
+                 evidence_dir: Path | None = None) -> None:
         self.openocd_root = Path(openocd_root)
         self.python = Path(python)
         if type(adapter_khz) is not int or not 0 < adapter_khz <= 100_000:
@@ -72,6 +74,9 @@ class Abi5OpenocdAdapter:
         self._popen = popen
         self._openocd_running = openocd_running or self._pgrep_openocd
         self.poll_s = poll_s
+        # systemd StateDirectory is root-owned and writable despite ProtectSystem=strict.
+        state_root = Path(os.environ.get("STATE_DIRECTORY") or "/var/lib/plasma-site-worker")
+        self.evidence_dir = Path(evidence_dir) if evidence_dir is not None else state_root / "openocd-evidence"
 
     @property
     def openocd(self) -> Path:
@@ -177,6 +182,50 @@ class Abi5OpenocdAdapter:
             return False
         return r.returncode == 0 and not os.path.lexists(self._record(site))
 
+    def _save_openocd_evidence(self, site: int, raw: bytes, rc: int | None,
+                               reason: str | None, revoked: bool) -> None:
+        """Persist raw child output before any unknown-outcome error is raised.
+
+        Never return these root-private paths or raw text to the Runtime/API.
+        An untrusted directory or failed write must not produce a Flash PASS.
+        """
+        directory = self.evidence_dir
+        directory.mkdir(mode=0o700, exist_ok=True)
+        info = directory.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_mode & 0o077):
+            raise OSError("OPENOCD_EVIDENCE_DIR_UNTRUSTED")
+
+        fd, filename = tempfile.mkstemp(prefix=f"site{site}-", suffix=".stdout",
+                                         dir=directory)
+        with os.fdopen(fd, "wb") as output:
+            output.write(raw)
+            output.flush()
+            os.fsync(output.fileno())
+
+        marker = SAFE_OFF.encode("ascii") in raw
+        record = {
+            "schema": "plasma.ppu.openocd-evidence.v1",
+            "site": site,
+            "captured_unix_ns": time.time_ns(),
+            "stdout_file": Path(filename).name,
+            "stdout_bytes": len(raw),
+            "stdout_sha256": hashlib.sha256(raw).hexdigest(),
+            "openocd_rc": rc,
+            "safe_off_marker_present": marker,
+            "safe_off_verified": reason is None and revoked and marker,
+            "admission_revoked": revoked,
+            "termination_reason": reason,
+        }
+        metadata = Path(filename).with_suffix(".json")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
+        meta_fd = os.open(metadata, flags, 0o600)
+        with os.fdopen(meta_fd, "w", encoding="utf-8") as output:
+            json.dump(record, output, sort_keys=True, separators=(",", ":"))
+            output.write("\n")
+            output.flush()
+            os.fsync(output.fileno())
+
     def run(self, site: int, operation: str, *, deadline: float,
             cancel: threading.Event, image: FlashImage | None = None) -> Mapping[str, Any]:
         if site not in self.supported_sites or operation not in self.operations:
@@ -249,7 +298,7 @@ class Abi5OpenocdAdapter:
             if not self._revoke(site):
                 raise TransportUnknown("ADMISSION_REVOKE_FAILED")
             raise TransportDenied("ADMISSION_DENIED")
-        log, reason, rc = "", None, None
+        log, raw, reason, rc = "", b"", None, None
         try:
             child = self._popen(self._argv(site) if argv is None else argv,
                                 stdin=subprocess.DEVNULL,
@@ -270,10 +319,15 @@ class Abi5OpenocdAdapter:
                     break
                 time.sleep(self.poll_s)
             out = child.stdout.read() if child.stdout else b""
-            log = out.decode("utf-8", "replace") if isinstance(out, bytes) else str(out)
+            raw = out if isinstance(out, bytes) else str(out).encode("utf-8", "replace")
+            log = raw.decode("utf-8", "replace")
             rc = child.returncode
         finally:
             revoked = self._revoke(site)
+        try:
+            self._save_openocd_evidence(site, raw, rc, reason, revoked)
+        except OSError:
+            raise TransportUnknown("OPENOCD_EVIDENCE_WRITE_FAILED") from None
         if reason:
             # Killed mid-transaction: SAFE_OFF not proven.
             raise TransportUnknown(reason)
