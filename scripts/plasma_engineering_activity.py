@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import shlex
 from pathlib import Path
 import re
 
@@ -51,23 +52,96 @@ STATES = frozenset({"RUNNING", "DONE", "FAIL", "UNKNOWN"})
 KINDS = frozenset({"TEST", "COMMAND", "FILE", "READ", "BUILD", "CHECK"})
 MAX_EVENT_BYTES = 640
 MAX_ACTIVE_ITEMS = 64
-MAX_SEQUENCE = 10000000
-
+MAX_SEQUENCE # General-purpose, fail-closed command *preview*, not an execution policy.
+# Never copy arbitrary shell arguments into the group-readable monitor log.
+# Recognized tools, verbs, flags and repository-relative paths are readable;
+# literals, credential options, expansions, URLs and private paths are redacted.
+PREVIEW_TOOLS = frozenset({
+    "git", "gh", "python", "python3", "pytest", "rg", "grep", "find",
+    "sed", "head", "tail", "cat", "make", "ninja", "cmake", "gcc",
+    "g++", "clang", "vivado", "sha256sum", "shasum", "bash", "sh",
+    "curl", "ssh", "scp", "rsync", "cp", "mv", "ls", "pwd", "test",
+    "timeout", "env", "jq", "yq", "tar", "unzip", "zip",
+})
+PREVIEW_WORDS = frozenset({
+    "status", "diff", "log", "show", "rev-parse", "ls-files", "add",
+    "commit", "push", "fetch", "branch", "checkout", "switch", "merge",
+    "pr", "checks", "view", "list", "run", "workflow", "api",
+    "pytest", "unittest", "build", "test", "install", "clean",
+    "check", "lint", "format", "compile", "batch", "source",
+    "all", "HEAD", "origin", "main", "true", "false",
+})
+PREVIEW_FLAG = re.compile(r"-{1,2}[A-Za-z0-9][A-Za-z0-9-]{0,40}\\Z")
+PREVIEW_NUMBER = re.compile(r"[0-9]{1,8}\\Z")
+PREVIEW_PATH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,95}\\Z")
+PREVIEW_SHELL = re.compile(r"[;|&<>$`\\\\\\n\\r]")
 
 def safe_command(value: object) -> tuple[str, str]:
-    if (type(value) is str and len(value) <= 256 and value.isascii() and
-            SENSITIVE.search(value) is None):
-        if len(value) <= 125:
-            for grammar, kind in COMMANDS:
-                if grammar.fullmatch(value) is not None:
-                    return kind, value
-        # Classify relative, single-command forms only. An absolute argument
-        # or a shell control operator falls back to the opaque safe marker.
-        if re.search(r"\s/[A-Za-z]", value) is None:
-            for grammar, kind, label in SEMANTIC_COMMANDS:
-                if grammar.fullmatch(value) is not None:
-                    return kind, label
-    return "COMMAND", "(command hidden)"
+    """Return a useful redacted preview without leaking untrusted argument text.
+
+    This does not authorize or execute commands. Any uncertain argument is
+    replaced with a fixed marker; no blacklist is assumed complete.
+    """
+    if type(value) is not str or not value or len(value) > 2048 or not value.isascii():
+        return "COMMAND", "(command hidden)"
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+        return "COMMAND", "(command hidden)"
+    try:
+        words = shlex.split(value, posix=True)
+    except ValueError:
+        return "COMMAND", "(command hidden)"
+    if not words:
+        return "COMMAND", "(command hidden)"
+    executable = words[0]
+    # Never expose arbitrary executable names or absolute executable paths.
+    if "/" in executable:
+        executable = executable.rsplit("/", 1)[-1]
+    if executable not in PREVIEW_TOOLS:
+        return "COMMAND", "(command hidden)"
+    kind = ("TEST" if executable == "pytest" else
+            "READ" if executable in {"rg", "grep", "find", "sed", "head",
+                                     "tail", "cat", "ls"} else
+            "BUILD" if executable in {"make", "ninja", "cmake", "gcc",
+                                      "g++", "clang", "vivado"} else
+            "CHECK" if executable in {"sha256sum", "shasum"} else
+            "COMMAND")
+    if executable in {"python", "python3"} and (
+            "pytest" in words[1:3] or "unittest" in words[1:3] or
+            any(w.startswith("scripts/tests/") for w in words[1:4])):
+        kind = "TEST"
+    # Shell operators, expansions and scripting must never be echoed.
+    if PREVIEW_SHELL.search(value) is not None:
+        return kind, executable + " [shell-redacted]"
+    safe = [executable]
+    redactions = 0
+    for idx, word in enumerate(words[1:13], start=1):
+        if (idx > 1 and words[idx-1] in ("-c", "-lc", "--command", "-e",
+                                         "--execute", "--password", "-p")):
+            candidate = "[redacted]"
+        elif word in {"[redacted]", "[shell-redacted]"}:
+            candidate = word
+        elif SENSITIVE.search(word) is not None:
+            candidate = "[redacted]"
+        elif word in PREVIEW_WORDS or (
+                PREVIEW_FLAG.fullmatch(word) is not None):
+            candidate = word
+        elif PREVIEW_NUMBER.fullmatch(word) is not None:
+            candidate = word
+        elif (PREVIEW_PATH.fullmatch(word) is not None and
+              word.split("/", 1)[0] in REPO_TOP and
+              not word.startswith(".") and ".." not in word.split("/")):
+            candidate = word
+        else:
+            candidate = "[redacted]"
+        if candidate == "[redacted]":
+            redactions += 1
+        if candidate != "[redacted]" or safe[-1] != "[redacted]":
+            safe.append(candidate)
+    if len(words) > 13:
+        safe.append("[redacted]")
+    return kind, " ".join(safe)[:180]
+
+nd hidden)"
 
 
 def safe_repo_path(value: object, workspace: Path) -> str | None:
