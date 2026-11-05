@@ -97,7 +97,7 @@ if [ "$path3_index" != 2 ] || [ "$path3_panes" -ne 1 ]; then
 fi
 
 # --reload replaces observers only; never terminate a Worker.
-if [[ \${1:-} == "--reload" ]]; then
+if [[ ${1:-} == "--reload" ]]; then
   for path in path2 path3; do
     if [[ "$path" == path2 ]]; then idx=1; else idx=2; fi
     pane_pid="$(tmux display-message -p -t "$session:$idx" '#{pane_pid}')"
