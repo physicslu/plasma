@@ -1222,12 +1222,17 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     test_log = source.with_suffix(".test.log") if source is not None else None
     # Path 3 is a handoff, not a plan for the model's individual steps.
     prompt = (
-        "PLASMA Path 3 engineering assignment. Follow the repository AGENTS.md "
-        "and the owner-approved Gate 1 Work Order at its pinned source SHA. "
-        "Choose the implementation, tools, tests, and in-scope engineering "
-        "sequence autonomously. Report observed results and remaining blockers "
-        "accurately, including NOT_RUN when appropriate.\n"
-        "Goal:\n" + task["objective"] + "\n"
+        ("PLASMA owner-authorized Path 3 quick host-only observation. "
+         "Follow the mandatory constraints in AGENTS.md; do not expand "
+         "the task or explore unrelated repository contents. Run only the "
+         "requested observation and report the exit code and result.\n"
+         if quick else
+         "PLASMA Path 3 engineering assignment. Follow the repository AGENTS.md "
+         "and the owner-approved Gate 1 Work Order at its pinned source SHA. "
+         "Choose the implementation, tools, tests, and in-scope engineering "
+         "sequence autonomously. Report observed results and remaining blockers "
+         "accurately, including NOT_RUN when appropriate.\n")
+        + "Goal:\n" + task["objective"] + "\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
         prompt += (
@@ -1247,6 +1252,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     # Only the Owner-bound hardware Work Order can request unsandboxed Codex
     # for this single child invocation; Root Guard and OS locks still apply.
     command = ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"]
+    if quick:
+        # A bounded observation should not inherit potentially high effort.
+        command = ["codex", "-c", "model_reasoning_effort=low",
+                   "exec", "--json", "--sandbox", "workspace-write", "-"]
     if non_sandbox:
         command = ["codex", "exec", "--json",
                    "--sandbox", "danger-full-access", "-"]
