@@ -81,6 +81,8 @@ def test_site_worker_unit_is_local_only_and_not_a_network_service():
     assert d["User"] == ["root"] and d["PrivateNetwork"] == ["yes"]
     assert d["RestrictAddressFamilies"] == ["AF_UNIX"] and d["IPAddressDeny"] == ["any"]
     assert d["ProtectSystem"] == ["strict"] and d["NoNewPrivileges"] == ["yes"]
+    assert d["ProtectClock"] == ["yes"]
+    assert d["DeviceAllow"] == ["/dev/mem rw"]
     assert "ListenStream" not in units.site_worker_unit() and "Port" not in units.site_worker_unit()
     assert d["ExecStart"] == [f"{units.PYTHON} -I -B -S "
                               "/opt/plasma/bootstrap/ppu_site_worker_service.py"]
@@ -547,6 +549,7 @@ def test_recovery_positive_moves_marker_into_evidence_and_worker_unseals(tmp_pat
     ({"lease": "busy"}, None, "no_active_job"),
     ({"lease": "unknown"}, None, "no_active_job"),
     ({}, lambda a, s: setattr(a, "startup", {2}), "no_external_owner"),
+    ({}, lambda a, s: setattr(a, "_openocd_running", lambda: True), "no_external_owner"),
     ({}, lambda a, s: (s / "site2.sealed").write_text("{bad"), "seal_present"),
     ({}, lambda a, s: (s / "site2.sealed").unlink(), "seal_present"),
 ])

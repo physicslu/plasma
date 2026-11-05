@@ -236,6 +236,18 @@ class ExecutionContractServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["error"]["error_code"], ErrorCode.INTERFACE_FAILURE.value)
         self.assertEqual(result["error"]["failure_source"], "infrastructure")
 
+    async def test_retry_shutdown_failure_clears_scheduled_attempt(self) -> None:
+        client = await self.start_server(
+            interface_factory=lambda _site: ShutdownFailureMock(failures={"program": 1})
+        )
+        result = (await client.submit(JobRequest(
+            site_id=1, operation=Operation.PROGRAM, image=b"retry-shutdown",
+            max_retries=2, retry_backoff_s=0,
+        )))["result"]
+        self.assertEqual(result["state"], "error")
+        self.assertEqual(result["attempts"], 1)
+        self.assertFalse(result["attempt_history"][0]["retry_scheduled"])
+
 
 if __name__ == "__main__":
     unittest.main()

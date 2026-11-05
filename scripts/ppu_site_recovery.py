@@ -60,7 +60,8 @@ def checks(site: int, *, adapter, seal_dir: Path, worker_active: Callable[[], bo
     out["runtime_lease"] = lease
     try:
         leftover = adapter.startup_sealed_sites()
-        out["no_external_owner"] = "FAIL" if site in leftover else "PASS"
+        running = getattr(adapter, "_openocd_running", lambda: False)()
+        out["no_external_owner"] = "FAIL" if site in leftover or running else "PASS"
     except Exception as exc:
         out["no_external_owner"] = "UNKNOWN"
         out["owner_error"] = type(exc).__name__

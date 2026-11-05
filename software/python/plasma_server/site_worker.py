@@ -399,6 +399,7 @@ class SiteWorker:
                     try:
                         await self.handler.interface.safe_shutdown()
                     except Exception as exc:
+                        runtime.attempt_history[-1].retry_scheduled = False
                         final_error = (
                             exc
                             if isinstance(exc, PlasmaError)
@@ -419,6 +420,7 @@ class SiteWorker:
                         except TimeoutError:
                             pass
                     if runtime.cancel_requested:
+                        runtime.attempt_history[-1].retry_scheduled = False
                         cancelled = True
                         final_error = PlasmaError(
                             ErrorCode.OPERATION_CANCELLED,

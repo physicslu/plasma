@@ -57,7 +57,7 @@ This is a **data descriptor carried by an authorized Bundle Package**, not new f
 ## One Site Session Manager
 
 - Consolidate **Ownership / Lease / Lock** behind one atomic Site Session grant and one fencing generation/token. This is a *target state*, not a claim that today’s runtime has already been migrated.
-- AVAILABLE → ACTIVE after resource admission. On normal completion, release only after verified safe termination. On timeout, cancelled/unknown operation, stale owner, or unverifiable SAFE_OFF: deny new operations, enter RECOVERY / SEALED as appropriate.
+- AVAILABLE → ACTIVE after resource admission. On normal completion, release only after verified safe termination. Timeout or cancellation triggers bounded cleanup and SAFE_OFF/owner verification; proven safe failures return to PPU Job policy. A stale owner or unverifiable SAFE_OFF denies new hardware admission and enters RECOVERY / SEALED as appropriate.
 - `site<N>.sealed` is persistent safety evidence, not an expiring lease. It must not be deleted or ignored merely because the single Job deadline elapsed. Recovery uses the existing authorized operator procedure and independently verifies SAFE_OFF.
 - PPU-wide image/reload guard remains separate in **scope**, but belongs to the same Resource/Safety authority; do not hand FPGA configuration authority to a Provider.
 

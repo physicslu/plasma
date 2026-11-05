@@ -50,9 +50,10 @@ Therefore two simultaneously active C-3 REST Sessions were impossible.
    false idle), while the complete multi-session state uses the `sessions`
    array. Replace-by-Default migration will evaluate the exact status consumer
    before eliminating the old single-key view.
-6. A deadline, unexpected adapter exception or unknown SAFE_OFF result uses
-   the *existing* seal and fail-closed path. A sealed Site is not reassigned
-   or automatically recovered.
+6. An unproven SAFE_OFF result uses the existing seal and fail-closed path.
+   Deadline/cancel first perform bounded cleanup; a verified safe failure is
+   returned to PPU Job policy. A generic software exception is not hardware
+   evidence. A sealed Site is not reassigned or automatically recovered.
 7. For concurrent Flash Jobs, the existing Worker now rejects a second
    bound image unless the firmware SHA256 **and the complete trusted Flash
    Profile** match the first Session. A PPU Execution Lease by itself only

@@ -128,16 +128,18 @@ journal, receipt or FPGA loader.
     exactly `{protocol, op, site}`; `op` must be in the adapter allowlist;
     the Site must be in the session, supported and not sealed; the lease is
     re-checked; one in-flight operation per Site (`SITE_BUSY`).
-  - One session at a time (the C-1 Package Action lease is PPU-exclusive);
-    sessions are in memory only, so a Worker crash invalidates them.
-  - Fail-closed: adapter `TransportUnknown`, any adapter exception, timeout,
-    Runtime cancel (`close_session`) during an operation, or an FPGA identity
-    change during an operation **seal** the Site (persisted
-    `<seal_dir>/site<N>.sealed`, survives Worker restart, never auto-retried;
-    clearing is a separate operator recovery, not an IPC operation). An
-    identity change between operations invalidates the session. Startup
-    seals Sites with a leftover admission record, or all Sites while any
-    OpenOCD runs.
+  - Disjoint Site sessions may coexist; an overlapping Site reservation is
+    refused. Sessions are in memory only, so a Worker crash invalidates them.
+  - Fail-closed: an unproven hardware outcome or FPGA identity change during
+    an operation seals the Site (`<seal_dir>/site<N>.sealed`). Timeout and
+    cancellation first terminate the child, revoke admission and run a
+    bounded SAFE_OFF probe; only proven cleanup is returned as a safe failure.
+    Software exceptions and refusals before hardware do not create a seal.
+    Existing seals require operator recovery. A current admission record for
+    the requested Site refuses admission without creating a historical seal;
+    native `ps_owner` refuses a competing process on that Site. Another Site's
+    OpenOCD process does not block this Site. Recovery additionally verifies
+    that no OpenOCD process is running.
 - `scripts/ppu_site_adapter_abi5.py` (Hardware Adapter, Sites 1/2, op
   `probe`): existing root Site admission → PS-local OpenOCD `plasma_swd`
   (`dap init` + `dpreg 0`, fixed argv; no target/flash/erase/program/reset)
