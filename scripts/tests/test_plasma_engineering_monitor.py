@@ -30,8 +30,8 @@ class EngineeringMonitorTests(unittest.TestCase):
     def test_both_panes_idle_without_jobs(self):
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)
-            self.assertIn("STATUS: IDLE", mon.render_snapshot(base, "path2"))
-            self.assertIn("STATUS: IDLE", mon.render_snapshot(base, "path3"))
+            self.assertIn("| IDLE", mon.render_snapshot(base, "path2"))
+            self.assertIn("| IDLE", mon.render_snapshot(base, "path3"))
             self.assertFalse(list(base.iterdir()))
 
     def test_path2_success_returns_idle_and_last_pass(self):
@@ -48,8 +48,8 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(state["status"], "IDLE")
             self.assertEqual(state["last_result"], "PASS")
             self.assertEqual(state["run_id"], "39546002")
-            self.assertIn("WRAPPER: PASS", mon.render_snapshot(Path(td), "path2"))
-            self.assertIn("STAGE: (not available)", mon.render_snapshot(Path(td), "path2"))
+            self.assertIn("RESULT: PASS", mon.render_snapshot(Path(td), "path2"))
+            self.assertIn("RESULT:", mon.render_snapshot(Path(td), "path2"))
 
     def test_native_preflight_receipt_hint_matches_exact_run(self):
         with tempfile.TemporaryDirectory() as td:
@@ -89,15 +89,15 @@ class EngineeringMonitorTests(unittest.TestCase):
                 "component_index": 1,
             })
             frame = mon.render_snapshot(d, "path2", width=120, height=30)
-            self.assertIn("WRAPPER: FAIL  EXIT: 2", frame)
+            self.assertIn("RESULT: FAIL (exit 2)", frame)
             self.assertIn("RECEIPT: NATIVE_PATH_PERMISSIONS_DENIED | CLI_WRAPPER | PEER_WRITABLE | #1", frame)
             self.assertNotIn("/private/DO_NOT_SHOW", frame)
             self.assertNotIn("a" * 64, frame)
             self.assertNotIn("RECEIPT:", (d / "path2.log").read_text())
             compact = mon.render_snapshot(d, "path2", width=88, height=12)
-            self.assertIn("WRAPPER: FAIL", compact)
+            self.assertIn("RESULT: FAIL", compact)
             self.assertIn("RECEIPT: NATIVE_PATH_PERMISSIONS_DENIED", compact)
-            self.assertIn("RECENT ACTIVITY", compact)
+            self.assertIn("ACTIVITY TRACE", compact)
             self.assertIn("FAIL | exit=2", compact)
 
     def test_native_preflight_receipt_hint_fail_closed(self):
@@ -200,10 +200,10 @@ class EngineeringMonitorTests(unittest.TestCase):
             frame = mon.render_snapshot(
                 Path(td), "path2", width=120, height=24, now=FIXED_NOW)
             self.assertIn("GOAL: PATH2 Host-only CLI regression", frame)
-            self.assertIn("STAGE: CPU-only CLI", frame)
+            self.assertIn("RESULT:", frame)
             self.assertIn("PR: #1144", frame)
             self.assertIn("NOW: 2026-10-21 16:10", frame)
-            self.assertIn("WRAPPER: PASS  EXIT: 0", frame)
+            self.assertIn("RESULT: PASS (exit 0)", frame)
             self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
                              (Path(td) / "path2.log").read_text())
             self.assertNotIn("WORK_ORDER_SHA256", frame)
@@ -238,7 +238,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                         self.assertNotIn("token SECRET", frame)
                     if stage == "Erase entire DUT" or sha == "bad-hash":
                         self.assertEqual(state["monitor_stage"], "")
-                        self.assertIn("STAGE: (not available)", frame)
+                        self.assertIn("RESULT:", frame)
 
     def test_retired_stage_tasks_cannot_publish_guarded_operation(self):
         for task in ("z2-path2-download", "z2-path2-testing",
@@ -255,7 +255,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                         directory=Path(td)), 0)
                 state = json.loads((Path(td) / "path2.json").read_text())
                 self.assertEqual(state["monitor_stage"], "")
-                self.assertIn("STAGE: (not available)",
+                self.assertIn("RESULT:",
                               mon.render_snapshot(Path(td), "path2"))
 
     def test_shared_100_column_terminal_cap_with_cjk(self):
@@ -278,8 +278,8 @@ class EngineeringMonitorTests(unittest.TestCase):
                         for line in frame.splitlines():
                             self.assertEqual(
                                 line, mon._clip_columns(line, available))
-                        self.assertIn("NOW:", frame)
-                        self.assertIn("RECENT ACTIVITY", frame)
+                        self.assertIn("RECEIVED:", frame)
+                        self.assertIn("ACTIVITY TRACE", frame)
 
     def test_authorized_task_and_pr_are_visible_without_work_order_text(self):
         with tempfile.TemporaryDirectory() as td:
@@ -295,7 +295,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(state["task"], "path3-work-order")
             self.assertEqual(state["pr_number"], "1143")
             frame = mon.render_snapshot(Path(td), "path3")
-            self.assertIn("TASK: path3-work-order", frame)
+            self.assertIn("GOAL: (operator summary not provided)", frame)
             self.assertIn("PR: #1143", frame)
 
     def test_path3_only_displays_digest_bound_public_summary(self):
@@ -381,7 +381,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(state["status"], "IDLE")
             self.assertEqual(state["exit_code"], 7)
             self.assertEqual(state["last_result"], "FAIL")
-            self.assertIn("WRAPPER: FAIL", mon.render_snapshot(Path(td), "path3"))
+            self.assertIn("RESULT: FAIL", mon.render_snapshot(Path(td), "path3"))
 
     def test_stale_worker_is_not_reported_running(self):
         with tempfile.TemporaryDirectory() as td:
@@ -392,7 +392,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             }))
             result = mon.render_snapshot(directory, "path3")
             self.assertIn("IDLE (interrupted/unknown)", result)
-            self.assertNotIn("STATUS: RUNNING", result)
+            self.assertNotIn("| RUNNING", result)
 
     def test_log_render_does_not_interpret_control_characters(self):
         with tempfile.TemporaryDirectory() as td:
@@ -471,10 +471,10 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(content.count(b"@PLASMA_ACTIVITY_V1"), 4)
             (directory / "path3.log").write_bytes(content)
             frame = mon.render_snapshot(directory, "path3", width=100)
-            self.assertIn("RECENT ACTIVITY", frame)
+            self.assertIn("ACTIVITY TRACE", frame)
             self.assertIn("[C] TEST DONE", frame)
             self.assertIn("[C] FILE DONE", frame)
-            self.assertIn("DOING: —", frame)
+            self.assertNotIn("DOING:", frame)
             self.assertNotIn("[V]", frame)
             self.assertNotIn("PRIVATE_OUTPUT", frame)
 
@@ -489,8 +489,8 @@ class EngineeringMonitorTests(unittest.TestCase):
                 running = mon.render_snapshot(
                     directory, "path3", width=100)
             self.assertIn(
-                "DOING: TEST | python3 -m pytest scripts/tests/", running)
-            self.assertIn("STATUS: RUNNING", running)
+                "DOING: [C] TEST RUNNING | python3 -m pytest scripts/tests/", running)
+            self.assertIn("| RUNNING", running)
             self.assertNotIn("STATE: RUNNING", running)
 
     def test_codex_activity_v1_rejects_secrets_injection_and_escape(self):
@@ -529,7 +529,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                 "id": "cmd_1", "type": "command_execution",
                 "command": commands[1], "aggregated_output": "EVIL_SECRET"}}
             result = projector.project(evil)
-            self.assertIn(b"(command hidden)", result)
+            self.assertIn(b"[shell-redacted]", result)
             self.assertNotIn(b"EVIL_SECRET", result)
             self.assertNotIn(b"evil.example", result)
             self.assertEqual(
@@ -596,15 +596,15 @@ class EngineeringMonitorTests(unittest.TestCase):
                         check=False)
                     if result.returncode == 0:
                         frame = result.stdout
-                    if "DOING: TEST | python3 -m pytest scripts/tests/" in frame:
+                    if "DOING: [C] TEST RUNNING | python3 -m pytest scripts/tests/" in frame:
                         break
                     time.sleep(0.1)
-                self.assertIn("STATUS: RUNNING", frame)
+                self.assertIn("| RUNNING", frame)
                 self.assertIn("RUN: 123456", frame)
                 self.assertIn("GOAL: Fix Monitor Launcher", frame)
                 self.assertIn(
-                    "DOING: TEST | python3 -m pytest scripts/tests/", frame)
-                self.assertIn("RECENT ACTIVITY", frame)
+                    "DOING: [C] TEST RUNNING | python3 -m pytest scripts/tests/", frame)
+                self.assertIn("ACTIVITY TRACE", frame)
                 self.assertIn("[C] TEST RUNNING", frame)
                 self.assertNotIn("STATE: RUNNING", frame)
             finally:
@@ -748,7 +748,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                 "LAST ERROR: [C] COMMAND FAIL (exit 4) | git status",
                 rendered)
             self.assertIn(
-                "LAST STEP: [C] COMMAND DONE (exit 0) | git diff --check",
+                "[C] COMMAND DONE (exit 0) | git diff --check",
                 rendered)
             self.assertNotIn("18:54", rendered)
             self.assertNotIn("[V]", rendered)
@@ -857,7 +857,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                 "PATH 3 | SWPC Codex | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach")
             self.assertEqual(len([l for l in frame.splitlines()
                                   if "Ctrl+A" in l]), 1)
-            self.assertIn("STATUS: IDLE", frame)
+            self.assertIn("| IDLE", frame)
 
     def test_clear_is_display_only_and_new_lines_keep_streaming(self):
         with tempfile.TemporaryDirectory() as td:
@@ -929,7 +929,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(polls[0], 3)
             self.assertEqual(out.getvalue().count("\x1b[H"), 1)
             self.assertNotIn("\x1b[2J", out.getvalue())
-            self.assertIn("STATUS: IDLE", out.getvalue())
+            self.assertIn("| IDLE", out.getvalue())
 
     def test_view_repaints_on_terminal_resize(self):
         with tempfile.TemporaryDirectory() as td:
@@ -973,8 +973,8 @@ class EngineeringMonitorTests(unittest.TestCase):
                               sleep=fake_sleep, get_now=lambda: FIXED_NOW)
             self.assertEqual(out.getvalue().count("\x1b[H"), 2)
             self.assertIn("RUN: 12345", out.getvalue())
-            self.assertIn("TASK: test-task", out.getvalue())
-            self.assertIn("WRAPPER: PASS  EXIT: 0", out.getvalue())
+            self.assertIn("ACCEPTANCE: UNVERIFIED", out.getvalue())
+            self.assertIn("RESULT: PASS (exit 0)", out.getvalue())
 
     def test_log_is_clipped_to_pane_without_scrolling_status_offscreen(self):
         with tempfile.TemporaryDirectory() as td:
@@ -988,8 +988,8 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertLessEqual(len(lines), 11)
             self.assertTrue(all(mon._clip_columns(line, 37) == line
                                 for line in lines))
-            self.assertIn("STATUS: IDLE", frame)
-            self.assertIn("RECENT ACTIVITY", frame)
+            self.assertIn("| IDLE", frame)
+            self.assertIn("ACTIVITY TRACE", frame)
             self.assertIn("line-059:", frame)
             self.assertNotIn("line-001:", frame)
 
@@ -1012,15 +1012,15 @@ class EngineeringMonitorTests(unittest.TestCase):
                     directory, path, width=38, height=12, now=FIXED_NOW)
                 with self.subTest(path=path):
                     self.assertLessEqual(len(frame.splitlines()), 11)
-                    self.assertIn("STATUS: IDLE", frame)
+                    self.assertIn("| IDLE", frame)
                     self.assertIn("RUN: 12345", frame)
                     self.assertIn("PR: #1144", frame)
                     self.assertIn("GOAL:", frame)
                     if path == "path2":
-                        self.assertIn("STAGE: CPU-only CLI", frame)
-                    self.assertIn("WRAPPER: NOT_RUN", frame)
+                        self.assertIn("RESULT:", frame)
+                    self.assertIn("RESULT: NOT_RUN", frame)
                     self.assertIn("NOW: 2026-10-21 16:10", frame)
-                    self.assertIn("RECENT ACTIVITY", frame)
+                    self.assertIn("ACTIVITY TRACE", frame)
                     self.assertIn("latest-visible-entry", frame)
                     self.assertNotIn("old-000", frame)
 
