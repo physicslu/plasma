@@ -386,6 +386,7 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         task["codex_execution"] = order["codex_execution"]
     if "codex_profile" in order:
         task["codex_profile"] = order["codex_profile"]
+        task["work_order_scope"] = "host-only"
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order.get("scope", "host-only")
         if order["capability"] == "cpu-only":
