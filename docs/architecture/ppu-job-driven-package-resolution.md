@@ -6,6 +6,16 @@
 **Status:** Owner-approved architecture decision (2026-11-02); implementation, wire/API details and hardware qualification **NOT IMPLEMENTED / NOT VERIFIED**.  
 **Scope:** PLASMA PPU PS programming resource selection after Bundle v3 delivery. This document does **not** authorize runtime changes, deployment, activation, FPGA/DUT operation, or a new Gate 1.
 
+> **Implementation status (P4-02, 2026-11-05):** Standard Bundle v3 B3
+> Install/Verify now selects the Active Set under the existing Coordinator
+> deployment lock and Runtime connection-held Job quiescence lease.
+> `mode: "stage_only"` is the explicit exception. FPGA Bundles require
+> `fpga_load: true` with separate owner authorization and Root Identity PASS.
+> The older B4/explicit activation design steps below document the prior
+> architectural intent; consult the
+> [current B3 contract](../deployment/ppu-bundle-v3-generic-assets-gate1.md)
+> for executable API semantics. Active Set is never sufficient for Job READY.
+
 ## Accepted decision — one Active Asset Set per PPU
 
 **A PPU has exactly one effective Active Asset Set at a time.** This is a
