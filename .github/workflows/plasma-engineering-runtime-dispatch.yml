@@ -21,6 +21,7 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_host_observe.py"
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/plasma_engineering_activity.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
