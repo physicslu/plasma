@@ -2311,6 +2311,40 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertEqual(old_approval["monitor_summary"], "")
         self.assertEqual(old_approval["monitor_stage"], "CPU-only CLI")
 
+    def test_path3_monitor_phase_is_owner_bound_display_only(self):
+        for phase in ("HOST_ONLY", "INSTALL", "RUNTIME",
+                      "PROGRAMMING_PROFILE", "FLASH_TEST"):
+            with self.subTest(phase=phase):
+                order = self._order(monitor_phase=phase)
+                event = self._event(order)
+                request = dev.request(event, self._context())
+                approved = dev.authorize(event, self._context(), self.registry)
+                task = dev.task_for_request(self.registry, request, event)
+                self.assertEqual(approved["monitor_phase"], phase)
+                self.assertEqual(task["monitor_phase"], phase)
+                self.assertEqual(approved["execution_path"], "path3-codex")
+                self.assertEqual(approved["execution_capability"],
+                                 "codex-workspace")
+                self.assertNotIn("hardware_stages", approved)
+                changed = self._event(order | {"monitor_phase": "HOST_ONLY"
+                                              if phase != "HOST_ONLY" else "INSTALL"})
+                with self.assertRaisesRegex(
+                        dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+                    dev.task_for_request(self.registry, request, changed)
+        for phase in ("FLASH_PASS", "INSTALL\nsecret", "hostname;sudo",
+                      "", None, 1, True):
+            with self.subTest(phase=phase):
+                with self.assertRaisesRegex(
+                        dev.Denied, "WORK_ORDER_MONITOR_PHASE_DENIED"):
+                    dev.request(self._event(self._order(monitor_phase=phase)),
+                                self._context())
+        with self.assertRaises(dev.Denied):
+            dev.request(self._event(self._order(
+                "path2-cli", monitor_phase="INSTALL")), self._context())
+        legacy = dev.authorize(self._event(self._order()), self._context(),
+                               self.registry)
+        self.assertEqual(legacy["monitor_phase"], "")
+
     def test_path3_does_not_report_path2_cli_stage(self):
         a = dev.authorize(
             self._event(self._order()), self._context(), self.registry)
