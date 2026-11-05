@@ -1,8 +1,8 @@
 """OPF-4A: real Bundle v3/Active Set -> C-3 socket -> ABI-v5 interface.
 
 Host-only: the physical OpenOCD child and admission subprocess are simulated
-at the existing ABI-v5 process edge. No Mock Provider, PS Runtime cutover,
-FPGA load, Z2 access, or DUT operation is performed.
+at the existing ABI-v5 process edge. No FPGA load, Z2 access, or DUT
+operation is performed.
 """
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ import ppu_opf_reference_openocd as reference  # noqa: E402
 import ppu_site_adapter_abi5 as abi5  # noqa: E402
 import ppu_site_engine as engine  # noqa: E402
 import ppu_site_worker as worker  # noqa: E402
+import ppu_asset_set as assets  # noqa: E402
 
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"),
                                 reason="Linux AF_UNIX + SO_PEERCRED")
@@ -96,7 +97,13 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                                              require_root=False)
         sim = FlashSim(c3_profile.flash_base, c3_profile.flash_size)
         journal = path / "journal.json"
-        journal.write_text('{"status":"IMAGE","image_id":"test","session_id":"test"}')
+        fpga = assets.resolve_staged_fpga_handoff(co.paths.product_root, digest)["fpga_image"]
+        journal.write_text(json.dumps({
+            "schema": "plasma.fpga.image-deployment.v3", "status": "IMAGE",
+            "image_id": fpga["image_id"], "session_id": "test",
+            "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+            "firmware_sha256": fpga["bin_sha256"],
+            "manifest_sha256": fpga["manifest_sha256"], "test_count": 1}))
         (path / "records").mkdir()
         adapter = abi5.Abi5OpenocdAdapter(
             openocd_root=Path(engine_data["openocd_root"]), python=Path(sys.executable),

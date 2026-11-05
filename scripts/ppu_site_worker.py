@@ -289,6 +289,7 @@ class SiteWorkerCore:
                         "operations": sorted(self.adapter.operations),
                         "sealed_sites": sorted(self._sealed),
                         "not_ready": getattr(self.adapter, "not_ready", None),
+                        "identity": dict(self.adapter.identity()),
                         "sessions": sessions,
                         "session": sessions[0] if sessions else None}
         if op == "bind_image":
@@ -451,7 +452,8 @@ class SiteWorkerCore:
                 "owner_kind": owner_kind,
                 **({"worker_engine_selection_sha256": self.engine_selection_sha256}
                    if expected_engine is not None else {}),
-                **({"provider_route": dict(route), "deadline_monotonic": deadline}
+                **({"provider_route": dict(route), "deadline_monotonic": deadline,
+                    "identity": dict(identity)}
                    if route is not None else {})}
 
     def _transport(self, op: str, request: dict, peer: tuple[int, int, int]) -> dict[str, Any]:
