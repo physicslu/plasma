@@ -53,7 +53,8 @@ def test_issue_verify_roundtrip_summary_has_no_secret_or_mac():
 
 
 def test_manager_issuer_is_byte_identical_to_ppu_contract():
-    for action in (owner.ADMIT, owner.INSTALL, owner.INSTALL_FPGA_LOAD):
+    for action in (owner.ADMIT, owner.INSTALL, owner.ACTIVATE,
+                   owner.ACTIVATE_FPGA_LOAD):
         ppu = owner.issue(credential=OWNER_TOKEN, action=action, device_id=DEV,
                           subject_sha256=SHA, transaction_id=TX)
         mgr = manager_owner.issue_bundle_operation(
@@ -193,7 +194,8 @@ def test_b2_owner_chose_different_bytes_than_uploaded_is_denied(loopback, tmp_pa
     assert not paths.deployment_record.exists()
 
 
-@pytest.mark.parametrize("action", [owner.INSTALL, owner.INSTALL_FPGA_LOAD])
+@pytest.mark.parametrize("action", [owner.INSTALL, owner.ACTIVATE,
+                                     owner.ACTIVATE_FPGA_LOAD])
 def test_b2_rejects_authorization_for_another_stage(loopback, tmp_path, action):
     api, paths, _server = loopback
     archive, digest = bundle_v3(tmp_path)
@@ -248,6 +250,17 @@ def test_b3_without_or_with_forged_authorization_denied(tmp_path, mutate, code):
     mutate(body)
     with pytest.raises(bootstrap.BootstrapServiceError, match=code):
         srv.start_deployment(body)
+    assert calls == [] and srv.deployment_thread is None
+
+
+def test_b3_stage_authorization_cannot_activate_and_activation_cannot_stage(tmp_path):
+    srv, paths, calls, b2 = _admitted(tmp_path)
+    staged = install_body(paths, b2, fpga_load=False, mode="stage_only")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="ACTION_MISMATCH"):
+        srv.start_deployment({**staged, "mode": "activate"})
+    activating = install_body(paths, b2, fpga_load=False, mode="activate")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="ACTION_MISMATCH"):
+        srv.start_deployment({**activating, "mode": "stage_only"})
     assert calls == [] and srv.deployment_thread is None
 
 

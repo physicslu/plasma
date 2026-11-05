@@ -9,8 +9,8 @@ administrator pre-approval.
 
 Each mutating operation carries a fresh authorization bound to exactly:
 
-* ``action``          -- one of ACTIONS (admit / install / install+FPGA load
-                         / Asset execute); one authorization never covers a
+* ``action``          -- one of ACTIONS (admit / stage / activate /
+                         activate+FPGA load / Asset execute); one authorization never covers a
                          different stage;
 * ``device_id``       -- the target PPU's derived Bootstrap device identity;
 * ``subject_sha256``  -- the exact Bundle archive (== Asset Set) SHA256 the
@@ -48,9 +48,10 @@ DEVICE = re.compile(r"ppu-device-[0-9a-f]{16,64}\Z")
 
 ADMIT = "bundle.admit"
 INSTALL = "bundle.install"
-INSTALL_FPGA_LOAD = "bundle.install-fpga-load"
+ACTIVATE = "bundle.activate"
+ACTIVATE_FPGA_LOAD = "bundle.activate-fpga-load"
 EXECUTE = "asset.execute"
-ACTIONS = frozenset({ADMIT, INSTALL, INSTALL_FPGA_LOAD, EXECUTE})
+ACTIONS = frozenset({ADMIT, INSTALL, ACTIVATE, ACTIVATE_FPGA_LOAD, EXECUTE})
 FIELDS = frozenset({
     "schema", "action", "device_id", "subject_sha256", "transaction_id",
     "package_identity_sha256", "mac",

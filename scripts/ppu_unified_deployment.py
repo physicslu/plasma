@@ -710,7 +710,7 @@ def evaluate_host_only_owner_authorization(
     if (owner_authorization.get("status") != "OWNER_AUTHORIZED"
             or owner_authorization.get("schema") != OWNER_AUTHORIZATION_SCHEMA
             or owner_authorization.get("action") not in {
-                "bundle.install", "bundle.install-fpga-load"}):
+                "bundle.install", "bundle.activate", "bundle.activate-fpga-load"}):
         raise UnifiedDeploymentError("OWNER_AUTHORIZATION_REQUIRED")
     if owner_authorization.get("subject_sha256") != bundle.archive_sha256:
         raise UnifiedDeploymentError("OWNER_AUTHORIZATION_SUBJECT_MISMATCH")

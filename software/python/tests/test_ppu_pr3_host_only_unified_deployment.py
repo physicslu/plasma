@@ -260,10 +260,15 @@ def test_pr3_manager_rejects_untrusted_upstream_install_receipt(tmp_path):
 
 
 B3_BODY = {"kind": "bundle", "upload_id": "a" * 32, "archive_sha256": "b" * 64,
-           "admission_transaction_id": "e" * 32}
+           "admission_transaction_id": "e" * 32, "mode": "activate"}
 
 
-def test_manager_forwards_explicit_b3_fpga_load_only(tmp_path):
+@pytest.mark.parametrize("mode,fpga_load,action", [
+    ("stage_only", False, "bundle.install"),
+    ("activate", False, "bundle.activate"),
+    ("activate", True, "bundle.activate-fpga-load"),
+])
+def test_manager_forwards_b3_mode_and_exact_authorization(tmp_path, mode, fpga_load, action):
     FakeBootstrapClient.instances.clear()
     creds = BootstrapCredentialStore(tmp_path / "credentials.json")
     creds.set("z2", DEVICE_ID, TOKEN)
@@ -275,8 +280,9 @@ def test_manager_forwards_explicit_b3_fpga_load_only(tmp_path):
             return 202, {"ok": True, "deployment": {
                 "state": "queued", "upload_id": "a" * 32, "transaction_id": "c" * 32,
                 "admission_transaction_id": "e" * 32,
+                "mode": body["mode"], "fpga_load": body["fpga_load"],
                 "owner_authorization": {
-                    "status": "OWNER_AUTHORIZED", "action": "bundle.install-fpga-load",
+                    "status": "OWNER_AUTHORIZED", "action": action,
                     "subject_sha256": "b" * 64,
                 },
             }}
@@ -284,27 +290,35 @@ def test_manager_forwards_explicit_b3_fpga_load_only(tmp_path):
     manager = ManagerBootstrapCoordinator(
         _registry(tmp_path), creds, 2.0, client_factory=B3Client,
     )
-    status, body = manager.start_deployment("z2", {**B3_BODY, "fpga_load": True})
+    status, body = manager.start_deployment("z2", {**B3_BODY, "mode": mode,
+                                                   "fpga_load": fpga_load})
     assert status == 202 and body["deployment"]["state"] == "queued"
     calls = [c for c in B3Client.instances[-1].calls if c[0] == "start_deployment"]
     assert len(calls) == 1 and calls[0][1] == TOKEN
     sent = calls[0][2]
-    assert set(sent) == {"kind", "upload_id", "fpga_load", "authorization"}
-    assert sent["fpga_load"] is True
-    # FPGA load is a distinct action bound to the CURRENT B2 transaction.
+    assert set(sent) == {"kind", "upload_id", "mode", "fpga_load", "authorization"}
+    assert sent["mode"] == mode
+    assert sent["fpga_load"] is fpga_load
+    # Each B3 mode is a distinct action bound to the CURRENT B2 transaction.
     owner_module.verify(
-        sent["authorization"], credential=TOKEN, action="bundle.install-fpga-load",
+        sent["authorization"], credential=TOKEN, action=action,
         device_id=DEVICE_ID, subject_sha256="b" * 64, transaction_id="e" * 32,
     )
-    with pytest.raises(owner_module.OwnerAuthorizationDenied, match="ACTION_MISMATCH"):
-        owner_module.verify(
-            sent["authorization"], credential=TOKEN, action="bundle.install",
-            device_id=DEVICE_ID, subject_sha256="b" * 64, transaction_id="e" * 32,
-        )
+    for other_action in {"bundle.install", "bundle.activate",
+                         "bundle.activate-fpga-load"} - {action}:
+        with pytest.raises(owner_module.OwnerAuthorizationDenied, match="ACTION_MISMATCH"):
+            owner_module.verify(
+                sent["authorization"], credential=TOKEN, action=other_action,
+                device_id=DEVICE_ID, subject_sha256="b" * 64, transaction_id="e" * 32,
+            )
 
 
 @pytest.mark.parametrize("body", [
     {**B3_BODY, "fpga_load": "true"},
+    {**{key: value for key, value in B3_BODY.items() if key != "mode"}, "fpga_load": False},
+    {**B3_BODY, "fpga_load": True, "mode": "stage_only"},
+    {**B3_BODY, "fpga_load": False, "mode": "unknown"},
+    {**B3_BODY, "fpga_load": False, "mode": None},
     {**B3_BODY, "fpga_load": True, "idle": True},
     {**B3_BODY, "fpga_load": True, "path": "/opt"},
     {**B3_BODY, "upload_id": "A" * 32, "fpga_load": False},
@@ -332,6 +346,36 @@ def test_manager_rejects_b3_reply_that_is_not_queued(tmp_path):
 
     manager = ManagerBootstrapCoordinator(
         _registry(tmp_path), creds, 2.0, client_factory=Odd,
+    )
+    with pytest.raises(BootstrapManagerError, match="not a queued transaction"):
+        manager.start_deployment("z2", {**B3_BODY, "fpga_load": False})
+
+
+@pytest.mark.parametrize("change", [
+    lambda receipt: receipt.__setitem__("mode", "stage_only"),
+    lambda receipt: receipt.__setitem__("fpga_load", True),
+    lambda receipt: receipt["owner_authorization"].__setitem__("action", "bundle.install"),
+])
+def test_manager_rejects_b3_reply_with_changed_mode_or_action(tmp_path, change):
+    creds = BootstrapCredentialStore(tmp_path / "credentials.json")
+    creds.set("z2", DEVICE_ID, TOKEN)
+
+    class WrongB3(FakeBootstrapClient):
+        def start_deployment(self, token, body):
+            receipt = {
+                "state": "queued", "upload_id": "a" * 32,
+                "admission_transaction_id": "e" * 32,
+                "mode": "activate", "fpga_load": False,
+                "owner_authorization": {
+                    "status": "OWNER_AUTHORIZED", "action": "bundle.activate",
+                    "subject_sha256": "b" * 64,
+                },
+            }
+            change(receipt)
+            return 202, {"ok": True, "deployment": receipt}
+
+    manager = ManagerBootstrapCoordinator(
+        _registry(tmp_path), creds, 2.0, client_factory=WrongB3,
     )
     with pytest.raises(BootstrapManagerError, match="not a queued transaction"):
         manager.start_deployment("z2", {**B3_BODY, "fpga_load": False})

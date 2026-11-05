@@ -17,7 +17,8 @@ from .registry import PPURegistryStore, RegistryEntryNotFound, normalize_registr
 from .owner_authorization import (
     ADMIT,
     INSTALL,
-    INSTALL_FPGA_LOAD,
+    ACTIVATE,
+    ACTIVATE_FPGA_LOAD,
     OwnerAuthorizationError,
     issue_bundle_operation,
 )
@@ -486,25 +487,33 @@ class ManagerBootstrapCoordinator:
         # The Manager turns that ONE choice into a device-bound Owner Operation
         # Authorization; the PPU re-derives every bound fact and re-checks B2,
         # Target, Package DAG, FPGA qualification and its own locks.
-        if body.get("kind") == "bundle" and "fpga_load" in body:
+        if body.get("kind") == "bundle" and ("fpga_load" in body or "mode" in body):
             if set(body) != {"kind", "upload_id", "archive_sha256",
-                             "admission_transaction_id", "fpga_load"}:
+                             "admission_transaction_id", "mode", "fpga_load"}:
                 raise BootstrapManagerError(
                     "Bundle B3 requires kind, upload_id, archive_sha256, "
-                    "admission_transaction_id and fpga_load")
+                    "admission_transaction_id, mode and fpga_load")
             upload_id = _hex_field(body["upload_id"], 32, "generic Bundle upload_id")
             digest = _hex_field(body["archive_sha256"], 64, "Bundle archive_sha256")
             admission = _hex_field(body["admission_transaction_id"], 32,
                                    "Bundle admission_transaction_id")
             if type(body["fpga_load"]) is not bool:
                 raise BootstrapManagerError("Bundle B3 fpga_load must be a boolean")
+            mode = body["mode"]
+            if type(mode) is not str or mode not in {"activate", "stage_only"}:
+                raise BootstrapManagerError("Bundle B3 mode is invalid")
+            if mode == "stage_only" and body["fpga_load"]:
+                raise BootstrapManagerError("Bundle B3 stage_only cannot load FPGA")
+            action = (ACTIVATE_FPGA_LOAD if body["fpga_load"] else
+                      ACTIVATE if mode == "activate" else INSTALL)
             authorization = _issue(
-                token, INSTALL_FPGA_LOAD if body["fpga_load"] else INSTALL,
+                token, action,
                 device_id, digest, admission,
             )
             status, response = client.start_deployment(token, {
                 "kind": "bundle", "upload_id": upload_id,
-                "fpga_load": body["fpga_load"], "authorization": authorization,
+                "mode": mode, "fpga_load": body["fpga_load"],
+                "authorization": authorization,
             })
             deployment = response.get("deployment") if isinstance(response, dict) else None
             owner = deployment.get("owner_authorization") if isinstance(deployment, dict) else None
@@ -514,6 +523,8 @@ class ManagerBootstrapCoordinator:
                 or deployment.get("upload_id") != upload_id
                 or deployment.get("state") not in {"queued", "running"}
                 or deployment.get("admission_transaction_id") != admission
+                or deployment.get("mode") != mode
+                or deployment.get("fpga_load") is not body["fpga_load"]
                 or not isinstance(owner, dict)
                 or owner.get("status") != "OWNER_AUTHORIZED"
                 or owner.get("action") != authorization["action"]

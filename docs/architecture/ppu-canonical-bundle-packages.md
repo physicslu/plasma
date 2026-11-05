@@ -117,8 +117,8 @@ atomically publishes the verified Set under the Coordinator's existing
 it does not reload PL. A Bundle containing an FPGA Image cannot activate
 with `fpga_load: false`: its caller must **explicitly** choose
 `mode: "activate", fpga_load: true` and carry the separate
-`bundle.install-fpga-load` owner authorization. No server-side default or
-`bundle.install` authorization can infer this privilege.
+`bundle.activate-fpga-load` owner authorization. No server-side default or
+`bundle.install` or `bundle.activate` authorization can infer this privilege.
 
 **B3 FPGA load (owner decision 2026-11-02, [Gate 1](../deployment/ppu-bundle-v3-b3-fpga-load-gate1.md)).**
 A B3 `mode: "activate"` request with an explicit `"fpga_load": true` for a Bundle that contains

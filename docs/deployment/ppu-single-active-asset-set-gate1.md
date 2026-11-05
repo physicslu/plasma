@@ -26,7 +26,7 @@ signature, Master approval or device authorization.
 - \`GET /v1/assets\` gives an independently verified \`EMPTY\` or \`ACTIVE\`
   identity and a **READY=false** result. Corrupt active content causes
   failure/unknown, never a false SHA match.
-- Console \`reconcile_bundle_assets(full_bundle_bytes)\` fetches the
+- Console \`reconcile_bundle_assets(full_bundle_bytes, fpga_load=explicit_choice)\` fetches the
   PPU Active identity: if the digest matches it returns \`ALREADY_ACTIVE\`
   without upload; otherwise uploads the **whole Bundle** through B1,
   obtains B2, and explicitly requests B3 `mode="activate"`, including
@@ -36,7 +36,7 @@ signature, Master approval or device authorization.
   pointer untouched. Standard `mode="activate"` without FPGA Package
   atomically selects the verified Set under the existing Runtime lease.
   An FPGA Bundle requires explicit `fpga_load=true` and separate
-  `bundle.install-fpga-load` authorization; it publishes `active.json`
+  `bundle.activate-fpga-load` authorization; it publishes `active.json`
   only after protected Root Identity PASS
   ([B3 FPGA load Gate 1](ppu-bundle-v3-b3-fpga-load-gate1.md)).
 

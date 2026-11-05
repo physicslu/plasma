@@ -271,7 +271,8 @@ class BootstrapAPIClient:
             "kind": "bundle", "upload_id": admitted.upload_id, "mode": mode,
             "fpga_load": fpga_load,
             "authorization": self._authorize(
-                "bundle.install-fpga-load" if fpga_load else "bundle.install",
+                ("bundle.activate-fpga-load" if fpga_load else
+                 "bundle.activate" if mode == "activate" else "bundle.install"),
                 admitted.archive_sha256, admitted.transaction_id,
             ),
         }
@@ -371,8 +372,8 @@ class BootstrapAPIClient:
         )
 
     def install_bundle(
-        self, admitted: DeploymentSubmission, *, mode: str = "activate",
-        fpga_load: bool = False,
+        self, admitted: DeploymentSubmission, *, mode: str,
+        fpga_load: bool,
     ) -> DeploymentSubmission:
         """Explicit B3 of the EXACT current B2 admitted Bundle.
 
@@ -382,8 +383,9 @@ class BootstrapAPIClient:
         and the separate FPGA-load owner authorization; never infer privilege
         from a missing wire field. No Package/DUT execution is performed.
         The admission receipt must be read back from the current device and
-        match the operator's archive SHA256; a fresh ``bundle.install`` /
-        ``bundle.install-fpga-load`` owner authorization is bound to that
+        match the operator's archive SHA256; a fresh mode-specific
+        ``bundle.install`` / ``bundle.activate`` /
+        ``bundle.activate-fpga-load`` owner authorization is bound to that
         SHA256 and the CURRENT B2 transaction. A B2 receipt is never install
         authority. This method never auto-retries on uncertainty.
         """
@@ -417,14 +419,23 @@ class BootstrapAPIClient:
             raise DeploymentAPIError("B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD")
         if fpga_load and not has_fpga_image:
             raise DeploymentAPIError("B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE")
-        reply = self._call("POST", "/v1/deployments", self._install_body(admitted, mode, fpga_load))
+        body = self._install_body(admitted, mode, fpga_load)
+        reply = self._call("POST", "/v1/deployments", body)
         record = reply.get("deployment")
+        owner = record.get("owner_authorization") if isinstance(record, dict) else None
         if (not isinstance(record, dict)
                 or record.get("upload_id") != admitted.upload_id
                 or type(record.get("transaction_id")) is not str
                 or not _HEX32.fullmatch(record["transaction_id"])
                 or record.get("transaction_id") == admitted.transaction_id
-                or record.get("state") not in _INFLIGHT):
+                or record.get("state") not in _INFLIGHT
+                or record.get("mode") != mode
+                or record.get("fpga_load") is not fpga_load
+                or not isinstance(owner, dict)
+                or owner.get("status") != "OWNER_AUTHORIZED"
+                or owner.get("action") != body["authorization"]["action"]
+                or owner.get("subject_sha256") != admitted.archive_sha256
+                or owner.get("transaction_id") != admitted.transaction_id):
             raise DeploymentOutcomeUnknown("B3_INSTALL_SUBMISSION_UNKNOWN")
         return DeploymentSubmission(
             admitted.upload_id, record["transaction_id"], record["state"],
@@ -466,13 +477,15 @@ class BootstrapAPIClient:
             raise DeploymentOutcomeUnknown("ASSET_SET_STATUS_UNTRUSTED")
         return record
 
-    def reconcile_bundle_assets(self, archive: bytes) -> dict[str, Any]:
+    def reconcile_bundle_assets(self, archive: bytes, *, fpga_load: bool) -> dict[str, Any]:
         """Compare whole Bundle SHA; on mismatch explicitly B1 -> B2 -> B3.
 
         Returns the B3 transaction ID for explicit observation. Does NOT
-        launch a job or claim READY. It explicitly requests FPGA load for
-        an admitted FPGA Bundle with the matching owner operation.
+        launch a job or claim READY. The caller must explicitly choose whether
+        FPGA load is authorized; Bundle contents cannot grant that privilege.
         """
+        if type(fpga_load) is not bool:
+            raise DeploymentAPIError("B3_FPGA_LOAD_FLAG_INVALID")
         if not isinstance(archive, bytes) or not 0 < len(archive) <= _MAX_UPLOAD:
             raise DeploymentAPIError("ASSET_SET_BUNDLE_INVALID")
         digest = hashlib.sha256(archive).hexdigest()
@@ -484,10 +497,6 @@ class BootstrapAPIClient:
             }
         uploaded = self.upload(archive)
         b2 = self.submit(kind="bundle", upload_id=uploaded, archive_sha256=digest)
-        admission = self.deployment_state(b2.transaction_id)
-        plan = admission["result"]["plan"]
-        fpga_load = any(type(package) is dict and package.get("kind") == "fpga-image"
-                        for package in plan["packages"])
         b3 = self.install_bundle(b2, mode="activate", fpga_load=fpga_load)
         return {
             "result": "B3_INSTALL_QUEUED", "asset_set_sha256": digest,

@@ -121,7 +121,7 @@ tree, Golden and the existing OpenOCD installs.
 ## 5. Risks and safeguards
 
 - **HTTP-triggered PL reconfiguration.** It requires an explicit `fpga_load` field,
-  the device-bound Bootstrap pairing, a fresh owner `bundle.install-fpga-load`
+  the device-bound Bootstrap pairing, a fresh owner `bundle.activate-fpga-load`
   authorization bound to the current B2 admission, and the
   protected Root pin. It never triggers from upload alone.
 - **Active Jobs or OpenOCD during reload.** Runtime Quiesce covers Jobs, and the Root

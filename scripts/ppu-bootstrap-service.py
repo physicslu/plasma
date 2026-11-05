@@ -567,8 +567,8 @@ def _trusted_b3_install_policy(paths: ServicePaths) -> dict[str, Any]:
     """Device-local generic B3 enablement, not publisher authentication.
 
     Generic, Bundle-independent device capability (no per-Bundle SHA list).
-    Each B3 additionally needs a fresh owner ``bundle.install`` /
-    ``bundle.install-fpga-load`` authorization from the paired Console for
+    Each B3 additionally needs a fresh mode-specific owner ``bundle.install`` /
+    ``bundle.activate`` / ``bundle.activate-fpga-load`` authorization for
     the exact admitted Bundle. B3 never permits Package execution or DUT
     operation; FPGA load still passes the protected Root Entry.
     """
@@ -925,7 +925,8 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             # is never accepted as install authority.
             owner = _owner_operation(
                 self.bootstrap_paths, body["authorization"],
-                action="bundle.install-fpga-load" if fpga_load else "bundle.install",
+                action=("bundle.activate-fpga-load" if fpga_load else
+                        "bundle.activate" if mode == "activate" else "bundle.install"),
                 subject_sha256=plan["archive_sha256"],
                 transaction_id=earlier["transaction_id"],
             )
