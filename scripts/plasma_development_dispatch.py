@@ -17,6 +17,7 @@ import re
 import shutil
 import subprocess
 import select
+import signal
 import time
 import sys
 import uuid
@@ -1107,7 +1108,8 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
             trace.write(b"=== Codex JSONL event types (sensitive fields omitted) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE,
-                                  stderr=subprocess.DEVNULL) as worker:
+                                  stderr=subprocess.DEVNULL,
+                                  start_new_session=max_seconds is not None) as worker:
                 assert worker.stdin is not None and worker.stdout is not None
                 try:
                     worker.stdin.write(prompt)
@@ -1122,7 +1124,10 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                         remaining = deadline - time.monotonic()
                         if remaining <= 0:
                             usage.budget_reason = "WALL_TIMEOUT"
-                            worker.kill()
+                            try:
+                                os.killpg(worker.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
                             break
                         readable, _, _ = select.select(
                             [worker.stdout], [], [], min(remaining, 0.5))
@@ -1138,7 +1143,10 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                     if (max_tool_items is not None and
                             usage.tool_items_started > max_tool_items):
                         usage.budget_reason = "TOOL_ITEMS_LIMIT"
-                        worker.kill()
+                        try:
+                            os.killpg(worker.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
                         break
                     if live_fd >= 0 and monitor_safe:
                         try:
@@ -1263,6 +1271,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
                 max_tool_items=QUICK_MAX_TOOL_ITEMS if quick else None)
             proc = subprocess.CompletedProcess(command, returncode, b"", b"")
         except LiveMonitorUnavailable:
+            if quick:
+                # No streaming observation => cannot enforce tool-item budget.
+                raise Denied("QUICK_MONITOR_REQUIRED") from None
             # Only pre-execution setup can fall back. Never re-run a Codex
             # command after any part of its real execution has begun.
             # Monitor unavailable: preserve the original real execution path,
@@ -1278,6 +1289,8 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
                 usage.feed(proc.stdout) + usage.finish() +
                 (b"[codex stderr omitted]\n" if proc.stderr else b""))
     else:
+        if quick and executor is subprocess.run:
+            raise Denied("QUICK_MONITOR_REQUIRED")
         proc = executor(
             command, input=prompt.encode("utf-8"), cwd=root,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
