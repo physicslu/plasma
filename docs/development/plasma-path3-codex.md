@@ -60,6 +60,19 @@ Codex at all. See [Path 2 CLI contract](plasma-path2-cli.md). This is a
 routing choice by the dispatcher author, **not** an automatic reinterpretation
 of the approved Path 3 work order; do not silently change a scoped task.
 
+### Trusted CI Runtime Kit handoff
+
+An authenticated Path 3 hardware Work Order may carry an artifact_source object
+containing exactly source_sha (40-digit commit) and run_id (successful Z2 PS
+release CI run). The trusted GitHub Actions step checks producer repository,
+workflow, push to main, complete source SHA, successful conclusion, Artifact
+identity, expiry and ZIP SHA-256. It then verifies the Kit sidecar, complete
+internal SHA256SUMS, and embedded PPU release.json source identity. Only
+verified Kit and Sidecar paths are exported to the Path 3 subprocess.
+The token remains confined to the trusted Actions step. No fixed release is
+accepted as a fallback. This does not authorize any Z2 deployment or DUT work,
+which still requires the existing owner Work Order scope and Root Guard.
+
 ### Operator Monitor engineering diagnostics (display only)
 
 Path 3 Owner-authenticated Issue #981 Work Orders may add optional
