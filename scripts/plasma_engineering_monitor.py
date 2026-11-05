@@ -626,7 +626,7 @@ def render_snapshot(directory: Path, path: str, *,
     if width is not None:
         lines = [_clip_columns(str(line),
                  max(0, min(width - 1, MAX_DISPLAY_COLUMNS))) for line in lines]
-    return CONTROL.sub("", "\\n".join(str(line) for line in lines))
+    return CONTROL.sub("", "\n".join(str(line) for line in lines))
 
 
 def view_loop(path: str, *, directory: Path = MONITOR, output=None,
