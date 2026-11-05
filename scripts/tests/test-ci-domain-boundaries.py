@@ -194,6 +194,25 @@ def validate_p1_path_filter_contracts() -> None:
                 raise SystemExit(f"{owner}: ordered paths exclusion was lost")
             cursor = exclusion + len(negative_marker)
 
+    # Host-only C-3 Site Session changes are covered by Python PS tests, not
+    # the ARMv7 Bootstrap deploy/QEMU acceptance. Keep each ordered exclusion
+    # under the positive plasma_interfaces glob for push and pull_request.
+    qemu = read("z2like-demo-qemu.yml")
+    positive = '"software/python/plasma_interfaces/**"'
+    negative = '"!software/python/plasma_interfaces/site_worker_c3.py"'
+    require_count(qemu, positive, 2, owner="OPF C-3/QEMU path routing")
+    require_count(qemu, negative, 2, owner="OPF C-3/QEMU path routing")
+    cursor = 0
+    for _ in ("push", "pull_request"):
+        start = qemu.find(positive, cursor)
+        exclusion = qemu.find(negative, start + len(positive))
+        next_positive = qemu.find(positive, start + len(positive))
+        if start < 0 or exclusion < 0 or (
+            next_positive >= 0 and exclusion > next_positive
+        ):
+            raise SystemExit("OPF C-3/QEMU: ordered paths exclusion was lost")
+        cursor = exclusion + len(negative)
+
     # The repository-wide docs contract owns docs/README.md. These dedicated
     # jobs do not consume that file; retain their own domain document triggers.
     for name in (
