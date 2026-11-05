@@ -198,22 +198,28 @@ def test_worker_without_verified_startup_engine_denies_reference_route():
         assert env["core"]._sessions == {} and not env["sim"].argvs
 
 
-def test_missing_in_band_worker_receipt_closes_qualified_session():
-    class MissingReceipt:
+@pytest.mark.parametrize("tamper", ["missing_sha", "wrong_sha", "wrong_epoch"])
+def test_invalid_in_band_worker_receipt_closes_qualified_session(tamper):
+    class AlteredReceipt:
         def __init__(self, client):
             self.client = client
 
         def open_job_session(self, **kwargs):
             opened = self.client.open_job_session(**kwargs)
-            return {key: value for key, value in opened.items()
-                    if key != "worker_engine_selection_sha256"}
+            if tamper == "missing_sha":
+                del opened["worker_engine_selection_sha256"]
+            elif tamper == "wrong_sha":
+                opened["worker_engine_selection_sha256"] = "f" * 64
+            else:
+                opened["epoch"] = "invalid-epoch"
+            return opened
 
         def call(self, *args, **kwargs):
             return self.client.call(*args, **kwargs)
 
     with installed_bundle() as env:
         with pytest.raises(ValueError, match="WORKER_ENGINE_RECEIPT_MISMATCH"):
-            _execute(env, client=MissingReceipt(env["client"]))
+            _execute(env, client=AlteredReceipt(env["client"]))
         assert env["core"]._sessions == {} and env["core"]._site_owners == {}
         assert not env["sim"].argvs
 
