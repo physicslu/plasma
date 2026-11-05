@@ -1495,6 +1495,72 @@ if op in ("new-session", "new-window"):
                 if started:
                     tmux("kill-server", check=False)
 
+    @unittest.skipUnless(shutil.which("tmux"), "tmux binary not installed")
+    def test_one_line_reload_replaces_only_private_monitor_viewers(self):
+        """Validate --reload against real tmux, never a user-owned session."""
+        with tempfile.TemporaryDirectory(prefix="plasma-reload-tmux-") as td:
+            root = Path(td)
+            socket = str(root / "private.sock")
+            real_tmux = shutil.which("tmux")
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            wrapper = bin_dir / "tmux"
+            wrapper.write_text(
+                '#!/bin/bash\n'
+                'if [[ "$1" == attach-session ]]; then exit 0; fi\n'
+                'exec "$TEST_REAL_TMUX" -S "$TEST_SOCKET" -f /dev/null "$@"\n')
+            wrapper.chmod(0o755)
+            for name, body in (
+                ("id", '[[ "$1" == "-un" ]] && { echo operator; exit; }\n'
+                 '[[ "$1" == "-nG" ]] && { echo "operator plasma-monitor"; exit; }\n'
+                 'exit 2\n'),
+                ("getent", '[[ "$1" == group && "$2" == plasma-monitor ]]\n'),
+                ("sg", 'echo "STUB_RELOAD_VIEWER_EXIT" >&2\nexit 7\n'),
+            ):
+                stub = bin_dir / name
+                stub.write_text("#!/bin/bash\n" + body)
+                stub.chmod(0o755)
+            env = dict(os.environ, TEST_REAL_TMUX=real_tmux,
+                       TEST_SOCKET=socket)
+            env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
+            def tmux(*args):
+                return subprocess.run(
+                    [real_tmux, "-S", socket, "-f", "/dev/null", *args],
+                    capture_output=True, text=True, check=True, timeout=10)
+            started = False
+            try:
+                tmux("new-session", "-d", "-s", "plasma-monitor",
+                     "-x", "80", "-y", "24", "-n", "path2", "bash")
+                started = True
+                tmux("move-window", "-d", "-s", "plasma-monitor:0",
+                     "-t", "plasma-monitor:1")
+                tmux("new-window", "-d", "-t", "plasma-monitor:2",
+                     "-n", "path3", "bash")
+                tmux("set-environment", "-g", "PATH", env["PATH"])
+                launcher = subprocess.run(
+                    ["bash", str(ROOT / "scripts/plasma-engineering-monitor.sh"),
+                     "--reload"], env=env, capture_output=True, text=True,
+                    timeout=15)
+                self.assertEqual(launcher.returncode, 0, launcher.stderr)
+                panes = tmux("list-windows", "-t", "plasma-monitor",
+                             "-F", "#{window_index}:#{window_name}").stdout
+                self.assertIn("1:path2", panes)
+                self.assertIn("2:path3", panes)
+                for path, index in (("path2", 1), ("path3", 2)):
+                    frame = ""
+                    for _ in range(40):
+                        frame = tmux("capture-pane", "-p", "-S", "-50",
+                                     "-t", "plasma-monitor:" + str(index)).stdout
+                        if "MONITOR_VIEWER_EXIT path=" + path in frame:
+                            break
+                        time.sleep(0.1)
+                    self.assertIn(
+                        "MONITOR_VIEWER_EXIT path=" + path + " exit=7",
+                        frame)
+            finally:
+                if started:
+                    tmux("kill-server")
+
     def test_one_shared_workflow_and_two_paths(self):
         workflow = WORKFLOW.read_text()
         self.assertIn("plasma_engineering_monitor.py run path2 --", workflow)
