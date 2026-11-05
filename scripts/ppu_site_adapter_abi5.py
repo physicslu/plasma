@@ -166,6 +166,10 @@ class Abi5OpenocdAdapter:
             # algorithm stuck after the erase (Driver track HIL 2026-11-04,
             # runbook section 10): every Flash operation starts from reset.
             "-c", "reset halt",
+            # Match the proven Site 2 A/B OpenOCD sequence: avoid background
+            # target-state polling and explicitly probe bank 0 before erase.
+            "-c", "poll off",
+            "-c", "flash probe 0",
             "-c", f"flash erase_address {base} 0x{profile.erase_length(size):08x}",
             "-c", f"flash write_image {source} {base} bin",
             "-c", f"flash verify_image {source} {base} bin",
