@@ -285,6 +285,7 @@ class SiteWorkerCore:
                     )
                 ]
                 return {"epoch": self.epoch, "adapter": self.adapter.name,
+                        "platform": dict(getattr(self.adapter, "platform", {})),
                         "supported_sites": sorted(self.adapter.supported_sites),
                         "operations": sorted(self.adapter.operations),
                         "sealed_sites": sorted(self._sealed),

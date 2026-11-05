@@ -70,7 +70,7 @@ def test_packaged_opf_contract_imports_from_isolated_zipapp(tmp_path: Path) -> N
         "assert TimeoutPolicy(5000, 12000).default_timeout_ms == 5000"
     )
     result = subprocess.run(
-        [sys.executable, "-I", "-B", "-c", probe], cwd=tmp_path,
+        [sys.executable, "-I", "-S", "-B", "-c", probe], cwd=tmp_path,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15,
     )
     assert result.returncode == 0, result.stderr
@@ -88,6 +88,12 @@ def test_runtime_validator_rejects_missing_opf_contract(tmp_path: Path) -> None:
             if item.filename not in {"plasma_opf/__init__.py", "plasma_opf/contract.py"}:
                 dest.writestr(item, source.read(item.filename))
     damaged.replace(app)
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", "-B", "-c",
+         f"import sys; sys.path.insert(0, {str(app)!r}); import plasma_opf.contract"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode != 0 and "No module named 'plasma_opf.contract'" in result.stderr
     with pytest.raises(runtime.PPURuntimePackagingError, match="plasma_opf"):
         runtime.validate_runtime(output)
 
