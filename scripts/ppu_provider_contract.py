@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import ppu_asset_set
+import ppu_provider_options
 
 SCHEMA = "plasma.ppu.provider-capabilities.v1"
 DESCRIPTOR = "data/plasma-provider.json"
@@ -38,6 +39,14 @@ def _pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _schema_pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in items:
+        _need(key not in result, "OPTIONS_SCHEMA_INVALID")
+        result[key] = value
+    return result
+
+
 @dataclass(frozen=True)
 class ProviderRoute:
     asset_set_sha256: str
@@ -51,18 +60,23 @@ class ProviderRoute:
     driver_abi: str | None
     fpga_package: str | None
     max_image_bytes: int
+    options_schema_sha256: str
+    options_sha256: str
+    options_json: bytes
 
 
 def resolve(
     product_root: Path, *, asset_set_sha256: str, target: str,
     provider: str, profile: str, operation: str, site_id: int, image_size: int,
-    hardware: Mapping[str, Any],
+    hardware: Mapping[str, Any], options: Mapping[str, Any],
 ) -> ProviderRoute:
     """Resolve one route from verified bytes and observed capabilities.
 
     ``hardware`` is supplied by a trusted device-side observer, never copied
     from the Job or Bundle. A PS-only route requires explicit observed PS Site
     support; an FPGA route requires the observed loaded image/ABI/Site.
+    ``options`` must be supplied explicitly, even when empty. It is checked
+    against the selected Provider's hash-verified, versioned schema.
     """
     _need(type(asset_set_sha256) is str and SHA64.fullmatch(asset_set_sha256) is not None,
           "ASSET_SET_IDENTITY_INVALID")
@@ -178,7 +192,31 @@ def resolve(
               and hardware.get("driver_abi") == desc["driver_abi"]
               and hardware.get("fpga_identity_proven") is True,
               "FPGA_DRIVER_UNVERIFIED")
+    options_path = provider_prefix + ppu_provider_options.FILE
+    schema_entries = [entry for entry in selected_provider["files"]
+                      if entry["path"] == options_path]
+    _need(len(schema_entries) == 1, "OPTIONS_SCHEMA_MISSING")
+    schema_entry = schema_entries[0]
+    _need(schema_entry["executable"] is False
+          and 0 < schema_entry["size"] <= ppu_provider_options.MAX_SCHEMA_BYTES,
+          "OPTIONS_SCHEMA_INVALID")
+    try:
+        schema_raw = (root / options_path).read_bytes()
+    except OSError as exc:
+        raise ProviderDenied("OPTIONS_SCHEMA_UNREADABLE") from exc
+    schema_sha = hashlib.sha256(schema_raw).hexdigest()
+    _need(len(schema_raw) == schema_entry["size"]
+          and schema_sha == schema_entry["sha256"], "OPTIONS_SCHEMA_CHANGED")
+    try:
+        schema = json.loads(schema_raw, object_pairs_hook=_schema_pairs)
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise ProviderDenied("OPTIONS_SCHEMA_INVALID") from exc
+    try:
+        options_json = ppu_provider_options.validate(schema, options)
+    except ppu_provider_options.OptionsDenied as exc:
+        raise ProviderDenied(str(exc)) from exc
     return ProviderRoute(asset_set_sha256, selected_provider["id"], selected_profile["id"], digest,
                          target, operation, site_id, desc["transport"],
                          desc["driver_abi"], desc["fpga_package"],
-                         desc["max_image_bytes"])
+                         desc["max_image_bytes"], schema_sha,
+                         hashlib.sha256(options_json).hexdigest(), options_json)

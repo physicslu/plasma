@@ -374,9 +374,12 @@ def _bundle_package_file_allowed(
             return not member.executable and suffix.endswith((".so", ".a"))
         if suffix.startswith("include/"):
             return not member.executable and suffix.endswith((".h", ".hpp"))
-        # The ONE declarative resource manifest an executable Package may carry
-        # (plasma.ppu.package-resources.v1); never an executable entitlement.
-        return not member.executable and suffix == "config/plasma-package-resources.json"
+        # Only these fixed declarative resources are permitted in native code
+        # Packages. Neither grants execution or privileged hardware access.
+        return not member.executable and suffix in (
+            "config/plasma-package-resources.json",
+            "config/plasma-provider-options.json",
+        )
     if kind == "fpga-image":
         # Z2 Root Loader contract: FPGA Manager BIN + HWH + paired
         # plasma.fpga.image.v1 Manifest. A Vivado .bit is not loadable here.
