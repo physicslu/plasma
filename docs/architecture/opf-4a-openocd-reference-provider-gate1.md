@@ -3,6 +3,8 @@
 **Status:** Host-only integration seam; **NOT** a production Runtime cutover or HIL qualification.
 **Scope:** One selected Bundle v3 Active Asset Set, one `flash_cycle` Job, one existing C-3 Site Worker.
 
+> **Gate 1 candidate (Draft only):** Production Runtime cutover is pending in this PR. Previous Path 3 patch evidence: Run #42022044418. No HIL qualification, deployment, or Gate 2 approval is implied.
+
 ## Execution contract
 
 `ppu_opf_reference_openocd.qualify_reference` first delegates Provider/Profile/Options
