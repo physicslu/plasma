@@ -186,6 +186,9 @@ class SiteWorkerCore:
                  clock: Callable[[], float] = time.monotonic,
                  peer_groups: Callable[[int], tuple[int, int]] = proc_peer) -> None:
         self.adapter = adapter
+        # Immutable startup snapshot. An updated selection file cannot claim
+        # that this already-running Worker switched its OpenOCD executable.
+        self.engine_selection_sha256 = getattr(adapter, "engine_selection_sha256", None)
         self.runtime_pid = runtime_pid
         self.lease_verifier = lease_verifier
         self.seal_dir = Path(seal_dir)
@@ -374,6 +377,9 @@ class SiteWorkerCore:
         route = request.get("provider_route") if not package else None
         if route is not None:
             fields |= {"provider_route", "deadline_monotonic"}
+        expected_engine = request.get("expected_engine_selection_sha256")
+        if "expected_engine_selection_sha256" in request:
+            fields.add("expected_engine_selection_sha256")
         _require(set(request) == fields, "REQUEST_INVALID")
         job, sites = request["job_id"], request["sites"]
         _require(type(job) is str and JOB_ID.fullmatch(job) is not None
@@ -404,6 +410,14 @@ class SiteWorkerCore:
             deadline = request["deadline_monotonic"]
             _require(type(deadline) in (int, float) and self.clock() < deadline
                      <= self.clock() + request["max_runtime_s"], "JOB_DEADLINE_INVALID")
+        if "expected_engine_selection_sha256" in request:
+            _require(route is not None and type(expected_engine) is str
+                     and re.fullmatch(r"[0-9a-f]{64}", expected_engine) is not None,
+                     "WORKER_ENGINE_BINDING_INVALID")
+            _require(type(self.engine_selection_sha256) is str,
+                     "WORKER_ENGINE_UNVERIFIED")
+            _require(expected_engine == self.engine_selection_sha256,
+                     "WORKER_ENGINE_SELECTION_MISMATCH")
         not_ready = getattr(self.adapter, "not_ready", None)
         _require(not not_ready, f"ENGINE_NOT_READY:{not_ready}")
         _require(set(sites) <= self.adapter.supported_sites, "SITE_NOT_SUPPORTED")
@@ -435,6 +449,8 @@ class SiteWorkerCore:
                 self._site_owners[site] = s.session_id
         return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites),
                 "owner_kind": owner_kind,
+                **({"worker_engine_selection_sha256": self.engine_selection_sha256}
+                   if expected_engine is not None else {}),
                 **({"provider_route": dict(route), "deadline_monotonic": deadline}
                    if route is not None else {})}
 
@@ -634,10 +650,13 @@ class SiteWorkerClient:
     def open_job_session(self, *, job_id: str, sites: list[int],
                          max_runtime_s: int,
                          provider_route: Mapping[str, Any] | None = None,
-                         deadline_monotonic: float | None = None) -> dict[str, Any]:
+                         deadline_monotonic: float | None = None,
+                         expected_engine_selection_sha256: str | None = None) -> dict[str, Any]:
         extra = ({} if provider_route is None else {
             "provider_route": dict(provider_route),
             "deadline_monotonic": deadline_monotonic})
+        if expected_engine_selection_sha256 is not None:
+            extra["expected_engine_selection_sha256"] = expected_engine_selection_sha256
         return self.call("open_job_session", job_id=job_id, sites=sites,
                          max_runtime_s=max_runtime_s, **extra)
 

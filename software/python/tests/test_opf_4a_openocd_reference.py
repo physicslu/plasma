@@ -31,6 +31,7 @@ from .test_ppu_bundle_v3_packages_contract import ROOT, TARGET, bundle_v3
 sys.path.insert(0, str(ROOT / "scripts"))
 import ppu_opf_reference_openocd as reference  # noqa: E402
 import ppu_site_adapter_abi5 as abi5  # noqa: E402
+import ppu_site_engine as engine  # noqa: E402
 import ppu_site_worker as worker  # noqa: E402
 
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"),
@@ -53,7 +54,7 @@ def _json(payload):
 @contextmanager
 def installed_bundle(*, profile_change=None, descriptor_change=None,
                      engine_binary=OPENOCD, options_schema=None,
-                     with_control_socket=True):
+                     with_control_socket=True, verified_worker=True):
     with tempfile.TemporaryDirectory(prefix="opf4a-", dir="/tmp") as directory:
         path = Path(directory)
         c3_profile = c3_flash_profile(get_default_ic_support_resolver().require_exact(ICPN))
@@ -91,6 +92,8 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
 
         engine_data = make_engine(path / "openocd", "selected", binary=engine_binary)
         engine_record = write_selection(path / "engine.json", engine_data)
+        selected_engine = engine.load_engine(engine_record, base=path / "openocd",
+                                             require_root=False)
         sim = FlashSim(c3_profile.flash_base, c3_profile.flash_size)
         journal = path / "journal.json"
         journal.write_text('{"status":"IMAGE","image_id":"test","session_id":"test"}')
@@ -98,6 +101,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
         adapter = abi5.Abi5OpenocdAdapter(
             openocd_root=Path(engine_data["openocd_root"]), python=Path(sys.executable),
             adapter_khz=engine_data["adapter_khz"], journal=journal,
+            verified_engine=selected_engine if verified_worker else None,
             record_dir=path / "records", run=sim.run, popen=sim.popen,
             openocd_running=lambda: False, poll_s=0.01,
             evidence_dir=path / "openocd-evidence")
@@ -129,7 +133,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                 "job_deadline_monotonic": time.monotonic() + 5,
                 "job_timeout_s": 5.0,
                 "core": core, "sim": sim, "adapter": adapter,
-                "allowed_jobs": allowed_jobs,
+                "allowed_jobs": allowed_jobs, "engine_data": engine_data,
             }
         finally:
             server.close()
@@ -167,10 +171,51 @@ def test_verified_reference_executes_existing_c3_abi5_flash_and_readback():
         assert result["opf_asset_set_sha256"] == env["asset_set_sha256"]
         assert result["opf_openocd_sha256"] == hashlib.sha256(OPENOCD).hexdigest()
         assert result["opf_driver_abi"] == DRIVER_ABI
+        assert result["opf_worker_engine_selection_sha256"] == result["opf_engine_selection_sha256"]
+        assert result["opf_worker_epoch"] == env["core"].epoch
         assert len(env["sim"].argvs) == 1
         assert bytes(env["sim"].memory[:len(IMAGE)]) == IMAGE
         assert list(env["image_root"].iterdir()) == []
         assert env["core"]._site_owners == {} and env["core"]._sealed == set()
+
+
+def test_reselection_without_worker_restart_denies_before_site_ownership():
+    with installed_bundle() as env:
+        # An operator selects a different speed/record but has not restarted
+        # this Worker. Its actual adapter remains pinned to the old selection.
+        changed = {**env["engine_data"], "adapter_khz": 2000}
+        write_selection(env["engine_record"], changed)
+        with pytest.raises(Exception, match="WORKER_ENGINE_SELECTION_MISMATCH"):
+            _execute(env)
+        assert env["core"]._sessions == {} and env["core"]._site_owners == {}
+        assert not env["sim"].argvs
+
+
+def test_worker_without_verified_startup_engine_denies_reference_route():
+    with installed_bundle(verified_worker=False) as env:
+        with pytest.raises(Exception, match="WORKER_ENGINE_UNVERIFIED"):
+            _execute(env)
+        assert env["core"]._sessions == {} and not env["sim"].argvs
+
+
+def test_missing_in_band_worker_receipt_closes_qualified_session():
+    class MissingReceipt:
+        def __init__(self, client):
+            self.client = client
+
+        def open_job_session(self, **kwargs):
+            opened = self.client.open_job_session(**kwargs)
+            return {key: value for key, value in opened.items()
+                    if key != "worker_engine_selection_sha256"}
+
+        def call(self, *args, **kwargs):
+            return self.client.call(*args, **kwargs)
+
+    with installed_bundle() as env:
+        with pytest.raises(ValueError, match="WORKER_ENGINE_RECEIPT_MISMATCH"):
+            _execute(env, client=MissingReceipt(env["client"]))
+        assert env["core"]._sessions == {} and env["core"]._site_owners == {}
+        assert not env["sim"].argvs
 
 
 @pytest.mark.parametrize("change,code", [

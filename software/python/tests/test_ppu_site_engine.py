@@ -68,6 +68,8 @@ def test_install_select_two_engines_and_worker_uses_exactly_the_selected_one(tmp
         adapter = service.default_adapter(record, base=base, require_root=False)
         assert str(adapter.openocd) == chosen["root"] + "/bin/openocd"
         assert adapter.adapter_khz == 500 and adapter.adapter_driver == "plasma_swd"
+        assert adapter.engine_selection_sha256 == engine.load_engine(
+            record, base=base, require_root=False).record_sha256
     # The Runtime picks its SWCLK independently of the driver default.
     engine.select(a["runtime_id"], record=record, base=base, require_root=False, adapter_khz=2000)
     assert service.default_adapter(record, base=base, require_root=False).adapter_khz == 2000

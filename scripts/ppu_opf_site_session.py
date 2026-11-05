@@ -6,6 +6,7 @@ does not select an executor or switch the production Flash route.
 from __future__ import annotations
 
 import math
+import re
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -24,6 +25,8 @@ class BoundSession:
     timeout_ms: int
     timeout_source: str
     deadline_monotonic: float
+    worker_epoch: str | None = None
+    worker_engine_selection_sha256: str | None = None
 
 
 def open_provider_job_session(
@@ -32,6 +35,7 @@ def open_provider_job_session(
     job_id: str, target: str, operation: str, site_id: int,
     image_size: int, hardware: Mapping[str, Any],
     job_deadline_monotonic: float, job_timeout_s: float,
+    expected_engine_selection_sha256: str | None = None,
 ) -> BoundSession:
     """Resolve once, then pin the exact route and the Job's existing deadline.
 
@@ -55,14 +59,27 @@ def open_provider_job_session(
     # the same absolute monotonic deadline used by the PPU Job.
     route_wire = {key: value for key, value in asdict(route).items()
                   if key != "options_json"}
+    extra = ({"expected_engine_selection_sha256": expected_engine_selection_sha256}
+             if expected_engine_selection_sha256 is not None else {})
     opened = client.open_job_session(
         job_id=job_id, sites=[site_id], max_runtime_s=math.ceil(remaining),
         provider_route=route_wire,
-        deadline_monotonic=deadline)
+        deadline_monotonic=deadline, **extra)
     if (opened.get("provider_route") != route_wire
             or opened.get("deadline_monotonic") != deadline):
         if isinstance(opened.get("session_id"), str):
             client.call("close_session", session_id=opened["session_id"])
         raise ValueError("SESSION_BINDING_MISMATCH")
+    if expected_engine_selection_sha256 is not None and (
+        opened.get("worker_engine_selection_sha256") != expected_engine_selection_sha256
+        or type(opened.get("epoch")) is not str
+        or re.fullmatch(r"[0-9a-f]{32}", opened["epoch"]) is None
+    ):
+        if isinstance(opened.get("session_id"), str):
+            client.call("close_session", session_id=opened["session_id"])
+        raise ValueError("WORKER_ENGINE_RECEIPT_MISMATCH")
     return BoundSession(opened["session_id"], job_id, route,
-                        selected.timeout_ms, selected.timeout_source, deadline)
+                        selected.timeout_ms, selected.timeout_source, deadline,
+                        opened.get("epoch") if expected_engine_selection_sha256 is not None else None,
+                        opened.get("worker_engine_selection_sha256")
+                        if expected_engine_selection_sha256 is not None else None)

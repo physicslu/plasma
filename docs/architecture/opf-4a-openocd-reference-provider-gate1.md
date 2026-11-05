@@ -57,10 +57,14 @@ introduces **none** of those controls.
   identity: `driver_abi` and the engine's admission SHA are verified, but this
   must not be presented as a distinct signed Driver Package qualification.
 - The Worker pins its actual Adapter on startup. The selected Engine record
-  can be inspected independently, but this Gate 1 seam does not yet provide
-  an authenticated, in-band Worker **engine digest receipt**. Before Runtime
-  cutover, prove the running Worker is using exactly the Engine selected for
-  the Job (including restart/reselection races), or fail closed.
+  is now bound in the existing authenticated C-3 `open_job_session` exchange:
+  the root-owned Worker snapshots the SHA-256 of its verified Engine Selection
+  record at startup, rejects an OPF-4A Job whose expected digest differs, and
+  echoes that digest plus its Worker epoch in the accepted Session receipt.
+  Missing/unverified Worker binding or a missing/mismatching receipt fails closed
+  before Flash. Changing Selection without Worker restart cannot silently
+  change the running Adapter. This is Host-only contract evidence, not a Z2 HIL
+  observation or permission to switch the production Runtime route.
 - The trusted Runtime must obtain `hardware` independently on-device. Test
   observations are synthetic inputs, **not** proof of real Image/ABI/PL
   compatibility. The full authorization/ownership/Timeout chain still needs

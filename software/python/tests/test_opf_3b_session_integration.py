@@ -117,6 +117,66 @@ def test_selection_mismatch_never_claims_site(tmp_path):
     assert core._sessions == {}
 
 
+def test_in_band_worker_engine_identity_is_checked_before_site_grant(tmp_path):
+    adapter = Adapter()
+    adapter.engine_selection_sha256 = "a" * 64  # verified startup snapshot in this host fixture
+    core = worker.SiteWorkerCore(adapter, runtime_pid=os.getpid,
+                                 lease_verifier=lambda job, kind: True,
+                                 seal_dir=tmp_path / "seals")
+    client = Client(core)
+    route = {
+        "asset_set_sha256": "1" * 64, "provider_package": "openocd",
+        "profile_package": "profile", "descriptor_sha256": "2" * 64,
+        "options_schema_sha256": "3" * 64, "options_sha256": "4" * 64,
+        "target": "new-ic", "operation": "erase", "site_id": 1,
+        "transport": "fpga", "driver_abi": "plasma_swd:5",
+        "fpga_package": "fpga", "max_image_bytes": 4096,
+    }
+
+    def admission(expected, job="job-a"):
+        return client.call("open_job_session", job_id=job, sites=[1],
+                           max_runtime_s=5, provider_route=route,
+                           deadline_monotonic=time.monotonic() + 2,
+                           expected_engine_selection_sha256=expected)
+
+    for unexpected, error in [("b" * 64, "WORKER_ENGINE_SELECTION_MISMATCH"),
+                              ("invalid", "WORKER_ENGINE_BINDING_INVALID")]:
+        with pytest.raises(worker.SiteWorkerDenied, match=error):
+            admission(unexpected)
+        assert core._sessions == {} and core._site_owners == {}
+    opened = admission("a" * 64)
+    assert opened["worker_engine_selection_sha256"] == "a" * 64
+    assert opened["epoch"] == core.epoch
+    assert client.call("close_session", session_id=opened["session_id"])["closed"] is True
+
+    # A restarted Worker has a fresh epoch and may pin another valid engine.
+    # The previous Runtime binding must not be admitted on that process.
+    replacement = Adapter()
+    replacement.engine_selection_sha256 = "b" * 64
+    restarted = worker.SiteWorkerCore(
+        replacement, runtime_pid=os.getpid,
+        lease_verifier=lambda job, kind: True,
+        seal_dir=tmp_path / "replacement-seals")
+    assert restarted.epoch != core.epoch
+    with pytest.raises(worker.SiteWorkerDenied, match="WORKER_ENGINE_SELECTION_MISMATCH"):
+        Client(restarted).call("open_job_session", job_id="job-c", sites=[1],
+                               max_runtime_s=5, provider_route=route,
+                               deadline_monotonic=time.monotonic() + 2,
+                               expected_engine_selection_sha256="a" * 64)
+    assert restarted._sessions == {}
+
+    # A new Worker lacking verified engine evidence cannot accept an OpenOCD
+    # route even if the trusted Runtime supplies a syntactically valid digest.
+    unverified = worker.SiteWorkerCore(
+        Adapter(), runtime_pid=os.getpid, lease_verifier=lambda job, kind: True,
+        seal_dir=tmp_path / "other-seals")
+    with pytest.raises(worker.SiteWorkerDenied, match="WORKER_ENGINE_UNVERIFIED"):
+        Client(unverified).call("open_job_session", job_id="job-b", sites=[1],
+                                max_runtime_s=5, provider_route=route,
+                                deadline_monotonic=time.monotonic() + 2,
+                                expected_engine_selection_sha256="a" * 64)
+
+
 def test_safe_failure_cancellation_and_runtime_restart(tmp_path):
     class SafeFailure(Adapter):
         def run(self, site, operation, *, deadline, cancel, image=None):
