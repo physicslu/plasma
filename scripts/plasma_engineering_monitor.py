@@ -25,6 +25,7 @@ import termios
 import time
 import tty
 import unicodedata
+from zoneinfo import ZoneInfo
 
 import plasma_engineering_activity as engineering_activity
 
@@ -493,7 +494,7 @@ def render_snapshot(directory: Path, path: str, *,
         try:
             parsed = dt.datetime.fromisoformat(raw_received)
             if parsed.tzinfo is not None and parsed.utcoffset() is not None:
-                received = parsed.astimezone(clock.tzinfo).strftime("%Y-%m-%d %H:%M:%S")
+                received = parsed.astimezone(ZoneInfo("Asia/Taipei")).strftime("%Y-%m-%d %H:%M:%S")
         except ValueError:
             pass
     path_name = "PATH 2" if path == "path2" else "PATH 3"
