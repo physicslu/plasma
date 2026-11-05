@@ -765,63 +765,57 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 subject_sha256=meta["sha256"], transaction_id=upload_id,
             )
             target = _trusted_package_target(self.bootstrap_paths)
-            contract = _load_script(
-                Path(__file__).with_name("ppu_unified_deployment.py"),
-                "plasma_ppu_package_admission_contract",
-            )
-            try:
-                verified = contract.verify_host_only_artifact(
-                    upload.committed, expected_sha256=meta["sha256"],
-                    source_commit=None, target_profile=target,
-                )
-            except contract.UnifiedDeploymentError as exc:
-                raise BootstrapServiceError(str(exc)) from exc
-            if verified.kind != kind:
-                raise BootstrapServiceError("PACKAGE_KIND_MISMATCH")
-            if verified.archive_sha256 != owner["subject_sha256"]:
-                raise BootstrapServiceError("OWNER_AUTHORIZATION_SUBJECT_MISMATCH")
-            # FPGA Image is an ordinary Asset of the same Bundle; B2 PASS also
-            # requires its static qualification. No FPGA load, no readback.
-            fpga_qualification = None
-            if verified.kind == "bundle":
-                fpga = _load_script(
-                    Path(__file__).with_name("ppu_fpga_qualification.py"),
-                    "plasma_ppu_b2_fpga_static_qualification",
+            if kind == "bundle":
+                # Bundle v3 verification and qualification have ONE domain
+                # owner. The API only supplies trusted upload/owner context.
+                deployment = _load_script(
+                    Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                    "plasma_ppu_b2_deployment_engine",
                 )
                 try:
-                    fpga_qualification = fpga.qualify_bundle_fpga(
-                        upload.committed, verified,
+                    plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
+                        upload.committed, expected_sha256=meta["sha256"],
+                        target_profile=target,
                         contracts_path=self.bootstrap_paths.fpga_image_contracts,
-                        trusted_target=target,
                     )
-                except fpga.FpgaQualificationDenied as exc:
+                except (deployment.BundleV3AdmissionVerificationDenied,
+                        deployment.BundleV3AdmissionQualificationDenied) as exc:
                     raise BootstrapServiceError(str(exc)) from exc
+                fpga_qualification = plan["fpga_qualification"]
+            else:
+                # Non-Bundle package admission is outside the Bundle v3
+                # consolidation; retain its existing verifier contract.
+                contract = _load_script(
+                    Path(__file__).with_name("ppu_unified_deployment.py"),
+                    "plasma_ppu_package_admission_contract",
+                )
+                try:
+                    verified = contract.verify_host_only_artifact(
+                        upload.committed, expected_sha256=meta["sha256"],
+                        source_commit=None, target_profile=target,
+                    )
+                except contract.UnifiedDeploymentError as exc:
+                    raise BootstrapServiceError(str(exc)) from exc
+                if verified.kind != kind:
+                    raise BootstrapServiceError("PACKAGE_KIND_MISMATCH")
+                fpga_qualification = None
+                plan = {
+                    "package": verified.name,
+                    "kind": verified.kind,
+                    "version": verified.version,
+                    "source_commit": verified.source_commit,
+                    "archive_sha256": verified.archive_sha256,
+                    "files": [dict(path=item.path, sha256=item.sha256, size=item.size,
+                                   executable=item.executable) for item in verified.files],
+                    "target": dict(verified.target),
+                    "requested_actions": list(verified.actions),
+                    "execution_permitted": False,
+                }
+            if plan["archive_sha256"] != owner["subject_sha256"]:
+                raise BootstrapServiceError("OWNER_AUTHORIZATION_SUBJECT_MISMATCH")
+            plan["owner_authorization"] = owner
             transaction_id = uuid.uuid4().hex
             now = time.time()
-            plan = {
-                "package": verified.name,
-                "kind": verified.kind,
-                "version": verified.version,
-                "source_commit": verified.source_commit,
-                "archive_sha256": verified.archive_sha256,
-                "files": [dict(path=item.path, sha256=item.sha256, size=item.size,
-                               executable=item.executable) for item in verified.files],
-                "target": dict(verified.target),
-                "requested_actions": list(verified.actions),
-                "execution_permitted": False,
-                "owner_authorization": owner,
-            }
-            if verified.kind == "bundle":
-                plan["fpga_qualification"] = fpga_qualification
-                plan["purpose"] = verified.purpose
-                # Canonical Bundle v3 is the only active admission contract.
-                plan["packages"] = [
-                    {"id": package.id, "kind": package.kind, "version": package.version,
-                     "requires": list(package.requires),
-                     "files": [f.path for f in package.files]}
-                    for package in verified.packages
-                ]
-                plan["bundle_schema"] = verified.schema
             record = {
                 "schema_version": 1,
                 "transaction_id": transaction_id,
@@ -907,33 +901,25 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 subject_sha256=plan["archive_sha256"],
                 transaction_id=earlier["transaction_id"],
             )
-            contract = _load_script(
-                Path(__file__).with_name("ppu_unified_deployment.py"),
-                "plasma_ppu_b3_bundle_verifier",
+            deployment = _load_script(
+                Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                "plasma_ppu_b3_deployment_engine",
             )
             try:
-                verified = contract.verify_host_only_artifact(
+                reverified_plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
                     upload.committed, expected_sha256=plan["archive_sha256"],
-                    source_commit=plan["source_commit"], target_profile=trusted_target,
-                )
-            except contract.UnifiedDeploymentError as exc:
-                raise BootstrapServiceError("B3_BUNDLE_REVERIFY_DENIED") from exc
-            # Re-qualify FPGA statically from the same bytes and CURRENT trusted
-            # contract; any drift since B2 fails closed.
-            fpga = _load_script(
-                Path(__file__).with_name("ppu_fpga_qualification.py"),
-                "plasma_ppu_b3_fpga_static_qualification",
-            )
-            try:
-                requalified = fpga.qualify_bundle_fpga(
-                    upload.committed, verified,
+                    source_commit=plan["source_commit"],
+                    target_profile=trusted_target,
                     contracts_path=self.bootstrap_paths.fpga_image_contracts,
-                    trusted_target=trusted_target,
                 )
-            except fpga.FpgaQualificationDenied as exc:
+            except deployment.BundleV3AdmissionVerificationDenied as exc:
+                raise BootstrapServiceError("B3_BUNDLE_REVERIFY_DENIED") from exc
+            except deployment.BundleV3AdmissionQualificationDenied as exc:
                 raise BootstrapServiceError("B3_FPGA_QUALIFICATION_DENIED") from exc
-            if ("fpga_qualification" not in plan
-                    or plan["fpga_qualification"] != requalified):
+            # Re-qualification must match B2 even when the trusted FPGA
+            # contracts change without changing the uploaded archive.
+            if ("fpga_qualification" not in plan or
+                    plan["fpga_qualification"] != reverified_plan["fpga_qualification"]):
                 raise BootstrapServiceError("B3_FPGA_QUALIFICATION_CHANGED")
             if fpga_load and not any(
                     type(item) is dict and item.get("kind") == "fpga-image"

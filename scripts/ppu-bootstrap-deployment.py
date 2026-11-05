@@ -54,6 +54,14 @@ class DeploymentError(RuntimeError):
     """Raised when a bootstrap deployment transaction cannot complete safely."""
 
 
+class BundleV3AdmissionVerificationDenied(DeploymentError):
+    """Canonical Bundle v3 verification failed before B3 installation."""
+
+
+class BundleV3AdmissionQualificationDenied(DeploymentError):
+    """Trusted FPGA static qualification failed before B3 installation."""
+
+
 @dataclass(frozen=True)
 class DeploymentPaths:
     bootstrap_state_root: Path = Path("/var/lib/plasma-bootstrap")
@@ -285,6 +293,78 @@ class DeploymentCoordinator:
         self.root_bundle_loader = root_bundle_loader
         self.quiescence_lease = quiescence_lease
         self.runtime_restart_quiesce = runtime_restart_quiesce
+
+    @staticmethod
+    def qualify_bundle_v3_admission(
+        archive: Path, *, expected_sha256: str,
+        target_profile: Mapping[str, str], contracts_path: Path,
+        source_commit: str | None = None,
+    ) -> dict[str, Any]:
+        """One read-only B2/B3 preflight for the canonical Bundle v3.
+
+        The Bootstrap API owns upload transport and owner authorization; this
+        Engine owns Bundle verification, static FPGA qualification and the
+        canonical admission plan. This writes no journal or active pointer.
+        B3 independently verifies the ZIP again *under* deployment.lock.
+        """
+        contract_path = Path(__file__).with_name("ppu_unified_deployment.py")
+        spec = importlib.util.spec_from_file_location(
+            "plasma_bundle_v3_engine_admission", contract_path,
+        )
+        if spec is None or spec.loader is None:
+            raise BundleV3AdmissionVerificationDenied("BUNDLE_VERIFIER_UNAVAILABLE")
+        contract = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = contract
+        spec.loader.exec_module(contract)
+        try:
+            verified = contract.verify_host_only_artifact(
+                archive, expected_sha256=expected_sha256,
+                source_commit=source_commit, target_profile=target_profile,
+            )
+        except contract.UnifiedDeploymentError as exc:
+            raise BundleV3AdmissionVerificationDenied(str(exc)) from exc
+        if (not isinstance(verified, contract.VerifiedBundle)
+                or verified.kind != "bundle" or verified.schema != contract.BUNDLE_SCHEMA):
+            raise BundleV3AdmissionVerificationDenied("PACKAGE_KIND_MISMATCH")
+
+        fpga_path = Path(__file__).with_name("ppu_fpga_qualification.py")
+        fpga_spec = importlib.util.spec_from_file_location(
+            "plasma_bundle_v3_engine_fpga_qualification", fpga_path,
+        )
+        if fpga_spec is None or fpga_spec.loader is None:
+            raise BundleV3AdmissionQualificationDenied("FPGA_QUALIFIER_UNAVAILABLE")
+        fpga = importlib.util.module_from_spec(fpga_spec)
+        sys.modules[fpga_spec.name] = fpga
+        fpga_spec.loader.exec_module(fpga)
+        try:
+            fpga_qualification = fpga.qualify_bundle_fpga(
+                archive, verified, contracts_path=contracts_path,
+                trusted_target=target_profile,
+            )
+        except fpga.FpgaQualificationDenied as exc:
+            raise BundleV3AdmissionQualificationDenied(str(exc)) from exc
+
+        return {
+            "package": verified.name,
+            "kind": verified.kind,
+            "version": verified.version,
+            "source_commit": verified.source_commit,
+            "archive_sha256": verified.archive_sha256,
+            "files": [dict(path=item.path, sha256=item.sha256, size=item.size,
+                           executable=item.executable) for item in verified.files],
+            "target": dict(verified.target),
+            "requested_actions": list(verified.actions),
+            "execution_permitted": False,
+            "fpga_qualification": fpga_qualification,
+            "purpose": verified.purpose,
+            "packages": [
+                {"id": package.id, "kind": package.kind, "version": package.version,
+                 "requires": list(package.requires),
+                 "files": [item.path for item in package.files]}
+                for package in verified.packages
+            ],
+            "bundle_schema": verified.schema,
+        }
 
     def _installer_paths(self):
         return self.installer.InstallPaths(
