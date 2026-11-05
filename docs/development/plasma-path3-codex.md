@@ -60,6 +60,39 @@ Codex at all. See [Path 2 CLI contract](plasma-path2-cli.md). This is a
 routing choice by the dispatcher author, **not** an automatic reinterpretation
 of the approved Path 3 work order; do not silently change a scoped task.
 
+### Operator Monitor engineering diagnostics (display only)
+
+Path 3 Owner-authenticated Issue #981 Work Orders may add optional
+`"monitor_phase"` with **only** `HOST_ONLY`, `INSTALL`, `RUNTIME`,
+`PROGRAMMING_PROFILE` or `FLASH_TEST`. The trusted GitHub-hosted
+Authorizer hashes the full Work Order and emits only the validated enum
+to the existing SWPC Monitor wrapper. Absence is `NOT_DECLARED`.
+This is **OWNER PLAN**, not a real-time stage transition, hardware
+permission, recovery trigger or proof that a stage occurred. A running
+pre-change job cannot be retroactively tagged. Existing Work Orders and
+the engineering executor operate unchanged.
+
+The existing read-only tmux pane classifies Codex-reported tool events
+as `WORK TYPE` (e.g. COMMAND, READ, FILE, TEST, BUILD), displays
+`ERROR: COMMAND_NONZERO (exit N) [OBSERVED_CODEX]` on reported failures,
+and marks subsequent tool starts as
+`FOLLOW-UP: ACTIVITY_OBSERVED; REPAIR_UNVERIFIED`. A subsequent command
+is **not** evidence of a repair, successful install, Programming Profile
+or real flash operation. Arbitrary shell commands, arguments, source and
+credential text remain redacted and are never replayed or parsed for
+error causes.
+
+At job completion, the Monitor may read only the fixed, owner/run/digest
+bound `plasma-path3-receipt.json` under the Runner's existing temp
+directory, under file ownership, size and symlink checks. Only
+predefined wrapper `status`, `cost_budget_status` and categorical
+failure codes are projected. They are **not independently validated**
+execution or DUT receipts. The real engineering report and final
+acceptance remain in GitHub Actions Run/Artifact, subject to separate
+review: the pane keeps `ACCEPTANCE: UNVERIFIED` even if wrapper exit is 0.
+No additional Runner, workflow, privileged process, Codex call, device
+access, phase progression or deployment is authorized by the display.
+
 ## 4. Z2 SSH/sudo and hardware boundary
 
 Use the existing owner-controlled local credential source described in the [Embedded contract](plasma-embedded.md), never commit, print, log or copy secrets into PR artifacts. SSH/sudo must use the enrolled owner-approved route and actual Linux rights; no sudoers edits or sandbox bypass. For approved FPGA work, validate current board/boot, candidate BIN/Manifest and SHA, Root/FPGA Manager ownership, safe output/electrical state and Golden recovery. Path 3 may perform bounded development deployment/FPGA operations only when included in Gate 1. Z2 PS, not SWPC, hosts live DUT OpenOCD and PS-local WordPort; PL performs DUT I/O. Internal-loopback evidence is not external SWD/DUT qualification. On unknown/unsafe state stop and report NOT_RUN/FAIL accurately.

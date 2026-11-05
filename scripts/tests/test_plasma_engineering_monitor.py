@@ -431,6 +431,199 @@ class EngineeringMonitorTests(unittest.TestCase):
                 mon._clip_columns(line, 27) == line
                 for line in frame.splitlines()))
 
+    def test_path3_owner_display_phase_is_public_but_not_child_authority(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            probe = root / "child-metadata.txt"
+            env = {
+                "GITHUB_RUN_ID": "42050011440",
+                "PLASMA_MONITOR_TASK": "path3-work-order",
+                "WORK_ORDER_SHA256": "a" * 64,
+                "PLASMA_MONITOR_PHASE": "INSTALL",
+                "RUNNER_TEMP": td,
+            }
+            code = ("import os,pathlib,sys;"
+                    "pathlib.Path(sys.argv[1]).write_text("
+                    "str('PLASMA_MONITOR_PHASE' in os.environ))")
+            with patch.dict(os.environ, env, clear=True):
+                rc = mon.run_job("path3", [sys.executable, "-c", code,
+                                            str(probe)], directory=root)
+            self.assertEqual(rc, 0)
+            self.assertEqual(probe.read_text(), "False")
+            snapshot = json.loads((root / "path3.json").read_text())
+            self.assertEqual(snapshot["monitor_phase"], "INSTALL")
+            view = mon.render_snapshot(root, "path3", height=25)
+            self.assertIn("STAGE: Codex workspace | OWNER PLAN: INSTALL", view)
+            self.assertIn("EVIDENCE: GitHub Actions Run/Artifact; REVIEW_REQUIRED",
+                          view)
+            self.assertIn("ACCEPTANCE: UNVERIFIED", view)
+            self.assertNotIn("PROGRAMMING PASS", view)
+
+    def test_path3_owner_phase_rejects_forged_or_non_path3_metadata(self):
+        for path, task, digest, phase in (
+            ("path3", "path3-work-order", "a"*64, "FLASH_PASS"),
+            ("path3", "path3-work-order", "a"*64, "INSTALL\nTOKEN_SECRET"),
+            ("path3", "path3-work-order", "bad-digest", "INSTALL"),
+            ("path3", "not-a-work-order", "a"*64, "INSTALL"),
+            ("path2", "path2-work-order", "a"*64, "INSTALL"),
+        ):
+            with self.subTest(path=path, phase=phase), \
+                    tempfile.TemporaryDirectory() as td:
+                env = {
+                    "GITHUB_RUN_ID": "42050011440",
+                    "PLASMA_MONITOR_TASK": task,
+                    "WORK_ORDER_SHA256": digest,
+                    "PLASMA_MONITOR_PHASE": phase,
+                }
+                with patch.dict(os.environ, env, clear=True):
+                    mon.run_job(path, [sys.executable, "-c", "pass"],
+                                directory=Path(td))
+                snapshot = json.loads(
+                    (Path(td) / (path + ".json")).read_text())
+                self.assertEqual(snapshot.get("monitor_phase"), "")
+                rendered = mon.render_snapshot(Path(td), path, height=25)
+                self.assertNotIn("OWNER PLAN: INSTALL", rendered)
+                self.assertNotIn("FLASH_PASS", rendered)
+                self.assertNotIn("TOKEN_SECRET", rendered)
+
+    def test_path3_command_failure_and_followup_are_not_repair_pass(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            source = activity.Path3Activity(d)
+            records = []
+            for ident, command, rc in (
+                ("first", "bash -lc 'private PASSWORD=abc'", 1),
+                ("second", "git status", 0),
+            ):
+                item = {"type": "command_execution", "id": ident,
+                        "command": command}
+                records.append(source.project({"type": "item.started",
+                                               "item": item}))
+                records.append(source.project({"type": "item.completed",
+                                               "item": {**item, "exit_code": rc,
+                                                        "aggregated_output": "TOKEN_SECRET"}}))
+            (d / "path3.log").write_bytes(b"".join(records))
+            (d / "path3.json").write_text(json.dumps({
+                "status": "RUNNING", "run_id": "42050011440",
+                "task": "path3-work-order", "monitor_phase": "RUNTIME",
+                "pid": os.getpid(), "proc_start": mon._proc_start(os.getpid()),
+            }))
+            result = mon.render_snapshot(d, "path3", height=30, width=110)
+            self.assertIn("STAGE: Codex workspace | OWNER PLAN: RUNTIME", result)
+            self.assertIn("WORK TYPE: COMMAND [OBSERVED_CODEX]", result)
+            self.assertIn("ERROR: COMMAND_NONZERO (exit 1) [OBSERVED_CODEX]",
+                          result)
+            self.assertIn("FOLLOW-UP: ACTIVITY_OBSERVED; REPAIR_UNVERIFIED",
+                          result)
+            self.assertIn("WARNING: Command failure observed", result)
+            self.assertIn("ACCEPTANCE: UNVERIFIED", result)
+            self.assertNotIn("PASSWORD=abc", result)
+            self.assertNotIn("TOKEN_SECRET", result)
+
+    def test_path3_receipt_projection_is_bounded_and_not_acceptance(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            raw = {
+                "github_run_id": "42050011440",
+                "task_id": "path3-work-order",
+                "work_order_sha256": "a" * 64,
+                "execution_path": "path3-codex",
+                "status": "EVIDENCE_READY_REVIEW_REQUIRED",
+                "cost_budget_status": "EXCEEDED",
+                "functional_acceptance": "UNVERIFIED",
+                "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
+                "codex_exit_code": 0,
+                "codex_execution_status": "EXIT_ZERO",
+                "worker_admission": {
+                    "status": "WORKER_SOURCE_ADMITTED",
+                    "task_id": "path3-work-order",
+                    "execution_path": "path3-codex",
+                },
+                "private_prompt": "NEVER_DISPLAY_SECRET",
+            }
+            receipt = root / "plasma-path3-receipt.json"
+            receipt.write_text(json.dumps(raw), encoding="utf-8")
+            env = {
+                "GITHUB_RUN_ID": "42050011440",
+                "PLASMA_MONITOR_TASK": "path3-work-order",
+                "WORK_ORDER_SHA256": "a" * 64,
+                "PLASMA_MONITOR_PHASE": "PROGRAMMING_PROFILE",
+                "RUNNER_TEMP": td,
+            }
+            with patch.dict(os.environ, env, clear=True):
+                self.assertEqual(mon.run_job(
+                    "path3", [sys.executable, "-c", "pass"],
+                    directory=root), 0)
+            frame = mon.render_snapshot(root, "path3", height=28)
+            self.assertIn("OWNER PLAN: PROGRAMMING_PROFILE", frame)
+            self.assertIn("WRAPPER RECEIPT: EVIDENCE_READY_REVIEW_REQUIRED | COST: EXCEEDED",
+                          frame)
+            self.assertIn("ACCEPTANCE: UNVERIFIED", frame)
+            self.assertNotIn("NEVER_DISPLAY_SECRET", frame)
+            self.assertNotIn("a" * 64, frame)
+            self.assertNotIn("NEVER_DISPLAY_SECRET",
+                             (root / "path3.log").read_text())
+            # A real error remains a failure even after a later command.
+            failed = dict(raw, status="CODEX_EXECUTION_FAILED_REVIEW_REQUIRED",
+                          codex_exit_code=7, codex_execution_status="EXIT_NONZERO",
+                          failure_reason="CODEX_CLI_NONZERO")
+            self.assertEqual(mon._safe_path3_receipt_hint(
+                failed, run_id="42050011440", task="path3-work-order",
+                work_order_sha="a" * 64, wrapper_exit=2), {
+                    "result": "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED",
+                    "cost": "EXCEEDED", "failure": "CODEX_CLI_NONZERO",
+                })
+
+    def test_path3_receipt_rejects_wrong_run_sha_secret_and_symlink(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            raw = {
+                "github_run_id": "42050011440",
+                "task_id": "path3-work-order",
+                "work_order_sha256": "a" * 64,
+                "execution_path": "path3-codex",
+                "status": "EVIDENCE_READY_REVIEW_REQUIRED",
+                "cost_budget_status": "WITHIN_LIMIT",
+                "functional_acceptance": "UNVERIFIED",
+                "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
+                "codex_exit_code": 0, "codex_execution_status": "EXIT_ZERO",
+                "worker_admission": {
+                    "status": "WORKER_SOURCE_ADMITTED",
+                    "task_id": "path3-work-order",
+                    "execution_path": "path3-codex",
+                },
+            }
+            args = dict(run_id="42050011440", task="path3-work-order",
+                        work_order_sha="a"*64, wrapper_exit=0)
+            for patch_raw in (
+                dict(raw, github_run_id="99999"),
+                dict(raw, work_order_sha256="b"*64),
+                dict(raw, status="FLASH_SUCCESS"),
+                dict(raw, functional_acceptance="PASS"),
+                dict(raw, codex_exit_code=True),
+                dict(raw, cost_budget_status="TOKEN_SECRET"),
+                dict(raw, worker_admission={}),
+                dict(raw, failure_reason="TOKEN_SECRET"),
+            ):
+                with self.subTest(patch_raw=repr(patch_raw)[:45]):
+                    self.assertIsNone(
+                        mon._safe_path3_receipt_hint(patch_raw, **args))
+            receipt = root / "plasma-path3-receipt.json"
+            receipt.write_text(json.dumps(raw))
+            receipt.chmod(0o666)
+            self.assertIsNone(mon._read_path3_receipt_hint(
+                runner_temp=td, run_id=args["run_id"], task=args["task"],
+                work_order_sha=args["work_order_sha"], exit_code=0))
+            receipt.chmod(0o600)
+            self.assertIsNotNone(mon._read_path3_receipt_hint(
+                runner_temp=td, run_id=args["run_id"], task=args["task"],
+                work_order_sha=args["work_order_sha"], exit_code=0))
+            receipt.unlink()
+            receipt.symlink_to(root / "not-exist")
+            self.assertIsNone(mon._read_path3_receipt_hint(
+                runner_temp=td, run_id=args["run_id"], task=args["task"],
+                work_order_sha=args["work_order_sha"], exit_code=0))
+
     def test_path3_failure_preserves_real_exit_and_idle(self):
         with tempfile.TemporaryDirectory() as td:
             rc = mon.run_job("path3", [sys.executable, "-c",

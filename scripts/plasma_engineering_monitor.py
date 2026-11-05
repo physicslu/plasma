@@ -66,6 +66,21 @@ RECEIPT_PERMISSION_STAGES = frozenset({
 })
 RECEIPT_PERMISSION_CAUSES = frozenset({"OWNER_MISMATCH", "PEER_WRITABLE"})
 MAX_RECEIPT_BYTES = 8192
+# This describes Owner intent only. It cannot advance a runtime or prove Flash.
+PATH3_PHASES = frozenset({
+    "HOST_ONLY", "INSTALL", "RUNTIME", "PROGRAMMING_PROFILE", "FLASH_TEST",
+})
+PATH3_RECEIPT_STATUSES = frozenset({
+    "EVIDENCE_READY_REVIEW_REQUIRED",
+    "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED",
+    "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED",
+})
+PATH3_COST_STATUSES = frozenset({
+    "NOT_AVAILABLE", "NOT_APPLICABLE", "WITHIN_LIMIT", "EXCEEDED",
+})
+PATH3_FAILURE_CODES = frozenset({
+    "CODEX_CLI_NONZERO", "WALL_TIMEOUT", "TOOL_ITEMS_LIMIT",
+})
 
 
 def _receipt_permission_hint(raw: object, *, run_id: str, task: str,
@@ -156,6 +171,91 @@ def _read_path2_receipt_hint(*, runner_temp: object, run_id: str,
             os.close(fd)
 
 
+
+
+def _safe_path3_receipt_hint(raw: object, *, run_id: str, task: str,
+                             work_order_sha: str, wrapper_exit: int) -> dict | None:
+    """Project trusted-wrapper categories, never an acceptance or DUT result."""
+    if (task != "path3-work-order" or
+            WORK_ORDER_SHA256.fullmatch(work_order_sha) is None or
+            type(raw) is not dict or raw.get("github_run_id") != run_id or
+            raw.get("task_id") != task or
+            raw.get("work_order_sha256") != work_order_sha or
+            raw.get("execution_path") != "path3-codex" or
+            raw.get("functional_acceptance") != "UNVERIFIED" or
+            raw.get("acceptance") != "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG"):
+        return None
+    admission = raw.get("worker_admission")
+    if (type(admission) is not dict or
+            admission.get("status") != "WORKER_SOURCE_ADMITTED" or
+            admission.get("execution_path") != "path3-codex" or
+            admission.get("task_id") != task):
+        return None
+    status, cost, code = (raw.get("status"), raw.get("cost_budget_status"),
+                          raw.get("codex_exit_code"))
+    if (type(status) is not str or status not in PATH3_RECEIPT_STATUSES or
+            type(cost) is not str or cost not in PATH3_COST_STATUSES or
+            type(code) is not int or not -255 <= code <= 255 or
+            raw.get("codex_execution_status") !=
+                ("EXIT_ZERO" if code == 0 else "EXIT_NONZERO") or
+            (status == "EVIDENCE_READY_REVIEW_REQUIRED") !=
+                (wrapper_exit == 0 and code == 0)):
+        return None
+    reason = raw.get("failure_reason")
+    if (reason is not None and
+            (type(reason) is not str or reason not in PATH3_FAILURE_CODES)):
+        return None
+    if ((status == "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED" and
+         (code == 0 or reason != "CODEX_CLI_NONZERO")) or
+            (status == "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED" and
+             reason not in ("WALL_TIMEOUT", "TOOL_ITEMS_LIMIT"))):
+        return None
+    return {"result": status, "cost": cost,
+            "failure": reason if reason is not None else "NONE"}
+
+
+def _read_path3_receipt_hint(*, runner_temp: object, run_id: str,
+                             task: str, work_order_sha: str,
+                             exit_code: int) -> dict | None:
+    """Read the existing exact Runner Temp receipt, without trusting paths."""
+    if (type(runner_temp) is not str or not runner_temp or
+            not Path(runner_temp).is_absolute() or len(runner_temp) > 512 or
+            run_id == "unknown"):
+        return None
+    fd = -1
+    try:
+        file_path = Path(runner_temp) / "plasma-path3-receipt.json"
+        fd = os.open(file_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        st = os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or
+                st.st_nlink != 1 or st.st_mode & 0o022 or
+                not 0 < st.st_size <= MAX_RECEIPT_BYTES):
+            return None
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            body = stream.read(MAX_RECEIPT_BYTES + 1)
+        if len(body) > MAX_RECEIPT_BYTES:
+            return None
+        return _safe_path3_receipt_hint(
+            json.loads(body.decode("utf-8")), run_id=run_id,
+            task=task, work_order_sha=work_order_sha, wrapper_exit=exit_code)
+    except (OSError, ValueError, UnicodeError, TypeError):
+        return None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def _safe_stored_path3_receipt_hint(value: object) -> dict | None:
+    if type(value) is not dict or set(value) != {"result", "cost", "failure"}:
+        return None
+    if (type(value["result"]) is not str or
+            value["result"] not in PATH3_RECEIPT_STATUSES or
+            type(value["cost"]) is not str or
+            value["cost"] not in PATH3_COST_STATUSES or
+            type(value["failure"]) is not str or
+            value["failure"] not in PATH3_FAILURE_CODES | {"NONE"}):
+        return None
+    return value
 
 
 def _valid_dir(path: Path, uid: int, gid: int) -> bool:
@@ -307,6 +407,11 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
         and MONITOR_SENSITIVE.search(summary) is None
     )
     stage = os.environ.get("PLASMA_MONITOR_STAGE", "")
+    declared_phase = os.environ.get("PLASMA_MONITOR_PHASE", "")
+    if not (path == "path3" and task == "path3-work-order" and
+            WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None and
+            type(declared_phase) is str and declared_phase in PATH3_PHASES):
+        declared_phase = ""
     guarded = stage.startswith("Guarded ") if type(stage) is str else False
     # Only the digest-bound dynamic operation may publish guarded metadata.
     guarded_verified = (task == "path2-work-order" and
@@ -330,6 +435,7 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
         "task": task, "pr_number": pr_number,
         "monitor_summary": summary if summary_valid else "",
         "monitor_stage": stage,
+        "monitor_phase": declared_phase,
         "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
         "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
@@ -347,6 +453,7 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     # Operator-only metadata never enters the engineering/Codex process env.
     env.pop("PLASMA_MONITOR_SUMMARY", None)
     env.pop("PLASMA_MONITOR_STAGE", None)
+    env.pop("PLASMA_MONITOR_PHASE", None)
     env.pop("PLASMA_MONITOR_COMMENT_ID", None)
     if live and path == "path3":
         env["PLASMA_ENGINEERING_MONITOR_LIVE_LOG"] = str(log)
@@ -389,11 +496,18 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
                     run_id=run_id, task=task,
                     work_order_sha=work_order_sha, exit_code=rc)
                     if path == "path2" and rc != 0 else None)
+                path3_hint = (_read_path3_receipt_hint(
+                    runner_temp=os.environ.get("RUNNER_TEMP", ""),
+                    run_id=run_id, task=task,
+                    work_order_sha=work_order_sha, exit_code=rc)
+                    if path == "path3" else None)
                 _append(log, "%s | exit=%s | Run %s" % (result, rc, run_id))
                 _write_state(directory, path, {
                     **state, "status": "IDLE", "last_result": result,
                     "exit_code": rc,
                     **({"receipt_hint": hint} if hint is not None else {}),
+                    **({"path3_receipt_hint": path3_hint}
+                       if path3_hint is not None else {}),
                     "finished": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                 })
             except OSError as exc:
@@ -550,17 +664,24 @@ def render_snapshot(directory: Path, path: str, *,
     active_items = {}
     last_error = None
     last_sequence = 0
+    last_work_kind = None
+    followup_after_failure = False
     for original in history_lines:
         event = engineering_activity.parse_public_line(original)
         if event is None or event["seq"] <= last_sequence:
             continue
         last_sequence = event["seq"]
+        last_work_kind = event["kind"]
+        if last_error is not None and event["seq"] > last_error["seq"] and (
+                event["state"] == "RUNNING"):
+            followup_after_failure = True
         if event["state"] == "RUNNING":
             active_items[event["id"]] = event
         else:
             active_items.pop(event["id"], None)
             if event["state"] == "FAIL":
                 last_error = event
+                followup_after_failure = False
 
     def _step_label(event: dict) -> str:
         result = event["state"]
@@ -581,6 +702,29 @@ def render_snapshot(directory: Path, path: str, *,
     lines.append("-" * 35)
     if run != "-":
         lines.append("RUN LOG: https://github.com/physicslu/plasma/actions/runs/" + run)
+    if path == "path3":
+        phase = state.get("monitor_phase")
+        if type(phase) is not str or phase not in PATH3_PHASES or (
+                state.get("task") != "path3-work-order"):
+            phase = "NOT_DECLARED"
+        lines.append("STAGE: Codex workspace | OWNER PLAN: " + phase)
+        if last_work_kind is not None:
+            # This is a Codex-reported item category, NOT verified execution.
+            lines.append("WORK TYPE: " + last_work_kind + " [OBSERVED_CODEX]")
+        if last_error is not None:
+            lines.append("ERROR: COMMAND_NONZERO (exit %d) [OBSERVED_CODEX]" %
+                         last_error["exit_code"])
+            lines.append("FOLLOW-UP: " + (
+                "ACTIVITY_OBSERVED; REPAIR_UNVERIFIED" if followup_after_failure
+                else "NOT_OBSERVED; REPAIR_UNVERIFIED"))
+        receipt = _safe_stored_path3_receipt_hint(
+            state.get("path3_receipt_hint"))
+        if receipt is not None:
+            lines.append("WRAPPER RECEIPT: %s | COST: %s" %
+                         (receipt["result"], receipt["cost"]))
+            if receipt["failure"] != "NONE":
+                lines.append("WRAPPER ERROR: " + receipt["failure"])
+        lines.append("EVIDENCE: GitHub Actions Run/Artifact; REVIEW_REQUIRED")
     hint = _safe_stored_receipt_hint(state.get("receipt_hint"))
     if (path == "path2" and state.get("last_result") == "FAIL" and
             type(state.get("exit_code")) is int and
