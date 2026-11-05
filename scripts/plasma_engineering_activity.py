@@ -52,7 +52,10 @@ STATES = frozenset({"RUNNING", "DONE", "FAIL", "UNKNOWN"})
 KINDS = frozenset({"TEST", "COMMAND", "FILE", "READ", "BUILD", "CHECK"})
 MAX_EVENT_BYTES = 640
 MAX_ACTIVE_ITEMS = 64
-MAX_SEQUENCE # General-purpose, fail-closed command *preview*, not an execution policy.
+MAX_SEQUENCE = 10000000
+
+
+# General-purpose, fail-closed command *preview*, not an execution policy.
 # Never copy arbitrary shell arguments into the group-readable monitor log.
 # Recognized tools, verbs, flags and repository-relative paths are readable;
 # literals, credential options, expansions, URLs and private paths are redacted.
@@ -71,9 +74,9 @@ PREVIEW_WORDS = frozenset({
     "check", "lint", "format", "compile", "batch", "source",
     "all", "HEAD", "origin", "main", "true", "false",
 })
-PREVIEW_FLAG = re.compile(r"-{1,2}[A-Za-z0-9][A-Za-z0-9-]{0,40}\\Z")
-PREVIEW_NUMBER = re.compile(r"[0-9]{1,8}\\Z")
-PREVIEW_PATH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,95}\\Z")
+PREVIEW_FLAG = re.compile(r"-{1,2}[A-Za-z0-9][A-Za-z0-9-]{0,40}\Z")
+PREVIEW_NUMBER = re.compile(r"[0-9]{1,8}\Z")
+PREVIEW_PATH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,95}\Z")
 PREVIEW_SHELL = re.compile(r"[;|&<>$`\\\\\\n\\r]")
 
 def safe_command(value: object) -> tuple[str, str]:
@@ -113,7 +116,6 @@ def safe_command(value: object) -> tuple[str, str]:
     if PREVIEW_SHELL.search(value) is not None:
         return kind, executable + " [shell-redacted]"
     safe = [executable]
-    redactions = 0
     for idx, word in enumerate(words[1:13], start=1):
         previous = words[idx - 1] if idx > 1 else ""
         credential_option = (
@@ -139,13 +141,11 @@ def safe_command(value: object) -> tuple[str, str]:
             candidate = word
         else:
             candidate = "[redacted]"
-        if candidate == "[redacted]":
-            redactions += 1
         if candidate != "[redacted]" or safe[-1] != "[redacted]":
             safe.append(candidate)
     if len(words) > 13:
         safe.append("[redacted]")
-    return kind, " ".join(safe)[:180]
+    return kind, " ".join(safe)[:140]
 
 nd hidden)"
 
