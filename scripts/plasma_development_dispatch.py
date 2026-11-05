@@ -16,6 +16,9 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import select
+import signal
+import time
 import sys
 import uuid
 from urllib.error import HTTPError, URLError
@@ -33,6 +36,11 @@ COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
+# Explicit opt-in for a host-only observation. Engineering work stays unbounded.
+QUICK_PROFILE = "quick-observe"
+QUICK_MAX_SECONDS = 75
+QUICK_MAX_TOOL_ITEMS = 12
+QUICK_INPUT_TOKEN_BUDGET = 30000  # Post-turn alert; not a live hard cap.
 # Explicit operator-public metadata; never derived from objective/acceptance.
 # Single-line restricted vocabulary prevents control sequences, URLs, quotes,
 # shell syntax and raw JSON from crossing the GitHub output/monitor boundary.
@@ -199,7 +207,8 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "expected_stdout_sha256", "verification",
                                "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
-                                "monitor_summary", "codex_execution"},
+                                "monitor_summary", "codex_execution",
+                               "codex_profile"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -225,11 +234,19 @@ def parse_dynamic_work_order(event: object) -> dict:
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
+        quick = order.get("codex_profile") == QUICK_PROFILE
+        allowed = (base - {"scope"}) | optional_ref | {
+            "monitor_summary", "codex_execution", "codex_profile"}
+        if quick:
+            allowed |= {"scope"}
         require(capability == "codex-workspace" and
-                set(order) <= (base - {"scope"}) | optional_ref |
-                {"monitor_summary", "codex_execution"} and
+                set(order) <= allowed and
                 ("codex_execution" not in order or
-                 order["codex_execution"] == "guarded-hardware-no-sandbox"),
+                 order["codex_execution"] == "guarded-hardware-no-sandbox") and
+                ("codex_profile" not in order or quick) and
+                (not quick or (order.get("scope") == "host-only"
+                 and "codex_execution" not in order
+                 and order.get("pr_number", 0) == 0)),
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
     elif capability == "cpu-only" and "native_preflight" in order:
         # Existing Path 2 task_id and Runner. No candidate scripts, shell,
@@ -368,6 +385,9 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         task["monitor_summary"] = order["monitor_summary"]
     if "codex_execution" in order:
         task["codex_execution"] = order["codex_execution"]
+    if "codex_profile" in order:
+        task["codex_profile"] = order["codex_profile"]
+        task["work_order_scope"] = "host-only"
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order.get("scope", "host-only")
         if order["capability"] == "cpu-only":
@@ -936,6 +956,13 @@ class CodexUsageCollector:
                        "output_tokens": 0}
         self.turns = 0
         self.invalid = False
+        # Metadata-only observations; commands, stdout and model text excluded.
+        self.items_started = 0
+        self.items_completed = 0
+        self.commands_started = 0
+        self.commands_failed = 0
+        self.tool_items_started = 0
+        self.budget_reason = None
 
     def _line(self, raw: bytes) -> bytes:
         try:
@@ -945,6 +972,21 @@ class CodexUsageCollector:
         if type(event) is not dict:
             return b"[codex unrecognized event]\n"
         kind = event.get("type")
+        item = event.get("item")
+        category = item.get("type") if type(item) is dict else None
+        if kind == "item.started":
+            self.items_started += 1
+            if category == "command_execution":
+                self.commands_started += 1
+            if category in ("command_execution", "mcp_tool_call",
+                            "web_search", "collab_tool_call"):
+                self.tool_items_started += 1
+        elif kind == "item.completed":
+            self.items_completed += 1
+            if category == "command_execution":
+                code = item.get("exit_code")
+                if type(code) is int and code != 0:
+                    self.commands_failed += 1
         if kind == "thread.started":
             thread_id = event.get("thread_id")
             try:
@@ -1012,6 +1054,21 @@ class CodexUsageCollector:
         self.pending.clear()
         return result
 
+    def activity_counts(self) -> dict:
+        """Counters only: no stdout, commands, prompts or private paths."""
+        return {
+            "schema_version": 1,
+            "source": "codex_exec_jsonl",
+            "turns_completed": self.turns,
+            "items_started": self.items_started,
+            "items_completed": self.items_completed,
+            "tool_items_started": self.tool_items_started,
+            "commands_started": self.commands_started,
+            "commands_failed": self.commands_failed,
+            "model_request_count": None,
+            "model_request_count_status": "NOT_AVAILABLE",
+        }
+
     def snapshot(self) -> dict:
         complete = self.turns > 0 and not self.invalid
         return {
@@ -1029,7 +1086,9 @@ class CodexUsageCollector:
 
 def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                              evidence: Path, live_log: str,
-                             usage: CodexUsageCollector | None = None) -> int:
+                             usage: CodexUsageCollector | None = None,
+                             max_seconds: int | None = None,
+                             max_tool_items: int | None = None) -> int:
     """Stream existing type-only evidence and projected safe Monitor events.
 
     Only a trusted main worker supplies the fixed monitor path. Loss of the
@@ -1050,7 +1109,8 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
             trace.write(b"=== Codex JSONL event types (sensitive fields omitted) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE,
-                                  stderr=subprocess.DEVNULL) as worker:
+                                  stderr=subprocess.DEVNULL,
+                                  start_new_session=max_seconds is not None) as worker:
                 assert worker.stdin is not None and worker.stdout is not None
                 try:
                     worker.stdin.write(prompt)
@@ -1058,7 +1118,22 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                     pass
                 finally:
                     worker.stdin.close()
+                deadline = (time.monotonic() + max_seconds
+                            if max_seconds is not None else None)
                 while True:
+                    if deadline is not None:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            usage.budget_reason = "WALL_TIMEOUT"
+                            try:
+                                os.killpg(worker.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                            break
+                        readable, _, _ = select.select(
+                            [worker.stdout], [], [], min(remaining, 0.5))
+                        if not readable:
+                            continue
                     chunk = worker.stdout.read1(16384)
                     if not chunk:
                         break
@@ -1066,6 +1141,14 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                     monitor_safe = monitor_events.feed(chunk)
                     trace.write(safe)
                     trace.flush()
+                    if (max_tool_items is not None and
+                            usage.tool_items_started > max_tool_items):
+                        usage.budget_reason = "TOOL_ITEMS_LIMIT"
+                        try:
+                            os.killpg(worker.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        break
                     if live_fd >= 0 and monitor_safe:
                         try:
                             pending = memoryview(monitor_safe)
@@ -1105,6 +1188,17 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     # a single non-sandboxed Codex invocation. Worker admission revalidates
     # the owner event, SHA-pinned candidate and full Work Order digest.
     non_sandbox = task.get("codex_execution") is not None
+    quick = task.get("codex_profile") is not None
+    if quick:
+        require(task.get("codex_profile") == QUICK_PROFILE and
+                task_id == DYNAMIC_TASKS["path3-codex"] and
+                task.get("execution_path") == "path3-codex" and
+                task.get("capability") == "codex-workspace" and
+                task.get("work_order_scope") == "host-only" and
+                type(task.get("work_order_sha256")) is str and
+                SHA256.fullmatch(task["work_order_sha256"]) is not None and
+                not non_sandbox,
+                "CODEX_QUICK_ADMISSION_DENIED")
     if non_sandbox:
         require(task_id == DYNAMIC_TASKS["path3-codex"] and
                 task.get("execution_path") == "path3-codex" and
@@ -1128,26 +1222,45 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     test_log = source.with_suffix(".test.log") if source is not None else None
     # Path 3 is a handoff, not a plan for the model's individual steps.
     prompt = (
-        "PLASMA Path 3 engineering assignment. Follow the repository AGENTS.md "
-        "and the owner-approved Gate 1 Work Order at its pinned source SHA. "
-        "Choose the implementation, tools, tests, and in-scope engineering "
-        "sequence autonomously. Report observed results and remaining blockers "
-        "accurately, including NOT_RUN when appropriate.\n"
-        "Goal:\n" + task["objective"] + "\n"
+        ("PLASMA owner-authorized Path 3 quick host-only observation. "
+         "Follow the mandatory constraints in AGENTS.md; do not expand "
+         "the task or explore unrelated repository contents. Run only the "
+         "requested observation and report the exit code and result.\n"
+         if quick else
+         "PLASMA Path 3 engineering assignment. Follow the repository AGENTS.md "
+         "and the owner-approved Gate 1 Work Order at its pinned source SHA. "
+         "Choose the implementation, tools, tests, and in-scope engineering "
+         "sequence autonomously. Report observed results and remaining blockers "
+         "accurately, including NOT_RUN when appropriate.\n")
+        + "Goal:\n" + task["objective"] + "\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
         prompt += (
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
         )
+    if quick:
+        # Instructions guide the agent; the wrapper independently enforces
+        # wall-clock/tool-item limits (not a live token budget).
+        prompt += (
+            "QUICK OBSERVATION: Host-only, no hardware, network, broad "
+            "repository search, source edits, builds or repeated testing. "
+            "Run the exact bounded observation once; report exit code and "
+            "sanitized result. Do not expand scope.\n"
+        )
     # Pin ordinary Path 3 inside a sandbox even if operator defaults change.
     # Only the Owner-bound hardware Work Order can request unsandboxed Codex
     # for this single child invocation; Root Guard and OS locks still apply.
     command = ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"]
+    if quick:
+        # A bounded observation should not inherit potentially high effort.
+        command = ["codex", "-c", "model_reasoning_effort=low",
+                   "exec", "--json", "--sandbox", "workspace-write", "-"]
     if non_sandbox:
         command = ["codex", "exec", "--json",
                    "--sandbox", "danger-full-access", "-"]
     usage = CodexUsageCollector()
+    started_at = time.monotonic()
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.
     # One autonomous Codex invocation owns scoped FIX -> RETEST iterations.
@@ -1163,9 +1276,14 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         try:
             returncode = _run_codex_with_live_log(
                 command, prompt.encode("utf-8"), root, codex_log, live_log,
-                usage=usage)
+                usage=usage,
+                max_seconds=QUICK_MAX_SECONDS if quick else None,
+                max_tool_items=QUICK_MAX_TOOL_ITEMS if quick else None)
             proc = subprocess.CompletedProcess(command, returncode, b"", b"")
         except LiveMonitorUnavailable:
+            if quick:
+                # No streaming observation => cannot enforce tool-item budget.
+                raise Denied("QUICK_MONITOR_REQUIRED") from None
             # Only pre-execution setup can fall back. Never re-run a Codex
             # command after any part of its real execution has begun.
             # Monitor unavailable: preserve the original real execution path,
@@ -1173,17 +1291,21 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             proc = executor(
                 command, input=prompt.encode("utf-8"), cwd=root,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                timeout=None, check=False,
+                timeout=QUICK_MAX_SECONDS if quick else None,
+                check=False,
             )
             codex_log.write_bytes(
                 b"=== Codex JSONL event types (sensitive fields omitted) ===\n" +
                 usage.feed(proc.stdout) + usage.finish() +
                 (b"[codex stderr omitted]\n" if proc.stderr else b""))
     else:
+        if quick and executor is subprocess.run:
+            raise Denied("QUICK_MONITOR_REQUIRED")
         proc = executor(
             command, input=prompt.encode("utf-8"), cwd=root,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            timeout=None, check=False,
+            timeout=QUICK_MAX_SECONDS if quick else None,
+                check=False,
         )
         codex_log.write_bytes(
             b"=== Codex JSONL event types (sensitive fields omitted) ===\n" +
@@ -1193,6 +1315,18 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         return hashlib.sha256(p.read_bytes()).hexdigest()
     usage_path = evidence / "codex-token-usage.json"
     usage_snapshot = usage.snapshot()
+    metrics = usage.activity_counts()
+    metrics.update({
+        "elapsed_ms": max(0, int((time.monotonic() - started_at) * 1000)),
+        "execution_profile": QUICK_PROFILE if quick else "engineering",
+        "wall_seconds_limit": QUICK_MAX_SECONDS if quick else None,
+        "tool_items_limit": QUICK_MAX_TOOL_ITEMS if quick else None,
+        "input_tokens_soft_limit": QUICK_INPUT_TOKEN_BUDGET if quick else None,
+    })
+    if (quick and usage_snapshot["status"] == "reported" and
+            usage_snapshot["input_tokens"] > QUICK_INPUT_TOKEN_BUDGET):
+        usage.budget_reason = usage.budget_reason or "INPUT_BUDGET_POST_TURN"
+    metrics["budget_reason"] = usage.budget_reason
     # Bounded numeric-only context diagnostics. The size of a repo file is
     # NOT proof of actual Codex instruction loading or a model request count.
     root_agents = root / "AGENTS.md"
@@ -1218,6 +1352,7 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_log_path": str(codex_log.relative_to(root)),
         "codex_log_sha256": digest(codex_log),
         "codex_usage": usage_snapshot,
+        "codex_activity_metrics": metrics,
         "codex_context_audit": context_audit,
         "codex_model_selection": codex_requested_model_settings(command),
         "codex_sandbox_request": ("danger-full-access" if non_sandbox
@@ -1251,7 +1386,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     # Preserve the real Codex exit code and evidence even when execution
     # fails. A JSON receipt is NOT acceptance; main() returns nonzero for
     # failure and Actions collects source changes in an always() step.
-    if proc.returncode != 0:
+    if usage.budget_reason is not None:
+        receipt["status"] = "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED"
+        receipt["failure_reason"] = usage.budget_reason
+    elif proc.returncode != 0:
         receipt["status"] = "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED"
         receipt["failure_reason"] = "CODEX_CLI_NONZERO"
     # Report completeness is review metadata for both Paths/scopes. Physical

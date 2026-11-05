@@ -16,6 +16,36 @@ Codex owns implementation, real execution, self-tests, failure diagnosis and rep
 
 Use native CLI, SSH, USB/TTY, Sigrok and project build/test tools within the approved scope. Do **not** reinstate retired JSON Host Supervisor, fixed operation adapters, LA-only launchers, per-device Stage/Profile/Probe allowlists or a separate resume layer. LA2016 and Z2 are examples, not an allowlist. Consult [Path 3 native hardware tools](plasma-path3-direct-hardware-tools.md) when relevant. The worker's actual USB/device permissions and device-specific native busy/claim checks remain mandatory.
 
+### Explicit quick-observe profile (development-only)
+
+For an **owner-authenticated dynamic Path 3** work order that truly only
+observes a small host-local fact, the dispatcher author (not Codex's
+natural-language interpretation) may explicitly add both
+`"codex_profile": "quick-observe"` and `"scope": "host-only"`.
+It is **opt-in**; absent the marker, the unchanged engineering profile
+runs normally, including Vivado and long debug tasks. A quick request cannot
+select a PR candidate or `guarded-hardware-no-sandbox` and retains
+`--sandbox workspace-write`. It must never be used to authorize device work.
+
+A quick run's SWPC Python wrapper enforces a 75-second wall-clock deadline
+and stops after more than 12 JSONL tool-item starts. Quick runs fail closed
+if the streamed Monitor sink cannot be opened; no unsupervised fallback.
+The input-token threshold (30,000) is a **post-turn warning/failure check**,
+not a live API cost ceiling: current Codex `exec --json` provides token
+usage at `turn.completed`, after tokens are consumed. This distinction
+must not be hidden in acceptance reports. Host-only quick requests must
+not be silently inferred from arbitrary Work Order prose.
+
+The engineering receipt contains a bounded, numeric-only
+`codex_activity_metrics` object: elapsed milliseconds, tool starts,
+command starts/failures, item counts, turns, selected execution profile,
+limits and budget reason. It contains no shell arguments, output, tokens,
+prompt or path contents. Model-request count is `NOT_AVAILABLE` unless
+a trustworthy upstream event contract supports it; a Codex Turn is not
+equivalent to one model/API request. The existing
+`codex_usage` values remain Codex-reported totals (including cached input
+within input), never exact billing proof.
+
 ## 4. Z2 SSH/sudo and hardware boundary
 
 Use the existing owner-controlled local credential source described in the [Embedded contract](plasma-embedded.md), never commit, print, log or copy secrets into PR artifacts. SSH/sudo must use the enrolled owner-approved route and actual Linux rights; no sudoers edits or sandbox bypass. For approved FPGA work, validate current board/boot, candidate BIN/Manifest and SHA, Root/FPGA Manager ownership, safe output/electrical state and Golden recovery. Path 3 may perform bounded development deployment/FPGA operations only when included in Gate 1. Z2 PS, not SWPC, hosts live DUT OpenOCD and PS-local WordPort; PL performs DUT I/O. Internal-loopback evidence is not external SWD/DUT qualification. On unknown/unsafe state stop and report NOT_RUN/FAIL accurately.
