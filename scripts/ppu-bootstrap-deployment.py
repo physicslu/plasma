@@ -116,7 +116,9 @@ class BundleV3InstallRequest:
     artifact_sha256: str
     target_profile: Mapping[str, str]
     api_transaction_id: str
-    # Explicit owner request: also load the Bundle's FPGA Image (B3 v2).
+    # Standard B3 selects the verified Set; stage_only is an explicit exception.
+    mode: str = "activate"
+    # Only a separately authorized, explicit request may load FPGA hardware.
     fpga_load: bool = False
 
 @dataclass(frozen=True)
@@ -531,7 +533,7 @@ class DeploymentCoordinator:
     def execute_bundle_v3_install(
         self, request: BundleV3InstallRequest,
     ) -> Mapping[str, Any]:
-        """Single locked PS Installer B3; no activation, backup or B4.
+        """Single locked B3 Install/Activate or explicit stage_only, no B4.
 
         This is NOT the Host-only simulator. A factory provisioned local policy
         and a matching B2 admission receipt must be checked by Bootstrap before
@@ -551,6 +553,10 @@ class DeploymentCoordinator:
             raise DeploymentError("B3_INSTALL_TARGET_INVALID")
         if type(request.fpga_load) is not bool:
             raise DeploymentError("B3_FPGA_LOAD_FLAG_INVALID")
+        if type(request.mode) is not str or request.mode not in {"activate", "stage_only"}:
+            raise DeploymentError("B3_MODE_INVALID")
+        if request.mode == "stage_only" and request.fpga_load:
+            raise DeploymentError("B3_STAGE_ONLY_FPGA_LOAD_DENIED")
         verify_contract = Path(__file__).with_name("ppu_unified_deployment.py")
         spec = importlib.util.spec_from_file_location("plasma_b3_device_contract", verify_contract)
         if spec is None or spec.loader is None:
@@ -600,15 +606,20 @@ class DeploymentCoordinator:
                 record.module = bundle.name
                 record.release_id = (bundle.version + "-" +
                                      bundle.archive_sha256[:16])
-                if request.fpga_load and not any(
-                        package.kind == "fpga-image" for package in bundle.packages):
+                has_fpga_image = any(
+                    package.kind == "fpga-image" for package in bundle.packages)
+                if request.fpga_load and not has_fpga_image:
                     raise DeploymentError("B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE")
+                if request.mode == "activate" and has_fpga_image and not request.fpga_load:
+                    raise DeploymentError("B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD")
                 self.journal.write(record, "verified")
             except Exception as exc:
-                if str(exc) == "B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE":
+                if str(exc) in {"B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE",
+                                "B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD"}:
                     self.journal.write(
                         record, "verify_failed",
-                        error_code="b3_fpga_load_requires_fpga_image",
+                        error_code=("b3_fpga_load_requires_fpga_image"
+                                    if request.fpga_load else "b3_fpga_activation_requires_explicit_load"),
                         error_message=type(exc).__name__,
                     )
                     raise
@@ -643,11 +654,18 @@ class DeploymentCoordinator:
                 fpga_load, active = self._b3_fpga_load_locked(
                     record, request.artifact_sha256, Path(evidence["path"]),
                 )
+            elif request.mode == "activate":
+                active = self._b3_activate_without_fpga_locked(
+                    record, request.artifact_sha256,
+                )
             return {
                 "result": "PASS",
                 "schema": B3_RECEIPT_SCHEMA,
                 "stage": ("bundle_install_and_fpga_load" if request.fpga_load
-                          else "bundle_install_only"),
+                          else "bundle_install_and_activate" if request.mode == "activate"
+                          else "bundle_staged_only"),
+                "mode": request.mode,
+                "ready": False,
                 "transaction": asdict(record),
                 "bundle_name": bundle.name,
                 "archive_sha256": request.artifact_sha256,
@@ -666,6 +684,47 @@ class DeploymentCoordinator:
                     "REQUIRED" if request.fpga_load else "NOT_REQUIRED"),
                 "dut": "NOT_RUN",
             }
+
+    def _b3_activate_without_fpga_locked(
+        self, record: DeploymentRecord, asset_set_sha256: str,
+    ) -> Mapping[str, Any]:
+        """Reuse the same Runtime lease and atomic Active Set publisher under deployment.lock."""
+        helper = self._asset_helper()
+        lease = self.quiescence_lease or helper.held_runtime_asset_lease
+        try:
+            hold = lease()
+            with hold:
+                self.journal.write(record, "activating")
+                try:
+                    active = helper.activate_verified(
+                        self.paths.product_root, asset_set_sha256, runtime_quiesced=True,
+                    )
+                    if (active.get("result") != "PASS"
+                            or active.get("asset_set_sha256") != asset_set_sha256
+                            or active.get("ready") is not False
+                            or active.get("fpga") != "NOT_RUN"):
+                        raise DeploymentError("B3_ACTIVE_SET_RECEIPT_INVALID")
+                except Exception as exc:
+                    self.journal.write(record, "recovery_required",
+                                       error_code="b3_active_set_publish_uncertain",
+                                       error_message=type(exc).__name__)
+                    raise DeploymentError("B3_ACTIVE_SET_PUBLISH_REQUIRES_RECOVERY") from exc
+                self.journal.write(record, "asset_set_active")
+        except DeploymentError:
+            raise
+        except Exception as exc:
+            if record.state == "bundle_installed":
+                self.journal.write(record, "verify_failed",
+                                   error_code="b3_runtime_quiesce_denied",
+                                   error_message=type(exc).__name__)
+                raise DeploymentError("B3_RUNTIME_QUIESCE_DENIED") from exc
+            self.journal.write(record, "recovery_required",
+                               error_code="b3_activation_outcome_uncertain",
+                               error_message=type(exc).__name__)
+            raise DeploymentError("B3_ACTIVATION_REQUIRES_RECOVERY") from exc
+        return {"asset_set_sha256": active["asset_set_sha256"],
+                "generation": active["generation"],
+                "already_active": active["already_active"]}
 
     def _asset_helper(self) -> ModuleType:
         helper_path = Path(__file__).with_name("ppu_asset_set.py")
@@ -1386,7 +1445,7 @@ def _parser() -> argparse.ArgumentParser:
     deploy.add_argument("--facility-id", required=True)
     deploy.add_argument("--display-name", default="Plasma PPU")
     deploy.add_argument("--api-transaction-id", help="optional Bootstrap API correlation ID; not authority")
-    b3 = sub.add_parser("install-bundle", help="B3 canonical v3 PS file installation ONLY")
+    b3 = sub.add_parser("install-bundle", help="B3 canonical v3 Install/Activate or explicit stage_only")
     b3.add_argument("--release-artifact", type=Path, required=True)
     b3.add_argument("--source-commit", required=True)
     b3.add_argument("--artifact-sha256", required=True)
@@ -1394,6 +1453,7 @@ def _parser() -> argparse.ArgumentParser:
     b3.add_argument("--board", required=True)
     b3.add_argument("--fpga-part", required=True)
     b3.add_argument("--api-transaction-id", required=True)
+    b3.add_argument("--mode", required=True, choices=("activate", "stage_only"))
     b3.add_argument("--fpga-load", action="store_true",
                     help="also load the Bundle's FPGA Image via the protected Root Entry")
 
@@ -1429,7 +1489,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "fpga_part": args.fpga_part,
             },
             api_transaction_id=args.api_transaction_id,
-            fpga_load=bool(args.fpga_load),
+            mode=args.mode, fpga_load=bool(args.fpga_load),
         )
         try:
             result = DeploymentCoordinator(paths=paths, installer=installer).execute_bundle_v3_install(request)

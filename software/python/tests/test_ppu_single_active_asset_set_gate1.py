@@ -24,7 +24,7 @@ def stage(tmp_path, *, fpga=b"image-1", folder="a"):
     archive, sha = build_generic_assets(tmp_path / folder, bitstream=fpga)
     coordinator = make_coordinator(tmp_path)
     receipt = coordinator.execute_bundle_v3_install(b3_request(archive, sha))
-    assert receipt["stage"] == "bundle_install_only"
+    assert receipt["stage"] == "bundle_staged_only"
     return coordinator, sha, Path(receipt["install_path"])
 
 

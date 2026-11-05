@@ -284,13 +284,14 @@ def test_swpc_cli_api_status_requires_explicit_url_and_token(capsys):
     assert "requires --api-url and --token-file" in capsys.readouterr().err
 
 
-def _admitted_bundle_record(upload_id, tx, *, actions=None, sha="a" * 64):
+def _admitted_bundle_record(upload_id, tx, *, actions=None, sha="a" * 64,
+                            with_fpga=True):
     return {
         "transaction_id": tx, "upload_id": upload_id, "state": "admitted",
         "result": {
             "result": "PASS", "stage": "package_admission_only",
             "owner_authorized": True,
-            "fpga_static_qualification": "STATIC_QUALIFIED",
+            "fpga_static_qualification": "STATIC_QUALIFIED" if with_fpga else "NOT_APPLICABLE",
             "fpga_loaded": False, "identity_readback": "NOT_RUN",
             "install_qualified": False,
             "plan": {
@@ -305,7 +306,7 @@ def _admitted_bundle_record(upload_id, tx, *, actions=None, sha="a" * 64):
                 },
                 "requested_actions": ["install", "verify"] if actions is None else actions,
                 "packages": [{
-                    "id": "custom-swd", "kind": "fpga-image",
+                    "id": "custom-swd", "kind": "fpga-image" if with_fpga else "python",
                     "version": "1.0.0", "requires": [], "files": ["fpga/swd.bin"],
                 }],
             },
@@ -327,17 +328,18 @@ def test_console_generic_bundle_b2_then_explicit_b3_no_implicit_execution(tmp_pa
             "transaction_id": b3_tx, "upload_id": uploaded, "state": "queued",
             "result": None,
         }}).encode())
-    submission = api.install_bundle(admitted)
+    submission = api.install_bundle(admitted, fpga_load=True)
     assert submission.upload_id == uploaded
     assert submission.transaction_id == b3_tx
     assert submission.state == "queued"
     assert fake.calls[-3][1] == "/v1/deployment"
     method, path, body = fake.calls[-1]
     assert (method, path) == ("POST", "/v1/deployments")
-    assert set(body) == {"kind", "upload_id", "fpga_load", "authorization"}
-    assert body["fpga_load"] is False
+    assert set(body) == {"kind", "upload_id", "mode", "fpga_load", "authorization"}
+    assert body["mode"] == "activate"
+    assert body["fpga_load"] is True
     # Bound to the device, the operator's exact SHA and the CURRENT B2 tx.
-    owner.verify(body["authorization"], credential=TOKEN, action="bundle.install",
+    owner.verify(body["authorization"], credential=TOKEN, action="bundle.install-fpga-load",
                  device_id=DEVICE, subject_sha256="a" * 64, transaction_id=b2_tx)
 
 
@@ -396,7 +398,7 @@ def test_console_asset_set_mismatch_uploads_whole_bundle_then_b2_b3(tmp_path):
         body = json.loads(raw) if raw is not None else None
         if path == "/v1/deployments":
             fake.calls.append((method, path, body))
-            if body.get("fpga_load") is False:
+            if "fpga_load" in body:
                 receipt = {
                     "transaction_id": "d"*32, "upload_id": fake.upload_id,
                     "state": "queued", "result": None,
@@ -415,18 +417,19 @@ def test_console_asset_set_mismatch_uploads_whole_bundle_then_b2_b3(tmp_path):
     result = api.reconcile_bundle_assets(archive)
     assert result["result"] == "B3_INSTALL_QUEUED"
     assert result["asset_set_sha256"] == sha
-    assert result["ready"] is False and result["fpga"] == "NOT_RUN"
+    assert result["ready"] is False and result["fpga"] == "QUEUED"
     assert result["b3"]["transaction_id"] == "d"*32
     assert server._upload_paths(fake.paths, fake.upload_id).committed.read_bytes() == archive
     sent = [body for _method, path, body in fake.calls if path == "/v1/deployments"]
     assert [set(body) for body in sent] == [
         {"kind", "upload_id", "authorization"},
-        {"kind", "upload_id", "fpga_load", "authorization"},
+        {"kind", "upload_id", "mode", "fpga_load", "authorization"},
     ]
-    assert sent[1]["fpga_load"] is False
+    assert sent[1]["mode"] == "activate"
+    assert sent[1]["fpga_load"] is True
     owner.verify(sent[0]["authorization"], credential=TOKEN, action="bundle.admit",
                  device_id=DEVICE, subject_sha256=sha, transaction_id=fake.upload_id)
-    owner.verify(sent[1]["authorization"], credential=TOKEN, action="bundle.install",
+    owner.verify(sent[1]["authorization"], credential=TOKEN, action="bundle.install-fpga-load",
                  device_id=DEVICE, subject_sha256=sha, transaction_id="e" * 32)
 
 
@@ -477,3 +480,46 @@ def test_console_b2_requires_operator_chosen_sha_before_any_request(tmp_path):
         with pytest.raises(client.DeploymentAPIError, match="API_OWNER_ARCHIVE_SHA256_REQUIRED"):
             api.submit(kind="bundle", upload_id="a" * 32, archive_sha256=bad)
     assert fake.calls == []
+
+
+def test_console_fpga_b3_denies_implicit_load_but_allows_explicit_stage_only(tmp_path):
+    api, fake = make(tmp_path)
+    upload_id, tx = "a" * 32, "e" * 32
+    admitted = client.DeploymentSubmission(upload_id, tx, "admitted", "a" * 64)
+    fake.override["/v1/deployment"] = (
+        200, json.dumps({"ok": True, "deployment":
+                         _admitted_bundle_record(upload_id, tx)}).encode())
+    with pytest.raises(client.DeploymentAPIError, match="B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD"):
+        api.install_bundle(admitted)
+    assert [path for _method, path, _body in fake.calls] == ["/v1/deployment"]
+    fake.override["/v1/deployments"] = (
+        202, json.dumps({"ok": True, "deployment": {
+            "transaction_id": "d" * 32, "upload_id": upload_id, "state": "queued",
+        }}).encode())
+    result = api.install_bundle(admitted, mode="stage_only")
+    assert result.state == "queued"
+    body = fake.calls[-1][2]
+    assert body["mode"] == "stage_only"
+    assert body["fpga_load"] is False
+    owner.verify(body["authorization"], credential=TOKEN, action="bundle.install",
+                 device_id=DEVICE, subject_sha256="a" * 64, transaction_id=tx)
+
+
+def test_console_no_fpga_standard_b3_explicitly_activates_without_hardware(tmp_path):
+    api, fake = make(tmp_path)
+    upload_id, tx = "a" * 32, "e" * 32
+    admitted = client.DeploymentSubmission(upload_id, tx, "admitted", "a" * 64)
+    fake.override["/v1/deployment"] = (
+        200, json.dumps({"ok": True, "deployment":
+                         _admitted_bundle_record(upload_id, tx, with_fpga=False)}).encode())
+    fake.override["/v1/deployments"] = (
+        202, json.dumps({"ok": True, "deployment": {
+            "transaction_id": "d" * 32, "upload_id": upload_id, "state": "queued",
+        }}).encode())
+    result = api.install_bundle(admitted)
+    assert result.state == "queued"
+    body = fake.calls[-1][2]
+    assert body["mode"] == "activate"
+    assert body["fpga_load"] is False
+    owner.verify(body["authorization"], credential=TOKEN, action="bundle.install",
+                 device_id=DEVICE, subject_sha256="a" * 64, transaction_id=tx)

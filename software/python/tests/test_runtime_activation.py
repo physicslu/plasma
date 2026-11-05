@@ -285,7 +285,7 @@ def test_p1_coordinator_integrates_real_runtime_socket_with_atomic_asset_set(tmp
         archive, sha = build_generic_assets(tmp_path / "asset-archive")
         coordinator = make_coordinator(tmp_path)
         b3 = coordinator.execute_bundle_v3_install(b3_request(archive, sha))
-        assert b3["stage"] == "bundle_install_only"
+        assert b3["stage"] == "bundle_staged_only"
         assert not (coordinator.paths.product_root / "assets/active.json").exists()
         manager = SiteManager(config(tmp_path / "runtime"))
         await manager.start()

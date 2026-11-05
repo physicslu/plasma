@@ -1,6 +1,6 @@
 # PLASMA Universal Bundle — Canonical Naming and Wire Schema
 
-> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+> **Term note:** in this document **B1/B2/B3 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify plus standard Active selection. Independent legacy B4 recovery/backup remains separately governed. Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
 
 **Architecture Decision (2026-10-31, merged in PR #1225):** One deployment format, **Bundle → Packages → Files**. This document defines the only canonical vocabulary for future PLASMA PPU packaging. It does not grant install, activation, publisher authority, FPGA, DUT, or production-security qualification.
 
@@ -106,12 +106,22 @@ multi-version package co-installation. Existing v3 `packages[].requires`
 continues to describe **dependencies inside one delivered Bundle**, not
 the set of operations in a Job.
 
-B1/B2/B3 continue to mean Receive, Admission, and Install/Verify. A B3
-request without `fpga_load` installs files only: it does not activate the
-Set, reconfigure the FPGA, or execute a Programming Job.
+B1/B2/B3 continue to mean Receive, Admission, and Install/Verify.
+Under the 2026-11-03 owner decision, **standard B3 success also selects the
+verified Active Set**. The B3 HTTP body has exact `mode: "activate"` or
+`mode: "stage_only"` plus mandatory boolean `fpga_load`. An exceptional
+`stage_only` installs/verifies files but never publishes `active.json`.
+For a Bundle with **no FPGA Image**, `mode: "activate", fpga_load: false`
+atomically publishes the verified Set under the Coordinator's existing
+`deployment.lock` and a connection-held Runtime Job quiescence lease;
+it does not reload PL. A Bundle containing an FPGA Image cannot activate
+with `fpga_load: false`: its caller must **explicitly** choose
+`mode: "activate", fpga_load: true` and carry the separate
+`bundle.install-fpga-load` owner authorization. No server-side default or
+`bundle.install` authorization can infer this privilege.
 
 **B3 FPGA load (owner decision 2026-11-02, [Gate 1](../deployment/ppu-bundle-v3-b3-fpga-load-gate1.md)).**
-A B3 request with an explicit `"fpga_load": true` for a Bundle that contains
+A B3 `mode: "activate"` request with an explicit `"fpga_load": true` for a Bundle that contains
 exactly one `fpga-image` Package also loads that Image, in the same
 `deployment.lock` transaction: install/verify → Runtime Job Quiesce
 (connection-held) → protected Root Entry `bundle-load <asset_set_sha256>`
@@ -126,11 +136,16 @@ The receipt is `plasma.ppu.b3-deployment-receipt.v2` and reports
 alone and never performs a DUT operation. A PPU is READY only after the
 selected Set and physical/runtime prerequisites are proven.
 
-The existing B3 install path `/opt/plasma/bundles/<bundle-name>` has
-**no generic Active Asset Set feature today**, and B3 physical acceptance
-covers only the approved Smoke Bundle from PR #1241. The canonical Set
-identity algorithm, activation API, persistence and recovery remain
-unimplemented, despite this architecture choice.
+The current generic B3 installer stores immutable Sets in
+`/opt/plasma/assets/staged/<archive_sha256>`, while the existing Active
+Asset Set helper atomically publishes `/opt/plasma/assets/active.json`
+(`os.replace` + fsync). Each receipt distinguishes
+`bundle_install_and_activate`, `bundle_install_and_fpga_load` or
+`bundle_staged_only`, reports `ready: false`, and records the
+Coordinator transaction. Neither Active identity nor a successful B3
+implies that a Programming Job is READY. Host-only tests are not Z2 HIL
+evidence; unknown physical state requires guarded recovery and fresh
+Site/FPGA admission.
 
 **Terminology:** Bundle-as-Assets is a system-level classification; a
 Bundle is **not identical to one** `Programming Asset` object from

@@ -335,7 +335,8 @@ def test_b3_unapproved_package_actions_or_fpga_widening_denied(tmp_path):
     # Install-only owner authorization cannot be widened to an FPGA load.
     upload_id = _commit(paths, archive.read_bytes())
     b2 = srv.start_deployment(admit_body(paths, "bundle", upload_id))
-    widened = dict(install_body(paths, b2, fpga_load=False), fpga_load=True)
+    widened = dict(install_body(paths, b2, fpga_load=False),
+                   mode="activate", fpga_load=True)
     with pytest.raises(bootstrap.BootstrapServiceError, match="ACTION_MISMATCH"):
         srv.start_deployment(widened)
     assert calls == []
