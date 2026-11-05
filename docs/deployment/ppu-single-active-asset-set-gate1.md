@@ -1,8 +1,8 @@
 # PPU Single Active Asset Set — P1 Gate 1
 
-> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+> **Term note:** in this document **B1/B2/B3 are Bundle stages** — B1 upload/commit, B2 admission and B3 install/verify plus standard Active selection; guarded recovery/legacy B4 stays separate. Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
 
-**State:** Host-only implementation merged in main (PR #1246) / CI evidence only.
+**Evidence lineage:** PR #1246 implemented the Host-only Active Set helper and quiescence lease. Later #1308 centralized the Coordinator, and P4-02 standardizes B3 Install/Activate. These are code evidence only, not real Z2 HIL.
 **Dependencies:** [PR #1245](https://github.com/physicslu/plasma/pull/1245)
 (Generic Bundle B3 Install/Verify), plus the owner-approved architectural
 decision in [PR #1244](https://github.com/physicslu/plasma/pull/1244).
@@ -29,13 +29,15 @@ signature, Master approval or device authorization.
 - Console \`reconcile_bundle_assets(full_bundle_bytes)\` fetches the
   PPU Active identity: if the digest matches it returns \`ALREADY_ACTIVE\`
   without upload; otherwise uploads the **whole Bundle** through B1,
-  obtains B2, and explicitly requests B3 Install-only. It returns
+  obtains B2, and explicitly requests B3 `mode="activate"`, including
+  `fpga_load=true` plus matching authorization for FPGA Bundles. It returns
   \`B3_INSTALL_QUEUED\`, **not** \`ACTIVE\` or \`READY\`.
-- B3 without `fpga_load` still verifies every Package and installs without
-  changing the Active pointer, rebooting a service, running a Python Parser,
-  loading an FPGA or touching a DUT. B3 with an explicit `fpga_load=true`
-  loads the Bundle's FPGA Image and publishes `active.json` under the same
-  Runtime Job Quiesce, only after Root Identity PASS
+- B3 `mode="stage_only", fpga_load=false` intentionally leaves the Active
+  pointer untouched. Standard `mode="activate"` without FPGA Package
+  atomically selects the verified Set under the existing Runtime lease.
+  An FPGA Bundle requires explicit `fpga_load=true` and separate
+  `bundle.install-fpga-load` authorization; it publishes `active.json`
+  only after protected Root Identity PASS
   ([B3 FPGA load Gate 1](ppu-bundle-v3-b3-fpga-load-gate1.md)).
 
 ## Activation and authoritative cross-process Job Quiescence
@@ -43,7 +45,7 @@ signature, Master approval or device authorization.
 The existing `DeploymentCoordinator` owns `deployment.lock` and
 `deployment.json` for B3 and Asset Set activation, with one atomic
 `assets/active.json` pointer swap and durable `fsync`. This is a
-**separate explicit operation**, never an implicit B3 side effect.
+**standard B3 activation step**, except for the explicit `stage_only` mode.
 
 The PPU Runtime already has a private Unix control socket
 (`/run/plasma-server/control.sock`) and a `SiteManager` execution
@@ -74,9 +76,9 @@ another daemon or path, with a private
 **Evidence limit:** The P1 cross-process contract is Host-only tested.
 Runtime admission and activation have not yet been validated on a real
 Z2, and other out-of-process FPGA Manager/UIO/kernel owners remain
-outside this Job-quiescence guarantee. There is still **no public
-Console B4/Activation API** and no real PPU activation permission
-claimed here. Source installation, service restarts, physical HIL and
+outside this Job-quiescence guarantee. There is no separate public generic B4 API, and **no physical Z2
+activation/HIL qualification** is claimed here. Standard B3 is the
+explicitly authorized Install/Activate operation. Source installation, service restarts, physical HIL and
 full end-to-end recovery remain separate acceptance work.
 
 A failed update leaves the last verified Active Set unchanged; an
@@ -89,13 +91,12 @@ successful P1 Asset Set SHA match is not evidence that the FPGA is loaded.
 
 ## Non-goals and next evidence
 
-This PR does not add a new server/daemon/installer, multi-version Package
-Resolver, FPGA Loader, proprietary staging path, public B4 activation
-API, production publisher authentication, real Z2 cross-process/HIL
-qualification, Job execution or Z2 HIL results.
+This integration does not add a server/daemon/installer, multi-version Package
+Resolver, FPGA Loader, proprietary staging path, public separate B4 API,
+production publisher authentication, real Z2 cross-process/HIL qualification,
+Job execution or Z2 HIL results.
 
-Before a real PPU activation can be enabled, integrate and demonstrate
-an authoritative cross-process Job ownership/quiescence lease held by
-**all programming entrypoints** and the exclusive Configuration/
-Activation owner. Demonstrate interruption, restore/recovery, Site
-concurrency and hardware isolation under separate authorized scope.
+The existing cross-process Runtime lease is the single Job-admission gate
+used by B3. Before physical release, demonstrate the deployed Runtime holds
+it across all applicable programming entrypoints, including interruptions,
+restore/recovery, queued/cancelling Site concurrency and hardware isolation.
