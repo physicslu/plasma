@@ -16,6 +16,8 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import select
+import time
 import sys
 import uuid
 from urllib.error import HTTPError, URLError
@@ -33,6 +35,11 @@ COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
+# Explicit opt-in for a host-only observation. Engineering work stays unbounded.
+QUICK_PROFILE = "quick-observe"
+QUICK_MAX_SECONDS = 75
+QUICK_MAX_TOOL_ITEMS = 12
+QUICK_INPUT_TOKEN_BUDGET = 30000  # Post-turn alert; not a live hard cap.
 # Explicit operator-public metadata; never derived from objective/acceptance.
 # Single-line restricted vocabulary prevents control sequences, URLs, quotes,
 # shell syntax and raw JSON from crossing the GitHub output/monitor boundary.
@@ -199,7 +206,8 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "expected_stdout_sha256", "verification",
                                "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
-                                "monitor_summary", "codex_execution"},
+                                "monitor_summary", "codex_execution",
+                               "codex_profile"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -225,11 +233,19 @@ def parse_dynamic_work_order(event: object) -> dict:
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
+        quick = order.get("codex_profile") == QUICK_PROFILE
+        allowed = (base - {"scope"}) | optional_ref | {
+            "monitor_summary", "codex_execution", "codex_profile"}
+        if quick:
+            allowed |= {"scope"}
         require(capability == "codex-workspace" and
-                set(order) <= (base - {"scope"}) | optional_ref |
-                {"monitor_summary", "codex_execution"} and
+                set(order) <= allowed and
                 ("codex_execution" not in order or
-                 order["codex_execution"] == "guarded-hardware-no-sandbox"),
+                 order["codex_execution"] == "guarded-hardware-no-sandbox") and
+                ("codex_profile" not in order or quick) and
+                (not quick or (order.get("scope") == "host-only"
+                 and "codex_execution" not in order
+                 and order.get("pr_number", 0) == 0)),
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
     elif capability == "cpu-only" and "native_preflight" in order:
         # Existing Path 2 task_id and Runner. No candidate scripts, shell,
@@ -368,6 +384,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         task["monitor_summary"] = order["monitor_summary"]
     if "codex_execution" in order:
         task["codex_execution"] = order["codex_execution"]
+    if "codex_profile" in order:
+        task["codex_profile"] = order["codex_profile"]
     if order["execution_path"] == "path2-cli":
         task["work_order_scope"] = order.get("scope", "host-only")
         if order["capability"] == "cpu-only":
@@ -936,6 +954,12 @@ class CodexUsageCollector:
                        "output_tokens": 0}
         self.turns = 0
         self.invalid = False
+        # Metadata-only observations; commands, stdout and model text excluded.
+        self.items_started = 0
+        self.items_completed = 0
+        self.commands_started = 0
+        self.commands_failed = 0
+        self.tool_items_started = 0
 
     def _line(self, raw: bytes) -> bytes:
         try:
@@ -945,6 +969,21 @@ class CodexUsageCollector:
         if type(event) is not dict:
             return b"[codex unrecognized event]\n"
         kind = event.get("type")
+        item = event.get("item")
+        category = item.get("type") if type(item) is dict else None
+        if kind == "item.started":
+            self.items_started += 1
+            if category == "command_execution":
+                self.commands_started += 1
+            if category in ("command_execution", "mcp_tool_call",
+                            "web_search", "collab_tool_call"):
+                self.tool_items_started += 1
+        elif kind == "item.completed":
+            self.items_completed += 1
+            if category == "command_execution":
+                code = item.get("exit_code")
+                if type(code) is int and code != 0:
+                    self.commands_failed += 1
         if kind == "thread.started":
             thread_id = event.get("thread_id")
             try:
@@ -1011,6 +1050,21 @@ class CodexUsageCollector:
         result = self._line(bytes(self.pending))
         self.pending.clear()
         return result
+
+    def activity_counts(self) -> dict:
+        """Counters only: no stdout, commands, prompts or private paths."""
+        return {
+            "schema_version": 1,
+            "source": "codex_exec_jsonl",
+            "turns_completed": self.turns,
+            "items_started": self.items_started,
+            "items_completed": self.items_completed,
+            "tool_items_started": self.tool_items_started,
+            "commands_started": self.commands_started,
+            "commands_failed": self.commands_failed,
+            "model_request_count": None,
+            "model_request_count_status": "NOT_AVAILABLE",
+        }
 
     def snapshot(self) -> dict:
         complete = self.turns > 0 and not self.invalid
