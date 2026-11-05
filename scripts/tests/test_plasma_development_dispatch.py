@@ -1524,6 +1524,9 @@ class GenericWorkOrderContracts(unittest.TestCase):
             usage_text = (work / receipt["codex_usage_path"]).read_text()
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][1]["timeout"], dev.QUICK_MAX_SECONDS)
+        self.assertEqual(calls[0][0],
+            ["codex", "-c", "model_reasoning_effort=low",
+             "exec", "--json", "--sandbox", "workspace-write", "-"])
         self.assertIn("QUICK OBSERVATION", calls[0][1]["input"].decode())
         self.assertEqual(receipt["status"],
                          "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED")
