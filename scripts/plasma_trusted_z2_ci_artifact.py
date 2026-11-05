@@ -22,11 +22,11 @@ import zipfile
 
 REPOSITORY = "physicslu/plasma"
 WORKFLOW = ".github/workflows/z2-ps-release.yml"
-SHA40 = re.compile(r"[0-9a-f]{40}\\Z")
-SHA256 = re.compile(r"[0-9a-f]{64}\\Z")
+SHA40 = re.compile(r"[0-9a-f]{40}\Z")
+SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 KIT_NAME = re.compile(
-    r"plasma-z2-ps-kit-(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+"
-    r"(?:-[A-Za-z0-9.-]+)?(?:\\+[A-Za-z0-9.-]+)?)-(?P<prefix>[0-9a-f]{12})\\Z"
+    r"plasma-z2-ps-kit-(?P<version>[0-9]+\.[0-9]+\.[0-9]+"
+    r"(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?)-(?P<prefix>[0-9a-f]{12})\Z"
 )
 MAX_ZIP_BYTES = 512 * 1024 * 1024
 MAX_KIT_BYTES = 512 * 1024 * 1024
