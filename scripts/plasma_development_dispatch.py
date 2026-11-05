@@ -41,6 +41,10 @@ QUICK_PROFILE = "quick-observe"
 QUICK_MAX_SECONDS = 75
 QUICK_MAX_TOOL_ITEMS = 12
 QUICK_INPUT_TOKEN_BUDGET = 30000  # Post-turn alert; not a live hard cap.
+# Owner-declared display phase, not a live stage, hardware permission or PASS.
+MONITOR_PHASES = frozenset({
+    "HOST_ONLY", "INSTALL", "RUNTIME", "PROGRAMMING_PROFILE", "FLASH_TEST",
+})
 # Explicit operator-public metadata; never derived from objective/acceptance.
 # Single-line restricted vocabulary prevents control sequences, URLs, quotes,
 # shell syntax and raw JSON from crossing the GitHub output/monitor boundary.
@@ -208,7 +212,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
                                 "monitor_summary", "codex_execution",
-                               "codex_profile", "artifact_preset"},
+                               "codex_profile", "artifact_preset", "monitor_phase"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -225,6 +229,10 @@ def parse_dynamic_work_order(event: object) -> dict:
                 MONITOR_SUMMARY.fullmatch(summary) is not None and
                 MONITOR_SENSITIVE.search(summary) is None,
                 "WORK_ORDER_MONITOR_SUMMARY_DENIED")
+    if "monitor_phase" in order:
+        require(type(order["monitor_phase"]) is str and
+                order["monitor_phase"] in MONITOR_PHASES,
+                "WORK_ORDER_MONITOR_PHASE_DENIED")
     path, capability, scope = (order["execution_path"],
                                order["capability"], order.get("scope"))
     require(type(path) is str and path in DYNAMIC_TASKS and
@@ -237,7 +245,7 @@ def parse_dynamic_work_order(event: object) -> dict:
         quick = order.get("codex_profile") == QUICK_PROFILE
         allowed = (base - {"scope"}) | optional_ref | {
             "monitor_summary", "codex_execution", "codex_profile",
-            "artifact_preset"}
+            "artifact_preset", "monitor_phase"}
         if quick:
             allowed |= {"scope"}
         require(capability == "codex-workspace" and
@@ -390,6 +398,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
     }
     if "monitor_summary" in order:
         task["monitor_summary"] = order["monitor_summary"]
+    if "monitor_phase" in order:
+        task["monitor_phase"] = order["monitor_phase"]
     if "codex_execution" in order:
         task["codex_execution"] = order["codex_execution"]
     if "artifact_preset" in order:
@@ -584,6 +594,8 @@ def authorize(event: object, context: dict, registry: object,
         # Only explicit, checksum-bound, operator-public Path 2/3 metadata.
         # No objective, acceptance, prompt, or Work Order JSON in this field.
         "monitor_summary": task.get("monitor_summary", ""),
+        # Only owner-authenticated, hash-bound Path 3 display metadata.
+        "monitor_phase": task.get("monitor_phase", ""),
         **({"artifact_preset": task["artifact_preset"]}
           if "artifact_preset" in task else {}),
         **a2_claim,
