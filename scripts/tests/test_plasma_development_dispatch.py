@@ -18,6 +18,7 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"scripts"))
 import plasma_development_dispatch as dev
+import plasma_host_observe as host_observe
 
 WORKFLOW=ROOT/".github/workflows/plasma-engineering-runtime-dispatch.yml"
 REGISTRY=ROOT/"specs/engineering-dispatch/development-tasks-v1.json"
@@ -1460,6 +1461,114 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["acceptance"], order["acceptance"])
 
 
+    def test_simple_host_queries_use_existing_path2_without_codex(self):
+        """Host-only CLI: owner event, exact script, bwrap, real output evidence."""
+        self.assertEqual(host_observe.observe("hostname"), os.uname().nodename)
+        self.assertEqual(host_observe.observe("kernel-release"), os.uname().release)
+        self.assertTrue(host_observe.observe("python-version").startswith(
+            f"{sys.version_info.major}.{sys.version_info.minor}."))
+        self.assertEqual(host_observe.main(["hostname"]), 0)
+        for argv in ([], ["hostname", "extra"], ["sudo"], ["bash"], ["../etc/passwd"]):
+            with self.subTest(argv=argv):
+                self.assertEqual(host_observe.main(argv), 2)
+
+        order = self._order(
+            "path2-cli", script="scripts/plasma_host_observe.py",
+            argv=["hostname"], verification="exit-code",
+            timeout_seconds=20)
+        order.pop("expected_stdout_sha256")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        self.assertEqual(req["task_id"], "path2-work-order")
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["capability"], "cpu-only")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["verification"], "exit-code")
+        self.assertNotIn("codex_profile", task)
+        calls = []
+        def stub(command, **kwargs):
+            calls.append((command, kwargs))
+            return subprocess.CompletedProcess(command, 0, b"SWPC\n", b"")
+        with tempfile.TemporaryDirectory() as td:
+            evidence = Path(td)
+            # Offline argument-contract only; no SWPC, bwrap or Codex executes.
+            with patch.object(dev.shutil, "which", return_value="/usr/bin/python3"), \
+                    patch.object(dev.sys, "executable", "/usr/bin/python3"):
+                result = dev.run_task(
+                    task, workspace=ROOT, sandbox=True, evidence_dir=evidence,
+                    executor=stub)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["verification"], "exit-code")
+            self.assertEqual(result["stdout_sha256"],
+                             hashlib.sha256(b"SWPC\n").hexdigest())
+            self.assertEqual(
+                (evidence / "plasma-path2-stdout.txt").read_bytes(), b"SWPC\n")
+            self.assertEqual(json.loads(
+                (evidence / "plasma-path2-process.json").read_text())["exit_code"], 0)
+        self.assertEqual(len(calls), 1)
+        argv, kwargs = calls[0]
+        self.assertIn("--unshare-all", argv)
+        self.assertIn("--clearenv", argv)
+        self.assertIn("--ro-bind", argv)
+        self.assertIn("--dev", argv)
+        self.assertIn("/work/scripts/plasma_host_observe.py", argv)
+        self.assertEqual(argv[-1], "hostname")
+        self.assertNotIn("codex", " ".join(argv))
+        self.assertEqual(kwargs["timeout"], 20)
+
+    def test_quick_cost_status_does_not_mask_real_codex_failure(self):
+        quick = self._order("path3-codex", codex_profile="quick-observe",
+                            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        thread = "0199a213-81c0-7800-8aa1-bbab2a035a53"
+        for tokens, rc, expected_cost, expected_status in (
+            (5_000, 0, "WITHIN_LIMIT", "EVIDENCE_READY_REVIEW_REQUIRED"),
+            (35_000, 0, "EXCEEDED", "EVIDENCE_READY_REVIEW_REQUIRED"),
+            (35_000, 7, "EXCEEDED", "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED"),
+        ):
+            with self.subTest(tokens=tokens, rc=rc):
+                stream = (
+                    json.dumps({"type": "thread.started", "thread_id": thread})
+                    + "\n" + json.dumps({"type": "turn.completed", "usage": {
+                        "input_tokens": tokens, "cached_input_tokens": tokens-100,
+                        "output_tokens": 3}}) + "\n"
+                ).encode()
+                with tempfile.TemporaryDirectory() as td:
+                    proc = lambda argv, **kw: subprocess.CompletedProcess(
+                        argv, rc, stream, b"")
+                    report = dev.run_codex_task(
+                        task, workspace=Path(td), executor=proc,
+                        task_id="path3-work-order")
+                self.assertEqual(report["cost_budget_status"], expected_cost)
+                self.assertEqual(report["status"], expected_status)
+                self.assertEqual(report["functional_acceptance"], "UNVERIFIED")
+                self.assertEqual(report["codex_exit_code"], rc)
+                self.assertEqual(
+                    report["codex_context_audit"]["model_request_count_status"],
+                    "NOT_AVAILABLE")
+
+    def test_quick_cost_unknown_is_distinct_from_execution_status(self):
+        quick = self._order("path3-codex", codex_profile="quick-observe",
+                            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            report = dev.run_codex_task(
+                task, workspace=Path(td),
+                executor=lambda argv, **kw: subprocess.CompletedProcess(
+                    argv, 0, b'{"type":"turn.started"}\n', b""),
+                task_id="path3-work-order")
+        self.assertEqual(report["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+        self.assertEqual(report["cost_budget_status"], "NOT_AVAILABLE")
+        self.assertIsNone(
+            report["codex_activity_metrics"]["non_cached_input_tokens"])
+        self.assertEqual(
+            report["codex_context_audit"]["model_request_count_source"],
+            "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS")
+
     def test_explicit_quick_profile_requires_owner_bound_host_only(self):
         quick = self._order(
             "path3-codex", codex_profile=dev.QUICK_PROFILE,
@@ -1528,9 +1637,11 @@ class GenericWorkOrderContracts(unittest.TestCase):
             ["codex", "-c", "model_reasoning_effort=low",
              "exec", "--json", "--sandbox", "workspace-write", "-"])
         self.assertIn("QUICK OBSERVATION", calls[0][1]["input"].decode())
-        self.assertEqual(receipt["status"],
-                         "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED")
-        self.assertEqual(receipt["failure_reason"], "INPUT_BUDGET_POST_TURN")
+        self.assertEqual(receipt["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+        self.assertNotIn("failure_reason", receipt)
+        self.assertEqual(receipt["cost_budget_status"], "EXCEEDED")
+        self.assertEqual(receipt["codex_execution_status"], "EXIT_ZERO")
+        self.assertEqual(receipt["functional_acceptance"], "UNVERIFIED")
         self.assertEqual(receipt["codex_usage"]["input_tokens"], 33000)
         self.assertEqual(receipt["codex_usage"]["cached_input_tokens"], 30000)
         counts = receipt["codex_activity_metrics"]
@@ -1540,7 +1651,15 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertEqual(counts["items_completed"], 1)
         self.assertEqual(counts["turns_completed"], 1)
         self.assertEqual(counts["input_tokens_soft_limit"], 30000)
+        self.assertEqual(counts["cost_budget_status"], "EXCEEDED")
+        self.assertEqual(counts["cost_budget_alert"], "INPUT_BUDGET_POST_TURN")
+        self.assertIsNone(counts["budget_reason"])
+        self.assertEqual(counts["non_cached_input_tokens"], 3000)
+        self.assertGreater(counts["cache_share_basis_points"], 9000)
         self.assertEqual(counts["model_request_count_status"], "NOT_AVAILABLE")
+        self.assertEqual(receipt["codex_context_audit"]["model_request_count_source"],
+                         "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS")
+        self.assertEqual(receipt["codex_context_audit"]["observed_turns_completed"], 1)
         self.assertIsNone(counts["model_request_count"])
         self.assertGreaterEqual(counts["elapsed_ms"], 0)
         self.assertNotIn(secret, json.dumps(receipt) + usage_text)
