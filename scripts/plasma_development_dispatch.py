@@ -208,7 +208,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
                                 "monitor_summary", "codex_execution",
-                               "codex_profile"},
+                               "codex_profile", "artifact_preset"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -236,7 +236,8 @@ def parse_dynamic_work_order(event: object) -> dict:
     if path == "path3-codex":
         quick = order.get("codex_profile") == QUICK_PROFILE
         allowed = (base - {"scope"}) | optional_ref | {
-            "monitor_summary", "codex_execution", "codex_profile"}
+            "monitor_summary", "codex_execution", "codex_profile",
+            "artifact_preset"}
         if quick:
             allowed |= {"scope"}
         require(capability == "codex-workspace" and
@@ -248,6 +249,12 @@ def parse_dynamic_work_order(event: object) -> dict:
                  and "codex_execution" not in order
                  and order.get("pr_number", 0) == 0)),
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
+        if "artifact_preset" in order:
+            require(order["artifact_preset"] == "opf-site2-c7502a3"
+                    and not quick
+                    and order.get("pr_number", 0) == 0
+                    and order.get("codex_execution") == "guarded-hardware-no-sandbox",
+                    "WORK_ORDER_ARTIFACT_PRESET_DENIED")
     elif capability == "cpu-only" and "native_preflight" in order:
         # Existing Path 2 task_id and Runner. No candidate scripts, shell,
         # path parameters, model or hardware under this one main-only route.
@@ -385,6 +392,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         task["monitor_summary"] = order["monitor_summary"]
     if "codex_execution" in order:
         task["codex_execution"] = order["codex_execution"]
+    if "artifact_preset" in order:
+        task["artifact_preset"] = order["artifact_preset"]
     if "codex_profile" in order:
         task["codex_profile"] = order["codex_profile"]
         task["work_order_scope"] = "host-only"
@@ -575,6 +584,8 @@ def authorize(event: object, context: dict, registry: object,
         # Only explicit, checksum-bound, operator-public Path 2/3 metadata.
         # No objective, acceptance, prompt, or Work Order JSON in this field.
         "monitor_summary": task.get("monitor_summary", ""),
+        **({"artifact_preset": task["artifact_preset"]}
+          if "artifact_preset" in task else {}),
         **a2_claim,
     }
 
