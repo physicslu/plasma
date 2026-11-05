@@ -82,12 +82,15 @@ class SiteWorkerControlClient:
         return result
 
     def open_job_session(self, *, job_id: str, sites: list[int], max_runtime_s: int,
-                         provider_route: Mapping[str, Any], deadline_monotonic: float
+                         provider_route: Mapping[str, Any], deadline_monotonic: float,
+                         expected_engine_selection_sha256: str | None = None,
                          ) -> dict[str, Any]:
+        fields = {"provider_route": dict(provider_route),
+                  "deadline_monotonic": deadline_monotonic}
+        if expected_engine_selection_sha256 is not None:
+            fields["expected_engine_selection_sha256"] = expected_engine_selection_sha256
         return self.call("open_job_session", job_id=job_id, sites=sites,
-                         max_runtime_s=max_runtime_s,
-                         provider_route=dict(provider_route),
-                         deadline_monotonic=deadline_monotonic)
+                         max_runtime_s=max_runtime_s, **fields)
 
 
 def stage_image(image_root: Path, job_id: str, image: bytes) -> Path:
@@ -113,7 +116,8 @@ def _refusal(stage: str, exc: SiteWorkerRefused, **context: Any) -> PlasmaError:
     code = exc.code
     unknown = code.startswith("OUTCOME_UNKNOWN")
     safe_failure = code.startswith("OPERATION_FAILED_SAFE:")
-    not_ready = code.startswith(("ENGINE_NOT_READY", "SITE_WORKER_UNREACHABLE"))
+    not_ready = code.startswith(("ENGINE_NOT_READY", "WORKER_ENGINE_",
+                                 "SITE_WORKER_UNREACHABLE"))
     return PlasmaError(
         ErrorCode.INTERFACE_NOT_CONFIGURED if not_ready else ErrorCode.INTERFACE_FAILURE,
         f"C-3 Site Worker {stage} refused: {code}",

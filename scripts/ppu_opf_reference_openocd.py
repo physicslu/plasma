@@ -162,26 +162,34 @@ async def execute_reference_flash(
         image_size=len(image), hardware=hardware, runtime_profile=runtime_profile,
         engine_record=engine_record, engine_base=engine_base, require_root=require_root)
 
+    worker_receipt: ppu_opf_site_session.BoundSession | None = None
+
     def open_session() -> dict[str, Any]:
+        nonlocal worker_receipt
         bound = ppu_opf_site_session.open_provider_job_session(
             client, product_root=product_root, asset_set_sha256=asset_set_sha256,
             selection=selection, policy=policy, job_id=job_id, target=target,
             operation="flash_cycle", site_id=site_id, image_size=len(image),
             hardware=hardware, job_deadline_monotonic=job_deadline_monotonic,
-            job_timeout_s=job_timeout_s)
+            job_timeout_s=job_timeout_s,
+            expected_engine_selection_sha256=binding.engine.record_sha256)
         if bound.route != binding.route:
             client.call("close_session", session_id=bound.session_id)
             raise ReferenceDenied("REFERENCE_ROUTE_CHANGED")
+        worker_receipt = bound
         return {"session_id": bound.session_id}
 
     result = await run_flash_cycle(
         client, job_id=job_id, site_id=site_id, profile=binding.profile,
         image=image, image_root=image_root, max_runtime_s=math.ceil(job_timeout_s),
         session_factory=open_session)
+    _need(worker_receipt is not None, "WORKER_ENGINE_RECEIPT_MISSING")
     return {**result, "opf_provider_package": binding.route.provider_package,
             "opf_profile_package": binding.route.profile_package,
             "opf_asset_set_sha256": binding.route.asset_set_sha256,
             "opf_profile_sha256": binding.profile_sha256,
             "opf_driver_abi": binding.route.driver_abi,
             "opf_openocd_sha256": binding.engine.openocd_sha256,
-            "opf_engine_selection_sha256": binding.engine.record_sha256}
+            "opf_engine_selection_sha256": binding.engine.record_sha256,
+            "opf_worker_engine_selection_sha256": worker_receipt.worker_engine_selection_sha256,
+            "opf_worker_epoch": worker_receipt.worker_epoch}

@@ -38,6 +38,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from ppu_site_engine import EngineSelection
 from ppu_site_worker import FlashImage, TransportDenied, TransportFailed, TransportUnknown
 
 DPIDR = re.compile(r"SWD DPIDR (0x[0-9a-fA-F]{8})")
@@ -55,6 +56,7 @@ class Abi5OpenocdAdapter:
 
     def __init__(self, *, openocd_root: Path, python: Path, adapter_khz: int,
                  adapter_driver: str = "plasma_swd",
+                 verified_engine: EngineSelection | None = None,
                  journal: Path = Path("/var/lib/plasma-privileged/fpga-deployment-state.json"),
                  record_dir: Path = Path("/run/plasma-z2-swd05"),
                  run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
@@ -70,6 +72,18 @@ class Abi5OpenocdAdapter:
             raise ValueError("adapter_driver invalid")
         self.adapter_khz = adapter_khz
         self.adapter_driver = adapter_driver
+        # The root Worker service supplies this only after load_engine() has
+        # verified the selection record and installed executable/admission SHA.
+        # A directly constructed adapter has no trusted OPF Engine receipt.
+        if verified_engine is not None and (
+            self.openocd_root != verified_engine.openocd_root
+            or adapter_khz != verified_engine.adapter_khz
+            or adapter_driver != verified_engine.adapter_driver
+        ):
+            raise ValueError("verified engine does not match adapter")
+        self.engine_selection_sha256 = (
+            verified_engine.record_sha256 if verified_engine is not None else None
+        )
         self.journal = Path(journal)
         self.record_dir = Path(record_dir)
         self._run = run
