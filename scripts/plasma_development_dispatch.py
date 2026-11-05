@@ -962,6 +962,7 @@ class CodexUsageCollector:
         self.commands_started = 0
         self.commands_failed = 0
         self.tool_items_started = 0
+        self.budget_reason = None
 
     def _line(self, raw: bytes) -> bytes:
         try:
