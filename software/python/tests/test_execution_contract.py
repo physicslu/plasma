@@ -227,6 +227,22 @@ class ExecutionContractServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result["attempt_history"]), 3)
         self.assertFalse(result["attempt_history"][-1]["retry_scheduled"])
 
+    async def test_one_job_deadline_covers_retries(self) -> None:
+        client = await self.start_server(site_options={1: {"mock": {
+            "failures": {"program": 1},
+            "failure_recoverable": True,
+        }}})
+        request = JobRequest(site_id=1, operation=Operation.PROGRAM,
+                             image=b"deadline-image", timeout_s=0.06,
+                             max_retries=3, retry_backoff_s=0.2)
+        result = (await client.submit(request))["result"]
+        self.assertEqual(result["state"], "timeout")
+        self.assertGreaterEqual(result["attempts"], 2)
+        self.assertLess(result["elapsed_ms"], 160)
+        assert self.server is not None
+        runtime = self.server.manager.registry.get(request.job_id)
+        self.assertIsNotNone(runtime.deadline_monotonic)
+
     async def test_interface_shutdown_failure_is_job_error(self) -> None:
         client = await self.start_server(
             interface_factory=lambda _site: ShutdownFailureMock()
