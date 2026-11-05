@@ -239,7 +239,12 @@ def test_real_worker_unproven_safe_off_seals_site_and_blocks_next_job():
                      job_deadline_monotonic=time.monotonic() + 1)
         assert 2 in env["core"]._sealed
         assert (env["core"].seal_dir / "site2.sealed").exists()
+        # The first failed Job may launch a *second*, bounded OpenOCD child
+        # for the existing SAFE_OFF probe; that is not a second programming
+        # attempt or a retry. A sealed Site must launch no further child.
+        children_before_denial = len(env["sim"].argvs)
+        assert children_before_denial >= 1
         env["sim"].hang.clear()
         with pytest.raises(Exception, match="SITE_SEALED"):
             _execute(env, job_id="job-2", job_deadline_monotonic=time.monotonic() + 5)
-        assert len(env["sim"].argvs) == 1
+        assert len(env["sim"].argvs) == children_before_denial
