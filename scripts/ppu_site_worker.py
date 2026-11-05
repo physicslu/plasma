@@ -20,7 +20,8 @@ Programming Site. It is deliberately small:
   (``open_job_session``) and run an allowlisted operation on the control
   socket (``run``); such a session has no Package peer;
 * fail-closed: an adapter outcome that cannot be proven safe seals the Site
-  (persisted marker, never auto-retried); an FPGA identity change invalidates
+  (persisted marker, never auto-retried); a live external owner is checked at
+  each admission without creating a historical seal; an FPGA identity change invalidates
   the session; expiry / cancel / close end the session. FPGA Image management
   belongs to the PPU Loader.
 
@@ -78,6 +79,14 @@ class TransportDenied(Exception):
 
 class TransportUnknown(Exception):
     """Hardware outcome cannot be proven safe: the Site must be sealed."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+class TransportFailed(Exception):
+    """Operation failed after the adapter proved release and SAFE_OFF."""
 
     def __init__(self, code: str):
         super().__init__(code)
@@ -185,13 +194,12 @@ class SiteWorkerCore:
         self.epoch = secrets.token_hex(16)
         self._lock = threading.Lock()
         self._site_locks = {site: threading.Lock() for site in adapter.supported_sites}
-        # Reuse the existing Worker, lease, per-Site locks, and persistent seals.
+        # Existing seals remain migration blockers; current external owners
+        # are checked at admission and must not become historical seals.
         self._sessions: dict[str, _Session] = {}
         self._site_owners: dict[int, str] = {}
         self.seal_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self._sealed: set[int] = set(self._persisted_seals()) | set(adapter.startup_sealed_sites())
-        for site in sorted(self._sealed):
-            self._persist_seal(site, "STARTUP_STATE_UNSAFE")
+        self._sealed: set[int] = set(self._persisted_seals())
 
     # --- seals (persisted markers; cleared only by an operator recovery) ---------
     def _persisted_seals(self) -> list[int]:
@@ -376,6 +384,8 @@ class SiteWorkerCore:
         identity = dict(self.adapter.identity())
         with self._lock:
             _require(not (set(sites) & self._sealed), "SITE_SEALED")
+            _require(not (set(sites) & self.adapter.startup_sealed_sites()),
+                     "EXTERNAL_SITE_OWNER_PRESENT")
             _require(not (set(sites) & self._site_owners.keys()), "SITE_BUSY")
             if package:
                 _require(not any(
@@ -445,12 +455,16 @@ class SiteWorkerCore:
                     ))
             except TransportDenied as exc:
                 raise SiteWorkerDenied("TRANSPORT_DENIED:" + exc.code) from None
+            except TransportFailed as exc:
+                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + exc.code) from None
             except TransportUnknown as exc:
                 self._seal(site, exc.code, s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + exc.code) from None
-            except Exception as exc:  # any adapter bug is an unknown hardware outcome
-                self._seal(site, type(exc).__name__, s)
-                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + type(exc).__name__) from None
+            except Exception as exc:
+                # The hardware adapter owns its admission/child cleanup and
+                # raises TransportUnknown only when safety cannot be proven.
+                # An unclassified Python failure is not hardware evidence.
+                raise SiteWorkerDenied("SOFTWARE_EXCEPTION:" + type(exc).__name__) from None
             if dict(self.adapter.identity()) != s.identity:
                 self._seal(site, "FPGA_IDENTITY_CHANGED_DURING_OPERATION", s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION")

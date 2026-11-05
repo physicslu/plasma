@@ -29,9 +29,12 @@ import pytest
 
 from plasma_client.client import PlasmaClient
 from plasma_core.config import PlasmaConfig, ServerConfig, SiteConfig
+from plasma_core.enums import Operation
+from plasma_core.errors import PlasmaError
 from plasma_core.ic_support import get_default_ic_support_resolver
-from plasma_core.models import JOB_ID_PATTERN, new_job_id
+from plasma_core.models import JOB_ID_PATTERN, JobRequest, new_job_id
 from plasma_interfaces.openocd import OpenOCDInterface, c3_flash_profile
+from plasma_interfaces.site_worker_c3 import C3FlashProfile, SiteWorkerRefused, run_flash_cycle
 from plasma_server.runtime_control import RuntimeControlServer
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
@@ -215,6 +218,7 @@ class FlashSim:
         self.base, self.memory = base, bytearray(b"\xff" * size)
         self.argvs: list[list[str]] = []
         self.corrupt = False
+        self.fail_at = None
         self.hang = threading.Event()  # set -> OpenOCD never exits until killed
 
     def run(self, argv, **_kw):
@@ -229,12 +233,18 @@ class FlashSim:
             path = re.search(r"\{([^{}]+)\}", command)
             parts = command.split()
             if command.startswith("flash erase_address "):
+                if self.fail_at == "erase":
+                    rc = 5
                 start, length = int(parts[2], 0) - self.base, int(parts[3], 0)
                 self.memory[start:start + length] = b"\xff" * length
             elif command.startswith("flash write_image "):
+                if self.fail_at == "write":
+                    rc = 5
                 data = Path(path.group(1)).read_bytes()
                 self.memory[:len(data)] = data
             elif command.startswith("flash verify_image "):
+                if self.fail_at == "verify":
+                    rc = 5
                 data = Path(path.group(1)).read_bytes()
                 rc = rc or (0 if self.memory[:len(data)] == data else 5)
             elif command.startswith("dump_image "):
@@ -265,7 +275,8 @@ class _Proc:
 
 
 class Stack:
-    def __init__(self, root: Path, *, site_target="STM32F103C8T6", adapter=None):
+    def __init__(self, root: Path, *, site_target="STM32F103C8T6", adapter=None,
+                 max_retries=0):
         self.root = root
         self.sim = FlashSim(0x08000000, 0x10000)
         engine = make_engine(root / "openocd", "0.12.0-test-plasma-swd-555555555555")
@@ -279,6 +290,7 @@ class Stack:
         (root / "rec").mkdir()
         self.images = root / "normalized-images"
         self.site_target = site_target
+        self.max_retries = max_retries
 
     async def __aenter__(self):
         root = self.root
@@ -287,6 +299,7 @@ class Stack:
                                 log_root=root / "logs", max_supported_sites=2,
                                 max_concurrent_jobs=1),
             sites=[SiteConfig(id=2, enabled=True, interface="openocd", target=self.site_target,
+                              max_retries=self.max_retries, retry_backoff_s=0,
                               openocd={"site_worker_socket": str(root / "c3.sock"),
                                        "normalized_image_root": str(self.images)})],
         )
@@ -410,6 +423,68 @@ def test_rest_flash_cycle_readback_mismatch_is_never_success():
                 assert job["state"] != "success"
                 assert "READBACK_MISMATCH" in json.dumps(job)
                 assert list(stack.images.iterdir()) == []
+    run(scenario())
+
+
+@pytest.mark.parametrize("phase", ["erase", "write", "verify", "readback"])
+def test_safe_flash_failure_allows_next_independent_job(phase):
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory)) as stack:
+                stack.sim.corrupt = phase == "readback"
+                stack.sim.fail_at = None if phase == "readback" else phase
+                _first_id, failed = await stack.flash(b"FIRST")
+                assert failed["state"] != "success"
+                assert stack.core.handle({"protocol": worker.PROTOCOL, "op": "status"},
+                                         (os.getpid(), 0, 0), "control")["result"]["sealed_sites"] == []
+                stack.sim.corrupt = False
+                stack.sim.fail_at = None
+                _next_id, passed = await stack.flash(b"SECOND")
+                assert passed["state"] == "success", passed
+    run(scenario())
+
+
+def test_safe_flash_failure_uses_bounded_runtime_attempt_history():
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), max_retries=2) as stack:
+                stack.sim.fail_at = "verify"
+                host, port = stack.server.address
+                response = await PlasmaClient(host, port).submit(JobRequest(
+                    site_id=2, operation=Operation.FLASH_CYCLE, image=b"RETRY",
+                    target="STM32F103C8T6", max_retries=2, retry_backoff_s=0,
+                ))
+                failed = response["result"]
+                assert failed["state"] != "success"
+                assert len(failed["attempt_history"]) == 3, json.dumps(failed, indent=2)
+                assert [a["retry_scheduled"] for a in failed["attempt_history"]] == [
+                    True, True, False]
+                assert failed["retry_exhausted"] is True
+                assert len(stack.sim.argvs) == 3
+    run(scenario())
+
+
+def test_unconfirmed_session_close_prevents_safe_failure_retry(tmp_path):
+    class RefusingClose:
+        def call(self, op, **_fields):
+            if op == "open_job_session":
+                return {"session_id": "session"}
+            if op == "bind_image":
+                return {"bound": True}
+            if op == "run":
+                return {"result": "FAIL", "code": "WRITE_FAILED", "safe_off": True}
+            raise SiteWorkerRefused("SITE_WORKER_UNREACHABLE")
+
+    async def scenario():
+        with pytest.raises(PlasmaError) as caught:
+            await run_flash_cycle(
+                RefusingClose(), job_id="job-close-failure", site_id=2,
+                profile=C3FlashProfile("STM32F103C8T6", "target/stm32f1x.cfg",
+                                       0x08000000, 0x10000, 1024),
+                image=b"FW", image_root=tmp_path, max_runtime_s=30)
+        assert caught.value.recoverable is False
+        assert "close did not confirm" in str(caught.value)
+        assert list(tmp_path.iterdir()) == []
     run(scenario())
 
 

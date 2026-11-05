@@ -284,17 +284,17 @@ def test_cancel_by_runtime_close_stops_in_flight_operation_and_seals(rig):
 
 @pytest.mark.parametrize("behaviour,error", [
     ("unknown", "OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED"),
-    ("crash", "OUTCOME_UNKNOWN_SITE_SEALED:RuntimeError"),
+    ("crash", "SOFTWARE_EXCEPTION:RuntimeError"),
 ])
-def test_unknown_hardware_outcomes_seal_and_never_retry(rig, behaviour, error):
+def test_unknown_hardware_outcomes_and_software_errors(rig, behaviour, error):
     rig.adapter.behaviour = behaviour
     child = rig.package(PROBE2 + PROBE2)
     rig.open(child)
     first, second = rig.go(child)
     assert first == {"ok": False, "error": error}
     assert second["ok"] is False
-    assert len(rig.adapter.calls) == 1        # no automatic retry
-    assert 2 in rig.client.call("status")["sealed_sites"]
+    assert len(rig.adapter.calls) == (1 if behaviour == "unknown" else 2)
+    assert (2 in rig.client.call("status")["sealed_sites"]) is (behaviour == "unknown")
 
 
 def test_denied_before_hardware_keeps_site_usable(rig):
@@ -408,12 +408,17 @@ def test_runtime_restart_keeps_in_flight_site_reserved(tmp_path):
             rig.reap(child)
 
 
-def test_startup_unknown_owner_state_seals_sites(tmp_path):
+def test_external_owner_blocks_only_while_present(tmp_path):
     adapter = MockAdapter()
     adapter.startup = {1}
     r = Rig(tmp_path, adapter)
     try:
-        assert r.client.call("status")["sealed_sites"] == [1]
+        assert r.client.call("status")["sealed_sites"] == []
+        with pytest.raises(worker.SiteWorkerDenied, match="EXTERNAL_SITE_OWNER_PRESENT"):
+            r.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30)
+        adapter.startup.clear()
+        opened = r.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30)
+        assert r.client.close_session(opened["session_id"])["sealed_sites"] == []
     finally:
         r.close()
 
@@ -673,7 +678,7 @@ class FakeProc:
         return -9
 
 
-def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=False,
+def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, hang_once=False, openocd=False,
               flash_readback=None):
     tmp_path.mkdir(parents=True, exist_ok=True)
     journal = tmp_path / "journal.json"
@@ -693,7 +698,7 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
                 assert path_match is not None
                 if flash_readback is not None:
                     Path(path_match.group(1)).write_bytes(flash_readback)
-        return FakeProc(log, rc, hang)
+        return FakeProc(log, rc, hang or (hang_once and len(calls["popen"]) == 1))
 
     scripts = tmp_path / "ocd" / "share" / "openocd" / "scripts" / "target"
     scripts.mkdir(parents=True)
@@ -785,7 +790,6 @@ def test_abi5_probe_uses_existing_admission_and_fixed_openocd_argv(tmp_path):
 
 
 @pytest.mark.parametrize("kw,exc,code", [
-    ({"openocd": True}, worker.TransportDenied, "EXTERNAL_SITE_OWNER_PRESENT"),
     ({"admit_ok": False}, worker.TransportDenied, "ADMISSION_DENIED"),
     ({"log": b"SWD DPIDR 0x1ba01477\n"}, worker.TransportUnknown, "SAFE_OFF_NOT_VERIFIED"),
     ({"hang": True}, worker.TransportUnknown, "OPERATION_TIMEOUT"),
@@ -796,6 +800,29 @@ def test_abi5_fail_closed_paths(tmp_path, kw, exc, code):
         a.run(2, "probe", deadline=time.monotonic() + 0.3, cancel=threading.Event())
     if calls["run"] and calls["run"][0] == ["admit", "2"]:
         assert calls["run"][-1] == ["revoke", "2"]     # always revoked
+
+
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_abi5_timeout_or_cancel_with_verified_cleanup_is_safe_failure(tmp_path, cancelled):
+    a, calls, _ = make_abi5(tmp_path, log=GOOD, hang_once=True)
+    cancel = threading.Event()
+    if cancelled:
+        cancel.set()
+    with pytest.raises(worker.TransportFailed, match=(
+        "CANCELLED_DURING_OPERATION" if cancelled else "OPERATION_TIMEOUT")):
+        a.run(2, "probe", deadline=time.monotonic() + 0.2, cancel=cancel)
+    assert len(calls["popen"]) == 2
+    assert calls["run"] == [["admit", "2"], ["revoke", "2"],
+                             ["admit", "2"], ["revoke", "2"]]
+
+
+@pytest.mark.parametrize("reason", ["PS_OWNER_SITE_LOCK_UNAVAILABLE",
+                                     "PS_OWNER_PL_IMAGE_NOT_LOADED"])
+def test_native_pre_mmio_refusal_does_not_seal_site(tmp_path, reason):
+    a, calls, _ = make_abi5(tmp_path, log=("Error: plasma_swd: " + reason).encode(), rc=1)
+    with pytest.raises(worker.TransportDenied, match=reason):
+        a.run(2, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+    assert calls["run"] == [["admit", "2"], ["revoke", "2"]]
 
 
 def test_abi5_probe_is_independent_of_root_journal_and_image_id(tmp_path):
@@ -813,12 +840,14 @@ def test_abi5_probe_is_independent_of_root_journal_and_image_id(tmp_path):
     assert len(calls["popen"]) == 3
 
 
-def test_abi5_startup_seals_on_leftover_record_or_running_openocd(tmp_path):
+def test_abi5_admission_records_are_per_site_even_with_other_openocd(tmp_path):
     a, _c, _j = make_abi5(tmp_path)
     (tmp_path / "rec" / "swd-site1-admission").write_text("x")
     assert a.startup_sealed_sites() == {1}
-    b, _c, _j = make_abi5(tmp_path / "b", openocd=True)
-    assert b.startup_sealed_sites() == {1, 2}
+    b, _c, _j = make_abi5(tmp_path / "b", openocd=True, log=GOOD)
+    assert b.startup_sealed_sites() == set()
+    assert b.run(2, "probe", deadline=time.monotonic() + 5,
+                 cancel=threading.Event())["result"] == "PASS"
 
 
 # --- C-1 lease op and C-2 wiring ------------------------------------------------------

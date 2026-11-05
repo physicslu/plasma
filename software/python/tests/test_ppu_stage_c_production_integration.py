@@ -547,6 +547,7 @@ def test_recovery_positive_moves_marker_into_evidence_and_worker_unseals(tmp_pat
     ({"lease": "busy"}, None, "no_active_job"),
     ({"lease": "unknown"}, None, "no_active_job"),
     ({}, lambda a, s: setattr(a, "startup", {2}), "no_external_owner"),
+    ({}, lambda a, s: setattr(a, "_openocd_running", lambda: True), "no_external_owner"),
     ({}, lambda a, s: (s / "site2.sealed").write_text("{bad"), "seal_present"),
     ({}, lambda a, s: (s / "site2.sealed").unlink(), "seal_present"),
 ])

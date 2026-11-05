@@ -36,6 +36,25 @@ Before standardizing a Z2 Python environment, verify compatibility with PYNQ/XRT
 
 Mock/software validation does not prove Z2/FPGA/OpenOCD/real-target behavior.
 
+## SWD operation outcomes
+
+Each Flash attempt opens a fresh Site Worker session and PS-local OpenOCD
+process. The native `ps_owner` retains the FPGA reload fence, per-Site lock,
+same-boot image and Site/MMIO checks, and resource release. The Worker checks
+current external ownership at every admission. A prior Job failure alone does
+not block a Site. An existing `site<N>.sealed` marker or an operation whose
+SAFE_OFF and owner release cannot be proven still blocks admission. Existing
+markers require the evidence-backed operator recovery procedure; they must
+not be deleted or ignored as part of this software migration. A verified
+SAFE_OFF failure is returned to PPU Job policy for bounded retry.
+
+For a pre-existing seal, first run the read-only `ppu_site_recovery.py
+diagnose <site>` and inspect the marker and owner state. At a separately
+authorized maintenance execution, stop the Worker, prove no Runtime lease,
+OpenOCD process or admission record, run `recover <site> --operator <name>`
+to verify SAFE_OFF and archive the marker with its evidence, then restart the
+Worker and check fresh admission. Any unproven check leaves the seal in place.
+
 ## Z2 SSH/sudo and hardware recovery boundary (normative)
 
 The owner-approved Gate 1 scope is an execution assignment, not a new planning request. The executor must perform authorized work or report a real blocker; Gate 2 remains solely for merging. Path 3 Codex-specific execution and sandbox details live in [Path 3 contract](plasma-path3-codex.md). Path 2 fixed-CLI capabilities live in [Path 2 contract](plasma-path2-cli.md).

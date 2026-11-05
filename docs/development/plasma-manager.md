@@ -112,6 +112,12 @@ Do not bypass failed tests and restart new code as if validation succeeded.
 
 ## Site execution invariants
 
+The PPU Runtime owns Flash outcome policy, `JobRequest.max_retries`,
+`attempt_history`, `retry_backoff_s`, and any decision to mark a Job failed
+or block a Site after exhausted retries. Each attempt creates a fresh hardware
+session. Plasma Manager only relays and observes PPU Jobs; PPU HTTP retry is
+separate from Flash retry.
+
 Unless a real shared resource requires synchronization:
 
 - Sites execute independently.
