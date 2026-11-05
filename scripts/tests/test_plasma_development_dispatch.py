@@ -1569,25 +1569,36 @@ class GenericWorkOrderContracts(unittest.TestCase):
             report["codex_context_audit"]["model_request_count_source"],
             "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS")
 
-    def test_opf_artifact_preset_requires_exact_owner_hardware_main_request(self):
+    def test_z2_ci_artifact_source_requires_exact_owner_hardware_main_request(self):
+        source = {
+            "source_sha": "e949d1bcbf0941eb034c76e842bd90cc943152dc",
+            "run_id": 42064496761,
+        }
         authorized = self._order(
-            "path3-codex", artifact_preset="opf-site2-c7502a3",
+            "path3-codex", artifact_source=source,
             codex_execution="guarded-hardware-no-sandbox")
         event = self._event(authorized)
         request = dev.request(event, self._context())
         approval = dev.authorize(event, self._context(), self.registry)
         task = dev.task_for_request(self.registry, request, event)
-        self.assertEqual(approval["artifact_preset"], "opf-site2-c7502a3")
-        self.assertEqual(task["artifact_preset"], "opf-site2-c7502a3")
-        self.assertNotIn("artifact_preset", dev.authorize(
+        self.assertEqual(approval["artifact_run_id"], str(source["run_id"]))
+        self.assertEqual(approval["artifact_source_sha"], source["source_sha"])
+        self.assertEqual(task["artifact_source"], source)
+        self.assertNotIn("artifact_run_id", dev.authorize(
             self._event(self._order()), self._context(), self.registry))
         negatives = (
-            {"artifact_preset": "other",
+            {"artifact_source": {"source_sha": source["source_sha"], "run_id": True},
              "codex_execution": "guarded-hardware-no-sandbox"},
-            {"artifact_preset": "opf-site2-c7502a3"},
-            {"artifact_preset": "opf-site2-c7502a3",
-             "codex_profile": "quick-observe", "scope": "host-only"},
-            {"artifact_preset": "opf-site2-c7502a3",
+            {"artifact_source": {"source_sha": source["source_sha"], "run_id": -1},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": {"source_sha": "a" * 12, "run_id": source["run_id"]},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": {**source, "download_url": "https://attacker.invalid"},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": source},
+            {"artifact_source": source, "codex_profile": "quick-observe",
+             "scope": "host-only"},
+            {"artifact_source": source,
              "codex_execution": "guarded-hardware-no-sandbox",
              "pr_number": 123, "source_sha": "a" * 40},
         )
@@ -1596,14 +1607,16 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 dev.request(self._event(self._order("path3-codex", **change)),
                             self._context())
         yaml = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
-        self.assertIn("artifact_preset == 'opf-site2-c7502a3'", yaml)
-        self.assertIn("OPF_SITE2_ARTIFACTS_VERIFIED", yaml)
-        self.assertIn("PLASMA_OPF_ARTIFACTS_DIR=", yaml)
+        self.assertIn("artifact_run_id != ''", yaml)
+        self.assertIn("PLASMA_Z2_CI_ARTIFACTS_VERIFIED", yaml)
+        self.assertIn("plasma_trusted_z2_ci_artifact.py verify", yaml)
+        self.assertNotIn("opf-site2-c7502a3", yaml)
         self.assertIn("actions: read  # fetch only owner-pinned", yaml)
         codex_step = yaml.split(
             "      - name: Codex develops, builds and tests candidate; preserve real evidence", 1
         )[1].split("      - name: Collect Path 3 evidence", 1)[0]
         self.assertNotIn("GH_TOKEN:", codex_step)
+        self.assertNotIn("GITHUB_TOKEN:", codex_step)
 
     def test_explicit_quick_profile_requires_owner_bound_host_only(self):
         quick = self._order(
