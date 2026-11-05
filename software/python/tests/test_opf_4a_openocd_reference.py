@@ -231,7 +231,10 @@ def test_real_worker_unproven_safe_off_seals_site_and_blocks_next_job():
     with installed_bundle() as env:
         env["sim"].hang.set()
         selection = {**env["selection"], "timeout_ms": 1000}
-        with pytest.raises(Exception, match="OUTCOME_UNKNOWN|SITE_SEALED|SAFE_OFF"):
+        with pytest.raises(Exception, match=(
+            "OUTCOME_UNKNOWN|SITE_SEALED|SAFE_OFF|"
+            "close did not confirm hardware release"
+        )):
             _execute(env, selection=selection, job_timeout_s=1.0,
                      job_deadline_monotonic=time.monotonic() + 1)
         assert 2 in env["core"]._sealed
