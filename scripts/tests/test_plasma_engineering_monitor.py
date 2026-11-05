@@ -51,6 +51,66 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("RESULT: PASS", mon.render_snapshot(Path(td), "path2"))
             self.assertIn("RESULT:", mon.render_snapshot(Path(td), "path2"))
 
+    def test_authorized_work_order_receipt_timestamp_is_not_runner_start(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            event_path = directory / "event.json"
+            payload = {
+                "action": "created",
+                "repository": {"full_name": "physicslu/plasma"},
+                "issue": {"number": 981},
+                "sender": {"login": "physicslu"},
+                "comment": {"id": 7654321, "user": {"login": "physicslu"},
+                            "created_at": "2026-11-05T12:34:56Z"},
+            }
+            event_path.write_text(json.dumps(payload))
+            for path in ("path2", "path3"):
+                with self.subTest(path=path), patch.dict(os.environ, {
+                    "GITHUB_RUN_ID": "42028568124",
+                    "PLASMA_MONITOR_TASK": path + "-work-order",
+                    "PLASMA_MONITOR_COMMENT_ID": "7654321",
+                    "GITHUB_EVENT_PATH": str(event_path),
+                    "WORK_ORDER_SHA256": "a" * 64,
+                }, clear=True):
+                    self.assertEqual(mon.run_job(
+                        path, [sys.executable, "-c", "pass"],
+                        directory=directory), 0)
+                state = json.loads((directory / (path + ".json")).read_text())
+                self.assertEqual(state["received"], "2026-11-05T12:34:56+00:00")
+                self.assertIn("RECEIVED: 2026-11-05 20:34:56",
+                    mon.render_snapshot(directory, path,
+                        now=dt.datetime(2026, 11, 5, 21, tzinfo=TAIPEI)))
+                self.assertNotIn("PLASMA_MONITOR_COMMENT_ID",
+                    (directory / (path + ".log")).read_text())
+            payload["comment"]["id"] = 9999
+            event_path.write_text(json.dumps(payload))
+            self.assertEqual(mon._trusted_work_order_received(
+                str(event_path), "7654321"), "")
+            payload["comment"]["id"] = 7654321
+            payload["comment"]["user"]["login"] = "not-owner"
+            event_path.write_text(json.dumps(payload))
+            self.assertEqual(mon._trusted_work_order_received(
+                str(event_path), "7654321"), "")
+
+    def test_header_is_five_lines_with_detailed_trace_below(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory = Path(td)
+            (directory / "path3.json").write_text(json.dumps({
+                "status": "IDLE", "run_id": "42028568124",
+                "pr_number": "1316", "last_result": "PASS",
+                "exit_code": 0, "received": "2026-11-05T12:34:56+00:00",
+                "monitor_summary": "OPF Site2 Runtime cutover PR1316 Gate1",
+            }))
+            (directory / "path3.log").write_text("PASS | exit=0\n")
+            frame = mon.render_snapshot(directory, "path3",
+                     now=dt.datetime(2026, 11, 5, 21, tzinfo=TAIPEI))
+            header = frame.split("ACTIVITY TRACE", 1)[0].splitlines()
+            self.assertEqual(len(header), 5)
+            self.assertIn("PATH 3 | IDLE | PR #1316", header[0])
+            self.assertIn("RUN: 42028568124", header[1])
+            self.assertIn("ACCEPTANCE: UNVERIFIED", header[3])
+            self.assertIn("RUN LOG: https://github.com/physicslu/plasma/actions/runs/42028568124",frame)
+
     def test_native_preflight_receipt_hint_matches_exact_run(self):
         with tempfile.TemporaryDirectory() as td:
             d = Path(td)
