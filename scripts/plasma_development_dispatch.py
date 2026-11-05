@@ -584,7 +584,8 @@ def authorize(event: object, context: dict, registry: object,
         # Only explicit, checksum-bound, operator-public Path 2/3 metadata.
         # No objective, acceptance, prompt, or Work Order JSON in this field.
         "monitor_summary": task.get("monitor_summary", ""),
-        "artifact_preset": task.get("artifact_preset", ""),
+        **({"artifact_preset": task["artifact_preset"]}
+          if "artifact_preset" in task else {}),
         **a2_claim,
     }
 
