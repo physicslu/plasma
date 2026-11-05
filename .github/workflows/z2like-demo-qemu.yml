@@ -24,6 +24,8 @@ on:
       - "release/openocd.json"
       - "software/python/plasma_manager/**"
       - "software/python/plasma_interfaces/**"
+      # OPF C-3 Site Session is validated by Python PS, not QEMU Bootstrap.
+      - "!software/python/plasma_interfaces/site_worker_c3.py"
       - "software/python/plasma_web/**"
       - "!software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
       - "!software/python/plasma_web/device_catalog.py"
@@ -59,6 +61,8 @@ on:
       - "release/openocd.json"
       - "software/python/plasma_manager/**"
       - "software/python/plasma_interfaces/**"
+      # OPF C-3 Site Session is validated by Python PS, not QEMU Bootstrap.
+      - "!software/python/plasma_interfaces/site_worker_c3.py"
       - "software/python/plasma_web/**"
       - "!software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
       - "!software/python/plasma_web/device_catalog.py"
