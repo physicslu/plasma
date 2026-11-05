@@ -30,21 +30,35 @@ select a PR candidate or `guarded-hardware-no-sandbox` and retains
 A quick run's SWPC Python wrapper enforces a 75-second wall-clock deadline
 and stops after more than 12 JSONL tool-item starts. Quick runs fail closed
 if the streamed Monitor sink cannot be opened; no unsupervised fallback.
-The input-token threshold (30,000) is a **post-turn warning/failure check**,
-not a live API cost ceiling: current Codex `exec --json` provides token
-usage at `turn.completed`, after tokens are consumed. This distinction
-must not be hidden in acceptance reports. Host-only quick requests must
-not be silently inferred from arbitrary Work Order prose.
+The input-token threshold (30,000) is **post-turn cost telemetry, not a
+runtime failure or a live API cost ceiling**: current Codex `exec --json`
+reports usage at `turn.completed`, after tokens have been consumed. An
+over-budget but exit-zero Codex invocation reports
+`status: EVIDENCE_READY_REVIEW_REQUIRED` and
+`cost_budget_status: EXCEEDED`, with `functional_acceptance: UNVERIFIED`.
+Only a real CLI failure or an enforced wall/tool limit changes the
+execution status to failure. The report must never interpret an exit-zero
+Codex wrapper as independent functional acceptance. Host-only quick
+requests must not be silently inferred from Work Order prose.
 
-The engineering receipt contains a bounded, numeric-only
-`codex_activity_metrics` object: elapsed milliseconds, tool starts,
-command starts/failures, item counts, turns, selected execution profile,
-limits and budget reason. It contains no shell arguments, output, tokens,
-prompt or path contents. Model-request count is `NOT_AVAILABLE` unless
-a trustworthy upstream event contract supports it; a Codex Turn is not
-equivalent to one model/API request. The existing
-`codex_usage` values remain Codex-reported totals (including cached input
-within input), never exact billing proof.
+The engineering receipt contains bounded, numeric-only
+`codex_activity_metrics`: elapsed milliseconds, tool and command counts,
+command failures, turns, execution profile, limits, enforcement reason,
+cached-share basis points, non-cached input-token count and independent
+cost-budget status. No shell arguments, output, prompt or source text
+is retained. `codex_context_audit` separately identifies observed Turns
+and tool starts, and marks model-request count
+`NOT_AVAILABLE` with source reason
+`CODEX_EXEC_JSONL_NO_REQUEST_EVENTS`: the available Codex JSONL does
+not expose a verified model-request-count contract. Do not mistake Turn
+count for individual model requests. `codex_usage` contains reported total
+input including cached input, not a billing receipt.
+
+For an exact deterministic host-local observation, dispatch the existing
+Path 2 `cpu-only` `scripts/plasma_host_observe.py` instead of launching
+Codex at all. See [Path 2 CLI contract](plasma-path2-cli.md). This is a
+routing choice by the dispatcher author, **not** an automatic reinterpretation
+of the approved Path 3 work order; do not silently change a scoped task.
 
 ## 4. Z2 SSH/sudo and hardware boundary
 

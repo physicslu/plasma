@@ -6,6 +6,31 @@
 
 Path 2 is ChatGPT → owner-authorized GitHub Actions / existing trusted Dispatcher → SWPC self-hosted Runner → reviewed deterministic native CLI/Python commands → real result and evidence. Choose it when SWPC execution is required and bounded commands suffice. ChatGPT Direct is the default for source/docs/host-only work; Path 3 is for autonomous Codex diagnosis and iterative implementation. Path 2 **does not delegate execution to Codex**. Keep existing Path 2 identifiers for receipts and compatibility.
 
+### Deterministic Host-only observation (no Codex tokens)
+
+Before selecting Path 3 for an exact, non-interpretive SWPC query such as
+`hostname`, prefer the **existing Path 2 `cpu-only` route**. The reviewed
+`scripts/plasma_host_observe.py` accepts only one of `hostname`,
+`kernel-release` or `python-version`; it never launches a shell,
+Codex, SSH, network or device APIs. It runs under the existing Bubblewrap
+`--unshare-all` sandbox; observations describe that process's namespace,
+which must not be conflated with a privileged or global machine audit.
+
+For an owner-authenticated Issue #981 dynamic Work Order, use:
+`execution_path: "path2-cli"`, `capability: "cpu-only"`,
+`scope: "host-only"`, `script: "scripts/plasma_host_observe.py"`,
+`argv: ["hostname"]`, `verification: "exit-code"`, and a bounded
+`timeout_seconds`. Retain the normal `schema`, `objective` and
+`acceptance` fields. The code is source-pinned by the existing Dispatcher;
+no new workflow, task registry, runner or privilege is introduced.
+
+Exit code 0 verifies command completion, **not the factual correctness of
+stdout**: check the stored Path 2 stdout/stderr/process receipt and record
+the observed hostname as evidence separately. For an exact predictable
+stdout, the existing `stdout-sha256` verification remains available.
+GitHub-hosted mocks only prove the routing/sandbox contract; real SWPC
+observation is NOT_RUN until separately authorized and executed.
+
 ## 2. Gate 1 Work Order and source binding
 
 Use the existing Owner-approved, bounded Work Order and trusted dispatcher. Bind the exact owner PR HEAD / source SHA, scoped commands, capability, acceptance, environment, and evidence. Issue #981 Development Dispatcher can admit the exact HEAD of an open same-repository owner PR while its trusted entrypoint remains on main. A user-supplied SHA alone does not authorize work. No per-task Workflow, Registry task ID, third approval Gate, new Runner or Stage/Profile layer is implied. After Gate 1, execute the authorized test/fix/retest loop; Gate 2 is only for merging a PR.

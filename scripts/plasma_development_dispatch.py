@@ -1334,10 +1334,31 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "tool_items_limit": QUICK_MAX_TOOL_ITEMS if quick else None,
         "input_tokens_soft_limit": QUICK_INPUT_TOKEN_BUDGET if quick else None,
     })
-    if (quick and usage_snapshot["status"] == "reported" and
-            usage_snapshot["input_tokens"] > QUICK_INPUT_TOKEN_BUDGET):
-        usage.budget_reason = usage.budget_reason or "INPUT_BUDGET_POST_TURN"
+    # The input-token threshold is reported only after turn.completed.
+    # It is a cost observation, never a runtime failure or functional verdict.
+    if not quick:
+        cost_budget_status = "NOT_APPLICABLE"
+    elif usage_snapshot["status"] != "reported":
+        cost_budget_status = "NOT_AVAILABLE"
+    elif usage_snapshot["input_tokens"] > QUICK_INPUT_TOKEN_BUDGET:
+        cost_budget_status = "EXCEEDED"
+    else:
+        cost_budget_status = "WITHIN_LIMIT"
+    metrics["cost_budget_status"] = cost_budget_status
+    metrics["cost_budget_alert"] = (
+        "INPUT_BUDGET_POST_TURN" if cost_budget_status == "EXCEEDED" else None)
+    # Only hard wall-clock or tool-item limits may stop a running Quick job.
     metrics["budget_reason"] = usage.budget_reason
+    if usage_snapshot["status"] == "reported":
+        metrics["non_cached_input_tokens"] = (
+            usage_snapshot["input_tokens"] - usage_snapshot["cached_input_tokens"])
+        metrics["cache_share_basis_points"] = (
+            (10000 * usage_snapshot["cached_input_tokens"] //
+             usage_snapshot["input_tokens"])
+            if usage_snapshot["input_tokens"] else 0)
+    else:
+        metrics["non_cached_input_tokens"] = None
+        metrics["cache_share_basis_points"] = None
     # Bounded numeric-only context diagnostics. The size of a repo file is
     # NOT proof of actual Codex instruction loading or a model request count.
     root_agents = root / "AGENTS.md"
@@ -1352,6 +1373,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "dispatched_prompt_bytes": len(prompt.encode("utf-8")),
         "model_request_count": None,
         "model_request_count_status": "NOT_AVAILABLE",
+        "model_request_count_source": "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS",
+        "observed_turns_completed": usage.turns,
+        "observed_tool_items_started": usage.tool_items_started,
         "actual_instruction_load_status": "NOT_VERIFIED",
     }
     usage_path.write_text(json.dumps(usage_snapshot, indent=2, sort_keys=True) + "\n")
@@ -1365,6 +1389,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_usage": usage_snapshot,
         "codex_activity_metrics": metrics,
         "codex_context_audit": context_audit,
+        "cost_budget_status": cost_budget_status,
+        "functional_acceptance": "UNVERIFIED",
+        "codex_execution_status": (
+            "EXIT_ZERO" if proc.returncode == 0 else "EXIT_NONZERO"),
         "codex_model_selection": codex_requested_model_settings(command),
         "codex_sandbox_request": ("danger-full-access" if non_sandbox
                                   else "workspace-write"),
@@ -1394,9 +1422,10 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     evidence_complete = ("engineering_report_sha256" in receipt or
                          all(k in receipt for k in (
                              "source_sha256", "output_sha256", "test_log_sha256")))
+    # Cost-budget alerts do not change execution success or acceptance.
     # Preserve the real Codex exit code and evidence even when execution
     # fails. A JSON receipt is NOT acceptance; main() returns nonzero for
-    # failure and Actions collects source changes in an always() step.
+    # hard execution failure and Actions always collects source changes.
     if usage.budget_reason is not None:
         receipt["status"] = "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED"
         receipt["failure_reason"] = usage.budget_reason
