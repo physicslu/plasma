@@ -64,6 +64,15 @@ Select the smallest capable Path. Choosing a Path never grants additional author
 
 **Process safety:** Identify precise service/PIDs before stopping. No broad `pkill`/`killall`. No unapproved deployment, destructive Git, privilege escalation or credential disclosure.
 
+## Codex token efficiency (advisory; no new Gate)
+
+- Minimize **model round-trips and context size** together. Follow the domain routing above; bound searches and file/CI output to relevant excerpts, and do not repeatedly read unchanged files without a new reason.
+- Batch independent read-only inspections when safe; keep dependent edits, failures and verification visible. Reuse evidence for unchanged HEAD, but run all required focused, regression, negative and safety checks for the approved scope.
+- For CI, prefer a single bounded status collection and asynchronous waiting over repeated model-driven polling. Fetch detailed logs for failed or ambiguous jobs; do not recheck unchanged successful results without cause.
+- For small/medium host-only tasks, review tool churn and remaining acceptance at about **20 top-level tool calls**; at about **35**, record a concise efficiency checkpoint and reduce redundant work. These are **advisory checkpoints**, not stop conditions, test limits, approval gates or permission to leave Gate 1 incomplete.
+- Continue the approved Build → Run → Observe → Fix → Retest loop to observed PASS or an actionable blocker. Safety, recovery, interface compatibility and Gate evidence take precedence over token savings; only a material scope change requires revised Gate 1.
+- When metrics are available, report model/effort, tool calls and cached/non-cached/output tokens as observed. Do not infer five-hour subscription allowance consumption from local token counters. Stop nonessential inspection after required Gate readiness evidence is complete.
+
 ## Approval, Git and completion
 
 Gate 1 = bounded plan before implementation. After approval, finish all in-scope work autonomously. Gate 2 = explicit merge approval for a specific merge-ready PR (verify HEAD, CI, Rulesets, Reviews, Threads, Mergeability). Merge does not authorize deployment or hardware operations.
