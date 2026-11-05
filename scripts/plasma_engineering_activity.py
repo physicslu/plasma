@@ -105,6 +105,12 @@ def safe_command(value: object) -> tuple[str, str]:
         return "COMMAND", "(command hidden)"
     executable = words[0].rsplit("/", 1)[-1]
     if executable not in PREVIEW_TOOLS:
+        # Unknown engineering tools are still visible by safe basename;
+        # never echo arbitrary arguments from unknown command grammars.
+        if (re.fullmatch(r"[A-Za-z][A-Za-z0-9_.+-]{0,31}", executable)
+                and SENSITIVE.search(executable) is None
+                and re.fullmatch(r"[A-Fa-f0-9]{16,}", executable) is None):
+            return "COMMAND", executable + " [redacted]"
         return "COMMAND", "(command hidden)"
     kind = ("TEST" if executable == "pytest" else
             "READ" if executable in {"rg", "grep", "find", "sed", "head",
