@@ -1460,6 +1460,154 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["acceptance"], order["acceptance"])
 
 
+    def test_explicit_quick_profile_requires_owner_bound_host_only(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["codex_profile"], "quick-observe")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["work_order_sha256"], req["work_order_sha256"])
+        self.assertNotIn(
+            "codex_profile", dev.task_for_request(
+                self.registry,
+                dev.request(self._event(self._order()), self._context()),
+                self._event(self._order())))
+        invalid = (
+            {"codex_profile": "automatic", "scope": "host-only"},
+            {"codex_profile": "quick-observe"},
+            {"codex_profile": "quick-observe", "scope": "guarded-hardware"},
+            {"codex_profile": "quick-observe", "scope": "host-only",
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"codex_profile": "quick-observe", "scope": "host-only",
+             "pr_number": 11, "source_sha": "a"*40},
+        )
+        for changes in invalid:
+            with self.subTest(changes=changes), self.assertRaisesRegex(
+                    dev.Denied, "WORK_ORDER_PATH3_FIELDS_DENIED"):
+                dev.parse_dynamic_work_order(
+                    self._event(self._order("path3-codex", **changes)))
+
+    def test_quick_budget_metrics_are_redacted_and_post_turn_not_preemptive(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        secret = "SENSITIVE_COMMAND_ARGUMENT_SHOULD_NOT_APPEAR"
+        stream = [
+            {"type": "thread.started",
+             "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"},
+            {"type": "item.started", "item": {
+                "type": "command_execution", "id": "a",
+                "command": "bash -lc '" + secret + "'"}},
+            {"type": "item.completed", "item": {
+                "type": "command_execution", "id": "a",
+                "command": "bash -lc '" + secret + "'", "exit_code": 2}},
+            {"type": "turn.completed", "usage": {
+                "input_tokens": 33000, "cached_input_tokens": 30000,
+                "output_tokens": 40}},
+        ]
+        data = ("\n".join(json.dumps(event) for event in stream) + "\n").encode()
+        calls = []
+        def executor(argv, **kwargs):
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0, data, b"")
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            receipt = dev.run_codex_task(
+                task, task_id="path3-work-order", workspace=work,
+                executor=executor)
+            usage_text = (work / receipt["codex_usage_path"]).read_text()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1]["timeout"], dev.QUICK_MAX_SECONDS)
+        self.assertIn("QUICK OBSERVATION", calls[0][1]["input"].decode())
+        self.assertEqual(receipt["status"],
+                         "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED")
+        self.assertEqual(receipt["failure_reason"], "INPUT_BUDGET_POST_TURN")
+        self.assertEqual(receipt["codex_usage"]["input_tokens"], 33000)
+        self.assertEqual(receipt["codex_usage"]["cached_input_tokens"], 30000)
+        counts = receipt["codex_activity_metrics"]
+        self.assertEqual(counts["execution_profile"], "quick-observe")
+        self.assertEqual(counts["tool_items_started"], 1)
+        self.assertEqual(counts["commands_failed"], 1)
+        self.assertEqual(counts["items_completed"], 1)
+        self.assertEqual(counts["turns_completed"], 1)
+        self.assertEqual(counts["input_tokens_soft_limit"], 30000)
+        self.assertEqual(counts["model_request_count_status"], "NOT_AVAILABLE")
+        self.assertIsNone(counts["model_request_count"])
+        self.assertGreaterEqual(counts["elapsed_ms"], 0)
+        self.assertNotIn(secret, json.dumps(receipt) + usage_text)
+        self.assertEqual(receipt["codex_model_selection"]["model"]["source"],
+                         "NOT_AVAILABLE")
+
+    def test_quick_requires_streaming_monitor_on_real_executor(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            with patch.dict(os.environ, {}, clear=True):
+                with self.assertRaisesRegex(
+                        dev.Denied, "QUICK_MONITOR_REQUIRED"):
+                    dev.run_codex_task(
+                        task, workspace=Path(td), executor=subprocess.run,
+                        task_id="path3-work-order")
+        for mutant in (
+            task | {"work_order_scope": "guarded-hardware"},
+            task | {"codex_execution": "guarded-hardware-no-sandbox"},
+            task | {"work_order_sha256": "invalid"},
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                with self.assertRaisesRegex(
+                        dev.Denied, "CODEX_QUICK_ADMISSION_DENIED"):
+                    dev.run_codex_task(
+                        mutant, workspace=Path(td),
+                        executor=lambda *_a, **_kw: self.fail("invoked Codex"),
+                        task_id="path3-work-order")
+
+    def test_quick_streamed_limits_kill_process_group_without_secrets(self):
+        secret = "PRIVATE_DATA_NEVER_PERSIST"
+        script = (
+            "import json,sys,time\n"
+            "for i in range(3):\n"
+            " print(json.dumps({'type':'item.started','item':"
+            "{'id':str(i),'type':'command_execution',"
+            "'command':'git status "+secret+"'}}),flush=True)\n"
+            "time.sleep(3)\n"
+        )
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            live = work / "path3.log"
+            evidence = work / "codex.log"
+            live.touch()
+            usage = dev.CodexUsageCollector()
+            rc = dev._run_codex_with_live_log(
+                [sys.executable, "-u", "-c", script], b"smoke",
+                work, evidence, str(live), usage=usage,
+                max_seconds=3, max_tool_items=1)
+            self.assertEqual(usage.budget_reason, "TOOL_ITEMS_LIMIT")
+            self.assertNotEqual(rc, 0)
+            self.assertGreater(usage.tool_items_started, 1)
+            self.assertNotIn(secret, live.read_text() + evidence.read_text())
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            live = work / "path3.log"
+            evidence = work / "codex.log"
+            live.touch()
+            usage = dev.CodexUsageCollector()
+            rc = dev._run_codex_with_live_log(
+                [sys.executable, "-u", "-c", "import time;time.sleep(3)"],
+                b"smoke", work, evidence, str(live), usage=usage,
+                max_seconds=0.3, max_tool_items=10)
+            self.assertEqual(usage.budget_reason, "WALL_TIMEOUT")
+            self.assertNotEqual(rc, 0)
+
     def test_path3_owner_hardware_no_sandbox_is_one_invocation(self):
         """Host-only stub; no Codex process, USB, Z2, FPGA or DUT."""
         ordinary = self._order("path3-codex")
