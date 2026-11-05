@@ -55,10 +55,8 @@ MAX_ACTIVE_ITEMS = 64
 MAX_SEQUENCE = 10000000
 
 
-# General-purpose, fail-closed command *preview*, not an execution policy.
-# Never copy arbitrary shell arguments into the group-readable monitor log.
-# Recognized tools, verbs, flags and repository-relative paths are readable;
-# literals, credential options, expansions, URLs and private paths are redacted.
+# Safe, bounded command preview. This changes display only, never execution.
+# Unknown values and secrets are redacted *before* writing group-readable logs.
 PREVIEW_TOOLS = frozenset({
     "git", "gh", "python", "python3", "pytest", "rg", "grep", "find",
     "sed", "head", "tail", "cat", "make", "ninja", "cmake", "gcc",
@@ -72,101 +70,32 @@ PREVIEW_WORDS = frozenset({
     "pr", "checks", "view", "list", "run", "workflow", "api",
     "pytest", "unittest", "build", "test", "install", "clean",
     "check", "lint", "format", "compile", "batch", "source",
-    "all", "HEAD", "origin", "main", "true", "false",
+    "all", "HEAD", "origin", "main",
 })
-PREVIEW_FLAG = re.compile(r"-{1,2}[A-Za-z0-9][A-Za-z0-9-]{0,40}\Z")
-PREVIEW_NUMBER = re.compile(r"[0-9]{1,8}\Z")
+PREVIEW_FLAGS = frozenset({
+    "-m", "-q", "-n", "-v", "-k", "-r", "-s", "-C", "--short",
+    "--porcelain", "--check", "--oneline", "--name-only", "--stat",
+    "--all", "--verbose", "--quiet", "--no-pager", "--no-cache",
+    "--exit-code", "--dry-run", "--help", "-c", "-lc", "-H",
+    "-u", "-p", "-e", "--header", "--data", "--command",
+})
 PREVIEW_PATH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,95}\Z")
-PREVIEW_SHELL = re.compile(r"[;|&<>"""Read-only, operator-public projections of Codex JSONL item events.
-
-This module never executes commands, reads file contents or changes evidence.
-Raw JSON/arguments are untrusted: only strictly allowlisted fields are emitted.
-"""
-from __future__ import annotations
-
-import datetime as dt
-import json
-import shlex
-from pathlib import Path
-import re
-
-PREFIX = "@PLASMA_ACTIVITY_V1 "
-ITEM_ID = re.compile(r"[A-Za-z0-9_-]{1,48}\Z")
-SAFE_PATH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,95}\Z")
-SENSITIVE = re.compile(
-    r"(?i)(?:secret|token|passwd|password|credential|private|"
-    r"authorization|\.env|id_rsa|\.pem|\.key|auth)"
-)
-# Complete-command grammar. Never show shell pipelines, expansion,
-# URLs, absolute paths, inline Python, arguments or embedded secrets.
-COMMANDS = (
-    (re.compile(r"python3 -m pytest scripts/tests/(?:test_[A-Za-z0-9_]+\.py)?\Z"),
-     "TEST"),
-    (re.compile(r"python3 scripts/tests/test_[A-Za-z0-9_]+\.py\Z"), "TEST"),
-    (re.compile(r"git status(?: --short| --porcelain)?\Z"), "COMMAND"),
-    (re.compile(r"git diff --check\Z"), "COMMAND"),
-)
-# Classifications expose only a fixed label; no shell arguments or paths.
-# These describe Codex-reported commands, not verified execution receipts.
-SEMANTIC_COMMANDS = (
-    (re.compile(r"git (?:status|diff|log|show|rev-parse|ls-files)(?: [A-Za-z0-9_./=:+, '()-]{1,160})?\Z"),
-     "COMMAND", "Inspect Git repository (arguments redacted)"),
-    (re.compile(r"(?:rg|grep|sed|head|tail|cat|find) [A-Za-z0-9_./=:+, '()*?-]{1,160}\Z"),
-     "READ", "Inspect source files (arguments redacted)"),
-    (re.compile(r"python3 -m (?:pytest|unittest)(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
-     "TEST", "Run Python tests (arguments redacted)"),
-    (re.compile(r"(?:/opt/Xilinx/Vivado/[0-9.]+/bin/)?vivado -mode batch(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
-     "BUILD", "Run Vivado batch build (arguments redacted)"),
-    (re.compile(r"(?:make|ninja|cmake)(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
-     "BUILD", "Run build tool (arguments redacted)"),
-    (re.compile(r"(?:sha256sum|shasum)(?: [A-Za-z0-9_./=:+, '()*-]{1,160})?\Z"),
-     "CHECK", "Inspect artifact checksums (arguments redacted)"),
-)
-SEMANTIC_KIND_BY_LABEL = {label: kind for _, kind, label in SEMANTIC_COMMANDS}
-REPO_TOP = frozenset({
-    "scripts", "software", "pl", "firmware", "docs", "specs", "packaging",
-    "data", "handover", "release",
+PREVIEW_SECRET_OPTIONS = frozenset({
+    "-c", "-lc", "-H", "-u", "-p", "-e", "--header", "--data",
+    "--command", "--execute", "--password", "--token", "--key",
+    "--api-key", "--secret",
 })
-STATES = frozenset({"RUNNING", "DONE", "FAIL", "UNKNOWN"})
-KINDS = frozenset({"TEST", "COMMAND", "FILE", "READ", "BUILD", "CHECK"})
-MAX_EVENT_BYTES = 640
-MAX_ACTIVE_ITEMS = 64
-MAX_SEQUENCE = 10000000
 
-
-# General-purpose, fail-closed command *preview*, not an execution policy.
-# Never copy arbitrary shell arguments into the group-readable monitor log.
-# Recognized tools, verbs, flags and repository-relative paths are readable;
-# literals, credential options, expansions, URLs and private paths are redacted.
-PREVIEW_TOOLS = frozenset({
-    "git", "gh", "python", "python3", "pytest", "rg", "grep", "find",
-    "sed", "head", "tail", "cat", "make", "ninja", "cmake", "gcc",
-    "g++", "clang", "vivado", "sha256sum", "shasum", "bash", "sh",
-    "curl", "ssh", "scp", "rsync", "cp", "mv", "ls", "pwd", "test",
-    "timeout", "env", "jq", "yq", "tar", "unzip", "zip",
-})
-PREVIEW_WORDS = frozenset({
-    "status", "diff", "log", "show", "rev-parse", "ls-files", "add",
-    "commit", "push", "fetch", "branch", "checkout", "switch", "merge",
-    "pr", "checks", "view", "list", "run", "workflow", "api",
-    "pytest", "unittest", "build", "test", "install", "clean",
-    "check", "lint", "format", "compile", "batch", "source",
-    "all", "HEAD", "origin", "main", "true", "false",
-})
-PREVIEW_FLAG = re.compile(r"-{1,2}[A-Za-z0-9][A-Za-z0-9-]{0,40}\Z")
-PREVIEW_NUMBER = re.compile(r"[0-9]{1,8}\Z")
-PREVIEW_PATH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,95}\Z")
- ]")
 
 def safe_command(value: object) -> tuple[str, str]:
-    """Return a useful redacted preview without leaking untrusted argument text.
+    """Project only safe tool/arguments, not a raw shell or authorization.
 
-    This does not authorize or execute commands. Any uncertain argument is
-    replaced with a fixed marker; no blacklist is assumed complete.
+    The producer's unknown arguments are replaced with fixed placeholders.
+    A preview can contain no URLs, credential values or private home paths.
     """
-    if type(value) is not str or not value or len(value) > 2048 or not value.isascii():
-        return "COMMAND", "(command hidden)"
-    if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+    if (type(value) is not str or not value or len(value) > 2048 or
+            not value.isascii() or
+            any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
         return "COMMAND", "(command hidden)"
     try:
         words = shlex.split(value, posix=True)
@@ -174,10 +103,7 @@ def safe_command(value: object) -> tuple[str, str]:
         return "COMMAND", "(command hidden)"
     if not words:
         return "COMMAND", "(command hidden)"
-    executable = words[0]
-    # Never expose arbitrary executable names or absolute executable paths.
-    if "/" in executable:
-        executable = executable.rsplit("/", 1)[-1]
+    executable = words[0].rsplit("/", 1)[-1]
     if executable not in PREVIEW_TOOLS:
         return "COMMAND", "(command hidden)"
     kind = ("TEST" if executable == "pytest" else
@@ -187,46 +113,36 @@ def safe_command(value: object) -> tuple[str, str]:
                                       "g++", "clang", "vivado"} else
             "CHECK" if executable in {"sha256sum", "shasum"} else
             "COMMAND")
-    if executable in {"python", "python3"} and (
-            "pytest" in words[1:3] or "unittest" in words[1:3] or
-            any(w.startswith("scripts/tests/") for w in words[1:4])):
+    if (executable in {"python", "python3"} and
+            ("pytest" in words[1:3] or "unittest" in words[1:3] or
+             any(arg.startswith("scripts/tests/") for arg in words[1:4]))):
         kind = "TEST"
-    # Shell operators, expansions and scripting must never be echoed.
-    if PREVIEW_SHELL.search(value) is not None or chr(92) in value:
+    if any(char in value for char in (";", "|", "&", "<", ">", "$",
+                                     chr(96), chr(92))):
         return kind, executable + " [shell-redacted]"
     safe = [executable]
-    for idx, word in enumerate(words[1:13], start=1):
-        previous = words[idx - 1] if idx > 1 else ""
-        credential_option = (
-            previous in {"-c", "-lc", "--command", "-e", "--execute",
-                         "-H", "-u", "-p", "--header", "--data"} or
-            re.fullmatch(r"--(?:api-)?key", previous) is not None or
-            SENSITIVE.search(previous) is not None
-        )
-        if credential_option:
-            candidate = "[redacted]"
+    for i, word in enumerate(words[1:13], start=1):
+        previous = words[i - 1]
+        if (previous in PREVIEW_SECRET_OPTIONS or
+                SENSITIVE.search(previous) is not None or
+                SENSITIVE.search(word) is not None):
+            clean = "[redacted]"
         elif word in {"[redacted]", "[shell-redacted]"}:
-            candidate = word
-        elif SENSITIVE.search(word) is not None:
-            candidate = "[redacted]"
-        elif word in PREVIEW_WORDS or (
-                PREVIEW_FLAG.fullmatch(word) is not None):
-            candidate = word
-        elif PREVIEW_NUMBER.fullmatch(word) is not None:
-            candidate = word
+            clean = word
+        elif word in PREVIEW_WORDS or word in PREVIEW_FLAGS:
+            clean = word
         elif (PREVIEW_PATH.fullmatch(word) is not None and
               word.split("/", 1)[0] in REPO_TOP and
-              not word.startswith(".") and ".." not in word.split("/")):
-            candidate = word
+              not word.startswith(".") and
+              ".." not in word.split("/")):
+            clean = word
         else:
-            candidate = "[redacted]"
-        if candidate != "[redacted]" or safe[-1] != "[redacted]":
-            safe.append(candidate)
+            clean = "[redacted]"
+        if clean != "[redacted]" or safe[-1] != "[redacted]":
+            safe.append(clean)
     if len(words) > 13:
         safe.append("[redacted]")
     return kind, " ".join(safe)[:140]
-
-nd hidden)"
 
 
 def safe_repo_path(value: object, workspace: Path) -> str | None:
