@@ -47,6 +47,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
+      - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
       - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
@@ -110,6 +111,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
+      - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
       - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
@@ -184,6 +186,7 @@ jobs:
           software/python/tests/test_ppu_bootstrap_deployment.py
           software/python/tests/test_ppu_deploy_api_host.py
           software/python/tests/test_ppu_b3_z2_install_gate1.py
+          software/python/tests/test_ppu_b3_fpga_load_gate1.py
           software/python/tests/test_ppu_owner_authorization_gate1.py
           software/python/tests/test_ppu_asset_execution_gate1.py
           software/python/tests/test_ppu_privileged_source_gate1.py

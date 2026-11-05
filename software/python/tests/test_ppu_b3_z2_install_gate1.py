@@ -7,6 +7,7 @@ local runner, not network, systemd or privileged Z2 I/O.
 from __future__ import annotations
 
 import base64
+from contextlib import contextmanager
 import hashlib
 import json
 import stat
@@ -43,11 +44,11 @@ def make_coordinator(tmp_path):
     )
 
 
-def b3_request(archive, digest):
+def b3_request(archive, digest, *, mode="stage_only"):
     return engine.BundleV3InstallRequest(
         archive=archive, source_commit=SOURCE,
         artifact_sha256=digest, target_profile=dict(TARGET),
-        api_transaction_id="b" * 32,
+        api_transaction_id="b" * 32, mode=mode,
     )
 
 
@@ -55,7 +56,7 @@ def test_real_installer_b3_stages_and_verifies_three_packages_without_activation
     archive, digest = build_smoke(tmp_path / "bundle")
     co = make_coordinator(tmp_path)
     result = co.execute_bundle_v3_install(b3_request(archive, digest))
-    assert result["stage"] == "bundle_install_only"
+    assert result["stage"] == "bundle_staged_only"
     assert result["transaction"]["state"] == "bundle_installed"
     assert result["per_package_install_executed"] is True
     assert result["runtime_activation_executed"] is False
@@ -131,9 +132,9 @@ def test_b3_existing_symlink_fail_closed(tmp_path):
 def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     archive, digest = build_smoke(tmp_path / "bundle")
     source_policy = {
-        "schema": "plasma.ppu.b3-install-policy.v1",
+        "schema": "plasma.ppu.b3-install-policy.v2",
         "mode": "development",
-        "install_only": True,
+        "modes": ["activate", "stage_only"],
         "actions": ["install", "verify"],
     }
     paths = bootstrap.ServicePaths(
@@ -161,12 +162,14 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
             archive=bootstrap._upload_paths(paths, upload_id).committed,
             source_commit=SOURCE, artifact_sha256=digest,
             target_profile=TARGET, api_transaction_id=request["api_transaction_id"],
+            mode=request["mode"], fpga_load=request["fpga_load"],
         )
         return co.execute_bundle_v3_install(real)
     srv.bundle_install_runner = runner
     # Without B2, B3 is forbidden and cannot stage software.
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_MATCHING_B2_ADMISSION_REQUIRED"):
-        srv.start_deployment({"kind": "bundle", "upload_id": "a" * 32, "fpga_load": False,
+        srv.start_deployment({"kind": "bundle", "upload_id": "a" * 32,
+                              "mode": "stage_only", "fpga_load": False,
                               "authorization": {}})
     raw = archive.read_bytes()
     upload = bootstrap.create_upload(paths, size=len(raw), sha256=digest)
@@ -207,7 +210,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
     assert not srv.deployment_thread.is_alive()
     result = bootstrap._deployment_api_record(paths)
     assert result["state"] == "succeeded", result.get("error_code")
-    assert result["result"]["stage"] == "bundle_install_only"
+    assert result["result"]["stage"] == "bundle_staged_only"
     assert result["result"]["coordinator_receipt"]["coordinator_state"] == "bundle_installed"
     assert result["result"]["runtime_activation_executed"] is False
     assert not (paths.product_root / "current").exists()
@@ -316,3 +319,91 @@ def test_generic_b3_rejects_symlinked_asset_root_without_external_write(tmp_path
         co.execute_bundle_v3_install(b3_request(archive, digest))
     assert not list(external.iterdir())
     assert co.journal.read().state == "recovery_required"
+
+
+def test_b3_standard_no_fpga_activates_once_with_held_runtime_lease(tmp_path):
+    archive, digest = build_smoke(tmp_path / "bundle")
+    co = make_coordinator(tmp_path)
+    events = []
+
+    @contextmanager
+    def lease():
+        events.append("acquired")
+        try:
+            yield {"lease_kind": "connection_held", "active_job_count": 0}
+        finally:
+            events.append("released")
+
+    co.quiescence_lease = lease
+    first = co.execute_bundle_v3_install(b3_request(archive, digest, mode="activate"))
+    second = co.execute_bundle_v3_install(b3_request(archive, digest, mode="activate"))
+    assert events == ["acquired", "released", "acquired", "released"]
+    assert first["stage"] == "bundle_install_and_activate"
+    assert first["mode"] == second["mode"] == "activate"
+    assert first["ready"] is second["ready"] is False
+    assert first["fpga"] == second["fpga"] == "NOT_RUN"
+    assert first["active_asset_set"] == {
+        "asset_set_sha256": digest, "generation": 1, "already_active": False,
+    }
+    assert second["active_asset_set"] == {
+        "asset_set_sha256": digest, "generation": 1, "already_active": True,
+    }
+    assert second["transaction"]["state"] == "asset_set_active"
+    active = json.loads((co.paths.product_root / "assets" / "active.json").read_text())
+    assert active["asset_set_sha256"] == digest
+    assert active["generation"] == 1
+
+
+def test_b3_no_fpga_quiescence_denial_does_not_change_active(tmp_path):
+    archive, digest = build_smoke(tmp_path / "bundle")
+    co = make_coordinator(tmp_path)
+
+    @contextmanager
+    def denied_lease():
+        raise RuntimeError("RUNNING_OR_QUEUED_JOB")
+        yield
+
+    co.quiescence_lease = denied_lease
+    with pytest.raises(engine.DeploymentError, match="B3_RUNTIME_QUIESCE_DENIED"):
+        co.execute_bundle_v3_install(b3_request(archive, digest, mode="activate"))
+    assert co.journal.read().state == "verify_failed"
+    assert co.journal.read().error_code == "b3_runtime_quiesce_denied"
+    assert not (co.paths.product_root / "assets" / "active.json").exists()
+    assert (co.paths.product_root / "assets" / "staged" / digest).exists()
+
+
+def test_b3_no_fpga_unknown_active_publish_requires_recovery(tmp_path):
+    archive, digest = build_smoke(tmp_path / "bundle")
+    co = make_coordinator(tmp_path)
+
+    @contextmanager
+    def held():
+        yield {"lease_kind": "connection_held", "active_job_count": 0}
+
+    co.quiescence_lease = held
+    helper = co._asset_helper()
+    def failed_publish(*_args, **_kwargs):
+        raise OSError("INJECTED_UNCERTAIN_FSYNC")
+    helper.activate_verified = failed_publish
+    co._asset_helper = lambda: helper
+    with pytest.raises(engine.DeploymentError, match="B3_ACTIVE_SET_PUBLISH_REQUIRES_RECOVERY"):
+        co.execute_bundle_v3_install(b3_request(archive, digest, mode="activate"))
+    assert co.journal.read().state == "recovery_required"
+    with pytest.raises(engine.DeploymentError, match="requires recovery"):
+        co.execute_bundle_v3_install(b3_request(archive, digest, mode="stage_only"))
+
+
+@pytest.mark.parametrize("mode,load", [
+    ("", False), ("install_only", False), ("stage_only", True),
+])
+def test_b3_rejects_ambiguous_mode_without_install(tmp_path, mode, load):
+    archive, digest = build_smoke(tmp_path / "bundle")
+    request = engine.BundleV3InstallRequest(
+        archive=archive, source_commit=SOURCE, artifact_sha256=digest,
+        target_profile=dict(TARGET), api_transaction_id="b" * 32,
+        mode=mode, fpga_load=load,
+    )
+    co = make_coordinator(tmp_path)
+    with pytest.raises(engine.DeploymentError, match="B3_MODE_INVALID|B3_STAGE_ONLY_FPGA_LOAD_DENIED"):
+        co.execute_bundle_v3_install(request)
+    assert not co.paths.product_root.exists()

@@ -70,11 +70,15 @@ def admit_body(paths, kind: str, upload_id: str, **overrides) -> dict:
                                        **overrides)}
 
 
-def install_body(paths, b2_record: dict, *, fpga_load: bool, **overrides) -> dict:
+def install_body(paths, b2_record: dict, *, fpga_load: bool,
+                 mode: str | None = None, **overrides) -> dict:
     """B3 request bound to the CURRENT B2 transaction and its archive SHA256."""
     plan = b2_record["result"]["plan"]
     action = owner.INSTALL_FPGA_LOAD if fpga_load else owner.INSTALL
-    return {"kind": "bundle", "upload_id": b2_record["upload_id"], "fpga_load": fpga_load,
+    if mode is None:
+        mode = "activate" if fpga_load else "stage_only"
+    return {"kind": "bundle", "upload_id": b2_record["upload_id"],
+            "mode": mode, "fpga_load": fpga_load,
             "authorization": authorize(paths, action, plan["archive_sha256"],
                                        b2_record["transaction_id"], **overrides)}
 

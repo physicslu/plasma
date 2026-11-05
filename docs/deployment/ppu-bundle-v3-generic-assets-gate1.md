@@ -1,75 +1,72 @@
 # PPU Bundle v3 — Generic Asset Set B3 (Gate 1)
 
-> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+**Evidence lineage:** PR #1245 merged the generic staging installer on
+2026-11-02 (Host-only). PR #1308 unified B2/B3 under the single
+`DeploymentCoordinator`. P4-02 extends that implementation with an explicit
+Install/Activate contract. These are versioned code milestones, **not**
+physical Z2/FPGA qualification.
 
-**Status:** merged in main (PR #1245), 2026-11-02. Host-only CI / Test only.
-**Baseline:** latest main plus owner-approved Single Active Asset Set architecture
-([PR #1244](https://github.com/physicslu/plasma/pull/1244), merged).
-**Hardware boundary:** no Z2 execution, FPGA reload, systemd restart or DUT programming
-authorized by this PR.
-
-## One product installation path
+## One trusted deployment path
 
 ```text
-Console / authenticated paired Controller (private commissioning lab)
-  -> POST /v1/uploads (chunks, commit with SHA256)
-  -> POST /v1/deployments  {"kind":"bundle","upload_id":"...","authorization":{bundle.admit}}  [B2]
-  -> POST /v1/deployments  {"kind":"bundle","upload_id":"...","fpga_load":false,"authorization":{bundle.install}} [B3]
-  -> existing Bootstrap DeploymentCoordinator lock and journal
-  -> existing Z2 Installer Core, verified Bundle v3 ZIP only
-  -> /opt/plasma/assets/staged/<archive_sha256>/
-       b3-install.json
-       manifest.json
-       payload/packages/<package-id>/...
+Console -> Bootstrap B1 upload/commit
+        -> Bootstrap B2 admission (bundle.admit)
+        -> Bootstrap B3 {"kind":"bundle","upload_id":"…",
+                         "mode":"activate"|"stage_only","fpga_load":boolean,
+                         "authorization":{owner-operation}}
+        -> DeploymentCoordinator (existing deployment.lock + journal)
+        -> existing Z2 Installer Core, verified Bundle v3 ZIP only
+        -> /opt/plasma/assets/staged/<archive_sha256>/
+        -> standard activate: connection-held Runtime Job quiescence lease
+        -> /opt/plasma/assets/active.json (atomic replace + fsync)
 ```
 
-**No product installation API, filename, absolute destination or Package
-allowlist is specific to Smoke, F1-B, a target ICPN, an FPGA type, or three
-hardcoded Packages.** The legacy PR #1241 Smoke-only real-HIL control scripts
-are retired from the executable product tree; their evidence remains preserved
-in Git history. Tests may continue using a harmless Python Smoke fixture.
+The B3 request must refer to the **current** B2 admission: the same
+upload, source commit, full archive SHA256, target and verified Package
+qualification. The owner authorization is **fresh and B3-specific**;
+`bundle.admit` is not installation authority. No Bundle field grants execution.
 
-**All Packages remain inert Assets** (Python, Native C, FPGA Image BIN/HWH,
-Programming Profile, firmware, etc.). B3 does not execute files, load PL,
-change /opt/plasma/current, switch an Asset Set or operate DUT. B3 verifies
-the exact archive content against B1/B2 metadata and canonical v3
-Manifest/target/dependency contract. Every staged Set retains the verified canonical `manifest.json`,
-with its own SHA256 included in the B3 receipt. Every staged Set is stored under its
-complete archive SHA256, not its display name. Reuse of an existing digest
-requires re-verifying every installed file and the exact file set; it must not
-overwrite that path. This provides Staging only, **not** Active Set activation.
+| Explicit B3 contract | Required B3 authority | Result |
+| --- | --- | --- |
+| `mode: "stage_only", fpga_load: false` | `bundle.install` | Verified staging only; `active_asset_set: null` |
+| `mode: "activate", fpga_load: false` with **no** FPGA Package | `bundle.install` | Verified staging then atomic Active selection under the trusted Runtime lease; no FPGA reload |
+| `mode: "activate", fpga_load: true` with FPGA Package | `bundle.install-fpga-load` | Existing protected Root load, Identity PASS, then Active publication while lease remains held |
+| `activate` FPGA Bundle with `fpga_load: false`; `stage_only` with `fpga_load: true`; absent/invalid flags | Denied | No implicit load privilege, no false activation success |
 
-## Installation authority and trust levels
+Each successful receipt records `mode`, `ready: false`, the exact
+archive SHA, Coordinator journal transaction and one of
+`bundle_staged_only`, `bundle_install_and_activate`,
+`bundle_install_and_fpga_load`. For standard activation, the receipt
+includes an `active_asset_set` identity and generation; exceptional staging
+must never claim Active. No route executes a Parser, native binary, Runtime
+Job or DUT operation as a side effect.
 
-Device-side factory installs `ppu-bundle-install-policy.json` mode 0600
-with schema `plasma.ppu.b3-install-policy.v1`, development mode,
-`install_only=true` and fixed allowed actions `install,verify`.
-B3 admission requires the existing authenticated Bootstrap request;
-the immediately preceding device-local B2 record for the **same upload ID**;
-a verified ZIP SHA256, source commit and **device-local target profile**; and
-the same single DeploymentCoordinator lock/journal and correlated receipt.
-The policy is **never an HTTP upload parameter**. No custom user executable
-or FPGA image gains execution privilege just by arriving in a Bundle.
+The factory provisions `ppu-bundle-install-policy.json` with schema
+`plasma.ppu.b3-install-policy.v2`, mode `development`,
+`modes: ["activate", "stage_only"]`, and only `actions:["install","verify"]`.
+The factory policy is **not** a public HTTP field and does not authorize
+privileged FPGA operations.
 
-In the **controlled private lab** this grants B3 install-only to the paired
-Console. It does **not** establish publisher authenticity, production
-authorization, confidential network transport, or Master role binding.
-Product deployment must not open this endpoint to public/untrusted clients.
+## Failure and recovery
 
-## Future integration boundary — P1 / P2
+- Archive, SHA, target, owner authorization and optional FPGA static
+  qualification are revalidated fail-closed at B3.
+- The existing Runtime control socket owns the connection-held Job
+  quiescence gate. Busy/queued/cancelling Jobs and denied or lost leases must
+  prevent Active publication. An idle snapshot supplied by Console is not a
+  lease.
+- Identity FAIL retains the loaded FPGA Image **without** automatic
+  Golden Restore; unknown physical or pointer-publish results enter
+  `recovery_required`. The old `active.json` does not prove old hardware
+  was restored.
+- The existing guarded recovery path is the only recovery authority. Do not
+  add another Journal, lock, Hardware Manager or READY state machine.
+- `GET /v1/assets` reports verified **Active identity only**, with
+  `ready:false`. Before a Job, independent FPGA Image/ABI, Site readmission,
+  hardware ownership and ProgrammingQualification must still be proven.
 
-- **P1:** Console compares exact intended complete Asset Set identity against
-  PPU Active identity; if different, transfers a complete Set. A verified
-  staged Set may be atomically activated only with all relevant Jobs idle
-  and exclusive ownership. No cross-Bundle fallback, no mid-Job replacement.
-- **P2:** Controller separately requests an FPGA configuration; an approved
-  Hand-off passes only the selected Active Set BIN/HWH/FPGA Manifest to the
-  **existing protected FPGA Root Loader**. No arbitrary path passed from
-  Console to Root. Preserve Source Pin, Image ABI, FPGA Manager ownership,
-  Site quiescence, Golden Restore, and electrical safeguards.
-- A staged or Active Set is **not READY** merely because the Bundle digest is
-  correct. Real FPGA configuration and real IC ProgrammingQualification are
-  independent evidence gates.
+## Evidence limits
 
-No new API schema, B4 Activation, runtime FPGA load, Programming Runtime
-provider or physical HIL acceptance is claimed by P0.
+This Gate 1 contract is validated by Host-only positive/negative tests and
+GitHub-hosted CI. Z2 factory refresh, FPGA reload, real Runtime race tests and
+DUT HIL are **NOT_RUN** without separate operator approval.

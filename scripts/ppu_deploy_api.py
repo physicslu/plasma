@@ -266,9 +266,10 @@ class BootstrapAPIClient:
         return {"kind": kind, "upload_id": upload_id,
                 "authorization": self._authorize("bundle.admit", archive_sha256, upload_id)}
 
-    def _install_body(self, admitted: "DeploymentSubmission", fpga_load: bool) -> dict[str, Any]:
+    def _install_body(self, admitted: "DeploymentSubmission", mode: str, fpga_load: bool) -> dict[str, Any]:
         return {
-            "kind": "bundle", "upload_id": admitted.upload_id, "fpga_load": fpga_load,
+            "kind": "bundle", "upload_id": admitted.upload_id, "mode": mode,
+            "fpga_load": fpga_load,
             "authorization": self._authorize(
                 "bundle.install-fpga-load" if fpga_load else "bundle.install",
                 admitted.archive_sha256, admitted.transaction_id,
@@ -370,14 +371,16 @@ class BootstrapAPIClient:
         )
 
     def install_bundle(
-        self, admitted: DeploymentSubmission, *, fpga_load: bool = False,
+        self, admitted: DeploymentSubmission, *, mode: str = "activate",
+        fpga_load: bool = False,
     ) -> DeploymentSubmission:
         """Explicit B3 of the EXACT current B2 admitted Bundle.
 
-        Without ``fpga_load`` this installs files only. With an explicit
-        ``fpga_load=True`` the PPU also loads the Bundle's FPGA Image through
-        its protected Root Entry and publishes the Active Set only after
-        Identity PASS. Never a package execution or DUT operation.
+        Standard ``activate`` publishes the verified Set under the trusted
+        Runtime quiesce lease. Explicit ``stage_only`` does not publish Active.
+        A Bundle containing FPGA Image requires caller-supplied ``fpga_load=True``
+        and the separate FPGA-load owner authorization; never infer privilege
+        from a missing wire field. No Package/DUT execution is performed.
         The admission receipt must be read back from the current device and
         match the operator's archive SHA256; a fresh ``bundle.install`` /
         ``bundle.install-fpga-load`` owner authorization is bound to that
@@ -393,6 +396,10 @@ class BootstrapAPIClient:
             raise DeploymentAPIError("B3_VALID_B2_ADMISSION_REQUIRED")
         if type(fpga_load) is not bool:
             raise DeploymentAPIError("B3_FPGA_LOAD_FLAG_INVALID")
+        if type(mode) is not str or mode not in {"activate", "stage_only"}:
+            raise DeploymentAPIError("B3_MODE_INVALID")
+        if mode == "stage_only" and fpga_load:
+            raise DeploymentAPIError("B3_STAGE_ONLY_FPGA_LOAD_DENIED")
         b2 = self.deployment_state(admitted.transaction_id)
         result = b2.get("result")
         plan = result.get("plan") if isinstance(result, dict) else None
@@ -402,7 +409,15 @@ class BootstrapAPIClient:
                 or plan.get("archive_sha256") != admitted.archive_sha256
                 or plan.get("requested_actions") != ["install", "verify"]):
             raise DeploymentOutcomeUnknown("B3_DEVICE_ADMISSION_CHANGED")
-        reply = self._call("POST", "/v1/deployments", self._install_body(admitted, fpga_load))
+        has_fpga_image = any(
+            type(package) is dict and package.get("kind") == "fpga-image"
+            for package in plan.get("packages", [])
+        )
+        if mode == "activate" and has_fpga_image and not fpga_load:
+            raise DeploymentAPIError("B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD")
+        if fpga_load and not has_fpga_image:
+            raise DeploymentAPIError("B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE")
+        reply = self._call("POST", "/v1/deployments", self._install_body(admitted, mode, fpga_load))
         record = reply.get("deployment")
         if (not isinstance(record, dict)
                 or record.get("upload_id") != admitted.upload_id
@@ -455,7 +470,8 @@ class BootstrapAPIClient:
         """Compare whole Bundle SHA; on mismatch explicitly B1 -> B2 -> B3.
 
         Returns the B3 transaction ID for explicit observation. Does NOT
-        activate the Set, load an FPGA, launch a job or claim READY.
+        launch a job or claim READY. It explicitly requests FPGA load for
+        an admitted FPGA Bundle with the matching owner operation.
         """
         if not isinstance(archive, bytes) or not 0 < len(archive) <= _MAX_UPLOAD:
             raise DeploymentAPIError("ASSET_SET_BUNDLE_INVALID")
@@ -468,14 +484,18 @@ class BootstrapAPIClient:
             }
         uploaded = self.upload(archive)
         b2 = self.submit(kind="bundle", upload_id=uploaded, archive_sha256=digest)
-        b3 = self.install_bundle(b2)
+        admission = self.deployment_state(b2.transaction_id)
+        plan = admission["result"]["plan"]
+        fpga_load = any(type(package) is dict and package.get("kind") == "fpga-image"
+                        for package in plan["packages"])
+        b3 = self.install_bundle(b2, mode="activate", fpga_load=fpga_load)
         return {
             "result": "B3_INSTALL_QUEUED", "asset_set_sha256": digest,
             "ready": False, "b3": {
                 "upload_id": b3.upload_id,
                 "transaction_id": b3.transaction_id,
                 "state": b3.state,
-            }, "fpga": "NOT_RUN",
+            }, "fpga": "QUEUED" if fpga_load else "NOT_RUN",
         }
 
     def status(self) -> dict[str, Any]:

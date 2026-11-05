@@ -57,9 +57,9 @@ def generic_factory_sources(tmp_path):
 def test_generic_policy_has_no_bundle_name_or_fixed_archive_digest():
     data = json.loads((ROOT / "scripts" / POLICY_FILE).read_text())
     assert data == {
-        "schema": "plasma.ppu.b3-install-policy.v1",
-        "mode": "development", "install_only": True,
-        "actions": ["install", "verify"],
+        "schema": "plasma.ppu.b3-install-policy.v2",
+        "mode": "development", "actions": ["install", "verify"],
+        "modes": ["activate", "stage_only"],
     }
     assert "smoke" not in json.dumps(data).lower()
 
