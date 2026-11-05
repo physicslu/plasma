@@ -115,8 +115,14 @@ def safe_command(value: object) -> tuple[str, str]:
     safe = [executable]
     redactions = 0
     for idx, word in enumerate(words[1:13], start=1):
-        if (idx > 1 and words[idx-1] in ("-c", "-lc", "--command", "-e",
-                                         "--execute", "--password", "-p")):
+        previous = words[idx - 1] if idx > 1 else ""
+        credential_option = (
+            previous in {"-c", "-lc", "--command", "-e", "--execute",
+                         "-H", "-u", "-p", "--header", "--data"} or
+            re.fullmatch(r"--(?:api-)?key", previous) is not None or
+            SENSITIVE.search(previous) is not None
+        )
+        if credential_option:
             candidate = "[redacted]"
         elif word in {"[redacted]", "[shell-redacted]"}:
             candidate = word
