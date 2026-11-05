@@ -118,6 +118,10 @@ try:
             proc[int(entry.name)] = (parent, [x.decode("utf-8", "replace") for x in args if x])
         except (OSError, ValueError, IndexError):
             continue
+    pane_command = proc.get(root)
+    if not pane_command or not pane_command[1] or (
+            pathlib.Path(pane_command[1][0]).name not in {"bash", "sh"}):
+        raise ValueError("pane is not a monitor shell")
     children = set()
     pending = [root]
     while pending:
