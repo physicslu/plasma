@@ -202,7 +202,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertIn("GOAL: PATH2 Host-only CLI regression", frame)
             self.assertIn("RESULT:", frame)
             self.assertIn("PR: #1144", frame)
-            self.assertIn("NOW: 2026-10-21 16:10", frame)
+            self.assertIn("RECEIVED: —", frame)
             self.assertIn("RESULT: PASS (exit 0)", frame)
             self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
                              (Path(td) / "path2.log").read_text())
@@ -863,7 +863,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                 Path(td), "path3", prefix="Ctrl+A", width=90, height=20)
             self.assertEqual(
                 frame.splitlines()[0],
-                "PATH 3 | SWPC Codex | C Clear | Ctrl+A 1/2 Switch | Ctrl+A D Detach")
+                "PATH 3 | IDLE")
             self.assertEqual(len([l for l in frame.splitlines()
                                   if "Ctrl+A" in l]), 1)
             self.assertIn("| IDLE", frame)
@@ -1028,7 +1028,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                     if path == "path2":
                         self.assertIn("RESULT:", frame)
                     self.assertIn("RESULT: NOT_RUN", frame)
-                    self.assertIn("NOW: 2026-10-21 16:10", frame)
+                    self.assertIn("RECEIVED: —", frame)
                     self.assertIn("ACTIVITY TRACE", frame)
                     self.assertIn("latest-visible-entry", frame)
                     self.assertNotIn("old-000", frame)
@@ -1448,6 +1448,8 @@ if op in ("new-session", "new-window"):
         self.assertIn("tmux break-pane -d", script)
         self.assertIn('tmux new-window -d -t "$session:2"', script)
         self.assertIn("tmux move-window -d", script)
+        self.assertIn("tmux respawn-pane -k", script)
+        self.assertIn("--reload", script)
         self.assertIn('tmux select-window -t "$session:1"', script)
         self.assertEqual(workflow.count(
             "PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}"), 2)
@@ -1455,6 +1457,8 @@ if op in ("new-session", "new-window"):
             "PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}"), 2)
         self.assertEqual(workflow.count(
             "PLASMA_MONITOR_STAGE: ${{ needs.development-authorize.outputs.monitor_stage }}"), 1)
+        self.assertEqual(workflow.count(
+            "PLASMA_MONITOR_COMMENT_ID: ${{ needs.development-authorize.outputs.comment_id }}"), 2)
         self.assertIn(
             'monitor_summary: ${{ steps.approve.outputs.monitor_summary }}',
             workflow)
