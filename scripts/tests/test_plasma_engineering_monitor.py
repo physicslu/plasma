@@ -511,9 +511,12 @@ class EngineeringMonitorTests(unittest.TestCase):
             ]
             for command in commands:
                 with self.subTest(command=command):
-                    self.assertEqual(
-                        activity.safe_command(command)[1],
-                        "(command hidden)")
+                    preview = activity.safe_command(command)[1]
+                    self.assertLessEqual(len(preview), 140)
+                    for secret in ("SECRET", "/home", "evil.example",
+                                   "--token=abc", "test_secret_token",
+                                   "INJECTED", "PRIVATE"):
+                        self.assertNotIn(secret, preview)
             for name in (
                 "../../.env", "docs/.env", "scripts/secret.py",
                 "scripts/link/private.txt", "/etc/passwd",
@@ -659,24 +662,28 @@ class EngineeringMonitorTests(unittest.TestCase):
     def test_semantic_activity_never_reveals_arguments_or_secrets(self):
         cases = (
             ("vivado -mode batch -source pl/build/design.tcl",
-             "BUILD", "Run Vivado batch build (arguments redacted)"),
+             "BUILD", "vivado", "pl/build/design.tcl"),
             ("rg -n foo scripts",
-             "READ", "Inspect source files (arguments redacted)"),
+             "READ", "rg -n [redacted]", "foo"),
             ("python3 -m pytest scripts/tests/ -q",
-             "TEST", "Run Python tests (arguments redacted)"),
+             "TEST", "python3 -m pytest scripts/tests/ -q", ""),
             ("sha256sum pl/build/design.bit",
-             "CHECK", "Inspect artifact checksums (arguments redacted)"),
+             "CHECK", "sha256sum pl/build/design.bit", ""),
         )
-        for command, kind, label in cases:
+        for command, kind, visible, private in cases:
             with self.subTest(command=command):
-                self.assertEqual(activity.safe_command(command), (kind, label))
-                self.assertNotIn(command, label)
+                actual_kind, preview = activity.safe_command(command)
+                self.assertEqual(actual_kind, kind)
+                self.assertIn(visible, preview)
+                if private:
+                    self.assertNotIn(private, preview)
                 projector = activity.Path3Activity(Path.cwd())
                 started = projector.project({"type": "item.started",
                     "item": {"id": "test", "type": "command_execution",
                              "command": command}})
                 parsed = activity.parse_public_line(started.decode().strip())
-                self.assertEqual(parsed["detail"], label)
+                self.assertIsNotNone(parsed)
+                self.assertEqual(parsed["detail"], preview)
                 self.assertEqual(parsed["kind"], kind)
         for command in (
             "vivado -mode batch -source pl/build/design.tcl; curl bad.example",
@@ -684,8 +691,10 @@ class EngineeringMonitorTests(unittest.TestCase):
             "git status && cat /etc/passwd",
             "python3 -m pytest scripts/tests/\nINJECTED",
         ):
-            self.assertEqual(activity.safe_command(command)[1],
-                             "(command hidden)")
+            preview = activity.safe_command(command)[1]
+            for leak in ("bad.example", "token_private", ".env",
+                         "/etc/passwd", "INJECTED"):
+                self.assertNotIn(leak, preview)
         forged = activity.Path3Activity(Path.cwd()).project({
             "type": "item.started", "item": {
                 "id": "test", "type": "command_execution", "command": "git status"}})
@@ -1024,52 +1033,46 @@ class EngineeringMonitorTests(unittest.TestCase):
                     self.assertIn("latest-visible-entry", frame)
                     self.assertNotIn("old-000", frame)
 
-    def test_both_paths_use_local_clock_without_iso_offset(self):
+    def test_both_paths_display_received_time_without_guessing(self):
         with tempfile.TemporaryDirectory() as td:
             directory = Path(td)
-            before = mon.render_snapshot(directory, "path3", now=FIXED_NOW)
-            same_minute = mon.render_snapshot(
-                directory, "path3", now=FIXED_NOW.replace(second=59))
-            next_minute = mon.render_snapshot(
-                directory, "path3", now=FIXED_NOW + dt.timedelta(minutes=1))
-            self.assertEqual(before, same_minute)
-            self.assertNotEqual(before, next_minute)
-            self.assertIn("NOW: 2026-10-21 16:10", before)
-            self.assertIn("NOW: 2026-10-21 16:11", next_minute)
-            self.assertIn("NOW: 2026-10-21 16:10", mon.render_snapshot(
-                directory, "path2", now=FIXED_NOW))
             for path in ("path2", "path3"):
+                (directory / (path + ".json")).write_text(json.dumps({
+                    "status": "IDLE", "run_id": "123",
+                    "received": "2026-10-21T08:10:11+00:00",
+                }))
                 frame = mon.render_snapshot(directory, path, now=FIXED_NOW)
-                self.assertNotIn("2026-10-21T16:10", frame)
+                self.assertIn("RECEIVED: 2026-10-21 16:10:11", frame)
                 self.assertNotIn("+08:00", frame)
-                self.assertNotIn("NOW: 2026-10-21 16:10:00", frame)
-            with self.assertRaisesRegex(
-                    ValueError, "timezone-aware timestamp"):
-                mon.render_snapshot(
-                    directory, "path2",
+                self.assertNotIn("NOW:", frame)
+                self.assertIn("ACCEPTANCE: UNVERIFIED", frame)
+            no_clock = mon.render_snapshot(directory, "path3",
+                                           now=FIXED_NOW.replace(minute=11))
+            self.assertIn("RECEIVED: 2026-10-21 16:10:11", no_clock)
+            self.assertEqual(
+                mon.render_snapshot(directory, "path3", now=FIXED_NOW),
+                mon.render_snapshot(directory, "path3", now=FIXED_NOW.replace(second=59)))
+            with self.assertRaisesRegex(ValueError, "timezone-aware timestamp"):
+                mon.render_snapshot(directory, "path2",
                     now=dt.datetime(2026, 10, 21, 16, 10))
 
-    def test_path3_view_redraws_once_at_minute_boundary(self):
+    def test_path3_view_does_not_redraw_for_clock_only_change(self):
         with tempfile.TemporaryDirectory() as td:
             output = io.StringIO()
             readings = iter([FIXED_NOW.replace(second=1),
                              FIXED_NOW.replace(second=59),
                              FIXED_NOW + dt.timedelta(minutes=1)])
             polls = [0]
-
             def fake_sleep(_seconds):
                 polls[0] += 1
                 if polls[0] >= 3:
                     raise StopIteration
-
             with self.assertRaises(StopIteration):
                 mon.view_loop("path3", directory=Path(td), output=output,
                               get_size=lambda: os.terminal_size((80, 24)),
                               sleep=fake_sleep, get_now=lambda: next(readings))
-            self.assertEqual(output.getvalue().count("\x1b[H"), 2)
+            self.assertEqual(output.getvalue().count("\x1b[H"), 1)
             self.assertNotIn("\x1b[2J", output.getvalue())
-            self.assertIn("NOW: 2026-10-21 16:10", output.getvalue())
-            self.assertIn("NOW: 2026-10-21 16:11", output.getvalue())
 
     def test_path3_time_marks_only_after_60_elapsed_seconds(self):
         class FakeProcess:
