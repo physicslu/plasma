@@ -57,6 +57,41 @@ def test_build_runtime_creates_server_gateway_helper_zipapp_and_catalog(tmp_path
         assert expected in completed.stdout
 
 
+def test_packaged_opf_contract_imports_from_isolated_zipapp(tmp_path: Path) -> None:
+    """Regression: the real Z2 release failed after activation without plasma_opf."""
+    output = tmp_path / "runtime"
+    runtime.build_runtime(repo_root=ROOT, output_dir=output)
+    app = output / "ppu" / "ppu.pyz"
+    probe = (
+        "import sys; "
+        f"sys.path.insert(0, {str(app)!r}); "
+        "from plasma_opf import TimeoutPolicy, OPF_PROGRAMMING_SCHEMA; "
+        "assert OPF_PROGRAMMING_SCHEMA == 'plasma.opf.programming.v1'; "
+        "assert TimeoutPolicy(5000, 12000).default_timeout_ms == 5000"
+    )
+    result = subprocess.run(
+        [sys.executable, "-I", "-B", "-c", probe], cwd=tmp_path,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_runtime_validator_rejects_missing_opf_contract(tmp_path: Path) -> None:
+    import zipfile
+
+    output = tmp_path / "runtime"
+    runtime.build_runtime(repo_root=ROOT, output_dir=output)
+    app = output / "ppu" / "ppu.pyz"
+    damaged = tmp_path / "damaged.pyz"
+    with zipfile.ZipFile(app) as source, zipfile.ZipFile(damaged, "w") as dest:
+        for item in source.infolist():
+            if item.filename not in {"plasma_opf/__init__.py", "plasma_opf/contract.py"}:
+                dest.writestr(item, source.read(item.filename))
+    damaged.replace(app)
+    with pytest.raises(runtime.PPURuntimePackagingError, match="plasma_opf"):
+        runtime.validate_runtime(output)
+
+
 def test_runtime_builder_refuses_to_overwrite_output(tmp_path: Path) -> None:
     output = tmp_path / "runtime"
     output.mkdir()
