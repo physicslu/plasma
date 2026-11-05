@@ -187,6 +187,7 @@ jobs:
       execution_capability: ${{ steps.approve.outputs.execution_capability }}
       task_id: ${{ steps.approve.outputs.task_id }}
       monitor_summary: ${{ steps.approve.outputs.monitor_summary }}
+      artifact_preset: ${{ steps.approve.outputs.artifact_preset }}
       monitor_stage: ${{ steps.approve.outputs.monitor_stage }}
       comment_id: ${{ steps.approve.outputs.comment_id }}
       claim_ref: ${{ steps.approve.outputs.claim_ref }}
@@ -270,7 +271,7 @@ jobs:
                         "registry_sha256","execution_path","execution_capability","task_id"):
                   f.write(f"{k}={data[k]}\n")
               for k in ("comment_id","claim_ref","work_order_sha256",
-                        "monitor_summary","monitor_stage"):
+                        "monitor_summary","monitor_stage","artifact_preset"):
                   f.write(f"{k}={data.get(k,'')}\n")
               # Pass only the minimal, already-verified PR identity snapshot.
               # No second PR API client or runner is required on SWPC.
@@ -589,13 +590,48 @@ jobs:
           path: candidate
           persist-credentials: false
           clean: true
+      # Immutable, owner-bound Gate 1 artifact inputs, fetched by trusted Actions.
+      # The Codex child receives only verified file paths, never GitHub tokens.
+      - name: Download OPF Site 2 Runtime Kit (trusted)
+        if: ${{ needs.development-authorize.outputs.artifact_preset == 'opf-site2-c7502a3' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          repository: physicslu/plasma
+          run-id: 42034429486
+          name: plasma-z2-ps-kit-0.2.1-c7502a3645b5
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/plasma-opf-site2-artifacts/kit
+      - name: Download OPF Site 2 Factory Bootstrap (trusted)
+        if: ${{ needs.development-authorize.outputs.artifact_preset == 'opf-site2-c7502a3' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          repository: physicslu/plasma
+          run-id: 42034429491
+          name: ppu-bootstrap-factory-bundle
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/plasma-opf-site2-artifacts/factory
+      - name: Verify pinned OPF Site 2 artifacts (trusted)
+        if: ${{ needs.development-authorize.outputs.artifact_preset == 'opf-site2-c7502a3' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/plasma-opf-site2-artifacts"
+          kit="plasma-z2-ps-kit-0.2.1-c7502a3645b5.tar.gz"
+          factory="plasma-ppu-bootstrap-0.1.0-c7502a3645b5.tar.gz"
+          test -f "$dir/kit/$kit" && test -f "$dir/factory/$factory"
+          printf '%s  %s\n' '7ef5196760744241684b276c25e7e53cfb148b0307de2c31add9c6e4be335e39' "$kit" |
+            (cd "$dir/kit" && sha256sum -c - && sha256sum -c "$kit.sha256")
+          printf '%s  %s\n' '513774ba3021053aae60939e21e48fea428013addbe8e3a37673e7b7b3414f70' "$factory" |
+            (cd "$dir/factory" && sha256sum -c - && sha256sum -c "$factory.sha256")
+          python3 trusted/scripts/ppu-bootstrap-kit.py verify "$dir/kit/$kit" --sidecar "$dir/kit/$kit.sha256"
+          echo "PLASMA_OPF_ARTIFACTS_DIR=$dir" >> "$GITHUB_ENV"
+          echo OPF_SITE2_ARTIFACTS_VERIFIED
       - name: Codex develops, builds and tests candidate; preserve real evidence
         shell: bash
         env:
           PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
           PLASMA_MONITOR_COMMENT_ID: ${{ needs.development-authorize.outputs.comment_id }}
           PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}
-          GH_TOKEN: ${{ github.token }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
