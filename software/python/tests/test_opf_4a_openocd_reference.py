@@ -214,14 +214,29 @@ def test_worker_lease_denial_no_second_site_lock_or_flash():
         assert list(env["image_root"].iterdir()) == []
 
 
-def test_real_worker_unknown_outcome_seals_site_and_rejects_new_session():
+def test_verified_safe_failure_does_not_seal_site_or_schedule_a_new_retry_owner():
     with installed_bundle() as env:
         env["sim"].corrupt = True
-        with pytest.raises(Exception, match="OUTCOME_UNKNOWN|READBACK_MISMATCH"):
+        with pytest.raises(Exception, match="READBACK_MISMATCH"):
             _execute(env)
+        assert env["core"]._sealed == set()
+        assert env["core"]._site_owners == {}
+        env["sim"].corrupt = False
+        result = _execute(env, job_id="job-2", job_deadline_monotonic=time.monotonic() + 5)
+        assert result["result"] == "PASS" and result["safe_off"] is True
+        assert len(env["sim"].argvs) == 2
+
+
+def test_real_worker_unproven_safe_off_seals_site_and_blocks_next_job():
+    with installed_bundle() as env:
+        env["sim"].hang.set()
+        selection = {**env["selection"], "timeout_ms": 1000}
+        with pytest.raises(Exception, match="OUTCOME_UNKNOWN|SITE_SEALED|SAFE_OFF"):
+            _execute(env, selection=selection, job_timeout_s=1.0,
+                     job_deadline_monotonic=time.monotonic() + 1)
         assert 2 in env["core"]._sealed
         assert (env["core"].seal_dir / "site2.sealed").exists()
-        env["sim"].corrupt = False
+        env["sim"].hang.clear()
         with pytest.raises(Exception, match="SITE_SEALED"):
             _execute(env, job_id="job-2", job_deadline_monotonic=time.monotonic() + 5)
         assert len(env["sim"].argvs) == 1
