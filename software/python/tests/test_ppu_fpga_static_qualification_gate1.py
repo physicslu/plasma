@@ -386,8 +386,8 @@ def _b3_server(tmp_path):
     paths.package_target_file.write_text(json.dumps(TARGET))
     paths.package_target_file.chmod(0o600)
     paths.bundle_install_policy.write_text(json.dumps({
-        "schema": "plasma.ppu.b3-install-policy.v1", "mode": "development",
-        "install_only": True, "actions": ["install", "verify"],
+        "schema": "plasma.ppu.b3-install-policy.v2", "mode": "development",
+        "modes": ["activate", "stage_only"], "actions": ["install", "verify"],
     }))
     paths.bundle_install_policy.chmod(0o600)
     srv = object.__new__(bootstrap.BootstrapHTTPServer)
