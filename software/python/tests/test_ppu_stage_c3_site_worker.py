@@ -732,15 +732,17 @@ def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
     # The engine's qualified SWCLK overrides the target config's own speed.
     assert commands.index("adapter speed 500") < commands.index("init")
     assert argv.index("-f") < argv.index("adapter speed 500")
-    assert [v for v in commands if v.startswith("flash ")][0] == (
-        "flash erase_address 0x08000000 0x00000400")  # 20 B -> one 1 KiB page
+    erase = "flash erase_address 0x08000000 0x00000400"  # 20 B -> one 1 KiB page
     assert [v.split()[1] for v in commands if v.startswith("flash ")] == [
-        "erase_address", "write_image", "verify_image"
+        "probe", "erase_address", "write_image", "verify_image"
     ]
     assert commands[-2:] == ["reset run", "shutdown"]
-    # Flash work always starts from reset (a running DUT breaks the write algorithm).
-    assert commands.index("reset halt") < commands.index(
-        "flash erase_address 0x08000000 0x00000400")
+    # The proven A/B sequence resets, disables background polling, then probes
+    # bank 0 before any erase/write; probe-only operations must remain flash-free.
+    index = commands.index("reset halt")
+    assert commands[index:index + 4] == ["reset halt", "poll off", "flash probe 0", erase]
+    assert "poll on" not in commands
+    assert "halt" not in commands
     assert "halt" not in commands
     assert any(v.startswith("dump_image ") for v in commands)
     assert not any(v.startswith("swd newdap bp") for v in commands)
