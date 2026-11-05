@@ -29,8 +29,8 @@ qualification. The owner authorization is **fresh and B3-specific**;
 | Explicit B3 contract | Required B3 authority | Result |
 | --- | --- | --- |
 | `mode: "stage_only", fpga_load: false` | `bundle.install` | Verified staging only; `active_asset_set: null` |
-| `mode: "activate", fpga_load: false` with **no** FPGA Package | `bundle.install` | Verified staging then atomic Active selection under the trusted Runtime lease; no FPGA reload |
-| `mode: "activate", fpga_load: true` with FPGA Package | `bundle.install-fpga-load` | Existing protected Root load, Identity PASS, then Active publication while lease remains held |
+| `mode: "activate", fpga_load: false` with **no** FPGA Package | `bundle.activate` | Verified staging then atomic Active selection under the trusted Runtime lease; no FPGA reload |
+| `mode: "activate", fpga_load: true` with FPGA Package | `bundle.activate-fpga-load` | Existing protected Root load, Identity PASS, then Active publication while lease remains held |
 | `activate` FPGA Bundle with `fpga_load: false`; `stage_only` with `fpga_load: true`; absent/invalid flags | Denied | No implicit load privilege, no false activation success |
 
 Each successful receipt records `mode`, `ready: false`, the exact

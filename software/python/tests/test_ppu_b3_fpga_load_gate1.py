@@ -718,7 +718,8 @@ def test_b3_fpga_standard_activation_requires_explicit_load(tmp_path):
 def test_service_explicit_fpga_activation_denied_without_load_and_stage_only_conflict(tmp_path):
     srv, paths, calls, _id = admitted_fpga_bundle(tmp_path)
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD"):
-        srv.start_deployment(b3(paths, fpga_load=False) | {"mode": "activate"})
+        srv.start_deployment(install_body(paths, bootstrap._deployment_api_record(paths),
+                                          fpga_load=False, mode="activate"))
     with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
         srv.start_deployment(b3(paths) | {"mode": "stage_only"})
     assert calls == []

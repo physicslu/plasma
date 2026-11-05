@@ -11,7 +11,7 @@ Console chooses complete Asset Set (SHA) and explicit operation
 B2 owner `bundle.admit` authorization for the exact Bundle SHA (no device allowlist)
    |
    v
-B3 owner `bundle.install[-fpga-load]` authorization → immutable Install/Verify → Single Active Asset Set
+B3 mode-bound owner `bundle.install` / `bundle.activate` / `bundle.activate-fpga-load` authorization → immutable Install/Verify → Single Active Asset Set
    |
    v
 One internal PPU Asset Execution Layer
