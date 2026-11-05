@@ -193,11 +193,11 @@ class PayloadTests(unittest.TestCase):
             fake_helper = base / "fake-kit-verifier.py"
             release = base / "ppu.tar.gz"
             fake_helper.write_text(
-                "from pathlib import Path\\n"
-                "from types import SimpleNamespace\\n"
-                "def verify_kit(artifact, *, sidecar, extract_to):\\n"
+                "from pathlib import Path\n"
+                "from types import SimpleNamespace\n"
+                "def verify_kit(artifact, *, sidecar, extract_to):\n"
                 f"    return SimpleNamespace(root=Path({ARTIFACT_NAME!r}), "
-                f"ppu_artifact=Path({str(release)!r}))\\n",
+                f"ppu_artifact=Path({str(release)!r}))\n",
                 encoding="utf-8")
             for variant in ("pass", "wrong-source", "wrong-version", "wrong-target"):
                 manifest = {
