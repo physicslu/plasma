@@ -274,7 +274,8 @@ class Stack:
         self.adapter = adapter or abi5.Abi5OpenocdAdapter(
             openocd_root=Path(engine["openocd_root"]), python=Path(sys.executable),
             adapter_khz=500, journal=journal, record_dir=root / "rec",
-            run=self.sim.run, popen=self.sim.popen, openocd_running=lambda: False, poll_s=0.01)
+            run=self.sim.run, popen=self.sim.popen, openocd_running=lambda: False, poll_s=0.01,
+            evidence_dir=root / "openocd-evidence")
         (root / "rec").mkdir()
         self.images = root / "normalized-images"
         self.site_target = site_target

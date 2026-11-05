@@ -701,7 +701,8 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
     a = abi5.Abi5OpenocdAdapter(openocd_root=tmp_path / "ocd", python=Path("/usr/bin/python3"),
                                 adapter_khz=500, journal=journal,
                                 record_dir=tmp_path / "rec", run=run, popen=popen,
-                                openocd_running=lambda: openocd, poll_s=0.01)
+                                openocd_running=lambda: openocd, poll_s=0.01,
+                                evidence_dir=tmp_path / "openocd-evidence")
     (tmp_path / "rec").mkdir()
     return a, calls, journal
 

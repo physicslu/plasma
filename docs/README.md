@@ -136,6 +136,7 @@
 - **Current** · `Engineering` · `Route B` — [ABI-v5 OpenOCD plasma_swd → Blue Pill DPIDR HIL Runbook](development/swd-abi5-openocd-dpidr-hil-runbook.md)：Build／部署／DPIDR 流程、失敗判讀、FPGA 經 HTTP API 交付與載入，以及 §9 Blue Pill Flash（erase／write／verify／read，500 kHz，LA2016 比對 ST-LINK）與 `plasma_swd` adapter 契約。
 - **Current** · `Handoff` · `2026-11-04` — [SWD Driver／FPGA 交接](development/handoff/2026-11-04-swd-driver-fpga-track.md)：雙路分工中 PL SWD IP 與 `plasma_swd` adapter 這一路的範圍、目前版本、實測結果（0.5–5 MHz）、C adapter 在 RTL 模擬與 Site 規則 checker（host）、ORUNDETECT／`fault_q` 發現、待辦與兩路介面契約。
 - **Current** · `Handoff` · `2026-11-04` — [SWD 整合交接](development/handoff/2026-11-04-swd-integration-track.md)：Runtime／Site Worker／REST `flash_cycle` 這一路的 Z2 狀態、P0（`reset halt`、engine selection、部署 #1286）、後續工作與兩路介面契約。
+- **Reference** · `Site 2` · `PR #1304 Draft` · `Host-only` — [Site 2 REST Flash 失敗診斷（2026-11-05）](development/site2-rest-flash-diagnosis-20261105.md)：既有失敗 Job 的 C3 Adapter／OpenOCD／SAFE_OFF 證據缺口與存取限制；不代表真實故障根因已確認或 Z2 實機 Flash PASS。
 - **Plan** · `Gate 1` · `PR #1265 Draft` · `Host-only` — [OpenOCD 5088 ARMv7 CI Build Cache Optimization](development/openocd5088-armv7-ci-build-cache.md)：依實際編譯輸入內容建立快取，保留每次驗證、重新封裝及最新 HEAD Evidence；未合併、不部署、不操作實機。
 
 ## Deployment
