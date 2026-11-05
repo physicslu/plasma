@@ -274,6 +274,37 @@ def _reconcile_runtime_result(
 
 def _recover_interrupted_api_deployment(paths: ServicePaths) -> dict[str, Any] | None:
     record = _deployment_api_record(paths)
+    if record is not None and record.get("state") in DEPLOYMENT_API_IN_FLIGHT_STATES | {"recovery_required"}:
+        journal = _read_coordinator_journal(paths)
+        if (journal is not None and journal.get("kind") == "bundle"
+                and journal.get("api_transaction_id") == record.get("transaction_id")
+                and journal.get("asset_activation_previous") is not None
+                and journal.get("asset_activation_fpga") is False
+                and journal.get("state") in {"activating", "recovery_required", "rolled_back"}):
+            # Resume only the already authorized pointer-only transaction.
+            # The sole Coordinator rechecks under its lock and Runtime lease;
+            # failed or unavailable recovery leaves the API fenced.
+            engine = _load_script(Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                                  "plasma_ppu_api_recovery_engine")
+            coordinator = engine.DeploymentCoordinator(
+                paths=engine.DeploymentPaths(product_root=paths.product_root,
+                                             bootstrap_state_root=paths.state_root),
+                installer=object(),
+            )
+            try:
+                with coordinator._deployment_lock(recover_assets=True):
+                    recovered = coordinator.journal.read()
+                    if recovered.state != "rolled_back":
+                        raise BootstrapServiceError("ASSET_SET_RECOVERY_NOT_CONFIRMED")
+            except Exception:
+                pass  # Existing interrupted-service reconciliation below fences it.
+            else:
+                record.update(state="failed", updated_at_epoch_s=time.time(),
+                              error_code="asset_activation_rolled_back",
+                              error="Previous Asset Set restored; activation did not succeed",
+                              result=None)
+                _atomic_json(paths.deployment_record, record)
+                return record
     if record is None or record["state"] not in DEPLOYMENT_API_IN_FLIGHT_STATES:
         return record
     interrupted_state = record["state"]
@@ -1152,11 +1183,16 @@ class BootstrapHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/v1/assets":
             try:
-                helper = _load_script(
-                    Path(__file__).with_name("ppu_asset_set.py"),
-                    "plasma_ppu_assets_status",
+                deployment = _load_script(
+                    Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                    "plasma_ppu_assets_status_engine",
                 )
-                current = helper.read_active(self.owner.bootstrap_paths.product_root)
+                current = deployment.DeploymentCoordinator(
+                    paths=deployment.DeploymentPaths(
+                        product_root=self.owner.bootstrap_paths.product_root,
+                        bootstrap_state_root=self.owner.bootstrap_paths.state_root),
+                    installer=self.owner.base_module,
+                ).asset_status()
                 self._json(HTTPStatus.OK, {"ok": True, "assets": current})
             except Exception:
                 # An untrusted or corrupt pointer must not be returned as

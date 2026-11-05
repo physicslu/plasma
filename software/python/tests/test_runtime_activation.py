@@ -61,6 +61,102 @@ def test_quiesce_is_bounded_and_expires(tmp_path: Path) -> None:
     assert manager.runtime_quiesce_snapshot()["active"] is False
 
 
+def test_p4_asset_pin_uses_configured_runtime_root_not_host_path(tmp_path):
+    from plasma_server.package_actions import PackageActionRuntime
+
+    manager = SiteManager(config(tmp_path))
+    assert manager._active_asset_set_reader is None
+    product_root = tmp_path / "different-ppu-root"
+    PackageActionRuntime(
+        manager,
+        control_plane=Path(__file__).resolve().parents[3] / "scripts",
+        product_root=product_root,
+        state_root=tmp_path / "state",
+        owner_credential=None,
+        spawner=object(),
+        python_executable=Path(sys.executable),
+    )
+    assert manager._active_asset_set_reader is not None
+    assert manager._active_asset_set_reader()["state"] == "EMPTY"
+
+
+def test_p4_job_pins_active_identity_inside_ppu_lease(tmp_path):
+    async def scenario():
+        active = {"state": "ACTIVE", "asset_set_sha256": "a" * 64,
+                  "generation": 3, "ready": False}
+        manager = SiteManager(config(tmp_path), active_asset_set_reader=lambda: active)
+        await manager.start()
+        try:
+            original = manager._active_asset_set_reader
+            def read():
+                assert manager.execution_lease_snapshot()["busy"] is True
+                with pytest.raises(PlasmaError) as error:
+                    manager.acquire_asset_set_quiesce()
+                assert error.value.code is ErrorCode.PPU_BUSY
+                return original()
+            manager._active_asset_set_reader = read
+            request = JobRequest(site_id=1, operation=Operation.READ, job_id="p4-pinned")
+            future = manager.enqueue(request)
+            runtime = manager.registry.get(request.job_id)
+            active["asset_set_sha256"] = "b" * 64
+            assert runtime.snapshot()["active_asset_set"]["asset_set_sha256"] == "a" * 64
+            # Duplicate admission cannot release the original Job's lease.
+            with pytest.raises(PlasmaError) as error:
+                manager.enqueue(request)
+            assert error.value.code is ErrorCode.DUPLICATE_JOB
+            assert manager.execution_lease_snapshot()["busy"] is True
+            await future
+            await asyncio.sleep(0)
+            assert manager.execution_lease_snapshot()["busy"] is False
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_p4_asset_read_failure_releases_job_reservation(tmp_path):
+    async def scenario():
+        def corrupt():
+            raise RuntimeError("ASSET_SET_CORRUPT")
+        manager = SiteManager(config(tmp_path), active_asset_set_reader=corrupt)
+        await manager.start()
+        try:
+            with pytest.raises(RuntimeError, match="ASSET_SET_CORRUPT"):
+                manager.enqueue(JobRequest(site_id=1, operation=Operation.READ, job_id="p4-denied"))
+            assert manager.execution_lease_snapshot()["busy"] is False
+            assert manager.registry.all() == []
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_p4_ppu_fence_covers_other_site_queue_and_cancellation(tmp_path):
+    async def scenario():
+        cfg = config(tmp_path)
+        cfg.sites.append(SiteConfig(id=2, enabled=True, interface="mock", target="STM32F103C8T6"))
+        manager = SiteManager(cfg)
+        await manager.start()
+        # Occupy the concurrency slot: both admitted Jobs stay queued.
+        await manager._semaphore.acquire()
+        try:
+            requests = [JobRequest(site_id=site, operation=Operation.READ, job_id=f"p4-site-{site}",
+                                   metadata={"execution_owner_kind": "batch", "execution_owner_id": "p4"})
+                        for site in (1, 2)]
+            futures = [manager.enqueue(request) for request in requests]
+            manager.cancel(requests[0].job_id)
+            with pytest.raises(PlasmaError) as error:
+                manager.acquire_asset_set_quiesce()
+            assert error.value.code is ErrorCode.PPU_BUSY
+            assert manager.execution_lease_snapshot()["active_job_count"] == 2
+            manager._semaphore.release()
+            await asyncio.gather(*futures)
+            await asyncio.sleep(0)
+            lease = manager.acquire_asset_set_quiesce()
+            manager.release_runtime_quiesce(lease["token"])
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
 def test_runtime_revision_is_order_independent() -> None:
     first = {"sites": [{"site_id": 2, "desired_revision": "sha256:" + "b" * 64}, {"site_id": 1, "desired_revision": "sha256:" + "a" * 64}]}
     second = {"sites": list(reversed(first["sites"]))}

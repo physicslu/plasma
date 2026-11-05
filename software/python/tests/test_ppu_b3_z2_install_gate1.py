@@ -391,6 +391,10 @@ def test_b3_no_fpga_unknown_active_publish_requires_recovery(tmp_path):
     assert co.journal.read().state == "recovery_required"
     with pytest.raises(engine.DeploymentError, match="requires recovery"):
         co.execute_bundle_v3_install(b3_request(archive, digest, mode="stage_only"))
+    # Only an activation path may recover the pointer under the same lease.
+    with co._deployment_lock(recover_assets=True):
+        assert co.journal.read().state == "rolled_back"
+    assert not (co.paths.product_root / "assets" / "active.json").exists()
 
 
 @pytest.mark.parametrize("mode,load", [
