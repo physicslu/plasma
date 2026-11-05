@@ -20,7 +20,7 @@ import os
 import socket
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from plasma_core.errors import ErrorCode, PlasmaError
 
@@ -132,6 +132,7 @@ async def run_flash_cycle(
     image: bytes,
     image_root: Path,
     max_runtime_s: int,
+    session_factory: Callable[[], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """One complete C-3 Flash cycle for one REST Job. Cancellation (task
     cancel / timeout) closes the session, which cancels the in-flight
@@ -143,9 +144,15 @@ async def run_flash_cycle(
     session_id: str | None = None
     try:
         try:
-            opened = await asyncio.to_thread(
-                client.call, "open_job_session", job_id=job_id, sites=[site_id],
-                max_runtime_s=max_runtime_s)
+            # OPF may supply an already-qualified C-3 Session opener. Both
+            # paths use this *same* bind/run/close/SAFE_OFF evidence handling;
+            # the production Runtime's existing route is unchanged.
+            if session_factory is None:
+                opened = await asyncio.to_thread(
+                    client.call, "open_job_session", job_id=job_id,
+                    sites=[site_id], max_runtime_s=max_runtime_s)
+            else:
+                opened = await asyncio.to_thread(session_factory)
             session_id = str(opened["session_id"])
             await asyncio.to_thread(
                 client.call, "bind_image", session_id=session_id, profile=profile.to_wire(),
