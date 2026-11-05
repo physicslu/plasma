@@ -45,6 +45,10 @@ REQUIRED_SCRIPTS = (
     "ppu_site_engine.py",
     "ppu_site_adapter_abi5.py",
     "ppu_site_recovery.py",
+    "ppu_opf_reference_openocd.py",
+    "ppu_opf_site_session.py",
+    "ppu_provider_contract.py",
+    "ppu_provider_options.py",
 )
 
 # B2 static FPGA qualification reuses the ONE protected Root Image Manifest

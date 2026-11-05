@@ -1,9 +1,9 @@
 # OPF-4A — OpenOCD / ABI v5 Reference Provider (Gate 1)
 
-**Status:** Host-only integration seam; **NOT** a production Runtime cutover or HIL qualification.
+**Status:** Production REST Runtime source cutover; validation is Host-only, not HIL qualification.
 **Scope:** One selected Bundle v3 Active Asset Set, one `flash_cycle` Job, one existing C-3 Site Worker.
 
-> **Gate 1 candidate (Draft only):** Production Runtime cutover is pending in this PR. Previous Path 3 patch evidence: Run #42022044418. No HIL qualification, deployment, or Gate 2 approval is implied.
+> **Gate 1 candidate (Draft only):** Reuses and revises the source patch from Run #42022044418. No HIL qualification, deployment, or Gate 2 approval is implied.
 
 ## Execution contract
 
@@ -40,6 +40,23 @@ owns Site ownership, Job lease verification, operation timeout, SAFE_OFF and
 persistent seals; the existing Runtime alone owns Job retry policy. This PR
 introduces **none** of those controls.
 
+## Production Runtime binding
+
+`PackageActionRuntime` wires configured C-3 OpenOCD interfaces to the reference
+executor using its configured product root. SiteWorker supplies the admitted
+Job's pinned Active Asset Set and original monotonic deadline on every attempt.
+The executor verifies the Set, resolves its Profile and declared Provider, and
+binds the installed Engine and exact-ICPN Runtime profile before C-3 admission.
+An unwired or invalid OPF route fails closed without direct-C3 fallback.
+
+The authenticated Worker supplies the loaded image identity and supported Sites.
+OPF checks loaded-image matching and pins that observation to the opened Session.
+It does not impose new per-Job boot ID, firmware/manifest SHA or test-count
+qualification gates. Root/native admission retains same-boot and live PL checks,
+the reload fence and Site lock. Existing C-3 identity-change checks, lease checks,
+seals and SAFE_OFF remain authoritative throughout execution. A qualified,
+unchanged session does not require requalification for an ordinary Job.
+
 ## Verification and retained boundaries
 
 - Host-only tests build and B3-install a real Bundle v3 ZIP, publish its
@@ -51,8 +68,8 @@ introduces **none** of those controls.
   wrong ABI, incompatible Flash Profile, missing C-3 lease, and readback
   mismatch with persistent Site sealing. See
   `software/python/tests/test_opf_4a_openocd_reference.py`.
-- No production `plasma-server` Runtime routing change, no Bootstrap/B3
-  Activation change, no Site 2 HIL, no DUT/FPGA/SWPC/Z2 operation. In
+- Production `plasma-server` Runtime routing changes for C-3 Flash only; no
+  Bootstrap/B3 Activation change, no Site 2 HIL or DUT/FPGA/SWPC/Z2 operation. In
   particular, Draft PR #1278's B3 Activation semantics are not modified.
 - The existing Provider Package's `bin/openocd` is bound by SHA to the
   selected Engine. The Bundle currently has no **separate** Driver Package
@@ -66,15 +83,14 @@ introduces **none** of those controls.
   Missing/unverified Worker binding or a missing/mismatching receipt fails closed
   before Flash. Changing Selection without Worker restart cannot silently
   change the running Adapter. This is Host-only contract evidence, not a Z2 HIL
-  observation or permission to switch the production Runtime route.
+  observation or hardware execution authorization.
 - The trusted Runtime must obtain `hardware` independently on-device. Test
   observations are synthetic inputs, **not** proof of real Image/ABI/PL
   compatibility. The full authorization/ownership/Timeout chain still needs
-  live Runtime integration and Site 2 HIL before declaring Flash PASS.
+  live Site 2 HIL before declaring physical Flash PASS.
 
 ## Next Gate
 
 Gate 2 can review this narrow Host-only PR after required hosted CI PASS.
-The separate **OPF Runtime routing** PR must close the Worker-engine identity
-receipt gap and establish actual device-side hardware observations. Only then
-request separate Site 2 HIL authorization for the real Flash PASS objective.
+This source cutover requires exact-HEAD Gate 2 review and CI. Hardware acceptance
+remains NOT_RUN until separately authorized Site 2 HIL.

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import math
+from collections.abc import Awaitable, Callable
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,6 @@ from .site_worker_c3 import (
     DEFAULT_IMAGE_ROOT,
     C3FlashProfile,
     SiteWorkerControlClient,
-    run_flash_cycle,
 )
 
 
@@ -63,6 +63,13 @@ class OpenOCDInterface(BaseInterface):
             options, process_launcher=process_launcher, compiler=self._compiler
         )
         self._request: JobRequest | None = None
+        # Installed by the trusted Runtime composition, never by Job metadata.
+        self.opf_flash_executor: Callable[..., Awaitable[dict[str, Any]]] | None = None
+        self._runtime_job: tuple[str, dict[str, Any] | None, float] | None = None
+
+    def bind_runtime_job(self, job_id: str, active_asset_set: dict[str, Any] | None,
+                         deadline_monotonic: float) -> None:
+        self._runtime_job = (job_id, deepcopy(active_asset_set), deadline_monotonic)
 
     @property
     def software_validation_ready(self) -> bool:
@@ -198,14 +205,16 @@ class OpenOCDInterface(BaseInterface):
         program = as_program_request(request)
         if self.site_worker_ready:
             assert self._site_worker is not None
-            evidence = await run_flash_cycle(
-                self._site_worker,
-                job_id=request.job_id,
-                site_id=request.site_id,
-                profile=c3_flash_profile(support),
-                image=image,
+            if (self.opf_flash_executor is None or self._runtime_job is None
+                    or self._runtime_job[0] != request.job_id):
+                raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED,
+                                  "OPF_RUNTIME_NOT_WIRED")
+            evidence = await self.opf_flash_executor(
+                self._site_worker, request=request,
+                active_asset_set=self._runtime_job[1],
+                job_deadline_monotonic=self._runtime_job[2],
+                runtime_profile=c3_flash_profile(support),
                 image_root=self.normalized_image_root,
-                max_runtime_s=max(1, min(3600, math.ceil(request.timeout_s))),
             )
         else:
             plan = compile_flash_cycle(
@@ -227,6 +236,7 @@ class OpenOCDInterface(BaseInterface):
     async def safe_shutdown(self) -> None:
         # OpenOCDPlanExecutor owns its subprocess and awaits its exit/kill.
         self._request = None
+        self._runtime_job = None
 
 
 def as_program_request(request: JobRequest) -> JobRequest:

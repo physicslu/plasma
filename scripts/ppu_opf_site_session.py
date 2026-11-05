@@ -1,7 +1,7 @@
-"""Host-only OPF admission into the existing C-3 Site Session boundary.
+"""OPF admission into the existing C-3 Site Session boundary.
 
 The trusted Runtime supplies the Job and device-side observation. This module
-does not select an executor or switch the production Flash route.
+does not add an executor or hardware authority.
 """
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ def open_provider_job_session(
     image_size: int, hardware: Mapping[str, Any],
     job_deadline_monotonic: float, job_timeout_s: float,
     expected_engine_selection_sha256: str | None = None,
+    expected_worker_identity: Mapping[str, Any] | None = None,
 ) -> BoundSession:
     """Resolve once, then pin the exact route and the Job's existing deadline.
 
@@ -78,6 +79,10 @@ def open_provider_job_session(
         if isinstance(opened.get("session_id"), str):
             client.call("close_session", session_id=opened["session_id"])
         raise ValueError("WORKER_ENGINE_RECEIPT_MISMATCH")
+    if expected_worker_identity is not None and opened.get("identity") != dict(expected_worker_identity):
+        if isinstance(opened.get("session_id"), str):
+            client.call("close_session", session_id=opened["session_id"])
+        raise ValueError("WORKER_FPGA_IDENTITY_MISMATCH")
     return BoundSession(opened["session_id"], job_id, route,
                         selected.timeout_ms, selected.timeout_source, deadline,
                         opened.get("epoch") if expected_engine_selection_sha256 is not None else None,

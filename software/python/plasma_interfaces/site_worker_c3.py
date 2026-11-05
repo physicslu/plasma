@@ -150,7 +150,8 @@ async def run_flash_cycle(
         try:
             # OPF may supply an already-qualified C-3 Session opener. Both
             # paths use this *same* bind/run/close/SAFE_OFF evidence handling;
-            # the production Runtime's existing route is unchanged.
+            # production OPF uses the qualified opener; low-level tests may
+            # exercise C-3 directly without a Bundle.
             if session_factory is None:
                 opened = await asyncio.to_thread(
                     client.call, "open_job_session", job_id=job_id,

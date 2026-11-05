@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import json
 import shutil
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -173,6 +174,20 @@ def _installed_factory_service(tmp_path: Path):
     sys.modules[spec.name] = installed_service
     spec.loader.exec_module(installed_service)
     return installed_service, state_root, install_root
+
+
+def test_factory_installs_importable_opf_runtime_dependencies(tmp_path: Path):
+    _service, _state, install_root = _installed_factory_service(tmp_path)
+    subprocess.run([
+        sys.executable, "-c",
+        "import sys; sys.path.insert(0, sys.argv[1]); "
+        "import ppu_opf_reference_openocd, ppu_opf_site_session, "
+        "ppu_provider_contract, ppu_provider_options; "
+        "assert all(m.__file__.startswith(sys.argv[1]) for m in "
+        "(ppu_opf_reference_openocd, ppu_opf_site_session, "
+        "ppu_provider_contract, ppu_provider_options))",
+        str(install_root),
+    ], check=True, cwd=ROOT / "software" / "python")
 
 
 def _factory_python_upload(installed_service, paths, tmp_path: Path):

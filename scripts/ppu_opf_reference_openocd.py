@@ -1,24 +1,29 @@
 """OPF-4A: verified Bundle v3 OpenOCD reference route into the existing C-3 Worker.
 
-This is an opt-in integration seam, NOT the production Runtime dispatcher.
+The production Runtime dispatcher below binds its admitted Job to this executor.
 The trusted Runtime owns the Job, its deadline, the actual hardware observation
 and the exact-ICPN C-3 profile. C-3 remains the sole flash executor and owner
 of Site admission, image binding, cancellation, SAFE_OFF and sealing.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import math
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
 from plasma_interfaces.site_worker_c3 import (
-    C3FlashProfile, SiteWorkerControlClient, run_flash_cycle,
+    C3FlashProfile, SiteWorkerControlClient, SiteWorkerRefused, run_flash_cycle,
 )
 from plasma_opf import TimeoutPolicy, parse_programming_selection
+from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.models import JobRequest
 
+import ppu_asset_set
 import ppu_opf_site_session
 import ppu_provider_contract
 import ppu_site_engine
@@ -144,7 +149,7 @@ async def execute_reference_flash(
 ) -> dict[str, Any]:
     """Run the *existing* native ABI-v5 flash cycle through C-3; no Provider subprocess.
 
-    The Runtime production dispatcher does not call this yet. The C-3 control
+    The Runtime production dispatcher calls this with its pinned Job. The C-3 control
     socket, staging, profile binding, readback checking and close/SAFE_OFF
     handling remain exactly the same as the pre-OPF Runtime flash path.
     """
@@ -172,7 +177,8 @@ async def execute_reference_flash(
             operation="flash_cycle", site_id=site_id, image_size=len(image),
             hardware=hardware, job_deadline_monotonic=job_deadline_monotonic,
             job_timeout_s=job_timeout_s,
-            expected_engine_selection_sha256=binding.engine.record_sha256)
+            expected_engine_selection_sha256=binding.engine.record_sha256,
+            expected_worker_identity=hardware.get("worker_identity"))
         if bound.route != binding.route:
             client.call("close_session", session_id=bound.session_id)
             raise ReferenceDenied("REFERENCE_ROUTE_CHANGED")
@@ -193,3 +199,67 @@ async def execute_reference_flash(
             "opf_engine_selection_sha256": binding.engine.record_sha256,
             "opf_worker_engine_selection_sha256": worker_receipt.worker_engine_selection_sha256,
             "opf_worker_epoch": worker_receipt.worker_epoch}
+
+
+async def execute_runtime_flash(
+    client: SiteWorkerControlClient, *, product_root: Path, request: JobRequest,
+    active_asset_set: Mapping[str, Any] | None, job_deadline_monotonic: float,
+    runtime_profile: C3FlashProfile, image_root: Path,
+) -> dict[str, Any]:
+    """Production REST Flash cutover; no direct-C3 fallback.
+
+    The Runtime supplies the Set pinned under its execution lease and the one
+    Job deadline (including retries). Select the sole verified Bundle Profile
+    and its declared Provider. No Job/Bundle path or hardware claim is used.
+    The authenticated root Worker observes its existing Root journal; native
+    admission still verifies current PL identity and holds the reload fence.
+    """
+    try:
+        _need(isinstance(active_asset_set, Mapping)
+              and active_asset_set.get("state") == "ACTIVE", "OPF_ACTIVE_SET_REQUIRED")
+        digest = active_asset_set.get("asset_set_sha256")
+        active = ppu_asset_set.read_active(product_root)
+        _need(active == dict(active_asset_set), "ACTIVE_SET_MISMATCH")
+        handoff = ppu_asset_set.resolve_staged_fpga_handoff(product_root, digest)
+        profile = handoff["programming_profile"]
+        _need(isinstance(profile, dict), "OPF_PROFILE_REQUIRED")
+        staged = product_root / "assets" / "staged" / digest
+        manifest = json.loads((staged / "manifest.json").read_bytes())
+        descriptor = json.loads((staged / "payload" / "packages" / profile["package_id"]
+                                 / ppu_provider_contract.DESCRIPTOR).read_bytes())
+        timeout_ms = round(request.timeout_s * 1000)
+        _need(timeout_ms / 1000.0 == request.timeout_s, "OPF_TIMEOUT_PRECISION_UNSUPPORTED")
+        policy = TimeoutPolicy(timeout_ms, 3600000)  # existing C-3 session ceiling
+        selection = {"schema": "plasma.opf.programming.v1",
+                     "provider": descriptor["provider_package"],
+                     "profile": profile["package_id"], "options": {}}
+        engine = ppu_site_engine.load_engine()
+        remaining = job_deadline_monotonic - time.monotonic()
+        _need(math.isfinite(remaining) and remaining > 0, "JOB_DEADLINE_EXPIRED")
+        status = await asyncio.to_thread(client.call, "status", timeout_s=remaining)
+        _need(not status.get("not_ready"), "REFERENCE_ENGINE_NOT_READY")
+        identity = status.get("identity", {})
+        fpga = handoff["fpga_image"]
+        # Root/native admission owns same-boot qualification and the reload
+        # fence. Ordinary Jobs bind the loaded image and unchanged Worker
+        # session; historical qualification metadata is not a new Job gate.
+        _need(identity.get("status") == "IMAGE"
+              and identity.get("image_id") == fpga["image_id"],
+              "OPF_FPGA_IDENTITY_UNVERIFIED")
+        hardware = {**manifest["target"], "sites": status["supported_sites"],
+                    "loaded_fpga_package": fpga["package_id"],
+                    "driver_abi": f"{engine.adapter_driver}:{engine.driver_abi}",
+                    "fpga_identity_proven": True, "worker_identity": identity}
+        return await execute_reference_flash(
+            client, product_root=product_root, asset_set_sha256=digest,
+            selection=selection, policy=policy, job_id=request.job_id,
+            site_id=request.site_id, target=request.target, image=request.image,
+            image_root=image_root, hardware=hardware, runtime_profile=runtime_profile,
+            job_deadline_monotonic=job_deadline_monotonic, job_timeout_s=request.timeout_s)
+    except SiteWorkerRefused as exc:
+        raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED,
+                          "OPF_WORKER_OBSERVATION_DENIED:" + exc.code) from exc
+    except (ValueError, KeyError, TypeError, OSError, ppu_asset_set.AssetSetError,
+            ppu_site_engine.EngineNotReady) as exc:
+        raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                          "OPF_FLASH_DENIED:" + str(exc)) from exc
