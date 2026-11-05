@@ -400,6 +400,18 @@ def test_console_generic_b3_denies_mismatched_or_invalid_admission(tmp_path):
     assert [item[1] for item in fake.calls] == ["/v1/deployment", "/v1/deployment"]
 
 
+def test_p4_console_does_not_skip_or_transfer_during_recovery(tmp_path):
+    api, fake = make(tmp_path)
+    archive = b"full-bundle-byte-identity"
+    fake.override["/v1/assets"] = (200, json.dumps({"ok": True, "assets": {
+        "schema": "plasma.ppu.active-assets.v1", "state": "RECOVERY_REQUIRED",
+        "asset_set_sha256": hashlib.sha256(archive).hexdigest(), "ready": False,
+    }}).encode())
+    with pytest.raises(client.DeploymentOutcomeUnknown, match="ASSET_SET_RECOVERY_REQUIRED"):
+        api.reconcile_bundle_assets(archive, fpga_load=False)
+    assert [item[1] for item in fake.calls] == ["/v1/assets"]
+
+
 def test_console_asset_set_sha_match_skips_transfer_and_never_claims_ready(tmp_path):
     archive = b"full-bundle-byte-identity"
     sha = hashlib.sha256(archive).hexdigest()

@@ -31,6 +31,7 @@ class JobRuntime:
     attempt: int = 0
     attempt_history: list[JobAttemptResult] = field(default_factory=list)
     retry_exhausted: bool = False
+    active_asset_set: dict[str, Any] | None = None
     updated_at: str = ""
 
     def __post_init__(self) -> None:
@@ -62,6 +63,7 @@ class JobRuntime:
             "attempt": self.attempt,
             "attempt_history": [item.to_dict(protocol_version) for item in self.attempt_history],
             "retry_exhausted": self.retry_exhausted,
+            "active_asset_set": self.active_asset_set,
             "updated_at": self.updated_at,
         }
         if self.result:

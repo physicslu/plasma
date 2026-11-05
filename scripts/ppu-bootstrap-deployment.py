@@ -154,6 +154,8 @@ class DeploymentRecord:
     source_commit: str | None = None
     api_transaction_id: str | None = None
     package_kind: str | None = None
+    asset_activation_previous: dict[str, Any] | None = None
+    asset_activation_fpga: bool = False
 
 
 class Journal:
@@ -377,9 +379,50 @@ class DeploymentCoordinator:
             systemd_root=self.paths.systemd_root,
         )
 
-    def _admit_previous_transaction(self) -> None:
+    def asset_status(self) -> dict[str, Any]:
+        """Read-only identity plus the sole transaction journal's safety fence."""
+        record = self.journal.read()
+        current = self._asset_helper().read_active(self.paths.product_root)
+        if record is not None and record.state in {
+                "activating", "fpga_loading", "recovery_required", "fpga_identity_failed"}:
+            current.update(state="RECOVERY_REQUIRED", ready=False,
+                           coordinator_state=record.state)
+        return current
+
+    def _admit_previous_transaction(self, *, recover_assets: bool = False) -> None:
         previous = self.journal.read()
         if previous is None or previous.state in SAFE_RESTART_STATES:
+            return
+        if (previous.kind in {"bundle", "asset-set"}
+                and previous.state in {"received", "verifying", "verified"}):
+            # These phases precede staging, Root entry and pointer mutation.
+            self.journal.write(previous, "verify_failed",
+                               error_code="interrupted_before_asset_mutation")
+            return
+        # Only a pointer-only activation can be recovered without hardware
+        # evidence. The snapshot is durable BEFORE publication; a PL write
+        # (including a successful download with uncertain publication) must
+        # remain fenced for guarded recovery.
+        if (recover_assets and previous.asset_activation_previous is not None
+                and previous.kind in {"bundle", "asset-set"}
+                and previous.asset_activation_fpga is False
+                and previous.state in {"activating", "recovery_required"}):
+            helper = self._asset_helper()
+            lease = self.quiescence_lease or helper.held_runtime_asset_lease
+            try:
+                with lease():
+                    helper.restore_previous(
+                        self.paths.product_root, previous.asset_activation_previous,
+                        previous.artifact_sha256, runtime_quiesced=True,
+                    )
+                    self.journal.write(previous, "rolled_back",
+                                       error_code="asset_activation_recovered",
+                                       error_message=None)
+            except Exception as exc:
+                self.journal.write(previous, "recovery_required",
+                                   error_code="asset_rollback_unproven",
+                                   error_message=type(exc).__name__)
+                raise DeploymentError("ASSET_SET_ROLLBACK_REQUIRES_RECOVERY") from exc
             return
         # "installed" is terminal for a verified B3 Host-only sandbox ONLY.
         # Do not admit this state for runtime/engineering/Bootstrap HTTP:
@@ -410,7 +453,7 @@ class DeploymentCoordinator:
         )
 
     @contextmanager
-    def _deployment_lock(self):
+    def _deployment_lock(self, *, recover_assets: bool = False):
         """The *same* durable lock for PS Runtime and Engineering plans."""
         self.paths.bootstrap_state_root.mkdir(parents=True, exist_ok=True)
         with self.paths.lock.open("a+b") as lock_stream:
@@ -420,7 +463,7 @@ class DeploymentCoordinator:
             except BlockingIOError as exc:
                 raise DeploymentError("another PPU deployment transaction is active") from exc
             try:
-                self._admit_previous_transaction()
+                self._admit_previous_transaction(recover_assets=recover_assets)
                 yield
             finally:
                 fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
@@ -566,7 +609,7 @@ class DeploymentCoordinator:
         spec.loader.exec_module(contract)
         # Explicitly reuse the sole deployment lock and journal. Do not add
         # another lock, daemon, process supervisor or recovery mechanism.
-        with self._deployment_lock():
+        with self._deployment_lock(recover_assets=request.mode == "activate"):
             install = getattr(self.installer, "install_verified_bundle_v3", None)
             if not callable(install):
                 raise DeploymentError("B3_DEVICE_INSTALLER_NOT_QUALIFIED")
@@ -694,7 +737,8 @@ class DeploymentCoordinator:
         try:
             hold = lease()
             with hold:
-                self.journal.write(record, "activating")
+                self.journal.write(record, "activating",
+                                   asset_activation_previous=helper.read_active(self.paths.product_root))
                 try:
                     active = helper.activate_verified(
                         self.paths.product_root, asset_set_sha256, runtime_quiesced=True,
@@ -771,7 +815,8 @@ class DeploymentCoordinator:
         except Exception as exc:
             raise deny("b3_runtime_quiesce_denied", exc) from exc
         with hold:
-            self.journal.write(record, "fpga_loading")
+            self.journal.write(record, "fpga_loading", asset_activation_fpga=True,
+                               asset_activation_previous=helper.read_active(self.paths.product_root))
             try:
                 outcome = dict(loader(asset_set_sha256))
             except Exception as exc:
@@ -859,7 +904,7 @@ class DeploymentCoordinator:
         spec.loader.exec_module(helper)
         if quiescence_lease is None:
             quiescence_lease = helper.held_runtime_asset_lease
-        with self._deployment_lock():
+        with self._deployment_lock(recover_assets=True):
             now = self.clock()
             record = DeploymentRecord(
                 schema_version=SCHEMA_VERSION,
@@ -883,7 +928,8 @@ class DeploymentCoordinator:
                 raise DeploymentError("ASSET_SET_NOT_VERIFIED") from exc
             try:
                 with quiescence_lease():
-                    self.journal.write(record, "activating")
+                    self.journal.write(record, "activating",
+                                       asset_activation_previous=helper.read_active(self.paths.product_root))
                     result = helper.activate_verified(
                         self.paths.product_root, asset_set_sha256,
                         runtime_quiesced=True,

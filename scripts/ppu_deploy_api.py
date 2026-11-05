@@ -466,9 +466,11 @@ class BootstrapAPIClient:
         record = self._call("GET", "/v1/assets", None).get("assets")
         if (not isinstance(record, dict)
                 or record.get("schema") != "plasma.ppu.active-assets.v1"
-                or record.get("state") not in {"EMPTY", "ACTIVE"}
+                or record.get("state") not in {"EMPTY", "ACTIVE", "RECOVERY_REQUIRED"}
                 or record.get("ready") is not False):
             raise DeploymentOutcomeUnknown("ASSET_SET_STATUS_UNTRUSTED")
+        if record["state"] == "RECOVERY_REQUIRED":
+            raise DeploymentOutcomeUnknown("ASSET_SET_RECOVERY_REQUIRED")
         if record["state"] == "ACTIVE":
             if (type(record.get("asset_set_sha256")) is not str
                     or not _HEX64.fullmatch(record["asset_set_sha256"])):
