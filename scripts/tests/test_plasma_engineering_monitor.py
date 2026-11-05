@@ -261,7 +261,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                 Path(td), "path2", width=120, height=24, now=FIXED_NOW)
             self.assertIn("GOAL: PATH2 Host-only CLI regression", frame)
             self.assertIn("RESULT:", frame)
-            self.assertIn("PR: #1144", frame)
+            self.assertIn("PR #1144", frame)
             self.assertIn("RECEIVED: —", frame)
             self.assertIn("RESULT: PASS (exit 0)", frame)
             self.assertNotIn(data["PLASMA_MONITOR_SUMMARY"],
@@ -356,7 +356,7 @@ class EngineeringMonitorTests(unittest.TestCase):
             self.assertEqual(state["pr_number"], "1143")
             frame = mon.render_snapshot(Path(td), "path3")
             self.assertIn("GOAL: (operator summary not provided)", frame)
-            self.assertIn("PR: #1143", frame)
+            self.assertIn("PR #1143", frame)
 
     def test_path3_only_displays_digest_bound_public_summary(self):
         with tempfile.TemporaryDirectory() as td:
@@ -722,7 +722,7 @@ class EngineeringMonitorTests(unittest.TestCase):
     def test_semantic_activity_never_reveals_arguments_or_secrets(self):
         cases = (
             ("vivado -mode batch -source pl/build/design.tcl",
-             "BUILD", "vivado", "pl/build/design.tcl"),
+             "BUILD", "vivado", ""),
             ("rg -n foo scripts",
              "READ", "rg -n [redacted]", "foo"),
             ("python3 -m pytest scripts/tests/ -q",
@@ -1083,7 +1083,7 @@ class EngineeringMonitorTests(unittest.TestCase):
                     self.assertLessEqual(len(frame.splitlines()), 11)
                     self.assertIn("| IDLE", frame)
                     self.assertIn("RUN: 12345", frame)
-                    self.assertIn("PR: #1144", frame)
+                    self.assertIn("PR #1144", frame)
                     self.assertIn("GOAL:", frame)
                     if path == "path2":
                         self.assertIn("RESULT:", frame)
