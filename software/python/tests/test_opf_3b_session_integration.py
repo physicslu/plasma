@@ -79,6 +79,8 @@ def test_route_identity_site_owner_deadline_and_safety(tmp_path):
     assert core._sessions[first.session_id].provider_route["provider_package"] == "ps-engine"
     with pytest.raises(worker.SiteWorkerDenied, match="SITE_BUSY"):
         open_for("job-b")
+    with pytest.raises(worker.SiteWorkerDenied, match="JOB_SESSION_ALREADY_ACTIVE"):
+        open_for("job-a", site=2)
     second = open_for("job-b", site=2)
     assert client.call("run", session_id=second.session_id, site=2, operation="erase")["result"] == "PASS"
     with pytest.raises(worker.SiteWorkerDenied, match="PROVIDER_ROUTE_MISMATCH"):

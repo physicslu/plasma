@@ -415,6 +415,9 @@ class SiteWorkerCore:
             _require(not (set(sites) & self.adapter.startup_sealed_sites()),
                      "EXTERNAL_SITE_OWNER_PRESENT")
             _require(not (set(sites) & self._site_owners.keys()), "SITE_BUSY")
+            if route is not None:
+                _require(not any(other.job_id == job for other in self._sessions.values()),
+                         "JOB_SESSION_ALREADY_ACTIVE")
             if package:
                 _require(not any(
                     other.owner_kind == OWNER_PACKAGE
@@ -555,10 +558,11 @@ class SiteWorkerServer:
         self._thread.start()
 
     def _serve(self) -> None:
-        assert self._sock is not None
+        sock = self._sock
+        assert sock is not None
         while True:
             try:
-                conn, _ = self._sock.accept()
+                conn, _ = sock.accept()
             except OSError:
                 return
             threading.Thread(target=self._one, args=(conn,), daemon=True).start()
