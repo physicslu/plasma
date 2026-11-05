@@ -1,6 +1,11 @@
-# Bundle v3 B3 — Install, Activate and Load the FPGA Image in One Transaction (Gate 1 plan)
+# HISTORICAL Gate 1 Plan — Bundle v3 B3 FPGA Load
 
 > **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+
+**Historical evidence; superseded by [current B3 contract](ppu-bundle-v3-generic-assets-gate1.md).**
+The 2026-11-02 behavior below records the earlier implementation plan;
+P4-02 now requires explicit `mode: "activate"|"stage_only"` and standard
+Active selection for verified non-FPGA Bundles. No Z2 acceptance is implied.
 
 **State:** Gate 1 approved by the owner on 2026-11-02 (§3 implementation,
 §4 Host-only verification and §4 physical HIL). Gate 2 (merge) is separate.
@@ -50,9 +55,10 @@ B3 install/verify (unchanged)
   -> release Quiesce; receipt stage=bundle_install_and_fpga_load
 ```
 
-Without `fpga_load`, or for a Bundle without an `fpga-image` Package, B3 stays
-exactly as it is today (install only). Under Replace-by-Default, the new receipt
-schema replaces the old one for all callers; there is no second B3 path.
+**Superseded:** Without an FPGA Package, current standard B3 `mode:activate`
+publishes the verified Active Set under Runtime quiescence; `mode:stage_only`
+explicitly preserves the old install-only behavior. An FPGA Bundle requires
+caller-authorized `fpga_load:true` in `mode:activate`.
 
 ### Result states (journal, receipt)
 
