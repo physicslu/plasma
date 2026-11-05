@@ -26,6 +26,10 @@ on:
       - "scripts/ppu_site_worker.py"
       - "scripts/ppu_site_worker_service.py"
       - "scripts/ppu_site_engine.py"
+      - "scripts/ppu_opf_reference_openocd.py"
+      - "scripts/ppu_opf_site_session.py"
+      - "scripts/ppu_provider_contract.py"
+      - "scripts/ppu_provider_options.py"
       - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/ppu_site_recovery.py"
       - "scripts/ppu_asset_execution.py"
@@ -90,6 +94,10 @@ on:
       - "scripts/ppu_site_worker.py"
       - "scripts/ppu_site_worker_service.py"
       - "scripts/ppu_site_engine.py"
+      - "scripts/ppu_opf_reference_openocd.py"
+      - "scripts/ppu_opf_site_session.py"
+      - "scripts/ppu_provider_contract.py"
+      - "scripts/ppu_provider_options.py"
       - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/ppu_site_recovery.py"
       - "scripts/ppu_asset_execution.py"
@@ -172,6 +180,10 @@ jobs:
           scripts/ppu_site_worker.py
           scripts/ppu_site_worker_service.py
           scripts/ppu_site_engine.py
+          scripts/ppu_opf_reference_openocd.py
+          scripts/ppu_opf_site_session.py
+          scripts/ppu_provider_contract.py
+          scripts/ppu_provider_options.py
           scripts/ppu_site_adapter_abi5.py
           scripts/ppu_site_recovery.py
           pl/hil/fpga_image_root.py
@@ -242,6 +254,10 @@ jobs:
             scripts/ppu_site_worker.py \
             scripts/ppu_site_worker_service.py \
             scripts/ppu_site_engine.py \
+            scripts/ppu_opf_reference_openocd.py \
+            scripts/ppu_opf_site_session.py \
+            scripts/ppu_provider_contract.py \
+            scripts/ppu_provider_options.py \
             scripts/ppu_site_adapter_abi5.py \
             scripts/ppu_site_recovery.py \
             scripts/ppu_fpga_qualification.py \
