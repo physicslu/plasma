@@ -17,6 +17,8 @@ import ppu_provider_options
 
 SCHEMA = "plasma.ppu.provider-capabilities.v1"
 DESCRIPTOR = "data/plasma-provider.json"
+PLATFORM_REFERENCE = "data/plasma-platform-engine.json"
+PLATFORM_OPTIONS = "data/plasma-provider-options.json"
 OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
 PACKAGE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
@@ -155,14 +157,17 @@ def resolve(
     _need(desc["provider_package"] == provider, "PROVIDER_SELECTION_MISMATCH")
     selected_provider = packages.get(desc["provider_package"])
     _need(selected_provider is not None and selected_provider["id"] in selected_profile["requires"]
-          and selected_provider["kind"] in ("python", "native-c"),
+          and selected_provider["kind"] in ("python", "native-c", "platform-provider"),
           "PROVIDER_PACKAGE_INVALID")
     provider_paths = {entry["path"] for entry in selected_provider["files"]}
     provider_prefix = f"payload/packages/{selected_provider['id']}/"
     _need((selected_provider["kind"] == "python" and provider_prefix + "python/main.py" in provider_paths)
           or (selected_provider["kind"] == "native-c" and any(
               entry["path"].startswith(provider_prefix + "bin/")
-              and entry["executable"] is True for entry in selected_provider["files"])),
+              and entry["executable"] is True for entry in selected_provider["files"]))
+          or (selected_provider["kind"] == "platform-provider"
+              and provider_prefix + PLATFORM_REFERENCE in provider_paths
+              and all(entry["executable"] is False for entry in selected_provider["files"])),
           "PROVIDER_ENTRYPOINT_MISSING")
     _need(operation in desc["operations"], "OPERATION_UNSUPPORTED")
     observed_sites = hardware.get("sites")
@@ -183,16 +188,22 @@ def resolve(
               "PS_TRANSPORT_UNVERIFIED")
     else:
         fpga = packages.get(desc["fpga_package"])
-        _need(fpga is not None and fpga["kind"] == "fpga-image"
-              and fpga["id"] in selected_profile["requires"]
+        _need((desc["fpga_package"] is None or (
+                  fpga is not None and fpga["kind"] == "fpga-image"
+                  and fpga["id"] in selected_profile["requires"]))
               and type(desc["driver_abi"]) is str and bool(desc["driver_abi"]),
               "FPGA_DRIVER_CONTRACT_INVALID")
         _need(hardware.get("fpga_part") == manifest["target"]["fpga_part"]
-              and hardware.get("loaded_fpga_package") == fpga["id"]
+              and (fpga is None or hardware.get("loaded_fpga_package") == fpga["id"])
               and hardware.get("driver_abi") == desc["driver_abi"]
-              and hardware.get("fpga_identity_proven") is True,
+              and hardware.get("fpga_identity_proven") is True
+              and (desc["fpga_package"] is not None or (
+                  type(hardware.get("worker_identity")) is dict
+                  and hardware["worker_identity"].get("status") == "IMAGE"
+                  and bool(hardware["worker_identity"].get("image_id")))),
               "FPGA_DRIVER_UNVERIFIED")
-    options_path = provider_prefix + ppu_provider_options.FILE
+    options_path = provider_prefix + (PLATFORM_OPTIONS if selected_provider["kind"]
+                                      == "platform-provider" else ppu_provider_options.FILE)
     schema_entries = [entry for entry in selected_provider["files"]
                       if entry["path"] == options_path]
     _need(len(schema_entries) == 1, "OPTIONS_SCHEMA_MISSING")

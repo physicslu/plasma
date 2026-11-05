@@ -19,12 +19,15 @@ from pathlib import Path
 import pytest
 
 from plasma_core.ic_support import get_default_ic_support_resolver
+from plasma_core.enums import Operation
+from plasma_core.models import JobRequest
+from plasma_core.errors import PlasmaError
 from plasma_interfaces.openocd import c3_flash_profile
-from plasma_interfaces.site_worker_c3 import SiteWorkerControlClient
+from plasma_interfaces.site_worker_c3 import SiteWorkerControlClient, SiteWorkerRefused
 from plasma_opf import OPF_PROGRAMMING_SCHEMA, TimeoutPolicy
 
 from .ppu_fpga_qualification_fixture import synthetic_image
-from .test_c3_rest_flash_cycle import FlashSim, make_engine, write_selection
+from .test_c3_rest_flash_cycle import FlashSim, make_engine, write_selection, run
 from .test_ppu_b3_z2_install_gate1 import b3_request, make_coordinator
 from .test_ppu_bundle_v3_packages_contract import ROOT, TARGET, bundle_v3
 
@@ -55,7 +58,9 @@ def _json(payload):
 @contextmanager
 def installed_bundle(*, profile_change=None, descriptor_change=None,
                      engine_binary=OPENOCD, options_schema=None,
-                     with_control_socket=True, verified_worker=True):
+                     with_control_socket=True, verified_worker=True,
+                     with_fpga=True, platform_provider=False, reference_change=None,
+                     profile_count=1):
     with tempfile.TemporaryDirectory(prefix="opf4a-", dir="/tmp") as directory:
         path = Path(directory)
         c3_profile = c3_flash_profile(get_default_ic_support_resolver().require_exact(ICPN))
@@ -64,6 +69,8 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                 "sites": [1, 2], "transport": "fpga", "driver_abi": DRIVER_ABI,
                 "fpga_package": FPGA, "max_image_bytes": 65536}
         desc.update(descriptor_change or {})
+        if not with_fpga:
+            desc["fpga_package"] = None
         profile = {"schema": reference.PROFILE_SCHEMA, **c3_profile.to_wire()}
         profile.update(profile_change or {})
         schema = options_schema or {
@@ -75,12 +82,30 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                 "bin/openocd": OPENOCD,
                 "config/plasma-provider-options.json": _json(schema),
             }),
-            (PROFILE, "programming-profile", [PROVIDER, FPGA], {
+            (PROFILE, "programming-profile", [PROVIDER] + ([FPGA] if with_fpga else []), {
                 "data/plasma-provider.json": _json(desc),
                 reference.PROFILE_FILE: _json(profile),
             }),
             (FPGA, "fpga-image", [], synthetic_image()[0]),
         ]
+        if not with_fpga:
+            parts.pop()
+        if platform_provider:
+            platform_reference = {
+                "schema": "plasma.ppu.platform-openocd-reference.v1",
+                "openocd_sha256": hashlib.sha256(OPENOCD).hexdigest(),
+                "admission_sha256": hashlib.sha256(b"# fake admission\n").hexdigest(),
+                "driver_abi": DRIVER_ABI,
+            }
+            platform_reference.update(reference_change or {})
+            parts[0] = (PROVIDER, "platform-provider", [], {
+                reference.ppu_provider_contract.PLATFORM_REFERENCE: _json(platform_reference),
+                reference.ppu_provider_contract.PLATFORM_OPTIONS: _json(schema),
+            })
+        if profile_count == 0:
+            parts = [part for part in parts if part[0] != PROFILE]
+        elif profile_count == 2:
+            parts.append(("other-profile", *parts[1][1:]))
         archive, digest = bundle_v3(
             path / "archive", parts=parts,
             mutate=lambda manifest: manifest.update(actions=["install", "verify"]))
@@ -97,7 +122,10 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                                              require_root=False)
         sim = FlashSim(c3_profile.flash_base, c3_profile.flash_size)
         journal = path / "journal.json"
-        fpga = assets.resolve_staged_fpga_handoff(co.paths.product_root, digest)["fpga_image"]
+        fpga = (assets.resolve_staged_fpga_handoff(co.paths.product_root, digest)["fpga_image"]
+                if with_fpga else {"image_id": "independently-installed-universal",
+                                   "bin_sha256": hashlib.sha256(b"installed PL").hexdigest(),
+                                   "manifest_sha256": hashlib.sha256(b"installed manifest").hexdigest()})
         journal.write_text(json.dumps({
             "schema": "plasma.fpga.image-deployment.v3", "status": "IMAGE",
             "image_id": fpga["image_id"], "session_id": "test",
@@ -124,6 +152,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
         try:
             yield {
                 "product_root": co.paths.product_root, "asset_set_sha256": digest,
+                "active_asset_set": assets.read_active(co.paths.product_root),
                 "selection": {"schema": OPF_PROGRAMMING_SCHEMA,
                               "provider": PROVIDER, "profile": PROFILE,
                               "timeout_ms": 5000, "options": {}},
@@ -131,7 +160,8 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                 "hardware": {"platform": TARGET["platform"], "board": TARGET["board"],
                              "fpga_part": TARGET["fpga_part"], "sites": [1, 2],
                              "loaded_fpga_package": FPGA, "driver_abi": DRIVER_ABI,
-                             "fpga_identity_proven": True},
+                             "fpga_identity_proven": True,
+                             "worker_identity": dict(adapter.identity())},
                 "runtime_profile": c3_profile,
                 "engine_record": engine_record, "engine_base": path / "openocd",
                 "require_root": False, "image_root": image_root,
@@ -306,3 +336,110 @@ def test_real_worker_unproven_safe_off_seals_site_and_blocks_next_job():
         with pytest.raises(Exception, match="SITE_SEALED"):
             _execute(env, job_id="job-2", job_deadline_monotonic=time.monotonic() + 5)
         assert len(env["sim"].argvs) == children_before_denial
+
+
+def _runtime_execute(env, monkeypatch):
+    """Real Runtime/Worker/ABI5; only socket and physical process edges replaced."""
+    original_load = engine.load_engine
+
+    def test_engine(*args, **kwargs):
+        assert kwargs.get("require_root", True) is True
+        return original_load(env["engine_record"], base=env["engine_base"], require_root=False)
+
+    monkeypatch.setattr(engine, "load_engine", test_engine)
+
+    def no_fpga_handoff(*args, **kwargs):
+        raise AssertionError("Profile-only Job must not request an FPGA handoff/load")
+
+    monkeypatch.setattr(assets, "resolve_staged_fpga_handoff", no_fpga_handoff)
+    calls = env["worker_calls"] = []
+
+    def worker_call(op, *, timeout_s=None, **fields):
+        calls.append(op)
+        reply = env["core"].handle({"protocol": worker.PROTOCOL, "op": op, **fields},
+                                     (os.getpid(), os.getuid(), os.getgid()), "control")
+        if not reply["ok"]:
+            raise SiteWorkerRefused(reply["error"])
+        return reply["result"]
+
+    monkeypatch.setattr(env["client"], "call", worker_call)
+    request = JobRequest(job_id="job-1", site_id=2, target=ICPN,
+                         operation=Operation.FLASH_CYCLE, image=IMAGE, timeout_s=5.0)
+    return run(reference.execute_runtime_flash(
+        env["client"], product_root=env["product_root"], request=request,
+        active_asset_set=env["active_asset_set"],
+        job_deadline_monotonic=time.monotonic() + 5,
+        runtime_profile=env["runtime_profile"], image_root=env["image_root"]))
+
+
+def test_profile_provider_only_runtime_flash_uses_installed_platform(monkeypatch):
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True) as env:
+        result = _runtime_execute(env, monkeypatch)
+        assert result["result"] == "PASS" and result["safe_off"] is True
+        assert result["readback_sha256"] == hashlib.sha256(IMAGE).hexdigest()
+        assert result["bytes_verified"] == len(IMAGE)
+        assert bytes(env["sim"].memory[:len(IMAGE)]) == IMAGE
+        assert len(env["sim"].argvs) == 1
+        assert set(env["worker_calls"]) == {
+            "status", "open_job_session", "bind_image", "run", "close_session"}
+        assert not env["core"]._sessions and not env["core"]._site_owners
+        staged = env["product_root"] / "assets/staged" / env["asset_set_sha256"]
+        manifest = json.loads((staged / "manifest.json").read_bytes())
+        assert {p["kind"] for p in manifest["packages"]} == {
+            "platform-provider", "programming-profile"}
+        assert all(not f["executable"] for p in manifest["packages"] for f in p["files"])
+
+
+@pytest.mark.parametrize("observation", [
+    {"fpga_identity_proven": False}, {"worker_identity": {}},
+    {"driver_abi": "plasma_swd:6"}, {"sites": [1]},
+])
+def test_no_fpga_package_still_requires_trusted_hardware(observation):
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True) as env:
+        with pytest.raises(ValueError, match="FPGA_DRIVER_UNVERIFIED|SITE_NOT_SUPPORTED"):
+            _qualify(env, hardware={**env["hardware"], **observation})
+        assert not env["core"]._sessions and not env["sim"].argvs
+
+
+@pytest.mark.parametrize("options,mutation,code", [
+    ({"profile_change": {"flash_size": 131072}}, None, "REFERENCE_PROFILE_RUNTIME_MISMATCH"),
+    ({"engine_binary": b"different installed engine"}, None, "REFERENCE_PLATFORM_ENGINE_MISMATCH"),
+    ({"reference_change": {"admission_sha256": "0" * 64}}, None, "REFERENCE_PLATFORM_ENGINE_MISMATCH"),
+    ({"reference_change": {"driver_abi": "plasma_swd:6"}}, None, "REFERENCE_PLATFORM_ENGINE_MISMATCH"),
+    ({"reference_change": {"path": "/bin/untrusted"}}, None, "REFERENCE_PLATFORM_ENGINE_MISMATCH"),
+    ({"descriptor_change": {"driver_abi": "plasma_swd:6"}}, None, "FPGA_DRIVER_UNVERIFIED"),
+    ({"profile_count": 0}, None, "OPF_PROFILE_MISSING_OR_AMBIGUOUS"),
+    ({"profile_count": 2}, None, "OPF_PROFILE_MISSING_OR_AMBIGUOUS"),
+    ({}, "boot", "OPF_FPGA_IDENTITY_UNVERIFIED"),
+    ({}, "image", "OPF_FPGA_IDENTITY_UNVERIFIED"),
+    ({}, "platform", "PLATFORM_MISMATCH"),
+    ({}, "tamper", "ASSET_SET_FILE_MISMATCH"),
+    ({}, "engine_record", "WORKER_ENGINE_SELECTION_MISMATCH"),
+])
+def test_profile_only_runtime_denies_before_session_or_flash(monkeypatch, options, mutation, code):
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True, **options) as env:
+        if mutation in ("boot", "image"):
+            journal = env["adapter"].journal
+            value = json.loads(journal.read_bytes())
+            value["boot_id" if mutation == "boot" else "status"] = "invalid"
+            journal.write_text(json.dumps(value))
+        elif mutation == "platform":
+            monkeypatch.setattr(env["adapter"], "platform", {**TARGET, "board": "wrong-board"})
+        elif mutation == "tamper":
+            staged = env["product_root"] / "assets/staged" / env["asset_set_sha256"]
+            profile_file = staged / f"payload/packages/{PROFILE}/{reference.PROFILE_FILE}"
+            profile_file.chmod(0o644)  # model corruption of normally immutable bytes
+            profile_file.write_bytes(b"tamper")
+        elif mutation == "engine_record":
+            write_selection(env["engine_record"], {**env["engine_data"], "adapter_khz": 2000})
+        with pytest.raises(PlasmaError, match=code):
+            _runtime_execute(env, monkeypatch)
+        assert "bind_image" not in env.get("worker_calls", [])
+        if mutation != "engine_record":
+            assert "open_job_session" not in env.get("worker_calls", [])
+        assert not env["core"]._sessions and not env["core"]._site_owners
+        assert not env["sim"].argvs
+        assert not env["image_root"].exists() or not list(env["image_root"].iterdir())

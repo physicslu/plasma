@@ -107,6 +107,12 @@ class Abi5OpenocdAdapter:
         return self.openocd_root / "share" / "openocd" / "scripts"
 
     # --- identity (FPGA reload detection; change detection, not a version pin) ---
+    # This installed adapter is the Z2 ABI5 reference implementation. Bundle
+    # declarations cannot choose its physical platform; native admission checks
+    # the live PL identity and ABI on every session.
+    platform = {"platform": "linux-armv7", "board": "pynq-z2",
+                "fpga_part": "xc7z020clg400-1"}
+
     def identity(self) -> Mapping[str, Any]:
         try:
             raw = self.journal.read_bytes()

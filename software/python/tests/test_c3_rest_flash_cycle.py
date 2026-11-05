@@ -521,9 +521,10 @@ def test_opf_ordinary_job_does_not_require_historical_qualification_metadata():
             async with Stack(Path(directory), in_process=True) as stack:
                 journal = stack.adapter.journal
                 data = json.loads(journal.read_text())
-                # Root/native owns boot and qualification admission. The OPF
-                # route must not add qualification-history gates per Job.
-                for key in ("schema", "boot_id", "firmware_sha256", "manifest_sha256"):
+                # Historical qualification metadata is optional. Current boot
+                # and firmware identity remain required for the installed
+                # platform observation before live C3 admission.
+                for key in ("schema", "manifest_sha256"):
                     data.pop(key, None)
                 data["test_count"] = 0
                 journal.write_text(json.dumps(data))

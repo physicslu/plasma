@@ -72,7 +72,7 @@ def qualify_reference(
         provider=selected.provider, profile=selected.profile,
         operation="flash_cycle", site_id=site_id, image_size=image_size,
         hardware=hardware, options=selected.options)
-    _need(route.transport == "fpga" and route.fpga_package is not None,
+    _need(route.transport == "fpga",
           "REFERENCE_TRANSPORT_UNSUPPORTED")
     # No option is silently ignored. Clock and adapter choices belong to the
     # trusted engine-selection record, not untrusted Bundle options.
@@ -99,7 +99,8 @@ def qualify_reference(
         profile_package = packages[route.profile_package]
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ReferenceDenied("REFERENCE_MANIFEST_INVALID") from exc
-    _need(provider["kind"] == "native-c", "REFERENCE_PROVIDER_KIND_UNSUPPORTED")
+    _need(provider["kind"] in ("native-c", "platform-provider"),
+          "REFERENCE_PROVIDER_KIND_UNSUPPORTED")
 
     def exact_file(package: Mapping[str, Any], suffix: str) -> tuple[bytes, str]:
         name = f"payload/packages/{package['id']}/{suffix}"
@@ -115,11 +116,27 @@ def qualify_reference(
               "REFERENCE_PACKAGE_FILE_CHANGED")
         return raw, digest
 
-    _, binary_sha = exact_file(provider, "bin/openocd")
-    _need(binary_sha == engine.openocd_sha256, "REFERENCE_ENGINE_BINARY_MISMATCH")
-    _need(any(entry["path"] == f"payload/packages/{provider['id']}/bin/openocd"
-              and entry["executable"] is True for entry in provider["files"]),
-          "REFERENCE_ENGINE_NOT_EXECUTABLE")
+    if provider["kind"] == "platform-provider":
+        raw, _ = exact_file(provider, ppu_provider_contract.PLATFORM_REFERENCE)
+        _need(len(raw) <= 8192, "REFERENCE_PLATFORM_ENGINE_INVALID")
+        try:
+            reference = json.loads(raw, object_pairs_hook=ppu_provider_contract._pairs)
+        except (ValueError, UnicodeError) as exc:
+            raise ReferenceDenied("REFERENCE_PLATFORM_ENGINE_INVALID") from exc
+        # Data only: no command/path or arbitrary native entrypoint. Installed
+        # bytes and root ownership are independently verified by load_engine.
+        _need(reference == {
+            "schema": "plasma.ppu.platform-openocd-reference.v1",
+            "openocd_sha256": engine.openocd_sha256,
+            "admission_sha256": engine.admission_sha256,
+            "driver_abi": f"{engine.adapter_driver}:{engine.driver_abi}",
+        }, "REFERENCE_PLATFORM_ENGINE_MISMATCH")
+    else:
+        _, binary_sha = exact_file(provider, "bin/openocd")
+        _need(binary_sha == engine.openocd_sha256, "REFERENCE_ENGINE_BINARY_MISMATCH")
+        _need(any(entry["path"] == f"payload/packages/{provider['id']}/bin/openocd"
+                  and entry["executable"] is True for entry in provider["files"]),
+              "REFERENCE_ENGINE_NOT_EXECUTABLE")
 
     profile_raw, profile_sha = exact_file(profile_package, PROFILE_FILE)
     _need(len(profile_raw) <= 8192, "REFERENCE_PROFILE_INVALID")
@@ -220,36 +237,48 @@ async def execute_runtime_flash(
         digest = active_asset_set.get("asset_set_sha256")
         active = ppu_asset_set.read_active(product_root)
         _need(active == dict(active_asset_set), "ACTIVE_SET_MISMATCH")
-        handoff = ppu_asset_set.resolve_staged_fpga_handoff(product_root, digest)
-        profile = handoff["programming_profile"]
-        _need(isinstance(profile, dict), "OPF_PROFILE_REQUIRED")
+        ppu_asset_set.verify_staged(product_root, digest)
         staged = product_root / "assets" / "staged" / digest
         manifest = json.loads((staged / "manifest.json").read_bytes())
-        descriptor = json.loads((staged / "payload" / "packages" / profile["package_id"]
+        profiles = [p for p in manifest["packages"] if p["kind"] == "programming-profile"]
+        _need(len(profiles) == 1, "OPF_PROFILE_MISSING_OR_AMBIGUOUS")
+        profile = profiles[0]
+        handoff = (ppu_asset_set.resolve_staged_fpga_handoff(product_root, digest)
+                   if any(p["kind"] == "fpga-image" for p in manifest["packages"]) else None)
+        descriptor = json.loads((staged / "payload" / "packages" / profile["id"]
                                  / ppu_provider_contract.DESCRIPTOR).read_bytes())
         timeout_ms = round(request.timeout_s * 1000)
         _need(timeout_ms / 1000.0 == request.timeout_s, "OPF_TIMEOUT_PRECISION_UNSUPPORTED")
         policy = TimeoutPolicy(timeout_ms, 3600000)  # existing C-3 session ceiling
         selection = {"schema": "plasma.opf.programming.v1",
                      "provider": descriptor["provider_package"],
-                     "profile": profile["package_id"], "options": {}}
-        engine = ppu_site_engine.load_engine()
+                     "profile": profile["id"], "options": {}}
+        engine = ppu_site_engine.load_engine(require_root=True)
         remaining = job_deadline_monotonic - time.monotonic()
         _need(math.isfinite(remaining) and remaining > 0, "JOB_DEADLINE_EXPIRED")
         status = await asyncio.to_thread(client.call, "status", timeout_s=remaining)
         _need(not status.get("not_ready"), "REFERENCE_ENGINE_NOT_READY")
         identity = status.get("identity", {})
-        fpga = handoff["fpga_image"]
+        fpga = handoff["fpga_image"] if handoff else None
         # Root/native admission owns same-boot qualification and the reload
         # fence. Ordinary Jobs bind the loaded image and unchanged Worker
         # session; historical qualification metadata is not a new Job gate.
-        _need(identity.get("status") == "IMAGE"
-              and identity.get("image_id") == fpga["image_id"],
+        identity_verified = (
+            identity.get("status") == "IMAGE"
+            and type(identity.get("image_id")) is str and bool(identity["image_id"])
+            and identity.get("boot_id") == Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+            and type(identity.get("firmware_sha256")) is str
+            and ppu_provider_contract.SHA64.fullmatch(identity["firmware_sha256"]) is not None
+            and (fpga is None or identity["image_id"] == fpga["image_id"]))
+        _need(identity_verified,
               "OPF_FPGA_IDENTITY_UNVERIFIED")
-        hardware = {**manifest["target"], "sites": status["supported_sites"],
-                    "loaded_fpga_package": fpga["package_id"],
+        # Platform comes from the authenticated installed Worker adapter, not
+        # from the Bundle's target declarations. Live C3 Root admission still
+        # verifies PL/ABI, ownership and SAFE_OFF before hardware execution.
+        hardware = {**status.get("platform", {}), "sites": status["supported_sites"],
+                    "loaded_fpga_package": fpga["package_id"] if fpga else None,
                     "driver_abi": f"{engine.adapter_driver}:{engine.driver_abi}",
-                    "fpga_identity_proven": True, "worker_identity": identity}
+                    "fpga_identity_proven": identity_verified, "worker_identity": identity}
         return await execute_reference_flash(
             client, product_root=product_root, asset_set_sha256=digest,
             selection=selection, policy=policy, job_id=request.job_id,
