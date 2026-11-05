@@ -564,6 +564,7 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: write  # trusted publisher can update only the verified PR ref
+      actions: read  # fetch only owner-pinned CI artifacts in trusted steps
       pull-requests: read  # resolve and verify live owner PR and pinned HEAD
     steps:
       - name: Check SWPC identity and trusted dispatcher SHA
