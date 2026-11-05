@@ -387,7 +387,11 @@ def test_rest_flash_cycle_through_c3_passes_with_full_readback():
                 commands = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "-c"]
                 assert argv[argv.index("-f") + 1] == "target/stm32f1x.cfg"
                 assert "adapter speed 500" in commands
-                assert "flash erase_address 0x08000000 0x00000c00" in commands
+                erase = "flash erase_address 0x08000000 0x00000c00"
+                index = commands.index("reset halt")
+                assert commands[index:index + 4] == [
+                    "reset halt", "poll off", "flash probe 0", erase
+                ]
                 assert any(c.startswith("dump_image ") for c in commands)
                 # Job-owned staged image removed; session closed; Site not sealed.
                 assert list(stack.images.iterdir()) == []
