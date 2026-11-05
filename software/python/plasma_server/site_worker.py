@@ -281,6 +281,9 @@ class SiteWorker:
                 image_reference_scheme=request.image_ref.scheme if request.image_ref else None,
             )
             started_monotonic = time.monotonic()
+            # One Job budget includes every attempt, cleanup, and retry delay.
+            job_deadline = started_monotonic + request.timeout_s
+            runtime.deadline_monotonic = job_deadline
             attempts = 0
             output = ExecutionOutput()
             final_error: PlasmaError | None = None
@@ -320,7 +323,8 @@ class SiteWorker:
                     name=f"{request.job_id}-attempt-{attempts}",
                 )
                 try:
-                    output = await asyncio.wait_for(runtime.active_task, timeout=request.timeout_s)
+                    output = await asyncio.wait_for(
+                        runtime.active_task, timeout=max(0.0, job_deadline - time.monotonic()))
                     final_error = None
                 except TimeoutError as exc:
                     final_error = PlasmaError(
@@ -363,6 +367,7 @@ class SiteWorker:
                     not cancelled
                     and final_error.recoverable
                     and attempts <= request.max_retries
+                    and time.monotonic() < job_deadline
                 )
                 attempt_error = ErrorDetail.from_exception(
                     final_error,
@@ -415,7 +420,8 @@ class SiteWorker:
                         try:
                             await asyncio.wait_for(
                                 runtime.cancel_event.wait(),
-                                timeout=request.retry_backoff_s,
+                                timeout=min(request.retry_backoff_s,
+                                            max(0.0, job_deadline - time.monotonic())),
                             )
                         except TimeoutError:
                             pass

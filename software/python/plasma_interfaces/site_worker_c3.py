@@ -81,6 +81,14 @@ class SiteWorkerControlClient:
             raise SiteWorkerRefused("SITE_WORKER_REPLY_INVALID")
         return result
 
+    def open_job_session(self, *, job_id: str, sites: list[int], max_runtime_s: int,
+                         provider_route: Mapping[str, Any], deadline_monotonic: float
+                         ) -> dict[str, Any]:
+        return self.call("open_job_session", job_id=job_id, sites=sites,
+                         max_runtime_s=max_runtime_s,
+                         provider_route=dict(provider_route),
+                         deadline_monotonic=deadline_monotonic)
+
 
 def stage_image(image_root: Path, job_id: str, image: bytes) -> Path:
     """Write the Job-owned Normalized Image exactly once (never reuse a file)."""

@@ -17,6 +17,7 @@ class JobRuntime:
     state: JobState = JobState.QUEUED
     created_at: str = ""
     started_at: str | None = None
+    deadline_monotonic: float | None = None
     active_task: asyncio.Task[Any] | None = None
     cancel_requested: bool = False
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event, repr=False)
