@@ -124,6 +124,7 @@ def site_worker_unit(python: str = PYTHON) -> str:
         "ProtectKernelModules=yes",
         "ProtectControlGroups=yes",
         "ProtectClock=yes",
+        "DeviceAllow=/dev/mem rw",
         "ProtectHostname=yes",
         "RestrictNamespaces=yes",
         "LockPersonality=yes",

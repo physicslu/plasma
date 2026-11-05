@@ -81,6 +81,8 @@ def test_site_worker_unit_is_local_only_and_not_a_network_service():
     assert d["User"] == ["root"] and d["PrivateNetwork"] == ["yes"]
     assert d["RestrictAddressFamilies"] == ["AF_UNIX"] and d["IPAddressDeny"] == ["any"]
     assert d["ProtectSystem"] == ["strict"] and d["NoNewPrivileges"] == ["yes"]
+    assert d["ProtectClock"] == ["yes"]
+    assert d["DeviceAllow"] == ["/dev/mem rw"]
     assert "ListenStream" not in units.site_worker_unit() and "Port" not in units.site_worker_unit()
     assert d["ExecStart"] == [f"{units.PYTHON} -I -B -S "
                               "/opt/plasma/bootstrap/ppu_site_worker_service.py"]

@@ -47,6 +47,8 @@ SAFE_OFF and owner release cannot be proven still blocks admission. Existing
 markers require the evidence-backed operator recovery procedure; they must
 not be deleted or ignored as part of this software migration. A verified
 SAFE_OFF failure is returned to PPU Job policy for bounded retry.
+The root Site Worker unit grants only `/dev/mem rw` for the native MMIO path;
+its other systemd isolation and native Owner checks remain in force.
 
 For a pre-existing seal, first run the read-only `ppu_site_recovery.py
 diagnose <site>` and inspect the marker and owner state. At a separately
