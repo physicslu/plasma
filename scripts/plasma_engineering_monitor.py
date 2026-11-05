@@ -240,6 +240,46 @@ def _monitor_time_mark(now: dt.datetime | None = None) -> str:
     return "[MONITOR TIME MARK] " + stamp.isoformat(timespec="seconds")
 
 
+def _trusted_work_order_received(event_path: str, comment_id: str) -> str:
+    """Authenticated GitHub issue-comment creation time, not Runner start time.
+
+    The upstream trusted Authorizer passes the validated comment ID. Fail
+    closed on absent, mismatched, malformed or non-owner webhook metadata.
+    """
+    if (not comment_id.isdecimal() or not 0 < len(comment_id) <= 20 or
+            not event_path or len(event_path) > 512 or
+            not Path(event_path).is_absolute()):
+        return ""
+    try:
+        fd = os.open(event_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or not 0 < st.st_size <= 1048576:
+                return ""
+            with os.fdopen(fd, "rb", closefd=False) as src:
+                raw = json.loads(src.read(1048577))
+        finally:
+            os.close(fd)
+        comment = raw.get("comment", {})
+        if (raw.get("action") != "created" or
+                raw.get("repository", {}).get("full_name") != "physicslu/plasma" or
+                raw.get("issue", {}).get("number") != 981 or
+                raw.get("sender", {}).get("login") != "physicslu" or
+                comment.get("user", {}).get("login") != "physicslu" or
+                type(comment.get("id")) is not int or
+                str(comment["id"]) != comment_id):
+            return ""
+        timestamp = comment.get("created_at", "")
+        if (type(timestamp) is not str or
+                re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z",
+                             timestamp) is None):
+            return ""
+        parsed = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        return parsed.isoformat(timespec="seconds")
+    except (OSError, ValueError, TypeError, AttributeError, UnicodeError):
+        return ""
+
+
 def run_job(path: str, command: list[str], directory: Path | None = None) -> int:
     if path not in PATHS or not command:
         raise ValueError("invalid path/command")
@@ -279,8 +319,13 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
           stage == "Codex workspace" or
           (guarded and not guarded_verified)):
         stage = ""
+    received = _trusted_work_order_received(
+        os.environ.get("GITHUB_EVENT_PATH", ""),
+        os.environ.get("PLASMA_MONITOR_COMMENT_ID", ""),
+    ) if task in ("path2-work-order", "path3-work-order") else ""
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
+        "received": received,
         "task": task, "pr_number": pr_number,
         "monitor_summary": summary if summary_valid else "",
         "monitor_stage": stage,
@@ -301,6 +346,7 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     # Operator-only metadata never enters the engineering/Codex process env.
     env.pop("PLASMA_MONITOR_SUMMARY", None)
     env.pop("PLASMA_MONITOR_STAGE", None)
+    env.pop("PLASMA_MONITOR_COMMENT_ID", None)
     if live and path == "path3":
         env["PLASMA_ENGINEERING_MONITOR_LIVE_LOG"] = str(log)
     else:
@@ -429,83 +475,59 @@ def render_snapshot(directory: Path, path: str, *,
                     now: dt.datetime | None = None,
                     clear_from: tuple[int, int, int, str | None] | None = None,
                     prefix: str = "Ctrl+B") -> str:
+    """Compact common header; evidence-neutral activity below it."""
     if path not in PATHS:
         raise ValueError("unknown path")
-    name = "PATH 2 | SWPC CLI" if path == "path2" else "PATH 3 | SWPC Codex"
-    log_file = directory / (path + ".log")
     state = _read_state(directory, path)
     status = state.get("status", "IDLE")
     if status == "RUNNING" and not _alive(state):
         status = "IDLE (interrupted/unknown)"
     if status not in ("IDLE", "RUNNING", "IDLE (interrupted/unknown)"):
         status = "UNKNOWN"
-    lines = ["%s | C Clear | %s 1/2 Switch | %s D Detach" %
-             (name, prefix, prefix),
-             "=" * 35,
-             "STATUS: %s    RUN: %s" % (status, state.get("run_id", "-")),
-             "TASK: %s" % state.get("task", "-")]
-    pr_number = state.get("pr_number")
-    if (type(pr_number) is str and PR_NUMBER.fullmatch(pr_number) and
-            pr_number != "0"):
-        lines[-1] += "  PR: #" + pr_number
-    if path in PATHS:
-        summary = state.get("monitor_summary", "")
-        if (type(summary) is str and
-                MONITOR_SUMMARY.fullmatch(summary) is not None and
-                MONITOR_SENSITIVE.search(summary) is None):
-            lines.append("GOAL: " + summary)
-        else:
-            lines.append("GOAL: (operator summary not provided)")
-    stage = state.get("monitor_stage", "")
-    if (type(stage) is not str or stage not in MONITOR_STAGES or
-        (path == "path3" and stage != "Codex workspace") or
-        (path == "path2" and stage == "Codex workspace")):
-        stage = ""
-    lines.append("STAGE: " + (stage or "(not available)"))
-    if status == "RUNNING":
-        started = state.get("started", "")
+    clock = dt.datetime.now().astimezone() if now is None else now
+    if clock.tzinfo is None or clock.utcoffset() is None:
+        raise ValueError("status clock requires a timezone-aware timestamp")
+    received = "—"
+    raw_received = state.get("received")
+    if type(raw_received) is str and len(raw_received) <= 40:
         try:
-            elapsed = max(0, int((dt.datetime.now(dt.timezone.utc) -
-                    dt.datetime.fromisoformat(started)).total_seconds()))
-            lines.append("ELAPSED: %ds" % elapsed)
-        except (TypeError, ValueError):
+            parsed = dt.datetime.fromisoformat(raw_received)
+            if parsed.tzinfo is not None and parsed.utcoffset() is not None:
+                received = parsed.astimezone(clock.tzinfo).strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
             pass
+    path_name = "PATH 2" if path == "path2" else "PATH 3"
+    pr = state.get("pr_number")
+    pr_display = (" | PR #" + pr if
+                  type(pr) is str and PR_NUMBER.fullmatch(pr) and pr != "0"
+                  else "")
+    summary = state.get("monitor_summary")
+    goal = (summary if type(summary) is str and
+            MONITOR_SUMMARY.fullmatch(summary) is not None and
+            MONITOR_SENSITIVE.search(summary) is None else
+            "(operator summary not provided)")
+    run = state.get("run_id", "-")
+    if type(run) is not str or RUN_ID.fullmatch(run) is None:
+        run = "-"
+    if status == "RUNNING":
+        try:
+            started = dt.datetime.fromisoformat(state["started"])
+            elapsed = max(0, int((clock.astimezone(dt.timezone.utc) -
+                                  started).total_seconds()))
+            result = "RUNNING | ELAPSED: %ds" % elapsed
+        except (KeyError, TypeError, ValueError):
+            result = "RUNNING"
     else:
-        # The monitor wrapper's return code is NOT a verification receipt.
-        lines.append("WRAPPER: %s  EXIT: %s" %
-                     (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
-        hint = _safe_stored_receipt_hint(state.get("receipt_hint"))
-        if (path == "path2" and state.get("last_result") == "FAIL" and
-                type(state.get("exit_code")) is int and
-                state["exit_code"] == 2 and
-                state.get("task") == "path2-work-order" and
-                hint is not None):
-            lines.append("RECEIPT: %s | %s | %s | #%d" % (
-                hint["reason"], hint["stage"], hint["cause"],
-                hint["component_index"]))
-    if path in PATHS:
-        clock = dt.datetime.now().astimezone() if now is None else now
-        if clock.tzinfo is None or clock.utcoffset() is None:
-            raise ValueError("status clock requires a timezone-aware timestamp")
-        # Show the SWPC host-local wall clock. Do not render ISO's "T"
-        # separator or UTC offset; keep minute cadence and timestamp inputs
-        # timezone-aware. Evidence and monitor time marks are unchanged.
-        lines.append("NOW: " + clock.strftime("%Y-%m-%d %H:%M"))
-    # Activity is recomputed from the already sanitized, bounded log tail.
-    # It never becomes a new job authorizer or a trusted result receipt.
-    lines.append("DOING: —")
-    lines.extend(["", "RECENT ACTIVITY", "-" * 35])
-    if height is not None:
-        # Preserve at least one latest log row plus a spare bottom row.
-        # Sacrifice decoration before truncating trusted status/goal/stage.
-        for decoration in ("-" * 35, ""):
-            if height > len(lines) + 1:
-                break
-            if decoration in lines:
-                lines.remove(decoration)
-    # Scan more than the visible tail so a prior observed failure survives
-    # subsequent successful steps. This is bounded history, not a receipt.
-    # The actual task result and failure cause remain in GitHub evidence.
+        result = "%s (exit %s)" % (
+            state.get("last_result", "NOT_RUN"), state.get("exit_code", "-"))
+    lines = [
+        "%s | %s%s" % (path_name, status, pr_display),
+        "RECEIVED: %s | RUN: %s" % (received, run),
+        "GOAL: " + goal,
+        "RESULT: %s | ACCEPTANCE: UNVERIFIED" % result,
+    ]
+    # Source log remains operator-only and is never a verified acceptance.
+    log_file = directory / (path + ".log")
     history_lines = []
     try:
         if log_file.is_symlink() or not stat.S_ISREG(log_file.stat().st_mode):
@@ -525,7 +547,6 @@ def render_snapshot(directory: Path, path: str, *,
     except OSError:
         log_lines = ["(no local output yet)"]
     active_items = {}
-    last_step = None
     last_error = None
     last_sequence = 0
     for original in history_lines:
@@ -537,7 +558,6 @@ def render_snapshot(directory: Path, path: str, *,
             active_items[event["id"]] = event
         else:
             active_items.pop(event["id"], None)
-            last_step = event
             if event["state"] == "FAIL":
                 last_error = event
 
@@ -548,74 +568,55 @@ def render_snapshot(directory: Path, path: str, *,
         return "[%s] %s %s | %s" % (
             event["source"], event["kind"], result, event["detail"])
 
+    if last_error is not None:
+        warning = "WARNING: Command failure observed"
+    elif state.get("last_result") == "FAIL":
+        warning = "WARNING: Wrapper failure observed"
+    else:
+        warning = "WARNING: —"
+    lines.append(warning + (" | LOG: GitHub Actions" if run != "-" else ""))
+    lines.append("ACTIVITY TRACE [%s] | C Clear | %s 1/2 Switch" %
+                 ("CLI" if path == "path2" else "C", prefix))
+    lines.append("-" * 35)
     activity_rows = []
-    visible_sequence = 0
+    sequence = 0
     for original in log_lines:
         event = engineering_activity.parse_public_line(original)
-        if event is None or event["seq"] <= visible_sequence:
+        if event is None or event["seq"] <= sequence:
             continue
-        visible_sequence = event["seq"]
+        sequence = event["seq"]
         activity_rows.append("%s %s" % (event["time"], _step_label(event)))
     if activity_rows:
         log_lines = activity_rows[-30:]
     else:
-        # Invalid structured records are never echoed as raw terminal lines.
-        log_lines = [
-            line for line in log_lines
-            if not line.startswith(engineering_activity.PREFIX)]
+        log_lines = [line for line in log_lines if (
+            not line.startswith(engineering_activity.PREFIX)
+            and not line.startswith("RUNNING | elapsed "))]
     if status == "RUNNING" and active_items:
-        last = next(reversed(active_items.values()))
-        lines[lines.index("DOING: —")] = (
-            "DOING: %s | %s" % (last["kind"], last["detail"]))
-    insert_at = lines.index("DOING: —") + 1 if "DOING: —" in lines else (
-        next(i for i, line in enumerate(lines) if line.startswith("DOING:")) + 1)
-    if last_step is not None:
-        lines.insert(insert_at, "LAST STEP: " + _step_label(last_step))
-        insert_at += 1
+        current = next(reversed(active_items.values()))
+        lines.append("DOING: " + _step_label(current))
     if last_error is not None:
-        lines.insert(insert_at, "LAST ERROR: " + _step_label(last_error))
+        lines.append("LAST ERROR: " + _step_label(last_error))
     if height is not None:
-        # Keep diagnostic failures ahead of optional last-step and decoration.
-        # A short pane still reserves one physical row for recent output.
-        while len(lines) > max(0, height - 2):
-            optional = next((i for i, line in enumerate(lines)
-                             if line.startswith("LAST STEP:")), None)
-            if optional is not None:
-                lines.pop(optional)
-            elif "" in lines:
-                lines.remove("")
-            elif "-" * 35 in lines:
-                lines.remove("-" * 35)
-            elif any(line.startswith("RECEIPT:") for line in lines):
-                # Keep the fixed denial hint and the newest activity on short panes.
-                clock_index = next((i for i, line in enumerate(lines)
-                                    if line.startswith("NOW:")), None)
-                if clock_index is not None:
-                    lines.pop(clock_index)
-                else:
-                    break
-            elif any(line.startswith("LAST ERROR:") for line in lines):
-                # Prefer the observed failure + recent output to a clock line.
-                clock_index = next((i for i, line in enumerate(lines)
-                                    if line.startswith("NOW:")), None)
-                if clock_index is not None:
-                    lines.pop(clock_index)
-                else:
-                    break
+        # Keep latest activity even in a 12-line pane; no terminal scrolling.
+        while len(lines) > max(0, height - 2) and len(lines) > 5:
+            if lines[-1].startswith("LAST ERROR:") and len(lines) > 7:
+                lines.pop(-1)
+            elif lines[-1] == "-" * 35:
+                lines.pop(-1)
+            elif len(lines) > 6:
+                lines.pop(-1)
             else:
                 break
-    if height is not None:
-        # Reserve the bottom row to prevent tmux scrolling on a repaint.
-        visible_log_rows = max(0, height - 1 - len(lines))
-        log_lines = log_lines[-visible_log_rows:] if visible_log_rows else []
+        visible = max(0, height - 1 - len(lines))
+        log_lines = log_lines[-visible:] if visible else []
     lines.extend(log_lines)
     if height is not None:
         lines = lines[:max(0, height - 1)]
     if width is not None:
-        # Leave one physical cell unused to avoid terminal autowrap.
         lines = [_clip_columns(str(line),
-                max(0, min(width - 1, MAX_DISPLAY_COLUMNS))) for line in lines]
-    return CONTROL.sub("", "\n".join(str(x) for x in lines))
+                 max(0, min(width - 1, MAX_DISPLAY_COLUMNS))) for line in lines]
+    return CONTROL.sub("", "\\n".join(str(line) for line in lines))
 
 
 def view_loop(path: str, *, directory: Path = MONITOR, output=None,
