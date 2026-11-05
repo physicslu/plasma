@@ -578,6 +578,16 @@ def render_snapshot(directory: Path, path: str, *,
     lines.append("ACTIVITY TRACE [%s] | C Clear | %s 1/2 Switch" %
                  ("CLI" if path == "path2" else "C", prefix))
     lines.append("-" * 35)
+    if run != "-":
+        lines.append("RUN LOG: https://github.com/physicslu/plasma/actions/runs/" + run)
+    hint = _safe_stored_receipt_hint(state.get("receipt_hint"))
+    if (path == "path2" and state.get("last_result") == "FAIL" and
+            type(state.get("exit_code")) is int and
+            state["exit_code"] == 2 and
+            state.get("task") == "path2-work-order" and hint is not None):
+        lines.append("RECEIPT: %s | %s | %s | #%d" % (
+            hint["reason"], hint["stage"], hint["cause"],
+            hint["component_index"]))
     activity_rows = []
     sequence = 0
     for original in log_lines:
