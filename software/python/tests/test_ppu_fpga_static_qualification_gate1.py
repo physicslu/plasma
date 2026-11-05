@@ -442,7 +442,7 @@ def test_b3_rejects_fpga_contract_or_owner_authorization_change_after_b2(tmp_pat
     paths.token_file.write_text(original_token)
     # FPGA load is a distinct owner action: an install-only authorization
     # cannot be widened into an FPGA load.
-    widened = dict(b3, fpga_load=True)
+    widened = dict(b3, mode="activate", fpga_load=True)
     with pytest.raises(bootstrap.BootstrapServiceError, match="OWNER_AUTHORIZATION_ACTION_MISMATCH"):
         srv.start_deployment(widened)
     assert calls == []
