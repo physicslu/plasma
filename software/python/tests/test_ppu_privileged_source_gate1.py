@@ -302,6 +302,66 @@ def test_root_upgrade_rejects_untrusted_factory_file_and_preserves_old(tmp_path,
         "code_manifest_sha256"] == old_sha
 
 
+
+def test_root_upgrade_no_change_cleans_unactivated_stage(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    same = factory / "pl/hil/fpga_image_admission.py"
+    shutil.copyfile(ROOT / "pl/hil/fpga_image_admission.py", same)
+    with pytest.raises(installer.ProvisionDenied, match="PRIVILEGED_UPGRADE_NO_CHANGE"):
+        installer.upgrade(
+            factory, destination, expected_current_manifest_sha256=old_sha,
+            _test_uid=os.getuid())
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == old_sha
+    assert not destination.with_name(destination.name + ".next").exists()
+    assert not destination.with_name(destination.name + ".previous").exists()
+
+
+def test_root_upgrade_postverify_failure_restores_old_source(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    original = installer._held_image_fingerprint
+    observed = {"calls": 0}
+    def fault(uid):
+        observed["calls"] += 1
+        return original(uid) if observed["calls"] == 1 else "0" * 64
+    monkeypatch.setattr(installer, "_held_image_fingerprint", fault)
+    with pytest.raises(installer.ProvisionDenied, match="POSTVERIFY_FAILED"):
+        installer.upgrade(
+            factory, destination, expected_current_manifest_sha256=old_sha,
+            _test_uid=os.getuid())
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == old_sha
+    assert not destination.with_name(destination.name + ".previous").exists()
+    # Failed new source is quarantined, not silently activated.
+    assert destination.with_name(destination.name + ".next").is_dir()
+
+
+def test_root_upgrade_lock_is_exclusive_and_fail_closed(tmp_path, monkeypatch):
+    from contextlib import ExitStack
+    installer, _, _, _, _ = _offline_upgrade_fixture(tmp_path, monkeypatch)
+    owner = tmp_path / "owner"
+    owner.mkdir(mode=0o700)
+    monkeypatch.setattr(installer, "GLOBAL_LOCK", owner / "supervisor.lock")
+    monkeypatch.setattr(installer, "RELOAD_FENCE", tmp_path / "reload.lock")
+    # Test the real _maintenance_locks() while keeping host-only paths.
+    spec = importlib.util.spec_from_file_location(
+        "ppu_privileged_lock_test", ROOT / "scripts/ppu-privileged-source-install.py")
+    lock_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lock_mod)
+    monkeypatch.setattr(lock_mod, "GLOBAL_LOCK", owner / "supervisor.lock")
+    monkeypatch.setattr(lock_mod, "RELOAD_FENCE", tmp_path / "reload.lock")
+    with lock_mod._maintenance_locks(os.getuid()):
+        with pytest.raises(lock_mod.ProvisionDenied, match="OWNER_BUSY"):
+            with lock_mod._maintenance_locks(os.getuid()):
+                pytest.fail("second maintenance lock must never be acquired")
+    # First holder released both FDs: next verified acquire is allowed.
+    with lock_mod._maintenance_locks(os.getuid()):
+        pass
+
+
+
 def test_privileged_source_provision_denies_untrusted_input(tmp_path, monkeypatch):
     installer, factory, destination = _installer_fixture(tmp_path, monkeypatch)
     (factory / "pl/hil/fpga_image_root.py").unlink()
