@@ -115,32 +115,24 @@ async def run_flash_cycle(
     *,
     job_id: str,
     site_id: int,
-    profile: Mapping[str, Any],
+    icpn: str,
     image: bytes,
     image_root: Path,
     max_runtime_s: int,
-    session_factory: Callable[[], Mapping[str, Any]] | None = None,
+    session_factory: Callable[[], Mapping[str, Any]],
 ) -> dict[str, Any]:
     """One complete C-3 Flash cycle for one REST Job. Cancellation (task
     cancel / timeout) closes the session, which cancels the in-flight
     OpenOCD operation inside the Worker. An unproven SAFE_OFF remains sealed;
     the staged image is always removed."""
     digest = hashlib.sha256(image).hexdigest()
-    context = {"job_id": job_id, "site_id": site_id, "icpn": profile["icpn"]}
+    context = {"job_id": job_id, "site_id": site_id, "icpn": icpn}
     staged = stage_image(image_root, job_id, image)
     session_id: str | None = None
     try:
         try:
-            # OPF may supply an already-qualified C-3 Session opener. Both
-            # paths use this *same* bind/run/close/SAFE_OFF evidence handling;
-            # production OPF uses the qualified opener; low-level tests may
-            # exercise C-3 directly without a Bundle.
-            if session_factory is None:
-                opened = await asyncio.to_thread(
-                    client.call, "open_job_session", job_id=job_id,
-                    sites=[site_id], max_runtime_s=max_runtime_s, profile=dict(profile))
-            else:
-                opened = await asyncio.to_thread(session_factory)
+            # The verified OPF Session opener owns the single Profile binding.
+            opened = await asyncio.to_thread(session_factory)
             session_id = str(opened["session_id"])
             await asyncio.to_thread(
                 client.call, "bind_image", session_id=session_id,
