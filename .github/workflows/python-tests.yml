@@ -112,6 +112,21 @@ jobs:
         run: bash scripts/tests/test-plasmactl-engineering-mock.sh
       - name: Install package
         run: python -m pip install -e "./software/python[dev]"
+      - name: Deny Site admission and revocation without Root ownership (host-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/z2/plasma_swd_site_admission.py
+          if python scripts/z2/plasma_swd_site_admission.py admit 2 > "$RUNNER_TEMP/site-admit.json"; then
+            echo "Unprivileged Site admission was accepted" >&2
+            exit 1
+          fi
+          grep -F '"code": "ROOT_REQUIRED"' "$RUNNER_TEMP/site-admit.json"
+          if python scripts/z2/plasma_swd_site_admission.py revoke 2 > "$RUNNER_TEMP/site-revoke.json"; then
+            echo "Unprivileged Site revocation was accepted" >&2
+            exit 1
+          fi
+          grep -F '"code": "REVOKE_DENIED"' "$RUNNER_TEMP/site-revoke.json"
       - name: Run pytest (PS / Python only; PL covered by pl-*.yml)
         run: python -m pytest -q software/python/tests
 
