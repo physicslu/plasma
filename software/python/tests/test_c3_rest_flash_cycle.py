@@ -172,6 +172,41 @@ def test_service_python_is_the_running_interpreter_not_a_versioned_path():
     assert "EXPECTED_IMAGE" not in source
 
 
+def test_probe_and_flash_use_identical_site_scoped_openocd_security_preamble(tmp_path):
+    root = tmp_path / "engine"
+    scripts = root / "share/openocd/scripts"
+    (scripts / "target").mkdir(parents=True)
+    (scripts / "target/stm32f1x.cfg").write_text("# fixture\n")
+    adapter = abi5.Abi5OpenocdAdapter(openocd_root=root, python=Path(sys.executable),
+                                       adapter_khz=500)
+    profile = worker.parse_flash_profile({
+        "icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
+        "flash_base": 0x08000000, "flash_size": 0x10000, "erase_granularity": 1024})
+    payload = b"\x01\x02"
+    image = worker.FlashImage(profile, payload, hashlib.sha256(payload).hexdigest())
+    staged, readback = tmp_path / "in.bin", tmp_path / "out.bin"
+    probe = adapter._argv(2)
+    flash = adapter._flash_argv(2, image, staged, readback)
+    preamble = [str(root / "bin/openocd"), "-s", str(scripts), "-d2",
+                "-c", "adapter driver plasma_swd", "-c", "plasma_swd site 2",
+                "-c", "transport select swd", "-c", "gdb port disabled",
+                "-c", "tcl port disabled", "-c", "telnet port disabled"]
+    assert probe[:len(preamble)] == flash[:len(preamble)] == preamble
+    assert probe[len(preamble):] == [
+        "-c", "swd newdap bp cpu", "-c", "dap create bp.dap -chain-position bp.cpu",
+        "-c", "init", "-c", "echo PLASMA_DPREG0=[bp.dap dpreg 0]", "-c", "shutdown"]
+    assert flash[len(preamble):len(preamble) + 2] == ["-f", "target/stm32f1x.cfg"]
+    operations = flash[len(preamble) + 2:]
+    commands = [operations[i + 1] for i, arg in enumerate(operations[:-1]) if arg == "-c"]
+    assert commands == [
+        "adapter speed 500", "init", "reset halt", "poll off", "flash probe 0",
+        "flash erase_address 0x08000000 0x00000400",
+        f"flash write_image {{{staged.resolve()}}} 0x08000000 bin",
+        f"flash verify_image {{{staged.resolve()}}} 0x08000000 bin",
+        f"dump_image {{{readback.resolve()}}} 0x08000000 0x00000002",
+        "reset run", "shutdown"]
+
+
 # --- Runtime-resolved Flash profile ----------------------------------------------------
 
 @pytest.mark.parametrize("field,value,code", [
