@@ -324,7 +324,21 @@ class Abi5OpenocdAdapter:
         if a.returncode != 0 or "SITE_ADMISSION_RECORD_ISSUED" not in a.stdout:
             if not self._revoke(site):
                 raise TransportUnknown("ADMISSION_REVOKE_FAILED")
-            raise TransportDenied("ADMISSION_DENIED")
+            # Expose only an explicitly structured, bounded Root denial code.
+            # Arbitrary stderr, paths and exception strings stay private.
+            denial = "ADMISSION_DENIED"
+            receipts = [line.split("=", 1)[1] for line in a.stdout.splitlines()
+                        if line.startswith("PLASMA_SWD_SITE_ADMISSION=")]
+            if len(receipts) == 1 and len(receipts[0]) <= 4096:
+                try:
+                    payload = json.loads(receipts[0])
+                except (ValueError, TypeError):
+                    payload = None
+                if isinstance(payload, dict) and payload.get("result") == "DENIED":
+                    code = payload.get("code")
+                    if type(code) is str and re.fullmatch(r"[A-Z][A-Z0-9_]{0,95}", code):
+                        denial += ":" + code
+            raise TransportDenied(denial)
         log, raw, reason, rc = "", b"", None, None
         child = None
         operation_error = None
