@@ -17,7 +17,7 @@ import pytest
 
 from .ppu_owner_authorization_fixture import install_summary
 from .test_ppu_bundle_v3_packages_contract import (
-    ROOT, SOURCE, TARGET, contract, coordinator, engine, request,
+    ROOT, TARGET, contract, coordinator, engine, request,
 )
 
 BUILDER = ROOT / "scripts" / "ppu-bundle-v3-smoke.py"
@@ -29,8 +29,7 @@ DEVICE = "payload/packages/ic-catalog/data/device.json"
 def build_smoke(tmp_path: Path) -> tuple[Path, str]:
     target = tmp_path / "smoke.zip"
     result = subprocess.run(
-        [sys.executable, str(BUILDER), "--output", str(target),
-         "--source-commit", SOURCE],
+        [sys.executable, str(BUILDER), "--output", str(target)],
         check=True, capture_output=True, text=True, timeout=20,
     )
     receipt = json.loads(result.stdout)
@@ -73,7 +72,7 @@ def test_smoke_archive_deterministic_and_canonical(tmp_path):
         assert manifest["packages"][0]["id"] == "python-smoke"
         assert set(bundle.namelist()) == {"manifest.json", DEVICE, GEOMETRY, SMOKE}
     verified = contract.verify_host_only_artifact(
-        a, expected_sha256=digest_a, source_commit=SOURCE, target_profile=TARGET,
+        a, expected_sha256=digest_a, target_profile=TARGET,
     )
     assert len(verified.packages) == 3
     assert verified.install_qualified is False

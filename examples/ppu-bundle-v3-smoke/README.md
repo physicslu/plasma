@@ -19,13 +19,12 @@ DAG resolution must stage catalog → profile → Python. Bundle actions are onl
 
 ```sh
 python3 scripts/ppu-bundle-v3-smoke.py \
-  --source-commit "$(git rev-parse HEAD)" \
   --output /tmp/ppu-b3-smoke.zip
 ```
 
 The builder outputs the ZIP digest. A digest **does not grant installation or
-execution permission**. Source commit provenance must be independently
-verified by the trusted authorization path.
+execution permission**. Optional source provenance is informational only;
+owner operation authorization is separately required for B2/B3.
 
 ## Host-only verification and explicit execution
 
@@ -61,3 +60,9 @@ SWPC/Z2, PS runtime activation, FPGA loading, DUT access or L2 support.
   fixture detection, checksum denial and fail-closed restart isolation.
 - Future Z2 Path 2 B3 installation requires independently authorized device
   installation and separate hardware execution approval.
+
+User Bundle authoring does not require GitHub or publisher provenance. The
+producer accepts `--output /tmp/local-bundle.zip` alone; `--source-commit`
+is optional informational provenance. B1/B2/B3 still check exact ZIP/file
+SHA256, target/dependencies and fresh mode-specific owner authorization.
+This does not change engineering Runtime Release or Dispatcher source pins.

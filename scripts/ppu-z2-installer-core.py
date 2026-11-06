@@ -1209,7 +1209,6 @@ def install_verified_bundle_v3(
         if (type(previous) is not dict
                 or previous.get("schema") != "plasma.ppu.b3-install.v1"
                 or previous.get("bundle_name") != verified.name
-                or previous.get("source_commit") != verified.source_commit
                 or previous.get("archive_sha256") != verified.archive_sha256):
             raise Z2InstallerError("B3_PREVIOUS_INSTALL_RECEIPT_INVALID")
         for item in target.rglob("*"):

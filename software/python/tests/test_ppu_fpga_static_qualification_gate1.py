@@ -38,7 +38,7 @@ def fpga_bundle(tmp_path, files=None, *, mutate=None):
 
 def qualify(tmp_path, archive, digest, contracts_path, *, target=TARGET):
     verified = contract.verify_host_only_artifact(
-        archive, expected_sha256=digest, source_commit=None, target_profile=target,
+        archive, expected_sha256=digest, target_profile=target,
     )
     return qualification.qualify_bundle_fpga(
         archive, verified, contracts_path=contracts_path, trusted_target=target,

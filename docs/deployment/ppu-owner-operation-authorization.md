@@ -69,7 +69,12 @@ Freshness without trusting the SWPC clock: B3 must name the PPU's
 No new database: nothing about authorizations is persisted except the
 verified summary (no MAC/secret) inside the existing B2/B3 deployment
 records. No Publisher, Git Commit Pin, per-Bundle admin approval or parallel
-authorization store exists.
+authorization store exists. User Bundle v3 `source_commit` is optional,
+untrusted provenance: omission is valid through B1/B2/B3, and a claimed
+commit grants no qualification. User ZIPs need not originate in GitHub and
+need no publisher signature or CI whitelist. Engineering Runtime Release,
+factory/CI identity and trusted Dispatcher Work Order pins remain mandatory
+under their independent contracts.
 
 ## Console → Manager → PPU
 

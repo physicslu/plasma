@@ -776,7 +776,8 @@ def b2_admission(api, uid: str, source_sha: str, target: Mapping[str, str],
     if (result["stage"] != "package_admission_only"
             or result["install_qualified"] is not False
             or plan["execution_permitted"] is not False
-            or plan["source_commit"] != source_sha
+            # User Bundle provenance is informational; legacy v1 is separate.
+            or (kind != "bundle" and plan.get("source_commit") != source_sha)
             or plan["target"] != dict(target)
             or plan["archive_sha256"] != digest
             or plan["kind"] != kind):

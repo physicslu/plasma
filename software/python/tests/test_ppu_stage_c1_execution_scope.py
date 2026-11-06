@@ -82,14 +82,14 @@ def test_resources_manifest_rejects_duplicate_nonfinite_or_oversized(data):
 def test_bundle_accepts_resources_file_only_at_the_declared_path(tmp_path):
     archive, digest = bundle_v3(tmp_path / "ok", parts=with_resources(PARTS))
     contract.verify_host_only_artifact(archive, expected_sha256=digest,
-                                       source_commit=None, target_profile=TARGET)
+    target_profile=TARGET)
     # Native C may not smuggle any other config/data file.
     bad = [(i, k, r, {**f, "config/other.json": b"{}"}) if k == "native-c" else (i, k, r, f)
            for i, k, r, f in with_resources(PARTS)]
     archive, digest = bundle_v3(tmp_path / "bad", parts=bad)
     with pytest.raises(contract.UnifiedDeploymentError):
         contract.verify_host_only_artifact(archive, expected_sha256=digest,
-                                           source_commit=None, target_profile=TARGET)
+        target_profile=TARGET)
 
 
 # --- prepare / dispatch -------------------------------------------------------------

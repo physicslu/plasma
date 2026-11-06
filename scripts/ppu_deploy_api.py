@@ -98,7 +98,10 @@ def _bounded_json(raw: bytes, *, expected: bool = True) -> dict[str, Any]:
 
 
 def _valid_package_admission(receipt: Mapping[str, Any], *, kind: str | None = None) -> bool:
-    """An admitted package is verified, never installed or executable."""
+    """Validate content/owner admission; source_commit/publisher never qualify.
+
+    The Bundle may be authored locally with neither metadata field.
+    """
     result = receipt.get("result")
     if (receipt.get("state") != "admitted"
             or not isinstance(result, dict)

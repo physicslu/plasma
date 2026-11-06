@@ -46,7 +46,7 @@ def make_coordinator(tmp_path):
 
 def b3_request(archive, digest, *, mode="stage_only"):
     return engine.BundleV3InstallRequest(
-        archive=archive, source_commit=SOURCE,
+        archive=archive,
         artifact_sha256=digest, target_profile=dict(TARGET),
         api_transaction_id="b" * 32, mode=mode,
     )
@@ -160,7 +160,7 @@ def test_bootstrap_b2_admission_then_b3_requires_exact_factory_policy(tmp_path):
         co = make_coordinator(tmp_path)
         real = engine.BundleV3InstallRequest(
             archive=bootstrap._upload_paths(paths, upload_id).committed,
-            source_commit=SOURCE, artifact_sha256=digest,
+             artifact_sha256=digest,
             target_profile=TARGET, api_transaction_id=request["api_transaction_id"],
             mode=request["mode"], fpga_load=request["fpga_load"],
         )
@@ -403,7 +403,7 @@ def test_b3_no_fpga_unknown_active_publish_requires_recovery(tmp_path):
 def test_b3_rejects_ambiguous_mode_without_install(tmp_path, mode, load):
     archive, digest = build_smoke(tmp_path / "bundle")
     request = engine.BundleV3InstallRequest(
-        archive=archive, source_commit=SOURCE, artifact_sha256=digest,
+        archive=archive,  artifact_sha256=digest,
         target_profile=dict(TARGET), api_transaction_id="b" * 32,
         mode=mode, fpga_load=load,
     )

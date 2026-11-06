@@ -21,8 +21,8 @@ DEPLOYMENT_API = "/v1/deployments"
 DEPLOYMENT_LOCK = "/var/lib/plasma-bootstrap/deployment.lock"
 DEPLOYMENT_JOURNAL = "/var/lib/plasma-bootstrap/deployment.json"
 # The first three #1207 modules are acceptance fixtures, not a permanent module
-# allowlist. Package admission is based on a reviewed source/publisher and a
-# trusted target profile, neither of which is furnished by a module name.
+# allowlist. User Bundle admission validates exact content and a trusted
+# target profile; publisher/GitHub identity is not an admission qualification.
 FIRST_ACCEPTANCE_MODULES = ("wordport", "openocd-integration", "abtest")
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -342,7 +342,7 @@ class VerifiedBundle:
     name: str
     kind: str
     version: str
-    source_commit: str
+    source_commit: str | None
     archive_sha256: str
     files: tuple[VerifiedPackageFile, ...]
     target: Mapping[str, str]
@@ -415,18 +415,17 @@ def _verify_bundle_dependencies(packages: tuple[VerifiedBundlePackage, ...]) -> 
 
 
 def verify_host_only_bundle(
-    archive_path: Path, *, expected_sha256: str, source_commit: str | None,
+    archive_path: Path, *, expected_sha256: str,
     target_profile: Mapping[str, str],
 ) -> VerifiedBundle:
     """Verify canonical v3 package-based wire format only; no execution.
 
-    Publisher provenance, Master authorization, privilege and Site ownership
-    are not established by a valid manifest or checksum.
+    Optional source_commit is untrusted provenance only. No GitHub commit,
+    publisher, signature or CI identity qualifies a user Bundle. Owner action
+    authorization, privilege and Site ownership remain separate requirements.
     """
-    if (type(expected_sha256) is not str or not SHA64.fullmatch(expected_sha256)
-            or (source_commit is not None and
-                (type(source_commit) is not str or not SHA40.fullmatch(source_commit)))):
-        raise UnifiedDeploymentError("BUNDLE_PROVENANCE_FORMAT_INVALID")
+    if type(expected_sha256) is not str or not SHA64.fullmatch(expected_sha256):
+        raise UnifiedDeploymentError("BUNDLE_SHA256_FORMAT_INVALID")
     if (not isinstance(archive_path, Path) or archive_path.is_symlink()
             or not archive_path.is_file() or archive_path.stat().st_size > MAX_PACKAGE_BYTES):
         raise UnifiedDeploymentError("BUNDLE_ARCHIVE_UNTRUSTED")
@@ -464,15 +463,15 @@ def verify_host_only_bundle(
             if schema != BUNDLE_SCHEMA:
                 raise UnifiedDeploymentError("BUNDLE_SCHEMA_UNSUPPORTED")
             package_key = "packages"
-            fields = {"schema", "name", "version", "source_commit", "target",
+            fields = {"schema", "name", "version", "target",
                       "purpose", package_key}
-            if (set(manifest) not in (fields, fields | {"actions"})
+            if (not fields <= set(manifest) <= fields | {"actions", "source_commit"}
                     or manifest["schema"] != schema
                     or type(manifest["name"]) is not str or not SAFE_NAME.fullmatch(manifest["name"])
                     or type(manifest["version"]) is not str or not SAFE_VERSION.fullmatch(manifest["version"])
-                    or type(manifest["source_commit"]) is not str
-                    or not SHA40.fullmatch(manifest["source_commit"])
-                    or (source_commit is not None and source_commit != manifest["source_commit"])
+                    or ("source_commit" in manifest and
+                        (type(manifest["source_commit"]) is not str
+                         or not SHA40.fullmatch(manifest["source_commit"])))
                     or type(manifest["purpose"]) is not str
                     or not SAFE_NAME.fullmatch(manifest["purpose"])
                     or type(manifest["target"]) is not dict
@@ -556,7 +555,7 @@ def verify_host_only_bundle(
             _verify_bundle_dependencies(tuple(packages))
             return VerifiedBundle(
                 manifest["name"], BUNDLE_KIND, manifest["version"],
-                manifest["source_commit"], expected_sha256, tuple(files),
+                manifest.get("source_commit"), expected_sha256, tuple(files),
                 dict(target_profile), tuple(packages), manifest["purpose"],
                 actions=tuple(actions), schema=schema,
             )
@@ -568,9 +567,9 @@ def verify_host_only_bundle(
 
 
 def verify_host_only_artifact(
-    archive_path: Path, *, expected_sha256: str, source_commit: str | None,
+    archive_path: Path, *, expected_sha256: str,
     target_profile: Mapping[str, str],
-) -> VerifiedPackage | VerifiedBundle:
+) -> VerifiedBundle:
     """Admit canonical Bundle v3 only; legacy standalone packages fail closed."""
     if not isinstance(archive_path, Path) or archive_path.is_symlink():
         raise UnifiedDeploymentError("PACKAGE_ARCHIVE_UNTRUSTED")
@@ -592,7 +591,7 @@ def verify_host_only_artifact(
     if schema == BUNDLE_SCHEMA:
         return verify_host_only_bundle(
             archive_path, expected_sha256=expected_sha256,
-            source_commit=source_commit, target_profile=target_profile,
+            target_profile=target_profile,
         )
     raise UnifiedDeploymentError("PACKAGE_SCHEMA_UNSUPPORTED")
 

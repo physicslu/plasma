@@ -51,7 +51,7 @@ def fpga_bundle(tmp_path: Path):
 def load_request(archive, digest, fpga_load=True, *, mode=None):
     request = b3_request(archive, digest)
     return engine.BundleV3InstallRequest(
-        archive=request.archive, source_commit=request.source_commit,
+        archive=request.archive,
         artifact_sha256=request.artifact_sha256,
         target_profile=request.target_profile,
         api_transaction_id=request.api_transaction_id,
@@ -636,7 +636,7 @@ def test_service_forwards_explicit_fpga_load_to_coordinator(tmp_path):
     srv.deployment_thread.join(timeout=10)
     assert len(calls) == 1
     assert calls[0][2]["fpga_load"] is True
-    assert set(calls[0][2]) == {"api_transaction_id", "source_commit",
+    assert set(calls[0][2]) == {"api_transaction_id",
                                 "archive_sha256", "target", "mode", "fpga_load"}
 
 
