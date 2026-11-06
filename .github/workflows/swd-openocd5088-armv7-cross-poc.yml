@@ -1,0 +1,88 @@
+name: PLASMA OpenOCD 5088 ARMv7 cross-build A/B (experimental)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/swd-openocd5088-armv7-cross-poc.yml"
+      - "scripts/ci/build-openocd5088-armv7-cross.sh"
+      - "scripts/ci/tests/test_openocd5088_armv7_cross_poc.py"
+
+permissions:
+  contents: read
+
+# Independent non-required experiment. Never publish a production candidate.
+jobs:
+  armv7-cross-cold-experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout PR source without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate isolated benchmark contracts (host-only)
+        run: python3 -m unittest discover -s scripts/ci/tests -p test_openocd5088_armv7_cross_poc.py -v
+
+      - name: Enable ARMv7 QEMU for baseline and both verifications
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: Cold QEMU ARMv7 build (existing source-locked recipe, no cache)
+        id: qemu
+        shell: bash
+        run: |
+          set -euo pipefail
+          start="$(date +%s)"
+          bash scripts/ci/build-openocd5088-armv7.sh "$RUNNER_TEMP/qemu-cold"
+          end="$(date +%s)"
+          echo "duration_s=$((end - start))" >> "$GITHUB_OUTPUT"
+
+      - name: Verify QEMU-built ELF and admission denials on ARMv7
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/verify-openocd5088-armv7.sh \
+            "$RUNNER_TEMP/qemu-cold" "$RUNNER_TEMP/qemu-verified"
+
+      - name: Cold native x86_64 to ARMv7 cross-build (no cache)
+        id: cross
+        shell: bash
+        run: |
+          set -euo pipefail
+          start="$(date +%s)"
+          bash scripts/ci/build-openocd5088-armv7-cross.sh "$RUNNER_TEMP/cross-cold"
+          end="$(date +%s)"
+          echo "duration_s=$((end - start))" >> "$GITHUB_OUTPUT"
+
+      - name: Verify cross-built ELF and admission denials on the same ARMv7 QEMU
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/verify-openocd5088-armv7.sh \
+            "$RUNNER_TEMP/cross-cold" "$RUNNER_TEMP/cross-verified"
+
+      - name: Report cold A/B evidence (non-release)
+        if: always()
+        shell: bash
+        env:
+          QEMU_RESULT: ${{ steps.qemu.outcome }}
+          CROSS_RESULT: ${{ steps.cross.outcome }}
+          QEMU_SECONDS: ${{ steps.qemu.outputs.duration_s }}
+          CROSS_SECONDS: ${{ steps.cross.outputs.duration_s }}
+        run: |
+          {
+            echo '### Experimental OpenOCD 5088 ARMv7 cold-build A/B'
+            echo ''
+            echo 'Source lock: `5088db4c9154ca833c6d558381074b33672e127a`'
+            echo 'Both builds: same PLASMA checkout; no cache; `make -j2`.'
+            echo 'Both binaries: original ARMv7 QEMU positive/negative verifier.'
+            echo ''
+            echo '| Cold build | Step outcome | Elapsed seconds (including apt/network) |'
+            echo '| --- | --- | ---: |'
+            echo "| ARMv7 QEMU baseline | $QEMU_RESULT | ${QEMU_SECONDS:-not available} |"
+            echo "| x86_64 cross-compile | $CROSS_RESULT | ${CROSS_SECONDS:-not available} |"
+            echo ''
+            echo 'Gate 1 only; **NOT** production-ready; no Z2, FPGA, or DUT execution.'
+          } >> "$GITHUB_STEP_SUMMARY"
