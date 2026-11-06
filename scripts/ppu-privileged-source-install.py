@@ -226,10 +226,17 @@ def upgrade(factory_root: Path = FACTORY_ROOT,
         current = verifier.verify_source(destination, expected_uid=uid)
         _need(current["code_manifest_sha256"] == expected_current_manifest_sha256,
               "PRIVILEGED_UPGRADE_STALE_SOURCE")
-        provision(factory_root, staged, _test_uid=uid)
-        candidate = verifier.verify_source(staged, expected_uid=uid)
-        _need(candidate["code_manifest_sha256"] != expected_current_manifest_sha256,
-              "PRIVILEGED_UPGRADE_NO_CHANGE")
+        try:
+            provision(factory_root, staged, _test_uid=uid)
+            candidate = verifier.verify_source(staged, expected_uid=uid)
+            _need(candidate["code_manifest_sha256"] != expected_current_manifest_sha256,
+                  "PRIVILEGED_UPGRADE_NO_CHANGE")
+        except Exception:
+            # Nothing was activated: remove only the stage created by this
+            # maintenance attempt. Preserve current verified Root unchanged.
+            if staged.is_dir() and not staged.is_symlink():
+                shutil.rmtree(staged)
+            raise
         try:
             os.rename(destination, backup)
             _sync_dir(destination.parent)
