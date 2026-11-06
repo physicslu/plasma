@@ -63,10 +63,12 @@ def open_provider_job_session(
                   if key not in ("options_json", "target")}
     extra = ({"expected_engine_selection_sha256": expected_engine_selection_sha256}
              if expected_engine_selection_sha256 is not None else {})
+    if profile is not None:
+        extra["profile"] = dict(profile)
     opened = client.open_job_session(
         job_id=job_id, sites=[site_id], max_runtime_s=math.ceil(remaining),
         provider_route=route_wire,
-        deadline_monotonic=deadline, profile=profile, **extra)
+        deadline_monotonic=deadline, **extra)
     if (opened.get("provider_route") != route_wire
             or opened.get("deadline_monotonic") != deadline):
         if isinstance(opened.get("session_id"), str):
