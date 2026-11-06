@@ -11,6 +11,10 @@ commit, configure flags, image tag, apt dependencies, explicit toolchain epoch),
 the native injector, every C/H file named in its COPIES tuple, and the cache
 key/verification implementation. It excludes docs, the HIL deployment template,
 and the independent admission script because none feeds the C compiler.
+Site admission changes instead run the existing Python PS source-test job,
+including unprivileged admit/revoke denial checks; they do not trigger the
+ARMv7 OpenOCD candidate workflow. OpenOCD C/H, build/verification tooling
+and the ARMv7 workflow itself still trigger source-locked candidate checks.
 
 The arm32v7/ubuntu:22.04 image tag and apt packages are not fully immutable.
 Maintainers MUST bump OPENOCD5088_TOOLCHAIN_EPOCH when the toolchain, Ubuntu
@@ -52,3 +56,12 @@ Keep the integrity, QEMU negative checks, and per-HEAD evidence mandatory.
 
 This PR is independent of #1264. It must pass separate Gate 2 merge approval
 before its workflow can speed subsequent #1264 PR pushes.
+
+## Native OpenOCD source-build routing
+The existing Python source-test workflow has a separate `swd-openocd-native`
+job. Native OpenOCD rebuilds for C/H, injector, native compilation-test changes,
+or changes to the native job's own YAML block. A Python-test-only edit to
+`python-tests.yml` skips that build. Missing/unreadable PR base or a missing
+native job stanza fails closed by requiring the build. The native job allows
+45 minutes because hosted Ubuntu APT downloads exhausted its previous 20-minute
+cap before C compilation started; this does not relax validation.

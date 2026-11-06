@@ -10,7 +10,6 @@ on:
       - "scripts/ci/openocd5088-armv7-cache.py"
       - "scripts/ci/tests/test_openocd5088_armv7_cache.py"
       - "software/native/swd/**"
-      - "scripts/z2/plasma_swd_site_admission.py"
 
 permissions:
   contents: read
