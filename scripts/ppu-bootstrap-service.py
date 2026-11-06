@@ -638,14 +638,12 @@ def run_bundle_install_subprocess(
         if script.is_symlink() or not script.is_file():
             raise BootstrapServiceError("B3_INSTALLED_ENGINE_NOT_QUALIFIED")
     _trusted_b3_install_policy(paths)
-    if (set(request) != {"api_transaction_id", "source_commit", "archive_sha256",
+    if (set(request) != {"api_transaction_id", "archive_sha256",
                          "target", "mode", "fpga_load"}
             or request.get("mode") not in ("activate", "stage_only")
             or type(request.get("mode")) is not str
             or (request["mode"] == "stage_only" and request["fpga_load"])
             or type(request.get("fpga_load")) is not bool
-            or type(request.get("source_commit")) is not str
-            or not re.fullmatch(r"[0-9a-f]{40}", request["source_commit"])
             or type(request.get("archive_sha256")) is not str
             or not HEX64_RE.fullmatch(request["archive_sha256"])
             or type(request.get("target")) is not dict
@@ -658,7 +656,6 @@ def run_bundle_install_subprocess(
         "--product-root", str(paths.product_root),
         "install-bundle", "--release-artifact", str(upload.committed),
         "--artifact-sha256", request["archive_sha256"],
-        "--source-commit", request["source_commit"],
         "--platform", request["target"]["platform"],
         "--board", request["target"]["board"],
         "--fpga-part", request["target"]["fpga_part"],
@@ -690,8 +687,7 @@ def run_bundle_install_subprocess(
             or result.get("ready") is not False
             or (active is not None if request["mode"] == "stage_only"
                 else not isinstance(active, dict) or active.get("asset_set_sha256") != request["archive_sha256"])
-            or result.get("archive_sha256") != request["archive_sha256"]
-            or result.get("source_commit") != request["source_commit"]):
+            or result.get("archive_sha256") != request["archive_sha256"]):
         raise BootstrapServiceError("B3_DEVICE_INSTALL_RECEIPT_INVALID")
     return result
 
@@ -722,13 +718,11 @@ def _reconcile_b3_install_result(
                 or active.get("asset_set_sha256") != runner_result.get("archive_sha256"))):
         raise BootstrapServiceError("B3_API_RECEIPT_MODE_MISMATCH")
     record = _read_coordinator_journal(paths)
-    source = runner_result.get("source_commit")
     digest = runner_result.get("archive_sha256")
     if (record is None
             or record.get("state") != ("bundle_installed" if mode == "stage_only" else
                                        "fpga_loaded" if fpga_load else "asset_set_active")
             or record.get("kind") != "bundle"
-            or record.get("source_commit") != source
             or record.get("artifact_sha256") != digest
             or record.get("api_transaction_id") != api_transaction_id
             or record.get("transaction_id") == previous_coordinator_id
@@ -848,7 +842,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 try:
                     verified = contract.verify_host_only_artifact(
                         upload.committed, expected_sha256=meta["sha256"],
-                        source_commit=None, target_profile=target,
+                        target_profile=target,
                     )
                 except contract.UnifiedDeploymentError as exc:
                     raise BootstrapServiceError(str(exc)) from exc
@@ -930,8 +924,6 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     or result.get("stage") != "package_admission_only"
                     or plan.get("bundle_schema") != "plasma.ppu.bundle.v3"
                     or plan.get("kind") != "bundle"
-                    or type(plan.get("source_commit")) is not str
-                    or not re.fullmatch(r"[0-9a-f]{40}", plan["source_commit"])
                     or type(plan.get("archive_sha256")) is not str
                     or not HEX64_RE.fullmatch(plan["archive_sha256"])
                     or type(plan.get("packages")) is not list
@@ -968,7 +960,6 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             try:
                 reverified_plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
                     upload.committed, expected_sha256=plan["archive_sha256"],
-                    source_commit=plan["source_commit"],
                     target_profile=trusted_target,
                     contracts_path=self.bootstrap_paths.fpga_image_contracts,
                 )
@@ -1014,7 +1005,6 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     evidence = dict(runner(
                         self.bootstrap_paths, upload_id,
                         {"api_transaction_id": transaction_id,
-                         "source_commit": plan["source_commit"],
                          "archive_sha256": plan["archive_sha256"],
                          "target": dict(trusted_target),
                          "mode": mode, "fpga_load": fpga_load},

@@ -107,12 +107,12 @@ class EngineeringDeploymentRequest:
 class BundleV3InstallRequest:
     """Device-local B3 install, admitted by the existing Bootstrap API only.
 
-    Source, archive digest and target are PINNED by device-local policy; HTTP
-    can only refer to an already committed/admitted upload_id.
+    Exact archive digest and target are checked against device-local policy;
+    HTTP can only refer to an already committed/admitted upload_id. Git
+    provenance is never an admission or activation qualification.
     """
 
     archive: Path
-    source_commit: str
     artifact_sha256: str
     target_profile: Mapping[str, str]
     api_transaction_id: str
@@ -126,7 +126,6 @@ class HostOnlyPackageRequest:
     """Never built from HTTP; dry-run target identity comes from a test fixture."""
 
     archive: Path
-    source_commit: str
     artifact_sha256: str
     target_profile: Mapping[str, str]
 
@@ -302,7 +301,6 @@ class DeploymentCoordinator:
     def qualify_bundle_v3_admission(
         archive: Path, *, expected_sha256: str,
         target_profile: Mapping[str, str], contracts_path: Path,
-        source_commit: str | None = None,
     ) -> dict[str, Any]:
         """One read-only B2/B3 preflight for the canonical Bundle v3.
 
@@ -323,7 +321,7 @@ class DeploymentCoordinator:
         try:
             verified = contract.verify_host_only_artifact(
                 archive, expected_sha256=expected_sha256,
-                source_commit=source_commit, target_profile=target_profile,
+                target_profile=target_profile,
             )
         except contract.UnifiedDeploymentError as exc:
             raise BundleV3AdmissionVerificationDenied(str(exc)) from exc
@@ -584,8 +582,7 @@ class DeploymentCoordinator:
         """
         if not isinstance(request, BundleV3InstallRequest):
             raise DeploymentError("B3_INSTALL_REQUEST_INVALID")
-        if (not _HEX40.fullmatch(request.source_commit)
-                or not _HEX64.fullmatch(request.artifact_sha256)
+        if (not _HEX64.fullmatch(request.artifact_sha256)
                 or not _API_TRANSACTION_ID.fullmatch(request.api_transaction_id)
                 or not isinstance(request.archive, Path)
                 or request.archive.is_symlink()
@@ -622,7 +619,6 @@ class DeploymentCoordinator:
                 started_at_epoch_s=now,
                 updated_at_epoch_s=now,
                 release_artifact=str(request.archive),
-                source_commit=request.source_commit,
                 api_transaction_id=request.api_transaction_id,
                 artifact_sha256=request.artifact_sha256,
                 kind="bundle",
@@ -633,7 +629,6 @@ class DeploymentCoordinator:
                 self.journal.write(record, "verifying")
                 bundle = contract.verify_host_only_artifact(
                     request.archive, expected_sha256=request.artifact_sha256,
-                    source_commit=request.source_commit,
                     target_profile=request.target_profile,
                 )
                 if (not isinstance(bundle, contract.VerifiedBundle)
@@ -646,6 +641,7 @@ class DeploymentCoordinator:
                 # kinds, file constraints, target compatibility, SHA-256, and
                 # closed acyclic dependency graph. Never special-case a named
                 # fixture or treat its contents as execution authority.
+                record.source_commit = bundle.source_commit
                 record.module = bundle.name
                 record.release_id = (bundle.version + "-" +
                                      bundle.archive_sha256[:16])
@@ -680,7 +676,6 @@ class DeploymentCoordinator:
                 if (not isinstance(evidence, Mapping)
                         or evidence.get("result") != "PASS"
                         or evidence.get("archive_sha256") != request.artifact_sha256
-                        or evidence.get("source_commit") != request.source_commit
                         or evidence.get("bundle_name") != bundle.name):
                     raise DeploymentError("B3_DEVICE_INSTALL_RECEIPT_INVALID")
             except Exception as exc:
@@ -712,7 +707,7 @@ class DeploymentCoordinator:
                 "transaction": asdict(record),
                 "bundle_name": bundle.name,
                 "archive_sha256": request.artifact_sha256,
-                "source_commit": request.source_commit,
+                "source_commit": bundle.source_commit,
                 "package_order": evidence["package_order"],
                 "files_verified": evidence["files_verified"],
                 "install_path": evidence["path"],
@@ -990,7 +985,6 @@ class DeploymentCoordinator:
         try:
             bundle = contract.verify_host_only_artifact(
                 request.archive, expected_sha256=request.artifact_sha256,
-                source_commit=request.source_commit,
                 target_profile=request.target_profile,
             )
             if (not isinstance(bundle, contract.VerifiedBundle)
@@ -1075,19 +1069,20 @@ class DeploymentCoordinator:
                 transaction_id=self.transaction_id_factory(),
                 state="received", sequence=0, started_at_epoch_s=now,
                 updated_at_epoch_s=now, release_artifact=str(request.archive),
-                source_commit=request.source_commit, kind="host-only-package",
+                kind="host-only-package",
             )
             self.journal.write(record, "received")
             try:
                 self.journal.write(record, "verifying")
                 package = contract.verify_host_only_artifact(
                     request.archive, expected_sha256=request.artifact_sha256,
-                    source_commit=request.source_commit, target_profile=request.target_profile,
+                    target_profile=request.target_profile,
                 )
             except Exception as exc:
                 self.journal.write(record, "verify_failed",
                                    error_code="package_verification_failed", error_message=str(exc))
                 raise DeploymentError(f"host-only package verification failed: {exc}") from exc
+            record.source_commit = package.source_commit
             record.module = package.name
             record.package_kind = package.kind
             record.artifact_sha256 = package.archive_sha256
@@ -1112,7 +1107,7 @@ class DeploymentCoordinator:
             # Only a non-production simulation store is mutated; the real
             # /opt/plasma, FPGA Manager and factory recovery are untouched.
             store = self.paths.bootstrap_state_root / "host-only-packages"
-            release_id = (f"{package.version}-{package.source_commit[:12]}-"
+            release_id = (f"{package.version}-"
                           f"{package.archive_sha256[:16]}")
             release_root = store / "releases" / package.name / release_id
             active_path = store / "active" / f"{package.name}.json"
@@ -1181,8 +1176,6 @@ class DeploymentCoordinator:
                             or prior.get("kind") not in contract.PACKAGE_KINDS | {contract.BUNDLE_KIND}
                             or type(prior.get("release_id")) is not str
                             or not re.fullmatch(r"[A-Za-z0-9_.-]{1,160}", prior["release_id"])
-                            or type(prior.get("source_commit")) is not str
-                            or not _HEX40.fullmatch(prior["source_commit"])
                             or type(prior.get("archive_sha256")) is not str
                             or not _HEX64.fullmatch(prior["archive_sha256"])
                             or not prior["release_id"].endswith(prior["archive_sha256"][:16])):
@@ -1493,7 +1486,6 @@ def _parser() -> argparse.ArgumentParser:
     deploy.add_argument("--api-transaction-id", help="optional Bootstrap API correlation ID; not authority")
     b3 = sub.add_parser("install-bundle", help="B3 canonical v3 Install/Activate or explicit stage_only")
     b3.add_argument("--release-artifact", type=Path, required=True)
-    b3.add_argument("--source-commit", required=True)
     b3.add_argument("--artifact-sha256", required=True)
     b3.add_argument("--platform", required=True)
     b3.add_argument("--board", required=True)
@@ -1528,7 +1520,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "install-bundle":
         request = BundleV3InstallRequest(
             archive=args.release_artifact,
-            source_commit=args.source_commit,
             artifact_sha256=args.artifact_sha256,
             target_profile={
                 "platform": args.platform, "board": args.board,

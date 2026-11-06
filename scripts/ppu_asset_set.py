@@ -83,7 +83,6 @@ def verify_staged(product_root: Path, asset_set_sha256: str) -> dict[str, Any]:
             or receipt.get("archive_sha256") != asset_set_sha256
             or receipt.get("manifest_sha256") != _digest(target / "manifest.json")
             or receipt.get("bundle_name") != manifest.get("name")
-            or receipt.get("source_commit") != manifest.get("source_commit")
             or manifest.get("schema") != BUNDLE
             or manifest.get("actions") != ["install", "verify"]
             or type(manifest.get("packages")) is not list

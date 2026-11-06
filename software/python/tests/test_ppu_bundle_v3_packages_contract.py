@@ -76,7 +76,7 @@ def coordinator(tmp):
 
 
 def request(archive, digest):
-    return engine.HostOnlyPackageRequest(archive, SOURCE, digest, TARGET)
+    return engine.HostOnlyPackageRequest(archive, digest, TARGET)
 
 
 def bundle_v3(tmp_path: Path, *, mutate=None, parts=PARTS):
@@ -119,7 +119,7 @@ def bundle_v3(tmp_path: Path, *, mutate=None, parts=PARTS):
 def test_v3_schema_and_single_plural_packages_exact_structure(tmp_path):
     archive, digest = bundle_v3(tmp_path)
     verified = contract.verify_host_only_artifact(
-        archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+        archive, expected_sha256=digest, target_profile=TARGET
     )
     assert verified.schema == "plasma.ppu.bundle.v3"
     assert len(verified.packages) == 6
@@ -182,7 +182,7 @@ def test_v3_rejects_legacy_field_dependency_or_member_path(tmp_path, modify):
     archive, digest = bundle_v3(tmp_path, mutate=modify)
     with pytest.raises(contract.UnifiedDeploymentError):
         contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256=digest, target_profile=TARGET
         )
 
 
@@ -199,12 +199,12 @@ def test_v3_exact_package_count_boundary(tmp_path, count, accepted):
     if not accepted:
         with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_MANIFEST_CONTENT_DENIED"):
             contract.verify_host_only_artifact(
-                archive, expected_sha256=digest, source_commit=SOURCE,
+                archive, expected_sha256=digest,
                 target_profile=TARGET,
             )
     else:
         verified = contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE,
+            archive, expected_sha256=digest,
             target_profile=TARGET,
         )
         assert len(verified.packages) == count
@@ -314,7 +314,7 @@ def test_v3_rejects_legacy_package_v1_at_canonical_entry(tmp_path):
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_SCHEMA_UNSUPPORTED"):
         contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256=digest, target_profile=TARGET
         )
 
 
@@ -332,7 +332,7 @@ def test_v3_rejects_duplicate_manifest_key(tmp_path):
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     with pytest.raises(contract.UnifiedDeploymentError):
         contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256=digest, target_profile=TARGET
         )
 
 
@@ -340,7 +340,7 @@ def test_v3_rejects_file_hash_mismatch(tmp_path):
     archive, digest = bundle_v3(tmp_path, mutate=lambda m: m["packages"][0]["files"][0].update(sha256="0" * 64))
     with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_FILE_SHA256_MISMATCH"):
         contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256=digest, target_profile=TARGET
         )
 
 
@@ -356,7 +356,7 @@ def test_v3_migrated_manifest_and_member_fail_closed(tmp_path, mutation, reason)
     archive, digest = bundle_v3(tmp_path, mutate=mutation)
     with pytest.raises(contract.UnifiedDeploymentError, match=reason):
         contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256=digest, target_profile=TARGET
         )
 
 
@@ -364,13 +364,13 @@ def test_v3_migrated_archive_digest_and_symlink_fail_closed(tmp_path):
     archive, digest = bundle_v3(tmp_path)
     with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_ARCHIVE_SHA256_MISMATCH"):
         contract.verify_host_only_artifact(
-            archive, expected_sha256="0" * 64, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256="0" * 64, target_profile=TARGET
         )
     link = tmp_path / "archive-link.zip"
     link.symlink_to(archive)
     with pytest.raises(contract.UnifiedDeploymentError, match="PACKAGE_ARCHIVE_UNTRUSTED"):
         contract.verify_host_only_artifact(
-            link, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            link, expected_sha256=digest, target_profile=TARGET
         )
 
 
@@ -381,7 +381,7 @@ def test_v3_migrated_undeclared_zip_member_fail_closed(tmp_path):
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_UNDECLARED_OR_DUPLICATE_FILES"):
         contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256=digest, target_profile=TARGET
         )
 
 
@@ -390,7 +390,7 @@ def test_v3_vivado_bit_is_not_a_z2_loader_asset(tmp_path):
     archive, digest = bundle_v3(tmp_path, parts=parts)
     with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_PACKAGE_FILE_KIND_DENIED"):
         contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256=digest, target_profile=TARGET
         )
 
 
@@ -401,5 +401,5 @@ def test_v3_fpga_package_requires_bin_hwh_manifest_triple(tmp_path, missing):
     archive, digest = bundle_v3(tmp_path, parts=[("fpga-addon", "fpga-image", [], files)])
     with pytest.raises(contract.UnifiedDeploymentError, match="BUNDLE_FPGA_PAIR_DENIED"):
         contract.verify_host_only_artifact(
-            archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET
+            archive, expected_sha256=digest, target_profile=TARGET
         )

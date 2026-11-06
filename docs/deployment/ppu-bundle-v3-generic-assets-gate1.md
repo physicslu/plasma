@@ -22,9 +22,19 @@ Console -> Bootstrap B1 upload/commit
 ```
 
 The B3 request must refer to the **current** B2 admission: the same
-upload, source commit, full archive SHA256, target and verified Package
+upload, full archive SHA256, target and verified Package
 qualification. The owner authorization is **fresh and B3-specific**;
 `bundle.admit` is not installation authority. No Bundle field grants execution.
+
+A locally authored ZIP needs neither `source_commit` nor Publisher metadata,
+signature, GitHub upload or successful publisher CI. Optional `source_commit`
+is untrusted provenance only and never compared to engineering HEAD. B2/B3
+identity and reconciliation use exact archive SHA256 and transaction IDs;
+absent source provenance appears as `null` in receipts. The device engine
+`install-bundle` CLI takes no `--source-commit`; its required artifact SHA256,
+target, API correlation, explicit mode and FPGA load selection remain.
+Engineering Runtime Release and trusted Dispatcher source pins are unchanged.
+See the [canonical manifest contract](../architecture/ppu-canonical-bundle-packages.md).
 
 | Explicit B3 contract | Required B3 authority | Result |
 | --- | --- | --- |

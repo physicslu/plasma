@@ -87,7 +87,7 @@ def _ready_fixture(tmp_path, parts=None):
 
     bundle = contract.verify_host_only_artifact(
         archive, expected_sha256=digest,
-        source_commit=SOURCE, target_profile=TARGET,
+        target_profile=TARGET,
     )
     by_kind = {p.kind: p for p in bundle.packages
                if p.kind in {"python", "native-c", "fpga-image"}}
@@ -331,7 +331,7 @@ def _b3_fpga_receipt_fixture(tmp_path):
 
     bundle = contract.verify_host_only_artifact(
         archive, expected_sha256=digest,
-        source_commit=SOURCE, target_profile=TARGET,
+        target_profile=TARGET,
     )
     fpga = next(p for p in bundle.packages if p.kind == "fpga-image")
     request = execution.AssetExecutionRequest(

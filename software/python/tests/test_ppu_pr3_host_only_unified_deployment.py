@@ -25,7 +25,7 @@ from .ppu_owner_authorization_fixture import install_summary, owner as owner_mod
 def verified(tmp_path: Path):
     archive, digest = bundle_v3(tmp_path)
     return archive, digest, contract.verify_host_only_artifact(
-        archive, expected_sha256=digest, source_commit=SOURCE, target_profile=TARGET,
+        archive, expected_sha256=digest, target_profile=TARGET,
     )
 
 
