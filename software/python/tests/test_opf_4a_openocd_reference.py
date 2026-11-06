@@ -59,7 +59,7 @@ def _json(payload):
 def installed_bundle(*, profile_change=None, descriptor_change=None,
                      engine_binary=OPENOCD, options_schema=None,
                      with_control_socket=True, verified_worker=True,
-                     with_fpga=True, platform_provider=False, reference_change=None,
+                     with_fpga=True, platform_provider=False, platform_extra_files=None,
                      profile_count=1):
     with tempfile.TemporaryDirectory(prefix="opf4a-", dir="/tmp") as directory:
         path = Path(directory)
@@ -91,16 +91,9 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
         if not with_fpga:
             parts.pop()
         if platform_provider:
-            platform_reference = {
-                "schema": "plasma.ppu.platform-openocd-reference.v1",
-                "openocd_sha256": hashlib.sha256(OPENOCD).hexdigest(),
-                "admission_sha256": hashlib.sha256(b"# fake admission\n").hexdigest(),
-                "driver_abi": DRIVER_ABI,
-            }
-            platform_reference.update(reference_change or {})
             parts[0] = (PROVIDER, "platform-provider", [], {
-                reference.ppu_provider_contract.PLATFORM_REFERENCE: _json(platform_reference),
                 reference.ppu_provider_contract.PLATFORM_OPTIONS: _json(schema),
+                **(platform_extra_files or {}),
             })
         if profile_count == 0:
             parts = [part for part in parts if part[0] != PROFILE]
@@ -391,6 +384,46 @@ def test_profile_provider_only_runtime_flash_uses_installed_platform(monkeypatch
         assert all(not f["executable"] for p in manifest["packages"] for f in p["files"])
 
 
+def test_platform_provider_accepts_new_verified_engine_without_bundle_pins(monkeypatch):
+    updated_engine = b"\x7fELF-updated-plasma-swd-v5"
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True, engine_binary=updated_engine) as env:
+        result = _runtime_execute(env, monkeypatch)
+        assert result["result"] == "PASS" and result["safe_off"] is True
+        assert result["opf_openocd_sha256"] == hashlib.sha256(updated_engine).hexdigest()
+        assert result["opf_worker_engine_selection_sha256"] == result["opf_engine_selection_sha256"]
+        staged = env["product_root"] / "assets/staged" / env["asset_set_sha256"]
+        manifest = json.loads((staged / "manifest.json").read_bytes())
+        provider = next(p for p in manifest["packages"] if p["kind"] == "platform-provider")
+        assert [f["path"] for f in provider["files"]] == [
+            f"payload/packages/{PROVIDER}/data/plasma-provider-options.json"]
+        assert sum(len(p["files"]) for p in manifest["packages"]) == 3
+
+
+def test_platform_provider_rejects_retired_engine_reference_file(monkeypatch):
+    with installed_bundle(
+            with_control_socket=False, with_fpga=False, platform_provider=True,
+            platform_extra_files={"data/plasma-platform-engine.json": _json({
+                "schema": "plasma.ppu.platform-openocd-reference.v1",
+                "openocd_sha256": "0" * 64,
+                "admission_sha256": "0" * 64,
+                "driver_abi": DRIVER_ABI,
+            })}) as env:
+        with pytest.raises(PlasmaError, match="PROVIDER_ENTRYPOINT_MISSING"):
+            _runtime_execute(env, monkeypatch)
+        assert not env["sim"].argvs and not env["core"]._sessions
+
+
+def test_platform_provider_rejects_modified_installed_engine(monkeypatch):
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True) as env:
+        selected = Path(env["engine_data"]["openocd_root"]) / "bin" / "openocd"
+        selected.write_bytes(b"tampered-installed-engine")
+        with pytest.raises(PlasmaError, match="OPENOCD_SHA256_MISMATCH"):
+            _runtime_execute(env, monkeypatch)
+        assert not env["sim"].argvs and not env["core"]._sessions
+
+
 @pytest.mark.parametrize("observation", [
     {"fpga_identity_proven": False}, {"worker_identity": {}},
     {"driver_abi": "plasma_swd:6"}, {"sites": [1]},
@@ -405,10 +438,6 @@ def test_no_fpga_package_still_requires_trusted_hardware(observation):
 
 @pytest.mark.parametrize("options,mutation,code", [
     ({"profile_change": {"flash_size": 131072}}, None, "REFERENCE_PROFILE_RUNTIME_MISMATCH"),
-    ({"engine_binary": b"different installed engine"}, None, "REFERENCE_PLATFORM_ENGINE_MISMATCH"),
-    ({"reference_change": {"admission_sha256": "0" * 64}}, None, "REFERENCE_PLATFORM_ENGINE_MISMATCH"),
-    ({"reference_change": {"driver_abi": "plasma_swd:6"}}, None, "REFERENCE_PLATFORM_ENGINE_MISMATCH"),
-    ({"reference_change": {"path": "/bin/untrusted"}}, None, "REFERENCE_PLATFORM_ENGINE_MISMATCH"),
     ({"descriptor_change": {"driver_abi": "plasma_swd:6"}}, None, "FPGA_DRIVER_UNVERIFIED"),
     ({"profile_count": 0}, None, "OPF_PROFILE_MISSING_OR_AMBIGUOUS"),
     ({"profile_count": 2}, None, "OPF_PROFILE_MISSING_OR_AMBIGUOUS"),

@@ -17,7 +17,6 @@ import ppu_provider_options
 
 SCHEMA = "plasma.ppu.provider-capabilities.v1"
 DESCRIPTOR = "data/plasma-provider.json"
-PLATFORM_REFERENCE = "data/plasma-platform-engine.json"
 PLATFORM_OPTIONS = "data/plasma-provider-options.json"
 OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -166,7 +165,7 @@ def resolve(
               entry["path"].startswith(provider_prefix + "bin/")
               and entry["executable"] is True for entry in selected_provider["files"]))
           or (selected_provider["kind"] == "platform-provider"
-              and provider_prefix + PLATFORM_REFERENCE in provider_paths
+              and provider_paths == {provider_prefix + PLATFORM_OPTIONS}
               and all(entry["executable"] is False for entry in selected_provider["files"])),
           "PROVIDER_ENTRYPOINT_MISSING")
     _need(operation in desc["operations"], "OPERATION_UNSUPPORTED")
