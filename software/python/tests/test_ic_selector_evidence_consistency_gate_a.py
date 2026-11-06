@@ -18,10 +18,12 @@ class ICSelectorEvidenceConsistencyTests(unittest.TestCase):
         cls.microchip = [r for r in cls.catalog.records if r.vendor == "Microchip"]
 
     def test_all_1015_read_only_upstream_evidence_and_job_denied(self):
-        self.assertEqual(len(self.microchip), 1015)
-        self.assertEqual(sum(r.family == "PIC32MX" for r in self.microchip), 893)
-        self.assertEqual(sum(r.family == "SAML1X" for r in self.microchip), 122)
-        for row in self.microchip:
+        # The original source-lock evidence is scoped to these two admitted families.
+        legacy = [r for r in self.microchip if r.family in {"PIC32MX", "SAML1X"}]
+        self.assertEqual(len(legacy), 1015)
+        self.assertEqual(sum(r.family == "PIC32MX" for r in legacy), 893)
+        self.assertEqual(sum(r.family == "SAML1X" for r in legacy), 122)
+        for row in legacy:
             with self.subTest(icpn=row.icpn):
                 evidence = microchip_upstream_openocd_evidence(row)
                 q = self.qualification.describe("Microchip", row.icpn)
@@ -46,6 +48,26 @@ class ICSelectorEvidenceConsistencyTests(unittest.TestCase):
                     self.assertEqual(evidence["target_cfg"]["path"], "tcl/target/atsaml1x.cfg")
                     self.assertIsNone(evidence["flash_driver"])
                     self.assertIsNone(evidence["device_id"])
+
+    def test_phase2_892_not_inferred_as_upstream_binding_or_executable(self):
+        # Phase 2 has separate pinned driver DEVSEL candidate evidence, not
+        # the original upstream CFG/DEVID projection from Gate A.
+        phase2 = [r for r in self.microchip if r.family in {"SAMDCRL0", "SAMD5E5"}]
+        self.assertEqual(len(self.microchip), 1907)
+        self.assertEqual(len(phase2), 892)
+        self.assertEqual(sum(r.family == "SAMDCRL0" for r in phase2), 538)
+        self.assertEqual(sum(r.family == "SAMD5E5" for r in phase2), 354)
+        for row in phase2:
+            with self.subTest(icpn=row.icpn):
+                q = self.qualification.describe("Microchip", row.icpn)
+                self.assertIsNone(microchip_upstream_openocd_evidence(row))
+                self.assertEqual(row.mapping_status, "no_mapping")
+                self.assertFalse(row.target_config)
+                self.assertEqual(q["catalog_level"], 1)
+                self.assertEqual(q["state"], "CANDIDATE")
+                self.assertFalse(q["job_selectable"])
+                self.assertFalse(q["execution_authorized"])
+                self.assertFalse(q["physical_programming_qualified"])
 
     def test_pic32mx_and_saml1x_details_use_actual_source_and_level(self):
         samples = (

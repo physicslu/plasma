@@ -50,7 +50,7 @@ class MicrochipSAML1XOfficialL1Tests(unittest.TestCase):
         summary = next(x for x in observer.report["manufacturers"]
                        if x["manufacturer"] == "Microchip")
         self.assertEqual(summary["catalog_level_counts"],
-                         {"0": 0, "1": 1015, "2": 0, "3": 0})
+                         {"0": 0, "1": 1907, "2": 0, "3": 0})
         self.assertEqual(summary["job_selectable_exact_icpns"], 0)
 
     def test_legacy_unadmitted_research_icpns_remain_out_of_product(self):

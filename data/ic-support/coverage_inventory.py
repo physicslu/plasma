@@ -749,14 +749,14 @@ def build_inventory() -> dict[str, Any]:
                 # retain their historical strict pin-count validation.
                 "pin_count": (
                     None
-                    if (manufacturer == "Microchip" and family == "PIC32MX"
+                    if (manufacturer == "Microchip" and family in {"PIC32MX", "SAMDCRL0", "SAMD5E5"}
                         and mapping_status == "no_mapping"
                         and not row["package"] and not row["pin_count"])
                     else parse_pin_count(row["pin_count"], row["package"])
                 ),
                 "flash_size": (
                     None
-                    if (manufacturer == "Microchip" and family == "PIC32MX"
+                    if (manufacturer == "Microchip" and family in {"PIC32MX", "SAMDCRL0", "SAMD5E5"}
                         and not row["flash_size"])
                     else row["flash_size"]
                 ),

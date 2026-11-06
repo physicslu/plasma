@@ -1,0 +1,136 @@
+name: Microchip Phase 2 explicit DEVSEL admission research
+
+on:
+  pull_request:
+    paths:
+      - 'data/device-catalog/research/microchip_phase2_explicit_devsel_audit_v1.py'
+      - '.github/workflows/microchip-phase2-explicit-devsel.yml'
+      - 'software/python/plasma_web/microchip_sam_explicit_devsel_route_evidence.py'
+      - 'software/python/plasma_web/microchip_phase1_admission_guard.py'
+      - 'software/python/plasma_web/programming_qualification.py'
+      - 'software/python/tests/test_microchip_sam_phase2_892_l1.py'
+      - 'data/device-catalog/research/microchip-phase2-samdcrl0-538-commercial-l1-v1.csv'
+      - 'data/device-catalog/research/microchip-phase2-samd5e5-354-commercial-l1-v1.csv'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  microchip-phase2-source-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch pinned upstream driver source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/microchip-phase2"
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://raw.githubusercontent.com/openocd-org/openocd/9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c/src/flash/nor/at91samd.c' \
+            -o "$RUNNER_TEMP/microchip-phase2/at91samd.c"
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://raw.githubusercontent.com/openocd-org/openocd/9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c/src/flash/nor/atsame5.c' \
+            -o "$RUNNER_TEMP/microchip-phase2/atsame5.c"
+      - name: Replay 1548 exact identities and independently count 892 explicit DEVSEL matches
+        shell: bash
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/microchip_phase2_explicit_devsel_audit_v1.py \
+            --driver-d "$RUNNER_TEMP/microchip-phase2/at91samd.c" \
+            --driver-e "$RUNNER_TEMP/microchip-phase2/atsame5.c" \
+            --output "$RUNNER_TEMP/microchip-phase2/phase2-1548-devsel-review.json"
+          python data/device-catalog/research/microchip_phase2_explicit_devsel_audit_v1.py \
+            --driver-d "$RUNNER_TEMP/microchip-phase2/at91samd.c" \
+            --driver-e "$RUNNER_TEMP/microchip-phase2/atsame5.c" \
+            --output "$RUNNER_TEMP/microchip-phase2/phase2-1548-devsel-review.json" --verify
+      - name: Assert fail-closed under source tampering and check 892 canonical L1-only admissions
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          root = Path.cwd()
+          sys.path.insert(0, str(root / 'data/device-catalog/research'))
+          import microchip_phase2_explicit_devsel_audit_v1 as a
+          from plasma_web.device_catalog import get_default_device_catalog
+          from plasma_web.programming_qualification import get_default_programming_qualification_registry
+          base = Path(os.environ['RUNNER_TEMP']) / 'microchip-phase2'
+          queue = json.loads((base / 'phase2-1548-devsel-review.json').read_text())
+          assert queue['candidate_counts'] == {
+              'EXACT_DRIVER_PART_DEVSEL_REVIEW_CANDIDATE': 892,
+              'NO_EXPLICIT_DRIVER_PART_TABLE_MATCH': 656,
+          }
+          assert queue['direct_base_device_counts'] == {
+              'tcl/target/at91samdXX.cfg': 59,
+              'tcl/target/atsame5x.cfg': 25,
+          }
+          assert len(queue['rows']) == queue['remaining_icpns'] == 1548
+          assert all(r['catalog_level'] is None and
+                     not r['canonical_identity_admitted'] and
+                     not r['canonical_route_admitted'] and
+                     not r['execution_authorized'] and
+                     not r['job_selectable'] for r in queue['rows'])
+          source = a.ORIGINAL.read_bytes()
+          original = a.PIC_ADMITTED.read_bytes()
+          d = (base / 'at91samd.c').read_bytes()
+          e = (base / 'atsame5.c').read_bytes()
+          for altered in (
+              (source + b'\n#tampered', original, d, e),
+              (source, original, d + b'\n#tampered', e),
+              (source, original, d, e + b'\n#tampered'),
+          ):
+              try:
+                  a.audit(*altered)
+              except ValueError:
+                  pass
+              else:
+                  raise AssertionError('Modified upstream/original source accepted')
+          catalog = get_default_device_catalog()
+          microchip = [r for r in catalog.records if r.vendor == 'Microchip']
+          from plasma_web.microchip_sam_explicit_devsel_route_evidence import SAM_EXPLICIT_DEVSEL
+          assert len(microchip) == 1907
+          assert len(SAM_EXPLICIT_DEVSEL) == 84
+          registry = get_default_programming_qualification_registry()
+          actual = registry.summary
+          by_level = actual['catalog_level_counts']
+          assert by_level['1'] >= 1907
+          for item in queue['rows']:
+              hit = catalog.resolve('Microchip', item['exact_icpn'])
+              if item['research_review_state'] == 'EXACT_DRIVER_PART_DEVSEL_REVIEW_CANDIDATE':
+                  assert hit is not None
+                  family, devsel = SAM_EXPLICIT_DEVSEL[item['official_base_device']]
+                  assert family == hit.family and devsel == item['driver_devsel']
+                  result = registry.describe('Microchip', item['exact_icpn'])
+                  assert result['catalog_level'] == 1
+                  assert result['state'] == 'CANDIDATE'
+                  assert result['selector_visible'] is True
+                  assert result['job_selectable'] is False
+                  assert result['execution_authorized'] is False
+              else:
+                  assert hit is None
+          assert all(r.mapping_status == 'no_mapping' and not r.target_config
+                     for r in microchip)
+          PY
+      - name: Run source-bound SAM L1 and historical Microchip regression tests
+        env:
+          PYTHONPATH: software/python
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s software/python/tests -p 'test_microchip_sam_phase2_892_l1.py' -v
+          python -m unittest discover -s software/python/tests -p 'test_microchip_saml1x_route_evidence.py' -v
+          python -m unittest discover -s software/python/tests -p 'test_microchip_pic32mx_893_l1_admission.py' -v
+      - name: Upload read-only admission review ledger
+        uses: actions/upload-artifact@v4
+        with:
+          name: microchip-phase2-1548-explicit-devsel-review
+          path: ${{ runner.temp }}/microchip-phase2/phase2-1548-devsel-review.json
+          retention-days: 30

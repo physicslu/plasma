@@ -109,22 +109,34 @@ def validate()->dict:
     # from the in-memory replay. Never rewrite the historical receipt.
     live_manifest=json.loads(MANIFEST.read_bytes())
     live_sources=live_manifest["sources"]
-    req(len(live_sources)==36 and sum(int(s["row_count"]) for s in live_sources)==5885,
+    req(len(live_sources)==38 and sum(int(s["row_count"]) for s in live_sources)==6777,
         "current Production scope must remain ST 4629 + NXP 241 + Microchip 122 SAML1X + 893 PIC32MX")
-    req(live_sources[-2]=={
+    req(live_sources[-4]=={
         "manufacturer":"Microchip","family":"SAML1X",
         "path":"../research/microchip-saml1x-122-commercial-icpn-v1.csv",
         "row_count":122,
         "git_blob_sha":"0eb9c765e78e93686629b17576b122a14dfa60ab",
         "sha256":"2cc6aefd029edbb6438c300d485d4df8b639f41c099b168f216f31c31165593e",
     }, "unreviewed Microchip admission changes historical ST replay scope")
-    req(live_sources[-1]=={
+    req(live_sources[-3]=={
         "manufacturer":"Microchip","family":"PIC32MX",
         "path":"../research/microchip-pic32mx-893-commercial-l1-v1.csv",
         "row_count":893,
         "git_blob_sha":"9eba3e0898a42ef1129a572c5c3a6b0613e01166",
         "sha256":"b40e11e46230b45f8f6d8a078b9c56666be79495908c200c4d22529ffe1043d8",
     }, "PIC32MX 893 source pin absent or changed in historical ST replay")
+    req(live_sources[-2:] == [
+        {"manufacturer":"Microchip","family":"SAMDCRL0",
+        "path":"../research/microchip-phase2-samdcrl0-538-commercial-l1-v1.csv",
+        "row_count":538,
+        "git_blob_sha":"f554d5de7de63879ddf0132e9b7a76279249b304",
+        "sha256":"b417a8949bbc5bdbe14c08ca5b45862251dfb4331ff1da4eb219946b7c739bc4"},
+        {"manufacturer":"Microchip","family":"SAMD5E5",
+        "path":"../research/microchip-phase2-samd5e5-354-commercial-l1-v1.csv",
+        "row_count":354,
+        "git_blob_sha":"35dc0f61f26229ed5bd6856cb86d240f901285cb",
+        "sha256":"00741bdf43ddcea94e77d25bc7c8734f9de7bc446cde53b16ea3f8f772dacb7b"},
+    ], "Microchip SAM Phase-2 892 exact source pins changed")
     req(live_sources[28:31]==[
         {
             "manufacturer":"NXP","family":"KL25",

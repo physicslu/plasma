@@ -49,7 +49,7 @@ class Nxp277GapReviewTests(unittest.TestCase):
         extra = {r["icpn"] for r in csvrows(SOURCE_148)}
         self.assertEqual({r["icpn"] for r in self.queue}, original | extra)
         self.assertEqual(len(original & extra), 0)
-        self.assertEqual(self.catalog.size, 5885)
+        self.assertEqual(self.catalog.size, 6777)
         self.assertEqual(sum(x.vendor == "NXP" for x in self.catalog.records), 241)
         self.assertTrue(all(self.catalog.resolve("NXP",r["icpn"]) is None
                             for r in self.queue))
@@ -67,7 +67,13 @@ class Nxp277GapReviewTests(unittest.TestCase):
                 # Microchip publication, not treat an amended manifest as
                 # the old immutable source.
                 current = json.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual(len(current["sources"]), 36)
+                self.assertEqual(len(current["sources"]), 38)
+                # Remove only independently pinned additive SAM D/E sources
+                # before replaying the original NXP historical manifest bytes.
+                self.assertEqual([(r["family"],r["row_count"])
+                                  for r in current["sources"][-2:]],
+                                 [("SAMDCRL0",538),("SAMD5E5",354)])
+                del current["sources"][-2:]
                 self.assertEqual(current["sources"][-1], {
                     "manufacturer":"Microchip","family":"PIC32MX",
                     "path":"../research/microchip-pic32mx-893-commercial-l1-v1.csv",

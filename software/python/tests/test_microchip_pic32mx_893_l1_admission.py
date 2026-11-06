@@ -81,7 +81,7 @@ class PIC32MX893ProductionL1AdmissionTests(unittest.TestCase):
         summary = next(x for x in promotion.report["manufacturers"]
                        if x["manufacturer"] == "Microchip")
         self.assertEqual(summary["catalog_level_counts"],
-                         {"0": 0, "1": 1015, "2": 0, "3": 0})
+                         {"0": 0, "1": 1907, "2": 0, "3": 0})
         self.assertEqual(summary["job_selectable_exact_icpns"], 0)
 
     def test_tampering_pinned_exact_identity_or_device_id_fails_closed(self):

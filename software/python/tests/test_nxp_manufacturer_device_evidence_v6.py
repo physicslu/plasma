@@ -25,7 +25,7 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
         cls.new = [r for r in cls.nxp if r.family in {"MCX", "K32L2"}]
 
     def test_bounded_212_admitted_exact_and_source_verified(self) -> None:
-        self.assertEqual(self.catalog.size, 5885)
+        self.assertEqual(self.catalog.size, 6777)
         self.assertEqual(self.evidence.size, 212)
         self.assertEqual(len(self.nxp), 241)
         self.assertEqual(len(self.new), 212)
