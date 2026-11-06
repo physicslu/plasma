@@ -145,6 +145,7 @@
 
 ## Deployment
 
+- **Reference** · `Host-only` · `PR #1327 Gate 1` — [Z2 Root Privileged Code 受控升級與 Site 2 驗收準備](deployment/z2-root-code-controlled-upgrade-site2.md)：既有 Root Code Manifest 的離線更新與回復方案，修復 Site 2 唯讀偵測工具；未部署 Z2、未重載 FPGA、未燒錄 DUT。
 - **Current** — [PPU Deployment — Start Here](deployment/ppu-deployment-start-here.md)：PPU 只有兩條部署路線——**A. 正式部署**（Console → Bootstrap API（`/v1/uploads` 上傳 → `POST /v1/deployments`），單一 Coordinator；Factory Bootstrap 為前置步驟、`plasmactl z2-ps` 為內部執行器、Bundle v3 為內容格式）與 **B. 工程部署**（SWPC `ppu-deploy` over SSH，僅供開發）——以及部署順序。
 - **Current** · `Gate 1` · `Host-only` — [Owner Operation Authorization — user-programmable Bundles](deployment/ppu-owner-operation-authorization.md)：已配對 Console → Manager → PPU 對每個 B2／B3／Runtime 操作簽發綁定 Device、Bundle SHA256、Transaction、Action 的授權；退役逐 Bundle SHA256 白名單（Authority v2）。FPGA 靜態資格、Target、Owner Lock、Journal、Recovery 不變；`execution_permitted=false`。
 - **Plan** · `Gate 1` · `Host-only` · `PR #1252 Draft` — [One typed Package/Asset Execution Layer — Python, Native C, FPGA](deployment/ppu-common-asset-execution-gate1.md)：共用身分、授權與 dispatch seam；真實 Executor、FPGA Load 接線與 HIL 尚未驗證。
