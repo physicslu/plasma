@@ -117,7 +117,7 @@ No broker framework, network service, session database, second Job engine,
 journal, receipt or FPGA loader.
 
 - `scripts/ppu_site_worker.py` (core): one Unix stream socket, one JSON line
-  request/response, protocol `plasma.ppu.site-worker.v1`. Peer identity is
+  request/response, protocol `plasma.ppu.site-worker.v2`. Peer identity is
   `SO_PEERCRED` + kernel `/proc/<pid>/stat`, never a request claim.
   - Control (`open_session`, `close_session`, `status`): ONLY the trusted
     Runtime process (production: `plasma-server.service` MainPID), and
