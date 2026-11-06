@@ -8,11 +8,13 @@ The trusted Runtime parses the OPF-1 selection with PPU timeout policy, then
 calls the existing `ppu_provider_contract.resolve` against the selected,
 verified Active Asset Set and a device-side hardware observation. The
 `ppu_opf_site_session.open_provider_job_session` helper carries that exact
-resolved route to the existing C-3 `open_job_session` control operation. Only
-the trusted Runtime peer can issue it. The Site Worker holds an immutable copy
-of the Active Set digest, Provider, Profile, descriptor and options digests,
-Driver/FPGA binding, operation and Site in its existing per-Site Session.
-Subsequent `run` calls must use the bound Site and operation. The existing
+resolved route to C-3 `open_job_session` control. For Flash, the verified
+Bundle Geometry is also bound once at Session open; `bind_image` only supplies
+the normalized image SHA256 and byte count. The Root Worker does not receive a
+second `target` field inside the route wire: the bound Profile supplies ICPN.
+Only the trusted Runtime peer can create the Session. Active Set, Provider,
+Profile, descriptor/options digests, Driver/FPGA, operation and Site remain
+pinned. Subsequent `run` calls must use the bound Site and operation. The existing
 Job lease, Site owner, hardware identity fence, external owner check, Site
 lock, SAFE_OFF and persistent unknown-outcome seal still apply.
 
