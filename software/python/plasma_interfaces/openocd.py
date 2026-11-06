@@ -114,7 +114,8 @@ class OpenOCDInterface(BaseInterface):
             try:
                 self.opf_flash_preflight(
                     active_asset_set=self._runtime_job[1], target=request.target,
-                    site_id=request.site_id, image_size=request.image_size)
+                    site_id=request.site_id, image_size=request.image_size,
+                    provider=request.metadata.get("provider"), profile=request.metadata.get("profile"))
             except (ValueError, OSError, KeyError, TypeError) as exc:
                 raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                                   "OPF_FLASH_DENIED:" + str(exc)) from exc

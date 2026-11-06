@@ -61,7 +61,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                      engine_binary=OPENOCD, options_schema=None,
                      with_control_socket=True, verified_worker=True,
                      with_fpga=True, platform_provider=False, platform_extra_files=None,
-                     profile_count=1, target_icpn=ICPN):
+                     profile_count=1, target_icpn=ICPN, other_target=None):
     with tempfile.TemporaryDirectory(prefix="opf4a-", dir="/tmp") as directory:
         path = Path(directory)
         c3_profile = replace(
@@ -101,7 +101,11 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
         if profile_count == 0:
             parts = [part for part in parts if part[0] != PROFILE]
         elif profile_count == 2:
-            parts.append(("other-profile", *parts[1][1:]))
+            other_files = dict(parts[1][3])
+            if other_target is not None:
+                other_files["data/plasma-provider.json"] = _json({**desc, "target": other_target})
+                other_files[reference.PROFILE_FILE] = _json({**profile, "icpn": other_target})
+            parts.append(("other-profile", parts[1][1], parts[1][2], other_files))
         archive, digest = bundle_v3(
             path / "archive", parts=parts,
             mutate=lambda manifest: manifest.update(actions=["install", "verify"]))
@@ -204,6 +208,19 @@ def test_bundle_profile_accepts_icpn_absent_from_local_registry():
         result = _execute(env)
         assert result["result"] == "PASS" and result["safe_off"] is True
         assert result["opf_profile_sha256"] == preflight["profile_sha256"]
+
+
+def test_two_targets_select_their_declared_profiles_in_one_active_bundle():
+    other = "NEW-EXACT-TARGET-B"
+    with installed_bundle(profile_count=2, other_target=other) as env:
+        for target, profile_id in ((ICPN, PROFILE), (other, "other-profile")):
+            pinned = reference.preflight_runtime_flash(
+                product_root=env["product_root"], active_asset_set=env["active_asset_set"],
+                target=target, site_id=2, image_size=len(IMAGE),
+                provider=PROVIDER, profile=profile_id)
+            assert pinned["profile_package"] == profile_id
+            assert pinned["profile"]["icpn"] == target
+        assert not env["sim"].argvs
 
 
 def test_bundle_profile_image_bounds_and_target_claim_fail_closed():

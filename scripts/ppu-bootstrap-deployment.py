@@ -865,7 +865,6 @@ class DeploymentCoordinator:
             "identity": outcome["identity"],
             "boot_id": outcome.get("boot_id"),
             "auto_restore": False,
-            "programming_profile": handoff["programming_profile"],
         }, {
             "asset_set_sha256": active["asset_set_sha256"],
             "generation": active["generation"],

@@ -601,7 +601,6 @@ def test_root_handoff_accepts_fpga_only_bundle_without_profile(tmp_path):
     receipt = protected_root.validate_bundle_fpga_handoff(
         handoff, expected_active_set_sha256=digest,
         manifest_bytes=manifest, bin_bytes=bin_bytes, hwh_bytes=hwh)
-    assert receipt["programming_profile_identity_sha256"] is None
     assert receipt["fpga_loaded"] is False
 
 

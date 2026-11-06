@@ -452,6 +452,8 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "asset_base64",
                 "session_id",
                 "target",
+                "provider",
+                "profile",
             },
             required={"site_id", "operation"},
             label="job request",
@@ -466,7 +468,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         if target is not None and (not isinstance(target, str) or not target):
             raise ValueError("target must be a non-empty exact ICPN string")
 
-        common_fields = {"site_id", "operation", "timeout_s", "map_data", "target"}
+        common_fields = {"site_id", "operation", "timeout_s", "map_data", "target", "provider", "profile"}
         image_operations = {Operation.PROGRAM, Operation.VERIFY, Operation.FLASH_CYCLE}
         if operation is Operation.READ:
             allowed_fields = common_fields | {"offset", "length"}
@@ -516,17 +518,21 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         site_id = _parse_site_id(body["site_id"])
         image = b""
         metadata: dict[str, Any] = {}
+        if "provider" in body or "profile" in body:
+            if not all(isinstance(body.get(key), str) and body[key] for key in ("provider", "profile")):
+                raise ValueError("provider and profile must both be non-empty strings")
+            metadata.update(provider=body["provider"], profile=body["profile"])
         if operation in image_operations and allow_inline_asset:
             asset = self._inline_asset(body)
             normalized = asset.normalize_image()
             image = normalized.data
-            metadata = {
+            metadata.update({
                 "image_name": normalized.name,
                 "source_asset_name": asset.name,
                 "source_asset_sha256": asset.sha256,
                 "source_asset_type": asset.asset_type.value,
                 "source_asset_format": asset.asset_format.value,
-            }
+            })
         return JobRequest(
             site_id=site_id,
             operation=operation,

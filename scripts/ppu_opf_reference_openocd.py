@@ -74,7 +74,8 @@ def _parse_profile(raw: bytes, target: str, image_size: int) -> C3FlashProfile:
 
 
 def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str, Any] | None,
-                            target: str, site_id: int, image_size: int) -> dict[str, Any]:
+                            target: str, site_id: int, image_size: int,
+                            provider: str | None = None, profile: str | None = None) -> dict[str, Any]:
     """Verify the pinned Active Bundle Profile; no IC registry or hardware claims."""
     _need(isinstance(active_asset_set, Mapping)
           and active_asset_set.get("state") == "ACTIVE", "OPF_ACTIVE_SET_REQUIRED")
@@ -93,8 +94,14 @@ def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str
                               object_pairs_hook=ppu_provider_contract._pairs)
         _need(manifest.get("schema") == "plasma.ppu.bundle.v3", "BUNDLE_SCHEMA_INVALID")
         profiles = [p for p in manifest["packages"] if p["kind"] == "programming-profile"]
-        _need(len(profiles) == 1, "OPF_PROFILE_MISSING_OR_AMBIGUOUS")
-        selected = profiles[0]
+        if profile is None and provider is None:
+            _need(len(profiles) == 1, "OPF_PROFILE_MISSING_OR_AMBIGUOUS")
+            selected = profiles[0]
+        else:
+            _need(type(profile) is str and type(provider) is str,
+                  "OPF_SELECTION_INCOMPLETE")
+            selected = next((p for p in profiles if p["id"] == profile), None)
+            _need(selected is not None, "PROFILE_MISSING_OR_AMBIGUOUS")
         prefix = f"payload/packages/{selected['id']}/"
         entries = {x["path"]: x for x in selected["files"]}
         descriptor = json.loads((staged / (prefix + ppu_provider_contract.DESCRIPTOR)).read_bytes(),
@@ -102,6 +109,8 @@ def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str
         _need(type(descriptor) is dict
               and descriptor.get("schema") == ppu_provider_contract.SCHEMA
               and descriptor.get("target") == target, "REFERENCE_TARGET_MISMATCH")
+        _need(provider is None or descriptor.get("provider_package") == provider,
+              "PROVIDER_SELECTION_MISMATCH")
         _need(type(site_id) is int and site_id in descriptor["sites"], "SITE_NOT_SUPPORTED")
         _need("flash_cycle" in descriptor["operations"], "OPERATION_UNSUPPORTED")
         _need(type(image_size) is int and 0 < image_size <= descriptor["max_image_bytes"],
@@ -267,7 +276,7 @@ async def execute_runtime_flash(
     """Production REST Flash cutover; no direct-C3 fallback.
 
     The Runtime supplies the Set pinned under its execution lease and the one
-    Job deadline (including retries). Select the sole verified Bundle Profile
+    Job deadline (including retries). Select the requested Bundle Profile
     and its declared Provider. No Job/Bundle path or hardware claim is used.
     The authenticated root Worker observes its existing Root journal; native
     admission still verifies current PL identity and holds the reload fence.
@@ -275,7 +284,8 @@ async def execute_runtime_flash(
     try:
         pinned_profile = preflight_runtime_flash(
             product_root=product_root, active_asset_set=active_asset_set,
-            target=request.target, site_id=request.site_id, image_size=len(request.image))
+            target=request.target, site_id=request.site_id, image_size=len(request.image),
+            provider=request.metadata.get("provider"), profile=request.metadata.get("profile"))
         digest = pinned_profile["asset_set_sha256"]
         staged = product_root / "assets" / "staged" / digest
         manifest = json.loads((staged / "manifest.json").read_bytes())

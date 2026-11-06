@@ -33,7 +33,7 @@ OPF Provider / Driver capability boundary (OpenOCD optional)
 
 ## Minimal OPF programming selection (v1 proposal)
 
-This is a **data descriptor carried by an authorized Bundle Package**, not new fields on the strict root Bundle v3 manifest. Exact descriptor-file discovery and Package-kind admission are **future integration work**; do not claim the current B2/B3 parser accepts this proposal. Names below are references to Package IDs in the same Active Asset Set, not filesystem paths.
+This is a **data descriptor carried by an authorized Bundle Package**, not new fields on the strict root Bundle v3 manifest. The current C-3 Flash route resolves the verified descriptor from the Active Asset Set. Names below are references to Package IDs in that Set, not filesystem paths.
 
 ```json
 {
@@ -46,6 +46,13 @@ This is a **data descriptor carried by an authorized Bundle Package**, not new f
 ```
 
 **Only three universal programming selections:** `provider`, `profile`, and optional `timeout_ms`. `schema` identifies the contract version; `options` is an opaque Provider-specific JSON object, not a set of PPU Core knobs. The Provider declares a separate, versioned schema for its options and validates it **before** any hardware operation. Core must never interpret arbitrary Provider options as a waiver of a safety gate.
+
+For the current C-3 `POST /api/jobs` `flash_cycle` route, the REST body accepts
+`provider` and `profile` as Package IDs from the single Active Asset Set. Both
+must be supplied together. A Job without them is accepted only when the Set
+contains exactly one Programming Profile. Runtime checks the selected Profile's
+Target and declared Provider before any Site Worker admission; the existing
+hardware and SAFE_OFF checks still apply.
 
 ### Single timeout rule
 

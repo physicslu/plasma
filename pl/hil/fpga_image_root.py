@@ -274,25 +274,15 @@ def validate_bundle_fpga_handoff(
          handoff.get("root_hardware_validation") == "NOT_RUN",
          "ROOT_HANDOFF_NOT_BOUND_TO_ACTIVE_SET")
     selected = handoff.get("fpga_image")
-    # A Programming Profile is optional: an FPGA-only Bundle is valid.
-    profile = handoff.get("programming_profile")
-    need(type(selected) is dict and (profile is None or type(profile) is dict),
-         "ROOT_HANDOFF_SELECTION_MISSING")
+    need(type(selected) is dict, "ROOT_HANDOFF_SELECTION_MISSING")
     image_id = selected.get("image_id")
     package_id = selected.get("package_id")
     package_version = selected.get("package_version")
     names = [image_id, package_id, package_version]
-    if profile is not None:
-        names += [profile.get("package_id"), profile.get("package_version")]
     need(all(type(item) is str and
              re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item) is not None
              for item in names),
          "ROOT_HANDOFF_SELECTION_INVALID")
-    need(profile is None or
-         (type(profile.get("package_identity_sha256")) is str and
-          re.fullmatch(r"[0-9a-f]{64}",
-                       profile["package_identity_sha256"]) is not None),
-         "ROOT_HANDOFF_PROFILE_IDENTITY_INVALID")
     need(type(bin_bytes) is bytes and 0 < len(bin_bytes) <= 16_000_000 and
          type(hwh_bytes) is bytes and 0 < len(hwh_bytes) <= 4_000_000,
          "ROOT_HANDOFF_IMAGE_SIZE_INVALID")
@@ -344,8 +334,6 @@ def validate_bundle_fpga_handoff(
         "fpga_bin_sha256": manifest.firmware_sha256,
         "fpga_hwh_sha256": selected["hwh_sha256"],
         "fpga_manifest_sha256": selected["manifest_sha256"],
-        "programming_profile_identity_sha256":
-            None if profile is None else profile["package_identity_sha256"],
         "board_id": manifest.board_id,
         "fpga_part": manifest.fpga_part,
         "abi_version": manifest.abi_version,
