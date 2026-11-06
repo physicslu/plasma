@@ -14,10 +14,9 @@ from plasma_core.models import JobRequest
 
 from .base import BaseInterface, ProgressCallback
 from .openocd_executor import OpenOCDPlanExecutor, ProcessLauncher, compile_flash_cycle
-from .openocd_plan import OpenOCDPlanCompiler, normalize_openocd_target_config
+from .openocd_plan import OpenOCDPlanCompiler
 from .site_worker_c3 import (
     DEFAULT_IMAGE_ROOT,
-    C3FlashProfile,
     SiteWorkerControlClient,
 )
 
@@ -256,29 +255,3 @@ def as_program_request(request: JobRequest) -> JobRequest:
     source-locked compiler has no FLASH_CYCLE operation)."""
     return replace(request, operation=Operation.PROGRAM)
 
-
-def c3_flash_profile(support) -> C3FlashProfile:
-    """Exact-ICPN Flash profile for the C-3 Site Worker, from IC Support only."""
-    target = normalize_openocd_target_config(support.openocd_target_config)
-    data = support.memory_geometry_profile.data
-    try:
-        profile = C3FlashProfile(
-            icpn=support.icpn,
-            target_config=str(target),
-            flash_base=int(str(data["main_flash_start"]), 0),
-            flash_size=int(data["main_flash_size_bytes"]),
-            erase_granularity=int(data["erase_granularity_bytes"]),
-        )
-    except (KeyError, TypeError, ValueError) as exc:
-        raise PlasmaError(
-            ErrorCode.OPERATION_UNSUPPORTED,
-            "IC Support has no complete Flash geometry for the C-3 Flash cycle",
-            context={"target": support.icpn},
-        ) from exc
-    if target is None or not target.startswith("target/"):
-        raise PlasmaError(
-            ErrorCode.OPERATION_UNSUPPORTED,
-            "IC Support has no OpenOCD target config for the C-3 Flash cycle",
-            context={"target": support.icpn},
-        )
-    return profile
