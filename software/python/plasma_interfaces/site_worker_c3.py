@@ -8,8 +8,7 @@ systemd MainPID) runs one REST Site Job through C-3 as:
 
 The Worker owns Site admission, PS-local OpenOCD, SAFE_OFF verification and
 sealing. This client sends no path, executable or Tcl: only the Job ID, the
-Site, the exact-ICPN Flash profile resolved from IC Support and the image
-SHA256/size. Wire protocol: ``plasma.ppu.site-worker.v1`` (one JSON line).
+Site, the verified Active Bundle Flash profile and the image SHA256/size. Wire protocol: ``plasma.ppu.site-worker.v1`` (one JSON line).
 """
 from __future__ import annotations
 
@@ -18,7 +17,6 @@ import hashlib
 import json
 import os
 import socket
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -32,24 +30,6 @@ class SiteWorkerRefused(Exception):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
-
-
-@dataclass(frozen=True)
-class C3FlashProfile:
-    icpn: str
-    target_config: str
-    flash_base: int
-    flash_size: int
-    erase_granularity: int
-
-    def to_wire(self) -> dict[str, Any]:
-        return {
-            "icpn": self.icpn,
-            "target_config": self.target_config,
-            "flash_base": self.flash_base,
-            "flash_size": self.flash_size,
-            "erase_granularity": self.erase_granularity,
-        }
 
 
 class SiteWorkerControlClient:
@@ -132,7 +112,7 @@ async def run_flash_cycle(
     *,
     job_id: str,
     site_id: int,
-    profile: C3FlashProfile,
+    profile: Mapping[str, Any],
     image: bytes,
     image_root: Path,
     max_runtime_s: int,
@@ -143,7 +123,7 @@ async def run_flash_cycle(
     OpenOCD operation inside the Worker. An unproven SAFE_OFF remains sealed;
     the staged image is always removed."""
     digest = hashlib.sha256(image).hexdigest()
-    context = {"job_id": job_id, "site_id": site_id, "icpn": profile.icpn}
+    context = {"job_id": job_id, "site_id": site_id, "icpn": profile["icpn"]}
     staged = stage_image(image_root, job_id, image)
     session_id: str | None = None
     try:
@@ -160,7 +140,7 @@ async def run_flash_cycle(
                 opened = await asyncio.to_thread(session_factory)
             session_id = str(opened["session_id"])
             await asyncio.to_thread(
-                client.call, "bind_image", session_id=session_id, profile=profile.to_wire(),
+                client.call, "bind_image", session_id=session_id, profile=dict(profile),
                 image_sha256=digest, image_size=len(image))
             result = await asyncio.to_thread(
                 client.call, "run", timeout_s=max_runtime_s + 30.0, session_id=session_id,
