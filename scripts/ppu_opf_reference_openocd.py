@@ -81,9 +81,12 @@ def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str
     digest = active_asset_set.get("asset_set_sha256")
     _need(type(digest) is str and ppu_provider_contract.SHA64.fullmatch(digest) is not None,
           "ASSET_SET_IDENTITY_INVALID")
-    _need(ppu_asset_set.read_active(product_root) == dict(active_asset_set),
-          "ACTIVE_SET_MISMATCH")
-    ppu_asset_set.verify_staged(product_root, digest)
+    try:
+        active = ppu_asset_set.read_active(product_root)
+        ppu_asset_set.verify_staged(product_root, digest)
+    except ppu_asset_set.AssetSetError as exc:
+        raise ReferenceDenied("ACTIVE_SET_UNTRUSTED:" + str(exc)) from exc
+    _need(active == dict(active_asset_set), "ACTIVE_SET_MISMATCH")
     staged = product_root / "assets" / "staged" / digest
     try:
         manifest = json.loads((staged / "manifest.json").read_bytes(),
@@ -280,8 +283,6 @@ async def execute_runtime_flash(
                        if p["id"] == pinned_profile["profile_package"])
         handoff = (ppu_asset_set.resolve_staged_fpga_handoff(product_root, digest)
                    if any(p["kind"] == "fpga-image" for p in manifest["packages"]) else None)
-        descriptor = json.loads((staged / "payload" / "packages" / profile["id"]
-                                 / ppu_provider_contract.DESCRIPTOR).read_bytes())
         timeout_ms = round(request.timeout_s * 1000)
         _need(timeout_ms / 1000.0 == request.timeout_s, "OPF_TIMEOUT_PRECISION_UNSUPPORTED")
         policy = TimeoutPolicy(timeout_ms, 3600000)  # existing C-3 session ceiling
