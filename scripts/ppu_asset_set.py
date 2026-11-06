@@ -234,8 +234,8 @@ def resolve_staged_fpga_handoff(
 ) -> dict[str, Any]:
     """Resolve the FPGA handoff of a just-installed immutable B3 Set.
 
-    The Bundle itself selects the Image: exactly one ``fpga-image`` Package
-    and at most one ``programming-profile`` Package (optional). The Set need
+    The Bundle itself selects the Image: exactly one ``fpga-image`` Package.
+    The Set need
     not be Active yet: B3 ``fpga_load`` publishes ``active.json`` only after
     Root Identity PASS. This performs NO installation or load; the protected
     Root re-derives and re-verifies everything independently from the Set
@@ -247,38 +247,13 @@ def resolve_staged_fpga_handoff(
     manifest = _json_file(target / "manifest.json")
     packages = manifest["packages"]
     fpga_packages = [p for p in packages if type(p) is dict and p.get("kind") == "fpga-image"]
-    profiles = [p for p in packages
-                if type(p) is dict and p.get("kind") == "programming-profile"]
     if len(fpga_packages) != 1:
         raise AssetSetError("ASSET_HANDOFF_FPGA_PACKAGE_NOT_UNIQUE_OR_MISSING")
-    if len(profiles) > 1:
-        raise AssetSetError("ASSET_HANDOFF_PROFILE_NOT_UNIQUE")
     fpga = fpga_packages[0]
     for value in (fpga.get("id"), fpga.get("version")):
         if (type(value) is not str or not 0 < len(value) <= 128
                 or not re.fullmatch(r"[A-Za-z0-9_.-]+", value)):
             raise AssetSetError("ASSET_HANDOFF_IDENTITY_INVALID")
-    profile_identity = None
-    if profiles:
-        profile = profiles[0]
-        # Bind Profile identity to the full canonical manifest descriptor,
-        # not only a file name or semantic version.
-        descriptor = {
-            "id": profile["id"], "kind": profile["kind"],
-            "version": profile["version"], "requires": profile["requires"],
-            "files": sorted(({
-                "path": item["path"], "sha256": item["sha256"],
-                "size": item["size"], "executable": item["executable"],
-            } for item in profile["files"]), key=lambda item: item["path"]),
-        }
-        profile_identity = {
-            "package_id": profile["id"],
-            "package_version": profile["version"],
-            "package_identity_sha256": hashlib.sha256(json.dumps(
-                descriptor, sort_keys=True, separators=(",", ":")).encode()
-            ).hexdigest(),
-        }
-
     def files_with_suffix(suffix: str) -> list[dict[str, Any]]:
         return [item for item in fpga["files"]
                 if type(item) is dict and item.get("path", "").endswith(suffix)]
@@ -339,7 +314,6 @@ def resolve_staged_fpga_handoff(
             "fpga_part": paired["fpga_part"],
             "abi_version_claim": paired["abi_version"],
         },
-        "programming_profile": profile_identity,
         "root_hardware_validation": "NOT_RUN",
         "fpga_install": "NOT_RUN",
         "fpga_load": "NOT_RUN",

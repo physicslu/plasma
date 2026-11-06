@@ -107,52 +107,51 @@ def resolve(
         raise ProviderDenied("BUNDLE_MANIFEST_UNREADABLE") from exc
     _need(manifest.get("schema") == "plasma.ppu.bundle.v3", "BUNDLE_SCHEMA_INVALID")
     packages = {p["id"]: p for p in manifest["packages"]}
-    matches: list[tuple[dict[str, Any], dict[str, Any], str]] = []
-    for package in manifest["packages"]:
-        if package["id"] != profile:
+    selected_profile = packages.get(profile)
+    _need(selected_profile is not None, "PROFILE_MISSING_OR_AMBIGUOUS")
+    _need(selected_profile["kind"] == "programming-profile", "PROFILE_PACKAGE_INVALID")
+    for entry in selected_profile["files"]:
+        if entry["path"] != f"payload/packages/{profile}/{DESCRIPTOR}":
             continue
-        _need(package["kind"] == "programming-profile", "PROFILE_PACKAGE_INVALID")
-        for entry in package["files"]:
-            if entry["path"] != f"payload/packages/{package['id']}/{DESCRIPTOR}":
-                continue
-            _need(entry["executable"] is False and entry["size"] <= 8192,
-                  "PROVIDER_DESCRIPTOR_INVALID")
-            try:
-                raw = (root / entry["path"]).read_bytes()
-            except OSError as exc:
-                raise ProviderDenied("PROVIDER_DESCRIPTOR_UNREADABLE") from exc
-            _need(hashlib.sha256(raw).hexdigest() == entry["sha256"],
-                  "PROVIDER_DESCRIPTOR_CHANGED")
-            try:
-                desc = json.loads(raw, object_pairs_hook=_pairs)
-            except (ValueError, UnicodeError) as exc:
-                raise ProviderDenied("PROVIDER_DESCRIPTOR_INVALID") from exc
-            _need(type(desc) is dict and set(desc) == {
-                "schema", "target", "provider_package", "operations", "sites",
-                "transport", "driver_abi", "fpga_package", "max_image_bytes"},
-                  "PROVIDER_DESCRIPTOR_INVALID")
-            _need(desc["schema"] == SCHEMA and type(desc["target"]) is str
-                  and type(desc["provider_package"]) is str
-                  and type(desc["operations"]) is list
-                  and bool(desc["operations"])
-                  and all(type(op) is str for op in desc["operations"])
-                  and len(desc["operations"]) == len(set(desc["operations"]))
-                  and set(desc["operations"]) <= OPERATIONS
-                  and type(desc["sites"]) is list and bool(desc["sites"])
-                  and all(type(s) is int for s in desc["sites"])
-                  and desc["sites"] == sorted(set(desc["sites"]))
-                  and all(type(s) is int and s >= 1 for s in desc["sites"])
-                  and type(desc["transport"]) is str
-                  and desc["transport"] in ("ps-only", "fpga")
-                  and (desc["driver_abi"] is None or type(desc["driver_abi"]) is str)
-                  and (desc["fpga_package"] is None or type(desc["fpga_package"]) is str)
-                  and type(desc["max_image_bytes"]) is int
-                  and 0 < desc["max_image_bytes"] <= 512 * 1024 * 1024,
-                  "PROVIDER_DESCRIPTOR_INVALID")
-            if desc["target"] == target:
-                matches.append((package, desc, entry["sha256"]))
-    _need(len(matches) == 1, "PROFILE_MISSING_OR_AMBIGUOUS")
-    selected_profile, desc, digest = matches[0]
+        _need(entry["executable"] is False and entry["size"] <= 8192,
+              "PROVIDER_DESCRIPTOR_INVALID")
+        try:
+            raw = (root / entry["path"]).read_bytes()
+        except OSError as exc:
+            raise ProviderDenied("PROVIDER_DESCRIPTOR_UNREADABLE") from exc
+        _need(hashlib.sha256(raw).hexdigest() == entry["sha256"],
+              "PROVIDER_DESCRIPTOR_CHANGED")
+        try:
+            desc = json.loads(raw, object_pairs_hook=_pairs)
+        except (ValueError, UnicodeError) as exc:
+            raise ProviderDenied("PROVIDER_DESCRIPTOR_INVALID") from exc
+        _need(type(desc) is dict and set(desc) == {
+            "schema", "target", "provider_package", "operations", "sites",
+            "transport", "driver_abi", "fpga_package", "max_image_bytes"},
+              "PROVIDER_DESCRIPTOR_INVALID")
+        _need(desc["schema"] == SCHEMA and type(desc["target"]) is str
+              and type(desc["provider_package"]) is str
+              and type(desc["operations"]) is list
+              and bool(desc["operations"])
+              and all(type(op) is str for op in desc["operations"])
+              and len(desc["operations"]) == len(set(desc["operations"]))
+              and set(desc["operations"]) <= OPERATIONS
+              and type(desc["sites"]) is list and bool(desc["sites"])
+              and all(type(s) is int for s in desc["sites"])
+              and desc["sites"] == sorted(set(desc["sites"]))
+              and all(type(s) is int and s >= 1 for s in desc["sites"])
+              and type(desc["transport"]) is str
+              and desc["transport"] in ("ps-only", "fpga")
+              and (desc["driver_abi"] is None or type(desc["driver_abi"]) is str)
+              and (desc["fpga_package"] is None or type(desc["fpga_package"]) is str)
+              and type(desc["max_image_bytes"]) is int
+              and 0 < desc["max_image_bytes"] <= 512 * 1024 * 1024,
+              "PROVIDER_DESCRIPTOR_INVALID")
+        break
+    else:
+        raise ProviderDenied("PROVIDER_DESCRIPTOR_MISSING")
+    _need(desc["target"] == target, "TARGET_MISMATCH")
+    digest = entry["sha256"]
     _need(desc["provider_package"] == provider, "PROVIDER_SELECTION_MISMATCH")
     selected_provider = packages.get(desc["provider_package"])
     _need(selected_provider is not None and selected_provider["id"] in selected_profile["requires"]

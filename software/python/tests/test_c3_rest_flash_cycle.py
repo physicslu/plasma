@@ -786,6 +786,35 @@ def test_rest_bundle_flash_without_registered_icpn():
     run(scenario())
 
 
+def test_rest_explicit_profile_selects_one_of_two_in_active_bundle():
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), in_process=True,
+                             bundle_options={"profile_count": 2}) as stack:
+                _job_id, job = await stack.flash(b"SELECTED", provider="openocd-reference",
+                                                 profile="stm32f103-c8")
+                assert job["state"] == "success", job
+                assert job["result"]["details"]["flash_cycle"]["opf_profile_package"] == "stm32f103-c8"
+                assert len(stack.sim.argvs) == 1
+    run(scenario())
+
+
+@pytest.mark.parametrize("selection,code", [
+    ({"provider": "openocd-reference", "profile": "missing"}, "PROFILE_MISSING_OR_AMBIGUOUS"),
+    ({"provider": "wrong-provider", "profile": "stm32f103-c8"}, "PROVIDER_SELECTION_MISMATCH"),
+    ({}, "OPF_PROFILE_MISSING_OR_AMBIGUOUS"),
+])
+def test_rest_multi_profile_invalid_selection_never_writes(selection, code):
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), in_process=True,
+                             bundle_options={"profile_count": 2}) as stack:
+                _job_id, job = await stack.flash(b"DENIED", **selection)
+                assert job["state"] != "success" and code in json.dumps(job), job
+                assert not stack.sim.argvs and not stack.core._sessions
+    run(scenario())
+
+
 def test_rest_job_unsupported_target_never_reaches_c3():
     async def scenario():
         with short_tmp() as directory:

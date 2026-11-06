@@ -67,8 +67,6 @@ def test_p2_exact_fpga_handoff_returns_inert_plan_not_loaded(tmp_path: Path):
     assert result["fpga_image"]["bin_relative_path"] == "payload/packages/custom-swd/fpga/swd.bin"
     assert result["fpga_image"]["hwh_relative_path"] == "payload/packages/custom-swd/fpga/swd.hwh"
     assert result["fpga_image"]["manifest_relative_path"] == "payload/packages/custom-swd/fpga/image.json"
-    assert result["programming_profile"]["package_id"] == PROFILE_ID
-    assert result["programming_profile"]["package_identity_sha256"] == profile_sha
     assert result["fpga_install"] == "NOT_RUN"
     assert result["fpga_load"] == "NOT_RUN"
     assert result["root_hardware_validation"] == "NOT_RUN"

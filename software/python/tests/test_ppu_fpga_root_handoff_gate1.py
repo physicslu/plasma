@@ -46,7 +46,6 @@ def test_root_handoff_uses_full_existing_root_parser_without_loading(tmp_path: P
     assert receipt["fpga_bin_sha256"] == plan["fpga_image"]["bin_sha256"]
     assert receipt["fpga_hwh_sha256"] == plan["fpga_image"]["hwh_sha256"]
     assert receipt["fpga_manifest_sha256"] == plan["fpga_image"]["manifest_sha256"]
-    assert receipt["programming_profile_identity_sha256"] == plan["programming_profile"]["package_identity_sha256"]
     assert receipt["root_source_pin"] == "NOT_VERIFIED"
     assert receipt["golden_recovery"] == "NOT_VERIFIED"
     assert receipt["hardware_ownership"] == "NOT_VERIFIED"
