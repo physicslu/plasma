@@ -252,7 +252,7 @@ async def execute_reference_flash(
         return {"session_id": bound.session_id}
 
     result = await run_flash_cycle(
-        client, job_id=job_id, site_id=site_id, profile=binding.profile,
+        client, job_id=job_id, site_id=site_id, icpn=binding.profile["icpn"],
         image=image, image_root=image_root, max_runtime_s=math.ceil(job_timeout_s),
         session_factory=open_session)
     _need(worker_receipt is not None, "WORKER_ENGINE_RECEIPT_MISSING")
