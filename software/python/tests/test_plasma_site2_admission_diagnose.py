@@ -12,9 +12,10 @@ assert spec and spec.loader
 SCRIPT=importlib.util.module_from_spec(spec);spec.loader.exec_module(SCRIPT)
 SHA="a"*40;HOST="192.168.2.99"
 def state():
-    return {"z2":{"engine":{"status":"VERIFIED","abi":5,"driver":"plasma_swd"},
-       "fpga":{"status":"IMAGE","boot_match":True},
-       "site2_seal":{"present":True},"site2_admission":{"present":False},
+    return {"readiness":"NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS",
+            "z2":{"engine":{"status":"VERIFIED","abi":5,"driver":"plasma_swd"},
+       "fpga":{"status":"IMAGE","boot_match":True,"manager_state":"operating"},
+       "site2_seal":{"present":False},"site2_admission":{"present":False},
        "openocd_pids":[]},
        "rest":{"status":"OBSERVED","health_ready":True,
          "node_matches_status":True,"lease_busy":False,"active_job_count":0,
@@ -51,7 +52,7 @@ def test_root_entry_diagnostic_is_source_pinned_and_releases_record():
 @pytest.mark.parametrize("change",[
  ("openocd_pids",[543]),
  ("site2_admission",{"present":True}),
- ("site2_seal",{"present":False}),
+ ("site2_seal",{"present":True}),
 ])
 def test_bad_ownership_cannot_reach_ssh(change):
     s=state();key,value=change;s["z2"][key]=value
