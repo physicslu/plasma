@@ -60,6 +60,19 @@ class CrossBuildGate1Contracts(unittest.TestCase):
             with self.subTest(script=script.name):
                 subprocess.run(["bash", "-n", str(script)], check=True)
 
+    def test_ubuntu_apt_source_arch_rewrite(self):
+        source = CROSS.read_text()
+        expression = source.split("sed -i -E '", 1)[1].split("'", 1)[0]
+        before = (
+            "deb http://archive.ubuntu.com/ubuntu/ jammy main restricted\n"
+            "deb http://security.ubuntu.com/ubuntu/ jammy-security main\n"
+        )
+        result = subprocess.run(
+            ["sed", "-E", expression], input=before, text=True,
+            capture_output=True, check=True,
+        )
+        self.assertEqual(result.stdout, before.replace("deb http", "deb [arch=amd64] http"))
+
 
 if __name__ == "__main__":
     unittest.main()
