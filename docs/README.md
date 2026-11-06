@@ -142,6 +142,8 @@
 - **Reference** · `Site 2` · `PR #1304 Draft` · `Host-only` — [Site 2 REST Flash 失敗診斷（2026-11-05）](development/site2-rest-flash-diagnosis-20261105.md)：既有失敗 Job 的 C3 Adapter／OpenOCD／SAFE_OFF 證據缺口與存取限制；不代表真實故障根因已確認或 Z2 實機 Flash PASS。
 - **Plan** · `Gate 1` · `PR #1265 Draft` · `Host-only` — [OpenOCD 5088 ARMv7 CI Build Cache Optimization](development/openocd5088-armv7-ci-build-cache.md)：依實際編譯輸入內容建立快取，保留每次驗證、重新封裝及最新 HEAD Evidence；未合併、不部署、不操作實機。
 
+- **Gate 1 / Host-only Research, L2 BLOCKED** — [NXP MCXN236VKLT ROM ISP/blhost Compatibility PoC](development/nxp-mcxn236-blhost-l2-compat-poc-gate1.md)：固定 MCXN23x／SEC 26.06／SPSDK 3.10.0 來源與 Mock-only 燒錄契約，未註冊 Provider、不提升 L1/L2、不操作硬體。
+
 ## Deployment
 
 - **Current** — [PPU Deployment — Start Here](deployment/ppu-deployment-start-here.md)：PPU 只有兩條部署路線——**A. 正式部署**（Console → Bootstrap API（`/v1/uploads` 上傳 → `POST /v1/deployments`），單一 Coordinator；Factory Bootstrap 為前置步驟、`plasmactl z2-ps` 為內部執行器、Bundle v3 為內容格式）與 **B. 工程部署**（SWPC `ppu-deploy` over SSH，僅供開發）——以及部署順序。
