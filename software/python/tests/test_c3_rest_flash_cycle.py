@@ -790,10 +790,8 @@ def test_unconfirmed_session_close_prevents_safe_failure_retry(tmp_path):
         with pytest.raises(PlasmaError) as caught:
             await run_flash_cycle(
                 RefusingClose(), job_id="job-close-failure", site_id=2,
-                profile={"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
-                         "flash_base": 0x08000000, "flash_size": 0x10000,
-                         "erase_granularity": 1024},
-                image=b"FW", image_root=tmp_path, max_runtime_s=30)
+                icpn="STM32F103C8T6", image=b"FW", image_root=tmp_path,
+                max_runtime_s=30, session_factory=lambda: {"session_id": "session"})
         assert caught.value.recoverable is False
         assert "close did not confirm" in str(caught.value)
         assert list(tmp_path.iterdir()) == []
