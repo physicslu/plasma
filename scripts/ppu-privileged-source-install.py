@@ -29,7 +29,7 @@ GLOBAL_LOCK = ADMISSIONS / "supervisor.lock"
 RELOAD_FENCE = Path("/run/lock/plasma-mmio.lock")
 SERVICES = ("plasma-server.service", "plasma-site-worker.service",
             "plasma-bootstrap.service", "plasma-package-control.service")
-SHA64 = re.compile(r"[0-9a-f]{64}\\Z")
+SHA64 = re.compile(r"[0-9a-f]{64}\Z")
 
 
 class ProvisionDenied(RuntimeError):
