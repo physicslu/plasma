@@ -242,6 +242,9 @@ def test_session_binds_geometry_once_and_old_bind_wire_is_rejected(tmp_path):
                "flash_base": 0x08000000, "flash_size": 1024, "erase_granularity": 1024}
     req = {"protocol": worker.PROTOCOL, "op": "open_job_session",
            "job_id": "job-once", "sites": [2], "max_runtime_s": 30}
+    assert core.handle({**req, "protocol": "plasma.ppu.site-worker.v1",
+                        "profile": profile}, peer, "control") == {
+                            "ok": False, "error": "REQUEST_INVALID"}
     invalid = core.handle({**req, "profile": {**profile, "erase_granularity": 1000}},
                           peer, "control")
     assert invalid == {"ok": False, "error": "PROFILE_GEOMETRY_INVALID"}
