@@ -103,7 +103,7 @@ class Rig:
                 f"S={str(self.sock)!r}\n"
                 "def call(req):\n"
                 " s=socket.socket(socket.AF_UNIX); s.connect(S)\n"
-                " s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v1',**req))+'\\n').encode())\n"
+                " s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v2',**req))+'\\n').encode())\n"
                 " d=b''\n"
                 " while not d.endswith(b'\\n'):\n"
                 "  c=s.recv(65536)\n"
@@ -547,7 +547,7 @@ def test_cancel_one_site_does_not_cancel_unrelated_site(tmp_path):
 
 
 @pytest.mark.parametrize("raw", [b"not json\n", b"[]\n", b'{"op":"probe","site":2}\n',
-                                 b"x" * 5000 + b"\n", b'{"protocol":"plasma.ppu.site-worker.v1"}\n'])
+                                 b"x" * 5000 + b"\n", b'{"protocol":"plasma.ppu.site-worker.v2"}\n'])
 def test_malformed_requests_rejected(rig, raw):
     import socket as s
     with s.socket(s.AF_UNIX) as sock:
@@ -900,7 +900,7 @@ def test_c2_launcher_package_uses_site_worker_end_to_end(tmp_path, rig):
             "S = os.environ['PLASMA_SITE_WORKER_SOCKET']\n"
             "def call(req):\n"
             "    s = socket.socket(socket.AF_UNIX); s.connect(S)\n"
-            "    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v1', **req)) + '\\n').encode())\n"
+            "    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v2', **req)) + '\\n').encode())\n"
             "    return json.loads(s.makefile().readline())\n"
             "for _ in range(100):\n"
             "    r = call({'op': 'probe', 'site': 2})\n"
