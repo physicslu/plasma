@@ -81,6 +81,8 @@ class PackageActionRuntime:
             if isinstance(interface, OpenOCDInterface) and interface.site_worker_ready:
                 interface.opf_flash_executor = partial(
                     reference.execute_runtime_flash, product_root=self.product_root)
+                interface.opf_flash_preflight = partial(
+                    reference.preflight_runtime_flash, product_root=self.product_root)
         # Pin the configured Asset Set at Job admission. Never infer a product
         # directory from the host or re-check PL hardware for ordinary Jobs.
         if (hasattr(site_manager, "_active_asset_set_reader")

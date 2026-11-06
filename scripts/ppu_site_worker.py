@@ -26,7 +26,7 @@ Programming Site. It is deliberately small:
   belongs to the PPU Loader.
 
 The target (OpenOCD target config, Flash geometry) of a Flash operation is
-resolved by the Runtime from the exact-ICPN IC Support and bound per session;
+resolved by the Runtime from the selected verified Bundle Profile and bound per session;
 this core holds no IC, image ID, build or versioned path.
 
 Hardware specifics live behind a replaceable adapter (see
@@ -95,7 +95,7 @@ class TransportFailed(Exception):
 
 @dataclass(frozen=True)
 class FlashProfile:
-    """Runtime-resolved exact-ICPN Flash target, bound once per session."""
+    """Runtime-resolved Bundle Flash target, bound once per session."""
     icpn: str
     target_config: str
     flash_base: int

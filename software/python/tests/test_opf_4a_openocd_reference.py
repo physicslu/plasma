@@ -14,6 +14,7 @@ import sys
 import tempfile
 import time
 from contextlib import contextmanager, nullcontext
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -60,11 +61,13 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                      engine_binary=OPENOCD, options_schema=None,
                      with_control_socket=True, verified_worker=True,
                      with_fpga=True, platform_provider=False, platform_extra_files=None,
-                     profile_count=1):
+                     profile_count=1, target_icpn=ICPN):
     with tempfile.TemporaryDirectory(prefix="opf4a-", dir="/tmp") as directory:
         path = Path(directory)
-        c3_profile = c3_flash_profile(get_default_ic_support_resolver().require_exact(ICPN))
-        desc = {"schema": "plasma.ppu.provider-capabilities.v1", "target": ICPN,
+        c3_profile = replace(
+            c3_flash_profile(get_default_ic_support_resolver().require_exact(ICPN)),
+            icpn=target_icpn)
+        desc = {"schema": "plasma.ppu.provider-capabilities.v1", "target": target_icpn,
                 "provider_package": PROVIDER, "operations": ["flash_cycle"],
                 "sites": [1, 2], "transport": "fpga", "driver_abi": DRIVER_ABI,
                 "fpga_package": FPGA, "max_image_bytes": 65536}
@@ -149,7 +152,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                 "selection": {"schema": OPF_PROGRAMMING_SCHEMA,
                               "provider": PROVIDER, "profile": PROFILE,
                               "timeout_ms": 5000, "options": {}},
-                "policy": POLICY, "target": ICPN, "site_id": 2,
+                "policy": POLICY, "target": target_icpn, "site_id": 2,
                 "hardware": {"platform": TARGET["platform"], "board": TARGET["board"],
                              "fpga_part": TARGET["fpga_part"], "sites": [1, 2],
                              "loaded_fpga_package": FPGA, "driver_abi": DRIVER_ABI,
@@ -173,7 +176,7 @@ def _execute(env, **changes):
     payload = {key: value for key, value in env.items()
                if key in {"client", "product_root", "asset_set_sha256", "selection",
                           "policy", "job_id", "site_id", "target", "image",
-                          "image_root", "hardware", "runtime_profile",
+                          "image_root", "hardware",
                           "job_deadline_monotonic", "job_timeout_s", "engine_record",
                           "engine_base", "require_root"}}
     payload.update(changes)
@@ -183,11 +186,37 @@ def _execute(env, **changes):
 def _qualify(env, **changes):
     payload = {key: value for key, value in env.items()
                if key in {"product_root", "asset_set_sha256", "selection",
-                          "policy", "site_id", "target", "hardware", "runtime_profile",
+                          "policy", "site_id", "target", "hardware",
                           "engine_record", "engine_base", "require_root"}}
     payload["image_size"] = len(env["image"])
     payload.update(changes)
     return reference.qualify_reference(**payload)
+
+
+def test_bundle_profile_accepts_icpn_absent_from_local_registry():
+    unknown = "VENDOR-NEW-PART-A"
+    assert get_default_ic_support_resolver().resolve_exact(unknown) is None
+    with installed_bundle(target_icpn=unknown) as env:
+        preflight = reference.preflight_runtime_flash(
+            product_root=env["product_root"], active_asset_set=env["active_asset_set"],
+            target=unknown, site_id=2, image_size=len(IMAGE))
+        assert preflight["profile"]["icpn"] == unknown
+        result = _execute(env)
+        assert result["result"] == "PASS" and result["safe_off"] is True
+        assert result["opf_profile_sha256"] == preflight["profile_sha256"]
+
+
+def test_bundle_profile_image_bounds_and_target_claim_fail_closed():
+    with installed_bundle() as env:
+        with pytest.raises(ValueError, match="REFERENCE_IMAGE_OUT_OF_BOUNDS"):
+            reference.preflight_runtime_flash(
+                product_root=env["product_root"], active_asset_set=env["active_asset_set"],
+                target=ICPN, site_id=2, image_size=65537)
+        with pytest.raises(ValueError, match="REFERENCE_TARGET_MISMATCH"):
+            reference.preflight_runtime_flash(
+                product_root=env["product_root"], active_asset_set=env["active_asset_set"],
+                target="ANOTHER-UNLISTED-MCU", site_id=2, image_size=len(IMAGE))
+        assert not env["sim"].argvs and not env["core"]._sessions
 
 
 def test_verified_reference_executes_existing_c3_abi5_flash_and_readback():
@@ -275,7 +304,7 @@ def test_untrusted_selection_fails_before_c3_session(change, code):
 @pytest.mark.parametrize("property_change,code", [
     ({"engine_binary": b"wrong engine bytes"}, "REFERENCE_ENGINE_BINARY_MISMATCH"),
     ({"descriptor_change": {"driver_abi": "plasma_swd:6"}}, "FPGA_DRIVER_UNVERIFIED"),
-    ({"profile_change": {"flash_size": 131072}}, "REFERENCE_PROFILE_RUNTIME_MISMATCH"),
+    ({"profile_change": {"flash_size": 65537}}, "PROFILE_GEOMETRY_INVALID"),
     ({"descriptor_change": {"transport": "ps-only", "driver_abi": None,
                              "fpga_package": None}}, "PS_TRANSPORT_UNVERIFIED"),
 ])
@@ -356,13 +385,13 @@ def _runtime_execute(env, monkeypatch):
         return reply["result"]
 
     monkeypatch.setattr(env["client"], "call", worker_call)
-    request = JobRequest(job_id="job-1", site_id=2, target=ICPN,
+    request = JobRequest(job_id="job-1", site_id=2, target=env["target"],
                          operation=Operation.FLASH_CYCLE, image=IMAGE, timeout_s=5.0)
     return run(reference.execute_runtime_flash(
         env["client"], product_root=env["product_root"], request=request,
         active_asset_set=env["active_asset_set"],
         job_deadline_monotonic=time.monotonic() + 5,
-        runtime_profile=env["runtime_profile"], image_root=env["image_root"]))
+        image_root=env["image_root"]))
 
 
 def test_profile_provider_only_runtime_flash_uses_installed_platform(monkeypatch):
@@ -437,7 +466,7 @@ def test_no_fpga_package_still_requires_trusted_hardware(observation):
 
 
 @pytest.mark.parametrize("options,mutation,code", [
-    ({"profile_change": {"flash_size": 131072}}, None, "REFERENCE_PROFILE_RUNTIME_MISMATCH"),
+    ({"profile_change": {"flash_size": 65537}}, None, "PROFILE_GEOMETRY_INVALID"),
     ({"descriptor_change": {"driver_abi": "plasma_swd:6"}}, None, "FPGA_DRIVER_UNVERIFIED"),
     ({"profile_count": 0}, None, "OPF_PROFILE_MISSING_OR_AMBIGUOUS"),
     ({"profile_count": 2}, None, "OPF_PROFILE_MISSING_OR_AMBIGUOUS"),

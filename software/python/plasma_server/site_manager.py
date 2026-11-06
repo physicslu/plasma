@@ -73,7 +73,10 @@ class SiteManager:
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
         requires_ic_support = any(
-            site.enabled and site.interface != "mock" for site in config.sites
+            site.enabled and site.interface != "mock"
+            and not (site.interface == "openocd"
+                     and bool(site.openocd.get("site_worker_socket")))
+            for site in config.sites
         )
         self.ic_support_resolver = (
             ic_support_resolver

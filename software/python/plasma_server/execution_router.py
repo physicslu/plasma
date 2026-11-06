@@ -97,7 +97,9 @@ class SiteExecutionRouter:
         self.site = site
         self.interface = interface
         self.resolver = resolver
-        self.compiler_registry = compiler_registry or _default_compiler_registry()
+        self.compiler_registry = (compiler_registry if compiler_registry is not None else
+                                  None if isinstance(interface, OpenOCDInterface)
+                                  and interface.site_worker_ready else _default_compiler_registry())
         self._generic_handler = ProgrammingOperationHandler(interface)
         self._profile_handlers: dict[str, BaseHandler] = {
             profile_id: ProgrammingOperationHandler(interface)
@@ -188,6 +190,17 @@ class SiteExecutionRouter:
         return programming_profile_id, support, support.to_runtime_payload()
 
     def _resolve_openocd(self, request: JobRequest) -> JobRequest:
+        # The C-3 OPF flash_cycle uses the selected Active Bundle, not the
+        # repository exact-ICPN list or static compiler admission projection.
+        if isinstance(self.interface, OpenOCDInterface) and self.interface.site_worker_ready:
+            if request.operation is not Operation.FLASH_CYCLE:
+                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                  "C-3 supports only flash_cycle")
+            return self._decorate(request, route={
+                "mode": OPENOCD_ROUTE, "target": request.target,
+                "backend_implementation_state": "opf_bundle_c3_site_worker",
+                "software_validation_runtime_ready": False,
+                "hardware_runtime_ready": True})
         programming_profile_id, support, support_payload = self._resolved_support(request)
         # REST read offsets are relative to main Flash; the canonical compiler
         # only accepts absolute target addresses. Normalize before admission.
@@ -344,6 +357,8 @@ class SiteExecutionRouter:
                 f"unsupported resolved execution route: {mode!r}",
                 context={"site_id": self.site.id, "job_id": request.job_id},
             )
+        if isinstance(self.interface, OpenOCDInterface) and self.interface.site_worker_ready:
+            return self._generic_handler
         profile_id = route.get("selected_programming_profile_id")
         try:
             return self._profile_handlers[str(profile_id)]
