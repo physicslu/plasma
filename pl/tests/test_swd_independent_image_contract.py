@@ -287,8 +287,11 @@ def test_explicit_devmem_engineering_owner_is_not_inferred_from_covering_uio(tmp
         release = root.read_image_manifest()
         assert release.uio_name == ""
         assert release.expected_uio["backend"] == "devmem"
+        # Root accepts a new Image digest here; the Bundle and journal bind
+        # it to actual bytes before any load or Site admission.
+        manifest.write_text(json.dumps(data | {"firmware_sha256": "0" * 64}))
+        assert root.read_image_manifest().firmware_sha256 == "0" * 64
         for field, changed in (
-            ("firmware_sha256", "0" * 64),
             ("abi_version", 0x00040001),
             ("axi_base", 0x43C00000),
             ("identity_words", [[0, 0x00050001, 0xFFFFFFFF],
@@ -325,6 +328,15 @@ def test_explicit_devmem_engineering_owner_is_not_inferred_from_covering_uio(tmp
                                    release.firmware_name + " to fpga0"),
             expected_firmware=release.firmware_name)
     assert admit()["mmio_backend"] == "devmem"
+    new_release = root.parse_image_manifest_bytes(json.dumps(
+        data | {"image_id": "new-bundle-abi5-image",
+                "firmware_sha256": "0" * 64}).encode())
+    new_facts = facts | {"candidate_sha256": new_release.firmware_sha256}
+    assert admission.check_exact(
+        release=new_release, passive=new_facts, uio=kernel,
+        original_manager_load=("fpga_manager fpga0: writing " +
+                               new_release.firmware_name + " to fpga0"),
+        expected_firmware=new_release.firmware_name)["mmio_backend"] == "devmem"
     for bad in (facts | {"proc_conflicts": ["321"]},
                 facts | {"uio_overlaps": ["uio1"]},
                 facts | {"platform_overlaps": ["43c00000.audio-codec-ctrl",

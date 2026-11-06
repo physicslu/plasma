@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from .ppu_owner_authorization_fixture import admit_body, install_body, machine_id_file
+from .ppu_fpga_qualification_fixture import SYNTHETIC_HWH
 
 from .test_ppu_bundle_v3_packages_contract import (
     ROOT, SOURCE, TARGET, contract, engine, load,
@@ -220,10 +221,19 @@ def build_generic_assets(tmp_path, *, bitstream=b"fpga-image-v1", fpga_manifest=
     """Canonical, nonexecuting multi-kind Bundle; unrelated to smoke fixture."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     archive = tmp_path / "assets.zip"
+    hwh = SYNTHETIC_HWH
+    if fpga_manifest is not None:
+        image = json.loads(fpga_manifest)
+        base = image["axi_base"]
+        hwh = (f"<ROOT><SYSTEMINFO BOARD='pynq-z2' DEVICE='7z020' "
+               f"PACKAGE='clg400' SPEEDGRADE='-1'/>"
+               f"<MEMRANGE MASTERBUSINTERFACE='M_AXI_GP0' "
+               f"BASEVALUE='{base:#x}' "
+               f"HIGHVALUE='{base + image['axi_bytes'] - 1:#x}'/></ROOT>").encode()
     package_specs = [
         ("swd-parser", "python", (), {"python/parse.py": b"raise RuntimeError('NOT_EXECUTED')\\n"}),
         ("custom-swd", "fpga-image", (), {
-            "fpga/swd.bin": bitstream, "fpga/swd.hwh": b"<hwh/>",
+            "fpga/swd.bin": bitstream, "fpga/swd.hwh": hwh,
             "fpga/image.json": (
                 fpga_manifest if fpga_manifest is not None
                 else b'{"image_id":"custom-swd"}'

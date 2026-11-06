@@ -76,9 +76,10 @@ Target and independent FPGA ABI/Identity qualification, Runtime ownership,
 reload fences, SAFE_OFF, resource limits and Linux permissions remain in
 force. The engineering Runtime Release, factory/CI artifact identity and
 trusted GitHub Dispatcher Work Order source pins are separate contracts
-and retain their existing mandatory source identity checks. Existing FPGA
-factory contracts describe qualified hardware/ABI artifacts; they confer no
-publisher identity or user operation authority.
+and retain their existing mandatory source identity checks. The Bundle FPGA
+Manifest is a checked declaration; Root hardware evidence and owner operation
+authorization remain separate requirements. Publisher authenticity is not
+independently established by the current paired owner authorization.
 
 *The illustration is not a valid ZIP until real SHA256 and sizes are substituted.* Optional `actions` and `source_commit` declarations confer no execution permission. All other Manifest fields are denied; a v3 Manifest containing `components` is invalid. A v2 Manifest containing `packages` is also invalid.
 
@@ -99,7 +100,7 @@ Changing `components` to `packages` on an existing `plasma.ppu.bundle.v2` is **i
 - The Python model exposes `VerifiedBundle.packages: tuple[VerifiedBundlePackage]`, `MAX_BUNDLE_PACKAGES=32`, `bundle_package_identity`, and Package-based DAG resolution. Legacy attribute/function aliases remain narrowly for v2 consumers and cannot be used for new schema authoring.
 - New v3 Bundle Resolution emits `schema=plasma.ppu.bundle-resolution.v2`, `package_order`, `package_sha256`; v2 continues the old `component_order` and `component_sha256` Receipt shape.
 - Host-only transaction returns a top-level `bundle` envelope containing `packages` for v3; legacy v2 and Package v1 continue to return their historical `package` envelope. This is only a simulated transaction Receipt, not proof of device installation.
-- Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions (`fpga-image` = exactly one BIN + HWH + `plasma.fpga.image.v1` Manifest, statically qualified at B2 per [Owner Operation Authorization](../deployment/ppu-owner-operation-authorization.md) and the factory FPGA Image contracts); opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. `python` and `native-c` Packages may carry the declarative `config/plasma-package-resources.json` (`plasma.ppu.package-resources.v1`: `sites`, `max_runtime_s`); it is identity-bound and required for execution, never an execution entitlement. A Provider Package may also carry the fixed non-executable `config/plasma-provider-options.json` (see [P1-01 OPF Options Schema](opf-provider-options-schema-gate1.md)); this does not grant execution. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
+- Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions (`fpga-image` = exactly one BIN + HWH + `plasma.fpga.image.v1` Manifest, statically checked at B2 against the verified Bundle, device target and current Driver ABI; [Owner Operation Authorization](../deployment/ppu-owner-operation-authorization.md) binds the exact ZIP bytes and operation); opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. `python` and `native-c` Packages may carry the declarative `config/plasma-package-resources.json` (`plasma.ppu.package-resources.v1`: `sites`, `max_runtime_s`); it is identity-bound and required for execution, never an execution entitlement. A Provider Package may also carry the fixed non-executable `config/plasma-provider-options.json` (see [P1-01 OPF Options Schema](opf-provider-options-schema-gate1.md)); this does not grant execution. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
 - Component/Package hashing only establishes content identity; a checksum or Manifest `source_commit` never replaces the separate authenticated owner operation authorization.
 
 ## Asset-only Bundle semantics and single Active Asset Set

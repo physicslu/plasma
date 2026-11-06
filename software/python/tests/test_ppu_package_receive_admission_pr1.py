@@ -11,7 +11,6 @@ import pytest
 
 from .test_ppu_generic_package_host_only_gate1 import load, package, SAMPLES, TARGET
 from .ppu_owner_authorization_fixture import machine_id_file
-from .ppu_fpga_qualification_fixture import provision_default_contract
 
 service = load("ppu_package_receive_service_pr1", "ppu-bootstrap-service.py")
 base = load("ppu_package_receive_base_pr1", "ppu-bootstrap.py")
@@ -30,10 +29,7 @@ def loopback(tmp_path: Path):
         state_root=state, product_root=tmp_path / "product-untouched",
         package_target_file=target_file,
         machine_id_path=machine_id_file(tmp_path),
-        fpga_image_contracts=tmp_path / "factory" / "ppu-fpga-image-contracts.json",
     )
-    # Simulates the factory-Bootstrap-shipped trusted FPGA contract.
-    provision_default_contract(paths)
     service.provision_token(paths.token_file, token=TOKEN)
     server = service.BootstrapHTTPServer(
         ("127.0.0.1", 0), paths=paths, base_module=base,

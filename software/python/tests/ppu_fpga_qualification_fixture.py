@@ -1,10 +1,9 @@
-"""Test-only SYNTHETIC FPGA Image triple and trusted contract provisioner.
+"""Test-only SYNTHETIC FPGA Image triple.
 
 The BIN/HWH bytes below are deliberately not a Vivado build. They only let
 Host-only tests exercise the B2 static-qualification code path with a
 Manifest that the protected Root parser accepts. Nothing here is FPGA build,
 load, Identity readback or HIL evidence, and none of it ships to a PPU.
-The real shipped contract is ``scripts/ppu-fpga-image-contracts.json``.
 """
 from __future__ import annotations
 
@@ -13,7 +12,12 @@ import json
 from pathlib import Path
 
 SYNTHETIC_BIN = b"SYNTHETIC HOST-ONLY FPGA BIN - NOT A BITSTREAM"
-SYNTHETIC_HWH = b"<!-- SYNTHETIC HOST-ONLY HWH - NOT A VIVADO HANDOFF -->"
+SYNTHETIC_HWH = (b"<ROOT><SYSTEMINFO BOARD='pynq-z2' DEVICE='7z020' "
+                 b"PACKAGE='clg400' SPEEDGRADE='-1'/>"
+                 b"<MEMRANGE MASTERBUSINTERFACE='M_AXI_GP0' "
+                 b"BASEVALUE='0x43c01000' HIGHVALUE='0x43c01fff'/>"
+                 b"<MEMRANGE MASTERBUSINTERFACE='M_AXI_GP0' "
+                 b"BASEVALUE='0x43c02000' HIGHVALUE='0x43c02fff'/></ROOT>")
 TARGET = {"platform": "linux-armv7", "board": "pynq-z2", "fpga_part": "xc7z020clg400-1"}
 
 # ABI-v5-shaped geometry (same layout as the d0add58c contract), synthetic SHAs.
@@ -25,7 +29,7 @@ GEOMETRY = {"axi_base": 0x43C01000, "axi_bytes": 0x2000,
 
 def synthetic_image(bin_bytes: bytes = SYNTHETIC_BIN, *,
                     hwh_bytes: bytes = SYNTHETIC_HWH, manifest_overrides=None):
-    """Return (package files under fpga/, trusted contract entry)."""
+    """Return (package files under fpga/, no factory registry)."""
     bin_sha = hashlib.sha256(bin_bytes).hexdigest()
     build = bin_sha[:8]
     image_id = f"synthetic-host-only-abi5-{build}"
@@ -61,40 +65,4 @@ def synthetic_image(bin_bytes: bytes = SYNTHETIC_BIN, *,
         "fpga/system.hwh": hwh_bytes,
         "fpga/plasma-image-manifest.json": manifest_bytes,
     }
-    contract = {
-        "contract_id": f"synthetic-test-{build}",
-        "evidence": "synthetic-host-only-test",
-        "target": dict(TARGET),
-        "build": build,
-        "source_commit": build + "0" * 32,
-        "image_id": image_id,
-        "firmware_name": firmware,
-        "bin_sha256": bin_sha,
-        "hwh_sha256": hashlib.sha256(hwh_bytes).hexdigest(),
-        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
-        "recovery_name": "base.bin",
-        "abi_version": SITES[0]["identity"],
-        "abi_offset": SITES[0]["offset"],
-        "site_identities": [dict(s) for s in SITES],
-        "site_bitmap": 3,
-        "site_bitmap_offset": None,
-        **GEOMETRY,
-    }
-    return files, contract
-
-
-def write_contracts(path: Path, *contracts: dict) -> Path:
-    """Simulate the factory-Bootstrap-shipped trusted contract file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({
-        "schema": "plasma.ppu.fpga-image-contracts.v1",
-        "contracts": list(contracts),
-    }), encoding="utf-8")
-    path.chmod(0o644)
-    return path
-
-
-def provision_default_contract(paths) -> dict:
-    _files, contract = synthetic_image()
-    write_contracts(paths.fpga_image_contracts, contract)
-    return contract
+    return files, None

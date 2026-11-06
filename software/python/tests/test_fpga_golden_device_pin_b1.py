@@ -19,7 +19,7 @@ from pl.hil import fpga_image_root as root
 from .ppu_fpga_qualification_fixture import synthetic_image
 from .test_ppu_bundle_v3_packages_contract import ROOT, load
 from .test_ppu_fpga_static_qualification_gate1 import (
-    _with_manifest, deny, fpga_bundle, contract_file, qualify,
+    _with_manifest, deny, fpga_bundle, qualify,
 )
 
 GOLDEN = "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c"
@@ -47,8 +47,6 @@ def test_every_shipped_manifest_restates_the_device_golden():
     for path in shipped:
         data = json.loads(path.read_text())
         assert (data["recovery_name"], data["recovery_sha256"]) == ("base.bin", GOLDEN), path
-    contracts = json.loads((ROOT / "scripts/ppu-fpga-image-contracts.json").read_text())
-    assert all(c["recovery_name"] == "base.bin" for c in contracts["contracts"])
     assert root.parse_image_manifest_bytes(RELEASE.read_bytes()).recovery_sha256 == GOLDEN
 
 
@@ -74,15 +72,15 @@ def test_image_manifest_object_cannot_carry_non_golden_recovery(field, value):
 def test_b2_static_qualification_denies_bundle_redefining_golden(tmp_path):
     # Even if the trusted contract pinned THAT Manifest's bytes, the Root
     # parser refuses a non-Golden recovery before any contract comparison.
-    archive, digest, path = _with_manifest(tmp_path, {"recovery_sha256": "d" * 64})
+    archive, digest = _with_manifest(tmp_path, {"recovery_sha256": "d" * 64})
     deny("FPGA_IMAGE_MANIFEST_DENIED:IMAGE_RECOVERY_NOT_DEVICE_GOLDEN",
-         tmp_path, archive, digest, path)
+         tmp_path, archive, digest)
 
 
 def test_b2_static_qualification_passes_with_device_golden(tmp_path):
-    files, entry = synthetic_image()
+    files, _ = synthetic_image()
     archive, digest = fpga_bundle(tmp_path, files)
-    result = qualify(tmp_path, archive, digest, contract_file(tmp_path, entry))
+    result = qualify(tmp_path, archive, digest)
     assert result["result"] == "STATIC_QUALIFIED"
 
 

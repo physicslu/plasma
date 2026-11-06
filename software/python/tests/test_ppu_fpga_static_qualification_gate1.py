@@ -1,9 +1,4 @@
-"""B2 static FPGA qualification inside the ONE Bundle v3 B2/B3 flow (Host-only).
-
-All FPGA bytes here are SYNTHETIC (see ppu_fpga_qualification_fixture). These
-tests prove admission logic only; they are not a Vivado build, FPGA load,
-Identity readback, Z2 HIL or DUT result.
-"""
+"""Host-only Bundle v3 FPGA admission and owner authorization tests."""
 from __future__ import annotations
 
 import base64
@@ -15,265 +10,148 @@ from pathlib import Path
 import pytest
 
 from .ppu_owner_authorization_fixture import admit_body, install_body, machine_id_file
-from .ppu_fpga_qualification_fixture import (
-    synthetic_image, write_contracts, provision_default_contract,
-)
-from .test_ppu_bundle_v3_packages_contract import (
-    ROOT, SOURCE, TARGET, bundle_v3, contract, load,
-)
+from .ppu_fpga_qualification_fixture import synthetic_image
+from .test_ppu_bundle_v3_packages_contract import ROOT, TARGET, bundle_v3, contract, load
 from .test_ppu_package_receive_admission_pr1 import TOKEN, client, loopback  # noqa: F401
 
 qualification = load("ppu_fpga_static_qualification_test", "ppu_fpga_qualification.py")
 bootstrap = load("ppu_fpga_static_qualification_service", "ppu-bootstrap-service.py")
 
-SHIPPED = ROOT / "scripts" / "ppu-fpga-image-contracts.json"
-
-
 
 def fpga_bundle(tmp_path, files=None, *, mutate=None):
     files = synthetic_image()[0] if files is None else files
-    return bundle_v3(tmp_path, parts=[("swd-image", "fpga-image", [], files)],
-                     mutate=mutate)
+    return bundle_v3(tmp_path, parts=[("swd-image", "fpga-image", [], files)], mutate=mutate)
 
 
-def qualify(tmp_path, archive, digest, contracts_path, *, target=TARGET):
+def qualify(tmp_path, archive, digest, *, target=TARGET):
     verified = contract.verify_host_only_artifact(
-        archive, expected_sha256=digest, target_profile=target,
-    )
-    return qualification.qualify_bundle_fpga(
-        archive, verified, contracts_path=contracts_path, trusted_target=target,
-    )
+        archive, expected_sha256=digest, target_profile=target)
+    return qualification.qualify_bundle_fpga(archive, verified, trusted_target=target)
 
 
-def deny(code, tmp_path, archive, digest, contracts_path, **kw):
+def deny(code, tmp_path, archive, digest, **kw):
     with pytest.raises(qualification.FpgaQualificationDenied, match=code):
-        qualify(tmp_path, archive, digest, contracts_path, **kw)
+        qualify(tmp_path, archive, digest, **kw)
 
 
-def contract_file(tmp_path, *entries):
-    return write_contracts(tmp_path / "factory" / "contracts.json", *entries)
-
-
-# --- shipped trusted contracts (ABI v5 independent: d0add58c; ab79b04e, bd976140 retired) ----
-
-SHIPPED_BUILDS = ("d0add58c",)
-RETIRED_BUILDS = ("ab79b04e", "bd976140")
-
-
-def _release_manifest(build: str) -> bytes:
-    return (ROOT / f"pl/hil/releases/swd-independent-{build}/plasma-image-manifest.json").read_bytes()
-
-
-def test_shipped_contracts_are_abi5_independent_two_site(tmp_path):
-    copy = tmp_path / "shipped.json"
-    copy.write_bytes(SHIPPED.read_bytes())
-    copy.chmod(0o644)
-    contracts, _ = qualification.read_trusted_contracts(copy)
-    assert list(contracts) == [f"z2-independent-swd-v5-{b}" for b in SHIPPED_BUILDS]
-    for build in SHIPPED_BUILDS:
-        entry = contracts[f"z2-independent-swd-v5-{build}"]
-        assert entry["build"] == build
-        assert entry["source_commit"].startswith(build)
-        assert entry["target"] == TARGET
-        assert entry["site_identities"] == [
-            {"site_id": 1, "offset": 0x0000, "identity": 0x00050001},
-            {"site_id": 2, "offset": 0x1000, "identity": 0x00050002},
-        ]
-        assert entry["abi_version"] == 0x00050001 and entry["site_bitmap"] == 0b11
-        # The contract is a static expectation; it never claims readback/HIL.
-        assert "static" in entry["evidence"] and "hil" not in entry["evidence"].lower()
-
-
-@pytest.mark.parametrize("index,build", list(enumerate(SHIPPED_BUILDS)))
-def test_shipped_contract_pins_devmem_manifest_parsed_by_root_parser(index, build):
-    entry = json.loads(SHIPPED.read_text())["contracts"][index]
-    manifest = _release_manifest(build)
-    assert hashlib.sha256(manifest).hexdigest() == entry["manifest_sha256"]
-    root = qualification.load_root_manifest_parser()
-    assert Path(root.__file__).resolve() == (ROOT / "pl/hil/fpga_image_root.py").resolve()
-    parsed = root.parse_image_manifest_bytes(manifest)
-    assert parsed.image_id == entry["image_id"]
-    assert parsed.firmware_name == entry["firmware_name"]
-    assert parsed.firmware_sha256 == entry["bin_sha256"]
-    assert parsed.identity_words == ((0, 0x00050001, 0xFFFFFFFF),
-                                     (0x1000, 0x00050002, 0xFFFFFFFF))
-    assert (parsed.axi_base, parsed.axi_bytes, parsed.owner_base, parsed.owner_bytes) == (
-        entry["axi_base"], entry["axi_bytes"], entry["owner_base"], entry["owner_bytes"])
-
-
-def test_root_devmem_image_table_matches_shipped_contracts():
-    root = qualification.load_root_manifest_parser()
-    shipped = {c["image_id"]: c["bin_sha256"]
-               for c in json.loads(SHIPPED.read_text())["contracts"]}
-    assert root.admission.DEVMEM_INDEPENDENT_IMAGES == shipped
-
-
-def test_root_devmem_denies_unlisted_image_and_mismatched_bin():
-    root = qualification.load_root_manifest_parser()
-    base = json.loads(_release_manifest("d0add58c"))
-    for change in ({"image_id": "z2-independent-swd-v5-deadbeef"},
-                   {"firmware_sha256": "0" * 64}):
-        data = dict(base, **change)
-        with pytest.raises(Exception, match="DEVMEM_INDEPENDENT_IMAGE_CONTRACT_DENIED"):
-            root.parse_image_manifest_bytes(json.dumps(data).encode())
-
-
-def test_shipped_contract_rejects_synthetic_image(tmp_path):
-    archive, digest = fpga_bundle(tmp_path)
-    copy = tmp_path / "shipped.json"
-    copy.write_bytes(SHIPPED.read_bytes())
-    copy.chmod(0o644)
-    deny("FPGA_IMAGE_CONTRACT_UNKNOWN", tmp_path, archive, digest, copy)
-
-
-# --- module-level positive and negative ------------------------------------
-
-def test_valid_triple_is_static_qualified_without_load_or_readback(tmp_path):
-    files, entry = synthetic_image()
-    archive, digest = fpga_bundle(tmp_path, files)
-    result = qualify(tmp_path, archive, digest, contract_file(tmp_path, entry))
-    assert result["result"] == "STATIC_QUALIFIED"
-    assert result["archive_sha256"] == digest
-    assert result["fpga_loaded"] is False
-    assert result["identity_readback"] == "NOT_RUN"
-    assert result["execution_permitted"] is False
-    (image,) = result["images"]
-    assert image["contract_id"] == entry["contract_id"]
-    assert image["site_identities"] == entry["site_identities"]
-    assert image["bin_sha256"] == entry["bin_sha256"]
-
-
-def test_bundle_without_fpga_needs_no_contract(tmp_path):
-    archive, digest = bundle_v3(tmp_path, parts=[
-        ("tool", "python", [], {"python/tool.py": b"# not executed\n"})])
-    assert qualify(tmp_path, archive, digest, tmp_path / "absent.json") is None
-
-
-@pytest.mark.parametrize("problem,code", [
-    ("missing", "FPGA_CONTRACTS_NOT_PROVISIONED"),
-    ("group-writable", "FPGA_CONTRACTS_UNTRUSTED"),
-    ("symlink", "FPGA_CONTRACTS_UNTRUSTED"),
-    ("bad-schema", "FPGA_CONTRACTS_INVALID"),
-    ("zero-site", "FPGA_CONTRACT_SITES_INVALID"),
-    ("bitmap", "FPGA_CONTRACT_SITES_INVALID"),
-])
-def test_untrusted_or_invalid_contract_fails_closed(tmp_path, problem, code):
-    files, entry = synthetic_image()
-    archive, digest = fpga_bundle(tmp_path, files)
-    path = tmp_path / "factory" / "contracts.json"
-    if problem == "missing":
-        pass
-    elif problem == "group-writable":
-        contract_file(tmp_path, entry).chmod(0o664)
-    elif problem == "symlink":
-        real = write_contracts(tmp_path / "elsewhere.json", entry)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.symlink_to(real)
-    elif problem == "bad-schema":
-        contract_file(tmp_path, entry)
-        data = json.loads(path.read_text())
-        data["schema"] = "plasma.ppu.fpga-image-contracts.v0"
-        path.write_text(json.dumps(data))
-    elif problem == "zero-site":
-        contract_file(tmp_path, dict(entry, site_identities=[
-            {"site_id": 0, "offset": 0, "identity": 0x00050001}]))
-    elif problem == "bitmap":
-        contract_file(tmp_path, dict(entry, site_bitmap=1))
-    deny(code, tmp_path, archive, digest, path)
-
-
-def _with_manifest(tmp_path, overrides, *, contract_overrides=None, bin_bytes=None):
-    """Bundle whose Manifest differs; contract pins THAT Manifest's SHA so the
-    semantic (ABI / Identity / Site / BIN) check is the one that must fail."""
-    good_files, good = synthetic_image()
-    files, changed = synthetic_image(manifest_overrides=overrides)
+def _with_manifest(tmp_path, overrides, *, bin_bytes=None):
+    files, _ = synthetic_image(manifest_overrides=overrides)
     if bin_bytes is not None:
         name = next(k for k in files if k.endswith(".bin"))
         files[name] = bin_bytes
-    entry = dict(good, manifest_sha256=changed["manifest_sha256"],
-                 **(contract_overrides or {}))
     archive, digest = fpga_bundle(tmp_path, files)
-    return archive, digest, contract_file(tmp_path, entry)
+    return archive, digest
+
+
+def test_new_image_id_requires_no_factory_registry(tmp_path):
+    new_bin = b"NEW SYNTHETIC HOST-ONLY FPGA BIN - NOT A BITSTREAM"
+    files, _ = synthetic_image(new_bin, manifest_overrides={
+        "image_id": "new-authorized-image-2026"})
+    archive, digest = fpga_bundle(tmp_path, files)
+    result = qualify(tmp_path, archive, digest)
+    assert result["archive_sha256"] == digest
+    assert result["images"][0]["image_id"] == "new-authorized-image-2026"
+    assert result["images"][0]["bin_sha256"] == hashlib.sha256(new_bin).hexdigest()
+    assert result["identity_readback"] == "NOT_RUN"
+    assert result["fpga_loaded"] is False
+    assert result["execution_permitted"] is False
+    assert not (tmp_path / "factory-registry.json").exists()
+
+
+def test_reference_manifest_still_parses(tmp_path):
+    path = ROOT / "pl/hil/releases/swd-independent-d0add58c/plasma-image-manifest.json"
+    root = qualification.load_root_manifest_parser()
+    parsed = root.parse_image_manifest_bytes(path.read_bytes())
+    assert parsed.abi_version == qualification.DRIVER_ABI
+    assert parsed.site_bitmap == 3
+    assert parsed.expected_uio["backend"] == "devmem"
+
+
+def test_valid_triple_is_static_qualified_without_load_or_readback(tmp_path):
+    files, _ = synthetic_image()
+    archive, digest = fpga_bundle(tmp_path, files)
+    result = qualify(tmp_path, archive, digest)
+    assert result["result"] == "STATIC_QUALIFIED"
+    assert result["archive_sha256"] == digest
+    assert result["identity_readback"] == "NOT_RUN"
+
+
+def test_bundle_without_fpga_needs_no_registry(tmp_path):
+    archive, digest = bundle_v3(tmp_path, parts=[
+        ("tool", "python", [], {"python/tool.py": b"# not executed\n"})])
+    assert qualify(tmp_path, archive, digest) is None
+
+
+def test_multiple_fpga_packages_fail_before_install(tmp_path):
+    files, _ = synthetic_image()
+    archive, digest = bundle_v3(tmp_path, parts=[
+        ("image-one", "fpga-image", [], files),
+        ("image-two", "fpga-image", [], files)])
+    deny("FPGA_IMAGE_PACKAGE_NOT_UNIQUE", tmp_path, archive, digest)
 
 
 @pytest.mark.parametrize("overrides,code", [
     ({"abi_version": 0x00060001, "identity_words": [[0, 0x00060001, 0xFFFFFFFF],
                                                     [0x1000, 0x00050002, 0xFFFFFFFF]]},
-     "FPGA_IMAGE_ABI_MISMATCH"),
-    ({"identity_words": [[0, 0x00050001, 0xFFFFFFFF], [0x1000, 0x00050003, 0xFFFFFFFF]]},
-     "FPGA_IMAGE_IDENTITY_MISMATCH"),
-    ({"site_bitmap": 1}, "FPGA_IMAGE_SITE_CAPABILITY_MISMATCH"),
+     "FPGA_IMAGE_DRIVER_ABI_UNSUPPORTED"),
+    ({"identity_words": [[0, 0x00050001, 0xFFFFFFFF], [0, 0x00050002, 0xFFFFFFFF]]},
+     "FPGA_IMAGE_MANIFEST_DENIED:IMAGE_RELEASE_ABI_DENIED"),
+    ({"site_bitmap": 0}, "FPGA_IMAGE_MANIFEST_DENIED:IMAGE_RELEASE_APERTURE_DENIED"),
     ({"firmware_sha256": "0" * 64}, "FPGA_IMAGE_BIN_SHA_MISMATCH"),
+    ({"recovery_sha256": "d" * 64}, "FPGA_IMAGE_MANIFEST_DENIED:IMAGE_RECOVERY_NOT_DEVICE_GOLDEN"),
 ])
-def test_manifest_semantics_must_match_trusted_contract(tmp_path, overrides, code):
-    archive, digest, path = _with_manifest(tmp_path, overrides)
-    deny(code, tmp_path, archive, digest, path)
-
-
-def test_wrong_image_identity_is_unknown_to_contract(tmp_path):
-    files, _ = synthetic_image(manifest_overrides={"image_id": "attacker-chosen-ab79b04e"})
-    _, entry = synthetic_image()
-    archive, digest = fpga_bundle(tmp_path, files)
-    deny("FPGA_IMAGE_CONTRACT_UNKNOWN", tmp_path, archive, digest,
-         contract_file(tmp_path, entry))
+def test_invalid_image_fails_closed(tmp_path, overrides, code):
+    archive, digest = _with_manifest(tmp_path, overrides)
+    deny(code, tmp_path, archive, digest)
 
 
 def test_manifest_rejected_by_root_parser(tmp_path):
-    files, entry = synthetic_image(manifest_overrides={"schema": "plasma.fpga.image.v0"})
-    archive, digest = fpga_bundle(tmp_path, files)
-    deny("FPGA_IMAGE_MANIFEST_DENIED:IMAGE_MANIFEST_SCHEMA_DENIED",
-         tmp_path, archive, digest, contract_file(tmp_path, entry))
+    archive, digest = _with_manifest(tmp_path, {"schema": "plasma.fpga.image.v0"})
+    deny("FPGA_IMAGE_MANIFEST_DENIED:IMAGE_MANIFEST_SCHEMA_DENIED", tmp_path, archive, digest)
 
 
 def test_bin_bytes_differ_from_manifest(tmp_path):
-    files, entry = synthetic_image()
+    files, _ = synthetic_image()
     name = next(k for k in files if k.endswith(".bin"))
     files[name] = b"TAMPERED SYNTHETIC BIN"
     archive, digest = fpga_bundle(tmp_path, files)
-    deny("FPGA_IMAGE_BIN_SHA_MISMATCH", tmp_path, archive, digest,
-         contract_file(tmp_path, entry))
+    deny("FPGA_IMAGE_BIN_SHA_MISMATCH", tmp_path, archive, digest)
 
 
 def test_bin_name_differs_from_manifest(tmp_path):
-    files, entry = synthetic_image()
+    files, _ = synthetic_image()
     name = next(k for k in files if k.endswith(".bin"))
     files["fpga/renamed.bin"] = files.pop(name)
     archive, digest = fpga_bundle(tmp_path, files)
-    deny("FPGA_IMAGE_BIN_NAME_MISMATCH", tmp_path, archive, digest,
-         contract_file(tmp_path, entry))
+    deny("FPGA_IMAGE_BIN_NAME_MISMATCH", tmp_path, archive, digest)
 
 
-def test_hwh_not_paired_with_trusted_contract(tmp_path):
-    files, entry = synthetic_image(hwh_bytes=b"<!-- other synthetic handoff -->")
-    _, good = synthetic_image()
+@pytest.mark.parametrize("hwh,code", [
+    (b"<hwh/>", "IMAGE_HWH_RANGE_INVALID"),
+    (b"<ROOT><SYSTEMINFO BOARD='pynq-z2' DEVICE='7z020' PACKAGE='clg400' SPEEDGRADE='-1'/>"
+     b"<MEMRANGE MASTERBUSINTERFACE='M_AXI_GP0' BASEVALUE='0x43c01000' "
+     b"HIGHVALUE='0x43c01fff'/></ROOT>", "IMAGE_HWH_IDENTITY_RANGE_MISMATCH"),
+])
+def test_hwh_must_cover_declared_identity_addresses(tmp_path, hwh, code):
+    files, _ = synthetic_image(hwh_bytes=hwh)
     archive, digest = fpga_bundle(tmp_path, files)
-    deny("FPGA_IMAGE_CONTRACT_HWH_MISMATCH", tmp_path, archive, digest,
-         contract_file(tmp_path, dict(entry, hwh_sha256=good["hwh_sha256"])))
+    deny("FPGA_IMAGE_MANIFEST_DENIED:" + code, tmp_path, archive, digest)
 
 
-def test_manifest_bytes_not_pinned_by_contract(tmp_path):
-    files, entry = synthetic_image(manifest_overrides={"soc_compatible": "other"})
-    _, good = synthetic_image()
+def test_hwh_target_must_match_manifest(tmp_path):
+    files, _ = synthetic_image()
+    name = next(k for k in files if k.endswith(".hwh"))
+    files[name] = files[name].replace(b"DEVICE='7z020'", b"DEVICE='7z030'")
     archive, digest = fpga_bundle(tmp_path, files)
-    deny("FPGA_IMAGE_CONTRACT_MANIFEST_MISMATCH", tmp_path, archive, digest,
-         contract_file(tmp_path, dict(entry, manifest_sha256=good["manifest_sha256"])))
-
-
-def test_contract_target_differs_from_device_target(tmp_path):
-    files, entry = synthetic_image()
-    archive, digest = fpga_bundle(tmp_path, files)
-    other = dict(entry, target=dict(TARGET, platform="linux-aarch64"))
-    deny("FPGA_IMAGE_CONTRACT_TARGET_MISMATCH", tmp_path, archive, digest,
-         contract_file(tmp_path, other))
+    deny("FPGA_IMAGE_MANIFEST_DENIED:IMAGE_HWH_TARGET_MISMATCH",
+         tmp_path, archive, digest)
 
 
 def test_device_target_board_differs_from_manifest(tmp_path):
-    files, entry = synthetic_image()
-    device = dict(TARGET, board="other-board")
-    archive, digest = fpga_bundle(
-        tmp_path, files, mutate=lambda m: m.__setitem__("target", dict(device)))
-    deny("FPGA_IMAGE_TARGET_MISMATCH", tmp_path, archive, digest,
-         contract_file(tmp_path, dict(entry, target=device)), target=device)
+    files, _ = synthetic_image()
+    target = dict(TARGET, board="other-board")
+    archive, digest = fpga_bundle(tmp_path, files, mutate=lambda m: m.__setitem__("target", target))
+    deny("FPGA_IMAGE_TARGET_MISMATCH", tmp_path, archive, digest, target=target)
 
 
 def test_static_qualification_never_touches_root_loader(tmp_path, monkeypatch):
@@ -284,10 +162,8 @@ def test_static_qualification_never_touches_root_loader(tmp_path, monkeypatch):
                  "live_report", "write_state", "trusted_local"):
         monkeypatch.setattr(root, name, forbidden)
     monkeypatch.setattr(root.guard, "RootZ2TargetPort", forbidden)
-    files, entry = synthetic_image()
-    archive, digest = fpga_bundle(tmp_path, files)
-    assert qualify(tmp_path, archive, digest,
-                   contract_file(tmp_path, entry))["result"] == "STATIC_QUALIFIED"
+    archive, digest = fpga_bundle(tmp_path)
+    assert qualify(tmp_path, archive, digest)["result"] == "STATIC_QUALIFIED"
 
 
 # --- service B2 over real loopback HTTP ------------------------------------
@@ -349,12 +225,12 @@ def test_client_rejects_b2_receipt_claiming_fpga_load_or_missing_qualification(
         assert not client._valid_package_admission(changed, kind="bundle")
 
 
-def test_service_b2_fpga_unqualified_is_not_admitted(loopback, tmp_path):
+def test_service_b2_invalid_fpga_is_not_admitted(loopback, tmp_path):
     api, paths, server = loopback
-    files, _ = synthetic_image(b"OTHER SYNTHETIC BIN WITH NO CONTRACT")
+    files, _ = synthetic_image(manifest_overrides={"firmware_sha256": "0" * 64})
     archive, _digest = fpga_bundle(tmp_path / "bad", files)
     status, body = _b2(api, paths, archive.read_bytes())
-    assert status == 409 and "FPGA_IMAGE_CONTRACT_UNKNOWN" in json.dumps(body)
+    assert status == 409 and "FPGA_IMAGE_BIN_SHA_MISMATCH" in json.dumps(body)
     record = bootstrap._deployment_api_record(paths)
     assert record is None or record.get("state") != "admitted"
 
@@ -381,7 +257,6 @@ def _b3_server(tmp_path):
         package_target_file=tmp_path / "trusted-target.json",
         bundle_install_policy=tmp_path / "trusted-policy.json",
         machine_id_path=machine_id_file(tmp_path),
-        fpga_image_contracts=tmp_path / "factory" / "ppu-fpga-image-contracts.json",
     )
     paths.package_target_file.write_text(json.dumps(TARGET))
     paths.package_target_file.chmod(0o600)
@@ -409,29 +284,15 @@ def _commit(paths, raw):
     return upload_id
 
 
-def test_b3_rejects_fpga_contract_or_owner_authorization_change_after_b2(tmp_path):
+def test_b3_rejects_owner_authorization_change_after_b2(tmp_path):
     srv, paths, calls = _b3_server(tmp_path)
     archive, digest = bundle_v3(tmp_path / "bundle", mutate=lambda m: m.__setitem__(
         "actions", ["install", "verify"]))
     raw = archive.read_bytes()
     upload_id = _commit(paths, raw)
-    _, entry = synthetic_image()
-    write_contracts(paths.fpga_image_contracts, entry)
     b2 = srv.start_deployment(admit_body(paths, "bundle", upload_id))
     assert b2["result"]["fpga_static_qualification"] == "STATIC_QUALIFIED"
     b3 = install_body(paths, b2, fpga_load=False)
-
-    # Contract withdrawn after B2.
-    original = paths.fpga_image_contracts.read_bytes()
-    paths.fpga_image_contracts.unlink()
-    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_FPGA_QUALIFICATION_DENIED"):
-        srv.start_deployment(b3)
-    # Contract replaced by a different (still valid) trusted contract set.
-    _, extra = synthetic_image(b"ANOTHER SYNTHETIC BIN")
-    write_contracts(paths.fpga_image_contracts, entry, extra)
-    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_FPGA_QUALIFICATION_CHANGED"):
-        srv.start_deployment(b3)
-    paths.fpga_image_contracts.write_bytes(original)
 
     # Pairing credential rotated after the owner signed the B3 request:
     # every outstanding authorization is invalid.
@@ -454,10 +315,6 @@ def test_b3_rejects_fpga_contract_or_owner_authorization_change_after_b2(tmp_pat
     assert not (paths.product_root / "current").exists()
 
 
-@pytest.mark.parametrize("build", RETIRED_BUILDS)
-def test_retired_image_not_trusted_anywhere(build):
-    root = qualification.load_root_manifest_parser()
-    shipped = json.loads(SHIPPED.read_text())
-    assert not any(build in json.dumps(c) for c in shipped["contracts"])
-    assert f"z2-independent-swd-v5-{build}" not in root.admission.DEVMEM_INDEPENDENT_IMAGES
+@pytest.mark.parametrize("build", ("ab79b04e", "bd976140"))
+def test_retired_release_files_remain_absent(build):
     assert not (ROOT / f"pl/hil/releases/swd-independent-{build}").exists()

@@ -12,16 +12,6 @@ import re
 from pl.hil import fpga_image_guard as guard
 
 
-# Reviewed ABI-v5 independent Images admitted to the opt-in /dev/mem
-# engineering backend: image_id -> paired BIN SHA-256. Every entry shares the
-# same HWH-proven two-Site geometry checked by the Root Manifest parser.
-DEVMEM_INDEPENDENT_IMAGES = {
-    # PR #1285 head d0add58c3: 0x68 IDLE_CYCLES (OpenOCD AP memaccess delay).
-    "z2-independent-swd-v5-d0add58c":
-        "0d99ecafcb570c39217aa39723ccfcf593ae2021158599085a01436665374bc7",
-}
-
-
 class AdmissionDenied(ValueError):
     pass
 
@@ -89,11 +79,10 @@ def check_exact(*, release, passive: dict, uio: dict,
                  "UIO_PLATFORM_OWNER_MISMATCH")
             if owner.get("backend") == "devmem":
                 # Kernel UIO here supplies *conflict evidence*, never the
-                # SWD register provider. Root opens /dev/mem only after this
-                # exact, source-pinned and process-conflict-free admission.
-                need(DEVMEM_INDEPENDENT_IMAGES.get(release.image_id) ==
-                     release.firmware_sha256 and
-                     release.axi_base == 0x43C01000 and
+                # SWD register provider. Root opens /dev/mem only after the
+                # paired Manifest, current-boot journal, identity readback and
+                # process-conflict-free admission.
+                need(release.axi_base == 0x43C01000 and
                      release.axi_bytes == 0x2000 and
                      release.abi_version == 0x00050001 and
                      release.site_bitmap == 3 and

@@ -74,10 +74,6 @@ class ServicePaths:
     bootstrap_script: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap.py")
     kit_tool: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap-kit.py")
     package_target_file: Path = Path("/etc/plasma/ppu-package-target.json")
-    # Factory-Bootstrap-shipped trusted FPGA Image Target/ABI contracts used by
-    # B2 static FPGA qualification. Never supplied by a Bundle or HTTP.
-    fpga_image_contracts: Path = Path("/opt/plasma/bootstrap/ppu-fpga-image-contracts.json")
-
     # Root-provisioned lab installation capability, independent of any
     # Bundle name, file SHA or test fixture; NEVER writable via HTTP.
     bundle_install_policy: Path = Path("/opt/plasma/bootstrap/ppu-bundle-install-policy.json")
@@ -826,7 +822,6 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
                         upload.committed, expected_sha256=meta["sha256"],
                         target_profile=target,
-                        contracts_path=self.bootstrap_paths.fpga_image_contracts,
                     )
                 except (deployment.BundleV3AdmissionVerificationDenied,
                         deployment.BundleV3AdmissionQualificationDenied) as exc:
@@ -961,14 +956,12 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 reverified_plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
                     upload.committed, expected_sha256=plan["archive_sha256"],
                     target_profile=trusted_target,
-                    contracts_path=self.bootstrap_paths.fpga_image_contracts,
                 )
             except deployment.BundleV3AdmissionVerificationDenied as exc:
                 raise BootstrapServiceError("B3_BUNDLE_REVERIFY_DENIED") from exc
             except deployment.BundleV3AdmissionQualificationDenied as exc:
                 raise BootstrapServiceError("B3_FPGA_QUALIFICATION_DENIED") from exc
-            # Re-qualification must match B2 even when the trusted FPGA
-            # contracts change without changing the uploaded archive.
+            # Re-qualification must match B2 for the exact uploaded archive.
             if ("fpga_qualification" not in plan or
                     plan["fpga_qualification"] != reverified_plan["fpga_qualification"]):
                 raise BootstrapServiceError("B3_FPGA_QUALIFICATION_CHANGED")

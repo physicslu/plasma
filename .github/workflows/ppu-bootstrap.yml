@@ -38,7 +38,6 @@ on:
       - "scripts/z2/plasma-path2-root-entry"
       - "software/python/tests/test_ppu_privileged_source_gate1.py"
       - "scripts/ppu_fpga_qualification.py"
-      - "scripts/ppu-fpga-image-contracts.json"
       - "pl/hil/fpga_image_guard.py"
       - "pl/hil/fpga_image_admission.py"
       - "scripts/plasmactl-z2-ps"
@@ -107,7 +106,6 @@ on:
       - "scripts/z2/plasma-path2-root-entry"
       - "software/python/tests/test_ppu_privileged_source_gate1.py"
       - "scripts/ppu_fpga_qualification.py"
-      - "scripts/ppu-fpga-image-contracts.json"
       - "pl/hil/fpga_image_guard.py"
       - "pl/hil/fpga_image_admission.py"
       - "scripts/plasmactl-z2-ps"
@@ -264,7 +262,6 @@ jobs:
             scripts/ppu_site_adapter_abi5.py \
             scripts/ppu_site_recovery.py \
             scripts/ppu_fpga_qualification.py \
-            scripts/ppu-fpga-image-contracts.json \
             "$root/scripts/"
           # B2 static FPGA qualification reuses the protected Root parser.
           mkdir -p "$root/scripts/pl/hil"
@@ -333,9 +330,8 @@ jobs:
           test -f "$sandbox/opt/plasma/bootstrap/ppu-z2-installer-core.py"
           test -f "$sandbox/opt/plasma/bootstrap/ppu-bundle-install-policy.json"
           test -f "$sandbox/opt/plasma/bootstrap/ppu_fpga_qualification.py"
-          test -f "$sandbox/opt/plasma/bootstrap/ppu-fpga-image-contracts.json"
+          test ! -e "$sandbox/opt/plasma/bootstrap/ppu-fpga-image-contracts.json"
           test -f "$sandbox/opt/plasma/bootstrap/pl/hil/fpga_image_root.py"
-          test "$(stat -c '%a' "$sandbox/opt/plasma/bootstrap/ppu-fpga-image-contracts.json")" = "644"
           test "$(stat -c '%a' "$sandbox/opt/plasma/bootstrap/ppu-bundle-install-policy.json")" = "600"
           test ! -e "$sandbox/opt/plasma/current"
           grep -q 'ppu-bootstrap-service.py serve --host 192.168.2.99 --port 18081' \

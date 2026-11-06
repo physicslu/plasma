@@ -300,7 +300,7 @@ class DeploymentCoordinator:
     @staticmethod
     def qualify_bundle_v3_admission(
         archive: Path, *, expected_sha256: str,
-        target_profile: Mapping[str, str], contracts_path: Path,
+        target_profile: Mapping[str, str],
     ) -> dict[str, Any]:
         """One read-only B2/B3 preflight for the canonical Bundle v3.
 
@@ -340,8 +340,7 @@ class DeploymentCoordinator:
         fpga_spec.loader.exec_module(fpga)
         try:
             fpga_qualification = fpga.qualify_bundle_fpga(
-                archive, verified, contracts_path=contracts_path,
-                trusted_target=target_profile,
+                archive, verified, trusted_target=target_profile,
             )
         except fpga.FpgaQualificationDenied as exc:
             raise BundleV3AdmissionQualificationDenied(str(exc)) from exc
