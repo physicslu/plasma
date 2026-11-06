@@ -32,10 +32,11 @@ def need(ok: bool, code: str) -> None:
 
 
 def check_exact(*, release, passive: dict, uio: dict,
-                original_manager_load: str, expected_firmware: str,
+                original_manager_load: str | None, expected_firmware: str,
                 previous_firmware: str | None = None,
                 runtime_program_session: bool = False,
-                require_mmio: bool = True) -> dict:
+                require_mmio: bool = True,
+                require_manager_provenance: bool = True) -> dict:
     need(type(passive) is dict and
          passive.get("observation_kind") == "LIVE_ROOT_READ_ONLY" and
          passive.get("root") is True and bool(passive.get("boot_id")) and
@@ -47,6 +48,11 @@ def check_exact(*, release, passive: dict, uio: dict,
     need(type(require_mmio) is bool and
          (require_mmio or not runtime_program_session),
          "INVALID_MMIO_ADMISSION_POLICY")
+    # Only the fully scanned, MMIO-qualified Site path may omit the
+    # ephemeral Kernel ring-buffer load message. Deployment stays strict.
+    need(type(require_manager_provenance) is bool and
+         (require_manager_provenance or (require_mmio and not runtime_program_session)),
+         "SITE_ADMISSION_MODE_INVALID")
     scan = passive.get("proc_scan_diagnostic")
     if runtime_program_session:
         # This is NOT a no-conflict measurement. In particular a forged
@@ -114,9 +120,10 @@ def check_exact(*, release, passive: dict, uio: dict,
     need(expected_firmware in (guard.GOLDEN_RECOVERY_NAME, release.firmware_name) or
          (previous_firmware is not None and expected_firmware == previous_firmware),
          "MANAGER_FIRMWARE_NOT_ALLOWLISTED")
-    need(type(original_manager_load) is str and
-         ": writing " + expected_firmware + " to " in original_manager_load,
-         "MANAGER_LOAD_PROVENANCE_UNPROVEN")
+    if require_manager_provenance:
+        need(type(original_manager_load) is str and
+             ": writing " + expected_firmware + " to " in original_manager_load,
+             "MANAGER_LOAD_PROVENANCE_UNPROVEN")
     return {
         "site": release.site_bitmap,
         "target_boot_id": passive["boot_id"],
@@ -137,7 +144,8 @@ def check_exact(*, release, passive: dict, uio: dict,
 def collect_live(*, root_port: guard.RootZ2TargetPort, release,
                  expected_firmware: str, previous_firmware: str | None = None,
                  runtime_program_session: bool = False,
-                 require_mmio: bool = True) -> dict:
+                 require_mmio: bool = True,
+                 require_manager_provenance: bool = True) -> dict:
     root_port._require_locked()
     need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
     need(root_port.release == release, "ROOT_RELEASE_BINDING_CHANGED")
@@ -145,6 +153,9 @@ def collect_live(*, root_port: guard.RootZ2TargetPort, release,
     need(type(require_mmio) is bool and
          (require_mmio or not runtime_program_session),
          "INVALID_MMIO_ADMISSION_POLICY")
+    need(type(require_manager_provenance) is bool and
+         (require_manager_provenance or (require_mmio and not runtime_program_session)),
+         "SITE_ADMISSION_MODE_INVALID")
     passive = (root_port.runtime_program_facts() if runtime_program_session
                else root_port.current_facts())
     uio = None
@@ -195,11 +206,13 @@ def collect_live(*, root_port: guard.RootZ2TargetPort, release,
              "UIO_PLATFORM_OWNER_MISMATCH")
     report = check_exact(
         release=release, passive=passive, uio=uio,
-        original_manager_load=guard.manager_last_load(),
+        original_manager_load=(guard.manager_last_load()
+                               if require_manager_provenance else None),
         expected_firmware=expected_firmware,
         previous_firmware=previous_firmware,
         runtime_program_session=runtime_program_session,
-        require_mmio=require_mmio)
+        require_mmio=require_mmio,
+        require_manager_provenance=require_manager_provenance)
     need((guard.PROC / "sys/kernel/random/boot_id").read_text().strip()
          == report["target_boot_id"], "BOOT_CHANGED_AFTER_RISK_SCAN")
     return report
