@@ -29,23 +29,7 @@ jobs:
         with:
           platforms: arm
 
-      - name: Cold QEMU ARMv7 build (existing source-locked recipe, no cache)
-        id: qemu
-        shell: bash
-        run: |
-          set -euo pipefail
-          start="$(date +%s)"
-          bash scripts/ci/build-openocd5088-armv7.sh "$RUNNER_TEMP/qemu-cold"
-          end="$(date +%s)"
-          echo "duration_s=$((end - start))" >> "$GITHUB_OUTPUT"
-
-      - name: Verify QEMU-built ELF and admission denials on ARMv7
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/ci/verify-openocd5088-armv7.sh \
-            "$RUNNER_TEMP/qemu-cold" "$RUNNER_TEMP/qemu-verified"
-
+      # Fail fast on cross-toolchain issues before spending ~20m on QEMU baseline.
       - name: Cold native x86_64 to ARMv7 cross-build (no cache)
         id: cross
         shell: bash
@@ -62,6 +46,23 @@ jobs:
           set -euo pipefail
           bash scripts/ci/verify-openocd5088-armv7.sh \
             "$RUNNER_TEMP/cross-cold" "$RUNNER_TEMP/cross-verified"
+
+      - name: Cold QEMU ARMv7 build (existing source-locked recipe, no cache)
+        id: qemu
+        shell: bash
+        run: |
+          set -euo pipefail
+          start="$(date +%s)"
+          bash scripts/ci/build-openocd5088-armv7.sh "$RUNNER_TEMP/qemu-cold"
+          end="$(date +%s)"
+          echo "duration_s=$((end - start))" >> "$GITHUB_OUTPUT"
+
+      - name: Verify QEMU-built ELF and admission denials on ARMv7
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/verify-openocd5088-armv7.sh \
+            "$RUNNER_TEMP/qemu-cold" "$RUNNER_TEMP/qemu-verified"
 
       - name: Report cold A/B evidence (non-release)
         if: always()
