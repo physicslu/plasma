@@ -242,7 +242,7 @@ async def execute_reference_flash(
             selection=selection, policy=policy, job_id=job_id, target=target,
             operation="flash_cycle", site_id=site_id, image_size=len(image),
             hardware=hardware, job_deadline_monotonic=job_deadline_monotonic,
-            job_timeout_s=job_timeout_s,
+            job_timeout_s=job_timeout_s, profile=binding.profile,
             expected_engine_selection_sha256=binding.engine.record_sha256,
             expected_worker_identity=hardware.get("worker_identity"))
         if bound.route != binding.route:
