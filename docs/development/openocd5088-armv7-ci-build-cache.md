@@ -11,6 +11,10 @@ commit, configure flags, image tag, apt dependencies, explicit toolchain epoch),
 the native injector, every C/H file named in its COPIES tuple, and the cache
 key/verification implementation. It excludes docs, the HIL deployment template,
 and the independent admission script because none feeds the C compiler.
+Site admission changes instead run the existing Python PS source-test job,
+including unprivileged admit/revoke denial checks; they do not trigger the
+ARMv7 OpenOCD candidate workflow. OpenOCD C/H, build/verification tooling
+and the ARMv7 workflow itself still trigger source-locked candidate checks.
 
 The arm32v7/ubuntu:22.04 image tag and apt packages are not fully immutable.
 Maintainers MUST bump OPENOCD5088_TOOLCHAIN_EPOCH when the toolchain, Ubuntu
