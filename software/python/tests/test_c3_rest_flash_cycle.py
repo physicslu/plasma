@@ -803,7 +803,7 @@ def test_c3_path_offers_only_the_complete_flash_cycle():
             async with Stack(Path(directory)) as stack:
                 status, payload = await stack.api("POST", "/api/jobs",
                                                   {"site_id": 2, "operation": "erase"})
-                assert status == 400 and "not runtime-ready" in payload["error"]["message"]
+                assert status == 400 and "C-3 supports only flash_cycle" in payload["error"]["message"]
                 assert stack.sim.argvs == []
     run(scenario())
 

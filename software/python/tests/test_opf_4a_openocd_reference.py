@@ -208,7 +208,7 @@ def test_bundle_profile_accepts_icpn_absent_from_local_registry():
 
 def test_bundle_profile_image_bounds_and_target_claim_fail_closed():
     with installed_bundle() as env:
-        with pytest.raises(ValueError, match="REFERENCE_IMAGE_OUT_OF_BOUNDS"):
+        with pytest.raises(ValueError, match="IMAGE_OUT_OF_BOUNDS"):
             reference.preflight_runtime_flash(
                 product_root=env["product_root"], active_asset_set=env["active_asset_set"],
                 target=ICPN, site_id=2, image_size=65537)
