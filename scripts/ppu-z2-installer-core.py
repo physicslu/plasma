@@ -972,8 +972,14 @@ STAGE_C_PYTHON_UNITS = {
 }
 
 
-def _stage_c_units_module():
-    path = Path(__file__).resolve().parent / "ppu_package_units.py"
+def _stage_c_units_module(paths: InstallPaths):
+    """Use the INSTALLED Bootstrap's Stage C unit renderer, not the Runtime kit.
+
+    The Runtime ZIP intentionally does not carry ppu_package_units.py.
+    """
+    path = paths.product_root / "bootstrap" / "ppu_package_units.py"
+    if not path.is_file():
+        return None
     spec = importlib.util.spec_from_file_location("ppu_package_units", path)
     if spec is None or spec.loader is None:
         raise Z2InstallerError(f"cannot load Stage C unit renderer: {path}")
@@ -993,7 +999,9 @@ def render_stage_c_refresh(
     """
     if not (paths.systemd_root / "plasma-site-worker.service").is_file():
         return []
-    units = _stage_c_units_module()
+    units = _stage_c_units_module(paths)
+    if units is None:
+        return []
     python = str(python_runtime.path)
     out = [
         (paths.systemd_root / name, getattr(units, renderer)(python), 0o644)
