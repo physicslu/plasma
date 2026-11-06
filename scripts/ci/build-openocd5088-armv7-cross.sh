@@ -12,6 +12,17 @@ docker run --rm -i --platform linux/amd64 \
   --volume "$OUTPUT_DIR:/cross-output" \
   ubuntu:22.04 bash -euo pipefail -s <<'CROSS'
 export DEBIAN_FRONTEND=noninteractive
+# Ubuntu's amd64 archive does not publish armhf indexes; armhf lives on ports.
+# Scope each source to its architecture before enabling dpkg multiarch.
+test -f /etc/apt/sources.list
+sed -i -E 's|^deb (http://(archive.ubuntu.com/ubuntu/|security.ubuntu.com/ubuntu/))|deb [arch=amd64] \1|' \
+  /etc/apt/sources.list
+cat > /etc/apt/sources.list.d/armhf-ports.list <<'APT_ARMHF'
+deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+APT_ARMHF
 dpkg --add-architecture armhf
 apt-get update -qq
 apt-get install -y --no-install-recommends \
