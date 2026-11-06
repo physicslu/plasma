@@ -8,7 +8,7 @@ systemd MainPID) runs one REST Site Job through C-3 as:
 
 The Worker owns Site admission, PS-local OpenOCD, SAFE_OFF verification and
 sealing. The verified Bundle Flash profile is pinned once at Session open;
-bind_image sends only SHA256 and size, never a second Geometry declaration. Wire protocol: ``plasma.ppu.site-worker.v1`` (one JSON line).
+bind_image sends only SHA256 and size, never a second Geometry declaration. Wire protocol: ``plasma.ppu.site-worker.v2`` (one JSON line).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from typing import Any, Callable, Mapping
 
 from plasma_core.errors import ErrorCode, PlasmaError
 
-PROTOCOL = "plasma.ppu.site-worker.v1"
+PROTOCOL = "plasma.ppu.site-worker.v2"
 DEFAULT_IMAGE_ROOT = Path("/run/plasma-server/normalized-images")
 
 
