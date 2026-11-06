@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Owner Work Order artifact_sources (optional Path 3 field)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ps_kit",
+    "factory",
+    "engine_candidate"
+  ],
+  "properties": {
+    "ps_kit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflow",
+        "run_id",
+        "artifact_id",
+        "source_sha",
+        "zip_sha256",
+        "artifact_name",
+        "event",
+        "branch",
+        "pr_number"
+      ],
+      "properties": {
+        "repository": {
+          "const": "physicslu/plasma"
+        },
+        "workflow": {
+          "const": ".github/workflows/z2-ps-release.yml"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999999999999
+        },
+        "artifact_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999999999999
+        },
+        "source_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "zip_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifact_name": {
+          "type": "string",
+          "pattern": "^plasma-z2-ps-kit-[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?(?:\\+[A-Za-z0-9.-]+)?-[a-f0-9]{12}$"
+        },
+        "event": {
+          "enum": [
+            "push",
+            "workflow_dispatch"
+          ]
+        },
+        "branch": {
+          "const": "main"
+        },
+        "pr_number": {
+          "const": 0
+        }
+      }
+    },
+    "factory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflow",
+        "run_id",
+        "artifact_id",
+        "source_sha",
+        "zip_sha256",
+        "artifact_name",
+        "event",
+        "branch",
+        "pr_number"
+      ],
+      "properties": {
+        "repository": {
+          "const": "physicslu/plasma"
+        },
+        "workflow": {
+          "const": ".github/workflows/ppu-bootstrap.yml"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999999999999
+        },
+        "artifact_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999999999999
+        },
+        "source_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "zip_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifact_name": {
+          "const": "ppu-bootstrap-factory-bundle"
+        },
+        "event": {
+          "enum": [
+            "push",
+            "workflow_dispatch"
+          ]
+        },
+        "branch": {
+          "const": "main"
+        },
+        "pr_number": {
+          "const": 0
+        }
+      }
+    },
+    "engine_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflow",
+        "run_id",
+        "artifact_id",
+        "source_sha",
+        "zip_sha256",
+        "artifact_name",
+        "event",
+        "branch",
+        "pr_number"
+      ],
+      "properties": {
+        "repository": {
+          "const": "physicslu/plasma"
+        },
+        "workflow": {
+          "const": ".github/workflows/swd-openocd5088-armv7-candidate.yml"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999999999999
+        },
+        "artifact_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999999999999
+        },
+        "source_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "zip_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifact_name": {
+          "const": "plasma-openocd5088-armv7-candidate"
+        },
+        "event": {
+          "const": "pull_request"
+        },
+        "branch": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9/_.-]{0,120}$",
+          "not": {
+            "const": "main"
+          }
+        },
+        "pr_number": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

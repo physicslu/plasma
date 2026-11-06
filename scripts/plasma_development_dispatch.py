@@ -212,7 +212,7 @@ def parse_dynamic_work_order(event: object) -> dict:
                                "timeout_seconds", "project", "operation",
                                "toolchain", "board_repo_sha",
                                 "monitor_summary", "codex_execution",
-                               "codex_profile", "artifact_source", "monitor_phase"},
+                               "codex_profile", "artifact_source", "artifact_sources", "monitor_phase"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -245,7 +245,7 @@ def parse_dynamic_work_order(event: object) -> dict:
         quick = order.get("codex_profile") == QUICK_PROFILE
         allowed = (base - {"scope"}) | optional_ref | {
             "monitor_summary", "codex_execution", "codex_profile",
-            "artifact_source", "monitor_phase"}
+            "artifact_source", "artifact_sources", "monitor_phase"}
         if quick:
             allowed |= {"scope"}
         require(capability == "codex-workspace" and
@@ -257,6 +257,14 @@ def parse_dynamic_work_order(event: object) -> dict:
                  and "codex_execution" not in order
                  and order.get("pr_number", 0) == 0)),
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
+        if "artifact_sources" in order:
+            require(not quick and "artifact_source" not in order,
+                    "WORK_ORDER_ARTIFACT_SET_DENIED")
+            import plasma_trusted_artifact_set as artifacts
+            try:
+                artifacts.validate_pins(order["artifact_sources"])
+            except (ValueError, TypeError, KeyError):
+                raise Denied("WORK_ORDER_ARTIFACT_SET_DENIED") from None
         if "artifact_source" in order:
             source = order["artifact_source"]
             require(type(source) is dict and
@@ -409,6 +417,8 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         task["codex_execution"] = order["codex_execution"]
     if "artifact_source" in order:
         task["artifact_source"] = order["artifact_source"]
+    if "artifact_sources" in order:
+        task["artifact_sources"] = order["artifact_sources"]
     if "codex_profile" in order:
         task["codex_profile"] = order["codex_profile"]
         task["work_order_scope"] = "host-only"
@@ -604,6 +614,7 @@ def authorize(event: object, context: dict, registry: object,
         **({"artifact_run_id": str(task["artifact_source"]["run_id"]),
             "artifact_source_sha": task["artifact_source"]["source_sha"]}
           if "artifact_source" in task else {}),
+        "artifact_set_requested": "true" if "artifact_sources" in task else "",
         **a2_claim,
     }
 

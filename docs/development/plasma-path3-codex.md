@@ -73,6 +73,24 @@ The token remains confined to the trusted Actions step. No fixed release is
 accepted as a fallback. This does not authorize any Z2 deployment or DUT work,
 which still requires the existing owner Work Order scope and Root Guard.
 
+The optional `artifact_sources` field replaces `artifact_source` for an exact
+three-artifact handoff (the fields are mutually exclusive). Its executable
+validator is `scripts/plasma_trusted_artifact_set.py`; the field schema is
+[artifact-sources.schema.json](../../specs/engineering-dispatch/artifact-sources.schema.json).
+It pins `ps_kit`, `factory`, and `engine_candidate`, each with repository,
+workflow, run ID, artifact ID, actual source SHA, exact GitHub ZIP SHA256,
+artifact name, event, branch and PR number. Main push or owner workflow_dispatch
+is accepted for Kit and Factory; Engine uses the actual same-repository PR head,
+never a claim that the candidate is main. Run attempts other than 1 fail closed.
+
+The existing trusted Actions job fetches and verifies the entire set before
+launching Codex. Token-bearing requests and redirects remain in that step;
+redirects strip Authorization. Errors are categorical. Only local payload and
+sidecar paths plus a sanitized receipt are exported, after all three pass and
+files are made read-only. No fallback to a different run or the legacy Kit
+route is permitted. Ordinary user OPF bundle admission is unchanged. This
+transport alone grants no deployment or hardware authority.
+
 ### Operator Monitor engineering diagnostics (display only)
 
 Path 3 Owner-authenticated Issue #981 Work Orders may add optional

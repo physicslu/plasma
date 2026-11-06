@@ -20,6 +20,9 @@ on:
     paths:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
+      - "specs/engineering-dispatch/artifact-sources.schema.json"
+      - "scripts/plasma_trusted_artifact_set.py"
+      - "scripts/tests/test_plasma_trusted_artifact_set.py"
       - "scripts/plasma_development_dispatch.py"
       - "scripts/plasma_host_observe.py"
       - "scripts/plasma_engineering_monitor.py"
@@ -51,6 +54,9 @@ on:
     paths:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
+      - "specs/engineering-dispatch/artifact-sources.schema.json"
+      - "scripts/plasma_trusted_artifact_set.py"
+      - "scripts/tests/test_plasma_trusted_artifact_set.py"
       - "scripts/plasma_development_dispatch.py"
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/plasma_engineering_activity.py"
@@ -117,9 +123,23 @@ jobs:
           python3 scripts/tests/test_plasma_development_stage_transport.py
           python3 scripts/tests/test_plasma_path2_trusted_z2_artifact.py
           python3 scripts/tests/test_plasma_trusted_z2_ci_artifact.py
+          python3 scripts/tests/test_plasma_trusted_artifact_set.py
           python3 scripts/tests/test_plasma_path2_root_direct.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
+
+      - name: Run host-only release archive regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/plasma-dispatch-release-tests"
+          "$RUNNER_TEMP/plasma-dispatch-release-tests/bin/python" -m pip install 'pytest>=8.0'
+          "$RUNNER_TEMP/plasma-dispatch-release-tests/bin/python" -m pytest -q -o addopts= \
+            software/python/tests/test_ppu_release.py \
+            software/python/tests/test_product_release.py \
+            software/python/tests/test_z2_python_runtime_artifact.py \
+            software/python/tests/test_openocd_runtime_artifact.py \
+            software/python/tests/test_z2_ps_release_cache_contract.py
 
   candidate-dispatcher-premerge:
     # Existing PR event is the unprivileged branch-test entry. This runs the
@@ -190,6 +210,7 @@ jobs:
       task_id: ${{ steps.approve.outputs.task_id }}
       monitor_summary: ${{ steps.approve.outputs.monitor_summary }}
       monitor_phase: ${{ steps.approve.outputs.monitor_phase }}
+      artifact_set_requested: ${{ steps.approve.outputs.artifact_set_requested }}
       artifact_run_id: ${{ steps.approve.outputs.artifact_run_id }}
       artifact_source_sha: ${{ steps.approve.outputs.artifact_source_sha }}
       monitor_stage: ${{ steps.approve.outputs.monitor_stage }}
@@ -276,7 +297,7 @@ jobs:
                   f.write(f"{k}={data[k]}\n")
               for k in ("comment_id","claim_ref","work_order_sha256",
                         "monitor_summary","monitor_stage","monitor_phase",
-                        "artifact_run_id","artifact_source_sha"):
+                        "artifact_run_id","artifact_source_sha","artifact_set_requested"):
                   f.write(f"{k}={data.get(k,'')}\n")
               # Pass only the minimal, already-verified PR identity snapshot.
               # No second PR API client or runner is required on SWPC.
@@ -645,6 +666,20 @@ jobs:
             --receipt "$RUNNER_TEMP/plasma-z2-ci-verified-receipt.json" \
             --github-env "$GITHUB_ENV"
           echo PLASMA_Z2_CI_ARTIFACTS_VERIFIED
+      - name: Fetch and verify owner-pinned official artifact set (trusted)
+        if: ${{ needs.development-authorize.outputs.artifact_set_requested == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 trusted/scripts/plasma_trusted_artifact_set.py \
+            --event "$GITHUB_EVENT_PATH" \
+            --work-order-sha256 "$WORK_ORDER_SHA256" \
+            --destination "$RUNNER_TEMP/plasma-official-artifacts-$GITHUB_RUN_ID" \
+            --github-env "$GITHUB_ENV"
       - name: Codex develops, builds and tests candidate; preserve real evidence
         shell: bash
         env:
@@ -793,6 +828,7 @@ jobs:
             ${{ runner.temp }}/plasma-path3-receipt.json.sha256
             ${{ runner.temp }}/plasma-z2-ci-admission.json
             ${{ runner.temp }}/plasma-z2-ci-verified-receipt.json
+            ${{ runner.temp }}/plasma-official-artifacts-${{ github.run_id }}/verified-receipt.json
             ${{ runner.temp }}/plasma-path3-source.patch
             ${{ runner.temp }}/plasma-path3-source.patch.sha256
             ${{ runner.temp }}/plasma-path3-status.txt

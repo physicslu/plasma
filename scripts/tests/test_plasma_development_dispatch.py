@@ -1513,7 +1513,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
         self.assertIn("--dev", argv)
         self.assertIn("/work/scripts/plasma_host_observe.py", argv)
         self.assertEqual(argv[-1], "hostname")
-        self.assertNotIn("codex", " ".join(argv))
+        self.assertFalse(any(Path(arg).name == "codex" for arg in argv))
         self.assertEqual(kwargs["timeout"], 20)
 
     def test_quick_cost_status_does_not_mask_real_codex_failure(self):

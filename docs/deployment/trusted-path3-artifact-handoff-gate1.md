@@ -28,3 +28,34 @@ No new runner, release producer, OpenOCD build, FPGA/Driver change, or physical 
 ## Gate 1 acceptance
 
 A minimal Draft PR on current main with host-only tests and actual GitHub-hosted CI evidence, exact PR HEAD, changed files, and Gate 2 readiness. **No merge, Z2 deployment, FPGA reload, OPF Gen7/Gen8 activation, Flash, Verify or Readback** under this implementation task. Any real hardware continuation requires an independently eligible authorized execution after the handoff is merged and in trusted main.
+
+## Implemented host-only interface
+
+Owner Work Orders may carry `artifact_sources` with exactly `ps_kit`, `factory`
+and `engine_candidate`. See the [field schema](../../specs/engineering-dispatch/artifact-sources.schema.json).
+All fields are mandatory; pins are part of the authenticated Work Order digest.
+The existing `artifact_source` route remains limited to its original authorized
+single-Kit hardware scenarios and cannot be combined with the set.
+
+The trusted-main helper fetches run metadata, the complete artifact listing and
+(for Engine) current PR identity before fetching ZIP bytes by exact artifact ID.
+It rejects replayed run attempts, wrong actors, mismatched sources and producer
+relations, expired artifacts, ambiguous names and incorrect metadata or ZIP hashes.
+The PR must still have the pinned head; a superseded candidate fails closed.
+Kit and Factory accept owner main `push` or `workflow_dispatch`; Engine accepts
+only the pinned owner PR-head `pull_request` producer. A merge-ref/source mismatch
+is denied rather than mislabeled as main.
+
+Kit reuses the existing verifier and additionally checks nested archive safety
+and complete nested SHA256SUMS. Factory verifies its existing bootstrap manifest
+and complete checksums. Engine verifies its producer's two-file checksum list,
+ARM ELF header, binary and Admission hashes, source evidence and ABI-v5 Admission
+identity. Its producer does not supply a whole-tree SHA256SUMS: the owner-pinned
+ZIP digest covers the entire existing archive, including Tcl and provenance.
+No shipped code or ARM binary is executed during verification.
+
+The trusted step exports no paths until all three pass, freezes local files
+read-only, and exports only payload/sidecar paths and a sanitized receipt path.
+Credentials and signed download redirects are neither logged nor serialized.
+The original archives are preserved. No publisher/source restriction is added
+to ordinary user OPF input admission.
