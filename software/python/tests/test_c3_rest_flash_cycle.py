@@ -520,6 +520,10 @@ def test_rest_flash_cycle_through_c3_passes_with_full_readback(in_process):
                     [opened] = [r for r in stack.worker_requests if r["op"] == "open_job_session"]
                     assert opened["deadline_monotonic"] == runtime.deadline_monotonic
                     assert opened["provider_route"]["site_id"] == 2
+                    assert opened["profile"]["icpn"] == "STM32F103C8T6"
+                    assert "target" not in opened["provider_route"]
+                    assert all("profile" not in r for r in stack.worker_requests
+                               if r["op"] == "bind_image")
                 assert bytes(stack.sim.memory[:len(image)]) == image
                 [argv] = stack.sim.argvs
                 commands = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "-c"]
@@ -929,10 +933,10 @@ def test_image_larger_than_profile_flash_is_refused_at_bind(tmp_path):
                                  image_root=tmp_path / "img")
     me = (os.getpid(), os.getuid(), os.getgid())
     sid = core.handle({"protocol": worker.PROTOCOL, "op": "open_job_session", "job_id": "job-y",
-                       "sites": [2], "max_runtime_s": 30}, me, "control")["result"]["session_id"]
+                       "sites": [2], "max_runtime_s": 30,
+                       "profile": {"icpn": "TINY", "target_config": "target/t.cfg",
+                                   "flash_base": 0, "flash_size": 1024,
+                                   "erase_granularity": 1024}}, me, "control")["result"]["session_id"]
     reply = core.handle({"protocol": worker.PROTOCOL, "op": "bind_image", "session_id": sid,
-                         "profile": {"icpn": "TINY", "target_config": "target/t.cfg",
-                                     "flash_base": 0, "flash_size": 1024,
-                                     "erase_granularity": 1024},
                          "image_sha256": "0" * 64, "image_size": 2048}, me, "control")
     assert reply == {"ok": False, "error": "IMAGE_SIZE_INVALID"}
