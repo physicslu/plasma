@@ -78,14 +78,23 @@ class RealSysfsLayoutTests(unittest.TestCase):
         (uio / "maps/map0/size").write_text("0x00010000")
         (uio / "device").symlink_to(device)
 
-    def collect(self):
+    def collect(self, *, site_admission=False):
         load = "fpga_manager fpga0: writing " + self.release.firmware_name + " to x"
+        manager = (patch.object(guard, "manager_last_load",
+                                side_effect=AssertionError("dmesg used by Site"))
+                   if site_admission else
+                   patch.object(guard, "manager_last_load", return_value=load))
         with patch.object(guard, "PROC", self.proc), \
                 patch.object(guard, "SYS", self.sys), \
-                patch.object(guard, "manager_last_load", return_value=load), \
-                patch.object(admission.os, "geteuid", return_value=0):
+                manager, patch.object(admission.os, "geteuid", return_value=0):
+            port = Port(self.release, self.facts)
+            if site_admission:
+                port.image_sha256 = lambda which: (
+                    self.release.firmware_sha256 if which == "candidate"
+                    else self.release.recovery_sha256)
+                return root.live_site_admission_report(port, self.release)
             return admission.collect_live(
-                root_port=Port(self.release, self.facts), release=self.release,
+                root_port=port, release=self.release,
                 expected_firmware=self.release.firmware_name)
 
     def test_real_layout_platform_device_admitted_as_devmem(self):
@@ -109,6 +118,68 @@ class RealSysfsLayoutTests(unittest.TestCase):
         self.facts["proc_conflicts"] = ["4242"]
         with self.assertRaisesRegex(ValueError, "PROC_RESOURCE_OWNER_CONFLICT"):
             self.collect()
+
+    def test_runtime_site_admission_ignores_evicted_dmesg_only(self):
+        self.build()
+        report = self.collect(site_admission=True)
+        self.assertEqual(report["mmio_backend"], "devmem")
+        self.assertEqual(report["expected_manager_firmware"],
+                         self.release.firmware_name)
+
+    def test_runtime_site_still_requires_complete_process_census(self):
+        self.build()
+        self.facts["proc_complete"] = False
+        with self.assertRaisesRegex(ValueError, "PROC_SCAN_INCOMPLETE"):
+            self.collect(site_admission=True)
+
+    def test_runtime_site_still_denies_competing_mmio_owner(self):
+        self.build()
+        self.facts["proc_conflicts"] = ["4242"]
+        with self.assertRaisesRegex(ValueError, "PROC_RESOURCE_OWNER_CONFLICT"):
+            self.collect(site_admission=True)
+
+    def test_runtime_site_still_requires_operating_manager_and_known_image(self):
+        self.build()
+        self.facts["manager_state"] = "unknown"
+        with self.assertRaisesRegex(ValueError, "INCOMPLETE_ROOT_OR_PROCESS_FACTS"):
+            self.collect(site_admission=True)
+        self.facts["manager_state"] = "operating"
+        self.facts["candidate_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "INCOMPLETE_ROOT_OR_PROCESS_FACTS"):
+            self.collect(site_admission=True)
+
+    def test_runtime_site_still_denies_wrong_kernel_owner(self):
+        self.build(bus_link="other")
+        with self.assertRaisesRegex(ValueError, "UIO_NOT_PLATFORM_DEVICE"):
+            self.collect(site_admission=True)
+
+    def test_only_full_mmio_site_check_can_skip_manager_log(self):
+        self.build()
+        with self.assertRaisesRegex(ValueError, "SITE_ADMISSION_MODE_INVALID"):
+            admission.check_exact(
+                release=self.release, passive=self.facts, uio={},
+                original_manager_load=None,
+                expected_firmware=self.release.firmware_name,
+                require_mmio=False, require_manager_provenance=False)
+        with self.assertRaisesRegex(ValueError, "SITE_ADMISSION_MODE_INVALID"):
+            admission.check_exact(
+                release=self.release, passive=self.facts, uio={},
+                original_manager_load=None,
+                expected_firmware=self.release.firmware_name,
+                runtime_program_session=True, require_manager_provenance=False)
+
+    def test_fpga_deployment_still_checks_load_provenance(self):
+        self.build()
+        with patch.object(guard, "manager_last_load",
+                          side_effect=ValueError("NO_CURRENT_BOOT_LOAD")):
+            with patch.object(guard, "PROC", self.proc), \
+                    patch.object(guard, "SYS", self.sys), \
+                    patch.object(admission.os, "geteuid", return_value=0):
+                with self.assertRaisesRegex(ValueError, "NO_CURRENT_BOOT_LOAD"):
+                    admission.collect_live(
+                        root_port=Port(self.release, self.facts),
+                        release=self.release,
+                        expected_firmware=self.release.firmware_name)
 
 
 if __name__ == "__main__":
