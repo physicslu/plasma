@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from contextlib import ExitStack
 from unittest.mock import patch
 from http.client import HTTPConnection
