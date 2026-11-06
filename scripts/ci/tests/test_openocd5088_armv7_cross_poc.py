@@ -32,6 +32,7 @@ class CrossBuildGate1Contracts(unittest.TestCase):
             "gcc-arm-linux-gnueabihf", "libusb-1.0-0-dev:armhf",
             "--host=arm-linux-gnueabihf", "PKG_CONFIG_LIBDIR=",
             "arm-linux-gnueabihf-readelf", "--volume \"$GITHUB_WORKSPACE:/plasma:ro\"",
+            "deb [arch=amd64]", "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports",
         ):
             self.assertIn(needle, cross)
         self.assertNotIn("--privileged", cross)
