@@ -25,6 +25,7 @@
 - **Current** — [Web UI domain contract](development/plasma-web.md)
 - **Current** — [Former monolithic contract — entry stub linking the contracts above](development/plasma-autonomous-development-contract-full.md)
 - **Current** — [Documentation maintenance rules — statuses, placement, source priority](development/documentation-maintenance.md)
+- **Reference** · `OPF Bundle v3` · `Host-only Gate 1` — [User Bundle v3 Source-independent Admission Evidence](development/opf-user-bundle-source-agnostic-host-20261106.md)：記錄移除使用者 Bundle Git Source/Publisher 資格限制的 Host-only 實作與測試；新 Z2 B3 仍未實測。
 - **Current** — [Glossary — current terms and retired codes](glossary.md)
 
 ## Architecture Decision Records
