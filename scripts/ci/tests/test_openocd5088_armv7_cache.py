@@ -132,6 +132,11 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn(
             "Deny Site admission and revocation without Root ownership", python_wf
         )
+        native_job = python_wf.split("\n  swd-openocd-native:", 1)[1]
+        self.assertIn('git show "${BASE_SHA}:.github/workflows/python-tests.yml"', native_job)
+        self.assertIn("sed -n '/^  swd-openocd-native:/,$p'", native_job)
+        self.assertIn("Unknown base must build", native_job)
+        self.assertIn("timeout-minutes: 45", native_job)
         self.assertIn("steps.build-cache.outputs.cache-hit != 'true'", wf)
         self.assertIn("github.event.pull_request.head.sha", wf)
         self.assertIn("actions/cache/restore@v4", wf)
