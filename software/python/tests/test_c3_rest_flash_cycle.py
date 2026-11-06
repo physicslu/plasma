@@ -330,8 +330,8 @@ class Stack:
                               openocd={"site_worker_socket": str(root / "c3.sock"),
                                        "normalized_image_root": str(self.images)})],
         )
-        resolver = get_default_ic_support_resolver()
-        self.manager = SiteManager(config, ic_support_resolver=resolver)
+        self.manager = SiteManager(config)
+        assert self.manager.ic_support_resolver is None
         self.package_runtime = PackageActionRuntime(
             self.manager, control_plane=ROOT / "scripts", product_root=self.opf["product_root"],
             state_root=root / "package-state", owner_credential=None, spawner=None,
@@ -578,7 +578,7 @@ def test_rest_flash_cycle_readback_mismatch_is_never_success(in_process):
 @pytest.mark.parametrize("case,options,code", [
     ("empty", {}, "OPF_ACTIVE_SET_REQUIRED"),
     ("stale", {}, "ACTIVE_SET_MISMATCH"),
-    ("profile", {"profile_change": {"flash_size": 131072}}, "REFERENCE_PROFILE_RUNTIME_MISMATCH"),
+    ("profile", {"profile_change": {"flash_size": 65537}}, "PROFILE_GEOMETRY_INVALID"),
     ("driver", {"descriptor_change": {"driver_abi": "plasma_swd:6"}}, "FPGA_DRIVER_UNVERIFIED"),
     ("engine", {"engine_binary": b"different-installed-engine"}, "REFERENCE_ENGINE_BINARY_MISMATCH"),
     ("unverified-worker", {"verified_worker": False}, "WORKER_ENGINE_UNVERIFIED"),
@@ -769,13 +769,31 @@ def test_rest_job_without_any_target_is_refused_before_execution():
     run(scenario())
 
 
+def test_rest_bundle_flash_without_registered_icpn():
+    """The selected, verified Bundle supplies the profile, not repository IC Support."""
+    unknown = "VENDOR-NEW-PART-A"
+    assert get_default_ic_support_resolver().resolve_exact(unknown) is None
+
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), site_target=unknown, in_process=True,
+                             bundle_options={"target_icpn": unknown}) as stack:
+                _job_id, job = await stack.flash(b"BUNDLE-DRIVEN-MCU")
+                assert job["state"] == "success", job
+                assert job["result"]["details"]["flash_cycle"]["icpn"] == unknown
+                assert stack.manager.ic_support_resolver is None
+                assert len(stack.sim.argvs) == 1
+    run(scenario())
+
+
 def test_rest_job_unsupported_target_never_reaches_c3():
     async def scenario():
         with short_tmp() as directory:
             async with Stack(Path(directory)) as stack:
-                status, payload = await stack.flash(b"FW", target="NOT-A-REAL-ICPN")
-                assert status == 400 and "NOT-A-REAL-ICPN" in payload["error"]["message"]
+                _job_id, job = await stack.flash(b"FW", target="NOT-A-REAL-ICPN")
+                assert job["state"] != "success" and "REFERENCE_TARGET_MISMATCH" in json.dumps(job)
                 assert stack.sim.argvs == []
+                assert not stack.core._sessions
     run(scenario())
 
 
@@ -785,7 +803,7 @@ def test_c3_path_offers_only_the_complete_flash_cycle():
             async with Stack(Path(directory)) as stack:
                 status, payload = await stack.api("POST", "/api/jobs",
                                                   {"site_id": 2, "operation": "erase"})
-                assert status == 400 and "not runtime-ready" in payload["error"]["message"]
+                assert status == 400 and "C-3 supports only flash_cycle" in payload["error"]["message"]
                 assert stack.sim.argvs == []
     run(scenario())
 

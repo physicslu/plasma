@@ -28,7 +28,7 @@ class OpenOCDInterface(BaseInterface):
     * ``site_worker_socket`` (Z2 product path): the complete Flash cycle runs
       through the local Stage C-3 Site Worker, which owns Site admission and
       the PS-local OpenOCD. Only ``flash_cycle`` is offered; the target config
-      and Flash geometry come from the Job's exact-ICPN IC Support.
+      and Flash geometry come from the selected verified Bundle Profile.
     * an injected ``process_launcher`` (Host-only software validation with
       fake processes).
 
@@ -65,6 +65,7 @@ class OpenOCDInterface(BaseInterface):
         self._request: JobRequest | None = None
         # Installed by the trusted Runtime composition, never by Job metadata.
         self.opf_flash_executor: Callable[..., Awaitable[dict[str, Any]]] | None = None
+        self.opf_flash_preflight: Callable[..., dict[str, Any]] | None = None
         self._runtime_job: tuple[str, dict[str, Any] | None, float] | None = None
 
     def bind_runtime_job(self, job_id: str, active_asset_set: dict[str, Any] | None,
@@ -107,8 +108,19 @@ class OpenOCDInterface(BaseInterface):
                 "the C-3 Site Worker path offers only the complete flash_cycle operation",
                 context={"operation": request.operation.value},
             )
-        # The Job is already resolved by SiteExecutionRouter, but recompile
-        # from the canonical support before anything executes.
+        if self.site_worker_ready:
+            if self.opf_flash_preflight is None or self._runtime_job is None:
+                raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED, "OPF_RUNTIME_NOT_WIRED")
+            try:
+                self.opf_flash_preflight(
+                    active_asset_set=self._runtime_job[1], target=request.target,
+                    site_id=request.site_id, image_size=request.image_size)
+            except (ValueError, OSError, KeyError, TypeError) as exc:
+                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                  "OPF_FLASH_DENIED:" + str(exc)) from exc
+            self._request = request
+            return
+        # Non-C3 software validation keeps its separate compiled-plan contract.
         support = self._support(request.target)
         if request.operation is Operation.FLASH_CYCLE:
             compile_flash_cycle(
@@ -201,8 +213,6 @@ class OpenOCDInterface(BaseInterface):
         request = self._prepared(Operation.FLASH_CYCLE)
         if image != request.image or not image:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "OpenOCD Job image mismatch")
-        support = self._support(request.target)
-        program = as_program_request(request)
         if self.site_worker_ready:
             assert self._site_worker is not None
             if (self.opf_flash_executor is None or self._runtime_job is None
@@ -213,10 +223,11 @@ class OpenOCDInterface(BaseInterface):
                 self._site_worker, request=request,
                 active_asset_set=self._runtime_job[1],
                 job_deadline_monotonic=self._runtime_job[2],
-                runtime_profile=c3_flash_profile(support),
                 image_root=self.normalized_image_root,
             )
         else:
+            support = self._support(request.target)
+            program = as_program_request(request)
             plan = compile_flash_cycle(
                 self._compiler, support, program,
                 configured_target_config=self.target_config_for(support),

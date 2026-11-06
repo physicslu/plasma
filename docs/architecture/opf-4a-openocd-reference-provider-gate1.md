@@ -28,9 +28,16 @@ Options object for this Reference implementation. It then checks:
    Generic v3 opaque-resource admission does not grant execution.
 2. Selected Profile Package contains `data/plasma-flash-profile.json`, schema
    `plasma.ppu.openocd-flash-profile.v1`, with exactly `icpn`, `target_config`,
-   `flash_base`, `flash_size`, and `erase_granularity` fields plus `schema`.
-   These verified values must match the trusted Runtime's existing exact-ICPN
-   `C3FlashProfile`; a Bundle cannot override the admitted geometry silently.
+   `flash_base`, `flash_size`, and `erase_granularity` plus `schema`.
+   The hash-verified selected Active Bundle supplies the Flash Profile for
+   C-3 OPF `flash_cycle`; the Runtime checks the requested target, erase
+   alignment and image-size bounds using the existing C-3 Worker validator.
+   The pinned, verified Profile is bound to the Job Session. Repository exact
+   ICPN IC Support, built-in Compiler IDs and static operation-admission
+   projections no longer gate this route. Host-only acceptance does NOT prove
+   the actual DUT's identity or physical Flash geometry. The provider's live
+   `flash probe 0` is necessary but is not a proven independent capacity
+   measurement contract; real multi-target HIL must verify that limitation.
 3. Capability `driver_abi` must exactly equal the selected engine's actual
    `<adapter_driver>:<driver_abi>`, e.g. `plasma_swd:5`. Independently verified
    device-side observations must also match platform, image identity and driver
@@ -60,7 +67,10 @@ introduces **none** of those controls.
 executor using its configured product root. SiteWorker supplies the admitted
 Job's pinned Active Asset Set and original monotonic deadline on every attempt.
 The executor verifies the Set, resolves its Profile and declared Provider, and
-binds the installed Engine and exact-ICPN Runtime profile before C-3 admission.
+binds the installed Engine and Bundle-derived Flash Profile before C-3 admission.
+The C-3 OPF flash_cycle does not run the SiteExecutionRouter's static IC Support,
+Compiler Registry, or OpenOCDInterface recompilation; non-C-3 plan-based
+software-validation paths are unchanged.
 An unwired or invalid OPF route fails closed without direct-C3 fallback.
 
 The authenticated Worker supplies its installed adapter's platform, loaded image

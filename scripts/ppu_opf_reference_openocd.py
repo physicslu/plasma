@@ -2,7 +2,7 @@
 
 The production Runtime dispatcher below binds its admitted Job to this executor.
 The trusted Runtime owns the Job, its deadline, the actual hardware observation
-and the exact-ICPN C-3 profile. C-3 remains the sole flash executor and owner
+and the Bundle-derived C-3 profile. C-3 remains the sole flash executor and owner
 of Site admission, image binding, cancellation, SAFE_OFF and sealing.
 """
 from __future__ import annotations
@@ -27,6 +27,7 @@ import ppu_asset_set
 import ppu_opf_site_session
 import ppu_provider_contract
 import ppu_site_engine
+import ppu_site_worker
 
 
 PROFILE_FILE = "data/plasma-flash-profile.json"
@@ -50,11 +51,79 @@ class ReferenceBinding:
     profile_sha256: str
 
 
+def _parse_profile(raw: bytes, target: str, image_size: int) -> C3FlashProfile:
+    """Parse hash-verified Bundle profile using the existing Worker geometry contract."""
+    _need(len(raw) <= 8192, "REFERENCE_PROFILE_INVALID")
+    try:
+        payload = json.loads(raw, object_pairs_hook=ppu_provider_contract._pairs)
+    except (ValueError, UnicodeError) as exc:
+        raise ReferenceDenied("REFERENCE_PROFILE_INVALID") from exc
+    _need(type(payload) is dict and set(payload) == {
+        "schema", "icpn", "target_config", "flash_base", "flash_size",
+        "erase_granularity"} and payload.get("schema") == PROFILE_SCHEMA,
+        "REFERENCE_PROFILE_INVALID")
+    values = {key: value for key, value in payload.items() if key != "schema"}
+    try:
+        checked = ppu_site_worker.parse_flash_profile(values)
+    except ppu_site_worker.SiteWorkerDenied as exc:
+        raise ReferenceDenied(exc.code) from exc
+    _need(checked.icpn == target, "REFERENCE_TARGET_MISMATCH")
+    _need(type(image_size) is int and 0 < image_size <= checked.flash_size,
+          "REFERENCE_IMAGE_OUT_OF_BOUNDS")
+    return C3FlashProfile(**values)
+
+
+def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str, Any] | None,
+                            target: str, site_id: int, image_size: int) -> dict[str, Any]:
+    """Verify the pinned Active Bundle Profile; no IC registry or hardware claims."""
+    _need(isinstance(active_asset_set, Mapping)
+          and active_asset_set.get("state") == "ACTIVE", "OPF_ACTIVE_SET_REQUIRED")
+    digest = active_asset_set.get("asset_set_sha256")
+    _need(type(digest) is str and ppu_provider_contract.SHA64.fullmatch(digest) is not None,
+          "ASSET_SET_IDENTITY_INVALID")
+    try:
+        active = ppu_asset_set.read_active(product_root)
+        ppu_asset_set.verify_staged(product_root, digest)
+    except ppu_asset_set.AssetSetError as exc:
+        raise ReferenceDenied("ACTIVE_SET_UNTRUSTED:" + str(exc)) from exc
+    _need(active == dict(active_asset_set), "ACTIVE_SET_MISMATCH")
+    staged = product_root / "assets" / "staged" / digest
+    try:
+        manifest = json.loads((staged / "manifest.json").read_bytes(),
+                              object_pairs_hook=ppu_provider_contract._pairs)
+        _need(manifest.get("schema") == "plasma.ppu.bundle.v3", "BUNDLE_SCHEMA_INVALID")
+        profiles = [p for p in manifest["packages"] if p["kind"] == "programming-profile"]
+        _need(len(profiles) == 1, "OPF_PROFILE_MISSING_OR_AMBIGUOUS")
+        selected = profiles[0]
+        prefix = f"payload/packages/{selected['id']}/"
+        entries = {x["path"]: x for x in selected["files"]}
+        descriptor = json.loads((staged / (prefix + ppu_provider_contract.DESCRIPTOR)).read_bytes(),
+                                object_pairs_hook=ppu_provider_contract._pairs)
+        _need(type(descriptor) is dict
+              and descriptor.get("schema") == ppu_provider_contract.SCHEMA
+              and descriptor.get("target") == target, "REFERENCE_TARGET_MISMATCH")
+        _need(type(site_id) is int and site_id in descriptor["sites"], "SITE_NOT_SUPPORTED")
+        _need("flash_cycle" in descriptor["operations"], "OPERATION_UNSUPPORTED")
+        _need(type(image_size) is int and 0 < image_size <= descriptor["max_image_bytes"],
+              "IMAGE_OUT_OF_BOUNDS")
+        profile_path = prefix + PROFILE_FILE
+        entry = entries[profile_path]
+        raw = (staged / profile_path).read_bytes()
+        _need(entry["executable"] is False and entry["size"] == len(raw)
+              and hashlib.sha256(raw).hexdigest() == entry["sha256"],
+              "REFERENCE_PROFILE_CHANGED")
+        profile = _parse_profile(raw, target, image_size)
+    except (KeyError, OSError, TypeError, UnicodeError) as exc:
+        raise ReferenceDenied("REFERENCE_PROFILE_INVALID") from exc
+    return {"asset_set_sha256": digest, "profile_package": selected["id"],
+            "provider_package": descriptor["provider_package"],
+            "profile_sha256": entry["sha256"], "profile": profile.to_wire()}
+
+
 def qualify_reference(
     *, product_root: Path, asset_set_sha256: str,
     selection: Mapping[str, Any], policy: TimeoutPolicy, target: str,
     site_id: int, image_size: int, hardware: Mapping[str, Any],
-    runtime_profile: C3FlashProfile,
     engine_record: Path = ppu_site_engine.ENGINE_SELECTION,
     engine_base: Path = ppu_site_engine.ENGINE_BASE,
     require_root: bool = True,
@@ -77,9 +146,6 @@ def qualify_reference(
     # No option is silently ignored. Clock and adapter choices belong to the
     # trusted engine-selection record, not untrusted Bundle options.
     _need(route.options_json == b"{}", "REFERENCE_OPTIONS_UNSUPPORTED")
-    _need(isinstance(runtime_profile, C3FlashProfile)
-          and runtime_profile.icpn == target, "REFERENCE_TARGET_MISMATCH")
-
     try:
         engine = ppu_site_engine.load_engine(
             record=engine_record, base=engine_base, require_root=require_root)
@@ -124,18 +190,8 @@ def qualify_reference(
               "REFERENCE_ENGINE_NOT_EXECUTABLE")
 
     profile_raw, profile_sha = exact_file(profile_package, PROFILE_FILE)
-    _need(len(profile_raw) <= 8192, "REFERENCE_PROFILE_INVALID")
-    try:
-        profile = json.loads(profile_raw)
-    except (ValueError, UnicodeError) as exc:
-        raise ReferenceDenied("REFERENCE_PROFILE_INVALID") from exc
-    _need(type(profile) is dict
-          and set(profile) == {"schema", *runtime_profile.to_wire()}
-          and profile.get("schema") == PROFILE_SCHEMA,
-          "REFERENCE_PROFILE_INVALID")
-    _need({key: value for key, value in profile.items() if key != "schema"}
-          == runtime_profile.to_wire(), "REFERENCE_PROFILE_RUNTIME_MISMATCH")
-    return ReferenceBinding(route, runtime_profile, engine, profile_sha)
+    profile = _parse_profile(profile_raw, target, image_size)
+    return ReferenceBinding(route, profile, engine, profile_sha)
 
 
 async def execute_reference_flash(
@@ -143,7 +199,7 @@ async def execute_reference_flash(
     asset_set_sha256: str, selection: Mapping[str, Any], policy: TimeoutPolicy,
     job_id: str, site_id: int, target: str, image: bytes,
     image_root: Path, hardware: Mapping[str, Any],
-    runtime_profile: C3FlashProfile, job_deadline_monotonic: float,
+    job_deadline_monotonic: float,
     job_timeout_s: float,
     engine_record: Path = ppu_site_engine.ENGINE_SELECTION,
     engine_base: Path = ppu_site_engine.ENGINE_BASE,
@@ -166,7 +222,7 @@ async def execute_reference_flash(
     binding = qualify_reference(
         product_root=product_root, asset_set_sha256=asset_set_sha256,
         selection=selection, policy=policy, target=target, site_id=site_id,
-        image_size=len(image), hardware=hardware, runtime_profile=runtime_profile,
+        image_size=len(image), hardware=hardware,
         engine_record=engine_record, engine_base=engine_base, require_root=require_root)
 
     worker_receipt: ppu_opf_site_session.BoundSession | None = None
@@ -206,7 +262,7 @@ async def execute_reference_flash(
 async def execute_runtime_flash(
     client: SiteWorkerControlClient, *, product_root: Path, request: JobRequest,
     active_asset_set: Mapping[str, Any] | None, job_deadline_monotonic: float,
-    runtime_profile: C3FlashProfile, image_root: Path,
+    image_root: Path,
 ) -> dict[str, Any]:
     """Production REST Flash cutover; no direct-C3 fallback.
 
@@ -217,26 +273,21 @@ async def execute_runtime_flash(
     admission still verifies current PL identity and holds the reload fence.
     """
     try:
-        _need(isinstance(active_asset_set, Mapping)
-              and active_asset_set.get("state") == "ACTIVE", "OPF_ACTIVE_SET_REQUIRED")
-        digest = active_asset_set.get("asset_set_sha256")
-        active = ppu_asset_set.read_active(product_root)
-        _need(active == dict(active_asset_set), "ACTIVE_SET_MISMATCH")
-        ppu_asset_set.verify_staged(product_root, digest)
+        pinned_profile = preflight_runtime_flash(
+            product_root=product_root, active_asset_set=active_asset_set,
+            target=request.target, site_id=request.site_id, image_size=len(request.image))
+        digest = pinned_profile["asset_set_sha256"]
         staged = product_root / "assets" / "staged" / digest
         manifest = json.loads((staged / "manifest.json").read_bytes())
-        profiles = [p for p in manifest["packages"] if p["kind"] == "programming-profile"]
-        _need(len(profiles) == 1, "OPF_PROFILE_MISSING_OR_AMBIGUOUS")
-        profile = profiles[0]
+        profile = next(p for p in manifest["packages"]
+                       if p["id"] == pinned_profile["profile_package"])
         handoff = (ppu_asset_set.resolve_staged_fpga_handoff(product_root, digest)
                    if any(p["kind"] == "fpga-image" for p in manifest["packages"]) else None)
-        descriptor = json.loads((staged / "payload" / "packages" / profile["id"]
-                                 / ppu_provider_contract.DESCRIPTOR).read_bytes())
         timeout_ms = round(request.timeout_s * 1000)
         _need(timeout_ms / 1000.0 == request.timeout_s, "OPF_TIMEOUT_PRECISION_UNSUPPORTED")
         policy = TimeoutPolicy(timeout_ms, 3600000)  # existing C-3 session ceiling
         selection = {"schema": "plasma.opf.programming.v1",
-                     "provider": descriptor["provider_package"],
+                     "provider": pinned_profile["provider_package"],
                      "profile": profile["id"], "options": {}}
         engine = ppu_site_engine.load_engine(require_root=True)
         remaining = job_deadline_monotonic - time.monotonic()
@@ -268,7 +319,7 @@ async def execute_runtime_flash(
             client, product_root=product_root, asset_set_sha256=digest,
             selection=selection, policy=policy, job_id=request.job_id,
             site_id=request.site_id, target=request.target, image=request.image,
-            image_root=image_root, hardware=hardware, runtime_profile=runtime_profile,
+            image_root=image_root, hardware=hardware,
             job_deadline_monotonic=job_deadline_monotonic, job_timeout_s=request.timeout_s)
     except SiteWorkerRefused as exc:
         raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED,

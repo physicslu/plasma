@@ -81,6 +81,23 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
             "target/stm32f1x.cfg",
         )
 
+    def test_c3_opf_flash_cycle_does_not_require_icpn_or_compiler_registry(self) -> None:
+        site = SiteConfig(id=2, enabled=True, interface="openocd",
+                          openocd={"site_worker_socket": "/tmp/unit-test-c3.sock"})
+        interface = OpenOCDInterface(site.openocd)
+        router = SiteExecutionRouter(site, interface, None)
+        self.assertIsNone(router.compiler_registry)
+        request = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                             target="UNREGISTERED-ICPN", image=b"TEST")
+        admitted = router.admit(request)
+        route = admitted.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
+        self.assertEqual(route["backend_implementation_state"], "opf_bundle_c3_site_worker")
+        self.assertIsNotNone(router.handler_for(admitted))
+        with self.assertRaises(PlasmaError) as caught:
+            router.admit(JobRequest(site_id=2, operation=Operation.ERASE,
+                                    target="UNREGISTERED-ICPN"))
+        self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
+
     def test_mock_route_accepts_unbound_catalog_target_without_hardware_claim(self) -> None:
         site = SiteConfig(id=1, enabled=True, interface="mock")
         router = SiteExecutionRouter(site, self.interface, None)
