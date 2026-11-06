@@ -127,3 +127,29 @@ def test_remote_receipt_claiming_flash_run_is_rejected():
     with patch.object(PROBE.subprocess,"run",return_value=SimpleNamespace(stdout=SHA+"\n")):
         with pytest.raises(RuntimeError,match="REMOTE_RECEIPT_INVALID"):
             PROBE.run(HOST,SHA,helper=h,baseline=Baseline(),rest=rest)
+
+def test_runtime_private_socket_is_not_falsely_rejected():
+    z=observation()
+    z["runtime_control_socket"]={
+        "present":True,"socket":True,"root_owned":False,
+        "uid":999,"gid":999,"mode":"0600","writable_by_others":False}
+    result,_=run_with(z)
+    assert "SOCKET_PERMISSION_REVIEW_runtime_control_socket" not in result["blockers"]
+    assert result["readiness"]=="NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS"
+
+
+def test_runtime_socket_broad_permissions_are_rejected():
+    z=observation()
+    z["runtime_control_socket"]={
+        "present":True,"socket":True,"root_owned":False,
+        "uid":999,"gid":999,"mode":"0666","writable_by_others":True}
+    result,_=run_with(z)
+    assert "SOCKET_PERMISSION_REVIEW_runtime_control_socket" in result["blockers"]
+
+
+def test_manager_sysfs_uses_bounded_read_not_virtual_stat_size():
+    remote=PROBE.REMOTE
+    assert 'ms=sysfs_text("/sys/class/fpga_manager/fpga0/state",128)' in remote
+    assert 'stream.read(limit+1)' in remote
+    assert 'ms=literal("/sys/class/fpga_manager/fpga0/state",128)' not in remote
+

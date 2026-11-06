@@ -133,6 +133,235 @@ def test_privileged_source_explicit_provision_no_hardware(tmp_path, monkeypatch)
         installer.provision(factory, destination, _test_uid=os.getuid())
 
 
+
+def _offline_upgrade_fixture(tmp_path, monkeypatch):
+    from contextlib import nullcontext
+    installer, factory, destination = _installer_fixture(tmp_path, monkeypatch)
+    installer.provision(factory, destination, _test_uid=os.getuid())
+    old = source.verify_source(destination, expected_uid=os.getuid())
+    journal = tmp_path / "state" / "fpga-deployment-state.json"
+    journal.parent.mkdir(mode=0o700)
+    journal.parent.chmod(0o700)
+    journal.write_text(json.dumps({
+        "status": "IMAGE", "boot_id": "boot-verified-1234"
+    }), encoding="utf-8")
+    journal.chmod(0o600)
+    boot = tmp_path / "boot"
+    boot.write_text("boot-verified-1234\n")
+    manager = tmp_path / "manager-state"
+    manager.write_text("operating\n")
+    monkeypatch.setattr(installer, "JOURNAL", journal)
+    monkeypatch.setattr(installer, "BOOT_ID", boot)
+    monkeypatch.setattr(installer, "FPGA_MANAGER", manager)
+    monkeypatch.setattr(installer, "_quiescent", lambda: None)
+    monkeypatch.setattr(installer, "_maintenance_locks", lambda _uid: nullcontext())
+    # New Root code, same known-good Manifest schema and exact source inventory.
+    candidate = factory / "pl/hil/fpga_image_admission.py"
+    candidate.write_text(candidate.read_text() + "\n# host-only candidate v2\n")
+    return installer, factory, destination, journal, old["code_manifest_sha256"]
+
+
+def test_root_upgrade_is_offline_atomic_with_retained_rollback(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    before = journal.read_bytes()
+    result = installer.upgrade(
+        factory, destination, expected_current_manifest_sha256=old_sha,
+        _test_uid=os.getuid())
+    assert result["result"] == "UPGRADED_NOT_EXECUTED"
+    assert result["previous_manifest_sha256"] == old_sha
+    assert result["current_manifest_sha256"] != old_sha
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == result["current_manifest_sha256"]
+    assert source.verify_source(
+        destination.with_name(destination.name + ".previous"),
+        expected_uid=os.getuid())["code_manifest_sha256"] == old_sha
+    assert journal.read_bytes() == before
+    assert result["dut"] == "NOT_RUN" and result["fpga_reloaded"] is False
+    assert result["service_restarted"] is False
+
+
+def test_root_upgrade_rejects_stale_source_without_modification(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    with pytest.raises(installer.ProvisionDenied, match="STALE_SOURCE"):
+        installer.upgrade(
+            factory, destination, expected_current_manifest_sha256="0"*64,
+            _test_uid=os.getuid())
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == old_sha
+    assert not destination.with_name(destination.name + ".previous").exists()
+
+
+def test_root_upgrade_rejects_changed_boot_or_manager(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    journal.write_text(json.dumps({"status": "IMAGE", "boot_id": "wrong-boot"}))
+    with pytest.raises(installer.ProvisionDenied, match="IMAGE_UNVERIFIED"):
+        installer.upgrade(
+            factory, destination, expected_current_manifest_sha256=old_sha,
+            _test_uid=os.getuid())
+    assert not destination.with_name(destination.name + ".previous").exists()
+
+
+def test_root_upgrade_requires_quiescence(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    monkeypatch.undo()  # prove the production checker, not the injected no-op
+    # Load a distinct module for isolated direct quiescence test.
+    spec = importlib.util.spec_from_file_location(
+        "ppu_privileged_quiescence_test", ROOT / "scripts/ppu-privileged-source-install.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    def running(argv, **kwargs):
+        if argv[0] == "/bin/systemctl":
+            return SimpleNamespace(returncode=0, stdout=(
+                "LoadState=loaded\nActiveState=active\nSubState=running\n"))
+        return SimpleNamespace(returncode=1, stdout="")
+    monkeypatch.setattr(module.subprocess, "run", running)
+    with pytest.raises(module.ProvisionDenied, match="SERVICE_NOT_QUIESCENT"):
+        module._quiescent()
+
+
+def test_root_upgrade_requires_no_admission_or_openocd(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    spec = importlib.util.spec_from_file_location(
+        "ppu_privileged_owners_test", ROOT / "scripts/ppu-privileged-source-install.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    records = tmp_path / "admissions"
+    records.mkdir()
+    monkeypatch.setattr(module, "ADMISSIONS", records)
+    def stopped(argv, **kwargs):
+        if argv[0] == "/bin/systemctl":
+            return SimpleNamespace(returncode=0, stdout=(
+                "LoadState=loaded\nActiveState=inactive\nSubState=dead\n"))
+        return SimpleNamespace(returncode=1, stdout="")
+    monkeypatch.setattr(module.subprocess, "run", stopped)
+    module._quiescent()
+    (records / "swd-site2-admission").touch()
+    with pytest.raises(module.ProvisionDenied, match="ADMISSION_OWNER_PRESENT"):
+        module._quiescent()
+    (records / "swd-site2-admission").unlink()
+    def openocd(argv, **kwargs):
+        if argv[0] == "/usr/bin/pgrep":
+            return SimpleNamespace(returncode=0, stdout=b"1234")
+        return stopped(argv, **kwargs)
+    monkeypatch.setattr(module.subprocess, "run", openocd)
+    with pytest.raises(module.ProvisionDenied, match="OPENOCD_PRESENT"):
+        module._quiescent()
+
+
+def test_root_rollback_restores_verified_old_code_and_preserves_journal(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    new = installer.upgrade(
+        factory, destination, expected_current_manifest_sha256=old_sha,
+        _test_uid=os.getuid())
+    before = journal.read_bytes()
+    result = installer.rollback(
+        factory, destination, expected_backup_manifest_sha256=old_sha,
+        _test_uid=os.getuid())
+    assert result["result"] == "ROLLED_BACK_NOT_EXECUTED"
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == old_sha
+    assert journal.read_bytes() == before
+    rejected = destination.with_name(destination.name + ".rejected")
+    assert source.verify_source(rejected, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == new["current_manifest_sha256"]
+    assert result["dut"] == "NOT_RUN"
+
+
+def test_root_rollback_recovers_interrupted_directory_swap(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    installer.upgrade(factory, destination,
+                      expected_current_manifest_sha256=old_sha,
+                      _test_uid=os.getuid())
+    destination.rename(destination.with_name(destination.name + ".next"))
+    result = installer.rollback(
+        factory, destination, expected_backup_manifest_sha256=old_sha,
+        _test_uid=os.getuid())
+    assert result["result"] == "ROLLED_BACK_NOT_EXECUTED"
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == old_sha
+
+
+def test_root_upgrade_rejects_untrusted_factory_file_and_preserves_old(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    candidate = factory / "pl/hil/fpga_image_admission.py"
+    candidate.unlink()
+    candidate.symlink_to(ROOT / "pl/hil/fpga_image_admission.py")
+    with pytest.raises(installer.ProvisionDenied, match="SYMLINK_DENIED"):
+        installer.upgrade(
+            factory, destination, expected_current_manifest_sha256=old_sha,
+            _test_uid=os.getuid())
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == old_sha
+
+
+
+def test_root_upgrade_no_change_cleans_unactivated_stage(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    same = factory / "pl/hil/fpga_image_admission.py"
+    shutil.copyfile(ROOT / "pl/hil/fpga_image_admission.py", same)
+    with pytest.raises(installer.ProvisionDenied, match="PRIVILEGED_UPGRADE_NO_CHANGE"):
+        installer.upgrade(
+            factory, destination, expected_current_manifest_sha256=old_sha,
+            _test_uid=os.getuid())
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == old_sha
+    assert not destination.with_name(destination.name + ".next").exists()
+    assert not destination.with_name(destination.name + ".previous").exists()
+
+
+def test_root_upgrade_postverify_failure_restores_old_source(tmp_path, monkeypatch):
+    installer, factory, destination, journal, old_sha = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    original = installer._held_image_fingerprint
+    observed = {"calls": 0}
+    def fault(uid):
+        observed["calls"] += 1
+        return original(uid) if observed["calls"] == 1 else "0" * 64
+    monkeypatch.setattr(installer, "_held_image_fingerprint", fault)
+    with pytest.raises(installer.ProvisionDenied, match="POSTVERIFY_FAILED"):
+        installer.upgrade(
+            factory, destination, expected_current_manifest_sha256=old_sha,
+            _test_uid=os.getuid())
+    assert source.verify_source(destination, expected_uid=os.getuid())[
+        "code_manifest_sha256"] == old_sha
+    assert not destination.with_name(destination.name + ".previous").exists()
+    # Failed new source is quarantined, not silently activated.
+    assert destination.with_name(destination.name + ".next").is_dir()
+
+
+def test_root_upgrade_lock_is_exclusive_and_fail_closed(tmp_path, monkeypatch):
+    from contextlib import ExitStack
+    installer, _, _, _, _ = _offline_upgrade_fixture(tmp_path, monkeypatch)
+    owner = tmp_path / "owner"
+    owner.mkdir(mode=0o700)
+    monkeypatch.setattr(installer, "GLOBAL_LOCK", owner / "supervisor.lock")
+    monkeypatch.setattr(installer, "RELOAD_FENCE", tmp_path / "reload.lock")
+    # Test the real _maintenance_locks() while keeping host-only paths.
+    spec = importlib.util.spec_from_file_location(
+        "ppu_privileged_lock_test", ROOT / "scripts/ppu-privileged-source-install.py")
+    lock_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lock_mod)
+    monkeypatch.setattr(lock_mod, "GLOBAL_LOCK", owner / "supervisor.lock")
+    monkeypatch.setattr(lock_mod, "RELOAD_FENCE", tmp_path / "reload.lock")
+    with lock_mod._maintenance_locks(os.getuid()):
+        with pytest.raises(lock_mod.ProvisionDenied, match="OWNER_BUSY"):
+            with lock_mod._maintenance_locks(os.getuid()):
+                pytest.fail("second maintenance lock must never be acquired")
+    # First holder released both FDs: next verified acquire is allowed.
+    with lock_mod._maintenance_locks(os.getuid()):
+        pass
+
+
+
 def test_privileged_source_provision_denies_untrusted_input(tmp_path, monkeypatch):
     installer, factory, destination = _installer_fixture(tmp_path, monkeypatch)
     (factory / "pl/hil/fpga_image_root.py").unlink()

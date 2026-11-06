@@ -94,10 +94,12 @@ def run(host,sha,*,preflight=None,helper=None):
     if preflight is None:preflight=load("scripts/plasma_site2_path2_preflight.py","plasma_admit_preflight")
     state=preflight.run(host,sha)
     z=state["z2"];rest=state["rest"]
-    if not (z["engine"].get("status")=="VERIFIED"
+    if not (state.get("readiness")=="NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS"
+       and z["engine"].get("status")=="VERIFIED"
        and z["engine"].get("abi")==5 and z["engine"].get("driver")=="plasma_swd"
        and z["fpga"].get("status")=="IMAGE" and z["fpga"].get("boot_match") is True
-       and z["site2_seal"].get("present") is True
+       and z["fpga"].get("manager_state")=="operating"
+       and z["site2_seal"].get("present") is False
        and z["site2_admission"].get("present") is False
        and not z["openocd_pids"]
        and rest.get("status")=="OBSERVED" and rest.get("health_ready") is True
