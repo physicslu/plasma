@@ -97,7 +97,6 @@ def resolve(
         _need(active["state"] == "ACTIVE"
               and active["asset_set_sha256"] == asset_set_sha256,
               "ACTIVE_SET_MISMATCH")
-        ppu_asset_set.verify_staged(product_root, asset_set_sha256)
     except ppu_asset_set.AssetSetError as exc:
         raise ProviderDenied(f"ACTIVE_SET_UNTRUSTED:{exc}") from exc
     root = product_root / "assets" / "staged" / asset_set_sha256

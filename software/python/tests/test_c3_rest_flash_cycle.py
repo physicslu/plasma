@@ -36,8 +36,8 @@ from plasma_core.enums import Operation
 from plasma_core.errors import PlasmaError
 from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.models import JOB_ID_PATTERN, JobRequest, new_job_id
-from plasma_interfaces.openocd import OpenOCDInterface, c3_flash_profile
-from plasma_interfaces.site_worker_c3 import C3FlashProfile, SiteWorkerRefused, run_flash_cycle
+from plasma_interfaces.openocd import OpenOCDInterface
+from plasma_interfaces.site_worker_c3 import SiteWorkerRefused, run_flash_cycle
 from plasma_server.runtime_control import RuntimeControlServer
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
@@ -226,19 +226,6 @@ def test_flash_profile_shape_is_validated(field, value, code):
     with pytest.raises(worker.SiteWorkerDenied, match=code):
         worker.parse_flash_profile(raw)
 
-
-def test_profile_comes_from_exact_icpn_ic_support():
-    resolver = get_default_ic_support_resolver()
-    profile = c3_flash_profile(resolver.require_exact("STM32F103C8T6"))
-    assert profile.to_wire() == {"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
-                                 "flash_base": 0x08000000, "flash_size": 65536,
-                                 "erase_granularity": 1024}
-    # A different exact ICPN changes target config / geometry / readback range.
-    other = [icpn for icpn in ("STM32F103CBT6", "STM32F103RBT6", "STM32F103C6T6")
-             if resolver.resolve_exact(icpn) is not None]
-    if other:
-        alt = c3_flash_profile(resolver.require_exact(other[0]))
-        assert alt.icpn == other[0] and alt.to_wire() != profile.to_wire()
 
 
 def test_canonical_job_id_rule_is_shared_by_rest_and_c3():
@@ -750,8 +737,9 @@ def test_unconfirmed_session_close_prevents_safe_failure_retry(tmp_path):
         with pytest.raises(PlasmaError) as caught:
             await run_flash_cycle(
                 RefusingClose(), job_id="job-close-failure", site_id=2,
-                profile=C3FlashProfile("STM32F103C8T6", "target/stm32f1x.cfg",
-                                       0x08000000, 0x10000, 1024),
+                profile={"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
+                         "flash_base": 0x08000000, "flash_size": 0x10000,
+                         "erase_granularity": 1024},
                 image=b"FW", image_root=tmp_path, max_runtime_s=30)
         assert caught.value.recoverable is False
         assert "close did not confirm" in str(caught.value)

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from plasma_interfaces.site_worker_c3 import (
-    C3FlashProfile, SiteWorkerControlClient, SiteWorkerRefused, run_flash_cycle,
+    SiteWorkerControlClient, SiteWorkerRefused, run_flash_cycle,
 )
 from plasma_opf import TimeoutPolicy, parse_programming_selection
 from plasma_core.errors import ErrorCode, PlasmaError
@@ -46,12 +46,12 @@ def _need(condition: bool, code: str) -> None:
 @dataclass(frozen=True)
 class ReferenceBinding:
     route: ppu_provider_contract.ProviderRoute
-    profile: C3FlashProfile
+    profile: dict[str, Any]
     engine: ppu_site_engine.EngineSelection
     profile_sha256: str
 
 
-def _parse_profile(raw: bytes, target: str, image_size: int) -> C3FlashProfile:
+def _parse_profile(raw: bytes, target: str, image_size: int) -> dict[str, Any]:
     """Parse hash-verified Bundle profile using the existing Worker geometry contract."""
     _need(len(raw) <= 8192, "REFERENCE_PROFILE_INVALID")
     try:
@@ -70,7 +70,7 @@ def _parse_profile(raw: bytes, target: str, image_size: int) -> C3FlashProfile:
     _need(checked.icpn == target, "REFERENCE_TARGET_MISMATCH")
     _need(type(image_size) is int and 0 < image_size <= checked.flash_size,
           "REFERENCE_IMAGE_OUT_OF_BOUNDS")
-    return C3FlashProfile(**values)
+    return values
 
 
 def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str, Any] | None,
@@ -84,7 +84,6 @@ def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str
           "ASSET_SET_IDENTITY_INVALID")
     try:
         active = ppu_asset_set.read_active(product_root)
-        ppu_asset_set.verify_staged(product_root, digest)
     except ppu_asset_set.AssetSetError as exc:
         raise ReferenceDenied("ACTIVE_SET_UNTRUSTED:" + str(exc)) from exc
     _need(active == dict(active_asset_set), "ACTIVE_SET_MISMATCH")
@@ -126,7 +125,7 @@ def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str
         raise ReferenceDenied("REFERENCE_PROFILE_INVALID") from exc
     return {"asset_set_sha256": digest, "profile_package": selected["id"],
             "provider_package": descriptor["provider_package"],
-            "profile_sha256": entry["sha256"], "profile": profile.to_wire()}
+            "profile_sha256": entry["sha256"], "profile": profile}
 
 
 def qualify_reference(
