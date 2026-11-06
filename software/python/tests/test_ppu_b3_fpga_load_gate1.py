@@ -604,11 +604,27 @@ def test_root_handoff_accepts_fpga_only_bundle_without_profile(tmp_path):
     assert receipt["fpga_loaded"] is False
 
 
+def test_root_handoff_rejects_unmatched_hwh_geometry(tmp_path):
+    staged, digest, _bin_sha, _ = installed_set(tmp_path)
+    with root_sandbox(tmp_path, staged):
+        handoff, manifest, bin_bytes, _ = protected_root.read_staged_fpga_handoff(digest)
+    base = json.loads(manifest)["axi_base"]
+    hwh = (f"<ROOT><SYSTEMINFO BOARD='pynq-z2' DEVICE='7z020' PACKAGE='clg400' SPEEDGRADE='-1'/>"
+           f"<MEMRANGE MASTERBUSINTERFACE='M_AXI_GP0' BASEVALUE='{base + 16:#x}' "
+           f"HIGHVALUE='{base + 31:#x}'/></ROOT>").encode()
+    handoff["fpga_image"]["hwh_sha256"] = hashlib.sha256(hwh).hexdigest()
+    with pytest.raises(protected_root.ImageDeploymentDenied,
+                       match="IMAGE_HWH_IDENTITY_RANGE_MISMATCH"):
+        protected_root.validate_bundle_fpga_handoff(
+            handoff, expected_active_set_sha256=digest,
+            manifest_bytes=manifest, bin_bytes=bin_bytes, hwh_bytes=hwh)
+
+
 # --- Bootstrap HTTP service ------------------------------------------------
 
 from .ppu_owner_authorization_fixture import admit_body, install_body  # noqa: E402
 from .test_ppu_fpga_static_qualification_gate1 import (  # noqa: E402
-    _b3_server, _commit, bootstrap, bundle_v3, synthetic_image, write_contracts,
+    _b3_server, _commit, bootstrap, bundle_v3, synthetic_image,
 )
 
 
@@ -618,8 +634,6 @@ def admitted_fpga_bundle(tmp_path):
         "actions", ["install", "verify"]))
     raw = archive.read_bytes()
     upload_id = _commit(paths, raw)
-    _, entry = synthetic_image()
-    write_contracts(paths.fpga_image_contracts, entry)
     srv.start_deployment(admit_body(paths, "bundle", upload_id))
     return srv, paths, calls, upload_id
 

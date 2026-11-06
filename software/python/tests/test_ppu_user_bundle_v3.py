@@ -24,7 +24,7 @@ from .ppu_owner_authorization_fixture import (
     OWNER_TOKEN, admit_body, device_id, install_body, machine_id_file,
     provision_owner,
 )
-from .ppu_fpga_qualification_fixture import synthetic_image, write_contracts
+from .ppu_fpga_qualification_fixture import synthetic_image
 
 ROOT = Path(__file__).resolve().parents[3]
 TARGET = {"platform": "linux-armv7", "board": "pynq-z2", "fpga_part": "xc7z020clg400-1"}
@@ -58,7 +58,6 @@ class UserBundleTests(unittest.TestCase):
             package_target_file=self.root / "target.json",
             bundle_install_policy=self.root / "policy.json",
             machine_id_path=machine_id_file(self.root),
-            fpga_image_contracts=self.root / "fpga-contracts.json",
             deployment_engine_script=ROOT / "scripts/ppu-bootstrap-deployment.py",
             z2_installer_script=ROOT / "scripts/ppu-z2-installer.py",
         )
@@ -132,14 +131,13 @@ class UserBundleTests(unittest.TestCase):
         self.assertFalse(self.server.deployment_thread.is_alive())
         return bootstrap._deployment_api_record(self.paths)
 
-    def fpga(self):
-        files, entry = synthetic_image()
+    def fpga(self, overrides=None):
+        files, _ = synthetic_image(manifest_overrides=overrides)
         members = {f"payload/packages/image/{n}": data for n, data in files.items()}
         package = {"id": "image", "kind": "fpga-image", "version": "1", "requires": [],
                    "files": [{"path": n, "sha256": hashlib.sha256(v).hexdigest(),
                               "size": len(v), "executable": False} for n, v in members.items()]}
         self.rewrite(lambda m: m["packages"].append(package), payload=members)
-        write_contracts(self.paths.fpga_image_contracts, entry)
 
     def test_local_zip_b1_b2_b3_activate_and_repeat_without_provenance(self):
         with zipfile.ZipFile(self.archive) as source:
@@ -326,11 +324,10 @@ class UserBundleTests(unittest.TestCase):
         self.assertFalse(self.paths.product_root.exists())
         self.co.root_bundle_loader.assert_not_called()
 
-    def test_fpga_abi_contract_mismatch_is_denied_at_b2(self):
-        self.fpga()
-        contracts = json.loads(self.paths.fpga_image_contracts.read_text())
-        contracts["contracts"][0]["abi_version"] = 0x00060001
-        self.paths.fpga_image_contracts.write_text(json.dumps(contracts))
+    def test_fpga_abi_mismatch_is_denied_at_b2(self):
+        self.fpga({"abi_version": 0x00060001,
+                   "identity_words": [[0, 0x00060001, 0xFFFFFFFF],
+                                      [0x1000, 0x00050002, 0xFFFFFFFF]]})
         uid = self.commit()
         with self.assertRaises(bootstrap.BootstrapServiceError):
             self.server.start_deployment(admit_body(self.paths, "bundle", uid))

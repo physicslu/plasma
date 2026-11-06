@@ -538,7 +538,7 @@ def verify_host_only_bundle(
                     raise UnifiedDeploymentError("BUNDLE_NATIVE_BINARY_MISSING")
                 if entry["kind"] == "fpga-image":
                     # Structure only. Static FPGA qualification (Root Manifest
-                    # parser, SHA pairing, trusted Target/ABI contract) is a
+                    # parser, SHA pairing, device Target/Driver ABI) is a
                     # separate B2 step in ppu_fpga_qualification.py.
                     image = [f for f in package_files if f.path.endswith(".bin")]
                     handoff = [f for f in package_files if f.path.endswith(".hwh")]

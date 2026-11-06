@@ -116,17 +116,15 @@ and an FPGA reload under a revised Gate 1.
 
 ## 6. Loading the fixed Image through the HTTP API (B3 `fpga_load`)
 
-Since PR #1261, Bundle v3 B3 with `fpga_load=true` loads an FPGA Image through
-the protected Root Entry (`bundle-load <asset_set_sha256>`). The Root still
-admits only reviewed Images:
-
-| Trust point | File | What must list the Image |
-|---|---|---|
-| B2 static qualification | `scripts/ppu-fpga-image-contracts.json` (Bootstrap) | BIN/HWH/Manifest SHA-256, identities, geometry |
-| Root devmem backend | `DEVMEM_INDEPENDENT_IMAGES` in `pl/hil/fpga_image_admission.py` (protected tree) | `image_id` → BIN SHA-256 |
-| Site admission | `scripts/z2/plasma_swd_site_admission.py` | reads the same table from the privileged code root |
-| Golden recovery | `GOLDEN_RECOVERY_*` in `pl/hil/fpga_image_guard.py` (protected tree) | nothing: the Manifest must restate `base.bin` / `c6768695…e19c` exactly (Stage B-1) |
-| B2/B3 operation authorization | per-request `plasma.ppu.owner-operation-authorization.v1` from the paired client | nothing pre-listed; each request binds device, exact Bundle SHA-256, transaction and action |
+Bundle v3 B3 with explicit `fpga_load=true` invokes the protected Root Entry
+(`bundle-load <asset_set_sha256>`). The selected Image ID is supplied by
+the authorized Bundle, with no factory Image ID registry. B2 checks the exact
+verified BIN/HWH/Manifest triple, target and current Driver ABI. B3 verifies
+the Bundle again and requires a fresh owner authorization bound to device,
+ZIP SHA256, transaction and the FPGA-load action. Root independently checks
+the root-owned staged Set and file hashes, pinned Golden, current boot journal,
+MMIO/UIO ownership, reload lock and live Identity. This host-only change does
+not establish publisher authenticity or prove a new Image on hardware.
 
 The current Image is `z2-independent-swd-v5-d0add58c` (PR #1285 head
 `d0add58c3`, Vivado Host Build run 41648270405: adds `0x68 IDLE_CYCLES`).
@@ -137,8 +135,7 @@ is the bootgen-equivalent Zynq word-swapped payload of the run's
 sample-point Image `bd976140` (PR #1255) is retired: the current adapter
 writes `0x68`, which that Image rejects.
 
-To load a newly listed Image: refresh the Bootstrap and re-provision the
-privileged code root from it (§8), then run B1 → B2 → B3 `fpga_load=true` over
+For the reference Image, run B1 → B2 → B3 `fpga_load=true` over
 HTTP with the paired client (`BootstrapAPIClient` issues a fresh owner
 authorization for each stage; no Bundle SHA-256 is pre-listed on the device). The DPIDR procedure in §3 then runs with
 `@IMAGE_ID@` set to the loaded Image.

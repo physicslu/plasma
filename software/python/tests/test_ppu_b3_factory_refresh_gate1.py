@@ -86,8 +86,7 @@ def test_generic_b3_factory_refresh_preserves_bootstrap_enrollment(tmp_path):
     assert (runtime / "keep").read_text() == "current-runtime-preserved"
     assert (paths.install_root / "ppu-bootstrap-service.py").read_bytes() == service.read_bytes()
     assert (paths.install_root / POLICY_FILE).stat().st_mode & 0o777 == 0o600
-    # B2 static FPGA qualification ships with the same Bootstrap refresh.
-    assert (paths.install_root / "ppu-fpga-image-contracts.json").stat().st_mode & 0o777 == 0o644
+    assert not (paths.install_root / "ppu-fpga-image-contracts.json").exists()
     for name in installer.ROOT_PARSER_FILES:
         assert ((paths.install_root / "pl" / "hil" / name).read_bytes()
                 == (ROOT / "pl" / "hil" / name).read_bytes())
