@@ -140,12 +140,15 @@ class Abi5OpenocdAdapter:
         return {site for site in self.supported_sites if os.path.lexists(self._record(site))}
 
     # --- operations ---------------------------------------------------------------
-    def _argv(self, site: int) -> list[str]:
+    def _base_argv(self, site: int) -> list[str]:
         return [str(self.openocd), "-s", str(self.scripts_root), "-d2",
                 "-c", f"adapter driver {self.adapter_driver}",
                 "-c", f"{self.adapter_driver} site {site}",
                 "-c", "transport select swd", "-c", "gdb port disabled",
-                "-c", "tcl port disabled", "-c", "telnet port disabled",
+                "-c", "tcl port disabled", "-c", "telnet port disabled"]
+
+    def _argv(self, site: int) -> list[str]:
+        return [*self._base_argv(site),
                 "-c", "swd newdap bp cpu", "-c", "dap create bp.dap -chain-position bp.cpu",
                 "-c", "init", "-c", "echo PLASMA_DPREG0=[bp.dap dpreg 0]", "-c", "shutdown"]
 
@@ -170,13 +173,7 @@ class Abi5OpenocdAdapter:
         base = f"0x{profile.flash_base:08x}"
         source, output = tcl_path(staged), tcl_path(readback)
         return [
-            str(self.openocd), "-s", str(self.scripts_root), "-d2",
-            "-c", f"adapter driver {self.adapter_driver}",
-            "-c", f"{self.adapter_driver} site {site}",
-            "-c", "transport select swd",
-            "-c", "gdb port disabled",
-            "-c", "tcl port disabled",
-            "-c", "telnet port disabled",
+            *self._base_argv(site),
             "-f", self._target_config(image),
             # Target configs may force their own SWCLK (stm32f1x.cfg: 1000 kHz);
             # the selected engine's qualified adapter speed wins.
