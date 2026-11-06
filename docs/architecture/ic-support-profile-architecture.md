@@ -82,7 +82,23 @@ Owns address ranges, sizes, page/sector geometry, bank topology and erase/progra
 
 ### 4.3 Package / Minimum Hardware Profile
 
-Owns package-dependent physical requirements and programming interfaces. Phase A intentionally stops before pin-level minimum hardware because the pilot has not yet retained/pinned the required pin/electrical evidence. That field is fail-closed as `pending_evidence`.
+Owns manufacturer-near package facts and programming-interface presence. The original STM32F103C benchmark intentionally remains at this evidence depth, so C8/CB still share `stm32f103-lqfp48-debug-v0`; historical benchmark semantics are not rewritten by later engineering work.
+
+Socket design is a downstream composition, not a manufacturer-near relationship. It therefore lives in an independent `data/ic-support/socket-design/` sidecar registry. The frozen IC Support binding remains unchanged; the sidecar binds an existing exact ICPN to a design-only `package_hardware` overlay containing physical pin mapping, power/reset rules, package mechanics and the minimum programming-contact set.
+
+The current pilot is:
+
+```text
+Frozen IC Support:
+  STM32F103C8T6.package_hardware = stm32f103-lqfp48-debug-v0
+  STM32F103CBT6.package_hardware = stm32f103-lqfp48-debug-v0
+
+Socket-design sidecar:
+  STM32F103C8T6 -> stm32f103c8t6-lqfp48-programming-hardware-v1
+  STM32F103CBT6 -> no overlay
+```
+
+`socket_design_input_ready` means the retained evidence is sufficient to design a Socket schematic/contact map. It **does not** mean a Socket model has been selected, that Site electrical compatibility passed, or that physical programming has been verified. Those remain fail-closed until versioned Socket/Adapter/PPU/Site evidence and HIL exist.
 
 ### 4.4 Option Profile
 
@@ -164,9 +180,15 @@ The checked-in `ground-truth.json` is now explicitly bound to `stm32f103c-source
 - profile-kind/reference mismatch;
 - invalid geometry arithmetic;
 - C8/CB incorrectly sharing Memory Geometry;
-- C8/CB unnecessarily splitting Programming/Package/Option/Security profiles;
+- C8/CB unnecessarily splitting manufacturer-near Programming/Package/Option/Security profiles;
 - invented revision overrides;
-- promotion of incomplete pin-level minimum hardware into runtime-ready status.
+The frozen validator deliberately does not own downstream Socket engineering. `data/ic-support/socket-design/validate.py` separately fails closed on:
+
+- malformed or cross-ICPN Socket design overlays;
+- overlay references to an ICPN absent from the frozen IC Support binding;
+- duplicate/invalid mandatory Socket contacts;
+- non-manufacturer hardware-design evidence;
+- any Socket design input claiming Site/Socket compatibility, hardware runtime readiness, physical qualification or L3 without HIL.
 
 `benchmarks/stm32f103c/validate_source_lock.py` additionally checks that source lock, Ground Truth, extraction contract and retained catalog blob all agree.
 
