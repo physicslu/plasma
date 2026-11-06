@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
-PROTOCOL = "plasma.ppu.site-worker.v1"
+PROTOCOL = "plasma.ppu.site-worker.v2"
 MAX_REQUEST = 4096
 # Same canonical Job ID rule as plasma_core.models.JOB_ID_PATTERN (REST Jobs
 # and Package Action Jobs share it; a test keeps the two in lockstep).
