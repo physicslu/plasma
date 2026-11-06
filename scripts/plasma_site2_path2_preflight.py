@@ -38,6 +38,15 @@ def literal(path,limit=16384):
         return None
 def safe_string(value):
     return value if isinstance(value,str) and len(value)<=128 and NAME.fullmatch(value) else "UNVERIFIED"
+def sysfs_text(path,limit=128):
+    # sysfs advertises a virtual size (e.g. 4096); bound ACTUAL read bytes.
+    try:
+        p=P(path)
+        if not stat.S_ISREG(p.lstat().st_mode):return None
+        with p.open("rb") as stream: raw=stream.read(limit+1)
+        return raw if 0<len(raw)<=limit else None
+    except (OSError,ValueError):
+        return None
 def metadata(path):
     try:
         info=P(path).lstat()
@@ -45,6 +54,7 @@ def metadata(path):
                 "socket":stat.S_ISSOCK(info.st_mode),
                 "symlink":stat.S_ISLNK(info.st_mode),
                 "root_owned":info.st_uid==0,
+                "uid":info.st_uid,"gid":info.st_gid,
                 "mode":format(stat.S_IMODE(info.st_mode),"04o"),
                 "writable_by_others":bool(info.st_mode&0o022)}
     except OSError:
@@ -119,7 +129,7 @@ def fpga():
     boot=literal("/proc/sys/kernel/random/boot_id",128)
     result={"journal":"UNAVAILABLE","manager_state":"UNAVAILABLE","boot_match":False}
     if boot: result["boot_id_sha12"]=hashlib.sha256(boot.strip()).hexdigest()[:12]
-    ms=literal("/sys/class/fpga_manager/fpga0/state",128)
+    ms=sysfs_text("/sys/class/fpga_manager/fpga0/state",128)
     if ms: result["manager_state"]=safe_string(ms.decode("ascii","replace").strip())
     if not raw: return result
     result["journal_sha256"]=hashlib.sha256(raw).hexdigest()
@@ -270,8 +280,19 @@ def run(host: str,source_sha: str,*,helper=None,baseline=None,rest=None) -> dict
     for entry in ("site_worker_control_socket","site_worker_transport_socket","runtime_control_socket"):
         if z[entry].get("socket") is not True:
             blockers.append("SOCKET_MISSING_"+entry)
-        elif not z[entry].get("root_owned") or z[entry].get("mode") not in ("0660","0600","0640","0644"):
-            blockers.append("SOCKET_PERMISSION_REVIEW_"+entry)
+        else:
+            meta=z[entry]
+            # Runtime's own control.sock is deliberately 0600, owned by
+            # the unprivileged Runtime account (not by root). This is
+            # observational readiness only, not authority to use the socket.
+            runtime_private=(entry=="runtime_control_socket"
+                and meta.get("mode")=="0600"
+                and type(meta.get("uid")) is int and meta["uid"]>0
+                and meta.get("writable_by_others") is False)
+            root_control=(meta.get("root_owned") is True and
+                meta.get("mode") in ("0660","0600","0640","0644"))
+            if not (root_control or runtime_private):
+                blockers.append("SOCKET_PERMISSION_REVIEW_"+entry)
     if z["fpga"].get("status")!="IMAGE" or not z["fpga"].get("boot_match"): blockers.append("FPGA_IDENTITY_OR_BOOT_UNVERIFIED")
     if z["fpga"].get("manager_state")!="operating":blockers.append("FPGA_MANAGER_NOT_OPERATING")
     if z["site2_seal"].get("present"): blockers.append("SITE2_SEALED")
