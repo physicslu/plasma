@@ -89,9 +89,9 @@ def qualify_reference(
           "REFERENCE_DRIVER_ABI_MISMATCH")
 
     staged = product_root / "assets" / "staged" / asset_set_sha256
-    # Provider resolution already verifies *all* staged files against the
-    # canonical Bundle manifest. Bind the executable bytes to the selected
-    # engine too, rather than accepting only an ABI string as proof.
+    # The platform Engine is independently verified by load_engine.
+    # Only a native-c Provider carrying executable bytes must bind those
+    # Bundle bytes to the installed Engine.
     try:
         manifest = json.loads((staged / "manifest.json").read_bytes())
         packages = {item["id"]: item for item in manifest["packages"]}
@@ -116,22 +116,7 @@ def qualify_reference(
               "REFERENCE_PACKAGE_FILE_CHANGED")
         return raw, digest
 
-    if provider["kind"] == "platform-provider":
-        raw, _ = exact_file(provider, ppu_provider_contract.PLATFORM_REFERENCE)
-        _need(len(raw) <= 8192, "REFERENCE_PLATFORM_ENGINE_INVALID")
-        try:
-            reference = json.loads(raw, object_pairs_hook=ppu_provider_contract._pairs)
-        except (ValueError, UnicodeError) as exc:
-            raise ReferenceDenied("REFERENCE_PLATFORM_ENGINE_INVALID") from exc
-        # Data only: no command/path or arbitrary native entrypoint. Installed
-        # bytes and root ownership are independently verified by load_engine.
-        _need(reference == {
-            "schema": "plasma.ppu.platform-openocd-reference.v1",
-            "openocd_sha256": engine.openocd_sha256,
-            "admission_sha256": engine.admission_sha256,
-            "driver_abi": f"{engine.adapter_driver}:{engine.driver_abi}",
-        }, "REFERENCE_PLATFORM_ENGINE_MISMATCH")
-    else:
+    if provider["kind"] == "native-c":
         _, binary_sha = exact_file(provider, "bin/openocd")
         _need(binary_sha == engine.openocd_sha256, "REFERENCE_ENGINE_BINARY_MISMATCH")
         _need(any(entry["path"] == f"payload/packages/{provider['id']}/bin/openocd"

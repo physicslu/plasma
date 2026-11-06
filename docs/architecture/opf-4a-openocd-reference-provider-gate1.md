@@ -12,20 +12,20 @@ admission to `ppu_provider_contract.resolve` (OPF-2) and the existing Active Set
 verifier. It permits `fpga` / `flash_cycle` and accepts only an empty Provider
 Options object for this Reference implementation. It then checks:
 
-1. A `platform-provider` metadata Package references the independently installed
-   universal Engine without shipping its C driver or FPGA Image. Its only Engine
-   reference is non-executable `data/plasma-platform-engine.json`, with exactly
-   `schema: "plasma.ppu.platform-openocd-reference.v1"`, `openocd_sha256`,
-   `admission_sha256`, and `driver_abi`. All values must equal the Engine checked
-   by `ppu_site_engine.load_engine(require_root=True)`. No command or path is
-   accepted. Its Options Schema is `data/plasma-provider-options.json`; the
-   Profile requires this Provider in the same verified Active Set. Generic v3
-   opaque-resource admission remains unchanged and confers no execution grant.
-   Alternatively, an explicitly selected `native-c` Provider contains `bin/openocd`
-   whose SHA-256 is **exactly** the installed, independently verified OpenOCD
-   selected by the root-owned `site-worker-engine.json` record. The existing
-   Engine verifier separately validates the installed admission-helper SHA-256;
-   native-c Bundle v3 does not admit arbitrary `libexec/` files.
+1. A `platform-provider` Package uses the independently installed Engine,
+   without shipping its C driver, FPGA Image, OpenOCD Binary or Admission
+   Python. Its **only file** is the non-executable Provider Options Schema
+   `data/plasma-provider-options.json`; the selected Profile depends on that
+   Provider. The retired `data/plasma-platform-engine.json`, including
+   Bundle-side `openocd_sha256` / `admission_sha256`, is not accepted:
+   there is no optional field or backwards-compatible branch. The Profile's
+   `driver_abi` must match the independently installed, root-owned Engine
+   verified by `ppu_site_engine.load_engine(require_root=True)`. Bundle
+   bytes and provenance never select an Engine or grant permission to run.
+   Alternatively, a `native-c` Provider carrying `bin/openocd` must match
+   the selected installed executable SHA-256 exactly; the Engine Manager
+   verifies both OpenOCD and Admission Python digests independently.
+   Generic v3 opaque-resource admission does not grant execution.
 2. Selected Profile Package contains `data/plasma-flash-profile.json`, schema
    `plasma.ppu.openocd-flash-profile.v1`, with exactly `icpn`, `target_config`,
    `flash_base`, `flash_size`, and `erase_granularity` fields plus `schema`.
@@ -40,6 +40,9 @@ Options object for this Reference implementation. It then checks:
 
 There is **no** baked-in FPGA Image ID, OpenOCD installation path or version,
 and no Provider-supplied command-line, Tcl, timeout bypass or Root privilege.
+Active Sets containing the retired Engine reference must be replaced through
+normal Bundle v3 B1/B2/B3. Do not rewrite Gen7 or add legacy acceptance.
+Engine Selection and Worker Session identity checks remain unchanged.
 
 `execute_reference_flash` passes the qualifying OPF-3B route into the existing
 `ppu_opf_site_session.open_provider_job_session`. It then invokes the same
@@ -80,17 +83,19 @@ unchanged session does not require requalification for an ordinary Job.
   C-3 Unix protocol into the existing ABI-v5 OpenOCD Adapter. The **process
   edge only** is simulated; this is not a Mock Provider.
 - Negative cases include wrong Active Set, stale/unknown FPGA observation,
-  unsupported Options/Site, incorrect Job deadline, wrong OpenOCD digest,
-  wrong ABI, incompatible Flash Profile, missing C-3 lease, and readback
+  unsupported Options/Site, incorrect Job deadline, corrupted installed Engine
+  or bundled native-c digest, wrong ABI, incompatible Flash Profile, missing
+  C-3 lease, and readback
   mismatch with persistent Site sealing. See
   `software/python/tests/test_opf_4a_openocd_reference.py`.
 - Production `plasma-server` Runtime routing changes for C-3 Flash only; no
   Bootstrap/B3 Activation change, no Site 2 HIL or DUT/FPGA/SWPC/Z2 operation. In
   particular, Draft PR #1278's B3 Activation semantics are not modified.
-- The Provider's reference metadata (or explicitly bundled `bin/openocd`) is
-  bound to the selected Engine. This is not a distinct signed Driver Package
-  qualification; installed Engine ownership/SHA verification and live native
-  admission remain authoritative.
+- A `platform-provider` has no Engine Binary or Admission digest claim;
+  ABI compatibility and the independently verified installed Engine are
+  authoritative. A Provider explicitly bundling `bin/openocd` still binds
+  its executable bytes to the selected Engine. No signed Driver Package
+  qualification is introduced; native admission remains authoritative.
 - The Worker pins its actual Adapter on startup. The selected Engine record
   is now bound in the existing authenticated C-3 `open_job_session` exchange:
   the root-owned Worker snapshots the SHA-256 of its verified Engine Selection
