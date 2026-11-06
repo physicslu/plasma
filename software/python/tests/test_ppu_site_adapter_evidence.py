@@ -138,6 +138,42 @@ def test_admission_denial_starts_no_child_and_creates_no_evidence(tmp_path):
     assert not (tmp_path / "private").exists()
 
 
+def test_admission_denial_preserves_only_structured_safe_code(tmp_path):
+    adapter, calls = rig(tmp_path, admit=False)
+    old_run = adapter._run
+
+    def run(argv, **kwargs):
+        if argv[-2] == "admit":
+            receipt = {"result": "DENIED", "code": "ROOT_JOURNAL_NOT_HELD_IMAGE"}
+            return subprocess.CompletedProcess(
+                argv, 1, "PLASMA_SWD_SITE_ADMISSION=" + json.dumps(receipt), "")
+        return old_run(argv, **kwargs)
+
+    adapter._run = run
+    with pytest.raises(worker.TransportDenied,
+                       match="ADMISSION_DENIED:ROOT_JOURNAL_NOT_HELD_IMAGE"):
+        attempt(adapter)
+    assert calls == [["revoke", "2"]]
+    assert not (tmp_path / "private").exists()
+
+
+def test_admission_denial_does_not_expose_arbitrary_text(tmp_path):
+    adapter, calls = rig(tmp_path, admit=False)
+    old_run = adapter._run
+
+    def run(argv, **kwargs):
+        if argv[-2] == "admit":
+            receipt = {"result": "DENIED", "code": "/secret/password"}
+            return subprocess.CompletedProcess(
+                argv, 1, "PLASMA_SWD_SITE_ADMISSION=" + json.dumps(receipt), "")
+        return old_run(argv, **kwargs)
+
+    adapter._run = run
+    with pytest.raises(worker.TransportDenied, match="^ADMISSION_DENIED$"):
+        attempt(adapter)
+    assert calls == [["revoke", "2"]]
+
+
 def test_private_directory_required_fail_closed_when_write_untrusted(tmp_path):
     directory = tmp_path / "too-open"
     directory.mkdir(mode=0o755)
