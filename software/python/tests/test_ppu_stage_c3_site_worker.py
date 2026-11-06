@@ -284,17 +284,17 @@ def test_cancel_by_runtime_close_stops_in_flight_operation_and_seals(rig):
 
 @pytest.mark.parametrize("behaviour,error", [
     ("unknown", "OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED"),
-    ("crash", "OUTCOME_UNKNOWN_SITE_SEALED:RuntimeError"),
+    ("crash", "SOFTWARE_EXCEPTION:RuntimeError"),
 ])
-def test_unknown_hardware_outcomes_seal_and_never_retry(rig, behaviour, error):
+def test_unknown_hardware_outcomes_and_software_errors(rig, behaviour, error):
     rig.adapter.behaviour = behaviour
     child = rig.package(PROBE2 + PROBE2)
     rig.open(child)
     first, second = rig.go(child)
     assert first == {"ok": False, "error": error}
     assert second["ok"] is False
-    assert len(rig.adapter.calls) == 1        # no automatic retry
-    assert 2 in rig.client.call("status")["sealed_sites"]
+    assert len(rig.adapter.calls) == (1 if behaviour == "unknown" else 2)
+    assert (2 in rig.client.call("status")["sealed_sites"]) is (behaviour == "unknown")
 
 
 def test_denied_before_hardware_keeps_site_usable(rig):
@@ -354,27 +354,196 @@ def test_worker_crash_invalidates_sessions(rig):
     assert rig.go(child) == [{"ok": False, "error": "NO_SESSION_FOR_PEER"}]
 
 
-def test_startup_unknown_owner_state_seals_sites(tmp_path):
+def test_runtime_restart_keeps_in_flight_site_reserved(tmp_path):
+    """Do not re-admit an old Runtime's Site while an adapter is still running."""
+    class DelayedSafeAdapter(MockAdapter):
+        def __init__(self):
+            super().__init__()
+            self.release = threading.Event()
+
+        def run(self, site, operation, *, deadline, cancel, image=None):
+            self.started.set()
+            # Simulate an uninterruptible adapter which finishes with proven
+            # SAFE_OFF even after the former Runtime loses ownership.
+            assert self.release.wait(10), "adapter did not reach SAFE_OFF"
+            return {"result": "PASS", "safe_off": True}
+
+    adapter = DelayedSafeAdapter()
+    rig = Rig(tmp_path, adapter)
+    child = rig.package(PROBE2)
+    current = os.getpid()
+    new_runtime = current + 9999
+    thread = None
+    result = {}
+    try:
+        rig.open(child, sites=(2,))
+        thread = threading.Thread(target=lambda: result.setdefault("reply", rig.go(child)))
+        thread.start()
+        assert adapter.started.wait(8)
+        rig.core.runtime_pid = lambda: new_runtime
+        req = {"protocol": worker.PROTOCOL, "op": "open_job_session",
+               "job_id": JOB, "sites": [2], "max_runtime_s": 30}
+        peer = (new_runtime, os.getuid(), os.getgid())
+        denied = rig.core.handle(req, peer, "control")
+        assert denied == {"ok": False, "error": "SITE_BUSY"}
+        assert rig.core._site_owners and len(rig.core._sessions) == 1
+        adapter.release.set()
+        thread.join(10)
+        assert not thread.is_alive()
+        assert result["reply"] == [{"ok": False, "error": "SESSION_CLOSED"}]
+        opened = rig.core.handle(req, peer, "control")
+        assert opened["ok"] is True
+        assert list(rig.core._site_owners) == [2]
+        closed = rig.core.handle(
+            {"protocol": worker.PROTOCOL, "op": "close_session",
+             "session_id": opened["result"]["session_id"]}, peer, "control")
+        assert closed["result"]["sealed_sites"] == []
+        assert not rig.core._site_owners
+    finally:
+        adapter.release.set()
+        if thread is not None:
+            thread.join(10)
+        rig.close()
+        if child.poll() is None:
+            rig.reap(child)
+
+
+def test_external_owner_blocks_only_while_present(tmp_path):
     adapter = MockAdapter()
     adapter.startup = {1}
     r = Rig(tmp_path, adapter)
     try:
-        assert r.client.call("status")["sealed_sites"] == [1]
+        assert r.client.call("status")["sealed_sites"] == []
+        with pytest.raises(worker.SiteWorkerDenied, match="EXTERNAL_SITE_OWNER_PRESENT"):
+            r.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30)
+        adapter.startup.clear()
+        opened = r.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30)
+        assert r.client.close_session(opened["session_id"])["sealed_sites"] == []
     finally:
         r.close()
 
 
-def test_one_session_at_a_time_and_cleanup(rig):
+def test_independent_site_sessions_and_overlap_denial(rig):
     a = rig.package("import time; time.sleep(5)\n")
-    s = rig.open(a)
     b = rig.package("import time; time.sleep(5)\n")
-    with pytest.raises(worker.SiteWorkerDenied, match="SESSION_ALREADY_ACTIVE"):
-        rig.open(b)
-    rig.client.close_session(s["session_id"])
-    with pytest.raises(worker.SiteWorkerDenied, match="SESSION_UNKNOWN"):
-        rig.client.close_session(s["session_id"])
-    rig.client.close_session(rig.open(b)["session_id"])
-    rig.reap(a, b)
+    c = rig.package("import time; time.sleep(5)\n")
+    try:
+        first = rig.open(a, sites=(1,))
+        second = rig.open(b, sites=(2,))
+        assert first["session_id"] != second["session_id"]
+        assert [x["sites"] for x in rig.client.call("status")["sessions"]] == [[1], [2]]
+        with pytest.raises(worker.SiteWorkerDenied, match="SITE_BUSY"):
+            rig.open(c, sites=(1,))
+        rig.client.close_session(first["session_id"])
+        with pytest.raises(worker.SiteWorkerDenied, match="SESSION_UNKNOWN"):
+            rig.client.close_session(first["session_id"])
+        third = rig.open(c, sites=(1,))
+        assert [x["sites"] for x in rig.client.call("status")["sessions"]] == [[1], [2]]
+        rig.client.close_session(third["session_id"])
+        rig.client.close_session(second["session_id"])
+        assert rig.client.call("status")["sessions"] == []
+    finally:
+        rig.reap(a, b, c)
+
+
+def test_multi_site_package_reserves_all_sites_atomically(rig):
+    a = rig.package("import time; time.sleep(5)\n")
+    b = rig.package("import time; time.sleep(5)\n")
+    try:
+        both = rig.open(a, sites=(1, 2))
+        with pytest.raises(worker.SiteWorkerDenied, match="SITE_BUSY"):
+            rig.open(b, sites=(2,))
+        with pytest.raises(worker.SiteWorkerDenied, match="SITE_BUSY"):
+            rig.open(b, sites=(1,))
+        assert rig.client.call("status")["sessions"][0]["sites"] == [1, 2]
+        rig.client.close_session(both["session_id"])
+        other = rig.open(b, sites=(2,))
+        rig.client.close_session(other["session_id"])
+    finally:
+        rig.reap(a, b)
+
+
+def test_independent_sites_can_execute_concurrently(tmp_path):
+    class OverlapAdapter(MockAdapter):
+        def __init__(self):
+            super().__init__()
+            self.arrivals = set()
+            self.both_started = threading.Event()
+            self.release = threading.Event()
+            self.guard = threading.Lock()
+
+        def run(self, site, operation, *, deadline, cancel, image=None):
+            with self.guard:
+                self.arrivals.add(site)
+                if self.arrivals == {1, 2}:
+                    self.both_started.set()
+            while not self.release.wait(0.01):
+                if cancel.is_set() or time.monotonic() >= deadline:
+                    raise worker.TransportUnknown("CONCURRENT_PROBE_ABORTED")
+            return {"result": "PASS", "safe_off": True}
+
+    adapter = OverlapAdapter()
+    rig = Rig(tmp_path, adapter)
+    a = rig.package("print(json.dumps(call({'op':'probe','site':1})))\n")
+    b = rig.package(PROBE2)
+    try:
+        one = rig.open(a, sites=(1,))
+        two = rig.open(b, sites=(2,))
+        out = {}
+        ta = threading.Thread(target=lambda: out.setdefault("one", rig.go(a)))
+        tb = threading.Thread(target=lambda: out.setdefault("two", rig.go(b)))
+        ta.start()
+        tb.start()
+        assert adapter.both_started.wait(8), "two independent Site operations did not overlap"
+        adapter.release.set()
+        ta.join(10)
+        tb.join(10)
+        assert out["one"][0]["ok"] is True
+        assert out["two"][0]["ok"] is True
+        assert rig.client.close_session(one["session_id"])["sealed_sites"] == []
+        assert rig.client.close_session(two["session_id"])["sealed_sites"] == []
+    finally:
+        adapter.release.set()
+        rig.close()
+        if a.poll() is None or b.poll() is None:
+            rig.reap(*(child for child in (a, b) if child.poll() is None))
+
+
+def test_cancel_one_site_does_not_cancel_unrelated_site(tmp_path):
+    class PerSiteAdapter(MockAdapter):
+        def __init__(self):
+            super().__init__()
+            self.site1_started = threading.Event()
+
+        def run(self, site, operation, *, deadline, cancel, image=None):
+            if site == 1:
+                self.site1_started.set()
+                while not cancel.is_set() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                raise worker.TransportUnknown("SITE1_CANCELLED")
+            return {"result": "PASS", "safe_off": True}
+
+    adapter = PerSiteAdapter()
+    rig = Rig(tmp_path, adapter)
+    a = rig.package("print(json.dumps(call({'op':'probe','site':1})))\n")
+    b = rig.package(PROBE2)
+    try:
+        one = rig.open(a, sites=(1,))
+        two = rig.open(b, sites=(2,))
+        out = {}
+        t = threading.Thread(target=lambda: out.setdefault("one", rig.go(a)))
+        t.start()
+        assert adapter.site1_started.wait(8)
+        assert rig.go(b)[0]["ok"] is True
+        assert rig.client.close_session(one["session_id"])["sealed_sites"] == [1]
+        t.join(10)
+        assert out["one"][0]["error"] == "OUTCOME_UNKNOWN_SITE_SEALED:SITE1_CANCELLED"
+        assert rig.client.call("status")["sealed_sites"] == [1]
+        assert rig.client.close_session(two["session_id"])["sealed_sites"] == []
+    finally:
+        rig.close()
+        if a.poll() is None or b.poll() is None:
+            rig.reap(*(child for child in (a, b) if child.poll() is None))
 
 
 @pytest.mark.parametrize("raw", [b"not json\n", b"[]\n", b'{"op":"probe","site":2}\n',
@@ -400,6 +569,45 @@ class FlashMockAdapter(MockAdapter):
         self.profiles = getattr(self, "profiles", []) + [image.profile]
         return {"result": "PASS", "bytes_verified": len(image.payload),
                 "readback_sha256": image.sha256, "safe_off": True}
+
+
+def test_parallel_flash_sessions_reject_different_image_or_mcu(tmp_path):
+    adapter = FlashMockAdapter()
+    rig = Rig(tmp_path, adapter)
+    other_job = "2" * 32
+    rig.lease.add(other_job)
+    payload = b"FIRMWARE-A"
+    other_payload = b"FIRMWARE-B"
+    digest = hashlib.sha256(payload).hexdigest()
+    other_digest = hashlib.sha256(other_payload).hexdigest()
+    (rig.image_root / (JOB + ".bin")).write_bytes(payload)
+    (rig.image_root / (other_job + ".bin")).write_bytes(other_payload)
+    try:
+        first = rig.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30)
+        second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30)
+        rig.client.bind_image(first["session_id"], profile=F103,
+                              image_sha256=digest, image_size=len(payload))
+        with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
+            rig.client.bind_image(second["session_id"], profile=F103,
+                                  image_sha256=other_digest, image_size=len(other_payload))
+        (rig.image_root / (other_job + ".bin")).write_bytes(payload)
+        different_target = {**F103, "icpn": "STM32F101C8T6"}
+        with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
+            rig.client.bind_image(second["session_id"], profile=different_target,
+                                  image_sha256=digest, image_size=len(payload))
+        accepted = rig.client.bind_image(second["session_id"], profile=F103,
+                                         image_sha256=digest, image_size=len(payload))
+        assert accepted["bound"] is True
+        rig.client.close_session(first["session_id"])
+        rig.client.close_session(second["session_id"])
+        # No active Site sessions: another Job may now select another firmware.
+        third = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30)
+        (rig.image_root / (other_job + ".bin")).write_bytes(other_payload)
+        rig.client.bind_image(third["session_id"], profile=different_target,
+                              image_sha256=other_digest, image_size=len(other_payload))
+        assert rig.client.close_session(third["session_id"])["sealed_sites"] == []
+    finally:
+        rig.close()
 
 
 def test_c3_binds_exact_firmware_bytes_for_flash_cycle(tmp_path):
@@ -470,7 +678,7 @@ class FakeProc:
         return -9
 
 
-def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=False,
+def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, hang_once=False, openocd=False,
               flash_readback=None):
     tmp_path.mkdir(parents=True, exist_ok=True)
     journal = tmp_path / "journal.json"
@@ -490,7 +698,7 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
                 assert path_match is not None
                 if flash_readback is not None:
                     Path(path_match.group(1)).write_bytes(flash_readback)
-        return FakeProc(log, rc, hang)
+        return FakeProc(log, rc, hang or (hang_once and len(calls["popen"]) == 1))
 
     scripts = tmp_path / "ocd" / "share" / "openocd" / "scripts" / "target"
     scripts.mkdir(parents=True)
@@ -498,7 +706,8 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, openocd=Fal
     a = abi5.Abi5OpenocdAdapter(openocd_root=tmp_path / "ocd", python=Path("/usr/bin/python3"),
                                 adapter_khz=500, journal=journal,
                                 record_dir=tmp_path / "rec", run=run, popen=popen,
-                                openocd_running=lambda: openocd, poll_s=0.01)
+                                openocd_running=lambda: openocd, poll_s=0.01,
+                                evidence_dir=tmp_path / "openocd-evidence")
     (tmp_path / "rec").mkdir()
     return a, calls, journal
 
@@ -528,15 +737,17 @@ def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
     # The engine's qualified SWCLK overrides the target config's own speed.
     assert commands.index("adapter speed 500") < commands.index("init")
     assert argv.index("-f") < argv.index("adapter speed 500")
-    assert [v for v in commands if v.startswith("flash ")][0] == (
-        "flash erase_address 0x08000000 0x00000400")  # 20 B -> one 1 KiB page
+    erase = "flash erase_address 0x08000000 0x00000400"  # 20 B -> one 1 KiB page
     assert [v.split()[1] for v in commands if v.startswith("flash ")] == [
-        "erase_address", "write_image", "verify_image"
+        "probe", "erase_address", "write_image", "verify_image"
     ]
     assert commands[-2:] == ["reset run", "shutdown"]
-    # Flash work always starts from reset (a running DUT breaks the write algorithm).
-    assert commands.index("reset halt") < commands.index(
-        "flash erase_address 0x08000000 0x00000400")
+    # The proven A/B sequence resets, disables background polling, then probes
+    # bank 0 before any erase/write; probe-only operations must remain flash-free.
+    index = commands.index("reset halt")
+    assert commands[index:index + 4] == ["reset halt", "poll off", "flash probe 0", erase]
+    assert "poll on" not in commands
+    assert "halt" not in commands
     assert "halt" not in commands
     assert any(v.startswith("dump_image ") for v in commands)
     assert not any(v.startswith("swd newdap bp") for v in commands)
@@ -579,7 +790,6 @@ def test_abi5_probe_uses_existing_admission_and_fixed_openocd_argv(tmp_path):
 
 
 @pytest.mark.parametrize("kw,exc,code", [
-    ({"openocd": True}, worker.TransportDenied, "EXTERNAL_SITE_OWNER_PRESENT"),
     ({"admit_ok": False}, worker.TransportDenied, "ADMISSION_DENIED"),
     ({"log": b"SWD DPIDR 0x1ba01477\n"}, worker.TransportUnknown, "SAFE_OFF_NOT_VERIFIED"),
     ({"hang": True}, worker.TransportUnknown, "OPERATION_TIMEOUT"),
@@ -590,6 +800,29 @@ def test_abi5_fail_closed_paths(tmp_path, kw, exc, code):
         a.run(2, "probe", deadline=time.monotonic() + 0.3, cancel=threading.Event())
     if calls["run"] and calls["run"][0] == ["admit", "2"]:
         assert calls["run"][-1] == ["revoke", "2"]     # always revoked
+
+
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_abi5_timeout_or_cancel_with_verified_cleanup_is_safe_failure(tmp_path, cancelled):
+    a, calls, _ = make_abi5(tmp_path, log=GOOD, hang_once=True)
+    cancel = threading.Event()
+    if cancelled:
+        cancel.set()
+    with pytest.raises(worker.TransportFailed, match=(
+        "CANCELLED_DURING_OPERATION" if cancelled else "OPERATION_TIMEOUT")):
+        a.run(2, "probe", deadline=time.monotonic() + 0.2, cancel=cancel)
+    assert len(calls["popen"]) == 2
+    assert calls["run"] == [["admit", "2"], ["revoke", "2"],
+                             ["admit", "2"], ["revoke", "2"]]
+
+
+@pytest.mark.parametrize("reason", ["PS_OWNER_SITE_LOCK_UNAVAILABLE",
+                                     "PS_OWNER_PL_IMAGE_NOT_LOADED"])
+def test_native_pre_mmio_refusal_does_not_seal_site(tmp_path, reason):
+    a, calls, _ = make_abi5(tmp_path, log=("Error: plasma_swd: " + reason).encode(), rc=1)
+    with pytest.raises(worker.TransportDenied, match=reason):
+        a.run(2, "probe", deadline=time.monotonic() + 5, cancel=threading.Event())
+    assert calls["run"] == [["admit", "2"], ["revoke", "2"]]
 
 
 def test_abi5_probe_is_independent_of_root_journal_and_image_id(tmp_path):
@@ -607,12 +840,14 @@ def test_abi5_probe_is_independent_of_root_journal_and_image_id(tmp_path):
     assert len(calls["popen"]) == 3
 
 
-def test_abi5_startup_seals_on_leftover_record_or_running_openocd(tmp_path):
+def test_abi5_admission_records_are_per_site_even_with_other_openocd(tmp_path):
     a, _c, _j = make_abi5(tmp_path)
     (tmp_path / "rec" / "swd-site1-admission").write_text("x")
     assert a.startup_sealed_sites() == {1}
-    b, _c, _j = make_abi5(tmp_path / "b", openocd=True)
-    assert b.startup_sealed_sites() == {1, 2}
+    b, _c, _j = make_abi5(tmp_path / "b", openocd=True, log=GOOD)
+    assert b.startup_sealed_sites() == set()
+    assert b.run(2, "probe", deadline=time.monotonic() + 5,
+                 cancel=threading.Event())["result"] == "PASS"
 
 
 # --- C-1 lease op and C-2 wiring ------------------------------------------------------
@@ -697,7 +932,8 @@ def test_c2_launcher_package_uses_site_worker_end_to_end(tmp_path, rig):
     assert receipt["site_ids"] == [2] and receipt["site_transport"]["session"] == "CLOSED"
     out = json.loads(receipt["stdout"]["tail"])
     assert out["ok"] is True and out["result"]["dpidr"] == "0x1ba01477"
-    assert rig.core._session is None
+    assert rig.core._sessions == {}
+    assert rig.core._site_owners == {}
 
     # Worker refuses the session (lease not held): the Package is killed, FAILED.
     rig.lease.clear()

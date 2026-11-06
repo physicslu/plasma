@@ -45,6 +45,10 @@ REQUIRED_SCRIPTS = (
     "ppu_site_engine.py",
     "ppu_site_adapter_abi5.py",
     "ppu_site_recovery.py",
+    "ppu_opf_reference_openocd.py",
+    "ppu_opf_site_session.py",
+    "ppu_provider_contract.py",
+    "ppu_provider_options.py",
 )
 
 # B2 static FPGA qualification reuses the ONE protected Root Image Manifest
@@ -158,8 +162,8 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
     _root_parser_source(source_root)
     install_root.mkdir(parents=True, exist_ok=True)
     install_root.chmod(0o755)
-    # The generic policy grants install-only for previously admitted
-    # canonical Bundles in development mode; not arbitrary code execution.
+    # The factory grants only explicit B3 modes for owner-admitted Bundles;
+    # hardware activation still requires separate FPGA-load authority.
     policy_present = (source_root / "ppu-bundle-install-policy.json").is_file()
     b3_present = list(B3_FILES) if policy_present else []
     if policy_present and not all((source_root / name).is_file() for name in B3_FILES):
@@ -170,10 +174,10 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
         except (OSError, ValueError) as exc:
             raise BootstrapInstallError("factory B3 policy unreadable") from exc
         if (type(policy) is not dict
-                or set(policy) != {"schema", "mode", "install_only", "actions"}
-                or policy.get("schema") != "plasma.ppu.b3-install-policy.v1"
+                or set(policy) != {"schema", "mode", "modes", "actions"}
+                or policy.get("schema") != "plasma.ppu.b3-install-policy.v2"
                 or policy.get("mode") != "development"
-                or policy.get("install_only") is not True
+                or policy.get("modes") != ["activate", "stage_only"]
                 or policy.get("actions") != ["install", "verify"]):
             raise BootstrapInstallError("factory B3 policy invalid")
     for name in (*REQUIRED_SCRIPTS, *(B3_FILES if b3_present else ())):

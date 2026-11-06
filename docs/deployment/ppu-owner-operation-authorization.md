@@ -28,7 +28,7 @@ Schema `plasma.ppu.owner-operation-authorization.v1`
 ```json
 {
   "schema": "plasma.ppu.owner-operation-authorization.v1",
-  "action": "bundle.admit | bundle.install | bundle.install-fpga-load | asset.execute",
+  "action": "bundle.admit | bundle.install | bundle.activate | bundle.activate-fpga-load | asset.execute",
   "device_id": "ppu-device-<hex>",
   "subject_sha256": "<exact Bundle archive == Asset Set SHA256>",
   "transaction_id": "<B1 upload_id | current B2 transaction_id | Runtime job_id>",
@@ -43,15 +43,16 @@ Schema `plasma.ppu.owner-operation-authorization.v1`
 | Stage | Action | `transaction_id` | PPU derives itself |
 | --- | --- | --- | --- |
 | B2 Admission | `bundle.admit` | B1 `upload_id` | device ID, committed upload SHA256 |
-| B3 Install | `bundle.install` | **current** B2 `transaction_id` | device ID, re-hashed archive, current journal |
-| B3 Install + FPGA load | `bundle.install-fpga-load` | current B2 `transaction_id` | same |
+| B3 `stage_only` Install/Verify | `bundle.install` | **current** B2 `transaction_id` | device ID, re-hashed archive, current journal |
+| B3 `activate`, no FPGA load | `bundle.activate` | current B2 `transaction_id` | same, explicit mode |
+| B3 `activate` + FPGA load | `bundle.activate-fpga-load` | current B2 `transaction_id` | same, explicit mode and `fpga_load:true` |
 | Runtime Dispatch | `asset.execute` (+ `package_identity_sha256`) | Runtime `job_id` (== Job lease) | Active Set SHA256, Package identity |
 
 Each stage verifies its **own** fresh authorization against facts the PPU
 derived (device identity from `/etc/machine-id`, the bytes it hashed, its own
 current journal/Active Set). A B2 receipt is never install authority, a B3
-receipt is never execute authority, and an install authorization cannot be
-widened into an FPGA load.
+receipt is never execute authority, and a stage-only authorization cannot be
+widened into activation or FPGA load.
 
 What the MAC is and is not: it adds **no** strength over the Bearer
 credential itself. It binds the user's explicit choice to one exact
@@ -68,16 +69,22 @@ Freshness without trusting the SWPC clock: B3 must name the PPU's
 No new database: nothing about authorizations is persisted except the
 verified summary (no MAC/secret) inside the existing B2/B3 deployment
 records. No Publisher, Git Commit Pin, per-Bundle admin approval or parallel
-authorization store exists.
+authorization store exists. User Bundle v3 `source_commit` is optional,
+untrusted provenance: omission is valid through B1/B2/B3, and a claimed
+commit grants no qualification. User ZIPs need not originate in GitHub and
+need no publisher signature or CI whitelist. Engineering Runtime Release,
+factory/CI identity and trusted Dispatcher Work Order pins remain mandatory
+under their independent contracts.
 
 ## Console → Manager → PPU
 
 - Console B2 body: `{kind:"bundle", upload_id, archive_sha256}` — the SHA256 of
   the file the user selected.
 - Console B3 body: `{kind:"bundle", upload_id, archive_sha256,
-  admission_transaction_id, fpga_load}`.
+  admission_transaction_id, mode, fpga_load}`; `mode` is exactly `activate` or
+  `stage_only`, and `stage_only` requires `fpga_load:false`.
 - Manager (paired, device-bound credential) issues the authorization and
-  forwards `{kind, upload_id, [fpga_load], authorization}`. Callers can
+  forwards `{kind, upload_id, mode, fpga_load, authorization}`. Callers can
   never supply their own `authorization` field through the Manager.
 - PPU Bootstrap: 401 without the Bearer credential; 409 for any denied
   binding. B1 upload and B2 admission never install or execute; FPGA load

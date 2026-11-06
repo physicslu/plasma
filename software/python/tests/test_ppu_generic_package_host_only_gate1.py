@@ -59,7 +59,7 @@ def test_retired_v1_cannot_admit_or_stage(tmp_path: Path, kind: str, filename: s
         systemd_root=tmp_path / "systemd",
     )
     co = engine.DeploymentCoordinator(paths=paths, installer=SimpleNamespace(), clock=lambda: 123.0)
-    request = engine.HostOnlyPackageRequest(archive, SOURCE, digest, TARGET)
+    request = engine.HostOnlyPackageRequest(archive, digest, TARGET)
     with pytest.raises(engine.DeploymentError, match="PACKAGE_SCHEMA_UNSUPPORTED"):
         co.execute_package_host_only(request)
     assert not paths.product_root.exists()
@@ -114,4 +114,4 @@ def coordinator(tmp: Path):
 
 
 def request(archive: Path, digest: str):
-    return engine.HostOnlyPackageRequest(archive, SOURCE, digest, TARGET)
+    return engine.HostOnlyPackageRequest(archive, digest, TARGET)

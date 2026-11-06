@@ -70,7 +70,8 @@ def default_adapter(record: Path = ENGINE_SELECTION, *, python: Path = PYTHON,
         return NotReadyAdapter(exc.code)
     return Abi5OpenocdAdapter(openocd_root=engine.openocd_root, python=python,
                               adapter_khz=engine.adapter_khz,
-                              adapter_driver=engine.adapter_driver)
+                              adapter_driver=engine.adapter_driver,
+                              verified_engine=engine)
 
 
 def build(run_dir: Path = RUN, state_dir: Path = STATE, *, adapter=None,

@@ -18,6 +18,7 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"scripts"))
 import plasma_development_dispatch as dev
+import plasma_host_observe as host_observe
 
 WORKFLOW=ROOT/".github/workflows/plasma-engineering-runtime-dispatch.yml"
 REGISTRY=ROOT/"specs/engineering-dispatch/development-tasks-v1.json"
@@ -1460,6 +1461,324 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["acceptance"], order["acceptance"])
 
 
+    def test_simple_host_queries_use_existing_path2_without_codex(self):
+        """Host-only CLI: owner event, exact script, bwrap, real output evidence."""
+        self.assertEqual(host_observe.observe("hostname"), os.uname().nodename)
+        self.assertEqual(host_observe.observe("kernel-release"), os.uname().release)
+        self.assertTrue(host_observe.observe("python-version").startswith(
+            f"{sys.version_info.major}.{sys.version_info.minor}."))
+        self.assertEqual(host_observe.main(["hostname"]), 0)
+        for argv in ([], ["hostname", "extra"], ["sudo"], ["bash"], ["../etc/passwd"]):
+            with self.subTest(argv=argv):
+                self.assertEqual(host_observe.main(argv), 2)
+
+        order = self._order(
+            "path2-cli", script="scripts/plasma_host_observe.py",
+            argv=["hostname"], verification="exit-code",
+            timeout_seconds=20)
+        order.pop("expected_stdout_sha256")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        self.assertEqual(req["task_id"], "path2-work-order")
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["capability"], "cpu-only")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["verification"], "exit-code")
+        self.assertNotIn("codex_profile", task)
+        calls = []
+        def stub(command, **kwargs):
+            calls.append((command, kwargs))
+            return subprocess.CompletedProcess(command, 0, b"SWPC\n", b"")
+        with tempfile.TemporaryDirectory() as td:
+            evidence = Path(td)
+            # Offline argument-contract only; no SWPC, bwrap or Codex executes.
+            with patch.object(dev.shutil, "which", return_value="/usr/bin/python3"), \
+                    patch.object(dev.sys, "executable", "/usr/bin/python3"):
+                result = dev.run_task(
+                    task, workspace=ROOT, sandbox=True, evidence_dir=evidence,
+                    executor=stub)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["verification"], "exit-code")
+            self.assertEqual(result["stdout_sha256"],
+                             hashlib.sha256(b"SWPC\n").hexdigest())
+            self.assertEqual(
+                (evidence / "plasma-path2-stdout.txt").read_bytes(), b"SWPC\n")
+            self.assertEqual(json.loads(
+                (evidence / "plasma-path2-process.json").read_text())["exit_code"], 0)
+        self.assertEqual(len(calls), 1)
+        argv, kwargs = calls[0]
+        self.assertIn("--unshare-all", argv)
+        self.assertIn("--clearenv", argv)
+        self.assertIn("--ro-bind", argv)
+        self.assertIn("--dev", argv)
+        self.assertIn("/work/scripts/plasma_host_observe.py", argv)
+        self.assertEqual(argv[-1], "hostname")
+        self.assertNotIn("codex", " ".join(argv))
+        self.assertEqual(kwargs["timeout"], 20)
+
+    def test_quick_cost_status_does_not_mask_real_codex_failure(self):
+        quick = self._order("path3-codex", codex_profile="quick-observe",
+                            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        thread = "0199a213-81c0-7800-8aa1-bbab2a035a53"
+        for tokens, rc, expected_cost, expected_status in (
+            (5_000, 0, "WITHIN_LIMIT", "EVIDENCE_READY_REVIEW_REQUIRED"),
+            (35_000, 0, "EXCEEDED", "EVIDENCE_READY_REVIEW_REQUIRED"),
+            (35_000, 7, "EXCEEDED", "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED"),
+        ):
+            with self.subTest(tokens=tokens, rc=rc):
+                stream = (
+                    json.dumps({"type": "thread.started", "thread_id": thread})
+                    + "\n" + json.dumps({"type": "turn.completed", "usage": {
+                        "input_tokens": tokens, "cached_input_tokens": tokens-100,
+                        "output_tokens": 3}}) + "\n"
+                ).encode()
+                with tempfile.TemporaryDirectory() as td:
+                    proc = lambda argv, **kw: subprocess.CompletedProcess(
+                        argv, rc, stream, b"")
+                    report = dev.run_codex_task(
+                        task, workspace=Path(td), executor=proc,
+                        task_id="path3-work-order")
+                self.assertEqual(report["cost_budget_status"], expected_cost)
+                self.assertEqual(report["status"], expected_status)
+                self.assertEqual(report["functional_acceptance"], "UNVERIFIED")
+                self.assertEqual(report["codex_exit_code"], rc)
+                self.assertEqual(
+                    report["codex_context_audit"]["model_request_count_status"],
+                    "NOT_AVAILABLE")
+
+    def test_quick_cost_unknown_is_distinct_from_execution_status(self):
+        quick = self._order("path3-codex", codex_profile="quick-observe",
+                            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            report = dev.run_codex_task(
+                task, workspace=Path(td),
+                executor=lambda argv, **kw: subprocess.CompletedProcess(
+                    argv, 0, b'{"type":"turn.started"}\n', b""),
+                task_id="path3-work-order")
+        self.assertEqual(report["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+        self.assertEqual(report["cost_budget_status"], "NOT_AVAILABLE")
+        self.assertIsNone(
+            report["codex_activity_metrics"]["non_cached_input_tokens"])
+        self.assertEqual(
+            report["codex_context_audit"]["model_request_count_source"],
+            "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS")
+
+    def test_z2_ci_artifact_source_requires_exact_owner_hardware_main_request(self):
+        source = {
+            "source_sha": "e949d1bcbf0941eb034c76e842bd90cc943152dc",
+            "run_id": 42064496761,
+        }
+        authorized = self._order(
+            "path3-codex", artifact_source=source,
+            codex_execution="guarded-hardware-no-sandbox")
+        event = self._event(authorized)
+        request = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, request, event)
+        self.assertEqual(approval["artifact_run_id"], str(source["run_id"]))
+        self.assertEqual(approval["artifact_source_sha"], source["source_sha"])
+        self.assertEqual(task["artifact_source"], source)
+        self.assertNotIn("artifact_run_id", dev.authorize(
+            self._event(self._order()), self._context(), self.registry))
+        negatives = (
+            {"artifact_source": {"source_sha": source["source_sha"], "run_id": True},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": {"source_sha": source["source_sha"], "run_id": -1},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": {"source_sha": "a" * 12, "run_id": source["run_id"]},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": {**source, "download_url": "https://attacker.invalid"},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": source},
+            {"artifact_source": source, "codex_profile": "quick-observe",
+             "scope": "host-only"},
+            {"artifact_source": source,
+             "codex_execution": "guarded-hardware-no-sandbox",
+             "pr_number": 123, "source_sha": "a" * 40},
+        )
+        for change in negatives:
+            with self.subTest(change=change), self.assertRaises(dev.Denied):
+                dev.request(self._event(self._order("path3-codex", **change)),
+                            self._context())
+        yaml = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
+        self.assertIn("artifact_run_id != ''", yaml)
+        self.assertIn("PLASMA_Z2_CI_ARTIFACTS_VERIFIED", yaml)
+        self.assertIn("plasma_trusted_z2_ci_artifact.py verify", yaml)
+        self.assertNotIn("opf-site2-c7502a3", yaml)
+        self.assertIn("actions: read  # fetch only owner-pinned", yaml)
+        codex_step = yaml.split(
+            "      - name: Codex develops, builds and tests candidate; preserve real evidence", 1
+        )[1].split("      - name: Collect Path 3 evidence", 1)[0]
+        self.assertNotIn("GH_TOKEN:", codex_step)
+        self.assertNotIn("GITHUB_TOKEN:", codex_step)
+
+    def test_explicit_quick_profile_requires_owner_bound_host_only(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["codex_profile"], "quick-observe")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["work_order_sha256"], req["work_order_sha256"])
+        self.assertNotIn(
+            "codex_profile", dev.task_for_request(
+                self.registry,
+                dev.request(self._event(self._order()), self._context()),
+                self._event(self._order())))
+        invalid = (
+            {"codex_profile": "automatic", "scope": "host-only"},
+            {"codex_profile": "quick-observe"},
+            {"codex_profile": "quick-observe", "scope": "guarded-hardware"},
+            {"codex_profile": "quick-observe", "scope": "host-only",
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"codex_profile": "quick-observe", "scope": "host-only",
+             "pr_number": 11, "source_sha": "a"*40},
+        )
+        for changes in invalid:
+            with self.subTest(changes=changes), self.assertRaisesRegex(
+                    dev.Denied, "WORK_ORDER_PATH3_FIELDS_DENIED"):
+                dev.parse_dynamic_work_order(
+                    self._event(self._order("path3-codex", **changes)))
+
+    def test_quick_budget_metrics_are_redacted_and_post_turn_not_preemptive(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        secret = "SENSITIVE_COMMAND_ARGUMENT_SHOULD_NOT_APPEAR"
+        stream = [
+            {"type": "thread.started",
+             "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"},
+            {"type": "item.started", "item": {
+                "type": "command_execution", "id": "a",
+                "command": "bash -lc '" + secret + "'"}},
+            {"type": "item.completed", "item": {
+                "type": "command_execution", "id": "a",
+                "command": "bash -lc '" + secret + "'", "exit_code": 2}},
+            {"type": "turn.completed", "usage": {
+                "input_tokens": 33000, "cached_input_tokens": 30000,
+                "output_tokens": 40}},
+        ]
+        data = ("\n".join(json.dumps(event) for event in stream) + "\n").encode()
+        calls = []
+        def executor(argv, **kwargs):
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0, data, b"")
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            receipt = dev.run_codex_task(
+                task, task_id="path3-work-order", workspace=work,
+                executor=executor)
+            usage_text = (work / receipt["codex_usage_path"]).read_text()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1]["timeout"], dev.QUICK_MAX_SECONDS)
+        self.assertEqual(calls[0][0],
+            ["codex", "-c", "model_reasoning_effort=low",
+             "exec", "--json", "--sandbox", "workspace-write", "-"])
+        self.assertIn("QUICK OBSERVATION", calls[0][1]["input"].decode())
+        self.assertEqual(receipt["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+        self.assertNotIn("failure_reason", receipt)
+        self.assertEqual(receipt["cost_budget_status"], "EXCEEDED")
+        self.assertEqual(receipt["codex_execution_status"], "EXIT_ZERO")
+        self.assertEqual(receipt["functional_acceptance"], "UNVERIFIED")
+        self.assertEqual(receipt["codex_usage"]["input_tokens"], 33000)
+        self.assertEqual(receipt["codex_usage"]["cached_input_tokens"], 30000)
+        counts = receipt["codex_activity_metrics"]
+        self.assertEqual(counts["execution_profile"], "quick-observe")
+        self.assertEqual(counts["tool_items_started"], 1)
+        self.assertEqual(counts["commands_failed"], 1)
+        self.assertEqual(counts["items_completed"], 1)
+        self.assertEqual(counts["turns_completed"], 1)
+        self.assertEqual(counts["input_tokens_soft_limit"], 30000)
+        self.assertEqual(counts["cost_budget_status"], "EXCEEDED")
+        self.assertEqual(counts["cost_budget_alert"], "INPUT_BUDGET_POST_TURN")
+        self.assertIsNone(counts["budget_reason"])
+        self.assertEqual(counts["non_cached_input_tokens"], 3000)
+        self.assertGreater(counts["cache_share_basis_points"], 9000)
+        self.assertEqual(counts["model_request_count_status"], "NOT_AVAILABLE")
+        self.assertEqual(receipt["codex_context_audit"]["model_request_count_source"],
+                         "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS")
+        self.assertEqual(receipt["codex_context_audit"]["observed_turns_completed"], 1)
+        self.assertIsNone(counts["model_request_count"])
+        self.assertGreaterEqual(counts["elapsed_ms"], 0)
+        self.assertNotIn(secret, json.dumps(receipt) + usage_text)
+        self.assertEqual(receipt["codex_model_selection"]["model"]["source"],
+                         "NOT_AVAILABLE")
+
+    def test_quick_requires_streaming_monitor_on_real_executor(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            with patch.dict(os.environ, {}, clear=True):
+                with self.assertRaisesRegex(
+                        dev.Denied, "QUICK_MONITOR_REQUIRED"):
+                    dev.run_codex_task(
+                        task, workspace=Path(td), executor=subprocess.run,
+                        task_id="path3-work-order")
+        for mutant in (
+            task | {"work_order_scope": "guarded-hardware"},
+            task | {"codex_execution": "guarded-hardware-no-sandbox"},
+            task | {"work_order_sha256": "invalid"},
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                with self.assertRaisesRegex(
+                        dev.Denied, "CODEX_QUICK_ADMISSION_DENIED"):
+                    dev.run_codex_task(
+                        mutant, workspace=Path(td),
+                        executor=lambda *_a, **_kw: self.fail("invoked Codex"),
+                        task_id="path3-work-order")
+
+    def test_quick_streamed_limits_kill_process_group_without_secrets(self):
+        secret = "PRIVATE_DATA_NEVER_PERSIST"
+        script = (
+            "import json,sys,time\n"
+            "for i in range(3):\n"
+            " print(json.dumps({'type':'item.started','item':"
+            "{'id':str(i),'type':'command_execution',"
+            "'command':'git status "+secret+"'}}),flush=True)\n"
+            "time.sleep(3)\n"
+        )
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            live = work / "path3.log"
+            evidence = work / "codex.log"
+            live.touch()
+            usage = dev.CodexUsageCollector()
+            rc = dev._run_codex_with_live_log(
+                [sys.executable, "-u", "-c", script], b"smoke",
+                work, evidence, str(live), usage=usage,
+                max_seconds=3, max_tool_items=1)
+            self.assertEqual(usage.budget_reason, "TOOL_ITEMS_LIMIT")
+            self.assertNotEqual(rc, 0)
+            self.assertGreater(usage.tool_items_started, 1)
+            self.assertNotIn(secret, live.read_text() + evidence.read_text())
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            live = work / "path3.log"
+            evidence = work / "codex.log"
+            live.touch()
+            usage = dev.CodexUsageCollector()
+            rc = dev._run_codex_with_live_log(
+                [sys.executable, "-u", "-c", "import time;time.sleep(3)"],
+                b"smoke", work, evidence, str(live), usage=usage,
+                max_seconds=0.3, max_tool_items=10)
+            self.assertEqual(usage.budget_reason, "WALL_TIMEOUT")
+            self.assertNotEqual(rc, 0)
+
     def test_path3_owner_hardware_no_sandbox_is_one_invocation(self):
         """Host-only stub; no Codex process, USB, Z2, FPGA or DUT."""
         ordinary = self._order("path3-codex")
@@ -2004,6 +2323,40 @@ class GenericWorkOrderContracts(unittest.TestCase):
         old_approval = dev.authorize(old, self._context(), self.registry)
         self.assertEqual(old_approval["monitor_summary"], "")
         self.assertEqual(old_approval["monitor_stage"], "CPU-only CLI")
+
+    def test_path3_monitor_phase_is_owner_bound_display_only(self):
+        for phase in ("HOST_ONLY", "INSTALL", "RUNTIME",
+                      "PROGRAMMING_PROFILE", "FLASH_TEST"):
+            with self.subTest(phase=phase):
+                order = self._order(monitor_phase=phase)
+                event = self._event(order)
+                request = dev.request(event, self._context())
+                approved = dev.authorize(event, self._context(), self.registry)
+                task = dev.task_for_request(self.registry, request, event)
+                self.assertEqual(approved["monitor_phase"], phase)
+                self.assertEqual(task["monitor_phase"], phase)
+                self.assertEqual(approved["execution_path"], "path3-codex")
+                self.assertEqual(approved["execution_capability"],
+                                 "codex-workspace")
+                self.assertNotIn("hardware_stages", approved)
+                changed = self._event(order | {"monitor_phase": "HOST_ONLY"
+                                              if phase != "HOST_ONLY" else "INSTALL"})
+                with self.assertRaisesRegex(
+                        dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+                    dev.task_for_request(self.registry, request, changed)
+        for phase in ("FLASH_PASS", "INSTALL\nsecret", "hostname;sudo",
+                      "", None, 1, True):
+            with self.subTest(phase=phase):
+                with self.assertRaisesRegex(
+                        dev.Denied, "WORK_ORDER_MONITOR_PHASE_DENIED"):
+                    dev.request(self._event(self._order(monitor_phase=phase)),
+                                self._context())
+        with self.assertRaises(dev.Denied):
+            dev.request(self._event(self._order(
+                "path2-cli", monitor_phase="INSTALL")), self._context())
+        legacy = dev.authorize(self._event(self._order()), self._context(),
+                               self.registry)
+        self.assertEqual(legacy["monitor_phase"], "")
 
     def test_path3_does_not_report_path2_cli_stage(self):
         a = dev.authorize(

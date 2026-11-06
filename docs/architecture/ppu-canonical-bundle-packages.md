@@ -1,6 +1,6 @@
 # PLASMA Universal Bundle — Canonical Naming and Wire Schema
 
-> **Term note:** in this document **B1/B2/B3/B4 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify, B4 activation (incl. previous-version backup). Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
+> **Term note:** in this document **B1/B2/B3 are Bundle stages** — B1 upload/commit, B2 admission, B3 install/verify plus standard Active selection. Independent legacy B4 recovery/backup remains separately governed. Not the FPGA/UIO or governance meanings; see [glossary](../glossary.md#b1b2b3).
 
 **Architecture Decision (2026-10-31, merged in PR #1225):** One deployment format, **Bundle → Packages → Files**. This document defines the only canonical vocabulary for future PLASMA PPU packaging. It does not grant install, activation, publisher authority, FPGA, DUT, or production-security qualification.
 
@@ -25,7 +25,6 @@
   "name": "example-programming-route",
   "version": "1.0.0",
   "purpose": "programming",
-  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "target": {
     "platform": "linux-armv7",
     "board": "pynq-z2",
@@ -60,7 +59,28 @@
 }
 ```
 
-*The illustration is not a valid ZIP until real SHA256 and sizes are substituted.* An optional `actions` declaration is descriptive, not execution permission. All other Manifest fields are denied; a v3 Manifest containing `components` is invalid. A v2 Manifest containing `packages` is also invalid.
+User-authored v3 Bundles may originate entirely outside GitHub. Neither
+`source_commit` nor a Publisher, signature or CI provenance is required for
+B1/B2/B3. Optional `source_commit` is a lowercase SHA40 **claim**, retained
+as untrusted provenance only; there is no repository lookup, comparison to
+engineering HEAD, publisher whitelist or authorization derived from it.
+Malformed optional metadata still fails schema validation. The canonical
+verifier and B3 engine accept no caller-provided expected source commit.
+Admission/install receipts emit `source_commit: null` when absent; consumers
+must also tolerate omission of that informational field. Exact ZIP SHA256
+and per-file hashes remain authoritative content identities.
+
+Each action still requires authenticated owner authorization bound to the
+physical PPU, exact ZIP bytes, current transaction and requested privilege.
+Target and independent FPGA ABI/Identity qualification, Runtime ownership,
+reload fences, SAFE_OFF, resource limits and Linux permissions remain in
+force. The engineering Runtime Release, factory/CI artifact identity and
+trusted GitHub Dispatcher Work Order source pins are separate contracts
+and retain their existing mandatory source identity checks. Existing FPGA
+factory contracts describe qualified hardware/ABI artifacts; they confer no
+publisher identity or user operation authority.
+
+*The illustration is not a valid ZIP until real SHA256 and sizes are substituted.* Optional `actions` and `source_commit` declarations confer no execution permission. All other Manifest fields are denied; a v3 Manifest containing `components` is invalid. A v2 Manifest containing `packages` is also invalid.
 
 ## Explicit version transition, not a silent rename
 
@@ -79,8 +99,8 @@ Changing `components` to `packages` on an existing `plasma.ppu.bundle.v2` is **i
 - The Python model exposes `VerifiedBundle.packages: tuple[VerifiedBundlePackage]`, `MAX_BUNDLE_PACKAGES=32`, `bundle_package_identity`, and Package-based DAG resolution. Legacy attribute/function aliases remain narrowly for v2 consumers and cannot be used for new schema authoring.
 - New v3 Bundle Resolution emits `schema=plasma.ppu.bundle-resolution.v2`, `package_order`, `package_sha256`; v2 continues the old `component_order` and `component_sha256` Receipt shape.
 - Host-only transaction returns a top-level `bundle` envelope containing `packages` for v3; legacy v2 and Package v1 continue to return their historical `package` envelope. This is only a simulated transaction Receipt, not proof of device installation.
-- Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions (`fpga-image` = exactly one BIN + HWH + `plasma.fpga.image.v1` Manifest, statically qualified at B2 per [Owner Operation Authorization](../deployment/ppu-owner-operation-authorization.md) and the factory FPGA Image contracts); opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. `python` and `native-c` Packages may carry exactly one declarative `config/plasma-package-resources.json` (`plasma.ppu.package-resources.v1`: `sites`, `max_runtime_s`); it is identity-bound and required for execution, never an execution entitlement. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
-- Component/Package hashing only establishes content identity; a Bearer token, checksum or Manifest `source_commit` does not prove Publisher/Master authorization.
+- Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions (`fpga-image` = exactly one BIN + HWH + `plasma.fpga.image.v1` Manifest, statically qualified at B2 per [Owner Operation Authorization](../deployment/ppu-owner-operation-authorization.md) and the factory FPGA Image contracts); opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. `python` and `native-c` Packages may carry the declarative `config/plasma-package-resources.json` (`plasma.ppu.package-resources.v1`: `sites`, `max_runtime_s`); it is identity-bound and required for execution, never an execution entitlement. A Provider Package may also carry the fixed non-executable `config/plasma-provider-options.json` (see [P1-01 OPF Options Schema](opf-provider-options-schema-gate1.md)); this does not grant execution. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
+- Component/Package hashing only establishes content identity; a checksum or Manifest `source_commit` never replaces the separate authenticated owner operation authorization.
 
 ## Asset-only Bundle semantics and single Active Asset Set
 
@@ -106,12 +126,22 @@ multi-version package co-installation. Existing v3 `packages[].requires`
 continues to describe **dependencies inside one delivered Bundle**, not
 the set of operations in a Job.
 
-B1/B2/B3 continue to mean Receive, Admission, and Install/Verify. A B3
-request without `fpga_load` installs files only: it does not activate the
-Set, reconfigure the FPGA, or execute a Programming Job.
+B1/B2/B3 continue to mean Receive, Admission, and Install/Verify.
+Under the 2026-11-03 owner decision, **standard B3 success also selects the
+verified Active Set**. The B3 HTTP body has exact `mode: "activate"` or
+`mode: "stage_only"` plus mandatory boolean `fpga_load`. An exceptional
+`stage_only` installs/verifies files but never publishes `active.json`.
+For a Bundle with **no FPGA Image**, `mode: "activate", fpga_load: false`
+atomically publishes the verified Set under the Coordinator's existing
+`deployment.lock` and a connection-held Runtime Job quiescence lease;
+it does not reload PL. A Bundle containing an FPGA Image cannot activate
+with `fpga_load: false`: its caller must **explicitly** choose
+`mode: "activate", fpga_load: true` and carry the separate
+`bundle.activate-fpga-load` owner authorization. No server-side default or
+`bundle.install` or `bundle.activate` authorization can infer this privilege.
 
 **B3 FPGA load (owner decision 2026-11-02, [Gate 1](../deployment/ppu-bundle-v3-b3-fpga-load-gate1.md)).**
-A B3 request with an explicit `"fpga_load": true` for a Bundle that contains
+A B3 `mode: "activate"` request with an explicit `"fpga_load": true` for a Bundle that contains
 exactly one `fpga-image` Package also loads that Image, in the same
 `deployment.lock` transaction: install/verify → Runtime Job Quiesce
 (connection-held) → protected Root Entry `bundle-load <asset_set_sha256>`
@@ -126,11 +156,16 @@ The receipt is `plasma.ppu.b3-deployment-receipt.v2` and reports
 alone and never performs a DUT operation. A PPU is READY only after the
 selected Set and physical/runtime prerequisites are proven.
 
-The existing B3 install path `/opt/plasma/bundles/<bundle-name>` has
-**no generic Active Asset Set feature today**, and B3 physical acceptance
-covers only the approved Smoke Bundle from PR #1241. The canonical Set
-identity algorithm, activation API, persistence and recovery remain
-unimplemented, despite this architecture choice.
+The current generic B3 installer stores immutable Sets in
+`/opt/plasma/assets/staged/<archive_sha256>`, while the existing Active
+Asset Set helper atomically publishes `/opt/plasma/assets/active.json`
+(`os.replace` + fsync). Each receipt distinguishes
+`bundle_install_and_activate`, `bundle_install_and_fpga_load` or
+`bundle_staged_only`, reports `ready: false`, and records the
+Coordinator transaction. Neither Active identity nor a successful B3
+implies that a Programming Job is READY. Host-only tests are not Z2 HIL
+evidence; unknown physical state requires guarded recovery and fresh
+Site/FPGA admission.
 
 **Terminology:** Bundle-as-Assets is a system-level classification; a
 Bundle is **not identical to one** `Programming Asset` object from
@@ -143,3 +178,29 @@ for ownership, update sequence, FPGA boundaries and non-goals.
 ## Execution and migration boundaries
 
 Only new v3 Bundles should be produced. Do **not** convert historical on-device v2 bytes in place; generate a new v3 ZIP with updated path, Manifest, hashes and provenance. Keep legacy v1/v2 parsers until all old callers and archived evidence are accounted for. Package installation, activation, recovery, trust signing and real PPU v3 admission remain separate qualification gates. No FPGA or DUT operation is authorized by the naming migration.
+
+## Programming execution boundary (owner decision 2026-11-04)
+
+See [Unified Bundle-driven Programming Execution](unified-bundle-driven-programming-decision-2026-11-04.md).
+**Bundle v3 is not an OpenOCD bundle** and its `python`, `native-c`,
+`fpga-image` and opaque-data kinds are not intended as a fixed list of
+programming technologies. Third-party FPGA/Driver/Provider and PS-only
+programmers must be supportable by a standard, capability-declared Plugin
+interface without editing PLASMA Core. A verified Bundle is not by itself
+an entitlement to execute arbitrary code or hardware operations.
+
+Engineering and Production use **the same programming execution pipeline**,
+while retaining their existing distinct policies and approval requirements.
+Console owns Bundle selection, target/operation policy admission and
+delivery. PPU validates received bytes, selected Active Set identity,
+applicability and the actual hardware safety/compatibility state; PPU
+must not gate the Job on a central Device Catalog, a pre-registered ICPN,
+a hardcoded Compiler/Backend/Image ID, or OpenOCD availability when the
+selected valid Provider does not require it.
+
+**Current implementation is incomplete:** existing B2 factory FPGA
+contracts, static Runtime operation-admission projection and OpenOCD-only
+Site adapter remain until replaced by trusted Bundle-derived equivalents.
+This paragraph does **not** declare current Bundle v3 Parser capable of
+executing an opaque Resource Package or bypass B1/B2/B3 and local safety gates.
+

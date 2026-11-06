@@ -8,9 +8,6 @@ from __future__ import annotations
 
 import pytest
 
-from plasma_core.enums import Operation
-from plasma_core.errors import PlasmaError
-from plasma_server.execution_router import _default_compiler_registry
 from plasma_web import gateway
 from plasma_web.device_catalog import DeviceCatalogIntegrityError
 
@@ -35,19 +32,6 @@ def test_target_device_is_unverified_claim_without_catalog(monkeypatch, vendor, 
     assert selected.identifier_kind == "unverified_exact_target_claim"
 
 
-def test_microchip_l0_cannot_bypass_runtime_operation_admission_when_catalog_missing(monkeypatch):
-    monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
-    raw_icpn = "ATSAML10E16A-MZTVAO"
-    claim = gateway._parse_target_device({"vendor": "Microchip", "identifier": raw_icpn})
-    assert claim.icpn == raw_icpn
-    # The current default Runtime has no admitted Compiler for this Microchip
-    # target; the Backend must reject it regardless of any Catalog contents.
-    registry = _default_compiler_registry()
-    for operation in (Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ):
-        with pytest.raises(PlasmaError, match="no admitted compiler binding"):
-            registry.select(claim.icpn, operation)
-
-
 @pytest.mark.parametrize("value", [
     {"vendor": "", "identifier": "MCU"},
     {"vendor": "Third Party", "identifier": ""},
@@ -65,3 +49,37 @@ def test_catalog_still_required_for_catalog_search_not_programming(monkeypatch):
     monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
     with pytest.raises(DeviceCatalogIntegrityError):
         gateway._device_search_payload("STM32", 5, 0)
+
+
+@pytest.mark.parametrize("target", ["STM32F103C8T6", "MCXN236VKLT",
+                                    "ATSAML10E16A-MZTVAO", "thirdparty-mcu-v1"])
+@pytest.mark.parametrize("client_id", ["plasma-web", "plasma-web-engineering"])
+def test_raw_job_target_and_owner_survive_without_catalog(monkeypatch, target, client_id):
+    monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
+    handler = object.__new__(gateway.PlasmaWebHandler)
+    request = handler._job_request(
+        {"site_id": 1, "operation": "erase", "target": target,
+         "execution_owner_id": "owner-test"}, client_id=client_id)
+    assert request.target == target
+    assert request.metadata["execution_owner_id"] == "owner-test"
+    assert request.metadata["execution_owner_kind"] == (
+        "engineering_session" if client_id == "plasma-web-engineering" else "rest_client")
+
+
+@pytest.mark.parametrize("target", ["", "*", "../../bad", "a/../bad", "bad\nname",
+                                    "bad name", 17, True])
+def test_malformed_raw_target_fails_without_catalog(monkeypatch, target):
+    monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
+    handler = object.__new__(gateway.PlasmaWebHandler)
+    with pytest.raises(ValueError):
+        handler._job_request({"site_id": 1, "operation": "erase", "target": target},
+                             client_id="plasma-web")
+
+
+def test_production_typed_target_policy_remains_separate(monkeypatch):
+    monkeypatch.setattr(gateway, "get_default_device_catalog", _catalog_unavailable)
+    handler = object.__new__(gateway.PlasmaWebHandler)
+    with pytest.raises(ValueError, match="only valid for an Engineering"):
+        handler._job_request({"site_id": 1, "operation": "erase",
+                              "target_device": {"vendor": "User", "identifier": "user-mcu"}},
+                             client_id="plasma-web")

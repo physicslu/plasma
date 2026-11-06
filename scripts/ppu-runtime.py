@@ -32,6 +32,7 @@ PPU_PACKAGES = (
     "plasma_core",
     "plasma_interfaces",
     "plasma_handlers",
+    "plasma_opf",
     "plasma_server",
     "plasma_client",
     "plasma_web",
@@ -378,6 +379,8 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     required = {
         "__main__.py",
         "plasma_core/config.py",
+        "plasma_opf/__init__.py",
+        "plasma_opf/contract.py",
         "plasma_server/server.py",
         "plasma_server/runtime_server.py",
         "plasma_server/runtime_control.py",

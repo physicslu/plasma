@@ -18,6 +18,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import threading
+from functools import partial
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -73,6 +74,20 @@ class PackageActionRuntime:
         self.execution = _load(control_plane, "ppu_asset_execution.py")
         self.launcher = _load(control_plane, "ppu_package_launcher.py")
         self.product_root = Path(product_root)
+        from plasma_interfaces.openocd import OpenOCDInterface
+
+        reference = _load(control_plane, "ppu_opf_reference_openocd.py")
+        for interface in getattr(site_manager, "interfaces", {}).values():
+            if isinstance(interface, OpenOCDInterface) and interface.site_worker_ready:
+                interface.opf_flash_executor = partial(
+                    reference.execute_runtime_flash, product_root=self.product_root)
+        # Pin the configured Asset Set at Job admission. Never infer a product
+        # directory from the host or re-check PL hardware for ordinary Jobs.
+        if (hasattr(site_manager, "_active_asset_set_reader")
+                and site_manager._active_asset_set_reader is None):
+            site_manager._active_asset_set_reader = (
+                lambda: _load(control_plane, "ppu_asset_set.py").read_active(self.product_root)
+            )
         self.state_root = Path(state_root)
         self.owner_credential = owner_credential
         self.spawner = spawner

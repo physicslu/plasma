@@ -381,6 +381,14 @@ def _parse_targets(value: Any) -> tuple[BatchTarget, ...]:
     return tuple(targets)
 
 
+def _validated_target_claim(value: Any, *, label: str) -> str:
+    if (not isinstance(value, str)
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+/-]{0,127}", value)
+            or any(part in {".", "..", ""} for part in value.split("/"))):
+        raise ValueError(f"{label} must be a valid exact target identifier")
+    return value
+
+
 def _parse_target_device(
     value: Any,
     *,
@@ -406,9 +414,8 @@ def _parse_target_device(
     # The selected Runtime Provider must separately resolve exact-target
     # capabilities and refuse unsupported operations before any hardware I/O.
     vendor = vendor.strip()
-    identifier = identifier.strip()
-    if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+/-]{0,127}", identifier)
-            or len(vendor) > 128 or any(ord(c) < 32 for c in vendor)):
+    identifier = _validated_target_claim(identifier.strip(), label=label)
+    if len(vendor) > 128 or any(ord(c) < 32 or ord(c) == 127 for c in vendor):
         raise ValueError(f"{label} target identity is invalid")
     return BatchTargetDeviceSnapshot(
         vendor=vendor,
@@ -542,6 +549,8 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
     ):
         normalized = dict(body)
         raw_target_device = normalized.pop("target_device", None)
+        if normalized.get("target") is not None:
+            normalized["target"] = _validated_target_claim(normalized["target"], label="target")
         execution_owner_id = self._validated_rest_owner(normalized.pop("execution_owner_id", None))
         request = super()._job_request(
             normalized,

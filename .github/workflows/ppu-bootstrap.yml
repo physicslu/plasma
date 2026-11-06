@@ -26,6 +26,10 @@ on:
       - "scripts/ppu_site_worker.py"
       - "scripts/ppu_site_worker_service.py"
       - "scripts/ppu_site_engine.py"
+      - "scripts/ppu_opf_reference_openocd.py"
+      - "scripts/ppu_opf_site_session.py"
+      - "scripts/ppu_provider_contract.py"
+      - "scripts/ppu_provider_options.py"
       - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/ppu_site_recovery.py"
       - "scripts/ppu_asset_execution.py"
@@ -47,9 +51,12 @@ on:
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
+      - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
       - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
+      - "software/python/tests/test_ppu_user_bundle_v3.py"
+      - "software/python/tests/test_ppu_bundle_v3_single_engine_gate1.py"
       - "software/python/tests/ppu_fpga_qualification_fixture.py"
       - "software/python/tests/test_ppu_bundle_v3_packages_contract.py"
       - "software/python/tests/test_ppu_package_receive_admission_pr1.py"
@@ -88,6 +95,10 @@ on:
       - "scripts/ppu_site_worker.py"
       - "scripts/ppu_site_worker_service.py"
       - "scripts/ppu_site_engine.py"
+      - "scripts/ppu_opf_reference_openocd.py"
+      - "scripts/ppu_opf_site_session.py"
+      - "scripts/ppu_provider_contract.py"
+      - "scripts/ppu_provider_options.py"
       - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/ppu_site_recovery.py"
       - "scripts/ppu_asset_execution.py"
@@ -109,9 +120,12 @@ on:
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
+      - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
       - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
+      - "software/python/tests/test_ppu_user_bundle_v3.py"
+      - "software/python/tests/test_ppu_bundle_v3_single_engine_gate1.py"
       - "software/python/tests/ppu_fpga_qualification_fixture.py"
       - "software/python/tests/test_ppu_bundle_v3_packages_contract.py"
       - "software/python/tests/test_ppu_package_receive_admission_pr1.py"
@@ -168,6 +182,10 @@ jobs:
           scripts/ppu_site_worker.py
           scripts/ppu_site_worker_service.py
           scripts/ppu_site_engine.py
+          scripts/ppu_opf_reference_openocd.py
+          scripts/ppu_opf_site_session.py
+          scripts/ppu_provider_contract.py
+          scripts/ppu_provider_options.py
           scripts/ppu_site_adapter_abi5.py
           scripts/ppu_site_recovery.py
           pl/hil/fpga_image_root.py
@@ -182,10 +200,13 @@ jobs:
           software/python/tests/test_ppu_bootstrap_deployment.py
           software/python/tests/test_ppu_deploy_api_host.py
           software/python/tests/test_ppu_b3_z2_install_gate1.py
+          software/python/tests/test_ppu_b3_fpga_load_gate1.py
           software/python/tests/test_ppu_owner_authorization_gate1.py
           software/python/tests/test_ppu_asset_execution_gate1.py
           software/python/tests/test_ppu_privileged_source_gate1.py
           software/python/tests/test_ppu_fpga_static_qualification_gate1.py
+          software/python/tests/test_ppu_user_bundle_v3.py
+          software/python/tests/test_ppu_bundle_v3_single_engine_gate1.py
           software/python/tests/test_ppu_bundle_v3_packages_contract.py
           software/python/tests/test_ppu_package_receive_admission_pr1.py
           software/python/tests/test_ppu_b3_factory_refresh_gate1.py
@@ -236,6 +257,10 @@ jobs:
             scripts/ppu_site_worker.py \
             scripts/ppu_site_worker_service.py \
             scripts/ppu_site_engine.py \
+            scripts/ppu_opf_reference_openocd.py \
+            scripts/ppu_opf_site_session.py \
+            scripts/ppu_provider_contract.py \
+            scripts/ppu_provider_options.py \
             scripts/ppu_site_adapter_abi5.py \
             scripts/ppu_site_recovery.py \
             scripts/ppu_fpga_qualification.py \

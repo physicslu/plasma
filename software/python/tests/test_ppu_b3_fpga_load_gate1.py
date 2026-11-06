@@ -48,13 +48,14 @@ def fpga_bundle(tmp_path: Path):
     return archive, digest, data["firmware_sha256"], manifest
 
 
-def load_request(archive, digest, fpga_load=True):
+def load_request(archive, digest, fpga_load=True, *, mode=None):
     request = b3_request(archive, digest)
     return engine.BundleV3InstallRequest(
-        archive=request.archive, source_commit=request.source_commit,
+        archive=request.archive,
         artifact_sha256=request.artifact_sha256,
         target_profile=request.target_profile,
-        api_transaction_id=request.api_transaction_id, fpga_load=fpga_load,
+        api_transaction_id=request.api_transaction_id,
+        mode=mode or ("activate" if fpga_load else "stage_only"), fpga_load=fpga_load,
     )
 
 
@@ -143,12 +144,12 @@ def test_b3_fpga_load_publishes_active_set_only_after_identity_pass(tmp_path):
     ]
 
 
-def test_b3_without_fpga_load_is_install_only_v2_receipt(tmp_path):
+def test_b3_explicit_stage_only_never_publishes_or_loads_fpga(tmp_path):
     archive, digest, _bin_sha, _ = fpga_bundle(tmp_path)
     h = Harness(tmp_path, outcome=AssertionError("must not run"))
     receipt = h.co.execute_bundle_v3_install(load_request(archive, digest, fpga_load=False))
     assert receipt["schema"] == "plasma.ppu.b3-deployment-receipt.v2"
-    assert receipt["stage"] == "bundle_install_only"
+    assert receipt["stage"] == "bundle_staged_only"
     assert receipt["fpga"] == "NOT_RUN"
     assert receipt["fpga_load"] == {"requested": False, "result": "NOT_RUN"}
     assert receipt["active_asset_set"] is None
@@ -635,8 +636,8 @@ def test_service_forwards_explicit_fpga_load_to_coordinator(tmp_path):
     srv.deployment_thread.join(timeout=10)
     assert len(calls) == 1
     assert calls[0][2]["fpga_load"] is True
-    assert set(calls[0][2]) == {"api_transaction_id", "source_commit",
-                                "archive_sha256", "target", "fpga_load"}
+    assert set(calls[0][2]) == {"api_transaction_id",
+                                "archive_sha256", "target", "mode", "fpga_load"}
 
 
 @pytest.mark.parametrize("body", [
@@ -700,3 +701,38 @@ def test_service_reconciles_known_b3_failures_from_coordinator_journal(
         assert record["result"]["coordinator_receipt"]["coordinator_state"] == state
     else:
         assert record["error_code"] == "b3_install_outcome_unreconciled"
+
+
+def test_b3_fpga_standard_activation_requires_explicit_load(tmp_path):
+    archive, digest, _bin_sha, _ = fpga_bundle(tmp_path)
+    h = Harness(tmp_path, outcome=AssertionError("must not load"))
+    with pytest.raises(engine.DeploymentError, match="B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD"):
+        h.co.execute_bundle_v3_install(
+            load_request(archive, digest, fpga_load=False, mode="activate"))
+    assert h.co.journal.read().state == "verify_failed"
+    assert "journal:staging" not in h.events
+    assert "lease:acquired" not in h.events
+    assert h.active()["state"] == "EMPTY"
+
+
+def test_service_explicit_fpga_activation_denied_without_load_and_stage_only_conflict(tmp_path):
+    srv, paths, calls, _id = admitted_fpga_bundle(tmp_path)
+    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD"):
+        srv.start_deployment(install_body(paths, bootstrap._deployment_api_record(paths),
+                                          fpga_load=False, mode="activate"))
+    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
+        srv.start_deployment(b3(paths) | {"mode": "stage_only"})
+    assert calls == []
+
+
+def test_service_missing_mode_and_fpga_flag_never_infer_privilege(tmp_path):
+    srv, paths, calls, _id = admitted_fpga_bundle(tmp_path)
+    body = b3(paths)
+    body.pop("mode")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
+        srv.start_deployment(body)
+    body = b3(paths)
+    body.pop("fpga_load")
+    with pytest.raises(bootstrap.BootstrapServiceError, match="B3_INSTALL_REQUEST_FIELDS_DENIED"):
+        srv.start_deployment(body)
+    assert calls == []

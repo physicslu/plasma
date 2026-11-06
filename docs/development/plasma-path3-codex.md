@@ -16,6 +16,96 @@ Codex owns implementation, real execution, self-tests, failure diagnosis and rep
 
 Use native CLI, SSH, USB/TTY, Sigrok and project build/test tools within the approved scope. Do **not** reinstate retired JSON Host Supervisor, fixed operation adapters, LA-only launchers, per-device Stage/Profile/Probe allowlists or a separate resume layer. LA2016 and Z2 are examples, not an allowlist. Consult [Path 3 native hardware tools](plasma-path3-direct-hardware-tools.md) when relevant. The worker's actual USB/device permissions and device-specific native busy/claim checks remain mandatory.
 
+### Explicit quick-observe profile (development-only)
+
+For an **owner-authenticated dynamic Path 3** work order that truly only
+observes a small host-local fact, the dispatcher author (not Codex's
+natural-language interpretation) may explicitly add both
+`"codex_profile": "quick-observe"` and `"scope": "host-only"`.
+It is **opt-in**; absent the marker, the unchanged engineering profile
+runs normally, including Vivado and long debug tasks. A quick request cannot
+select a PR candidate or `guarded-hardware-no-sandbox` and retains
+`--sandbox workspace-write`. It must never be used to authorize device work.
+
+A quick run's SWPC Python wrapper enforces a 75-second wall-clock deadline
+and stops after more than 12 JSONL tool-item starts. Quick runs fail closed
+if the streamed Monitor sink cannot be opened; no unsupervised fallback.
+The input-token threshold (30,000) is **post-turn cost telemetry, not a
+runtime failure or a live API cost ceiling**: current Codex `exec --json`
+reports usage at `turn.completed`, after tokens have been consumed. An
+over-budget but exit-zero Codex invocation reports
+`status: EVIDENCE_READY_REVIEW_REQUIRED` and
+`cost_budget_status: EXCEEDED`, with `functional_acceptance: UNVERIFIED`.
+Only a real CLI failure or an enforced wall/tool limit changes the
+execution status to failure. The report must never interpret an exit-zero
+Codex wrapper as independent functional acceptance. Host-only quick
+requests must not be silently inferred from Work Order prose.
+
+The engineering receipt contains bounded, numeric-only
+`codex_activity_metrics`: elapsed milliseconds, tool and command counts,
+command failures, turns, execution profile, limits, enforcement reason,
+cached-share basis points, non-cached input-token count and independent
+cost-budget status. No shell arguments, output, prompt or source text
+is retained. `codex_context_audit` separately identifies observed Turns
+and tool starts, and marks model-request count
+`NOT_AVAILABLE` with source reason
+`CODEX_EXEC_JSONL_NO_REQUEST_EVENTS`: the available Codex JSONL does
+not expose a verified model-request-count contract. Do not mistake Turn
+count for individual model requests. `codex_usage` contains reported total
+input including cached input, not a billing receipt.
+
+For an exact deterministic host-local observation, dispatch the existing
+Path 2 `cpu-only` `scripts/plasma_host_observe.py` instead of launching
+Codex at all. See [Path 2 CLI contract](plasma-path2-cli.md). This is a
+routing choice by the dispatcher author, **not** an automatic reinterpretation
+of the approved Path 3 work order; do not silently change a scoped task.
+
+### Trusted CI Runtime Kit handoff
+
+An authenticated Path 3 hardware Work Order may carry an artifact_source object
+containing exactly source_sha (40-digit commit) and run_id (successful Z2 PS
+release CI run). The trusted GitHub Actions step checks producer repository,
+workflow, push to main, complete source SHA, successful conclusion, Artifact
+identity, expiry and ZIP SHA-256. It then verifies the Kit sidecar, complete
+internal SHA256SUMS, and embedded PPU release.json source identity. Only
+verified Kit and Sidecar paths are exported to the Path 3 subprocess.
+The token remains confined to the trusted Actions step. No fixed release is
+accepted as a fallback. This does not authorize any Z2 deployment or DUT work,
+which still requires the existing owner Work Order scope and Root Guard.
+
+### Operator Monitor engineering diagnostics (display only)
+
+Path 3 Owner-authenticated Issue #981 Work Orders may add optional
+`"monitor_phase"` with **only** `HOST_ONLY`, `INSTALL`, `RUNTIME`,
+`PROGRAMMING_PROFILE` or `FLASH_TEST`. The trusted GitHub-hosted
+Authorizer hashes the full Work Order and emits only the validated enum
+to the existing SWPC Monitor wrapper. Absence is `NOT_DECLARED`.
+This is **OWNER PLAN**, not a real-time stage transition, hardware
+permission, recovery trigger or proof that a stage occurred. A running
+pre-change job cannot be retroactively tagged. Existing Work Orders and
+the engineering executor operate unchanged.
+
+The existing read-only tmux pane classifies Codex-reported tool events
+as `WORK TYPE` (e.g. COMMAND, READ, FILE, TEST, BUILD), displays
+`ERROR: COMMAND_NONZERO (exit N) [OBSERVED_CODEX]` on reported failures,
+and marks subsequent tool starts as
+`FOLLOW-UP: ACTIVITY_OBSERVED; REPAIR_UNVERIFIED`. A subsequent command
+is **not** evidence of a repair, successful install, Programming Profile
+or real flash operation. Arbitrary shell commands, arguments, source and
+credential text remain redacted and are never replayed or parsed for
+error causes.
+
+At job completion, the Monitor may read only the fixed, owner/run/digest
+bound `plasma-path3-receipt.json` under the Runner's existing temp
+directory, under file ownership, size and symlink checks. Only
+predefined wrapper `status`, `cost_budget_status` and categorical
+failure codes are projected. They are **not independently validated**
+execution or DUT receipts. The real engineering report and final
+acceptance remain in GitHub Actions Run/Artifact, subject to separate
+review: the pane keeps `ACCEPTANCE: UNVERIFIED` even if wrapper exit is 0.
+No additional Runner, workflow, privileged process, Codex call, device
+access, phase progression or deployment is authorized by the display.
+
 ## 4. Z2 SSH/sudo and hardware boundary
 
 Use the existing owner-controlled local credential source described in the [Embedded contract](plasma-embedded.md), never commit, print, log or copy secrets into PR artifacts. SSH/sudo must use the enrolled owner-approved route and actual Linux rights; no sudoers edits or sandbox bypass. For approved FPGA work, validate current board/boot, candidate BIN/Manifest and SHA, Root/FPGA Manager ownership, safe output/electrical state and Golden recovery. Path 3 may perform bounded development deployment/FPGA operations only when included in Gate 1. Z2 PS, not SWPC, hosts live DUT OpenOCD and PS-local WordPort; PL performs DUT I/O. Internal-loopback evidence is not external SWD/DUT qualification. On unknown/unsafe state stop and report NOT_RUN/FAIL accurately.

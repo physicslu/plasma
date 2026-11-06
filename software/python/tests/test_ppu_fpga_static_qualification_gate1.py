@@ -38,7 +38,7 @@ def fpga_bundle(tmp_path, files=None, *, mutate=None):
 
 def qualify(tmp_path, archive, digest, contracts_path, *, target=TARGET):
     verified = contract.verify_host_only_artifact(
-        archive, expected_sha256=digest, source_commit=None, target_profile=target,
+        archive, expected_sha256=digest, target_profile=target,
     )
     return qualification.qualify_bundle_fpga(
         archive, verified, contracts_path=contracts_path, trusted_target=target,
@@ -386,8 +386,8 @@ def _b3_server(tmp_path):
     paths.package_target_file.write_text(json.dumps(TARGET))
     paths.package_target_file.chmod(0o600)
     paths.bundle_install_policy.write_text(json.dumps({
-        "schema": "plasma.ppu.b3-install-policy.v1", "mode": "development",
-        "install_only": True, "actions": ["install", "verify"],
+        "schema": "plasma.ppu.b3-install-policy.v2", "mode": "development",
+        "modes": ["activate", "stage_only"], "actions": ["install", "verify"],
     }))
     paths.bundle_install_policy.chmod(0o600)
     srv = object.__new__(bootstrap.BootstrapHTTPServer)
@@ -442,7 +442,7 @@ def test_b3_rejects_fpga_contract_or_owner_authorization_change_after_b2(tmp_pat
     paths.token_file.write_text(original_token)
     # FPGA load is a distinct owner action: an install-only authorization
     # cannot be widened into an FPGA load.
-    widened = dict(b3, fpga_load=True)
+    widened = dict(b3, mode="activate", fpga_load=True)
     with pytest.raises(bootstrap.BootstrapServiceError, match="OWNER_AUTHORIZATION_ACTION_MISMATCH"):
         srv.start_deployment(widened)
     assert calls == []

@@ -20,7 +20,8 @@ Programming Site. It is deliberately small:
   (``open_job_session``) and run an allowlisted operation on the control
   socket (``run``); such a session has no Package peer;
 * fail-closed: an adapter outcome that cannot be proven safe seals the Site
-  (persisted marker, never auto-retried); an FPGA identity change invalidates
+  (persisted marker, never auto-retried); a live external owner is checked at
+  each admission without creating a historical seal; an FPGA identity change invalidates
   the session; expiry / cancel / close end the session. FPGA Image management
   belongs to the PPU Loader.
 
@@ -78,6 +79,14 @@ class TransportDenied(Exception):
 
 class TransportUnknown(Exception):
     """Hardware outcome cannot be proven safe: the Site must be sealed."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+class TransportFailed(Exception):
+    """Operation failed after the adapter proved release and SAFE_OFF."""
 
     def __init__(self, code: str):
         super().__init__(code)
@@ -158,6 +167,7 @@ class _Session:
     closed: bool = False
     sealed_during: set[int] = field(default_factory=set)
     image: FlashImage | None = None
+    provider_route: Mapping[str, Any] | None = None
 
 
 def proc_peer(pid: int, proc_root: Path = Path("/proc")) -> tuple[int, int]:
@@ -176,6 +186,9 @@ class SiteWorkerCore:
                  clock: Callable[[], float] = time.monotonic,
                  peer_groups: Callable[[int], tuple[int, int]] = proc_peer) -> None:
         self.adapter = adapter
+        # Immutable startup snapshot. An updated selection file cannot claim
+        # that this already-running Worker switched its OpenOCD executable.
+        self.engine_selection_sha256 = getattr(adapter, "engine_selection_sha256", None)
         self.runtime_pid = runtime_pid
         self.lease_verifier = lease_verifier
         self.seal_dir = Path(seal_dir)
@@ -185,11 +198,12 @@ class SiteWorkerCore:
         self.epoch = secrets.token_hex(16)
         self._lock = threading.Lock()
         self._site_locks = {site: threading.Lock() for site in adapter.supported_sites}
-        self._session: _Session | None = None
+        # Existing seals remain migration blockers; current external owners
+        # are checked at admission and must not become historical seals.
+        self._sessions: dict[str, _Session] = {}
+        self._site_owners: dict[int, str] = {}
         self.seal_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self._sealed: set[int] = set(self._persisted_seals()) | set(adapter.startup_sealed_sites())
-        for site in sorted(self._sealed):
-            self._persist_seal(site, "STARTUP_STATE_UNSAFE")
+        self._sealed: set[int] = set(self._persisted_seals())
 
     # --- seals (persisted markers; cleared only by an operator recovery) ---------
     def _persisted_seals(self) -> list[int]:
@@ -219,14 +233,23 @@ class SiteWorkerCore:
 
     # --- dispatch ------------------------------------------------------------------
     def _drop_if_runtime_restarted(self) -> None:
-        """A session belongs to ONE Runtime process; a Runtime restart ends it."""
+        """Cancel stale Runtime sessions without releasing an in-flight Site."""
         current = self.runtime_pid()
         with self._lock:
-            s = self._session
-            if s is not None and s.runtime_pid != current:
-                s.closed = True
-                s.cancel.set()
-                self._session = None
+            for session_id, sess in list(self._sessions.items()):
+                # A closed Session in the *current* Runtime is retained
+                # until its explicit close_session can return the seal receipt.
+                if sess.runtime_pid == current:
+                    continue
+                sess.closed = True
+                sess.cancel.set()
+                # Do not re-admit this Site before its adapter has exited.
+                if any(self._site_locks[site].locked() for site in sess.sites):
+                    continue
+                for site in sess.sites:
+                    if self._site_owners.get(site) == session_id:
+                        del self._site_owners[site]
+                del self._sessions[session_id]
 
     def handle(self, request: object, peer: tuple[int, int, int],
                role: str | None = None) -> dict[str, Any]:
@@ -254,14 +277,22 @@ class SiteWorkerCore:
         if op == "status":
             _require(set(request) == {"protocol", "op"}, "REQUEST_INVALID")
             with self._lock:
-                s = self._session
+                sessions = [
+                    {"job_id": sess.job_id, "sites": sorted(sess.sites),
+                     "owner_kind": sess.owner_kind}
+                    for sess in sorted(
+                        self._sessions.values(), key=lambda x: (min(x.sites), x.job_id)
+                    )
+                ]
                 return {"epoch": self.epoch, "adapter": self.adapter.name,
+                        "platform": dict(getattr(self.adapter, "platform", {})),
                         "supported_sites": sorted(self.adapter.supported_sites),
                         "operations": sorted(self.adapter.operations),
                         "sealed_sites": sorted(self._sealed),
                         "not_ready": getattr(self.adapter, "not_ready", None),
-                        "session": None if s is None else {"job_id": s.job_id, "sites": sorted(s.sites),
-                                                            "owner_kind": s.owner_kind}}
+                        "identity": dict(self.adapter.identity()),
+                        "sessions": sessions,
+                        "session": sessions[0] if sessions else None}
         if op == "bind_image":
             _require(set(request) == {
                 "protocol", "op", "session_id", "profile", "image_sha256", "image_size"
@@ -275,10 +306,8 @@ class SiteWorkerCore:
             digest = request["image_sha256"]
             _require(re.fullmatch(r"[0-9a-f]{64}", digest) is not None, "IMAGE_SHA256_INVALID")
             with self._lock:
-                s = self._session
-                _require(s is not None and not s.closed
-                         and secrets.compare_digest(s.session_id, request["session_id"]),
-                         "SESSION_UNKNOWN")
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None and not s.closed, "SESSION_UNKNOWN")
                 _require(s.image is None, "IMAGE_ALREADY_BOUND")
                 _require(self.clock() < s.expires, "SESSION_EXPIRED")
                 # Only the trusted Runtime stages this exact Job-owned image.
@@ -295,6 +324,14 @@ class SiteWorkerCore:
                     raise SiteWorkerDenied("IMAGE_NOT_STAGED") from exc
                 _require(len(payload) == size, "IMAGE_SIZE_MISMATCH")
                 _require(hashlib.sha256(payload).hexdigest() == digest, "IMAGE_SHA256_MISMATCH")
+                # One PPU may flash only the same MCU/firmware while its
+                # concurrently admitted Site Sessions are active. The
+                # existing Runtime owner lease alone does not prove this.
+                _require(all(
+                    other is s or other.image is None
+                    or (other.image.sha256 == digest and other.image.profile == profile)
+                    for other in self._sessions.values()
+                ), "PPU_IMAGE_OR_TARGET_CONFLICT")
                 s.image = FlashImage(profile, payload, digest)
                 return {"job_id": s.job_id, "icpn": profile.icpn,
                         "target_config": profile.target_config,
@@ -304,27 +341,34 @@ class SiteWorkerCore:
                      and type(request["session_id"]) is str and type(request["site"]) is int
                      and type(request["operation"]) is str, "REQUEST_INVALID")
             with self._lock:
-                s = self._session
-                _require(s is not None and not s.closed
-                         and secrets.compare_digest(s.session_id, request["session_id"]),
-                         "SESSION_UNKNOWN")
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None and not s.closed, "SESSION_UNKNOWN")
                 _require(s.owner_kind == OWNER_REST_JOB, "SESSION_NOT_RUNTIME_OWNED")
+                if s.provider_route is not None:
+                    _require(request["site"] == s.provider_route["site_id"]
+                             and request["operation"] == s.provider_route["operation"],
+                             "PROVIDER_ROUTE_MISMATCH")
             return self._execute(s, request["site"], request["operation"])
         if op == "close_session":
             _require(set(request) == {"protocol", "op", "session_id"}
                      and type(request["session_id"]) is str, "REQUEST_INVALID")
             with self._lock:
-                s = self._session
-                _require(s is not None and secrets.compare_digest(s.session_id, request["session_id"]),
-                         "SESSION_UNKNOWN")
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None, "SESSION_UNKNOWN")
                 s.closed = True
                 s.cancel.set()
-                self._session = None
-            # Wait for any in-flight operation to stop (adapter honours cancel).
+            # Ownership must outlive an in-flight operation and its SAFE_OFF
+            # verification, even when close races a cancellation.
             for site in sorted(s.sites):
                 lock = self._site_locks[site]
                 lock.acquire()
                 lock.release()
+            with self._lock:
+                if self._sessions.get(s.session_id) is s:
+                    del self._sessions[s.session_id]
+                    for site in s.sites:
+                        if self._site_owners.get(site) == s.session_id:
+                            del self._site_owners[site]
             return {"session_id": s.session_id, "closed": True,
                     "sealed_sites": sorted(s.sealed_during)}
         # open_session (Package Action peer) / open_job_session (Runtime REST Job)
@@ -332,6 +376,12 @@ class SiteWorkerCore:
         fields = {"protocol", "op", "job_id", "sites", "max_runtime_s"}
         if package:
             fields |= {"pgid", "uid"}
+        route = request.get("provider_route") if not package else None
+        if route is not None:
+            fields |= {"provider_route", "deadline_monotonic"}
+        expected_engine = request.get("expected_engine_selection_sha256")
+        if "expected_engine_selection_sha256" in request:
+            fields.add("expected_engine_selection_sha256")
         _require(set(request) == fields, "REQUEST_INVALID")
         job, sites = request["job_id"], request["sites"]
         _require(type(job) is str and JOB_ID.fullmatch(job) is not None
@@ -342,6 +392,34 @@ class SiteWorkerCore:
         if package:
             _require(type(request["pgid"]) is int and request["pgid"] > 1
                      and type(request["uid"]) is int and request["uid"] > 0, "REQUEST_INVALID")
+        if route is not None:
+            _require(type(route) is dict and set(route) == {
+                "asset_set_sha256", "provider_package", "profile_package",
+                "descriptor_sha256", "options_schema_sha256", "options_sha256",
+                "target", "operation", "site_id", "transport", "driver_abi",
+                "fpga_package", "max_image_bytes"}, "PROVIDER_ROUTE_INVALID")
+            _require(all(type(route[key]) is str and bool(route[key]) for key in (
+                "asset_set_sha256", "provider_package", "profile_package",
+                "descriptor_sha256", "options_schema_sha256", "options_sha256",
+                "target", "operation", "transport")), "PROVIDER_ROUTE_INVALID")
+            _require(type(route["site_id"]) is int and sites == [route["site_id"]]
+                     and route["operation"] in self.adapter.operations
+                     and type(route["max_image_bytes"]) is int
+                     and route["max_image_bytes"] > 0
+                     and (route["driver_abi"] is None or type(route["driver_abi"]) is str)
+                     and (route["fpga_package"] is None or type(route["fpga_package"]) is str),
+                     "PROVIDER_ROUTE_INVALID")
+            deadline = request["deadline_monotonic"]
+            _require(type(deadline) in (int, float) and self.clock() < deadline
+                     <= self.clock() + request["max_runtime_s"], "JOB_DEADLINE_INVALID")
+        if "expected_engine_selection_sha256" in request:
+            _require(route is not None and type(expected_engine) is str
+                     and re.fullmatch(r"[0-9a-f]{64}", expected_engine) is not None,
+                     "WORKER_ENGINE_BINDING_INVALID")
+            _require(type(self.engine_selection_sha256) is str,
+                     "WORKER_ENGINE_UNVERIFIED")
+            _require(expected_engine == self.engine_selection_sha256,
+                     "WORKER_ENGINE_SELECTION_MISMATCH")
         not_ready = getattr(self.adapter, "not_ready", None)
         _require(not not_ready, f"ENGINE_NOT_READY:{not_ready}")
         _require(set(sites) <= self.adapter.supported_sites, "SITE_NOT_SUPPORTED")
@@ -349,16 +427,35 @@ class SiteWorkerCore:
         _require(self.lease_verifier(job, owner_kind), "JOB_LEASE_NOT_HELD")
         identity = dict(self.adapter.identity())
         with self._lock:
-            _require(self._session is None, "SESSION_ALREADY_ACTIVE")
             _require(not (set(sites) & self._sealed), "SITE_SEALED")
+            _require(not (set(sites) & self.adapter.startup_sealed_sites()),
+                     "EXTERNAL_SITE_OWNER_PRESENT")
+            _require(not (set(sites) & self._site_owners.keys()), "SITE_BUSY")
+            if route is not None:
+                _require(not any(other.job_id == job for other in self._sessions.values()),
+                         "JOB_SESSION_ALREADY_ACTIVE")
+            if package:
+                _require(not any(
+                    other.owner_kind == OWNER_PACKAGE
+                    and other.pgid == request["pgid"] and other.uid == request["uid"]
+                    for other in self._sessions.values()
+                ), "PACKAGE_SESSION_ALREADY_ACTIVE")
             s = _Session(secrets.token_hex(16), job, frozenset(sites),
                          request["pgid"] if package else None,
                          request["uid"] if package else None,
-                         self.clock() + request["max_runtime_s"], identity,
+                         deadline if route is not None else self.clock() + request["max_runtime_s"], identity,
                          owner_kind=owner_kind, runtime_pid=pid)
-            self._session = s
+            s.provider_route = dict(route) if route is not None else None
+            self._sessions[s.session_id] = s
+            for site in sites:
+                self._site_owners[site] = s.session_id
         return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites),
-                "owner_kind": owner_kind}
+                "owner_kind": owner_kind,
+                **({"worker_engine_selection_sha256": self.engine_selection_sha256}
+                   if expected_engine is not None else {}),
+                **({"provider_route": dict(route), "deadline_monotonic": deadline,
+                    "identity": dict(identity)}
+                   if route is not None else {})}
 
     def _transport(self, op: str, request: dict, peer: tuple[int, int, int]) -> dict[str, Any]:
         pid, uid, _gid = peer
@@ -371,9 +468,13 @@ class SiteWorkerCore:
         except (OSError, ValueError, IndexError):
             raise SiteWorkerDenied("PEER_UNVERIFIABLE") from None
         with self._lock:
-            s = self._session
-            _require(s is not None and not s.closed and s.owner_kind == OWNER_PACKAGE
-                     and pgid == s.pgid and uid == s.uid, "NO_SESSION_FOR_PEER")
+            matches = [
+                candidate for candidate in self._sessions.values()
+                if not candidate.closed and candidate.owner_kind == OWNER_PACKAGE
+                and pgid == candidate.pgid and uid == candidate.uid
+            ]
+            _require(len(matches) == 1, "NO_SESSION_FOR_PEER")
+            s = matches[0]
         return self._execute(s, site, op)
 
     def _execute(self, s: _Session, site: int, op: str) -> dict[str, Any]:
@@ -388,7 +489,7 @@ class SiteWorkerCore:
         _require(self.lease_verifier(s.job_id, s.owner_kind), "JOB_LEASE_NOT_HELD")
         if dict(self.adapter.identity()) != s.identity:
             with self._lock:
-                if self._session is s:
+                if self._sessions.get(s.session_id) is s:
                     s.closed = True
                     s.cancel.set()
             raise SiteWorkerDenied("SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED")
@@ -407,15 +508,32 @@ class SiteWorkerCore:
                     ))
             except TransportDenied as exc:
                 raise SiteWorkerDenied("TRANSPORT_DENIED:" + exc.code) from None
+            except TransportFailed as exc:
+                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + exc.code) from None
             except TransportUnknown as exc:
                 self._seal(site, exc.code, s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + exc.code) from None
-            except Exception as exc:  # any adapter bug is an unknown hardware outcome
-                self._seal(site, type(exc).__name__, s)
-                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + type(exc).__name__) from None
+            except Exception as exc:
+                # The hardware adapter owns its admission/child cleanup and
+                # raises TransportUnknown only when safety cannot be proven.
+                # An unclassified Python failure is not hardware evidence.
+                raise SiteWorkerDenied("SOFTWARE_EXCEPTION:" + type(exc).__name__) from None
             if dict(self.adapter.identity()) != s.identity:
                 self._seal(site, "FPGA_IDENTITY_CHANGED_DURING_OPERATION", s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION")
+            if result.get("safe_off") is not True:
+                self._seal(site, "SAFE_OFF_NOT_VERIFIED", s)
+                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED")
+            if op == "flash_cycle" and result.get("result") == "PASS":
+                if (s.image is None or result.get("readback_sha256") != s.image.sha256
+                        or result.get("bytes_verified") != len(s.image.payload)):
+                    self._seal(site, "READBACK_NOT_VERIFIED", s)
+                    raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:READBACK_NOT_VERIFIED")
+            # A cancelled or invalidated Session must not claim Job PASS even
+            # when its adapter eventually completes with proven SAFE_OFF.
+            # Serialize the final decision against close/restart invalidation.
+            with self._lock:
+                _require(not s.closed and not s.cancel.is_set(), "SESSION_CLOSED")
             return {"site": site, "operation": op, "adapter": self.adapter.name, **result}
         finally:
             lock.release()
@@ -459,10 +577,11 @@ class SiteWorkerServer:
         self._thread.start()
 
     def _serve(self) -> None:
-        assert self._sock is not None
+        sock = self._sock
+        assert sock is not None
         while True:
             try:
-                conn, _ = self._sock.accept()
+                conn, _ = sock.accept()
             except OSError:
                 return
             threading.Thread(target=self._one, args=(conn,), daemon=True).start()
@@ -532,9 +651,17 @@ class SiteWorkerClient:
         return self.call("close_session", session_id=session_id)
 
     def open_job_session(self, *, job_id: str, sites: list[int],
-                         max_runtime_s: int) -> dict[str, Any]:
+                         max_runtime_s: int,
+                         provider_route: Mapping[str, Any] | None = None,
+                         deadline_monotonic: float | None = None,
+                         expected_engine_selection_sha256: str | None = None) -> dict[str, Any]:
+        extra = ({} if provider_route is None else {
+            "provider_route": dict(provider_route),
+            "deadline_monotonic": deadline_monotonic})
+        if expected_engine_selection_sha256 is not None:
+            extra["expected_engine_selection_sha256"] = expected_engine_selection_sha256
         return self.call("open_job_session", job_id=job_id, sites=sites,
-                         max_runtime_s=max_runtime_s)
+                         max_runtime_s=max_runtime_s, **extra)
 
     def bind_image(
         self, session_id: str, *, profile: Mapping[str, Any], image_sha256: str, image_size: int

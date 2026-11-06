@@ -33,6 +33,7 @@ on:
       - "software/python/plasma_core/**"
       - "software/python/plasma_interfaces/**"
       - "software/python/plasma_handlers/**"
+      - "software/python/plasma_opf/**"
       - "software/python/plasma_server/**"
       - "software/python/plasma_client/**"
       - "software/python/plasma_web/**"
@@ -75,6 +76,7 @@ on:
       - "software/python/plasma_core/**"
       - "software/python/plasma_interfaces/**"
       - "software/python/plasma_handlers/**"
+      - "software/python/plasma_opf/**"
       - "software/python/plasma_server/**"
       - "software/python/plasma_client/**"
       - "software/python/plasma_web/**"
@@ -485,6 +487,7 @@ jobs:
           cp scripts/ppu-bootstrap-deployment.py "$root/scripts/ppu-bootstrap-deployment.py"
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
           cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
+          cp scripts/ppu_package_units.py "$root/scripts/ppu_package_units.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
           cp scripts/openocd-runtime.py "$root/scripts/openocd-runtime.py"
           cp "$PPU_ARCHIVE" "$PPU_ARCHIVE.sha256" "$root/artifacts/"
@@ -495,6 +498,7 @@ jobs:
             "$root/scripts/ppu-bootstrap-deployment.py" "$root/scripts/ppu-z2-installer.py" \
             "$root/scripts/z2-python-runtime.py" "$root/scripts/openocd-runtime.py"
           test -f "$root/scripts/ppu-z2-installer-core.py"
+          test -f "$root/scripts/ppu_package_units.py"
           python scripts/z2-python-runtime.py verify \
             "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz" \
             --sidecar "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz.sha256"

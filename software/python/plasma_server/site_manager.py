@@ -5,6 +5,7 @@ import re
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -61,12 +62,14 @@ class SiteManager:
         interface_factory: InterfaceFactory | None = None,
         mock_tracker: MockActivityTracker | None = None,
         ic_support_resolver: ICSupportResolver | None = None,
+        active_asset_set_reader: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
         config.validate()
         self.config = config
         self.output = OutputManager(config.server.output_root)
         self.server_log = ServerEventLogger(config.server.log_root)
         self.registry = JobRegistry()
+        self._active_asset_set_reader = active_asset_set_reader
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
         requires_ic_support = any(
@@ -418,7 +421,6 @@ class SiteManager:
                     context={"site_id": request.site_id},
                 )
             request = replace(request, target=site_target)
-        request = self.execution_routers[request.site_id].admit(request)
         if worker.queue.full():
             raise PlasmaError(
                 ErrorCode.SITE_BUSY,
@@ -426,9 +428,21 @@ class SiteManager:
                 recoverable=True,
             )
 
+        # Reserve before reading Active identity or resolving a hardware route.
+        # The same lease excludes activation/FPGA reload through every queued
+        # Job, retry and cancellation cleanup, across the whole PPU.
         runtime = self.registry.create(request)
         try:
             owner_kind, owner_id = self._reserve_execution_job(request)
+            # Legacy/direct programming has no configured OPF Asset Set.
+            # Use the trusted configured reader only when Package Actions
+            # have been explicitly wired into this Runtime.
+            pinned = deepcopy(self._active_asset_set_reader()) if self._active_asset_set_reader else {
+                "state": "EMPTY", "asset_set_sha256": None, "ready": False,
+            }
+            request = self.execution_routers[request.site_id].admit(request)
+            runtime.request = request
+            runtime.active_asset_set = pinned
             self.output.write_state(request.job_id, worker._state_payload(runtime))
             worker.enqueue(runtime)
         except Exception:

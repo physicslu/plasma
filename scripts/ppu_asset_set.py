@@ -83,7 +83,6 @@ def verify_staged(product_root: Path, asset_set_sha256: str) -> dict[str, Any]:
             or receipt.get("archive_sha256") != asset_set_sha256
             or receipt.get("manifest_sha256") != _digest(target / "manifest.json")
             or receipt.get("bundle_name") != manifest.get("name")
-            or receipt.get("source_commit") != manifest.get("source_commit")
             or manifest.get("schema") != BUNDLE
             or manifest.get("actions") != ["install", "verify"]
             or type(manifest.get("packages")) is not list
@@ -347,6 +346,51 @@ def resolve_staged_fpga_handoff(
         "dut": "NOT_RUN",
         "ready": False,
     }
+
+
+def restore_previous(
+    product_root: Path, previous: Mapping[str, Any], candidate: str, *,
+    runtime_quiesced: bool = False,
+) -> dict[str, Any]:
+    """Recover pointer-only publication under the existing lock and lease.
+
+    Never restores PL or claims hardware READY. Refuse unexpected pointer
+    drift, corrupt previous assets and legacy transactions without a snapshot.
+    Repeating after a crash during rollback is safe.
+    """
+    if runtime_quiesced is not True:
+        raise AssetSetError("ASSET_SET_RUNTIME_QUIESCE_NOT_QUALIFIED")
+    if type(candidate) is not str or not HEX64.fullmatch(candidate):
+        raise AssetSetError("ASSET_SET_SHA_INVALID")
+    old_sha = previous.get("asset_set_sha256")
+    old_generation = previous.get("generation", 0)
+    if (previous.get("schema") != SCHEMA
+            or previous.get("state") not in {"ACTIVE", "EMPTY"}
+            or type(old_generation) is not int or old_generation < 0
+            or (previous["state"] == "EMPTY" and (old_sha is not None or old_generation != 0))
+            or (previous["state"] == "ACTIVE" and
+                (type(old_sha) is not str or not HEX64.fullmatch(old_sha) or old_generation < 1))):
+        raise AssetSetError("ASSET_SET_PREVIOUS_INVALID")
+    if old_sha is not None:
+        verify_staged(product_root, old_sha)
+    current = read_active(product_root)
+    if (current["asset_set_sha256"] == old_sha
+            and current.get("generation", 0) in {old_generation, old_generation + 2}):
+        return current
+    if (current["asset_set_sha256"] != candidate
+            or current.get("generation") != old_generation + 1):
+        raise AssetSetError("ASSET_SET_ROLLBACK_POINTER_DRIFT")
+    if old_sha is not None:
+        activate_verified(product_root, old_sha, runtime_quiesced=True)
+    else:
+        root, _, active = _root(product_root)
+        active.unlink()
+        directory = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    return read_active(product_root)
 
 
 def activate_verified(

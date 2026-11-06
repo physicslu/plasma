@@ -9,9 +9,6 @@ from urllib.parse import quote
 
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler, _parse_target_device
-from plasma_server.execution_router import _default_compiler_registry
-from plasma_core.enums import Operation
-from plasma_core.errors import PlasmaError
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
@@ -496,7 +493,6 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         catalog = get_default_device_catalog()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
         self.assertEqual(len(rows), 1015)
-        registry = _default_compiler_registry()
         for row in rows:
             with self.subTest(icpn=row.identifier):
                 selected = _parse_target_device(
@@ -504,16 +500,10 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                     label="Engineering target_device")
                 self.assertEqual(selected.icpn, row.identifier)
                 self.assertEqual(selected.identifier_kind, "unverified_exact_target_claim")
-                # The target metadata is not authorization; no Microchip
-                # compiler/operation is currently admitted in this Runtime.
-                with self.assertRaises(PlasmaError):
-                    registry.select(row.identifier, Operation.PROGRAM)
         unknown = _parse_target_device(
             {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
             label="Batch target_device")
         self.assertEqual(unknown.icpn, "ATSAML10E16A-MZTVAO")
-        with self.assertRaises(PlasmaError):
-            registry.select(unknown.icpn, Operation.PROGRAM)
 
     def test_microchip_official_saml1x_route_is_l1_visible_but_never_executable(self) -> None:
         catalog = get_default_device_catalog()

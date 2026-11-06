@@ -29,8 +29,8 @@ PACKAGES = (
 )
 
 
-def make_bundle(output: Path, source_commit: str) -> str:
-    if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+def make_bundle(output: Path, source_commit: str | None = None) -> str:
+    if source_commit is not None and not re.fullmatch(r"[0-9a-f]{40}", source_commit):
         raise ValueError("SOURCE_COMMIT_MUST_BE_EXACT_LOWERCASE_SHA40")
     members = {}
     packages = []
@@ -55,11 +55,12 @@ def make_bundle(output: Path, source_commit: str) -> str:
         "name": "ppu-b3-smoke",
         "version": "0.1.0",
         "purpose": "programming",
-        "source_commit": source_commit,
         "target": TARGET,
         "actions": ["install", "verify"],
         "packages": packages,
     }
+    if source_commit is not None:
+        manifest["source_commit"] = source_commit
     contents = {"manifest.json": (json.dumps(
         manifest, sort_keys=True, separators=(",", ":")
     ) + "\n").encode("utf-8"), **members}
@@ -77,7 +78,7 @@ def make_bundle(output: Path, source_commit: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--source-commit", help="optional untrusted provenance; never authorization")
     args = parser.parse_args()
     digest = make_bundle(args.output, args.source_commit)
     print(json.dumps({

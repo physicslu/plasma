@@ -25,6 +25,7 @@
 - **Current** — [Web UI domain contract](development/plasma-web.md)
 - **Current** — [Former monolithic contract — entry stub linking the contracts above](development/plasma-autonomous-development-contract-full.md)
 - **Current** — [Documentation maintenance rules — statuses, placement, source priority](development/documentation-maintenance.md)
+- **Reference** · `OPF Bundle v3` · `Host-only Gate 1` — [User Bundle v3 Source-independent Admission Evidence](development/opf-user-bundle-source-agnostic-host-20261106.md)：記錄移除使用者 Bundle Git Source/Publisher 資格限制的 Host-only 實作與測試；新 Z2 B3 仍未實測。
 - **Current** — [Glossary — current terms and retired codes](glossary.md)
 
 ## Architecture Decision Records
@@ -44,6 +45,13 @@
 
 - **Current** · `Bundle v3` · `PR #1225` — [Canonical Bundle v3: Bundle → Packages → Files](architecture/ppu-canonical-bundle-packages.md)：`packages[]`、Package DAG、SHA256 Admission；v1/v2 舊格式不作為 v3 相容介面。尚未完成 Z2 B2 驗收。
 - **Plan** · `PR #1225` — [PPU Target Platform Identity](architecture/ppu-target-platform-identity.md)：`linux-armv7` 可信套件目標與 `linux-armv7l` runtime 觀測值的區分；不得視為已證實的 HTTP 409 根因。
+- **Plan** · `OPF-3A` · `PR #1303 Draft` · `Host-only` — [OPF Per-Site Session Ownership](architecture/opf-site-session-manager-gate1.md)：重用 C-3 Worker、PPU Lease、ADR-0007 Lock／Fence 與 SEALED／Recovery，將全域單一 Session 改為不同 Site 可獨立 Admission；非 OPF Runtime 全面整合，也不代表實體多 Site 已驗證。
+- **Plan** · `OPF-3B` · `PR #1307 Draft` · `Host-only` — [Provider Route / Site Session / Job Timeout Integration](architecture/opf-3b-provider-site-session.md)：將可信 Active Asset Set 的 Provider Route 固定到既有 C-3 Site Session，並以單一 Job monotonic deadline 涵蓋重試；正式 Flash 路由與實體硬體驗收仍未切換。
+- **Plan** · `P1-01` · `Host-only` — [OPF Provider-owned Options Schema](architecture/opf-provider-options-schema-gate1.md)：在同一 Active Asset Set 內以版本化宣告式 Schema 驗證已選 Provider 的 options，綁定 Schema／Options SHA；不執行 Provider、不切換 Runtime 或操作硬體。
+- **Current** · `PR #1301 Merged` · `Host-only` — [OPF Provider Capability / Bundle Resolver](architecture/open-provider-framework-gate1.md)：單一可信 Bundle v3 Active Asset Set 內的 Provider／Profile／PS-only／FPGA capability 解析；尚未接入正式 Runtime、Z2 或 DUT，Timeout 統一由 OPF-1 決定。
+- **Current** · `OPF-1` · `PR #1302 Merged` · `Host-only` — [Open Provider Framework (OPF) v1 Foundation](architecture/opf-architecture.md)：Provider／Profile／單一 Bundle `timeout_ms`、Provider Options、Site Session Manager 與 SAFE_OFF／Recovery 的目標契約；僅 Host-only 設定驗證，不代表現有 Runtime 已支援 OPF 或已完成實體燒錄。
+- **Current** · `OPF-4A` · `Gate 1 / Host-only` — [OpenOCD / ABI v5 Reference Provider](architecture/opf-4a-openocd-reference-provider-gate1.md)：從已驗證 Active Set 綁定 Provider/Profile 與 OpenOCD Engine SHA/ABI，經既有 C-3 Session／Flash cycle 執行；正式 Runtime 路由與 Site 2 HIL 另案。
+- **Plan** · `Owner decision 2026-11-04` · `PR #1298` — [Unified Bundle-driven Programming Execution](architecture/unified-bundle-driven-programming-decision-2026-11-04.md)：Engineering／Production 共用同一條燒錄執行流程（其他政策不變）；Bundle 自帶 IC Profile／Provider／Driver／FPGA，Catalog 與固定 ICPN／Compiler／Image 登錄不得阻擋執行，保留必要來源、相容性及硬體安全驗證。目標架構尚未完整實作。
 - **Plan** · `Owner decision 2026-11-02` · `not implemented` — [PPU Single Active Asset Set：Bundle = Assets，Controller 指定整份資源與操作](architecture/ppu-job-driven-package-resolution.md)：每台 PPU 同時只有一份 Active Asset Set；Console 比對完整 Asset Set SHA256，若不同即傳送整份 Set；B1/B2/B3 負責 Receive／Admission／Install-Verify，但不自動啟用、載入 FPGA 或燒錄。Controller 決定 FPGA Image／Programming Profile 與 E/P/V/R；PPU 只在 Active Set 內選擇資源並驗證能力。Active+Staging 隔離、Job 執行期間不可切換、FPGA 配置是獨立受控操作。介面／B4／實機尚待實作。
 - **Reference** · `Host-only` · `PR #1208` — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。
 - **Plan** · `Host-only` · `product policy` — [PPU Z2 Monitor/Master/Engineer Privilege Boundary](architecture/ppu-privilege-boundary-gate1.md)：PPU 三級產品能力、Master 非 Linux Root 操作與部署、Engineer Root 維修、特權 Bridge 的預期邊界；僅 Host-only policy／tests，尚未接入 Runtime／Z2。
@@ -132,6 +140,7 @@
 - **Current** · `Engineering` · `Route B` — [ABI-v5 OpenOCD plasma_swd → Blue Pill DPIDR HIL Runbook](development/swd-abi5-openocd-dpidr-hil-runbook.md)：Build／部署／DPIDR 流程、失敗判讀、FPGA 經 HTTP API 交付與載入，以及 §9 Blue Pill Flash（erase／write／verify／read，500 kHz，LA2016 比對 ST-LINK）與 `plasma_swd` adapter 契約。
 - **Current** · `Handoff` · `2026-11-04` — [SWD Driver／FPGA 交接](development/handoff/2026-11-04-swd-driver-fpga-track.md)：雙路分工中 PL SWD IP 與 `plasma_swd` adapter 這一路的範圍、目前版本、實測結果（0.5–5 MHz）、C adapter 在 RTL 模擬與 Site 規則 checker（host）、ORUNDETECT／`fault_q` 發現、待辦與兩路介面契約。
 - **Current** · `Handoff` · `2026-11-04` — [SWD 整合交接](development/handoff/2026-11-04-swd-integration-track.md)：Runtime／Site Worker／REST `flash_cycle` 這一路的 Z2 狀態、P0（`reset halt`、engine selection、部署 #1286）、後續工作與兩路介面契約。
+- **Reference** · `Site 2` · `PR #1304 Draft` · `Host-only` — [Site 2 REST Flash 失敗診斷（2026-11-05）](development/site2-rest-flash-diagnosis-20261105.md)：既有失敗 Job 的 C3 Adapter／OpenOCD／SAFE_OFF 證據缺口與存取限制；不代表真實故障根因已確認或 Z2 實機 Flash PASS。
 - **Plan** · `Gate 1` · `PR #1265 Draft` · `Host-only` — [OpenOCD 5088 ARMv7 CI Build Cache Optimization](development/openocd5088-armv7-ci-build-cache.md)：依實際編譯輸入內容建立快取，保留每次驗證、重新封裝及最新 HEAD Evidence；未合併、不部署、不操作實機。
 
 ## Deployment

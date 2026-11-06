@@ -1,9 +1,12 @@
 {
-  "schema": "plasma.ppu.b3-install-policy.v1",
+  "schema": "plasma.ppu.b3-install-policy.v2",
   "mode": "development",
-  "install_only": true,
   "actions": [
     "install",
     "verify"
+  ],
+  "modes": [
+    "activate",
+    "stage_only"
   ]
 }

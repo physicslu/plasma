@@ -9,6 +9,7 @@ import threading
 import urllib.request
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,11 +21,131 @@ from .test_ppu_b3_z2_install_gate1 import (
 assets = load("ppu_single_active_asset_set_gate1", "ppu_asset_set.py")
 
 
+@pytest.mark.parametrize("state", ["received", "verifying", "verified"])
+def test_p4_restart_before_asset_mutation_is_safe_to_retry(tmp_path, state):
+    co, _, _ = stage(tmp_path)
+    co.journal.write(co.journal.read(), state)
+    with co._deployment_lock():
+        assert co.journal.read().state == "verify_failed"
+    assert co.asset_status()["state"] == "EMPTY"
+
+
+def test_p4_api_restart_reuses_coordinator_rollback_and_reports_failure(tmp_path, monkeypatch):
+    co, candidate, _ = stage(tmp_path)
+    co.quiescence_lease = nullcontext
+    previous = assets.read_active(co.paths.product_root)
+    record = co.journal.read()
+    co.journal.write(record, "activating", asset_activation_previous=previous,
+                     asset_activation_fpga=False)
+    assets.activate_verified(co.paths.product_root, candidate, runtime_quiesced=True)
+    paths = bootstrap.ServicePaths(product_root=co.paths.product_root,
+                                   state_root=co.paths.bootstrap_state_root)
+    bootstrap._atomic_json(paths.deployment_record, {
+        "schema_version": 1, "upload_id": "a" * 32,
+        "transaction_id": record.api_transaction_id, "state": "running",
+    })
+    original_load = bootstrap._load_script
+    def load_engine(path, name):
+        module = original_load(path, name)
+        # Only inject the host lease. Recovery still uses the real filesystem,
+        # Coordinator, lock, journal and publisher.
+        module.DeploymentCoordinator = lambda **kwargs: co
+        return module
+    monkeypatch.setattr(bootstrap, "_load_script", load_engine)
+    result = bootstrap._recover_interrupted_api_deployment(paths)
+    assert result["state"] == "failed"
+    assert result["error_code"] == "asset_activation_rolled_back"
+    assert co.journal.read().state == "rolled_back"
+    assert assets.read_active(co.paths.product_root)["state"] == "EMPTY"
+
+
+def test_p4_assets_get_exposes_recovery_without_socket_or_ready_claim(tmp_path):
+    co, candidate, _ = stage(tmp_path)
+    co.journal.write(co.journal.read(), "recovery_required")
+    handler = bootstrap.BootstrapHandler.__new__(bootstrap.BootstrapHandler)
+    # BaseHTTPRequestHandler.server owns the existing Bootstrap owner property.
+    handler.server = SimpleNamespace(bootstrap_paths=bootstrap.ServicePaths(
+        product_root=co.paths.product_root, state_root=co.paths.bootstrap_state_root),
+        base_module=object())
+    handler.path = "/v1/assets"
+    replies = []
+    handler._json = lambda status, payload: replies.append((status, payload))
+    handler.do_GET()
+    assert replies[0][0] == 200
+    assert replies[0][1]["assets"]["state"] == "RECOVERY_REQUIRED"
+    assert replies[0][1]["assets"]["ready"] is False
+
+
+@pytest.mark.parametrize("published", [False, True])
+@pytest.mark.parametrize("has_previous", [False, True])
+def test_p4_restart_recovers_pointer_publication_and_previous_set(tmp_path, published, has_previous):
+    co, first, _ = stage(tmp_path, folder="first")
+    co.quiescence_lease = nullcontext
+    if has_previous:
+        co.activate_staged_asset_set(first, quiescence_lease=nullcontext)
+    co, candidate, _ = stage(tmp_path, folder="candidate", fpga=b"new")
+    co.quiescence_lease = nullcontext
+    previous = assets.read_active(co.paths.product_root)
+    record = co.journal.read()
+    co.journal.write(record, "activating", asset_activation_previous=previous,
+                     artifact_sha256=candidate)
+    if published:
+        assets.activate_verified(co.paths.product_root, candidate, runtime_quiesced=True)
+    assert co.asset_status()["state"] == "RECOVERY_REQUIRED"
+    assert co.asset_status()["ready"] is False
+    # New process, same lock/journal/pointer, no alternate recovery store.
+    fresh = make_coordinator(tmp_path)
+    fresh.quiescence_lease = nullcontext
+    with fresh._deployment_lock(recover_assets=True):
+        assert fresh.journal.read().state == "rolled_back"
+    current = assets.read_active(co.paths.product_root)
+    assert current["asset_set_sha256"] == previous["asset_set_sha256"]
+    assert current["ready"] is False
+    assert fresh.asset_status()["state"] == previous["state"]
+    # Repeated recovery after rollback publication but before journal commit.
+    fresh.journal.write(record, "activating")
+    with fresh._deployment_lock(recover_assets=True):
+        assert fresh.journal.read().state == "rolled_back"
+
+
+@pytest.mark.parametrize("failure", ["busy", "corrupt_previous", "pointer_drift", "fpga"])
+def test_p4_rollback_failures_remain_fenced(tmp_path, failure):
+    co, first, stored = stage(tmp_path, folder="first")
+    co.activate_staged_asset_set(first, quiescence_lease=nullcontext)
+    previous = assets.read_active(co.paths.product_root)
+    co, candidate, _ = stage(tmp_path, folder="candidate", fpga=b"new")
+    record = co.journal.read()
+    co.journal.write(record, "activating", asset_activation_previous=previous,
+                     asset_activation_fpga=failure == "fpga")
+    assets.activate_verified(co.paths.product_root, candidate, runtime_quiesced=True)
+    if failure == "corrupt_previous":
+        parser = stored / "payload/packages/swd-parser/python/parse.py"
+        parser.chmod(0o600)
+        parser.write_text("corrupt")
+    if failure == "pointer_drift":
+        pointer = co.paths.product_root / "assets/active.json"
+        value = json.loads(pointer.read_text())
+        value["generation"] += 10
+        pointer.chmod(0o600)
+        pointer.write_text(json.dumps(value))
+    @contextmanager
+    def busy():
+        raise RuntimeError("ACTIVE_JOB")
+        yield
+    co.quiescence_lease = busy if failure == "busy" else nullcontext
+    before = (co.paths.product_root / "assets/active.json").read_bytes()
+    with pytest.raises(Exception, match="RECOVERY|recovery"):
+        with co._deployment_lock(recover_assets=True):
+            pytest.fail("must not admit a new transaction")
+    assert co.journal.read().state == "recovery_required"
+    assert (co.paths.product_root / "assets/active.json").read_bytes() == before
+
+
 def stage(tmp_path, *, fpga=b"image-1", folder="a"):
     archive, sha = build_generic_assets(tmp_path / folder, bitstream=fpga)
     coordinator = make_coordinator(tmp_path)
     receipt = coordinator.execute_bundle_v3_install(b3_request(archive, sha))
-    assert receipt["stage"] == "bundle_install_only"
+    assert receipt["stage"] == "bundle_staged_only"
     return coordinator, sha, Path(receipt["install_path"])
 
 

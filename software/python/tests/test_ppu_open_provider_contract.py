@@ -1,0 +1,440 @@
+"""Bundle-to-Provider Host-only route tests; never start hardware or Provider code."""
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+import zipfile
+from contextlib import nullcontext
+
+import pytest
+
+from plasma_opf import OPF_PROGRAMMING_SCHEMA, TimeoutPolicy, parse_programming_selection
+
+from .test_ppu_bundle_v3_packages_contract import ROOT, TARGET
+from .test_ppu_b3_z2_install_gate1 import b3_request, make_coordinator
+from .test_ppu_bundle_v3_smoke_execution_gate1 import build_smoke
+
+sys.path.insert(0, str(ROOT / "scripts"))
+import ppu_provider_contract as providers  # noqa: E402
+
+
+def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fpga",
+                    target="arbitrary-target", descriptor_change=None, options_schema_change=None,
+                    omit_options_schema=False, options_schema_raw=None,
+                    additional_provider=False, provider_kind="python",
+                    profile_kind="programming-profile"):
+    source, _ = build_smoke(tmp_path / "source")
+    with zipfile.ZipFile(source) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+    descriptor = {
+        "schema": providers.SCHEMA, "target": target,
+        "provider_package": provider_id,
+        "operations": ["erase", "program", "verify", "read", "flash_cycle"],
+        "sites": [1, 2], "transport": transport,
+        "driver_abi": "example-swd-abi" if transport == "fpga" else None,
+        "fpga_package": "example-fpga" if transport == "fpga" else None,
+        "max_image_bytes": 4096,
+    }
+    if descriptor_change:
+        descriptor.update(descriptor_change)
+    options_schema = {
+        "schema": providers.ppu_provider_options.SCHEMA,
+        "options": {"type": "object", "properties": {
+            "speed_khz": {"type": "integer", "minimum": 1, "maximum": 5000},
+            "mode": {"type": "string", "enum": ["swd", "mock"]},
+            "sequence": {"type": "array", "items": {"type": "string", "maxLength": 20},
+                         "maxItems": 5},
+        }},
+    }
+    if options_schema_change:
+        options_schema.update(options_schema_change)
+    provider_path = (f"payload/packages/{provider_id}/bin/native-tool" if provider_kind == "native-c"
+                     else f"payload/packages/{provider_id}/python/main.py")
+    profile_path = "payload/packages/profile/data/plasma-provider.json"
+    payloads = {
+        provider_path: (b"\x7fELFhost-only-fixture" if provider_kind == "native-c"
+                        else b"raise RuntimeError('Provider execution is not part of route resolution')\n"),
+        profile_path: json.dumps(descriptor, sort_keys=True).encode(),
+    }
+    if not omit_options_schema:
+        payloads[f"payload/packages/{provider_id}/{providers.ppu_provider_options.FILE}"] = (
+            options_schema_raw if options_schema_raw is not None
+            else json.dumps(options_schema, sort_keys=True).encode()
+        )
+    packages = [
+        {"id": provider_id, "kind": provider_kind, "version": "1.0", "requires": [],
+         "files": []},
+        {"id": "profile", "kind": profile_kind, "version": "1.0",
+         "requires": [provider_id] + (["example-fpga"] if transport == "fpga" else []),
+         "files": []},
+    ]
+    if transport == "fpga":
+        prefix = "payload/packages/example-fpga/fpga/"
+        payloads[prefix + "image.bin"] = b"host-only FPGA bytes never loaded"
+        payloads[prefix + "image.hwh"] = b"host-only HWH bytes never loaded"
+        payloads[prefix + "image.json"] = b"{}"
+        packages.append({"id": "example-fpga", "kind": "fpga-image", "version": "1.0",
+                         "requires": [], "files": []})
+    if additional_provider:
+        alternate = {**descriptor, "provider_package": "alternate-provider",
+                     "transport": "ps-only", "driver_abi": None, "fpga_package": None}
+        payloads["payload/packages/alternate-provider/python/main.py"] = (
+            b"raise RuntimeError('provider code must never execute in resolver')\n"
+        )
+        payloads["payload/packages/alternate-profile/data/plasma-provider.json"] = (
+            json.dumps(alternate, sort_keys=True).encode()
+        )
+        payloads["payload/packages/alternate-provider/config/plasma-provider-options.json"] = (
+            json.dumps({"schema": providers.ppu_provider_options.SCHEMA,
+                        "options": {"type": "object", "properties": {
+                            "vendor_option": {"type": "object", "properties": {
+                                "mode": {"type": "string", "enum": ["mock", "safe"]},
+                                "enabled": {"type": "boolean"},
+                            }, "required": ["mode"]},
+                        }}}, sort_keys=True).encode()
+        )
+        packages.extend([
+            {"id": "alternate-provider", "kind": "python", "version": "1.0",
+             "requires": [], "files": []},
+            {"id": "alternate-profile", "kind": "programming-profile", "version": "1.0",
+             "requires": ["alternate-provider"], "files": []},
+        ])
+    for package in packages:
+        prefix = f"payload/packages/{package['id']}/"
+        for path, raw in payloads.items():
+            if path.startswith(prefix):
+                package["files"].append({"path": path, "sha256": hashlib.sha256(raw).hexdigest(),
+                                         "size": len(raw),
+                                         "executable": package["kind"] == "native-c" and path == provider_path})
+    manifest["packages"] = packages
+    archive = tmp_path / "provider.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("manifest.json", json.dumps(manifest, sort_keys=True))
+        for path, raw in payloads.items():
+            output.writestr(path, raw)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    co = make_coordinator(tmp_path)
+    co.execute_bundle_v3_install(b3_request(archive, digest))
+    co.activate_staged_asset_set(digest, quiescence_lease=nullcontext)
+    return co.paths.product_root, digest, descriptor
+
+
+def observed(*, transport="fpga"):
+    return {"platform": TARGET["platform"], "board": TARGET["board"],
+            "fpga_part": TARGET["fpga_part"], "sites": [1, 2],
+            "ps_transport_ready": True, "loaded_fpga_package": "example-fpga",
+            "driver_abi": "example-swd-abi", "fpga_identity_proven": transport == "fpga"}
+
+
+def resolve(*args, options=None, **kwargs):
+    """Existing route tests use absent optional Job options explicitly as {}."""
+    return providers.resolve(*args, options={} if options is None else options, **kwargs)
+
+
+def test_two_provider_routes_use_one_bundle_job_contract_without_catalog(tmp_path):
+    for provider_id, transport in (("reference-provider", "fpga"),
+                                   ("independent-provider", "ps-only")):
+        root, digest, _ = staged_provider(tmp_path / provider_id,
+                                          provider_id=provider_id, transport=transport)
+        route = resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                                  provider=provider_id, profile="profile",
+                                  operation="flash_cycle", site_id=2, image_size=1024,
+                                  hardware=observed(transport=transport))
+        assert route.provider_package == provider_id
+        assert route.operation == "flash_cycle" and route.site_id == 2
+        assert route.transport == transport
+        assert route.options_json == b"{}"
+        assert route.options_sha256 == hashlib.sha256(b"{}").hexdigest()
+
+
+@pytest.mark.parametrize("change,code", [
+    ({"operations": ["program"]}, "OPERATION_UNSUPPORTED"),
+    ({"provider_package": "missing"}, "PROVIDER_SELECTION_MISMATCH"),
+    ({"max_image_bytes": 4}, "IMAGE_OUT_OF_BOUNDS"),
+    ({"max_runtime_s": 30}, "PROVIDER_DESCRIPTOR_INVALID"),
+])
+def test_incomplete_provider_contract_fails_closed(tmp_path, change, code):
+    root, digest, _ = staged_provider(tmp_path, descriptor_change=change)
+    with pytest.raises(providers.ProviderDenied, match=code):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                          provider="reference-provider", profile="profile",
+                          operation="flash_cycle", site_id=2, image_size=1024,
+                          hardware=observed())
+
+
+def test_actual_hardware_and_active_bytes_must_still_match(tmp_path):
+    root, digest, _ = staged_provider(tmp_path)
+    with pytest.raises(providers.ProviderDenied, match="FPGA_DRIVER_UNVERIFIED"):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                          provider="reference-provider", profile="profile",
+                          operation="program", site_id=2, image_size=1024,
+                          hardware={**observed(), "driver_abi": "other"})
+    descriptor = root / "assets" / "staged" / digest / "payload/packages/profile/data/plasma-provider.json"
+    descriptor.chmod(0o600)
+    descriptor.write_text("{}")
+    with pytest.raises(providers.ProviderDenied, match="ACTIVE_SET_UNTRUSTED"):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                          provider="reference-provider", profile="profile",
+                          operation="program", site_id=2, image_size=1024,
+                          hardware=observed())
+
+
+def test_explicit_provider_profile_selection_allows_same_target_multi_provider(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    reference = resolve(
+        root, asset_set_sha256=digest, target="arbitrary-target",
+        provider="reference-provider", profile="profile", operation="flash_cycle",
+        site_id=2, image_size=1024, hardware=observed())
+    alternative = resolve(
+        root, asset_set_sha256=digest, target="arbitrary-target",
+        provider="alternate-provider", profile="alternate-profile",
+        operation="flash_cycle", site_id=2, image_size=1024,
+        hardware=observed(transport="ps-only"))
+    assert (reference.provider_package, reference.profile_package) == (
+        "reference-provider", "profile")
+    assert (alternative.provider_package, alternative.profile_package) == (
+        "alternate-provider", "alternate-profile")
+
+
+@pytest.mark.parametrize(("provider", "profile", "code"), [
+    ("alternate-provider", "profile", "PROVIDER_SELECTION_MISMATCH"),
+    ("reference-provider", "alternate-profile", "PROVIDER_SELECTION_MISMATCH"),
+    ("reference-provider", "not-in-this-set", "PROFILE_MISSING_OR_AMBIGUOUS"),
+    ("../escape", "profile", "PROVIDER_REF_INVALID"),
+    ("reference-provider", "/escape", "PROFILE_REF_INVALID"),
+])
+def test_explicit_selection_mismatch_denied(tmp_path, provider, profile, code):
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    with pytest.raises(providers.ProviderDenied, match=code):
+        resolve(
+            root, asset_set_sha256=digest, target="arbitrary-target",
+            provider=provider, profile=profile, operation="flash_cycle",
+            site_id=2, image_size=1024, hardware=observed())
+
+
+def test_native_c_provider_entrypoint_is_resolved_without_execution(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, provider_kind="native-c")
+    route = resolve(
+        root, asset_set_sha256=digest, target="arbitrary-target",
+        provider="reference-provider", profile="profile", operation="flash_cycle",
+        site_id=2, image_size=1024, hardware=observed())
+    assert route.provider_package == "reference-provider"
+    assert route.transport == "fpga"
+    assert len(route.options_schema_sha256) == 64
+
+
+def test_opf1_selection_binds_to_opf2_active_bundle_route(tmp_path):
+    """OPF-1 parses syntax; OPF-2 independently grants only an exact verified route."""
+    selection = parse_programming_selection(
+        {"schema": OPF_PROGRAMMING_SCHEMA, "provider": "alternate-provider",
+         "profile": "alternate-profile", "timeout_ms": 45000,
+         "options": {"vendor_option": {"mode": "mock", "enabled": True}}},
+        policy=TimeoutPolicy(default_timeout_ms=10000, maximum_timeout_ms=60000),
+    )
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    route = resolve(
+        root, asset_set_sha256=digest, target="arbitrary-target",
+        provider=selection.provider, profile=selection.profile,
+        operation="flash_cycle", site_id=2, image_size=1024,
+        hardware=observed(transport="ps-only"), options=selection.options,
+    )
+    assert (route.provider_package, route.profile_package, route.transport) == (
+        "alternate-provider", "alternate-profile", "ps-only"
+    )
+    assert selection.timeout_ms == 45000 and selection.timeout_source == "bundle_override"
+    assert not hasattr(route, "timeout_ms")  # One Job authority, not another Provider timer.
+    assert json.loads(route.options_json) == selection.options
+    assert route.options_sha256 == hashlib.sha256(route.options_json).hexdigest()
+
+
+def test_opf1_well_formed_selection_cannot_override_bundle_provider_binding(tmp_path):
+    selection = parse_programming_selection(
+        {"schema": OPF_PROGRAMMING_SCHEMA, "provider": "reference-provider",
+         "profile": "alternate-profile", "options": {"claim_verified": True}},
+        policy=TimeoutPolicy(default_timeout_ms=10000, maximum_timeout_ms=60000),
+    )
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    with pytest.raises(providers.ProviderDenied, match="PROVIDER_SELECTION_MISMATCH"):
+        resolve(
+            root, asset_set_sha256=digest, target="arbitrary-target",
+            provider=selection.provider, profile=selection.profile,
+            operation="flash_cycle", site_id=2, image_size=1024,
+            hardware=observed(transport="ps-only"),
+        )
+
+
+def test_non_programming_profile_resource_cannot_be_selected(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, profile_kind="unrelated-data")
+    with pytest.raises(providers.ProviderDenied, match="PROFILE_PACKAGE_INVALID"):
+        resolve(
+            root, asset_set_sha256=digest, target="arbitrary-target",
+            provider="reference-provider", profile="profile",
+            operation="flash_cycle", site_id=2, image_size=1024, hardware=observed(),
+        )
+
+
+@pytest.mark.parametrize("sites", [None, 2, "2", [True], ["2"], [2, 2]])
+def test_malformed_trusted_hardware_site_observation_fails_closed(tmp_path, sites):
+    root, digest, _ = staged_provider(tmp_path)
+    with pytest.raises(providers.ProviderDenied, match="HARDWARE_SITES_INVALID"):
+        resolve(
+            root, asset_set_sha256=digest, target="arbitrary-target",
+            provider="reference-provider", profile="profile",
+            operation="flash_cycle", site_id=2, image_size=1024,
+            hardware={**observed(), "sites": sites},
+        )
+
+
+def test_selected_provider_schema_not_cross_provider_fallback(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    reference = resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                        provider="reference-provider", profile="profile", operation="program",
+                        site_id=2, image_size=100, hardware=observed(),
+                        options={"speed_khz": 2000, "mode": "swd"})
+    alternate = resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                        provider="alternate-provider", profile="alternate-profile",
+                        operation="program", site_id=2, image_size=100,
+                        hardware=observed(transport="ps-only"),
+                        options={"vendor_option": {"mode": "mock", "enabled": False}})
+    assert reference.options_schema_sha256 != alternate.options_schema_sha256
+    assert reference.options_json == b'{"mode":"swd","speed_khz":2000}'
+    assert json.loads(alternate.options_json)["vendor_option"]["enabled"] is False
+    with pytest.raises(providers.ProviderDenied, match="OPTIONS_UNKNOWN_FIELD"):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                provider="alternate-provider", profile="alternate-profile",
+                operation="program", site_id=2, image_size=100,
+                hardware=observed(transport="ps-only"), options={"speed_khz": 2000})
+
+
+@pytest.mark.parametrize(("options", "code"), [
+    ({"unrecognized": 1}, "OPTIONS_UNKNOWN_FIELD"),
+    ({"speed_khz": True}, "OPTIONS_TYPE_MISMATCH"),
+    ({"speed_khz": 0}, "OPTIONS_OUT_OF_RANGE"),
+    ({"speed_khz": 5001}, "OPTIONS_OUT_OF_RANGE"),
+    ({"speed_khz": 12.5}, "OPTIONS_TYPE_MISMATCH"),
+    ({"mode": "skip_safe_off"}, "OPTIONS_ENUM_MISMATCH"),
+    ({"sequence": ["ok"] * 6}, "OPTIONS_OUT_OF_RANGE"),
+    ({"sequence": ["x" * 21]}, "OPTIONS_OUT_OF_RANGE"),
+    ({"sequence": "not-an-array"}, "OPTIONS_TYPE_MISMATCH"),
+    ({"sequence": [float("nan")]}, "OPTIONS_TYPE_MISMATCH"),
+    ({"mode": "x" * 5000}, "OPTIONS_TOO_LARGE"),
+])
+def test_provider_options_fail_closed(tmp_path, options, code):
+    root, digest, _ = staged_provider(tmp_path)
+    with pytest.raises(providers.ProviderDenied, match=code):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                provider="reference-provider", profile="profile", operation="program",
+                site_id=2, image_size=100, hardware=observed(), options=options)
+
+
+def test_nested_options_requirements_and_type_checked_before_any_execution(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, additional_provider=True)
+    for options, code in (
+        ({"vendor_option": {}}, "OPTIONS_REQUIRED_MISSING"),
+        ({"vendor_option": {"mode": "mock", "enabled": 1}}, "OPTIONS_TYPE_MISMATCH"),
+        ({"vendor_option": {"mode": "danger"}}, "OPTIONS_ENUM_MISMATCH"),
+        ({"vendor_option": {"mode": "mock", "root_override": True}}, "OPTIONS_UNKNOWN_FIELD"),
+    ):
+        with pytest.raises(providers.ProviderDenied, match=code):
+            resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                    provider="alternate-provider", profile="alternate-profile",
+                    operation="program", site_id=2, image_size=100,
+                    hardware=observed(transport="ps-only"), options=options)
+
+
+@pytest.mark.parametrize(("change", "code"), [
+    ({"schema": "plasma.ppu.provider-options.v999"}, "OPTIONS_SCHEMA_UNSUPPORTED"),
+    ({"options": {"type": "object", "properties": {}, "$ref": "https://example.invalid"}},
+     "OPTIONS_SCHEMA_INVALID"),
+    ({"options": {"type": "object", "properties": {
+        "value": {"type": "integer", "minimum": 10, "maximum": 1}}}},
+     "OPTIONS_SCHEMA_INVALID"),
+    ({"options": {"type": "object", "properties": {
+        "value": {"type": "string", "enum": ["same", "same"]}}}},
+     "OPTIONS_SCHEMA_INVALID"),
+    ({"options": {"type": "object", "properties": {
+        "value": {"type": "array", "items": {"type": "boolean"}, "maxItems": 1000}}}},
+     "OPTIONS_SCHEMA_INVALID"),
+    ({"options": {"type": "object", "properties": {}, "required": ["missing"]}},
+     "OPTIONS_SCHEMA_INVALID"),
+])
+def test_malformed_provider_schema_fails_closed(tmp_path, change, code):
+    root, digest, _ = staged_provider(tmp_path, options_schema_change=change)
+    with pytest.raises(providers.ProviderDenied, match=code):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                provider="reference-provider", profile="profile", operation="program",
+                site_id=2, image_size=100, hardware=observed(), options={})
+
+
+def test_missing_provider_schema_fails_closed(tmp_path):
+    root, digest, _ = staged_provider(tmp_path, omit_options_schema=True)
+    with pytest.raises(providers.ProviderDenied, match="OPTIONS_SCHEMA_MISSING"):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                provider="reference-provider", profile="profile", operation="program",
+                site_id=2, image_size=100, hardware=observed(), options={})
+
+
+@pytest.mark.parametrize(("raw", "code"), [
+    (b'{"schema":"plasma.ppu.provider-options.v1","options":{"type":"object",'
+     b'"properties":{},"properties":{}}}', "OPTIONS_SCHEMA_INVALID"),
+    (b'{"schema":', "OPTIONS_SCHEMA_INVALID"),
+    (b'{"padding":"' + b'x' * 8200 + b'"}', "OPTIONS_SCHEMA_INVALID"),
+])
+def test_duplicate_corrupt_or_oversized_schema_denied(tmp_path, raw, code):
+    root, digest, _ = staged_provider(tmp_path, options_schema_raw=raw)
+    with pytest.raises(providers.ProviderDenied, match=code):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                provider="reference-provider", profile="profile", operation="program",
+                site_id=2, image_size=100, hardware=observed(), options={})
+
+
+def test_modified_provider_schema_is_denied_by_active_set_integrity(tmp_path):
+    root, digest, _ = staged_provider(tmp_path)
+    path = root / "assets" / "staged" / digest / (
+        "payload/packages/reference-provider/config/plasma-provider-options.json")
+    path.chmod(0o600)
+    path.write_text('{"schema":"attacker"}')
+    with pytest.raises(providers.ProviderDenied, match="ACTIVE_SET_UNTRUSTED"):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                provider="reference-provider", profile="profile", operation="program",
+                site_id=2, image_size=100, hardware=observed(), options={})
+
+
+def test_direct_resolver_requires_options_argument(tmp_path):
+    root, digest, _ = staged_provider(tmp_path)
+    with pytest.raises(TypeError, match="options"):
+        providers.resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                          provider="reference-provider", profile="profile", operation="program",
+                          site_id=2, image_size=100, hardware=observed())
+
+
+def test_provider_options_global_size_and_depth_limits_without_hardware():
+    schema = {"schema": providers.ppu_provider_options.SCHEMA,
+              "options": {"type": "object", "properties": {
+                  f"k{i}": {"type": "string"} for i in range(8)}}}
+    with pytest.raises(providers.ppu_provider_options.OptionsDenied, match="OPTIONS_TOO_LARGE"):
+        providers.ppu_provider_options.validate(
+            schema, {f"k{i}": "x" * 4096 for i in range(8)})
+
+    deep = {"type": "boolean"}
+    for _ in range(13):
+        deep = {"type": "object", "properties": {"next": deep}}
+    schema["options"] = deep
+    with pytest.raises(providers.ppu_provider_options.OptionsDenied, match="OPTIONS_SCHEMA_INVALID"):
+        providers.ppu_provider_options.validate(schema, {})
+
+
+def test_provider_options_surrogate_and_nested_object_are_fail_closed():
+    schema = {"schema": providers.ppu_provider_options.SCHEMA,
+              "options": {"type": "object", "properties": {
+                  "label": {"type": "string"},
+                  "measurement": {"type": "number", "minimum": 0},
+                  "null_value": {"type": "null"}}}}
+    with pytest.raises(providers.ppu_provider_options.OptionsDenied, match="OPTIONS_NOT_JSON"):
+        providers.ppu_provider_options.validate(schema, {"label": "\ud800"})
+    with pytest.raises(providers.ppu_provider_options.OptionsDenied, match="OPTIONS_TYPE_MISMATCH"):
+        providers.ppu_provider_options.validate(schema, {"measurement": float("inf")})
+    assert json.loads(providers.ppu_provider_options.validate(
+        schema, {"measurement": 1.25, "null_value": None})) == {
+            "measurement": 1.25, "null_value": None}

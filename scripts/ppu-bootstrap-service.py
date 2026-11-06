@@ -274,6 +274,37 @@ def _reconcile_runtime_result(
 
 def _recover_interrupted_api_deployment(paths: ServicePaths) -> dict[str, Any] | None:
     record = _deployment_api_record(paths)
+    if record is not None and record.get("state") in DEPLOYMENT_API_IN_FLIGHT_STATES | {"recovery_required"}:
+        journal = _read_coordinator_journal(paths)
+        if (journal is not None and journal.get("kind") == "bundle"
+                and journal.get("api_transaction_id") == record.get("transaction_id")
+                and journal.get("asset_activation_previous") is not None
+                and journal.get("asset_activation_fpga") is False
+                and journal.get("state") in {"activating", "recovery_required", "rolled_back"}):
+            # Resume only the already authorized pointer-only transaction.
+            # The sole Coordinator rechecks under its lock and Runtime lease;
+            # failed or unavailable recovery leaves the API fenced.
+            engine = _load_script(Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                                  "plasma_ppu_api_recovery_engine")
+            coordinator = engine.DeploymentCoordinator(
+                paths=engine.DeploymentPaths(product_root=paths.product_root,
+                                             bootstrap_state_root=paths.state_root),
+                installer=object(),
+            )
+            try:
+                with coordinator._deployment_lock(recover_assets=True):
+                    recovered = coordinator.journal.read()
+                    if recovered.state != "rolled_back":
+                        raise BootstrapServiceError("ASSET_SET_RECOVERY_NOT_CONFIRMED")
+            except Exception:
+                pass  # Existing interrupted-service reconciliation below fences it.
+            else:
+                record.update(state="failed", updated_at_epoch_s=time.time(),
+                              error_code="asset_activation_rolled_back",
+                              error="Previous Asset Set restored; activation did not succeed",
+                              result=None)
+                _atomic_json(paths.deployment_record, record)
+                return record
     if record is None or record["state"] not in DEPLOYMENT_API_IN_FLIGHT_STATES:
         return record
     interrupted_state = record["state"]
@@ -567,8 +598,8 @@ def _trusted_b3_install_policy(paths: ServicePaths) -> dict[str, Any]:
     """Device-local generic B3 enablement, not publisher authentication.
 
     Generic, Bundle-independent device capability (no per-Bundle SHA list).
-    Each B3 additionally needs a fresh owner ``bundle.install`` /
-    ``bundle.install-fpga-load`` authorization from the paired Console for
+    Each B3 additionally needs a fresh mode-specific owner ``bundle.install`` /
+    ``bundle.activate`` / ``bundle.activate-fpga-load`` authorization for
     the exact admitted Bundle. B3 never permits Package execution or DUT
     operation; FPGA load still passes the protected Root Entry.
     """
@@ -583,10 +614,10 @@ def _trusted_b3_install_policy(paths: ServicePaths) -> dict[str, Any]:
             or info.st_uid != os.geteuid()):
         raise BootstrapServiceError("B3_INSTALL_POLICY_UNTRUSTED")
     policy = _read_private_json(path)
-    if (set(policy) != {"schema", "mode", "install_only", "actions"}
-            or policy.get("schema") != "plasma.ppu.b3-install-policy.v1"
+    if (set(policy) != {"schema", "mode", "modes", "actions"}
+            or policy.get("schema") != "plasma.ppu.b3-install-policy.v2"
             or policy.get("mode") != "development"
-            or policy.get("install_only") is not True
+            or policy.get("modes") != ["activate", "stage_only"]
             or policy.get("actions") != ["install", "verify"]):
         raise BootstrapServiceError("B3_INSTALL_POLICY_INVALID")
     return policy
@@ -607,11 +638,12 @@ def run_bundle_install_subprocess(
         if script.is_symlink() or not script.is_file():
             raise BootstrapServiceError("B3_INSTALLED_ENGINE_NOT_QUALIFIED")
     _trusted_b3_install_policy(paths)
-    if (set(request) != {"api_transaction_id", "source_commit", "archive_sha256",
-                         "target", "fpga_load"}
+    if (set(request) != {"api_transaction_id", "archive_sha256",
+                         "target", "mode", "fpga_load"}
+            or request.get("mode") not in ("activate", "stage_only")
+            or type(request.get("mode")) is not str
+            or (request["mode"] == "stage_only" and request["fpga_load"])
             or type(request.get("fpga_load")) is not bool
-            or type(request.get("source_commit")) is not str
-            or not re.fullmatch(r"[0-9a-f]{40}", request["source_commit"])
             or type(request.get("archive_sha256")) is not str
             or not HEX64_RE.fullmatch(request["archive_sha256"])
             or type(request.get("target")) is not dict
@@ -624,11 +656,11 @@ def run_bundle_install_subprocess(
         "--product-root", str(paths.product_root),
         "install-bundle", "--release-artifact", str(upload.committed),
         "--artifact-sha256", request["archive_sha256"],
-        "--source-commit", request["source_commit"],
         "--platform", request["target"]["platform"],
         "--board", request["target"]["board"],
         "--fpga-part", request["target"]["fpga_part"],
         "--api-transaction-id", identity,
+        "--mode", request["mode"],
     ]
     if request["fpga_load"]:
         argv.append("--fpga-load")
@@ -644,12 +676,18 @@ def run_bundle_install_subprocess(
         result = json.loads(completed.stdout)
     except (ValueError, TypeError) as exc:
         raise BootstrapServiceError("B3_DEVICE_INSTALL_RECEIPT_INVALID") from exc
+    stage = ("bundle_staged_only" if request["mode"] == "stage_only"
+             else "bundle_install_and_fpga_load" if request["fpga_load"]
+             else "bundle_install_and_activate")
+    active = result.get("active_asset_set") if isinstance(result, dict) else None
     if (type(result) is not dict or result.get("result") != "PASS"
             or result.get("schema") != "plasma.ppu.b3-deployment-receipt.v2"
-            or result.get("stage") != ("bundle_install_and_fpga_load" if request["fpga_load"]
-                                       else "bundle_install_only")
-            or result.get("archive_sha256") != request["archive_sha256"]
-            or result.get("source_commit") != request["source_commit"]):
+            or result.get("mode") != request["mode"]
+            or result.get("stage") != stage
+            or result.get("ready") is not False
+            or (active is not None if request["mode"] == "stage_only"
+                else not isinstance(active, dict) or active.get("asset_set_sha256") != request["archive_sha256"])
+            or result.get("archive_sha256") != request["archive_sha256"]):
         raise BootstrapServiceError("B3_DEVICE_INSTALL_RECEIPT_INVALID")
     return result
 
@@ -661,18 +699,30 @@ def _reconcile_b3_install_result(
     previous_coordinator_id: str | None,
     runner_result: Mapping[str, Any],
     fpga_load: bool,
+    mode: str,
 ) -> dict[str, str]:
     if (type(api_transaction_id) is not str
             or not UPLOAD_ID_RE.fullmatch(api_transaction_id)
+            or mode not in {"activate", "stage_only"}
             or runner_result.get("result") != "PASS"):
         raise BootstrapServiceError("B3_API_CORRELATION_INVALID")
+    expected_stage = ("bundle_staged_only" if mode == "stage_only"
+                      else "bundle_install_and_fpga_load" if fpga_load
+                      else "bundle_install_and_activate")
+    active = runner_result.get("active_asset_set")
+    if (runner_result.get("mode") != mode
+            or runner_result.get("stage") != expected_stage
+            or runner_result.get("ready") is not False
+            or (active is not None if mode == "stage_only"
+                else not isinstance(active, Mapping)
+                or active.get("asset_set_sha256") != runner_result.get("archive_sha256"))):
+        raise BootstrapServiceError("B3_API_RECEIPT_MODE_MISMATCH")
     record = _read_coordinator_journal(paths)
-    source = runner_result.get("source_commit")
     digest = runner_result.get("archive_sha256")
     if (record is None
-            or record.get("state") != ("fpga_loaded" if fpga_load else "bundle_installed")
+            or record.get("state") != ("bundle_installed" if mode == "stage_only" else
+                                       "fpga_loaded" if fpga_load else "asset_set_active")
             or record.get("kind") != "bundle"
-            or record.get("source_commit") != source
             or record.get("artifact_sha256") != digest
             or record.get("api_transaction_id") != api_transaction_id
             or record.get("transaction_id") == previous_coordinator_id
@@ -765,63 +815,57 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 subject_sha256=meta["sha256"], transaction_id=upload_id,
             )
             target = _trusted_package_target(self.bootstrap_paths)
-            contract = _load_script(
-                Path(__file__).with_name("ppu_unified_deployment.py"),
-                "plasma_ppu_package_admission_contract",
-            )
-            try:
-                verified = contract.verify_host_only_artifact(
-                    upload.committed, expected_sha256=meta["sha256"],
-                    source_commit=None, target_profile=target,
-                )
-            except contract.UnifiedDeploymentError as exc:
-                raise BootstrapServiceError(str(exc)) from exc
-            if verified.kind != kind:
-                raise BootstrapServiceError("PACKAGE_KIND_MISMATCH")
-            if verified.archive_sha256 != owner["subject_sha256"]:
-                raise BootstrapServiceError("OWNER_AUTHORIZATION_SUBJECT_MISMATCH")
-            # FPGA Image is an ordinary Asset of the same Bundle; B2 PASS also
-            # requires its static qualification. No FPGA load, no readback.
-            fpga_qualification = None
-            if verified.kind == "bundle":
-                fpga = _load_script(
-                    Path(__file__).with_name("ppu_fpga_qualification.py"),
-                    "plasma_ppu_b2_fpga_static_qualification",
+            if kind == "bundle":
+                # Bundle v3 verification and qualification have ONE domain
+                # owner. The API only supplies trusted upload/owner context.
+                deployment = _load_script(
+                    Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                    "plasma_ppu_b2_deployment_engine",
                 )
                 try:
-                    fpga_qualification = fpga.qualify_bundle_fpga(
-                        upload.committed, verified,
+                    plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
+                        upload.committed, expected_sha256=meta["sha256"],
+                        target_profile=target,
                         contracts_path=self.bootstrap_paths.fpga_image_contracts,
-                        trusted_target=target,
                     )
-                except fpga.FpgaQualificationDenied as exc:
+                except (deployment.BundleV3AdmissionVerificationDenied,
+                        deployment.BundleV3AdmissionQualificationDenied) as exc:
                     raise BootstrapServiceError(str(exc)) from exc
+                fpga_qualification = plan["fpga_qualification"]
+            else:
+                # Non-Bundle package admission is outside the Bundle v3
+                # consolidation; retain its existing verifier contract.
+                contract = _load_script(
+                    Path(__file__).with_name("ppu_unified_deployment.py"),
+                    "plasma_ppu_package_admission_contract",
+                )
+                try:
+                    verified = contract.verify_host_only_artifact(
+                        upload.committed, expected_sha256=meta["sha256"],
+                        target_profile=target,
+                    )
+                except contract.UnifiedDeploymentError as exc:
+                    raise BootstrapServiceError(str(exc)) from exc
+                if verified.kind != kind:
+                    raise BootstrapServiceError("PACKAGE_KIND_MISMATCH")
+                fpga_qualification = None
+                plan = {
+                    "package": verified.name,
+                    "kind": verified.kind,
+                    "version": verified.version,
+                    "source_commit": verified.source_commit,
+                    "archive_sha256": verified.archive_sha256,
+                    "files": [dict(path=item.path, sha256=item.sha256, size=item.size,
+                                   executable=item.executable) for item in verified.files],
+                    "target": dict(verified.target),
+                    "requested_actions": list(verified.actions),
+                    "execution_permitted": False,
+                }
+            if plan["archive_sha256"] != owner["subject_sha256"]:
+                raise BootstrapServiceError("OWNER_AUTHORIZATION_SUBJECT_MISMATCH")
+            plan["owner_authorization"] = owner
             transaction_id = uuid.uuid4().hex
             now = time.time()
-            plan = {
-                "package": verified.name,
-                "kind": verified.kind,
-                "version": verified.version,
-                "source_commit": verified.source_commit,
-                "archive_sha256": verified.archive_sha256,
-                "files": [dict(path=item.path, sha256=item.sha256, size=item.size,
-                               executable=item.executable) for item in verified.files],
-                "target": dict(verified.target),
-                "requested_actions": list(verified.actions),
-                "execution_permitted": False,
-                "owner_authorization": owner,
-            }
-            if verified.kind == "bundle":
-                plan["fpga_qualification"] = fpga_qualification
-                plan["purpose"] = verified.purpose
-                # Canonical Bundle v3 is the only active admission contract.
-                plan["packages"] = [
-                    {"id": package.id, "kind": package.kind, "version": package.version,
-                     "requires": list(package.requires),
-                     "files": [f.path for f in package.files]}
-                    for package in verified.packages
-                ]
-                plan["bundle_schema"] = verified.schema
             record = {
                 "schema_version": 1,
                 "transaction_id": transaction_id,
@@ -851,10 +895,13 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
     def start_bundle_install(self, body: Mapping[str, Any]) -> dict[str, Any]:
         """B3 only for the CURRENT B2 admission and a fresh owner install action."""
         if (type(body) is not dict
-                or set(body) != {"kind", "upload_id", "fpga_load", "authorization"}
-                or body["kind"] != "bundle" or type(body["fpga_load"]) is not bool):
+                or set(body) != {"kind", "upload_id", "mode", "fpga_load", "authorization"}
+                or body["kind"] != "bundle" or type(body["fpga_load"]) is not bool
+                or type(body["mode"]) is not str or body["mode"] not in {"activate", "stage_only"}
+                or (body["mode"] == "stage_only" and body["fpga_load"])):
             raise BootstrapServiceError("B3_INSTALL_REQUEST_FIELDS_DENIED")
         fpga_load = body["fpga_load"]
+        mode = body["mode"]
         upload_id = body["upload_id"]
         if type(upload_id) is not str or not UPLOAD_ID_RE.fullmatch(upload_id):
             raise BootstrapServiceError("B3_UPLOAD_ID_INVALID")
@@ -877,8 +924,6 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     or result.get("stage") != "package_admission_only"
                     or plan.get("bundle_schema") != "plasma.ppu.bundle.v3"
                     or plan.get("kind") != "bundle"
-                    or type(plan.get("source_commit")) is not str
-                    or not re.fullmatch(r"[0-9a-f]{40}", plan["source_commit"])
                     or type(plan.get("archive_sha256")) is not str
                     or not HEX64_RE.fullmatch(plan["archive_sha256"])
                     or type(plan.get("packages")) is not list
@@ -903,42 +948,39 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             # is never accepted as install authority.
             owner = _owner_operation(
                 self.bootstrap_paths, body["authorization"],
-                action="bundle.install-fpga-load" if fpga_load else "bundle.install",
+                action=("bundle.activate-fpga-load" if fpga_load else
+                        "bundle.activate" if mode == "activate" else "bundle.install"),
                 subject_sha256=plan["archive_sha256"],
                 transaction_id=earlier["transaction_id"],
             )
-            contract = _load_script(
-                Path(__file__).with_name("ppu_unified_deployment.py"),
-                "plasma_ppu_b3_bundle_verifier",
+            deployment = _load_script(
+                Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                "plasma_ppu_b3_deployment_engine",
             )
             try:
-                verified = contract.verify_host_only_artifact(
+                reverified_plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
                     upload.committed, expected_sha256=plan["archive_sha256"],
-                    source_commit=plan["source_commit"], target_profile=trusted_target,
-                )
-            except contract.UnifiedDeploymentError as exc:
-                raise BootstrapServiceError("B3_BUNDLE_REVERIFY_DENIED") from exc
-            # Re-qualify FPGA statically from the same bytes and CURRENT trusted
-            # contract; any drift since B2 fails closed.
-            fpga = _load_script(
-                Path(__file__).with_name("ppu_fpga_qualification.py"),
-                "plasma_ppu_b3_fpga_static_qualification",
-            )
-            try:
-                requalified = fpga.qualify_bundle_fpga(
-                    upload.committed, verified,
+                    target_profile=trusted_target,
                     contracts_path=self.bootstrap_paths.fpga_image_contracts,
-                    trusted_target=trusted_target,
                 )
-            except fpga.FpgaQualificationDenied as exc:
+            except deployment.BundleV3AdmissionVerificationDenied as exc:
+                raise BootstrapServiceError("B3_BUNDLE_REVERIFY_DENIED") from exc
+            except deployment.BundleV3AdmissionQualificationDenied as exc:
                 raise BootstrapServiceError("B3_FPGA_QUALIFICATION_DENIED") from exc
-            if ("fpga_qualification" not in plan
-                    or plan["fpga_qualification"] != requalified):
+            # Re-qualification must match B2 even when the trusted FPGA
+            # contracts change without changing the uploaded archive.
+            if ("fpga_qualification" not in plan or
+                    plan["fpga_qualification"] != reverified_plan["fpga_qualification"]):
                 raise BootstrapServiceError("B3_FPGA_QUALIFICATION_CHANGED")
-            if fpga_load and not any(
-                    type(item) is dict and item.get("kind") == "fpga-image"
-                    for item in plan["packages"]):
+            has_fpga_image = any(
+                type(item) is dict and item.get("kind") == "fpga-image"
+                for item in plan["packages"])
+            if fpga_load and not has_fpga_image:
                 raise BootstrapServiceError("B3_FPGA_LOAD_REQUIRES_FPGA_IMAGE")
+            if mode == "activate" and has_fpga_image and not fpga_load:
+                raise BootstrapServiceError("B3_FPGA_ACTIVATION_REQUIRES_EXPLICIT_LOAD")
+            if mode not in policy["modes"]:
+                raise BootstrapServiceError("B3_MODE_POLICY_DENIED")
             previous_coordinator = _admit_coordinator_journal(self.bootstrap_paths)
             transaction_id = uuid.uuid4().hex
             record = {
@@ -947,7 +989,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 "started_at_epoch_s": time.time(),
                 "updated_at_epoch_s": time.time(),
                 "error_code": None, "error": None, "result": None,
-                "fpga_load": fpga_load,
+                "mode": mode, "fpga_load": fpga_load,
                 "admission_transaction_id": earlier["transaction_id"],
                 "owner_authorization": owner,
             }
@@ -963,15 +1005,15 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     evidence = dict(runner(
                         self.bootstrap_paths, upload_id,
                         {"api_transaction_id": transaction_id,
-                         "source_commit": plan["source_commit"],
                          "archive_sha256": plan["archive_sha256"],
                          "target": dict(trusted_target),
-                         "fpga_load": fpga_load},
+                         "mode": mode, "fpga_load": fpga_load},
                     ))
                     correlation = _reconcile_b3_install_result(
                         self.bootstrap_paths, api_transaction_id=transaction_id,
                         previous_coordinator_id=previous_id,
                         runner_result=evidence, fpga_load=fpga_load,
+                        mode=mode,
                     )
                 except Exception as exc:
                     known = _b3_known_failure(
@@ -1001,7 +1043,8 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             return record
 
     def start_deployment(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        if type(body) is dict and body.get("kind") == "bundle" and "fpga_load" in body:
+        if (type(body) is dict and body.get("kind") == "bundle"
+                and ("fpga_load" in body or "mode" in body)):
             return self.start_bundle_install(body)
         if type(body.get("kind")) is str and body["kind"] in {"python", "native-c", "fpga-image", "bundle"}:
             return self.admit_package(body)
@@ -1130,11 +1173,16 @@ class BootstrapHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/v1/assets":
             try:
-                helper = _load_script(
-                    Path(__file__).with_name("ppu_asset_set.py"),
-                    "plasma_ppu_assets_status",
+                deployment = _load_script(
+                    Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                    "plasma_ppu_assets_status_engine",
                 )
-                current = helper.read_active(self.owner.bootstrap_paths.product_root)
+                current = deployment.DeploymentCoordinator(
+                    paths=deployment.DeploymentPaths(
+                        product_root=self.owner.bootstrap_paths.product_root,
+                        bootstrap_state_root=self.owner.bootstrap_paths.state_root),
+                    installer=self.owner.base_module,
+                ).asset_status()
                 self._json(HTTPStatus.OK, {"ok": True, "assets": current})
             except Exception:
                 # An untrusted or corrupt pointer must not be returned as

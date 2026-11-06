@@ -21,6 +21,7 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
+      - "scripts/plasma_host_observe.py"
       - "scripts/plasma_engineering_monitor.py"
       - "scripts/plasma_engineering_activity.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
@@ -114,6 +115,8 @@ jobs:
           python3 -m py_compile scripts/plasma_development_stage_transport.py scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_development_stage_transport.py
+          python3 scripts/tests/test_plasma_path2_trusted_z2_artifact.py
+          python3 scripts/tests/test_plasma_trusted_z2_ci_artifact.py
           python3 scripts/tests/test_plasma_path2_root_direct.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
@@ -186,6 +189,9 @@ jobs:
       execution_capability: ${{ steps.approve.outputs.execution_capability }}
       task_id: ${{ steps.approve.outputs.task_id }}
       monitor_summary: ${{ steps.approve.outputs.monitor_summary }}
+      monitor_phase: ${{ steps.approve.outputs.monitor_phase }}
+      artifact_run_id: ${{ steps.approve.outputs.artifact_run_id }}
+      artifact_source_sha: ${{ steps.approve.outputs.artifact_source_sha }}
       monitor_stage: ${{ steps.approve.outputs.monitor_stage }}
       comment_id: ${{ steps.approve.outputs.comment_id }}
       claim_ref: ${{ steps.approve.outputs.claim_ref }}
@@ -269,7 +275,8 @@ jobs:
                         "registry_sha256","execution_path","execution_capability","task_id"):
                   f.write(f"{k}={data[k]}\n")
               for k in ("comment_id","claim_ref","work_order_sha256",
-                        "monitor_summary","monitor_stage"):
+                        "monitor_summary","monitor_stage","monitor_phase",
+                        "artifact_run_id","artifact_source_sha"):
                   f.write(f"{k}={data.get(k,'')}\n")
               # Pass only the minimal, already-verified PR identity snapshot.
               # No second PR API client or runner is required on SWPC.
@@ -434,10 +441,53 @@ jobs:
           name: plasma-armv7-hil-a1-pr-39192248348
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/plasma-hil-a2-source
+      # The new bridge is a ONE-SOURCE trusted step, not a candidate credential.
+      # No GH_TOKEN/GITHUB_TOKEN is passed to the operator-cli process.
+      - name: Qualify pinned Z2 Runtime Kit metadata (trusted)
+        id: z2kit
+        if: >-
+          needs.development-authorize.outputs.task_id == 'path2-work-order' &&
+          needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
+          needs.development-authorize.outputs.pr_number == '1299' &&
+          needs.development-authorize.outputs.pinned_sha == '1d2b0527928ee2ab58aca3a6f855916bceb3a648'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method GET /repos/physicslu/plasma/actions/runs/41792402221 \
+            > "$RUNNER_TEMP/plasma-z2-kit-run.json"
+          gh api --method GET /repos/physicslu/plasma/actions/runs/41792402221/artifacts \
+            > "$RUNNER_TEMP/plasma-z2-kit-artifacts.json"
+          python3 trusted/scripts/plasma_path2_trusted_z2_artifact.py verify-metadata \
+            --run-json "$RUNNER_TEMP/plasma-z2-kit-run.json" \
+            --artifacts-json "$RUNNER_TEMP/plasma-z2-kit-artifacts.json" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Download pinned Z2 Runtime Kit (trusted)
+        if: ${{ steps.z2kit.outcome == 'success' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          repository: physicslu/plasma
+          run-id: ${{ steps.z2kit.outputs.run_id }}
+          name: ${{ steps.z2kit.outputs.artifact_name }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/plasma-z2-kit-source
+      - name: Verify pinned Z2 Runtime Kit bytes (trusted)
+        if: ${{ steps.z2kit.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 trusted/scripts/plasma_path2_trusted_z2_artifact.py verify-archive \
+            --directory "$RUNNER_TEMP/plasma-z2-kit-source" \
+            --receipt "$RUNNER_TEMP/plasma-z2-kit-trusted-receipt.json"
+          python3 trusted/scripts/ppu-bootstrap-kit.py verify \
+            "$RUNNER_TEMP/plasma-z2-kit-source/plasma-z2-ps-kit-0.2.1-7ef3509265bc.tar.gz" \
+            --sidecar "$RUNNER_TEMP/plasma-z2-kit-source/plasma-z2-ps-kit-0.2.1-7ef3509265bc.tar.gz.sha256"
       - name: Execute candidate CLI using trusted dispatcher
         shell: bash
         env:
           PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
+          PLASMA_MONITOR_COMMENT_ID: ${{ needs.development-authorize.outputs.comment_id }}
           PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}
           PLASMA_MONITOR_STAGE: ${{ needs.development-authorize.outputs.monitor_stage }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
@@ -450,6 +500,7 @@ jobs:
           PLASMA_HIL_A2_CLAIM_REF: ${{ needs.development-claim.outputs.claim_ref }}
           PLASMA_HIL_A2_WORK_ORDER_SHA256: ${{ needs.development-claim.outputs.work_order_sha256 }}
           PLASMA_HIL_A2_ARTIFACT_DIR: ${{ runner.temp }}/plasma-hil-a2-source
+          PLASMA_Z2_KIT_ARTIFACT_DIR: ${{ runner.temp }}/plasma-z2-kit-source
         run: |
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
@@ -499,6 +550,7 @@ jobs:
             ${{ runner.temp }}/plasma-path2-stderr.txt
             ${{ runner.temp }}/plasma-path2-process.json
             ${{ runner.temp }}/plasma-path2-vivado-host-receipt.json
+            ${{ runner.temp }}/plasma-z2-kit-trusted-receipt.json
             candidate/pl/build/**/*.log
             candidate/pl/build/**/*.rpt
             candidate/pl/build/**/*.bit
@@ -517,6 +569,7 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: write  # trusted publisher can update only the verified PR ref
+      actions: read  # fetch only owner-pinned CI artifacts in trusted steps
       pull-requests: read  # resolve and verify live owner PR and pinned HEAD
     steps:
       - name: Check SWPC identity and trusted dispatcher SHA
@@ -543,12 +596,62 @@ jobs:
           path: candidate
           persist-credentials: false
           clean: true
+      # The trusted Actions step, never the Codex child, uses GITHUB_TOKEN.
+      # Owner work order pins the exact successful main push run and source.
+      - name: Admit source-pinned Z2 CI artifact (trusted)
+        id: z2-ci
+        if: ${{ needs.development-authorize.outputs.artifact_run_id != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_RUN_ID: ${{ needs.development-authorize.outputs.artifact_run_id }}
+          ARTIFACT_SOURCE_SHA: ${{ needs.development-authorize.outputs.artifact_source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_RUN_ID" =~ ^[1-9][0-9]{0,14}$ ]]
+          [[ "$ARTIFACT_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/physicslu/plasma/actions/runs/$ARTIFACT_RUN_ID" \
+            > "$RUNNER_TEMP/plasma-z2-ci-run.json"
+          gh api "repos/physicslu/plasma/actions/runs/$ARTIFACT_RUN_ID/artifacts?per_page=100" \
+            > "$RUNNER_TEMP/plasma-z2-ci-artifacts.json"
+          python3 trusted/scripts/plasma_trusted_z2_ci_artifact.py admit \
+            --run-json "$RUNNER_TEMP/plasma-z2-ci-run.json" \
+            --artifacts-json "$RUNNER_TEMP/plasma-z2-ci-artifacts.json" \
+            --source-sha "$ARTIFACT_SOURCE_SHA" --run-id "$ARTIFACT_RUN_ID" \
+            --receipt "$RUNNER_TEMP/plasma-z2-ci-admission.json" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Download and verify Z2 CI artifact bytes (trusted)
+        if: ${{ steps.z2-ci.outcome == 'success' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.z2-ci.outputs.artifact_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]{0,14}$ ]]
+          curl --fail --location --silent --show-error --retry 2 \
+            --connect-timeout 15 --max-time 1200 --max-filesize 536870912 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/physicslu/plasma/actions/artifacts/$ARTIFACT_ID/zip" \
+            -o "$RUNNER_TEMP/plasma-z2-ci-artifact.zip"
+          python3 trusted/scripts/plasma_trusted_z2_ci_artifact.py verify \
+            --admission "$RUNNER_TEMP/plasma-z2-ci-admission.json" \
+            --zip "$RUNNER_TEMP/plasma-z2-ci-artifact.zip" \
+            --destination "$RUNNER_TEMP/plasma-z2-ci-verified" \
+            --helper trusted/scripts/ppu-bootstrap-kit.py \
+            --receipt "$RUNNER_TEMP/plasma-z2-ci-verified-receipt.json" \
+            --github-env "$GITHUB_ENV"
+          echo PLASMA_Z2_CI_ARTIFACTS_VERIFIED
       - name: Codex develops, builds and tests candidate; preserve real evidence
         shell: bash
         env:
           PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
+          PLASMA_MONITOR_COMMENT_ID: ${{ needs.development-authorize.outputs.comment_id }}
           PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}
-          GH_TOKEN: ${{ github.token }}
+          PLASMA_MONITOR_PHASE: ${{ needs.development-authorize.outputs.monitor_phase }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
@@ -688,6 +791,8 @@ jobs:
           path: |
             ${{ runner.temp }}/plasma-path3-receipt.json
             ${{ runner.temp }}/plasma-path3-receipt.json.sha256
+            ${{ runner.temp }}/plasma-z2-ci-admission.json
+            ${{ runner.temp }}/plasma-z2-ci-verified-receipt.json
             ${{ runner.temp }}/plasma-path3-source.patch
             ${{ runner.temp }}/plasma-path3-source.patch.sha256
             ${{ runner.temp }}/plasma-path3-status.txt

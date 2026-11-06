@@ -13,8 +13,9 @@ operation it composes ONLY existing, reviewed owners:
 
 Operations (allowlist): ``probe`` = OpenOCD ``dap init`` + ``dpreg 0`` with a
 fixed argv (no target, flash, erase, program or reset); ``flash_cycle`` =
-``reset halt`` -> erase (image rounded up to erase units) -> write -> verify
--> full readback compare -> ``reset run`` for the session-bound, Runtime-resolved Flash profile
+``reset halt`` -> ``poll off`` -> ``flash probe 0`` -> erase (image rounded up
+to erase units) -> write -> verify -> full readback compare -> ``reset run``
+-> ``shutdown`` for the session-bound, Runtime-resolved Flash profile
 (target config + geometry). Sites: 1 and 2 only (the ABI-v5 two-Site
 geometry with a real hardware baseline; deriving Sites from the loaded PL is a
 separate Root/FPGA change).
@@ -29,6 +30,7 @@ import json
 import os
 import re
 import signal
+import stat
 import subprocess
 import tempfile
 import threading
@@ -36,13 +38,15 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from ppu_site_worker import FlashImage, TransportDenied, TransportUnknown
+from ppu_site_engine import EngineSelection
+from ppu_site_worker import FlashImage, TransportDenied, TransportFailed, TransportUnknown
 
 DPIDR = re.compile(r"SWD DPIDR (0x[0-9a-fA-F]{8})")
 DPREG0 = re.compile(r"PLASMA_DPREG0=(0x[0-9a-fA-F]+)")
 SAFE_OFF = "SAFE_OFF_MODE_OFF_VERIFIED"
 ADMIT_TIMEOUT_S = 120
 OPENOCD_MAX_S = 45
+CLEANUP_PROBE_MAX_S = 5
 
 
 class Abi5OpenocdAdapter:
@@ -52,12 +56,14 @@ class Abi5OpenocdAdapter:
 
     def __init__(self, *, openocd_root: Path, python: Path, adapter_khz: int,
                  adapter_driver: str = "plasma_swd",
+                 verified_engine: EngineSelection | None = None,
                  journal: Path = Path("/var/lib/plasma-privileged/fpga-deployment-state.json"),
                  record_dir: Path = Path("/run/plasma-z2-swd05"),
                  run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
                  popen: Callable[..., Any] = subprocess.Popen,
                  openocd_running: Callable[[], bool] | None = None,
-                 poll_s: float = 0.05) -> None:
+                 poll_s: float = 0.05,
+                 evidence_dir: Path | None = None) -> None:
         self.openocd_root = Path(openocd_root)
         self.python = Path(python)
         if type(adapter_khz) is not int or not 0 < adapter_khz <= 100_000:
@@ -66,12 +72,27 @@ class Abi5OpenocdAdapter:
             raise ValueError("adapter_driver invalid")
         self.adapter_khz = adapter_khz
         self.adapter_driver = adapter_driver
+        # The root Worker service supplies this only after load_engine() has
+        # verified the selection record and installed executable/admission SHA.
+        # A directly constructed adapter has no trusted OPF Engine receipt.
+        if verified_engine is not None and (
+            self.openocd_root != verified_engine.openocd_root
+            or adapter_khz != verified_engine.adapter_khz
+            or adapter_driver != verified_engine.adapter_driver
+        ):
+            raise ValueError("verified engine does not match adapter")
+        self.engine_selection_sha256 = (
+            verified_engine.record_sha256 if verified_engine is not None else None
+        )
         self.journal = Path(journal)
         self.record_dir = Path(record_dir)
         self._run = run
         self._popen = popen
         self._openocd_running = openocd_running or self._pgrep_openocd
         self.poll_s = poll_s
+        # systemd StateDirectory is root-owned and writable despite ProtectSystem=strict.
+        state_root = Path(os.environ.get("STATE_DIRECTORY") or "/var/lib/plasma-site-worker")
+        self.evidence_dir = Path(evidence_dir) if evidence_dir is not None else state_root / "openocd-evidence"
 
     @property
     def openocd(self) -> Path:
@@ -86,6 +107,12 @@ class Abi5OpenocdAdapter:
         return self.openocd_root / "share" / "openocd" / "scripts"
 
     # --- identity (FPGA reload detection; change detection, not a version pin) ---
+    # This installed adapter is the Z2 ABI5 reference implementation. Bundle
+    # declarations cannot choose its physical platform; native admission checks
+    # the live PL identity and ABI on every session.
+    platform = {"platform": "linux-armv7", "board": "pynq-z2",
+                "fpga_part": "xc7z020clg400-1"}
+
     def identity(self) -> Mapping[str, Any]:
         try:
             raw = self.journal.read_bytes()
@@ -109,9 +136,7 @@ class Abi5OpenocdAdapter:
         return self.record_dir / f"swd-site{site}-admission"
 
     def startup_sealed_sites(self) -> set[int]:
-        """A leftover admission record or any running OpenOCD is an unknown owner."""
-        if self._openocd_running():
-            return set(self.supported_sites)
+        """Current per-Site root admission records, checked afresh by Worker."""
         return {site for site in self.supported_sites if os.path.lexists(self._record(site))}
 
     # --- operations ---------------------------------------------------------------
@@ -161,6 +186,10 @@ class Abi5OpenocdAdapter:
             # algorithm stuck after the erase (Driver track HIL 2026-11-04,
             # runbook section 10): every Flash operation starts from reset.
             "-c", "reset halt",
+            # Match the proven Site 2 A/B OpenOCD sequence: avoid background
+            # target-state polling and explicitly probe bank 0 before erase.
+            "-c", "poll off",
+            "-c", "flash probe 0",
             "-c", f"flash erase_address {base} 0x{profile.erase_length(size):08x}",
             "-c", f"flash write_image {source} {base} bin",
             "-c", f"flash verify_image {source} {base} bin",
@@ -173,9 +202,53 @@ class Abi5OpenocdAdapter:
         try:
             r = self._run([str(self.python), "-I", "-B", str(self.admission), "revoke", str(site)],
                           capture_output=True, text=True, timeout=60)
-        except (OSError, subprocess.TimeoutExpired):
+        except Exception:
             return False
         return r.returncode == 0 and not os.path.lexists(self._record(site))
+
+    def _save_openocd_evidence(self, site: int, raw: bytes, rc: int | None,
+                               reason: str | None, revoked: bool) -> None:
+        """Persist raw child output before any unknown-outcome error is raised.
+
+        Never return these root-private paths or raw text to the Runtime/API.
+        An untrusted directory or failed write must not produce a Flash PASS.
+        """
+        directory = self.evidence_dir
+        directory.mkdir(mode=0o700, exist_ok=True)
+        info = directory.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_mode & 0o077):
+            raise OSError("OPENOCD_EVIDENCE_DIR_UNTRUSTED")
+
+        fd, filename = tempfile.mkstemp(prefix=f"site{site}-", suffix=".stdout",
+                                         dir=directory)
+        with os.fdopen(fd, "wb") as output:
+            output.write(raw)
+            output.flush()
+            os.fsync(output.fileno())
+
+        marker = SAFE_OFF.encode("ascii") in raw
+        record = {
+            "schema": "plasma.ppu.openocd-evidence.v1",
+            "site": site,
+            "captured_unix_ns": time.time_ns(),
+            "stdout_file": Path(filename).name,
+            "stdout_bytes": len(raw),
+            "stdout_sha256": hashlib.sha256(raw).hexdigest(),
+            "openocd_rc": rc,
+            "safe_off_marker_present": marker,
+            "safe_off_verified": reason is None and revoked and marker,
+            "admission_revoked": revoked,
+            "termination_reason": reason,
+        }
+        metadata = Path(filename).with_suffix(".json")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
+        meta_fd = os.open(metadata, flags, 0o600)
+        with os.fdopen(meta_fd, "w", encoding="utf-8") as output:
+            json.dump(record, output, sort_keys=True, separators=(",", ":"))
+            output.write("\n")
+            output.flush()
+            os.fsync(output.fileno())
 
     def run(self, site: int, operation: str, *, deadline: float,
             cancel: threading.Event, image: FlashImage | None = None) -> Mapping[str, Any]:
@@ -227,20 +300,23 @@ class Abi5OpenocdAdapter:
         Raises TransportDenied / TransportUnknown exactly like ``run``."""
         if site not in self.supported_sites:
             raise TransportDenied("OPERATION_OR_SITE_NOT_SUPPORTED")
-        log, rc = self._session(site, deadline=deadline, cancel=threading.Event())
+        log, rc = self._session(site, deadline=deadline, cancel=threading.Event(),
+                                cleanup_probe=False)
         return {"result": "SAFE_OFF_VERIFIED", "openocd_rc": rc,
                 "log_sha256": hashlib.sha256(log.encode()).hexdigest()}
 
     def _session(self, site: int, *, deadline: float, cancel: threading.Event,
                  argv: list[str] | None = None,
-                 max_duration_s: float = OPENOCD_MAX_S) -> tuple[str, Any]:
-        # Single hardware owner: refuse while any other OpenOCD / admission exists.
-        if self._openocd_running() or os.path.lexists(self._record(site)):
+                 max_duration_s: float = OPENOCD_MAX_S,
+                 cleanup_probe: bool = True) -> tuple[str, Any]:
+        # The admission record and native ps_owner lock protect this Site.
+        # A different Site's OpenOCD process does not block this Site.
+        if os.path.lexists(self._record(site)):
             raise TransportDenied("EXTERNAL_SITE_OWNER_PRESENT")
         try:
             a = self._run([str(self.python), "-I", "-B", str(self.admission), "admit", str(site)],
                           capture_output=True, text=True, timeout=ADMIT_TIMEOUT_S)
-        except (OSError, subprocess.TimeoutExpired):
+        except Exception:
             # Admission writes only a root-private record; revoke and refuse.
             if not self._revoke(site):
                 raise TransportUnknown("ADMISSION_OUTCOME_UNKNOWN")
@@ -249,7 +325,10 @@ class Abi5OpenocdAdapter:
             if not self._revoke(site):
                 raise TransportUnknown("ADMISSION_REVOKE_FAILED")
             raise TransportDenied("ADMISSION_DENIED")
-        log, reason, rc = "", None, None
+        log, raw, reason, rc = "", b"", None, None
+        child = None
+        operation_error = None
+        cleanup_error = False
         try:
             child = self._popen(self._argv(site) if argv is None else argv,
                                 stdin=subprocess.DEVNULL,
@@ -270,15 +349,52 @@ class Abi5OpenocdAdapter:
                     break
                 time.sleep(self.poll_s)
             out = child.stdout.read() if child.stdout else b""
-            log = out.decode("utf-8", "replace") if isinstance(out, bytes) else str(out)
+            raw = out if isinstance(out, bytes) else str(out).encode("utf-8", "replace")
+            log = raw.decode("utf-8", "replace")
             rc = child.returncode
+        except Exception as exc:
+            operation_error = type(exc).__name__
+            try:
+                if child is not None and child.poll() is None:
+                    try:
+                        os.killpg(child.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    child.wait()
+                if child is not None:
+                    rc = child.returncode
+            except Exception:
+                cleanup_error = True
         finally:
             revoked = self._revoke(site)
-        if reason:
-            # Killed mid-transaction: SAFE_OFF not proven.
-            raise TransportUnknown(reason)
+        try:
+            self._save_openocd_evidence(site, raw, rc, reason, revoked)
+        except Exception:
+            raise TransportUnknown("OPENOCD_EVIDENCE_WRITE_FAILED") from None
         if not revoked:
             raise TransportUnknown("ADMISSION_REVOKE_FAILED")
+        if cleanup_error:
+            raise TransportUnknown("OPENOCD_CHILD_NOT_REAPED")
+        if reason or operation_error:
+            if not cleanup_probe:
+                raise TransportUnknown(reason or "OPENOCD_EXCEPTION:" + operation_error)
+            # A killed or crashed child may have been in a SWD transaction.
+            # A new bounded native-owner session must prove SAFE_OFF before
+            # this failure may be offered to the Runtime for retry.
+            if child is None:
+                raise TransportDenied("OPENOCD_START_FAILED:" + operation_error)
+            try:
+                self.verify_safe_off(site, deadline=time.monotonic() + CLEANUP_PROBE_MAX_S)
+            except Exception as exc:
+                raise TransportUnknown((reason or operation_error) + ":CLEANUP_UNVERIFIED:" +
+                                       getattr(exc, "code", type(exc).__name__)) from None
+            raise TransportFailed(reason or "OPENOCD_EXCEPTION:" + operation_error)
         if SAFE_OFF not in log:
+            # Native ps_owner reports these before any MMIO or SWD access.
+            # Another process may legitimately hold the Site lock; that is
+            # current ownership, not a permanent fault in this Job's Site.
+            for denied in ("PS_OWNER_SITE_LOCK_UNAVAILABLE", "PS_OWNER_PL_IMAGE_NOT_LOADED"):
+                if "plasma_swd: " + denied in log:
+                    raise TransportDenied(denied)
             raise TransportUnknown("SAFE_OFF_NOT_VERIFIED")
         return log, rc

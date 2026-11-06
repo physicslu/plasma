@@ -20,7 +20,7 @@ import os
 import socket
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from plasma_core.errors import ErrorCode, PlasmaError
 
@@ -81,6 +81,17 @@ class SiteWorkerControlClient:
             raise SiteWorkerRefused("SITE_WORKER_REPLY_INVALID")
         return result
 
+    def open_job_session(self, *, job_id: str, sites: list[int], max_runtime_s: int,
+                         provider_route: Mapping[str, Any], deadline_monotonic: float,
+                         expected_engine_selection_sha256: str | None = None,
+                         ) -> dict[str, Any]:
+        fields = {"provider_route": dict(provider_route),
+                  "deadline_monotonic": deadline_monotonic}
+        if expected_engine_selection_sha256 is not None:
+            fields["expected_engine_selection_sha256"] = expected_engine_selection_sha256
+        return self.call("open_job_session", job_id=job_id, sites=sites,
+                         max_runtime_s=max_runtime_s, **fields)
+
 
 def stage_image(image_root: Path, job_id: str, image: bytes) -> Path:
     """Write the Job-owned Normalized Image exactly once (never reuse a file)."""
@@ -104,10 +115,13 @@ def stage_image(image_root: Path, job_id: str, image: bytes) -> Path:
 def _refusal(stage: str, exc: SiteWorkerRefused, **context: Any) -> PlasmaError:
     code = exc.code
     unknown = code.startswith("OUTCOME_UNKNOWN")
-    not_ready = code.startswith(("ENGINE_NOT_READY", "SITE_WORKER_UNREACHABLE"))
+    safe_failure = code.startswith("OPERATION_FAILED_SAFE:")
+    not_ready = code.startswith(("ENGINE_NOT_READY", "WORKER_ENGINE_",
+                                 "SITE_WORKER_UNREACHABLE"))
     return PlasmaError(
         ErrorCode.INTERFACE_NOT_CONFIGURED if not_ready else ErrorCode.INTERFACE_FAILURE,
         f"C-3 Site Worker {stage} refused: {code}",
+        recoverable=safe_failure,
         context={"site_worker_stage": stage, "site_worker_code": code,
                  "outcome_unknown": unknown, **context},
     )
@@ -122,20 +136,28 @@ async def run_flash_cycle(
     image: bytes,
     image_root: Path,
     max_runtime_s: int,
+    session_factory: Callable[[], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """One complete C-3 Flash cycle for one REST Job. Cancellation (task
     cancel / timeout) closes the session, which cancels the in-flight
-    OpenOCD operation inside the Worker (the Worker seals on an unproven
-    SAFE_OFF); the staged image is always removed."""
+    OpenOCD operation inside the Worker. An unproven SAFE_OFF remains sealed;
+    the staged image is always removed."""
     digest = hashlib.sha256(image).hexdigest()
     context = {"job_id": job_id, "site_id": site_id, "icpn": profile.icpn}
     staged = stage_image(image_root, job_id, image)
     session_id: str | None = None
     try:
         try:
-            opened = await asyncio.to_thread(
-                client.call, "open_job_session", job_id=job_id, sites=[site_id],
-                max_runtime_s=max_runtime_s)
+            # OPF may supply an already-qualified C-3 Session opener. Both
+            # paths use this *same* bind/run/close/SAFE_OFF evidence handling;
+            # production OPF uses the qualified opener; low-level tests may
+            # exercise C-3 directly without a Bundle.
+            if session_factory is None:
+                opened = await asyncio.to_thread(
+                    client.call, "open_job_session", job_id=job_id,
+                    sites=[site_id], max_runtime_s=max_runtime_s)
+            else:
+                opened = await asyncio.to_thread(session_factory)
             session_id = str(opened["session_id"])
             await asyncio.to_thread(
                 client.call, "bind_image", session_id=session_id, profile=profile.to_wire(),
@@ -150,6 +172,7 @@ async def run_flash_cycle(
             raise PlasmaError(
                 ErrorCode.INTERFACE_FAILURE,
                 f"C-3 Flash cycle failed: {result.get('code', 'FAIL')}",
+                recoverable=result.get("safe_off") is True,
                 context={**context, "site_worker_result": result},
             )
         if result.get("readback_sha256") != digest or result.get("bytes_verified") != len(image):
@@ -160,13 +183,25 @@ async def run_flash_cycle(
             )
         return {**result, "image_sha256": digest, "session_id": session_id}
     finally:
-        if session_id is not None:
-            # Shielded: a cancelled Job still closes its session (stops OpenOCD).
-            await asyncio.shield(asyncio.to_thread(_close_quietly, client, session_id))
         try:
-            staged.unlink()
-        except FileNotFoundError:
-            pass
+            if session_id is not None:
+                # A retry is safe only after close has waited for the native
+                # operation and its cleanup to finish. Failed close is
+                # authoritative even if the Flash result had SAFE_OFF.
+                closed = await asyncio.shield(asyncio.to_thread(
+                    _close_quietly, client, session_id))
+                if closed is None or not closed.get("closed") or closed.get("sealed_sites"):
+                    raise PlasmaError(
+                        ErrorCode.INTERFACE_FAILURE,
+                        "C-3 Site Worker close did not confirm hardware release",
+                        context={**context, "site_worker_stage": "close",
+                                 "outcome_unknown": True},
+                    )
+        finally:
+            try:
+                staged.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def _close_quietly(client: SiteWorkerControlClient, session_id: str) -> Mapping[str, Any] | None:

@@ -271,3 +271,25 @@ The current resolver contract does not:
 - create PPU or Socket validation evidence;
 - deploy or restart services;
 - access Z2, FPGA or real IC hardware.
+
+## Owner decision addendum (2026-11-04): separate catalog data from execution
+
+See [Unified Bundle-driven Programming Execution](unified-bundle-driven-programming-decision-2026-11-04.md).
+Existing sections above describe the **current implementation**, including
+repository-owned ICPN/IC Support datasets and OpenOCD-specific planning.
+For the target product architecture, those datasets are optional research,
+qualification and Console admission inputs, **not** mandatory PPU programming
+execution inputs. The selected, authorized Active Bundle supplies exact-target
+Programming Profile, memory geometry, selected Provider and its operation
+capabilities. The PPU validates those selected resources and real hardware
+conditions instead of demanding a built-in manufacturer/ICPN table or an
+existing static Compiler Admission record.
+
+The programming flow is shared by Engineering and Production, **without**
+changing any other mode policies. Runtime must still reject malformed,
+incompatible, unauthenticated or incomplete selected Provider/Profile inputs;
+the Catalog removal cannot be a fail-open path for an unknown target.
+The transition from built-in IC Support Resolver and Compiler Registry to
+Bundle-driven resolution is **NOT IMPLEMENTED**; until migrated, current
+restrictions and their error codes still apply.
+

@@ -33,6 +33,7 @@ on:
       - "software/python/plasma_core/**"
       - "software/python/plasma_interfaces/**"
       - "software/python/plasma_handlers/**"
+      - "software/python/plasma_opf/**"
       - "software/python/plasma_server/**"
       - "software/python/plasma_client/**"
       - "software/python/plasma_manager/**"

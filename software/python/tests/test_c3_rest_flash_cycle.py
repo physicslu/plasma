@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import io
 import json
 import os
 import re
@@ -21,6 +22,8 @@ import subprocess
 import sys
 import tempfile
 import threading
+from contextlib import ExitStack
+from unittest.mock import patch
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -29,12 +32,16 @@ import pytest
 
 from plasma_client.client import PlasmaClient
 from plasma_core.config import PlasmaConfig, ServerConfig, SiteConfig
+from plasma_core.enums import Operation
+from plasma_core.errors import PlasmaError
 from plasma_core.ic_support import get_default_ic_support_resolver
-from plasma_core.models import JOB_ID_PATTERN, new_job_id
+from plasma_core.models import JOB_ID_PATTERN, JobRequest, new_job_id
 from plasma_interfaces.openocd import OpenOCDInterface, c3_flash_profile
+from plasma_interfaces.site_worker_c3 import C3FlashProfile, SiteWorkerRefused, run_flash_cycle
 from plasma_server.runtime_control import RuntimeControlServer
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
+from plasma_server.package_actions import PackageActionRuntime
 from plasma_web.gateway import PlasmaWebHandler
 from plasma_web import gateway as gateway_module
 from plasma_web.device_catalog import DeviceCatalogIntegrityError
@@ -217,6 +224,7 @@ class FlashSim:
         self.base, self.memory = base, bytearray(b"\xff" * size)
         self.argvs: list[list[str]] = []
         self.corrupt = False
+        self.fail_at = None
         self.hang = threading.Event()  # set -> OpenOCD never exits until killed
 
     def run(self, argv, **_kw):
@@ -231,12 +239,18 @@ class FlashSim:
             path = re.search(r"\{([^{}]+)\}", command)
             parts = command.split()
             if command.startswith("flash erase_address "):
+                if self.fail_at == "erase":
+                    rc = 5
                 start, length = int(parts[2], 0) - self.base, int(parts[3], 0)
                 self.memory[start:start + length] = b"\xff" * length
             elif command.startswith("flash write_image "):
+                if self.fail_at == "write":
+                    rc = 5
                 data = Path(path.group(1)).read_bytes()
                 self.memory[:len(data)] = data
             elif command.startswith("flash verify_image "):
+                if self.fail_at == "verify":
+                    rc = 5
                 data = Path(path.group(1)).read_bytes()
                 rc = rc or (0 if self.memory[:len(data)] == data else 5)
             elif command.startswith("dump_image "):
@@ -267,8 +281,11 @@ class _Proc:
 
 
 class Stack:
-    def __init__(self, root: Path, *, site_target="STM32F103C8T6", adapter=None):
+    def __init__(self, root: Path, *, site_target="STM32F103C8T6", adapter=None,
+                 max_retries=0, in_process=False, bundle_options=None):
         self.root = root
+        self.in_process = in_process
+        self.bundle_options = bundle_options or {}
         self.sim = FlashSim(0x08000000, 0x10000)
         engine = make_engine(root / "openocd", "0.12.0-test-plasma-swd-555555555555")
         journal = root / "journal.json"
@@ -276,58 +293,135 @@ class Stack:
         self.adapter = adapter or abi5.Abi5OpenocdAdapter(
             openocd_root=Path(engine["openocd_root"]), python=Path(sys.executable),
             adapter_khz=500, journal=journal, record_dir=root / "rec",
-            run=self.sim.run, popen=self.sim.popen, openocd_running=lambda: False, poll_s=0.01)
+            run=self.sim.run, popen=self.sim.popen, openocd_running=lambda: False, poll_s=0.01,
+            evidence_dir=root / "openocd-evidence")
         (root / "rec").mkdir()
         self.images = root / "normalized-images"
         self.site_target = site_target
+        self.max_retries = max_retries
 
     async def __aenter__(self):
+        # Real installed/verified Bundle + production Runtime composition.
+        # Only root ownership and physical process edges are test substitutes.
+        from .test_opf_4a_openocd_reference import installed_bundle
+        import ppu_site_engine
+
+        self.opf_context = ExitStack()
+        self.opf = self.opf_context.enter_context(installed_bundle(
+            with_control_socket=False, **self.bundle_options))
+        if isinstance(self.adapter, abi5.Abi5OpenocdAdapter):
+            self.adapter = self.opf["adapter"]
+            self.sim = self.opf["sim"]
+        self.images = self.opf["image_root"]
+        original_load = ppu_site_engine.load_engine
+
+        def test_engine(*args, **kwargs):
+            return original_load(self.opf["engine_record"],
+                                 base=self.opf["engine_base"], require_root=False)
+
+        self.opf_context.enter_context(patch.object(ppu_site_engine, "load_engine", test_engine))
         root = self.root
         config = PlasmaConfig(
             server=ServerConfig(host="127.0.0.1", port=0, output_root=root / "output",
                                 log_root=root / "logs", max_supported_sites=2,
                                 max_concurrent_jobs=1),
             sites=[SiteConfig(id=2, enabled=True, interface="openocd", target=self.site_target,
+                              max_retries=self.max_retries, retry_backoff_s=0,
                               openocd={"site_worker_socket": str(root / "c3.sock"),
                                        "normalized_image_root": str(self.images)})],
         )
         resolver = get_default_ic_support_resolver()
         self.manager = SiteManager(config, ic_support_resolver=resolver)
+        self.package_runtime = PackageActionRuntime(
+            self.manager, control_plane=ROOT / "scripts", product_root=self.opf["product_root"],
+            state_root=root / "package-state", owner_credential=None, spawner=None,
+            python_executable=Path(sys.executable))
         self.server = PlasmaServer(config, self.manager)
-        await self.server.start()
+        if self.in_process:
+            self.worker_requests = []
+            await self.manager.start()
+        else:
+            await self.server.start()
         self.control = RuntimeControlServer(self.manager, root / "runtime.sock")
-        await self.control.start()
+        if not self.in_process:
+            await self.control.start()
         self.core = worker.SiteWorkerCore(
             self.adapter, runtime_pid=os.getpid,
-            lease_verifier=worker.runtime_lease_verifier(root / "runtime.sock"),
+            lease_verifier=(lambda job, kind: kind == "rest_job" and job in
+                            self.manager.execution_lease_snapshot().get("job_ids", []))
+            if self.in_process else worker.runtime_lease_verifier(root / "runtime.sock"),
             seal_dir=root / "seals", image_root=self.images)
         self.c3 = worker.SiteWorkerServer(self.core, root / "c3.sock", mode=0o600)
-        self.c3.start()
-        host, port = self.server.address
+        if not self.in_process:
+            self.c3.start()
 
         class Gateway(PlasmaWebHandler):
             pass
 
-        Gateway.client_factory = staticmethod(lambda: PlasmaClient(host, port))
+        if self.in_process:
+            loop = asyncio.get_running_loop()
+            server = self.server
+
+            class InProcessClient(PlasmaClient):
+                async def _exchange(self, frame, **kwargs):
+                    pending = asyncio.run_coroutine_threadsafe(
+                        server._dispatch(frame, ("in-process-test", 0)), loop)
+                    # No socketpair wakeup is assumed in the workspace sandbox.
+                    for _ in range(1000):
+                        if pending.done():
+                            return pending.result()
+                        await asyncio.sleep(0.01)
+                    raise AssertionError("test protocol transport did not complete")
+
+            Gateway.client_factory = staticmethod(InProcessClient)
+
+            def worker_call(op, *, timeout_s=None, **fields):
+                self.worker_requests.append({"op": op, **fields})
+                reply = self.core.handle({"protocol": worker.PROTOCOL, "op": op, **fields},
+                                         (os.getpid(), os.getuid(), os.getgid()), "control")
+                if not reply["ok"]:
+                    raise SiteWorkerRefused(reply["error"])
+                return reply["result"]
+
+            self.manager.interfaces[2]._site_worker.call = worker_call
+        else:
+            host, port = self.server.address
+            Gateway.client_factory = staticmethod(lambda: PlasmaClient(host, port))
         Gateway.output_root = root / "output"
         Gateway.engineering_provider = None
         Gateway.batch_runtime = None
         Gateway.static_root = None
+        self.gateway = Gateway
+        if self.in_process:
+            return self
         self.http = ThreadingHTTPServer(("127.0.0.1", 0), Gateway)
         self.thread = threading.Thread(target=self.http.serve_forever, daemon=True)
         self.thread.start()
         return self
 
     async def __aexit__(self, *exc):
-        await asyncio.to_thread(self.http.shutdown)
-        self.http.server_close()
-        self.thread.join(timeout=5)
-        self.c3.close()
-        await self.control.close()
+        if not self.in_process:
+            await asyncio.to_thread(self.http.shutdown)
+            self.http.server_close()
+            self.thread.join(timeout=5)
+            self.c3.close()
+            await self.control.close()
         await self.server.close()
+        self.opf_context.close()
 
     async def api(self, method, endpoint, payload=None):
         def request():
+            if self.in_process:
+                handler = object.__new__(self.gateway)
+                handler.path = endpoint
+                handler.command = method
+                data = json.dumps(payload).encode() if payload is not None else b""
+                handler.headers = {"Content-Length": str(len(data))}
+                handler.rfile = io.BytesIO(data)
+                response = []
+                handler._json = lambda status, body: response.append((status, body))
+                getattr(handler, "do_" + method)()
+                return response[0]
             conn = HTTPConnection("127.0.0.1", self.http.server_port, timeout=30)
             try:
                 data = json.dumps(payload).encode() if payload is not None else None
@@ -339,7 +433,7 @@ class Stack:
                 return response.status, (json.loads(raw) if "application/json" in kind else raw)
             finally:
                 conn.close()
-        return await asyncio.to_thread(request)
+        return await asyncio.wait_for(asyncio.to_thread(request), timeout=10)
 
     async def flash(self, image: bytes, **extra):
         body = {"site_id": 2, "operation": "flash_cycle", "asset_name": "fw.bin",
@@ -363,18 +457,30 @@ def short_tmp():
 
 
 def run(coro):
-    return asyncio.run(coro)
+    async def main():
+        # Timers let thread completions progress even where the sandbox denies
+        # socketpair wakeups. No network permission is needed or changed.
+        loop = asyncio.get_running_loop()
+
+        def tick():
+            loop.call_later(0.01, tick)
+
+        tick()
+        return await coro
+
+    return asyncio.run(main())
 
 
-def test_rest_flash_cycle_through_c3_passes_with_full_readback():
+@pytest.mark.parametrize("in_process", [False, True], ids=["sockets", "in-process"])
+def test_rest_flash_cycle_through_c3_passes_with_full_readback(in_process):
     image = bytes(range(256)) * 9  # 2304 B -> 3 pages erased
     digest = hashlib.sha256(image).hexdigest()
 
     async def scenario():
         with short_tmp() as directory:
-            async with Stack(Path(directory)) as stack:
+            async with Stack(Path(directory), in_process=in_process) as stack:
                 job_id, job = await stack.flash(image)
-                assert job["state"] == "success", job
+                assert job["state"] == "success", json.dumps(job, indent=2)
                 # The unchanged REST Job ID format is accepted by C-3 as-is.
                 assert job_id.startswith("job-") and worker.JOB_ID.fullmatch(job_id)
                 result = job["result"]
@@ -383,15 +489,28 @@ def test_rest_flash_cycle_through_c3_passes_with_full_readback():
                 assert evidence["readback_sha256"] == digest == result["image_sha256"]
                 assert evidence["bytes_verified"] == len(image)
                 assert evidence["icpn"] == "STM32F103C8T6" and evidence["adapter_khz"] == 500
+                assert evidence["opf_asset_set_sha256"] == stack.opf["asset_set_sha256"]
+                assert evidence["opf_provider_package"] == "openocd-reference"
+                assert evidence["opf_worker_engine_selection_sha256"] == evidence["opf_engine_selection_sha256"]
+                runtime = stack.manager.registry.get(job_id)
+                assert runtime.active_asset_set["asset_set_sha256"] == evidence["opf_asset_set_sha256"]
+                if in_process:
+                    [opened] = [r for r in stack.worker_requests if r["op"] == "open_job_session"]
+                    assert opened["deadline_monotonic"] == runtime.deadline_monotonic
+                    assert opened["provider_route"]["site_id"] == 2
                 assert bytes(stack.sim.memory[:len(image)]) == image
                 [argv] = stack.sim.argvs
                 commands = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "-c"]
                 assert argv[argv.index("-f") + 1] == "target/stm32f1x.cfg"
                 assert "adapter speed 500" in commands
-                assert "flash erase_address 0x08000000 0x00000c00" in commands
+                erase = "flash erase_address 0x08000000 0x00000c00"
+                index = commands.index("reset halt")
+                assert commands[index:index + 4] == [
+                    "reset halt", "poll off", "flash probe 0", erase
+                ]
                 assert any(c.startswith("dump_image ") for c in commands)
                 # Job-owned staged image removed; session closed; Site not sealed.
-                assert list(stack.images.iterdir()) == []
+                assert not stack.images.exists() or list(stack.images.iterdir()) == []
                 status = stack.core.handle({"protocol": worker.PROTOCOL, "op": "status"},
                                            (os.getpid(), 0, 0), "control")["result"]
                 assert status["session"] is None and status["sealed_sites"] == []
@@ -399,7 +518,7 @@ def test_rest_flash_cycle_through_c3_passes_with_full_readback():
 
 
 
-def test_st_rest_c3_flash_does_not_require_unrelated_production_device_catalog(monkeypatch):
+def test_rest_opf_flash_does_not_require_unrelated_device_catalog(monkeypatch):
     """The actual Gateway -> Runtime -> C3 fake-OpenOCD path stays available
     when a slim PPU has no full Microchip/Production browsing Catalog."""
     def catalog_not_installed():
@@ -409,7 +528,7 @@ def test_st_rest_c3_flash_does_not_require_unrelated_production_device_catalog(m
 
     async def scenario():
         with short_tmp() as directory:
-            async with Stack(Path(directory)) as stack:
+            async with Stack(Path(directory), in_process=True) as stack:
                 payload = b"HOST-ONLY-NO-MICROCHIP-CATALOG"
                 _job_id, job = await stack.flash(payload)
                 assert job["state"] == "success", job
@@ -420,15 +539,188 @@ def test_st_rest_c3_flash_does_not_require_unrelated_production_device_catalog(m
 
     run(scenario())
 
-def test_rest_flash_cycle_readback_mismatch_is_never_success():
+
+def test_opf_ordinary_job_does_not_require_historical_qualification_metadata():
     async def scenario():
         with short_tmp() as directory:
-            async with Stack(Path(directory)) as stack:
+            async with Stack(Path(directory), in_process=True) as stack:
+                journal = stack.adapter.journal
+                data = json.loads(journal.read_text())
+                # Historical qualification metadata is optional. Current boot
+                # and firmware identity remain required for the installed
+                # platform observation before live C3 admission.
+                for key in ("schema", "manifest_sha256"):
+                    data.pop(key, None)
+                data["test_count"] = 0
+                journal.write_text(json.dumps(data))
+                for _ in range(2):
+                    _job_id, job = await stack.flash(b"UNCHANGED-QUALIFIED-SESSION")
+                    assert job["state"] == "success", job
+                assert len(stack.sim.argvs) == 2
+                assert not stack.core._sessions and not stack.core._site_owners
+                assert not stack.core._sealed
+    run(scenario())
+
+
+@pytest.mark.parametrize("in_process", [False, True], ids=["sockets", "in-process"])
+def test_rest_flash_cycle_readback_mismatch_is_never_success(in_process):
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), in_process=in_process) as stack:
                 stack.sim.corrupt = True
                 _job_id, job = await stack.flash(b"INTENDED-FIRMWARE")
                 assert job["state"] != "success"
                 assert "READBACK_MISMATCH" in json.dumps(job)
                 assert list(stack.images.iterdir()) == []
+    run(scenario())
+
+
+@pytest.mark.parametrize("case,options,code", [
+    ("empty", {}, "OPF_ACTIVE_SET_REQUIRED"),
+    ("stale", {}, "ACTIVE_SET_MISMATCH"),
+    ("profile", {"profile_change": {"flash_size": 131072}}, "REFERENCE_PROFILE_RUNTIME_MISMATCH"),
+    ("driver", {"descriptor_change": {"driver_abi": "plasma_swd:6"}}, "FPGA_DRIVER_UNVERIFIED"),
+    ("engine", {"engine_binary": b"different-installed-engine"}, "REFERENCE_ENGINE_BINARY_MISMATCH"),
+    ("unverified-worker", {"verified_worker": False}, "WORKER_ENGINE_UNVERIFIED"),
+    ("image", {}, "OPF_FPGA_IDENTITY_UNVERIFIED"),
+    ("unsafe", {}, "OPF_FPGA_IDENTITY_UNVERIFIED"),
+    ("lease", {}, "JOB_LEASE_NOT_HELD"),
+    ("unwired", {}, "OPF_RUNTIME_NOT_WIRED"),
+    ("sealed", {}, "SITE_SEALED"),
+    ("external-owner", {}, "EXTERNAL_SITE_OWNER_PRESENT"),
+    ("race", {}, "WORKER_FPGA_IDENTITY_MISMATCH"),
+    ("reselected", {}, "WORKER_ENGINE_SELECTION_MISMATCH"),
+    ("transport", {"descriptor_change": {"transport": "ps-only", "driver_abi": None,
+                                          "fpga_package": None}}, "PS_TRANSPORT_UNVERIFIED"),
+])
+def test_opf_rest_fail_closed_before_flash(case, options, code):
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), in_process=True, bundle_options=options) as stack:
+                reader = stack.manager._active_asset_set_reader
+                if case == "empty":
+                    stack.manager._active_asset_set_reader = lambda: {"state": "EMPTY"}
+                elif case == "stale":
+                    pinned = reader()
+                    stack.manager._active_asset_set_reader = lambda: {**pinned, "generation": 999}
+                elif case in {"image", "unsafe"}:
+                    journal = stack.adapter.journal
+                    data = json.loads(journal.read_text())
+                    journal.write_text(json.dumps({**data, **({"image_id": "different-image"} if case == "image"
+                                                       else {"status": "UNKNOWN"})}))
+                elif case == "unwired":
+                    stack.manager.interfaces[2].opf_flash_executor = None
+                elif case == "sealed":
+                    stack.core._sealed.add(2)
+                elif case == "external-owner":
+                    stack.adapter._record(2).touch()
+                elif case == "lease":
+                    stack.core.lease_verifier = lambda *_: False
+                elif case == "race":
+                    client = stack.manager.interfaces[2]._site_worker
+                    original_call = client.call
+
+                    def changed_after_status(op, **fields):
+                        reply = original_call(op, **fields)
+                        if op == "status":
+                            journal = stack.adapter.journal
+                            data = json.loads(journal.read_text())
+                            journal.write_text(json.dumps({**data, "session_id": "changed"}))
+                        return reply
+
+                    client.call = changed_after_status
+                elif case == "reselected":
+                    write_selection(stack.opf["engine_record"],
+                                    {**stack.opf["engine_data"], "adapter_khz": 2000})
+                _job_id, job = await stack.flash(b"DENIED")
+                assert job["state"] != "success" and code in json.dumps(job), job
+                assert not stack.sim.argvs
+                assert stack.core._sessions == {} and stack.core._site_owners == {}
+                assert not stack.images.exists() or list(stack.images.iterdir()) == []
+                assert stack.manager.execution_lease_snapshot()["busy"] is False
+    run(scenario())
+
+
+def test_opf_runtime_retries_keep_one_job_deadline_and_release_owner():
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), in_process=True, max_retries=2) as stack:
+                stack.sim.fail_at = "verify"
+                result = await stack.manager.submit(JobRequest(
+                    site_id=2, operation=Operation.FLASH_CYCLE, image=b"RETRY",
+                    target="STM32F103C8T6", max_retries=2, retry_backoff_s=0, timeout_s=5))
+                assert result.state.value != "success"
+                assert len(result.attempt_history) == 3 and result.retry_exhausted
+                opens = [r for r in stack.worker_requests if r["op"] == "open_job_session"]
+                assert len(opens) == 3
+                deadline = stack.manager.registry.get(result.job_id).deadline_monotonic
+                assert all(r["deadline_monotonic"] == deadline for r in opens)
+                assert len(stack.sim.argvs) == 3
+                assert not stack.core._sessions and not stack.core._site_owners
+                assert not stack.core._sealed
+                assert stack.manager.execution_lease_snapshot()["busy"] is False
+    run(scenario())
+
+
+@pytest.mark.parametrize("phase", ["erase", "write", "verify", "readback"])
+def test_safe_flash_failure_allows_next_independent_job(phase):
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory)) as stack:
+                stack.sim.corrupt = phase == "readback"
+                stack.sim.fail_at = None if phase == "readback" else phase
+                _first_id, failed = await stack.flash(b"FIRST")
+                assert failed["state"] != "success"
+                assert stack.core.handle({"protocol": worker.PROTOCOL, "op": "status"},
+                                         (os.getpid(), 0, 0), "control")["result"]["sealed_sites"] == []
+                stack.sim.corrupt = False
+                stack.sim.fail_at = None
+                _next_id, passed = await stack.flash(b"SECOND")
+                assert passed["state"] == "success", passed
+    run(scenario())
+
+
+def test_safe_flash_failure_uses_bounded_runtime_attempt_history():
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), max_retries=2) as stack:
+                stack.sim.fail_at = "verify"
+                host, port = stack.server.address
+                response = await PlasmaClient(host, port).submit(JobRequest(
+                    site_id=2, operation=Operation.FLASH_CYCLE, image=b"RETRY",
+                    target="STM32F103C8T6", max_retries=2, retry_backoff_s=0,
+                ))
+                failed = response["result"]
+                assert failed["state"] != "success"
+                assert len(failed["attempt_history"]) == 3, json.dumps(failed, indent=2)
+                assert [a["retry_scheduled"] for a in failed["attempt_history"]] == [
+                    True, True, False]
+                assert failed["retry_exhausted"] is True
+                assert len(stack.sim.argvs) == 3
+    run(scenario())
+
+
+def test_unconfirmed_session_close_prevents_safe_failure_retry(tmp_path):
+    class RefusingClose:
+        def call(self, op, **_fields):
+            if op == "open_job_session":
+                return {"session_id": "session"}
+            if op == "bind_image":
+                return {"bound": True}
+            if op == "run":
+                return {"result": "FAIL", "code": "WRITE_FAILED", "safe_off": True}
+            raise SiteWorkerRefused("SITE_WORKER_UNREACHABLE")
+
+    async def scenario():
+        with pytest.raises(PlasmaError) as caught:
+            await run_flash_cycle(
+                RefusingClose(), job_id="job-close-failure", site_id=2,
+                profile=C3FlashProfile("STM32F103C8T6", "target/stm32f1x.cfg",
+                                       0x08000000, 0x10000, 1024),
+                image=b"FW", image_root=tmp_path, max_runtime_s=30)
+        assert caught.value.recoverable is False
+        assert "close did not confirm" in str(caught.value)
+        assert list(tmp_path.iterdir()) == []
     run(scenario())
 
 
@@ -440,14 +732,15 @@ def test_rest_flash_cycle_engine_not_ready_fails_explicitly():
                 _job_id, job = await stack.flash(b"FW")
                 assert job["state"] != "success"
                 assert "ENGINE_NOT_READY" in json.dumps(job)
-                assert list(stack.images.iterdir()) == []
+                assert not stack.images.exists() or list(stack.images.iterdir()) == []
     run(scenario())
 
 
-def test_rest_flash_cycle_timeout_never_reports_success_and_seals():
+@pytest.mark.parametrize("in_process", [False, True], ids=["sockets", "in-process"])
+def test_rest_flash_cycle_timeout_never_reports_success_and_seals(in_process):
     async def scenario():
         with short_tmp() as directory:
-            async with Stack(Path(directory)) as stack:
+            async with Stack(Path(directory), in_process=in_process) as stack:
                 stack.sim.hang.set()
                 _job_id, job = await stack.flash(b"FW-THAT-HANGS", timeout_s=1.5)
                 assert job["state"] != "success"
