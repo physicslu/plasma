@@ -653,15 +653,17 @@ class SiteWorkerClient:
         return reply["result"]
 
     def open_session(self, *, job_id: str, sites: list[int], pgid: int, uid: int,
-                     max_runtime_s: int) -> dict[str, Any]:
+                     max_runtime_s: int, profile: Mapping[str, Any] | None = None) -> dict[str, Any]:
         return self.call("open_session", job_id=job_id, sites=sites, pgid=pgid, uid=uid,
-                         max_runtime_s=max_runtime_s)
+                         max_runtime_s=max_runtime_s,
+                         **({"profile": dict(profile)} if profile is not None else {}))
 
     def close_session(self, session_id: str) -> dict[str, Any]:
         return self.call("close_session", session_id=session_id)
 
     def open_job_session(self, *, job_id: str, sites: list[int],
                          max_runtime_s: int,
+                         profile: Mapping[str, Any] | None = None,
                          provider_route: Mapping[str, Any] | None = None,
                          deadline_monotonic: float | None = None,
                          expected_engine_selection_sha256: str | None = None) -> dict[str, Any]:
@@ -670,13 +672,15 @@ class SiteWorkerClient:
             "deadline_monotonic": deadline_monotonic})
         if expected_engine_selection_sha256 is not None:
             extra["expected_engine_selection_sha256"] = expected_engine_selection_sha256
+        if profile is not None:
+            extra["profile"] = dict(profile)
         return self.call("open_job_session", job_id=job_id, sites=sites,
                          max_runtime_s=max_runtime_s, **extra)
 
     def bind_image(
-        self, session_id: str, *, profile: Mapping[str, Any], image_sha256: str, image_size: int
+        self, session_id: str, *, image_sha256: str, image_size: int
     ) -> dict[str, Any]:
-        return self.call("bind_image", session_id=session_id, profile=dict(profile),
+        return self.call("bind_image", session_id=session_id,
                          image_sha256=image_sha256, image_size=image_size)
 
     def run(self, session_id: str, *, site: int, operation: str) -> dict[str, Any]:
