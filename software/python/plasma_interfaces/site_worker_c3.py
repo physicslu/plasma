@@ -63,10 +63,13 @@ class SiteWorkerControlClient:
 
     def open_job_session(self, *, job_id: str, sites: list[int], max_runtime_s: int,
                          provider_route: Mapping[str, Any], deadline_monotonic: float,
+                         profile: Mapping[str, Any] | None = None,
                          expected_engine_selection_sha256: str | None = None,
                          ) -> dict[str, Any]:
         fields = {"provider_route": dict(provider_route),
                   "deadline_monotonic": deadline_monotonic}
+        if profile is not None:
+            fields["profile"] = dict(profile)
         if expected_engine_selection_sha256 is not None:
             fields["expected_engine_selection_sha256"] = expected_engine_selection_sha256
         return self.call("open_job_session", job_id=job_id, sites=sites,
@@ -135,12 +138,12 @@ async def run_flash_cycle(
             if session_factory is None:
                 opened = await asyncio.to_thread(
                     client.call, "open_job_session", job_id=job_id,
-                    sites=[site_id], max_runtime_s=max_runtime_s)
+                    sites=[site_id], max_runtime_s=max_runtime_s, profile=dict(profile))
             else:
                 opened = await asyncio.to_thread(session_factory)
             session_id = str(opened["session_id"])
             await asyncio.to_thread(
-                client.call, "bind_image", session_id=session_id, profile=dict(profile),
+                client.call, "bind_image", session_id=session_id,
                 image_sha256=digest, image_size=len(image))
             result = await asyncio.to_thread(
                 client.call, "run", timeout_s=max_runtime_s + 30.0, session_id=session_id,
