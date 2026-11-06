@@ -55,8 +55,9 @@ Engine Selection and Worker Session identity checks remain unchanged.
 `ppu_opf_site_session.open_provider_job_session`. It then invokes the same
 `plasma_interfaces.site_worker_c3.run_flash_cycle` implementation already used
 by the current REST Runtime, with an optional qualified Session opener. The
-remaining sequence is unchanged: stage Job image, C-3 `bind_image`, C-3 `run`,
-full readback SHA/length evidence, C-3 `close_session`, cleanup. C-3 alone
+sequence is: stage Job image, open C-3 Session with the one Bundle Flash
+Profile, `bind_image` with SHA256/size only, `run`, full readback SHA/length
+evidence, `close_session`, cleanup. C-3 alone
 owns Site ownership, Job lease verification, operation timeout, SAFE_OFF and
 persistent seals; the existing Runtime alone owns Job retry policy. This PR
 introduces **none** of those controls.
