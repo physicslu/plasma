@@ -29,7 +29,6 @@ REQUIRED_SCRIPTS = (
     "ppu_unified_deployment.py",
     "ppu_owner_authorization.py",
     "ppu_fpga_qualification.py",
-    "ppu-fpga-image-contracts.json",
     "ppu_asset_set.py",
     "ppu_asset_execution.py",
     "ppu_privileged_source.py",

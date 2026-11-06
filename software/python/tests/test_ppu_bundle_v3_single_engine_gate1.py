@@ -9,21 +9,20 @@ import pytest
 from .ppu_fpga_qualification_fixture import synthetic_image
 from .test_ppu_bundle_v3_packages_contract import TARGET, engine
 from .test_ppu_bundle_v3_smoke_execution_gate1 import build_smoke
-from .test_ppu_fpga_static_qualification_gate1 import contract_file, fpga_bundle
+from .test_ppu_fpga_static_qualification_gate1 import fpga_bundle
 
 
-def _admit(archive, digest, contracts_path, *, target=TARGET):
+def _admit(archive, digest, *, target=TARGET):
     return engine.DeploymentCoordinator.qualify_bundle_v3_admission(
         archive, expected_sha256=digest,
-        target_profile=target, contracts_path=contracts_path,
+        target_profile=target,
     )
 
 
 def test_engine_b2_and_b3_preflight_same_real_three_package_bundle(tmp_path):
     archive, digest = build_smoke(tmp_path / "archive")
-    absent_contracts = tmp_path / "factory" / "contracts.json"
-    b2 = _admit(archive, digest, absent_contracts)
-    b3 = _admit(archive, digest, absent_contracts)
+    b2 = _admit(archive, digest)
+    b3 = _admit(archive, digest)
     assert b2 == b3
     assert b2["bundle_schema"] == "plasma.ppu.bundle.v3"
     assert b2["archive_sha256"] == digest
@@ -34,7 +33,6 @@ def test_engine_b2_and_b3_preflight_same_real_three_package_bundle(tmp_path):
     ]
     assert b2["execution_permitted"] is False
     assert b2["fpga_qualification"] is None
-    assert not absent_contracts.exists()
     assert not (tmp_path / "product").exists()
     assert not (tmp_path / "state").exists()
     assert not list(tmp_path.rglob("active.json"))
@@ -50,23 +48,17 @@ def test_engine_preflight_fail_closed_without_deployment_mutation(tmp_path, deni
     else:
         kwargs["target"] = {**TARGET, "board": "wrong-board"}
     with pytest.raises(engine.BundleV3AdmissionVerificationDenied):
-        _admit(archive, digest, tmp_path / "unused.json", **kwargs)
+        _admit(archive, digest, **kwargs)
     assert not (tmp_path / "product").exists()
     assert not list(tmp_path.rglob("active.json"))
     assert not list(tmp_path.rglob("deployment.json"))
 
 
-def test_engine_fpga_qualification_is_shared_and_trusted_contract_drift_detectable(tmp_path):
-    files, entry = synthetic_image()
+def test_engine_fpga_qualification_is_shared_without_factory_registry(tmp_path):
+    files, _ = synthetic_image()
     archive, digest = fpga_bundle(tmp_path / "archive", files)
-    contracts = contract_file(tmp_path, entry)
-    b2 = _admit(archive, digest, contracts)
+    b2 = _admit(archive, digest)
     assert b2["fpga_qualification"]["result"] == "STATIC_QUALIFIED"
     assert b2["fpga_qualification"]["fpga_loaded"] is False
-    assert b2 == _admit(archive, digest, contracts)
-
-    # Withdraw factory contract after B2; B3 preflight must fail closed.
-    contracts.unlink()
-    with pytest.raises(engine.BundleV3AdmissionQualificationDenied):
-        _admit(archive, digest, contracts)
+    assert b2 == _admit(archive, digest)
     assert not list(tmp_path.rglob("active.json"))

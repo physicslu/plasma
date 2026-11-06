@@ -18,6 +18,7 @@ import stat
 import sys
 import tempfile
 import uuid
+import xml.etree.ElementTree as ET
 
 from pl.hil import fpga_image_guard as guard
 from pl.hil import fpga_image_admission as admission
@@ -212,12 +213,10 @@ def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
            all(type(n) is int and 0 <= n <= 0xFFFFFFFF
                for n in uio["irq_counts"]))), "IMAGE_RELEASE_UIO_DENIED")
     if devmem:
-        # /dev/mem is an opt-in engineering backend, not evidence that a
-        # covering UIO node owns the SWD IP. Restrict it to the pinned
-        # independent Images + both HWH-proven Site identity word locations.
-        need(admission.DEVMEM_INDEPENDENT_IMAGES.get(data["image_id"]) ==
-             data["firmware_sha256"] and
-             data["axi_base"] == 0x43C01000 and
+        # /dev/mem remains limited to the ABI-v5 two-Site geometry. Image
+        # identity and bytes are bound by the Bundle, Root journal and live
+        # readback; no factory Image ID is an authority.
+        need(data["axi_base"] == 0x43C01000 and
              data["axi_bytes"] == 0x2000 and
              data["abi_version"] == 0x00050001 and
              words == [[0, 0x00050001, 0xFFFFFFFF],
@@ -241,6 +240,45 @@ def parse_image_manifest_bytes(raw: bytes) -> ImageManifest:
         axi_base=data["axi_base"], axi_bytes=data["axi_bytes"],
         owner_base=data["owner_base"], owner_bytes=data["owner_bytes"],
         uio_name=data.get("uio_name", ""), expected_uio=uio)
+
+
+def validate_hwh_bytes(raw: bytes, manifest: ImageManifest) -> None:
+    """Check declared PS AXI ranges cover each Identity register exactly once.
+
+    HWH is Bundle data, so this is structural evidence only. The Root's live
+    Identity readback remains mandatory before a loaded Image is accepted.
+    """
+    need(type(raw) is bytes and 0 < len(raw) <= 4_000_000,
+         "IMAGE_HWH_SIZE_DENIED")
+    try:
+        tree = ET.fromstring(raw)
+        system = tree.find("SYSTEMINFO")
+        ranges = [(int(node.get("BASEVALUE"), 0),
+                   int(node.get("HIGHVALUE"), 0))
+                  for node in tree.iter("MEMRANGE")
+                  if node.get("MASTERBUSINTERFACE") == "M_AXI_GP0"]
+    except (ET.ParseError, TypeError, ValueError) as exc:
+        raise ImageDeploymentDenied("IMAGE_HWH_INVALID") from exc
+    need(bool(ranges) and
+         all(manifest.axi_base <= lo <= hi <
+             manifest.axi_base + manifest.axi_bytes for lo, hi in ranges) and
+         all(hi < other_lo or other_hi < lo
+             for index, (lo, hi) in enumerate(ranges)
+             for other_lo, other_hi in ranges[index + 1:]),
+         "IMAGE_HWH_RANGE_INVALID")
+    board = system.get("BOARD", "").split(":") if system is not None else []
+    need(system is not None and
+         (board == [manifest.board_id] or
+          len(board) == 4 and board[1] == manifest.board_id) and
+         "xc" + system.get("DEVICE", "") +
+         system.get("PACKAGE", "") +
+         system.get("SPEEDGRADE", "") == manifest.fpga_part,
+         "IMAGE_HWH_TARGET_MISMATCH")
+    addresses = [manifest.axi_base + offset for offset, _, _ in
+                 manifest.identity_words]
+    need(all(sum(lo <= address and address + 3 <= hi
+                 for lo, hi in ranges) == 1 for address in addresses),
+         "IMAGE_HWH_IDENTITY_RANGE_MISMATCH")
 
 
 def validate_bundle_fpga_handoff(
@@ -287,6 +325,7 @@ def validate_bundle_fpga_handoff(
          type(hwh_bytes) is bytes and 0 < len(hwh_bytes) <= 4_000_000,
          "ROOT_HANDOFF_IMAGE_SIZE_INVALID")
     manifest = parse_image_manifest_bytes(manifest_bytes)
+    validate_hwh_bytes(hwh_bytes, manifest)
     prefix = "payload/packages/" + package_id + "/fpga/"
     names = {
         "bin": selected.get("bin_relative_path"),

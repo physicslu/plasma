@@ -299,9 +299,10 @@ Profile/Provider cannot execute. OpenOCD and ABI v5 are reference plugins,
 not universal infrastructure requirements.
 
 **Implementation gap:** Current `SiteExecutionRouter` and
-`CompilerRegistry` still load fixed ICPN/operation admissions,
-`ppu_fpga_qualification.py` requires a factory Image Contract, and the
-existing C3 adapter is OpenOCD/ABI-v5/2-Site specific. These are backlog
+`CompilerRegistry` still load fixed ICPN/operation admissions. FPGA
+qualification now checks the verified Bundle and Driver ABI without a factory
+Image ID contract. The existing C3 adapter remains OpenOCD/ABI-v5/2-Site
+specific. These are backlog
 migration blockers, **not** proof that the architecture is already implemented.
 Do not weaken Site Lock, lease, physical compatibility, memory bounds, tamper
 detection or SAFE_OFF checks when removing static registry dependencies.

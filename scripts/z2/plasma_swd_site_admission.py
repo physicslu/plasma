@@ -119,15 +119,6 @@ def _write_private(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
-def guard_images() -> dict:
-    """Reviewed devmem Image table from the root-owned protected tree."""
-    from pl.hil import fpga_image_admission as admission  # noqa: E402
-    need(Path(admission.__file__).resolve() ==
-         PROTECTED_ROOT / "pl/hil/fpga_image_admission.py",
-         "ADMISSION_MODULE_NOT_PROTECTED")
-    return admission.DEVMEM_INDEPENDENT_IMAGES
-
-
 def admit(site: int) -> dict:
     need(site in (1, 2), "SITE_INVALID")
     need(os.geteuid() == 0, "ROOT_REQUIRED")
@@ -140,8 +131,7 @@ def admit(site: int) -> dict:
          PROTECTED_ROOT / "pl/hil/fpga_image_root.py", "ROOT_MODULE_NOT_PROTECTED")
     root.trusted_local()
     release = root.read_image_manifest()
-    need(guard_images().get(release.image_id) == release.firmware_sha256 and
-         release.abi_version == 0x00050001 and release.site_bitmap == 3 and
+    need(release.abi_version == 0x00050001 and release.site_bitmap == 3 and
          release.axi_base == 0x43C01000 and release.axi_bytes == 0x2000,
          "RELEASE_NOT_ABI5_INDEPENDENT")
     port = guard.RootZ2TargetPort(release=release)

@@ -28,8 +28,8 @@ SAFE_OFF/resource/permission guards remain. Non-FPGA `activate` with
 `fpga_load:false` succeeds under a held Runtime lease; FPGA activation requires
 explicit load plus separate load authorization. Installation never executes
 uploaded code or starts a DUT operation. Runtime Release, factory/CI identity
-and trusted Dispatcher source pins are unchanged. Existing FPGA contract
-provenance is independent of the user Bundle's optional source claim.
+and trusted Dispatcher source pins are unchanged. The later OPF P0 Step 2 migration removes the factory FPGA Image ID contract;
+Root hardware and operation guards still apply.
 
 ## Observed validation
 
