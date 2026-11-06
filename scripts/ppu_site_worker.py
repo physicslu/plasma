@@ -167,6 +167,7 @@ class _Session:
     closed: bool = False
     sealed_during: set[int] = field(default_factory=set)
     image: FlashImage | None = None
+    profile: FlashProfile | None = None
     provider_route: Mapping[str, Any] | None = None
 
 
@@ -295,14 +296,12 @@ class SiteWorkerCore:
                         "session": sessions[0] if sessions else None}
         if op == "bind_image":
             _require(set(request) == {
-                "protocol", "op", "session_id", "profile", "image_sha256", "image_size"
+                "protocol", "op", "session_id", "image_sha256", "image_size"
             }, "REQUEST_INVALID")
             _require(type(request["session_id"]) is str
                      and type(request["image_sha256"]) is str
                      and type(request["image_size"]) is int, "REQUEST_INVALID")
-            profile = parse_flash_profile(request["profile"])
             size = request["image_size"]
-            _require(0 < size <= profile.flash_size, "IMAGE_SIZE_INVALID")
             digest = request["image_sha256"]
             _require(re.fullmatch(r"[0-9a-f]{64}", digest) is not None, "IMAGE_SHA256_INVALID")
             with self._lock:
@@ -310,6 +309,11 @@ class SiteWorkerCore:
                 _require(s is not None and not s.closed, "SESSION_UNKNOWN")
                 _require(s.image is None, "IMAGE_ALREADY_BOUND")
                 _require(self.clock() < s.expires, "SESSION_EXPIRED")
+                profile = s.profile
+                _require(profile is not None, "PROFILE_NOT_BOUND")
+                _require(0 < size <= profile.flash_size, "IMAGE_SIZE_INVALID")
+                if s.provider_route is not None:
+                    _require(size <= s.provider_route["max_image_bytes"], "IMAGE_SIZE_INVALID")
                 # Only the trusted Runtime stages this exact Job-owned image.
                 # No file path or command is accepted from the caller.
                 path = self.image_root / (s.job_id + ".bin")
@@ -376,6 +380,8 @@ class SiteWorkerCore:
         fields = {"protocol", "op", "job_id", "sites", "max_runtime_s"}
         if package:
             fields |= {"pgid", "uid"}
+        if "profile" in request:
+            fields.add("profile")
         route = request.get("provider_route") if not package else None
         if route is not None:
             fields |= {"provider_route", "deadline_monotonic"}
@@ -392,16 +398,17 @@ class SiteWorkerCore:
         if package:
             _require(type(request["pgid"]) is int and request["pgid"] > 1
                      and type(request["uid"]) is int and request["uid"] > 0, "REQUEST_INVALID")
+        profile = parse_flash_profile(request["profile"]) if "profile" in request else None
         if route is not None:
             _require(type(route) is dict and set(route) == {
                 "asset_set_sha256", "provider_package", "profile_package",
                 "descriptor_sha256", "options_schema_sha256", "options_sha256",
-                "target", "operation", "site_id", "transport", "driver_abi",
+                "operation", "site_id", "transport", "driver_abi",
                 "fpga_package", "max_image_bytes"}, "PROVIDER_ROUTE_INVALID")
             _require(all(type(route[key]) is str and bool(route[key]) for key in (
                 "asset_set_sha256", "provider_package", "profile_package",
                 "descriptor_sha256", "options_schema_sha256", "options_sha256",
-                "target", "operation", "transport")), "PROVIDER_ROUTE_INVALID")
+                "operation", "transport")), "PROVIDER_ROUTE_INVALID")
             _require(type(route["site_id"]) is int and sites == [route["site_id"]]
                      and route["operation"] in self.adapter.operations
                      and type(route["max_image_bytes"]) is int
@@ -409,6 +416,8 @@ class SiteWorkerCore:
                      and (route["driver_abi"] is None or type(route["driver_abi"]) is str)
                      and (route["fpga_package"] is None or type(route["fpga_package"]) is str),
                      "PROVIDER_ROUTE_INVALID")
+            if route["operation"] == "flash_cycle":
+                _require(profile is not None, "PROFILE_REQUIRED")
             deadline = request["deadline_monotonic"]
             _require(type(deadline) in (int, float) and self.clock() < deadline
                      <= self.clock() + request["max_runtime_s"], "JOB_DEADLINE_INVALID")
@@ -446,6 +455,7 @@ class SiteWorkerCore:
                          deadline if route is not None else self.clock() + request["max_runtime_s"], identity,
                          owner_kind=owner_kind, runtime_pid=pid)
             s.provider_route = dict(route) if route is not None else None
+            s.profile = profile
             self._sessions[s.session_id] = s
             for site in sites:
                 self._site_owners[site] = s.session_id
