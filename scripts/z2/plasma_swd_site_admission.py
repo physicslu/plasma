@@ -153,8 +153,9 @@ def admit(site: int) -> dict:
              state["manifest_sha256"] == root.manifest_sha256() and
              state["firmware_sha256"] == release.firmware_sha256,
              "ROOT_JOURNAL_NOT_HELD_IMAGE")
-        report = root.live_report(port, release, release.firmware_name,
-                                  require_mmio=True)
+        # The protected Root journal has already proved the same-boot Image.
+        # Runtime admission checks live hardware; dmesg history is not durable.
+        report = root.live_site_admission_report(port, release)
         need(report["target_boot_id"] == state["boot_id"],
              "BOOT_CHANGED_MANUAL_REVIEW")
         need(report["mmio_backend"] == "devmem" and

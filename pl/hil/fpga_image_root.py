@@ -624,6 +624,25 @@ def live_report(port: guard.RootZ2TargetPort, release: ImageManifest,
     return report
 
 
+def live_site_admission_report(port: guard.RootZ2TargetPort,
+                               release: ImageManifest) -> dict:
+    """Root Site Admission only, after a locked same-boot IMAGE journal check.
+
+    Re-run the complete process census, Kernel/PL owner checks, file hashes,
+    ABI and MMIO qualifications. A potentially overwritten dmesg load message
+    is not a live-hardware prerequisite. Not for FPGA load/test/restore.
+    """
+    report = admission.collect_live(
+        root_port=port, release=release,
+        expected_firmware=release.firmware_name,
+        require_mmio=True, require_manager_provenance=False)
+    need(report["expected_manager_firmware"] == release.firmware_name and
+         port.image_sha256("candidate") == release.firmware_sha256 and
+         port.image_sha256("recovery") == guard.GOLDEN_RECOVERY_SHA256,
+         "CURRENT_IMAGE_OR_RECOVERY_CHANGED")
+    return report
+
+
 def live_program_session_report(port: guard.RootZ2TargetPort,
                                 release: ImageManifest) -> dict:
     """Read-only Bridge admission; no whole-system process census.
