@@ -126,3 +126,52 @@ PR #1285 之後 adapter 不讀 admission record、不讀電氣確認紀錄，adm
   `plasma-openocd5088-armv7-candidate` 的 `candidate-evidence.json` 加入
   `adapter_driver`、`driver_abi`、`adapter_khz`（driver 預設值）、`openocd_version`。
   有這四個欄位時安裝工具直接採用；沒有時由 operator 在 `install --declare-*` 聲明並記錄為 operator 聲明。
+
+## 9. Z2 部署與測試狀態（2026-11-04 11:30，整合這一路）
+
+Owner Gate 1（2026-11-04）：只清理燒錄路徑這一層，保留 Root Entry / journal / privileged tree /
+FPGA / Active Asset Set / Bootstrap 登錄 / Python / OpenOCD / 帳號，部署後以 REST `flash_cycle` 實測。
+證據全在 SWPC `.work/z2-g1b-test-20261104/`（`evidence/` 編號依步驟，`tools/` 為實際執行的腳本）。
+
+### 9.1 Z2 目前狀態
+| 項目 | 值 |
+|---|---|
+| Bootstrap 程式碼 | main `4dbb58a7c`（#1289），以完整安裝取代舊目錄；unit / 登錄 / token 不變 |
+| Runtime | `/opt/plasma/releases/0.2.1-622e17465ea7`（PR #1291 merge-ref = main `d4ffae9c9` + installer 修正），6 個服務 active |
+| OpenOCD 選擇 | `/etc/plasma/site-worker-engine.json` → `0.12.0-5088db4c9154-plasma-swd-b8a7db670649`，`adapter_khz` 2000；由 `ppu_site_engine.py` 接管（engine 欄位 operator 聲明） |
+| Site 2 | `enabled`、`interface: openocd`、`target: STM32F103C8T6`、`openocd.site_worker_socket: /run/plasma-site-worker/control.sock`（SSH 直接改 `ppu.yaml`，見 9.3） |
+| FPGA / journal | 未變：`d0add58c` IMAGE、journal `986446e7…`、Active Set gen 6 |
+| 備份 | Z2 `/var/backups/plasma-g1b-clean-20261104T090540/`（舊 Bootstrap、舊 releases、`/var/lib/plasma` 內容、HIL 殘留、`b8a7` 目錄原有的 `runtime.json`）；`/etc/plasma/ppu.yaml.bk-site2-c3-20261104T112119` |
+| 燒錄 | **NOT_RUN**（燒錄前 heartbeat 基準已記錄：`hb/cdc-before.json`） |
+
+### 9.2 部署過程與已修正的問題
+1. 唯讀盤點（`evidence/00-inventory.json`）。
+2. Phase 1（SSH root，自動 rollback）：停服務 → 搬移 → 安裝 Bootstrap → engine install/select → 啟動。
+   第一次因 `b8a7` 目錄多一個 HIL 範本寫的 `runtime.json` 而 `EXISTING_INSTALL_DIFFERS`，rollback 成功；
+   將該檔搬入備份後重跑 APPLIED。其餘檔案與 CI run 41681514427 的 artifact 逐位元組一致。
+3. Phase 2（Bootstrap API `kind=ppu-runtime`）：main `4dbb58a7c` 的 kit 失敗 ——
+   #1289 的 installer 從自己旁邊載入 `ppu_package_units.py`，但 Runtime kit 沒有這個檔
+   （啟用前失敗，Runtime / `ppu.yaml` / unit 皆未變）。兩份 Bootstrap 部署紀錄以 operator 步驟標記為終結
+   （`tools/p2r_journal_recovery.py`，原紀錄備份為 `*.recovery-20261104T091005`）。
+   修正：**PR #1291**（從已安裝的 Bootstrap 載入產生器；CI 全過，**未合併，待 Gate 2**）。
+   以 #1291 的 kit 重跑 PASS。
+4. Phase 3：設定 Site 2（見 9.3），重啟 server/web，lease 閒置。
+
+### 9.3 已知缺口（後續工作）
+- **Gateway 無法把 Site 接到 C-3**：`POST /api/settings/sites/{id}` 只允許 `enabled/interface/target`，
+  不能設 `openocd.site_worker_socket`。建議：plasma-server 從 Stage C 設定
+  （`ppu-package-actions.json` 的 `site_worker_control_socket`）自動帶入，`interface: openocd` 即走 C-3。
+- `GET /api/status` 的 `capabilities.operations` 尚未列出 `flash_cycle`。
+- D6（Package 連 `transport.sock` 的 `PermissionError`）尚未重測；REST `flash_cycle` 走 control socket，不受影響。
+- **同時操作**：11:21:40–45 有另一個 SWPC SSH `sudo` session 在 Z2 執行 HIL 腳本（輸出 `mode`/`attempt`），
+  並重置了 Blue Pill。兩路共用 Z2 / Site 2 / DUT，實機操作前需先協調。C-3 遇到其他 OpenOCD 或 admission
+  紀錄會拒絕，但無法防止之後才開始的外部操作。
+- `z2run.py` 只印遠端輸出最後 60,000 字元（輔助腳本的設計，不是 SSH 限制）；大輸出請在 Z2 上先彙總。
+
+### 9.4 下一步
+1. 協調好 Z2 使用權後，`POST /api/jobs` `{"site_id":2,"operation":"flash_cycle", 內嵌 asset}`，
+   韌體 `.work/bluepill-ab-20261028/plasma-blue-pill-cdc.bin`（18,768 B，`8d3ffb02…`）。
+   驗收：Job success、readback SHA = `8d3ffb02…`、`safe_off`、Site 未 seal、FPGA/journal 未變、
+   SWPC heartbeat 恢復且 uptime 重新起算。
+2. #1291 Gate 2；9.3 的產品缺口另開 Gate 1 / PR。
+3. D6 / D7、OpenOCD Bundle Package kind（§4.5）。
