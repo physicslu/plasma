@@ -14,16 +14,13 @@ import sys
 import tempfile
 import time
 from contextlib import contextmanager, nullcontext
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.enums import Operation
 from plasma_core.models import JobRequest
 from plasma_core.errors import PlasmaError
-from plasma_interfaces.openocd import c3_flash_profile
 from plasma_interfaces.site_worker_c3 import SiteWorkerControlClient, SiteWorkerRefused
 from plasma_opf import OPF_PROGRAMMING_SCHEMA, TimeoutPolicy
 
@@ -64,9 +61,9 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                      profile_count=1, target_icpn=ICPN, other_target=None):
     with tempfile.TemporaryDirectory(prefix="opf4a-", dir="/tmp") as directory:
         path = Path(directory)
-        c3_profile = replace(
-            c3_flash_profile(get_default_ic_support_resolver().require_exact(ICPN)),
-            icpn=target_icpn)
+        c3_profile = {"icpn": target_icpn, "target_config": "target/stm32f1x.cfg",
+                      "flash_base": 0x08000000, "flash_size": 65536,
+                      "erase_granularity": 1024}
         desc = {"schema": "plasma.ppu.provider-capabilities.v1", "target": target_icpn,
                 "provider_package": PROVIDER, "operations": ["flash_cycle"],
                 "sites": [1, 2], "transport": "fpga", "driver_abi": DRIVER_ABI,
@@ -74,7 +71,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
         desc.update(descriptor_change or {})
         if not with_fpga:
             desc["fpga_package"] = None
-        profile = {"schema": reference.PROFILE_SCHEMA, **c3_profile.to_wire()}
+        profile = {"schema": reference.PROFILE_SCHEMA, **c3_profile}
         profile.update(profile_change or {})
         schema = options_schema or {
             "schema": "plasma.ppu.provider-options.v1",
@@ -120,7 +117,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
         engine_record = write_selection(path / "engine.json", engine_data)
         selected_engine = engine.load_engine(engine_record, base=path / "openocd",
                                              require_root=False)
-        sim = FlashSim(c3_profile.flash_base, c3_profile.flash_size)
+        sim = FlashSim(c3_profile["flash_base"], c3_profile["flash_size"])
         journal = path / "journal.json"
         fpga = (assets.resolve_staged_fpga_handoff(co.paths.product_root, digest)["fpga_image"]
                 if with_fpga else {"image_id": "independently-installed-universal",
@@ -197,9 +194,8 @@ def _qualify(env, **changes):
     return reference.qualify_reference(**payload)
 
 
-def test_bundle_profile_accepts_icpn_absent_from_local_registry():
+def test_bundle_profile_accepts_new_icpn_without_core_registry():
     unknown = "VENDOR-NEW-PART-A"
-    assert get_default_ic_support_resolver().resolve_exact(unknown) is None
     with installed_bundle(target_icpn=unknown) as env:
         preflight = reference.preflight_runtime_flash(
             product_root=env["product_root"], active_asset_set=env["active_asset_set"],
