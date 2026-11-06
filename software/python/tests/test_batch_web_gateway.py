@@ -6,6 +6,7 @@ import json
 import threading
 import time
 import unittest
+from unittest.mock import patch
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
@@ -57,6 +58,29 @@ class BatchWebGatewayTests(unittest.TestCase):
                 return payload["batch"]
             time.sleep(0.01)
         self.fail(f"Batch {batch_id} did not finish")
+
+    def test_all_vendor_batches_complete_with_catalog_loader_unavailable(self):
+        # Fake Provider proves Gateway + per-Batch submission isolation only;
+        # it grants no physical Provider qualification.
+        from plasma_web.device_catalog import DeviceCatalogIntegrityError
+        targets = [("STMicroelectronics", "STM32F103C8T6"),
+                   ("NXP", "MCXN236VKLT"), ("Microchip", "ATSAML10E16A-MZTVAO"),
+                   ("Independent Device", "thirdparty-mcu-v1")]
+        with patch("plasma_web.gateway.get_default_device_catalog",
+                   side_effect=DeviceCatalogIntegrityError("catalog unavailable")) as loader:
+            for vendor, target in targets:
+                with self.subTest(target=target):
+                    status, payload = self.request("POST", "/api/batches", {
+                        "targets": [{"facility_id": "facility-1", "ppu_id": "ppu-1",
+                                     "site_ids": [1]}],
+                        "operations": ["erase"], "execution_policy": {"repeat_count": 2},
+                        "target_device": {"vendor": vendor, "identifier": target},
+                    })
+                    self.assertEqual(status, 202, payload)
+                    final = self.wait_terminal(payload["batch"]["batch_id"])
+                    self.assertEqual(final["state"], "success", final)
+                    self.assertEqual(final["target_device"]["icpn"], target)
+            loader.assert_not_called()
 
     def test_create_and_get_batch_roundtrip(self):
         status, payload = self.request(
@@ -134,18 +158,19 @@ class BatchWebGatewayTests(unittest.TestCase):
         self.assertEqual(status, 202)
         target = payload["batch"]["target_device"]
         self.assertEqual(target["vendor"], record.vendor)
-        self.assertEqual(target["family"], record.family)
+        self.assertEqual(target["family"], "")
         self.assertEqual(target["identifier"], record.identifier)
-        self.assertEqual(target["identifier_kind"], record.identifier_kind)
-        self.assertEqual(target["icpn"], record.icpn)
+        self.assertEqual(target["identifier_kind"], "unverified_exact_target_claim")
+        self.assertEqual(target["icpn"], record.identifier)
 
         final = self.wait_terminal(payload["batch"]["batch_id"])
         self.assertEqual(final["target_device"], target)
 
-    def test_batch_rejects_research_only_target_device_not_in_production_catalog(self):
+    def test_batch_target_snapshot_is_not_gated_by_catalog_membership(self):
+        # A Batch's declared target identity does not grant programming
+        # authority. Its selected Provider/PPU must independently admit it.
         status, payload = self.request(
-            "POST",
-            "/api/batches",
+            "POST", "/api/batches",
             {
                 "targets": [
                     {"facility_id": "facility-1", "ppu_id": "ppu-1", "site_ids": [1]},
@@ -162,9 +187,14 @@ class BatchWebGatewayTests(unittest.TestCase):
                 },
             },
         )
-        self.assertEqual(status, 400)
-        self.assertFalse(payload["ok"])
-        self.assertIn("canonical Device Catalog", payload["error"]["message"])
+        self.assertEqual(status, 202)
+        target = payload["batch"]["target_device"]
+        self.assertEqual(target["vendor"], "Analog Devices")
+        self.assertEqual(target["identifier"], "ADUC7019BCPZ62I")
+        self.assertEqual(target["identifier_kind"], "unverified_exact_target_claim")
+        self.assertEqual(target["icpn"], "ADUC7019BCPZ62I")
+        # This is the Mock Batch route: a 202 does NOT claim real Provider
+        # support, a valid electrical target or successful physical erase.
 
     def test_program_batch_accepts_one_asset_snapshot(self):
         image = b"batch-rest-image" * 16

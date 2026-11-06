@@ -381,6 +381,14 @@ def _parse_targets(value: Any) -> tuple[BatchTarget, ...]:
     return tuple(targets)
 
 
+def _validated_target_claim(value: Any, *, label: str) -> str:
+    if (not isinstance(value, str)
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+/-]{0,127}", value)
+            or any(part in {".", "..", ""} for part in value.split("/"))):
+        raise ValueError(f"{label} must be a valid exact target identifier")
+    return value
+
+
 def _parse_target_device(
     value: Any,
     *,
@@ -401,32 +409,21 @@ def _parse_target_device(
         raise ValueError(f"{label} vendor is required")
     if not isinstance(identifier, str) or not identifier.strip():
         raise ValueError(f"{label} identifier is required")
-    record = get_default_device_catalog().resolve(vendor, identifier)
-    if record is None:
-        raise ValueError(f"{label} must resolve to one canonical Device Catalog record")
-    # Catalog identity is useful for Research/Engineering lookup, not an execution grant.
-    # This applies equally to Engineering Job and Batch target_device inputs.
-    if record.vendor == "Microchip" and record.mapping_status == "no_mapping":
-        raise ValueError(f"{label} Microchip Level 0 identity has no executable programming mapping")
+    # User-supplied target identity is a CLAIM, not Catalog qualification.
+    # No Catalog dependency is permitted in Programming Job / Batch submission.
+    # The selected Runtime Provider must separately resolve exact-target
+    # capabilities and refuse unsupported operations before any hardware I/O.
+    vendor = vendor.strip()
+    identifier = _validated_target_claim(identifier.strip(), label=label)
+    if len(vendor) > 128 or any(ord(c) < 32 or ord(c) == 127 for c in vendor):
+        raise ValueError(f"{label} target identity is invalid")
     return BatchTargetDeviceSnapshot(
-        vendor=record.vendor,
-        family=record.family,
-        identifier=record.identifier,
-        identifier_kind=record.identifier_kind,
-        icpn=record.icpn,
+        vendor=vendor,
+        family="",
+        identifier=identifier,
+        identifier_kind="unverified_exact_target_claim",
+        icpn=identifier,
     )
-
-
-def _reject_unmapped_microchip_raw_job_target(target: Any) -> None:
-    """Guard raw Job target strings, independent from typed target_device."""
-    if not isinstance(target, str):
-        return
-    record = get_default_device_catalog().resolve("Microchip", target)
-    if record is not None and record.mapping_status == "no_mapping":
-        raise ValueError(
-            "Microchip Level 0 exact ICPN is lookup-only; "
-            "no executable programming mapping exists"
-        )
 
 
 def _parse_asset(value: Any) -> ProgrammingAsset | None:
@@ -552,6 +549,8 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
     ):
         normalized = dict(body)
         raw_target_device = normalized.pop("target_device", None)
+        if normalized.get("target") is not None:
+            normalized["target"] = _validated_target_claim(normalized["target"], label="target")
         execution_owner_id = self._validated_rest_owner(normalized.pop("execution_owner_id", None))
         request = super()._job_request(
             normalized,
@@ -559,8 +558,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             default_timeout_s=default_timeout_s,
             allow_inline_asset=allow_inline_asset,
         )
-        # Reject a raw Job target even when target_device was omitted.
-        _reject_unmapped_microchip_raw_job_target(request.target)
         if execution_owner_id is not None:
             owner_kind = "engineering_session" if client_id == "plasma-web-engineering" else "rest_client"
             request = replace(

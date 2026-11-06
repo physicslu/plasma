@@ -8,7 +8,7 @@ from http.server import ThreadingHTTPServer
 from urllib.parse import quote
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import PlasmaWebHandler, _parse_target_device, _reject_unmapped_microchip_raw_job_target
+from plasma_web.gateway import PlasmaWebHandler, _parse_target_device
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
@@ -487,27 +487,23 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32g0x.cfg")
         self.assertEqual(result["physical_validation"]["engineering_status"], "no_evidence")
 
-    def test_microchip_phase1_identity_rejected_from_job_batch_target(self) -> None:
+    def test_microchip_phase1_catalog_is_lookup_only_but_cannot_gate_programming_job(self) -> None:
+        # Catalog is still a research/Console selector. REST Job admission
+        # never loads it. Actual Runtime operation capabilities are separate.
         catalog = get_default_device_catalog()
         rows = [r for r in catalog.records if r.vendor == "Microchip"]
         self.assertEqual(len(rows), 1015)
         for row in rows:
             with self.subTest(icpn=row.identifier):
-                with self.assertRaisesRegex(ValueError, "no executable programming mapping"):
-                    _parse_target_device(
-                        {"vendor": "Microchip", "identifier": row.identifier},
-                        label="Engineering target_device")
-        with self.assertRaisesRegex(ValueError, "canonical Device Catalog"):
-            _parse_target_device(
-                {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
-                label="Batch target_device")
-        # Untyped Job.target string cannot bypass target_device's same guard.
-        for row in rows:
-            with self.subTest(raw_target=row.identifier):
-                with self.assertRaisesRegex(ValueError, "lookup-only"):
-                    _reject_unmapped_microchip_raw_job_target(row.identifier)
-        for other in ("STM32F103C8T6", "ATSAML10E16A-MZTVAO", None):
-            _reject_unmapped_microchip_raw_job_target(other)
+                selected = _parse_target_device(
+                    {"vendor": "Microchip", "identifier": row.identifier},
+                    label="Engineering target_device")
+                self.assertEqual(selected.icpn, row.identifier)
+                self.assertEqual(selected.identifier_kind, "unverified_exact_target_claim")
+        unknown = _parse_target_device(
+            {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
+            label="Batch target_device")
+        self.assertEqual(unknown.icpn, "ATSAML10E16A-MZTVAO")
 
     def test_microchip_official_saml1x_route_is_l1_visible_but_never_executable(self) -> None:
         catalog = get_default_device_catalog()
@@ -919,7 +915,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
 
-    def test_engineering_job_target_device_resolves_to_admitted_exact_icpn(self) -> None:
+    def test_engineering_job_target_device_preserves_unverified_icpn_claim(self) -> None:
         record = get_default_device_catalog().search("STM32F407VGT6", limit=1)[0]
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
         request = handler._job_request(
@@ -934,21 +930,27 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(request.target, "STM32F407VGT6")
         self.assertEqual(request.metadata["target_device"]["vendor"], record.vendor)
         self.assertEqual(request.metadata["target_device"]["identifier"], record.identifier)
-        self.assertEqual(request.metadata["target_device"]["identifier_kind"], "manufacturer_part_number")
+        self.assertEqual(request.metadata["target_device"]["identifier_kind"], "unverified_exact_target_claim")
         self.assertEqual(request.metadata["target_device"]["icpn"], "STM32F407VGT6")
 
-    def test_engineering_job_target_device_fails_closed_when_not_admitted(self) -> None:
+    def test_engineering_job_target_device_does_not_depend_on_catalog_admission(self) -> None:
+        # A syntactically valid selected Target is a Job request claim; Runtime
+        # Provider remains the only programming capability authority.
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
-        with self.assertRaisesRegex(ValueError, "canonical Device Catalog record"):
-            handler._job_request(
-                {
-                    "site_id": 1,
-                    "operation": "erase",
-                    "target_device": {"vendor": "Analog Devices", "identifier": "ADUC7019BCPZ62I"},
-                },
-                client_id="plasma-web-engineering",
-                allow_inline_asset=False,
-            )
+        request = handler._job_request(
+            {
+                "site_id": 1,
+                "operation": "erase",
+                "target_device": {"vendor": "Analog Devices", "identifier": "ADUC7019BCPZ62I"},
+            },
+            client_id="plasma-web-engineering",
+            allow_inline_asset=False,
+        )
+        self.assertEqual(request.target, "ADUC7019BCPZ62I")
+        self.assertEqual(
+            request.metadata["target_device"]["identifier_kind"],
+            "unverified_exact_target_claim",
+        )
 
 
 if __name__ == "__main__":

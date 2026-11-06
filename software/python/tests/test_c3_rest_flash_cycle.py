@@ -43,6 +43,8 @@ from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
 from plasma_server.package_actions import PackageActionRuntime
 from plasma_web.gateway import PlasmaWebHandler
+from plasma_web import gateway as gateway_module
+from plasma_web.device_catalog import DeviceCatalogIntegrityError
 
 from .test_ppu_bundle_v3_packages_contract import ROOT
 
@@ -512,6 +514,29 @@ def test_rest_flash_cycle_through_c3_passes_with_full_readback(in_process):
                 status = stack.core.handle({"protocol": worker.PROTOCOL, "op": "status"},
                                            (os.getpid(), 0, 0), "control")["result"]
                 assert status["session"] is None and status["sealed_sites"] == []
+    run(scenario())
+
+
+
+def test_rest_opf_flash_does_not_require_unrelated_device_catalog(monkeypatch):
+    """The actual Gateway -> Runtime -> C3 fake-OpenOCD path stays available
+    when a slim PPU has no full Microchip/Production browsing Catalog."""
+    def catalog_not_installed():
+        raise DeviceCatalogIntegrityError("production Device Catalog unavailable")
+
+    monkeypatch.setattr(gateway_module, "get_default_device_catalog", catalog_not_installed)
+
+    async def scenario():
+        with short_tmp() as directory:
+            async with Stack(Path(directory), in_process=True) as stack:
+                payload = b"HOST-ONLY-NO-MICROCHIP-CATALOG"
+                _job_id, job = await stack.flash(payload)
+                assert job["state"] == "success", job
+                cycle = job["result"]["details"]["flash_cycle"]
+                assert cycle["result"] == "PASS"
+                assert cycle["readback_sha256"] == hashlib.sha256(payload).hexdigest()
+                assert cycle["safe_off"] is True
+
     run(scenario())
 
 
