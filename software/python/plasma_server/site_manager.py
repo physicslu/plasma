@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from plasma_core.config import PlasmaConfig, SiteConfig
-from plasma_core.enums import Operation, SiteState
+from plasma_core.enums import JobState, Operation, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import ICSupportResolver, get_default_ic_support_resolver
 from plasma_core.job_logging import OutputManager, ServerEventLogger
@@ -408,10 +408,14 @@ class SiteManager:
         """
         with self._execution_lock:
             lease = self._execution_lease
+            job = self.registry.get(job_id)
             if (lease is None or lease.owner_kind == "package_action"
                     or job_id not in lease.job_ids
                     or job_id in self._delegated_package_jobs
-                    or site_id not in self.workers):
+                    or site_id not in self.workers
+                    or job.request.site_id != site_id
+                    or not isinstance(job.trusted_provider, TrustedProviderAction)
+                    or job.state is not JobState.RUNNING):
                 raise PlasmaError(ErrorCode.PPU_BUSY, "PROGRAMMING_PACKAGE_LEASE_DENIED")
             self._delegated_package_jobs.add(job_id)
         try:
