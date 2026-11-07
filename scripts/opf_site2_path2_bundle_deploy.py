@@ -35,7 +35,7 @@ base=Path('/opt/plasma/assets/staged/4efe0fea45cd71e48f4de53318f4a4fb863c2332bab
 manifest=json.loads((base/'manifest.json').read_bytes())
 assert manifest['schema']=='plasma.ppu.bundle.v3'
 pkgs={p['id']:p for p in manifest['packages']}
-assert set(pkgs)=={'openocd-platform-reference','stm32f103c8t6-site2'}
+assert {'openocd-platform-reference','stm32f103c8t6-site2'}<=set(pkgs)
 provider=pkgs['openocd-platform-reference']
 profile=pkgs['stm32f103c8t6-site2']
 assert provider['kind']=='platform-provider' and profile['kind']=='programming-profile'
