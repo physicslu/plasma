@@ -8,6 +8,36 @@ Runtime Site Admission no longer requires a dmesg FPGA Manager history record (P
 
 A software source update **does not** need to reload the already-qualified FPGA. Keep the existing paired Image/JOURNAL so long as Boot, live FPGA Manager, hardware ABI and Site ownership checks continue to pass.
 
+
+## 2026-11-07 Site 2 verified minimal fix (no Root reinstall required)
+
+Real SWPC Path 2 [Run #42348102004](https://github.com/physicslu/plasma/actions/runs/42348102004)
+proved the two installed protected Python Root modules already match current
+`main` and their installed manifest. A fresh native Python process imported the
+same protected sources, without obsolete bytecode references or `.pyc` files.
+The **separately installed selected OpenOCD Engine Site Admission entry** was
+SHA-matched to its old Engine Selection record **but still referenced**
+`DEVMEM_INDEPENDENT_IMAGES` removed by PR #1332. This is an **Engine/Root
+interface mismatch**, not an OPF Bundle defect or evidence of an unupdated
+protected Root tree.
+
+The smallest correction is to repackage the **current** reviewed
+`scripts/z2/plasma_swd_site_admission.py` with the existing qualified
+OpenOCD binary, install the complete new SHA-verified Engine artifact **side
+by side**, then select the new immutable Engine identity under the existing
+Job/Owner guards. `scripts/ppu_site_engine.py` now includes the Admission
+script SHA in the installed `runtime_id` to prevent immutable directory
+collisions. Preserve the previous Engine as rollback candidate. Do **not**
+perform the Root-code upgrade steps below when the installed protected Root
+already matches. Do not patch a root-owned Engine file in place.
+
+Selection/Worker restart is a separate device maintenance action: **not
+authorized by this read-only diagnosis**. No FPGA reload, OPF Bundle reinstall
+or DUT Flash belongs to this source repair. Post-maintenance acceptance:
+selected Engine admission SHA and current Root API match, Site 2 one-shot
+admit/revoke + no residual owner PASS, then separately authorized single
+physical Flash/readback. Host-only/CI artifact alone is not Z2 acceptance.
+
 ## Sequence: one explicit operator maintenance transaction
 
 1. **Release preparation (outside Z2):** qualify the target Runtime factory, pinned Root code closure and new OpenOCD ARMv7 candidate/admission SHA. The target `ppu_privileged_source.py` verifier must include the exact five protected source files. Preserve the existing selected engine for rollback. Confirm latest merged commit and corresponding installer/engine checksums. Host-only CI is not a physical qualification.
