@@ -12,6 +12,7 @@ from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
 from plasma_interfaces.openocd import OpenOCDInterface, as_program_request
+from plasma_interfaces.package_provider import PackageProviderInterface
 from plasma_interfaces.openocd_executor import compile_flash_cycle
 from plasma_interfaces.compiler_registry import (
     CompilerBinding,
@@ -30,6 +31,7 @@ RESOLVED_IC_SUPPORT_METADATA_KEY = "resolved_ic_support"
 MOCK_ROUTE = "mock_workflow"
 OPENOCD_ROUTE = "openocd"
 PLASMA_NATIVE_ROUTE = "plasma_native"
+PACKAGE_PROVIDER_ROUTE = "opf_package"
 ROUTABLE_PROGRAMMING_PROFILES = OPENOCD_PLAN_PROGRAMMING_PROFILES
 STM32_COMPILER_ID = "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler"
 KL25_COMPILER_ID = "plasma_interfaces.kl25_openocd_plan.KL25OpenOCDPlanCompiler"
@@ -304,6 +306,17 @@ class SiteExecutionRouter:
             return self._resolve_mock(request)
         if self.site.interface == "openocd":
             return self._resolve_openocd(request)
+        if self.site.interface == "provider":
+            if (not isinstance(self.interface, PackageProviderInterface)
+                    or not self.interface.runtime_wired
+                    or request.operation is not Operation.FLASH_CYCLE):
+                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PACKAGE_PROVIDER_NOT_READY")
+            return self._decorate(request, route={
+                "mode": PACKAGE_PROVIDER_ROUTE,
+                "backend_implementation_state": "opf_package_c2",
+                "software_validation_runtime_ready": False,
+                "hardware_runtime_ready": True,
+            })
         if self.site.interface == "fpga":
             return self._resolve_fpga(request)
         raise PlasmaError(
@@ -339,7 +352,7 @@ class SiteExecutionRouter:
     def handler_for(self, request: JobRequest) -> BaseHandler:
         route = self._route_payload(request)
         mode = route.get("mode")
-        if mode == MOCK_ROUTE:
+        if mode in (MOCK_ROUTE, PACKAGE_PROVIDER_ROUTE):
             return self._generic_handler
         host_only = (
             mode == OPENOCD_ROUTE
