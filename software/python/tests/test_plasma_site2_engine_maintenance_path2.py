@@ -94,3 +94,20 @@ def test_remote_script_denies_an_unexpected_mode(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="MODE_DENIED"):
         module.run("192.168.2.99", SHA, "deploy",
                    baseline=object(), helper=object())
+
+
+def test_interrupted_staging_finalize_is_atomic_and_does_not_retry_prepare():
+    import plasma_site2_engine_finalize_stage_path2 as finalize
+
+    compile(finalize.REMOTE, "<site2-recovery-finalize>", "exec")
+    remote = finalize.REMOTE
+    assert "os.replace(STAGE,TARGET)" in remote
+    assert "held_runtime_asset_lease()" in remote
+    assert "not Path(\"/proc/680\").exists()" in remote
+    assert "STAGE_MANIFEST=" in remote
+    assert "STAGE_CONTENT_DELTA_NOT_ADMISSION_ONLY" in remote
+    assert "STAGE_NATIVE_OR_ADMISSION_SHA_MISMATCH" in remote
+    assert "engine.load_engine().openocd_root==BASE/OLD" in remote
+    for forbidden in ("copytree(", "install_selected_admission(", "systemctl",
+                      "flash_cycle(", "sudo ", "pkill", "SIGKILL"):
+        assert forbidden not in remote
