@@ -71,6 +71,8 @@ def test_already_active_skips_mutating_b1_b2_b3(monkeypatch):
     result = joint.execute()
     assert result["action"] == "ALREADY_ACTIVE_NO_REDEPLOY"
     assert result["b3"] == "NOT_RUN_ALREADY_ACTIVE"
+    assert result["post_doctor"] == "WARN"
+    assert result["deployment_provenance"] == "NOT_VERIFIED"
 
 
 @pytest.mark.parametrize("observed", [
@@ -90,6 +92,27 @@ def test_unexpected_active_identity_denies_all_writes(monkeypatch, observed):
                        match="ACTIVE_SET_NOT_EXPECTED_GEN7_DO_NOT_DEPLOY"):
         joint.execute()
 
+
+
+
+def test_already_conformant_active_changes_during_noop_denied(monkeypatch):
+    snapshots = iter([
+        {"state": "ACTIVE", "asset_set_sha256": NEW, "opf_static": "PASS"},
+        {"state": "ACTIVE", "asset_set_sha256": "e" * 64, "opf_static": "PASS"},
+    ])
+    doctors = []
+    def doctor():
+        doctors.append("doctor")
+        return {"overall": "WARN"}, HOST
+    monkeypatch.setattr(joint, "doctor_snapshot", doctor)
+    monkeypatch.setattr(joint, "observe_active",
+                        lambda *a, **kw: next(snapshots))
+    monkeypatch.setattr(joint.deployer, "_load", lambda *a: object())
+    monkeypatch.setattr(joint.deployer, "run",
+                        lambda *a: pytest.fail("Never deploy during no-op reconciliation"))
+    with pytest.raises(joint.JointDenied, match="NOOP_POST_ACTIVE_OPF_MISMATCH"):
+        joint.execute()
+    assert len(doctors) == 2
 
 def test_post_b3_changed_identity_is_not_reported_as_success(monkeypatch):
     snapshots = iter([
