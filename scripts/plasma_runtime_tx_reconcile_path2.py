@@ -95,6 +95,30 @@ try:
         if resolved.parent == pathlib.Path("/opt/plasma/releases"):
             out["active_release"]=field(resolved.name)
 except OSError:pass
+# Bounded, read-only journal excerpt for THIS activation failure: no raw logs.
+def gateway_errors(unit):
+    import subprocess
+    try:
+        p=subprocess.run(["journalctl","-u",unit,"-n","400","--no-pager",
+                          "--output=cat"],capture_output=True,text=True,
+                         timeout=12,check=False)
+        if p.returncode!=0:return ["JOURNAL_UNAVAILABLE"]
+        lines=p.stdout.splitlines()[-400:]
+        keys=("Traceback","Error","Exception","ModuleNotFound",
+              "ImportError","Permission denied","Address already in use",
+              "Failed","failed","Connection refused","No module named",
+              "No such file","not found","AttributeError","TypeError")
+        selected=[line for line in lines if any(key.lower() in line.lower() for key in keys)]
+        def scrub(line):
+            line=re.sub(r"(?i)(Bearer|token|password|Authorization)[^\\r\\n]{0,100}","[REDACTED]",line)
+            line=re.sub(r"[A-Za-z0-9_/-]{40,}","[REDACTED]",line)
+            return "".join(c if c.isascii() and (c.isalnum() or c in " .,;:()[]_/-=+!?") else " " for c in line)[:250]
+        return [scrub(line) for line in selected[-30:]]
+    except (OSError,subprocess.TimeoutExpired):return ["JOURNAL_TIMEOUT"]
+out["gateway_service_errors"]={
+    "plasma-web.service":gateway_errors("plasma-web.service"),
+    "plasma-server.service":gateway_errors("plasma-server.service"),
+}
 print("PLASMA_RUNTIME_TX_RECONCILE="+json.dumps(out,sort_keys=True,separators=(",",":")))
 '''
 
