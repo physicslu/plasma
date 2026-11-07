@@ -63,6 +63,15 @@ def soname_loadable():
         ctypes.CDLL("libgpiod.so.2")
         return True
     except OSError:return False
+def bounded_error_excerpt(value):
+    if type(value) is not str:return {"length":0,"start":"NOT_AVAILABLE","end":"NOT_AVAILABLE"}
+    def sanitize(chunk):
+        # Strip secrets/opaque IDs; keep only legible low-entropy diagnostics.
+        chunk=re.sub(r"[A-Za-z0-9_/-]{35,}","[REDACTED]",chunk)
+        chunk=re.sub(r"(?i)(Bearer|token|password|Authorization)[^\r\n]{0,100}","[REDACTED]",chunk)
+        return "".join(c if c.isascii() and (c.isalnum() or c in " .,;:()[]_/-=+!?\n") else " " for c in chunk)
+    return {"length":len(value),
+            "start":sanitize(value[:500]),"end":sanitize(value[-300:])}
 api,a=read_file(API);coord,c=read_file(COORD)
 out={"schema":"plasma.runtime-tx-readonly.v1","api_file":a,"coordinator_file":c,
      "api":{},"coordinator":{},"active_release":"UNVERIFIED","mutations":"NOT_RUN"}
@@ -71,6 +80,7 @@ if api is not None:
     out["api"]["error_class"]=reason(api.get("error"))
     out["api"]["dependency_detail"]=libgpiod_detail(api.get("error"))
     out["api"]["libgpiod_so2_loadable"]=soname_loadable()
+    out["api"]["error_excerpt"]=bounded_error_excerpt(api.get("error"))
     out["api"]["result_present"]=api.get("result") is not None
 if coord is not None:
     out["coordinator"]={k:field(coord.get(k),128) for k in
