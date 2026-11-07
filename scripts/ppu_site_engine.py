@@ -408,8 +408,9 @@ def install_selected_admission(artifact: Path, *, expected_admission_sha256: str
             (stage / MANIFEST_NAME).write_text(
                 json.dumps(new_manifest, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8")
-            changed = {k for k in original_files.keys() | _tree(stage).keys()
-                       if original_files.get(k) != _tree(stage).get(k)}
+            staged_files = _tree(stage)
+            changed = {k for k in original_files.keys() | staged_files.keys()
+                       if original_files.get(k) != staged_files.get(k)}
             _need(changed == {f"libexec/{ADMISSION_NAME}", MANIFEST_NAME},
                   "ADMISSION_ONLY_FILE_DELTA_INVALID")
             _need(_sha256(stage / "bin/openocd") == selected.openocd_sha256,
