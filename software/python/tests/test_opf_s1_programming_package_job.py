@@ -44,7 +44,7 @@ FIRMWARE = "firmware-asset"
 TARGET_ID = "user-specific-ic-without-catalog"
 IMAGE = b"\x42\x25\x96\x01"
 
-PYTHON = b"""import json
+PYTHON = """import json
 import os
 import socket
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
