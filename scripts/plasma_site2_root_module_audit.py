@@ -29,7 +29,7 @@ FILES = (
 )
 
 REMOTE = r'''
-import hashlib,json,stat,subprocess
+import hashlib,json,stat,subprocess,re
 from pathlib import Path
 root=Path("/opt/plasma/privileged/fpga-root")
 files=("pl/hil/fpga_image_root.py","pl/hil/fpga_image_admission.py")
@@ -70,12 +70,13 @@ try:
         selection_raw=bounded("/etc/plasma/site-worker-engine.json",8192)
         selection=json.loads(selection_raw)
         engine_root=Path(selection["openocd_root"])
-        if (selection.get("schema")!="plasma.ppu.site-worker-engine.v1"
-            or engine_root.parent != Path(
-                "/opt/plasma/programming-engines/openocd")
-            or not engine_root.name.isascii()
-            or not engine_root.name.replace("-","").replace("_","").isalnum()):
-            raise ValueError("ENGINE_SELECTION_INVALID")
+        if selection.get("schema")!="plasma.ppu.site-worker-engine.v1":
+            raise ValueError("ENGINE_SCHEMA_INVALID")
+        if engine_root.parent != Path(
+                "/opt/plasma/programming-engines/openocd"):
+            raise ValueError("ENGINE_ROOT_OUT_OF_SCOPE")
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,128}",engine_root.name):
+            raise ValueError("ENGINE_ID_INVALID")
         entry=engine_root/"libexec/plasma_swd_site_admission.py"
         raw=bounded(entry,524288)
         digest=hashlib.sha256(raw).hexdigest()
@@ -88,8 +89,10 @@ try:
             "source_mtime_ns":entry.stat().st_mtime_ns,
         }
     except Exception as exc:
-        result["engine_entry"]={"status":"BLOCKED",
-                                "error_type":type(exc).__name__}
+        safe={"ENGINE_SCHEMA_INVALID","ENGINE_ROOT_OUT_OF_SCOPE",
+              "ENGINE_ID_INVALID","SOURCE_UNTRUSTED"}
+        reason=str(exc) if isinstance(exc,ValueError) and str(exc) in safe else type(exc).__name__
+        result["engine_entry"]={"status":"BLOCKED","error_code":reason}
     # Run a new isolated, native 3.12.13 process like the protected admission
     # entrypoint, but ONLY import pure Python modules and inspect code objects.
     # Do not invoke any Root functions, access FPGA/MMIO, create state or flash.
