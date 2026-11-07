@@ -245,3 +245,75 @@ def test_existing_private_bootstrap_assets_read_only(monkeypatch):
     client = program.open_bootstrap(HOST, "x" * 32)
     assert client.assets_status()["asset_set_sha256"] == "a" * 64
     assert calls == [("GET", "/v1/assets")]
+
+
+def test_runtime_deploy_refuses_untrusted_kit_before_device_io(monkeypatch):
+    patch_ready(monkeypatch)
+    client = Client()
+    monkeypatch.delenv("PLASMA_Z2_KIT_ARTIFACT_PATH", raising=False)
+    monkeypatch.delenv("PLASMA_Z2_KIT_SOURCE_SHA", raising=False)
+    with pytest.raises(program.ProgramDenied, match="TRUSTED_RUNTIME_KIT_NOT_DELIVERED"):
+        program.deploy_runtime_kit(
+            client, selection(), host=HOST, device_id=DEVICE,
+            runtime_sha="d" * 40, kit_sha256="e" * 64,
+            ppu_id="z2-hil", facility_id="lab", display_name="Plasma Z2 PS")
+    assert client.events == []
+
+
+def test_runtime_deploy_one_bootstrap_transaction_never_programs(tmp_path, monkeypatch):
+    import hashlib
+    import ppu_deploy_api
+    patch_ready(monkeypatch)
+    archive = tmp_path / "verified-kit.tar.gz"
+    data = b"simulated-source-verified-runtime-kit"
+    archive.write_bytes(data)
+    monkeypatch.setenv("PLASMA_Z2_KIT_ARTIFACT_PATH", str(archive))
+    monkeypatch.setenv("PLASMA_Z2_KIT_SOURCE_SHA", "d" * 40)
+
+    class RuntimeClient(Client):
+        def upload(self, payload):
+            self.events.append("upload")
+            assert payload == data
+            return "a" * 32
+        def submit(self, **kwargs):
+            self.events.append("submit")
+            assert kwargs == {
+                "kind": "ppu-runtime", "upload_id": "a" * 32,
+                "gateway_host": HOST, "ppu_id": "z2-hil",
+                "facility_id": "lab", "display_name": "Plasma Z2 PS",
+            }
+            return ppu_deploy_api.DeploymentSubmission("a" * 32, "d" * 32, "queued")
+        def deployment_state(self, transaction):
+            assert transaction == "d" * 32
+            self.events.append("poll")
+            self.runtime = "d" * 40
+            return {"state": "succeeded", "result": {"result": "PASS"}}
+        def status(self):
+            return {**super().status(), "capabilities": {"runtime_deployment": True}}
+
+    client = RuntimeClient()
+    monkeypatch.setattr(program, "post_once",
+                        lambda *args: pytest.fail("DUT programming forbidden"))
+    result = program.deploy_runtime_kit(
+        client, selection(), host=HOST, device_id=DEVICE,
+        runtime_sha="d" * 40, kit_sha256=hashlib.sha256(data).hexdigest(),
+        ppu_id="z2-hil", facility_id="lab", display_name="Plasma Z2 PS")
+    assert result["status"] == "PASS"
+    assert result["transaction_id"] == "d" * 32
+    assert result["flash"] == "NOT_RUN"
+    assert client.events.count("submit") == 1
+    assert client.events.count("poll") == 1
+
+
+def test_runtime_deploy_rejects_wrong_sha_before_any_bootstrap_io(tmp_path, monkeypatch):
+    archive = tmp_path / "mismatch.tar.gz"
+    archive.write_bytes(b"not-matching")
+    monkeypatch.setenv("PLASMA_Z2_KIT_ARTIFACT_PATH", str(archive))
+    monkeypatch.setenv("PLASMA_Z2_KIT_SOURCE_SHA", "d" * 40)
+    client = Client()
+    with pytest.raises(program.ProgramDenied, match="RUNTIME_KIT_SHA256_MISMATCH"):
+        program.deploy_runtime_kit(
+            client, selection(), host=HOST, device_id=DEVICE,
+            runtime_sha="d" * 40, kit_sha256="e" * 64,
+            ppu_id="z2-hil", facility_id="lab", display_name="Plasma Z2 PS")
+    assert client.events == []
