@@ -112,5 +112,5 @@ def test_root_denial_with_oserror_punctuation_is_not_masked():
     assert 're.fullmatch(r"[\\x20-\\x7e]{1,160}",code)' in SCRIPT.REMOTE
     assert "DENIAL_CODE_UNRECOGNIZED" not in SCRIPT.REMOTE
     raw = "[Errno 2] No such file or directory: '/opt/plasma/privileged-code'"
-    assert re.fullmatch(r"[\\x20-\\x7e]{1,160}", raw)
+    assert all(0x20 <= ord(ch) <= 0x7e for ch in raw)
 
