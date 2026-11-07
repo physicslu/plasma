@@ -95,12 +95,14 @@ def observe_active(host: str, *, helper) -> dict:
 
 def doctor_snapshot() -> tuple[dict, str]:
     host = plasma_z2.paired_host()
-    args = Namespace(repo=ROOT, host=None, paired_host=True,
+    # Resolve the authenticated local target exactly once. Doctor uses that
+    # same host instead of reading mutable paired config a second time.
+    args = Namespace(repo=ROOT, host=host, paired_host=False,
                      ssh_user=None, known_hosts=Path.home() /
                      ".config/plasma/z2-login-known_hosts")
     document = plasma_z2.doctor(args)
     indexed = {row["check"]: row for row in document["checks"]}
-    expected = ("paired_target", "tcp_18080", "tcp_18081",
+    expected = ("tcp_18080", "tcp_18081",
                 "bootstrap_health", "bootstrap_status", "deployment_guard")
     if any(indexed.get(key, {}).get("status") != "PASS" for key in expected):
         raise JointDenied("DOCTOR_REMOTE_GATE_NOT_PASS")
