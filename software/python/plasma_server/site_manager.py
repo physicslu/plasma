@@ -70,6 +70,8 @@ class SiteManager:
         self.server_log = ServerEventLogger(config.server.log_root)
         self.registry = JobRegistry()
         self._active_asset_set_reader = active_asset_set_reader
+        # Wired by the trusted PPU PackageActionRuntime, never from a Job or ZIP.
+        self._bundle_firmware_resolver: Callable[..., dict[str, Any]] | None = None
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
         requires_ic_support = any(
@@ -443,6 +445,55 @@ class SiteManager:
             pinned = deepcopy(self._active_asset_set_reader()) if self._active_asset_set_reader else {
                 "state": "EMPTY", "asset_set_sha256": None, "ready": False,
             }
+            bundle_keys = {
+                "bundle_asset_set_sha256", "bundle_firmware_package_id",
+                "bundle_firmware_sha256",
+            }
+            selected = bundle_keys.intersection(request.metadata)
+            if selected:
+                if (selected != bundle_keys
+                        or request.operation is not Operation.FLASH_CYCLE
+                        or request.image or request.image_ref is not None
+                        or request.max_retries != 0
+                        or not isinstance(self.interfaces[request.site_id], OpenOCDInterface)
+                        or not self.interfaces[request.site_id].site_worker_ready
+                        or self._bundle_firmware_resolver is None
+                        or type(request.metadata.get("profile")) is not str
+                        or type(request.metadata.get("provider")) is not str):
+                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                      "BUNDLE_FIRMWARE_JOB_NOT_QUALIFIED")
+                digest = request.metadata["bundle_asset_set_sha256"]
+                if (type(pinned) is not dict or pinned.get("state") != "ACTIVE"
+                        or pinned.get("asset_set_sha256") != digest):
+                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                      "BUNDLE_FIRMWARE_ACTIVE_SET_MISMATCH")
+                try:
+                    resolved = self._bundle_firmware_resolver(
+                        asset_set_sha256=digest,
+                        firmware_package_id=request.metadata["bundle_firmware_package_id"],
+                        profile_package_id=request.metadata["profile"],
+                        firmware_sha256=request.metadata["bundle_firmware_sha256"],
+                    )
+                except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
+                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                      "BUNDLE_FIRMWARE_RESOLUTION_DENIED") from exc
+                if (type(resolved) is not dict
+                        or type(resolved.get("image")) is not bytes
+                        or not resolved["image"]
+                        or resolved.get("asset_set_sha256") != digest
+                        or resolved.get("firmware_package_id")
+                            != request.metadata["bundle_firmware_package_id"]
+                        or resolved.get("profile_package_id") != request.metadata["profile"]
+                        or resolved.get("image_sha256")
+                            != request.metadata["bundle_firmware_sha256"]):
+                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                      "BUNDLE_FIRMWARE_RESOLVER_CONTRACT_INVALID")
+                request = replace(request, image=resolved["image"], metadata={
+                    **request.metadata,
+                    "image_name": resolved["image_name"],
+                    "source_asset_name": resolved["image_name"],
+                    "source_asset_sha256": resolved["image_sha256"],
+                })
             request = self.execution_routers[request.site_id].admit(request)
             runtime.request = request
             runtime.active_asset_set = pinned
