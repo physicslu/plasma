@@ -111,8 +111,8 @@ def fixture(tmp_path: Path, *, with_authorization=True):
         "package_identity_sha256": identity, "job_id": JOB,
         "programming": {
             "site_id": 2, "target": TARGET_ID, "operation": "flash_cycle",
-            "profile": PROFILE, "firmware_package": FIRMWARE,
-            "firmware_sha256": hashlib.sha256(IMAGE).hexdigest(),
+            "profile": PROFILE, "asset_package_id": FIRMWARE,
+            "asset_sha256": hashlib.sha256(IMAGE).hexdigest(),
         },
     }
     return co.paths.product_root, req, authorization
@@ -189,7 +189,7 @@ def test_signed_python_provider_uses_real_programming_job_and_c3_but_never_flash
     lambda req, auth: req["programming"].update(profile="wrong-profile"),
     lambda req, auth: req["programming"].update(site_id=1),
     lambda req, auth: req.update(package_identity_sha256="f" * 64),
-    lambda req, auth: req["programming"].update(firmware_sha256="0" * 64),
+    lambda req, auth: req["programming"].update(asset_sha256="0" * 64),
 ])
 def test_invalid_authorization_or_bundle_selection_never_spawns_provider(tmp_path, mutation):
     result, manager, core, adapter = asyncio.run(run_scenario(tmp_path, mutate=mutation))
