@@ -40,7 +40,22 @@ try:
     adm=e.openocd_root/"libexec/plasma_swd_site_admission.py"
     record=Path("/run/plasma-z2-swd05/swd-site2-admission")
     if record.exists():raise RuntimeError("EXISTING_ADMISSION_OWNER")
-    argv=[sys.executable,"-I","-B",str(adm)]
+    # Use the actual running Site Worker interpreter, not this SSH helper's
+    # system python3. Protected Root admission independently enforces ARMv7,
+    # Python 3.12.13 and its native runtime installation path.
+    pid_result=subprocess.run(["/bin/systemctl","show","--property=MainPID",
+        "--value","plasma-site-worker.service"],capture_output=True,text=True,
+        timeout=6,stdin=subprocess.DEVNULL)
+    pid=pid_result.stdout.strip()
+    if pid_result.returncode!=0 or not pid.isdigit() or int(pid)<2:
+        raise RuntimeError("WORKER_NATIVE_PYTHON_UNAVAILABLE")
+    native=(Path("/proc")/pid/"exe").resolve(strict=True)
+    info=native.lstat()
+    if (not native.is_relative_to("/opt/plasma/python")
+        or not stat.S_ISREG(info.st_mode) or info.st_uid!=0
+        or info.st_mode&0o022):
+        raise RuntimeError("WORKER_NATIVE_PYTHON_UNTRUSTED")
+    argv=[str(native),"-I","-B",str(adm)]
     def call(action):
         return subprocess.run(argv+[action,"2"],capture_output=True,text=True,
                               timeout=100,stdin=subprocess.DEVNULL)
@@ -54,7 +69,10 @@ try:
         else:
             payload=json.loads(found[0])
             code=str(payload.get("code","NOT_RECORDED"))[:160]
-            out["code"]=code if re.fullmatch(r"[A-Za-z0-9_.:/+-]{1,160}",code) else "DENIAL_CODE_UNRECOGNIZED"
+            # Root already bounds the diagnostic to 160 chars. Preserve printable ASCII
+            # including spaces, brackets and quotes in Python/OSError messages;
+            # the old code regex hid the only actionable Root denial as UNRECOGNIZED.
+            out["code"]=code if re.fullmatch(r"[\x20-\x7e]{1,160}",code) else "DENIAL_CODE_NONPRINTABLE"
             out["result"]="ADMITTED" if attempt.returncode==0 and payload.get("result")=="SITE_ADMISSION_RECORD_ISSUED" else "DENIED"
     except (OSError,ValueError,subprocess.SubprocessError):
         out["result"]="INCOMPLETE";out["code"]="ADMISSION_EXECUTION_FAILED"
@@ -75,7 +93,8 @@ try:
 except Exception as e:
     out["result"]="BLOCKED"
     value=str(e)
-    out["code"]=value if value in ("ROOT_REQUIRED","EXISTING_ADMISSION_OWNER") else type(e).__name__
+    out["code"]=value if value in ("ROOT_REQUIRED","EXISTING_ADMISSION_OWNER",
+        "WORKER_NATIVE_PYTHON_UNAVAILABLE","WORKER_NATIVE_PYTHON_UNTRUSTED") else type(e).__name__
 print("PLASMA_SITE2_ADMISSION_DIAGNOSTIC="+json.dumps(out,sort_keys=True,separators=(",",":")))
 '''
 def load(path,name):
@@ -130,7 +149,9 @@ def main(argv=None):
     args=p.parse_args(argv)
     try:
         value=run(args.host,args.source_sha)
-        rc=0 if value["observation"]["result"] in ("DENIED","ADMITTED") and not value["observation"]["record_present"] else 1
+        rc=0 if (value["observation"]["result"]=="ADMITTED"
+                 and value["observation"]["revoke"]=="PASS"
+                 and value["observation"]["record_present"] is False) else 1
     except Exception as exc:
         allowed={"SOURCE_SHA_MISMATCH","HOST_SCOPE_DENIED","DIAGNOSTIC_SAFETY_PRECONDITION_FAILED",
                  "ENROLLED_HOST_MISMATCH","PINNED_SSH_FAILED","REMOTE_DIAGNOSTIC_RECEIPT_INVALID"}

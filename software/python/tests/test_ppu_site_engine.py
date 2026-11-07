@@ -80,6 +80,113 @@ def test_install_select_two_engines_and_worker_uses_exactly_the_selected_one(tmp
     assert [e["selected"] for e in listing["engines"]].count(True) == 1
 
 
+
+def test_admission_only_upgrade_gets_new_immutable_engine_id(tmp_path):
+    # Same OpenOCD executable and source commit, but different Root/Site
+    # admission logic must NOT alias an existing engine's immutable directory.
+    base, record = tmp_path / "openocd", tmp_path / "engine.json"
+    old = install(candidate(tmp_path / "old", admission=b"# old admission\\n"), base)
+    fresh = install(candidate(tmp_path / "fresh", admission=b"# new admission\\n"), base)
+    assert old["openocd_sha256"] == fresh["openocd_sha256"]
+    assert old["admission_sha256"] != fresh["admission_sha256"]
+    assert old["runtime_id"] != fresh["runtime_id"]
+    assert fresh["runtime_id"].endswith(fresh["admission_sha256"][:12])
+    assert (Path(old["root"]) / "libexec" / engine.ADMISSION_NAME).read_bytes() == b"# old admission\\n"
+    assert (Path(fresh["root"]) / "libexec" / engine.ADMISSION_NAME).read_bytes() == b"# new admission\\n"
+    # Do not switch the selected Engine merely because another version was installed.
+    engine.select(old["runtime_id"], record=record, base=base, require_root=False)
+    assert engine.load_engine(record, base=base, require_root=False).openocd_root == Path(old["root"])
+    engine.select(fresh["runtime_id"], record=record, base=base, require_root=False)
+    assert engine.load_engine(record, base=base, require_root=False).openocd_root == Path(fresh["root"])
+
+
+
+
+def test_admission_only_install_preserves_selected_binary_tcl_and_clock(tmp_path):
+    base, record = tmp_path / "engine", tmp_path / "selection.json"
+    old = install(candidate(tmp_path / "old", binary=ELF_ARM + b"old-binary",
+                            admission=b"# old\n"), base)
+    engine.select(old["runtime_id"], record=record, base=base,
+                  require_root=False, adapter_khz=2000)
+    incoming = b"def current_site_admission():\n    return True\n"
+    # The candidate intentionally has a DIFFERENT OpenOCD binary; only its
+    # provenance-checked admission is eligible for import.
+    art = candidate(tmp_path / "new", binary=ELF_ARM + b"other-binary",
+                    admission=incoming)
+    digest = hashlib.sha256(incoming).hexdigest()
+    result = engine.install_selected_admission(
+        art, expected_admission_sha256=digest,
+        record=record, base=base, require_root=False)
+    assert result["result"] == "ADMISSION_INSTALLED_NOT_SELECTED"
+    assert result["openocd_sha256"] == old["openocd_sha256"]
+    assert result["admission_sha256"] == digest
+    assert result["selection_changed"] is False
+    assert result["service_restarted"] is False
+    assert result["fpga_reloaded"] is False
+    assert result["flash"] == "NOT_RUN"
+    assert (Path(result["runtime_id"]).name != old["runtime_id"])
+    updated = base / result["runtime_id"]
+    original = base / old["runtime_id"]
+    assert (updated / "bin/openocd").read_bytes() == (original / "bin/openocd").read_bytes()
+    assert (updated / "share/openocd/scripts/target/stm32f1x.cfg").read_bytes() == (
+        original / "share/openocd/scripts/target/stm32f1x.cfg").read_bytes()
+    assert (updated / "libexec" / engine.ADMISSION_NAME).read_bytes() == incoming
+    assert (original / "libexec" / engine.ADMISSION_NAME).read_bytes() == b"# old\n"
+    assert engine._manifest(updated)["adapter_khz"] == 2000
+    # No automatic selection while installation is verified.
+    assert engine.load_engine(record, base=base, require_root=False).openocd_root == original
+    engine.select(result["runtime_id"], record=record, base=base, require_root=False)
+    chosen = engine.load_engine(record, base=base, require_root=False)
+    assert chosen.adapter_khz == 2000
+    assert chosen.openocd_sha256 == old["openocd_sha256"]
+
+
+
+
+def test_admission_only_install_hashes_each_full_tree_once(tmp_path, monkeypatch):
+    # One comprehensive SHA scan per tree (old, staged). The old implementation
+    # invoked _tree(stage) inside the per-file comparison, yielding O(N^2)
+    # content reads and a stuck Z2 installer when Tcl inventory was large.
+    base, record = tmp_path / "engine", tmp_path / "selection.json"
+    old = install(candidate(tmp_path / "old", admission=b"# old\n"), base)
+    engine.select(old["runtime_id"], record=record, base=base, require_root=False)
+    artifact = candidate(tmp_path / "next", admission=b"def admit():\n    pass\n")
+    expected_sha = hashlib.sha256(b"def admit():\n    pass\n").hexdigest()
+    original_tree = engine._tree
+    scans = []
+
+    def counted_tree(root):
+        scans.append(Path(root))
+        return original_tree(root)
+
+    monkeypatch.setattr(engine, "_tree", counted_tree)
+    out = engine.install_selected_admission(
+        artifact, expected_admission_sha256=expected_sha,
+        record=record, base=base, require_root=False)
+    assert out["result"] == "ADMISSION_INSTALLED_NOT_SELECTED"
+    assert len(scans) == 2
+    assert scans[0] == base / old["runtime_id"]
+    assert scans[1].name.startswith("." + out["runtime_id"] + ".tmp-")
+
+
+def test_admission_only_install_denies_wrong_hash_and_legacy_api(tmp_path):
+    base, record = tmp_path / "engine", tmp_path / "selection.json"
+    old = install(candidate(tmp_path / "old", admission=b"# old\n"), base)
+    engine.select(old["runtime_id"], record=record, base=base, require_root=False)
+    art = candidate(tmp_path / "new", admission=b"DEVMEM_INDEPENDENT_IMAGES\n")
+    with pytest.raises(engine.EngineNotReady, match="ADMISSION_CANDIDATE_SHA_MISMATCH"):
+        engine.install_selected_admission(
+            art, expected_admission_sha256="0" * 64,
+            record=record, base=base, require_root=False)
+    with pytest.raises(engine.EngineNotReady, match="ADMISSION_REMOVED_API_REFERENCE"):
+        engine.install_selected_admission(
+            art, expected_admission_sha256=hashlib.sha256(
+                b"DEVMEM_INDEPENDENT_IMAGES\n").hexdigest(),
+            record=record, base=base, require_root=False)
+    assert [x.name for x in base.iterdir()] == [old["runtime_id"]]
+    assert engine.load_engine(record, base=base, require_root=False).openocd_root.name == old["runtime_id"]
+
+
 def test_install_is_idempotent_and_adopts_an_identical_side_by_side_install(tmp_path):
     base = tmp_path / "openocd"
     art = candidate(tmp_path / "a")
