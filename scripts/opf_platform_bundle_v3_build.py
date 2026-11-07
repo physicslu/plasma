@@ -49,6 +49,8 @@ def _unique_pairs(pairs):
 def _load_json(raw: bytes):
     try:
         return json.loads(raw, object_pairs_hook=_unique_pairs)
+    except BundleBuildDenied:
+        raise
     except (ValueError, UnicodeError) as exc:
         raise BundleBuildDenied("SOURCE_JSON_INVALID") from exc
 
