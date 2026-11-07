@@ -398,6 +398,7 @@ def install_selected_admission(artifact: Path, *, expected_admission_sha256: str
             new_manifest = dict(manifest)
             new_manifest.update({
                 "runtime_id": new_id, "admission_sha256": admission_sha,
+                "adapter_khz": selected.adapter_khz,
                 "admission_source_sha": evidence["plasma_source_sha"],
                 "admission_source_artifact_sha256": archive_sha,
                 "source_engine_runtime_id": old.name,
