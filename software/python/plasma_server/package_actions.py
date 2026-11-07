@@ -90,6 +90,12 @@ class PackageActionRuntime:
             site_manager._active_asset_set_reader = (
                 lambda: _load(control_plane, "ppu_asset_set.py").read_active(self.product_root)
             )
+        # Bundle Firmware is selected only inside SiteManager's existing Job lease.
+        # The trusted control-plane resolver revalidates Active Set + B3 files.
+        if getattr(site_manager, "_bundle_firmware_resolver", None) is None:
+            active_helper = _load(control_plane, "ppu_asset_set.py")
+            site_manager._bundle_firmware_resolver = partial(
+                active_helper.resolve_active_firmware, self.product_root)
         self.state_root = Path(state_root)
         self.owner_credential = owner_credential
         self.spawner = spawner
