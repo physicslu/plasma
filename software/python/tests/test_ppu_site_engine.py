@@ -141,6 +141,34 @@ def test_admission_only_install_preserves_selected_binary_tcl_and_clock(tmp_path
     assert chosen.openocd_sha256 == old["openocd_sha256"]
 
 
+
+
+def test_admission_only_install_hashes_each_full_tree_once(tmp_path, monkeypatch):
+    # One comprehensive SHA scan per tree (old, staged). The old implementation
+    # invoked _tree(stage) inside the per-file comparison, yielding O(N^2)
+    # content reads and a stuck Z2 installer when Tcl inventory was large.
+    base, record = tmp_path / "engine", tmp_path / "selection.json"
+    old = install(candidate(tmp_path / "old", admission=b"# old\n"), base)
+    engine.select(old["runtime_id"], record=record, base=base, require_root=False)
+    artifact = candidate(tmp_path / "next", admission=b"def admit():\n    pass\n")
+    expected_sha = hashlib.sha256(b"def admit():\n    pass\n").hexdigest()
+    original_tree = engine._tree
+    scans = []
+
+    def counted_tree(root):
+        scans.append(Path(root))
+        return original_tree(root)
+
+    monkeypatch.setattr(engine, "_tree", counted_tree)
+    out = engine.install_selected_admission(
+        artifact, expected_admission_sha256=expected_sha,
+        record=record, base=base, require_root=False)
+    assert out["result"] == "ADMISSION_INSTALLED_NOT_SELECTED"
+    assert len(scans) == 2
+    assert scans[0] == base / old["runtime_id"]
+    assert scans[1].name.startswith("." + out["runtime_id"] + ".tmp-")
+
+
 def test_admission_only_install_denies_wrong_hash_and_legacy_api(tmp_path):
     base, record = tmp_path / "engine", tmp_path / "selection.json"
     old = install(candidate(tmp_path / "old", admission=b"# old\n"), base)
