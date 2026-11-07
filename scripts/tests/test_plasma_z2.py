@@ -1,0 +1,67 @@
+"""Host-only safety tests for the Z2 Path 2 diagnostic CLI."""
+import importlib.util
+import io
+import json
+import tempfile
+import unittest
+from argparse import Namespace
+from pathlib import Path
+from unittest import mock
+
+SCRIPT = Path(__file__).resolve().parents[1] / "plasma_z2.py"
+spec = importlib.util.spec_from_file_location("plasma_z2", SCRIPT)
+doctor = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(doctor)
+
+
+class DoctorTests(unittest.TestCase):
+    def options(self, host=None, paired_host=False):
+        return Namespace(repo=Path("/tmp/no-plasma-checkout"), host=host,
+                         paired_host=paired_host, ssh_user=None,
+                         known_hosts=Path("/tmp/no-pinned-key"))
+
+    def test_paired_host_only_owner_mode(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            config = base / ".config/plasma/z2-login-smoke.json"
+            config.parent.mkdir(parents=True)
+            config.write_text(json.dumps({
+                "ssh_host": "z2.local", "ssh_password": "REDACT_ME",
+                "sudo_password": "REDACT_ME_TOO"}))
+            config.chmod(0o600)
+            with mock.patch.object(doctor.Path, "home", return_value=base):
+                self.assertEqual(doctor.paired_host(), "z2.local")
+                config.chmod(0o644)
+                with self.assertRaisesRegex(ValueError, "PAIRED_TARGET_CONFIG_UNTRUSTED"):
+                    doctor.paired_host()
+
+    def test_missing_host_no_network(self):
+        with mock.patch.object(doctor, "local_repo", return_value=[]), \
+                mock.patch.object(doctor, "fetch_status") as status:
+            result = doctor.doctor(self.options())
+            self.assertEqual(result["overall"], "INCOMPLETE")
+            status.assert_not_called()
+
+    def test_recovery_required_denied(self):
+        def payload(host, path):
+            if path == "/v1/health":
+                return "PASS", {"ok": True, "service": "plasma-ppu-bootstrap"}, "ok"
+            return "PASS", {"ok": True, "bootstrap": {"state": "bootstrap_ready"},
+                            "deployment": {"state": "recovery_required"}}, "ok"
+        with mock.patch.object(doctor, "local_repo", return_value=[]), \
+                mock.patch.object(doctor, "tcp_probe", return_value=doctor.check("tcp", "PASS", "ok")), \
+                mock.patch.object(doctor, "fetch_status", side_effect=payload):
+            result = doctor.doctor(self.options(host="z2.local"))
+            self.assertEqual(result["overall"], "BLOCKED")
+
+    def test_deploy_never_runs(self):
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout, \
+                mock.patch.object(doctor, "fetch_status") as fetch:
+            rc = doctor.main(["deploy", "--json"])
+        self.assertEqual(rc, 2)
+        self.assertEqual(json.loads(stdout.getvalue())["reason"], "DEPLOY_DISABLED_BY_DESIGN")
+        fetch.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
