@@ -51,18 +51,33 @@ def reason(value):
                   "API_HTTP_REJECTED","TimeoutExpired","ImportError","OSError"):
         if token.lower() in value.lower():return token.replace(" ","_")
     return "OTHER_OR_NONE"
+def libgpiod_detail(value):
+    if type(value) is not str:return "NO_DETAIL"
+    match=re.search(r"(?i).{0,50}libgpiod.{0,135}",value)
+    if match is None:return "NOT_RECORDED"
+    # Only the bounded dependency error fragment, never raw private journals.
+    return "".join(ch if ch.isascii() and (ch.isalnum() or ch in " .:_/-=(),") else " " for ch in match.group(0))[:185]
+def soname_loadable():
+    try:
+        import ctypes
+        ctypes.CDLL("libgpiod.so.2")
+        return True
+    except OSError:return False
 api,a=read_file(API);coord,c=read_file(COORD)
 out={"schema":"plasma.runtime-tx-readonly.v1","api_file":a,"coordinator_file":c,
      "api":{},"coordinator":{},"active_release":"UNVERIFIED","mutations":"NOT_RUN"}
 if api is not None:
     out["api"]={k:field(api.get(k),128) for k in ("state","transaction_id","error_code")}
     out["api"]["error_class"]=reason(api.get("error"))
+    out["api"]["dependency_detail"]=libgpiod_detail(api.get("error"))
+    out["api"]["libgpiod_so2_loadable"]=soname_loadable()
     out["api"]["result_present"]=api.get("result") is not None
 if coord is not None:
     out["coordinator"]={k:field(coord.get(k),128) for k in
                         ("state","kind","transaction_id","api_transaction_id",
                          "release_id","error_code","previous_release")}
     out["coordinator"]["error_class"]=reason(coord.get("error_message"))
+    out["coordinator"]["dependency_detail"]=libgpiod_detail(coord.get("error_message"))
     out["coordinator"]["result_present"]=coord.get("result") is not None
 try:
     if CURRENT.is_symlink():
