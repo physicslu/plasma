@@ -15,6 +15,7 @@ from plasma_core.job_logging import JobEventLogger, OutputManager
 from plasma_core.models import ErrorDetail, ExecutionOutput, JobAttemptResult, JobResult, iso_now
 from plasma_handlers.base import BaseHandler
 from plasma_interfaces.openocd import OpenOCDInterface
+from plasma_interfaces.package_provider import PackageProviderInterface
 
 from .job_manager import JobRuntime
 
@@ -322,6 +323,10 @@ class SiteWorker:
                 if isinstance(self.handler.interface, OpenOCDInterface):
                     self.handler.interface.bind_runtime_job(
                         request.job_id, runtime.active_asset_set, job_deadline)
+                elif isinstance(self.handler.interface, PackageProviderInterface):
+                    self.handler.interface.bind_runtime_job(
+                        request.job_id, runtime.active_asset_set, job_deadline,
+                        runtime.trusted_provider)
                 runtime.active_task = asyncio.create_task(
                     self.handler.execute(request, stage_callback),
                     name=f"{request.job_id}-attempt-{attempts}",
