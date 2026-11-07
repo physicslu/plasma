@@ -68,7 +68,31 @@ try:
                       "NEW" if rec.get("openocd_root")==str(BASE/NEW) else "OTHER_OR_UNKNOWN")
     ret["selection_binary_sha256"]=rec.get("openocd_sha256")
     ret["selection_admission_sha256"]=rec.get("admission_sha256")
-    ret["stage_temp_count"]=len(tuple(BASE.glob("."+NEW+".tmp-*")))
+    stages=sorted(BASE.glob("."+NEW+".tmp-*"))
+    ret["stage_temp_count"]=len(stages)
+    ret["stages"]=[]
+    for stage in stages[:3]:
+        try:
+            if stage.is_symlink() or not stage.is_dir():continue
+            meta=stage.stat()
+            suffix=stage.name.rsplit(".tmp-",1)[-1]
+            pid=int(suffix) if suffix.isdigit() else 0
+            comm_file=Path("/proc")/str(pid)/"comm"
+            pid_alive=pid>1 and comm_file.is_file()
+            comm=comm_file.read_text(errors="replace").strip() if pid_alive else "ABSENT"
+            if comm not in ("python","python3","sudo","ABSENT"):comm="OTHER"
+            ret["stages"].append({
+                "directory_owner_uid":meta.st_uid,
+                "mtime_ns":meta.st_mtime_ns,
+                "pid_from_stage_name":pid,
+                "pid_present":pid_alive,
+                "pid_comm":comm,
+                "partial_binary":(stage/"bin/openocd").is_file(),
+                "partial_admission":(stage/"libexec/plasma_swd_site_admission.py").is_file(),
+                "partial_manifest":(stage/"plasma-engine.json").is_file(),
+                "partial_tcl":(stage/"share/openocd/scripts").is_dir(),
+            })
+        except (OSError,ValueError):ret["stages"].append({"status":"UNVERIFIED"})
     mgr=Path("/sys/class/fpga_manager/fpga0/state").read_text().strip()
     ret["fpga_manager"]=mgr if mgr in ("operating","unknown","write","reset") else "UNVERIFIED"
     ret["site2_sealed"]=Path("/var/lib/plasma-site-worker/seals/site2.sealed").exists()
