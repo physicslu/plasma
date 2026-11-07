@@ -80,6 +80,26 @@ def test_install_select_two_engines_and_worker_uses_exactly_the_selected_one(tmp
     assert [e["selected"] for e in listing["engines"]].count(True) == 1
 
 
+
+def test_admission_only_upgrade_gets_new_immutable_engine_id(tmp_path):
+    # Same OpenOCD executable and source commit, but different Root/Site
+    # admission logic must NOT alias an existing engine's immutable directory.
+    base, record = tmp_path / "openocd", tmp_path / "engine.json"
+    old = install(candidate(tmp_path / "old", admission=b"# old admission\\n"), base)
+    fresh = install(candidate(tmp_path / "fresh", admission=b"# new admission\\n"), base)
+    assert old["openocd_sha256"] == fresh["openocd_sha256"]
+    assert old["admission_sha256"] != fresh["admission_sha256"]
+    assert old["runtime_id"] != fresh["runtime_id"]
+    assert fresh["runtime_id"].endswith(fresh["admission_sha256"][:12])
+    assert (Path(old["root"]) / "libexec" / engine.ADMISSION_NAME).read_bytes() == b"# old admission\\n"
+    assert (Path(fresh["root"]) / "libexec" / engine.ADMISSION_NAME).read_bytes() == b"# new admission\\n"
+    # Do not switch the selected Engine merely because another version was installed.
+    engine.select(old["runtime_id"], record=record, base=base, require_root=False)
+    assert engine.load_engine(record, base=base, require_root=False).openocd_root == Path(old["root"])
+    engine.select(fresh["runtime_id"], record=record, base=base, require_root=False)
+    assert engine.load_engine(record, base=base, require_root=False).openocd_root == Path(fresh["root"])
+
+
 def test_install_is_idempotent_and_adopts_an_identical_side_by_side_install(tmp_path):
     base = tmp_path / "openocd"
     art = candidate(tmp_path / "a")
