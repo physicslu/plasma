@@ -324,6 +324,112 @@ def install(artifact: Path, *, sidecar: Path | None = None, base: Path = ENGINE_
                 "adapter_khz", "engine_fields_declared_by")}}
 
 
+def install_selected_admission(artifact: Path, *, expected_admission_sha256: str,
+                               sidecar: Path | None = None,
+                               record: Path = ENGINE_SELECTION,
+                               base: Path = ENGINE_BASE,
+                               require_root: bool = True) -> dict[str, Any]:
+    """Side-by-side Admission revision; preserve selected OpenOCD binary and Tcl.
+
+    Verify the incoming CI candidate's Admission source, then clone the exact
+    currently selected Engine with only that entry and its manifest changed.
+    Never switch selection, restart services or operate hardware here.
+    """
+    if require_root:
+        _need(os.geteuid() == 0, "ROOT_REQUIRED")
+    _need(type(expected_admission_sha256) is str and
+          re.fullmatch(r"[0-9a-f]{64}", expected_admission_sha256) is not None,
+          "EXPECTED_ADMISSION_SHA_INVALID")
+    selected = load_engine(record, base=base, require_root=require_root)
+    old = selected.openocd_root
+    manifest = _manifest(old)
+    version, source = manifest.get("openocd_version"), manifest.get("openocd_source_sha")
+    _need(type(version) is str and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
+          and type(source) is str and re.fullmatch(r"[0-9a-f]{40}", source),
+          "SELECTED_ENGINE_PROVENANCE_INVALID")
+    _need(manifest.get("openocd_sha256") == selected.openocd_sha256
+          and manifest.get("admission_sha256") == selected.admission_sha256,
+          "SELECTED_ENGINE_MANIFEST_MISMATCH")
+    _need(all(not p.is_symlink() for p in old.rglob("*")),
+          "SELECTED_ENGINE_SYMLINK_DENIED")
+    original_files = _tree(old)
+    archive_sha = _verify_sidecar(
+        artifact, sidecar or Path(str(artifact) + ".sha256"))
+    with tempfile.TemporaryDirectory(prefix="plasma-admission-") as tmp:
+        extracted = Path(tmp) / "artifact"
+        extracted.mkdir()
+        _extract(artifact, extracted)
+        src = extracted / ADMISSION_NAME
+        _need(src.is_file() and not src.is_symlink(),
+              "ADMISSION_CANDIDATE_MISSING")
+        raw = src.read_bytes()
+        admission_sha = hashlib.sha256(raw).hexdigest()
+        _need(admission_sha == expected_admission_sha256,
+              "ADMISSION_CANDIDATE_SHA_MISMATCH")
+        _need(admission_sha != selected.admission_sha256, "ADMISSION_UNCHANGED")
+        try:
+            compile(raw, ADMISSION_NAME, "exec")
+            evidence = json.loads(
+                (extracted / "candidate-evidence.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError, SyntaxError, UnicodeError) as exc:
+            raise EngineNotReady("ADMISSION_CANDIDATE_INVALID") from exc
+        _need(type(evidence) is dict and
+              evidence.get("schema") == CANDIDATE_SCHEMA and
+              evidence.get("site_admission_script_sha256") == admission_sha and
+              evidence.get("openocd_source_sha") == source and
+              type(evidence.get("plasma_source_sha")) is str and
+              re.fullmatch(r"[0-9a-f]{40}", evidence["plasma_source_sha"]),
+              "ADMISSION_CANDIDATE_PROVENANCE_MISMATCH")
+        _need(b"DEVMEM_INDEPENDENT_IMAGES" not in raw,
+              "ADMISSION_REMOVED_API_REFERENCE")
+        new_id = (f"{version}-{source[:12]}-"
+                  f"{selected.adapter_driver.replace('_', '-')}-"
+                  f"{selected.openocd_sha256[:12]}-{admission_sha[:12]}")
+        _need(RUNTIME_ID.fullmatch(new_id) is not None, "RUNTIME_ID_INVALID")
+        target = base / new_id
+        _need(not os.path.lexists(target), "ADMISSION_INSTALL_ALREADY_EXISTS")
+        stage = base / f".{new_id}.tmp-{os.getpid()}"
+        _need(not os.path.lexists(stage), "ADMISSION_INSTALL_STAGE_COLLISION")
+        try:
+            shutil.copytree(old, stage, symlinks=True)
+            entry = stage / "libexec" / ADMISSION_NAME
+            entry.write_bytes(raw)
+            entry.chmod(0o644)
+            new_manifest = dict(manifest)
+            new_manifest.update({
+                "runtime_id": new_id, "admission_sha256": admission_sha,
+                "admission_source_sha": evidence["plasma_source_sha"],
+                "admission_source_artifact_sha256": archive_sha,
+                "source_engine_runtime_id": old.name,
+                "source_engine_manifest_sha256":
+                    hashlib.sha256((old / MANIFEST_NAME).read_bytes()).hexdigest(),
+            })
+            (stage / MANIFEST_NAME).write_text(
+                json.dumps(new_manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8")
+            changed = {k for k in original_files.keys() | _tree(stage).keys()
+                       if original_files.get(k) != _tree(stage).get(k)}
+            _need(changed == {f"libexec/{ADMISSION_NAME}", MANIFEST_NAME},
+                  "ADMISSION_ONLY_FILE_DELTA_INVALID")
+            _need(_sha256(stage / "bin/openocd") == selected.openocd_sha256,
+                  "OPENOCD_BINARY_CHANGED")
+            os.replace(stage, target)
+            verify_installed(target, openocd_sha256=selected.openocd_sha256,
+                             admission_sha256=admission_sha, require_root=require_root)
+        finally:
+            if stage.exists():
+                shutil.rmtree(stage)
+    return {
+        "result": "ADMISSION_INSTALLED_NOT_SELECTED", "runtime_id": new_id,
+        "previous_runtime_id": old.name,
+        "openocd_sha256": selected.openocd_sha256,
+        "previous_admission_sha256": selected.admission_sha256,
+        "admission_sha256": admission_sha,
+        "selection_changed": False, "service_restarted": False,
+        "fpga_reloaded": False, "flash": "NOT_RUN",
+    }
+
+
 # --- select / list ---------------------------------------------------------------------
 
 def _manifest(root: Path) -> dict[str, Any]:
@@ -428,6 +534,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--declare-driver-abi", type=int)
     p.add_argument("--declare-adapter-khz", type=int)
     p.add_argument("--declare-openocd-version")
+    a = sub.add_parser("install-selected-admission")
+    a.add_argument("artifact", type=Path)
+    a.add_argument("--sidecar", type=Path)
+    a.add_argument("--expected-admission-sha256", required=True)
     s = sub.add_parser("select")
     s.add_argument("runtime_id")
     s.add_argument("--restart", action="store_true")
@@ -443,6 +553,10 @@ def main(argv: list[str] | None = None) -> int:
                 "adapter_khz": args.declare_adapter_khz,
                 "openocd_version": args.declare_openocd_version}.items() if v is not None}
             out = install(args.artifact, sidecar=args.sidecar, declared=declared or None)
+        elif args.command == "install-selected-admission":
+            out = install_selected_admission(
+                args.artifact, expected_admission_sha256=args.expected_admission_sha256,
+                sidecar=args.sidecar)
         elif args.command == "select":
             out = select(args.runtime_id, restart=args.restart, adapter_khz=args.adapter_khz)
         else:
