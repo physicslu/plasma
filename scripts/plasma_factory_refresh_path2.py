@@ -264,7 +264,9 @@ def get(host: str, path: str) -> dict:
 def make_archive() -> bytes:
     inputs={}
     for name in ALL_FILES:
-        f=ROOT/name
+        relative=name[len("scripts/"):]
+        f=(ROOT/relative if relative.startswith(("pl/hil/","software/python/"))
+           else ROOT/name)
         if f.is_symlink() or not f.is_file():
             raise RuntimeError("FACTORY_SOURCE_FILE_MISSING_OR_SYMLINK")
         inputs[name]=f.read_bytes()
