@@ -92,9 +92,9 @@ def active_set(tmp_path: Path, *, deps=None, content=PAYLOAD):
 def resolve(product, **kw):
     return assets.resolve_active_firmware(
         product, asset_set_sha256=kw.pop("asset_set_sha256", SET_SHA),
-        firmware_package_id=kw.pop("firmware_package_id", FIRMWARE),
+        asset_package_id=kw.pop("asset_package_id", FIRMWARE),
         profile_package_id=kw.pop("profile_package_id", PROFILE),
-        firmware_sha256=kw.pop("firmware_sha256", digest(PAYLOAD)),
+        bundle_asset_sha256=kw.pop("bundle_asset_sha256", digest(PAYLOAD)),
         **kw,
     )
 
@@ -106,19 +106,19 @@ def test_verified_firmware_is_taken_from_only_active_set(tmp_path):
     assert result["image_sha256"] == digest(PAYLOAD)
     assert result["asset_set_sha256"] == SET_SHA
     assert result["image_name"] == "firmware.bin"
-    assert result["firmware_package_id"] == FIRMWARE
+    assert result["asset_package_id"] == FIRMWARE
     assert result["profile_package_id"] == PROFILE
 
 
 @pytest.mark.parametrize("override", [
     {"asset_set_sha256": "b" * 64},
     {"asset_set_sha256": "../escape"},
-    {"firmware_package_id": "../escape"},
-    {"firmware_package_id": "missing"},
-    {"firmware_package_id": PROFILE},
+    {"asset_package_id": "../escape"},
+    {"asset_package_id": "missing"},
+    {"asset_package_id": PROFILE},
     {"profile_package_id": "missing"},
-    {"firmware_sha256": "0" * 64},
-    {"firmware_sha256": "bad"},
+    {"bundle_asset_sha256": "0" * 64},
+    {"bundle_asset_sha256": "bad"},
 ])
 def test_bad_reference_never_resolves_firmware(tmp_path, override):
     product, _ = active_set(tmp_path)
@@ -153,18 +153,18 @@ def test_gateway_bundle_reference_carries_no_inline_image():
     request = handler._job_request({
         "site_id": 2, "operation": "flash_cycle",
         "target": "STM32F103C8T6", "provider": PROVIDER, "profile": PROFILE,
-        "asset_set_sha256": SET_SHA, "firmware_package_id": FIRMWARE,
-        "firmware_sha256": digest(PAYLOAD),
+        "asset_set_sha256": SET_SHA, "asset_package_id": FIRMWARE,
+        "bundle_asset_sha256": digest(PAYLOAD),
     }, client_id="plasma-web")
     assert request.operation is Operation.FLASH_CYCLE
     assert request.image == b"" and request.image_ref is None
     assert request.metadata["bundle_asset_set_sha256"] == SET_SHA
-    assert request.metadata["bundle_firmware_package_id"] == FIRMWARE
-    assert request.metadata["bundle_firmware_sha256"] == digest(PAYLOAD)
+    assert request.metadata["bundle_asset_package_id"] == FIRMWARE
+    assert request.metadata["bundle_asset_sha256"] == digest(PAYLOAD)
 
 
 @pytest.mark.parametrize("change", [
-    {"firmware_sha256": None},
+    {"bundle_asset_sha256": None},
     {"asset_base64": "AA=="},
     {"operation": "verify"},
     {"provider": None},
@@ -173,12 +173,12 @@ def test_gateway_refuses_incomplete_or_mixed_bundle_source(change):
     body = {
         "site_id": 2, "operation": "flash_cycle",
         "target": "STM32F103C8T6", "provider": PROVIDER, "profile": PROFILE,
-        "asset_set_sha256": SET_SHA, "firmware_package_id": FIRMWARE,
-        "firmware_sha256": digest(PAYLOAD),
+        "asset_set_sha256": SET_SHA, "asset_package_id": FIRMWARE,
+        "bundle_asset_sha256": digest(PAYLOAD),
     }
     body.update(change)
-    if body.get("firmware_sha256") is None:
-        body.pop("firmware_sha256", None)
+    if body.get("bundle_asset_sha256") is None:
+        body.pop("bundle_asset_sha256", None)
     handler = object.__new__(PlasmaWebHandler)
     with pytest.raises(ValueError):
         handler._job_request(body, client_id="plasma-web")
