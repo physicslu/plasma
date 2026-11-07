@@ -67,6 +67,7 @@ def test_bounded_path2_b3_uses_real_builder_and_no_fpga_load(tmp_path, monkeypat
     class Api:
         def __init__(self, host, module, token):
             assert host == "192.168.2.99" and token == "sample-owner-token"
+            self.module = module
         def upload(self, blob):
             events.append(("B1", len(blob)))
             return "a" * 32
