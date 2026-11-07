@@ -83,25 +83,24 @@ independently established by the current paired owner authorization.
 
 *The illustration is not a valid ZIP until real SHA256 and sizes are substituted.* Optional `actions` and `source_commit` declarations confer no execution permission. All other Manifest fields are denied; a v3 Manifest containing `components` is invalid. A v2 Manifest containing `packages` is also invalid.
 
-## Explicit version transition, not a silent rename
+## One admitted wire format: Bundle v3
 
-| Wire format | Status | Exact accepted field and path |
-|---|---|---|
-| `plasma.ppu.package.v1` | Legacy single-kind Package input; retained for compatibility, not the canonical new authoring format | `files`, original v1 `payload/...` |
-| `plasma.ppu.bundle.v2` | Legacy read/admission compatibility, including historical PR2/PR3 / PR #1224 evidence | `components`, `payload/components/<id>/...` |
-| `plasma.ppu.bundle.v3` | **Only canonical format for all new Bundle authors** | `packages`, `payload/packages/<id>/...` |
+| Schema | Current admission |
+| --- | --- |
+| `plasma.ppu.package.v1` | **RETIRED / REJECTED**; historical standalone Package fixture only |
+| `plasma.ppu.bundle.v2` | **RETIRED / REJECTED**; historical `components` fixture only |
+| `plasma.ppu.bundle.v3` | **ACCEPTED**; `packages`, `payload/packages/<package-id>/...` |
 
-Changing `components` to `packages` on an existing `plasma.ppu.bundle.v2` is **invalid**, because a published Schema version is an interface contract. Existing physical B1 and B2-v1 receipts do not change; B2-v2 remains **NOT_QUALIFIED** on the installed Z2 until independently attested. A Host-only v3 PASS is not a physical Z2 v3 PASS.
+There is no v1/v2 admission or installation compatibility path. Existing historical
+receipts are evidence, not permission to replay an obsolete transaction.
 
 ## Parser and Receipt boundaries
 
-- The existing `POST /v1/uploads`, chunk/commit and `POST /v1/deployments` API and `kind=bundle` remain unchanged. No new Manager, Installer, Lock, Journal or transport.
-- Canonical v3 admission Plan emits `bundle_schema: "plasma.ppu.bundle.v3"` and **`packages` only**; v2 Plan emits the historical **`components` only**. Malformed mixed responses must be rejected.
-- The Python model exposes `VerifiedBundle.packages: tuple[VerifiedBundlePackage]`, `MAX_BUNDLE_PACKAGES=32`, `bundle_package_identity`, and Package-based DAG resolution. Legacy attribute/function aliases remain narrowly for v2 consumers and cannot be used for new schema authoring.
-- New v3 Bundle Resolution emits `schema=plasma.ppu.bundle-resolution.v2`, `package_order`, `package_sha256`; v2 continues the old `component_order` and `component_sha256` Receipt shape.
-- Host-only transaction returns a top-level `bundle` envelope containing `packages` for v3; legacy v2 and Package v1 continue to return their historical `package` envelope. This is only a simulated transaction Receipt, not proof of device installation.
-- Code types `python`, `native-c`, `fpga-image` have reviewed file-shape restrictions (`fpga-image` = exactly one BIN + HWH + `plasma.fpga.image.v1` Manifest, statically checked at B2 against the verified Bundle, device target and current Driver ABI; [Owner Operation Authorization](../deployment/ppu-owner-operation-authorization.md) binds the exact ZIP bytes and operation); opaque data kinds such as IC Catalog and Programming Profile cannot carry executable files. `python` and `native-c` Packages may carry the declarative `config/plasma-package-resources.json` (`plasma.ppu.package-resources.v1`: `sites`, `max_runtime_s`); it is identity-bound and required for execution, never an execution entitlement. A Provider Package may also carry the fixed non-executable `config/plasma-provider-options.json` (see [P1-01 OPF Options Schema](opf-provider-options-schema-gate1.md)); this does not grant execution. File/path limits, unique IDs, SHA, ZIP protections and target compatibility remain enforced.
-- Component/Package hashing only establishes content identity; a checksum or Manifest `source_commit` never replaces the separate authenticated owner operation authorization.
+- Reuse `POST /v1/uploads` and `POST /v1/deployments`; canonical B2 admission uses `kind=bundle`. The separate `kind=ppu-runtime` deployment retains its distinct verified Release Kit and Coordinator path.
+- `verify_host_only_artifact` accepts only v3. Its plan contains `bundle_schema: "plasma.ppu.bundle.v3"` and `packages`, never `components`. The Host-only receipt contains the v3 `bundle` envelope.
+- `VerifiedBundle.packages`, `VerifiedBundlePackage`, and `MAX_BUNDLE_PACKAGES=32` define the Package graph. The resolver emits `plasma.ppu.bundle-resolution.v2` with `package_order` and `package_sha256`; this resolution schema version is **not** Bundle v2 admission.
+- Package kinds `python`, `native-c` and `fpga-image` retain file-shape restrictions; `fpga-image` requires the paired BIN, HWH and `plasma.fpga.image.v1` manifest plus separate Root qualification. Opaque data Packages, including Catalog and Programming Profile, cannot carry executable files.
+- A Python or native Package may carry `config/plasma-package-resources.json` for Site/time limits, and a Provider may carry `config/plasma-provider-options.json`. These resources grant no executable authority. SHA, ZIP/path, dependency DAG, target, Owner Authorization and privilege checks remain mandatory.
 
 ## Asset-only Bundle semantics and single Active Asset Set
 
