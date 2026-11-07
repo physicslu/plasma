@@ -43,6 +43,7 @@
 
 ## PPU architecture and runtime
 
+- **Plan** · `PR #1343` · `documentation-only` — [PLASMA Core Convergence and Deletion-First Roadmap](architecture/plasma-core-convergence-and-deletion-first-roadmap.md)：後續 OPF／Bundle／Runtime 收斂及舊程式刪除的共同基準；S0–S5 尚待個別 Gate 1，非 Runtime 或實機驗收。
 - **Current** · `Bundle v3` · `PR #1225` — [Canonical Bundle v3: Bundle → Packages → Files](architecture/ppu-canonical-bundle-packages.md)：`packages[]`、Package DAG、SHA256 Admission；v1/v2 舊格式不作為 v3 相容介面。尚未完成 Z2 B2 驗收。
 - **Plan** · `PR #1225` — [PPU Target Platform Identity](architecture/ppu-target-platform-identity.md)：`linux-armv7` 可信套件目標與 `linux-armv7l` runtime 觀測值的區分；不得視為已證實的 HTTP 409 根因。
 - **Plan** · `OPF-3A` · `PR #1303 Draft` · `Host-only` — [OPF Per-Site Session Ownership](architecture/opf-site-session-manager-gate1.md)：重用 C-3 Worker、PPU Lease、ADR-0007 Lock／Fence 與 SEALED／Recovery，將全域單一 Session 改為不同 Site 可獨立 Admission；非 OPF Runtime 全面整合，也不代表實體多 Site 已驗證。
