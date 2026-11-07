@@ -143,3 +143,44 @@ def test_source_and_job_regex_fullmatch_contract():
     assert flow.HEX64.fullmatch(ACTIVE)
     assert not flow.JOB_RE.fullmatch(JOB_ID+"EXTRA")
     assert not flow.HEX40.fullmatch(SHA+"a")
+
+
+@pytest.mark.parametrize("response,expected", [
+    ({"job": {"job_id": JOB_ID}}, JOB_ID),
+    ({"job_id": JOB_ID}, "POST_JOB_ID_UNKNOWN_DO_NOT_RESUBMIT"),
+    ({"job": {}}, "POST_JOB_ID_UNKNOWN_DO_NOT_RESUBMIT"),
+])
+def test_accepted_rest_post_requires_nested_gateway_job_id_and_never_retries(
+    monkeypatch, response, expected
+):
+    import json
+    requests=[]
+
+    class Connection:
+        def __init__(self, host, port, timeout):
+            assert host==HOST and port==18080
+        def request(self, method, path, body=None, headers=None):
+            requests.append((method,path,body))
+        def getresponse(self):
+            class Reply:
+                status=202
+                def read(self, limit):
+                    return json.dumps(response).encode("utf8")
+            return Reply()
+        def close(self):
+            pass
+
+    monkeypatch.setattr(flow.http.client,"HTTPConnection",Connection)
+    if expected == JOB_ID:
+        assert flow.submit_exactly_once(HOST,b"test") == JOB_ID
+    else:
+        with pytest.raises(flow.FlashDenied,match=expected):
+            flow.submit_exactly_once(HOST,b"test")
+    assert len(requests)==1
+    assert requests[0][0:2]==("POST","/api/jobs")
+    payload=json.loads(requests[0][2])
+    assert payload["site_id"]==2
+    assert payload["operation"]=="flash_cycle"
+    assert payload["asset_sha256"]==flow.IMAGE_SHA
+    assert payload["provider"]==flow.PROVIDER
+    assert payload["profile"]==flow.PROFILE
