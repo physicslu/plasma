@@ -51,7 +51,7 @@ import socket
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.connect(os.environ['PLASMA_SITE_WORKER_SOCKET'])
 s.sendall((json.dumps({'protocol': 'plasma.ppu.site-worker.v2',
-                        }) + "\n").encode())
+                      'op': 'probe', 'site': 2}) + '\\n').encode())
 data = b''
 while not data.endswith(b'\\n'):
     part = s.recv(4096)
@@ -167,7 +167,7 @@ async def run_scenario(tmp_path, *, mutate=None, observer=True,
                             "authorization": authorization,
                             "ephemeral_credential": OWNER_TOKEN,
                             "device_id": DEVICE,
-                        }) + "\\n").encode())
+                        }) + "\n").encode())
                         await writer.drain()
                         response = json.loads((await reader.readline()).decode())
                         if not response["ok"]:
