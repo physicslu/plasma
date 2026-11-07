@@ -347,7 +347,7 @@ def resolve_staged_fpga_handoff(
     if (type(paired.get("image_id")) is not str
             or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", paired["image_id"])
             or paired.get("firmware_name") != Path(image["path"]).name
-            or paired.get("asset_sha256") != image["sha256"]
+            or paired.get("firmware_sha256") != image["sha256"]
             or paired.get("board_id") != manifest["target"]["board"]
             or paired.get("fpga_part") != manifest["target"]["fpga_part"]
             or paired.get("recovery_name") != "base.bin"
