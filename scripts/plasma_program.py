@@ -419,9 +419,108 @@ def execute(command: str, selection: Selection, *, host: str, device_id: str,
             "job": verified, "auto_retry": "DISABLED"}
 
 
+
+def deploy_runtime_kit(client, selection: Selection, *, host: str,
+                       device_id: str, runtime_sha: str, kit_sha256: str,
+                       ppu_id: str, facility_id: str,
+                       display_name: str) -> dict:
+    """Use ONLY the installed Bootstrap Coordinator for a single Runtime upgrade."""
+    require(type(runtime_sha) is str and SHA40.fullmatch(runtime_sha) is not None
+            and type(kit_sha256) is str and SHA64.fullmatch(kit_sha256) is not None,
+            "RUNTIME_KIT_IDENTITY_REQUIRED")
+    require(type(ppu_id) is str and type(facility_id) is str
+            and type(display_name) is str and 1 <= len(display_name) <= 128
+            and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", ppu_id) is not None
+            and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", facility_id) is not None
+            and all(ord(c) >= 32 for c in display_name),
+            "RUNTIME_PLATFORM_IDENTITY_REQUIRED")
+    # Trusted GitHub Actions step must already have verified CI run provenance,
+    # ZIP digest, kit sidecar, target, and the full nested release source SHA.
+    kit_name = os.environ.get("PLASMA_Z2_KIT_ARTIFACT_PATH", "")
+    require(kit_name and os.path.isabs(kit_name)
+            and os.environ.get("PLASMA_Z2_KIT_SOURCE_SHA") == runtime_sha,
+            "TRUSTED_RUNTIME_KIT_NOT_DELIVERED")
+    kit = Path(kit_name)
+    require(not kit.is_symlink() and kit.is_file()
+            and 0 < kit.stat().st_size <= 512 * 1024 * 1024,
+            "RUNTIME_KIT_PATH_DENIED")
+    digest = hashlib.sha256()
+    with kit.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    require(digest.hexdigest() == kit_sha256, "RUNTIME_KIT_SHA256_MISMATCH")
+    require_device(client, device_id)
+    before = readiness(host, selection)
+    require(before["ppu_id"] == ppu_id, "PPU_IDENTITY_MISMATCH")
+    current = client.status()
+    require(current.get("capabilities", {}).get("runtime_deployment") is True,
+            "BOOTSTRAP_RUNTIME_DEPLOYMENT_UNAVAILABLE")
+    old_sha = current["runtime"].get("git_sha")
+    active = client.assets_status()
+    require(active.get("state") == "ACTIVE"
+            and active.get("asset_set_sha256") == selection.bundle_sha,
+            "ACTIVE_SET_CHANGED")
+    if old_sha == runtime_sha:
+        return {"status": "PASS", "deployment": "ALREADY_INSTALLED",
+                "runtime_git_sha": runtime_sha, "flash": "NOT_RUN"}
+    archive = kit.read_bytes()
+    require(hashlib.sha256(archive).hexdigest() == kit_sha256,
+            "RUNTIME_KIT_CHANGED")
+    # No direct /opt/plasma writes, service kills or FPGA operations here.
+    # The existing Coordinator owns quiescence, transaction and rollback.
+    uploaded = client.upload(archive)
+    try:
+        accepted = client.submit(
+            kind="ppu-runtime", upload_id=uploaded, gateway_host=host,
+            ppu_id=ppu_id, facility_id=facility_id, display_name=display_name)
+    except Exception:
+        return {"status": "OUTCOME_UNKNOWN", "phase": "RUNTIME_SUBMIT",
+                "upload_id": uploaded, "auto_retry": "DISABLED",
+                "flash": "NOT_RUN"}
+    tx = accepted.transaction_id
+    deadline = time.monotonic() + 900
+    while time.monotonic() < deadline:
+        try:
+            record = client.deployment_state(tx)
+        except Exception:
+            return {"status": "OUTCOME_UNKNOWN", "transaction_id": tx,
+                    "phase": "DEPLOYMENT_POLL", "auto_retry": "DISABLED",
+                    "flash": "NOT_RUN"}
+        if record["state"] == "succeeded":
+            break
+        if record["state"] in ("failed", "recovery_required"):
+            return {"status": "FAIL_OR_RECOVERY_REQUIRED",
+                    "transaction_id": tx, "deployment_state": record["state"],
+                    "auto_retry": "DISABLED", "flash": "NOT_RUN"}
+        time.sleep(2)
+    else:
+        return {"status": "OUTCOME_UNKNOWN", "transaction_id": tx,
+                "phase": "DEPLOYMENT_TIMEOUT", "auto_retry": "DISABLED",
+                "flash": "NOT_RUN"}
+    # Only GETs after activation. A missing readiness is never a new install.
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        try:
+            require_device(client, device_id, runtime_sha)
+            readiness(host, selection)
+            verified = client.assets_status()
+            require(verified.get("asset_set_sha256") == selection.bundle_sha,
+                    "RUNTIME_UPGRADE_CHANGED_ACTIVE_SET")
+            return {"status": "PASS", "transaction_id": tx,
+                    "before_runtime_git_sha": old_sha,
+                    "runtime_git_sha": runtime_sha,
+                    "active_asset_set_sha256": selection.bundle_sha,
+                    "auto_retry": "DISABLED", "flash": "NOT_RUN"}
+        except (OSError, ProgramDenied, TimeoutError):
+            time.sleep(2)
+    return {"status": "POST_INSTALL_VERIFICATION_INCOMPLETE",
+            "transaction_id": tx, "auto_retry": "DISABLED",
+            "flash": "NOT_RUN"}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("diagnose", "deploy", "flash", "run"))
+    parser.add_argument("command", choices=("diagnose", "deploy", "flash", "run", "runtime-deploy"))
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--firmware-package")
     parser.add_argument("--image", type=Path,
@@ -430,7 +529,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", required=True)
     parser.add_argument("--device-id", required=True)
     parser.add_argument("--runtime-sha",
-                        help="required for flash/run; full installed Runtime Git SHA")
+                        help="required for flash/run/runtime-deploy; full Runtime Git SHA")
+    parser.add_argument("--kit-sha256", help="source-bound CI Runtime Kit digest")
+    parser.add_argument("--ppu-id", help="existing Z2 PPU ID, for runtime-deploy")
+    parser.add_argument("--facility-id", help="existing facility ID, for runtime-deploy")
+    parser.add_argument("--display-name", help="existing display name, for runtime-deploy")
     parser.add_argument("--owner-token-file", type=Path,
                         help="existing owner-only 0600 credential; otherwise use enrolled SWPC SSH")
     parser.add_argument("--source-sha", help="optional exact Git HEAD pin for dispatched runs")
@@ -439,8 +542,8 @@ def main(argv: list[str] | None = None) -> int:
     receipt = {"schema": SCHEMA, "command": args.command,
                "status": "NOT_RUN", "auto_retry": "DISABLED"}
     try:
-        require(args.command not in ("flash", "run") or args.runtime_sha is not None,
-                "RUNTIME_SHA_REQUIRED")
+        require(args.command not in ("flash", "run", "runtime-deploy")
+                or args.runtime_sha is not None, "RUNTIME_SHA_REQUIRED")
         require(args.command == "diagnose" or args.approved_once,
                 "OWNER_APPROVAL_REQUIRED")
         validate_host(args.host, args.device_id)
@@ -453,10 +556,17 @@ def main(argv: list[str] | None = None) -> int:
                        site_id=selection.site)
         token = owner_token(args.host, args.owner_token_file)
         client = open_bootstrap(args.host, token)
-        result = execute(args.command, selection, host=args.host,
-                         device_id=args.device_id, client=client,
-                         runtime_sha=args.runtime_sha,
-                         approved_once=args.approved_once)
+        if args.command == "runtime-deploy":
+            result = deploy_runtime_kit(
+                client, selection, host=args.host, device_id=args.device_id,
+                runtime_sha=args.runtime_sha, kit_sha256=args.kit_sha256,
+                ppu_id=args.ppu_id, facility_id=args.facility_id,
+                display_name=args.display_name)
+        else:
+            result = execute(args.command, selection, host=args.host,
+                             device_id=args.device_id, client=client,
+                             runtime_sha=args.runtime_sha,
+                             approved_once=args.approved_once)
         receipt.update(result)
         code = 0 if receipt["status"] == "PASS" else 1
     except ProgramDenied as exc:

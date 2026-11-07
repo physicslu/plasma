@@ -229,5 +229,22 @@ class PayloadTests(unittest.TestCase):
                         mod.verify_kit_source(**kwargs)
 
 
+    def test_path2_shares_main_only_ci_kit_verification_without_cli_secrets(self):
+        workflow = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
+        self.assertIn("Admit owner-pinned Z2 Runtime CI Kit (trusted Path 2)", workflow)
+        self.assertIn("Verify owner-pinned Z2 Runtime CI Kit (trusted Path 2)", workflow)
+        self.assertIn("trusted/scripts/plasma_trusted_z2_ci_artifact.py admit", workflow)
+        self.assertIn("trusted/scripts/plasma_trusted_z2_ci_artifact.py verify", workflow)
+        self.assertIn("outputs.pr_number == '0'", workflow)
+        self.assertIn('PLASMA_Z2_KIT_SOURCE_SHA=$ARTIFACT_SOURCE_SHA', workflow)
+        self.assertNotIn("outputs.pr_number == '1299'", workflow)
+        stage = workflow.split(
+            "- name: Execute candidate CLI using trusted dispatcher", 1)[1].split(
+            "        run: |", 1)[0]
+        self.assertNotIn("GH_TOKEN:", stage)
+        self.assertNotIn("GITHUB_TOKEN:", stage)
+        self.assertNotIn("secrets.", stage)
+
+
 if __name__ == "__main__":
     unittest.main()
