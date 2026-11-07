@@ -33,6 +33,8 @@ import base64,hashlib,json
 from pathlib import Path
 base=Path('/opt/plasma/assets/staged/4efe0fea45cd71e48f4de53318f4a4fb863c2332bab8a04affbcdd26fce52a8d')
 manifest=json.loads((base/'manifest.json').read_bytes())
+active=json.loads((base.parent.parent/'active.json').read_bytes())
+assert active.get('asset_set_sha256')=='4efe0fea45cd71e48f4de53318f4a4fb863c2332bab8a04affbcdd26fce52a8d'
 assert manifest['schema']=='plasma.ppu.bundle.v3'
 pkgs={p['id']:p for p in manifest['packages']}
 assert {'openocd-platform-reference','stm32f103c8t6-site2'}<=set(pkgs)
