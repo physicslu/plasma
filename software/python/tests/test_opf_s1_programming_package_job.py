@@ -155,6 +155,7 @@ async def run_scenario(tmp_path, *, mutate=None, observer=True,
             "ps_transport_ready": True,
         }) if observer else None,
     )
+    control.package_actions = package  # RuntimeServer production composition
     try:
         try:
             if via_control:
