@@ -104,3 +104,13 @@ def test_cli_admitted_requires_revoke_pass_and_no_record(monkeypatch,capsys):
     capsys.readouterr()
     result["record_present"]=True
     assert SCRIPT.main(["--host",HOST,"--source-sha",SHA])==1
+
+def test_root_denial_with_oserror_punctuation_is_not_masked():
+    import re
+    # A trusted Root OSError can carry spaces, [Errno 2] and a quoted
+    # filesystem path. Do not erase that reason as DENIAL_CODE_UNRECOGNIZED.
+    assert 're.fullmatch(r"[\\x20-\\x7e]{1,160}",code)' in SCRIPT.REMOTE
+    assert "DENIAL_CODE_UNRECOGNIZED" not in SCRIPT.REMOTE
+    raw = "[Errno 2] No such file or directory: '/opt/plasma/privileged-code'"
+    assert re.fullmatch(r"[\\x20-\\x7e]{1,160}", raw)
+
