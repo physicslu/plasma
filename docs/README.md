@@ -41,6 +41,8 @@
 - **Plan** · `PR #1189 Draft` — [ADR-0006: 專用 SWD Engine 與未來通用 GPIO Bus](adr/0006-independent-swd-engine-and-future-gpio-bus.md)：SWD 只保留 OFF/NORMAL，未來 GPIO Bus、JTAG、SPI、UART、I²C 分別規劃，未宣稱實作或實機驗收。
 - **Plan** · `Host-only` — [ADR-0007: PPU Image/Reload 與每 Site 並行所有權](adr/0007-ppu-reload-fence-per-site-locking.md)：保留 Root Guard，PPU Fence 共享／獨占及每 Site 獨占鎖；不宣稱 Z2 或 8-Site HIL。
 
+- **Plan** · `Draft PR #1338` · `Path 2` · `read-only` — [Z2 Deployment Doctor](deployment/plasma-z2-doctor.md)：SWPC／Z2 唯讀部署診斷原型；未取代 Bootstrap 或工程部署引擎，現場驗收以 Runner 證據為準。
+
 ## PPU architecture and runtime
 
 - **Current** · `Bundle v3` · `PR #1225` — [Canonical Bundle v3: Bundle → Packages → Files](architecture/ppu-canonical-bundle-packages.md)：`packages[]`、Package DAG、SHA256 Admission；v1/v2 舊格式不作為 v3 相容介面。尚未完成 Z2 B2 驗收。
