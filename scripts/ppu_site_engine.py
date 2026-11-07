@@ -276,7 +276,7 @@ def install(artifact: Path, *, sidecar: Path | None = None, base: Path = ENGINE_
         version = fields.get("openocd_version")
         _need(type(version) is str and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is not None,
               "OPENOCD_VERSION_INVALID")
-        runtime_id = f"{version}-{source_sha[:12]}-{driver.replace('_', '-')}-{bin_sha[:12]}"
+        runtime_id = f"{version}-{source_sha[:12]}-{driver.replace('_', '-')}-{bin_sha[:12]}-{adm_sha[:12]}"
         _need(RUNTIME_ID.fullmatch(runtime_id) is not None, "RUNTIME_ID_INVALID")
         manifest = {
             "schema": MANIFEST_SCHEMA, "runtime_id": runtime_id, "openocd_version": version,
