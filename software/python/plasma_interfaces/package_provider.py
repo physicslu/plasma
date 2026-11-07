@@ -16,7 +16,7 @@ from plasma_core.models import JobRequest
 from .base import BaseInterface, ProgressCallback
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class TrustedProviderAction:
     """Runtime-only authority: never populated from Job metadata or a Bundle."""
 
