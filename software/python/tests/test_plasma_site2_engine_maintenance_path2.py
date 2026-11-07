@@ -4,6 +4,7 @@ No SWPC SSH, sudo, Z2, FPGA or DUT is touched.
 """
 from __future__ import annotations
 
+import ast
 import importlib.util
 import subprocess
 import sys
@@ -44,6 +45,19 @@ def test_remote_is_parseable_and_never_executes_during_import():
     assert "openocd_build" in module.REMOTE
     assert "bundle_deploy" in module.REMOTE
     assert "DEVMEM_INDEPENDENT_IMAGES" in module.REMOTE  # rejection, not use
+
+
+
+def test_remote_switch_health_check_has_its_own_subprocess_import():
+    # The remote interpreter runs in a fresh -I subprocess and does NOT
+    # inherit the SSH-side module imports. Missing import here can turn an
+    # already committed selection into a misleading UNKNOWN result.
+    tree = ast.parse(module.REMOTE)
+    imports = {alias.name for node in tree.body
+               if isinstance(node, ast.Import) for alias in node.names}
+    assert "subprocess" in imports
+    assert 'service=subprocess.run(["systemctl","is-active"' in module.REMOTE
+
 
 
 def test_wrong_source_commit_refuses_before_any_preflight(tmp_path, monkeypatch):
