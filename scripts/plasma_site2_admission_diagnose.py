@@ -69,7 +69,10 @@ try:
         else:
             payload=json.loads(found[0])
             code=str(payload.get("code","NOT_RECORDED"))[:160]
-            out["code"]=code if re.fullmatch(r"[A-Za-z0-9_.:/+-]{1,160}",code) else "DENIAL_CODE_UNRECOGNIZED"
+            # Root already bounds the diagnostic to 160 chars. Preserve printable ASCII
+            # including spaces, brackets and quotes in Python/OSError messages;
+            # the old code regex hid the only actionable Root denial as UNRECOGNIZED.
+            out["code"]=code if re.fullmatch(r"[\x20-\x7e]{1,160}",code) else "DENIAL_CODE_NONPRINTABLE"
             out["result"]="ADMITTED" if attempt.returncode==0 and payload.get("result")=="SITE_ADMISSION_RECORD_ISSUED" else "DENIED"
     except (OSError,ValueError,subprocess.SubprocessError):
         out["result"]="INCOMPLETE";out["code"]="ADMISSION_EXECUTION_FAILED"
