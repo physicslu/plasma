@@ -120,10 +120,17 @@ class WorkflowContractTests(unittest.TestCase):
     def test_required_job_fresh_receipt_and_identical_artifact(self):
         wf = (REPO / ".github/workflows/swd-openocd5088-armv7-candidate.yml").read_text()
         self.assertIn("  armv7-source-locked-candidate:", wf)
-        self.assertNotIn(
-            'scripts/z2/plasma_swd_site_admission.py',
-            wf.split("\npermissions:", 1)[0],
-        )
+        # OpenOCD binary cache is independent, but every Root/Admission
+        # interface change must repackage a fresh candidate with its exact
+        # current Site Admission source and checksum.
+        triggers = wf.split("\npermissions:", 1)[0]
+        for path in (
+            "scripts/z2/plasma_swd_site_admission.py",
+            "pl/hil/fpga_image_root.py",
+            "pl/hil/fpga_image_admission.py",
+            "scripts/ppu_site_engine.py",
+        ):
+            self.assertIn(f'"{path}"', triggers)
         python_wf = (REPO / ".github/workflows/python-tests.yml").read_text()
         self.assertIn(
             'scripts/z2/plasma_swd_site_admission.py',
