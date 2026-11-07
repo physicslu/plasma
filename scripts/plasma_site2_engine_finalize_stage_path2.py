@@ -98,8 +98,13 @@ try:
         trust(STAGE/"plasma-engine.json",False)
         require(sha(STAGE/"plasma-engine.json")==STAGE_MANIFEST,
                 "STAGE_MANIFEST_SHA_MISMATCH")
-        new_manifest=engine._manifest(STAGE)
-        require(new_manifest.get("runtime_id")==NEW and
+        # A staged directory deliberately has a .tmp-PID name; the public
+        # _manifest() validator requires the *final* runtime directory name.
+        # Verify raw staged content by pinned SHA, then inspect its identity.
+        new_manifest=json.loads((STAGE/"plasma-engine.json").read_bytes())
+        require(type(new_manifest) is dict and
+                new_manifest.get("schema")==engine.MANIFEST_SCHEMA and
+                new_manifest.get("runtime_id")==NEW and
                 new_manifest.get("source_engine_runtime_id")==OLD and
                 new_manifest.get("openocd_sha256")==BIN and
                 new_manifest.get("admission_sha256")==NEW_ADM and
