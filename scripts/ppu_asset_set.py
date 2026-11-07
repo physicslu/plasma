@@ -183,8 +183,8 @@ def _require_trusted_control_socket(socket_path: Path) -> None:
 
 
 def resolve_active_firmware(
-    product_root: Path, *, asset_set_sha256: str, firmware_package_id: str,
-    profile_package_id: str, firmware_sha256: str,
+    product_root: Path, *, asset_set_sha256: str, asset_package_id: str,
+    profile_package_id: str, asset_sha256: str,
 ) -> dict[str, Any]:
     """Read verified Firmware bytes from ONE currently Active Bundle v3.
 
@@ -195,10 +195,10 @@ def resolve_active_firmware(
     package_id = re.compile(r"[a-z][a-z0-9_.-]{0,63}\Z")
     if (type(asset_set_sha256) is not str
             or HEX64.fullmatch(asset_set_sha256) is None
-            or type(firmware_sha256) is not str
-            or HEX64.fullmatch(firmware_sha256) is None
+            or type(asset_sha256) is not str
+            or HEX64.fullmatch(asset_sha256) is None
             or any(type(v) is not str or package_id.fullmatch(v) is None
-                   for v in (firmware_package_id, profile_package_id))):
+                   for v in (asset_package_id, profile_package_id))):
         raise AssetSetError("BUNDLE_FIRMWARE_REFERENCE_INVALID")
     before = read_active(product_root)
     if (before["state"] != "ACTIVE"
@@ -206,14 +206,14 @@ def resolve_active_firmware(
         raise AssetSetError("BUNDLE_FIRMWARE_ACTIVE_SET_MISMATCH")
     stage = product_root / "assets" / "staged" / asset_set_sha256
     manifest = _json_file(stage / "manifest.json")
-    matches = [p for p in manifest["packages"] if p["id"] == firmware_package_id]
+    matches = [p for p in manifest["packages"] if p["id"] == asset_package_id]
     profiles = [p for p in manifest["packages"] if p["id"] == profile_package_id]
     if (len(matches) != 1 or matches[0]["kind"] != "firmware-asset"
             or len(profiles) != 1 or profiles[0]["kind"] != "programming-profile"
             or profile_package_id not in matches[0]["requires"]):
         raise AssetSetError("BUNDLE_FIRMWARE_PACKAGE_OR_PROFILE_INVALID")
     package = matches[0]
-    prefix = f"payload/packages/{firmware_package_id}/data/"
+    prefix = f"payload/packages/{asset_package_id}/data/"
     entries = package["files"]
     if (len(entries) != 1 or type(entries[0]) is not dict
             or entries[0]["executable"] is not False):
@@ -224,14 +224,14 @@ def resolve_active_firmware(
             or not filename.endswith(".bin")
             or "/" in filename[len(prefix):]
             or not 0 < entry["size"] <= 32 * 1024 * 1024
-            or entry["sha256"] != firmware_sha256):
+            or entry["sha256"] != asset_sha256):
         raise AssetSetError("BUNDLE_FIRMWARE_FILE_INVALID")
     path = stage / filename
     if path.is_symlink() or not path.is_file():
         raise AssetSetError("BUNDLE_FIRMWARE_FILE_UNTRUSTED")
     payload = path.read_bytes()
     if (len(payload) != entry["size"]
-            or hashlib.sha256(payload).hexdigest() != firmware_sha256):
+            or hashlib.sha256(payload).hexdigest() != asset_sha256):
         raise AssetSetError("BUNDLE_FIRMWARE_CONTENT_CHANGED")
     after = read_active(product_root)
     if (after["state"] != "ACTIVE"
@@ -241,9 +241,9 @@ def resolve_active_firmware(
     return {
         "image": payload,
         "image_name": filename[len(prefix):],
-        "image_sha256": firmware_sha256,
+        "image_sha256": asset_sha256,
         "asset_set_sha256": asset_set_sha256,
-        "firmware_package_id": firmware_package_id,
+        "asset_package_id": asset_package_id,
         "profile_package_id": profile_package_id,
     }
 
@@ -347,7 +347,7 @@ def resolve_staged_fpga_handoff(
     if (type(paired.get("image_id")) is not str
             or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", paired["image_id"])
             or paired.get("firmware_name") != Path(image["path"]).name
-            or paired.get("firmware_sha256") != image["sha256"]
+            or paired.get("asset_sha256") != image["sha256"]
             or paired.get("board_id") != manifest["target"]["board"]
             or paired.get("fpga_part") != manifest["target"]["fpga_part"]
             or paired.get("recovery_name") != "base.bin"
