@@ -50,6 +50,7 @@ try:
             manifest.get("schema")=="plasma.ppu.privileged-code.v1" and
             type(manifest.get("files")) is dict)
     result["manifest_sha256"]=hashlib.sha256(manifest_raw).hexdigest()
+    result["manifest_mtime_ns"]=(root/".plasma-privileged-code.json").stat().st_mtime_ns
     result["manifest"]="PARSED"
     for name in files:
         raw=bounded(root/name,524288)
@@ -57,10 +58,38 @@ try:
         expected=manifest["files"].get(name)
         result["modules"][name]={
             "sha256":digest,
+            "source_mtime_ns":(root/name).stat().st_mtime_ns,
             "manifest_sha256":expected if isinstance(expected,str) else None,
             "manifest_match":isinstance(expected,str) and digest==expected,
             "references_devmem_independent_images":b"DEVMEM_INDEPENDENT_IMAGES" in raw,
         }
+    # Independently inspect the selected Engine's fixed admission entrypoint.
+    # This entry is not part of the FPGA privileged-source file manifest.
+    result["engine_entry"]={"status":"UNVERIFIED"}
+    try:
+        selection_raw=bounded("/etc/plasma/site-worker-engine.json",8192)
+        selection=json.loads(selection_raw)
+        engine_root=Path(selection["openocd_root"])
+        if (selection.get("schema")!="plasma.ppu.site-worker-engine.v1"
+            or engine_root.parent != Path(
+                "/opt/plasma/programming-engines/openocd")
+            or not engine_root.name.isascii()
+            or not engine_root.name.replace("-","").replace("_","").isalnum()):
+            raise ValueError("ENGINE_SELECTION_INVALID")
+        entry=engine_root/"libexec/plasma_swd_site_admission.py"
+        raw=bounded(entry,524288)
+        digest=hashlib.sha256(raw).hexdigest()
+        result["engine_entry"]={
+            "status":"OBSERVED",
+            "source_sha256":digest,
+            "selected_sha256_matches":digest==selection.get("admission_sha256"),
+            "references_removed_symbol":
+                b"DEVMEM_INDEPENDENT_IMAGES" in raw,
+            "source_mtime_ns":entry.stat().st_mtime_ns,
+        }
+    except Exception as exc:
+        result["engine_entry"]={"status":"BLOCKED",
+                                "error_type":type(exc).__name__}
     # Run a new isolated, native 3.12.13 process like the protected admission
     # entrypoint, but ONLY import pure Python modules and inspect code objects.
     # Do not invoke any Root functions, access FPGA/MMIO, create state or flash.
@@ -186,6 +215,7 @@ def run(source_sha: str, *, helper=paired) -> dict:
             "z2_sha256": item["sha256"],
             "git_sha256": source_sha256,
             "matches_git": item["sha256"] == source_sha256,
+            "source_mtime_ns": item.get("source_mtime_ns"),
             "matches_installed_manifest": item["manifest_match"],
             "references_devmem_independent_images": item[
                 "references_devmem_independent_images"
@@ -196,6 +226,8 @@ def run(source_sha: str, *, helper=paired) -> dict:
         "result": "OBSERVED",
         "source_sha": source_sha,
         "installed_manifest_sha256": observed["manifest_sha256"],
+        "installed_manifest_mtime_ns": observed.get("manifest_mtime_ns"),
+        "engine_entry": observed.get("engine_entry", {"status": "NOT_RUN"}),
         "modules": result,
         "native_import": observed.get("native_import", {"status": "NOT_RUN"}),
         "hardware": "NOT_RUN",
