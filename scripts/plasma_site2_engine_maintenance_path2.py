@@ -33,7 +33,7 @@ SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 MARK = "PLASMA_SITE2_ENGINE_MAINT="
 
 REMOTE = r'''
-import base64,hashlib,io,json,os,re,stat,sys,tarfile,tempfile,types,zlib
+import base64,hashlib,io,json,os,re,stat,subprocess,sys,tarfile,tempfile,types,zlib
 from pathlib import Path
 
 MARK="PLASMA_SITE2_ENGINE_MAINT="
