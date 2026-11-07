@@ -100,8 +100,10 @@ class SiteExecutionRouter:
         self.interface = interface
         self.resolver = resolver
         self.compiler_registry = (compiler_registry if compiler_registry is not None else
-                                  None if isinstance(interface, OpenOCDInterface)
-                                  and interface.site_worker_ready else _default_compiler_registry())
+                                  None if (isinstance(interface, PackageProviderInterface)
+                                           or (isinstance(interface, OpenOCDInterface)
+                                               and interface.site_worker_ready))
+                                  else _default_compiler_registry())
         self._generic_handler = ProgrammingOperationHandler(interface)
         self._profile_handlers: dict[str, BaseHandler] = {
             profile_id: ProgrammingOperationHandler(interface)
