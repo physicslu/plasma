@@ -114,9 +114,13 @@ def submit_exactly_once(host: str, data: bytes) -> str:
             raise FlashDenied("POST_RESPONSE_INVALID_OUTCOME_UNKNOWN") from exc
         if response.status!=202:
             raise FlashDenied("GATEWAY_SUBMIT_HTTP_"+str(response.status))
-        require(type(parsed) is dict and type(parsed.get("job_id")) is str,
+        # The established REST Gateway start() envelope is {"job": {"job_id": ...}}.
+        # A 202 POST may already be executing hardware, so fail without
+        # resubmission if its exact Job ID cannot be recovered.
+        job=parsed.get("job") if type(parsed) is dict else None
+        require(type(job) is dict and type(job.get("job_id")) is str,
                 "POST_JOB_ID_UNKNOWN_DO_NOT_RESUBMIT")
-        job_id=parsed["job_id"]
+        job_id=job["job_id"]
         require(bool(JOB_RE.fullmatch(job_id)),"POST_JOB_ID_UNTRUSTED_DO_NOT_RESUBMIT")
         return job_id
     except (OSError,TimeoutError,http.client.HTTPException) as exc:
