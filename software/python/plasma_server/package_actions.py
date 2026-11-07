@@ -92,7 +92,8 @@ class PackageActionRuntime:
             )
         # Bundle Programming Asset is selected only inside SiteManager's existing Job lease.
         # The trusted control-plane resolver revalidates Active Set + B3 files.
-        if getattr(site_manager, "_bundle_firmware_resolver", None) is None:
+        if (hasattr(site_manager, "_bundle_firmware_resolver")
+                and site_manager._bundle_firmware_resolver is None):
             active_helper = _load(control_plane, "ppu_asset_set.py")
             site_manager._bundle_firmware_resolver = partial(
                 active_helper.resolve_active_firmware, self.product_root)
