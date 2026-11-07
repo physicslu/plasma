@@ -104,8 +104,18 @@ def fetch_status(host: str, endpoint: str) -> tuple[str, dict | None, str]:
         record = json.loads(body.decode("utf-8"))
         if not isinstance(record, dict):
             return "FAIL", None, "Unexpected JSON response"
-        if record.get("ok") is not True:
-            return "FAIL", None, "Bootstrap rejected request"
+        if endpoint == "/v1/health":
+            if record.get("ok") is not True:
+                return "FAIL", None, "Bootstrap health rejected request"
+        elif endpoint == "/v1/status":
+            # Status is a bare schema-v1 status_document, not an {ok:true} envelope.
+            if (record.get("schema_version") != 1
+                    or not isinstance(record.get("bootstrap"), dict)
+                    or not isinstance(record.get("runtime"), dict)
+                    or not isinstance(record.get("capabilities"), dict)):
+                return "FAIL", None, "Bootstrap status schema invalid or unsupported"
+        else:
+            return "FAIL", None, "Unsupported diagnostic endpoint"
         return "PASS", record, "Bootstrap JSON response received (unauthenticated commissioning HTTP)"
     except urllib.error.HTTPError as e:
         return "WARN" if e.code in (401, 403) else "FAIL", None, f"Bootstrap HTTP {e.code}"
