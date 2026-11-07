@@ -41,8 +41,6 @@
 - **Plan** · `PR #1189 Draft` — [ADR-0006: 專用 SWD Engine 與未來通用 GPIO Bus](adr/0006-independent-swd-engine-and-future-gpio-bus.md)：SWD 只保留 OFF/NORMAL，未來 GPIO Bus、JTAG、SPI、UART、I²C 分別規劃，未宣稱實作或實機驗收。
 - **Plan** · `Host-only` — [ADR-0007: PPU Image/Reload 與每 Site 並行所有權](adr/0007-ppu-reload-fence-per-site-locking.md)：保留 Root Guard，PPU Fence 共享／獨占及每 Site 獨占鎖；不宣稱 Z2 或 8-Site HIL。
 
-- **Plan** · `Draft PR #1338` · `Path 2` · `read-only` — [Z2 Deployment Doctor](deployment/plasma-z2-doctor.md)：SWPC／Z2 唯讀部署診斷原型；未取代 Bootstrap 或工程部署引擎，現場驗收以 Runner 證據為準。
-
 ## PPU architecture and runtime
 
 - **Current** · `Bundle v3` · `PR #1225` — [Canonical Bundle v3: Bundle → Packages → Files](architecture/ppu-canonical-bundle-packages.md)：`packages[]`、Package DAG、SHA256 Admission；v1/v2 舊格式不作為 v3 相容介面。尚未完成 Z2 B2 驗收。
@@ -53,6 +51,8 @@
 - **Current** · `PR #1301 Merged` · `Host-only` — [OPF Provider Capability / Bundle Resolver](architecture/open-provider-framework-gate1.md)：單一可信 Bundle v3 Active Asset Set 內的 Provider／Profile／PS-only／FPGA capability 解析；尚未接入正式 Runtime、Z2 或 DUT，Timeout 統一由 OPF-1 決定。
 - **Current** · `OPF-1` · `PR #1302 Merged` · `Host-only` — [Open Provider Framework (OPF) v1 Foundation](architecture/opf-architecture.md)：Provider／Profile／單一 Bundle `timeout_ms`、Provider Options、Site Session Manager 與 SAFE_OFF／Recovery 的目標契約；僅 Host-only 設定驗證，不代表現有 Runtime 已支援 OPF 或已完成實體燒錄。
 - **Current** · `OPF-4A` · `Gate 1 / Host-only` — [OpenOCD / ABI v5 Reference Provider](architecture/opf-4a-openocd-reference-provider-gate1.md)：從已驗證 Active Set 綁定 Provider/Profile 與 OpenOCD Engine SHA/ABI，經既有 C-3 Session／Flash cycle 執行；正式 Runtime 路由與 Site 2 HIL 另案。
+- **Reference** · `Site 2` · `PR #1337 Merged` · `Host-only` — [OPF platform-provider Bundle v3 source alignment](development/site2-opf-platform-bundle-v3-gate1.md)：Gen7 舊 Engine reference 拒絕原因、原始 Builder 來源缺口、替代離線 Builder 與正負向測試；未部署 Z2、未操作 DUT。
+- **Plan** · `Draft PR #1338` · `Path 2` · `read-only` — [Z2 Deployment Doctor](deployment/plasma-z2-doctor.md)：SWPC／Z2 唯讀診斷（Path 2 已有觀測）；與已合併 #1337 的 OPF Bundle 部署器整合驗收仍須取得獨立 Runner／B3／Active Set 回執。
 - **Plan** · `Owner decision 2026-11-04` · `PR #1298` — [Unified Bundle-driven Programming Execution](architecture/unified-bundle-driven-programming-decision-2026-11-04.md)：Engineering／Production 共用同一條燒錄執行流程（其他政策不變）；Bundle 自帶 IC Profile／Provider／Driver／FPGA，Catalog 與固定 ICPN／Compiler／Image 登錄不得阻擋執行，保留必要來源、相容性及硬體安全驗證。目標架構尚未完整實作。
 - **Plan** · `Owner decision 2026-11-02` · `not implemented` — [PPU Single Active Asset Set：Bundle = Assets，Controller 指定整份資源與操作](architecture/ppu-job-driven-package-resolution.md)：每台 PPU 同時只有一份 Active Asset Set；Console 比對完整 Asset Set SHA256，若不同即傳送整份 Set；B1/B2/B3 負責 Receive／Admission／Install-Verify，但不自動啟用、載入 FPGA 或燒錄。Controller 決定 FPGA Image／Programming Profile 與 E/P/V/R；PPU 只在 Active Set 內選擇資源並驗證能力。Active+Staging 隔離、Job 執行期間不可切換、FPGA 配置是獨立受控操作。介面／B4／實機尚待實作。
 - **Reference** · `Host-only` · `PR #1208` — [PPU Master 非 Root 受控執行與部署契約](architecture/ppu-master-nonroot-execution-gate1.md)：重用既有 PPU Installer/Bootstrap 與 Root Guard，建立 WordPort／FPGA／Protected Root 的特權操作規劃與正負向測試；不接入真實權限、不改 Z2、不部署、不合併。
