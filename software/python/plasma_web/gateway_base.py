@@ -450,6 +450,9 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "asset_size",
                 "asset_sha256",
                 "asset_base64",
+                "asset_set_sha256",
+                "asset_package_id",
+                "bundle_asset_sha256",
                 "session_id",
                 "target",
                 "provider",
@@ -468,12 +471,27 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         if target is not None and (not isinstance(target, str) or not target):
             raise ValueError("target must be a non-empty exact ICPN string")
 
+        bundle_fields = {"asset_set_sha256", "asset_package_id", "bundle_asset_sha256"}
+        bundle_selected = bool(bundle_fields.intersection(body))
+        if bundle_selected:
+            if (operation is not Operation.FLASH_CYCLE or not allow_inline_asset
+                    or not bundle_fields.issubset(body)
+                    or any(key in body for key in (
+                        "asset_name", "asset_type", "asset_format",
+                        "asset_size", "asset_sha256", "asset_base64"))):
+                raise ValueError("Bundle Programming Asset reference must be a complete, exclusive flash_cycle input")
+            if not all(type(body[key]) is str and body[key] for key in bundle_fields):
+                raise ValueError("Bundle Programming Asset reference fields must be nonempty strings")
+
         common_fields = {"site_id", "operation", "timeout_s", "map_data", "target", "provider", "profile"}
         image_operations = {Operation.PROGRAM, Operation.VERIFY, Operation.FLASH_CYCLE}
         if operation is Operation.READ:
             allowed_fields = common_fields | {"offset", "length"}
         elif operation in image_operations:
-            if allow_inline_asset:
+            if bundle_selected:
+                allowed_fields = common_fields | bundle_fields
+                required_fields = {"site_id", "operation", "target", "provider", "profile"} | bundle_fields
+            elif allow_inline_asset:
                 allowed_fields = common_fields | {
                     "asset_name",
                     "asset_type",
@@ -522,7 +540,13 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             if not all(isinstance(body.get(key), str) and body[key] for key in ("provider", "profile")):
                 raise ValueError("provider and profile must both be non-empty strings")
             metadata.update(provider=body["provider"], profile=body["profile"])
-        if operation in image_operations and allow_inline_asset:
+        if bundle_selected:
+            metadata.update({
+                "bundle_asset_set_sha256": body["asset_set_sha256"],
+                "bundle_asset_package_id": body["asset_package_id"],
+                "bundle_asset_sha256": body["bundle_asset_sha256"],
+            })
+        elif operation in image_operations and allow_inline_asset:
             asset = self._inline_asset(body)
             normalized = asset.normalize_image()
             image = normalized.data
