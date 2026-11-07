@@ -148,7 +148,7 @@ class PackageActionRuntime:
             raise ValueError("PROVIDER_PROGRAMMING_REQUEST_INVALID")
         programming = request["programming"]
         required = {"site_id", "target", "operation", "profile",
-                    "firmware_package", "firmware_sha256"}
+                    "asset_package_id", "asset_sha256"}
         if (type(programming) is not dict or set(programming) != required
                 or type(programming["site_id"]) is not int
                 or programming["site_id"] < 1
@@ -175,9 +175,9 @@ class PackageActionRuntime:
                        "ppu_asset_set.py")
         resolved = active.resolve_active_firmware(
             self.product_root, asset_set_sha256=typed.asset_set_sha256,
-            asset_package_id=programming["firmware_package"],
+            asset_package_id=programming["asset_package_id"],
             profile_package_id=programming["profile"],
-            asset_sha256=programming["firmware_sha256"])
+            asset_sha256=programming["asset_sha256"])
         hardware = self.hardware_observer(site_id)
         route = self.provider_contract.resolve(
             self.product_root, asset_set_sha256=typed.asset_set_sha256,
