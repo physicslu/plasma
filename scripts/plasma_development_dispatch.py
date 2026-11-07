@@ -324,7 +324,8 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(path == "path2-cli" and scope == "guarded-hardware" and
                 {"script", "argv"} <= set(order) and
                 set(order) <= base | optional_ref |
-                {"script", "argv", "timeout_seconds", "monitor_summary"},
+                {"script", "argv", "timeout_seconds", "monitor_summary",
+                 "artifact_source"},
                 "WORK_ORDER_OPERATOR_CLI_FIELDS_DENIED")
         script = order["script"]
         require(type(script) is str and re.fullmatch(
@@ -339,6 +340,20 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(type(timeout_seconds) is int and
                 1 <= timeout_seconds <= 1800,
                 "WORK_ORDER_OPERATOR_CLI_TIMEOUT_DENIED")
+        # Path 2 may request only the already-qualified CI Kit handoff used
+        # by Path 3. No candidate GitHub token, arbitrary URL, or PR artifact.
+        if "artifact_source" in order:
+            source = order["artifact_source"]
+            require(order.get("pr_number", 0) == 0
+                    and type(source) is dict
+                    and set(source) == {"run_id", "source_sha"}
+                    and type(source["run_id"]) is int
+                    and 1 <= source["run_id"] <= 999_999_999_999_999
+                    and type(source["source_sha"]) is str
+                    and SHA40.fullmatch(source["source_sha"]) is not None
+                    and order["script"] == "scripts/plasma_program.py"
+                    and order["argv"][0:1] == ["runtime-deploy"],
+                    "PATH2_RUNTIME_ARTIFACT_SOURCE_DENIED")
     elif capability == "vivado-host-build":
         # Admission accepts a pinned project path from trusted main or an
         # exact PR HEAD. The selected driver still proves its project contract.
