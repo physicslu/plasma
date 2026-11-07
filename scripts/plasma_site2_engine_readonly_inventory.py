@@ -110,6 +110,21 @@ try:
                           if x.startswith("btime "))+
                      int((Path("/proc")/str(pid)/"stat").read_text().rsplit(")",1)[1].split()[19])/
                      os.sysconf("SC_CLK_TCK")) if pid_alive else None),
+                "pid_command_marker_matches":(
+                    b"PLASMA_SITE2_ENGINE_MAINT=" in
+                    (Path("/proc")/str(pid)/"cmdline").read_bytes()[:131072]
+                    if pid_alive else False),
+                "pid_mode_prepare":(
+                    b"prepare\x00" in
+                    (Path("/proc")/str(pid)/"cmdline").read_bytes()[:131072]
+                    if pid_alive else False),
+                "pid_state":(
+                    (Path("/proc")/str(pid)/"stat").read_text().rsplit(")",1)[1].split()[0]
+                    if pid_alive else None),
+                "pid_cpu_ticks":(
+                    sum(int((Path("/proc")/str(pid)/"stat").read_text()
+                            .rsplit(")",1)[1].split()[i]) for i in (11,12))
+                    if pid_alive else None),
             })
         except (OSError,ValueError):ret["stages"].append({"status":"UNVERIFIED"})
     mgr=Path("/sys/class/fpga_manager/fpga0/state").read_text().strip()
