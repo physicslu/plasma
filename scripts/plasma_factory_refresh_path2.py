@@ -169,11 +169,6 @@ if checks!=expected_checks:fail("FACTORY_FILE_HASHES_INVALID")
 if (not any(isinstance(n,ast.FunctionDef) and n.name=="resolve_active_firmware"
             for n in ast.parse(files["scripts/ppu_asset_set.py"]).body)):
     fail("FACTORY_REQUIRED_RESOLVER_MISSING")
-if pathlib.Path("/opt/plasma/bootstrap/ppu_asset_set.py").read_bytes()==files["scripts/ppu_asset_set.py"]:
-    print("PLASMA_FACTORY_STAGE="+json.dumps({"status":"PASS","result":"ALREADY_INSTALLED",
-          "resolver_source_sha256":hashlib.sha256(files["scripts/ppu_asset_set.py"]).hexdigest(),
-          "unit_changed":False,"service_restarted":False,"runtime_installed":False}))
-    raise SystemExit(0)
 # Extract only exact regular allowlisted files. Avoid tarfile.extractall traversal.
 for name,data in files.items():
     dst=package/name
