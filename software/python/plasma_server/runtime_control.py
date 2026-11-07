@@ -164,9 +164,17 @@ class RuntimeControlServer:
             raise RuntimeControlError("package_action request fields are invalid")
         cancel = threading.Event()
         loop = asyncio.get_running_loop()
-        work = loop.run_in_executor(None, self.package_actions.run_control,
-                                    request["request"], request["authorization"],
-                                    request["ephemeral_credential"], request["device_id"], cancel)
+        if (isinstance(request["request"], dict)
+                and "programming" in request["request"]):
+            # Same root-only Package Action entry, but executed by a real
+            # SiteManager Programming Job; no second engine or Root endpoint.
+            work = asyncio.create_task(self.package_actions.run_programming_control(
+                request["request"], request["authorization"],
+                request["ephemeral_credential"], request["device_id"], cancel))
+        else:
+            work = loop.run_in_executor(None, self.package_actions.run_control,
+                                        request["request"], request["authorization"],
+                                        request["ephemeral_credential"], request["device_id"], cancel)
         eof = asyncio.ensure_future(reader.read(1))
         done, _ = await asyncio.wait({work, eof}, return_when=asyncio.FIRST_COMPLETED)
         if work not in done:
