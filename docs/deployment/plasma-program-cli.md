@@ -1,0 +1,35 @@
+# PLASMA 通用 Bundle 燒錄 CLI
+
+**入口：scripts/plasma_program.py**。名稱與 Path 2、Path 3、Site 2、特定 MCU 無關；這是原一鍵工具的取代版本，不是另一套 Operator、燒錄引擎或 Deployment Coordinator。
+
+命令：diagnose（唯讀）、deploy（只部署/啟用 Bundle）、flash（只對已啟用 Bundle 執行一次 Job）、run（一次執行部署/啟用及 Flash）。所有寫入都必須有既有 Owner／執行環境授權，--approved-once 僅是防誤觸，並非授權憑證。
+
+## 單次執行範例
+
+```bash
+python3 scripts/plasma_program.py run \
+  --bundle ./firmware-v01.zip \
+  --site 2 --host 192.168.2.99 \
+  --device-id ppu-device-7ed4b30913a9bf6101da5a7a \
+  --runtime-sha 2a5c09f62d07ce15f5c871a2cab99b7bdf64fc92 \
+  --approved-once
+```
+
+上述是預計的**新介面**，不是已完成的實機證據。執行前必須先透過正式產品流程更新 Z2 Runtime 至相同的 --runtime-sha。可以額外提供 --source-sha 固定執行程式來源（在 Path 2/3 Work Order 中也必須由 trusted dispatcher 做獨立來源鎖定）。
+
+- --firmware-package：Bundle 有多份 firmware-asset 時必填；若只有一份則自動選取。
+- --image：非必要，只核對外部 BIN 與選定 Bundle Firmware SHA/大小完全相同，**不會將 BIN 另送至 Z2**。
+- --owner-token-file：讓具既有 Owner 授權的本機/其他路徑使用受保護的 0600 憑證；省略時沿用 SWPC 已配對的 Z2 SSH 憑證路徑。不得在命令參數、PR、Issue、CI log 寫入 Token。
+- --site：從 Bundle Programming Profile 宣告的 sites 驗證。提供其他 Site 不代表可執行，Runtime/Site Worker 仍有最後的硬體 Admission 權限。
+
+## 硬體與部署邊界
+
+先使用現有 Bundle v3 Host-only Verifier 驗證 Archive SHA、Manifest、Package/Files，確認 FPGA Image 不在此 Firmware-only 路徑。B1/B2/B3 僅透過 ppu_deploy_api.BootstrapAPIClient 的 reconcile_bundle_assets，B3 由原 Coordinator + quiesce lease 執行，fpga_load=false；只有確認 Active Set 身分與 Runtime Git SHA 後，才送一筆 flash_cycle Job，使用 asset_set_sha256、asset_package_id、bundle_asset_sha256，絕不傳送 asset_base64。
+
+Job 的 Erase/Program/Readback、Site Ownership、Root Admission、FPGA Reload Lock、SAFE_OFF 仍由既有 Z2 Runtime / Site Worker 負責。只有 Readback SHA、Verified Bytes、SAFE_OFF、Job/PPU Idle 全部相符才可 PASS。若 HTTP 結果、B3 Journal 或 Job 結果不明，只能唯讀對帳，不得自動重新提交。
+
+此 CLI 是**受控單機工程入口**，Bootstrap commissioning HTTP 的私有網路連線不具備生產部署的 TLS 安全資格。對多 PPU、生產線及八 Site 的資格需要獨立實機證據。實作的 Host-only CI 不能宣稱 Z2 或 DUT PASS。
+
+## Gate
+
+Gate 1：Draft PR、Host-only 正負向測試與 CI。Gate 2：Owner 核准後才合併；部署 Z2 與 DUT A/B 實機 Flash 是獨立執行範圍。原 scripts/plasma_site2_path2_ops.py 及其文件/測試直接被此 CLI 取代，不保留雙入口。

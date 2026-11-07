@@ -41,4 +41,4 @@
 
 ## Path 2 三入口
 
-使用 docs/deployment/plasma-site2-path2-one-entry.md 所述單一 deploy、diagnose、flash CLI；它們**不是**本次原始實機驗收已測過的相同腳本版本。新入口需以其自身 CI 與未來特定批准的 Work Order 驗證。
+使用 docs/deployment/plasma-program-cli.md 所述通用 Bundle CLI；它們**不是**本次原始實機驗收已測過的相同腳本版本。新入口需以其自身 CI 與未來特定批准的 Work Order 驗證。

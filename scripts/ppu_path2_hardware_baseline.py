@@ -157,7 +157,7 @@ class DirectSSHAuthenticatedBootstrap:
     def _call(self, method: str, path: str, body: Mapping[str, object] | None):
         if (method not in ("GET", "POST")
                 or not re.fullmatch(
-                    r"/v1/(status|deployment|uploads(?:/[0-9a-f]{32}/(?:chunks|commit))?|deployments)",
+                    r"/v1/(status|assets|deployment|uploads(?:/[0-9a-f]{32}/(?:chunks|commit))?|deployments)",
                     path)):
             raise BaselineError("DIRECT_BOOTSTRAP_ROUTE_DENIED")
         if method == "POST" and path not in ("/v1/uploads", "/v1/deployments") and not path.startswith("/v1/uploads/"):
