@@ -34,9 +34,9 @@ ICPN = "STM32F103C8T6"
 SITE = 2
 PROVIDER = "openocd-platform-reference"
 PROFILE = "stm32f103c8t6-site2"
-JOB_RE = re.compile(r"job-[0-9]{8}-[0-9]{6}-[0-9a-f]{8}\\Z")
-HEX40 = re.compile(r"[0-9a-f]{40}\\Z")
-HEX64 = re.compile(r"[0-9a-f]{64}\\Z")
+JOB_RE = re.compile(r"job-[0-9]{8}-[0-9]{6}-[0-9a-f]{8}\Z")
+HEX40 = re.compile(r"[0-9a-f]{40}\Z")
+HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 TERMINAL = frozenset(("success","failed","error","cancelled","timeout","aborted"))
 SCHEMA = "plasma.site2.path2-single-rest-flash.v1"
 
@@ -193,7 +193,7 @@ def execute(source_sha: str, expected_active_sha: str) -> dict:
     proof=root["observation"]
     require(proof.get("result")=="ADMITTED" and proof.get("revoke")=="PASS"
             and proof.get("record_present") is False,
-            "SITE2_ROOT_ADMISSION_DENIED")
+            "SITE2_ROOT_ADMISSION_DENIED:" + str(proof.get("code","UNREPORTED"))[:80])
 
     # Site must still be empty and correct after Root probing, before POST.
     renewed=preflight.run(host,source_sha,helper=pairing)
@@ -249,7 +249,11 @@ def main() -> int:
             reason=str(exc)
         else:
             reason=type(exc).__name__
+        maybe_submitted=any(word in reason for word in (
+            "OUTCOME_UNKNOWN","DO_NOT_RESUBMIT","JOB_STILL_UNRESOLVED",
+            "GATEWAY_GET_DENIED","JOB_IDENTITY_MISMATCH"))
         result.update({"flash_result":"NOT_RUN_OR_UNKNOWN","reason":reason,
+                       "submission_count":"UNKNOWN" if maybe_submitted else 0,
                        "warning":"DO_NOT_RESUBMIT_WITHOUT_JOB_RECONCILIATION"})
     print("PLASMA_SITE2_SINGLE_FLASH="+json.dumps(result,sort_keys=True,
         separators=(",",":")))
