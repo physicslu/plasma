@@ -71,6 +71,12 @@ def loopback(tmp_path: Path):
         thread.join(5)
 
 
+def single_v3(tmp_path, mutate=None):
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+    return bundle_v3(tmp_path, mutate=mutate,
+                     parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})])
+
+
 @pytest.mark.parametrize("name,kind,files", SAMPLES)
 def test_real_http_accepts_manifest_actions_without_install(loopback, tmp_path, name, kind, files):
     # Reuse the same HTTP upload and admission path; only the ZIP contract changes.
@@ -119,13 +125,8 @@ def test_real_http_accepts_manifest_actions_without_install(loopback, tmp_path, 
                 "size": 3, "executable": False}]},
 ])
 def test_real_http_rejects_bad_manifest_without_side_effects(loopback, tmp_path, alterations):
-    from .test_ppu_bundle_v3_packages_contract import bundle_v3
-
     api, paths, server = loopback
-    archive, _ = bundle_v3(
-        tmp_path, mutate=lambda manifest: manifest.update(alterations),
-        parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})],
-    )
+    archive, _ = single_v3(tmp_path, mutate=lambda m: m.update(alterations))
     upload_id = api.upload(archive.read_bytes())
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
         api.submit(kind="bundle", upload_id=upload_id)
@@ -136,12 +137,8 @@ def test_real_http_rejects_bad_manifest_without_side_effects(loopback, tmp_path,
 
 
 def test_real_http_wrong_kind_or_spoofed_authority_denied(loopback, tmp_path):
-    from .test_ppu_bundle_v3_packages_contract import bundle_v3
-
     api, paths, _ = loopback
-    archive, digest = bundle_v3(
-        tmp_path, parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})],
-    )
+    archive, digest = single_v3(tmp_path)
     upload_id = api.upload(archive.read_bytes())
     body = api._admission_body("bundle", upload_id, digest)
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
@@ -154,12 +151,8 @@ def test_real_http_wrong_kind_or_spoofed_authority_denied(loopback, tmp_path):
 
 
 def test_target_profile_missing_or_untrusted_fails_closed(loopback, tmp_path):
-    from .test_ppu_bundle_v3_packages_contract import bundle_v3
-
     api, paths, _ = loopback
-    archive, _ = bundle_v3(
-        tmp_path, parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})],
-    )
+    archive, _ = single_v3(tmp_path)
     upload_id = api.upload(archive.read_bytes())
     paths.package_target_file.chmod(0o644)
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
@@ -171,12 +164,8 @@ def test_target_profile_missing_or_untrusted_fails_closed(loopback, tmp_path):
 
 
 def test_archive_changed_after_upload_commit_fails_closed(loopback, tmp_path):
-    from .test_ppu_bundle_v3_packages_contract import bundle_v3
-
     api, paths, _ = loopback
-    archive, _ = bundle_v3(
-        tmp_path, parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})],
-    )
+    archive, _ = single_v3(tmp_path)
     upload_id = api.upload(archive.read_bytes())
     destination = service._upload_paths(paths, upload_id).committed
     destination.chmod(0o600)
