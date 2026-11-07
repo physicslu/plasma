@@ -91,6 +91,25 @@ try:
                 "partial_admission":(stage/"libexec/plasma_swd_site_admission.py").is_file(),
                 "partial_manifest":(stage/"plasma-engine.json").is_file(),
                 "partial_tcl":(stage/"share/openocd/scripts").is_dir(),
+                "stage_binary_sha256":digest(stage/"bin/openocd"),
+                "stage_admission_sha256":digest(
+                    stage/"libexec/plasma_swd_site_admission.py",1048576),
+                "stage_manifest_sha256":digest(stage/"plasma-engine.json",16384),
+                "stage_manifest_mtime_ns":(
+                    (stage/"plasma-engine.json").stat().st_mtime_ns
+                    if (stage/"plasma-engine.json").is_file() else None),
+                "pid_uid":(Path("/proc")/str(pid)).stat().st_uid
+                          if pid_alive else None,
+                "pid_executable":(
+                    "PLASMA_NATIVE" if str((Path("/proc")/str(pid)/"exe").resolve()).startswith(
+                        "/opt/plasma/python/3.12.13/") else "OTHER"
+                    if pid_alive else "ABSENT"),
+                "pid_start_epoch":(
+                    (next(int(x.split()[1]) for x in
+                          Path("/proc/stat").read_text().splitlines()
+                          if x.startswith("btime "))+
+                     int((Path("/proc")/str(pid)/"stat").read_text().rsplit(")",1)[1].split()[19])/
+                     os.sysconf("SC_CLK_TCK")) if pid_alive else None),
             })
         except (OSError,ValueError):ret["stages"].append({"status":"UNVERIFIED"})
     mgr=Path("/sys/class/fpga_manager/fpga0/state").read_text().strip()
