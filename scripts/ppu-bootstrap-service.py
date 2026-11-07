@@ -788,7 +788,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         if set(body) != {"kind", "upload_id", "authorization"}:
             raise BootstrapServiceError("PACKAGE_REQUEST_FIELDS_DENIED")
         kind, upload_id = body["kind"], body["upload_id"]
-        if type(kind) is not str or kind not in {"python", "native-c", "fpga-image", "bundle"}:
+        if type(kind) is not str or kind != "bundle":
             raise BootstrapServiceError("PACKAGE_KIND_DENIED")
         if type(upload_id) is not str or not UPLOAD_ID_RE.fullmatch(upload_id):
             raise BootstrapServiceError("PACKAGE_UPLOAD_ID_DENIED")
@@ -811,51 +811,21 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 subject_sha256=meta["sha256"], transaction_id=upload_id,
             )
             target = _trusted_package_target(self.bootstrap_paths)
-            if kind == "bundle":
-                # Bundle v3 verification and qualification have ONE domain
-                # owner. The API only supplies trusted upload/owner context.
-                deployment = _load_script(
-                    Path(__file__).with_name("ppu-bootstrap-deployment.py"),
-                    "plasma_ppu_b2_deployment_engine",
+            # Bundle v3 verification and qualification have ONE domain
+            # owner. The API only supplies trusted upload/owner context.
+            deployment = _load_script(
+                Path(__file__).with_name("ppu-bootstrap-deployment.py"),
+                "plasma_ppu_b2_deployment_engine",
+            )
+            try:
+                plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
+                    upload.committed, expected_sha256=meta["sha256"],
+                    target_profile=target,
                 )
-                try:
-                    plan = deployment.DeploymentCoordinator.qualify_bundle_v3_admission(
-                        upload.committed, expected_sha256=meta["sha256"],
-                        target_profile=target,
-                    )
-                except (deployment.BundleV3AdmissionVerificationDenied,
-                        deployment.BundleV3AdmissionQualificationDenied) as exc:
-                    raise BootstrapServiceError(str(exc)) from exc
-                fpga_qualification = plan["fpga_qualification"]
-            else:
-                # Non-Bundle package admission is outside the Bundle v3
-                # consolidation; retain its existing verifier contract.
-                contract = _load_script(
-                    Path(__file__).with_name("ppu_unified_deployment.py"),
-                    "plasma_ppu_package_admission_contract",
-                )
-                try:
-                    verified = contract.verify_host_only_artifact(
-                        upload.committed, expected_sha256=meta["sha256"],
-                        target_profile=target,
-                    )
-                except contract.UnifiedDeploymentError as exc:
-                    raise BootstrapServiceError(str(exc)) from exc
-                if verified.kind != kind:
-                    raise BootstrapServiceError("PACKAGE_KIND_MISMATCH")
-                fpga_qualification = None
-                plan = {
-                    "package": verified.name,
-                    "kind": verified.kind,
-                    "version": verified.version,
-                    "source_commit": verified.source_commit,
-                    "archive_sha256": verified.archive_sha256,
-                    "files": [dict(path=item.path, sha256=item.sha256, size=item.size,
-                                   executable=item.executable) for item in verified.files],
-                    "target": dict(verified.target),
-                    "requested_actions": list(verified.actions),
-                    "execution_permitted": False,
-                }
+            except (deployment.BundleV3AdmissionVerificationDenied,
+                    deployment.BundleV3AdmissionQualificationDenied) as exc:
+                raise BootstrapServiceError(str(exc)) from exc
+            fpga_qualification = plan["fpga_qualification"]
             if plan["archive_sha256"] != owner["subject_sha256"]:
                 raise BootstrapServiceError("OWNER_AUTHORIZATION_SUBJECT_MISMATCH")
             plan["owner_authorization"] = owner
@@ -1036,10 +1006,9 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             return record
 
     def start_deployment(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        if (type(body) is dict and body.get("kind") == "bundle"
-                and ("fpga_load" in body or "mode" in body)):
-            return self.start_bundle_install(body)
-        if type(body.get("kind")) is str and body["kind"] in {"python", "native-c", "fpga-image", "bundle"}:
+        if type(body) is dict and body.get("kind") == "bundle":
+            if "fpga_load" in body or "mode" in body:
+                return self.start_bundle_install(body)
             return self.admit_package(body)
         request = _deployment_request(body)
         upload_id = request["upload_id"]
