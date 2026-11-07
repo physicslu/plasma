@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""One-shot Z2 Runtime rollback journal reconciliation plus libgpiod2 prerequisite.
+"""One-shot Z2 Runtime rollback journal reconciliation for SECOND failed transaction.
 
-Dev-only temporary PR; no install/deploy/flash/FPGA actions. The already
-rolled-back Coordinator transaction must be PROVEN terminal before fixing the
-Bootstrap API's independent recovery_required state.
+Dev-only temporary PR; journal CAS recovery only. No apt, runtime/factory
+install, deploy, service restart, Flash or FPGA action. Require terminal
+Coordinator rollback proof before reconciling API's recovery_required state.
 """
 from __future__ import annotations
 import argparse
@@ -19,23 +19,23 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 SHA = re.compile(r"[a-f0-9]{40}\Z")
 DEVICE = "ppu-device-7ed4b30913a9bf6101da5a7a"
-TX = "192d50fd295e4e9788b34b3ad4d7e83f"
+TX = "dc3f9426b54049618be2a676738ba0c7"
 OLD = "0.2.1-68536c66bb82"
 NEW = "0.2.1-2a5c09f62d07"
 ACTIVE_A = "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a"
 MARKER = "PLASMA_RUNTIME_ROLLBACK_RECOVER="
 
 REMOTE = r'''
-import ctypes,ctypes.util,hashlib,json,os,pathlib,shutil,stat,subprocess,time
+import json,os,pathlib,shutil,stat,time
 BASE=pathlib.Path("/var/lib/plasma-bootstrap")
 API=BASE/"deployment-api.json"
 COORD=BASE/"deployment.json"
 CURRENT=pathlib.Path("/opt/plasma/current")
-TX="192d50fd295e4e9788b34b3ad4d7e83f"
+TX="dc3f9426b54049618be2a676738ba0c7"
 OLD="0.2.1-68536c66bb82"
 NEW="0.2.1-2a5c09f62d07"
 RESULT={"schema":"plasma.runtime-rollback-recovery.v1",
-        "status":"BLOCKED","api_record":"NOT_CHANGED","dependency":"NOT_RUN",
+        "status":"BLOCKED","api_record":"NOT_CHANGED","factory_refresh":"NOT_RUN",
         "new_runtime_install":"NOT_RUN","fpga":"NOT_RUN","dut":"NOT_RUN"}
 def fail(why):
     RESULT["reason"]=why
@@ -68,8 +68,9 @@ if (coordinator.get("api_transaction_id")!=TX
     or coordinator.get("release_id")!=NEW):
     fail("COORDINATOR_ROLLBACK_NOT_PROVEN")
 error=api.get("error")
-if type(error) is not str or "libgpiod" not in error.lower():
-    fail("EXPECTED_LIBGPIOD_CAUSE_NOT_PROVEN")
+if (type(error) is not str or "Plasma Gateway readiness deadline exceeded" not in error
+    or "Connection refused" not in error):
+    fail("EXPECTED_GATEWAY_READINESS_CAUSE_NOT_PROVEN")
 try:
     if not CURRENT.is_symlink() or CURRENT.resolve(strict=True)!=pathlib.Path("/opt/plasma/releases")/OLD:
         fail("ORIGINAL_RUNTIME_NOT_SELECTED")
@@ -118,23 +119,8 @@ recovered,_=bounded(API)
 if recovered.get("state")!="failed" or recovered.get("transaction_id")!=TX:
     fail("API_RECOVERY_READBACK_FAILED")
 RESULT.update(api_record="RECONCILED_FAILED",coordinator_unchanged=True,
-              previous_release=OLD,status="PARTIAL_PASS")
-# Installation prerequisite is the documented OS library ONLY, not an OS upgrade.
-def available():
-    try:
-        ctypes.CDLL("libgpiod.so.2")
-        return True
-    except OSError:return False
-if not available():
-    cmd=["apt-get","install","-y","--no-install-recommends","libgpiod2"]
-    env={"PATH":"/usr/sbin:/usr/bin:/sbin:/bin","LANG":"C",
-         "DEBIAN_FRONTEND":"noninteractive","APT_LISTCHANGES_FRONTEND":"none"}
-    try:
-        proc=subprocess.run(cmd,capture_output=True,text=True,timeout=240,check=False,env=env)
-    except (OSError,subprocess.TimeoutExpired):fail("LIBGPIOD2_APT_UNAVAILABLE")
-    if proc.returncode!=0:fail("LIBGPIOD2_APT_INSTALL_FAILED")
-if not available():fail("LIBGPIOD_SO2_STILL_NOT_LOADABLE")
-RESULT.update(status="PASS",dependency="LIBGPIOD_SO2_LOADABLE")
+              previous_release=OLD,status="PASS")
+
 print("PLASMA_RUNTIME_ROLLBACK_RECOVER="+json.dumps(RESULT,sort_keys=True,separators=(",",":")))
 '''
 
