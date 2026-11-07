@@ -13,6 +13,7 @@ import sys
 import threading
 from contextlib import nullcontext
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -118,7 +119,8 @@ def fixture(tmp_path: Path, *, with_authorization=True):
     return co.paths.product_root, req, authorization
 
 
-async def run_scenario(tmp_path, *, mutate=None, observer=True):
+async def run_scenario(tmp_path, *, mutate=None, observer=True,
+                       via_control=False, trusted_root=False):
     product, request, authorization = fixture(tmp_path)
     if mutate:
         mutate(request, authorization)
@@ -155,8 +157,34 @@ async def run_scenario(tmp_path, *, mutate=None, observer=True):
     )
     try:
         try:
-            result = await package.run_programming_control(
-                request, authorization, OWNER_TOKEN, DEVICE, threading.Event())
+            if via_control:
+                async def send():
+                    reader, writer = await asyncio.open_unix_connection(
+                        str(tmp_path / "runtime.sock"))
+                    try:
+                        writer.write((json.dumps({
+                            "operation": "package_action", "request": request,
+                            "authorization": authorization,
+                            "ephemeral_credential": OWNER_TOKEN,
+                            "device_id": DEVICE,
+                        }) + "\\n").encode())
+                        await writer.drain()
+                        response = json.loads((await reader.readline()).decode())
+                        if not response["ok"]:
+                            raise RuntimeError(response["error"]["message"])
+                        return response["result"]
+                    finally:
+                        writer.close()
+                        await writer.wait_closed()
+
+                if trusted_root:
+                    with patch("plasma_server.runtime_control._peer_uid", return_value=0):
+                        result = await send()
+                else:
+                    result = await send()
+            else:
+                result = await package.run_programming_control(
+                    request, authorization, OWNER_TOKEN, DEVICE, threading.Event())
             return result, manager, core, adapter
         except Exception as exc:
             return exc, manager, core, adapter
@@ -225,3 +253,24 @@ def test_plain_rest_or_protocol_cannot_claim_trusted_provider_authority(tmp_path
         finally:
             await manager.shutdown()
     asyncio.run(scenario())
+
+
+def test_existing_root_only_control_dispatches_same_programming_job(tmp_path):
+    result, manager, core, adapter = asyncio.run(run_scenario(
+        tmp_path, via_control=True, trusted_root=True))
+    assert isinstance(result, dict), result
+    assert result["job_id"] == JOB and result["state"] != "success"
+    assert "PROVIDER_PROGRAMMING_EVIDENCE_NOT_QUALIFIED" in str(result)
+    assert manager.interfaces[2].last_receipt["executor_result"]["result"] == "SUCCEEDED"
+    assert adapter.calls == [(2, "probe")]
+    assert not core._sessions
+
+
+def test_nonroot_control_cannot_use_new_programming_option(tmp_path):
+    result, manager, core, adapter = asyncio.run(run_scenario(
+        tmp_path, via_control=True, trusted_root=False))
+    assert isinstance(result, RuntimeError)
+    assert "requires the local root operator" in str(result)
+    assert manager.registry.all() == []
+    assert not adapter.calls
+    assert not core._sessions
