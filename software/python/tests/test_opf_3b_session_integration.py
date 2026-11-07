@@ -128,7 +128,7 @@ def test_in_band_worker_engine_identity_is_checked_before_site_grant(tmp_path):
         "asset_set_sha256": "1" * 64, "provider_package": "openocd",
         "profile_package": "profile", "descriptor_sha256": "2" * 64,
         "options_schema_sha256": "3" * 64, "options_sha256": "4" * 64,
-        "target": "new-ic", "operation": "erase", "site_id": 1,
+        "operation": "erase", "site_id": 1,
         "transport": "fpga", "driver_abi": "plasma_swd:5",
         "fpga_package": "fpga", "max_image_bytes": 4096,
     }

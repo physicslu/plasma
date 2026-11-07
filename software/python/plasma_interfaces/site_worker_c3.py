@@ -3,12 +3,12 @@
 plasma-server (the trusted Runtime, identified by the Worker through its
 systemd MainPID) runs one REST Site Job through C-3 as:
 
-  stage Job-owned Normalized Image -> open_job_session -> bind_image(profile)
-  -> run(flash_cycle) -> close_session -> remove staged image
+  stage Job-owned Normalized Image -> open_job_session(profile)
+  -> bind_image(image identity) -> run(flash_cycle) -> close_session -> remove staged image
 
 The Worker owns Site admission, PS-local OpenOCD, SAFE_OFF verification and
-sealing. This client sends no path, executable or Tcl: only the Job ID, the
-Site, the verified Active Bundle Flash profile and the image SHA256/size. Wire protocol: ``plasma.ppu.site-worker.v1`` (one JSON line).
+sealing. The verified Bundle Flash profile is pinned once at Session open;
+bind_image sends only SHA256 and size, never a second Geometry declaration. Wire protocol: ``plasma.ppu.site-worker.v2`` (one JSON line).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from typing import Any, Callable, Mapping
 
 from plasma_core.errors import ErrorCode, PlasmaError
 
-PROTOCOL = "plasma.ppu.site-worker.v1"
+PROTOCOL = "plasma.ppu.site-worker.v2"
 DEFAULT_IMAGE_ROOT = Path("/run/plasma-server/normalized-images")
 
 
@@ -63,10 +63,13 @@ class SiteWorkerControlClient:
 
     def open_job_session(self, *, job_id: str, sites: list[int], max_runtime_s: int,
                          provider_route: Mapping[str, Any], deadline_monotonic: float,
+                         profile: Mapping[str, Any] | None = None,
                          expected_engine_selection_sha256: str | None = None,
                          ) -> dict[str, Any]:
         fields = {"provider_route": dict(provider_route),
                   "deadline_monotonic": deadline_monotonic}
+        if profile is not None:
+            fields["profile"] = dict(profile)
         if expected_engine_selection_sha256 is not None:
             fields["expected_engine_selection_sha256"] = expected_engine_selection_sha256
         return self.call("open_job_session", job_id=job_id, sites=sites,
@@ -112,35 +115,27 @@ async def run_flash_cycle(
     *,
     job_id: str,
     site_id: int,
-    profile: Mapping[str, Any],
+    icpn: str,
     image: bytes,
     image_root: Path,
     max_runtime_s: int,
-    session_factory: Callable[[], Mapping[str, Any]] | None = None,
+    session_factory: Callable[[], Mapping[str, Any]],
 ) -> dict[str, Any]:
     """One complete C-3 Flash cycle for one REST Job. Cancellation (task
     cancel / timeout) closes the session, which cancels the in-flight
     OpenOCD operation inside the Worker. An unproven SAFE_OFF remains sealed;
     the staged image is always removed."""
     digest = hashlib.sha256(image).hexdigest()
-    context = {"job_id": job_id, "site_id": site_id, "icpn": profile["icpn"]}
+    context = {"job_id": job_id, "site_id": site_id, "icpn": icpn}
     staged = stage_image(image_root, job_id, image)
     session_id: str | None = None
     try:
         try:
-            # OPF may supply an already-qualified C-3 Session opener. Both
-            # paths use this *same* bind/run/close/SAFE_OFF evidence handling;
-            # production OPF uses the qualified opener; low-level tests may
-            # exercise C-3 directly without a Bundle.
-            if session_factory is None:
-                opened = await asyncio.to_thread(
-                    client.call, "open_job_session", job_id=job_id,
-                    sites=[site_id], max_runtime_s=max_runtime_s)
-            else:
-                opened = await asyncio.to_thread(session_factory)
+            # The verified OPF Session opener owns the single Profile binding.
+            opened = await asyncio.to_thread(session_factory)
             session_id = str(opened["session_id"])
             await asyncio.to_thread(
-                client.call, "bind_image", session_id=session_id, profile=dict(profile),
+                client.call, "bind_image", session_id=session_id,
                 image_sha256=digest, image_size=len(image))
             result = await asyncio.to_thread(
                 client.call, "run", timeout_s=max_runtime_s + 30.0, session_id=session_id,

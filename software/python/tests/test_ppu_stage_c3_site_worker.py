@@ -103,7 +103,7 @@ class Rig:
                 f"S={str(self.sock)!r}\n"
                 "def call(req):\n"
                 " s=socket.socket(socket.AF_UNIX); s.connect(S)\n"
-                " s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v1',**req))+'\\n').encode())\n"
+                " s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v2',**req))+'\\n').encode())\n"
                 " d=b''\n"
                 " while not d.endswith(b'\\n'):\n"
                 "  c=s.recv(65536)\n"
@@ -114,9 +114,9 @@ class Rig:
         return subprocess.Popen([sys.executable, "-I", "-c", code], stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE, text=True, start_new_session=new_session)
 
-    def open(self, child, sites=(2,), runtime=30):
+    def open(self, child, sites=(2,), runtime=30, profile=None):
         return self.client.open_session(job_id=JOB, sites=list(sites), pgid=os.getpgid(child.pid),
-                                        uid=os.getuid(), max_runtime_s=runtime)
+                                        uid=os.getuid(), max_runtime_s=runtime, profile=profile)
 
     @staticmethod
     def reap(*children):
@@ -547,7 +547,7 @@ def test_cancel_one_site_does_not_cancel_unrelated_site(tmp_path):
 
 
 @pytest.mark.parametrize("raw", [b"not json\n", b"[]\n", b'{"op":"probe","site":2}\n',
-                                 b"x" * 5000 + b"\n", b'{"protocol":"plasma.ppu.site-worker.v1"}\n'])
+                                 b"x" * 5000 + b"\n", b'{"protocol":"plasma.ppu.site-worker.v2"}\n'])
 def test_malformed_requests_rejected(rig, raw):
     import socket as s
     with s.socket(s.AF_UNIX) as sock:
@@ -580,31 +580,38 @@ def test_parallel_flash_sessions_reject_different_image_or_mcu(tmp_path):
     other_payload = b"FIRMWARE-B"
     digest = hashlib.sha256(payload).hexdigest()
     other_digest = hashlib.sha256(other_payload).hexdigest()
+    different_target = {**F103, "icpn": "STM32F101C8T6"}
     (rig.image_root / (JOB + ".bin")).write_bytes(payload)
     (rig.image_root / (other_job + ".bin")).write_bytes(other_payload)
     try:
-        first = rig.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30)
-        second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30)
-        rig.client.bind_image(first["session_id"], profile=F103,
-                              image_sha256=digest, image_size=len(payload))
+        first = rig.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30,
+                                            profile=F103)
+        second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30,
+                                             profile=F103)
+        rig.client.bind_image(first["session_id"], image_sha256=digest, image_size=len(payload))
         with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
-            rig.client.bind_image(second["session_id"], profile=F103,
-                                  image_sha256=other_digest, image_size=len(other_payload))
+            rig.client.bind_image(second["session_id"], image_sha256=other_digest,
+                                  image_size=len(other_payload))
+        rig.client.close_session(second["session_id"])
         (rig.image_root / (other_job + ".bin")).write_bytes(payload)
-        different_target = {**F103, "icpn": "STM32F101C8T6"}
+        second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30,
+                                             profile=different_target)
         with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
-            rig.client.bind_image(second["session_id"], profile=different_target,
-                                  image_sha256=digest, image_size=len(payload))
-        accepted = rig.client.bind_image(second["session_id"], profile=F103,
-                                         image_sha256=digest, image_size=len(payload))
+            rig.client.bind_image(second["session_id"], image_sha256=digest, image_size=len(payload))
+        rig.client.close_session(second["session_id"])
+        second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30,
+                                             profile=F103)
+        accepted = rig.client.bind_image(second["session_id"], image_sha256=digest,
+                                         image_size=len(payload))
         assert accepted["bound"] is True
         rig.client.close_session(first["session_id"])
         rig.client.close_session(second["session_id"])
-        # No active Site sessions: another Job may now select another firmware.
-        third = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30)
+        # No active Site sessions: another Job may now select a different MCU/firmware.
+        third = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30,
+                                            profile=different_target)
         (rig.image_root / (other_job + ".bin")).write_bytes(other_payload)
-        rig.client.bind_image(third["session_id"], profile=different_target,
-                              image_sha256=other_digest, image_size=len(other_payload))
+        rig.client.bind_image(third["session_id"], image_sha256=other_digest,
+                              image_size=len(other_payload))
         assert rig.client.close_session(third["session_id"])["sealed_sites"] == []
     finally:
         rig.close()
@@ -618,10 +625,9 @@ def test_c3_binds_exact_firmware_bytes_for_flash_cycle(tmp_path):
         digest = hashlib.sha256(payload).hexdigest()
         (r.image_root / (JOB + ".bin")).write_bytes(payload)
         child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
-        session = r.open(child)
+        session = r.open(child, profile=F103)
         binding = r.client.bind_image(
-            session["session_id"], profile=F103,
-            image_sha256=digest, image_size=len(payload)
+            session["session_id"], image_sha256=digest, image_size=len(payload)
         )
         assert binding == {"job_id": JOB, "icpn": "STM32F103C8T6",
                            "target_config": "target/stm32f1x.cfg",
@@ -645,11 +651,10 @@ def test_c3_rejects_unbound_or_mismatched_firmware(tmp_path):
         payload = b"GOOD-FIRMWARE"
         (r.image_root / (JOB + ".bin")).write_bytes(payload)
         child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
-        session = r.open(child)
+        session = r.open(child, profile=F103)
         with pytest.raises(worker.SiteWorkerDenied, match="IMAGE_SHA256_MISMATCH"):
             r.client.bind_image(
-                session["session_id"], profile=F103,
-                image_sha256="0" * 64, image_size=len(payload),
+                session["session_id"], image_sha256="0" * 64, image_size=len(payload),
             )
         [result] = r.go(child)
         assert result == {"ok": False, "error": "IMAGE_NOT_BOUND"}
@@ -895,7 +900,7 @@ def test_c2_launcher_package_uses_site_worker_end_to_end(tmp_path, rig):
             "S = os.environ['PLASMA_SITE_WORKER_SOCKET']\n"
             "def call(req):\n"
             "    s = socket.socket(socket.AF_UNIX); s.connect(S)\n"
-            "    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v1', **req)) + '\\n').encode())\n"
+            "    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v2', **req)) + '\\n').encode())\n"
             "    return json.loads(s.makefile().readline())\n"
             "for _ in range(100):\n"
             "    r = call({'op': 'probe', 'site': 2})\n"

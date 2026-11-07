@@ -35,6 +35,7 @@ def open_provider_job_session(
     job_id: str, target: str, operation: str, site_id: int,
     image_size: int, hardware: Mapping[str, Any],
     job_deadline_monotonic: float, job_timeout_s: float,
+    profile: Mapping[str, Any] | None = None,
     expected_engine_selection_sha256: str | None = None,
     expected_worker_identity: Mapping[str, Any] | None = None,
 ) -> BoundSession:
@@ -59,9 +60,11 @@ def open_provider_job_session(
     # C-3's integer max is only an admission ceiling; its effective expiry is
     # the same absolute monotonic deadline used by the PPU Job.
     route_wire = {key: value for key, value in asdict(route).items()
-                  if key != "options_json"}
+                  if key not in ("options_json", "target")}
     extra = ({"expected_engine_selection_sha256": expected_engine_selection_sha256}
              if expected_engine_selection_sha256 is not None else {})
+    if profile is not None:
+        extra["profile"] = dict(profile)
     opened = client.open_job_session(
         job_id=job_id, sites=[site_id], max_runtime_s=math.ceil(remaining),
         provider_route=route_wire,

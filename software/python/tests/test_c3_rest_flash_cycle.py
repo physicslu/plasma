@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from contextlib import ExitStack
 from unittest.mock import patch
 from http.client import HTTPConnection
@@ -227,6 +228,58 @@ def test_flash_profile_shape_is_validated(field, value, code):
         worker.parse_flash_profile(raw)
 
 
+
+
+def test_session_binds_geometry_once_and_old_bind_wire_is_rejected(tmp_path):
+    image_root = tmp_path / "images"
+    image_root.mkdir()
+    payload = b"FW"
+    (image_root / "job-once.bin").write_bytes(payload)
+    core = worker.SiteWorkerCore(abi5_stub(), runtime_pid=os.getpid,
+                                 lease_verifier=lambda j, k: True, seal_dir=tmp_path / "seals",
+                                 image_root=image_root)
+    peer = (os.getpid(), os.getuid(), os.getgid())
+    profile = {"icpn": "NEW-IC", "target_config": "target/t.cfg",
+               "flash_base": 0x08000000, "flash_size": 1024, "erase_granularity": 1024}
+    req = {"protocol": worker.PROTOCOL, "op": "open_job_session",
+           "job_id": "job-once", "sites": [2], "max_runtime_s": 30}
+    assert core.handle({**req, "protocol": "plasma.ppu.site-worker.v1",
+                        "profile": profile}, peer, "control") == {
+                            "ok": False, "error": "REQUEST_INVALID"}
+    invalid = core.handle({**req, "profile": {**profile, "erase_granularity": 1000}},
+                          peer, "control")
+    assert invalid == {"ok": False, "error": "PROFILE_GEOMETRY_INVALID"}
+    assert core._sessions == {} and core._site_owners == {}
+    opened = core.handle({**req, "profile": profile}, peer, "control")
+    assert opened["ok"]
+    sid = opened["result"]["session_id"]
+    assert core._sessions[sid].profile.icpn == "NEW-IC"
+    wire = {"protocol": worker.PROTOCOL, "op": "bind_image", "session_id": sid,
+            "image_sha256": hashlib.sha256(payload).hexdigest(), "image_size": len(payload)}
+    old_format = core.handle({**wire, "profile": profile}, peer, "control")
+    assert old_format == {"ok": False, "error": "REQUEST_INVALID"}
+    bound = core.handle(wire, peer, "control")
+    assert bound["ok"] and core._sessions[sid].image.profile is core._sessions[sid].profile
+    assert core.handle({"protocol": worker.PROTOCOL, "op": "close_session",
+                        "session_id": sid}, peer, "control")["ok"]
+
+
+def test_provider_flash_session_without_geometry_fails_before_site_ownership(tmp_path):
+    core = worker.SiteWorkerCore(abi5_stub(), runtime_pid=os.getpid,
+                                 lease_verifier=lambda j, k: True, seal_dir=tmp_path / "seals")
+    peer = (os.getpid(), os.getuid(), os.getgid())
+    route = {"asset_set_sha256": "a" * 64, "provider_package": "p",
+             "profile_package": "profile", "descriptor_sha256": "b" * 64,
+             "options_schema_sha256": "c" * 64, "options_sha256": "d" * 64,
+             "operation": "flash_cycle", "site_id": 2, "transport": "fpga",
+             "driver_abi": "plasma_swd:5", "fpga_package": "fpga",
+             "max_image_bytes": 1024}
+    reply = core.handle({"protocol": worker.PROTOCOL, "op": "open_job_session",
+                         "job_id": "job-flash", "sites": [2], "max_runtime_s": 30,
+                         "provider_route": route,
+                         "deadline_monotonic": time.monotonic() + 10}, peer, "control")
+    assert reply == {"ok": False, "error": "PROFILE_REQUIRED"}
+    assert core._sessions == {} and core._site_owners == {}
 
 def test_canonical_job_id_rule_is_shared_by_rest_and_c3():
     samples = [new_job_id(), "1" * 32, "a", "job.1_x-2", "A" * 128, "A" * 129, "-x", ".x",
@@ -520,6 +573,10 @@ def test_rest_flash_cycle_through_c3_passes_with_full_readback(in_process):
                     [opened] = [r for r in stack.worker_requests if r["op"] == "open_job_session"]
                     assert opened["deadline_monotonic"] == runtime.deadline_monotonic
                     assert opened["provider_route"]["site_id"] == 2
+                    assert opened["profile"]["icpn"] == "STM32F103C8T6"
+                    assert "target" not in opened["provider_route"]
+                    assert all("profile" not in r for r in stack.worker_requests
+                               if r["op"] == "bind_image")
                 assert bytes(stack.sim.memory[:len(image)]) == image
                 [argv] = stack.sim.argvs
                 commands = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "-c"]
@@ -737,10 +794,8 @@ def test_unconfirmed_session_close_prevents_safe_failure_retry(tmp_path):
         with pytest.raises(PlasmaError) as caught:
             await run_flash_cycle(
                 RefusingClose(), job_id="job-close-failure", site_id=2,
-                profile={"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
-                         "flash_base": 0x08000000, "flash_size": 0x10000,
-                         "erase_granularity": 1024},
-                image=b"FW", image_root=tmp_path, max_runtime_s=30)
+                icpn="STM32F103C8T6", image=b"FW", image_root=tmp_path,
+                max_runtime_s=30, session_factory=lambda: {"session_id": "session"})
         assert caught.value.recoverable is False
         assert "close did not confirm" in str(caught.value)
         assert list(tmp_path.iterdir()) == []
@@ -929,10 +984,10 @@ def test_image_larger_than_profile_flash_is_refused_at_bind(tmp_path):
                                  image_root=tmp_path / "img")
     me = (os.getpid(), os.getuid(), os.getgid())
     sid = core.handle({"protocol": worker.PROTOCOL, "op": "open_job_session", "job_id": "job-y",
-                       "sites": [2], "max_runtime_s": 30}, me, "control")["result"]["session_id"]
+                       "sites": [2], "max_runtime_s": 30,
+                       "profile": {"icpn": "TINY", "target_config": "target/t.cfg",
+                                   "flash_base": 0, "flash_size": 1024,
+                                   "erase_granularity": 1024}}, me, "control")["result"]["session_id"]
     reply = core.handle({"protocol": worker.PROTOCOL, "op": "bind_image", "session_id": sid,
-                         "profile": {"icpn": "TINY", "target_config": "target/t.cfg",
-                                     "flash_base": 0, "flash_size": 1024,
-                                     "erase_granularity": 1024},
                          "image_sha256": "0" * 64, "image_size": 2048}, me, "control")
     assert reply == {"ok": False, "error": "IMAGE_SIZE_INVALID"}
