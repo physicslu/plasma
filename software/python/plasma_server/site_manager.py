@@ -20,6 +20,7 @@ from plasma_interfaces.base import BaseInterface
 from plasma_interfaces.fpga import FPGAInterface
 from plasma_interfaces.mock import MockActivityTracker, MockInterface
 from plasma_interfaces.openocd import OpenOCDInterface
+from plasma_interfaces.package_provider import PackageProviderInterface, TrustedProviderAction
 
 from .execution_router import RoutedProgrammingHandler, SiteExecutionRouter
 from .job_manager import JobRegistry, JobRuntime
@@ -75,7 +76,7 @@ class SiteManager:
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
         requires_ic_support = any(
-            site.enabled and site.interface != "mock"
+            site.enabled and site.interface not in ("mock", "provider")
             and not (site.interface == "openocd"
                      and bool(site.openocd.get("site_worker_socket")))
             for site in config.sites
@@ -90,6 +91,7 @@ class SiteManager:
         self.workers: dict[int, SiteWorker] = {}
         self._execution_lock = threading.RLock()
         self._execution_lease: PPUExecutionLease | None = None
+        self._delegated_package_jobs: set[str] = set()
         self._runtime_quiesce = RuntimeQuiesceGate()
         self._started = False
 
@@ -125,6 +127,8 @@ class SiteManager:
             return OpenOCDInterface(site.openocd)
         if site.interface == "fpga":
             return FPGAInterface(site.id, site.register_base)
+        if site.interface == "provider":
+            return PackageProviderInterface()
         raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unsupported interface: {site.interface}")
 
     async def start(self) -> list[str]:
@@ -340,6 +344,7 @@ class SiteManager:
             if lease is None or job_id not in lease.job_ids:
                 return
             lease.job_ids.discard(job_id)
+            self._delegated_package_jobs.discard(job_id)
             if not lease.job_ids:
                 released = (lease.owner_kind, lease.owner_id)
                 self._execution_lease = None
@@ -394,6 +399,27 @@ class SiteManager:
         finally:
             self._release_execution_job(job_id)
 
+    @contextmanager
+    def programming_package_scope(self, job_id: str, site_id: int) -> Iterator[dict[str, Any]]:
+        """Borrow the existing Programming Job lease for a signed Package.
+
+        This is not a second lease or owner: the C-3 Worker sees this
+        short-lived delegation only while the exact parent Job remains active.
+        """
+        with self._execution_lock:
+            lease = self._execution_lease
+            if (lease is None or lease.owner_kind == "package_action"
+                    or job_id not in lease.job_ids
+                    or job_id in self._delegated_package_jobs
+                    or site_id not in self.workers):
+                raise PlasmaError(ErrorCode.PPU_BUSY, "PROGRAMMING_PACKAGE_LEASE_DENIED")
+            self._delegated_package_jobs.add(job_id)
+        try:
+            yield {"job_id": job_id, "site_ids": [site_id]}
+        finally:
+            with self._execution_lock:
+                self._delegated_package_jobs.discard(job_id)
+
     def execution_lease_snapshot(self) -> dict[str, Any]:
         with self._execution_lock:
             lease = self._execution_lease
@@ -404,9 +430,11 @@ class SiteManager:
                     "owner_id": None,
                     "active_job_count": 0,
                 }
-            return lease.snapshot()
+            return {**lease.snapshot(),
+                    "delegated_package_job_ids": sorted(self._delegated_package_jobs)}
 
-    def enqueue(self, request: JobRequest) -> asyncio.Future[JobResult]:
+    def enqueue(self, request: JobRequest, *,
+                trusted_provider: TrustedProviderAction | None = None) -> asyncio.Future[JobResult]:
         if not self._started:
             raise PlasmaError(ErrorCode.INTERNAL_ERROR, "site manager is not started")
         request.validate()
@@ -414,6 +442,18 @@ class SiteManager:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "status/cancel are control operations")
         worker = self._resolve_site(request.site_id)
         site_config = self._site_configs[request.site_id]
+        if site_config.interface == "provider":
+            if (not isinstance(trusted_provider, TrustedProviderAction)
+                    or request.job_id != trusted_provider.asset_request.job_id
+                    or request.site_id != trusted_provider.route.site_id
+                    or request.target != trusted_provider.route.target
+                    or request.metadata.get("provider") != trusted_provider.route.provider_package
+                    or request.metadata.get("profile") != trusted_provider.route.profile_package
+                    or request.operation.value != trusted_provider.route.operation
+                    or request.max_retries != 0):
+                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_NOT_AUTHORIZED")
+        elif trusted_provider is not None:
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_SITE_MISMATCH")
         if request.target is None and site_config.interface != "mock":
             # Real hardware: explicit Job target or the operator's explicit
             # Site selection only; never a product default. (The Mock
@@ -495,8 +535,13 @@ class SiteManager:
                     "source_asset_sha256": resolved["image_sha256"],
                 })
             request = self.execution_routers[request.site_id].admit(request)
+            if site_config.interface == "provider":
+                if (pinned.get("state") != "ACTIVE"
+                        or pinned.get("asset_set_sha256") != trusted_provider.route.asset_set_sha256):
+                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_ACTIVE_SET_MISMATCH")
             runtime.request = request
             runtime.active_asset_set = pinned
+            runtime.trusted_provider = trusted_provider
             self.output.write_state(request.job_id, worker._state_payload(runtime))
             worker.enqueue(runtime)
         except Exception:
