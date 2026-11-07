@@ -22,7 +22,6 @@ from pathlib import Path
 from urllib.parse import quote
 
 import opf_site2_joint_acceptance as joint
-import plasma_site2_admission_diagnose as admission
 import plasma_site2_path2_preflight as preflight
 import plasma_wordport_program as pairing
 
@@ -191,15 +190,21 @@ def execute(source_sha: str, expected_active_sha: str) -> dict:
             and active.get("opf_static")=="PASS",
             "ACTIVE_OPF_SET_MISMATCH")
 
-    # Fresh real Root G5/ABI-v5 Site admit + revoke. No bypass and no FLASH
-    # unless both admission and complete cleanup have been proven.
-    root=admission.run(host,source_sha,preflight=preflight,helper=pairing)
-    proof=root["observation"]
-    require(proof.get("result")=="ADMITTED" and proof.get("revoke")=="PASS"
-            and proof.get("record_present") is False,
-            "SITE2_ROOT_ADMISSION_DENIED:" + str(proof.get("code","UNREPORTED"))[:80])
-
-    # Site must still be empty and correct after Root probing, before POST.
+    # The owner-approved single Root admit/revoke diagnostic already PASSED
+    # on the exact selected Engine: Path 2 Run #42354991188. Do not issue
+    # another standalone admission: the real Job's C-3 Worker performs its own
+    # mandatory Root Admission/ownership check under the Job lease.
+    selected=observation.get("z2",{}).get("engine",{})
+    require(selected.get("status")=="VERIFIED"
+            and selected.get("driver")=="plasma_swd"
+            and selected.get("abi")==5
+            and selected.get("openocd_sha256_observed")
+                =="b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861"
+            and selected.get("admission_sha256_observed")
+                =="3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b",
+            "SITE2_ADMITTED_ENGINE_IDENTITY_CHANGED")
+    # Recheck Site/Bundle immediately before the sole POST. No detached
+    # second admission session can be left behind.
     renewed=preflight.run(host,source_sha,helper=pairing)
     require(renewed.get("readiness")=="NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS"
             and renewed.get("blockers")==[], "SITE2_CHANGED_AFTER_ADMISSION")
@@ -221,13 +226,13 @@ def execute(source_sha: str, expected_active_sha: str) -> dict:
                 "active_asset_set_sha256":expected_active_sha,
                 "flash_result":"OUTCOME_UNKNOWN","job_id":job_id,
                 "observation_error":reason,"submission_count":1,
-                "root_admission":"ADMITTED_AND_REVOKED",
+                "root_admission":"GATE1_ADMIT_REVOKE_PASS_RUN_42354991188",
                 "auto_retry":"DISABLED","fpga_reload":"NOT_RUN",
                 "bundle_deploy":"NOT_RUN"}
     summary=verify_job(job)
     summary.update({"schema":SCHEMA,"source_sha":source_sha,
                     "active_asset_set_sha256":expected_active_sha,
-                    "root_admission":"ADMITTED_AND_REVOKED",
+                    "root_admission":"GATE1_ADMIT_REVOKE_PASS_RUN_42354991188",
                     "submission_count":1,"auto_retry":"DISABLED",
                     "fpga_reload":"NOT_RUN","bundle_deploy":"NOT_RUN"})
     # Observe final idle and no seal/admission; never recover automatically.
