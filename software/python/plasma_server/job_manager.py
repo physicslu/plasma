@@ -32,6 +32,7 @@ class JobRuntime:
     attempt_history: list[JobAttemptResult] = field(default_factory=list)
     retry_exhausted: bool = False
     active_asset_set: dict[str, Any] | None = None
+    trusted_provider: Any | None = field(default=None, repr=False)
     updated_at: str = ""
 
     def __post_init__(self) -> None:
