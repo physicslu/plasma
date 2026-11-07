@@ -109,26 +109,26 @@ def test_real_http_accepts_manifest_actions_without_install(loopback, tmp_path, 
     assert persisted["result"]["plan"] == plan
 
 
-@pytest.mark.parametrize("alterations,error", [
-    ({"actions": ["shell", "verify"]}, "PACKAGE_ACTIONS_DENIED"),
-    ({"actions": ["verify", "verify"]}, "PACKAGE_ACTIONS_DENIED"),
-    ({"actions": ["install", {"shell": "rm"}]}, "PACKAGE_ACTIONS_DENIED"),
-    ({"target": {**TARGET, "board": "unknown-board"}}, "PACKAGE_MANIFEST_CONTENT_DENIED"),
-    ({"source_commit": "not-a-sha"}, "PACKAGE_MANIFEST_CONTENT_DENIED"),
-    ({"files": [{"path": "payload/python/fake.py", "sha256": "0"*64,
-                 "size": 3, "executable": False}]}, "PACKAGE_MEMBER_MISSING"),
+@pytest.mark.parametrize("alterations", [
+    {"actions": ["shell", "verify"]},
+    {"actions": ["verify", "verify"]},
+    {"actions": ["install", {"shell": "rm"}]},
+    {"target": {**TARGET, "board": "unknown-board"}},
+    {"source_commit": "not-a-sha"},
+    {"files": [{"path": "payload/python/fake.py", "sha256": "0"*64,
+                "size": 3, "executable": False}]},
 ])
-def test_real_http_rejects_bad_manifest_without_side_effects(
-    loopback, tmp_path, alterations, error,
-):
+def test_real_http_rejects_bad_manifest_without_side_effects(loopback, tmp_path, alterations):
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+
     api, paths, server = loopback
-    archive, _ = package(
-        tmp_path, "wordport", "python", {"payload/python/wordport.py": b"print('test')"},
-        alterations=alterations,
+    archive, _ = bundle_v3(
+        tmp_path, mutate=lambda manifest: manifest.update(alterations),
+        parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})],
     )
     upload_id = api.upload(archive.read_bytes())
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
-        api.submit(kind="python", upload_id=upload_id)
+        api.submit(kind="bundle", upload_id=upload_id)
     assert not paths.deployment_record.exists()
     assert not paths.coordinator_journal.exists()
     assert not paths.product_root.exists()
@@ -136,53 +136,64 @@ def test_real_http_rejects_bad_manifest_without_side_effects(
 
 
 def test_real_http_wrong_kind_or_spoofed_authority_denied(loopback, tmp_path):
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+
     api, paths, _ = loopback
-    archive, _ = package(tmp_path, "wordport", "python",
-                         {"payload/python/wordport.py": b"# fixture"})
+    archive, digest = bundle_v3(
+        tmp_path, parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})],
+    )
     upload_id = api.upload(archive.read_bytes())
+    body = api._admission_body("bundle", upload_id, digest)
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
-        api.submit(kind="native-c", upload_id=upload_id)
+        api._call("POST", "/v1/deployments", {**body, "kind": "native-c"})
+    with pytest.raises(client.DeploymentAPIError, match="API_DEPLOYMENT_KIND_DENIED"):
+        api.submit(kind="native-c", upload_id=upload_id, archive_sha256=digest)
     with pytest.raises(client.DeploymentAPIError, match="API_GENERIC_CALLER_AUTHORITY_DENIED"):
-        api.submit(kind="python", upload_id=upload_id, ppu_id="spoof")
+        api.submit(kind="bundle", upload_id=upload_id, ppu_id="spoof")
     assert not paths.deployment_record.exists()
 
 
 def test_target_profile_missing_or_untrusted_fails_closed(loopback, tmp_path):
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+
     api, paths, _ = loopback
-    archive, _ = package(tmp_path, "wordport", "python",
-                         {"payload/python/wordport.py": b"# fixture"})
+    archive, _ = bundle_v3(
+        tmp_path, parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})],
+    )
     upload_id = api.upload(archive.read_bytes())
     paths.package_target_file.chmod(0o644)
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
-        api.submit(kind="python", upload_id=upload_id)
+        api.submit(kind="bundle", upload_id=upload_id)
     paths.package_target_file.unlink()
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
-        api.submit(kind="python", upload_id=upload_id)
+        api.submit(kind="bundle", upload_id=upload_id)
     assert not paths.deployment_record.exists()
 
 
 def test_archive_changed_after_upload_commit_fails_closed(loopback, tmp_path):
+    from .test_ppu_bundle_v3_packages_contract import bundle_v3
+
     api, paths, _ = loopback
-    archive, _ = package(tmp_path, "wordport", "python",
-                         {"payload/python/wordport.py": b"# fixture"})
+    archive, _ = bundle_v3(
+        tmp_path, parts=[("wordport", "python", [], {"python/wordport.py": b"# fixture"})],
+    )
     upload_id = api.upload(archive.read_bytes())
     destination = service._upload_paths(paths, upload_id).committed
     destination.chmod(0o600)
     destination.write_bytes(b"corrupted-after-commit")
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
-        api.submit(kind="python", upload_id=upload_id)
+        api.submit(kind="bundle", upload_id=upload_id)
     assert not paths.deployment_record.exists()
 
 
 def test_retired_v1_manifest_rejected_after_unchanged_upload(loopback, tmp_path):
-    """Legacy content may be transported, but must fail at Admission."""
+    """Legacy ZIP bytes may upload, but the canonical B2 verifier rejects v1."""
     api, paths, server = loopback
     archive, _ = package(tmp_path, "wordport", "python",
                          {"payload/python/wordport.py": b"# legacy"})
-    uid = api.upload(archive.read_bytes())
-    assert uid
+    upload_id = api.upload(archive.read_bytes())
     with pytest.raises(client.DeploymentAPIError, match="API_HTTP_REJECTED:409"):
-        api.submit(kind="python", upload_id=uid)
+        api.submit(kind="bundle", upload_id=upload_id)
     assert not paths.deployment_record.exists()
     assert not paths.product_root.exists()
     assert server.deployment_thread is None
@@ -242,7 +253,7 @@ def test_client_rejects_admission_without_a_nonexecuting_plan():
         "https://ppu.host-only.invalid:18081", TOKEN, transport=fake_transport,
     )
     with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_RECEIPT_UNKNOWN"):
-        api.submit(kind="python", upload_id=upload_id, archive_sha256="f" * 64)
+        api.submit(kind="bundle", upload_id=upload_id, archive_sha256="f" * 64)
     with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_EVIDENCE_MISSING"):
         api.deployment_state(transaction_id)
 
@@ -272,4 +283,4 @@ def test_client_rejects_incorrect_kind_in_admission_receipt():
         "https://ppu.host-only.invalid:18081", TOKEN, transport=fake_transport,
     )
     with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_RECEIPT_UNKNOWN"):
-        api.submit(kind="python", upload_id=upload_id, archive_sha256="f" * 64)
+        api.submit(kind="bundle", upload_id=upload_id, archive_sha256="f" * 64)
