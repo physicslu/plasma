@@ -124,9 +124,22 @@ def execute() -> dict:
     original = observe_active(host, helper=helper)
 
     if original["state"] == "ACTIVE" and original["opf_static"] == "PASS":
+        # Even on the no-write path, honor the full pre/post observation.
+        # The matching hash proves stable Active identity, NOT which actor
+        # originally deployed that Bundle.
+        postdoctor, host2 = doctor_snapshot()
+        if host2 != host:
+            raise JointDenied("PAIRED_TARGET_CHANGED_DURING_NOOP")
+        final = observe_active(host, helper=helper)
+        if (final.get("state") != "ACTIVE"
+                or final.get("asset_set_sha256") != original["asset_set_sha256"]
+                or final.get("opf_static") != "PASS"):
+            raise JointDenied("NOOP_POST_ACTIVE_OPF_MISMATCH")
         return {"result": "PASS", "action": "ALREADY_ACTIVE_NO_REDEPLOY",
                 "asset_set_sha256": original["asset_set_sha256"],
                 "pre_doctor": predoctor["overall"],
+                "post_doctor": postdoctor["overall"],
+                "deployment_provenance": "NOT_VERIFIED",
                 "opf_static": "PASS", "fpga_reload": "NOT_RUN",
                 "dut": "NOT_RUN", "b3": "NOT_RUN_ALREADY_ACTIVE"}
 
