@@ -181,6 +181,73 @@ def _require_trusted_control_socket(socket_path: Path) -> None:
         raise AssetSetError("ASSET_SET_CONTROL_SOCKET_UNTRUSTED")
 
 
+
+def resolve_active_firmware(
+    product_root: Path, *, asset_set_sha256: str, firmware_package_id: str,
+    profile_package_id: str, firmware_sha256: str,
+) -> dict[str, Any]:
+    """Read verified Firmware bytes from ONE currently Active Bundle v3.
+
+    Caller MUST hold the Runtime's Job reservation/activation-exclusion lease.
+    This routine never opens hardware, switches Active Set or authorizes Flash.
+    A bundle package ID is not a path and never grants execution permission.
+    """
+    package_id = re.compile(r"[a-z][a-z0-9_.-]{0,63}\Z")
+    if (type(asset_set_sha256) is not str
+            or HEX64.fullmatch(asset_set_sha256) is None
+            or type(firmware_sha256) is not str
+            or HEX64.fullmatch(firmware_sha256) is None
+            or any(type(v) is not str or package_id.fullmatch(v) is None
+                   for v in (firmware_package_id, profile_package_id))):
+        raise AssetSetError("BUNDLE_FIRMWARE_REFERENCE_INVALID")
+    before = read_active(product_root)
+    if (before["state"] != "ACTIVE"
+            or before["asset_set_sha256"] != asset_set_sha256):
+        raise AssetSetError("BUNDLE_FIRMWARE_ACTIVE_SET_MISMATCH")
+    stage = product_root / "assets" / "staged" / asset_set_sha256
+    manifest = _json_file(stage / "manifest.json")
+    matches = [p for p in manifest["packages"] if p["id"] == firmware_package_id]
+    profiles = [p for p in manifest["packages"] if p["id"] == profile_package_id]
+    if (len(matches) != 1 or matches[0]["kind"] != "firmware-asset"
+            or len(profiles) != 1 or profiles[0]["kind"] != "programming-profile"
+            or profile_package_id not in matches[0]["requires"]):
+        raise AssetSetError("BUNDLE_FIRMWARE_PACKAGE_OR_PROFILE_INVALID")
+    package = matches[0]
+    prefix = f"payload/packages/{firmware_package_id}/data/"
+    entries = package["files"]
+    if (len(entries) != 1 or type(entries[0]) is not dict
+            or entries[0]["executable"] is not False):
+        raise AssetSetError("BUNDLE_FIRMWARE_FILE_SET_INVALID")
+    entry = entries[0]
+    filename = entry["path"]
+    if (not filename.startswith(prefix)
+            or not filename.endswith(".bin")
+            or "/" in filename[len(prefix):]
+            or not 0 < entry["size"] <= 32 * 1024 * 1024
+            or entry["sha256"] != firmware_sha256):
+        raise AssetSetError("BUNDLE_FIRMWARE_FILE_INVALID")
+    path = stage / filename
+    if path.is_symlink() or not path.is_file():
+        raise AssetSetError("BUNDLE_FIRMWARE_FILE_UNTRUSTED")
+    payload = path.read_bytes()
+    if (len(payload) != entry["size"]
+            or hashlib.sha256(payload).hexdigest() != firmware_sha256):
+        raise AssetSetError("BUNDLE_FIRMWARE_CONTENT_CHANGED")
+    after = read_active(product_root)
+    if (after["state"] != "ACTIVE"
+            or after["asset_set_sha256"] != asset_set_sha256
+            or after["generation"] != before["generation"]):
+        raise AssetSetError("BUNDLE_FIRMWARE_ACTIVE_SET_CHANGED")
+    return {
+        "image": payload,
+        "image_name": filename[len(prefix):],
+        "image_sha256": firmware_sha256,
+        "asset_set_sha256": asset_set_sha256,
+        "firmware_package_id": firmware_package_id,
+        "profile_package_id": profile_package_id,
+    }
+
+
 @contextmanager
 def held_runtime_asset_lease(
     socket_path: Path = Path("/run/plasma-server/control.sock"),
