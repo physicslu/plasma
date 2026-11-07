@@ -446,8 +446,8 @@ class SiteManager:
                 "state": "EMPTY", "asset_set_sha256": None, "ready": False,
             }
             bundle_keys = {
-                "bundle_asset_set_sha256", "bundle_firmware_package_id",
-                "bundle_firmware_sha256",
+                "bundle_asset_set_sha256", "bundle_asset_package_id",
+                "bundle_asset_sha256",
             }
             selected = bundle_keys.intersection(request.metadata)
             if selected:
@@ -461,33 +461,33 @@ class SiteManager:
                         or type(request.metadata.get("profile")) is not str
                         or type(request.metadata.get("provider")) is not str):
                     raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                      "BUNDLE_FIRMWARE_JOB_NOT_QUALIFIED")
+                                      "BUNDLE_ASSET_JOB_NOT_QUALIFIED")
                 digest = request.metadata["bundle_asset_set_sha256"]
                 if (type(pinned) is not dict or pinned.get("state") != "ACTIVE"
                         or pinned.get("asset_set_sha256") != digest):
                     raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                      "BUNDLE_FIRMWARE_ACTIVE_SET_MISMATCH")
+                                      "BUNDLE_ASSET_ACTIVE_SET_MISMATCH")
                 try:
                     resolved = self._bundle_firmware_resolver(
                         asset_set_sha256=digest,
-                        firmware_package_id=request.metadata["bundle_firmware_package_id"],
+                        asset_package_id=request.metadata["bundle_asset_package_id"],
                         profile_package_id=request.metadata["profile"],
-                        firmware_sha256=request.metadata["bundle_firmware_sha256"],
+                        asset_sha256=request.metadata["bundle_asset_sha256"],
                     )
                 except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
                     raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                      "BUNDLE_FIRMWARE_RESOLUTION_DENIED") from exc
+                                      "BUNDLE_ASSET_RESOLUTION_DENIED") from exc
                 if (type(resolved) is not dict
                         or type(resolved.get("image")) is not bytes
                         or not resolved["image"]
                         or resolved.get("asset_set_sha256") != digest
-                        or resolved.get("firmware_package_id")
-                            != request.metadata["bundle_firmware_package_id"]
+                        or resolved.get("asset_package_id")
+                            != request.metadata["bundle_asset_package_id"]
                         or resolved.get("profile_package_id") != request.metadata["profile"]
                         or resolved.get("image_sha256")
-                            != request.metadata["bundle_firmware_sha256"]):
+                            != request.metadata["bundle_asset_sha256"]):
                     raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                      "BUNDLE_FIRMWARE_RESOLVER_CONTRACT_INVALID")
+                                      "BUNDLE_ASSET_RESOLVER_CONTRACT_INVALID")
                 request = replace(request, image=resolved["image"], metadata={
                     **request.metadata,
                     "image_name": resolved["image_name"],
