@@ -10,7 +10,7 @@
 | python3 scripts/plasma_site2_path2_ops.py diagnose --source-sha SHA | Site 2 REST／FPGA／Engine／OPF 唯讀 preflight | 無寫入，不執行 Admit、SWD 或 Flash |
 | python3 scripts/plasma_site2_path2_ops.py flash --source-sha SHA --approved-once | 沿用既有單次 REST flash_cycle + Readback Verify + SAFE_OFF | 只允許明確核准的 Site 2 目標及已固定的 Firmware/Asset Set |
 
-SHA 必須替換為執行當下確切候選 Commit SHA；內部檢查 git rev-parse HEAD。--approved-once 只防止 CLI 誤觸，不取代 Owner 透過 Issue #981 發出的具體 Gate 1 授權。既有 Gate 1 批准首次燒錄，不代表授權未來任意重複燒錄。**合併後不能把已關閉 PR #1338 的 candidate SHA 當作往後持續運作的來源。** 使用主線執行時須遵守當時 Dispatcher 支援的 main/source 綁定。
+SHA 必須替換為執行當下確切候選 Commit SHA；內部檢查 git rev-parse HEAD。--approved-once 只防止 CLI 誤觸，不取代 Owner 透過 Issue #981 發出的具體 Gate 1 授權。既有 Gate 1 批准首次燒錄，不代表授權未來任意重複燒錄。**合併後不能把已關閉 PR #1338 的 candidate SHA 當作往後持續運作的來源。** 主線 Path 2 Work Order 請使用 pr_number=0，並在 Work Order JSON 中省略 source_sha 屬性（目前 Dispatcher 會由受信任的 main 事件帶入），但 argv 仍要提供當次確切 main HEAD 給 --source-sha。若 main SHA 與核准時不符，source_guard 應拒絕執行；不得自行改成舊 PR 的 source_sha 欄位繞過。
 
 ## Path 2 Work Order 固定欄位
 
