@@ -96,12 +96,42 @@ def run(host,source_sha,*,baseline=None,helper=None):
         raise RuntimeError("HOST_SCOPE_DENIED")
     if baseline is None:baseline=preflight
     check=baseline.run(host,source_sha)
-    if (check.get("readiness")!="NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS"
-        or check.get("blockers")
-        or check.get("z2",{}).get("engine",{}).get("openocd_sha256_observed")
+    # This is ONLY a maintenance-process cancellation, not Site admission.
+    # The orphan Prepare itself owns the Runtime's activation hold, so the
+    # generic "all activation inactive" preflight cannot be required here.
+    # Admit exactly this single expected blocker while proving zero Jobs.
+    rest=check.get("rest",{})
+    z2=check.get("z2",{})
+    engine=z2.get("engine",{})
+    fpga=z2.get("fpga",{})
+    expected_hold=(
+        check.get("readiness")=="BLOCKED_OR_UNVERIFIED"
+        and check.get("blockers")==["REST_SITE2_NOT_IDLE_OR_ENABLED"]
+        and rest.get("status")=="OBSERVED"
+        and rest.get("health_ready") is True
+        and rest.get("node_matches_status") is True
+        and rest.get("lease_busy") is False
+        and rest.get("active_job_count")==0
+        and rest.get("activation_active") is True
+        and rest.get("site2_enabled") is True
+        and rest.get("site2_interface")=="openocd"
+        and rest.get("site2_target_matches") is True
+        and rest.get("site2_idle") is True)
+    if (not expected_hold
+        or engine.get("status")!="VERIFIED"
+        or engine.get("driver")!="plasma_swd"
+        or engine.get("abi")!=5
+        or engine.get("adapter_khz")!=2000
+        or engine.get("openocd_sha256_observed")
            !="b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861"
-        or check.get("z2",{}).get("site2_admission",{}).get("present")
-        or check.get("z2",{}).get("site2_seal",{}).get("present")):
+        or engine.get("admission_sha256_observed")
+           !="1838d082222429083e3aca91290677d3873f5c681cac004a703b75f40d86c345"
+        or fpga.get("status")!="IMAGE"
+        or fpga.get("boot_match") is not True
+        or fpga.get("manager_state")!="operating"
+        or z2.get("openocd_pids")
+        or z2.get("site2_admission",{}).get("present") is not False
+        or z2.get("site2_seal",{}).get("present") is not False):
         raise RuntimeError("CANCEL_PREFLIGHT_BLOCKED")
     if helper is None:helper=ssh
     creds,known=helper.z2_login_credentials(Path.home())
