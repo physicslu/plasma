@@ -1,0 +1,390 @@
+{
+  "schema": "plasma.site2.first-flash-evidence.v1",
+  "record_date": "2026-11-07",
+  "device_class": "PYNQ-Z2",
+  "site_id": 2,
+  "target": "STM32F103C8T6",
+  "original_flash_source_sha": "ad439285a0e3552634f7679d341538d4be1128f1",
+  "qualified_scope": "ONE REAL SITE, ONE FLASH JOB, READBACK+SAFE_OFF",
+  "not_qualified": [
+    "eight_site_parallel",
+    "different_targets",
+    "production_process",
+    "electrical_parameter_suite"
+  ],
+  "immutable_identities": {
+    "firmware_bytes": 18768,
+    "firmware_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "active_asset_set_sha256": "b82ce5fd0725dacdd02a3805168e847b190841c95887ba2c567761a48024e393",
+    "selected_openocd_binary_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+    "selected_admission_sha256": "3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b",
+    "old_admission_sha256": "1838d082222429083e3aca91290677d3873f5c681cac004a703b75f40d86c345",
+    "fpga_journal_sha256": "986446e768a38ab19dab6b9dd9d521b880dcd72412a07ab4d90631795adafb0e",
+    "provider": "openocd-platform-reference",
+    "profile": "stm32f103c8t6-site2",
+    "flash_job_id": "job-20261107-083434-0c00decf"
+  },
+  "first_flash": {
+    "result": "PASS",
+    "attempts": 1,
+    "submission_count": 1,
+    "bytes_verified": 18768,
+    "readback_matches_image": true,
+    "safe_off": true,
+    "post_site2_idle": true,
+    "post_admission_record": false,
+    "post_seal": false,
+    "post_openocd_process_count": 0,
+    "no_auto_retry": true,
+    "bundle_deploy": "NOT_RUN",
+    "fpga_reload": "NOT_RUN"
+  },
+  "artifact_retention_warning": "Original GitHub Actions artifacts have finite retention. These source-pinned and content-addressed typed receipts are preserved in Git. Original ZIP SHA values were separately verified against downloaded artifacts, and stdout hashes match original runner receipts.",
+  "evidence": [
+    {
+      "run": 42348102004,
+      "job": 128330176175,
+      "phase": "root_cause_readonly",
+      "zip": "8cf3474f30311d8af253f83891fec8e0216a6960b388f0f9aa84be68383b1639",
+      "run_url": "https://github.com/physicslu/plasma/actions/runs/42348102004",
+      "original_receipt_sha256": "9141291ab8d6c33b5c26a5d8c5be8ae49324e241eff701b3163d5212bb96b95b",
+      "original_event_prefix": "PLASMA_SITE2_ROOT_MODULE_AUDIT",
+      "source_sha": "ff321756302e563edf120426f1fd1b3083c47b0a",
+      "original_stdout_line": "PLASMA_SITE2_ROOT_MODULE_AUDIT={\"deployment\": \"NOT_RUN\", \"engine_entry\": {\"references_removed_symbol\": true, \"selected_sha256_matches\": true, \"source_mtime_ns\": 1793724676000000000, \"source_sha256\": \"1838d082222429083e3aca91290677d3873f5c681cac004a703b75f40d86c345\", \"status\": \"OBSERVED\"}, \"flash\": \"NOT_RUN\", \"hardware\": \"NOT_RUN\", \"installed_manifest_mtime_ns\": 1794019417395249299, \"installed_manifest_sha256\": \"d7f808f9043906aa57db520230fbccdad0f37d062a51f2e340c72ef92f34b8ca\", \"modules\": {\"pl/hil/fpga_image_admission.py\": {\"git_sha256\": \"cce225276677d89fd44f209fe39919fd4cb6aa58205bbc05bf6213ce99f25c17\", \"matches_git\": true, \"matches_installed_manifest\": true, \"references_devmem_independent_images\": false, \"source_mtime_ns\": 1794019417355249009, \"z2_sha256\": \"cce225276677d89fd44f209fe39919fd4cb6aa58205bbc05bf6213ce99f25c17\"}, \"pl/hil/fpga_image_root.py\": {\"git_sha256\": \"a5682c2ee6d7269c1909d6291c69f12576e6252264456eec9b6f6138043645e3\", \"matches_git\": true, \"matches_installed_manifest\": true, \"references_devmem_independent_images\": false, \"source_mtime_ns\": 1794019417375249154, \"z2_sha256\": \"a5682c2ee6d7269c1909d6291c69f12576e6252264456eec9b6f6138043645e3\"}}, \"native_import\": {\"admission_cached_bytecode_exists\": false, \"admission_has_removed_symbol\": false, \"admission_loaded_from_protected_source\": true, \"root_cached_bytecode_exists\": false, \"root_live_bytecode_uses_removed_symbol\": false, \"root_loaded_from_protected_source\": true, \"status\": \"OBSERVED\"}, \"result\": \"OBSERVED\", \"schema\": \"plasma.site2.root-module-audit.v1\", \"source_sha\": \"ff321756302e563edf120426f1fd1b3083c47b0a\"}",
+      "typed_evidence": {
+        "deployment": "NOT_RUN",
+        "engine_entry": {
+          "references_removed_symbol": true,
+          "selected_sha256_matches": true,
+          "source_mtime_ns": 1793724676000000000,
+          "source_sha256": "1838d082222429083e3aca91290677d3873f5c681cac004a703b75f40d86c345",
+          "status": "OBSERVED"
+        },
+        "flash": "NOT_RUN",
+        "hardware": "NOT_RUN",
+        "installed_manifest_mtime_ns": 1794019417395249400,
+        "installed_manifest_sha256": "d7f808f9043906aa57db520230fbccdad0f37d062a51f2e340c72ef92f34b8ca",
+        "modules": {
+          "pl/hil/fpga_image_admission.py": {
+            "git_sha256": "cce225276677d89fd44f209fe39919fd4cb6aa58205bbc05bf6213ce99f25c17",
+            "matches_git": true,
+            "matches_installed_manifest": true,
+            "references_devmem_independent_images": false,
+            "source_mtime_ns": 1794019417355249000,
+            "z2_sha256": "cce225276677d89fd44f209fe39919fd4cb6aa58205bbc05bf6213ce99f25c17"
+          },
+          "pl/hil/fpga_image_root.py": {
+            "git_sha256": "a5682c2ee6d7269c1909d6291c69f12576e6252264456eec9b6f6138043645e3",
+            "matches_git": true,
+            "matches_installed_manifest": true,
+            "references_devmem_independent_images": false,
+            "source_mtime_ns": 1794019417375249200,
+            "z2_sha256": "a5682c2ee6d7269c1909d6291c69f12576e6252264456eec9b6f6138043645e3"
+          }
+        },
+        "native_import": {
+          "admission_cached_bytecode_exists": false,
+          "admission_has_removed_symbol": false,
+          "admission_loaded_from_protected_source": true,
+          "root_cached_bytecode_exists": false,
+          "root_live_bytecode_uses_removed_symbol": false,
+          "root_loaded_from_protected_source": true,
+          "status": "OBSERVED"
+        },
+        "result": "OBSERVED",
+        "schema": "plasma.site2.root-module-audit.v1",
+        "source_sha": "ff321756302e563edf120426f1fd1b3083c47b0a"
+      },
+      "verified_runner_receipt": {
+        "runner": "SWPC-plasma-codex",
+        "exit_code": 0,
+        "source_sha": "ff321756302e563edf120426f1fd1b3083c47b0a",
+        "work_order_sha256": "be13dcb377e3ed0eb89017eac9ed57524799ccaf33effdd7fe02868e7b810cd7",
+        "status": "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED"
+      }
+    },
+    {
+      "run": 42354483913,
+      "job": 128349478891,
+      "phase": "new_immutable_engine_finalize",
+      "zip": "b1fdf44ca1a798ef2fab97e344ebec6bddf3b8482632cf3fa014cf34244ea0ca",
+      "run_url": "https://github.com/physicslu/plasma/actions/runs/42354483913",
+      "original_receipt_sha256": "fe74ff4c74355e6cc9ac62be683b21d9713c776ae56600b77a3ffa7b601e2297",
+      "original_event_prefix": "PLASMA_SITE2_ENGINE_FINALIZE",
+      "source_sha": "8f3f95b8ff65cc44c915b1d108236b9cd951454b",
+      "original_stdout_line": "PLASMA_SITE2_ENGINE_FINALIZE={\"exit_code\":0,\"observation\":{\"admission_sha256\":\"3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b\",\"bundle_deploy\":\"NOT_RUN\",\"flash\":\"NOT_RUN\",\"fpga_journal_sha256\":\"986446e768a38ab19dab6b9dd9d521b880dcd72412a07ab4d90631795adafb0e\",\"fpga_reload\":\"NOT_RUN\",\"openocd_build\":\"NOT_RUN\",\"openocd_sha256\":\"b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861\",\"previous_runtime_id\":\"0.12.0-5088db4c9154-plasma-swd-b8a7db670649\",\"runtime_id\":\"0.12.0-5088db4c9154-plasma-swd-b8a7db670649-3f5d5feca058\",\"schema\":\"plasma.site2.engine-finalize.v1\",\"selection_changed\":false,\"service_restarted\":false,\"stage_published\":true,\"status\":\"FINALIZED_NOT_SELECTED\"},\"schema\":\"plasma.site2.path2-engine-finalize.v1\",\"source_sha\":\"8f3f95b8ff65cc44c915b1d108236b9cd951454b\"}",
+      "typed_evidence": {
+        "exit_code": 0,
+        "observation": {
+          "admission_sha256": "3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b",
+          "bundle_deploy": "NOT_RUN",
+          "flash": "NOT_RUN",
+          "fpga_journal_sha256": "986446e768a38ab19dab6b9dd9d521b880dcd72412a07ab4d90631795adafb0e",
+          "fpga_reload": "NOT_RUN",
+          "openocd_build": "NOT_RUN",
+          "openocd_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+          "previous_runtime_id": "0.12.0-5088db4c9154-plasma-swd-b8a7db670649",
+          "runtime_id": "0.12.0-5088db4c9154-plasma-swd-b8a7db670649-3f5d5feca058",
+          "schema": "plasma.site2.engine-finalize.v1",
+          "selection_changed": false,
+          "service_restarted": false,
+          "stage_published": true,
+          "status": "FINALIZED_NOT_SELECTED"
+        },
+        "schema": "plasma.site2.path2-engine-finalize.v1",
+        "source_sha": "8f3f95b8ff65cc44c915b1d108236b9cd951454b"
+      },
+      "verified_runner_receipt": {
+        "runner": "SWPC-plasma-codex",
+        "exit_code": 0,
+        "source_sha": "8f3f95b8ff65cc44c915b1d108236b9cd951454b",
+        "work_order_sha256": "3109ffd8e4110c4c8502c7cb30daf1fe7eee15f56097ff1efb6c1c0821ad0594",
+        "status": "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED"
+      }
+    },
+    {
+      "phase": "switch_exception_and_manual_reconciliation",
+      "run": 42354639724,
+      "job": 128349959171,
+      "run_url": "https://github.com/physicslu/plasma/actions/runs/42354639724",
+      "archive_zip_sha256": "e541181f9038f8b952b6a865f0d477dd4c28e56370ae5a01692262f474fe2d5c",
+      "original_receipt_sha256": "4d9931413469a47818db6b5c13b295fc4fd0bfb48ed34c45411bdea407e528fd",
+      "exit_code": 1,
+      "typed_evidence": {
+        "status": "BLOCKED",
+        "phase": "switch",
+        "error_code": "NameError",
+        "flash": "NOT_RUN",
+        "openocd_build": "NOT_RUN",
+        "bundle_deploy": "NOT_RUN",
+        "fpga_reload": "NOT_RUN"
+      },
+      "note": "The initial switch returned NameError, so it must not be reported as FAIL before read-only reconciliation. Subsequent Run 42354798488 proved Selection=NEW; no re-switch was performed."
+    },
+    {
+      "run": 42354798488,
+      "job": 128350451279,
+      "phase": "post_switch_readonly_reconciliation",
+      "zip": "d3945295c245b0fbe7385484600883c4305227d293391c67357aa8ead00f17ff",
+      "run_url": "https://github.com/physicslu/plasma/actions/runs/42354798488",
+      "original_receipt_sha256": "2fe98e38129955cd28d800c6f8e4b56461ba620e49040ebac5722840e1e1bfb5",
+      "original_event_prefix": "PLASMA_SITE2_ENGINE_INVENTORY",
+      "source_sha": "4640629cc698eccb85425035501759c26536414f",
+      "original_stdout_line": "PLASMA_SITE2_ENGINE_INVENTORY={\"deployment\":\"NOT_RUN\",\"flash\":\"NOT_RUN\",\"fpga_reload\":\"NOT_RUN\",\"observation\":{\"fpga_manager\":\"operating\",\"new_engine\":{\"admission_expected\":true,\"admission_sha256\":\"3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b\",\"manifest_admission_matches\":true,\"manifest_binary_matches\":true,\"manifest_runtime_id_matches\":true,\"native_binary_expected\":true,\"openocd_sha256\":\"b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861\",\"source_engine_runtime_id\":\"0.12.0-5088db4c9154-plasma-swd-b8a7db670649\",\"status\":\"OBSERVED\"},\"old_engine\":{\"admission_expected\":true,\"admission_sha256\":\"1838d082222429083e3aca91290677d3873f5c681cac004a703b75f40d86c345\",\"manifest_admission_matches\":true,\"manifest_binary_matches\":true,\"manifest_runtime_id_matches\":true,\"native_binary_expected\":true,\"openocd_sha256\":\"b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861\",\"source_engine_runtime_id\":null,\"status\":\"OBSERVED\"},\"openocd_process_count\":0,\"root_observer\":true,\"schema\":\"plasma.site2.engine-inventory.v1\",\"selection\":\"NEW\",\"selection_admission_sha256\":\"3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b\",\"selection_binary_sha256\":\"b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861\",\"site2_admission_record\":false,\"site2_sealed\":false,\"stage_temp_count\":0,\"stages\":[],\"status\":\"READ_ONLY_OBSERVED\"},\"schema\":\"plasma.site2.path2-engine-inventory.v1\",\"service_restart\":\"NOT_RUN\",\"source_sha\":\"4640629cc698eccb85425035501759c26536414f\"}",
+      "typed_evidence": {
+        "deployment": "NOT_RUN",
+        "flash": "NOT_RUN",
+        "fpga_reload": "NOT_RUN",
+        "observation": {
+          "fpga_manager": "operating",
+          "new_engine": {
+            "admission_expected": true,
+            "admission_sha256": "3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b",
+            "manifest_admission_matches": true,
+            "manifest_binary_matches": true,
+            "manifest_runtime_id_matches": true,
+            "native_binary_expected": true,
+            "openocd_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+            "source_engine_runtime_id": "0.12.0-5088db4c9154-plasma-swd-b8a7db670649",
+            "status": "OBSERVED"
+          },
+          "old_engine": {
+            "admission_expected": true,
+            "admission_sha256": "1838d082222429083e3aca91290677d3873f5c681cac004a703b75f40d86c345",
+            "manifest_admission_matches": true,
+            "manifest_binary_matches": true,
+            "manifest_runtime_id_matches": true,
+            "native_binary_expected": true,
+            "openocd_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+            "source_engine_runtime_id": null,
+            "status": "OBSERVED"
+          },
+          "openocd_process_count": 0,
+          "root_observer": true,
+          "schema": "plasma.site2.engine-inventory.v1",
+          "selection": "NEW",
+          "selection_admission_sha256": "3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b",
+          "selection_binary_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+          "site2_admission_record": false,
+          "site2_sealed": false,
+          "stage_temp_count": 0,
+          "stages": [],
+          "status": "READ_ONLY_OBSERVED"
+        },
+        "schema": "plasma.site2.path2-engine-inventory.v1",
+        "service_restart": "NOT_RUN",
+        "source_sha": "4640629cc698eccb85425035501759c26536414f"
+      },
+      "verified_runner_receipt": {
+        "runner": "SWPC-plasma-codex",
+        "exit_code": 0,
+        "source_sha": "4640629cc698eccb85425035501759c26536414f",
+        "work_order_sha256": "252a50dbd6c9b75c0130ad2ff3891fb1152a971ea9b11344cef322a20645f273",
+        "status": "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED"
+      }
+    },
+    {
+      "run": 42354899860,
+      "job": 128350758955,
+      "phase": "post_switch_ready_check_redacted",
+      "zip": "953a5bbe71a2a45d589aa96107fa46594ef05f45d6e3ec8776633210f3f7bd5c",
+      "run_url": "https://github.com/physicslu/plasma/actions/runs/42354899860",
+      "original_receipt_sha256": "9faef4c718934ecdbb59c6574e9b18f67dca5b91d538faf8b61e084b9094f0bc",
+      "original_event_prefix": "PLASMA_SITE2_PATH2_PREFLIGHT",
+      "raw_archived_in_action": true,
+      "sensitive_fields_omitted": [
+        "device_id_observed",
+        "ppu_id",
+        "service MainPID",
+        "session_id",
+        "boot_id"
+      ],
+      "source_sha": "4640629cc698eccb85425035501759c26536414f",
+      "typed_evidence": {
+        "schema": "plasma.site2.path2-readonly-preflight.v1",
+        "readiness": "NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS",
+        "blockers": [],
+        "gateway": {
+          "status": "OBSERVED",
+          "health_ready": true,
+          "active_job_count": 0,
+          "lease_busy": false,
+          "activation_active": false,
+          "site2_idle": true
+        },
+        "engine": {
+          "status": "VERIFIED",
+          "runtime_id": "0.12.0-5088db4c9154-plasma-swd-b8a7db670649-3f5d5feca058",
+          "openocd_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+          "admission_sha256": "3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b",
+          "driver": "plasma_swd",
+          "abi": 5,
+          "adapter_khz": 2000
+        },
+        "fpga": {
+          "status": "IMAGE",
+          "boot_match": true,
+          "manager_state": "operating",
+          "image_sha256": "0d99ecafcb570c39217aa39723ccfcf593ae2021158599085a01436665374bc7",
+          "journal_sha256": "986446e768a38ab19dab6b9dd9d521b880dcd72412a07ab4d90631795adafb0e"
+        },
+        "site2_sealed": false,
+        "site2_admission_record": false,
+        "openocd_process_count": 0
+      }
+    },
+    {
+      "run": 42354991188,
+      "job": 128351070989,
+      "phase": "root_admit_revoke",
+      "zip": "45d1a214b7643a187addf5f477fad7e3126f48b1255eb511cf10169e0b1c30da",
+      "run_url": "https://github.com/physicslu/plasma/actions/runs/42354991188",
+      "original_receipt_sha256": "a3f762dc03251adb63ecb8fab0462301f518ceb63cfc08e780b22da5e672eee0",
+      "original_event_prefix": "PLASMA_SITE2_ADMISSION_GATE1",
+      "source_sha": "4640629cc698eccb85425035501759c26536414f",
+      "original_stdout_line": "PLASMA_SITE2_ADMISSION_GATE1={\"flash\":\"NOT_RUN\",\"fpga_reload\":\"NOT_RUN\",\"observation\":{\"code\":\"NOT_RECORDED\",\"fpga_manager_state\":\"operating\",\"record_present\":false,\"result\":\"ADMITTED\",\"revoke\":\"PASS\",\"schema\":\"plasma.site2.admission-diagnostic.v1\"},\"physical_swd\":\"NOT_RUN\",\"recovery\":\"NOT_RUN\",\"schema\":\"plasma.site2.path2-admission-diagnostic.v1\",\"source_sha\":\"4640629cc698eccb85425035501759c26536414f\"}",
+      "typed_evidence": {
+        "flash": "NOT_RUN",
+        "fpga_reload": "NOT_RUN",
+        "observation": {
+          "code": "NOT_RECORDED",
+          "fpga_manager_state": "operating",
+          "record_present": false,
+          "result": "ADMITTED",
+          "revoke": "PASS",
+          "schema": "plasma.site2.admission-diagnostic.v1"
+        },
+        "physical_swd": "NOT_RUN",
+        "recovery": "NOT_RUN",
+        "schema": "plasma.site2.path2-admission-diagnostic.v1",
+        "source_sha": "4640629cc698eccb85425035501759c26536414f"
+      },
+      "verified_runner_receipt": {
+        "runner": "SWPC-plasma-codex",
+        "exit_code": 0,
+        "source_sha": "4640629cc698eccb85425035501759c26536414f",
+        "work_order_sha256": "758e91a2bb7a887fec5fac675d4d614ca7e5c0475c2422db71f0240987eecd31",
+        "status": "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED"
+      }
+    },
+    {
+      "run": 42355729976,
+      "job": 128353367370,
+      "phase": "active_opf_readonly_sha",
+      "zip": "b3bc4f467f25c1fa5b92f862eacbb624879180576100d6434f068cb36df62d7e",
+      "run_url": "https://github.com/physicslu/plasma/actions/runs/42355729976",
+      "original_receipt_sha256": "beac9efbd6f63ee6204fb8e8700c30f528c8e017bcc8990681683577d06ec78b",
+      "original_event_prefix": "PLASMA_SITE2_ACTIVE_READONLY",
+      "source_sha": "ad439285a0e3552634f7679d341538d4be1128f1",
+      "original_stdout_line": "PLASMA_SITE2_ACTIVE_READONLY={\"active_job_count\":0,\"asset_set_sha256\":\"b82ce5fd0725dacdd02a3805168e847b190841c95887ba2c567761a48024e393\",\"bundle_deploy\":\"NOT_RUN\",\"engine_admission_sha256\":\"3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b\",\"engine_binary_sha256\":\"b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861\",\"engine_switch\":\"NOT_RUN\",\"flash\":\"NOT_RUN\",\"fpga_reload\":\"NOT_RUN\",\"opf_static\":\"PASS\",\"readiness\":\"PASS\",\"schema\":\"plasma.site2.active-readonly.v1\",\"site2_idle\":true,\"source_sha\":\"ad439285a0e3552634f7679d341538d4be1128f1\"}",
+      "typed_evidence": {
+        "active_job_count": 0,
+        "asset_set_sha256": "b82ce5fd0725dacdd02a3805168e847b190841c95887ba2c567761a48024e393",
+        "bundle_deploy": "NOT_RUN",
+        "engine_admission_sha256": "3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b",
+        "engine_binary_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+        "engine_switch": "NOT_RUN",
+        "flash": "NOT_RUN",
+        "fpga_reload": "NOT_RUN",
+        "opf_static": "PASS",
+        "readiness": "PASS",
+        "schema": "plasma.site2.active-readonly.v1",
+        "site2_idle": true,
+        "source_sha": "ad439285a0e3552634f7679d341538d4be1128f1"
+      },
+      "verified_runner_receipt": {
+        "runner": "SWPC-plasma-codex",
+        "exit_code": 0,
+        "source_sha": "ad439285a0e3552634f7679d341538d4be1128f1",
+        "work_order_sha256": "085b92eca50f7d3daf964f49781b0195e2f5200ae14b4146d2086df3633aac3c",
+        "status": "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED"
+      }
+    },
+    {
+      "run": 42356019198,
+      "job": 128354209788,
+      "phase": "single_real_flash_readback",
+      "zip": "2e24fd3d61c98636a0f8bc103c7aba90fcf885286acc4e86a76a7d666e273ad5",
+      "run_url": "https://github.com/physicslu/plasma/actions/runs/42356019198",
+      "original_receipt_sha256": "edf61c1c33f2d653580fa34184fb46cc00435a569f26c3db357014eee2a76e20",
+      "original_event_prefix": "PLASMA_SITE2_SINGLE_FLASH",
+      "source_sha": "ad439285a0e3552634f7679d341538d4be1128f1",
+      "original_stdout_line": "PLASMA_SITE2_SINGLE_FLASH={\"active_asset_set_sha256\":\"b82ce5fd0725dacdd02a3805168e847b190841c95887ba2c567761a48024e393\",\"attempts\":1,\"auto_retry\":\"DISABLED\",\"bundle_deploy\":\"NOT_RUN\",\"bytes_verified\":18768,\"error_code\":null,\"flash_result\":\"PASS\",\"fpga_reload\":\"NOT_RUN\",\"image_sha256\":\"8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d\",\"image_size\":18768,\"job_id\":\"job-20261107-083434-0c00decf\",\"job_stage\":\"flash_cycle\",\"job_state\":\"success\",\"opf_profile\":\"stm32f103c8t6-site2\",\"opf_provider\":\"openocd-platform-reference\",\"post_openocd_processes\":0,\"post_site2_admission_record\":false,\"post_site2_idle\":true,\"post_site2_seal\":false,\"readback_sha256\":\"8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d\",\"root_admission\":\"GATE1_ADMIT_REVOKE_PASS_RUN_42354991188\",\"safe_off\":true,\"schema\":\"plasma.site2.path2-single-rest-flash.v1\",\"source_sha\":\"ad439285a0e3552634f7679d341538d4be1128f1\",\"submission_count\":1}",
+      "typed_evidence": {
+        "active_asset_set_sha256": "b82ce5fd0725dacdd02a3805168e847b190841c95887ba2c567761a48024e393",
+        "attempts": 1,
+        "auto_retry": "DISABLED",
+        "bundle_deploy": "NOT_RUN",
+        "bytes_verified": 18768,
+        "error_code": null,
+        "flash_result": "PASS",
+        "fpga_reload": "NOT_RUN",
+        "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+        "image_size": 18768,
+        "job_id": "job-20261107-083434-0c00decf",
+        "job_stage": "flash_cycle",
+        "job_state": "success",
+        "opf_profile": "stm32f103c8t6-site2",
+        "opf_provider": "openocd-platform-reference",
+        "post_openocd_processes": 0,
+        "post_site2_admission_record": false,
+        "post_site2_idle": true,
+        "post_site2_seal": false,
+        "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+        "root_admission": "GATE1_ADMIT_REVOKE_PASS_RUN_42354991188",
+        "safe_off": true,
+        "schema": "plasma.site2.path2-single-rest-flash.v1",
+        "source_sha": "ad439285a0e3552634f7679d341538d4be1128f1",
+        "submission_count": 1
+      },
+      "verified_runner_receipt": {
+        "runner": "SWPC-plasma-codex",
+        "exit_code": 0,
+        "source_sha": "ad439285a0e3552634f7679d341538d4be1128f1",
+        "work_order_sha256": "9397e8f37e32ca88664b8b4221a45579fcbc5cac997583b5732a59e50b5565f9",
+        "status": "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED"
+      }
+    }
+  ]
+}
