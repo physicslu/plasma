@@ -136,7 +136,7 @@ async def run_scenario(tmp_path, *, mutate=None, observer=True):
     await control.start()
     adapter = MockAdapter()
     core = c3.SiteWorkerCore(
-        adapter, runtime_pid=os.getpid(),
+        adapter, runtime_pid=os.getpid,
         lease_verifier=c3.runtime_lease_verifier(tmp_path / "runtime.sock"),
         seal_dir=tmp_path / "seals", image_root=tmp_path / "images",
     )
