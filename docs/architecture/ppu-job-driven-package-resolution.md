@@ -307,3 +307,86 @@ migration blockers, **not** proof that the architecture is already implemented.
 Do not weaken Site Lock, lease, physical compatibility, memory bounds, tamper
 detection or SAFE_OFF checks when removing static registry dependencies.
 
+
+
+## Owner decision addendum (2026-11-07): Ensure Programming Assets — download once, reuse exact version
+
+**Status: approved product behavior / architectural target, NOT yet an implemented
+API or a claim that the current Z2 cache resolver supports this flow.**
+This refines the older “always transfer full Set on Active-SHA mismatch”
+wording in the Console-to-PPU reconciliation section above. It does NOT
+change the canonical Bundle v3 schema, the one-Active-Set invariant, or
+the separate FPGA lifecycle.
+
+**User-visible principle:** select exact IC (ICPN), select firmware, start
+programming. The Console/PPU should transparently ensure all required files
+are installed before an accepted programming Job. It should not require
+operators to re-audit the entire programmer's installed software every Job.
+
+1. **Full delivery on first use / cache miss.** The Controller resolves the
+   chosen ICPN, operation(s), exact versioned Programming Profile, Provider,
+   required FPGA assets/other Bundle Packages and target PPU compatibility,
+   then selects one **complete, closed Bundle v3 Asset Set**. B1 Receive,
+   B2 Admission, and B3 Install/Verify (with separately authorized Active
+   selection) happen for that exact Set; no mixing individual Packages from
+   unrelated Bundle versions, no silently substituted profile.
+2. **No redundant transfer on a qualified cache hit.** Compare the required
+   **exact Asset Set SHA256 (current Bundle ZIP SHA256)** with the PPU's
+   **trusted** Active/installed verified Set identity. If the correct Set is
+   Active, reuse without downloading/reinstalling. If it is not Active but
+   is already present in **verified immutable local staging**, future
+   reconciliation may authorize safe selection of that exact existing Set
+   **without reupload**; this cache-aware Activate/receipt route still
+   requires implementation and Host/HIL qualification. A mismatch alone
+   must not automatically cause a new download if the exact Set can be
+   proven locally present and reusable.
+3. **Cache miss or invalid/untrusted local bytes.** Transfer the **entire
+   selected Bundle**, re-verify the complete ZIP, dependencies, target and
+   SHA256, then install/activate under the existing Coordinator lock,
+   Runtime quiescence lease, Root permission and FPGA identity guards.
+   A package-ID, filename, semantic version or ICPN match is NOT enough
+   to reuse different bytes. No in-place update of immutable Active/Staged
+   assets; fail closed on integrity or recovery errors.
+4. **Firmware Image is independently versioned.** A change to firmware
+   bytes changes its normalized Image SHA256 even if ICPN and Programming
+   Asset Set are identical; transfer/qualify the changed Image separately
+   under the existing Programming Asset and Image lease contract. Conversely,
+   unchanged firmware does not force a Package Bundle redeploy.
+5. **Runtime preflight remains necessary and bounded.** Skip redundant
+   B1/B2/B3 and repeated full machine/software inventory on cache hits,
+   **not** Site Ownership, Job lease, current Engine/Provider binding,
+   FPGA identity/ABI/capability (including same-boot/reload fence),
+   geometry/target validation, safe electrical state and readback Verify.
+   Cached qualification never means a permanent hardware READY flag.
+6. **Eight Sites remain one PPU configuration domain.** One PPU has only
+   one Active Asset Set at a time; switching sets/FPGA while any Site has
+   an active or cancelling Job must be denied. Identical authorized Jobs
+   can reuse the common Set and Image while their per-Site ownership and
+   unique DUT data stay isolated. All-Site mixed-firmware/mixed-IC
+   concurrent execution remains out of scope for this decision.
+
+**Target user workflow:**
+
+```text
+Select ICPN + Firmware
+  -> resolve exact complete Bundle SHA + Image SHA
+  -> trusted PPU Active/Installed Set match?
+     -> active exact: reuse
+     -> verified staged exact: authorize safe activation (future API)
+     -> absent/untrusted: B1 -> B2 -> B3 entire Bundle
+  -> ensure correct FPGA configuration / Site admission
+  -> Program/Verify Job -> per-Site evidence
+```
+
+**Implementation evidence boundary (as of this decision):**
+`ppu_asset_set.read_active()` verifies an existing immutable Active Set;
+the current Bootstrap B3 flow supports `activate` and `stage_only` but
+does not expose a fully qualified “select a previously staged Bundle without
+a new B1/B2” product API. PR #1337/#1338 implement a narrow Site 2 OPF
+reference route and diagnostic/idempotent no-op; they are **not** the general
+Ensure Programming Assets engine. Product deployment reconciliation, cache
+retention/GC, recovery, Console UI and mixed-Package policy must be
+implemented and independently tested later.
+
+No new Gate, new privilege, FPGA reload, DUT operation or production release
+is authorized by recording this decision.
