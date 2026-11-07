@@ -24,18 +24,16 @@ def observation(*_args,**_kwargs):
     return {
         "readiness":"NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS","blockers":[],
         "z2":{"site2_seal":{"present":False},
-              "site2_admission":{"present":False},"openocd_pids":[]},
+              "site2_admission":{"present":False},"openocd_pids":[],
+              "engine":{"status":"VERIFIED","driver":"plasma_swd","abi":5,
+                  "openocd_sha256_observed":"b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+                  "admission_sha256_observed":"3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b"}},
         "rest":{"site2_idle":True},
     }
 
 
 def active(*_args,**_kwargs):
     return {"state":"ACTIVE","asset_set_sha256":ACTIVE,"opf_static":"PASS"}
-
-
-def admitted(*_args,**_kwargs):
-    return {"observation":{"result":"ADMITTED","code":"NOT_RECORDED",
-                           "revoke":"PASS","record_present":False}}
 
 
 def complete():
@@ -51,8 +49,7 @@ def complete():
                    "opf_profile_package":flow.PROFILE}}}}
 
 
-def prepare(monkeypatch, *, root=admitted, preflight=observation,
-            asset=active, wait=None):
+def prepare(monkeypatch, *, preflight=observation, asset=active, wait=None):
     events=[]
     monkeypatch.setattr(flow,"current_source",lambda sha: events.append("source"))
     monkeypatch.setattr(flow,"paired_target",lambda:HOST)
@@ -61,8 +58,6 @@ def prepare(monkeypatch, *, root=admitted, preflight=observation,
         events.append("preflight") or preflight(*a,**kw)))
     monkeypatch.setattr(flow.joint,"observe_active",lambda *a,**kw: (
         events.append("asset") or asset(*a,**kw)))
-    monkeypatch.setattr(flow.admission,"run",lambda *a,**kw: (
-        events.append("admit_revoke") or root(*a,**kw)))
     def post(host, data):
         assert host==HOST and len(data)==flow.IMAGE_BYTES
         events.append("ONE_POST")
@@ -73,27 +68,29 @@ def prepare(monkeypatch, *, root=admitted, preflight=observation,
     return events
 
 
-def test_one_post_only_after_root_admit_revoke_and_static_opf(monkeypatch):
+def test_one_post_after_previous_admit_revoke_and_opf_static(monkeypatch):
     events=prepare(monkeypatch)
     result=flow.execute(SHA,ACTIVE)
     assert result["flash_result"]=="PASS"
     assert result["safe_off"] is True
     assert result["readback_sha256"]==flow.IMAGE_SHA
     assert result["submission_count"]==1
-    assert events==["source","preflight","asset","admit_revoke",
+    assert events==["source","preflight","asset",
                     "preflight","asset","ONE_POST","poll","preflight"]
 
 
-@pytest.mark.parametrize("root",[
-    lambda *a,**kw: {"observation":{"result":"DENIED",
-       "code":"NATIVE_ARMV7_PYTHON_RUNTIME_REQUIRED",
-       "revoke":"NOT_NEEDED","record_present":False}},
-    lambda *a,**kw: {"observation":{"result":"ADMITTED",
-       "code":"NOT_RECORDED","revoke":"FAIL","record_present":True}},
+@pytest.mark.parametrize("binary_sha,admission_sha",[
+    ("0"*64,"3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b"),
+    ("b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861","0"*64),
 ])
-def test_no_post_on_root_admission_denial_or_unproven_cleanup(monkeypatch,root):
-    events=prepare(monkeypatch,root=root)
-    with pytest.raises(flow.FlashDenied,match="SITE2_ROOT_ADMISSION_DENIED"):
+def test_no_post_if_selected_engine_identity_changed(monkeypatch,binary_sha,admission_sha):
+    def mismatch(*_args,**_kwargs):
+        state=observation()
+        state["z2"]["engine"]["openocd_sha256_observed"]=binary_sha
+        state["z2"]["engine"]["admission_sha256_observed"]=admission_sha
+        return state
+    events=prepare(monkeypatch,preflight=mismatch)
+    with pytest.raises(flow.FlashDenied,match="SITE2_ADMITTED_ENGINE_IDENTITY_CHANGED"):
         flow.execute(SHA,ACTIVE)
     assert "ONE_POST" not in events
 
@@ -103,7 +100,7 @@ def test_no_post_on_unexpected_active_set(monkeypatch):
         "state":"ACTIVE","asset_set_sha256":"c"*64,"opf_static":"PASS"})
     with pytest.raises(flow.FlashDenied,match="ACTIVE_OPF_SET_MISMATCH"):
         flow.execute(SHA,ACTIVE)
-    assert "admit_revoke" not in events and "ONE_POST" not in events
+    assert "ONE_POST" not in events
 
 
 def test_one_post_on_polling_uncertainty_preserves_job_id(monkeypatch):
