@@ -19,7 +19,7 @@ import plasma_site2_path2_preflight as site
 import plasma_wordport_program as pairing
 
 ROOT=Path(__file__).resolve().parents[1]
-SHA40=re.compile(r"[0-9a-f]{40}\\Z")
+SHA40=re.compile(r"[0-9a-f]{40}")
 BIN="b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861"
 ADM="3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b"
 
