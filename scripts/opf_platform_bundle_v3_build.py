@@ -174,8 +174,10 @@ def build_bundle(source: Path, output: Path, *, target: dict,
         **members,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
+    created = False
     try:
         with zipfile.ZipFile(output, "x") as archive:
+            created = True
             for name, raw in sorted(contents.items()):
                 info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
                 info.create_system = 3
@@ -186,7 +188,8 @@ def build_bundle(source: Path, output: Path, *, target: dict,
         ppu_unified_deployment.verify_host_only_bundle(
             output, expected_sha256=digest, target_profile=target)
     except BaseException:
-        output.unlink(missing_ok=True)
+        if created:
+            output.unlink(missing_ok=True)
         raise
     return digest
 
