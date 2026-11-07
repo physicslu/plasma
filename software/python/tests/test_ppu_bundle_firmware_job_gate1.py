@@ -94,7 +94,7 @@ def resolve(product, **kw):
         product, asset_set_sha256=kw.pop("asset_set_sha256", SET_SHA),
         asset_package_id=kw.pop("asset_package_id", FIRMWARE),
         profile_package_id=kw.pop("profile_package_id", PROFILE),
-        bundle_asset_sha256=kw.pop("bundle_asset_sha256", digest(PAYLOAD)),
+        asset_sha256=kw.pop("bundle_asset_sha256", digest(PAYLOAD)),
         **kw,
     )
 
