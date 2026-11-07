@@ -54,6 +54,25 @@ class DoctorTests(unittest.TestCase):
             result = doctor.doctor(self.options(host="z2.local"))
             self.assertEqual(result["overall"], "BLOCKED")
 
+    def test_bare_status_document_accepted(self):
+        from unittest.mock import Mock
+        record = {"schema_version": 1,
+                  "bootstrap": {"state": "bootstrap_ready"},
+                  "runtime": {"state": "runtime_active"},
+                  "capabilities": {"runtime_deployment": True}}
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                pass
+            def read(self, *_):
+                return json.dumps(record).encode()
+        opener = Mock(open=Mock(return_value=Response()))
+        with mock.patch.object(doctor.urllib.request, "build_opener", return_value=opener):
+            status, result, _ = doctor.fetch_status("z2.local", "/v1/status")
+        self.assertEqual(status, "PASS")
+        self.assertEqual(result["schema_version"], 1)
+
     def test_deploy_never_runs(self):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout, \
                 mock.patch.object(doctor, "fetch_status") as fetch:
