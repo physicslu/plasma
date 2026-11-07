@@ -207,7 +207,19 @@ def execute(source_sha: str, expected_active_sha: str) -> dict:
     # The trusted PPU Runtime performs exact OPF Provider resolution and
     # Worker Identity before opening its one physical Site Job.
     job_id=submit_exactly_once(host,image)
-    job=wait_job(host,job_id)
+    try:
+        job=wait_job(host,job_id)
+    except Exception as exc:
+        # The POST was accepted: retain its ID even when later observations
+        # are lost. Reconciliation is read-only; never submit a second Job.
+        reason=str(exc) if isinstance(exc,FlashDenied) else type(exc).__name__
+        return {"schema":SCHEMA,"source_sha":source_sha,
+                "active_asset_set_sha256":expected_active_sha,
+                "flash_result":"OUTCOME_UNKNOWN","job_id":job_id,
+                "observation_error":reason,"submission_count":1,
+                "root_admission":"ADMITTED_AND_REVOKED",
+                "auto_retry":"DISABLED","fpga_reload":"NOT_RUN",
+                "bundle_deploy":"NOT_RUN"}
     summary=verify_job(job)
     summary.update({"schema":SCHEMA,"source_sha":source_sha,
                     "active_asset_set_sha256":expected_active_sha,
