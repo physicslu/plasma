@@ -83,7 +83,7 @@ def package(tmp: Path, name: str, kind: str, files: dict[str, bytes], *,
                 "size": len(data), "executable": filename.startswith("payload/bin/")}
                for filename, data in files.items()]
     manifest = {
-        "schema": contract.PACKAGE_SCHEMA, "name": name, "kind": kind,
+        "schema": "plasma.ppu.package.v1", "name": name, "kind": kind,
         "version": "2026.10.29", "source_commit": SOURCE,
         "target": TARGET, "files": entries,
     }

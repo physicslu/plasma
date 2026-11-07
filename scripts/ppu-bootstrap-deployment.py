@@ -1171,7 +1171,7 @@ class DeploymentCoordinator:
                     if (not isinstance(prior, dict) or prior.get("name") != package.name
                             or set(prior) != {"name", "kind", "release_id",
                                               "archive_sha256", "source_commit"}
-                            or prior.get("kind") not in contract.PACKAGE_KINDS | {contract.BUNDLE_KIND}
+                            or prior.get("kind") != contract.BUNDLE_KIND
                             or type(prior.get("release_id")) is not str
                             or not re.fullmatch(r"[A-Za-z0-9_.-]{1,160}", prior["release_id"])
                             or type(prior.get("archive_sha256")) is not str

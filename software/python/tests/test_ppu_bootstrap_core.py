@@ -309,7 +309,7 @@ def test_factory_admission_without_device_owned_target_is_denied(tmp_path: Path)
     try:
         with pytest.raises(installed_service.BootstrapServiceError,
                            match="PACKAGE_TARGET_PROFILE_UNAVAILABLE"):
-            server.admit_package(admit_body(paths, "python", uid))
+            server.admit_package(admit_body(paths, "bundle", uid))
         assert not paths.deployment_record.exists()
         assert not paths.coordinator_journal.exists()
         assert not paths.product_root.exists()
