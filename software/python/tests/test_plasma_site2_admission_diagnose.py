@@ -67,3 +67,40 @@ def test_source_sha_change_denied_before_ssh():
         with pytest.raises(RuntimeError,match="SOURCE_SHA_MISMATCH"):
             SCRIPT.run(HOST,"b"*40,preflight=Pre(state()),helper=h)
     assert not h.calls
+
+
+def test_diagnostic_uses_active_root_worker_interpreter_not_system_python():
+    remote=SCRIPT.REMOTE
+    assert '["/bin/systemctl","show","--property=MainPID"' in remote
+    assert '(Path("/proc")/pid/"exe").resolve(strict=True)' in remote
+    assert 'native.is_relative_to("/opt/plasma/python")' in remote
+    assert "info.st_uid!=0" in remote and "info.st_mode&0o022" in remote
+    assert 'argv=[str(native),"-I","-B",str(adm)]' in remote
+    assert 'argv=[sys.executable' not in remote
+    assert 'call("admit")' in remote and 'call("revoke")' in remote
+
+
+def test_cli_denied_admission_is_not_pass(monkeypatch, capsys):
+    payload=SCRIPT.run
+    try:
+        monkeypatch.setattr(SCRIPT, "run", lambda *a: {
+            "schema":"plasma.site2.path2-admission-diagnostic.v1",
+            "observation":reply(), "flash":"NOT_RUN"})
+        assert SCRIPT.main(["--host",HOST,"--source-sha",SHA])==1
+        observed=json.loads(capsys.readouterr().out.split("=",1)[1])
+        assert observed["observation"]["result"]=="DENIED"
+        assert observed["flash"]=="NOT_RUN"
+    finally:
+        monkeypatch.setattr(SCRIPT,"run",payload)
+
+
+def test_cli_admitted_requires_revoke_pass_and_no_record(monkeypatch,capsys):
+    result=reply()
+    result.update(result="ADMITTED",code="NOT_RECORDED",revoke="PASS")
+    monkeypatch.setattr(SCRIPT, "run", lambda *a: {
+        "schema":"plasma.site2.path2-admission-diagnostic.v1",
+        "observation":result,"flash":"NOT_RUN"})
+    assert SCRIPT.main(["--host",HOST,"--source-sha",SHA])==0
+    capsys.readouterr()
+    result["record_present"]=True
+    assert SCRIPT.main(["--host",HOST,"--source-sha",SHA])==1
