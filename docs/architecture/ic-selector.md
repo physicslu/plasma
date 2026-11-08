@@ -59,7 +59,7 @@ The browser does not parse the CSV directly. Plasma Manager owns the read-only D
 GET /api/devices/search?q=<identifier>&limit=<1..100>&levels=<1,2,3 subset>
 ```
 
-The Console calls it through its same-origin Manager BFF (`GET /api/manager/devices/search`); it is never relayed to a PPU. The PPU Gateway is Catalog-free (PR-C1) and its transitional copy of this endpoint answers `503 DEVICE_SELECTOR_UNAVAILABLE`. An unavailable Catalog is always 503, never an empty result.
+The Console calls it through its same-origin Manager BFF (`GET /api/manager/devices/search`); it is never relayed to a PPU. The PPU Gateway is Catalog-free (PR-C1) and, since S5-B, has no copy of this endpoint (unknown route ⇒ 404). On the Manager an unavailable Catalog is always `503 DEVICE_SELECTOR_UNAVAILABLE`, never an empty result.
 
 The service reports the canonical catalog size with each search response. The browser must not hard-code that count.
 
