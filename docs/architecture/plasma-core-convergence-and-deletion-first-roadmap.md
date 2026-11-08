@@ -106,6 +106,14 @@ Bundle v3 -> B1/B2/B3 -> Active Set -> authorized PPU Host
 
 **Disposition of PR #1347:** **Merged**, no longer a Draft blocker. The sole PPU Job-selected route retains existing C-2/C-3, offline Plan Compiler/ICPN qualification and Site/FPGA safety. New-path Site 2 OpenOCD Bundle A/B Flash qualification is recorded in [the 2026-11-08 evidence](../evidence/opf-site2-ab-newpath-2026-11-08.md). It does not validate untested Providers, multiple Sites, cancellation or recovery failure cases.
 
+### 2026-11-08 S2/S3/S5 follow-up: Gen7-only operator helper retirement (Gate 1 source candidate)
+
+After merged #1353 removed the fixed-image direct Site 2 REST Flash writer and merged #1354 renamed PPU Doctor, a second independently approved deletion scope isolates the former Gen7-only Bootstrap B3/Joint acceptance scripts. The remaining Site 2 Active Set **read-only** observer previously imported the Gen7 joint tool; it must retain its paired-host, source SHA, verified installed Asset Set, preflight, Engine identity and error-denial behavior without importing a retired writer. The PPU Doctor source inventory must not require deleted helpers.
+
+Retire only `scripts/opf_site2_joint_acceptance.py`, `scripts/opf_site2_path2_bundle_deploy.py` and their obsolete dedicated tests after migrating essential observation negatives. Preserve independent `scripts/opf_platform_bundle_v3_build.py`, canonical `scripts/plasma_program.py`, PPU-wide Lease/Quiesce, C-3 Session/Worker, native FPGA reload fence, SAFE_OFF, SEALED and Recovery. The historical Gen7 dispatch records on [Issue #981](https://github.com/physicslu/plasma/issues/981) remain evidence, not current executable interfaces. Do not assume no pending *off-repository* work solely from issue comments.
+
+Acceptance is exact-head Host-only tests/CI plus positive/negative failure guards; these changes do not run any Z2/FPGA/DUT HIL, change the installed Runtime or qualify another Provider. See [the separate retirement ledger](../development/opf-s2-s3-s5-gen7-retirement-gate1-20261108.md). The larger S0/S2/S3/S5 backlog remains **partial**.
+
 ## 5. Required change ledger for every future implementation PR
 
 Every PR implementing this roadmap must link this roadmap PR and include the following in its description:

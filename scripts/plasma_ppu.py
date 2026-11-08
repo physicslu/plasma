@@ -30,8 +30,6 @@ _REPO_FILES = (
     "scripts/plasmactl", "scripts/plasmactl-z2-ps",
     "scripts/ppu-bootstrap-service.py", "scripts/ppu-bootstrap-deployment.py",
     "scripts/opf_platform_bundle_v3_build.py",
-    "scripts/opf_site2_path2_bundle_deploy.py",
-    "scripts/opf_site2_joint_acceptance.py",
 )
 
 
