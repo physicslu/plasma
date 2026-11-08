@@ -1,469 +1,152 @@
+"""S1-C PPU Job-selected Provider routing; no legacy CompilerRegistry Runtime gate."""
 from __future__ import annotations
 
 import asyncio
-import re
-import tempfile
-import unittest
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from plasma_core.config import PlasmaConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.models import JobRequest
-from plasma_interfaces.base import BaseInterface, ProgressCallback
+from plasma_interfaces.mock import MockInterface
 from plasma_interfaces.openocd import OpenOCDInterface
+from plasma_interfaces.package_provider import PackageProviderInterface, TrustedProviderAction
 from plasma_server.execution_router import (
-    MOCK_ROUTE,
-    OPENOCD_ROUTE,
-    PLASMA_NATIVE_ROUTE,
-    RESOLVED_IC_SUPPORT_METADATA_KEY,
-    RoutedProgrammingHandler,
+    MOCK_ROUTE, OPENOCD_ROUTE, PACKAGE_PROVIDER_ROUTE, ROUTE_METADATA_KEY,
     SiteExecutionRouter,
-    normalize_openocd_target_config,
 )
 from plasma_server.site_manager import SiteManager
 
 
-class StubInterface(BaseInterface):
-    async def erase(self, progress: ProgressCallback | None = None) -> None:
-        if progress:
-            await progress(1, 1)
-
-    async def program(
-        self,
-        image: bytes,
-        address: int = 0,
-        progress: ProgressCallback | None = None,
-    ) -> None:
-        if progress:
-            await progress(len(image), len(image))
-
-    async def verify(
-        self,
-        image: bytes,
-        address: int = 0,
-        progress: ProgressCallback | None = None,
-    ) -> None:
-        if progress:
-            await progress(len(image), len(image))
-
-    async def read(
-        self,
-        address: int,
-        length: int,
-        progress: ProgressCallback | None = None,
-    ) -> bytes:
-        if progress:
-            await progress(length, length)
-        return bytes(length)
-
-    async def safe_shutdown(self) -> None:
-        return None
+def test_c3_flash_route_uses_bundle_not_exact_icpn_catalog():
+    site = SiteConfig(id=2, enabled=True, interface="openocd",
+                      openocd={"site_worker_socket": "/tmp/s1c-test-c3.sock"})
+    interface = OpenOCDInterface(site.openocd)
+    router = SiteExecutionRouter(site, interface)
+    request = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                         target="UNREGISTERED-ICPN", image=b"TEST")
+    admitted = router.admit(request)
+    assert admitted.metadata[ROUTE_METADATA_KEY]["mode"] == OPENOCD_ROUTE
+    assert router.interface_for(admitted) is interface
+    with pytest.raises(PlasmaError) as error:
+        router.admit(JobRequest(site_id=2, operation=Operation.ERASE,
+                                target="UNREGISTERED-ICPN"))
+    assert error.value.code == ErrorCode.OPERATION_UNSUPPORTED
 
 
-class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
-    def setUp(self) -> None:
-        self.resolver = get_default_ic_support_resolver()
-        self.interface = StubInterface()
+def test_mock_route_does_not_claim_hardware_support():
+    site = SiteConfig(id=1, enabled=True, interface="mock")
+    interface = MockInterface.from_options({})
+    router = SiteExecutionRouter(site, interface)
+    admitted = router.admit(JobRequest(site_id=1, operation=Operation.ERASE,
+                                       target="UNKNOWN-ICPN"))
+    route = admitted.metadata[ROUTE_METADATA_KEY]
+    assert route["mode"] == MOCK_ROUTE and not route["hardware_support_claimed"]
+    assert router.interface_for(admitted) is interface
 
-    def test_openocd_target_normalization_accepts_catalog_and_runtime_forms(self) -> None:
-        self.assertEqual(
-            normalize_openocd_target_config("tcl/target/stm32f1x.cfg"),
-            "target/stm32f1x.cfg",
+
+def test_legacy_non_c3_openocd_runtime_path_is_removed():
+    site = SiteConfig(id=2, enabled=True, interface="openocd",
+                      openocd={"interface_cfg": "interface/cmsis-dap.cfg",
+                               "target_cfg": "target/stm32f1x.cfg"})
+    router = SiteExecutionRouter(site, OpenOCDInterface(site.openocd))
+    with pytest.raises(PlasmaError, match="NO_QUALIFIED_JOB_PROVIDER"):
+        router.admit(JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                                target="STM32F103C8T6", image=b"TEST"))
+
+
+@pytest.mark.parametrize("field", [ROUTE_METADATA_KEY, "resolved_ic_support"])
+def test_client_cannot_forge_server_selected_execution_route(field):
+    site = SiteConfig(id=1, enabled=True, interface="mock")
+    router = SiteExecutionRouter(site, MockInterface.from_options({}))
+    with pytest.raises(PlasmaError) as error:
+        router.admit(JobRequest(site_id=1, operation=Operation.ERASE,
+                                metadata={field: {"mode": OPENOCD_ROUTE}}))
+    assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+
+def test_signed_package_provider_is_selected_by_job_not_static_site_interface():
+    site = SiteConfig(id=2, enabled=True, interface="openocd")
+    base = OpenOCDInterface({})
+    package = PackageProviderInterface()
+    package.wire_runtime(lambda *_: {})
+    router = SiteExecutionRouter(site, base, package)
+    trusted = TrustedProviderAction(None, {}, None, SimpleNamespace())
+    request = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                         target="UNREGISTERED-ICPN", image=b"TEST")
+    admitted = router.admit(request, trusted_provider=trusted)
+    assert admitted.metadata[ROUTE_METADATA_KEY]["mode"] == PACKAGE_PROVIDER_ROUTE
+    assert router.interface_for(admitted) is package
+    with pytest.raises(PlasmaError, match="NO_QUALIFIED_JOB_PROVIDER"):
+        router.admit(request)
+
+
+def test_same_site_selects_openocd_or_package_per_authorized_job_without_fallback():
+    """Selected Provider is Job-local, not permanently attached to the Site."""
+    site = SiteConfig(id=2, enabled=True, interface="openocd",
+                      openocd={"site_worker_socket": "/tmp/s1c-two-provider-c3.sock"})
+    openocd = OpenOCDInterface(site.openocd)
+    package = PackageProviderInterface()
+    package.wire_runtime(lambda *_: {})
+    router = SiteExecutionRouter(site, openocd, package)
+    trusted = TrustedProviderAction(None, {}, None, SimpleNamespace())
+    direct = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                        target="STM32F103C8T6", image=b"IMAGE", job_id="direct-job")
+    signed = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                        target="EXTERNAL-PROVIDER-TARGET", image=b"IMAGE", job_id="signed-job")
+    assert router.interface_for(router.admit(direct)) is openocd
+    assert router.interface_for(router.admit(signed, trusted_provider=trusted)) is package
+    assert router.interface_for(router.admit(direct)) is openocd
+    # A tampered route from public metadata cannot switch a direct Job.
+    forged = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                        target="STM32F103C8T6", image=b"IMAGE",
+                        metadata={ROUTE_METADATA_KEY: {"mode": PACKAGE_PROVIDER_ROUTE}})
+    with pytest.raises(PlasmaError) as error:
+        router.admit(forged)
+    assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+
+def test_site_manager_rejects_legacy_route_before_queue_or_lease(tmp_path: Path):
+    async def scenario():
+        config = PlasmaConfig(
+            server=ServerConfig(output_root=tmp_path / "out", log_root=tmp_path / "log"),
+            sites=[SiteConfig(id=2, enabled=True, interface="openocd")],
         )
-        self.assertEqual(
-            normalize_openocd_target_config("target/stm32f1x.cfg"),
-            "target/stm32f1x.cfg",
+        manager = SiteManager(config)
+        await manager.start()
+        try:
+            with pytest.raises(PlasmaError, match="NO_QUALIFIED_JOB_PROVIDER"):
+                manager.enqueue(JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                                           target="STM32F103C8T6", image=b"TEST"))
+            assert manager.registry.all() == []
+            assert not manager.execution_lease_snapshot()["busy"]
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_mock_job_reuses_existing_site_worker(tmp_path: Path):
+    async def scenario():
+        config = PlasmaConfig(
+            server=ServerConfig(output_root=tmp_path / "out", log_root=tmp_path / "log"),
+            sites=[SiteConfig(id=1, enabled=True, interface="mock")],
         )
-        self.assertEqual(
-            normalize_openocd_target_config("/usr/share/openocd/scripts/target/stm32f1x.cfg"),
-            "target/stm32f1x.cfg",
-        )
-
-    def test_c3_opf_flash_cycle_does_not_require_icpn_or_compiler_registry(self) -> None:
-        site = SiteConfig(id=2, enabled=True, interface="openocd",
-                          openocd={"site_worker_socket": "/tmp/unit-test-c3.sock"})
-        interface = OpenOCDInterface(site.openocd)
-        router = SiteExecutionRouter(site, interface, None)
-        self.assertIsNone(router.compiler_registry)
-        request = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
-                             target="UNREGISTERED-ICPN", image=b"TEST")
-        admitted = router.admit(request)
-        route = admitted.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
-        self.assertEqual(route["backend_implementation_state"], "opf_bundle_c3_site_worker")
-        self.assertIsNotNone(router.handler_for(admitted))
-        with self.assertRaises(PlasmaError) as caught:
-            router.admit(JobRequest(site_id=2, operation=Operation.ERASE,
-                                    target="UNREGISTERED-ICPN"))
-        self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
-
-    def test_mock_route_accepts_unbound_catalog_target_without_hardware_claim(self) -> None:
-        site = SiteConfig(id=1, enabled=True, interface="mock")
-        router = SiteExecutionRouter(site, self.interface, None)
-        admitted = router.admit(
-            JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F407VGT6")
-        )
-        route = admitted.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
-        self.assertEqual(route["mode"], MOCK_ROUTE)
-        self.assertFalse(route["hardware_support_claimed"])
-        self.assertTrue(route["workflow_runtime_ready"])
-        self.assertFalse(route["hardware_runtime_ready"])
-        self.assertIsInstance(router.handler_for(admitted), object)
-
-    def test_openocd_route_compiles_f103_geometry_but_is_not_execution_ready(self) -> None:
-        site = SiteConfig(
-            id=1,
-            enabled=True,
-            interface="openocd",
-            openocd={
-                "interface_cfg": "interface/cmsis-dap.cfg",
-                "target_cfg": "target/stm32f1x.cfg",
-            },
-        )
-        router = SiteExecutionRouter(site, self.interface, self.resolver)
-        request = JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103CBT6")
-        resolved = router.resolve_route(request)
-        route = resolved.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
-        self.assertEqual(route["mode"], OPENOCD_ROUTE)
-        self.assertEqual(
-            route["selected_programming_profile_id"],
-            "stm32f1-medium-density-flash-v0",
-        )
-        self.assertEqual(route["selected_openocd_target_config"], "target/stm32f1x.cfg")
-        self.assertEqual(route["compiler_id"], "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler")
-        self.assertEqual(route["backend_id"], "stm32f103c-openocd-backend-v1")
-        self.assertEqual(
-            route["backend_lock_digest"],
-            "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
-        )
-        self.assertEqual(route["operation_contract_id"], "stm32f103c-operation-contract-erase-v1")
-        self.assertEqual(route["backend_implementation_state"], "plan_compiled_not_executable")
-        self.assertFalse(route["hardware_runtime_ready"])
-        plan = route["openocd_execution_plan"]
-        self.assertEqual(plan["memory_geometry_profile_id"], "stm32f103cb-128k-v0")
-        self.assertEqual(plan["memory"]["main_flash_size_bytes"], 128 * 1024)
-        self.assertEqual(
-            plan["commands"],
-            [
-                "init",
-                "reset init",
-                "flash erase_address 0x08000000 0x00020000",
-                "shutdown",
-            ],
-        )
-        self.assertTrue(plan["plan_only"])
-        self.assertFalse(plan["hardware_runtime_ready"])
-
-        with self.assertRaises(PlasmaError) as caught:
-            router.admit(request)
-        self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
-        self.assertEqual(caught.exception.context["route_mode"], OPENOCD_ROUTE)
-        self.assertEqual(
-            caught.exception.context["programming_profile_id"],
-            "stm32f1-medium-density-flash-v0",
-        )
-        self.assertEqual(
-            caught.exception.context["backend_implementation_state"],
-            "plan_compiled_not_executable",
-        )
-
-    def test_unbound_f4_is_rejected_before_real_route_is_created(self) -> None:
-        site = SiteConfig(
-            id=1,
-            enabled=True,
-            interface="openocd",
-            openocd={
-                "interface_cfg": "interface/cmsis-dap.cfg",
-                "target_cfg": "target/stm32f4x.cfg",
-            },
-        )
-        router = SiteExecutionRouter(site, self.interface, self.resolver)
-        with self.assertRaises(PlasmaError) as caught:
-            router.resolve_route(
-                JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F407VGT6")
-            )
-        self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
-        self.assertEqual(caught.exception.context["ic_support_state"], "unresolved")
-
-    def test_openocd_target_mismatch_fails_before_runtime_readiness_gate(self) -> None:
-        site = SiteConfig(
-            id=1,
-            enabled=True,
-            interface="openocd",
-            openocd={
-                "interface_cfg": "interface/cmsis-dap.cfg",
-                "target_cfg": "target/stm32f4x.cfg",
-            },
-        )
-        router = SiteExecutionRouter(site, self.interface, self.resolver)
-        with self.assertRaises(PlasmaError) as caught:
-            router.resolve_route(
-                JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103C8T6")
-            )
-        self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
-        self.assertEqual(
-            caught.exception.context["expected_target_config"],
-            "target/stm32f1x.cfg",
-        )
-
-    def test_native_fpga_route_resolves_profile_then_fails_runtime_readiness(self) -> None:
-        site = SiteConfig(id=1, enabled=True, interface="fpga")
-        router = SiteExecutionRouter(site, self.interface, self.resolver)
-        request = JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103C8T6")
-        resolved = router.resolve_route(request)
-        route = resolved.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
-        self.assertEqual(route["mode"], PLASMA_NATIVE_ROUTE)
-        self.assertEqual(
-            route["selected_programming_profile_id"],
-            "stm32f1-medium-density-flash-v0",
-        )
-        self.assertEqual(route["backend_implementation_state"], "not_implemented")
-        self.assertFalse(route["hardware_runtime_ready"])
-
-        with self.assertRaises(PlasmaError) as caught:
-            router.admit(request)
-        self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
-        self.assertEqual(caught.exception.context["route_mode"], PLASMA_NATIVE_ROUTE)
-
-    def test_client_cannot_supply_server_owned_resolution_metadata(self) -> None:
-        site = SiteConfig(id=1, enabled=True, interface="mock")
-        router = SiteExecutionRouter(site, self.interface, None)
-        with self.assertRaises(PlasmaError) as caught:
-            router.admit(
-                JobRequest(
-                    site_id=1,
-                    operation=Operation.ERASE,
-                    target="STM32F103C8T6",
-                    metadata={RESOLVED_IC_SUPPORT_METADATA_KEY: {"mode": "forged"}},
-                )
-            )
-        self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
-
-    async def test_site_manager_unresolved_target_fails_before_registry_or_execution_lease(self) -> None:
-        with tempfile.TemporaryDirectory() as root:
-            root_path = Path(root)
-            config = PlasmaConfig(
-                server=ServerConfig(
-                    host="127.0.0.1",
-                    port=0,
-                    output_root=root_path / "output",
-                    log_root=root_path / "logs",
-                    max_supported_sites=1,
-                    max_concurrent_jobs=1,
-                ),
-                sites=[
-                    SiteConfig(
-                        id=1,
-                        enabled=True,
-                        interface="openocd",
-                        openocd={
-                            "interface_cfg": "interface/cmsis-dap.cfg",
-                            "target_cfg": "target/stm32f4x.cfg",
-                        },
-                    )
-                ],
-            )
-            manager = SiteManager(
-                config,
-                interface_factory=lambda _site: self.interface,
-                ic_support_resolver=self.resolver,
-            )
-            await manager.start()
-            try:
-                with self.assertRaises(PlasmaError) as caught:
-                    manager.enqueue(
-                        JobRequest(
-                            site_id=1,
-                            operation=Operation.ERASE,
-                            target="STM32F407VGT6",
-                            job_id="unresolved-f4",
-                        )
-                    )
-                self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
-                self.assertEqual(manager.registry.all(), [])
-                self.assertFalse(manager.execution_lease_snapshot()["busy"])
-            finally:
-                await manager.shutdown()
-
-    async def test_site_manager_compiled_but_unready_backend_also_fails_before_queue(self) -> None:
-        with tempfile.TemporaryDirectory() as root:
-            root_path = Path(root)
-            config = PlasmaConfig(
-                server=ServerConfig(
-                    host="127.0.0.1",
-                    port=0,
-                    output_root=root_path / "output",
-                    log_root=root_path / "logs",
-                    max_supported_sites=1,
-                    max_concurrent_jobs=1,
-                ),
-                sites=[
-                    SiteConfig(
-                        id=1,
-                        enabled=True,
-                        interface="openocd",
-                        openocd={
-                            "interface_cfg": "interface/cmsis-dap.cfg",
-                            "target_cfg": "target/stm32f1x.cfg",
-                        },
-                    )
-                ],
-            )
-            manager = SiteManager(
-                config,
-                interface_factory=lambda _site: self.interface,
-                ic_support_resolver=self.resolver,
-            )
-            await manager.start()
-            try:
-                with self.assertRaises(PlasmaError) as caught:
-                    manager.enqueue(
-                        JobRequest(
-                            site_id=1,
-                            operation=Operation.ERASE,
-                            target="STM32F103C8T6",
-                            job_id="compiled-not-ready",
-                        )
-                    )
-                self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
-                self.assertEqual(caught.exception.context["route_mode"], OPENOCD_ROUTE)
-                self.assertEqual(
-                    caught.exception.context["backend_implementation_state"],
-                    "plan_compiled_not_executable",
-                )
-                self.assertEqual(manager.registry.all(), [])
-                self.assertFalse(manager.execution_lease_snapshot()["busy"])
-            finally:
-                await manager.shutdown()
-
-    async def test_host_only_injected_openocd_executes_site_jobs_without_hardware_claim(self) -> None:
-        image = b"HOST-ONLY-IMAGE"
-        commands_seen: list[str] = []
-        class FakeOpenOCDProcess:
-            returncode = 0
-
-            async def communicate(self):
-                return b"fake-openocd-PASS", b""
-
-        async def launcher(*argv, **_kwargs):
-            commands = [argv[index + 1] for index, value in enumerate(argv[:-1]) if value == "-c"]
-            commands_seen.extend(commands)
-            for command in commands:
-                if command.startswith("flash write_image ") or command.startswith("flash verify_image "):
-                    staged = re.search(r"\{([^{}]+)\}", command)
-                    assert staged is not None
-                    assert Path(staged.group(1)).read_bytes() == image
-                if command.startswith("dump_image "):
-                    staged = re.search(r"\{([^{}]+)\}", command)
-                    assert staged is not None
-                    Path(staged.group(1)).write_bytes(image)
-            return FakeOpenOCDProcess()
-
-        with tempfile.TemporaryDirectory() as root:
-            root_path = Path(root)
-            cfg = PlasmaConfig(
-                server=ServerConfig(
-                    output_root=root_path / "output",
-                    log_root=root_path / "logs",
-                    max_supported_sites=2,
-                    max_concurrent_jobs=1,
-                ),
-                sites=[SiteConfig(
-                    id=2,
-                    enabled=True,
-                    interface="openocd",
-                    target="STM32F103C8T6",
-                    openocd={
-                        "executable": "fake-openocd",
-                        "interface_cfg": "interface/cmsis-dap.cfg",
-                        "target_cfg": "target/stm32f1x.cfg",
-                        "work_dir": str(root_path),
-                    },
-                )],
-            )
-            manager = SiteManager(
-                cfg,
-                interface_factory=lambda site: OpenOCDInterface(
-                    site.openocd,
-                    process_launcher=launcher,
-                    resolver=self.resolver,
-                ),
-                ic_support_resolver=self.resolver,
-            )
-            route = manager.execution_routers[2].resolve_route(JobRequest(
-                site_id=2, operation=Operation.ERASE, target="STM32F103C8T6"
-            )).metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
-            self.assertTrue(route["software_validation_runtime_ready"])
-            self.assertFalse(route["hardware_runtime_ready"])
-            await manager.start()
-            try:
-                for operation in (Operation.ERASE, Operation.PROGRAM, Operation.VERIFY):
-                    request = JobRequest(
-                        site_id=2,
-                        operation=operation,
-                        target="STM32F103C8T6",
-                        image=image if operation in {Operation.PROGRAM, Operation.VERIFY} else b"",
-                    )
-                    result = await manager.submit(request)
-                    self.assertTrue(result.success, (operation, result.error))
-                read_request = JobRequest(
-                    site_id=2,
-                    operation=Operation.READ,
-                    target="STM32F103C8T6",
-                    map_data={
-                        "sections": [{
-                            "name": "full_image",
-                            "address": 0,
-                            "length": len(image),
-                        }],
-                    },
-                )
-                read_result = await manager.submit(read_request)
-                self.assertTrue(read_result.success, read_result.error)
-                self.assertEqual(len(read_result.output_files), 1)
-                self.assertEqual(Path(read_result.output_files[0]).read_bytes(), image)
-                self.assertTrue(any(cmd.startswith("flash erase_address ") for cmd in commands_seen))
-                self.assertTrue(any(cmd.startswith("flash write_image ") for cmd in commands_seen))
-                self.assertTrue(any(cmd.startswith("flash verify_image ") for cmd in commands_seen))
-                self.assertTrue(any(cmd.startswith("dump_image ") for cmd in commands_seen))
-            finally:
-                await manager.shutdown()
-
-    async def test_site_manager_uses_routed_handler_for_mock_without_resolver_dependency(self) -> None:
-        with tempfile.TemporaryDirectory() as root:
-            root_path = Path(root)
-            config = PlasmaConfig(
-                server=ServerConfig(
-                    host="127.0.0.1",
-                    port=0,
-                    output_root=root_path / "output",
-                    log_root=root_path / "logs",
-                    max_supported_sites=1,
-                    max_concurrent_jobs=1,
-                ),
-                sites=[SiteConfig(id=1, enabled=True, interface="mock")],
-            )
-            manager = SiteManager(
-                config,
-                interface_factory=lambda _site: self.interface,
-            )
-            self.assertIsNone(manager.ic_support_resolver)
-            self.assertIsInstance(manager.workers[1].handler, RoutedProgrammingHandler)
-            await manager.start()
-            try:
-                result = await manager.submit(
-                    JobRequest(
-                        site_id=1,
-                        operation=Operation.ERASE,
-                        target="STM32F407VGT6",
-                        job_id="mock-f4",
-                    )
-                )
-                self.assertTrue(result.success)
-            finally:
-                await manager.shutdown()
+        manager = SiteManager(config)
+        await manager.start()
+        try:
+            result = await manager.submit(JobRequest(site_id=1, operation=Operation.ERASE))
+            assert result.success
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_static_provider_site_interface_is_not_supported():
+    config = PlasmaConfig(server=ServerConfig(),
+                          sites=[SiteConfig(id=2, enabled=True, interface="provider")])
+    with pytest.raises(PlasmaError) as error:
+        config.validate()
+    assert error.value.code == ErrorCode.CONFIG_INVALID

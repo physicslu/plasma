@@ -406,7 +406,7 @@ class Stack:
                                        "normalized_image_root": str(self.images)})],
         )
         self.manager = SiteManager(config)
-        assert self.manager.ic_support_resolver is None
+        assert not hasattr(self.manager, "ic_support_resolver")
         self.package_runtime = PackageActionRuntime(
             self.manager, control_plane=ROOT / "scripts", product_root=self.opf["product_root"],
             state_root=root / "package-state", owner_credential=None, spawner=None,
@@ -859,7 +859,7 @@ def test_rest_bundle_flash_without_registered_icpn():
                 _job_id, job = await stack.flash(b"BUNDLE-DRIVEN-MCU")
                 assert job["state"] == "success", job
                 assert job["result"]["details"]["flash_cycle"]["icpn"] == unknown
-                assert stack.manager.ic_support_resolver is None
+                assert not hasattr(stack.manager, "ic_support_resolver")
                 assert len(stack.sim.argvs) == 1
     run(scenario())
 

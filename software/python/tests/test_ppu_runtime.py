@@ -151,7 +151,8 @@ def test_runtime_ships_ic_support_data_only_and_enabled_openocd_site_starts(tmp_
         "from plasma_core.config import load_config\n"
         "from plasma_server.site_manager import SiteManager\n"
         "manager = SiteManager(load_config(sys.argv[1]))\n"
-        "assert manager.ic_support_resolver is not None\n"
+        "from plasma_core.ic_support import get_default_ic_support_resolver\n"
+        "assert get_default_ic_support_resolver().summary()['resolved_exact_icpns'] > 0\n"
         "print(sorted(manager.interfaces))\n"
     )
     environment = {"PATH": "/usr/bin:/bin", "PLASMA_IC_SUPPORT_ROOT": str(ic_root)}

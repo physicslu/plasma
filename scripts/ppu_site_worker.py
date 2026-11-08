@@ -733,7 +733,12 @@ def runtime_lease_verifier(control_socket: Path,
         if not (isinstance(lease, dict) and lease.get("busy") is True):
             return False
         if owner_kind == OWNER_PACKAGE:
-            return lease.get("owner_kind") == OWNER_PACKAGE and lease.get("owner_id") == job_id
+            if lease.get("owner_kind") == OWNER_PACKAGE:
+                return lease.get("owner_id") == job_id
+            jobs = lease.get("job_ids")
+            delegates = lease.get("delegated_package_job_ids")
+            return (isinstance(jobs, list) and job_id in jobs
+                    and isinstance(delegates, list) and job_id in delegates)
         jobs = lease.get("job_ids")
         return (owner_kind == OWNER_REST_JOB and lease.get("owner_kind") != OWNER_PACKAGE
                 and isinstance(jobs, list) and job_id in jobs)

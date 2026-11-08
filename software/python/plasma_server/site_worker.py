@@ -15,6 +15,7 @@ from plasma_core.job_logging import JobEventLogger, OutputManager
 from plasma_core.models import ErrorDetail, ExecutionOutput, JobAttemptResult, JobResult, iso_now
 from plasma_handlers.base import BaseHandler
 from plasma_interfaces.openocd import OpenOCDInterface
+from plasma_interfaces.package_provider import PackageProviderInterface
 
 from .job_manager import JobRuntime
 
@@ -174,7 +175,12 @@ class SiteWorker:
                 original_exception=failure,
             )
         try:
-            await self.handler.interface.safe_shutdown()
+            selected_interface = (
+                self.handler.interface_for(request)
+                if callable(getattr(self.handler, "interface_for", None))
+                else self.handler.interface
+            )
+            await selected_interface.safe_shutdown()
         except Exception as exc:
             shutdown_error = (
                 exc
@@ -312,6 +318,12 @@ class SiteWorker:
                 self.output.write_state(request.job_id, self._state_payload(runtime))
                 logger.event(f"stage_{event}", level=level, stage=name, **fields)
 
+            # Job-scoped Provider selection; same SiteWorker and PPU lease.
+            selected_interface = (
+                self.handler.interface_for(request)
+                if callable(getattr(self.handler, "interface_for", None))
+                else self.handler.interface
+            )
             while attempts <= request.max_retries:
                 attempts += 1
                 runtime.attempt = attempts
@@ -319,9 +331,13 @@ class SiteWorker:
                 attempt_started_at = iso_now()
                 attempt_started_monotonic = time.monotonic()
                 logger.event("attempt_started", attempt=attempts)
-                if isinstance(self.handler.interface, OpenOCDInterface):
-                    self.handler.interface.bind_runtime_job(
+                if isinstance(selected_interface, OpenOCDInterface):
+                    selected_interface.bind_runtime_job(
                         request.job_id, runtime.active_asset_set, job_deadline)
+                elif isinstance(selected_interface, PackageProviderInterface):
+                    selected_interface.bind_runtime_job(
+                        request.job_id, runtime.active_asset_set, job_deadline,
+                        runtime.trusted_provider)
                 runtime.active_task = asyncio.create_task(
                     self.handler.execute(request, stage_callback),
                     name=f"{request.job_id}-attempt-{attempts}",
@@ -406,7 +422,7 @@ class SiteWorker:
                         backoff_s=request.retry_backoff_s,
                     )
                     try:
-                        await self.handler.interface.safe_shutdown()
+                        await selected_interface.safe_shutdown()
                     except Exception as exc:
                         runtime.attempt_history[-1].retry_scheduled = False
                         final_error = (
@@ -446,7 +462,7 @@ class SiteWorker:
             elapsed_ms = round((time.monotonic() - started_monotonic) * 1000)
             shutdown_error: PlasmaError | None = None
             try:
-                await self.handler.interface.safe_shutdown()
+                await selected_interface.safe_shutdown()
             except Exception as exc:
                 logger.event("safe_shutdown_failed", level="ERROR", error=str(exc))
                 shutdown_error = (
