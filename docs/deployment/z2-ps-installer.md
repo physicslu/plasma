@@ -261,7 +261,7 @@ decided only by the verified Active Bundle v3, device capability,
 authorization and hardware safety; an enabled non-mock Site starts without
 Catalog data. The PPU Gateway's legacy `GET /api/devices/search` answers
 `503 DEVICE_SELECTOR_UNAVAILABLE` on an installed PPU; the Device Selector is
-owned by Manager (Console consumer migration: PR-C2). Root, install,
+owned by Manager (Console consumers migrated in PR-C2). Root, install,
 verification and Rollback contracts are unchanged.
 
 ## Site Desired versus Runtime

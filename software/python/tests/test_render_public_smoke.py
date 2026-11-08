@@ -139,6 +139,8 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
     @staticmethod
     def contract_payload(path: str) -> dict[str, object]:
         normalized = path.removeprefix("/api/manager/ppu")
+        if normalized.startswith("/api/manager/devices/search"):
+            normalized = normalized.replace("/api/manager/devices/search", "/api/devices/search", 1)
         if normalized.startswith("/api/status?job="):
             return {"job": {"job_id": normalized.split("=", 1)[1], "state": "success"}}
         if normalized == "/api/status":
@@ -220,7 +222,8 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
 
         self.assertEqual(report.checks["api:device-catalog-search"], "PASS")
         self.assertEqual(report.checks["api:managed-mock-program"], "PASS")
-        self.assertIn("/api/manager/ppu/api/devices/search?q=stm32&limit=1", calls)
+        self.assertIn("/api/manager/devices/search?q=stm32&limit=1", calls)
+        self.assertNotIn("/api/manager/ppu/api/devices/search?q=stm32&limit=1", calls)
         self.assertIn("/api/manager/ppu/api/status?job=job-1", calls)
         self.assertEqual(posts, ["/api/manager/ppu/api/jobs"])
 

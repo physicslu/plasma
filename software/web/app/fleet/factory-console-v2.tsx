@@ -1161,7 +1161,6 @@ export default function FactoryConsoleV2() {
               onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
               expandLabel={text.showSelection}
               collapseLabel={text.hideSelection}
-              apiBase={apiBase}
               targetDevice={targetDevice}
               onTargetChange={setTargetDevice}
               targetDisabled={batchRunning}

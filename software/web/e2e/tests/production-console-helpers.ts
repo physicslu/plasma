@@ -47,7 +47,7 @@ export function productionOperation(page: Page, code: "E" | "P" | "V" | "R") {
 }
 
 export async function installTestDeviceCatalog(page: Page) {
-  await page.route("**/api/devices/search**", async route => {
+  await page.route("**/api/manager/devices/search**", async route => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

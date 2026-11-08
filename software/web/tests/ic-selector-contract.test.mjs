@@ -41,7 +41,7 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   const styles = await source("../app/devices/devices.css");
   const api = await source("../app/device-catalog-api.ts");
 
-  assert.match(api, /\/api\/devices\/search/);
+  assert.match(api, /\/api\/manager\/devices\/search/);
   assert.match(api, /catalog_verification/);
   assert.match(api, /physical_validation/);
   assert.match(api, /revision_sha256/);

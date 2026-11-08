@@ -61,7 +61,6 @@ export function ProgrammingJobPanel({
   onToggleCollapsed,
   expandLabel,
   collapseLabel,
-  apiBase,
   targetDevice,
   onTargetChange,
   targetDisabled,
@@ -89,7 +88,6 @@ export function ProgrammingJobPanel({
   onToggleCollapsed: () => void;
   expandLabel: string;
   collapseLabel: string;
-  apiBase: string;
   targetDevice: DeviceSearchResult | null;
   onTargetChange: (device: DeviceSearchResult | null) => void;
   targetDisabled: boolean;
@@ -139,7 +137,6 @@ export function ProgrammingJobPanel({
           <div className="programmingJobField" data-programming-job-field="target">
             <strong>1. {targetLabel}</strong>
             <ICPickerField
-              apiBase={apiBase}
               value={targetDevice}
               onChange={onTargetChange}
               disabled={targetDisabled}

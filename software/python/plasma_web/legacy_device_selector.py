@@ -1,18 +1,21 @@
-"""Legacy PPU-hosted Device Selector (``GET /api/devices/search``) projection.
+"""Device Selector (``GET /api/devices/search``) Catalog projection.
 
-Transitional, Catalog-only adapter. The Device Selector is owned by Manager
-(OPF S0-S5, PR-C1): the PPU Gateway never imports this module at startup and
-never needs it to accept, run or report Programming Jobs / Batches / Health.
+Catalog-only, read-only. Owned and hosted by Plasma Manager (OPF S0-S5,
+PR-C2): the Console reaches it through its Manager BFF. The PPU Gateway never
+imports this module at startup and never needs it to accept, run or report
+Programming Jobs / Batches / Health; its transitional copy of the endpoint
+answers ``503 DEVICE_SELECTOR_UNAVAILABLE`` on a Catalog-free PPU (PR-C1).
 When this module, its Catalog/Qualification dependencies or the Catalog data
-are absent, the Gateway answers ``503 DEVICE_SELECTOR_UNAVAILABLE`` instead of
-an empty (fake) result. No new Catalog Service is implemented here; Console
-consumers migrate to Manager in PR-C2.
+are absent, every host answers 503 instead of an empty (fake) result.
+
+This module must not import the PPU Gateway (Manager imports it standalone).
 """
 
 from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import parse_qs
 
 from plasma_core.ic_support import ICSupportIntegrityError, get_default_ic_support_resolver
 from plasma_core.manufacturer_device_basic import get_default_manufacturer_device_basic_resolver
@@ -25,11 +28,14 @@ from .device_catalog import (
     DeviceCatalogIntegrityError,
     get_default_device_catalog,
 )
-from .gateway_base import WEB_REST_CONTRACT_VERSION
 from .microchip_upstream_openocd_evidence import microchip_upstream_openocd_evidence
 from .nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
 from .openocd_provider_registry import get_default_openocd_provider_registry
 from .programming_qualification import get_default_programming_qualification_registry
+
+# Web REST contract version of the Selector payload; equality with the PPU
+# Gateway contract is enforced by tests (this module must not import it).
+WEB_REST_CONTRACT_VERSION = "3"
 
 # Data-availability failures that make the Selector unavailable (never empty).
 SELECTOR_DATA_ERRORS: tuple[type[BaseException], ...] = (
@@ -44,6 +50,7 @@ __all__ = [
     "SELECTOR_DATA_ERRORS",
     "parse_public_catalog_levels",
     "search",
+    "search_response",
     "warm",
 ]
 
@@ -312,3 +319,41 @@ def warm() -> dict[str, int]:
     """Build the immutable Qualification registry once; return Level counts."""
     counts = get_default_programming_qualification_registry().summary["catalog_level_counts"]
     return {str(level): int(counts[str(level)]) for level in range(4)}
+
+
+def unavailable_payload(message: str) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "error": {
+            "error_type": "DEVICE_SELECTOR_UNAVAILABLE",
+            "message": message,
+            "recoverable": True,
+        },
+    }
+
+
+def search_response(raw_query: str) -> tuple[int, dict[str, Any]]:
+    """Map one ``/api/devices/search`` query string to (HTTP status, JSON body).
+
+    400 INVALID_DEVICE_SEARCH for bad parameters, 503
+    DEVICE_SELECTOR_UNAVAILABLE when Catalog data cannot be loaded, else 200.
+    Never returns an empty result in place of an unavailable Catalog.
+    """
+    params = parse_qs(raw_query, keep_blank_values=True)
+    try:
+        query = params.get("q", [""])[0]
+        limit = int(params.get("limit", [str(DEFAULT_SEARCH_LIMIT)])[0])
+        offset = int(params.get("offset", ["0"])[0])
+        levels = _parse_public_catalog_levels(params.get("levels", [None])[0])
+        if limit < 1 or limit > MAX_SEARCH_LIMIT:
+            raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}")
+        if offset < 0:
+            raise ValueError("offset must be a non-negative integer")
+        return 200, _device_search_payload(query, limit, offset, levels=levels)
+    except SELECTOR_DATA_ERRORS as exc:
+        return 503, unavailable_payload(f"Device Selector Catalog data is unavailable: {exc}")
+    except (TypeError, ValueError) as exc:
+        return 400, {
+            "ok": False,
+            "error": {"error_type": "INVALID_DEVICE_SEARCH", "message": str(exc)},
+        }

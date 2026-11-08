@@ -92,10 +92,6 @@ server {
         limit_except GET { deny all; }
         proxy_pass $qemu_gateway_root;
     }
-    location = /api/devices/search {
-        limit_except GET { deny all; }
-        proxy_pass $qemu_gateway_root;
-    }
     location = /api/engineering/targets {
         limit_except GET { deny all; }
         proxy_pass $qemu_gateway_root;
@@ -224,6 +220,7 @@ server {
     # - POST /api/settings/ppu-network
     # - POST /api/settings/gateway
     # - arbitrary /api/* paths
+    # - /api/devices/search (Device Selector is owned by Manager, PR-C2)
     # - arbitrary Bootstrap /v1/* paths
     # - direct public access to QEMU/SWPC :18081
     location / { return 404; }

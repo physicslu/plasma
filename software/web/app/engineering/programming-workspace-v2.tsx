@@ -1036,7 +1036,6 @@ export default function ProgrammingWorkspaceV2() {
               onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
               expandLabel={locale === "zh-TW" ? "展開" : "Show"}
               collapseLabel={locale === "zh-TW" ? "收合" : "Hide"}
-              apiBase={apiBase}
               targetDevice={targetDevice}
               onTargetChange={selectTargetDevice}
               targetDisabled={targetLocked}
