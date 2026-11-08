@@ -13,6 +13,8 @@ import csv
 import hashlib
 import io
 import json
+import re
+import subprocess
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
@@ -56,6 +58,23 @@ def blob(data:bytes)->str:
 def digest(data:bytes)->str:
     return hashlib.sha256(data).hexdigest()
 
+def frozen_git_blob(blob_id:str,label:str)->bytes:
+    """Replay the frozen 2026-09-29 Production baseline from Git history.
+
+    This audit is historical evidence. It must not be re-validated against the
+    current, legitimately evolving Production catalog; the frozen manifest and
+    every ST source CSV are read by their recorded Git blob IDs instead.
+    """
+    require(isinstance(blob_id,str) and re.fullmatch(r"[0-9a-f]{40}",blob_id) is not None,
+            f"{label}: frozen Git blob ID invalid")
+    try:
+        raw=subprocess.run(["git","-C",str(ROOT),"cat-file","blob",blob_id],check=True,
+                           stdout=subprocess.PIPE,stderr=subprocess.DEVNULL).stdout
+    except (OSError,subprocess.CalledProcessError) as exc:
+        raise RuntimeError(f"{label}: frozen Git blob unavailable (full history required)") from exc
+    require(blob(raw)==blob_id,f"{label}: frozen Git blob content mismatch")
+    return raw
+
 def render()->dict:
     snapshot=load(SOURCE)
     require(snapshot.get("schema_version")==1,"snapshot schema drifted")
@@ -65,7 +84,7 @@ def render()->dict:
     frozen=snapshot["production_baseline"]
     require(frozen["manifest_git_blob_sha"]==EXPECTED_ST_MANIFEST_SHA,"baseline Git blob drifted")
     require(frozen["manufacturer"]=="STMicroelectronics","manufacturer scope drifted")
-    manifest_raw=MANIFEST.read_bytes()
+    manifest_raw=frozen_git_blob(frozen["manifest_git_blob_sha"],"frozen Production manifest")
     manifest=json.loads(manifest_raw)
     require(manifest.get("status")=="production","not a Production catalog")
     require(manifest.get("selection_policy")=="admitted_exact_manufacturer_part_number_only",
@@ -90,7 +109,7 @@ def render()->dict:
     for source in st_sources:
         path=(MANIFEST.parent/source["path"]).resolve()
         require(path.is_relative_to(ROOT),"source path escapes repository")
-        raw=path.read_bytes()
+        raw=frozen_git_blob(source["git_blob_sha"],f"{source['family']} frozen Production source")
         require(blob(raw)==source["git_blob_sha"],f"{source['family']}: Git blob mismatch")
         require(digest(raw)==source["sha256"],f"{source['family']}: SHA256 mismatch")
         rows=list(csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))))
