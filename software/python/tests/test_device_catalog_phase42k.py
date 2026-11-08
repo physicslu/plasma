@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 import threading
 from http.client import HTTPConnection
-from http.server import ThreadingHTTPServer
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import PlasmaWebHandler
+from plasma_manager.server import PlasmaManagerHandler, PlasmaManagerHTTPServer
 
 EXPECTED_MIN_PRODUCTION_CATALOG_SIZE = 301
 UFBGA_ICPN = "STM32F407IEH6"
@@ -42,7 +41,7 @@ def test_phase42k_exact_icpns_are_resolved_by_runtime_catalog() -> None:
 
 
 def test_phase42k_exact_icpn_is_exposed_by_rest_catalog_and_nrnd_is_absent() -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
+    server = PlasmaManagerHTTPServer(("127.0.0.1", 0), PlasmaManagerHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

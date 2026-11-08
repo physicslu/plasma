@@ -3,8 +3,12 @@
 Owner decision (OPF S0-S5): IC Catalog, IC Support and L0-L2 qualification are
 offline governance; the Device Selector belongs to Manager. The PPU Gateway must
 start, report Health and run Programming Jobs / Batches with no Catalog data, no
-Catalog-only modules and no Catalog environment. The legacy Selector endpoint
-must answer an explicit 503 when unavailable, never an empty (fake) result.
+Catalog-only modules and no Catalog environment.
+
+S5-B: the transitional PPU Selector route is deleted. ``GET /api/devices/search``
+is served only by Plasma Manager; on the PPU Gateway it is an unknown route
+(404, never a fake-empty result) and the Secure Gateway has no authorization
+rule for it (fail-closed).
 
 Host-only: fake OpenOCD / Mock interfaces; no Z2, FPGA, C driver or DUT. A fake
 OpenOCD PASS is never a physical Flash PASS (HIL: NOT_RUN).
@@ -27,6 +31,7 @@ from .test_ppu_bundle_v3_packages_contract import ROOT
 from .test_ppu_runtime_catalog_free import CatalogTripwire, _scenario
 
 CATALOG_ENV = ("PLASMA_DEVICE_CATALOG_MANIFEST", "PLASMA_IC_SUPPORT_ROOT")
+SELECTOR_MODULE = "plasma_web.legacy_device_selector"
 
 
 def _load_script(name: str, filename: str):
@@ -66,24 +71,16 @@ _PROBE = textwrap.dedent("""
         except Exception as exc:
             result[module] = type(exc).__name__ + ": " + str(exc)
     report = {"imports": result}
-    if extra:
-        from plasma_web import gateway
-        report["warm"] = gateway.warm_legacy_device_selector()
-        try:
-            gateway._legacy_device_selector()
-            report["selector"] = "LOADED"
-        except gateway.DeviceSelectorUnavailable as exc:
-            report["selector"] = "UNAVAILABLE"
-    report["attempts_before_selector"] = [a for a in attempts if a != "plasma_web.legacy_device_selector"]
+    report["attempts"] = attempts
     report["loaded"] = sorted(k for k in sys.modules if any(k == b or k.startswith(b + ".") for b in blocked))
     print(json.dumps(report))
 """)
 
 
-def _probe(blocked, modules, *, extra=False):
+def _probe(blocked, modules):
     roots = [str(ROOT / "software/python")]
     completed = subprocess.run(
-        [sys.executable, "-I", "-c", _PROBE, json.dumps([list(blocked), list(modules), roots, extra])],
+        [sys.executable, "-I", "-c", _PROBE, json.dumps([list(blocked), list(modules), roots, False])],
         check=True, capture_output=True, text=True, timeout=120, cwd="/")
     return json.loads(completed.stdout.strip().splitlines()[-1])
 
@@ -91,31 +88,37 @@ def _probe(blocked, modules, *, extra=False):
 # --- import layer -----------------------------------------------------------------------
 
 def test_gateway_and_runtime_entrypoints_import_with_every_catalog_module_blocked():
-    report = _probe(CATALOG_ONLY, GATEWAY_MODULES, extra=True)
+    report = _probe(CATALOG_ONLY, GATEWAY_MODULES)
     assert report["imports"] == {m: "OK" for m in GATEWAY_MODULES}, report
-    # Startup never touched a Catalog module; only the optional Selector probe did.
-    assert report["attempts_before_selector"] == [] and report["loaded"] == [], report
-    assert report["warm"] is False and report["selector"] == "UNAVAILABLE"
+    # No Gateway / Runtime entrypoint even attempts a Catalog (or Selector) import.
+    assert report["attempts"] == [] and report["loaded"] == [], report
 
 
 def test_catalog_blocker_negative_control():
-    report = _probe(CATALOG_ONLY, ("plasma_web.legacy_device_selector", "plasma_web.device_catalog"))
+    report = _probe(CATALOG_ONLY, (SELECTOR_MODULE, "plasma_web.device_catalog"))
     assert all(v.startswith("ImportError: CATALOG_BLOCKED:") for v in report["imports"].values())
 
 
 def test_gateway_module_holds_no_catalog_symbol():
     source = (ROOT / "software/python/plasma_web/gateway.py").read_text(encoding="utf-8")
     for module in CATALOG_ONLY:
-        if module.endswith("legacy_device_selector"):
-            continue
         leaf = module.rsplit(".", 1)[-1]
         assert f"import {leaf}" not in source and f".{leaf} import" not in source, leaf
+        assert module not in source, module
     for attr in ("get_default_device_catalog", "get_default_programming_qualification_registry",
-                 "get_default_ic_support_resolver", "_device_search_payload"):
+                 "get_default_ic_support_resolver", "_device_search_payload",
+                 # S5-B: transitional Selector adapter hooks are deleted.
+                 "LEGACY_DEVICE_SELECTOR_MODULE", "DeviceSelectorUnavailable",
+                 "_legacy_device_selector", "warm_legacy_device_selector"):
         assert not hasattr(gateway, attr), attr
+    for attr in ("_is_device_search_path", "_device_search", "_device_selector_unavailable"):
+        assert not hasattr(gateway.PlasmaWebHandler, attr), attr
+    assert "/api/devices/search" not in source
+    secure_source = (ROOT / "software/python/plasma_web/secure_gateway.py").read_text(encoding="utf-8")
+    assert "/api/devices/search" not in secure_source
 
 
-# --- Selector: optional, explicit, never fake-empty ---------------------------------------
+# --- Selector route: deleted from the PPU Gateway (owned by Manager) --------------------
 
 def _get(handler_class, path):
     handler = object.__new__(handler_class)
@@ -128,28 +131,31 @@ def _get(handler_class, path):
     return response[0]
 
 
-def test_selector_absent_is_503_not_empty(monkeypatch):
-    monkeypatch.setitem(sys.modules, gateway.LEGACY_DEVICE_SELECTOR_MODULE, None)
-    status, body = _get(gateway.PlasmaWebHandler, "/api/devices/search?q=STM32&limit=5")
-    assert status == 503, body
-    assert body["ok"] is False and "results" not in body
-    assert body["error"]["error_type"] == "DEVICE_SELECTOR_UNAVAILABLE"
-    assert gateway.warm_legacy_device_selector() is False
+@pytest.mark.parametrize("path", ["/api/devices/search?q=STM32&limit=5",
+                                  "/api/devices/search/?q=STM32F103C8T6",
+                                  "/api/devices/search?q=STM32&limit=0"])
+@pytest.mark.parametrize("selector_importable", [True, False])
+def test_gateway_device_search_is_unknown_route_never_results(monkeypatch, path, selector_importable):
+    if not selector_importable:
+        monkeypatch.setitem(sys.modules, SELECTOR_MODULE, None)
+    status, body = _get(gateway.PlasmaWebHandler, path)
+    # Same answer whether or not Catalog code is importable: no Selector here.
+    assert status == 404, body
+    assert body["ok"] is False and "results" not in body and "catalog_size" not in body
 
 
-def test_selector_catalog_data_failure_is_503_and_bad_query_is_400(monkeypatch):
-    from plasma_web import legacy_device_selector
-    from plasma_web.device_catalog import DeviceCatalogIntegrityError
+def test_secure_gateway_has_no_device_search_authorization_rule():
+    from plasma_core.errors import ErrorCode, PlasmaError
+    from plasma_web import secure_gateway
 
-    def unavailable():
-        raise DeviceCatalogIntegrityError("Catalog data absent")
-
-    status, body = _get(gateway.PlasmaWebHandler, "/api/devices/search?q=STM32&limit=0")
-    assert status == 400 and body["error"]["error_type"] == "INVALID_DEVICE_SEARCH"
-    monkeypatch.setattr(legacy_device_selector, "get_default_device_catalog", unavailable)
-    status, body = _get(gateway.PlasmaWebHandler, "/api/devices/search?q=STM32&limit=5")
-    assert status == 503 and "results" not in body
-    assert body["error"]["error_type"] == "DEVICE_SELECTOR_UNAVAILABLE"
+    handler = object.__new__(secure_gateway.SecurePlasmaWebHandler)
+    handler.path = "/api/devices/search?q=STM32"
+    handler.command = "GET"
+    handler._principal = lambda: type("P", (), {"principal_id": "p"})()
+    handler._authorize = lambda *a, **k: pytest.fail(f"unexpected authorization rule {a}")
+    with pytest.raises(PlasmaError) as caught:
+        handler._guard_get()
+    assert caught.value.code == ErrorCode.AUTHORIZATION_DENIED
 
 
 # --- call layer: Bundle v3 Mock path with the Selector module absent ----------------------
@@ -158,7 +164,7 @@ def test_selector_catalog_data_failure_is_503_and_bad_query_is_400(monkeypatch):
 def selector_absent(monkeypatch):
     for key in CATALOG_ENV:
         monkeypatch.delenv(key, raising=False)
-    monkeypatch.setitem(sys.modules, gateway.LEGACY_DEVICE_SELECTOR_MODULE, None)
+    monkeypatch.setitem(sys.modules, SELECTOR_MODULE, None)
     return CatalogTripwire(monkeypatch)
 
 
@@ -189,7 +195,7 @@ def test_bundle_target_provider_negatives_hold_with_selector_absent(selector_abs
 ])
 def test_selector_availability_never_changes_job_decision(monkeypatch, case):
     with_selector = _scenario(case)
-    monkeypatch.setitem(sys.modules, gateway.LEGACY_DEVICE_SELECTOR_MODULE, None)
+    monkeypatch.setitem(sys.modules, SELECTOR_MODULE, None)
     tripwire = CatalogTripwire(monkeypatch)
     without_selector = _scenario(case)
     keys = ("state", "http", "result", "icpn", "safe_off", "argvs", "sessions")
@@ -251,8 +257,7 @@ def test_packaged_runtime_gateway_health_passes_without_catalog(tmp_path: Path):
             loopback = acceptance._run_loopback(base_url)
             assert loopback
             status, selector = acceptance._request_json(f"{base_url}/api/devices/search?q=STM32")
-            assert status == 503, selector
-            assert selector["error"]["error_type"] == "DEVICE_SELECTOR_UNAVAILABLE"
+            assert status == 404, selector  # S5-B: no Selector route on the PPU
             assert "results" not in selector
             for name, proc in procs.items():
                 assert proc.poll() is None, logs[name].read_text(errors="replace")

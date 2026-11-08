@@ -99,7 +99,7 @@ __main__.py
 
 **Device Selector (OPF S5 / PR-C2).** Plasma Manager owns the Catalog-only
 Device Selector and answers `GET /api/devices/search` in-process; it is never
-relayed to a PPU (a Catalog-free PPU answers `503 DEVICE_SELECTOR_UNAVAILABLE`).
+relayed to a PPU (the Catalog-free PPU Gateway has no Selector route since S5-B).
 At build time `scripts/control-station-runtime.py` traces a Selector warm-up
 plus a sweep of every public L1–L3 record and ships exactly the Python modules
 and Catalog files it read (including complete evidence sets checked by

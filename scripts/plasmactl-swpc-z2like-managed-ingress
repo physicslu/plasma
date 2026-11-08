@@ -217,7 +217,8 @@ server {
     # - POST /api/settings/ppu-network
     # - POST /api/settings/gateway
     # - arbitrary /api/* paths
-    # - /api/devices/search (Device Selector is owned by Manager, PR-C2)
+    # - /api/devices/search (Device Selector is owned by Manager, PR-C2;
+    #   the PPU Gateway has no Selector route since S5-B)
     location / { return 404; }
 }
 EOF

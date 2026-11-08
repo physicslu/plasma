@@ -259,8 +259,8 @@ data, and neither `plasma-server.service` nor `plasma-web.service` sets
 `PLASMA_IC_SUPPORT_ROOT` or `PLASMA_DEVICE_CATALOG_MANIFEST`. Execution is
 decided only by the verified Active Bundle v3, device capability,
 authorization and hardware safety; an enabled non-mock Site starts without
-Catalog data. The PPU Gateway's legacy `GET /api/devices/search` answers
-`503 DEVICE_SELECTOR_UNAVAILABLE` on an installed PPU; the Device Selector is
+Catalog data. The PPU Gateway has no Device Selector route (`GET
+/api/devices/search` is an unknown route since S5-B); the Device Selector is
 owned by Manager (Console consumers migrated in PR-C2). Root, install,
 verification and Rollback contracts are unchanged.
 

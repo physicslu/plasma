@@ -4,10 +4,10 @@ import json
 import threading
 import unittest
 from http.client import HTTPConnection
-from http.server import ThreadingHTTPServer
 from urllib.parse import quote
 
 from plasma_web.device_catalog import get_default_device_catalog
+from plasma_manager.server import PlasmaManagerHandler, PlasmaManagerHTTPServer
 from plasma_web.gateway import PlasmaWebHandler, _parse_target_device
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
@@ -19,7 +19,7 @@ EXPECTED_CUSTOMER_SELECTOR_SIZE = sum(_LEVEL_COUNTS[str(level)] for level in (1,
 class DeviceCatalogWebGatewayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
+        cls.server = PlasmaManagerHTTPServer(("127.0.0.1", 0), PlasmaManagerHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
 
