@@ -157,6 +157,7 @@ def test_authorized_package_probe_succeeds(rig):
                                             "safe_off": True, "site": 2}}
     assert rig.client.close_session(s["session_id"]) == {
         "closed": True, "session_id": s["session_id"], "sealed_sites": []}
+    assert not (rig.seals / "site2.sealed").exists()
 
 
 def test_process_outside_the_session_group_is_denied(rig):
@@ -284,7 +285,7 @@ def test_cancel_by_runtime_close_stops_in_flight_operation_and_seals(rig):
 
 @pytest.mark.parametrize("behaviour,error", [
     ("unknown", "OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED"),
-    ("crash", "SOFTWARE_EXCEPTION:RuntimeError"),
+    ("crash", "OUTCOME_UNKNOWN_SITE_SEALED:UNCLASSIFIED_ADAPTER_EXCEPTION"),
 ])
 def test_unknown_hardware_outcomes_and_software_errors(rig, behaviour, error):
     rig.adapter.behaviour = behaviour
@@ -293,8 +294,11 @@ def test_unknown_hardware_outcomes_and_software_errors(rig, behaviour, error):
     first, second = rig.go(child)
     assert first == {"ok": False, "error": error}
     assert second["ok"] is False
-    assert len(rig.adapter.calls) == (1 if behaviour == "unknown" else 2)
-    assert (2 in rig.client.call("status")["sealed_sites"]) is (behaviour == "unknown")
+    # Neither an unknown transport outcome nor an unclassified Python crash
+    # proves SAFE_OFF. Both must seal Site 2 and prevent the second I/O.
+    assert len(rig.adapter.calls) == 1
+    assert 2 in rig.client.call("status")["sealed_sites"]
+    assert (rig.seals / "site2.sealed").is_file()
 
 
 def test_denied_before_hardware_keeps_site_usable(rig):
@@ -304,6 +308,44 @@ def test_denied_before_hardware_keeps_site_usable(rig):
     assert rig.go(child) == [{"ok": False, "error": "TRANSPORT_DENIED:ADMISSION_DENIED"}]
     assert rig.client.close_session(s["session_id"])["sealed_sites"] == []
     assert rig.client.call("status")["sealed_sites"] == []
+    assert not (rig.seals / "site2.sealed").exists()
+
+
+def test_guard_not_durable_prevents_all_hardware_operations(rig, monkeypatch):
+    """A storage fault before native admission is a hard stop, not a retry."""
+    original = worker.os.fsync
+    def refuse_fsync(fd):
+        raise OSError("simulated storage I/O failure")
+    monkeypatch.setattr(worker.os, "fsync", refuse_fsync)
+    child = rig.package(PROBE2)
+    rig.open(child)
+    assert rig.go(child) == [{
+        "ok": False, "error": "OPERATION_GUARD_NOT_DURABLE"
+    }]
+    assert rig.adapter.calls == []
+    assert 2 in rig.client.call("status")["sealed_sites"]
+    monkeypatch.setattr(worker.os, "fsync", original)
+    rig.restart()
+    assert 2 in rig.client.call("status")["sealed_sites"]
+
+
+def test_crash_leftover_operation_guard_blocks_after_worker_restart(tmp_path):
+    """A durable pre-I/O marker survives a Worker death before SAFE_OFF."""
+    rig = Rig(tmp_path)
+    try:
+        rig.core._begin_operation_guard(2)
+        marker = rig.seals / "site2.sealed"
+        assert marker.is_file()
+        assert json.loads(marker.read_text())["code"] == "OPERATION_IN_PROGRESS"
+        rig.restart()
+        assert 2 in rig.client.call("status")["sealed_sites"]
+        child = rig.package("import time; time.sleep(5)\n")
+        with pytest.raises(worker.SiteWorkerDenied, match="SITE_SEALED"):
+            rig.open(child)
+        rig.reap(child)
+        assert rig.adapter.calls == []
+    finally:
+        rig.close()
 
 
 def test_c3_accepts_any_image_id_but_detects_reload_within_a_session(tmp_path):
@@ -325,6 +367,29 @@ def test_c3_accepts_any_image_id_but_detects_reload_within_a_session(tmp_path):
         assert adapter.calls == [(2, "probe")]
         assert r.client.close_session(session["session_id"])["sealed_sites"] == []
         r.reap(child)
+    finally:
+        r.close()
+
+
+def test_unobservable_fpga_identity_after_operation_seals_site(tmp_path):
+    class UnobservableAdapter(MockAdapter):
+        def identity(self):
+            if self.calls:
+                raise RuntimeError("FPGA state cannot be observed after I/O")
+            return super().identity()
+
+    r = Rig(tmp_path, UnobservableAdapter())
+    try:
+        child = r.package(PROBE2)
+        session = r.open(child)
+        assert r.go(child) == [{
+            "ok": False,
+            "error": "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_OBSERVATION_FAILED",
+        }]
+        assert (r.seals / "site2.sealed").is_file()
+        assert r.client.close_session(session["session_id"])["sealed_sites"] == [2]
+        r.restart()
+        assert 2 in r.core._sealed
     finally:
         r.close()
 
