@@ -332,6 +332,29 @@ def test_c3_accepts_any_image_id_but_detects_reload_within_a_session(tmp_path):
         r.close()
 
 
+def test_unobservable_fpga_identity_after_operation_seals_site(tmp_path):
+    class UnobservableAdapter(MockAdapter):
+        def identity(self):
+            if self.calls:
+                raise RuntimeError("FPGA state cannot be observed after I/O")
+            return super().identity()
+
+    r = Rig(tmp_path, UnobservableAdapter())
+    try:
+        child = r.package(PROBE2)
+        session = r.open(child)
+        assert r.go(child) == [{
+            "ok": False,
+            "error": "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_OBSERVATION_FAILED",
+        }]
+        assert (r.seals / "site2.sealed").is_file()
+        assert r.client.close_session(session["session_id"])["sealed_sites"] == [2]
+        r.restart()
+        assert 2 in r.core._sealed
+    finally:
+        r.close()
+
+
 def test_fpga_reload_during_operation_seals_the_site(tmp_path):
     class ReloadingAdapter(MockAdapter):
         def run(self, site, operation, *, deadline, cancel, image=None):

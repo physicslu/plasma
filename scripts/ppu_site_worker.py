@@ -532,7 +532,17 @@ class SiteWorkerCore:
                 raise SiteWorkerDenied(
                     "OUTCOME_UNKNOWN_SITE_SEALED:UNCLASSIFIED_ADAPTER_EXCEPTION"
                 ) from None
-            if dict(self.adapter.identity()) != s.identity:
+            # The post-I/O identity observation is itself a hardware safety
+            # condition. If the observer crashes, an unchanged FPGA image and
+            # safe release are not proven; persist a Site seal.
+            try:
+                post_identity = dict(self.adapter.identity())
+            except Exception:
+                self._seal(site, "FPGA_IDENTITY_OBSERVATION_FAILED", s)
+                raise SiteWorkerDenied(
+                    "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_OBSERVATION_FAILED"
+                ) from None
+            if post_identity != s.identity:
                 self._seal(site, "FPGA_IDENTITY_CHANGED_DURING_OPERATION", s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION")
             if result.get("safe_off") is not True:
