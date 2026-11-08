@@ -130,7 +130,7 @@ async def run_scenario(tmp_path, *, mutate=None, observer=True,
             host="127.0.0.1", port=0, output_root=tmp_path / "output",
             log_root=tmp_path / "logs", max_supported_sites=2,
             max_concurrent_jobs=1),
-        sites=[SiteConfig(id=2, enabled=True, interface="provider", target=TARGET_ID)],
+        sites=[SiteConfig(id=2, enabled=True, interface="openocd", target=TARGET_ID)],
     )
     manager = SiteManager(config)
     await manager.start()
@@ -201,7 +201,7 @@ def test_signed_python_provider_uses_real_programming_job_and_c3_but_never_flash
     assert result["job_id"] == JOB
     assert result["state"] != "success"  # exit 0 is NOT programming evidence
     assert "PROVIDER_PROGRAMMING_EVIDENCE_NOT_QUALIFIED" in str(result)
-    interface = manager.interfaces[2]
+    interface = manager.provider_interfaces[2]
     receipt = interface.last_receipt
     assert receipt is not None
     assert receipt["executor_result"]["result"] == "SUCCEEDED"
@@ -210,7 +210,7 @@ def test_signed_python_provider_uses_real_programming_job_and_c3_but_never_flash
     assert adapter.calls == [(2, "probe")]
     assert not core._sessions and not core._site_owners
     assert manager.execution_lease_snapshot()["busy"] is False
-    assert manager.ic_support_resolver is None  # no ICPN / OpenOCD registry
+    assert not hasattr(manager, "ic_support_resolver")
 
 
 @pytest.mark.parametrize("mutation", [
@@ -239,7 +239,7 @@ def test_unobserved_ps_transport_denied_even_with_valid_owner_token(tmp_path):
 def test_plain_rest_or_protocol_cannot_claim_trusted_provider_authority(tmp_path):
     config = PlasmaConfig(
         server=ServerConfig(output_root=tmp_path / "o", log_root=tmp_path / "l"),
-        sites=[SiteConfig(id=2, enabled=True, interface="provider", target=TARGET_ID)],
+        sites=[SiteConfig(id=2, enabled=True, interface="openocd", target=TARGET_ID)],
     )
 
     async def scenario():
@@ -262,7 +262,7 @@ def test_existing_root_only_control_dispatches_same_programming_job(tmp_path):
     assert isinstance(result, dict), result
     assert result["job_id"] == JOB and result["state"] != "success"
     assert "PROVIDER_PROGRAMMING_EVIDENCE_NOT_QUALIFIED" in str(result)
-    assert manager.interfaces[2].last_receipt["executor_result"]["result"] == "SUCCEEDED"
+    assert manager.provider_interfaces[2].last_receipt["executor_result"]["result"] == "SUCCEEDED"
     assert adapter.calls == [(2, "probe")]
     assert not core._sessions
 
