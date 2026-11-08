@@ -157,6 +157,7 @@ def test_authorized_package_probe_succeeds(rig):
                                             "safe_off": True, "site": 2}}
     assert rig.client.close_session(s["session_id"]) == {
         "closed": True, "session_id": s["session_id"], "sealed_sites": []}
+    assert not (rig.seals / "site2.sealed").exists()
 
 
 def test_process_outside_the_session_group_is_denied(rig):
@@ -307,6 +308,44 @@ def test_denied_before_hardware_keeps_site_usable(rig):
     assert rig.go(child) == [{"ok": False, "error": "TRANSPORT_DENIED:ADMISSION_DENIED"}]
     assert rig.client.close_session(s["session_id"])["sealed_sites"] == []
     assert rig.client.call("status")["sealed_sites"] == []
+    assert not (rig.seals / "site2.sealed").exists()
+
+
+def test_guard_not_durable_prevents_all_hardware_operations(rig, monkeypatch):
+    """A storage fault before native admission is a hard stop, not a retry."""
+    original = worker.os.fsync
+    def refuse_fsync(fd):
+        raise OSError("simulated storage I/O failure")
+    monkeypatch.setattr(worker.os, "fsync", refuse_fsync)
+    child = rig.package(PROBE2)
+    rig.open(child)
+    assert rig.go(child) == [{
+        "ok": False, "error": "OPERATION_GUARD_NOT_DURABLE"
+    }]
+    assert rig.adapter.calls == []
+    assert 2 in rig.client.call("status")["sealed_sites"]
+    monkeypatch.setattr(worker.os, "fsync", original)
+    rig.restart()
+    assert 2 in rig.client.call("status")["sealed_sites"]
+
+
+def test_crash_leftover_operation_guard_blocks_after_worker_restart(tmp_path):
+    """A durable pre-I/O marker survives a Worker death before SAFE_OFF."""
+    rig = Rig(tmp_path)
+    try:
+        rig.core._begin_operation_guard(2)
+        marker = rig.seals / "site2.sealed"
+        assert marker.is_file()
+        assert json.loads(marker.read_text())["code"] == "OPERATION_IN_PROGRESS"
+        rig.restart()
+        assert 2 in rig.client.call("status")["sealed_sites"]
+        child = rig.package("import time; time.sleep(5)\n")
+        with pytest.raises(worker.SiteWorkerDenied, match="SITE_SEALED"):
+            rig.open(child)
+        rig.reap(child)
+        assert rig.adapter.calls == []
+    finally:
+        rig.close()
 
 
 def test_c3_accepts_any_image_id_but_detects_reload_within_a_session(tmp_path):

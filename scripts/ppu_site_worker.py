@@ -232,6 +232,49 @@ class SiteWorkerCore:
                 session.sealed_during.add(site)
         self._persist_seal(site, code)
 
+    def _begin_operation_guard(self, site: int) -> None:
+        """Persist a fail-closed *in-flight* Site marker before Adapter I/O.
+
+        An unexpected Worker crash or lost hardware outcome must be visible
+        across restarts. Root/native admission is still the hardware owner:
+        this is a durable software hazard marker, not a second Site lock.
+        """
+        path = self.seal_dir / f"site{site}.sealed"
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as stream:
+                json.dump({"site": site, "code": "OPERATION_IN_PROGRESS",
+                           "epoch": self.epoch, "time": time.time()}, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            dir_fd = os.open(self.seal_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except (OSError, ValueError):
+            # Never execute hardware when durable hazard recording cannot be
+            # proven. A partial marker is conservatively left for Recovery.
+            with self._lock:
+                self._sealed.add(site)
+            raise SiteWorkerDenied("OPERATION_GUARD_NOT_DURABLE") from None
+
+    def _clear_operation_guard(self, site: int, session: _Session) -> None:
+        """Clear the pre-I/O marker ONLY after verified safe termination."""
+        path = self.seal_dir / f"site{site}.sealed"
+        try:
+            path.unlink()
+            dir_fd = os.open(self.seal_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            # Failure to clear even a known-safe attempt must not leak an
+            # unowned Site. Keep the marker/lease failure visible.
+            self._seal(site, "OPERATION_GUARD_RELEASE_FAILED", session)
+            raise SiteWorkerDenied("OPERATION_GUARD_RELEASE_FAILED") from None
+
     # --- dispatch ------------------------------------------------------------------
     def _drop_if_runtime_restarted(self) -> None:
         """Cancel stale Runtime sessions without releasing an in-flight Site."""
@@ -505,8 +548,12 @@ class SiteWorkerCore:
             raise SiteWorkerDenied("SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED")
         lock = self._site_locks[site]
         _require(lock.acquire(blocking=False), "SITE_BUSY")
+        safe_to_clear_guard = False
         try:
             _require(not s.cancel.is_set(), "SESSION_CLOSED")
+            # Crash consistency: the persisted marker MUST exist and be
+            # fsynced before native admission, SWD, MMIO or OpenOCD can start.
+            self._begin_operation_guard(site)
             try:
                 if op == "flash_cycle":
                     result = dict(self.adapter.run(
@@ -517,8 +564,12 @@ class SiteWorkerCore:
                         site, op, deadline=s.expires, cancel=s.cancel
                     ))
             except TransportDenied as exc:
+                # Contract: Adapter refused before hardware was touched.
+                safe_to_clear_guard = True
                 raise SiteWorkerDenied("TRANSPORT_DENIED:" + exc.code) from None
             except TransportFailed as exc:
+                # Contract: native owner release and SAFE_OFF verified.
+                safe_to_clear_guard = True
                 raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + exc.code) from None
             except TransportUnknown as exc:
                 self._seal(site, exc.code, s)
@@ -553,6 +604,9 @@ class SiteWorkerCore:
                         or result.get("bytes_verified") != len(s.image.payload)):
                     self._seal(site, "READBACK_NOT_VERIFIED", s)
                     raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:READBACK_NOT_VERIFIED")
+            # Safe release and exact readback are proven before clearing the
+            # durable operation marker, even if a close/cancel raced.
+            safe_to_clear_guard = True
             # A cancelled or invalidated Session must not claim Job PASS even
             # when its adapter eventually completes with proven SAFE_OFF.
             # Serialize the final decision against close/restart invalidation.
@@ -560,7 +614,11 @@ class SiteWorkerCore:
                 _require(not s.closed and not s.cancel.is_set(), "SESSION_CLOSED")
             return {"site": site, "operation": op, "adapter": self.adapter.name, **result}
         finally:
-            lock.release()
+            try:
+                if safe_to_clear_guard:
+                    self._clear_operation_guard(site, s)
+            finally:
+                lock.release()
 
 
 # --- Unix socket transport ---------------------------------------------------------
