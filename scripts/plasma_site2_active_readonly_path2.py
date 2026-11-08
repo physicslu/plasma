@@ -18,6 +18,7 @@ from pathlib import Path
 import plasma_site2_path2_preflight as site
 import plasma_wordport_program as pairing
 
+HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 MARKER = "PLASMA_OPF_STATIC_READONLY:"
 
 # Only installed, protected Z2 files are inspected, never Bundle executable code.
