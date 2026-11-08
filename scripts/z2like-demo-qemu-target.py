@@ -183,16 +183,13 @@ def _runtime_environment(current: Path) -> dict[str, str]:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise TargetError(f"runtime manifest is unreadable: {exc}") from exc
-    data = manifest.get("data") if isinstance(manifest, dict) else None
-    catalog_rel = data.get("device_catalog_manifest") if isinstance(data, dict) else None
-    if not isinstance(catalog_rel, str) or not catalog_rel or catalog_rel.startswith("/") or ".." in Path(catalog_rel).parts:
-        raise TargetError("runtime Device Catalog path is invalid")
-    catalog = current / "runtime" / catalog_rel
-    if not catalog.is_file():
-        raise TargetError(f"runtime Device Catalog is missing: {catalog}")
+    if not isinstance(manifest, dict):
+        raise TargetError("runtime manifest is invalid")
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
-    env["PLASMA_DEVICE_CATALOG_MANIFEST"] = str(catalog)
+    # PPU Runtime is Catalog-free (OPF S5 / PR-C1): no Catalog environment.
+    env.pop("PLASMA_DEVICE_CATALOG_MANIFEST", None)
+    env.pop("PLASMA_IC_SUPPORT_ROOT", None)
     return env
 
 

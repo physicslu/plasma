@@ -413,8 +413,10 @@ def _print_summary(result: Mapping[str, Any], report: Path) -> None:
 def _inside_ppu(args: argparse.Namespace) -> int:
     if platform.machine().lower() not in {"armv7","armv7l"}: raise AcceptanceError(f"inside PPU requires ARMv7, got {platform.machine()}")
     runtime=args.runtime_dir.resolve(); work=args.work_dir.resolve(); app=runtime/"ppu/ppu.pyz"
-    manifest=json.loads((runtime/"ppu-runtime.json").read_text(encoding="utf-8")); catalog=runtime/str((manifest.get("data") or {}).get("device_catalog_manifest"))
-    env=dict(os.environ); env["PYTHONUNBUFFERED"]="1"; env["PLASMA_DEVICE_CATALOG_MANIFEST"]=str(catalog)
+    json.loads((runtime/"ppu-runtime.json").read_text(encoding="utf-8"))
+    env=dict(os.environ); env["PYTHONUNBUFFERED"]="1"
+    # PPU Runtime is Catalog-free (OPF S5 / PR-C1): no Catalog environment.
+    env.pop("PLASMA_DEVICE_CATALOG_MANIFEST", None); env.pop("PLASMA_IC_SUPPORT_ROOT", None)
     for directory in (work/"server-output",work/"gateway-output",work/"logs"): directory.mkdir(parents=True,exist_ok=True)
     server=gateway=None
     try:

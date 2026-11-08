@@ -5,7 +5,7 @@ from dataclasses import replace
 import unittest
 
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
-from plasma_web.gateway import _device_search_payload, _microchip_ic_information
+from plasma_web.legacy_device_selector import _device_search_payload, _microchip_ic_information
 from plasma_web.microchip_upstream_openocd_evidence import microchip_upstream_openocd_evidence
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 

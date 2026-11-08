@@ -66,7 +66,7 @@ class BatchWebGatewayTests(unittest.TestCase):
         targets = [("STMicroelectronics", "STM32F103C8T6"),
                    ("NXP", "MCXN236VKLT"), ("Microchip", "ATSAML10E16A-MZTVAO"),
                    ("Independent Device", "thirdparty-mcu-v1")]
-        with patch("plasma_web.gateway.get_default_device_catalog",
+        with patch("plasma_web.legacy_device_selector.get_default_device_catalog",
                    side_effect=DeviceCatalogIntegrityError("catalog unavailable")) as loader:
             for vendor, target in targets:
                 with self.subTest(target=target):

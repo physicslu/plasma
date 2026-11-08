@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import _device_search_payload
+from plasma_web.legacy_device_selector import _device_search_payload
 from plasma_web.nxp_manufacturer_device_evidence import (
     EVIDENCE_RELATIVE_PATH,
     NXPManufacturerDeviceEvidence,

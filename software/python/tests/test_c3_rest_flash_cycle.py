@@ -603,7 +603,11 @@ def test_rest_opf_flash_does_not_require_unrelated_device_catalog(monkeypatch):
     def catalog_not_installed():
         raise DeviceCatalogIntegrityError("production Device Catalog unavailable")
 
-    monkeypatch.setattr(gateway_module, "get_default_device_catalog", catalog_not_installed)
+    # PR-C1: the Gateway no longer holds any Catalog getter; the Selector
+    # adapter is the only Catalog consumer and is optional.
+    assert not hasattr(gateway_module, "get_default_device_catalog")
+    from plasma_web import legacy_device_selector
+    monkeypatch.setattr(legacy_device_selector, "get_default_device_catalog", catalog_not_installed)
 
     async def scenario():
         with short_tmp() as directory:

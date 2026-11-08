@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import plasma_web.nxp_manufacturer_device_evidence as evidence_module
 from plasma_web.device_catalog import DEVICE_CATALOG_MANIFEST_ENV
-from plasma_web.gateway import _device_search_payload
+from plasma_web.legacy_device_selector import _device_search_payload
 
 
 class NXPInstalledWheelDataRootTests(unittest.TestCase):

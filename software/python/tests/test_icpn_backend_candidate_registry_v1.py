@@ -14,7 +14,7 @@ from plasma_web import backend_candidate_registry as registry
 from plasma_web.device_catalog import (
     DeviceCatalog, DeviceCatalogIntegrityError, get_default_device_catalog,
 )
-from plasma_web.gateway import _device_search_payload
+from plasma_web.legacy_device_selector import _device_search_payload
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
@@ -108,8 +108,8 @@ class BackendCandidateRegistryTests(unittest.TestCase):
                 self.assertIsNone(self.registry.lookup(r))
 
     def test_current_api_keeps_mapping_separate_from_candidate(self):
-        with patch("plasma_web.gateway.get_default_device_catalog", return_value=self.catalog), \
-             patch("plasma_web.gateway.get_default_backend_candidate_registry", return_value=self.registry):
+        with patch("plasma_web.legacy_device_selector.get_default_device_catalog", return_value=self.catalog), \
+             patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.registry):
             h5 = _device_search_payload("STM32H503CBT6", 3)
             c5 = _device_search_payload("STM32C531CBT3TR", 3)
             f1 = _device_search_payload("STM32F103C8T6", 3)
@@ -146,8 +146,8 @@ class BackendCandidateRegistryTests(unittest.TestCase):
         self.assertEqual(f1["results"][0]["backend"]["mapping_status"], "mapped")
 
     def test_api_still_returns_only_admitted_exact_icpns(self):
-        with patch("plasma_web.gateway.get_default_device_catalog", return_value=self.catalog), \
-             patch("plasma_web.gateway.get_default_backend_candidate_registry", return_value=self.registry):
+        with patch("plasma_web.legacy_device_selector.get_default_device_catalog", return_value=self.catalog), \
+             patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.registry):
             payload = _device_search_payload("STM32H5", 100)
         self.assertEqual(payload["count"], 100)
         self.assertEqual({r["family"] for r in payload["results"]}, {"STM32H5"})

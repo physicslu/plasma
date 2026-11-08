@@ -31,32 +31,34 @@ def _fake_release(
     *,
     hardware_boundary: dict[str, bool] | None = None,
     symlink_member: bool = False,
+    legacy_catalog_data: bool = False,
 ) -> Path:
     bundle = root / "bundle" / "plasma-release"
     runtime = bundle / "runtime"
     app = runtime / "ppu" / "ppu.pyz"
-    catalog = runtime / "data" / "device-catalog" / "production" / "icpn-v1-manifest.json"
     app.parent.mkdir(parents=True)
-    catalog.parent.mkdir(parents=True)
 
     with zipfile.ZipFile(app, "w") as archive:
         archive.writestr("__main__.py", "print('ok')\n")
-    catalog.write_text('{"schema_version":1}\n', encoding="utf-8")
-    ic_profiles = runtime / "data" / "ic-support" / "profiles"
-    ic_profiles.mkdir(parents=True)
-    (ic_profiles / "README.md").write_text("fixture\n", encoding="utf-8")
 
-    runtime_manifest = {
+    # OPF S5 / PR-C1: a current PPU runtime carries no Catalog / IC Support.
+    runtime_manifest: dict[str, object] = {
         "schema_version": 1,
         "role": "ppu",
-        "data": {
-            "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json",
-            "ic_support_root": "data/ic-support",
-        },
         "hardware_boundary": hardware_boundary
         if hardware_boundary is not None
         else dict(installer.EXPECTED_HARDWARE_BOUNDARY),
     }
+    if legacy_catalog_data:
+        # Pre-PR-C1 release layout: shipped Catalog data is tolerated, never required.
+        catalog = runtime / "data" / "device-catalog" / "production" / "icpn-v1-manifest.json"
+        catalog.parent.mkdir(parents=True)
+        catalog.write_text('{"schema_version":1}\n', encoding="utf-8")
+        (runtime / "data" / "ic-support" / "profiles").mkdir(parents=True)
+        runtime_manifest["data"] = {
+            "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json",
+            "ic_support_root": "data/ic-support",
+        }
     (runtime / "ppu-runtime.json").write_text(
         json.dumps(runtime_manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -113,6 +115,16 @@ def test_release_verifier_accepts_canonical_ps_only_bundle(tmp_path: Path) -> No
     assert verified.git_sha == "a" * 40
     assert verified.release_id == "0.1.0-aaaaaaaaaaaa"
     assert verified.runtime_manifest["hardware_boundary"] == installer.EXPECTED_HARDWARE_BOUNDARY
+
+
+def test_release_verifier_requires_no_catalog_and_tolerates_legacy_catalog(tmp_path: Path) -> None:
+    current = installer.verify_release(_fake_release(tmp_path / "current"),
+                                       extract_to=tmp_path / "current-verified")
+    assert "data" not in current.runtime_manifest
+    assert not (tmp_path / "current-verified" / "plasma-release" / "runtime" / "data").exists()
+    legacy = installer.verify_release(_fake_release(tmp_path / "legacy", legacy_catalog_data=True),
+                                      extract_to=tmp_path / "legacy-verified")
+    assert legacy.runtime_manifest["data"]["ic_support_root"] == "data/ic-support"
 
 
 def test_release_verifier_rejects_tampered_archive_sidecar(tmp_path: Path) -> None:
@@ -215,7 +227,6 @@ def test_systemd_units_bind_absolute_isolated_python_and_keep_ps_only_boundary(t
         paths=paths,
         python_runtime=runtime,
         gateway_host="192.168.2.99",
-        catalog_relative="data/device-catalog/production/icpn-v1-manifest.json",
     )
     server = units["plasma-server.service"]
     gateway = units["plasma-web.service"]
@@ -236,9 +247,11 @@ def test_systemd_units_bind_absolute_isolated_python_and_keep_ps_only_boundary(t
     )
     assert "sites: []" not in config
     assert "max_supported_sites: 8" in config
-    ic_root = paths.current / "runtime" / "data" / "ic-support"
-    assert f"Environment=PLASMA_IC_SUPPORT_ROOT={ic_root}" in server
-    assert f"Environment=PLASMA_IC_SUPPORT_ROOT={ic_root}" in gateway
+    # OPF S5 / PR-C1: no Catalog environment is configured for PPU services.
+    for unit in (server, gateway):
+        assert "PLASMA_IC_SUPPORT_ROOT" not in unit
+        assert "PLASMA_DEVICE_CATALOG_MANIFEST" not in unit
+        assert "device-catalog" not in unit and "ic-support" not in unit
 
 
 def test_gateway_bind_is_explicit_and_not_wildcard() -> None:

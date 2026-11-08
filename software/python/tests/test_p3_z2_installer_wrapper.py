@@ -38,12 +38,7 @@ def runtime(install_paths):
 
 def verified():
     return SimpleNamespace(
-        runtime_manifest={
-            "data": {
-                "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json",
-                "ic_support_root": "data/ic-support",
-            }
-        }
+        runtime_manifest={"schema_version": 1, "role": "ppu"}
     )
 
 
@@ -53,7 +48,6 @@ def test_p3_units_make_helper_a_gateway_owned_dependency(tmp_path: Path) -> None
         paths=install_paths,
         python_runtime=runtime(install_paths),
         gateway_host="192.168.2.99",
-        catalog_relative="data/device-catalog/production/icpn-v1-manifest.json",
     )
 
     server = units["plasma-server.service"]

@@ -51,7 +51,6 @@ SERVICE_USER = "plasma"
 SERVICE_GROUP = "plasma"
 CONFIG_ROOT_MODE = 0o770
 MAX_SUPPORTED_SITES = 8
-IC_SUPPORT_RELATIVE_ROOT = "data/ic-support"
 
 
 class Z2InstallerError(RuntimeError):
@@ -432,22 +431,8 @@ def _verify_runtime(root: Path) -> dict[str, object]:
     if not app.is_file() or app.stat().st_size <= 0:
         raise Z2InstallerError("PPU runtime is missing ppu/ppu.pyz")
 
-    data = manifest.get("data")
-    if not isinstance(data, dict):
-        raise Z2InstallerError("PPU runtime data manifest is invalid")
-    catalog_rel = data.get("device_catalog_manifest")
-    if not isinstance(catalog_rel, str):
-        raise Z2InstallerError("PPU runtime Device Catalog manifest path is missing")
-    pure = PurePosixPath(catalog_rel)
-    if pure.is_absolute() or ".." in pure.parts or pure.as_posix() != catalog_rel:
-        raise Z2InstallerError("PPU runtime Device Catalog manifest path is unsafe")
-    if not (runtime / Path(*pure.parts)).is_file():
-        raise Z2InstallerError("PPU runtime production Device Catalog manifest is missing")
-    ic_support_rel = data.get("ic_support_root")
-    if ic_support_rel != IC_SUPPORT_RELATIVE_ROOT:
-        raise Z2InstallerError("PPU runtime IC Support root must be data/ic-support")
-    if not (runtime / Path(*PurePosixPath(ic_support_rel).parts) / "profiles").is_dir():
-        raise Z2InstallerError("PPU runtime IC Support data is missing")
+    # OPF S5 / PR-C1: IC Catalog / IC Support are offline governance, never a
+    # PPU Runtime dependency. Their presence or absence is not an install input.
     return manifest
 
 
@@ -564,13 +549,6 @@ def _validate_gateway_host(value: str) -> str:
     return str(address)
 
 
-def _catalog_relative(runtime_manifest: Mapping[str, object]) -> str:
-    data = runtime_manifest.get("data")
-    if not isinstance(data, dict) or not isinstance(data.get("device_catalog_manifest"), str):
-        raise Z2InstallerError("runtime manifest is missing Device Catalog identity")
-    return str(data["device_catalog_manifest"])
-
-
 def render_ppu_config(
     *,
     ppu_id: str,
@@ -628,12 +606,10 @@ def render_systemd_units(
     paths: InstallPaths,
     python_runtime: PythonRuntime,
     gateway_host: str,
-    catalog_relative: str,
 ) -> dict[str, str]:
     current_runtime = paths.current / "runtime"
     app = current_runtime / "ppu" / "ppu.pyz"
     config = paths.config_root / "ppu.yaml"
-    catalog = current_runtime / Path(*PurePosixPath(catalog_relative).parts)
     common = [
         "User=plasma",
         "Group=plasma",
@@ -644,8 +620,6 @@ def render_systemd_units(
         "ProtectHome=true",
         "ProtectSystem=strict",
         "Environment=PYTHONUNBUFFERED=1",
-        f"Environment=PLASMA_DEVICE_CATALOG_MANIFEST={catalog}",
-        f"Environment=PLASMA_IC_SUPPORT_ROOT={current_runtime / Path(*PurePosixPath(IC_SUPPORT_RELATIVE_ROOT).parts)}",
     ]
     server = "\n".join(
         [
@@ -1059,7 +1033,6 @@ def install_release(
         paths=paths,
         python_runtime=python_runtime,
         gateway_host=gateway_host,
-        catalog_relative=_catalog_relative(verified.runtime_manifest),
     )
 
     _write_text_atomic(config_path, config, 0o640)
