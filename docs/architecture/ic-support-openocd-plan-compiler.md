@@ -6,6 +6,8 @@ Status: **Current deterministic OpenOCD plan-compilation contract; introduced in
 
 Plasma converts evidence-backed IC Support knowledge into a deterministic, reviewable OpenOCD execution plan without treating plan generation as hardware readiness.
 
+> **S5 retirement (2026-11-08):** the Runtime exact-ICPN `CompilerRegistry` and the packaged STM32 `compiler admission projection` were deleted. IC Catalog / L0–L2 qualification and admission packages are an independent offline governance system and are never a direct or indirect PPU Runtime execution dependency; PPU execution is decided only by the verified Bundle v3, device capability, authorization and hardware safety. See the [deletion-first roadmap](plasma-core-convergence-and-deletion-first-roadmap.md).
+
 The current chain is:
 
 ```text
@@ -16,10 +18,6 @@ Exact ICPN
        -> Programming Profile
        -> Memory Geometry Profile
        -> OpenOCD target identity
-  -> Operation Admission
-  -> CompilerRegistry
-       -> compiler_id
-       -> backend_id + backend_lock_digest
   -> vendor/backend-specific plan compiler
   -> OpenOCDExecutionPlan
   -> software executor validation where applicable
