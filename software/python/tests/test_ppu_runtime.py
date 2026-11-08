@@ -164,13 +164,15 @@ def test_enabled_openocd_site_starts_from_catalog_free_runtime(tmp_path: Path) -
         "import plasma_web.gateway_phase3, plasma_web.runtime_activation_helper\n"
         "manager = SiteManager(load_config(sys.argv[1]))\n"
         "catalog = sorted(m for m in sys.modules if m.split('.')[-1] in sys.argv[2].split(','))\n"
+        "import plasma_web\n"
+        "assert plasma_web.__file__.startswith(sys.path[0]), plasma_web.__file__\n"
         "print(json.dumps({'sites': sorted(manager.interfaces), 'catalog': catalog}))\n"
     )
     names = ",".join(Path(m).stem for m in runtime.CATALOG_ONLY_MODULES)
     environment = {"PATH": "/usr/bin:/bin"}
     assert not set(_CATALOG_ENV) & set(environment)
     completed = subprocess.run(
-        [sys.executable, "-I", "-B", "-c",
+        [sys.executable, "-I", "-S", "-B", "-c",
          f"import sys; sys.path.insert(0, {str(output / 'ppu' / 'ppu.pyz')!r}); exec({probe!r})",
          str(config), names],
         cwd=tmp_path, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60,

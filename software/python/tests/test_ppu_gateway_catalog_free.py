@@ -217,15 +217,25 @@ def test_packaged_runtime_gateway_health_passes_without_catalog(tmp_path: Path):
     config = acceptance._write_config(work, server_port=server_port)
     (work / "gateway-output").mkdir(parents=True)
     env = {"PATH": "/usr/bin:/bin", "PYTHONUNBUFFERED": "1"}
+    # -I -S: like the Plasma-owned PPU Python, no site-packages; an installed
+    # (e.g. editable) Plasma package must never shadow the packaged zipapp.
+    origin = subprocess.run(
+        [sys.executable, "-I", "-S", "-c",
+         f"import sys; sys.path.insert(0, {str(app)!r}); import plasma_web, importlib.util as u; "
+         "print(plasma_web.__file__); print(u.find_spec('plasma_web.legacy_device_selector'))"],
+        cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30, check=True)
+    module_file, selector_spec = origin.stdout.split()[:2]
+    assert module_file.startswith(str(app)), origin.stdout
+    assert selector_spec == "None", origin.stdout
     logs = {name: work / f"{name}.log" for name in ("server", "gateway")}
     procs = {}
     try:
         with logs["server"].open("wb") as s_log, logs["gateway"].open("wb") as g_log:
             procs["server"] = subprocess.Popen(
-                [sys.executable, "-I", str(app), "server", "--config", str(config)],
+                [sys.executable, "-I", "-S", str(app), "server", "--config", str(config)],
                 cwd=work, env=env, stdout=s_log, stderr=subprocess.STDOUT)
             procs["gateway"] = subprocess.Popen(
-                [sys.executable, "-I", str(app), "gateway", "--host", "127.0.0.1",
+                [sys.executable, "-I", "-S", str(app), "gateway", "--host", "127.0.0.1",
                  "--port", str(gateway_port), "--plasma-host", "127.0.0.1",
                  "--plasma-port", str(server_port), "--output-root", str(work / "gateway-output")],
                 cwd=work, env=env, stdout=g_log, stderr=subprocess.STDOUT)
