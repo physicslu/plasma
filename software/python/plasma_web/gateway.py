@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-import importlib
 import re
 import time
 from dataclasses import replace
@@ -32,24 +31,9 @@ FLEET_CONTRACT_VERSION = base.FLEET_CONTRACT_VERSION
 WEB_REST_CONTRACT_VERSION = base.WEB_REST_CONTRACT_VERSION
 GATEWAY_SERVICE_NAME = base.GATEWAY_SERVICE_NAME
 
-# The legacy Device Selector is Catalog-only and owned by Manager. The PPU
-# Gateway never imports it at startup; Programming Job / Batch / Health never
-# depend on it. Absent module or data => explicit 503, never an empty result.
-LEGACY_DEVICE_SELECTOR_MODULE = "plasma_web.legacy_device_selector"
-
-
-class DeviceSelectorUnavailable(RuntimeError):
-    """The optional Catalog-backed Device Selector cannot serve this request."""
-
-
-def _legacy_device_selector() -> Any:
-    try:
-        selector = importlib.import_module(LEGACY_DEVICE_SELECTOR_MODULE)
-    except ImportError as exc:
-        raise DeviceSelectorUnavailable(
-            "Device Selector is not part of this PPU runtime; use the Manager Device Selector"
-        ) from exc
-    return selector
+# The Device Selector is Catalog-only and owned by Plasma Manager (OPF S5-B).
+# The PPU Gateway has no Selector route, imports no Catalog module and answers
+# the former Selector path like any unknown route (404).
 
 
 def _batch_payload(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -264,10 +248,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
     def _is_ppu_network_settings_path(path: str) -> bool:
         return path.rstrip("/") == "/api/settings/ppu-network"
 
-    @staticmethod
-    def _is_device_search_path(path: str) -> bool:
-        return path.rstrip("/") == "/api/devices/search"
-
     @classmethod
     def _mock_provider(cls) -> SharedImageMockEngineeringPPUProvider | None:
         provider = cls.engineering_provider
@@ -382,33 +362,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 },
             },
         )
-
-    def _device_selector_unavailable(self, exc: Exception) -> None:
-        self._json(
-            HTTPStatus.SERVICE_UNAVAILABLE,
-            {
-                "ok": False,
-                "error": {
-                    "error_type": "DEVICE_SELECTOR_UNAVAILABLE",
-                    "message": str(exc) or type(exc).__name__,
-                    "recoverable": True,
-                },
-            },
-        )
-
-    def _device_search(self, raw_query: str) -> None:
-        # Transitional PPU copy; the Device Selector is owned by Manager (PR-C2).
-        try:
-            selector = _legacy_device_selector()
-        except DeviceSelectorUnavailable as exc:
-            self._device_selector_unavailable(exc)
-            return
-        try:
-            status, payload = selector.search_response(raw_query)
-        except Exception as exc:
-            self._error(exc)
-            return
-        self._json(HTTPStatus(status), payload)
 
     def _batch_unavailable(self) -> None:
         self._json(
@@ -593,10 +546,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 self._error(exc)
             return
 
-        if self._is_device_search_path(parsed.path):
-            self._device_search(parsed.query)
-            return
-
         if self._is_mock_runtime_path(parsed.path):
             try:
                 provider = self._mock_provider()
@@ -753,24 +702,6 @@ def _build_batch_runtime(
     return None
 
 
-def warm_legacy_device_selector() -> bool:
-    """Best-effort Selector warm-up; never a Gateway startup dependency.
-
-    When the Catalog-backed Selector is present its immutable Qualification
-    registry is built before binding so the first search is not cold. When it
-    is absent or its data is untrusted, the Gateway still starts and the
-    Selector endpoint answers 503 DEVICE_SELECTOR_UNAVAILABLE.
-    """
-    try:
-        selector = _legacy_device_selector()
-        counts = selector.warm()
-    except Exception as exc:  # Selector must never block Programming service.
-        print(f"Device Selector unavailable (Programming service unaffected): {type(exc).__name__}: {exc}")
-        return False
-    print("Device Selector qualification registry ready: " + " ".join(f"L{k}={v}" for k, v in counts.items()))
-    return True
-
-
 def serve(
     host: str,
     port: int,
@@ -782,7 +713,6 @@ def serve(
     static_root: Path | None = None,
     gateway_settings_path: Path | None = None,
 ) -> None:
-    warm_legacy_device_selector()
     settings = GatewaySettingsController(gateway_settings_path or (output_root / "gateway-settings.yaml"))
     network_settings = PPUNetworkSettingsController(output_root / "ppu-network-settings.yaml")
     PlasmaWebHandler.client_factory = staticmethod(lambda: base.PlasmaClient(plasma_host, plasma_port))

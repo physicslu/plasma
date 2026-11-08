@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 import threading
 from http.client import HTTPConnection
-from http.server import ThreadingHTTPServer
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import PlasmaWebHandler
+from plasma_manager.server import PlasmaManagerHandler, PlasmaManagerHTTPServer
 
 EXPECTED_STM32F4_CATALOG_SIZE = 387
 LIFECYCLE_ONLY_ICPNS = {
@@ -30,7 +29,7 @@ def test_phase42aj_lifecycle_only_icpns_remain_absent_from_runtime_catalog() -> 
 
 
 def test_phase42aj_lifecycle_only_icpns_remain_absent_from_rest_catalog() -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
+    server = PlasmaManagerHTTPServer(("127.0.0.1", 0), PlasmaManagerHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

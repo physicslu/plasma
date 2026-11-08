@@ -332,9 +332,6 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             self._authorize(Permission.CATALOG_READ)
             self._security_filter_engineering_catalog = True
             return
-        if path == "/api/devices/search":
-            self._authorize(Permission.CATALOG_READ)
-            return
         if path in {"/api/settings/gateway", "/api/settings/ppu-network", "/api/mock/runtime"}:
             self._authorize(Permission.SETTINGS_READ)
             return
