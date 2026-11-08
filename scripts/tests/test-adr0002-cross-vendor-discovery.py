@@ -64,6 +64,7 @@ def main() -> int:
         ROOT / "software/python/plasma_web/device_catalog.py",
         ROOT / "software/python/plasma_web/programming_qualification.py",
         ROOT / "software/python/plasma_web/gateway.py",
+        ROOT / "software/python/plasma_web/legacy_device_selector.py",
         ROOT / "software/web/app/device-catalog-api.ts",
     )
     forbidden_active_tokens = (

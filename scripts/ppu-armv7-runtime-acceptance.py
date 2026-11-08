@@ -265,7 +265,7 @@ def run_acceptance(
     app = runtime_dir / "ppu" / "ppu.pyz"
     if not app.is_file():
         raise ARMv7AcceptanceError(f"PPU zipapp is missing: {app}")
-    _load_runtime_manifest(runtime_dir)
+    manifest = _load_runtime_manifest(runtime_dir)
 
     work_dir.mkdir(parents=True, exist_ok=True)
     config_path = _write_config(work_dir, server_port=server_port)
