@@ -45,7 +45,7 @@ At the baseline `scripts/ppu_site_worker.py::SiteWorkerCore._execute`, an unexpe
 All are **mandatory** and must be observed live immediately before the only POST:
 
 1. Authenticate the current SWPC/Z2 target from the owner-local paired configuration; never infer hostname or use repo secrets. Pin public host key. Verify PPU ID and Bootstrap device ID.
-2. Verify Z2 installed Runtime `git_sha` includes S1-C merged #1347. **Preferred exact candidate for this run: `91a4a12c0c89ffbea34152023b9d62948fb98a0f`**. If another SHA is installed, establish its equivalence before any Flash; do not claim this new path passed from old binaries.
+2. Verify Z2 installed Runtime `git_sha` includes S1-C merged #1347. **Required candidate: a future explicitly Gate-2-merged and verified Runtime containing the S2 safety fixes. The pre-fix baseline SHA must NOT be used as evidence of the corrected route.** If another SHA is installed, establish its equivalence before any Flash; do not claim this new path passed from old binaries.
 3. Verify Bootstrap `bootstrap_ready` / `runtime_active`, Gateway `/api/health/ready`, PPU execution lease empty, Runtime activation not held; Site 2 enabled, `openocd`, `STM32F103C8T6`, idle, no queue/current Job.
 4. Verify one immutable **Active** Bundle v3, its firmware SHA/size, Programming Profile, platform OpenOCD Reference Provider, installed C-3 engine SHA/ABI, target/geometry and trusted PS-local transport. No cross-Bundle fallback.
 5. Verify current boot ID and FPGA Image journal/ABI pairing, qualified native Owner/reload fence, no Site 2 `SEALED` or unclosed admission record; no stray OpenOCD child. No restoration, FPGA reload, site recovery or service restart is implied by this approval.
@@ -57,7 +57,7 @@ All are **mandatory** and must be observed live immediately before the only POST
 
 Use the current canonical `scripts/plasma_program.py` with an owner-verified, locally stored **Bundle v3 with no FPGA Image**. It is preferable to the historical `plasma_site2_single_flash_path2.py` because that earlier acceptance script pins a specific historical engine SHA/old admission and does not prove the new installed Runtime.
 
-On the *authorized SWPC integration host* with source exactly matching the tested candidate, first perform **read-only** diagnosis. The placeholders below must be filled from owner-local trusted records; do not commit values:
+On the *authorized SWPC integration host* with source exactly matching the tested candidate, first perform **read-only** diagnosis. Set `EXPECTED_S2_RUNTIME_SHA` only from the **approved future merge commit and verified installed release** after Gate 2; never copy the baseline audit SHA into this variable. The variables below must be resolved locally; their values are deliberately absent from this document. The placeholders below must be filled from owner-local trusted records; do not commit values:
 
 ```bash
 # Verify source and worktree without changing device state.
@@ -68,16 +68,16 @@ git rev-parse HEAD
 python3 scripts/plasma_program.py diagnose \
   --bundle "$VERIFIED_BUNDLE_V3" --site 2 \
   --host "$PAIRED_Z2_HOST" --device-id "$BOOTSTRAP_DEVICE_ID" \
-  --source-sha "91a4a12c0c89ffbea34152023b9d62948fb98a0f"
+  --source-sha "$EXPECTED_S2_RUNTIME_SHA"
 ```
 
-If the diagnosis, live identity checks and Runtime SHA `==91a4a12c0c89ffbea34152023b9d62948fb98a0f` are **all verified** and Site 2 is safely idle, perform exactly **one** authorized Job:
+If the diagnosis, live identity checks and Runtime SHA `==$EXPECTED_S2_RUNTIME_SHA` are **all verified** and Site 2 is safely idle, perform exactly **one** authorized Job:
 
 ```bash
 python3 scripts/plasma_program.py flash \
   --bundle "$VERIFIED_BUNDLE_V3" --site 2 \
   --host "$PAIRED_Z2_HOST" --device-id "$BOOTSTRAP_DEVICE_ID" \
-  --runtime-sha "91a4a12c0c89ffbea34152023b9d62948fb98a0f" --source-sha "91a4a12c0c89ffbea34152023b9d62948fb98a0f" \
+  --runtime-sha "$EXPECTED_S2_RUNTIME_SHA" --source-sha "$EXPECTED_S2_RUNTIME_SHA" \
   --approved-once
 ```
 
