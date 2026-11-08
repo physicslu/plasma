@@ -1,5 +1,7 @@
 # PLASMA OPF S2 safety-control audit and S1-C Site 2 physical Flash acceptance
 
+> **歷史快照，請勿當作目前阻塞狀態。** 本文件記錄 #1350 合併前的唯讀稽核。#1350 已合併並部署，2026-11-08 新路徑 Site 2 Bundle A/B 各完成一次真實 Flash、Readback 與 SAFE_OFF PASS。最新狀態與 Job/Runner 證據請見 [新路徑 A/B 實機驗收](opf-site2-ab-newpath-2026-11-08.md)。下方 `NOT_RUN`/`Draft` 僅代表**當時**觀測，不得推論仍未執行。
+
 **Date:** 2026-11-08 (Asia/Taipei)  
 **Baseline:** `main@91a4a12c0c89ffbea34152023b9d62948fb98a0f` (merged #1347 S1-C).  
 **Scope authorized:** S2 source-level and existing CI evidence audit; **one** physical Site 2 `STM32F103C8T6` Flash/Readback/SAFE_OFF through the *new* S1-C Runtime path, subject to observed safety admission.  

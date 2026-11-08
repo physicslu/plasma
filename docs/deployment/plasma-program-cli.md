@@ -15,7 +15,7 @@ python3 scripts/plasma_program.py run \
   --approved-once
 ```
 
-上述是預計的**新介面**，不是已完成的實機證據。執行前必須先透過正式產品流程更新 Z2 Runtime 至相同的 --runtime-sha。可以額外提供 --source-sha 固定執行程式來源（在 Path 2/3 Work Order 中也必須由 trusted dispatcher 做獨立來源鎖定）。
+此介面已於 2026-11-08 以新版 S1-C／S2 Runtime 完成單一 Site 2 的 Bundle [B](https://github.com/physicslu/plasma/actions/runs/42463696052) 與 [A](https://github.com/physicslu/plasma/actions/runs/42464939052) 實機燒錄，各自完整 Readback、SAFE_OFF PASS。此範例僅示意參數，執行時仍必須指定 Z2 **當前**實際安裝的 Runtime 完整 SHA。可以額外提供 --source-sha 固定執行程式來源（在 Path 2/3 Work Order 中也必須由 trusted dispatcher 做獨立來源鎖定）。
 
 - --firmware-package：Bundle 有多份 firmware-asset 時必填；若只有一份則自動選取。
 - --image：非必要，只核對外部 BIN 與選定 Bundle Firmware SHA/大小完全相同，**不會將 BIN 另送至 Z2**。
@@ -32,4 +32,4 @@ Job 的 Erase/Program/Readback、Site Ownership、Root Admission、FPGA Reload L
 
 ## Gate
 
-Gate 1：Draft PR、Host-only 正負向測試與 CI。Gate 2：Owner 核准後才合併；部署 Z2 與 DUT A/B 實機 Flash 是獨立執行範圍。原 scripts/plasma_site2_path2_ops.py 及其文件/測試直接被此 CLI 取代，不保留雙入口。
+Gate 1：Draft PR、Host-only 正負向測試與 CI。Gate 2：Owner 核准後才合併；部署 Z2 與 DUT A/B 實機 Flash 是獨立執行範圍。原歷史性 `scripts/plasma_site2_path2_ops.py` 已退休；本次 S2/S3 收斂再刪除硬編碼 v0.1 的 `scripts/plasma_site2_single_flash_path2.py` 與其專屬測試。**唯一通用受控 Bundle Flash CLI 是 `scripts/plasma_program.py`**，並繼續使用既有 PPU Runtime、C-3/Root/Site 安全機制。
