@@ -1,6 +1,7 @@
-"""PLASMA Open Provider Framework (OPF) contract-only foundation.
+"""Host-independent OPF contract and optional Python Provider observation.
 
-This package does not load Providers, allocate Sites, or execute hardware work.
+No PPU Bundle, Site ownership, hardware transport, or Flash PASS qualification
+is imported or granted by this package.
 """
 from .contract import (
     OPF_PROGRAMMING_SCHEMA,
@@ -9,6 +10,7 @@ from .contract import (
     TimeoutPolicy,
     parse_programming_selection,
 )
+from .python_provider import ProcessObservation, PythonProvider
 
 __all__ = [
     "OPF_PROGRAMMING_SCHEMA",
@@ -16,4 +18,6 @@ __all__ = [
     "ProgrammingSelection",
     "TimeoutPolicy",
     "parse_programming_selection",
+    "ProcessObservation",
+    "PythonProvider",
 ]
