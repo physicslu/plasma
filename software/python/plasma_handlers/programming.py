@@ -13,9 +13,8 @@ from .base import BaseHandler, StageCallback
 class ProgrammingOperationHandler(BaseHandler):
     """Generic execution-stage dispatcher for a pre-admitted programming route.
 
-    Target identity, Programming Profile selection and backend admission belong
-    to the Site execution router. This handler only translates one admitted Job
-    operation into the selected Site interface.
+    PPU Host authorization and Provider/Profile selection happen before queue
+    admission. This handler executes the one selected Job interface.
     """
 
     async def _stage(

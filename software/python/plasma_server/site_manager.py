@@ -12,7 +12,6 @@ from typing import Any
 from plasma_core.config import PlasmaConfig, SiteConfig
 from plasma_core.enums import JobState, Operation, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.ic_support import ICSupportResolver, get_default_ic_support_resolver
 from plasma_core.job_logging import OutputManager, ServerEventLogger
 from plasma_core.models import JobRequest, JobResult, iso_now
 from plasma_core.protocol import PROTOCOL_VERSION
@@ -62,7 +61,6 @@ class SiteManager:
         config: PlasmaConfig,
         interface_factory: InterfaceFactory | None = None,
         mock_tracker: MockActivityTracker | None = None,
-        ic_support_resolver: ICSupportResolver | None = None,
         active_asset_set_reader: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
         config.validate()
@@ -75,18 +73,8 @@ class SiteManager:
         self._bundle_firmware_resolver: Callable[..., dict[str, Any]] | None = None
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
-        requires_ic_support = any(
-            site.enabled and site.interface not in ("mock", "provider")
-            and not (site.interface == "openocd"
-                     and bool(site.openocd.get("site_worker_socket")))
-            for site in config.sites
-        )
-        self.ic_support_resolver = (
-            ic_support_resolver
-            if ic_support_resolver is not None
-            else get_default_ic_support_resolver() if requires_ic_support else None
-        )
         self.interfaces: dict[int, BaseInterface] = {}
+        self.provider_interfaces: dict[int, PackageProviderInterface] = {}
         self.execution_routers: dict[int, SiteExecutionRouter] = {}
         self.workers: dict[int, SiteWorker] = {}
         self._execution_lock = threading.RLock()
@@ -104,7 +92,11 @@ class SiteManager:
                 else self._default_interface(site, mock_tracker)
             )
             self.interfaces[site.id] = interface
-            router = SiteExecutionRouter(site, interface, self.ic_support_resolver)
+            package_interface = None
+            if site.interface != "mock":
+                package_interface = PackageProviderInterface()
+                self.provider_interfaces[site.id] = package_interface
+            router = SiteExecutionRouter(site, interface, package_interface)
             self.execution_routers[site.id] = router
             handler = RoutedProgrammingHandler(interface, router)
             self.workers[site.id] = SiteWorker(
@@ -127,8 +119,6 @@ class SiteManager:
             return OpenOCDInterface(site.openocd)
         if site.interface == "fpga":
             return FPGAInterface(site.id, site.register_base)
-        if site.interface == "provider":
-            return PackageProviderInterface()
         raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unsupported interface: {site.interface}")
 
     async def start(self) -> list[str]:
@@ -446,8 +436,12 @@ class SiteManager:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "status/cancel are control operations")
         worker = self._resolve_site(request.site_id)
         site_config = self._site_configs[request.site_id]
-        if site_config.interface == "provider":
+        # Trusted root-only Package selection is bound to the exact Programming
+        # Job; public metadata cannot impersonate Package Provider authority.
+        if trusted_provider is not None:
             if (not isinstance(trusted_provider, TrustedProviderAction)
+                    or site_config.interface == "mock"
+                    or request.site_id not in self.provider_interfaces
                     or request.job_id != trusted_provider.asset_request.job_id
                     or request.site_id != trusted_provider.route.site_id
                     or request.target != trusted_provider.route.target
@@ -456,8 +450,10 @@ class SiteManager:
                     or request.operation.value != trusted_provider.route.operation
                     or request.max_retries != 0):
                 raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_NOT_AUTHORIZED")
-        elif trusted_provider is not None:
-            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_SITE_MISMATCH")
+        elif (request.metadata.get("provider") is not None
+              and not (isinstance(self.interfaces[request.site_id], OpenOCDInterface)
+                       and self.interfaces[request.site_id].site_worker_ready)):
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_NOT_AUTHORIZED")
         if request.target is None and site_config.interface != "mock":
             # Real hardware: explicit Job target or the operator's explicit
             # Site selection only; never a product default. (The Mock
@@ -483,9 +479,7 @@ class SiteManager:
         runtime = self.registry.create(request)
         try:
             owner_kind, owner_id = self._reserve_execution_job(request)
-            # Legacy/direct programming has no configured OPF Asset Set.
-            # Use the trusted configured reader only when Package Actions
-            # have been explicitly wired into this Runtime.
+            # Pin the trusted Active Set when the Runtime composition provides it.
             pinned = deepcopy(self._active_asset_set_reader()) if self._active_asset_set_reader else {
                 "state": "EMPTY", "asset_set_sha256": None, "ready": False,
             }
@@ -538,8 +532,9 @@ class SiteManager:
                     "source_asset_name": resolved["image_name"],
                     "source_asset_sha256": resolved["image_sha256"],
                 })
-            request = self.execution_routers[request.site_id].admit(request)
-            if site_config.interface == "provider":
+            request = self.execution_routers[request.site_id].admit(
+                request, trusted_provider=trusted_provider)
+            if trusted_provider is not None:
                 if (pinned.get("state") != "ACTIVE"
                         or pinned.get("asset_set_sha256") != trusted_provider.route.asset_set_sha256):
                     raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_ACTIVE_SET_MISMATCH")

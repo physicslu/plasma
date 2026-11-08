@@ -116,7 +116,7 @@ class PlasmaConfig:
             )
         if len(ids) != len(set(ids)):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "site IDs must be unique")
-        supported_interfaces = {"mock", "openocd", "fpga", "provider"}
+        supported_interfaces = {"mock", "openocd", "fpga"}
         for site in self.sites:
             if site.interface not in supported_interfaces:
                 raise PlasmaError(

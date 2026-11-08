@@ -112,9 +112,8 @@ class PackageActionRuntime:
         self.spawner = spawner
         self.python_executable = Path(python_executable)
         self.site_worker = site_worker
-        for interface in getattr(site_manager, "interfaces", {}).values():
-            if isinstance(interface, PackageProviderInterface):
-                interface.wire_runtime(self._run_programming_package)
+        for interface in getattr(site_manager, "provider_interfaces", {}).values():
+            interface.wire_runtime(self._run_programming_package)
 
     def _run_programming_package(self, trusted: TrustedProviderAction,
                                  cancel_event: threading.Event) -> dict[str, Any]:
