@@ -175,7 +175,12 @@ class SiteWorker:
                 original_exception=failure,
             )
         try:
-            await self.handler.interface.safe_shutdown()
+            selected_interface = (
+                self.handler.interface_for(request)
+                if callable(getattr(self.handler, "interface_for", None))
+                else self.handler.interface
+            )
+            await selected_interface.safe_shutdown()
         except Exception as exc:
             shutdown_error = (
                 exc
