@@ -174,7 +174,7 @@ The installer boundary verifies at least:
 3. regular files/directories only and safe extraction limits;
 4. exact internal `SHA256SUMS` file set and digests;
 5. full source identity and `ppu/linux/armv7l` target;
-6. PPU runtime identity and production Device Catalog presence;
+6. PPU runtime identity (no Device Catalog / IC Support is required; a legacy release that still ships them is tolerated, never required);
 7. closed hardware boundary;
 8. explicit Plasma-owned ARMv7 final Python >=3.11;
 9. Server/Gateway canonical configuration identity.
@@ -252,16 +252,17 @@ running Runtime's bounded TTL quiesce (`quiesce`, 60 s); it is refused while any
 Site executes, and the upgrade then ends `verify_failed`
 (`runtime_quiesce_denied`) without mutating the installation.
 
-## IC Support data
+## IC Catalog / IC Support (not shipped)
 
-The Runtime kit ships the repository-owned IC Support **data** (`*.json`,
-`*.md`, `*.txt` under `data/ic-support`; no Python tooling) at
-`runtime/data/ic-support`, recorded as `data.ic_support_root` in
-`ppu-runtime.json`. Both `plasma-server.service` and `plasma-web.service` set
-`PLASMA_IC_SUPPORT_ROOT=/opt/plasma/current/runtime/data/ic-support`. Without
-it an enabled non-mock Site makes the Runtime fail closed at start
-(`ICSupportIntegrityError`), and Gateway device search cannot resolve IC
-Support.
+Since OPF S5 / PR-C1 the Runtime kit ships **no** IC Support or Device Catalog
+data, and neither `plasma-server.service` nor `plasma-web.service` sets
+`PLASMA_IC_SUPPORT_ROOT` or `PLASMA_DEVICE_CATALOG_MANIFEST`. Execution is
+decided only by the verified Active Bundle v3, device capability,
+authorization and hardware safety; an enabled non-mock Site starts without
+Catalog data. The PPU Gateway's legacy `GET /api/devices/search` answers
+`503 DEVICE_SELECTOR_UNAVAILABLE` on an installed PPU; the Device Selector is
+owned by Manager (Console consumer migration: PR-C2). Root, install,
+verification and Rollback contracts are unchanged.
 
 ## Site Desired versus Runtime
 

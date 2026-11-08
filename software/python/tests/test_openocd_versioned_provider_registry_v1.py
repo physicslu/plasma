@@ -163,12 +163,12 @@ class VersionedProviderRegistryTests(unittest.TestCase):
 
     def test_gateway_adds_read_only_provider_list_without_authorizing_job(self):
         from plasma_web.backend_candidate_registry import BackendCandidateRegistry
-        from plasma_web.gateway import _device_search_payload
+        from plasma_web.legacy_device_selector import _device_search_payload
         candidates = BackendCandidateRegistry(self.catalog)
         with (
-            patch("plasma_web.gateway.get_default_device_catalog", return_value=self.catalog),
-            patch("plasma_web.gateway.get_default_backend_candidate_registry", return_value=candidates),
-            patch("plasma_web.gateway.get_default_openocd_provider_registry", return_value=self.provider),
+            patch("plasma_web.legacy_device_selector.get_default_device_catalog", return_value=self.catalog),
+            patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=candidates),
+            patch("plasma_web.legacy_device_selector.get_default_openocd_provider_registry", return_value=self.provider),
         ):
             for part, expected in (
                 ("STM32F103C8T6", "openocd-upstream"),

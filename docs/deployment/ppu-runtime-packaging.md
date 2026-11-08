@@ -27,12 +27,11 @@ ppu/
 ├── ppu.pyz
 └── THIRD_PARTY_LICENSES/
     └── PyYAML.txt
-data/
-└── device-catalog/
-    └── production/
 ```
 
 `ppu.pyz` is a self-contained Python zipapp exposing Server, Gateway, and the bounded runtime-activation helper entrypoint. The runtime excludes Control Station, Manager, Node/npm, Git metadata, tests, FPGA bitstreams and physical-target power control.
+
+**Catalog-free (OPF S5 / PR-C1).** IC Catalog, IC Support and L0–L2 qualification are offline governance and never a PPU Runtime dependency. The runtime ships no `data/` tree, `ppu-runtime.json` has no `data` section, and `ppu.pyz` omits every module listed in `CATALOG_ONLY_MODULES` (`scripts/ppu-runtime.py`). The Gateway imports no Catalog / Qualification module at startup; Programming Job / Batch / Health never depend on it. The legacy `GET /api/devices/search` is served only where the optional `plasma_web.legacy_device_selector` adapter and its Catalog data exist (Render / source tree); on a packaged PPU it answers `503 DEVICE_SELECTOR_UNAVAILABLE`, never an empty result. The Device Selector is owned by Manager; Console migration is PR-C2. Host-only proof: `software/python/tests/test_ppu_gateway_catalog_free.py`.
 
 ## Canonical release and Release Identity v2
 
@@ -117,7 +116,7 @@ sites:
 
 On an **upgrade**, `/etc/plasma/ppu.yaml` is operator/runtime state and must not be regenerated from first-install defaults. P3 preserves the existing canonical file, including Site Desired records, while updating release/service wiring; the only rewrite is the one-time migration of the exact former first-install line `sites: []` to the disabled defaults. See [Z2 PS installer](z2-ps-installer.md).
 
-The runtime payload also carries the IC Support data at `data/ic-support` (`data.ic_support_root` in `ppu-runtime.json`); `validate` loads it with the shipped zipapp through `PLASMA_IC_SUPPORT_ROOT`.
+The runtime payload carries no IC Support or Device Catalog data and the installed services set no `PLASMA_IC_SUPPORT_ROOT` / `PLASMA_DEVICE_CATALOG_MANIFEST` (PR-C1). An enabled non-mock Site starts from the Catalog-free runtime (inverse of the historical Z2 D6 regression, `test_enabled_openocd_site_starts_from_catalog_free_runtime`).
 
 The topology semantics remain:
 

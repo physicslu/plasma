@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import importlib
 import re
 import time
 from dataclasses import replace
@@ -15,18 +16,9 @@ from plasma_core.assets import ProgrammingAsset
 from plasma_core.batch import BatchExecutionPolicy, BatchTarget
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.ic_support import get_default_ic_support_resolver
-from plasma_core.manufacturer_device_basic import get_default_manufacturer_device_basic_resolver
 
 from . import gateway_base as base
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
-from .backend_candidate_registry import get_default_backend_candidate_registry
-from .backend_source_reference import backend_source_reference, default_pinned_upstream
-from .openocd_provider_registry import get_default_openocd_provider_registry
-from .programming_qualification import get_default_programming_qualification_registry
-from .microchip_upstream_openocd_evidence import microchip_upstream_openocd_evidence
-from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
-from .nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
 from .durable_batch_runtime import DurableBatchRuntimeManager
 from .engineering_targets import EngineeringPPUProvider
 from .gateway_communication import ppu_response_budget_ms, request_with_gateway_policy
@@ -39,6 +31,25 @@ from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 FLEET_CONTRACT_VERSION = base.FLEET_CONTRACT_VERSION
 WEB_REST_CONTRACT_VERSION = base.WEB_REST_CONTRACT_VERSION
 GATEWAY_SERVICE_NAME = base.GATEWAY_SERVICE_NAME
+
+# The legacy Device Selector is Catalog-only and owned by Manager. The PPU
+# Gateway never imports it at startup; Programming Job / Batch / Health never
+# depend on it. Absent module or data => explicit 503, never an empty result.
+LEGACY_DEVICE_SELECTOR_MODULE = "plasma_web.legacy_device_selector"
+
+
+class DeviceSelectorUnavailable(RuntimeError):
+    """The optional Catalog-backed Device Selector cannot serve this request."""
+
+
+def _legacy_device_selector() -> Any:
+    try:
+        selector = importlib.import_module(LEGACY_DEVICE_SELECTOR_MODULE)
+    except ImportError as exc:
+        raise DeviceSelectorUnavailable(
+            "Device Selector is not part of this PPU runtime; use the Manager Device Selector"
+        ) from exc
+    return selector
 
 
 def _batch_payload(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -80,258 +91,6 @@ def _ppu_network_settings_payload(settings: dict[str, Any]) -> dict[str, Any]:
         },
     }
 
-
-_MICROCHIP_IDENTITY_ORDER = re.compile(
-    r"\A(ATSAML(10|11)(D|E)(14|15|16)A)-([AMUY])([UFZ])(T?)(KPH)?\Z"
-)
-_MICROCHIP_IDENTITY_PACKAGES = {"A":"TQFP","M":"VQFN","U":"WLCSP","Y":"SSOP"}
-_MICROCHIP_IDENTITY_FLASH_KB = {"14":16,"15":32,"16":64}
-_MICROCHIP_IDENTITY_PDF_SHA = (
-    "ee9c04451141173b787374388ddf9b607a5a569415ae85d9b5715237fd1cbb9e"
-)
-
-
-def _microchip_ic_information(
-    record: Any, qualification: dict[str, Any],
-) -> dict[str, Any] | None:
-    """Read-only manufacturer information; canonical Qualification owns Level."""
-    if record.vendor != "Microchip":
-        return None
-    if record.family == "PIC32MX":
-        ref = record.source_reference or ""
-        if (not record.production_admitted
-            or record.mapping_status != "no_mapping" or record.target_config
-            or not record.base_device or not record.identifier.startswith("PIC32MX")
-            or record.source_authority != "Microchip Technology official"
-            or record.verification_status !=
-                "verified_microchip_mcp_exact_ordering_and_pinned_openocd_devid"
-            or f"partNumber={record.icpn}" not in ref
-            or f"basePartNumber={record.base_device}" not in ref
-            or "original_response_sha256=" not in ref
-            or "expected_devid=" not in ref
-            or qualification["catalog_level"] != 1
-            or qualification["state"] != "CANDIDATE"
-            or qualification["job_selectable"]
-            or qualification["execution_authorized"]):
-            raise ValueError("Microchip PIC32MX exact identity/route evidence boundary changed")
-        return {
-            "status": "manufacturer_exact_material_identity_route_candidate",
-            "manufacturer": "Microchip", "icpn": record.icpn,
-            "identity_state": "IDENTIFIED", "information_complete": False,
-            "catalog_level": qualification["catalog_level"],
-            "catalog_level_state": qualification["catalog_level_state"],
-            "programming_state": qualification["state"],
-            "compatibility_state": "NOT_TESTED",
-            "ram_size": None, "core_model": None,
-            "working_vdd_v": None, "io_supply_v": None, "vdda_v": None,
-            "field_states": {
-                "manufacturer": "VERIFIED", "icpn": "VERIFIED",
-                "base_device": "VERIFIED", "package": "UNKNOWN",
-                "pin_count": "UNKNOWN", "flash": "UNKNOWN",
-                "ram": "UNKNOWN", "temperature": "UNKNOWN",
-                "core_model": "UNKNOWN", "working_vdd": "UNKNOWN",
-                "io_supply": "UNKNOWN", "vdda": "UNKNOWN",
-                "core_architecture": "UNKNOWN",
-            },
-            "source": {
-                "authority": "Microchip Technology official",
-                "exact_mcp_material_source": ref,
-                "provider_route_evidence": "OpenOCD v0.12.0 pinned driver DEVID",
-                "official_pdf_grammar_not_exact_material_list": False,
-            },
-            "software_supported": False,
-            "programming_provider": None,
-            "supported_operations": [],
-            "verified_configurations": [],
-            "programming_profile_authority": False,
-            "hardware_runtime_ready": False,
-        }
-    match = _MICROCHIP_IDENTITY_ORDER.fullmatch(record.icpn or "")
-    if match is None or record.family != "SAML1X" or not record.production_admitted:
-        raise ValueError("unknown Microchip exact SKU in admitted Product Catalog")
-    base, series, group, density, package_code, grade, _carrier, kph = match.groups()
-    package = _MICROCHIP_IDENTITY_PACKAGES[package_code]
-    pin_count = 24 if group == "D" else 32
-    high = 85 if grade == "U" else 125
-    ram = 16 if density == "16" else (8 if series == "11" or density == "15" else 4)
-    restrictions = (
-        (group == "D" and package not in ("VQFN", "SSOP"))
-        or (group == "E" and package not in ("VQFN", "TQFP", "WLCSP"))
-        or (grade == "Z" and package not in ("VQFN", "TQFP"))
-        or (bool(kph) and (series != "11" or package not in ("VQFN", "TQFP")))
-    )
-    if (restrictions or record.base_device != base
-        or record.subfamily != "SAML" + series
-        or record.package != package or record.pin_count != str(pin_count)
-        or record.flash_size != f"{_MICROCHIP_IDENTITY_FLASH_KB[density]} KB"
-        or record.temperature_grade != f"-40..{high} C"
-        or record.mapping_status != "no_mapping" or record.target_config
-        or record.verification_status != "verified_microchip_mcp_exact_ordering_and_pdf_applicability"
-        or "original_response_sha256=" not in (record.source_reference or "")
-        or _MICROCHIP_IDENTITY_PDF_SHA not in (record.source_reference or "")
-        or f"partNumber={record.icpn}" not in (record.source_reference or "")
-        or f"basePartNumber={base}" not in (record.source_reference or "")):
-        raise ValueError("Microchip original evidence applicability drift")
-    return {
-        "status":"manufacturer_exact_material_partial_information",
-        "manufacturer":"Microchip","icpn":record.icpn,
-        "identity_state":"IDENTIFIED",
-        "information_complete":False,
-        "catalog_level": qualification["catalog_level"],
-        "catalog_level_state": qualification["catalog_level_state"],
-        "programming_state": qualification["state"],
-        "compatibility_state":"NOT_TESTED",
-        "ram_size":f"{ram} KB",
-        "core_model":"Arm Cortex-M23",
-        "working_vdd_v":None,"io_supply_v":None,"vdda_v":None,
-        "field_states":{
-            "manufacturer":"VERIFIED","icpn":"VERIFIED","base_device":"VERIFIED",
-            "package":"VERIFIED","pin_count":"VERIFIED","flash":"VERIFIED",
-            "ram":"VERIFIED","temperature":"VERIFIED","core_model":"VERIFIED",
-            "working_vdd":"PARTIAL","io_supply":"UNKNOWN","vdda":"UNKNOWN",
-            "core_architecture":"UNKNOWN",
-        },
-        "source":{
-            "authority":"Microchip Technology official",
-            "exact_mcp_material_source":record.source_reference,
-            "pdf_revision":"DS60001513G",
-            "pdf_original_sha256":_MICROCHIP_IDENTITY_PDF_SHA,
-            "pdf_printed_pages":[14,16],
-            "official_pdf_grammar_not_exact_material_list":True,
-        },
-        "software_supported":False,
-        "programming_provider":None,
-        "supported_operations":[],
-        "verified_configurations":[],
-        "programming_profile_authority":False,
-        "hardware_runtime_ready":False,
-    }
-
-
-def _parse_public_catalog_levels(raw: str | None) -> tuple[int, ...]:
-    """Parse the customer-facing IC Selector level filter.
-
-    Level 0 is intentionally not exposed by this public Product API.
-    """
-    if raw is None or not raw.strip():
-        return (1, 2, 3)
-    values: list[int] = []
-    for token in raw.split(","):
-        token = token.strip()
-        if not token:
-            continue
-        try:
-            level = int(token)
-        except ValueError as exc:
-            raise ValueError("levels must be a comma-separated subset of 1,2,3") from exc
-        if level not in {1, 2, 3}:
-            raise ValueError("public IC Selector levels must be a subset of 1,2,3; Level 0 is internal-only")
-        if level not in values:
-            values.append(level)
-    if not values:
-        raise ValueError("levels must include at least one of 1,2,3")
-    return tuple(sorted(values))
-
-
-def _device_search_payload(
-    query: str,
-    limit: int,
-    offset: int = 0,
-    *,
-    levels: tuple[int, ...] = (1, 2, 3),
-) -> dict[str, Any]:
-    catalog = get_default_device_catalog()
-    programming_qualification = get_default_programming_qualification_registry()
-    qualification_cache: dict[tuple[str, str], dict[str, Any]] = {}
-
-    def qualification_for(record: Any) -> dict[str, Any]:
-        exact_icpn = record.icpn or record.identifier
-        key = (record.vendor, exact_icpn)
-        qualification = qualification_cache.get(key)
-        if qualification is None:
-            qualification = programming_qualification.describe(record.vendor, exact_icpn)
-            qualification_cache[key] = qualification
-        return qualification
-
-    def visible(record: Any) -> bool:
-        level = qualification_for(record).get("catalog_level")
-        return isinstance(level, int) and level in levels and level >= 1
-
-    matches, total_count = catalog.search_with_total(
-        query,
-        limit=limit,
-        offset=offset,
-        predicate=visible,
-    )
-
-    # Candidate evidence is an independent, read-only display projection.
-    # It never modifies authoritative backend routing or Job admission.
-    candidates = get_default_backend_candidate_registry()
-    upstream = default_pinned_upstream()
-    versioned_providers = get_default_openocd_provider_registry()
-    ic_support = get_default_ic_support_resolver()
-    device_basic = get_default_manufacturer_device_basic_resolver()
-    results = []
-    for record in matches:
-        item = record.to_payload()
-        qualification = qualification_for(record)
-        item["catalog_level"] = qualification["catalog_level"]
-        item["catalog_level_state"] = qualification["catalog_level_state"]
-        item["job_selectable"] = bool(qualification.get("job_selectable", False))
-
-        candidate = candidates.lookup(record)
-        item["backend_candidate"] = candidate
-        item["backend_source_reference"] = backend_source_reference(record, candidate, upstream)
-        item["backend_providers"] = (
-            versioned_providers.describe(record.vendor, record.identifier)
-            if versioned_providers is not None else []
-        )
-        exact_icpn = record.icpn or record.identifier
-        basic = device_basic.resolve_exact(
-            exact_icpn,
-            manufacturer=record.vendor,
-            family=record.family,
-            series=record.subfamily,
-            base_device=record.base_device,
-            package=record.package,
-            pin_count=record.pin_count,
-            flash_size=record.flash_size,
-            temperature_grade=record.temperature_grade,
-        )
-        item["manufacturer_device_basic_profile"] = (
-            basic.to_payload() if basic is not None else None
-        )
-        item["nxp_manufacturer_device_profile"] = (
-            get_default_nxp_manufacturer_device_evidence().resolve_exact(record)
-            if record.vendor == "NXP" and record.family in {"MCX", "K32L2"}
-            else None
-        )
-        item["microchip_ic_information"] = _microchip_ic_information(record, qualification)
-        item["upstream_openocd_evidence"] = microchip_upstream_openocd_evidence(record)
-        support = ic_support.resolve_exact(exact_icpn)
-        item["selected_profile"] = (
-            support.to_selected_profile_payload()
-            if support is not None
-            else None
-        )
-        item["programming_qualification"] = qualification
-        results.append(item)
-
-    level_counts = programming_qualification.summary["catalog_level_counts"]
-    catalog_size = sum(int(level_counts[str(level)]) for level in levels)
-    return {
-        "ok": True,
-        "rest_contract_version": WEB_REST_CONTRACT_VERSION,
-        "scope": "customer_ic_selector",
-        "query": query,
-        "levels": list(levels),
-        "catalog_size": catalog_size,
-        "count": len(results),
-        "total_count": total_count,
-        "limit": limit,
-        "offset": offset,
-        "results": results,
-    }
 
 def _require_object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
@@ -624,6 +383,56 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             },
         )
 
+    def _device_selector_unavailable(self, exc: Exception) -> None:
+        self._json(
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {
+                "ok": False,
+                "error": {
+                    "error_type": "DEVICE_SELECTOR_UNAVAILABLE",
+                    "message": str(exc) or type(exc).__name__,
+                    "recoverable": True,
+                },
+            },
+        )
+
+    def _device_search(self, raw_query: str) -> None:
+        try:
+            selector = _legacy_device_selector()
+            params = parse_qs(raw_query, keep_blank_values=True)
+            query = params.get("q", [""])[0]
+            raw_limit = params.get("limit", [str(selector.DEFAULT_SEARCH_LIMIT)])[0]
+            raw_offset = params.get("offset", ["0"])[0]
+            raw_levels = params.get("levels", [None])[0]
+            try:
+                limit = int(raw_limit)
+                offset = int(raw_offset)
+                levels = selector.parse_public_catalog_levels(raw_levels)
+                if limit < 1 or limit > selector.MAX_SEARCH_LIMIT:
+                    raise ValueError(f"limit must be between 1 and {selector.MAX_SEARCH_LIMIT}")
+                if offset < 0:
+                    raise ValueError("offset must be a non-negative integer")
+                payload = selector.search(query, limit, offset, levels=levels)
+            except selector.SELECTOR_DATA_ERRORS as exc:
+                raise DeviceSelectorUnavailable(f"Device Selector Catalog data is unavailable: {exc}") from exc
+            except (TypeError, ValueError) as exc:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "ok": False,
+                        "error": {
+                            "error_type": "INVALID_DEVICE_SEARCH",
+                            "message": str(exc),
+                        },
+                    },
+                )
+                return
+            self._json(HTTPStatus.OK, payload)
+        except DeviceSelectorUnavailable as exc:
+            self._device_selector_unavailable(exc)
+        except Exception as exc:
+            self._error(exc)
+
     def _batch_unavailable(self) -> None:
         self._json(
             HTTPStatus.SERVICE_UNAVAILABLE,
@@ -808,36 +617,7 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             return
 
         if self._is_device_search_path(parsed.path):
-            try:
-                params = parse_qs(parsed.query, keep_blank_values=True)
-                query = params.get("q", [""])[0]
-                raw_limit = params.get("limit", [str(DEFAULT_SEARCH_LIMIT)])[0]
-                raw_offset = params.get("offset", ["0"])[0]
-                raw_levels = params.get("levels", [None])[0]
-                limit = int(raw_limit)
-                offset = int(raw_offset)
-                levels = _parse_public_catalog_levels(raw_levels)
-                if limit < 1 or limit > MAX_SEARCH_LIMIT:
-                    raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}")
-                if offset < 0:
-                    raise ValueError("offset must be a non-negative integer")
-                self._json(
-                    HTTPStatus.OK,
-                    _device_search_payload(query, limit, offset, levels=levels),
-                )
-            except (TypeError, ValueError) as exc:
-                self._json(
-                    HTTPStatus.BAD_REQUEST,
-                    {
-                        "ok": False,
-                        "error": {
-                            "error_type": "INVALID_DEVICE_SEARCH",
-                            "message": str(exc),
-                        },
-                    },
-                )
-            except Exception as exc:
-                self._error(exc)
+            self._device_search(parsed.query)
             return
 
         if self._is_mock_runtime_path(parsed.path):
@@ -996,6 +776,24 @@ def _build_batch_runtime(
     return None
 
 
+def warm_legacy_device_selector() -> bool:
+    """Best-effort Selector warm-up; never a Gateway startup dependency.
+
+    When the Catalog-backed Selector is present its immutable Qualification
+    registry is built before binding so the first search is not cold. When it
+    is absent or its data is untrusted, the Gateway still starts and the
+    Selector endpoint answers 503 DEVICE_SELECTOR_UNAVAILABLE.
+    """
+    try:
+        selector = _legacy_device_selector()
+        counts = selector.warm()
+    except Exception as exc:  # Selector must never block Programming service.
+        print(f"Device Selector unavailable (Programming service unaffected): {type(exc).__name__}: {exc}")
+        return False
+    print("Device Selector qualification registry ready: " + " ".join(f"L{k}={v}" for k, v in counts.items()))
+    return True
+
+
 def serve(
     host: str,
     port: int,
@@ -1007,19 +805,7 @@ def serve(
     static_root: Path | None = None,
     gateway_settings_path: Path | None = None,
 ) -> None:
-    # Catalog/qualification registries are immutable for one Gateway process.
-    # Build and validate them before binding the HTTP socket so readiness never
-    # advertises a selector endpoint whose first request still performs cold
-    # evidence loading and integrity hashing.
-    qualification_registry = get_default_programming_qualification_registry()
-    qualification_summary = qualification_registry.summary
-    print(
-        "Device Selector qualification registry ready: "
-        f"L0={qualification_summary['catalog_level_counts']['0']} "
-        f"L1={qualification_summary['catalog_level_counts']['1']} "
-        f"L2={qualification_summary['catalog_level_counts']['2']} "
-        f"L3={qualification_summary['catalog_level_counts']['3']}"
-    )
+    warm_legacy_device_selector()
     settings = GatewaySettingsController(gateway_settings_path or (output_root / "gateway-settings.yaml"))
     network_settings = PPUNetworkSettingsController(output_root / "ppu-network-settings.yaml")
     PlasmaWebHandler.client_factory = staticmethod(lambda: base.PlasmaClient(plasma_host, plasma_port))

@@ -43,7 +43,6 @@ def test_z2_server_and_gateway_share_one_explicit_canonical_config(tmp_path: Pat
         paths=paths,
         python_runtime=installer.PythonRuntime(python_path, "3.11.9", "armv7l"),
         gateway_host="192.168.2.99",
-        catalog_relative="data/device-catalog/production/icpn-v1-manifest.json",
     )
     config = paths.config_root / "ppu.yaml"
     server = units["plasma-server.service"]

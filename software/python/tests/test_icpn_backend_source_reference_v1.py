@@ -12,7 +12,7 @@ from plasma_web.backend_source_reference import (
     backend_source_reference, load_pinned_upstream,
 )
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
-from plasma_web.gateway import _device_search_payload
+from plasma_web.legacy_device_selector import _device_search_payload
 
 
 class BackendSourceReferenceTests(unittest.TestCase):
@@ -95,9 +95,9 @@ class BackendSourceReferenceTests(unittest.TestCase):
             backend_source_reference(row, c, self.upstream)
 
     def test_gateway_exposes_source_reference_without_authorizing_runtime(self):
-        with (patch("plasma_web.gateway.get_default_device_catalog", return_value=self.catalog),
-              patch("plasma_web.gateway.get_default_backend_candidate_registry", return_value=self.candidates),
-              patch("plasma_web.gateway.default_pinned_upstream", return_value=self.upstream)):
+        with (patch("plasma_web.legacy_device_selector.get_default_device_catalog", return_value=self.catalog),
+              patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.candidates),
+              patch("plasma_web.legacy_device_selector.default_pinned_upstream", return_value=self.upstream)):
             for icpn, provider in (("STM32F103C8T6", "openocd-upstream"),
                                    ("STM32H503CBT6", "openocd-st-h5-research"),
                                    ("STM32C531CBT6", "openocd-st-c5-stldr-research")):

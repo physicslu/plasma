@@ -325,8 +325,7 @@ def _inside_mode(args: argparse.Namespace) -> int:
     app = runtime / "ppu/ppu.pyz"
     if not app.is_file():
         raise LabError(f"PPU zipapp is missing: {app}")
-    manifest = json.loads((runtime / "ppu-runtime.json").read_text())
-    catalog = runtime / str((manifest.get("data") or {}).get("device_catalog_manifest"))
+    json.loads((runtime / "ppu-runtime.json").read_text())
     control = _run_control_experiment(args.control_checkpoints)
     work = Path("/work")
     config = _write_config(work)
@@ -334,7 +333,9 @@ def _inside_mode(args: argparse.Namespace) -> int:
         directory.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
-    env["PLASMA_DEVICE_CATALOG_MANIFEST"] = str(catalog)
+    # PPU Runtime is Catalog-free (OPF S5 / PR-C1): no Catalog environment.
+    env.pop("PLASMA_DEVICE_CATALOG_MANIFEST", None)
+    env.pop("PLASMA_IC_SUPPORT_ROOT", None)
     server = gateway = None
     try:
         server = subprocess.Popen([sys.executable, str(app), "server", "--config", str(config)], cwd=work, env=env)
