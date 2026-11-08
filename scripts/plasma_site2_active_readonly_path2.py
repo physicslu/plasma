@@ -8,22 +8,95 @@ set through the trusted installed PPU read_active verifier.
 from __future__ import annotations
 
 import argparse
+import base64
 import ipaddress
 import json
 import re
 import subprocess
 from pathlib import Path
 
-import opf_site2_joint_acceptance as opf
 import plasma_site2_path2_preflight as site
 import plasma_wordport_program as pairing
+
+MARKER = "PLASMA_OPF_STATIC_READONLY:"
+
+# Only installed, protected Z2 files are inspected, never Bundle executable code.
+# ppu_asset_set.read_active independently verifies B3 receipt and every file.
+REMOTE_OBSERVE = """
+import base64,json,sys
+from pathlib import Path
+root=Path('/opt/plasma')
+sys.path.insert(0,str(root/'bootstrap'))
+from ppu_asset_set import read_active
+record=read_active(root)
+sha=record.get('asset_set_sha256')
+status={'state':record.get('state'),'asset_set_sha256':sha,
+        'generation':record.get('generation'),'opf_static':'NOT_APPLICABLE'}
+if record.get('state')=='ACTIVE':
+    manifest=json.loads((root/'assets/staged'/sha/'manifest.json').read_bytes())
+    pkgs={p['id']:p for p in manifest['packages']}
+    provider=pkgs.get('openocd-platform-reference')
+    profile=pkgs.get('stm32f103c8t6-site2')
+    if provider and profile:
+        provider_path='payload/packages/openocd-platform-reference/data/plasma-provider-options.json'
+        profile_paths={
+          'payload/packages/stm32f103c8t6-site2/data/plasma-provider.json',
+          'payload/packages/stm32f103c8t6-site2/data/plasma-flash-profile.json'}
+        paths={e['path'] for e in provider['files']}
+        profile_entries={e['path'] for e in profile['files']}
+        valid=(provider['kind']=='platform-provider'
+          and profile['kind']=='programming-profile'
+          and profile['requires']==['openocd-platform-reference']
+          and paths=={provider_path} and profile_entries==profile_paths
+          and all(e.get('executable') is False for e in provider['files']+profile['files']))
+        if valid:
+            descriptor=json.loads((root/'assets/staged'/sha/
+              'payload/packages/stm32f103c8t6-site2/data/plasma-provider.json').read_bytes())
+            valid=(descriptor.get('schema')=='plasma.ppu.provider-capabilities.v1'
+              and descriptor.get('provider_package')=='openocd-platform-reference'
+              and descriptor.get('target')=='STM32F103C8T6')
+        status['opf_static']='PASS' if valid else 'FAIL'
+print('PLASMA_OPF_STATIC_READONLY:'+base64.b64encode(
+  json.dumps(status,sort_keys=True,separators=(',',':')).encode()).decode())
+"""
+
+
+class ActiveObservationDenied(RuntimeError):
+    """Fixed, non-secret diagnostic code."""
+
+
+def observe_active(host: str, *, helper) -> dict:
+    credentials, hosts = helper.z2_login_credentials(Path.home())
+    if credentials.get("ssh_host") != host:
+        raise ActiveObservationDenied("PAIRED_TARGET_MISMATCH")
+    rc, transcript = helper.password_ssh_z2(
+        ["python3", "-I", "-c", REMOTE_OBSERVE], credentials, hosts, timeout=60)
+    if rc != 0:
+        raise ActiveObservationDenied("ACTIVE_SET_READ_ONLY_OBSERVATION_FAILED")
+    matches = re.findall(re.escape(MARKER) + r"([A-Za-z0-9+/=]{40,8192})", transcript)
+    if len(matches) != 1:
+        raise ActiveObservationDenied("ACTIVE_SET_RECEIPT_INVALID")
+    try:
+        result = json.loads(base64.b64decode(matches[0], validate=True))
+        if (type(result) is not dict
+                or result.get("state") not in ("ACTIVE", "EMPTY")
+                or result.get("opf_static") not in ("PASS", "FAIL", "NOT_APPLICABLE")
+                or (result["state"] == "ACTIVE"
+                    and not (type(result.get("asset_set_sha256")) is str
+                             and HEX64.fullmatch(result["asset_set_sha256"])))):
+            raise ValueError("invalid")
+    except (ValueError, UnicodeError) as exc:
+        raise ActiveObservationDenied("ACTIVE_SET_RECEIPT_INVALID") from exc
+    return result
+
 
 ROOT=Path(__file__).resolve().parents[1]
 SHA40=re.compile(r"[0-9a-f]{40}")
 BIN="b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861"
 ADM="3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b"
 
-def run(source_sha: str, *, helper=pairing, preflight=site, active=opf) -> dict:
+def run(source_sha: str, *, helper=pairing, preflight=site,
+        active_observer=observe_active) -> dict:
     sha=subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,check=True,
                        text=True,capture_output=True,timeout=8).stdout.strip()
     if not SHA40.fullmatch(source_sha) or sha!=source_sha:
@@ -48,7 +121,7 @@ def run(source_sha: str, *, helper=pairing, preflight=site, active=opf) -> dict:
         or r.get("active_job_count")!=0 or r.get("activation_active") is not False
         or r.get("lease_busy") is not False or r.get("site2_idle") is not True):
         raise RuntimeError("SITE2_PREFLIGHT_NOT_READY")
-    current=active.observe_active(host,helper=helper)
+    current=active_observer(host,helper=helper)
     if current.get("state")!="ACTIVE" or current.get("opf_static")!="PASS":
         raise RuntimeError("ACTIVE_OPF_NOT_VERIFIED")
     asset_sha=current.get("asset_set_sha256")
