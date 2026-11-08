@@ -84,7 +84,7 @@ class SiteExecutionRouter:
                 and self.interface.site_worker_ready):
             if request.operation is not Operation.FLASH_CYCLE:
                 raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                  "C-3 OpenOCD permits only flash_cycle")
+                                  "C-3 supports only flash_cycle")
             return self._decorate(request, route={
                 "mode": OPENOCD_ROUTE, "target": request.target,
                 "backend_implementation_state": "opf_bundle_c3_site_worker",
