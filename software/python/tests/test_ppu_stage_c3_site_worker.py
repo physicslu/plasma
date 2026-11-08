@@ -284,7 +284,7 @@ def test_cancel_by_runtime_close_stops_in_flight_operation_and_seals(rig):
 
 @pytest.mark.parametrize("behaviour,error", [
     ("unknown", "OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED"),
-    ("crash", "SOFTWARE_EXCEPTION:RuntimeError"),
+    ("crash", "OUTCOME_UNKNOWN_SITE_SEALED:UNCLASSIFIED_ADAPTER_EXCEPTION"),
 ])
 def test_unknown_hardware_outcomes_and_software_errors(rig, behaviour, error):
     rig.adapter.behaviour = behaviour
@@ -293,8 +293,11 @@ def test_unknown_hardware_outcomes_and_software_errors(rig, behaviour, error):
     first, second = rig.go(child)
     assert first == {"ok": False, "error": error}
     assert second["ok"] is False
-    assert len(rig.adapter.calls) == (1 if behaviour == "unknown" else 2)
-    assert (2 in rig.client.call("status")["sealed_sites"]) is (behaviour == "unknown")
+    # Neither an unknown transport outcome nor an unclassified Python crash
+    # proves SAFE_OFF. Both must seal Site 2 and prevent the second I/O.
+    assert len(rig.adapter.calls) == 1
+    assert 2 in rig.client.call("status")["sealed_sites"]
+    assert (rig.seals / "site2.sealed").is_file()
 
 
 def test_denied_before_hardware_keeps_site_usable(rig):

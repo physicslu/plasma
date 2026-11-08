@@ -9,7 +9,7 @@
 
 | Scope | Result | Evidence |
 | --- | --- | --- |
-| S2 source-level control audit | **COMPLETED (SOURCE REVIEW)** | Files and safety controls below; no source change required by this read-only audit |
+| S2 source-level control audit | **SOURCE AUDIT COMPLETE — P0 FAIL-CLOSED GAP IDENTIFIED AND FIX STAGED** | Files and safety controls below; the staged Runtime patch below must pass CI and Gate 2 before real HIL |
 | Existing Host-only regression | **PASS ON MERGED S1-C HEAD** | #1347 exact-head GitHub workflows: 9/9 success; Python PS 3,193 passed, 12 skipped, 4,592 subtests passed (run 42447228369) |
 | S1-C new-path Site 2 physical Flash | **NOT_RUN — execution-channel blocker** | No authorized live SWPC/Z2 session or physical receipts available in this environment |
 | Deployed new Runtime identity | **NOT_VERIFIED** | Git `main` does not establish Z2 installed release Git SHA |
@@ -29,6 +29,14 @@
 | Deadline, cancellation and child cleanup | `site_worker.py` single Job deadline, C-3 session expiration/close and per-Site operation lock; native adapter process lifecycle | `test_ppu_stage_c3_site_worker.py`, `test_ppu_stage_c_production_integration.py` | **PRESENT; KEEP**. For unknown hardware outcome, no automatic resubmission |
 | SAFE_OFF, sealed marker and operator recovery | `ppu_site_worker.py` seals on `TransportUnknown`, missing SAFE_OFF, FPGA identity mutation or readback mismatch; persisted `siteN.sealed` marker | `test_ppu_site_adapter_evidence.py`, `test_ppu_stage_c_production_integration.py` | **PRESENT IN SOURCE; physical negative-path evidence NOT_RUN**. Existing seal cannot be deleted as a test convenience |
 | One Flash Job and authenticated success | `scripts/plasma_program.py` one POST and no retry after ambiguous response; validates result SHA, bytes, one attempt and SAFE_OFF | `test_c3_rest_flash_cycle.py`, #1347 CI | **PRESENT IN SOURCE; S1-C physical outcome NOT_RUN** |
+
+### P0 — Unclassified C-3 Adapter crash did not persist SEALED (fix staged)
+
+At the baseline `scripts/ppu_site_worker.py::SiteWorkerCore._execute`, an unexpected exception from `adapter.run()` returned `SOFTWARE_EXCEPTION:<type>` without a persistent `site<N>.sealed`, despite the possibility that SWD/MMIO had begun. The original `test_unknown_hardware_outcomes_and_software_errors` explicitly allowed a second Adapter operation after that simulated crash. A Python exception does **not** prove SAFE_OFF.
+
+**Remediation in this Draft PR:** unexpected Adapter exceptions now seal the specific Site as `UNCLASSIFIED_ADAPTER_EXCEPTION` and return `OUTCOME_UNKNOWN_SITE_SEALED`; the regression now checks that no second Adapter access occurs and the marker exists. The separate verified-safe `TransportFailed` and pre-hardware `TransportDenied` handling remains unchanged. **Host-only CI: PENDING on this new HEAD.** Existing tests cover persisted seals across Worker restart; real DUT safety is NOT_RUN. The fix is **not** in `main` until independent Gate 2 approval and shall not be treated as an already-deployed guard.
+
+**Residual:** filesystem failure while creating a persistent seal also needs independent fail-closed/recovery evidence; it cannot be tested on a live DUT merely by forcing disk failure.
 
 **Key S2 architecture finding:** PPU-wide Lease, C-3 per-Site Session, and native FPGA Reload/PS Owner fences are **distinct trust boundaries**. Removing any as a presumed duplicate is not defensible without demonstrated equivalent safety and HIL. Do not reimplement a second general Router, Executor or Lock. S2 **source audit is complete**; S2 safety *rationalization/removal* is **NOT IMPLEMENTED** because no duplication has been proven safe to delete.
 
@@ -79,4 +87,4 @@ The operator-side credential comes from the owner-local approved store or `--own
 
 Record: actual target PPU/device IDs (redacted as appropriate), installed Runtime SHA, verified Active Bundle SHA, Engine SHA/ABI, Boot ID correlation, FPGA Image ID/ABI, Site 2 preflight, real voltage/safety observation, generated Job ID, exactly-one submit count, terminal Job/Result, readback digest/bytes, SAFE_OFF, post-Job no-seal/no-admission/no-child, and any Recovery state. Preserve only nonsecret evidence.
 
-**Current blocker:** No SWPC/Z2 device execution channel in this ChatGPT/GitHub-only context. Until operator-side live receipts exist, **S1-C Site 2 real Flash remains NOT_RUN**. This Draft PR is a verifiable audit/handoff; it is **not** a physical execution report, proof of device availability, Gate 2 approval, or authorization to merge/deploy.
+**Current blockers:** (1) P0 patch not yet validated by exact-head CI, merged or installed; (2) no authorized SWPC/Z2 device execution channel in this ChatGPT/GitHub-only context. Until operator-side live receipts exist, **S1-C Site 2 real Flash remains NOT_RUN**. This Draft PR is a verifiable audit/handoff; it is **not** a physical execution report, proof of device availability, Gate 2 approval, or authorization to merge/deploy.

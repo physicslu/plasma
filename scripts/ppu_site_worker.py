@@ -523,11 +523,15 @@ class SiteWorkerCore:
             except TransportUnknown as exc:
                 self._seal(site, exc.code, s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + exc.code) from None
-            except Exception as exc:
-                # The hardware adapter owns its admission/child cleanup and
-                # raises TransportUnknown only when safety cannot be proven.
-                # An unclassified Python failure is not hardware evidence.
-                raise SiteWorkerDenied("SOFTWARE_EXCEPTION:" + type(exc).__name__) from None
+            except Exception:
+                # Adapter code may fail *after* SWD/MMIO access. A generic
+                # exception proves neither owner release nor SAFE_OFF.
+                # Unlike TransportDenied (pre-I/O) or TransportFailed
+                # (verified cleanup), the outcome must remain UNKNOWN.
+                self._seal(site, "UNCLASSIFIED_ADAPTER_EXCEPTION", s)
+                raise SiteWorkerDenied(
+                    "OUTCOME_UNKNOWN_SITE_SEALED:UNCLASSIFIED_ADAPTER_EXCEPTION"
+                ) from None
             if dict(self.adapter.identity()) != s.identity:
                 self._seal(site, "FPGA_IDENTITY_CHANGED_DURING_OPERATION", s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION")
