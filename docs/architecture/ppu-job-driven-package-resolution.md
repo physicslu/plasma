@@ -298,8 +298,8 @@ Missing catalog data is never evidence that the delivered selected
 Profile/Provider cannot execute. OpenOCD and ABI v5 are reference plugins,
 not universal infrastructure requirements.
 
-**Implementation gap:** Current `SiteExecutionRouter` and
-`CompilerRegistry` still load fixed ICPN/operation admissions. FPGA
+**Implementation gap:** The fixed ICPN/operation admission route
+(`CompilerRegistry`) was removed by S1-C #1347 and S5 (2026-11-08). FPGA
 qualification now checks the verified Bundle and Driver ABI without a factory
 Image ID contract. The existing C3 adapter remains OpenOCD/ABI-v5/2-Site
 specific. These are backlog

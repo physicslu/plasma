@@ -248,6 +248,8 @@ Every admitted STM32 operation remains `hardware_runtime_ready=false`.
 
 Compiler availability is no longer operation authority.
 
+> **S5 retirement (2026-11-08):** the Runtime exact-ICPN `CompilerRegistry` and the packaged STM32 `compiler admission projection` were deleted. IC Catalog / L0–L2 qualification and admission packages are an independent offline governance system and are never a direct or indirect PPU Runtime execution dependency; PPU execution is decided only by the verified Bundle v3, device capability, authorization and hardware safety. See the [deletion-first roadmap](plasma-core-convergence-and-deletion-first-roadmap.md).
+
 The frozen selection chain is:
 
 ```text
@@ -345,7 +347,7 @@ Within the freeze baseline, the main supporting contracts are:
 - `docs/architecture/vendor-neutral-ic-admission.md`
 - `docs/architecture/ic-support-openocd-plan-compiler.md`
 - `docs/architecture/ic-support-openocd-plan-executor.md`
-- `software/python/plasma_interfaces/compiler_registry.py`
+- `software/python/plasma_interfaces/compiler_registry.py` (deleted by S5; historical reference only)
 - `data/ic-support/benchmarks/nxp-kl25/VENDOR_NEUTRAL_ADMISSION_ADAPTER.md`
 - `data/ic-support/benchmarks/stm32f103c/VENDOR_NEUTRAL_ADMISSION_MIGRATION.md`
 

@@ -37,6 +37,24 @@ def test_c3_flash_route_uses_bundle_not_exact_icpn_catalog():
     assert error.value.code == ErrorCode.OPERATION_UNSUPPORTED
 
 
+@pytest.mark.parametrize("operation", [Operation.PROGRAM, Operation.ERASE,
+                                       Operation.READ, Operation.VERIFY])
+def test_kl25_offline_evidence_never_selects_a_runtime_route(operation):
+    """KL25 Catalog/admission evidence is offline-only; no Runtime route admits it."""
+    c3_site = SiteConfig(id=2, enabled=True, interface="openocd",
+                         openocd={"site_worker_socket": "/tmp/s5-kl25-c3.sock"})
+    c3_router = SiteExecutionRouter(c3_site, OpenOCDInterface(c3_site.openocd))
+    with pytest.raises(PlasmaError) as error:
+        c3_router.admit(JobRequest(site_id=2, operation=operation, target="MKL25Z128VLK4"))
+    assert error.value.code == ErrorCode.OPERATION_UNSUPPORTED
+    legacy_site = SiteConfig(id=2, enabled=True, interface="openocd",
+                             openocd={"interface_cfg": "interface/cmsis-dap.cfg",
+                                      "target_cfg": "target/kl25.cfg"})
+    legacy_router = SiteExecutionRouter(legacy_site, OpenOCDInterface(legacy_site.openocd))
+    with pytest.raises(PlasmaError, match="NO_QUALIFIED_JOB_PROVIDER"):
+        legacy_router.admit(JobRequest(site_id=2, operation=operation, target="MKL25Z128VLK4"))
+
+
 def test_mock_route_does_not_claim_hardware_support():
     site = SiteConfig(id=1, enabled=True, interface="mock")
     interface = MockInterface.from_options({})

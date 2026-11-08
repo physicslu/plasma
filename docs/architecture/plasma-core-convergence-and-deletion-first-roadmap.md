@@ -50,6 +50,7 @@ Relevant historical PPU migration contract: [OPF-1 through OPF-5](opf-architectu
 | Canonical convergence roadmap | PR #1343 **merged**; update this canonical document through a new Draft PR, never rewrite the merged PR history |
 | S1-C Job-selected Package Provider cutover | **Merged #1347** (Runtime compiler registry and old product route deleted); **merged #1350** S2 fail-closed Worker; physical OpenOCD C-3 Bundle A/B PASS on Site 2. C-2/non-OpenOCD physical Provider remains unqualified; Host-only fake exit 0 is not Flash PASS. |
 | PR #1347 historical code budget | Pre-merge baseline `main@47a8c6a`: production **+403/-361 = net +42 LOC**; tests **+401/-685 = net -284 LOC**, historical full diff net **-242 LOC**. Not a current outstanding Draft or current branch diff. |
+| S5 Runtime ICPN admission retirement | `CompilerRegistry`, `CompilerBinding`, `CompilerSelection`, `PlanCompiler` Protocol and the packaged STM32 compiler admission projection deleted (production **-291** Python LOC, -111 JSON). IC Catalog / L0–L2 / admission packages are offline upstream governance and never a direct or indirect PPU Runtime execution dependency. OpenOCD Plan Compiler/Executor removal follows after Catalog-side source pins are decoupled. |
 | Portable OPF without PPU/Bundle/C-3 | **Linux Host-only PASS** via merged #1349; no physical Flash, macOS or ST-LINK qualification implied. |
 | Non-OpenOCD physical Provider; PC ST-LINK; full eight-Site HIL | **NOT_QUALIFIED** by these PRs |
 

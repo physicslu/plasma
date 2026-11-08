@@ -43,6 +43,5 @@ jobs:
         run: |
           python -m unittest discover -s software/python/tests -p 'test_kl25_openocd_plan.py' -v
           python -m unittest discover -s software/python/tests -p 'test_kl25_openocd_executor.py' -v
-          python -m unittest discover -s software/python/tests -p 'test_compiler_registry.py' -v
       - name: Preserve IC Support path contract
         run: python -m unittest discover -s software/python/tests -p 'test_ic_support_resolver.py' -v
