@@ -56,6 +56,8 @@ EXTRA_FILES = (
     "z2/plasma-path2-root-entry",
 )
 ALL_FILES = tuple(sorted("scripts/" + p for p in (*SCRIPT_NAMES, *EXTRA_FILES)))
+EXPECTED_ENGINE_BINARY = "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861"
+EXPECTED_ENGINE_ADMISSION = "3f5d5feca0582c91f1432496a6cf4b02112f52461bd0adc2a07c14242ded965b"
 
 REMOTE_COMMON = r'''
 import hashlib,json,os,pathlib,stat
@@ -259,6 +261,36 @@ def get(host: str, path: str) -> dict:
     finally:
         conn.close()
 
+def require_site2_safe_observation(snapshot: object) -> dict:
+    """Bounded, real read-only Z2 preflight; a zero exit alone is insufficient."""
+    if not isinstance(snapshot, dict) or snapshot.get("readiness") != "NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS" or snapshot.get("blockers") != []:
+        raise RuntimeError("SITE2_PHYSICAL_PRECHECK_BLOCKED")
+    z = snapshot.get("z2", {})
+    engine = z.get("engine", {})
+    fpga = z.get("fpga", {})
+    rest = snapshot.get("rest", {})
+    release = z.get("release", {})
+    if not (
+        snapshot.get("status") == "READ_ONLY_OBSERVED"
+        and release.get("current") == OLD
+        and engine.get("status") == "VERIFIED"
+        and engine.get("openocd_sha256_observed") == EXPECTED_ENGINE_BINARY
+        and engine.get("admission_sha256_observed") == EXPECTED_ENGINE_ADMISSION
+        and engine.get("driver") == "plasma_swd" and engine.get("abi") == 5
+        and fpga.get("status") == "IMAGE" and fpga.get("boot_match") is True
+        and fpga.get("manager_state") == "operating"
+        and z.get("site2_seal", {}).get("present") is False
+        and z.get("site2_admission", {}).get("present") is False
+        and z.get("openocd_pids") == []
+        and rest.get("active_job_count") == 0 and rest.get("lease_busy") is False
+        and rest.get("activation_active") is False and rest.get("site2_idle") is True
+    ):
+        raise RuntimeError("SITE2_PHYSICAL_PRECHECK_BLOCKED")
+    return {"fpga_image_id": fpga.get("image_id"),
+            "fpga_boot_id_sha12": fpga.get("boot_id_sha12"),
+            "engine_binary_sha256": EXPECTED_ENGINE_BINARY}
+
+
 def make_archive() -> bytes:
     inputs={}
     for name in ALL_FILES:
@@ -336,6 +368,8 @@ def main() -> int:
             and site.get("site_id")==2 and site.get("state")=="idle"
             and site.get("current_job_id") is None and site.get("queued_jobs")==0):
             raise RuntimeError("Z2_SITE2_NOT_IDLE")
+        preflight=load("scripts/plasma_site2_path2_preflight.py","factory_s2_readonly")
+        safety=require_site2_safe_observation(preflight.run(HOST,args.source_sha))
         token=baseline._existing_bootstrap_token_via_z2_ssh(HOST)
         client=baseline.DirectSSHAuthenticatedBootstrap(
             HOST,module=baseline._load_client(),token=token)
@@ -347,7 +381,7 @@ def main() -> int:
             raise RuntimeError("BOOTSTRAP_RECOVERY_OR_RUNTIME_MISMATCH")
         assets=client._call("GET","/v1/assets",None).get("assets",{})
         if (assets.get("state")!="ACTIVE" or assets.get("asset_set_sha256")!=ACTIVE_B):
-            raise RuntimeError("ACTIVE_BSSET_SET_CHANGED")
+            raise RuntimeError("ACTIVE_ASSET_SET_CHANGED")
         data=make_archive()
         digest=hashlib.sha256(data).hexdigest()
         chunks=[data[i:i+18000] for i in range(0,len(data),18000)]
@@ -374,6 +408,7 @@ def main() -> int:
                    .replace("__HASH__",hashlib.sha256(part).hexdigest())
                    .replace("__PART__","part-%03d.bin"%i))
             remote(script,"CHUNK_WRITTEN")
+        require_site2_safe_observation(preflight.run(HOST,args.source_sha))
         script=(REMOTE_APPLY.replace("__STAGE__",STAGE)
                 .replace("__DIGEST__",digest)
                 .replace("__NCHUNKS__",str(len(chunks)))
@@ -397,13 +432,16 @@ def main() -> int:
                       archive_sha256=digest,source_provenance="REPACKAGED_FROM_ACCEPTED_MAIN",
                       worker_sha256=final.get("worker_sha256"),
                       runtime_unchanged=True,active_bundle_unchanged=True,
-                      bootstrap_journals_unchanged=True,service_restart="NOT_RUN")
+                      bootstrap_journals_unchanged=True,service_restart="NOT_RUN",
+                      fpga_image_id=safety["fpga_image_id"],
+                      fpga_boot_id_sha12=safety["fpga_boot_id_sha12"])
         print(PREFIX+json.dumps(result,sort_keys=True))
         return 0
     except Exception as exc:
         allowed={"SOURCE_SHA_MISMATCH","OWNER_ONCE_APPROVAL_REQUIRED","HOST_DENIED",
                  "DEVICE_ID_MISMATCH","Z2_SITE2_NOT_IDLE",
-                 "BOOTSTRAP_RECOVERY_OR_RUNTIME_MISMATCH","ACTIVE_BSSET_SET_CHANGED",
+                 "BOOTSTRAP_RECOVERY_OR_RUNTIME_MISMATCH","ACTIVE_ASSET_SET_CHANGED",
+                 "SITE2_PHYSICAL_PRECHECK_BLOCKED",
                  "FACTORY_ACCEPTED_RESOLVER_SOURCE_MISMATCH",
                  "FACTORY_ACCEPTED_S2_WORKER_SOURCE_MISMATCH","FACTORY_ARCHIVE_BOUNDS_INVALID",
                  "FACTORY_ARCHIVE_CHUNK_LIMIT","ENROLLED_HOST_MISMATCH",
