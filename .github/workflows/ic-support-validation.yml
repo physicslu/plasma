@@ -68,33 +68,21 @@ jobs:
             data/ic-support/admission/validate.py \
             data/ic-support/tests/test_vendor_neutral_admission.py
           python data/ic-support/tests/test_vendor_neutral_admission.py
-      - name: Validate STM32F103C vendor-neutral admission migration
+      - name: Replay frozen STM32F103C vendor-neutral admission v1 (Runtime compiler retired)
         run: |
+          # The v1 generator/tests are frozen history that read the retired Runtime
+          # compiler from the working tree; replay serves it from the fixed
+          # migration_base_commit and asserts the original v1 artifact digests.
           python -m py_compile \
             data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission.py \
-            data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_v1.py
-          python data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_v1.py
-          out="$RUNNER_TEMP/stm32f103c-vendor-neutral-admission"
-          rm -rf "$out"
-          python data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission.py --output-dir "$out"
-          cat "$out/release-manifest.json"
-      - name: Replay STM32F103C admission v1 without the Runtime compiler
-        run: |
-          python -m py_compile \
             data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission_historical_replay.py \
             data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_historical_replay.py
+          test ! -e software/python/plasma_interfaces/openocd_plan.py
           python data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_historical_replay.py
-          v1_out="$RUNNER_TEMP/stm32f103c-vendor-neutral-admission"
-          replay_out="$RUNNER_TEMP/stm32f103c-admission-historical-replay"
-          removed="$RUNNER_TEMP/runtime-compiler-removed"
-          rm -rf "$replay_out" "$removed" && mkdir -p "$removed"
-          # Prove historical evidence is reproducible after the Runtime compiler is deleted.
-          for f in openocd_plan.py openocd_executor.py kl25_openocd_plan.py; do
-            mv "software/python/plasma_interfaces/$f" "$removed/$f"
-          done
-          trap 'for f in "$removed"/*; do mv "$f" software/python/plasma_interfaces/; done' EXIT
-          python data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission_historical_replay.py --output-dir "$replay_out"
-          diff -r "$v1_out" "$replay_out"
+          out="$RUNNER_TEMP/stm32f103c-vendor-neutral-admission"
+          rm -rf "$out"
+          python data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission_historical_replay.py --output-dir "$out"
+          cat "$out/release-manifest.json"
       - name: Upload STM32F103C vendor-neutral admission sidecar
         uses: actions/upload-artifact@v4
         with:

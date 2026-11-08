@@ -13,7 +13,7 @@
 | Data Ownership | Authoritative Runtime Contract | 已有 Loader／驗收 |
 |---|---|---|
 | Production Device Catalog | `PLASMA_DEVICE_CATALOG_MANIFEST` | `plasma_web.device_catalog`；原始 Manifest／hash／exact 行數原本即檢查 |
-| IC Support Profiles、Backend Lock | `PLASMA_IC_SUPPORT_ROOT` | `plasma_core.ic_support`、`plasma_interfaces.kl25_openocd_plan` |
+| IC Support Profiles、Backend Lock | `PLASMA_IC_SUPPORT_ROOT` | `plasma_core.ic_support`（`plasma_interfaces.kl25_openocd_plan` 已於 S5 刪除） |
 | Full Render OpenOCD / H5/C5 Research Evidence | `PLASMA_RUNTIME_EVIDENCE_ROOT` | `plasma_web.runtime_evidence_root` 與三個 source-only provider/candidate loader |
 | NXP Manufacturer evidence | 目前使用 Production Manifest 在 canonical layout 下的父層位置，#873 已修 | `plasma_web.nxp_manufacturer_device_evidence`；目前 canonical layout 之外需另做 explicit root 版本化，不能宣稱支援任意 Manifest 佈局 |
 | Wheel 內的唯讀模板／內建資源 | `importlib.resources.files(package)` | 僅限真正隨 wheel 發布的程式資源，不得假冒 repo 外部 research data |

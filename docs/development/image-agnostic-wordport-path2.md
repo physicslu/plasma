@@ -24,7 +24,7 @@ SWPC / Controller / Path 2 owner-approved Work Order
   -> receipts / readback hash / per-Site result
 ```
 
-The existing canonical `OpenOCDPlanCompiler`/`OpenOCDPlanExecutor` is
+The former canonical `OpenOCDPlanCompiler`/`OpenOCDPlanExecutor` (deleted by S5, 2026-11-08) was
 **software-only** and must not be silently promoted to production hardware
 runtime by this development tool. This first prototype uses the already
 HIL-proven single-Site physical WordPort transport with exact hardware

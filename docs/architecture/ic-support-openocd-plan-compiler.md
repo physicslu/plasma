@@ -1,6 +1,8 @@
 # Profile-driven OpenOCD Plan Compiler
 
-Status: **Current deterministic OpenOCD plan-compilation contract; introduced in Phase 3.7**
+Status: **Retired (S5, 2026-11-08); historical record of the Phase 3.7 plan-compilation contract.**
+
+> **Retired by S5 (2026-11-08):** `OpenOCDPlanCompiler`, `OpenOCDPlanExecutor`, `KL25OpenOCDPlanCompiler` and the `OpenOCDInterface` software-validation branch were deleted from the PPU Runtime. The only Runtime OpenOCD path is the C-3 Site Worker driven by the verified Bundle v3 Profile; IC Catalog / admission data is never a Runtime dependency. Historical STM32 admission evidence is reproduced by `data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission_historical_replay.py`. See the [deletion-first roadmap](plasma-core-convergence-and-deletion-first-roadmap.md).
 
 ## 1. Purpose
 

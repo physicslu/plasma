@@ -1,9 +1,9 @@
-name: KL25 backend implementation lock installed-runtime root v1
+name: Installed-wheel Runtime root and retired exact-ICPN compiler absence v1
 on:
   pull_request:
     paths:
-      - 'software/python/plasma_interfaces/kl25_openocd_plan.py'
-      - 'software/python/tests/test_kl25_openocd_plan.py'
+      - 'software/python/plasma_interfaces/**'
+      - 'software/python/pyproject.toml'
       - 'data/device-catalog/research/NXP_KL25_FCF_SECTOR_SAFETY_V1.md'
       - 'data/device-catalog/research/nxp-kl25-fcf-sector-safety-v1.json'
       - 'software/python/tests/test_kl25_runtime_root_contract_v1.py'
@@ -31,17 +31,13 @@ jobs:
           python - <<'PY'
           import os
           from pathlib import Path
-          import plasma_interfaces.kl25_openocd_plan as kl25
-          module=Path(kl25.__file__).resolve()
+          import plasma_interfaces
+          module=Path(plasma_interfaces.__file__).resolve()
           assert "site-packages" in str(module), module
           assert not module.is_relative_to(Path(os.environ["GITHUB_WORKSPACE"]).resolve()), module
-          print("KL25 installed module:", module)
+          print("Installed Runtime package:", module)
           PY
-      - name: KL25 root, lock hash and zero-admission regression
+      - name: Retired compiler/registry absence and data-root regression
         run: python -m unittest discover -s software/python/tests -p 'test_kl25_runtime_root_contract_v1.py' -v
-      - name: Existing KL25 compiler/executor software-only acceptance
-        run: |
-          python -m unittest discover -s software/python/tests -p 'test_kl25_openocd_plan.py' -v
-          python -m unittest discover -s software/python/tests -p 'test_kl25_openocd_executor.py' -v
       - name: Preserve IC Support path contract
         run: python -m unittest discover -s software/python/tests -p 'test_ic_support_resolver.py' -v
