@@ -38,3 +38,7 @@ No independent proof of redundant, safely removable authority exists for these m
 This bounded PR resolves **one true duplicate hardware-write entry**, reconciles S1-C/S2/S3 architecture/evidence, and preserves all current guards. It does **not** complete S2 multi-Site safety/recovery negative HIL, the Route B migration, multi-Host extension, or full S5 dead-code cleanup. Second physical Provider and eight-Site test are intentionally deferred.
 
 **Merge/deploy decision:** Draft Gate 1; exact-HEAD CI and independent Owner Gate 2 are required. Documentation and deletion do not require Z2 Runtime redeployment; the obsolete CLI lived only on SWPC.
+
+## Post-merge disposition (2026-11-08)
+
+**PR #1353 was merged.** Its fixed-image direct Site 2 REST Flash CLI and dedicated test were removed from main. The preceding "Draft Gate 1" language above records the original review decision, not the current merge status. The subsequent S2/S3/S5 source-only Gen7 helper cleanup is separately documented in [the retirement ledger](opf-s2-s3-s5-gen7-retirement-gate1-20261108.md). Neither source deletion changes Z2 Runtime nor proves multi-Site HIL.
