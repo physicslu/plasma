@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -49,33 +48,10 @@ def read_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def _git_blob_sha1_bytes(raw: bytes) -> str:
+def git_blob_sha1(path: Path) -> str:
+    raw = path.read_bytes()
     header = f"blob {len(raw)}\0".encode("ascii")
     return hashlib.sha1(header + raw).hexdigest()
-
-
-def git_blob_sha1(path: Path) -> str:
-    return _git_blob_sha1_bytes(path.read_bytes())
-
-
-def frozen_git_blob_text(entry: dict[str, Any], label: str) -> str:
-    """Read retired implementation evidence by Git content ID, never the working tree.
-
-    Admission data is offline Catalog governance and must not pin current PPU Runtime
-    source files; the recorded ``path`` is historical identity only.
-    """
-    blob = entry.get("git_blob_sha1")
-    require(isinstance(blob, str) and len(blob) == 40
-            and all(c in "0123456789abcdef" for c in blob), f"{label} Git blob ID invalid")
-    try:
-        raw = subprocess.run(
-            ["git", "-C", str(REPO_ROOT), "cat-file", "blob", blob],
-            check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        ).stdout
-    except (OSError, subprocess.CalledProcessError) as exc:
-        raise MigrationError(f"frozen {label} Git blob unavailable (full history required)") from exc
-    require(_git_blob_sha1_bytes(raw) == blob, f"{label} Git blob drifted")
-    return raw.decode("utf-8")
 
 
 def sha256_file(path: Path) -> str:
@@ -124,9 +100,8 @@ def _verify_blob(entry: dict[str, Any], label: str) -> None:
 
 def validate_frozen_inputs() -> dict[str, Any]:
     """Validate only the frozen execution-relevant STM32F103C migration inputs."""
-    for name in ("ground_truth", "binding", "programming_profile", "execution_ir"):
+    for name in ("ground_truth", "binding", "programming_profile", "execution_ir", "compiler"):
         _verify_blob(CONTRACT["legacy_inputs"][name], name)
-    frozen_git_blob_text(CONTRACT["legacy_inputs"]["compiler"], "compiler")
     for icpn, entry in CONTRACT["legacy_inputs"]["memory_geometry_profiles"].items():
         _verify_blob(entry, f"memory geometry {icpn}")
 
@@ -266,7 +241,8 @@ def validate_frozen_inputs() -> dict[str, Any]:
         "Execution IR operation surface drifted",
     )
 
-    compiler_text = frozen_git_blob_text(CONTRACT["legacy_inputs"]["compiler"], "compiler")
+    compiler_path = _repo_path(CONTRACT["legacy_inputs"]["compiler"]["path"])
+    compiler_text = compiler_path.read_text(encoding="utf-8")
     for sentinel in (
         "class OpenOCDPlanCompiler:",
         'f"flash erase_address {_hex32(geometry.start)} {_hex32(geometry.size_bytes)}"',
