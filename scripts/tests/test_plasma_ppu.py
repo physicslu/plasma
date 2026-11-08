@@ -40,6 +40,8 @@ class DoctorTests(unittest.TestCase):
                 mock.patch.object(doctor, "fetch_status") as status:
             result = doctor.doctor(self.options())
             self.assertEqual(result["overall"], "INCOMPLETE")
+            self.assertEqual(result["schema"], "plasma.ppu.readonly-doctor.v0")
+            self.assertIn("ppu_remote", [row["check"] for row in result["checks"]])
             status.assert_not_called()
 
     def test_recovery_required_denied(self):
@@ -72,6 +74,16 @@ class DoctorTests(unittest.TestCase):
             status, result, _ = doctor.fetch_status("z2.local", "/v1/status")
         self.assertEqual(status, "PASS")
         self.assertEqual(result["schema_version"], 1)
+
+    def test_plan_is_non_mutating_and_uses_ppu_schema(self):
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout, \
+                mock.patch.object(doctor, "fetch_status") as fetch:
+            rc = doctor.main(["plan", "--json"])
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["schema"], "plasma.ppu.readonly-doctor.v0")
+        self.assertEqual(report["overall"], "NOT_AUTHORIZED")
+        fetch.assert_not_called()
 
     def test_deploy_never_runs(self):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout, \
