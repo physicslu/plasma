@@ -8,6 +8,7 @@ change product configuration, access a PPU, touch FPGA/PL state, or program ICs.
 from __future__ import annotations
 
 import argparse
+import atexit
 import functools
 import importlib.metadata
 import importlib.util
@@ -16,6 +17,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import tomllib
 import zipapp
@@ -185,13 +187,39 @@ def _pyyaml_license() -> tuple[str, str]:
     return version, license_text
 
 
+# Catalog loaders verify SHA-256 / Git blob identity, so the shipped files must
+# be the committed bytes, never a working tree rewritten by checkout settings
+# (e.g. CRLF on Windows runners).
+CATALOG_TREES = ("data", "release")
+
+
+def _export_canonical_catalog(repo_root: Path, destination: Path) -> None:
+    try:
+        archive = subprocess.run(
+            ["git", "-C", str(repo_root), "archive", "--format=tar", "HEAD", "--", *CATALOG_TREES],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=300,
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimePackagingError(f"cannot export committed Catalog data with git archive: {exc}") from exc
+    import io
+
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as bundle:
+        if hasattr(tarfile, "data_filter"):
+            bundle.extractall(destination, filter="data")
+        else:  # git archive output from this repository; no links or absolute members
+            bundle.extractall(destination)
+
+
 @functools.lru_cache(maxsize=4)
 def _trace_device_selector(repo_root: Path) -> dict[str, object]:
+    canonical = Path(tempfile.mkdtemp(prefix="plasma-manager-catalog-"))
+    atexit.register(shutil.rmtree, canonical, True)
+    _export_canonical_catalog(repo_root, canonical)
     try:
         completed = subprocess.run(
             [sys.executable, "-I", "-B", "-c", _SELECTOR_TRACE,
-             str(repo_root), str(repo_root / "software" / "python")],
-            cwd=repo_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+             str(canonical), str(repo_root / "software" / "python")],
+            cwd=canonical, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, timeout=900, check=True,
         )
         trace = json.loads(completed.stdout.strip().splitlines()[-1])
@@ -203,6 +231,7 @@ def _trace_device_selector(repo_root: Path) -> dict[str, object]:
     files = trace.get("files")
     if not isinstance(files, list) or CATALOG_MANIFEST_RELATIVE not in files or not trace.get("records"):
         raise RuntimePackagingError("Manager Device Selector trace found no public Catalog records")
+    trace["canonical_root"] = str(canonical)
     return trace
 
 
@@ -256,7 +285,7 @@ def _build_manager_zipapp(repo_root: Path, destination: Path) -> tuple[str, str]
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
         _copy_device_selector_catalog(
-            repo_root, trace["files"], destination.parent / MANAGER_CATALOG_DIR
+            Path(str(trace["canonical_root"])), trace["files"], destination.parent / MANAGER_CATALOG_DIR
         )
         shutil.copytree(
             yaml_source,
