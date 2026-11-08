@@ -196,7 +196,9 @@ CATALOG_TREES = ("data", "release")
 def _export_canonical_catalog(repo_root: Path, destination: Path) -> None:
     try:
         archive = subprocess.run(
-            ["git", "-C", str(repo_root), "archive", "--format=tar", "HEAD", "--", *CATALOG_TREES],
+            # No EOL conversion: archive output must be the raw committed blobs.
+            ["git", "-C", str(repo_root), "-c", "core.autocrlf=false", "-c", "core.eol=lf",
+             "archive", "--format=tar", "HEAD", "--", *CATALOG_TREES],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=300,
         ).stdout
     except (OSError, subprocess.SubprocessError) as exc:
