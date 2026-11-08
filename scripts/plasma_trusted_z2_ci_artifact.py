@@ -70,10 +70,22 @@ def admit(run: dict, listing: dict, *, source_sha: str, run_id: int) -> dict:
     need(type(repo) is dict and repo.get("full_name") == REPOSITORY and
          type(repo.get("id")) is int and type(head_repo) is dict and
          head_repo.get("full_name") == REPOSITORY, "RUN_REPOSITORY_DENIED")
+    # Trusted main push OR a first-attempt main-only manual release actually
+    # initiated by the repository owner. Keep identical repository, exact
+    # workflow path, branch/SHA, success and artifact digest verification.
     need(type(run.get("id")) is int and run["id"] == run_id and
          run.get("head_sha") == source_sha and
          run.get("head_branch") == "main" and
-         run.get("event") == "push" and
+         (
+             run.get("event") == "push" or
+             (run.get("event") == "workflow_dispatch"
+              and type(run.get("actor")) is dict
+              and run["actor"].get("login") == "physicslu"
+              and type(run.get("triggering_actor")) is dict
+              and run["triggering_actor"].get("login") == "physicslu"
+              and type(run.get("run_attempt")) is int
+              and run["run_attempt"] == 1)
+         ) and
          run.get("path") == WORKFLOW and
          run.get("status") == "completed" and
          run.get("conclusion") == "success", "RUN_PROVENANCE_DENIED")
