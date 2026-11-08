@@ -1,6 +1,6 @@
 # Vendor-neutral IC admission governance
 
-Status: **Current governance contract with compiler-registry integration**
+Status: **Current offline governance contract** (Runtime compiler-registry integration retired by S5, 2026-11-08)
 
 ## Purpose
 
@@ -66,16 +66,14 @@ This prevents one high-level request name from silently inheriting the semantics
 
 A backend implementation binding records an implementation identity and revision, implementation evidence references, and an opaque vendor constraint payload reference. The lock digest covers those fields. The generic validator verifies the constraint payload reference but does not parse its semantics.
 
-## Compiler registry boundary
+## Runtime boundary (S5)
 
-The runtime `CompilerRegistry` consumes a small content-addressed admission projection that is deterministically checked against generic-valid admission packages in CI. Runtime does not import benchmark or migration code as an authority. The projection contains only operation rows that already passed generic admission validation, and its own digest is verified before registry construction.
+The former Runtime `CompilerRegistry` and its packaged content-addressed admission projection were deleted (S5, 2026-11-08). Admission packages, reviews, operation admissions and backend bindings are **offline upstream governance artifacts**. They may later be used to *generate* a Bundle v3, but the PPU Runtime never imports, packages or queries them, the IC Catalog or any L0/L1/L2 list as a programming precondition. A legitimate Bundle v3 need not originate from this framework.
 
-The registry selects by `compiler_id` only when the exact target and request operation are `ADMITTED`, and it requires the selected compiler registration to match both `backend_id` and `backend_lock_digest`. Registering a compiler alone never admits an operation. Existing admitted routes carry their operation-admission, operation-contract, backend-lock, and compiler identities into the resolved route metadata before plan compilation.
-
-Compiler selection remains separate from execution readiness. A projection with `hardware_runtime_ready=true` is rejected by the current software-only runtime integration; current routes continue to stop before hardware execution.
+PPU execution is decided only by the verified Active Bundle v3, actual device capability, owner authorization and hardware-safety checks. Generic-valid admission packages continue to be rebuilt and validated by `ic-support-validation.yml`.
 
 ## Current integration boundary
 
-No catalog record, Production target set, runtime launcher, deployment job, programmable-logic component, or hardware readiness flag is changed by compiler-registry integration.
+No catalog record, Production target set, runtime launcher, deployment job, programmable-logic component, or hardware readiness flag is changed or authorized by this offline admission framework.
 
 Migration of existing target artifacts requires separate work. A migration must construct target-owned payload schemas and prove equivalence without rewriting historical evidence or review records.

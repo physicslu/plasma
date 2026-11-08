@@ -199,8 +199,9 @@ a hardcoded Compiler/Backend/Image ID, or OpenOCD availability when the
 selected valid Provider does not require it.
 
 **Current implementation is incomplete:** existing B2 factory FPGA
-contracts, static Runtime operation-admission projection and OpenOCD-only
+contracts and OpenOCD-only
 Site adapter remain until replaced by trusted Bundle-derived equivalents.
 This paragraph does **not** declare current Bundle v3 Parser capable of
 executing an opaque Resource Package or bypass B1/B2/B3 and local safety gates.
+The static Runtime operation-admission projection was deleted by S5 (2026-11-08).
 
