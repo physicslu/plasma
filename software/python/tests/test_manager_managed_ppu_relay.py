@@ -151,6 +151,44 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         conn.close()
         return result
 
+    def test_catalog_failure_is_isolated_from_managed_programming(self):
+        """PR-C2: a Manager Catalog fault is confined to the Device Selector.
+
+        The Selector answers 503 (never empty), is never relayed to a PPU, and
+        authorized PPU programming relays keep working unchanged.
+        """
+        import sys
+        from unittest.mock import patch
+
+        from plasma_manager import server as manager_server
+
+        before = len(FakeManagedPPUGatewayHandler.requests)
+        with patch.dict(sys.modules, {manager_server.DEVICE_SELECTOR_MODULE: None}):
+            conn = HTTPConnection("127.0.0.1", self.manager_server.server_port, timeout=3)
+            conn.request("GET", "/api/devices/search?q=STM32")
+            response = conn.getresponse()
+            selector = json.loads(response.read())
+            conn.close()
+            self.assertEqual(response.status, 503)
+            self.assertEqual(selector["error"]["error_type"], "DEVICE_SELECTOR_UNAVAILABLE")
+            self.assertNotIn("results", selector)
+
+            status, _, _ = self.relay("GET", "/api/devices/search?q=STM32")
+            self.assertNotEqual(status, 200)
+            self.assertFalse(any("/api/devices/search" in r["path"]
+                                 for r in FakeManagedPPUGatewayHandler.requests[before:]))
+
+            body = json.dumps({"site_id": 1, "operation": "flash_cycle"}).encode("utf-8")
+            status, _, data = self.relay(
+                "POST", "/api/jobs", body=body,
+                headers={"Content-Type": "application/json", "Idempotency-Key": "catalog-down-1"},
+            )
+            self.assertEqual(status, 200, data)
+            self.assertEqual(FakeManagedPPUGatewayHandler.requests[-1]["path"], "/api/jobs")
+            self.assertEqual(FakeManagedPPUGatewayHandler.requests[-1]["body"], body)
+            status, _, _ = self.relay("GET", "/api/status")
+            self.assertEqual(status, 200)
+
     def test_json_command_preserves_security_headers(self):
         body = b"{}"
         status, _, data = self.relay(

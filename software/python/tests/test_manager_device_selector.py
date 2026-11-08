@@ -182,3 +182,30 @@ def test_packaged_manager_serves_selector_from_its_own_catalog(tmp_path: Path):
         process.wait(timeout=10)
     text = log.read_text(errors="replace")
     assert "Traceback" not in text, text
+
+
+
+def test_catalog_export_is_raw_git_blob_bytes_even_with_autocrlf(tmp_path: Path, monkeypatch):
+    """Windows and Linux package identical committed Catalog bytes.
+
+    core.autocrlf=true (the Windows-runner default) is injected through the
+    environment only; the export must still match every admitted source's
+    locked Git blob SHA *and* SHA-256 from the Production manifest. The locks
+    themselves are unchanged and enforced, never relaxed.
+    """
+    import hashlib
+    import posixpath
+
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.autocrlf")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "true")
+    packager = _load_packager()
+    packager._export_canonical_catalog(ROOT, tmp_path)
+    manifest_relative = packager.CATALOG_MANIFEST_RELATIVE
+    manifest = json.loads((tmp_path / manifest_relative).read_bytes())
+    for source in manifest["sources"]:
+        relative = posixpath.normpath(posixpath.join(posixpath.dirname(manifest_relative), source["path"]))
+        data = (tmp_path / relative).read_bytes()
+        assert hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest() == source["git_blob_sha"], relative
+        assert hashlib.sha256(data).hexdigest() == source["sha256"], relative
+    assert manifest["sources"]
