@@ -195,6 +195,30 @@ class STM32F103CVendorNeutralAdmissionTests(unittest.TestCase):
         adapter.seal(operations)
         self._assert_semantic_fail(package, "STM32F103C8T6")
 
+    def test_admission_does_not_read_runtime_compiler_from_working_tree(self) -> None:
+        # Catalog governance is independent of the PPU Runtime source tree: the
+        # frozen compiler evidence is read by Git content ID, so deleting or
+        # editing the Runtime file cannot change admission validity or digests.
+        baseline = {target: adapter.canonical_digest(adapter.build_package(target))
+                    for target in adapter.CONTRACT["targets"]}
+        compiler = adapter.CONTRACT["legacy_inputs"]["compiler"]
+        original_path = compiler["path"]
+        compiler["path"] = "software/python/plasma_interfaces/__retired_runtime_compiler__.py"
+        try:
+            self.assertFalse((adapter.REPO_ROOT / compiler["path"]).exists())
+            adapter.validate_frozen_inputs()
+            compiler["path"] = original_path
+            for target, digest in baseline.items():
+                self.assertEqual(adapter.canonical_digest(adapter.build_package(target)), digest)
+        finally:
+            compiler["path"] = original_path
+
+    def test_unknown_or_malformed_frozen_compiler_blob_fails_closed(self) -> None:
+        for blob in ("0" * 40, "A" * 40, "not-a-blob", None):
+            with self.subTest(blob=blob):
+                with self.assertRaises(adapter.MigrationError):
+                    adapter.frozen_git_blob_text({"git_blob_sha1": blob}, "compiler")
+
 
 if __name__ == "__main__":
     unittest.main()

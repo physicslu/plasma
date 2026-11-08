@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import validate_st_c5_dfp_loader_crosswalk_v09 as v09
@@ -54,6 +55,52 @@ def verify_source_bytes(path: Path, expected_blob: str, description: str) -> str
     raw = path.read_bytes()
     require(v09.git_blob(raw) == expected_blob, f"{description}: Git blob/source provenance mismatch")
     return raw.decode("utf-8")
+
+
+def read_frozen_git_blob(expected_blob: str, description: str) -> str:
+    """Read historical Plasma source evidence by Git content ID, never the working tree.
+
+    This research gate is offline Catalog governance; it must not pin or require
+    current PPU Runtime files. The recorded path is historical identity only.
+    """
+    require(isinstance(expected_blob, str) and re.fullmatch(r"[0-9a-f]{40}", expected_blob) is not None,
+            f"{description}: Git blob ID invalid")
+    try:
+        raw = subprocess.run(["git", "-C", str(ROOT), "cat-file", "blob", expected_blob],
+                             check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(f"{description}: frozen Git blob unavailable (full history required)") from exc
+    require(v09.git_blob(raw) == expected_blob, f"{description}: Git blob/source provenance mismatch")
+    return raw.decode("utf-8")
+
+
+def validate_plasma_source_evidence(ps: dict) -> None:
+    """Historical (reference_main_merge_commit) Plasma PS runtime-block evidence."""
+    sources = (
+        ("openocd_executor_path", "openocd_executor_blob_sha", EXPECTED_PLASMA_EXECUTOR),
+        ("openocd_interface_path", "openocd_interface_blob_sha", EXPECTED_PLASMA_INTERFACE),
+        ("site_router_path", "site_router_blob_sha", EXPECTED_PLASMA_ROUTER),
+    )
+    text = {}
+    for field_path, field_sha, expected_sha in sources:
+        require(ps[field_sha] == expected_sha, "Plasma PS source-lock digest drift")
+        text[field_path] = read_frozen_git_blob(expected_sha, field_path)
+    executor = text["openocd_executor_path"]
+    interface = text["openocd_interface_path"]
+    router = text["site_router_path"]
+    require("process_launcher: ProcessLauncher | None = None" in executor and
+            "self._process_launcher = process_launcher" in executor and
+            "if self._process_launcher is None:" in executor and
+            "OpenOCD compiled-plan executor has no software-validation process launcher" in executor,
+            "real execution might be reachable without explicit launcher")
+    require("def _raise_hardware_runtime_not_ready()" in interface and
+            interface.count("self._raise_hardware_runtime_not_ready()") >= 4 and
+            "OpenOCD hardware runtime is not enabled" in interface,
+            "OpenOCD direct hardware path may be newly enabled")
+    require('"backend_implementation_state": "plan_compiled_not_executable"' in router and
+            '"hardware_runtime_ready": False' in router and
+            'if route.get("hardware_runtime_ready") is not True:' in router,
+            "PS runtime router admission contract has changed")
 
 
 def patch_in_memory(cfg_bytes: bytes) -> str:
@@ -186,33 +233,7 @@ def validate_source_repo_boundary() -> dict:
             all(len(v) == 1 for v in rams.values()),
             "official RAM algorithm group no longer uniquely matches pinned DFP")
     ps = info["plasma_source"]
-    sources = (
-        ("openocd_executor_path", "openocd_executor_blob_sha", EXPECTED_PLASMA_EXECUTOR),
-        ("openocd_interface_path", "openocd_interface_blob_sha", EXPECTED_PLASMA_INTERFACE),
-        ("site_router_path", "site_router_blob_sha", EXPECTED_PLASMA_ROUTER),
-    )
-    text = {}
-    for field_path, field_sha, expected_sha in sources:
-        require(ps[field_sha] == expected_sha, "Plasma PS source-lock digest drift")
-        path = ROOT / ps[field_path]
-        require(path.is_file(), "Plasma selected PS source file absent")
-        text[field_path] = verify_source_bytes(path, expected_sha, field_path)
-    executor = text["openocd_executor_path"]
-    interface = text["openocd_interface_path"]
-    router = text["site_router_path"]
-    require("process_launcher: ProcessLauncher | None = None" in executor and
-            "self._process_launcher = process_launcher" in executor and
-            "if self._process_launcher is None:" in executor and
-            "OpenOCD compiled-plan executor has no software-validation process launcher" in executor,
-            "real execution might be reachable without explicit launcher")
-    require("def _raise_hardware_runtime_not_ready()" in interface and
-            interface.count("self._raise_hardware_runtime_not_ready()") >= 4 and
-            "OpenOCD hardware runtime is not enabled" in interface,
-            "OpenOCD direct hardware path may be newly enabled")
-    require('"backend_implementation_state": "plan_compiled_not_executable"' in router and
-            '"hardware_runtime_ready": False' in router and
-            'if route.get("hardware_runtime_ready") is not True:' in router,
-            "PS runtime router admission contract has changed")
+    validate_plasma_source_evidence(ps)
     require(ps["executor_no_default_process_launcher"] is True and
             ps["interface_direct_erase_program_verify_read_are_blocked"] is True and
             ps["backend_implementation_state"] == "plan_compiled_not_executable" and
