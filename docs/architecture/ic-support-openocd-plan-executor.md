@@ -1,6 +1,8 @@
 # IC Support OpenOCD Compiled-Plan Executor
 
-Status: **Current software-only compiled-plan executor contract; introduced in Phase 3.8**
+Status: **Current normative OpenOCD PS placement (§2) and Site power/reset safety (§11).** The software-only compiled-plan executor described in §1 and §3–§10, §12–§13 (Phase 3.8) is **retired** and kept as historical record.
+
+> **Retired by S5 (2026-11-08):** `OpenOCDPlanCompiler`, `OpenOCDPlanExecutor`, `KL25OpenOCDPlanCompiler` and the `OpenOCDInterface` software-validation branch were deleted from the PPU Runtime. The only Runtime OpenOCD path is the C-3 Site Worker driven by the verified Bundle v3 Profile; IC Catalog / admission data is never a Runtime dependency. Historical STM32 admission evidence is reproduced by `data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission_historical_replay.py`. See the [deletion-first roadmap](plasma-core-convergence-and-deletion-first-roadmap.md).
 
 ## 1. Purpose
 
@@ -79,6 +81,8 @@ ResolvedICSupport
 ```
 
 but that is a separate future phase and must not be inferred from OpenOCD readiness.
+
+> §3–§10 below are historical (retired compiled-plan executor); they are not current Runtime behavior.
 
 ## 3. Core invariant
 

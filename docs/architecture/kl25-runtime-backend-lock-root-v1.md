@@ -1,5 +1,7 @@
 # KL25 Programming Backend Lock — Installed-runtime Data Root v1
 
+> **S5 退役（2026-11-08）：** `plasma_interfaces/kl25_openocd_plan.py`（含 `load_backend_lock()`）與其測試已自 PPU Runtime 刪除。KL25 backend implementation lock 屬離線 IC Catalog 治理資料，由 `plasma_web/nxp_kl25_qualification.py` 以 digest 釘選；`test_kl25_runtime_root_contract_v1.py` 改為驗證已安裝 Runtime 不含任何已退役 exact-ICPN compiler／registry／projection。以下為歷史紀錄。
+
 **批次 B，根據 Runtime Data Root 架構稽核 #875；前置批次 A：#876 已合併。**
 
 ## 目標與既有問題

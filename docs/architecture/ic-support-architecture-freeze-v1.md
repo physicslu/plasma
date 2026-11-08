@@ -290,7 +290,7 @@ compiler registered
 
 The compiler layer remains vendor/backend-specific.
 
-For STM32F103C, the existing `OpenOCDPlanCompiler` derives target-specific ranges from the resolved Memory Geometry Profile.
+(Historical — these compilers were deleted from the Runtime by S5, 2026-11-08.) For STM32F103C, the existing `OpenOCDPlanCompiler` derives target-specific ranges from the resolved Memory Geometry Profile.
 
 For KL25, `KL25OpenOCDPlanCompiler` retains KL25-specific alignment, Flash Configuration Field, erase-sector, and OpenOCD target constraints.
 
