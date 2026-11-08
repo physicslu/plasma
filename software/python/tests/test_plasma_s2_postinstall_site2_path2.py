@@ -6,6 +6,7 @@ import sys
 from copy import deepcopy
 import pytest
 ROOT=Path(__file__).resolve().parents[3]
+sys.path.insert(0,str(ROOT/"scripts"))
 spec=importlib.util.spec_from_file_location("s2_postinstall_path2",ROOT/"scripts/plasma_s2_postinstall_site2_path2.py")
 assert spec and spec.loader
 m=importlib.util.module_from_spec(spec);sys.modules[spec.name]=m;spec.loader.exec_module(m)
