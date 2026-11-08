@@ -128,13 +128,13 @@ class CompilerRegistryTests(unittest.TestCase):
         sys.path[:0] = [str(admission_root), str(migration_root)]
         try:
             import stm32f103c_vendor_neutral_admission as migration
-            from plasma_server.execution_router import _default_compiler_registry
 
             projected = {
                 (row.target_icpn, row.request_operation): row
                 for row in load_operation_admission_projection()
             }
-            registry = _default_compiler_registry()
+            # Qualified plan registry is an offline evidence validator, not Runtime admission.
+            registry = CompilerRegistry(self.bindings(), tuple(projected.values()))
             expected_keys: set[tuple[str, str]] = set()
 
             for target in migration.CONTRACT["targets"]:

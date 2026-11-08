@@ -12,7 +12,7 @@ import plasma_interfaces.kl25_openocd_plan as kl25
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import IC_SUPPORT_ROOT_ENV
-from plasma_server.execution_router import _default_compiler_registry
+from plasma_interfaces.compiler_registry import load_operation_admission_projection
 
 ROOT = Path(__file__).resolve().parents[3]
 SUPPORT = ROOT / "data/ic-support"
@@ -64,13 +64,15 @@ class KL25InstalledRuntimeLockTests(unittest.TestCase):
                 kl25.load_backend_lock()
             self.assertEqual(error.exception.code,ErrorCode.CONFIG_INVALID)
 
-    def test_default_compiler_binding_is_not_an_operation_admission(self):
-        registry = _default_compiler_registry()
-        for operation in (Operation.PROGRAM,Operation.ERASE,Operation.READ,Operation.VERIFY):
+    def test_kl25_offline_evidence_does_not_authorize_runtime(self):
+        projected = load_operation_admission_projection()
+        for operation in (Operation.PROGRAM, Operation.ERASE, Operation.READ, Operation.VERIFY):
             with self.subTest(operation=operation):
-                with self.assertRaises(PlasmaError) as error:
-                    registry.select("MKL25Z128VLK4",operation)
-                self.assertEqual(error.exception.code,ErrorCode.OPERATION_UNSUPPORTED)
+                self.assertFalse(any(
+                    row.target_icpn == "MKL25Z128VLK4"
+                    and row.request_operation == operation.name
+                    for row in projected
+                ))
 
     def test_module_relative_root_regression_guard_for_affected_loaders(self):
         modules = (
