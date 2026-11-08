@@ -86,3 +86,51 @@ def test_wrong_source_sha_denies_before_device_access(monkeypatch, capsys):
     payload = json.loads(output.split("PLASMA_FACTORY_REFRESH=", 1)[1])
     assert payload["reason"] == "SOURCE_SHA_MISMATCH"
     assert payload["runtime_install"] == "NOT_RUN"
+
+
+def _safe_snapshot(mod):
+    return {
+        "status": "READ_ONLY_OBSERVED",
+        "readiness": "NO_KNOWN_BLOCKER_IN_OBSERVED_FIELDS",
+        "blockers": [],
+        "z2": {
+            "release": {"current": mod.OLD},
+            "engine": {"status": "VERIFIED", "driver": "plasma_swd",
+                       "abi": 5,
+                       "openocd_sha256_observed": mod.EXPECTED_ENGINE_BINARY,
+                       "admission_sha256_observed": mod.EXPECTED_ENGINE_ADMISSION},
+            "fpga": {"status": "IMAGE", "boot_match": True,
+                     "manager_state": "operating", "image_id": "paired-image"},
+            "site2_seal": {"present": False},
+            "site2_admission": {"present": False},
+            "openocd_pids": [],
+        },
+        "rest": {"active_job_count": 0, "lease_busy": False,
+                 "activation_active": False, "site2_idle": True},
+    }
+
+
+def test_live_preflight_requires_all_safety_fields():
+    mod = load_helper()
+    record = _safe_snapshot(mod)
+    assert mod.require_site2_safe_observation(record)["fpga_image_id"] == "paired-image"
+    from copy import deepcopy
+    mutations = [
+        ("readiness", "BLOCKED_OR_UNVERIFIED"),
+        ("z2", {"release": {"current": mod.OLD}}),
+        ("rest", {"active_job_count": 1}),
+    ]
+    for key, value in mutations:
+        invalid = deepcopy(record)
+        invalid[key] = value
+        with pytest.raises(RuntimeError, match="SITE2_PHYSICAL_PRECHECK_BLOCKED"):
+            mod.require_site2_safe_observation(invalid)
+    for key in ("site2_seal", "site2_admission"):
+        invalid = deepcopy(record)
+        invalid["z2"][key]["present"] = True
+        with pytest.raises(RuntimeError, match="SITE2_PHYSICAL_PRECHECK_BLOCKED"):
+            mod.require_site2_safe_observation(invalid)
+    invalid = deepcopy(record)
+    invalid["z2"]["fpga"]["boot_match"] = False
+    with pytest.raises(RuntimeError, match="SITE2_PHYSICAL_PRECHECK_BLOCKED"):
+        mod.require_site2_safe_observation(invalid)
