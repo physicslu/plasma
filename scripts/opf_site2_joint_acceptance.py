@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Path 2 Site 2 joint acceptance: Doctor -> reconcile -> B1/B2/B3 -> Doctor.
 
-Uses the existing read-only plasma_z2 Doctor and the existing reviewed OPF
+Uses the existing read-only plasma_ppu Doctor and the existing reviewed OPF
 Bootstrap deployment adapter. No direct installer, shell, service restart,
 FPGA load, Engine switch, or DUT operation. No retry after ambiguous writes.
 """
@@ -15,7 +15,7 @@ import sys
 from argparse import Namespace
 from pathlib import Path
 
-import plasma_z2
+import plasma_ppu
 import opf_site2_path2_bundle_deploy as deployer
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -94,13 +94,13 @@ def observe_active(host: str, *, helper) -> dict:
 
 
 def doctor_snapshot() -> tuple[dict, str]:
-    host = plasma_z2.paired_host()
+    host = plasma_ppu.paired_host()
     # Resolve the authenticated local target exactly once. Doctor uses that
     # same host instead of reading mutable paired config a second time.
     args = Namespace(repo=ROOT, host=host, paired_host=False,
                      ssh_user=None, known_hosts=Path.home() /
                      ".config/plasma/z2-login-known_hosts")
-    document = plasma_z2.doctor(args)
+    document = plasma_ppu.doctor(args)
     indexed = {row["check"]: row for row in document["checks"]}
     expected = ("tcp_18080", "tcp_18081",
                 "bootstrap_health", "bootstrap_status", "deployment_guard")

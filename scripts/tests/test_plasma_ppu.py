@@ -1,4 +1,4 @@
-"""Host-only safety tests for the Z2 Path 2 diagnostic CLI."""
+"""Host-only safety tests for the generic PPU diagnostic CLI (Z2 backend)."""
 import importlib.util
 import io
 import json
@@ -8,8 +8,8 @@ from argparse import Namespace
 from pathlib import Path
 from unittest import mock
 
-SCRIPT = Path(__file__).resolve().parents[1] / "plasma_z2.py"
-spec = importlib.util.spec_from_file_location("plasma_z2", SCRIPT)
+SCRIPT = Path(__file__).resolve().parents[1] / "plasma_ppu.py"
+spec = importlib.util.spec_from_file_location("plasma_ppu", SCRIPT)
 doctor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(doctor)
 
@@ -79,6 +79,7 @@ class DoctorTests(unittest.TestCase):
             rc = doctor.main(["deploy", "--json"])
         self.assertEqual(rc, 2)
         self.assertEqual(json.loads(stdout.getvalue())["reason"], "DEPLOY_DISABLED_BY_DESIGN")
+        self.assertEqual(json.loads(stdout.getvalue())["schema"], "plasma.ppu.readonly-doctor.v0")
         fetch.assert_not_called()
 
 
