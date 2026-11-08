@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import re
 import socketserver
@@ -8,7 +9,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from threading import RLock
+from threading import RLock, Thread
 from typing import Any
 from urllib.parse import unquote, urlparse
 
@@ -40,6 +41,33 @@ PS_LOOPBACK_ROUTE_PREFIX = "/api/ppus/"
 PS_LOOPBACK_ROUTE_SUFFIX = "/diagnostics/loopback"
 MANAGED_PPU_ROUTE_PREFIX = "/api/ppus/"
 MANAGED_PPU_ROUTE_MARKER = "/gateway"
+# Manager owns the Catalog-only Device Selector (OPF S5 / PR-C2). It is served
+# in-process from Catalog data available to this Manager, never relayed to a
+# PPU (a Catalog-free PPU answers 503). Absent module/data => explicit 503.
+DEVICE_SEARCH_ROUTE = "/api/devices/search"
+DEVICE_SELECTOR_MODULE = "plasma_web.legacy_device_selector"
+
+
+def _device_selector() -> Any | None:
+    try:
+        return importlib.import_module(DEVICE_SELECTOR_MODULE)
+    except ImportError:
+        return None
+
+
+def warm_device_selector() -> bool:
+    """Best-effort Selector warm-up; never a Manager startup dependency."""
+    selector = _device_selector()
+    if selector is None:
+        print("Manager Device Selector unavailable: Catalog modules are not installed")
+        return False
+    try:
+        counts = selector.warm()
+    except Exception as exc:  # Selector must never block fleet management.
+        print(f"Manager Device Selector unavailable: {type(exc).__name__}: {exc}")
+        return False
+    print("Manager Device Selector ready: " + " ".join(f"L{k}={v}" for k, v in counts.items()))
+    return True
 REGISTRY_ROUTE = "/api/registry"
 REGISTRY_ROUTE_PREFIX = "/api/registry/"
 NETWORK_COMMISSIONING_SUFFIX = "/network-commissioning"
@@ -61,7 +89,6 @@ _MANAGED_GET_PATTERNS = tuple(
         r"^/api/settings/sites$",
         r"^/api/mock/runtime$",
         r"^/api/security/me$",
-        r"^/api/devices/search$",
         r"^/api/engineering/targets$",
         rf"^/api/jobs/{_SEGMENT}/files/{_SEGMENT}$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/status$",
@@ -674,12 +701,40 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/fleet":
             self._json(HTTPStatus.OK, self._poller().snapshot())
             return
+        if parsed.path == DEVICE_SEARCH_ROUTE:
+            self._handle_device_search(parsed.query)
+            return
         managed = self._parse_managed_ppu_route(parsed.path)
         if managed is not None:
             alias, target_path = managed
             self._relay_managed_ppu_request(alias, target_path, parsed.query)
             return
         self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
+
+    def _handle_device_search(self, raw_query: str) -> None:
+        selector = _device_selector()
+        if selector is None:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "ok": False,
+                    "error": {
+                        "error_type": "DEVICE_SELECTOR_UNAVAILABLE",
+                        "message": "Device Selector Catalog modules are not installed on this Manager",
+                        "recoverable": True,
+                    },
+                },
+            )
+            return
+        try:
+            status, payload = selector.search_response(raw_query)
+        except Exception as exc:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                selector.unavailable_payload(f"Device Selector failed: {type(exc).__name__}: {exc}"),
+            )
+            return
+        self._json(status, payload)
 
     def _relay_ps_loopback(self, alias: str) -> None:
         entry = self._resolve_ppu_alias(alias)
@@ -997,6 +1052,7 @@ def serve(config: ManagerConfig) -> None:
     PlasmaManagerHandler.network_commissioning = commissioning
     server = PlasmaManagerHTTPServer((config.host, config.port), PlasmaManagerHandler)
     poller.start(prime_cache=False)
+    Thread(target=warm_device_selector, name="plasma-device-selector-warm", daemon=True).start()
     print(f"Plasma Manager listening on http://{config.host}:{config.port}")
     try:
         server.serve_forever()

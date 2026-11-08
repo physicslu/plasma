@@ -88,7 +88,7 @@ async function installDashboardMock(page: Page) {
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
   });
 
-  await page.route("**/api/devices/search**", async route => {
+  await page.route("**/api/manager/devices/search**", async route => {
     const query = new URL(route.request().url()).searchParams.get("q") ?? "";
     await route.fulfill({
       status: 200,

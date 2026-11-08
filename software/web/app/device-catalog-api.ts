@@ -1,4 +1,3 @@
-import { normalizeApiBase } from "./plasma-api";
 
 export type BackendCandidateEvidence = {
   family: "STM32H5" | "STM32C5";
@@ -424,8 +423,12 @@ export type DeviceSearchResponse = {
   results: DeviceSearchResult[];
 };
 
+// OPF S5 / PR-C2: the Device Selector is owned by Plasma Manager. The Console
+// reaches it through its same-origin Manager BFF; it is never a PPU Gateway
+// route and never follows the Gateway apiBase / managed PPU relay.
+export const DEVICE_SELECTOR_PATH = "/api/manager/devices/search";
+
 export type DeviceSearchOptions = {
-  apiBase: string;
   limit?: number;
   offset?: number;
   levels?: Array<1 | 2 | 3>;
@@ -436,7 +439,6 @@ export async function searchDevices(
   query: string,
   options: DeviceSearchOptions,
 ): Promise<DeviceSearchResponse> {
-  const apiBase = normalizeApiBase(options.apiBase);
   const limit = options.limit ?? 20;
   const offset = options.offset ?? 0;
   const levels = options.levels ?? [1, 2, 3];
@@ -446,7 +448,7 @@ export async function searchDevices(
     offset: String(offset),
     levels: levels.join(","),
   });
-  const response = await fetch(`${apiBase}/api/devices/search?${params.toString()}`, {
+  const response = await fetch(`${DEVICE_SELECTOR_PATH}?${params.toString()}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },
     signal: options.signal,

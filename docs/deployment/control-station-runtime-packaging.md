@@ -92,9 +92,23 @@ The zipapp contains:
 
 ```text
 plasma_manager/
+plasma_core/, plasma_web/   # Device Selector Catalog projection closure only (PR-C2)
 yaml/                 # pure-Python PyYAML runtime
 __main__.py
 ```
+
+**Device Selector (OPF S5 / PR-C2).** Plasma Manager owns the Catalog-only
+Device Selector and answers `GET /api/devices/search` in-process; it is never
+relayed to a PPU (a Catalog-free PPU answers `503 DEVICE_SELECTOR_UNAVAILABLE`).
+At build time `scripts/control-station-runtime.py` traces a Selector warm-up
+plus a sweep of every public L1–L3 record and ships exactly the Python modules
+and Catalog files it read (including complete evidence sets checked by
+`source_files_available`) under `manager/catalog/`. `__main__.py` defaults
+`PLASMA_DEVICE_CATALOG_MANIFEST`, `PLASMA_IC_SUPPORT_ROOT` and
+`PLASMA_RUNTIME_EVIDENCE_ROOT` to that directory unless explicitly set. The
+zipapp never contains the PPU Gateway, Server or interfaces. Missing modules or
+data make the Selector answer 503, never an empty result. The Console calls the
+same-origin BFF `GET /api/manager/devices/search`.
 
 The target invocation is conceptually:
 
@@ -141,6 +155,10 @@ runtime/
 │   └── ... Vinext standalone runtime files
 └── manager/
     ├── manager.pyz
+    ├── catalog/          # traced Device Selector Catalog data (PR-C2)
+    │   ├── data/device-catalog/...
+    │   ├── data/ic-support/...
+    │   └── release/openocd*.json ...
     └── THIRD_PARTY_LICENSES/
         └── PyYAML.txt
 ```

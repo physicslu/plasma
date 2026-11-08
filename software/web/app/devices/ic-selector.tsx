@@ -13,7 +13,6 @@ type CatalogLevelFilter = "all" | 1 | 2 | 3;
 
 export type ICSelectorProps = {
   usage?: ICSelectorUsage;
-  apiBase: string;
   onSelect?: (device: DeviceSearchResult) => void;
 };
 
@@ -156,7 +155,7 @@ function formatClock(
 
 const SEARCH_PAGE_SIZE = 30;
 
-export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorProps) {
+export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
   const { locale } = useI18n();
   const zh = locale === "zh-TW";
   const [query, setQuery] = useState("");
@@ -174,11 +173,11 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
     const levels: Array<1 | 2 | 3> = usage === "picker"
       ? [2, 3]
       : levelFilter === "all" ? [1, 2, 3] : [levelFilter];
-    void searchDevices("", { apiBase, limit: 1, levels, signal: controller.signal })
+    void searchDevices("", { limit: 1, levels, signal: controller.signal })
       .then(payload => setCatalogSize(payload.catalog_size))
       .catch(() => undefined);
     return () => controller.abort();
-  }, [apiBase, levelFilter, usage]);
+  }, [levelFilter, usage]);
 
   useEffect(() => {
     const normalized = query.trim();
@@ -193,7 +192,6 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
           ? [2, 3]
           : levelFilter === "all" ? [1, 2, 3] : [levelFilter];
         const payload = await searchDevices(normalized, {
-          apiBase,
           limit: SEARCH_PAGE_SIZE,
           offset: pageOffset,
           levels,
@@ -216,7 +214,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [apiBase, levelFilter, pageOffset, query, usage]);
+  }, [levelFilter, pageOffset, query, usage]);
 
   function updateQuery(value: string) {
     setQuery(value);

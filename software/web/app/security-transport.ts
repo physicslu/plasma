@@ -43,7 +43,6 @@ const gatewayPathPrefixes = [
   "/api/mock/runtime",
   "/api/engineering",
   "/api/security",
-  "/api/devices/search",
   "/api/health",
   "/api/node",
 ];

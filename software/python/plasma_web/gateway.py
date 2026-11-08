@@ -397,41 +397,18 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
         )
 
     def _device_search(self, raw_query: str) -> None:
+        # Transitional PPU copy; the Device Selector is owned by Manager (PR-C2).
         try:
             selector = _legacy_device_selector()
-            params = parse_qs(raw_query, keep_blank_values=True)
-            query = params.get("q", [""])[0]
-            raw_limit = params.get("limit", [str(selector.DEFAULT_SEARCH_LIMIT)])[0]
-            raw_offset = params.get("offset", ["0"])[0]
-            raw_levels = params.get("levels", [None])[0]
-            try:
-                limit = int(raw_limit)
-                offset = int(raw_offset)
-                levels = selector.parse_public_catalog_levels(raw_levels)
-                if limit < 1 or limit > selector.MAX_SEARCH_LIMIT:
-                    raise ValueError(f"limit must be between 1 and {selector.MAX_SEARCH_LIMIT}")
-                if offset < 0:
-                    raise ValueError("offset must be a non-negative integer")
-                payload = selector.search(query, limit, offset, levels=levels)
-            except selector.SELECTOR_DATA_ERRORS as exc:
-                raise DeviceSelectorUnavailable(f"Device Selector Catalog data is unavailable: {exc}") from exc
-            except (TypeError, ValueError) as exc:
-                self._json(
-                    HTTPStatus.BAD_REQUEST,
-                    {
-                        "ok": False,
-                        "error": {
-                            "error_type": "INVALID_DEVICE_SEARCH",
-                            "message": str(exc),
-                        },
-                    },
-                )
-                return
-            self._json(HTTPStatus.OK, payload)
         except DeviceSelectorUnavailable as exc:
             self._device_selector_unavailable(exc)
+            return
+        try:
+            status, payload = selector.search_response(raw_query)
         except Exception as exc:
             self._error(exc)
+            return
+        self._json(HTTPStatus(status), payload)
 
     def _batch_unavailable(self) -> None:
         self._json(

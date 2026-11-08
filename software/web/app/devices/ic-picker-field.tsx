@@ -8,7 +8,6 @@ import {
 import "./ic-picker-field.css";
 
 export type ICPickerFieldProps = {
-  apiBase: string;
   value: DeviceSearchResult | null;
   onChange: (device: DeviceSearchResult | null) => void;
   disabled?: boolean;
@@ -16,7 +15,6 @@ export type ICPickerFieldProps = {
 };
 
 export function ICPickerField({
-  apiBase,
   value,
   onChange,
   disabled = false,
@@ -37,7 +35,6 @@ export function ICPickerField({
       setLoading(true);
       try {
         const response = await searchDevices(normalized, {
-          apiBase,
           limit: 8,
           levels: [2, 3],
           signal: controller.signal,
@@ -57,7 +54,7 @@ export function ICPickerField({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [apiBase, query, value]);
+  }, [query, value]);
 
   function choose(device: DeviceSearchResult) {
     const label = device.icpn ?? device.identifier;
