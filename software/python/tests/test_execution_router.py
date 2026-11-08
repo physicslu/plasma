@@ -84,6 +84,31 @@ def test_signed_package_provider_is_selected_by_job_not_static_site_interface():
         router.admit(request)
 
 
+def test_same_site_selects_openocd_or_package_per_authorized_job_without_fallback():
+    """Selected Provider is Job-local, not permanently attached to the Site."""
+    site = SiteConfig(id=2, enabled=True, interface="openocd",
+                      openocd={"site_worker_socket": "/tmp/s1c-two-provider-c3.sock"})
+    openocd = OpenOCDInterface(site.openocd)
+    package = PackageProviderInterface()
+    package.wire_runtime(lambda *_: {})
+    router = SiteExecutionRouter(site, openocd, package)
+    trusted = TrustedProviderAction(None, {}, None, SimpleNamespace())
+    direct = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                        target="STM32F103C8T6", image=b"IMAGE", job_id="direct-job")
+    signed = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                        target="EXTERNAL-PROVIDER-TARGET", image=b"IMAGE", job_id="signed-job")
+    assert router.interface_for(router.admit(direct)) is openocd
+    assert router.interface_for(router.admit(signed, trusted_provider=trusted)) is package
+    assert router.interface_for(router.admit(direct)) is openocd
+    # A tampered route from public metadata cannot switch a direct Job.
+    forged = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+                        target="STM32F103C8T6", image=b"IMAGE",
+                        metadata={ROUTE_METADATA_KEY: {"mode": PACKAGE_PROVIDER_ROUTE}})
+    with pytest.raises(PlasmaError) as error:
+        router.admit(forged)
+    assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+
 def test_site_manager_rejects_legacy_route_before_queue_or_lease(tmp_path: Path):
     async def scenario():
         config = PlasmaConfig(
