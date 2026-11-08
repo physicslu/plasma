@@ -1,7 +1,7 @@
 """Select one PPU Programming Job execution route with existing SiteWorker/lease.
 
-The legacy exact-ICPN CompilerRegistry admission route is retired.
-OpenOCD Plan Compiler, Flash Geometry and qualification remain independent.
+The exact-ICPN registry and compiled-plan executors are retired. C-3 derives
+its executable target/geometry from the verified Bundle Profile, not Catalog.
 """
 from __future__ import annotations
 
