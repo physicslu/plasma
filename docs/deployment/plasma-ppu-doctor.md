@@ -1,6 +1,6 @@
 # PLASMA PPU Deployment Doctor — PYNQ-Z2 prototype backend
 
-**PPU = Plasma Programming Unit.** This is a product-level **read-only diagnostic and deployment-planning tool** whose current transport/target backend is PYNQ-Z2; it is not an installer or evidence that other PPU hardware is qualified. It is staged in a Draft PR for `physicslu/plasma`, has run read-only over the existing SWPC Path 2 runner (Run #42335593384; Doctor overall WARN), and therefore **does not qualify** any deployment, FPGA Image, Site or target Flash behavior.
+**PPU = Plasma Programming Unit.** This is a product-level **read-only diagnostic and deployment-planning tool** whose current transport/target backend is PYNQ-Z2; it is not an installer or evidence that other PPU hardware is qualified. Product-level naming and read-only safety tests are merged in [PR #1354](https://github.com/physicslu/plasma/pull/1354). Historical SWPC Path 2 [Run #42335593384](https://github.com/physicslu/plasma/actions/runs/42335593384) reported Doctor overall WARN; that observation does not qualify a deployment, FPGA Image, Site or target Flash.
 
 ## Requirements
 
@@ -45,7 +45,7 @@ python3 scripts/plasma_ppu.py doctor --host Z2_LAN_IP \
 
 **Treat `recovery_required` as a hard deployment block.** Missing Bootstrap or Runtime may mean a legitimate unprovisioned factory board; do not auto-install or auto-repair. Never change credentials or bypass host-key pinning to turn a red check green.
 
-Integration baseline: accepted `main` `38b4c0b68fb961b535af9e7a657f242376b9d98d` after PR #1337 (OPF Bundle v3 and Path 2 Install) merged. Worktree synchronization is independent of whether the deployed Z2 has been updated. The source references are `AGENTS.md`, `docs/deployment/ppu-deployment-start-here.md`, `docs/deployment/ppu-bootstrap-factory-and-hil.md`, and `docs/development/ppu-deploy-engineering-modules.md`. The integration-host default `plasmactl deploy` must **not** be mistaken for a Z2 install. The product route uses Bootstrap/Console, and the engineering route uses the separately reviewed `scripts/ppu-deploy` SSH transaction.
+Historical integration baseline (not the latest main): `38b4c0b68fb961b535af9e7a657f242376b9d98d` after PR #1337 (OPF Bundle v3 and Path 2 Install) merged. Worktree synchronization is independent of whether the deployed Z2 has been updated. The source references are `AGENTS.md`, `docs/deployment/ppu-deployment-start-here.md`, `docs/deployment/ppu-bootstrap-factory-and-hil.md`, and `docs/development/ppu-deploy-engineering-modules.md`. The integration-host default `plasmactl deploy` must **not** be mistaken for a Z2 install. The product route uses Bootstrap/Console, and the engineering route uses the separately reviewed `scripts/ppu-deploy` SSH transaction.
 
 ## Host-only tests
 
@@ -53,42 +53,19 @@ Integration baseline: accepted `main` `38b4c0b68fb961b535af9e7a657f242376b9d98d`
 python3 -m unittest -q /path/to/test_plasma_ppu.py
 ```
 
-The tests are mocks; they do not access a PYNQ-Z2. The output schema is `plasma.ppu.readonly-doctor.v0`, and the CLI intentionally has no compatibility alias under `plasma_z2.py`. Neither this prototype nor these tests constitute a Gate 2 merge or physical HIL approval.
+The tests are mocks; they do not access a PYNQ-Z2. The output schema is `plasma.ppu.readonly-doctor.v0`, and the CLI intentionally has no compatibility alias under `plasma_z2.py`. CI and mocks do not qualify physical HIL; PR #1354 naming changes are already merged.
 
-## Joint PR #1337 + #1338 acceptance gate
+## Current supported paths
 
-After collecting an actual SWPC `doctor --json` observation: compare deployed Bootstrap/Runtime evidence against the current accepted `main`, verify target Platform Identity and Engine Selection through existing reviewed mechanisms, reconcile in-flight/coordinator journal and receipt, and only then bind an approved deploy command to one of the **existing** backends. Do not create a parallel SSH writer or new deployment coordinator.
-## Path 2 SWPC observation (exact pinned Draft PR)
+- Read-only PPU Doctor: `scripts/plasma_ppu.py`. Its `deploy` subcommand remains disabled by design.
+- Site 2 current Active Set read-only checkpoint: `scripts/plasma_site2_active_readonly_path2.py`; this uses the installed, verified `ppu_asset_set.read_active()` observer and the existing paired-host/preflight/Engine identity guards. It does not receive, install, activate, reload FPGA, or flash a DUT.
+- Canonical owner-authorized PPU programming and Bundle v3 B1/B2/B3: `scripts/plasma_program.py`. The Bootstrap Coordinator, PPU Lease, C-3 Session/Root, FPGA Owner/Reload and SAFE_OFF/SEALED/Recovery controls remain unchanged. Outcome-unknown transactions must be reconciled, never blindly resubmitted.
+- Offline reusable Profile-only Bundle v3 builder: `scripts/opf_platform_bundle_v3_build.py` (not a deployment tool).
 
-The existing Issue #981 trusted dispatcher accepts an owner-authored Work Order with
-`execution_path=path2-cli`, `capability=operator-cli`,
-`scope=guarded-hardware`, `script=scripts/plasma_ppu.py`,
-`argv=["doctor","--paired-host","--json"]`, and an exact Draft PR HEAD.
+## Historical #1337 / #1338 Gen7 joint acceptance — retired executable entrypoints
 
-`--paired-host` resolves only the hostname from the owner-controlled,
-mode-0600 `~/.config/plasma/z2-login-smoke.json` on the actual SWPC worker.
-It never outputs passwords or an address. If worker credentials/configuration are
-unavailable, the tool fails closed and marks physical Z2 observation NOT_RUN.
-No deployment, FPGA load, DUT action, daemon restart or SSH password login.
+The former Gen7-only `scripts/opf_site2_joint_acceptance.py` and `scripts/opf_site2_path2_bundle_deploy.py` were temporary Site 2 migration helpers. They read a hard-pinned Gen7 Active Set and could invoke an additional B1/B2/B3 route. After canonical `plasma_program.py` and the Site 2 Bundle A/B physical PASS, these two legacy CLI entrypoints are retired in the separately approved S2/S3/S5 deletion work. **Do not dispatch either retired script or treat a historical Work Order as authorization.**
 
-Real acceptance requires the SWPC `development-execute` runner name, actual
-exit status, bounded stdout and job receipt. A hosted test is not Z2 evidence.
+Historical evidence: [Issue #981](https://github.com/physicslu/plasma/issues/981), [PR #1337](https://github.com/physicslu/plasma/pull/1337), [PR #1338](https://github.com/physicslu/plasma/pull/1338), and [Site 2 A/B new-path Flash/Readback/SAFE_OFF evidence](../evidence/opf-site2-ab-newpath-2026-11-08.md). The first #1337 [dispatch Run #42338239043](https://github.com/physicslu/plasma/actions/runs/42338239043) was denied before hardware execution; it is not evidence of a failed B3. Static file-set observation alone never establishes a live Flash PASS.
 
-
-## Evidence update — Path 2 live read-only Doctor
-
-- Existing real SWPC Path 2 [Run #42335593384](https://github.com/physicslu/plasma/actions/runs/42335593384) passed the operator CLI exit/receipt. The Doctor overall was **WARN**, not a deployment qualification.
-- TCP :18080/:18081, Bootstrap GET health/status, `bootstrap_ready`, `runtime_active`, and a prior `succeeded` deployment were observed. The cited `succeeded` deployment is not independently identified as the OPF Gen7 replacement.
-- PR #1337's first deployment dispatch [Run #42338239043](https://github.com/physicslu/plasma/actions/runs/42338239043) failed in `development-authorize` with `WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED`; SWPC `development-execute` was **skipped** and no Bundle B1/B2/B3 was executed by that request.
-- Joint Gate 1 sequence, with independently preserved receipts: (1) source-pinned Doctor precheck; (2) compare Active Asset Set SHA against Gen7/new validated bundle and do not resubmit an already completed transaction; (3) optionally execute authorized Path 2 B1/B2/B3 `mode=activate`, `fpga_load=false` using the existing Bootstrap Coordinator; (4) Doctor postcheck and separate OPF Provider/Active Set validation. Do not turn Doctor's intentionally disabled `deploy` command into an installer.
-- No DUT Flash, FPGA reload or OpenOCD Engine switch is in scope. This PR stays Draft pending Gate 2.
-
-## PR #1337 + #1338 Joint Gate 1 (approved, Path 2)
-
-The two changes now share the accepted #1337 main commit ancestry. The bounded joint operator entry is `scripts/opf_site2_joint_acceptance.py`, **not** the permanently disabled `plasma_ppu.py deploy` subcommand. The exact source-pinned Issue #981 Path 2 `operator-cli` uses `script=scripts/opf_site2_joint_acceptance.py`, `argv=[]`, `scope=guarded-hardware`, and the current unmerged PR #1338 HEAD.
-
-Under the existing enrolled SWPC non-root Worker, the joint entry performs: (1) a read-only Doctor using the single host from `~/.config/plasma/z2-login-smoke.json`; it requires reachable Bootstrap/Gateway, Bootstrap ready, Runtime active, no in-flight/recovery deployment, and Bundle v3 B3 capability; (2) privileged **read-only** Z2 `ppu_asset_set.read_active()` verification and static provider-file-set check; (3) if the expected retired Gen7 remains Active, one existing #1337 Bootstrap B1/B2/B3 activation via its source-pinned adapter with `fpga_load=false`; (4) a second Doctor and verified Active SHA/static OPF check. If a conforming Site 2 provider/profile Set is already Active, B1/B2/B3 is skipped **and Doctor plus Active Set are rechecked without mutation**. This skip is `NOT_RUN_ALREADY_ACTIVE`, and the actual deployment provenance remains `NOT_VERIFIED` until linked B3 journal/receipt evidence exists. Any other Active Set identity blocks instead of being overwritten. Failures after a submitted transaction never trigger automatic retries.
-
-A static OPF file-set PASS is not full live Provider Resolution, Hardware Image Identity, or a real DUT Flash/Readback PASS. The test `software/python/tests/test_opf_site2_joint_acceptance.py` exercises the order, idempotent skip, active mismatch, Doctor guards, SSH pin, and post-B3 identity mismatch with mocks. The existing full `software/python/tests/test_opf_site2_path2_bundle_deploy.py` and OPF Bundle Builder tests remain required.
-
-The previous #1337 dispatch [Run #42338239043](https://github.com/physicslu/plasma/actions/runs/42338239043) was **DENIED during development-authorize** (`WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED`), before SWPC execution. Do not classify it as a failed B3; no mutating deployment evidence exists for that request. This Gate 1 uses the exact OPEN PR #1338 SHA in the owner-authenticated Work Order, not a main-only `source_sha` override.
+The retired Gen7 regression suites are replaced where relevant by Host-only Active observer safety tests, PPU Doctor tests and the retained generic Bundle v3, programming CLI and C-3/Recovery regression tests. **No change to the running Z2 is implied by source-only retirement.**
