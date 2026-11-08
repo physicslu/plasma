@@ -35,6 +35,25 @@ class DoctorTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "PAIRED_TARGET_CONFIG_UNTRUSTED"):
                     doctor.paired_host()
 
+    def test_retired_gen7_helpers_are_not_required_for_source_check(self):
+        retired = {
+            "scripts/opf_site2_joint_acceptance.py",
+            "scripts/opf_site2_path2_bundle_deploy.py",
+        }
+        self.assertTrue(retired.isdisjoint(doctor._REPO_FILES))
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            for item in doctor._REPO_FILES:
+                path = base / item
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("tracked source\n")
+            with mock.patch.object(doctor, "git", side_effect=RuntimeError("no git")):
+                reports = doctor.local_repo(base)
+            source = next(row for row in reports
+                          if row["check"] == "source_entrypoints")
+            self.assertEqual(source["status"], "PASS")
+            self.assertEqual(source["missing"], [])
+
     def test_missing_host_no_network(self):
         with mock.patch.object(doctor, "local_repo", return_value=[]), \
                 mock.patch.object(doctor, "fetch_status") as status:
