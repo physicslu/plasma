@@ -1,6 +1,6 @@
-# PLASMA Z2 Deployment Doctor — safe standalone prototype
+# PLASMA PPU Deployment Doctor — PYNQ-Z2 prototype backend
 
-This is a **read-only diagnostic and deployment-planning tool**, not a Z2 installer. It is staged in a Draft PR for `physicslu/plasma`, has run read-only over the existing SWPC Path 2 runner (Run #42335593384; Doctor overall WARN), and therefore **does not qualify** any deployment, FPGA Image, Site or target Flash behavior.
+**PPU = Plasma Programming Unit.** This is a product-level **read-only diagnostic and deployment-planning tool** whose current transport/target backend is PYNQ-Z2; it is not an installer or evidence that other PPU hardware is qualified. It is staged in a Draft PR for `physicslu/plasma`, has run read-only over the existing SWPC Path 2 runner (Run #42335593384; Doctor overall WARN), and therefore **does not qualify** any deployment, FPGA Image, Site or target Flash behavior.
 
 ## Requirements
 
@@ -15,11 +15,11 @@ From a clean checked-out PLASMA repository, execute the source-pinned script (or
 
 ```sh
 cd /path/to/plasma
-python3 scripts/plasma_z2.py doctor
-python3 scripts/plasma_z2.py doctor --host Z2_LAN_IP
-python3 scripts/plasma_z2.py doctor --host Z2_LAN_IP --ssh-user xilinx --json > z2-doctor-report.json
-python3 scripts/plasma_z2.py plan --route product
-python3 scripts/plasma_z2.py plan --route engineering
+python3 scripts/plasma_ppu.py doctor
+python3 scripts/plasma_ppu.py doctor --host Z2_LAN_IP
+python3 scripts/plasma_ppu.py doctor --host Z2_LAN_IP --ssh-user xilinx --json > z2-doctor-report.json
+python3 scripts/plasma_ppu.py plan --route product
+python3 scripts/plasma_ppu.py plan --route engineering
 ```
 
 The `z2-doctor-report.json` file in this example is a **local report** created by shell redirection. Do not commit it. Avoid distributing details of your LAN addresses, Git revision, or installed release identifiers.
@@ -27,7 +27,7 @@ The `z2-doctor-report.json` file in this example is a **local report** created b
 To use a different **already-pinned** SSH host-key file:
 
 ```sh
-python3 scripts/plasma_z2.py doctor --host Z2_LAN_IP \
+python3 scripts/plasma_ppu.py doctor --host Z2_LAN_IP \
   --ssh-user xilinx --known-hosts /path/to/previously-pinned-known-hosts
 ```
 
@@ -50,10 +50,10 @@ Integration baseline: accepted `main` `38b4c0b68fb961b535af9e7a657f242376b9d98d`
 ## Host-only tests
 
 ```sh
-python3 -m unittest -q /path/to/test_plasma_z2.py
+python3 -m unittest -q /path/to/test_plasma_ppu.py
 ```
 
-The tests are mocks; they do not access a PYNQ-Z2. Neither this prototype nor these tests constitute a Gate 2 merge or physical HIL approval.
+The tests are mocks; they do not access a PYNQ-Z2. The output schema is `plasma.ppu.readonly-doctor.v0`, and the CLI intentionally has no compatibility alias under `plasma_z2.py`. Neither this prototype nor these tests constitute a Gate 2 merge or physical HIL approval.
 
 ## Joint PR #1337 + #1338 acceptance gate
 
@@ -62,7 +62,7 @@ After collecting an actual SWPC `doctor --json` observation: compare deployed Bo
 
 The existing Issue #981 trusted dispatcher accepts an owner-authored Work Order with
 `execution_path=path2-cli`, `capability=operator-cli`,
-`scope=guarded-hardware`, `script=scripts/plasma_z2.py`,
+`scope=guarded-hardware`, `script=scripts/plasma_ppu.py`,
 `argv=["doctor","--paired-host","--json"]`, and an exact Draft PR HEAD.
 
 `--paired-host` resolves only the hostname from the owner-controlled,
@@ -85,7 +85,7 @@ exit status, bounded stdout and job receipt. A hosted test is not Z2 evidence.
 
 ## PR #1337 + #1338 Joint Gate 1 (approved, Path 2)
 
-The two changes now share the accepted #1337 main commit ancestry. The bounded joint operator entry is `scripts/opf_site2_joint_acceptance.py`, **not** the permanently disabled `plasma_z2.py deploy` subcommand. The exact source-pinned Issue #981 Path 2 `operator-cli` uses `script=scripts/opf_site2_joint_acceptance.py`, `argv=[]`, `scope=guarded-hardware`, and the current unmerged PR #1338 HEAD.
+The two changes now share the accepted #1337 main commit ancestry. The bounded joint operator entry is `scripts/opf_site2_joint_acceptance.py`, **not** the permanently disabled `plasma_ppu.py deploy` subcommand. The exact source-pinned Issue #981 Path 2 `operator-cli` uses `script=scripts/opf_site2_joint_acceptance.py`, `argv=[]`, `scope=guarded-hardware`, and the current unmerged PR #1338 HEAD.
 
 Under the existing enrolled SWPC non-root Worker, the joint entry performs: (1) a read-only Doctor using the single host from `~/.config/plasma/z2-login-smoke.json`; it requires reachable Bootstrap/Gateway, Bootstrap ready, Runtime active, no in-flight/recovery deployment, and Bundle v3 B3 capability; (2) privileged **read-only** Z2 `ppu_asset_set.read_active()` verification and static provider-file-set check; (3) if the expected retired Gen7 remains Active, one existing #1337 Bootstrap B1/B2/B3 activation via its source-pinned adapter with `fpga_load=false`; (4) a second Doctor and verified Active SHA/static OPF check. If a conforming Site 2 provider/profile Set is already Active, B1/B2/B3 is skipped **and Doctor plus Active Set are rechecked without mutation**. This skip is `NOT_RUN_ALREADY_ACTIVE`, and the actual deployment provenance remains `NOT_VERIFIED` until linked B3 journal/receipt evidence exists. Any other Active Set identity blocks instead of being overwritten. Failures after a submitted transaction never trigger automatic retries.
 

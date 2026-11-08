@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PLASMA Z2 read-only deployment doctor (SWPC operator prototype).
+"""PLASMA PPU read-only deployment doctor (current Z2 prototype backend) (SWPC operator prototype).
 
 No deployment, file writes to the device, privilege escalation, FPGA, DUT,
 credential read, or mutable HTTP verbs. Python 3.9+ standard library only.
@@ -237,16 +237,16 @@ def doctor(args: argparse.Namespace) -> dict:
         else:
             rows.append(check("ssh_services", "NOT_RUN", "Supply --ssh-user to enable key-only, host-key-pinned read-only SSH"))
     else:
-        rows.append(check("z2_remote", "NOT_RUN", "Supply explicit --host to inspect the target; no network discovery"))
+        rows.append(check("ppu_remote", "NOT_RUN", "Supply explicit --host to inspect the target; no network discovery"))
     rows.append(check("target_bundle_identity", "NOT_RUN", "No privileged target-profile or installed Bundle verification in this prototype"))
     rows.append(check("fpga_dut", "NOT_RUN", "FPGA Image/ABI, SWD, DUT and physical Flash deliberately untouched"))
     observed = [row["status"] for row in rows]
     overall = "BLOCKED" if "BLOCKED" in observed else "FAIL" if "FAIL" in observed else "WARN" if "WARN" in observed else "PASS"
     if not host and overall != "BLOCKED":
         overall = "INCOMPLETE"
-    return {"schema": "plasma.z2.readonly-doctor.v0", "observed_at_utc": datetime.now(timezone.utc).isoformat(),
+    return {"schema": "plasma.ppu.readonly-doctor.v0", "observed_at_utc": datetime.now(timezone.utc).isoformat(),
             "operation": "doctor", "read_only": True, "overall": overall, "checks": rows,
-            "limitation": "SWPC/Z2 suitability not proven until real-world execution and privileged identity/version verification"}
+            "limitation": "SWPC/PPU suitability not proven until real-world execution and privileged identity/version verification"}
 
 
 def plan(args: argparse.Namespace) -> dict:
@@ -261,16 +261,16 @@ def plan(args: argparse.Namespace) -> dict:
                  "Use Console EMode -> PPU Sites -> Runtime Deployment -> Manager -> Bootstrap :18081",
                  "B1 upload; B2 admission; B3 explicit activate/stage_only and fpga_load authorization",
                  "Observe deployment receipt, journal, active runtime and independent reboot/recovery evidence"]
-    return {"schema": "plasma.z2.readonly-doctor.v0", "operation": "plan", "route": route,
+    return {"schema": "plasma.ppu.readonly-doctor.v0", "operation": "plan", "route": route,
             "overall": "NOT_AUTHORIZED", "steps": steps,
             "note": "This prototype does not invoke an installer. A deployment must be individually authorized and executed via the existing reviewed backend."}
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="PLASMA Z2 read-only doctor and deployment plan")
+    p = argparse.ArgumentParser(description="PLASMA PPU read-only doctor and deployment plan")
     p.add_argument("action", choices=("doctor", "plan", "deploy"))
     p.add_argument("--repo", type=Path, default=Path.cwd(), help="Current local PLASMA repository root")
-    p.add_argument("--host", help="Explicit Z2 LAN IP or DNS name; no auto-discovery")
+    p.add_argument("--host", help="Explicit PPU LAN IP or DNS name; no auto-discovery")
     p.add_argument("--paired-host", action="store_true", help="Read only the paired host from a private SWPC config; never output credentials")
     p.add_argument("--ssh-user", help="Optional pinned-host-key, key-only SSH (e.g., xilinx)")
     p.add_argument("--known-hosts", type=Path, default=Path.home() / ".config/plasma/z2-login-known_hosts")
@@ -286,13 +286,13 @@ def main(argv: list[str] | None = None) -> int:
     elif args.action == "plan":
         result = plan(args)
     else:
-        result = {"schema": "plasma.z2.readonly-doctor.v0", "operation": "deploy",
+        result = {"schema": "plasma.ppu.readonly-doctor.v0", "operation": "deploy",
                   "overall": "BLOCKED", "reason": "DEPLOY_DISABLED_BY_DESIGN",
                   "detail": "This is a diagnostic-only prototype; use the existing approved deployment backend."}
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
-        print(f"PLASMA Z2 {result['operation'].upper()}: {result['overall']}")
+        print(f"PLASMA PPU {result['operation'].upper()}: {result['overall']}")
         for c in result.get("checks", []):
             extra = {k: v for k, v in c.items() if k not in {"check", "status", "detail"}}
             print(f"  [{c['status']:<7}] {c['check']}: {c['detail']}")

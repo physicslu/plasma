@@ -139,7 +139,7 @@ def test_post_b3_changed_identity_is_not_reported_as_success(monkeypatch):
 
 def test_paired_doctor_uses_one_fixed_host_and_requires_real_remote_pass(monkeypatch):
     calls = []
-    monkeypatch.setattr(joint.plasma_z2, "paired_host", lambda: HOST)
+    monkeypatch.setattr(joint.plasma_ppu, "paired_host", lambda: HOST)
     def doct(args):
         calls.append((args.host, args.paired_host))
         return {"overall": "WARN", "checks": [
@@ -151,15 +151,15 @@ def test_paired_doctor_uses_one_fixed_host_and_requires_real_remote_pass(monkeyp
                 "runtime_state": "runtime_active",
                 "capabilities": {"bundle_v3_b3_install": True},
             }]}
-    monkeypatch.setattr(joint.plasma_z2, "doctor", doct)
+    monkeypatch.setattr(joint.plasma_ppu, "doctor", doct)
     doc, host = joint.doctor_snapshot()
     assert doc["overall"] == "WARN" and host == HOST
     assert calls == [(HOST, False)]
 
 
 def test_doctor_missing_b3_capability_blocks_before_ssh(monkeypatch):
-    monkeypatch.setattr(joint.plasma_z2, "paired_host", lambda: HOST)
-    monkeypatch.setattr(joint.plasma_z2, "doctor", lambda args: {
+    monkeypatch.setattr(joint.plasma_ppu, "paired_host", lambda: HOST)
+    monkeypatch.setattr(joint.plasma_ppu, "doctor", lambda args: {
         "overall": "WARN",
         "checks": [
             {"check": name, "status": "PASS"} for name in (
@@ -207,16 +207,16 @@ def test_host_mismatch_never_executes_ssh():
 
 
 def test_doctor_deploy_command_remains_refused(monkeypatch, capsys):
-    monkeypatch.setattr(joint.plasma_z2, "fetch_status",
+    monkeypatch.setattr(joint.plasma_ppu, "fetch_status",
                         lambda *a,**kw:pytest.fail("Doctor deploy used network"))
-    rc=joint.plasma_z2.main(["deploy","--json"])
+    rc=joint.plasma_ppu.main(["deploy","--json"])
     report=json.loads(capsys.readouterr().out)
     assert rc == 2 and report["reason"]=="DEPLOY_DISABLED_BY_DESIGN"
 
 
 def test_joint_gate_source_has_both_independent_entrypoints():
     paths=[
-        "scripts/plasma_z2.py",
+        "scripts/plasma_ppu.py",
         "scripts/opf_platform_bundle_v3_build.py",
         "scripts/opf_site2_path2_bundle_deploy.py",
         "scripts/opf_site2_joint_acceptance.py",

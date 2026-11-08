@@ -1,4 +1,4 @@
-"""Host-only safety tests for the Z2 Path 2 diagnostic CLI."""
+"""Host-only safety tests for the generic PPU diagnostic CLI (Z2 backend)."""
 import importlib.util
 import io
 import json
@@ -8,8 +8,8 @@ from argparse import Namespace
 from pathlib import Path
 from unittest import mock
 
-SCRIPT = Path(__file__).resolve().parents[1] / "plasma_z2.py"
-spec = importlib.util.spec_from_file_location("plasma_z2", SCRIPT)
+SCRIPT = Path(__file__).resolve().parents[1] / "plasma_ppu.py"
+spec = importlib.util.spec_from_file_location("plasma_ppu", SCRIPT)
 doctor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(doctor)
 
@@ -40,6 +40,8 @@ class DoctorTests(unittest.TestCase):
                 mock.patch.object(doctor, "fetch_status") as status:
             result = doctor.doctor(self.options())
             self.assertEqual(result["overall"], "INCOMPLETE")
+            self.assertEqual(result["schema"], "plasma.ppu.readonly-doctor.v0")
+            self.assertIn("ppu_remote", [row["check"] for row in result["checks"]])
             status.assert_not_called()
 
     def test_recovery_required_denied(self):
@@ -73,12 +75,23 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(status, "PASS")
         self.assertEqual(result["schema_version"], 1)
 
+    def test_plan_is_non_mutating_and_uses_ppu_schema(self):
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout, \
+                mock.patch.object(doctor, "fetch_status") as fetch:
+            rc = doctor.main(["plan", "--json"])
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["schema"], "plasma.ppu.readonly-doctor.v0")
+        self.assertEqual(report["overall"], "NOT_AUTHORIZED")
+        fetch.assert_not_called()
+
     def test_deploy_never_runs(self):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout, \
                 mock.patch.object(doctor, "fetch_status") as fetch:
             rc = doctor.main(["deploy", "--json"])
         self.assertEqual(rc, 2)
         self.assertEqual(json.loads(stdout.getvalue())["reason"], "DEPLOY_DISABLED_BY_DESIGN")
+        self.assertEqual(json.loads(stdout.getvalue())["schema"], "plasma.ppu.readonly-doctor.v0")
         fetch.assert_not_called()
 
 

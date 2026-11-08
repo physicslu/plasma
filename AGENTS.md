@@ -21,7 +21,7 @@ No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approve
 
 ## Project purpose and hard boundaries
 
-PLASMA is a configurable, multi-Site IC programmer; PYNQ-Z2 is the prototype target. Hierarchy: Facility → PPU → SITE 1..N (one-based `site_id`). Socket is a fixture, not Site identity. Protocol v3.3 (PLASMA33) and Web REST v3 are canonical. PPU exposes the **Plasma Gateway** service, its **Plasma Gateway API** and **Plasma Gateway Endpoint**. The Linux **Default Gateway** is an unrelated layer-3 next-hop; do not conflate them. Plasma Manager provides bounded managed PPU routing, not a universal scheduler. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity.
+PLASMA is a configurable, multi-Site IC programmer; **PPU means Plasma Programming Unit** (the hardware product identity), while PYNQ-Z2 is only the current prototype board. Keep product-wide tools named for PPU and reserve Z2 names for board-specific drivers, installers and enrollment details. Hierarchy: Facility → PPU → SITE 1..N (one-based `site_id`). Socket is a fixture, not Site identity. Protocol v3.3 (PLASMA33) and Web REST v3 are canonical. PPU exposes the **Plasma Gateway** service, its **Plasma Gateway API** and **Plasma Gateway Endpoint**. The Linux **Default Gateway** is an unrelated layer-3 next-hop; do not conflate them. Plasma Manager provides bounded managed PPU routing, not a universal scheduler. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity.
 
 **Hardware execution boundary (normative; CI-enforced):**
 - **SWPC runs Web / Controller / BFF** and sends high-level commands over Ethernet.
