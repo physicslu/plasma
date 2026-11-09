@@ -200,6 +200,7 @@ def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, obje
                     "gateway",
                     "--ppu-config", "<ppu-config>",
                     "--runtime-activation-socket", "<runtime-activation-socket>",
+                    "--controller-admission-socket", "<controller-admission-socket>",
                     "--host", "<gateway-bind>",
                     "--port", "18080",
                     "--plasma-host", "127.0.0.1",
@@ -293,6 +294,7 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     for name, value in (
         ("--ppu-config", "<ppu-config>"),
         ("--runtime-activation-socket", "<runtime-activation-socket>"),
+        ("--controller-admission-socket", "<controller-admission-socket>"),
     ):
         try:
             index = gateway_arguments.index(name)

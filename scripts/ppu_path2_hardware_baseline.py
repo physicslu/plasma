@@ -74,20 +74,20 @@ def _private_ipv4(host: str) -> str:
 # the pre-existing worker SSH/sudo enrollment and an exact trusted host key.
 # Do not place the returned secret into any GitHub Work Order, log or file.
 _TOKEN_REMOTE_READ = """
-import base64, os, stat, sys
-path = "/var/lib/plasma-bootstrap/control-token"
+import base64, json, os, stat, sys
+path = "/var/lib/plasma-bootstrap/controller/controller.json"
 try:
     if os.geteuid() != 0:
         raise RuntimeError()
     metadata = os.lstat(path)
-    if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0 or metadata.st_mode & 0o077 or not 32 <= metadata.st_size <= 512:
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0 or metadata.st_mode & 0o077 or not 32 <= metadata.st_size <= 65536:
         raise RuntimeError()
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
-        data = os.read(fd, 513)
+        data = os.read(fd, 65537)
     finally:
         os.close(fd)
-    token = data.strip()
+    token = json.loads(data)["credential"].encode("ascii")
     if not 32 <= len(token) <= 256 or any(ch <= 32 or ch > 126 for ch in token):
         raise RuntimeError()
     sys.stdout.write("PLASMA_BOOTSTRAP_MATERIAL:" + base64.b64encode(token).decode("ascii") + "\\n")

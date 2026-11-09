@@ -26,6 +26,8 @@ def selection():
 
 
 class Client:
+    _token = "c" * 64          # enrolled controller credential used to sign the Job
+
     def __init__(self, active="a" * 64, runtime=RUNTIME):
         self.active = active
         self.runtime = runtime
@@ -135,7 +137,7 @@ def test_runtime_version_guard_blocks_before_deployment(monkeypatch):
 def test_flash_requires_matching_current_active_set(monkeypatch):
     patch_ready(monkeypatch)
     client = Client(active="e" * 64)
-    monkeypatch.setattr(program, "post_once", lambda *_: pytest.fail("No Job"))
+    monkeypatch.setattr(program, "post_once", lambda *_, **_kw: pytest.fail("No Job"))
     with pytest.raises(program.ProgramDenied, match="BUNDLE_NOT_CURRENTLY_ACTIVE"):
         program.execute("flash", selection(), host=HOST, device_id=DEVICE,
                         client=client, runtime_sha=RUNTIME, approved_once=True)
@@ -146,7 +148,7 @@ def test_run_deploys_once_then_submits_one_bundle_reference_job(monkeypatch):
     client = Client(active="e" * 64)
     submitted = []
     monkeypatch.setattr(program, "post_once",
-                        lambda host, chosen: submitted.append((host, chosen)) or JOB)
+                        lambda host, chosen, **_kw: submitted.append((host, chosen)) or JOB)
     monkeypatch.setattr(program, "poll_job", lambda host, job: successful_job())
     result = program.execute("run", selection(), host=HOST, device_id=DEVICE,
                              client=client, runtime_sha=RUNTIME, approved_once=True)
@@ -173,7 +175,7 @@ def test_submitted_job_unknown_preserves_id_and_does_not_retry(monkeypatch):
     client = Client()
     events = []
     monkeypatch.setattr(program, "post_once",
-                        lambda *a: events.append("POST") or JOB)
+                        lambda *a, **_kw: events.append("POST") or JOB)
     def lost(*a):
         raise program.OutcomeUnknown("JOB_RESULT_UNKNOWN", JOB)
     monkeypatch.setattr(program, "poll_job", lost)
@@ -195,23 +197,43 @@ def test_failed_readback_or_safe_off_not_pass(monkeypatch):
 
 
 def test_job_http_payload_uses_reference_not_firmware(monkeypatch):
-    observed = []
+    """The Job is signed under the enrolled controller (LOM-P2A-2 G13)."""
+    auth = program.ppu_deploy_api._request_auth_module()
+    credential, device = "c" * 64, "ppu-device-0123456789abcdef01234567"
+    observed, nonce = [], "5" * 32
     class Response:
-        status = 202
+        def __init__(self, status, raw, headers=None):
+            self.status, self._raw, self._headers = status, raw, headers or {}
         def read(self, _max):
-            return json.dumps({"job": {"job_id": JOB}}).encode()
+            return self._raw
+        def getheader(self, name):
+            return self._headers.get(name)
     class HTTP:
         def __init__(self, host, port, timeout):
             assert (host, port) == (HOST, 18080)
-        def request(self, method, path, body, headers):
-            assert (method, path) == ("POST", "/api/jobs")
-            observed.append(json.loads(body))
+        def request(self, method, path, body=None, headers=None):
+            self.method, self.path, self.body, self.headers = method, path, body, headers
         def getresponse(self):
-            return Response()
+            if self.method == "GET":
+                assert self.path == "/api/auth/challenge"
+                return Response(200, json.dumps({"ok": True, "schema": auth.SCHEMA,
+                                                 "device_id": device, "nonce": nonce}).encode())
+            assert (self.method, self.path) == ("POST", "/api/jobs")
+            observed.append(json.loads(self.body))
+            admitted = auth.admit_request_header(header=self.headers["Authorization"],
+                                                 device_id=device, nonces=Nonces())
+            context = auth.verify_request(credential=credential, admitted=admitted,
+                                          method="POST", path="/api/jobs", body=self.body)
+            raw = json.dumps({"job": {"job_id": JOB}}).encode()
+            return Response(202, raw, {auth.RESPONSE_HEADER: auth.sign_response(
+                credential=credential, context=context, status=202, body=raw)})
         def close(self):
             pass
+    class Nonces:
+        def consume(self, value):
+            return value == nonce
     monkeypatch.setattr(program.http.client, "HTTPConnection", HTTP)
-    assert program.post_once(HOST, selection()) == JOB
+    assert program.post_once(HOST, selection(), credential=credential, device_id=device) == JOB
     assert len(observed) == 1
     body = observed[0]
     assert body["bundle_asset_sha256"] == "b" * 64
@@ -309,7 +331,7 @@ def test_runtime_deploy_one_bootstrap_transaction_never_programs(tmp_path, monke
 
     client = RuntimeClient()
     monkeypatch.setattr(program, "post_once",
-                        lambda *args: pytest.fail("DUT programming forbidden"))
+                        lambda *args, **_kw: pytest.fail("DUT programming forbidden"))
     result = program.deploy_runtime_kit(
         client, selection(), host=HOST, device_id=DEVICE,
         runtime_sha="d" * 40, kit_sha256=hashlib.sha256(data).hexdigest(),

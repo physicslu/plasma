@@ -64,7 +64,7 @@ def sign_request(
     device_id: str, nonce: str, cnonce: str | None = None,
 ) -> tuple[str, RequestContext]:
     if (type(method) is not str or method not in _METHODS or type(path) is not str
-            or not path.startswith("/v1/") or len(path) > 512
+            or not path.startswith(("/v1/", "/api/")) or len(path) > 512
             or any(ch.isspace() or ord(ch) < 33 or ord(ch) > 126 for ch in path)):
         raise BootstrapRequestAuthError("request authentication target is invalid")
     if type(device_id) is not str or not _DEVICE_RE.fullmatch(device_id):

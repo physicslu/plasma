@@ -576,20 +576,21 @@ def _status(alias: str, ppu_ip: str) -> int:
 
 
 def _token() -> int:
+    """Arm one Engineering-CLI enrollment window and print its one-time ticket."""
     current = _container_inspect()
     if current is None or not ((current.get("State") or {}).get("Running")):
         raise DemoError("z2like-demo QEMU container is not running")
     result = _docker(
-        "exec",
-        CONTAINER,
-        "cat",
-        "/var/lib/plasma-bootstrap/control-token",
+        "exec", CONTAINER, "python3", "/sim/ppu-enroll.py",
+        "--state-root", "/var/lib/plasma-bootstrap",
+        "--machine-id", "/var/lib/plasma-bootstrap/machine-id", "arm",
         capture=True,
     )
-    token = result.stdout.strip()
-    if not 32 <= len(token) <= 256 or any(ch.isspace() for ch in token):
-        raise DemoError("Bootstrap pairing token in the QEMU target is invalid")
-    print(token)
+    try:
+        ticket = json.loads(result.stdout)["ticket"]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise DemoError("QEMU target did not return an enrollment ticket") from exc
+    print(ticket)
     return 0
 
 

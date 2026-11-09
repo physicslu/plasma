@@ -33,7 +33,7 @@ MODE_NORMAL = "NORMAL"
 MODE_RECOVERY_ONLY = "RECOVERY_ONLY"
 CONTROLLER_STATES = ("UNENROLLED", MODE_NORMAL, MODE_RECOVERY_ONLY, "FAULT")
 ENROLLMENT_STATES = ("NONE", "ARMED", "CONSUMED", "LOCKED_OUT", "EXPIRED")
-TICKET_SOURCES = ("sd-boot-partition", "serial-dev")
+TICKET_SOURCES = ("sd-boot-partition", "engineering-cli")
 
 ERROR_CODES = frozenset({
     "ENROLLMENT_NOT_ARMED",
@@ -53,12 +53,22 @@ ERROR_CODES = frozenset({
     "CONTROLLER_STATE_ROLLBACK",
     "RECOVERY_BLOCKED",
     "RECOVERY_ACTION_NOT_REQUESTED",
+    # LOM-P2A-2 additions (button / engineering entries, G13 admission).
+    "ENROLLMENT_BUTTON_DISABLED",
+    "ENROLLMENT_CONTENDED",
+    "ENROLLMENT_BUSY",
+    "ENGINEERING_MODE_NOT_AUTHORIZED",
+    "CONTROLLER_STATE_INVALID",
+    "CONTROLLER_OPERATION_UNCLASSIFIED",
+    "CONTROLLER_TRANSITION_IN_PROGRESS",
+    "CONTROLLER_UNAUTHENTICATED",
 })
 
 # Normal writes: forbidden in RECOVERY_ONLY.
 NORMAL_WRITES = frozenset({
     "bundle.upload", "bundle.admit", "bundle.install", "runtime.deploy",
     "fpga.load", "site.job.submit", "site.settings.write", "site.activation",
+    "site.job.cancel", "ppu.settings.write", "engineering.write",
 })
 # Explicit, controlled recovery actions: allowed in RECOVERY_ONLY and NORMAL.
 RECOVERY_ACTIONS = frozenset({
@@ -304,16 +314,16 @@ class PPU:
                                   "source": source})
         self.events.append("ENROLLMENT_ARMED:" + source)
 
-    def serial_arm(self, now: float, *, local_console_root: bool) -> str:
-        """Development alternative: root on the PPU-local console prints a ticket once."""
-        if not local_console_root:
-            raise PermissionError("serial enrollment requires root on the local console")
+    def engineering_arm(self, now: float, *, authorized: bool) -> str:
+        """Engineering CLI: root under a trusted Engineering Mode policy prints a ticket once."""
+        if not authorized:
+            raise SpecError("ENGINEERING_MODE_NOT_AUTHORIZED")
         ticket = secrets.token_hex(32)
         tid = ticket_id(ticket)
         ledger = self._ledger()
         ledger["consumed"].append(tid)
         self.disk.put("ledger", ledger)
-        self._arm(tid, ticket_key(ticket), now, source="serial-dev")
+        self._arm(tid, ticket_key(ticket), now, source="engineering-cli")
         return ticket
 
     # -- enrollment exchange (reachable over the LAN, inert unless ARMED)
@@ -400,7 +410,7 @@ class PPU:
         if not hmac.compare_digest(record["credential"], credential):
             raise SpecError("CONTROLLER_REVOKED", {"current_generation": record["generation"]})
         if operation not in NORMAL_WRITES | RECOVERY_ACTIONS:
-            raise ValueError("unknown operation " + operation)
+            raise SpecError("CONTROLLER_OPERATION_UNCLASSIFIED", operation)
         if record["mode"] == MODE_RECOVERY_ONLY and operation in NORMAL_WRITES:
             raise SpecError("CONTROLLER_RECOVERY_ONLY", self.safety.unresolved())
         return record["mode"]

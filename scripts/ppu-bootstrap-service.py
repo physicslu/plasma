@@ -4,8 +4,10 @@
 The service is intentionally independent from Plasma Server/Gateway. Read-only
 health/status remain available when the product runtime is absent or broken.
 All mutation endpoints require mutual request authentication
-(``ppu_bootstrap_request_auth.py``) under the device-local credential provisioned
-outside the product runtime; the credential itself never crosses the wire. Release transport is chunked and bounded so the Manager
+(``ppu_bootstrap_request_auth.py``) under the CURRENT controller credential of
+``ppu_controller.py`` (LOM-P2A-2 local enrollment: PS-GPIO button, Engineering
+CLI or SD rescue ticket); the credential itself never crosses the wire. The
+same process serves the Gateway controller admission socket (G13). Release transport is chunked and bounded so the Manager
 never needs a single multi-hundred-megabyte request.
 
 Request/response MACs give integrity and mutual credential proof but NOT
@@ -27,7 +29,6 @@ import importlib.util
 import json
 import os
 import re
-import secrets
 import stat
 import subprocess
 import sys
@@ -81,10 +82,13 @@ class ServicePaths:
     bundle_install_policy: Path = Path("/opt/plasma/bootstrap/ppu-bundle-install-policy.json")
     deployment_engine_script: Path = Path("/opt/plasma/bootstrap/ppu-bootstrap-deployment.py")
     z2_installer_script: Path = Path("/opt/plasma/bootstrap/ppu-z2-installer.py")
-
-    @property
-    def token_file(self) -> Path:
-        return self.state_root / "control-token"
+    # LOM-P2A-2 controller authority and its read-only safety observation.
+    button_profile: Path = Path("/etc/plasma/ppu-enrollment-button.json")
+    admission_socket: Path = Path("/run/plasma-bootstrap/controller-admission.sock")
+    seal_dir: Path = Path("/var/lib/plasma-site-worker/seals")
+    runtime_control_socket: Path = Path("/run/plasma-server/control.sock")
+    reload_fence: Path = Path("/run/lock/plasma-mmio.lock")
+    site_recovery_script: Path = Path("/opt/plasma/bootstrap/ppu_site_recovery.py")
 
     @property
     def uploads_root(self) -> Path:
@@ -318,38 +322,28 @@ def _recover_interrupted_api_deployment(paths: ServicePaths) -> dict[str, Any] |
     return record
 
 
-def _valid_token(value: str) -> bool:
-    return 32 <= len(value) <= 256 and value.strip() == value and not any(ch.isspace() for ch in value)
+def _controller_module() -> ModuleType:
+    return _load_script(Path(__file__).with_name("ppu_controller.py"), "plasma_ppu_controller")
 
 
-def provision_token(path: Path, *, rotate: bool = False, token: str | None = None) -> str:
-    if path.exists() and not rotate:
-        raise BootstrapServiceError("bootstrap control token already exists; use --rotate explicitly")
-    value = token if token is not None else secrets.token_urlsafe(32)
-    if not _valid_token(value):
-        raise BootstrapServiceError("bootstrap control token must be 32-256 non-whitespace characters")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".new")
-    with temporary.open("w", encoding="utf-8") as stream:
-        stream.write(value + "\n")
-        stream.flush()
-        os.fsync(stream.fileno())
-    temporary.chmod(0o600)
-    os.replace(temporary, path)
-    return value
+def current_controller_credential(paths: ServicePaths) -> str:
+    """The current controller credential (root-private record), or fail closed.
 
-
-def load_token(path: Path) -> str:
+    Used for the Owner Operation Authorization key; request authentication goes
+    through ``EnrollmentEngine`` so mode/generation/rollback are enforced.
+    """
+    controller = _controller_module()
+    store = controller.ControllerStore(paths.state_root)
     try:
-        metadata = path.stat()
-        value = path.read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeDecodeError) as exc:
-        raise BootstrapServiceError("bootstrap control token is not provisioned") from exc
-    if metadata.st_mode & 0o077:
-        raise BootstrapServiceError("bootstrap control token permissions must not allow group/other access")
-    if not _valid_token(value):
-        raise BootstrapServiceError("bootstrap control token is invalid")
-    return value
+        record = store.controller()
+        high_water = store.ledger()["high_water"]
+    except controller.ControllerError as exc:
+        raise BootstrapServiceError(exc.code) from exc
+    if record is None:
+        raise BootstrapServiceError("CONTROLLER_NOT_ENROLLED")
+    if record["generation"] < high_water:
+        raise BootstrapServiceError("CONTROLLER_STATE_ROLLBACK")
+    return record["credential"]
 
 
 def _sha256(path: Path) -> str:
@@ -561,7 +555,7 @@ def _owner_operation(
         device_id = identity._machine_device_id(paths.machine_id_path)
     except Exception as exc:
         raise BootstrapServiceError("OWNER_AUTHORIZATION_DEVICE_IDENTITY_UNAVAILABLE") from exc
-    credential = load_token(paths.token_file)
+    credential = current_controller_credential(paths)
     try:
         return module.verify(
             authorization, credential=credential, action=action,
@@ -772,6 +766,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         paths: ServicePaths,
         base_module: ModuleType,
         deployment_runner: Callable[[ServicePaths, str, Mapping[str, Any]], Mapping[str, Any]] = run_deployment_subprocess,
+        boot_id: str | None = None,
     ) -> None:
         self.bootstrap_paths = paths
         self.base_module = base_module
@@ -779,12 +774,104 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         self.mutation_lock = threading.RLock()
         self.deployment_thread: threading.Thread | None = None
         self.recovered_deployment = _recover_interrupted_api_deployment(paths)
-        self.request_auth = _load_script(
-            Path(__file__).with_name("ppu_bootstrap_request_auth.py"),
-            "plasma_ppu_bootstrap_request_auth",
-        )
-        self.nonces = self.request_auth.NonceRegistry()
+        self.controller_module = _controller_module()
+        self.request_auth = self.controller_module.request_auth
+        store = self.controller_module.ControllerStore(paths.state_root)
+        store.migrate_legacy_token()      # P2A-1 control-token -> generation 1 (once)
+        self.engine = self.controller_module.EnrollmentEngine(
+            store, self._safety_probe(), device_id=self._local_device_id(),
+            boot_id=self.controller_module.boot_id() if boot_id is None else boot_id,
+            log=lambda line: sys.stderr.write(line + "\n"))
+        self.nonces = self.engine.request_nonces
+        self.button_watcher = None
+        self.admission_server = None
         super().__init__(address, BootstrapHandler)
+
+    # -- LOM-P2A-2 safety observation (read-only; never modifies records)
+    def _safety_probe(self) -> Any:
+        paths = self.bootstrap_paths
+        return self.controller_module.PPUSafetyProbe(
+            seal_dir=paths.seal_dir, runtime_control_socket=paths.runtime_control_socket,
+            reload_fence=paths.reload_fence, bootstrap_active=self._bootstrap_active,
+            bootstrap_unknown=self._bootstrap_unknown,
+            bootstrap_recovery_required=self._bootstrap_recovery_required,
+            site_recovery_script=paths.site_recovery_script)
+
+    def _bootstrap_active(self) -> list[str]:
+        ops = []
+        thread_alive = self.deployment_thread is not None and self.deployment_thread.is_alive()
+        try:
+            record = _deployment_api_record(self.bootstrap_paths)
+        except BootstrapServiceError:
+            record = None
+        if thread_alive or (record is not None and record["state"] in DEPLOYMENT_API_IN_FLIGHT_STATES):
+            ops.append("bootstrap-deployment:" + (record["transaction_id"] if record else "unknown"))
+        return ops
+
+    def _bootstrap_unknown(self) -> list[str]:
+        try:
+            record = _deployment_api_record(self.bootstrap_paths)
+        except BootstrapServiceError:
+            return ["bootstrap-deployment:record-unreadable"]
+        if record is not None and record["state"] == "recovery_required":
+            return ["bootstrap-deployment:" + record["transaction_id"]]
+        return []
+
+    def _bootstrap_recovery_required(self) -> bool:
+        if self.deployment_thread is not None and self.deployment_thread.is_alive():
+            return False      # an active deployment defers takeover instead
+        try:
+            journal = _read_coordinator_journal(self.bootstrap_paths)
+        except BootstrapServiceError:
+            return True
+        return journal is not None and journal.get("state") not in COORDINATOR_SAFE_RESTART_STATES
+
+    def start_controller_services(self) -> None:
+        """Admission socket for the Gateway (G13) and, when the board profile
+        enables it, the PS-GPIO enrollment button watcher."""
+        module = self.controller_module
+        try:
+            self.admission_server = module.AdmissionServer(self.bootstrap_paths.admission_socket,
+                                                           self.engine)
+        except OSError as exc:
+            # Gateway writes then fail closed (503); Bootstrap recovery stays reachable.
+            sys.stderr.write(f"plasma-controller admission socket unavailable: {exc}\n")
+        else:
+            threading.Thread(target=self.admission_server.serve_forever,
+                             name="plasma-controller-admission", daemon=True).start()
+        profile_path = self.bootstrap_paths.button_profile
+        if not profile_path.exists():
+            return
+        try:
+            profile = module.ButtonProfile.load(profile_path)
+            if not profile.enabled:
+                sys.stderr.write("plasma-enrollment button disabled: "
+                                 f"{profile.disabled_reason or 'board profile'}\n")
+                return
+            line = module.SysfsGpioInput(profile)
+        except Exception as exc:  # never arm on an untrusted/absent profile or line
+            sys.stderr.write(f"plasma-enrollment button unavailable: {type(exc).__name__}: {exc}\n")
+            return
+        self.engine.button_enabled = True
+        self.button_watcher = module.ButtonWatcher(self.engine, line, profile)
+        self.button_watcher.start()
+
+    def server_close(self) -> None:
+        if self.admission_server is not None:
+            self.admission_server.shutdown()
+            self.admission_server.server_close()
+        if self.button_watcher is not None:
+            self.button_watcher.stopped.set()
+        super().server_close()
+
+    def _local_device_id(self) -> str:
+        """Device identity from the sibling factory script (never request data)."""
+        identity = _load_script(Path(__file__).with_name("ppu-bootstrap.py"),
+                                "plasma_ppu_bootstrap_device_identity")
+        try:
+            return identity._machine_device_id(self.bootstrap_paths.machine_id_path)
+        except Exception as exc:
+            raise BootstrapServiceError("bootstrap device identity is unavailable") from exc
 
     def device_id(self) -> str:
         try:
@@ -1142,69 +1229,163 @@ class BootstrapHandler(BaseHTTPRequestHandler):
             raise BootstrapServiceError("request body must be a JSON object")
         return payload
 
-    def _authenticate(self, *, required: bool, read_body: bool) -> tuple[bool, bytes | None]:
+    _fence_held = False
+
+    def _controller_error(self, exc: Any) -> None:
+        payload = exc.payload()
+        if exc.code == "CONTROLLER_UNAUTHENTICATED":
+            # P2A-1 wire contract plus the (non-secret) current generation so a
+            # replaced Manager can tell it was revoked.
+            payload = {"ok": False, "error": "unauthorized", "code": exc.code,
+                       **(exc.detail or {})}
+        self._json(exc.http_status, payload)
+
+    def _release_fence(self) -> None:
+        if self._fence_held:
+            self._fence_held = False
+            self.owner.engine.fence.release_shared()
+
+    def _authenticate(
+        self, *, required: bool, read_body: bool,
+        operation_for: Callable[[bytes | None], str] | None = None,
+    ) -> tuple[bool, bytes | None]:
         """Mutual request authentication; returns (proceed, raw body).
 
         The credential never crosses the wire. Header syntax, device identity
         and the single-use nonce are checked BEFORE the body is read; the MAC
-        then binds method, exact request target and body SHA256. A former
-        ``Bearer`` header is rejected like any other malformed proof.
+        then binds method, exact request target and body SHA256 under the
+        CURRENT controller record (re-read per request), and the operation
+        class is checked against the controller mode. On success the
+        transition fence is held shared until ``_release_fence`` so no
+        takeover can commit while this request is being admitted.
         """
-        auth = self.owner.request_auth
         self._auth_context = self._auth_credential = None  # never carry proof across requests
         header = self.headers.get("Authorization")
         if header is None and not required:
-            return True, None
+            return True, None          # anonymous read-only discovery
+        engine = self.owner.engine
+        controller = self.owner.controller_module
         try:
-            credential = load_token(self.owner.bootstrap_paths.token_file)
-        except BootstrapServiceError as exc:
-            self._json(
-                HTTPStatus.SERVICE_UNAVAILABLE,
-                {"ok": False, "error": "control_not_provisioned", "message": str(exc)},
-            )
-            return False, None
-        try:
-            admitted = auth.admit_request_header(
-                header=header, device_id=self.owner.device_id(), nonces=self.owner.nonces)
-        except (auth.RequestAuthError, BootstrapServiceError):
-            self._json(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": "unauthorized"})
+            admitted = engine.admit_header(header)
+        except controller.ControllerError as exc:
+            self._controller_error(exc)
             return False, None
         # A malformed body is a request rejection (409 by the caller), read
         # under the already-consumed nonce and bounded by MAX_JSON_BODY.
         raw = self._raw_body() if read_body else None
+        operation = operation_for(raw) if operation_for is not None else "status.read"
         try:
-            context = auth.verify_request(
-                credential=credential, admitted=admitted, method=self.command,
-                path=self.path, body=raw,
-            )
-        except (auth.RequestAuthError, BootstrapServiceError):
-            self._json(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": "unauthorized"})
+            engine.fence.acquire_shared()
+        except controller.ControllerError as exc:
+            self._controller_error(exc)
             return False, None
-        self._auth_context, self._auth_credential = context, credential
+        self._fence_held = True
+        try:
+            admission = engine.verify_admitted(
+                admitted, method=self.command, target=self.path, operation=operation, body=raw)
+        except controller.ControllerError as exc:
+            self._release_fence()
+            self._controller_error(exc)
+            return False, None
+        self._auth_context, self._auth_credential = admission.context, admission.credential
         return True, raw
+
+    def _post_operation(self, path: str, raw: bytes | None) -> str:
+        """Every authenticated POST maps to exactly one operation class."""
+        if path == "/v1/uploads" or re.fullmatch(r"/v1/uploads/[0-9a-f]{32}/(chunks|commit)", path):
+            return "bundle.upload"
+        if path == "/v1/deployments":
+            body = self._body(raw or b"")
+            if body.get("kind") == "bundle":
+                if "fpga_load" in body or "mode" in body:
+                    return "fpga.load" if body.get("fpga_load") is True else "bundle.install"
+                return "bundle.admit"
+            return "runtime.deploy"
+        if path == "/v1/controller/recovery":
+            action = self._body(raw or b"").get("action")
+            if action in {"site.diagnose", "site.recover", "outcome.reconcile", "recovery.complete"}:
+                return action
+        return "unclassified"
+
+    def _small_body(self) -> dict[str, Any]:
+        raw_length = self.headers.get("Content-Length")
+        try:
+            size = int(raw_length or "0")
+        except ValueError as exc:
+            raise BootstrapServiceError("invalid Content-Length") from exc
+        if size <= 0 or size > 4096:
+            raise BootstrapServiceError("request body size is invalid")
+        return self._body(self.rfile.read(size))
+
+    def _enrollment_post(self, path: str) -> None:
+        """Anonymous, inert-unless-armed enrollment exchange (P2A-0 §5, §3.1)."""
+        engine = self.owner.engine
+        controller = self.owner.controller_module
+        try:
+            body = self._small_body()
+            now = controller.boot_clock()
+            if path == "/v1/enrollment/button-request":
+                self._json(HTTPStatus.OK, {"ok": True, **engine.button_request(body, now)})
+            else:
+                self._json(HTTPStatus.OK, {"ok": True, **engine.claim(body, now)})
+        except controller.ControllerError as exc:
+            self._controller_error(exc)
+        except BootstrapServiceError as exc:
+            self._json(HTTPStatus.BAD_REQUEST,
+                       {"ok": False, "error": "enrollment_request_invalid", "message": str(exc)})
+
+    def _recovery_action(self, body: Mapping[str, Any]) -> None:
+        """Explicit RECOVERY_ONLY actions (P2A-0 §7). The engine re-checks the
+        credential and takes the fence itself, so the admission hold is released."""
+        self._release_fence()
+        engine = self.owner.engine
+        credential = self._auth_credential
+        explicit = body.get("explicit_request") is True
+        action = body.get("action")
+        site = body.get("site")
+        if action in {"site.diagnose", "site.recover"} and (type(site) is not int or site < 1):
+            raise BootstrapServiceError("recovery site must be a positive integer")
+        try:
+            if action == "site.diagnose":
+                result = engine.diagnose_site(credential, site, explicit_request=explicit)
+            elif action == "site.recover":
+                generation = (engine.controller() or {}).get("generation")
+                result = engine.recover_site(credential, site, explicit_request=explicit,
+                                             operator=f"controller-generation-{generation}")
+            elif action == "outcome.reconcile":
+                result = engine.reconcile(
+                    credential, str(body.get("transaction")), str(body.get("decision")),
+                    body.get("evidence"), explicit_request=explicit)
+            else:
+                result = {"mode": engine.recovery_complete(
+                    credential, observed_device_id=str(body.get("observed_device_id")))}
+        except self.owner.controller_module.ControllerError as exc:
+            self._controller_error(exc)      # MACed: this request was authenticated
+            return
+        except ValueError as exc:
+            raise BootstrapServiceError(str(exc)) from exc
+        self._json(HTTPStatus.OK, {"ok": True, "action": action, "result": result})
 
     def do_GET(self) -> None:  # noqa: N802
         self._auth_context = self._auth_credential = None
         path = urlparse(self.path).path
         if path == self.owner.request_auth.CHALLENGE_PATH and self.path == path:
+            # P2A-1 challenge + current controller generation (LOM-P2A-2 §5.5).
+            self._json(HTTPStatus.OK, self.owner.engine.auth_challenge())
+            return
+        if path == "/v1/enrollment/challenge" and self.path == path:
+            controller = self.owner.controller_module
             try:
-                device_id = self.owner.device_id()
-            except BootstrapServiceError as exc:
-                self._json(
-                    HTTPStatus.SERVICE_UNAVAILABLE,
-                    {"ok": False, "error": "bootstrap_state_invalid", "message": str(exc)},
-                )
-                return
-            self._json(HTTPStatus.OK, {
-                "ok": True, "schema": self.owner.request_auth.SCHEMA,
-                "device_id": device_id, "nonce": self.owner.nonces.issue(),
-                "expires_in_s": self.owner.request_auth.NONCE_TTL_S,
-            })
+                self._json(HTTPStatus.OK, {
+                    "ok": True, **self.owner.engine.challenge(controller.boot_clock())})
+            except controller.ControllerError as exc:
+                self._controller_error(exc)
             return
         if path in {"/v1/status", "/v1/assets", "/v1/deployment"}:
             # Read-only discovery stays anonymous; an authenticated read is
             # MACed so a client can trust the paired device's own status.
             proceed, _raw = self._authenticate(required=False, read_body=False)
+            self._release_fence()       # reads need no fence beyond verification
             if not proceed:
                 return
         if path == "/v1/assets":
@@ -1242,8 +1423,10 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     self.owner.bootstrap_paths.machine_id_path,
                 )
                 payload = self.owner.base_module.status_document(base_paths)
+                controller_status = self.owner.engine.public_status(
+                    self.owner.controller_module.boot_clock())
                 payload["capabilities"]["runtime_deployment"] = (
-                    self.owner.bootstrap_paths.token_file.is_file()
+                    controller_status["controller_state"] in {"NORMAL", "RECOVERY_ONLY"}
                     and self.owner.bootstrap_paths.kit_tool.is_file()
                 )
                 factory_files_ready = all(
@@ -1266,7 +1449,8 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                 if b3_policy is not None:
                     payload["capabilities"]["bundle_v3_b3_mode"] = b3_policy["mode"]
                 payload["security"] = {
-                    "control_token_provisioned": self.owner.bootstrap_paths.token_file.is_file(),
+                    "controller": controller_status,
+                    "local_enrollment": self.owner.controller_module.SCHEMA,
                     "transport_confidentiality": "not_qualified",
                     "publisher_authenticity": "not_qualified",
                     "operation_authorization": "plasma.ppu.owner-operation-authorization.v1",
@@ -1295,8 +1479,21 @@ class BootstrapHandler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        self._auth_context = self._auth_credential = None
+        path = urlparse(self.path).path
+        if path in {"/v1/enrollment/button-request", "/v1/enrollment/claim"} and self.path == path:
+            self._enrollment_post(path)
+            return
         try:
-            proceed, raw = self._authenticate(required=True, read_body=True)
+            self._do_authenticated_post(path)
+        finally:
+            self._release_fence()
+
+    def _do_authenticated_post(self, path: str) -> None:
+        try:
+            proceed, raw = self._authenticate(
+                required=True, read_body=True,
+                operation_for=lambda raw: self._post_operation(path, raw))
         except BootstrapServiceError as exc:
             self._json(
                 HTTPStatus.CONFLICT,
@@ -1305,9 +1502,11 @@ class BootstrapHandler(BaseHTTPRequestHandler):
             return
         if not proceed:
             return
-        path = urlparse(self.path).path
         try:
             body = self._body(raw or b"")
+            if path == "/v1/controller/recovery":
+                self._recovery_action(body)
+                return
             with self.owner.mutation_lock:
                 if path == "/v1/uploads":
                     upload = create_upload(
@@ -1366,9 +1565,6 @@ def _parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    provision = sub.add_parser("provision-token")
-    provision.add_argument("--rotate", action="store_true")
-
     serve = sub.add_parser("serve")
     serve.add_argument("--host", required=True)
     serve.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -1386,12 +1582,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         package_target_file=args.package_target_file,
     )
     try:
-        if args.command == "provision-token":
-            token = provision_token(paths.token_file, rotate=args.rotate)
-            print(token)
-            return 0
         base = _load_script(paths.bootstrap_script, "plasma_ppu_bootstrap_base")
         server = BootstrapHTTPServer((args.host, args.port), paths=paths, base_module=base)
+        server.start_controller_services()
         try:
             server.serve_forever()
         except KeyboardInterrupt:

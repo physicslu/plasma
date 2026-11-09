@@ -11,7 +11,7 @@ import {
   createManagerPpuBootstrapUpload,
   getManagerPpuBootstrap,
   isMissingBootstrapCapabilityRoute,
-  pairManagerPpuBootstrap,
+  enrollManagerPpuBootstrap,
   parseSha256Sidecar,
   runManagerPpuPlatformPsLoopback,
   sha256Hex,
@@ -52,7 +52,8 @@ export default function PpuRuntimeDeployment({
   const [busy, setBusy] = useState<"pair" | "deploy" | "bundle" | "b3" | "loopback" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [pairingToken, setPairingToken] = useState("");
+  const [engineeringTicket, setEngineeringTicket] = useState("");
+  const [buttonEnrollment, setButtonEnrollment] = useState<"idle" | "awaiting">("idle");
   const [kit, setKit] = useState<File | null>(null);
   const [sidecar, setSidecar] = useState<File | null>(null);
   const [bundleFile, setBundleFile] = useState<File | null>(null);
@@ -109,7 +110,8 @@ export default function PpuRuntimeDeployment({
   const recoveryRequired = runtime?.state === "recovery_required" || deployment?.state === "recovery_required";
   const firstInstall = runtime?.state === "runtime_absent";
   const maintenanceReady = firstInstall || (runtime?.state === "runtime_active" && hasTrustedIdleObservation);
-  const canPair = Boolean(alias && pairingToken.trim().length >= 32 && busy === null);
+  const canEnroll = Boolean(alias && busy === null);
+  const canClaimTicket = Boolean(alias && /^[0-9a-f]{64}$/.test(engineeringTicket.trim()) && busy === null);
   const canLoopback = Boolean(
     alias
     && pairing?.paired
@@ -158,18 +160,26 @@ export default function PpuRuntimeDeployment({
     return "warning";
   }, [deployment]);
 
-  async function pair() {
-    if (!canPair) return;
+  async function enroll(request: Parameters<typeof enrollManagerPpuBootstrap>[1]) {
+    if (!canEnroll) return;
     setBusy("pair");
     setError(null);
     setNotice(null);
     try {
-      await pairManagerPpuBootstrap(alias, pairingToken);
-      setPairingToken("");
-      setNotice("Platform maintenance credential stored for this PPU. Maintenance authorization is active for the bounded Platform workflow.");
+      const result = await enrollManagerPpuBootstrap(alias, request);
+      if (result.state === "AWAITING_BUTTON") {
+        setButtonEnrollment("awaiting");
+        setNotice("Press and hold the PPU enrollment button for 3 seconds, then select Complete Enrollment.");
+        return;
+      }
+      setButtonEnrollment("idle");
+      setEngineeringTicket("");
+      setNotice(result.controller_mode === "RECOVERY_ONLY"
+        ? `Enrolled (generation ${result.controller_generation}) in RECOVERY_ONLY: ${(result.recovery_blockers ?? []).join(", ")}. Complete recovery before normal writes.`
+        : `This Control Station now controls the PPU (generation ${result.controller_generation}). No token is needed for normal use.`);
       await refresh(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Platform maintenance pairing failed");
+      setError(reason instanceof Error ? reason.message : "PPU enrollment failed");
     } finally {
       setBusy(null);
     }
@@ -385,27 +395,36 @@ export default function PpuRuntimeDeployment({
           <header className="ppuPlatformSectionHeader">
             <div>
               <small>MAINTENANCE</small>
-              <h4 id="platform-maintenance-heading">Platform Maintenance</h4>
-              <p>Authorize maintenance independently from programming Registration.</p>
+              <h4 id="platform-maintenance-heading">Local PPU Enrollment</h4>
+              <p>Connect this Control Station to the PPU by physical presence. No token is typed for normal use.</p>
             </div>
           </header>
           <div className="ppuPlatformMaintenanceControls">
+            {buttonEnrollment === "idle" ? (
+              <button className="operatorButton" data-variant="primary" type="button" disabled={!canEnroll} onClick={() => void enroll({ entry: "button", step: "start" })}>
+                {busy === "pair" ? "Requesting..." : "Enroll with PPU Button"}
+              </button>
+            ) : (
+              <button className="operatorButton" data-variant="primary" type="button" disabled={!canEnroll} onClick={() => void enroll({ entry: "button", step: "claim" })}>
+                {busy === "pair" ? "Completing..." : "Complete Enrollment"}
+              </button>
+            )}
             <label className="operatorField">
-              <span>Platform Maintenance Pairing Token</span>
+              <span>Engineering / SD rescue ticket (development)</span>
               <input
                 type="password"
                 autoComplete="off"
-                value={pairingToken}
+                value={engineeringTicket}
                 disabled={busy !== null}
-                placeholder="Factory / recovery pairing token"
-                onChange={event => setPairingToken(event.target.value)}
+                placeholder="64-hex ticket from plasma-enroll arm or plasma-enroll.json"
+                onChange={event => setEngineeringTicket(event.target.value)}
               />
             </label>
-            <button className="operatorButton" type="button" disabled={!canPair} onClick={() => void pair()}>
-              {busy === "pair" ? "Pairing..." : "Authorize Platform Maintenance"}
+            <button className="operatorButton" type="button" disabled={!canClaimTicket} onClick={() => void enroll({ entry: "ticket", ticket: engineeringTicket.trim() })}>
+              Claim Ticket
             </button>
           </div>
-          <p className="ppuPlatformSectionNote">This credential authorizes Platform maintenance. It does not register the PPU for managed programming operations.</p>
+          <p className="ppuPlatformSectionNote">Enrollment authorizes Platform maintenance and replaces any previous controller of this PPU. It does not register the PPU for managed programming operations.</p>
         </section>
 
         <section className="ppuPlatformSection ppuPlatformLoopback" aria-labelledby="platform-loopback-heading">

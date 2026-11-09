@@ -12,6 +12,7 @@ import pytest
 from .test_ppu_generic_package_host_only_gate1 import load, package, SAMPLES, TARGET
 from .ppu_owner_authorization_fixture import machine_id_file
 from .bootstrap_request_auth_fixture import AuthenticatedFakePPU, http_transport
+from .ppu_controller_fixture import seed_controller
 
 service = load("ppu_package_receive_service_pr1", "ppu-bootstrap-service.py")
 base = load("ppu_package_receive_base_pr1", "ppu-bootstrap.py")
@@ -32,7 +33,7 @@ def loopback(tmp_path: Path):
         package_target_file=target_file,
         machine_id_path=machine_id_file(tmp_path),
     )
-    service.provision_token(paths.token_file, token=TOKEN)
+    seed_controller(paths.state_root, TOKEN)
     server = service.BootstrapHTTPServer(
         ("127.0.0.1", 0), paths=paths, base_module=base,
         deployment_runner=lambda *_: pytest.fail("unexpected deployment runner"),

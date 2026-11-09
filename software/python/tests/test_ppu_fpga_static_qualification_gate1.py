@@ -14,6 +14,7 @@ from .ppu_fpga_qualification_fixture import synthetic_image
 from .test_ppu_bundle_v3_packages_contract import ROOT, TARGET, bundle_v3, contract, load
 from .test_ppu_package_receive_admission_pr1 import TOKEN, client, loopback  # noqa: F401
 from .bootstrap_request_auth_fixture import signed_call
+from .ppu_controller_fixture import current_credential, seed_controller
 
 qualification = load("ppu_fpga_static_qualification_test", "ppu_fpga_qualification.py")
 bootstrap = load("ppu_fpga_static_qualification_service", "ppu-bootstrap-service.py")
@@ -295,11 +296,11 @@ def test_b3_rejects_owner_authorization_change_after_b2(tmp_path):
 
     # Pairing credential rotated after the owner signed the B3 request:
     # every outstanding authorization is invalid.
-    original_token = paths.token_file.read_text()
-    paths.token_file.write_text("rotated-paired-credential-" + "z" * 24 + "\n")
+    original_token = current_credential(paths.state_root)
+    seed_controller(paths.state_root, "rotated-paired-credential-" + "z" * 24)
     with pytest.raises(bootstrap.BootstrapServiceError, match="OWNER_AUTHORIZATION_INVALID"):
         srv.start_deployment(b3)
-    paths.token_file.write_text(original_token)
+    seed_controller(paths.state_root, original_token)
     # FPGA load is a distinct owner action: an install-only authorization
     # cannot be widened into an FPGA load.
     widened = dict(b3, mode="activate", fpga_load=True)

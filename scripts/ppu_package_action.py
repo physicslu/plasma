@@ -27,7 +27,9 @@ from pathlib import Path
 from typing import Any
 
 BOOTSTRAP_DIR = Path(os.environ.get("PLASMA_BOOTSTRAP_DIR", "/opt/plasma/bootstrap"))
-TOKEN_FILE = Path(os.environ.get("PLASMA_BOOTSTRAP_TOKEN", "/var/lib/plasma-bootstrap/control-token"))
+# LOM-P2A-2: the current PPU controller record (credential + generation).
+CONTROLLER_RECORD = Path(os.environ.get("PLASMA_BOOTSTRAP_CONTROLLER",
+                                        "/var/lib/plasma-bootstrap/controller/controller.json"))
 MACHINE_ID = Path(os.environ.get("PLASMA_MACHINE_ID", "/etc/machine-id"))
 CONTROL_SOCKET = Path(os.environ.get("PLASMA_RUNTIME_CONTROL", "/run/plasma-server/control.sock"))
 REQUEST_FIELDS = {"asset_set_sha256", "package_id", "package_version", "package_kind",
@@ -49,10 +51,18 @@ def _load(name: str, path: Path):
 
 
 def _token() -> str:
-    info = os.lstat(TOKEN_FILE)
+    """Current controller credential; a revoked one can no longer authorize."""
+    info = os.lstat(CONTROLLER_RECORD)
     if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_uid != os.geteuid():
         raise ActionDenied("BOOTSTRAP_CREDENTIAL_UNTRUSTED")
-    return TOKEN_FILE.read_text(encoding="utf-8").strip()
+    try:
+        record = json.loads(CONTROLLER_RECORD.read_text(encoding="utf-8"))
+        credential = record["credential"]
+    except (OSError, ValueError, KeyError, TypeError):
+        raise ActionDenied("BOOTSTRAP_CREDENTIAL_UNTRUSTED") from None
+    if type(credential) is not str or not 32 <= len(credential) <= 256:
+        raise ActionDenied("BOOTSTRAP_CREDENTIAL_UNTRUSTED")
+    return credential
 
 
 def prepare(request: dict, authorization: dict) -> dict[str, Any]:

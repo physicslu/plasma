@@ -75,10 +75,10 @@ class FakeBootstrapCoordinator:
             },
         }
 
-    def pair(self, alias: str, token: str):
-        self.calls.append(("pair", alias, token))
+    def enrollment(self, alias: str, body):
+        self.calls.append(("enrollment", alias, dict(body)))
         self.paired = True
-        return {"ok": True, "ppu_alias": alias, "pairing": {"paired": True}}
+        return {"ok": True, "ppu_alias": alias, "state": "ENROLLED", "pairing": {"paired": True}}
 
     def create_upload(self, alias: str, body):
         self.calls.append(("create_upload", alias, dict(body)))
@@ -232,29 +232,35 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         self.assertEqual(payload["bootstrap"]["runtime"]["state"], "runtime_active")
         self.assertEqual(self.coordinator.calls, [("status", "z2", None)])
 
-    def test_pending_ppu_can_pair_without_being_commissioned(self) -> None:
-        token = "t" * 40
-        status, payload = self.request("POST", "/api/registry/z2/bootstrap/pair", {"token": token})
+    def test_pending_ppu_can_enroll_without_being_commissioned(self) -> None:
+        token = "a" * 64
+        status, payload = self.request("POST", "/api/registry/z2/bootstrap/enrollment",
+                                       {"entry": "ticket", "ticket": token})
         self.assertEqual(status, 200)
         self.assertTrue(payload["pairing"]["paired"])
-        self.assertEqual(self.coordinator.calls[-1], ("pair", "z2", token))
+        self.assertEqual(self.coordinator.calls[-1],
+                         ("enrollment", "z2", {"entry": "ticket", "ticket": token}))
 
-    def test_commissioned_ppu_can_pair_before_entering_maintenance(self) -> None:
+    def test_commissioned_ppu_can_enroll_before_entering_maintenance(self) -> None:
         self.registry.set_lifecycle("z2", "commissioned")
-        token = "t" * 40
-        status, payload = self.request("POST", "/api/registry/z2/bootstrap/pair", {"token": token})
+        token = "a" * 64
+        status, payload = self.request("POST", "/api/registry/z2/bootstrap/enrollment",
+                                       {"entry": "ticket", "ticket": token})
         self.assertEqual(status, 200)
         self.assertTrue(payload["pairing"]["paired"])
-        self.assertEqual(self.coordinator.calls[-1], ("pair", "z2", token))
+        self.assertEqual(self.coordinator.calls[-1],
+                         ("enrollment", "z2", {"entry": "ticket", "ticket": token}))
 
-    def test_pairing_is_not_blocked_by_active_execution_because_it_does_not_mutate_runtime(self) -> None:
+    def test_enrollment_is_not_blocked_by_active_execution_because_it_does_not_mutate_runtime(self) -> None:
         self.registry.set_lifecycle("z2", "commissioned")
         BootstrapPlasmaManagerHandler.poller = FakePoller(active=True)
-        token = "t" * 40
-        status, payload = self.request("POST", "/api/registry/z2/bootstrap/pair", {"token": token})
+        token = "a" * 64
+        status, payload = self.request("POST", "/api/registry/z2/bootstrap/enrollment",
+                                       {"entry": "ticket", "ticket": token})
         self.assertEqual(status, 200)
         self.assertTrue(payload["pairing"]["paired"])
-        self.assertEqual(self.coordinator.calls[-1], ("pair", "z2", token))
+        self.assertEqual(self.coordinator.calls[-1],
+                         ("enrollment", "z2", {"entry": "ticket", "ticket": token}))
 
     def test_platform_ps_loopback_requires_platform_pairing(self) -> None:
         status, payload = self.request(
@@ -263,7 +269,7 @@ class ManagerBootstrapRestTests(unittest.TestCase):
             self.loopback_body(),
         )
         self.assertEqual(status, 409)
-        self.assertEqual(payload["error"]["code"], "bootstrap_pairing_required")
+        self.assertEqual(payload["error"]["code"], "controller_enrollment_required")
         self.assertEqual(FakeRuntimeClient.calls, [])
 
     def test_pending_ppu_can_run_platform_ps_loopback(self) -> None:
@@ -301,7 +307,7 @@ class ManagerBootstrapRestTests(unittest.TestCase):
             {"site_id": 1, "timeout_ms": 5000},
         )
         self.assertEqual(status, 409)
-        self.assertEqual(payload["error"]["code"], "bootstrap_pairing_required")
+        self.assertEqual(payload["error"]["code"], "controller_enrollment_required")
         self.assertEqual(FakeRuntimeClient.calls, [])
 
     def test_pending_ppu_can_run_platform_openocd_control_plane(self) -> None:

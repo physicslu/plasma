@@ -111,7 +111,7 @@ class FakeBootstrapClient:
         return 202, {"ok": True, "deployment": {"state": "queued"}}
 
 
-def test_manager_owns_bootstrap_target_and_secret_after_pairing(tmp_path: Path):
+def test_manager_owns_bootstrap_target_and_secret_after_enrollment(tmp_path: Path):
     FakeBootstrapClient.instances.clear()
     coordinator = VerifiedManagerBootstrapCoordinator(
         _registry(tmp_path), BootstrapCredentialStore(tmp_path / "credentials.json"), 2.0,
@@ -121,7 +121,8 @@ def test_manager_owns_bootstrap_target_and_secret_after_pairing(tmp_path: Path):
     assert before["pairing"]["paired"] is False
     assert before["bootstrap_endpoint_policy"] == "z2-ps-same-host:18081"
     assert FakeBootstrapClient.instances[-1].endpoint == "http://192.168.2.99:18081"
-    paired = coordinator.pair("z2", TOKEN)
+    coordinator.credentials.set("z2", DEVICE_ID, TOKEN)        # local enrollment result
+    paired = coordinator.status("z2")
     assert paired["pairing"]["paired"] is True
     assert TOKEN not in json.dumps(paired)
     status, _ = coordinator.create_upload("z2", {"size": 123, "sha256": "0" * 64})
@@ -137,7 +138,7 @@ def test_unpaired_mutation_fails_before_authenticated_ppu_request(tmp_path: Path
         _registry(tmp_path), BootstrapCredentialStore(tmp_path / "credentials.json"), 2.0,
         client_factory=FakeBootstrapClient,
     )
-    with pytest.raises(BootstrapCredentialError, match="not paired"):
+    with pytest.raises(BootstrapCredentialError, match="not enrolled"):
         coordinator.create_upload("z2", {"size": 1, "sha256": "0" * 64})
     # Fails from local credential state before any PPU request is made.
     assert FakeBootstrapClient.instances == []

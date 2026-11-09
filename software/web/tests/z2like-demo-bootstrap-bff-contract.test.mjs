@@ -15,7 +15,7 @@ test("z2like Browser Bootstrap surface remains Manager-owned and maintenance-gat
 
   assert.match(bffSource, /managerApiBase\(\)/);
   assert.match(bffSource, /bootstrapActionAllowed/);
-  assert.match(bffSource, /normalizedAction !== "pair" && !hasMaintenanceCapability/);
+  assert.match(bffSource, /normalizedAction !== "enrollment" && !hasMaintenanceCapability/);
   assert.match(bffSource, /issueMaintenanceCapabilityCookie/);
   assert.match(bffSource, /maintenanceMutationOriginAllowed/);
   assert.match(capabilitySource, /Origin/);

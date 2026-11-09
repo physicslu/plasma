@@ -28,6 +28,9 @@ export type ManagerBootstrapStatus = {
     device_match: boolean;
     credential_persistence: string;
     updated_at: string | null;
+    controller_generation?: number | null;
+    controller_id?: string | null;
+    controller_replaced?: boolean;
   };
   bootstrap: {
     schema_version: number;
@@ -161,10 +164,27 @@ export function getManagerPpuBootstrap(alias: string): Promise<ManagerBootstrapS
   return jsonRequest<ManagerBootstrapStatus>(root(alias));
 }
 
-export function pairManagerPpuBootstrap(alias: string, token: string): Promise<ManagerBootstrapStatus> {
-  return jsonRequest<ManagerBootstrapStatus>(`${root(alias)}/pair`, {
+export type ManagerPpuEnrollmentResult = {
+  ok: boolean;
+  ppu_alias: string;
+  state: string | null;
+  controller_generation?: number;
+  controller_mode?: "NORMAL" | "RECOVERY_ONLY";
+  recovery_blockers?: string[];
+  enrollment_source?: string;
+  expires_in_s?: number;
+  instruction?: string;
+  detail?: unknown;
+};
+
+/** LOM-P2A-2 local enrollment: no token is ever typed for normal use. */
+export function enrollManagerPpuBootstrap(
+  alias: string,
+  request: { entry: "button"; step: "start" | "claim" } | { entry: "ticket"; ticket: string },
+): Promise<ManagerPpuEnrollmentResult> {
+  return jsonRequest<ManagerPpuEnrollmentResult>(`${root(alias)}/enrollment`, {
     method: "POST",
-    body: JSON.stringify({ token }),
+    body: JSON.stringify(request),
   });
 }
 

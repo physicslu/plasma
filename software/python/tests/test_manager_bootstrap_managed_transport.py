@@ -136,7 +136,7 @@ def test_managed_coordinator_keeps_public_reachability_separate_from_device_bind
     assert before["bootstrap_endpoint_policy"] == MANAGED_BOOTSTRAP_TRANSPORT
     assert FakeBootstrapClient.instances[-1].endpoint == MANAGED_ORIGIN
 
-    coordinator.pair("z2like-qemu", TOKEN)
+    coordinator.credentials.set("z2like-qemu", DEVICE_ID, TOKEN)   # enrolled (LOM-P2A-2)
     status, _ = coordinator.start_deployment(
         "z2like-qemu",
         {
@@ -169,7 +169,7 @@ def test_managed_deployment_requires_manager_owned_private_runtime_gateway_host(
         2.0,
         client_factory=FakeBootstrapClient,
     )
-    coordinator.pair("z2like-qemu", TOKEN)
+    coordinator.credentials.set("z2like-qemu", DEVICE_ID, TOKEN)   # enrolled (LOM-P2A-2)
 
     for value in (None, "127.0.0.1", "0.0.0.0", "ppu-managed-lab.example"):
         if value is None:

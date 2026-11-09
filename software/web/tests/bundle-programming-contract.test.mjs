@@ -14,7 +14,7 @@ test("BFF allowlists only the Manager-owned programming plan/run/status routes",
   assert.match(bff, /\/\^programming\\\/routes\$\//);
   assert.match(bff, /const RUN_ID = "\[0-9a-f\]\{32\}"/);
   // Programming POSTs ride the existing maintenance capability boundary.
-  assert.match(bff, /normalizedAction !== "pair" && !hasMaintenanceCapability\(request, normalizedAlias\)/);
+  assert.match(bff, /normalizedAction !== "enrollment" && !hasMaintenanceCapability\(request, normalizedAlias\)/);
   assert.doesNotMatch(bff, /programming\/(retry|resubmit)/);
 });
 

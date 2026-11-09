@@ -12,7 +12,11 @@ const BOOTSTRAP_TIMEOUT_MS = 45_000;
 const UPLOAD_ID = "[0-9a-f]{32}";
 const RUN_ID = "[0-9a-f]{32}";
 const BOOTSTRAP_POST_ACTIONS = [
-  /^pair$/,
+  // LOM-P2A-2: local enrollment (button or engineering/SD ticket) replaces
+  // the retired manual pairing token; explicit recovery actions need the
+  // maintenance capability like every other mutation.
+  /^enrollment$/,
+  /^recovery$/,
   /^ps-loopback$/,
   /^uploads$/,
   /^deployments$/,
@@ -89,7 +93,7 @@ export async function relayManagerBootstrapRequest(
     try {
       maintenanceCapabilityConfigured();
       if (!maintenanceMutationOriginAllowed(request)) return maintenanceCapabilityRequired();
-      if (normalizedAction !== "pair" && !hasMaintenanceCapability(request, normalizedAlias)) {
+      if (normalizedAction !== "enrollment" && !hasMaintenanceCapability(request, normalizedAlias)) {
         return maintenanceCapabilityRequired();
       }
     } catch {
@@ -139,7 +143,7 @@ export async function relayManagerBootstrapRequest(
       });
     }
     const headers = responseHeaders(response);
-    if (request.method === "POST" && normalizedAction === "pair" && response.ok) {
+    if (request.method === "POST" && normalizedAction === "enrollment" && response.ok) {
       const cookie = issueMaintenanceCapabilityCookie(normalizedAlias);
       if (cookie) headers.set("Set-Cookie", cookie);
     }

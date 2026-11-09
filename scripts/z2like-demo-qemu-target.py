@@ -125,30 +125,19 @@ def _ensure_machine_id(path: Path) -> None:
     os.replace(temporary, path)
 
 
-def _ensure_token(service_script: Path, state_root: Path, machine_id: Path) -> None:
-    token_file = state_root / "control-token"
-    if token_file.exists():
-        if token_file.stat().st_mode & 0o077:
-            raise TargetError("persistent Bootstrap token permissions are too broad")
-        return
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(service_script),
-            "--state-root",
-            str(state_root),
-            "--machine-id",
-            str(machine_id),
-            "provision-token",
-        ],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=10,
-    )
-    if completed.returncode != 0:
-        raise TargetError(f"cannot provision Bootstrap token: {completed.stderr.strip()}")
+def _ensure_engineering_policy(config_root: Path) -> None:
+    """Host-lab emulator only: enable the LOM-P2A-2 Engineering CLI entry for
+    seven days (root-owned policy inside the container). Never on a real PPU."""
+    path = config_root / "ppu-engineering-mode.json"
+    temporary = path.with_name(path.name + ".new")
+    temporary.write_text(json.dumps({
+        "schema": "plasma.ppu.engineering-mode.v1",
+        "enrollment_cli": True,
+        "expires_at_epoch_s": int(time.time()) + 7 * 24 * 3600,
+        "note": "z2like QEMU host-lab emulator",
+    }, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.chmod(0o644)
+    os.replace(temporary, path)
 
 
 def _release_identity(current: Path) -> str | None:
@@ -232,6 +221,8 @@ def _start_runtime(
                 "gateway",
                 "--ppu-config",
                 str(config),
+                "--controller-admission-socket",
+                "/run/plasma-bootstrap/controller-admission.sock",
                 "--host",
                 gateway_host,
                 "--port",
@@ -282,7 +273,7 @@ def _run(args: argparse.Namespace) -> int:
     for directory in (product_root, config_root, bootstrap_state, runtime_state, log_root):
         directory.mkdir(parents=True, exist_ok=True)
     _ensure_machine_id(machine_id)
-    _ensure_token(service_script, bootstrap_state, machine_id)
+    _ensure_engineering_policy(config_root)
 
     bootstrap = subprocess.Popen(
         [

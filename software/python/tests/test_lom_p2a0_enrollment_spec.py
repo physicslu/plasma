@@ -80,14 +80,15 @@ def test_replacement_station_reclaims_without_old_computer_or_token():
     assert exc.value.detail == {"current_generation": 2}
 
 
-def test_serial_console_is_a_labelled_development_alternative():
+def test_engineering_cli_is_a_labelled_controlled_development_entry():
     disk, state = m.Disk(), safety()
     ppu = boot(disk, state)
-    with pytest.raises(PermissionError):
-        ppu.serial_arm(0.0, local_console_root=False)
-    ticket = ppu.serial_arm(0.0, local_console_root=True)
+    with pytest.raises(m.SpecError) as denied:
+        ppu.engineering_arm(0.0, authorized=False)
+    assert denied.value.code == "ENGINEERING_MODE_NOT_AUTHORIZED"
+    ticket = ppu.engineering_arm(0.0, authorized=True)
     m.client_claim(ppu, ticket, 1.0)
-    assert ppu.controller()["last_enrollment"]["source"] == "serial-dev"
+    assert ppu.controller()["last_enrollment"]["source"] == "engineering-cli"
 
 
 @pytest.mark.parametrize("unsafe", ["seal", "unknown", "active_set"])
@@ -293,8 +294,9 @@ def test_unenrolled_and_unknown_operations_fail_closed():
         ppu.authorize("x" * 64, "status.read")
     assert exc.value.code == "CONTROLLER_NOT_ENROLLED"
     disk, state, cred = enrolled()
-    with pytest.raises(ValueError):
+    with pytest.raises(m.SpecError) as unclassified:
         boot(disk, state).authorize(cred, "shell.exec")
+    assert unclassified.value.code == "CONTROLLER_OPERATION_UNCLASSIFIED"
 
 
 def test_ticket_not_consumed_or_ledger_full_never_arms():

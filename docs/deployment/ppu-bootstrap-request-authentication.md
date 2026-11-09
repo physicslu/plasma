@@ -36,7 +36,7 @@ Anonymous reads (`/v1/health`, `/v1/status`, `/v1/assets`, `/v1/deployment`) rem
 
 - The Owner Operation Authorization (`ppu_owner_authorization.py`), its key derivation, B1/B2/B3, journals, Active Set, Site leases, SAFE_OFF, SEALED and `OUTCOME_UNKNOWN` rules are unchanged.
 - **No confidentiality.** Request/response bodies remain readable on the link; this proves integrity and credential possession only. Production TLS is still NOT_QUALIFIED.
-- **No enrollment.** The credential is still provisioned by `provision-token` and entered once; local physical enrollment/recovery is LOM-P2A-2 and remains blocked on the owner's physical-presence decision (ADR-0008 D1).
+- **Enrollment (LOM-P2A-2).** The credential is now the current controller credential created by local enrollment ([spec](../development/opf-local-owner-mode-p2a0-enrollment-spec.md)); `provision-token` and manual pairing are retired. `GET /v1/auth/challenge` additionally reports the non-secret `controller_generation`, and the same proof binds Gateway (`:18080`) writes through the controller admission socket (G13). Refused requests report `{"error":"unauthorized","code":"CONTROLLER_UNAUTHENTICATED","controller_generation":N}`.
 - A Bootstrap restart drops outstanding nonces; a client retries the read-only challenge, never a write whose outcome is unknown.
 - Challenge flooding can evict nonces (bounded DoS on the controlled link); it cannot authenticate a request.
 

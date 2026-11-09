@@ -303,6 +303,7 @@ def run_acceptance(
                     "127.0.0.1",
                     "--plasma-port",
                     str(server_port),
+                    "--host-lab-unauthenticated-writes",
                     "--output-root",
                     str(gateway_output),
                 ],

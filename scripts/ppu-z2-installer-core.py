@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, Sequence
 
+CONTROLLER_ADMISSION_SOCKET = "/run/plasma-bootstrap/controller-admission.sock"
 MIN_PYTHON = (3, 11, 0)
 EXPECTED_CONTRACTS = {"plasma_protocol": "3.3", "web_rest_api": "3"}
 EXPECTED_HARDWARE_BOUNDARY = {
@@ -654,6 +655,9 @@ def render_systemd_units(
                 f"ExecStart={python_runtime.path} {app} gateway "
                 f"--ppu-config {config} "
                 f"--host {gateway_host} --port 18080 "
+                # LOM-P2A-2 G13: every Gateway write is bound to the current
+                # PPU controller via the root Bootstrap admission socket.
+                f"--controller-admission-socket {CONTROLLER_ADMISSION_SOCKET} "
                 "--plasma-host 127.0.0.1 --plasma-port 9900 "
                 f"--output-root {paths.state_root / 'gateway-output'}"
             ),

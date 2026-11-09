@@ -23,6 +23,7 @@ from .test_ppu_bundle_v3_smoke_execution_gate1 import build_smoke
 from .test_ppu_fpga_static_qualification_gate1 import _b3_server, _commit, bootstrap
 from .test_ppu_package_receive_admission_pr1 import TOKEN, loopback  # noqa: F401
 from .bootstrap_request_auth_fixture import signed_call
+from .ppu_controller_fixture import clear_controller
 
 ROOT = Path(__file__).resolve().parents[3]
 # Load the Manager issuer by path: the factory Bootstrap CI job installs only
@@ -368,7 +369,7 @@ def test_b2_and_b3_require_the_device_identity_and_credential(tmp_path):
                        match="OWNER_AUTHORIZATION_DEVICE_IDENTITY_UNAVAILABLE"):
         srv.start_deployment(body)
     paths.machine_id_path.write_text(machine)
-    paths.token_file.unlink()
-    with pytest.raises(bootstrap.BootstrapServiceError, match="not provisioned"):
+    clear_controller(paths.state_root)
+    with pytest.raises(bootstrap.BootstrapServiceError, match="CONTROLLER_NOT_ENROLLED"):
         srv.start_deployment(body)
     assert calls == []

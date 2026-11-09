@@ -72,13 +72,7 @@ the SWPC production HTTPS Client must not silently downgrade to HTTP.
 
 A clean factory install must not create `/opt/plasma/current`.
 
-Provision the device-local pairing token separately:
-
-```bash
-sudo /usr/bin/python3 /opt/plasma/bootstrap/ppu-bootstrap-service.py provision-token
-```
-
-Treat the printed token as a one-time factory credential. Do not put it in repository files, screenshots, CI artifacts or general logs. Clients never send it over the network: every authenticated Bootstrap request uses [mutual request authentication](ppu-bootstrap-request-authentication.md) (per-request HMAC under a single-use PPU nonce, response MACed by the PPU). Manual entry of this credential is retired only by Local Owner Mode enrollment (LOM-P2A-2, [ADR-0008](../adr/0008-local-owner-mode.md)).
+The factory install provisions **no** credential. A Control Station becomes the PPU's controller only through Local Owner Mode enrollment (LOM-P2A-2, [ADR-0008](../adr/0008-local-owner-mode.md), [enrollment spec](../development/opf-local-owner-mode-p2a0-enrollment-spec.md)): the PS-GPIO enrollment button (production entry once the board profile is hardware-verified), the Engineering CLI `ppu-enroll.py arm` under a root-owned Engineering Mode policy (development), or an SD boot-partition ticket (rescue). The retired `provision-token` command no longer exists; an existing P2A-1 `control-token` is migrated once to controller generation 1. Clients never send the credential: every authenticated request uses [mutual request authentication](ppu-bootstrap-request-authentication.md).
 
 Validate Bootstrap while Product Runtime is absent:
 
@@ -180,7 +174,7 @@ In **EMode -> PPU Sites -> Runtime Deployment**:
 
 1. Select the known PPU connection. Programming Registration may still be pending, commissioned or disabled.
 2. Confirm Bootstrap status and immutable `device_id`.
-3. Enter the one-time Platform maintenance pairing token.
+3. Enroll this Control Station (Local PPU Enrollment: PPU button, or the engineering ticket in development). No token is typed for normal use.
 4. Select the CI-produced `plasma-z2-ps-kit-*.tar.gz` and matching `.sha256` sidecar.
 5. Confirm PPU ID, Facility ID and Display Name.
 6. Start Runtime deployment.

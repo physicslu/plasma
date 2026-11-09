@@ -74,12 +74,13 @@ test("Platform Release update is registration-independent while preserving idle,
   assert.doesNotMatch(deployment, /gateway_host/);
 });
 
-test("Platform maintenance pairing is separate from programming Registration", async () => {
+test("Local PPU enrollment replaces the pairing token and is separate from programming Registration", async () => {
   const deployment = await source(files.deployment);
-  assert.match(deployment, /Platform Maintenance Pairing Token/);
-  assert.match(deployment, /Authorize Platform Maintenance/);
+  assert.match(deployment, /Enroll with PPU Button/);
+  assert.match(deployment, /Complete Enrollment/);
+  assert.match(deployment, /enrollManagerPpuBootstrap/);
   assert.match(deployment, /does not register the PPU for managed programming operations/);
-  assert.match(deployment, /pairManagerPpuBootstrap/);
+  assert.doesNotMatch(deployment, /Pairing Token|pairManagerPpuBootstrap/);
 });
 
 test("Platform PS Loop Test reuses Runtime loopback without requiring programming Registration", async () => {

@@ -21,6 +21,20 @@ The normative requirements are:
 9. Startup/restart and recovery **MUST** preserve durable transaction records, activation identity and unresolved hardware states. Recovery of control credentials **MUST NOT** erase a pending Flash outcome, Site seal or active Lease, or trigger deployment/replay.
 10. This product policy **MUST NOT** be converted into a mandatory PPU/Bundle/Owner-HMAC import of standalone OPF Core. Introducing manufacturer or third-party operation entitlements in future **requires a new explicit owner-approved ADR**; it cannot be hidden in an API, installer, UI or deployment profile.
 
+## Enrollment entries (LOM-P2A-2 Gate 1, 2026-11-09)
+
+The physical-presence primitive (requirement 4) is decided per entry; all three feed **one** enrollment engine and **one** claim exchange ([spec](../development/opf-local-owner-mode-p2a0-enrollment-spec.md) §3) and produce the same controller record (credential + generation + mode):
+
+| Entry | Role | Physical-presence evidence | Status |
+| --- | --- | --- | --- |
+| **PS-GPIO enrollment button** | **Production entry on the prototype** | Debounced long press on a PPU-local button binds the window to the single Control Station request seen in a 120 s window; a competing request makes the window `CONTENDED` (fail closed) | Implemented Host-only; PYNQ-Z2 board profile shipped **disabled** until the J7 pin 6 / MIO12 wiring and live GPIO ownership are verified on hardware (separate approval) |
+| **Engineering CLI** (`ppu-enroll.py arm`) | Controlled development entry | Root on the PPU (SSH or console) **and** a root-owned, expiring Engineering Mode policy; prints a one-time ticket | Implemented Host-only |
+| **SD boot-partition ticket** | Rescue entry | Ticket file consumed once at boot | Implemented Host-only (boot unit NOT_RUN on hardware) |
+
+GPIO chip, line, active level, debounce and hold come from a root-owned board profile; no pin is hard-coded in the engine. The button entry has no PPU display: an **active man-in-the-middle on the management link during the press is not prevented** (passive observers are, via X25519). This residual is recorded in the [P2A-2 Gate 1 report](../development/opf-local-owner-mode-p2a2-gate1-20261109.md) for owner decision; the Engineering CLI and SD ticket do not have it.
+
+Every PPU mutating surface is bound to the current controller: Bootstrap (`:18081`) directly, the Gateway (`:18080`) through the root controller admission socket (G13). Recovery-Gated Takeover follows owner decision B3 (b).
+
 ## Authorization is not hardware safety
 
 | Concern | Local Owner decision | Retained enforcement |
@@ -60,6 +74,8 @@ A second control station must not silently invalidate a first controller during 
 An arbitrary FPGA bitstream can drive pins or bypass an expected PL-level `SAFE_OFF` implementation. The Gate 1 audit **cannot** claim a host-only ABI/manifest check proves electrical safety for an untrusted image. The later implementation must establish an independent fail-safe boundary (or document the exact unsupported image/hardware class and refuse unsafe activation). Keep Root-owned reload fencing, per-Site leases, output/power isolation and protected recovery. Provider subprocess isolation and authority to touch `/dev/mem`/USB/MMIO are likewise Host-owned and must not be granted merely by OPF Provider metadata.
 
 ## Migration gap: policy accepted, functionality not yet implemented
+
+> LOM-P2A-1 (request MAC) and LOM-P2A-2 Gate 1 (enrollment, controller generation, Recovery-Gated Takeover, G13) replace the Bearer token and manual pairing described below; Console simplification (P1), the fixed-lifecycle cookie and the Registry lifecycle remain as described until their own phases.
 
 As of main `6706758d5a4ef536d9f02a7df860ccfa3b565b80`:
 
