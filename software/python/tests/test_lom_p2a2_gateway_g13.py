@@ -373,3 +373,15 @@ def test_wrong_or_unarmed_enrollment_never_persists_a_credential(lab):
     assert store.paired("z2") is False and ppu.engine.controller() is None
     with pytest.raises(ValueError):
         coordinator.enrollment("z2", {"entry": "ticket", "ticket": "NOT-HEX"})
+
+
+def test_unenrolled_manager_write_is_refused_by_the_ppu_not_silently_accepted(lab):
+    ppu, gateway, _paths, tmp_path = lab
+    _store, coordinator = _manager(tmp_path, ppu, gateway, "a")
+    status, _headers, body = _post(_gateway_client(coordinator, gateway), "/api/jobs")
+    assert status == 503 and json.loads(body)["error"]["code"] == "CONTROLLER_NOT_ENROLLED"
+    _owner_store, owner = _manager(tmp_path, ppu, gateway, "owner")
+    owner.enrollment("z2", {"entry": "ticket", "ticket": _ticket(ppu)})
+    status, _headers, body = _post(_gateway_client(coordinator, gateway), "/api/jobs")
+    assert status == 401 and json.loads(body)["error"]["code"] == "CONTROLLER_UNAUTHENTICATED"
+    assert _Routes.recorded == []

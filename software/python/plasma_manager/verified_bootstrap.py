@@ -163,6 +163,12 @@ class VerifiedManagerBootstrapCoordinator(ManagerBootstrapCoordinator):
         """``PPUHttpClient.write_signer`` bound to this alias's enrollment."""
         def signer(client: Any, target: str, headers: Mapping[str, str], body: bytes | None,
                    timeout_s: float) -> tuple[int, dict[str, str], bytes]:
+            if not self.credentials.paired(alias):
+                # Not enrolled: nothing to sign with. The PPU Gateway is the
+                # enforcement point and refuses the write (G13, fail closed).
+                return client._raw_relay("POST", target, headers=dict(headers), body=body,
+                                         timeout_s=timeout_s,
+                                         max_response_bytes=MAX_GATEWAY_RESPONSE_BYTES)
             return self.signed_gateway_post(alias, client, target, headers=headers, body=body,
                                             timeout_s=timeout_s)
         return signer
