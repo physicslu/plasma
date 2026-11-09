@@ -209,7 +209,6 @@ jobs:
           software/python/tests/test_ppu_b3_z2_install_gate1.py
           software/python/tests/test_ppu_b3_fpga_load_gate1.py
           software/python/tests/test_ppu_owner_authorization_gate1.py
-          software/python/tests/test_ppu_bootstrap_request_auth.py
           software/python/tests/test_ppu_asset_execution_gate1.py
           software/python/tests/test_ppu_privileged_source_gate1.py
           software/python/tests/test_ppu_fpga_static_qualification_gate1.py
@@ -369,7 +368,10 @@ jobs:
       - name: Install Manager package and tests
         run: python -m pip install "./software/python[dev]"
       - name: Run Manager Bootstrap policy regressions
-        run: python -m pytest -q software/python/tests/test_manager_bootstrap.py
+        run: >-
+          python -m pytest -q software/python/tests/test_manager_bootstrap.py
+          software/python/tests/test_manager_bootstrap_verified_pairing.py
+          software/python/tests/test_ppu_bootstrap_request_auth.py
       - name: Prove production Manager entrypoint composes current Manager with Bootstrap routes
         run: >-
           python -c
