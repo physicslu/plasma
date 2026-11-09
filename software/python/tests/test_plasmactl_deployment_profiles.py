@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -378,6 +380,37 @@ def test_local_control_station_manager_is_bootstrap_capable_with_release_catalog
     # Committed bytes only, exported from the clean HEAD being activated.
     assert "archive --format=tar HEAD -- data release" in source
     assert "-c core.autocrlf=false -c core.eol=lf" in source
+    # L3 HIL receipts referenced by the reviewed manifests ship with the Catalog.
+    export = source.split("export_release_catalog() {", 1)[1].split("prepare_release() {", 1)[0]
+    assert '"$destination/release/physical-compatibility"' in export
+    assert 'value.startswith("docs/evidence/")' in export
+    assert 'archive --format=tar HEAD -- "${evidence_paths[@]}"' in export
+
+
+def test_local_control_station_release_catalog_ships_l3_evidence(tmp_path: Path) -> None:
+    """Execute export_release_catalog against this repository's HEAD."""
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    function = "export_release_catalog() {" + source.split("export_release_catalog() {", 1)[1].split("\nprepare_release() {", 1)[0]
+    repo_root = LOCAL_CONTROL_STATION.parents[1]
+    script = (
+        "set -euo pipefail\n"
+        'die() { echo "$*" >&2; exit 1; }\n'
+        f"repo_root={shlex.quote(str(repo_root))}\n"
+        f"base_python={shlex.quote(sys.executable)}\n"
+        f"{function}\n"
+        f"export_release_catalog {shlex.quote(str(tmp_path / 'catalog'))}\n"
+    )
+    subprocess.run(["bash", "-c", script], check=True, timeout=300)
+    catalog = tmp_path / "catalog"
+    manifest = json.loads((catalog / "release/physical-compatibility/l3-configurations-v1.json").read_text(encoding="utf-8"))
+    referenced = {manifest_path for record in manifest["configurations"]
+                  for manifest_path in [record["provenance"]["manager_journal"], record["provenance"]["bootstrap_status"],
+                                        *(receipt["path"] for receipt in record["evidence"])]}
+    assert referenced
+    for rel in referenced:
+        assert (catalog / rel).is_file(), rel
+    shipped = {str(p.relative_to(catalog)) for p in (catalog / "docs").rglob("*") if p.is_file()}
+    assert shipped == referenced
 
 
 def test_local_control_station_release_build_self_tests_manager_selector() -> None:
