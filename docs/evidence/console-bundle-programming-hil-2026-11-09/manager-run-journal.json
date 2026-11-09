@@ -1,0 +1,281 @@
+{
+ "runs": [
+  {
+   "acknowledged": false,
+   "activation": {
+    "admission_transaction_id": "285c0483c5b64f0d9c68a970cdcef8fe",
+    "b3_transaction_id": "d929e9859df14acc91bff2b53043b51b",
+    "fpga_load": false,
+    "mode": "activate",
+    "upload_id": "c103534f8bc1436e82caf16848510fbf"
+   },
+   "auto_retry": "DISABLED",
+   "created_at": "2026-11-09T04:24:25.764519+00:00",
+   "job": {
+    "bytes_done": 18768,
+    "bytes_total": 18768,
+    "job_id": "job-20261109-042428-113dd980",
+    "progress_percent": 100.0,
+    "stage": "flash_cycle",
+    "state": "success"
+   },
+   "job_submission_count": 1,
+   "outcome": "PASS",
+   "plan": {
+    "activation_required": true,
+    "active_asset_set": {
+     "asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+     "state": "ACTIVE"
+    },
+    "bundle": {
+     "archive_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+     "archive_size": 21607,
+     "asset_package_id": "img-8d3ffb02b80f7797",
+     "bundle_name": "stm32f103c8t6-site2-img-8d3ffb02b80f",
+     "bundle_schema": "plasma.ppu.bundle.v3",
+     "icpn": "STM32F103C8T6",
+     "image_filename": "plasma-blue-pill-cdc.bin",
+     "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+     "image_size": 18768,
+     "profile": "stm32f103c8t6-site2",
+     "provider": "openocd-platform-reference",
+     "target": {
+      "board": "pynq-z2",
+      "fpga_part": "xc7z020clg400-1",
+      "platform": "linux-armv7"
+     },
+     "version": "1.0.0"
+    },
+    "catalog_gate": "NOT_USED",
+    "confirm_required": "PROGRAM",
+    "fpga_load": false,
+    "plan_id": "1c9d2c6359cec95c8226142489d11083",
+    "ppu_alias": "z2",
+    "route": {
+     "driver_abi": "plasma_swd:5",
+     "flash_base": 134217728,
+     "flash_size": 65536,
+     "icpn": "STM32F103C8T6",
+     "max_image_bytes": 65536,
+     "operations": [
+      "flash_cycle"
+     ],
+     "profile": "stm32f103c8t6-site2",
+     "provider": "openocd-platform-reference",
+     "route_id": "z2-site2-stm32f103c8t6",
+     "sites": [
+      2
+     ],
+     "target": {
+      "board": "pynq-z2",
+      "fpga_part": "xc7z020clg400-1",
+      "platform": "linux-armv7"
+     },
+     "target_config": "target/stm32f1x.cfg",
+     "transport": "fpga"
+    },
+    "schema": "plasma.manager.bundle-programming-plan.v1",
+    "site_id": 2,
+    "steps": [
+     "B1_UPLOAD",
+     "B2_ADMIT",
+     "B3_ACTIVATE",
+     "FLASH_CYCLE_JOB",
+     "VERIFY_RECEIPT"
+    ]
+   },
+   "ppu_alias": "z2",
+   "reason": null,
+   "receipt": {
+    "asset_set_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+    "attempts": 1,
+    "bytes_verified": 18768,
+    "elapsed_ms": 7054,
+    "error": null,
+    "flash_result": "PASS",
+    "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "image_size": 18768,
+    "job_id": "job-20261109-042428-113dd980",
+    "job_state": "success",
+    "operation": "flash_cycle",
+    "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "safe_off": true,
+    "site_id": 2
+   },
+   "run_id": "de00788710bab4ed522e4705955d80f1",
+   "schema": "plasma.manager.bundle-programming-run.v1",
+   "site_id": 2,
+   "state": "finished",
+   "steps": [
+    {
+     "at": "2026-11-09T04:24:25.802398+00:00",
+     "result": "PASS",
+     "step": "PREFLIGHT"
+    },
+    {
+     "at": "2026-11-09T04:24:25.926713+00:00",
+     "result": "PASS",
+     "size": 21607,
+     "step": "B1_UPLOAD",
+     "upload_id": "c103534f8bc1436e82caf16848510fbf"
+    },
+    {
+     "at": "2026-11-09T04:24:26.159149+00:00",
+     "result": "PASS",
+     "step": "B2_ADMIT",
+     "transaction_id": "285c0483c5b64f0d9c68a970cdcef8fe"
+    },
+    {
+     "at": "2026-11-09T04:24:26.420474+00:00",
+     "result": "QUEUED",
+     "step": "B3_SUBMIT",
+     "transaction_id": "d929e9859df14acc91bff2b53043b51b"
+    },
+    {
+     "at": "2026-11-09T04:24:28.472101+00:00",
+     "result": "PASS",
+     "step": "B3_ACTIVATE",
+     "transaction_id": "d929e9859df14acc91bff2b53043b51b"
+    },
+    {
+     "at": "2026-11-09T04:24:28.965724+00:00",
+     "job_id": "job-20261109-042428-113dd980",
+     "result": "ACCEPTED",
+     "step": "FLASH_CYCLE_SUBMIT"
+    },
+    {
+     "at": "2026-11-09T04:24:36.072858+00:00",
+     "failed_checks": [],
+     "result": "PASS",
+     "step": "VERIFY_RECEIPT"
+    }
+   ],
+   "updated_at": "2026-11-09T04:24:36.074785+00:00"
+  },
+  {
+   "acknowledged": false,
+   "activation": {},
+   "auto_retry": "DISABLED",
+   "created_at": "2026-11-09T04:40:34.805160+00:00",
+   "job": {
+    "bytes_done": 18768,
+    "bytes_total": 18768,
+    "job_id": "job-20261109-044035-b8cbd4da",
+    "progress_percent": 100.0,
+    "stage": "flash_cycle",
+    "state": "success"
+   },
+   "job_submission_count": 1,
+   "outcome": "PASS",
+   "plan": {
+    "activation_required": false,
+    "active_asset_set": {
+     "asset_set_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+     "state": "ACTIVE"
+    },
+    "bundle": {
+     "archive_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+     "archive_size": 21607,
+     "asset_package_id": "img-8d3ffb02b80f7797",
+     "bundle_name": "stm32f103c8t6-site2-img-8d3ffb02b80f",
+     "bundle_schema": "plasma.ppu.bundle.v3",
+     "icpn": "STM32F103C8T6",
+     "image_filename": "plasma-blue-pill-cdc.bin",
+     "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+     "image_size": 18768,
+     "profile": "stm32f103c8t6-site2",
+     "provider": "openocd-platform-reference",
+     "target": {
+      "board": "pynq-z2",
+      "fpga_part": "xc7z020clg400-1",
+      "platform": "linux-armv7"
+     },
+     "version": "1.0.0"
+    },
+    "catalog_gate": "NOT_USED",
+    "confirm_required": "PROGRAM",
+    "fpga_load": false,
+    "plan_id": "977d3133fd588882fdc0443dcb1bb5f6",
+    "ppu_alias": "z2",
+    "route": {
+     "driver_abi": "plasma_swd:5",
+     "flash_base": 134217728,
+     "flash_size": 65536,
+     "icpn": "STM32F103C8T6",
+     "max_image_bytes": 65536,
+     "operations": [
+      "flash_cycle"
+     ],
+     "profile": "stm32f103c8t6-site2",
+     "provider": "openocd-platform-reference",
+     "route_id": "z2-site2-stm32f103c8t6",
+     "sites": [
+      2
+     ],
+     "target": {
+      "board": "pynq-z2",
+      "fpga_part": "xc7z020clg400-1",
+      "platform": "linux-armv7"
+     },
+     "target_config": "target/stm32f1x.cfg",
+     "transport": "fpga"
+    },
+    "schema": "plasma.manager.bundle-programming-plan.v1",
+    "site_id": 2,
+    "steps": [
+     "FLASH_CYCLE_JOB",
+     "VERIFY_RECEIPT"
+    ]
+   },
+   "ppu_alias": "z2",
+   "reason": null,
+   "receipt": {
+    "asset_set_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+    "attempts": 1,
+    "bytes_verified": 18768,
+    "elapsed_ms": 6747,
+    "error": null,
+    "flash_result": "PASS",
+    "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "image_size": 18768,
+    "job_id": "job-20261109-044035-b8cbd4da",
+    "job_state": "success",
+    "operation": "flash_cycle",
+    "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "safe_off": true,
+    "site_id": 2
+   },
+   "run_id": "92a6f9e068d0cc4b864e99e9053b3151",
+   "schema": "plasma.manager.bundle-programming-run.v1",
+   "site_id": 2,
+   "state": "finished",
+   "steps": [
+    {
+     "at": "2026-11-09T04:40:34.841165+00:00",
+     "result": "PASS",
+     "step": "PREFLIGHT"
+    },
+    {
+     "asset_set_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+     "at": "2026-11-09T04:40:34.843792+00:00",
+     "result": "ALREADY_ACTIVE",
+     "step": "ACTIVE_SET"
+    },
+    {
+     "at": "2026-11-09T04:40:35.310070+00:00",
+     "job_id": "job-20261109-044035-b8cbd4da",
+     "result": "ACCEPTED",
+     "step": "FLASH_CYCLE_SUBMIT"
+    },
+    {
+     "at": "2026-11-09T04:40:42.112737+00:00",
+     "failed_checks": [],
+     "result": "PASS",
+     "step": "VERIFY_RECEIPT"
+    }
+   ],
+   "updated_at": "2026-11-09T04:40:42.115281+00:00"
+  }
+ ],
+ "schema": "plasma.manager.bundle-programming-journal.v1"
+}
