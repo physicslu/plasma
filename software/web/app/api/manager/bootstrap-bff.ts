@@ -10,6 +10,7 @@ import {
 const MAX_BOOTSTRAP_BROWSER_REQUEST_BYTES = 2 * 1024 * 1024;
 const BOOTSTRAP_TIMEOUT_MS = 45_000;
 const UPLOAD_ID = "[0-9a-f]{32}";
+const RUN_ID = "[0-9a-f]{32}";
 const BOOTSTRAP_POST_ACTIONS = [
   /^pair$/,
   /^ps-loopback$/,
@@ -17,6 +18,17 @@ const BOOTSTRAP_POST_ACTIONS = [
   /^deployments$/,
   new RegExp(`^uploads/${UPLOAD_ID}/chunks$`),
   new RegExp(`^uploads/${UPLOAD_ID}/commit$`),
+  // Console-driven Bundle programming (Gate 1, 2026-11-09). The Manager builds
+  // the Bundle and owns B1/B2/B3 + flash_cycle; the Browser only plans,
+  // confirms, starts once and reads the run.
+  /^programming\/plans$/,
+  /^programming\/runs$/,
+  new RegExp(`^programming/runs/${RUN_ID}/acknowledge$`),
+];
+const BOOTSTRAP_GET_ACTIONS = [
+  /^$/,
+  /^programming\/routes$/,
+  new RegExp(`^programming/runs/${RUN_ID}$`),
 ];
 
 function json(status: number, payload: object): Response {
@@ -30,7 +42,7 @@ function json(status: number, payload: object): Response {
 }
 
 function bootstrapActionAllowed(method: string, action: string): boolean {
-  if (method === "GET") return action === "";
+  if (method === "GET") return BOOTSTRAP_GET_ACTIONS.some(pattern => pattern.test(action));
   if (method !== "POST") return false;
   return BOOTSTRAP_POST_ACTIONS.some(pattern => pattern.test(action));
 }

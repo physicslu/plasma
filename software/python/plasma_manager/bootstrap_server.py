@@ -15,11 +15,14 @@ from .bootstrap import (
     ManagerBootstrapCoordinator,
 )
 from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
+from .programming import BundleProgrammingWorkflow, ProgrammingError
 from .registry import RegistryEntryNotFound
 from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
 BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+PROGRAMMING_RUN_RE = re.compile(r"^programming/runs/([0-9a-f]{32})$")
+PROGRAMMING_ACK_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/acknowledge$")
 
 
 class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
@@ -31,6 +34,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
     """
 
     bootstrap_coordinator: ManagerBootstrapCoordinator | None = None
+    programming_workflow: BundleProgrammingWorkflow | None = None
     runtime_client_factory = PPUHttpClient
     _bootstrap_init_lock = RLock()
 
@@ -64,6 +68,36 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 config.request_timeout_s,
             )
             return cls.bootstrap_coordinator
+
+    def _programming(self) -> BundleProgrammingWorkflow:
+        cls = type(self)
+        if cls.programming_workflow is not None:
+            return cls.programming_workflow
+        with cls._bootstrap_init_lock:
+            if cls.programming_workflow is None:
+                config = self._config()
+                journal = (config.registry_state_path.with_name("bundle-programming-runs.json")
+                           if config.registry_state_path is not None else None)
+                cls.programming_workflow = BundleProgrammingWorkflow(
+                    coordinator=self._bootstrap(),
+                    registry=self.registry_store,
+                    gateway_client_factory=cls.runtime_client_factory,
+                    gate=self._operation_gate(),
+                    request_timeout_s=config.request_timeout_s,
+                    journal_path=journal,
+                )
+            return cls.programming_workflow
+
+    def _programming_call(self, call) -> None:
+        try:
+            status, payload = call()
+        except ProgrammingError as exc:
+            self._json(exc.status, exc.payload())
+            return
+        except Exception as exc:
+            self._bootstrap_error(exc)
+            return
+        self._json(status, payload)
 
     def _bootstrap_error(self, exc: Exception) -> None:
         if isinstance(exc, RegistryEntryNotFound):
@@ -204,6 +238,15 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         return False
 
     def _bootstrap_get(self, alias: str, action: str) -> None:
+        if action == "programming/routes":
+            self._programming_call(lambda: (HTTPStatus.OK, self._programming().list_routes()))
+            return
+        run_match = PROGRAMMING_RUN_RE.fullmatch(action)
+        if run_match is not None:
+            run_id = run_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._programming().run_status(alias, run_id)))
+            return
         if action:
             self._json(
                 HTTPStatus.NOT_FOUND,
@@ -377,6 +420,23 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 if set(body) != {"token"} or not isinstance(body.get("token"), str):
                     raise ValueError("Bootstrap pairing request requires only token")
                 self._json(HTTPStatus.OK, coordinator.pair(alias, body["token"]))
+                return
+            if action == "programming/plans":
+                self._programming_call(
+                    lambda: (HTTPStatus.OK, self._programming().plan(alias, body)))
+                return
+            if action == "programming/runs":
+                # Same Platform safety gate as manual B2/B3 (idle, no recovery).
+                if not self._bootstrap_mutation_allowed(alias):
+                    return
+                self._programming_call(
+                    lambda: (HTTPStatus.ACCEPTED, self._programming().start(alias, body)))
+                return
+            ack_match = PROGRAMMING_ACK_RE.fullmatch(action)
+            if ack_match is not None:
+                run_id = ack_match.group(1)
+                self._programming_call(
+                    lambda: (HTTPStatus.OK, self._programming().acknowledge(alias, run_id, body)))
                 return
             if action == "ps-loopback":
                 self._platform_ps_loopback(alias, body)

@@ -9,6 +9,7 @@ import {
   type ManagerRegistryPayload,
 } from "./ppu-registry-api";
 import PpuRuntimeDeployment from "./ppu-runtime-deployment";
+import BundleProgramming from "./bundle-programming";
 
 const ACTIVE_SITE_STATES = new Set(["queued", "submitting", "running", "stopping", "erase", "program", "verify", "read"]);
 
@@ -125,6 +126,10 @@ export default function PpuRuntimeDeploymentPage() {
           <h3>{loading ? "Loading PPU inventory..." : "No known PPU connection"}</h3>
           <p>Add a PPU connection from Registration before Platform inspection or maintenance. Programming Registration itself is not required.</p>
         </section>
+      )}
+
+      {selectedEntry?.alias && selectedEntry.lifecycle === "commissioned" && (
+        <BundleProgramming key={`programming-${selectedEntry.alias}`} alias={selectedEntry.alias} />
       )}
     </section>
   );
