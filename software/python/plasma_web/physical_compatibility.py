@@ -71,6 +71,9 @@ class PhysicalCompatibilityRegistry:
                                  for field in ("model", "revision")),
                          "Socket route requires a versioned fixture")
             _require(isinstance(evidence, list) and evidence, "at least one physical receipt required")
+            # Independent analog voltage/current measurements and a physical
+            # wiring-harness revision are optional L3 observations, not gates.
+            # When recorded, retain their truthful NOT_TESTED/NOT_RECORDED state.
             _require(isinstance(provenance, dict)
                      and all(isinstance(provenance.get(field), str) and provenance[field]
                              for field in ("manager_alias", "manager_journal", "manager_journal_sha256",

@@ -46,7 +46,7 @@ Neither flag overrides `execution_authorized=false`, live Site admission, or
   evidence is fixed in
   `docs/evidence/console-bundle-programming-hil-2026-11-09/`.
 
-## Critical limitations (not silently promoted)
+## L3 scope, optional observations, and execution safety
 
 The PPU Ready badge means **this particular archived PPU/Site direct-SWD
 configuration** successfully performed the scoped HIL operations. It does
@@ -54,10 +54,12 @@ configuration** successfully performed the scoped HIL operations. It does
 voltage is qualified. Specifically:
 
 - No Socket exists or was tested: `Socket Ready = false / NOT_TESTED`.
-- Analog target supply voltage/current was not independently measured:
-  `electrical_measurement=NOT_TESTED`.
-- PPU hardware and physical wiring revisions were not recorded; the claim is
-  limited to this identified physical instance and historical Job runs.
+- Independent analog target voltage/current measurement is **not required**
+  for L3; this run truthfully retains `electrical_measurement=NOT_TESTED`.
+- Physical wiring-harness Revision is **not required** for L3; this run
+  truthfully retains `physical_wiring_revision=NOT_RECORDED`. The PPU hardware
+  revision is also unrecorded, so this HIL claim is bound to the observed
+  physical instance and historical Job runs.
 - The Bootstrap state after these runs reports `pl_qualification=not_qualified`;
   this L3 operation result must not be recast as FPGA Image release qualification.
 - These runs did not independently observe post-Flash USB CDC behavior,

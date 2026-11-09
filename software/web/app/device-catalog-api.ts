@@ -265,8 +265,8 @@ export type VerifiedPhysicalConfiguration = {
   socket: { model: string; revision: string } | null;
   engine: { provider_id: string; provider_version: string; target_config: string; runtime_sha: string; fpga_image_id: string; abi: string; adapter: string; openocd_binary_sha256: string };
   physical_scope: string[];
-  electrical_measurement: string;
-  physical_wiring_revision: string;
+  electrical_measurement?: string;
+  physical_wiring_revision?: string;
   limitations: string[];
   provenance: { manager_alias: string; manager_journal: string; manager_journal_sha256: string; bootstrap_status: string; bootstrap_status_sha256: string };
   evidence: Array<{ path: string; sha256: string }>;

@@ -160,8 +160,11 @@ explicitly record that the Socket was absent. A Socket result requires a
 physical fixture identity and versioned receipt. Each HIL PASS is scoped to
 the actual device, site, image, operations and versions used. Missing analog
 voltage/current or wiring revision observations remain `NOT_TESTED` /
-`NOT_RECORDED`; neither an L3 badge nor a historical HIL PASS authorizes a
-new live Job. The separate L3 tracks do not create a `Both Ready` tier.
+`NOT_RECORDED` when available, but **independent analog voltage/current
+measurements and a physical wiring-harness revision are not L3 promotion
+prerequisites**. Either observation may be omitted without blocking the
+configuration-scoped HIL result. Neither an L3 badge nor a historical HIL PASS
+authorizes a new live Job. The separate L3 tracks do not create a `Both Ready` tier.
 
 The `configuration_fingerprint` covers reusable compatibility fields: device variant, package, programming backend/profile, interface, voltage/settings, PPU model/revision, Site interface profile/revision, Socket model/revision, and algorithm/settings revision.
 

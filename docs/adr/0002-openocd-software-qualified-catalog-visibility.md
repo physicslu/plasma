@@ -25,7 +25,7 @@ Socket、Adapter、PPU 與 Site 等實體硬體測試需購置特定封裝的樣
 2. **Canonical Identity Store** 管理精確原廠商業 ICPN 與逐欄位可驗證來源，並作為 Level 0+ 的共同 identity authority。**Level 1 `PROGRAMMING_CANDIDATE` 不是身分層，而是 programming-relevance admission：必須在 Exact ICPN identity 已成立的前提下，另有至少一條 source-backed Programming Provider／target／driver／algorithm／ROM-IAP／官方 programming route，可合理映射到該 Exact ICPN 或其已證實 Base／Family。**
 3. **Customer-facing IC Selector View** 收錄 **Level 1 `PROGRAMMING_CANDIDATE`、Level 2 `PROGRAMMABLE`、Level 3 `PLASMA_VERIFIED`**，並提供 Level Filter。Level 1 可被一般 User 搜尋與檢視，用來表達「已有具體 programming route、可委託 qualification」，但 `job_selectable=false`；只有 Level 2／3 可進 Job Picker。Level 0 僅存在於 Internal Research Registry，不由 public Selector API 暴露。
 4. 軟體支援資格要鎖定 **OpenOCD Provider / 版本或 source commit、Target／Device 對應、Flash Driver、必要的 Flash geometry／bank 假設以及 program、必要 erase、read/verify 等實際宣告的 operation 能力**，保留證據與約束。只有 CFG 檔案名稱、家族字首、確定性 `mapped` 路徑或研究候選，**不足以單獨宣告 OpenOCD = SUPPORTED**。不能在無實體的條件下證成必要晶片特性時，維持 Candidate/Unknown。
-5. **硬體驗證獨立維度**：`PPU Ready` 與 `Socket Ready` 是兩條可獨立導出 Level 3 的實機驗證路徑；不設 `Both Ready` 等級。每條路徑分別保存 IC/package、對應 PPU/Site 或 Socket/Adapter 配置與版本、接線、電氣觀測、Provider／PLASMA 軟體版本及真實 HIL 結果。未通過的路徑保持 `NOT_TESTED`，不得從另一條路徑的 PASS 推定。
+5. **硬體驗證獨立維度**：`PPU Ready` 與 `Socket Ready` 是兩條可獨立導出 Level 3 的實機驗證路徑；不設 `Both Ready` 等級。每條路徑分別保存 IC/package、對應 PPU/Site 或 Socket/Adapter 配置、Provider／PLASMA 軟體版本及真實 HIL 結果。獨立電壓／電流量測與實體線束 Revision 可另行記錄，**不是 L3 晉級必要條件**。未通過的路徑保持 `NOT_TESTED`，不得從另一條路徑的 PASS 推定。
 6. **執行授權仍分離**：Programming Catalog／IC Selector 顯示永遠不直接授權燒錄。Job/Batch 必須至少確認導出 Catalog Level 2 的 `ProgrammingQualification.state == SUPPORTED` 仍適用、相符 Runtime 已安裝、route／電壓／操作／安全條件成立，並在產品執行政策要求時確認對應 Catalog Level 3 verified configuration，全部 fail-closed。
 7. **OpenOCD 是目前主要 Programming Provider 之一，但不是 identity authority。** OpenOCD CFG／driver／target 可讓 Level 0 Exact ICPN 取得 Level 1 `PROGRAMMING_CANDIDATE` 的研究依據；只有版本鎖定 qualification 對 Exact ICPN 產生 `SUPPORTED`，才可導出 Level 2 `PROGRAMMABLE`。未來 Manufacturer backend / PLASMA-native backend 適用同一規則。
 
@@ -235,7 +235,7 @@ Catalog Level 2 建立獨立的軟體資格權威。Level 1 ICPN 可在一般 IC
 
 L3 計算規則：`L2 SUPPORTED AND (PPU_SITE HIL PASSED OR SOCKET_ADAPTER HIL PASSED)`。在 UI 對應顯示 `PPU Ready` 和／或 `Socket Ready`，但 `Ready` **僅表示封存的指定實驗配置通過相應測試**，不表示目前安裝的 PPU、Site、Socket、電氣條件或 Runtime 可無條件執行。每個 PASS 須鎖定 Exact ICPN／Package、PPU／Site、Debug Interface、實測操作、Readback／SAFE_OFF、PS／PL／Provider 身分與可核對的實體 Job 回執。Socket 路徑還要鎖定 Fixture／Adapter 的 Model 和 Revision；PPU 直接接線則記 `socket=null`、`connection_mode=DIRECT_WIRE`，不得捏造 Socket。
 
-電壓／電流、實體 Pin Mapping 與線束 Revision 若缺少獨立量測，應逐項明示 `NOT_TESTED`／`NOT_RECORDED`，不得改寫為 PASS。這可限制已驗證 HIL 的宣告範圍；正式生產電氣資格、其他配置相容性及當次 Runtime／Safety Admission 都是獨立 gate。**任何 mock、CI 或文件聲稱都不能代替真實 Flash／Readback／SAFE_OFF 回執。**
+**L3 非必要證據：**獨立的目標電壓／電流量測，以及實體線束的 Revision 編號。未量測或未記錄時可標註 `NOT_TESTED`／`NOT_RECORDED`，亦可省略這些可選欄位；**不因此阻止 PPU Ready 或 Socket Ready 晉級**，但不得宣稱該項目已驗證。這不豁免當次操作的供電適用性、接線／Pin Mapping、安全保護、Runtime／Safety Admission，也不等於取得生產電氣資格。**任何 mock、CI 或文件聲稱都不能代替真實 Flash／Readback／SAFE_OFF 回執。**
 
 Catalog Level 3 `PLASMA_VERIFIED` 統計**唯一 Exact ICPN 數**；通過的實體配置或測試次數另外統計。Catalog Level 2 `PROGRAMMABLE` 而兩條路徑都沒有 HIL PASS 的 IC 仍留在 IC Selector，但不得標示 Level 3。**單獨 PPU Site PASS 不等於 Socket Ready。** Job／Batch 對選定 Site 的執行期、安全及供電條件維持 Fail Closed；不得用 Catalog Level 1／2 文件捏造 HIL PASS。
 

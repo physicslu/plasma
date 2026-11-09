@@ -718,7 +718,7 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
                   <dd>
                     {configuration.configuration_id} · {configuration.ppu_site.model} Site {configuration.ppu_site.site_id}
                     {` · ${configuration.physical_scope.join(" / ")} · HIL ${configuration.result}`}
-                    {` · ${zh ? "電氣量測" : "Electrical measurement"}: ${configuration.electrical_measurement}`}
+                    {configuration.electrical_measurement && ` · ${zh ? "電氣量測" : "Electrical measurement"}: ${configuration.electrical_measurement}`}
                     {configuration.limitations.length > 0 && ` · ${zh ? "限制" : "Limits"}: ${configuration.limitations.join("; ")}`}
                   </dd>
                 </div>

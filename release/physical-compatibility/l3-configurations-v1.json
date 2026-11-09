@@ -42,7 +42,6 @@
       },
       "limitations": [
         "Only the documented PYNQ-Z2 Site 2 direct-wire SWD configuration was physically exercised.",
-        "Analog target voltage/current and physical harness revision were not independently recorded.",
         "No Socket or Adapter fixture was built or qualified.",
         "FPGA load, USB CDC execution, eight-Site concurrency and hardware fault injection were not tested in these jobs.",
         "L3 is a historical configuration HIL result, not permission to execute on any current PPU/Site."

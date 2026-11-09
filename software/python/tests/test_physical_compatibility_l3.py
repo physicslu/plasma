@@ -109,6 +109,27 @@ def test_direct_wire_never_claims_unbuilt_socket():
         PhysicalCompatibilityRegistry([record])
 
 
+def test_independent_voltage_current_measurement_and_harness_revision_are_optional():
+    record = deepcopy(get_default_physical_compatibility_registry().verified_for(
+        "STMicroelectronics", "STM32F103C8T6"
+    )[0])
+    record.pop("electrical_measurement")
+    record.pop("physical_wiring_revision")
+    physical = PhysicalCompatibilityRegistry(
+        [record], root=Path(__file__).resolve().parents[3],
+    )
+    assert physical.verified_for("STMicroelectronics", "STM32F103C8T6")[0]["result"] == "PASSED"
+
+    synthetic = _synthetic("PPU_SITE")
+    synthetic.pop("electrical_measurement")
+    synthetic.pop("physical_wiring_revision")
+    registry = ProgrammingQualificationRegistry(
+        _fake_catalog(), (_FakeProvider(),),
+        physical_compatibility=PhysicalCompatibilityRegistry([synthetic]),
+    )
+    assert registry.describe("ExampleVendor", "EXAMPLE123")["catalog_level"] == 3
+
+
 def test_socket_fixture_requires_model_and_revision():
     record = _synthetic("SOCKET_ADAPTER")
     record["socket"]["revision"] = ""
