@@ -299,6 +299,9 @@ jobs:
             scripts/ppu_asset_set.py \
             scripts/ppu_owner_authorization.py \
             scripts/ppu_bootstrap_request_auth.py \
+            scripts/ppu_local_enrollment.py \
+            scripts/ppu_controller.py \
+            scripts/ppu-enroll.py \
             scripts/ppu_asset_execution.py \
             scripts/ppu_privileged_source.py \
             scripts/ppu-privileged-source-install.py \
@@ -391,6 +394,13 @@ jobs:
           test ! -e "$sandbox/opt/plasma/current"
           grep -q 'ppu-bootstrap-service.py serve --host 192.168.2.99 --port 18081' \
             "$sandbox/etc/systemd/system/plasma-bootstrap.service"
+          # LOM-P2A-2: enrollment engine and SD rescue unit ship; nothing is enrolled.
+          test -f "$sandbox/opt/plasma/bootstrap/ppu_controller.py"
+          test -f "$sandbox/opt/plasma/bootstrap/ppu-enroll.py"
+          grep -q 'boot-consume --boot-partition /boot' \
+            "$sandbox/etc/systemd/system/plasma-enroll-boot.service"
+          test ! -e "$sandbox/var/lib/plasma-bootstrap/controller"
+          test ! -e "$sandbox/var/lib/plasma-bootstrap/control-token"
 
       - name: Upload factory Bootstrap bundle
         uses: actions/upload-artifact@v4

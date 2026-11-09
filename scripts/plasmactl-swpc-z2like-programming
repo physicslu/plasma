@@ -116,7 +116,7 @@ render_dropin() {
 # Managed by Plasma SWPC Z2-like configured Mock Programming activation
 [Service]
 ExecStart=
-ExecStart=$plasma_python $current_app gateway --ppu-config $ppu_config --runtime-activation-socket /run/plasma-runtime-activation/helper.sock --host 127.0.0.1 --port 18080 --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $output_root --engineering-configured-mock
+ExecStart=$plasma_python $current_app gateway --ppu-config $ppu_config --runtime-activation-socket /run/plasma-runtime-activation/helper.sock --host 127.0.0.1 --port 18080 --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $output_root --engineering-configured-mock --host-lab-unauthenticated-writes
 EOF
 }
 

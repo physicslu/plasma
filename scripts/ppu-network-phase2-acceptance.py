@@ -421,7 +421,7 @@ def _inside_ppu(args: argparse.Namespace) -> int:
     server=gateway=None
     try:
         server=subprocess.Popen([sys.executable,str(app),"server","--config",str(work/"ppu.yaml")],cwd=work,env=env)
-        gateway=subprocess.Popen([sys.executable,str(app),"gateway","--host","0.0.0.0","--port",str(PPU_PORT),"--plasma-host","127.0.0.1","--plasma-port","9900","--output-root",str(work/"gateway-output"),"--network-activation-socket",str(work/"network-helper.sock")],cwd=work,env=env)
+        gateway=subprocess.Popen([sys.executable,str(app),"gateway","--host","0.0.0.0","--port",str(PPU_PORT),"--plasma-host","127.0.0.1","--plasma-port","9900","--output-root",str(work/"gateway-output"),"--network-activation-socket",str(work/"network-helper.sock"),"--host-lab-unauthenticated-writes"],cwd=work,env=env)
         while True:
             if server.poll() is not None: raise AcceptanceError(f"Plasma Server exited: {server.returncode}")
             if gateway.poll() is not None: raise AcceptanceError(f"Gateway exited: {gateway.returncode}")
