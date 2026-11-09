@@ -1,6 +1,6 @@
 # PPU Bootstrap mutual request authentication (LOM-P2A-1)
 
-> Status: **Implemented, Host-only verified.** Policy: ADR-0008 Local Owner Mode (PR #1371, pending merge). Not deployed to any PPU by this change; real Z2 behavior is **NOT_RUN** until a separately approved deployment.
+> Status: **Implemented on main (`3c2145f3d`), Host-only and hosted-CI verified.** Deployment plan: [synchronized runbook](ppu-lom-p2a1-synchronized-deployment-runbook.md) (not authorized). Policy: [ADR-0008 Local Owner Mode](../adr/0008-local-owner-mode.md). Not deployed to any PPU by this change; real Z2 behavior is **NOT_RUN** until a separately approved deployment.
 > Wire contract: `plasma.ppu.bootstrap-request-auth.v1`. PPU verifier: `scripts/ppu_bootstrap_request_auth.py`. Manager client mirror: `software/python/plasma_manager/bootstrap_request_auth.py` (byte-identical, enforced by `software/python/tests/test_ppu_bootstrap_request_auth.py`).
 
 ## Why

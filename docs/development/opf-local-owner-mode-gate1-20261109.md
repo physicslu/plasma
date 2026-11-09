@@ -111,4 +111,6 @@ This executes current authentication and safety regressions, **not** the future 
 
 **Pending owner decisions:** B1 physical-presence primitive; B2 identity root (machine-id + enrolled key vs PL-dependent device DNA); B3 single vs multi-controller and the overlapping PR disposition; B4 Render `fixed-lifecycle` profile retention; B5 independent FPGA fail-safe (custom-image activation remains hardware NO_GO).
 
+**Follow-up (2026-11-09, after #1371/#1372 merged at `3c2145f3d`):** B1–B5 proposed design, refreshed gap items G9–G12 and the overlapping-PR audit are in [B1–B5 proposed design](opf-local-owner-mode-b1b5-design-20261109.md) (**pending owner confirmation**). The P2A-1 deployment plan is the [synchronized runbook](../deployment/ppu-lom-p2a1-synchronized-deployment-runbook.md) (**not authorized**).
+
 **Claude Code handoff:** The separate [complete delivery work order](opf-local-owner-mode-claude-handoff-20261109.md) specifies D1–D8 design decisions, precise small-PR breakdown, test/CI matrix and stop conditions. It is planning material; no external Claude execution is implied.

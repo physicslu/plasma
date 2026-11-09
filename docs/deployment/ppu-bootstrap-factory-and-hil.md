@@ -78,7 +78,7 @@ Provision the device-local pairing token separately:
 sudo /usr/bin/python3 /opt/plasma/bootstrap/ppu-bootstrap-service.py provision-token
 ```
 
-Treat the printed token as a one-time factory credential. Do not put it in repository files, screenshots, CI artifacts or general logs. Clients never send it over the network: every authenticated Bootstrap request uses [mutual request authentication](ppu-bootstrap-request-authentication.md) (per-request HMAC under a single-use PPU nonce, response MACed by the PPU). Manual entry of this credential is retired only by Local Owner Mode enrollment (LOM-P2A-2, ADR-0008 / PR #1371).
+Treat the printed token as a one-time factory credential. Do not put it in repository files, screenshots, CI artifacts or general logs. Clients never send it over the network: every authenticated Bootstrap request uses [mutual request authentication](ppu-bootstrap-request-authentication.md) (per-request HMAC under a single-use PPU nonce, response MACed by the PPU). Manual entry of this credential is retired only by Local Owner Mode enrollment (LOM-P2A-2, [ADR-0008](../adr/0008-local-owner-mode.md)).
 
 Validate Bootstrap while Product Runtime is absent:
 
