@@ -29,6 +29,9 @@ REQUIRED_SCRIPTS = (
     "ppu_unified_deployment.py",
     "ppu_owner_authorization.py",
     "ppu_bootstrap_request_auth.py",
+    "ppu_local_enrollment.py",
+    "ppu_controller.py",
+    "ppu-enroll.py",
     "ppu_fpga_qualification.py",
     "ppu_asset_set.py",
     "ppu_asset_execution.py",
@@ -203,6 +206,34 @@ def _copy_scripts(source_root: Path, install_root: Path) -> None:
     _copy_privileged_source_inputs(source_root, install_root)
 
 
+ENROLL_BOOT_UNIT = "plasma-enroll-boot.service"
+
+
+def render_enroll_boot_unit(*, python_executable: str, script_path: str, state_root: str,
+                            boot_partition: str = "/boot") -> str:
+    return "\n".join([
+        "[Unit]",
+        "Description=Plasma PPU local enrollment: consume SD boot-partition ticket (rescue)",
+        "DefaultDependencies=yes",
+        "Before=plasma-bootstrap.service",
+        f"ConditionPathIsMountPoint={boot_partition}",
+        "",
+        "[Service]",
+        "Type=oneshot",
+        "User=root",
+        "Group=root",
+        "NoNewPrivileges=true",
+        "PrivateTmp=true",
+        "ProtectHome=true",
+        (f"ExecStart={python_executable} {script_path} --state-root {state_root} "
+         f"boot-consume --boot-partition {boot_partition}"),
+        "",
+        "[Install]",
+        "WantedBy=multi-user.target",
+        "",
+    ])
+
+
 def install_bootstrap(
     *,
     source_root: Path,
@@ -262,10 +293,22 @@ def install_bootstrap(
     temporary.write_text(unit, encoding="utf-8")
     temporary.chmod(0o644)
     os.replace(temporary, paths.systemd_unit)
+    # LOM-P2A-2 SD rescue entry: consume a boot-partition ticket once per boot,
+    # before the Bootstrap service can accept any mutation.
+    enroll_unit = paths.systemd_unit.with_name(ENROLL_BOOT_UNIT)
+    temporary = enroll_unit.with_name(enroll_unit.name + ".new")
+    temporary.write_text(render_enroll_boot_unit(
+        python_executable=python_executable,
+        script_path=str(paths.install_root / "ppu-enroll.py"),
+        state_root=str(paths.state_root),
+    ), encoding="utf-8")
+    temporary.chmod(0o644)
+    os.replace(temporary, enroll_unit)
 
     if enable_now:
         for argv in (
             ["systemctl", "daemon-reload"],
+            ["systemctl", "enable", ENROLL_BOOT_UNIT],
             ["systemctl", "enable", "--now", "plasma-bootstrap.service"],
         ):
             completed = runner(

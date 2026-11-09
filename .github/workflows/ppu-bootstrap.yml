@@ -19,6 +19,10 @@ on:
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_owner_authorization.py"
       - "scripts/ppu_bootstrap_request_auth.py"
+      - "scripts/ppu_controller.py"
+      - "scripts/ppu_local_enrollment.py"
+      - "scripts/ppu-enroll.py"
+      - "scripts/ppu-board-profiles/**"
       - "scripts/ppu_package_launcher.py"
       - "scripts/ppu_package_entry.py"
       - "scripts/ppu_package_unit_helper.py"
@@ -49,6 +53,12 @@ on:
       - "software/python/plasma_manager/bootstrap_server.py"
       - "software/python/plasma_manager/bootstrap_request_auth.py"
       - "software/python/plasma_manager/verified_bootstrap.py"
+      - "software/python/plasma_manager/local_enrollment.py"
+      - "software/python/plasma_manager/client.py"
+      - "software/python/plasma_manager/server.py"
+      - "software/python/plasma_web/controller_admission.py"
+      - "software/python/plasma_web/gateway_phase3.py"
+      - "software/python/plasma_web/gateway_base.py"
       - "software/python/tests/test_manager_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
@@ -56,6 +66,14 @@ on:
       - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
       - "software/python/tests/test_ppu_bootstrap_request_auth.py"
+      - "software/python/tests/test_lom_p2a2_controller.py"
+      - "software/python/tests/test_lom_p2a2_reference_equivalence.py"
+      - "software/python/tests/test_lom_p2a2_gateway_g13.py"
+      - "software/python/tests/lom_p2a2_real_engine_shim.py"
+      - "software/python/tests/ppu_controller_fixture.py"
+      - "software/python/tests/test_lom_p2a0_enrollment_spec.py"
+      - "software/python/tests/lom_p2a0_reference_model.py"
+      - "docs/development/opf-local-owner-mode-p2a0-enrollment-spec.md"
       - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
       - "software/python/tests/test_ppu_user_bundle_v3.py"
@@ -91,6 +109,10 @@ on:
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_owner_authorization.py"
       - "scripts/ppu_bootstrap_request_auth.py"
+      - "scripts/ppu_controller.py"
+      - "scripts/ppu_local_enrollment.py"
+      - "scripts/ppu-enroll.py"
+      - "scripts/ppu-board-profiles/**"
       - "scripts/ppu_package_launcher.py"
       - "scripts/ppu_package_entry.py"
       - "scripts/ppu_package_unit_helper.py"
@@ -121,6 +143,12 @@ on:
       - "software/python/plasma_manager/bootstrap_server.py"
       - "software/python/plasma_manager/bootstrap_request_auth.py"
       - "software/python/plasma_manager/verified_bootstrap.py"
+      - "software/python/plasma_manager/local_enrollment.py"
+      - "software/python/plasma_manager/client.py"
+      - "software/python/plasma_manager/server.py"
+      - "software/python/plasma_web/controller_admission.py"
+      - "software/python/plasma_web/gateway_phase3.py"
+      - "software/python/plasma_web/gateway_base.py"
       - "software/python/tests/test_manager_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
@@ -128,6 +156,14 @@ on:
       - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
       - "software/python/tests/test_ppu_bootstrap_request_auth.py"
+      - "software/python/tests/test_lom_p2a2_controller.py"
+      - "software/python/tests/test_lom_p2a2_reference_equivalence.py"
+      - "software/python/tests/test_lom_p2a2_gateway_g13.py"
+      - "software/python/tests/lom_p2a2_real_engine_shim.py"
+      - "software/python/tests/ppu_controller_fixture.py"
+      - "software/python/tests/test_lom_p2a0_enrollment_spec.py"
+      - "software/python/tests/lom_p2a0_reference_model.py"
+      - "docs/development/opf-local-owner-mode-p2a0-enrollment-spec.md"
       - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
       - "software/python/tests/test_ppu_user_bundle_v3.py"
@@ -177,6 +213,9 @@ jobs:
           scripts/ppu_asset_set.py
           scripts/ppu_owner_authorization.py
           scripts/ppu_bootstrap_request_auth.py
+          scripts/ppu_local_enrollment.py
+          scripts/ppu_controller.py
+          scripts/ppu-enroll.py
           scripts/ppu_asset_execution.py
           scripts/ppu_privileged_source.py
           scripts/ppu-privileged-source-install.py
@@ -224,6 +263,12 @@ jobs:
           software/python/tests/test_fpga_golden_device_pin_b1.py
           software/python/tests/test_z2_bootstrap_deployment_call_graph.py
           software/python/tests/test_z2_hil_artifact_provenance_contract.py
+      - name: LOM-P2A-2 controller engine on stock-PYNQ Python (P2A-0 cases on the real engine)
+        run: >-
+          python -m pytest -q
+          software/python/tests/test_lom_p2a0_enrollment_spec.py
+          software/python/tests/test_lom_p2a2_reference_equivalence.py
+          software/python/tests/test_lom_p2a2_controller.py
 
   factory-bundle:
     needs: bootstrap-scripts
@@ -370,8 +415,9 @@ jobs:
       - name: Run Manager Bootstrap policy regressions
         run: >-
           python -m pytest -q software/python/tests/test_manager_bootstrap.py
-          software/python/tests/test_manager_bootstrap_verified_pairing.py
           software/python/tests/test_ppu_bootstrap_request_auth.py
+          software/python/tests/test_lom_p2a2_gateway_g13.py
+          software/python/tests/test_manager_bootstrap_rest.py
       - name: Prove production Manager entrypoint composes current Manager with Bootstrap routes
         run: >-
           python -c

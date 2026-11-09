@@ -41,13 +41,10 @@ def device_id(paths) -> str:
 
 
 def provision_owner(paths, *, token: str = OWNER_TOKEN) -> str:
-    """Pair this Host-only PPU: 0600 Bootstrap credential (same as B1 auth)."""
-    path: Path = paths.token_file
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.write_text(token + "\n", encoding="utf-8")
-    path.chmod(0o600)
-    return path.read_text(encoding="utf-8").strip()
+    """Enroll this Host-only PPU: current controller credential (same as B1 auth)."""
+    from .ppu_controller_fixture import current_credential, seed_controller
+    existing = current_credential(paths.state_root)
+    return existing if existing is not None else seed_controller(paths.state_root, token)
 
 
 def authorize(paths, action: str, subject_sha256: str, transaction_id: str, *,

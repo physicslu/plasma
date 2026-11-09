@@ -40,6 +40,7 @@ NETWORK_EXACT = frozenset(
         "software/python/plasma_web/gateway_runner.py",
         "software/python/plasma_web/gateway_phase2.py",
         "software/python/plasma_web/gateway_phase3.py",
+        "software/python/plasma_web/controller_admission.py",
         "software/python/plasma_web/ppu_network_settings.py",
         "software/python/plasma_web/ppu_network_activation.py",
         "software/python/plasma_web/secure_gateway.py",

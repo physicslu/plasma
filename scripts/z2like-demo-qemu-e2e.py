@@ -25,6 +25,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -183,18 +184,25 @@ def _commission_when_ready(manager: str, alias: str, *, timeout_s: float = 30.0)
 
 
 def _read_pairing_token(container: str) -> str:
+    """LOM-P2A-2: arm ONE Engineering-CLI enrollment window in the QEMU target
+    and return its one-time ticket (the retired control-token is gone)."""
     completed = subprocess.run(
-        ["docker", "exec", container, "cat", "/var/lib/plasma-bootstrap/control-token"],
+        ["docker", "exec", container, "python3", "/sim/ppu-enroll.py",
+         "--state-root", "/var/lib/plasma-bootstrap",
+         "--machine-id", "/var/lib/plasma-bootstrap/machine-id", "arm"],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        timeout=10,
+        timeout=20,
     )
-    token = completed.stdout.strip()
-    if completed.returncode != 0 or not 32 <= len(token) <= 256 or any(ch.isspace() for ch in token):
-        raise AcceptanceError("cannot read a valid local QEMU Bootstrap pairing token")
-    return token
+    try:
+        ticket = json.loads(completed.stdout)["ticket"]
+    except (ValueError, KeyError, TypeError):
+        ticket = ""
+    if completed.returncode != 0 or not re.fullmatch(r"[0-9a-f]{64}", ticket):
+        raise AcceptanceError("cannot arm a QEMU engineering enrollment ticket")
+    return ticket
 
 
 def _write_manager_config(root: Path, port: int) -> Path:
@@ -343,9 +351,9 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
 
             token = _read_pairing_token(args.container)
             status, paired = _json_request(
-                f"{bootstrap_url}/pair",
+                f"{bootstrap_url}/enrollment",
                 method="POST",
-                body={"token": token},
+                body={"entry": "ticket", "ticket": token},
             )
             _expect(status, 200, paired, "Bootstrap pairing")
             token = ""  # do not retain or print the device credential after pairing

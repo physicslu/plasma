@@ -27,7 +27,10 @@ from .owner_authorization import (
 # Profile-scoped contract: real z2-ps owns Bootstrap on :18081. SWPC z2-like
 # already uses :18081 for restricted diagnostics and is not a Bootstrap target.
 BOOTSTRAP_PORT = 18081
-BOOTSTRAP_CREDENTIAL_SCHEMA = 1
+# v2 (LOM-P2A-2): adds controller ``generation`` and ``controller_id``; v1 files
+# migrate in place to generation 1 (the PPU migrates its P2A-1 token likewise).
+BOOTSTRAP_CREDENTIAL_SCHEMA = 2
+_LEGACY_CREDENTIAL_SCHEMA = 1
 MAX_BOOTSTRAP_RESPONSE_BYTES = 4 * 1024 * 1024
 MANAGED_BOOTSTRAP_TRANSPORT_ENV = "PLASMA_MANAGER_BOOTSTRAP_TRANSPORT"
 MANAGED_BOOTSTRAP_TRANSPORT = "managed-gateway-prefix-v1"
@@ -43,12 +46,22 @@ class BootstrapCredentialError(BootstrapManagerError):
     """Raised when Bootstrap pairing credentials are unavailable or untrustworthy."""
 
 
+class ControllerReplacedError(BootstrapCredentialError):
+    """The PPU now has a newer controller generation: this Manager was replaced.
+
+    All writes stop; nothing is retried automatically. Re-enrollment (button,
+    engineering CLI or SD rescue ticket) is the only way back.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class BootstrapCredential:
     alias: str
     device_id: str
     token: str
     updated_at: str
+    generation: int = 1
+    controller_id: str | None = None
 
 
 def _utc_now() -> str:
@@ -180,6 +193,7 @@ class BootstrapCredentialStore:
         self._credentials: dict[str, BootstrapCredential] = {}
         if self.path is not None and self.path.exists():
             self._credentials = self._load(self.path)
+            self.migrate_in_place()
 
     @staticmethod
     def path_for_registry(registry_state_path: Path | None) -> Path | None:
@@ -197,15 +211,20 @@ class BootstrapCredentialStore:
             return normalized in self._credentials
 
     def credential_for(self, alias: str) -> tuple[str, str]:
-        """(paired device_id, credential); the device is proven per request."""
+        """(enrolled device_id, credential); the device is proven per request."""
+        record = self.record_for(alias)
+        return record.device_id, record.token
+
+    def record_for(self, alias: str) -> BootstrapCredential:
         normalized = normalize_registry_alias(alias)
         with self._lock:
             credential = self._credentials.get(normalized)
             if credential is None:
-                raise BootstrapCredentialError(f"PPU Bootstrap is not paired: {normalized}")
-            return credential.device_id, credential.token
+                raise BootstrapCredentialError(f"PPU is not enrolled with this Control Station: {normalized}")
+            return credential
 
-    def set(self, alias: str, device_id: str, token: str) -> None:
+    def set(self, alias: str, device_id: str, token: str, *, generation: int = 1,
+            controller_id: str | None = None) -> None:
         if self.path is None:
             raise BootstrapCredentialError(
                 "Bootstrap credential persistence is disabled; configure Manager runtime registry state"
@@ -215,11 +234,15 @@ class BootstrapCredentialStore:
         validated_token = _valid_token(token)
         with self._lock:
             previous = dict(self._credentials)
+            if type(generation) is not int or generation < 1:
+                raise BootstrapCredentialError("controller generation is invalid")
             self._credentials[normalized] = BootstrapCredential(
                 normalized,
                 validated_device,
                 validated_token,
                 _utc_now(),
+                generation,
+                controller_id,
             )
             try:
                 self._persist_locked()
@@ -251,6 +274,8 @@ class BootstrapCredentialStore:
             "device_id": credential.device_id if credential is not None else None,
             "credential_persistence": "file" if self.path is not None else "disabled",
             "updated_at": credential.updated_at if credential is not None else None,
+            "controller_generation": credential.generation if credential is not None else None,
+            "controller_id": credential.controller_id if credential is not None else None,
         }
 
     def _persist_locked(self) -> None:
@@ -263,6 +288,8 @@ class BootstrapCredentialStore:
                     "device_id": credential.device_id,
                     "token": credential.token,
                     "updated_at": credential.updated_at,
+                    "generation": credential.generation,
+                    "controller_id": credential.controller_id,
                 }
                 for alias, credential in sorted(self._credentials.items())
             },
@@ -297,18 +324,21 @@ class BootstrapCredentialStore:
             raise BootstrapCredentialError(f"cannot load Bootstrap credentials: {path}") from exc
         if mode & 0o077:
             raise BootstrapCredentialError("Bootstrap credential file must be mode 0600 or stricter")
-        if not isinstance(payload, dict) or payload.get("schema_version") != BOOTSTRAP_CREDENTIAL_SCHEMA:
+        schema = payload.get("schema_version") if isinstance(payload, dict) else None
+        if schema not in (BOOTSTRAP_CREDENTIAL_SCHEMA, _LEGACY_CREDENTIAL_SCHEMA):
             raise BootstrapCredentialError("unsupported Bootstrap credential schema")
         raw = payload.get("credentials")
         if not isinstance(raw, dict):
             raise BootstrapCredentialError("Bootstrap credentials must be a mapping")
+        fields = ({"device_id", "token", "updated_at"} if schema == _LEGACY_CREDENTIAL_SCHEMA
+                  else {"device_id", "token", "updated_at", "generation", "controller_id"})
         result: dict[str, BootstrapCredential] = {}
         for alias, record in raw.items():
             normalized = normalize_registry_alias(alias)
             if (
                 normalized != alias
                 or not isinstance(record, dict)
-                or set(record) != {"device_id", "token", "updated_at"}
+                or set(record) != fields
             ):
                 raise BootstrapCredentialError("Bootstrap credential entry is invalid")
             device_id = _valid_device_id(record.get("device_id"))
@@ -316,26 +346,41 @@ class BootstrapCredentialStore:
             updated_at = record.get("updated_at")
             if not isinstance(updated_at, str) or not updated_at:
                 raise BootstrapCredentialError("Bootstrap credential updated_at is invalid")
-            result[normalized] = BootstrapCredential(normalized, device_id, token, updated_at)
+            # v1 (P2A-1 pairing) == controller generation 1 on the migrated PPU.
+            generation = record.get("generation", 1)
+            controller_id = record.get("controller_id")
+            if (type(generation) is not int or generation < 1
+                    or (controller_id is not None and type(controller_id) is not str)):
+                raise BootstrapCredentialError("Bootstrap credential controller fields are invalid")
+            result[normalized] = BootstrapCredential(
+                normalized, device_id, token, updated_at, generation, controller_id)
         return result
+
+    def migrate_in_place(self) -> bool:
+        """Rewrite a v1 file as v2 (same secrets, generation 1); idempotent."""
+        if self.path is None or not self.path.exists():
+            return False
+        try:
+            schema = json.loads(self.path.read_text(encoding="utf-8")).get("schema_version")
+        except (OSError, ValueError, AttributeError) as exc:
+            raise BootstrapCredentialError(f"cannot load Bootstrap credentials: {self.path}") from exc
+        if schema == BOOTSTRAP_CREDENTIAL_SCHEMA:
+            return False
+        with self._lock:
+            self._persist_locked()
+        return True
 
 
 class BootstrapHttpClient:
     def __init__(self, endpoint: str, timeout_s: float) -> None:
         self.client = PPUHttpClient(endpoint, timeout_s)
         self.timeout_s = timeout_s
+        # Enrolled controller generation; set per call by the coordinator.
+        self.expected_generation: int | None = None
 
-    def _challenge(self, device_id: str) -> str:
+    def _challenge(self, device_id: str, generation: int | None = None) -> str:
         status, payload, _headers, _body = self._exchange("GET", request_auth.CHALLENGE_PATH)
-        if (status != 200 or payload.get("ok") is not True
-                or payload.get("schema") != request_auth.SCHEMA
-                or not request_auth.valid_nonce(payload.get("nonce"))):
-            raise BootstrapManagerError("PPU Bootstrap request-authentication challenge is unavailable")
-        if payload.get("device_id") != device_id:
-            raise BootstrapCredentialError(
-                "registered alias now resolves to a different Bootstrap device_id; explicit re-pairing is required"
-            )
-        return payload["nonce"]
+        return check_challenge(status, payload, device_id=device_id, generation=generation)
 
     def _exchange(
         self,
@@ -372,6 +417,7 @@ class BootstrapHttpClient:
         device_id: str | None = None,
         body: Mapping[str, Any] | None = None,
         timeout_s: float | None = None,
+        generation: int | None = None,
     ) -> tuple[int, dict[str, Any]]:
         """One Bootstrap call; authenticated calls never send the credential.
 
@@ -388,7 +434,8 @@ class BootstrapHttpClient:
             return status, payload
         if device_id is None:
             raise BootstrapManagerError("authenticated Bootstrap call requires the paired device_id")
-        nonce = self._challenge(device_id)
+        nonce = self._challenge(device_id, generation if generation is not None
+                                else self.expected_generation)
         try:
             header, context = request_auth.sign_request(
                 credential=credential, method=method, path=path, body=raw,
@@ -459,6 +506,35 @@ class BootstrapHttpClient:
                           timeout_s=10.0)
 
 
+def check_challenge(status: int, payload: Mapping[str, Any], *, device_id: str,
+                    generation: int | None) -> str:
+    """Validate a P2A-1 challenge (Bootstrap or Gateway) for this enrollment.
+
+    A higher ``controller_generation`` means another Control Station took
+    over: stop, never retry. A lower one means the PPU controller state went
+    backwards (restored backup / reset): stop as well.
+    """
+    if (status != 200 or payload.get("ok") is not True
+            or payload.get("schema") != request_auth.SCHEMA
+            or not request_auth.valid_nonce(payload.get("nonce"))):
+        raise BootstrapManagerError("PPU request-authentication challenge is unavailable")
+    if payload.get("device_id") != device_id:
+        raise BootstrapCredentialError(
+            "registered alias now resolves to a different PPU device_id; re-enrollment is required")
+    current = payload.get("controller_generation")
+    if generation is not None:
+        if type(current) is not int:
+            raise BootstrapManagerError("PPU did not report its controller generation")
+        if current > generation:
+            raise ControllerReplacedError(
+                f"PPU was enrolled by another Control Station (controller generation {current} > "
+                f"{generation}); this Manager stopped all writes")
+        if current < generation:
+            raise BootstrapCredentialError(
+                f"PPU controller generation went backwards ({current} < {generation}); re-enrollment is required")
+    return payload["nonce"]
+
+
 def _hex_field(value: object, length: int, label: str) -> str:
     if (type(value) is not str or len(value) != length
             or any(ch not in "0123456789abcdef" for ch in value)):
@@ -513,12 +589,14 @@ class ManagerBootstrapCoordinator:
     def _authenticated(self, alias: str):
         """Paired device proven by a MACed status, never by an anonymous read."""
         normalized, record = self._entry(alias)
-        device_id, token = self.credentials.credential_for(normalized)
+        enrolled = self.credentials.record_for(normalized)
+        device_id, token = enrolled.device_id, enrolled.token
         client = self.client_factory(bootstrap_endpoint_for_gateway(record.endpoint), self.timeout_s)
+        client.expected_generation = enrolled.generation
         status, payload = client.status(token, device_id)
         if status in (401, 503):
             raise BootstrapCredentialError(
-                "PPU Bootstrap rejected the paired credential; explicit re-pairing is required")
+                "PPU Bootstrap rejected the enrolled credential; re-enrollment is required")
         bootstrap = payload.get("bootstrap")
         if status != 200 or not isinstance(bootstrap, dict) or bootstrap.get("state") != "bootstrap_ready":
             raise BootstrapManagerError("PPU Bootstrap is not ready")
@@ -538,6 +616,9 @@ class ManagerBootstrapCoordinator:
         if pairing.get("paired"):
             try:
                 *_ignored, authenticated, proven_device, _token = self._authenticated(normalized)
+            except ControllerReplacedError as exc:
+                pairing["controller_replaced"] = True
+                pairing["controller_replaced_message"] = str(exc)
             except BootstrapManagerError:
                 pass
             else:

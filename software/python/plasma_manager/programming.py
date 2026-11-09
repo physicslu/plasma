@@ -444,6 +444,10 @@ class BundleProgrammingWorkflow:
         try:
             record = self._record(run.alias)
             client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+            # LOM-P2A-2 G13: Job submission is signed under the enrolled controller.
+            signer = getattr(self.coordinator, "gateway_signer", None)
+            if signer is not None and hasattr(client, "write_signer"):
+                client.write_signer = signer(run.alias)
             self._update(run, state="preflight")
             self._readiness(client, run.site, None)
             self._step(run, "PREFLIGHT", "PASS")

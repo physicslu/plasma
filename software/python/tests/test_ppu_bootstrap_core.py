@@ -67,17 +67,28 @@ def test_runtime_inspection_accepts_only_canonical_managed_release(tmp_path: Pat
     assert runtime.release_id == release_id
 
 
-def test_bootstrap_token_is_private_and_rotation_is_explicit(tmp_path: Path):
-    token_file = tmp_path / "control-token"
-    token = service.provision_token(token_file, token="x" * 40)
-    assert token == "x" * 40
-    assert token_file.stat().st_mode & 0o777 == 0o600
-    assert service.load_token(token_file) == token
-    with pytest.raises(service.BootstrapServiceError, match="already exists"):
-        service.provision_token(token_file, token="y" * 40)
-    token_file.chmod(0o644)
-    with pytest.raises(service.BootstrapServiceError, match="permissions"):
-        service.load_token(token_file)
+def test_p2a1_control_token_migrates_once_to_controller_generation_1(tmp_path: Path):
+    controller = service._controller_module()
+    state = tmp_path / "state"
+    state.mkdir()
+    legacy = state / "control-token"
+    legacy.write_text("x" * 40 + "\n", encoding="utf-8")
+    legacy.chmod(0o644)
+    store = controller.ControllerStore(state)
+    with pytest.raises(controller.ControllerError) as broad:
+        store.migrate_legacy_token()
+    assert broad.value.code == "CONTROLLER_STATE_INVALID" and legacy.exists()
+    legacy.chmod(0o600)
+    assert store.migrate_legacy_token() is True
+    record = store.controller()
+    assert (record["generation"], record["mode"], record["credential"]) == (1, "NORMAL", "x" * 40)
+    assert not legacy.exists() and store.ledger()["high_water"] == 1
+    assert store.path("controller").stat().st_mode & 0o777 == 0o600
+    # A leftover legacy file after a crash never overrides the committed record.
+    legacy.write_text("y" * 40 + "\n", encoding="utf-8")
+    legacy.chmod(0o600)
+    assert store.migrate_legacy_token() is False
+    assert store.controller()["credential"] == "x" * 40 and not legacy.exists()
 
 
 def test_chunked_upload_commits_only_after_full_sha256_match(tmp_path: Path):

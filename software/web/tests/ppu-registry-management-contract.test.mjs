@@ -77,7 +77,7 @@ test("Registration owns Console programming admission, not Platform maintenance"
   assert.match(registration, /Programming Registration is still pending/);
   assert.match(registration, /Platform maintenance remains a separate lifecycle/);
   assert.match(registration, /Bootstrap maintenance authorization used by Platform Release update is a separate Platform security boundary/);
-  assert.doesNotMatch(registration, /pairManagerPpuBootstrap|startManagerPpuBootstrapDeployment/);
+  assert.doesNotMatch(registration, /enrollManagerPpuBootstrap|pairManagerPpuBootstrap|startManagerPpuBootstrapDeployment/);
 });
 
 test("Registration keeps Lifecycle, Connectivity, and Health as orthogonal observations", () => {

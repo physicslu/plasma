@@ -243,7 +243,8 @@ def test_packaged_runtime_gateway_health_passes_without_catalog(tmp_path: Path):
             procs["gateway"] = subprocess.Popen(
                 [sys.executable, "-I", "-S", str(app), "gateway", "--host", "127.0.0.1",
                  "--port", str(gateway_port), "--plasma-host", "127.0.0.1",
-                 "--plasma-port", str(server_port), "--output-root", str(work / "gateway-output")],
+                 "--plasma-port", str(server_port), "--output-root", str(work / "gateway-output"),
+                 "--host-lab-unauthenticated-writes"],
                 cwd=work, env=env, stdout=g_log, stderr=subprocess.STDOUT)
             base_url = f"http://127.0.0.1:{gateway_port}"
             ready = acceptance._wait_ready(

@@ -133,18 +133,25 @@ def _expect(
 
 
 def _read_pairing_token(container: str) -> str:
+    """LOM-P2A-2: arm ONE Engineering-CLI enrollment window in the QEMU target
+    and return its one-time ticket (the retired control-token is gone)."""
     completed = subprocess.run(
-        ["docker", "exec", container, "cat", "/var/lib/plasma-bootstrap/control-token"],
+        ["docker", "exec", container, "python3", "/sim/ppu-enroll.py",
+         "--state-root", "/var/lib/plasma-bootstrap",
+         "--machine-id", "/var/lib/plasma-bootstrap/machine-id", "arm"],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        timeout=10,
+        timeout=20,
     )
-    token = completed.stdout.strip()
-    if completed.returncode != 0 or not 32 <= len(token) <= 256 or any(ch.isspace() for ch in token):
-        raise AcceptanceError("cannot read a valid local QEMU Bootstrap pairing token")
-    return token
+    try:
+        ticket = json.loads(completed.stdout)["ticket"]
+    except (ValueError, KeyError, TypeError):
+        ticket = ""
+    if completed.returncode != 0 or not re.fullmatch(r"[0-9a-f]{64}", ticket):
+        raise AcceptanceError("cannot arm a QEMU engineering enrollment ticket")
+    return ticket
 
 
 def _commit_is_acceptable(expected: str, actual: str, repo: Path) -> bool:
@@ -706,13 +713,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(pairing_before, dict):
         raise AcceptanceError("Bootstrap status omitted pairing state")
 
-    wrong_token = "invalid-z2like-demo-pairing-token-" + ("0" * 40)
+    # No enrollment window is armed yet: a guessed ticket changes nothing.
+    wrong_token = "0" * 64
     status, wrong_pair, wrong_cookies = session.request(
-        f"/api/manager/registry/{args.alias}/bootstrap/pair",
+        f"/api/manager/registry/{args.alias}/bootstrap/enrollment",
         method="POST",
-        body={"token": wrong_token},
+        body={"entry": "ticket", "ticket": wrong_token},
     )
-    _expect(status, 409, wrong_pair, "wrong Bootstrap pairing token", code="bootstrap_pairing_required")
+    _expect(status, 409, wrong_pair, "wrong enrollment ticket", code="ENROLLMENT_NOT_ARMED")
     if wrong_cookies or session.capability_value() is not None:
         raise AcceptanceError("wrong Bootstrap pairing token unexpectedly issued maintenance capability")
     after_wrong = _bootstrap_status(session, args.alias)
@@ -722,9 +730,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     token = _read_pairing_token(args.container)
     try:
         status, paired, set_cookies = session.request(
-            f"/api/manager/registry/{args.alias}/bootstrap/pair",
+            f"/api/manager/registry/{args.alias}/bootstrap/enrollment",
             method="POST",
-            body={"token": token},
+            body={"entry": "ticket", "ticket": token},
         )
     finally:
         token = ""

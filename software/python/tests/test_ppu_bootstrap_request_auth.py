@@ -25,12 +25,15 @@ from plasma_manager.bootstrap import (
     MANAGED_BOOTSTRAP_TRANSPORT_ENV,
     BootstrapCredentialError,
     BootstrapCredentialStore,
+    ControllerReplacedError,
     BootstrapHttpClient,
     BootstrapManagerError,
 )
 from plasma_manager.config import PPURegistryEntry
 from plasma_manager.registry import PPURegistryStore
 from plasma_manager.verified_bootstrap import VerifiedManagerBootstrapCoordinator
+
+from .ppu_controller_fixture import clear_controller, seed_controller
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -144,7 +147,7 @@ def ppu(tmp_path: Path):
         bootstrap_script=ROOT / "scripts" / "ppu-bootstrap.py",
         kit_tool=ROOT / "scripts" / "ppu-bootstrap-kit.py",
     )
-    service.provision_token(paths.token_file, token=TOKEN)
+    seed_controller(paths.state_root, TOKEN)
     server = service.BootstrapHTTPServer(("127.0.0.1", 0), paths=paths, base_module=bootstrap)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -247,7 +250,10 @@ def test_unauthenticated_mutations_fail_closed_before_side_effects(ppu, variant)
     else:
         status, raw, headers, *_ = _signed(port, "POST", "/v1/uploads", UPLOAD,
                                            send_path="/v1/deployments")
-    assert status == 401 and json.loads(raw) == {"ok": False, "error": "unauthorized"}
+    # P2A-1 contract plus the non-secret current generation (LOM-P2A-2 §5.5).
+    assert status == 401 and json.loads(raw) == {
+        "ok": False, "error": "unauthorized", "code": "CONTROLLER_UNAUTHENTICATED",
+        "controller_generation": 1}
     assert auth.RESPONSE_HEADER not in headers
     assert _uploads(paths) == []
     assert not paths.deployment_record.exists()
@@ -255,9 +261,9 @@ def test_unauthenticated_mutations_fail_closed_before_side_effects(ppu, variant)
 
 def test_unprovisioned_device_refuses_mutation(ppu):
     server, paths = ppu
-    paths.token_file.unlink()
+    clear_controller(paths.state_root)
     status, raw, _headers, *_ = _signed(server.server_port, "POST", "/v1/uploads", UPLOAD)
-    assert status == 503 and json.loads(raw)["error"] == "control_not_provisioned"
+    assert status == 503 and json.loads(raw)["error"] == "CONTROLLER_NOT_ENROLLED"
     assert _uploads(paths) == []
 
 
@@ -276,35 +282,27 @@ def _manager(tmp_path: Path, port: int, *, endpoint_port: int | None = None):
     return store, VerifiedManagerBootstrapCoordinator(registry, store, 3.0, client_factory=factory)
 
 
-def test_manager_pairs_and_writes_with_mutual_proof(ppu, tmp_path: Path):
+def test_enrolled_manager_writes_with_mutual_proof(ppu, tmp_path: Path):
     server, paths = ppu
     store, coordinator = _manager(tmp_path, server.server_port)
-    result = coordinator.pair("z2", TOKEN)
-    assert result["token_verification"] == "verified_before_persistence"
-    assert store.credential_for("z2") == (server.device_id(), TOKEN)
+    store.set("z2", server.device_id(), TOKEN, generation=1)       # enrollment result
     status = coordinator.status("z2")
     assert status["pairing"]["device_authenticated"] is True
     assert status["pairing"]["device_match"] is True
+    assert status["pairing"]["controller_generation"] == 1
     code, payload = coordinator.create_upload("z2", {"size": 4, "sha256": "0" * 64})
     assert code == 201 and payload["upload"]["upload_id"]
     assert len(_uploads(paths)) == 1
 
 
-def test_manager_wrong_credential_is_never_persisted(ppu, tmp_path: Path):
-    server, _paths = ppu
-    store, coordinator = _manager(tmp_path, server.server_port)
-    with pytest.raises(BootstrapCredentialError, match="could not be verified"):
-        coordinator.pair("z2", WRONG)
-    assert store.paired("z2") is False
-
-
-def test_rotated_ppu_credential_requires_explicit_repairing(ppu, tmp_path: Path):
+def test_takeover_by_another_controller_stops_the_manager_without_retry(ppu, tmp_path: Path):
     server, paths = ppu
     store, coordinator = _manager(tmp_path, server.server_port)
-    coordinator.pair("z2", TOKEN)
-    service.provision_token(paths.token_file, rotate=True, token="r" * 40)
-    assert coordinator.status("z2")["pairing"]["device_authenticated"] is False
-    with pytest.raises(BootstrapCredentialError, match="re-pairing"):
+    store.set("z2", server.device_id(), TOKEN, generation=1)
+    seed_controller(paths.state_root, "r" * 40)     # takeover by another controller (gen 2)
+    pairing = coordinator.status("z2")["pairing"]
+    assert pairing["device_authenticated"] is False and pairing["controller_replaced"] is True
+    with pytest.raises(ControllerReplacedError, match="another Control Station"):
         coordinator.create_upload("z2", {"size": 4, "sha256": "0" * 64})
     assert _uploads(paths) == []
 
@@ -332,7 +330,7 @@ class _SpoofHandler(BaseHTTPRequestHandler):
         self.seen.append(self.path + " " + str(self.headers.get("Authorization")))
         if self.path == "/v1/auth/challenge":
             self._reply(200, {"ok": True, "schema": auth.SCHEMA, "device_id": self.device_id,
-                              "nonce": "9" * 32, "expires_in_s": 60})
+                              "nonce": "9" * 32, "expires_in_s": 60, "controller_generation": 1})
             return
         self._reply(200, {"bootstrap": {"state": "bootstrap_ready"},
                           "identity": {"device_id": self.device_id}, "runtime": {}},
@@ -349,9 +347,9 @@ def test_spoofed_endpoint_cannot_learn_or_fake_the_credential(ppu, tmp_path: Pat
     try:
         store, coordinator = _manager(tmp_path, server.server_port,
                                       endpoint_port=spoof.server_address[1])
-        with pytest.raises(BootstrapCredentialError, match="could not be verified"):
-            coordinator.pair("z2", TOKEN)
-        assert store.paired("z2") is False
+        store.set("z2", server.device_id(), TOKEN, generation=1)
+        with pytest.raises(BootstrapManagerError, match="not authenticated by the paired device"):
+            coordinator.create_upload("z2", {"size": 4, "sha256": "0" * 64})
         assert _SpoofHandler.seen and all(TOKEN not in line for line in _SpoofHandler.seen)
         assert any("PLASMA-PPU-HMAC-V1" in line for line in _SpoofHandler.seen)
     finally:
@@ -390,7 +388,7 @@ def test_managed_prefix_signs_the_ppu_local_path(ppu, tmp_path: Path, monkeypatc
 def test_manager_rejects_challenge_for_a_different_device(ppu, tmp_path: Path):
     server, _paths = ppu
     client = BootstrapHttpClient(f"http://127.0.0.1:{server.server_port}", 3.0)
-    with pytest.raises(BootstrapCredentialError, match="different Bootstrap device_id"):
+    with pytest.raises(BootstrapCredentialError, match="different PPU device_id"):
         client.status(TOKEN, OTHER_DEVICE)
 
 

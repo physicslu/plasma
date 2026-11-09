@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from . import gateway as canonical_gateway
 from . import gateway_phase2 as phase2
 from .configured_mock_provider import ConfiguredMockEngineeringPPUProvider
+from .controller_admission import ControllerWriteAdmissionMixin
 from .engineering_targets import EngineeringPPUProvider
 from .gateway_runner import serve_handler
 from .runtime_activation import (
@@ -138,8 +139,8 @@ class SiteRuntimeActivationSupportMixin:
         return True
 
 
-class Phase3PlasmaWebHandler(SiteRuntimeActivationSupportMixin, phase2.Phase2PlasmaWebHandler):
-    """Canonical deployed Gateway handler: P3 + P2 + canonical REST features."""
+class Phase3RouteHandler(SiteRuntimeActivationSupportMixin, phase2.Phase2PlasmaWebHandler):
+    """P3 + P2 + canonical REST routes (no write admission; never served alone)."""
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
@@ -166,6 +167,11 @@ class Phase3PlasmaWebHandler(SiteRuntimeActivationSupportMixin, phase2.Phase2Pla
             self._error(exc)
             return
         super().do_POST()
+
+
+class Phase3PlasmaWebHandler(ControllerWriteAdmissionMixin, Phase3RouteHandler):
+    """Canonical deployed Gateway handler: every write bound to the current PPU
+    controller (LOM-P2A-2 G13) in front of the P3 + P2 + canonical routes."""
 
 
 # Compatibility alias for callers that imported the Phase-3 handler by the
@@ -198,6 +204,17 @@ def _parser() -> argparse.ArgumentParser:
         help="Allowed Web origin; repeat for multiple origins (prototype default: *)",
     )
     parser.add_argument("--runtime-activation-socket", type=Path)
+    admission = parser.add_mutually_exclusive_group()
+    admission.add_argument(
+        "--controller-admission-socket",
+        type=Path,
+        help="PPU Bootstrap controller admission socket; binds every write to the current controller (G13)",
+    )
+    admission.add_argument(
+        "--host-lab-unauthenticated-writes",
+        action="store_true",
+        help="Explicit host lab/emulator mode: writes are NOT controller-bound (never on a PPU)",
+    )
     parser.add_argument("--network-activation-socket", type=Path)
     parser.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"))
 
@@ -240,6 +257,11 @@ def _configure_handler(handler: type[Phase3PlasmaWebHandler], args: argparse.Nam
     if not issubclass(handler, phase2.SiteConfigurationSupportMixin):
         raise RuntimeError("configured Phase 3 Gateway handler lacks Site configuration support")
 
+    if issubclass(handler, ControllerWriteAdmissionMixin):
+        handler.configure_controller_admission(
+            socket_path=args.controller_admission_socket,
+            host_lab_unauthenticated_writes=args.host_lab_unauthenticated_writes,
+        )
     handler.configure_runtime_activation(args.runtime_activation_socket)
     handler.configure_network_activation(
         socket_path=args.network_activation_socket,

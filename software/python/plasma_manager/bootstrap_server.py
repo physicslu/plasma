@@ -12,6 +12,7 @@ from .bootstrap import (
     BootstrapCredentialError,
     BootstrapCredentialStore,
     BootstrapManagerError,
+    ControllerReplacedError,
     ManagerBootstrapCoordinator,
 )
 from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
@@ -67,6 +68,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 credentials,
                 config.request_timeout_s,
             )
+            if self.network_commissioning is not None:
+                self.network_commissioning.write_signer_for = cls.bootstrap_coordinator.gateway_signer
             return cls.bootstrap_coordinator
 
     def _programming(self) -> BundleProgrammingWorkflow:
@@ -99,13 +102,32 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             return
         self._json(status, payload)
 
+    def _ppu_client(self, alias: str, endpoint: str) -> PPUHttpClient:
+        client = type(self).runtime_client_factory(endpoint, self._config().request_timeout_s)
+        try:
+            signer = getattr(self._bootstrap(), "gateway_signer", None)
+        except BootstrapManagerError:
+            signer = None          # unsigned writes are refused by a G13 PPU (fail closed)
+        if signer is not None:
+            client.write_signer = signer(alias)
+        return client
+
+    def _ppu_write_error(self, exc: Exception) -> bool:
+        if isinstance(exc, (BootstrapManagerError, RegistryEntryNotFound)):
+            self._bootstrap_error(exc)
+            return True
+        return False
+
     def _bootstrap_error(self, exc: Exception) -> None:
         if isinstance(exc, RegistryEntryNotFound):
             status = HTTPStatus.NOT_FOUND
             code = "ppu_not_found"
+        elif isinstance(exc, ControllerReplacedError):
+            status = HTTPStatus.CONFLICT
+            code = "controller_replaced"
         elif isinstance(exc, BootstrapCredentialError):
             status = HTTPStatus.CONFLICT
-            code = "bootstrap_pairing_required"
+            code = "controller_enrollment_required"
         elif isinstance(exc, BootstrapManagerError):
             status = HTTPStatus.CONFLICT
             code = "bootstrap_operation_rejected"
@@ -299,7 +321,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             )
             return
         relay_timeout_s = min(max(timeout_ms / 1000.0 + 1.0, self._config().request_timeout_s), 121.0)
-        client = type(self).runtime_client_factory(entry.endpoint, self._config().request_timeout_s)
+        client = self._ppu_client(alias, entry.endpoint)
         started = time.monotonic()
         try:
             status, payload = client.ps_loopback(body, timeout_s=relay_timeout_s)
@@ -385,7 +407,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             )
             return
         relay_timeout_s = min(max(timeout_ms / 1000.0 + 2.0, self._config().request_timeout_s), 35.0)
-        client = type(self).runtime_client_factory(entry.endpoint, self._config().request_timeout_s)
+        client = self._ppu_client(alias, entry.endpoint)
         started = time.monotonic()
         try:
             status, payload = client.openocd_control_plane(body, timeout_s=relay_timeout_s)
@@ -416,10 +438,19 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         coordinator = self._bootstrap()
         try:
             body = self._read_json_object()
-            if action == "pair":
-                if set(body) != {"token"} or not isinstance(body.get("token"), str):
-                    raise ValueError("Bootstrap pairing request requires only token")
-                self._json(HTTPStatus.OK, coordinator.pair(alias, body["token"]))
+            if action == "enrollment":
+                # LOM-P2A-2: button (start/claim) or engineering/SD ticket claim.
+                result = coordinator.enrollment(alias, body)
+                if not result.get("ok"):
+                    result = {**result, "error": {
+                        "code": result.get("state") or "enrollment_failed",
+                        "message": "PPU enrollment did not complete; nothing was changed by this Manager",
+                    }}
+                self._json(HTTPStatus.OK if result.get("ok") else HTTPStatus.CONFLICT, result)
+                return
+            if action == "recovery":
+                status, payload = coordinator.recovery_action(alias, body)
+                self._json(status, payload)
                 return
             if action == "programming/plans":
                 self._programming_call(

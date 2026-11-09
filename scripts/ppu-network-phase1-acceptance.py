@@ -360,6 +360,7 @@ def _start_gateway(app: Path, work: Path, env: Mapping[str, str]) -> subprocess.
             "127.0.0.1",
             "--plasma-port",
             "9900",
+            "--host-lab-unauthenticated-writes",
             "--output-root",
             str(work / "gateway-output"),
         ],

@@ -292,7 +292,24 @@ def activate(client: ppu_deploy_api.BootstrapAPIClient,
             "transaction_id": transaction}
 
 
-def post_once(host: str, selection: Selection) -> str:
+def _gateway_challenge(host: str, device_id: str, auth) -> str:
+    """Read-only P2A-1 challenge from the PPU Gateway (LOM-P2A-2 G13)."""
+    connection = http.client.HTTPConnection(host, 18080, timeout=12)
+    try:
+        connection.request("GET", "/api/auth/challenge", headers={"Accept": "application/json"})
+        response = connection.getresponse()
+        raw = response.read(65537)
+    finally:
+        connection.close()
+    value = json.loads(raw) if response.status == 200 and len(raw) <= 65536 else None
+    require(type(value) is dict and value.get("ok") is True and value.get("schema") == auth.SCHEMA
+            and value.get("device_id") == device_id and type(value.get("nonce")) is str,
+            "GATEWAY_CHALLENGE_DENIED")
+    return value["nonce"]
+
+
+def post_once(host: str, selection: Selection, *, credential: str, device_id: str) -> str:
+    """Submit ONE flash_cycle Job, signed under the enrolled PPU controller (G13)."""
     payload = {
         "site_id": selection.site, "operation": "flash_cycle", "timeout_s": 180.0,
         "target": selection.target, "provider": selection.provider,
@@ -301,19 +318,30 @@ def post_once(host: str, selection: Selection) -> str:
         "asset_package_id": selection.firmware_package,
         "bundle_asset_sha256": selection.firmware_sha,
     }
+    auth = ppu_deploy_api._request_auth_module()
+    body = json.dumps(payload, sort_keys=True).encode()
+    nonce = _gateway_challenge(host, device_id, auth)
+    header, context = auth.sign_request(credential=credential, method="POST", path="/api/jobs",
+                                        body=body, device_id=device_id, nonce=nonce)
     connection = http.client.HTTPConnection(host, 18080, timeout=18)
     try:
         # No retry, including any network error after the bytes were sent.
         connection.request("POST", "/api/jobs",
-                           body=json.dumps(payload, sort_keys=True).encode(),
+                           body=body,
                            headers={"Content-Type": "application/json",
-                                    "Accept": "application/json"})
+                                    "Accept": "application/json",
+                                    "Authorization": header})
         response = connection.getresponse()
         raw = response.read(65537)
         if len(raw) > 65536:
             raise OutcomeUnknown("JOB_SUBMISSION_RESPONSE_TOO_LARGE")
         if response.status != 202:
             raise ProgramDenied("JOB_SUBMISSION_REJECTED_HTTP_" + str(response.status))
+        try:
+            auth.verify_response(credential=credential, context=context, status=202, body=raw,
+                                 header=response.getheader(auth.RESPONSE_HEADER))
+        except auth.RequestAuthError:
+            raise OutcomeUnknown("JOB_SUBMISSION_RESPONSE_UNAUTHENTICATED_DO_NOT_RESUBMIT") from None
         reply = json.loads(raw)
         job = reply.get("job") if type(reply) is dict else None
         if type(job) is not dict or type(job.get("job_id")) is not str:
@@ -397,7 +425,7 @@ def execute(command: str, selection: Selection, *, host: str, device_id: str,
             "ACTIVE_SET_CHANGED")
     readiness(host, selection)
     try:
-        job_id = post_once(host, selection)
+        job_id = post_once(host, selection, credential=client._token, device_id=device_id)
     except OutcomeUnknown as exc:
         return {"status": "OUTCOME_UNKNOWN", "reason": str(exc),
                 "submission_count": "UNKNOWN", "auto_retry": "DISABLED"}

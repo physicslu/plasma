@@ -220,6 +220,15 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             raise RuntimeError("Plasma Manager configuration is not configured")
         return self.config
 
+    def _ppu_client(self, alias: str, endpoint: str) -> PPUHttpClient:
+        """PPU Gateway client; the Bootstrap-enabled Manager attaches the
+        enrolled controller write signer (LOM-P2A-2 G13)."""
+        return PPUHttpClient(endpoint, self._config().request_timeout_s)
+
+    def _ppu_write_error(self, exc: Exception) -> bool:
+        """Map a controller-signing failure to a response; False = not handled."""
+        return False
+
     def _operation_gate(self) -> PPUOperationGate:
         return type(self).operation_gate
 
@@ -773,11 +782,18 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             )
             return
 
-        client = PPUHttpClient(entry.endpoint, self._config().request_timeout_s)
+        client = self._ppu_client(alias, entry.endpoint)
         relay_timeout_s = min(max(timeout_ms / 1000.0 + 1.0, self._config().request_timeout_s), 121.0)
         started = time.monotonic()
         try:
-            status, payload = client.ps_loopback(body, timeout_s=relay_timeout_s)
+            try:
+                status, payload = client.ps_loopback(body, timeout_s=relay_timeout_s)
+            except (PPUTransportError, PPUHTTPError):
+                raise
+            except Exception as exc:
+                if self._ppu_write_error(exc):
+                    return
+                raise
         except PPUTransportError:
             manager_rtt_ms = round((time.monotonic() - started) * 1000, 3)
             self._log_ps_loopback_relay(
@@ -907,7 +923,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             if key.lower() in FORWARDED_REQUEST_HEADERS
         }
         target = target_path + (f"?{query}" if query else "")
-        client = PPUHttpClient(entry.endpoint, self._config().request_timeout_s)
+        client = self._ppu_client(alias, entry.endpoint)
         started = time.monotonic()
         try:
             status, response_headers, response_body = client.relay(
@@ -942,6 +958,17 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.BAD_GATEWAY,
                 {"ok": False, "error": {"code": "ppu_protocol_error", "message": "PPU response exceeded Manager relay contract"}},
+            )
+            return
+        except Exception as exc:
+            if not self._ppu_write_error(exc):
+                raise
+            self._log_managed_relay(
+                alias=alias,
+                method=self.command,
+                target_path=target_path,
+                result="controller_write_refused",
+                http_status=HTTPStatus.CONFLICT,
             )
             return
 

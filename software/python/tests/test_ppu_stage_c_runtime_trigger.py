@@ -38,11 +38,11 @@ TOKEN = "paired-bootstrap-credential-" + "z" * 20
 def device(tmp_path, monkeypatch):
     machine = tmp_path / "machine-id"
     machine.write_text("0123456789abcdef0123456789abcdef\n")
-    token = tmp_path / "control-token"
-    token.write_text(TOKEN + "\n")
+    token = tmp_path / "controller.json"            # LOM-P2A-2 controller record
+    token.write_text(json.dumps({"generation": 1, "mode": "NORMAL", "credential": TOKEN}))
     token.chmod(0o600)
     monkeypatch.setattr(cli, "BOOTSTRAP_DIR", ROOT / "scripts")
-    monkeypatch.setattr(cli, "TOKEN_FILE", token)
+    monkeypatch.setattr(cli, "CONTROLLER_RECORD", token)
     monkeypatch.setattr(cli, "MACHINE_ID", machine)
     owner = cli._load("t_owner", ROOT / "scripts/ppu_owner_authorization.py")
     ident = cli._load("t_ident", ROOT / "scripts/ppu-bootstrap.py")

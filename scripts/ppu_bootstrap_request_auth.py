@@ -16,8 +16,9 @@ Wire contract: ``plasma.ppu.bootstrap-request-auth.v1``. Replaces the former
 This is a machine-to-machine transport proof. It is NOT a license, user
 login, manufacturer approval or a replacement for the Owner Operation
 Authorization (``ppu_owner_authorization.py``), SHA/Target/ABI checks, journals,
-Site leases, SAFE_OFF, SEALED or OUTCOME_UNKNOWN recovery. Enrollment and
-credential rotation are out of scope (LOM-P2A-2).
+Site leases, SAFE_OFF, SEALED or OUTCOME_UNKNOWN recovery. The credential is
+the current controller credential of ``ppu_controller.py`` (LOM-P2A-2); the same
+proof binds Gateway (:18080) writes through the controller admission service (G13).
 
 The Manager-side client mirror is
 ``software/python/plasma_manager/bootstrap_request_auth.py``; a cross-
@@ -50,6 +51,9 @@ _HEADER_RE = re.compile(
 )
 _RESPONSE_RE = re.compile(r"v1 mac=([0-9a-f]{64})\Z")
 _METHODS = frozenset({"GET", "POST"})
+# Bootstrap (:18081) ``/v1/`` and Gateway (:18080) ``/api/`` targets (LOM-P2A-2 G13).
+_TARGET_PREFIXES = ("/v1/", "/api/")
+_HEX64_RE = re.compile(r"[0-9a-f]{64}\Z")
 
 
 class RequestAuthError(ValueError):
@@ -80,7 +84,7 @@ def _key(credential: str, purpose: str) -> bytes:
 
 def _check_target(method: object, path: object) -> None:
     if (type(method) is not str or method not in _METHODS or type(path) is not str
-            or not path.startswith("/v1/") or len(path) > 512
+            or not path.startswith(_TARGET_PREFIXES) or len(path) > 512
             or any(ch.isspace() or ord(ch) < 33 or ord(ch) > 126 for ch in path)):
         raise RequestAuthError("request authentication target is invalid")
 
@@ -102,10 +106,18 @@ def _mac(key: bytes, message: bytes) -> str:
 
 def sign_request(
     *, credential: str, method: str, path: str, body: bytes | None,
-    device_id: str, nonce: str, cnonce: str | None = None,
+    device_id: str, nonce: str, cnonce: str | None = None, body_sha256: str | None = None,
 ) -> tuple[str, RequestContext]:
-    """Client side: the Authorization header value and its response context."""
+    """Client side: the Authorization header value and its response context.
+
+    ``body_sha256`` replaces ``body`` when only the digest is available (the
+    Gateway forwards a digest to the PPU controller admission service).
+    """
     _check_target(method, path)
+    if body_sha256 is None:
+        body_sha256 = hashlib.sha256(body or b"").hexdigest()
+    elif body is not None or type(body_sha256) is not str or not _HEX64_RE.fullmatch(body_sha256):
+        raise RequestAuthError("request authentication body digest is invalid")
     if type(device_id) is not str or not _DEVICE_RE.fullmatch(device_id):
         raise RequestAuthError("request authentication device identity is invalid")
     if type(nonce) is not str or not _HEX32_RE.fullmatch(nonce):
@@ -114,8 +126,7 @@ def sign_request(
     if type(cnonce) is not str or not _HEX32_RE.fullmatch(cnonce):
         raise RequestAuthError("request authentication client nonce is invalid")
     unsigned = RequestContext(method, path, device_id, nonce, cnonce, "")
-    mac = _mac(_key(credential, "request-key"),
-               _request_message(unsigned, hashlib.sha256(body or b"").hexdigest()))
+    mac = _mac(_key(credential, "request-key"), _request_message(unsigned, body_sha256))
     context = RequestContext(method, path, device_id, nonce, cnonce, mac)
     header = f"{AUTH_SCHEME} device_id={device_id},nonce={nonce},cnonce={cnonce},mac={mac}"
     return header, context
@@ -200,11 +211,13 @@ def admit_request_header(*, header: object, device_id: str, nonces: NonceRegistr
 
 def verify_request(
     *, credential: str, admitted: AdmittedHeader, method: str, path: str, body: bytes | None,
+    body_sha256: str | None = None,
 ) -> RequestContext:
-    """PPU side: the exact method/path/body under the admitted nonce."""
+    """PPU side: the exact method/path/body (or body digest) under the admitted nonce."""
     _expected_header, context = sign_request(
         credential=credential, method=method, path=path, body=body,
         device_id=admitted.device_id, nonce=admitted.nonce, cnonce=admitted.cnonce,
+        body_sha256=body_sha256,
     )
     if not hmac.compare_digest(context.mac, admitted.mac):
         raise RequestAuthError("request authentication failed")

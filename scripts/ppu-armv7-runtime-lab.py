@@ -342,6 +342,7 @@ def _inside_mode(args: argparse.Namespace) -> int:
         gateway = subprocess.Popen([
             sys.executable, str(app), "gateway", "--host", "127.0.0.1", "--port", "18080",
             "--plasma-host", "127.0.0.1", "--plasma-port", "9900", "--output-root", str(work / "gateway-output"),
+            "--host-lab-unauthenticated-writes",
         ], cwd=work, env=env)
         base = "http://127.0.0.1:18080"
         readiness_ms = _wait_ready(base, server, gateway)

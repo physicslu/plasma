@@ -206,6 +206,11 @@ class NetworkCommissioningCoordinator:
     commissioning request. It is never written to the transaction journal.
     """
 
+    def _signed(self, client: PPUHttpClient, alias: str) -> PPUHttpClient:
+        if self.write_signer_for is not None:
+            client.write_signer = self.write_signer_for(alias)
+        return client
+
     def __init__(
         self,
         registry: PPURegistryStore,
@@ -222,6 +227,9 @@ class NetworkCommissioningCoordinator:
         self._store = store
         self._request_timeout_s = request_timeout_s
         self._client_factory = client_factory
+        # LOM-P2A-2 G13: alias -> PPUHttpClient.write_signer (set by the
+        # Bootstrap-enabled Manager); None keeps unsigned host-lab behavior.
+        self.write_signer_for: Callable[[str], Any] | None = None
         self._sleep = sleeper
         self._monotonic = monotonic
         self._wall_time = wall_time
@@ -372,7 +380,7 @@ class NetworkCommissioningCoordinator:
                 )
 
             old_endpoint = entry.endpoint
-            old_client = self._client_factory(old_endpoint, self._request_timeout_s)
+            old_client = self._signed(self._client_factory(old_endpoint, self._request_timeout_s), alias)
             try:
                 _, node = old_client.node(headers=self._auth_headers(authorization))
                 ppu_id = self._ppu_id(node)
@@ -478,7 +486,8 @@ class NetworkCommissioningCoordinator:
                 )
                 record = self._transition(record, "reconnecting")
 
-                candidate_client = self._client_factory(candidate_endpoint, self._request_timeout_s)
+                candidate_client = self._signed(
+                    self._client_factory(candidate_endpoint, self._request_timeout_s), alias)
                 self._wait_for_same_identity(
                     candidate_client,
                     expected_ppu_id=ppu_id,
@@ -620,7 +629,8 @@ class NetworkCommissioningCoordinator:
         *,
         authorization: str | None,
     ) -> NetworkCommissioningRecord:
-        client = self._client_factory(record.old_endpoint, self._request_timeout_s)
+        client = self._signed(self._client_factory(record.old_endpoint, self._request_timeout_s),
+                              record.alias)
         deadline = (record.rollback_deadline_epoch_s or self._wall_time()) + 2.0
         while self._wall_time() <= deadline:
             try:

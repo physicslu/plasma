@@ -100,18 +100,28 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         return
 
+    def _extra_response_headers(self, status: int, data: bytes) -> dict[str, str]:
+        """Hook for response proofs (G13 controller admission); none by default."""
+        return {}
+
     def _json(self, status: int, payload: dict[str, Any]) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode()
+        extra = self._extra_response_headers(int(status), data)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        for key, value in extra.items():
+            self.send_header(key, value)
         self._cors_headers()
         self.end_headers()
         self.wfile.write(data)
 
     def _binary_data(self, data: bytes, filename: str) -> None:
+        extra = self._extra_response_headers(int(HTTPStatus.OK), data)
         self.send_response(HTTPStatus.OK)
+        for key, value in extra.items():
+            self.send_header(key, value)
         self.send_header("Content-Type", "application/octet-stream")
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Content-Length", str(len(data)))
