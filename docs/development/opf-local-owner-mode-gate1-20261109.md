@@ -72,7 +72,7 @@ software/python/.venv/bin/python -m pytest -q \
 PASS: 76 tests, 18 subtests; exit code 0 (20.00 s)
 ```
 
-This executes current authentication and safety regressions, **not** the future Local Owner functionality. Python emitted a `pytest-asyncio` deprecation warning about its fixture loop-scope default, not a test failure. The documentation-integrity guard separately reported `PASS (700 Markdown files)` with exit code 0 after adding the two new documents.
+This executes current authentication and safety regressions, **not** the future Local Owner functionality. Python emitted a `pytest-asyncio` deprecation warning about its fixture loop-scope default, not a test failure. The documentation-integrity guard separately reported `PASS (701 Markdown files)` with exit code 0 after adding the ADR, audit and Claude handoff documents.
 
 | Scenario | Test / evidence source | Gate 1 status boundary |
 | --- | --- | --- |
@@ -91,3 +91,5 @@ This executes current authentication and safety regressions, **not** the future 
 **Exit criteria for Gate 1:** ADR accepted as target; source-linked change ledger and safety exclusions reviewed; existing focused Host-only baseline tests actually run and reported; new Local Owner positives/negatives defined for later PRs; docs integrity passes. This docs-only PR cannot claim Local Owner Mode functional PASS or authorization migration complete.
 
 **Next Gate:** independent Gate 2 approval to merge the specification PR after CI, reviews, threads and mergeability are checked. A later implementation still requires a bounded Gate 1 before executable work or hardware validation.
+
+**Claude Code handoff:** The separate [complete delivery work order](opf-local-owner-mode-claude-handoff-20261109.md) specifies D1–D8 design decisions, precise small-PR breakdown, test/CI matrix and stop conditions. It is planning material; no external Claude execution is implied.
