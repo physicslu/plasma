@@ -77,7 +77,7 @@ BLOCKER_TAXONOMY = {
     ),
     PLASMA_VERIFIED_CONFIGURATION_MISSING: (
         "Software programming is qualified, but no versioned PLASMA "
-        "PPU/Site/Socket/Adapter/FPGA/PS/Provider configuration HIL PASS has "
+        "PPU/Site or Socket/Adapter versioned configuration HIL PASS has "
         "promoted the ICPN to Level 3."
     ),
 }
@@ -174,6 +174,12 @@ class CatalogPromotionFramework:
             promotion_edge = EDGE_L2_TO_L3
             blocker = PLASMA_VERIFIED_CONFIGURATION_MISSING
         else:
+            _require(
+                qualification.get("state") == "SUPPORTED"
+                and (qualification.get("ppu_ready") or qualification.get("socket_ready"))
+                and bool(qualification.get("verified_configurations")),
+                f"Level 3 needs one canonical verified configuration: {record.vendor}/{record.identifier}",
+            )
             evidence_class = EVIDENCE_PLASMA_VERIFIED_CONFIGURATION
             promotion_edge = None
             blocker = None

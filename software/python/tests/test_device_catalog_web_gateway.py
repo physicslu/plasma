@@ -57,7 +57,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertTrue(result["catalog_verification"]["status"].startswith("verified_"))
         self.assertEqual(result["backend"]["mapping_status"], "mapped")
         self.assertEqual(result["physical_validation"]["engineering_status"], "no_evidence")
-        self.assertEqual(result["physical_validation"]["ppu_status"], "no_evidence")
+        self.assertEqual(result["physical_validation"]["ppu_status"], "passed")
         self.assertEqual(result["physical_validation"]["socket_status"], "no_evidence")
 
         basic = result["manufacturer_device_basic_profile"]
@@ -115,11 +115,15 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             qualification["programming"]["flash_geometry"]["main_flash_size_bytes"],
             64 * 1024,
         )
-        self.assertEqual(result["catalog_level"], 2)
-        self.assertEqual(result["catalog_level_state"], "PROGRAMMABLE")
+        self.assertEqual(result["catalog_level"], 3)
+        self.assertEqual(result["catalog_level_state"], "PLASMA_VERIFIED")
         self.assertTrue(result["job_selectable"])
-        self.assertEqual(qualification["catalog_level"], 2)
-        self.assertEqual(qualification["catalog_level_state"], "PROGRAMMABLE")
+        self.assertEqual(qualification["catalog_level"], 3)
+        self.assertEqual(qualification["catalog_level_state"], "PLASMA_VERIFIED")
+        self.assertTrue(qualification["ppu_ready"])
+        self.assertFalse(qualification["socket_ready"])
+        self.assertEqual(len(qualification["verified_configurations"]), 1)
+        self.assertEqual(qualification["verified_configurations"][0]["verification_type"], "PPU_SITE")
         self.assertTrue(qualification["selector_visible"])
         self.assertTrue(qualification["job_selectable"])
         self.assertFalse(qualification["hardware_runtime_ready"])
@@ -591,7 +595,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertEqual(l2["total_count"], 0)
 
-    def test_customer_selector_filters_l1_and_l2_server_side(self) -> None:
+    def test_customer_selector_filters_l1_l2_and_l3_server_side(self) -> None:
         status, l1 = self.request("/api/devices/search?q=STM32F103T8U6&levels=1&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(l1["levels"], [1])
@@ -607,14 +611,22 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(l1_as_l2["count"], 0)
         self.assertEqual(l1_as_l2["total_count"], 0)
 
-        status, l2 = self.request("/api/devices/search?q=STM32F103C8T6&levels=2&limit=5")
+        status, l2 = self.request("/api/devices/search?q=STM32F103C8T6TR&levels=2&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(l2["levels"], [2])
         self.assertGreaterEqual(l2["count"], 1)
-        self.assertEqual(l2["results"][0]["icpn"], "STM32F103C8T6")
+        self.assertEqual(l2["results"][0]["icpn"], "STM32F103C8T6TR")
         self.assertEqual(l2["results"][0]["catalog_level"], 2)
         self.assertEqual(l2["results"][0]["catalog_level_state"], "PROGRAMMABLE")
         self.assertTrue(l2["results"][0]["job_selectable"])
+
+        status, l3 = self.request("/api/devices/search?q=STM32F103C8T6&levels=3&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(l3["levels"], [3])
+        self.assertEqual(l3["total_count"], 1)
+        self.assertEqual(l3["results"][0]["icpn"], "STM32F103C8T6")
+        self.assertTrue(l3["results"][0]["programming_qualification"]["ppu_ready"])
+        self.assertFalse(l3["results"][0]["programming_qualification"]["socket_ready"])
 
         status, l2_as_l1 = self.request("/api/devices/search?q=STM32F103C8T6&levels=1&limit=5")
         self.assertEqual(status, 200)

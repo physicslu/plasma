@@ -1,7 +1,7 @@
 """Vendor-neutral Programming Qualification registry.
 
 Provider-specific evidence loaders validate source, version, driver, geometry and
-operation evidence. This registry derives Catalog Level 0/1/2 without exposing
+operation evidence. This registry derives Catalog Level 0/1/2/3 without exposing
 legacy phase-prefixed fields. Catalog Level never grants Job/Batch execution authority.
 """
 from __future__ import annotations
@@ -22,12 +22,17 @@ from .nxp_kl25_qualification import get_default_nxp_kl25_qualification_provider
 from .microchip_saml1x_route_evidence import admitted_saml1x_official_programming_routes
 from .microchip_pic32mx_route_evidence import admitted_pic32mx_openocd_devid_routes
 from .nxp_mcxa_route_evidence import admitted_nxp_mcxa_official_programming_routes
+from .physical_compatibility import (
+    PhysicalCompatibilityRegistry,
+    get_default_physical_compatibility_registry,
+)
 
 
 IDENTIFIED = "IDENTIFIED"
 CATALOG_LEVEL_DISCOVERED = "DISCOVERED"
 CATALOG_LEVEL_CANDIDATE = "PROGRAMMING_CANDIDATE"
 CATALOG_LEVEL_PROGRAMMABLE = "PROGRAMMABLE"
+CATALOG_LEVEL_VERIFIED = "PLASMA_VERIFIED"
 PROGRAMMING_STATES = frozenset({"UNKNOWN", "CANDIDATE", "BLOCKED", "SUPPORTED", "UNSUPPORTED"})
 
 
@@ -61,9 +66,11 @@ class ProgrammingQualificationRegistry:
         *,
         candidate_registry: CandidateRouteEvidenceProvider | None = None,
         candidate_registries: tuple[CandidateRouteEvidenceProvider, ...] = (),
+        physical_compatibility: PhysicalCompatibilityRegistry | None = None,
     ) -> None:
         self._catalog = catalog
         self._providers = providers
+        self._physical_compatibility = physical_compatibility or PhysicalCompatibilityRegistry([])
         # Preserve the existing ST input while allowing independently reviewed
         # manufacturer-neutral adapters. Never silently select among conflicts.
         self._candidate_registries = (
@@ -92,6 +99,16 @@ class ProgrammingQualificationRegistry:
                     row.identity_state == IDENTIFIED,
                     f"Programming Qualification lacks IDENTIFIED exact ICPN prerequisite: {key}",
                 )
+        for physical_key in self._physical_compatibility.exact_keys:
+            row = self._identity_by_key.get(physical_key)
+            _require(row is not None, f"L3 configuration lacks admitted exact ICPN: {physical_key}")
+            matching = [
+                provider for provider in providers
+                if provider.lookup(row.vendor, row.identifier) is not None
+            ]
+            _require(len(matching) == 1
+                     and matching[0].describe(row.vendor, row.identifier).get("software_state") == "SUPPORTED",
+                     f"L3 configuration requires SUPPORTED L2 provider: {physical_key}")
 
     def _candidate_for(self, row: DeviceCatalogRecord) -> dict[str, Any] | None:
         candidates = [provider.lookup(row) for provider in self._candidate_registries]
@@ -133,6 +150,9 @@ class ProgrammingQualificationRegistry:
             "installed_runtime_attested": False,
             "hardware_runtime_ready": False,
             "physical_programming_qualified": False,
+            "ppu_ready": False,
+            "socket_ready": False,
+            "verified_configurations": [],
         }
 
     def describe(self, manufacturer: str, exact_icpn: str) -> dict[str, Any]:
@@ -168,14 +188,30 @@ class ProgrammingQualificationRegistry:
         state = raw.get("software_state")
         _require(state in PROGRAMMING_STATES, f"invalid provider state for {manufacturer}/{exact_icpn}: {state!r}")
         programmable = state == "SUPPORTED"
+        configurations = self._physical_compatibility.verified_for(manufacturer, exact_icpn)
+        _require(programmable or not configurations,
+                 f"L3 evidence cannot promote non-SUPPORTED exact ICPN: {manufacturer}/{exact_icpn}")
+        _require(not configurations or all(
+            item["identity"]["package"] == row.package
+            and item["identity"]["pin_count"] == row.pin_count
+            and item["engine"]["provider_id"] == (raw.get("provider") or {}).get("provider_id")
+            and item["engine"]["provider_version"] == (raw.get("provider") or {}).get("version")
+            for item in configurations
+        ), f"L3 configuration/package/provider mismatches L2 authority: {manufacturer}/{exact_icpn}")
+        ppu_ready = any(item["verification_type"] == "PPU_SITE" for item in configurations)
+        socket_ready = any(item["verification_type"] == "SOCKET_ADAPTER" for item in configurations)
+        verified = programmable and (ppu_ready or socket_ready)
         return {
             "schema_version": "2.0.0",
             "registry_id": raw.get("registry_id"),
             "state": state,
             "reviewed": bool(raw.get("reviewed")),
             "identity_state": IDENTIFIED,
-            "catalog_level": 2 if programmable else 1,
-            "catalog_level_state": CATALOG_LEVEL_PROGRAMMABLE if programmable else CATALOG_LEVEL_CANDIDATE,
+            "catalog_level": 3 if verified else (2 if programmable else 1),
+            "catalog_level_state": (
+                CATALOG_LEVEL_VERIFIED if verified else
+                CATALOG_LEVEL_PROGRAMMABLE if programmable else CATALOG_LEVEL_CANDIDATE
+            ),
             "provider": deepcopy(raw.get("provider")),
             "operations": deepcopy(raw.get("operations", {})),
             "programming": deepcopy(raw.get("programming")),
@@ -186,6 +222,9 @@ class ProgrammingQualificationRegistry:
             "installed_runtime_attested": bool(raw.get("installed_runtime_attested", False)),
             "hardware_runtime_ready": bool(raw.get("hardware_runtime_ready", False)),
             "physical_programming_qualified": bool(raw.get("physical_programming_qualified", False)),
+            "ppu_ready": ppu_ready,
+            "socket_ready": socket_ready,
+            "verified_configurations": configurations,
         }
 
     def state_for(self, manufacturer: str, exact_icpn: str) -> str:
@@ -218,19 +257,24 @@ class ProgrammingQualificationRegistry:
         } | reviewed_keys
         level0_only = len(discovered_keys - route_keys)
         level1_only = len(route_keys - supported_keys)
-        level2_only = len(supported_keys)
+        level3_keys = {
+            key for key in supported_keys
+            if self.describe(*key)["catalog_level"] == 3
+        }
+        level2_only = len(supported_keys - level3_keys)
         return {
             "provider_count": len(self._providers),
             "reviewed_exact_icpns": len(reviewed_keys),
             "catalog_level_0_or_higher_discovered_exact_icpns": len(discovered_keys),
             "catalog_level_0_only_exact_icpns": level0_only,
             "catalog_level_1_or_higher_exact_icpns": len(route_keys),
-            "catalog_level_2_programmable_exact_icpns": level2_only,
+            "catalog_level_2_programmable_exact_icpns": len(supported_keys),
+            "catalog_level_3_verified_exact_icpns": len(level3_keys),
             "catalog_level_counts": {
                 "0": level0_only,
                 "1": level1_only,
                 "2": level2_only,
-                "3": 0,
+                "3": len(level3_keys),
             },
             "selector_visibility_rule": "CATALOG_LEVEL_1_OR_HIGHER",
             "job_picker_rule": "CATALOG_LEVEL_2_OR_HIGHER",
@@ -257,4 +301,5 @@ def get_default_programming_qualification_registry() -> ProgrammingQualification
             admitted_pic32mx_openocd_devid_routes(catalog),
             admitted_nxp_mcxa_official_programming_routes(catalog),
         ),
+        physical_compatibility=get_default_physical_compatibility_registry(),
     )

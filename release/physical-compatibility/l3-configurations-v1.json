@@ -1,0 +1,62 @@
+{
+  "schema": "plasma.catalog.l3-configurations.v1",
+  "configurations": [
+    {
+      "configuration_id": "st-stm32f103c8t6-z2-site2-direct-swd-20261109-v1",
+      "verification_type": "PPU_SITE",
+      "result": "PASSED",
+      "identity": {
+        "manufacturer": "STMicroelectronics",
+        "icpn": "STM32F103C8T6",
+        "package": "LQFP",
+        "pin_count": "48"
+      },
+      "ppu_site": {
+        "model": "PYNQ-Z2 prototype",
+        "hardware_revision": "NOT_RECORDED",
+        "ppu_id": "z2-hil",
+        "device_id": "ppu-device-7ed4b30913a9bf6101da5a7a",
+        "site_id": 2
+      },
+      "connection_mode": "DIRECT_WIRE",
+      "socket": null,
+      "engine": {
+        "provider_id": "openocd-upstream",
+        "provider_version": "0.12.0",
+        "target_config": "target/stm32f1x.cfg",
+        "runtime_sha": "a1b1c6f3b1424ce38d1de7e597ef22d0ef4460f2",
+        "fpga_image_id": "z2-independent-swd-v5-d0add58c",
+        "abi": "plasma_swd:5",
+        "adapter": "z2-abi5-swd-openocd5088",
+        "openocd_binary_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861"
+      },
+      "physical_scope": ["erase", "program", "verify", "full_readback", "safe_off"],
+      "electrical_measurement": "NOT_TESTED",
+      "physical_wiring_revision": "NOT_RECORDED",
+      "provenance": {
+        "manager_alias": "z2",
+        "manager_journal": "docs/evidence/console-bundle-programming-hil-2026-11-09/manager-run-journal.json",
+        "manager_journal_sha256": "b08d83d68977415bf6c689c90fe2c9004c97e369ac75f6956ff661977e38e792",
+        "bootstrap_status": "docs/evidence/console-bundle-programming-hil-2026-11-09/bootstrap-status-after.json",
+        "bootstrap_status_sha256": "6d83fc4c414f5693b3e293048aaebac34d3100fddfe0490d94524ba60bc5ebf0"
+      },
+      "limitations": [
+        "Only the documented PYNQ-Z2 Site 2 direct-wire SWD configuration was physically exercised.",
+        "Analog target voltage/current and physical harness revision were not independently recorded.",
+        "No Socket or Adapter fixture was built or qualified.",
+        "FPGA load, USB CDC execution, eight-Site concurrency and hardware fault injection were not tested in these jobs.",
+        "L3 is a historical configuration HIL result, not permission to execute on any current PPU/Site."
+      ],
+      "evidence": [
+        {
+          "path": "docs/evidence/console-bundle-programming-hil-2026-11-09/ppu-job-job-20261109-042428-113dd980.json",
+          "sha256": "dfe72dc2e923d7b5dcaff947e54f82c9c99895517f1d6b72de543d7afb4ec504"
+        },
+        {
+          "path": "docs/evidence/console-bundle-programming-hil-2026-11-09/ppu-job-job-20261109-044035-b8cbd4da.json",
+          "sha256": "a04a0d42490042c45ed2adf54c0a109a2170d2d842ec881cb6093216eb58802e"
+        }
+      ]
+    }
+  ]
+}

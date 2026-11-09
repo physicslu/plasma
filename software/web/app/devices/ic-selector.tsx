@@ -110,7 +110,7 @@ function physicalValidationLabel(kind: "PPU" | "Socket", status: string, zh: boo
     return `${kind} · ${zh ? "未實機測試" : "Not hardware-tested"}`;
   }
   if (status === "engineering_verified" || status === "verified" || status === "passed") {
-    return `${kind} · ${zh ? "實機測試通過" : "Hardware test passed"}`;
+    return `${kind} Ready · ${zh ? "實機測試通過" : "Hardware test passed"}`;
   }
   if (status === "rejected" || status === "failed" || status === "blocked") {
     return `${kind} · ${zh ? "實機測試未通過" : "Hardware test failed"}`;
@@ -712,6 +712,17 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
               <div><dt>ICPN Evidence</dt><dd>{humanizeStatus(selected.catalog_verification.status)}</dd></div>
               <div><dt>PPU</dt><dd>{physicalValidationDetail(selected.physical_validation.ppu_status, zh)}</dd></div>
               <div><dt>Socket</dt><dd>{physicalValidationDetail(selected.physical_validation.socket_status, zh)}</dd></div>
+              {selected.programming_qualification?.verified_configurations.map(configuration => (
+                <div key={configuration.configuration_id}>
+                  <dt>{configuration.verification_type === "PPU_SITE" ? "PPU Ready" : "Socket Ready"}</dt>
+                  <dd>
+                    {configuration.configuration_id} · {configuration.ppu_site.model} Site {configuration.ppu_site.site_id}
+                    {` · ${configuration.physical_scope.join(" / ")} · HIL ${configuration.result}`}
+                    {` · ${zh ? "電氣量測" : "Electrical measurement"}: ${configuration.electrical_measurement}`}
+                    {configuration.limitations.length > 0 && ` · ${zh ? "限制" : "Limits"}: ${configuration.limitations.join("; ")}`}
+                  </dd>
+                </div>
+              ))}
               {selected.selected_profile && (
                 <>
                   <div><dt>{zh ? "Manufacturer Baseline" : "Manufacturer baseline"}</dt><dd><code>{selected.selected_profile.manufacturer_baseline.baseline_id}</code></dd></div>
@@ -732,8 +743,8 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
             <div className="icSelectorBoundary">
               {selected.catalog_level === 3
                 ? (zh
-                  ? "L3 PLASMA Verified：至少一組版本化 PLASMA configuration 已通過 HIL。實際 Job 仍需符合目前 Site、Adapter、Runtime、電氣與安全條件。"
-                  : "L3 PLASMA Verified: at least one versioned PLASMA configuration has passed HIL. The current Site, Adapter, Runtime, electrical, and safety gates still apply.")
+                  ? "L3 PLASMA Verified：PPU Ready 或 Socket Ready 至少一條獨立配置已有實機 HIL PASS；另一條未驗證時不得推定通過。實際 Job 仍需符合目前 Site、Adapter、Runtime、電氣與安全條件。"
+                  : "L3 PLASMA Verified: PPU Ready or Socket Ready has a versioned HIL PASS. The other path is not implied; current Site, Adapter, Runtime, electrical, and safety gates still apply.")
                 : selected.catalog_level === 1
                 ? (zh
                   ? "L1 Programming Candidate：已有具體、可追溯的 programming route，但尚未完成 qualification。這類 IC 可作為客戶委託 Programming Qualification 的候選，不能直接建立燒錄 Job。"

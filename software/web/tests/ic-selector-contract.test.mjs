@@ -76,8 +76,11 @@ test("Programming qualification derives Catalog Level 2 independently from CFG m
   assert.match(api, /programming_qualification\?:\s*ProgrammingQualification\s*\|\s*null/);
   assert.match(api, /state:\s*"UNKNOWN"\s*\|\s*"CANDIDATE"\s*\|\s*"BLOCKED"\s*\|\s*"SUPPORTED"\s*\|\s*"UNSUPPORTED"/);
   assert.match(api, /identity_state:\s*"IDENTIFIED"\s*\|\s*"NOT_IDENTIFIED"/);
-  assert.match(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*null/);
-  assert.match(api, /catalog_level_state:\s*"DISCOVERED"\s*\|\s*"PROGRAMMING_CANDIDATE"\s*\|\s*"PROGRAMMABLE"\s*\|\s*null/);
+  assert.match(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*3\s*\|\s*null/);
+  assert.match(api, /catalog_level_state:\s*"DISCOVERED"\s*\|\s*"PROGRAMMING_CANDIDATE"\s*\|\s*"PROGRAMMABLE"\s*\|\s*"PLASMA_VERIFIED"\s*\|\s*null/);
+  assert.match(api, /ppu_ready:\s*boolean/);
+  assert.match(api, /socket_ready:\s*boolean/);
+  assert.match(api, /verified_configurations:\s*VerifiedPhysicalConfiguration\[\]/);
   assert.match(api, /selector_visible:\s*boolean/);
   assert.match(api, /job_selectable:\s*boolean/);
   assert.match(api, /execution_authorized:\s*false/);
@@ -125,7 +128,9 @@ test("general IC Selector exposes L1-L3 filters while Level 0 stays outside the 
   assert.match(api, /levels:\s*levels\.join\(","\)/);
   assert.match(api, /scope:\s*"customer_ic_selector"/);
   assert.match(api, /catalog_level:\s*1\s*\|\s*2\s*\|\s*3/);
-  assert.doesNotMatch(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*3/);
+  // Qualification has a private L0 representation; the public DeviceSearchResult cannot.
+  const publicResultType = api.split("export type DeviceSearchResult = {")[1];
+  assert.doesNotMatch(publicResultType, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*3/);
   assert.match(selector, /全部 L1–L3/);
   assert.match(selector, /L1 Candidate/);
   assert.match(selector, /L2 Programmable/);

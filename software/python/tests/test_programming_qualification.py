@@ -101,6 +101,16 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         registry = get_default_programming_qualification_registry()
         self.assertEqual(registry.summary["reviewed_exact_icpns"], 78)
         self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 77)
+        self.assertEqual(registry.summary["catalog_level_3_verified_exact_icpns"], 1)
+        self.assertEqual(registry.summary["catalog_level_counts"], {"0": 204, "1": 5604, "2": 76, "3": 1})
+
+        blue_pill = registry.describe("STMicroelectronics", "STM32F103C8T6")
+        self.assertEqual(blue_pill["catalog_level"], 3)
+        self.assertEqual(blue_pill["catalog_level_state"], "PLASMA_VERIFIED")
+        self.assertTrue(blue_pill["ppu_ready"])
+        self.assertFalse(blue_pill["socket_ready"])
+        self.assertFalse(blue_pill["execution_authorized"])
+        self.assertFalse(blue_pill["hardware_runtime_ready"])
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
             "CATALOG_LEVEL_1_OR_HIGHER",
