@@ -40,7 +40,7 @@ Persisted credentials are compatible: the Manager `bootstrap-credentials.json` s
 
 ## 4. Procedure
 
-Conventions: run on SWPC as the Control Station user. `Z2` commands run over the owner-approved SSH/sudo channel defined in the Embedded contract (credential store outside the repo; sudo password via stdin; never echoed). `EV=/storage/projects/plasma-evidence/lom-p2a1-deploy-<UTC>` (mode `0700`); store secret-bearing backups **outside** `EV`.
+Conventions: run on SWPC as the Control Station user. `Z2` commands run over the owner-approved SSH/sudo channel defined in the Embedded contract (credential store outside the repo; sudo password via stdin; never echoed). `EV=<evidence-root>/lom-p2a1-deploy-<UTC>` (mode `0700`); store secret-bearing backups **outside** `EV`.
 
 ```bash
 Z2=192.168.2.99; MGR=http://127.0.0.1:18280; BFF=http://127.0.0.1:18190
@@ -67,7 +67,7 @@ STATE=~/.local/state/plasma/local-control-station
 - **W3 Z2 Bootstrap refresh.** In the extracted directory: `sudo /usr/bin/python3 scripts/ppu-bootstrap-installer.py --source-root "$PWD/scripts" --host 192.168.2.99 --refresh-only` → JSON `result:"PASS"`, `operation:"refresh_only"`, `unit_changed:false`, `control_token_provisioned:false`. Re-confirm Site idle and no deployment in flight, then `sudo systemctl restart plasma-bootstrap.service`; `systemctl is-active plasma-bootstrap.service` → `active`.
 - **W4 Worker restart (only if P5 showed Worker-file changes and the owner approved it).** With Site 1/2 idle: `sudo systemctl restart plasma-site-worker.service`; `systemctl is-active` → `active`; `ppu_site_recovery.py diagnose 2` → no seal.
 - **W5 Z2 post-refresh checks.** `sudo sha256sum /opt/plasma/bootstrap/*` equals the bundle for every shipped file; token SHA256 unchanged; `curl http://$Z2:18081/v1/status | jq .security.request_authentication` → `"plasma.ppu.bootstrap-request-auth.v1"`, `bootstrap_ready`, Runtime and deployment record unchanged; `curl http://$Z2:18081/v1/auth/challenge` → 200 with the **same** `device_id` as P4.
-- **W6 SWPC Manager/Console.** `git worktree add /storage/projects/plasma-wt-cs-3c2145f3d 3c2145f3d` (clean), then from it `scripts/plasmactl-local-control-station deploy` → `deployment complete: 3c2145f3d155`; `scripts/plasmactl-local-control-station verify` PASS (Console + Manager + Selector). The deploy restarts both user services.
+- **W6 SWPC Manager/Console.** `git worktree add <worktree-root>/plasma-wt-cs-3c2145f3d 3c2145f3d` (clean), then from it `scripts/plasmactl-local-control-station deploy` → `deployment complete: 3c2145f3d155`; `scripts/plasmactl-local-control-station verify` PASS (Console + Manager + Selector). The deploy restarts both user services.
 
 ## 5. Acceptance (all must PASS; record observed values)
 
