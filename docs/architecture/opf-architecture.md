@@ -4,6 +4,12 @@
 **Governance:** [Core convergence / deletion-first roadmap (PR #1343)](plasma-core-convergence-and-deletion-first-roadmap.md). The [2026-11-04 Bundle-driven Programming Decision (PR #1298)](unified-bundle-driven-programming-decision-2026-11-04.md) continues to govern **PLASMA PPU product execution**, not every independent use of OPF.
 **Scope:** Define the common programming contract and distinguish it from each Host's packaging, authorization and hardware controls. Engineering and Production still share **one PPU execution pipeline** after Console policy admission. No existing privileged guard is changed by this document.
 
+## PPU product Local Owner Mode — accepted policy, not yet implemented
+
+**[ADR-0008](../adr/0008-local-owner-mode.md) is the owner-approved default PLASMA PPU product policy (2026-11-09).** The person controlling the physical PPU can configure, maintain, install their own Runtime/Bundle/Provider/FPGA Image, and program offline **without a cloud account, Cloudflare Tunnel, manufacturer License/whitelist or periodic manufacturer approval**. Console should present one `Connect PPU` flow without manual Registry Validate & Enable, Pairing Token entry or repeated authorization prompts. Device enrollment must independently establish bounded local possession/control; LAN access alone does not do so. Manager and PPU retain device-specific internal security proofs, transaction/command identity, local ingress isolation, SHA/Target/ABI, Site/FPGA ownership, electrical SAFE_OFF, SEALED and UNKNOWN recovery.
+
+**Migration is pending.** Current Manager Registry commissioning, Bootstrap Bearer pairing and conditional BFF maintenance capability remain executable until their replacement is proven. The [Gate 1 authorization-chain audit](../development/opf-local-owner-mode-gate1-20261109.md) enumerates the exact call sites and staged changes; no claim of deployed Local Owner Mode follows from this architecture decision. This is a **PPU Host integration rule**, not an OPF Core dependency: standalone OPF continues to execute without a PPU, Bundle, Owner HMAC or account. New user-created Providers do not need manufacturer approval but remain constrained by the actual Host's executable safety and integrity rules.
+
 ## Target architecture: portable contract, no mandatory PPU dependency
 
 ```text
