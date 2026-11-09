@@ -10,7 +10,7 @@ async function source(path) {
 test("Console Device Selector calls the same-origin Manager BFF, not a PPU Gateway", async () => {
   const [api, transport, route, bff] = await Promise.all([
     source("../app/device-catalog-api.ts"),
-    source("../app/security-transport.ts"),
+    source("../app/gateway-transport.ts"),
     source("../app/api/manager/devices/search/route.ts"),
     source("../app/api/manager/manager-bff.ts"),
   ]);

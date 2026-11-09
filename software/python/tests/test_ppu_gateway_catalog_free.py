@@ -46,7 +46,7 @@ packaging = _load_script("ppu_runtime_pr_c1", "ppu-runtime.py")
 CATALOG_ONLY = tuple(m[:-3].replace("/", ".") for m in packaging.CATALOG_ONLY_MODULES)
 GATEWAY_MODULES = (
     "plasma_web.gateway", "plasma_web.gateway_phase2", "plasma_web.gateway_phase3",
-    "plasma_web.gateway_runner", "plasma_web.secure_gateway",
+    "plasma_web.gateway_runner",
     "plasma_web.runtime_activation_helper", "plasma_server.runtime_server",
 )
 
@@ -114,8 +114,6 @@ def test_gateway_module_holds_no_catalog_symbol():
     for attr in ("_is_device_search_path", "_device_search", "_device_selector_unavailable"):
         assert not hasattr(gateway.PlasmaWebHandler, attr), attr
     assert "/api/devices/search" not in source
-    secure_source = (ROOT / "software/python/plasma_web/secure_gateway.py").read_text(encoding="utf-8")
-    assert "/api/devices/search" not in secure_source
 
 
 # --- Selector route: deleted from the PPU Gateway (owned by Manager) --------------------
@@ -142,20 +140,6 @@ def test_gateway_device_search_is_unknown_route_never_results(monkeypatch, path,
     # Same answer whether or not Catalog code is importable: no Selector here.
     assert status == 404, body
     assert body["ok"] is False and "results" not in body and "catalog_size" not in body
-
-
-def test_secure_gateway_has_no_device_search_authorization_rule():
-    from plasma_core.errors import ErrorCode, PlasmaError
-    from plasma_web import secure_gateway
-
-    handler = object.__new__(secure_gateway.SecurePlasmaWebHandler)
-    handler.path = "/api/devices/search?q=STM32"
-    handler.command = "GET"
-    handler._principal = lambda: type("P", (), {"principal_id": "p"})()
-    handler._authorize = lambda *a, **k: pytest.fail(f"unexpected authorization rule {a}")
-    with pytest.raises(PlasmaError) as caught:
-        handler._guard_get()
-    assert caught.value.code == ErrorCode.AUTHORIZATION_DENIED
 
 
 # --- call layer: Bundle v3 Mock path with the Selector module absent ----------------------

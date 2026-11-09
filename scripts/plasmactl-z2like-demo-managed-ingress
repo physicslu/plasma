@@ -88,10 +88,6 @@ server {
         limit_except GET { deny all; }
         proxy_pass $qemu_gateway_root;
     }
-    location = /api/security/me {
-        limit_except GET { deny all; }
-        proxy_pass $qemu_gateway_root;
-    }
     location = /api/engineering/targets {
         limit_except GET { deny all; }
         proxy_pass $qemu_gateway_root;
