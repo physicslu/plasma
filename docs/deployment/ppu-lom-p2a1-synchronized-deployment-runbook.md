@@ -1,7 +1,7 @@
 # LOM-P2A-1 synchronized deployment runbook (SWPC Manager/CLI + Z2 Bootstrap)
 
 > **Status: PLAN ONLY — deployment NOT authorized.** Do not touch the SWPC Control Station, the Z2 or any DUT until the owner gives an explicit deployment approval naming this runbook and its pins. Approval of this document is not approval of any later P2A-x implementation.
-> Change being deployed: [PPU Bootstrap mutual request authentication](ppu-bootstrap-request-authentication.md) (#1372, merged in `main` `3c2145f3d`). Policy: [ADR-0008](../adr/0008-local-owner-mode.md). Design context: [B1–B5 proposed design](../development/opf-local-owner-mode-b1b5-design-20261109.md).
+> Change being deployed: [PPU Bootstrap mutual request authentication](ppu-bootstrap-request-authentication.md) (#1372, merged in `main` `3c2145f3d`). Policy: [ADR-0008](../adr/0008-local-owner-mode.md). Design context: [B1–B5 design direction](../development/opf-local-owner-mode-b1b5-design-20261109.md).
 > Contracts: [AGENTS.md](../../AGENTS.md), [Embedded](../development/plasma-embedded.md) (SSH/sudo, seals, recovery), [Manager](../development/plasma-manager.md), [Bootstrap factory refresh](ppu-bootstrap-factory-and-hil.md#single-z2-rd-refresh-current-development-route).
 
 ## 1. Pins (verify each before the window; any mismatch = STOP)
