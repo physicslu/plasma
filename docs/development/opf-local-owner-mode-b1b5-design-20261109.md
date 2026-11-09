@@ -1,6 +1,6 @@
-# OPF Local Owner Mode — B1–B5 proposed design and refreshed Gap Audit
+# OPF Local Owner Mode — B1–B5 design direction and refreshed Gap Audit
 
-> **Status: PROPOSED — pending explicit owner confirmation.** B1–B5 below are the owner's *proposed* direction (2026-11-09). This document is **not** a Gate 1 authorization for P2A-0, P2A-2, P2B, P1, P3 or P4, and nothing here is implemented except where stated as merged on main.
+> **Status: B1–B5 OWNER-CONFIRMED as the design direction (2026-11-09).** Confirmation fixes the direction only. It is **not** a Gate 1 authorization for P2A-0, P2A-2, P2B, P1, P3 or P4, does not authorize the P2A-1 deployment, and the open questions marked below remain to be frozen in P2A-0. Nothing here is implemented except where stated as merged on main.
 > Normative policy: [ADR-0008](../adr/0008-local-owner-mode.md). Prior audit: [Gate 1 ledger](opf-local-owner-mode-gate1-20261109.md) (§5 = first latest-main refresh). Deployment of the merged P2A-1: [synchronized deployment runbook](../deployment/ppu-lom-p2a1-synchronized-deployment-runbook.md) (**not authorized**).
 > Source: `main` `3c2145f3d` (#1371 + #1372 merged). Read-only audit; no SWPC/Z2/FPGA/DUT access.
 
@@ -25,7 +25,7 @@ New observations in this refresh:
 - **G11 — Path 2 CLI work orders are protocol-coupled.** `plasma_program.py` / `ppu_path2_hardware_baseline.py` run from the dispatcher `--source-sha`. After deployment, any work order pinned to a SHA before `3c2145f3d` fails with 401 (no side effect); during a rollback the converse holds.
 - **G12 — Console pairing UI still shows a manual token.** P2A-1 does not change that UX; "no manual credential" may be claimed only after P2A-2 and P1.
 
-## 2. Proposed B1–B5 (pending owner confirmation)
+## 2. B1–B5 (owner-confirmed direction, 2026-11-09)
 
 ### B1 — Physical presence: SD one-shot enrollment (primary), local serial (development alternative)
 
@@ -55,7 +55,7 @@ Principle: **only a physically bounded, PPU-local action can create or replace t
 
 - **One active controller per PPU** in the first version. The PPU stores `{controller_id, credential, generation}`; the generation is monotonic and durable.
 - **Reclaim** (new computer, lost credential, broken PC) uses the B1 ticket. Transition is **atomic**: write new credential+generation to a temp file, fsync, rename; old credential invalid from that instant, including on open connections. Crash before rename = old controller remains; after rename = new one; never both, never neither.
-- **Blocked while unsafe:** if any Site Job is active, a B3/deployment is `queued/running`, any `OUTCOME_UNKNOWN`/`recovery_required` is unresolved, or a Site is SEALED, reclaim reports the blocker and does not rotate. (Proposal for owner: allow reclaim while SEALED/UNKNOWN but require the new controller to reconcile before any write — choose one in P2A-0.)
+- **Blocked while unsafe:** if any Site Job is active, a B3/deployment is `queued/running`, any `OUTCOME_UNKNOWN`/`recovery_required` is unresolved, or a Site is SEALED, reclaim reports the blocker and does not rotate. (**Open for P2A-0:** alternatively allow reclaim while SEALED/UNKNOWN but require the new controller to reconcile before any write — the owner chooses one when approving P2A-0.)
 - **Never erased by reclaim:** `/var/lib/plasma-bootstrap/deployment*.json`, upload records, Active Set pointer and generation, Site seals, Worker journals, PPU-side programming outcomes. The new Manager must import PPU-side unresolved state before showing `READY` (G4 → P2B).
 - Read-only Monitor consoles (from #1204) are compatible as a later extension; not in the first version.
 
@@ -71,10 +71,10 @@ Principle: **only a physically bounded, PPU-local action can create or replace t
 
 ## 3. Revised small-PR plan (each still needs its own Gate 1)
 
-| PR | Depends on | Scope (proposed) | Exit |
+| PR | Depends on | Scope (each needs its own Gate 1) | Exit |
 | --- | --- | --- | --- |
 | P2A-1 deploy | Owner deployment approval | [Runbook](../deployment/ppu-lom-p2a1-synchronized-deployment-runbook.md) only | Hardware acceptance A1–A9 |
-| P2A-0 | B1–B3 confirmed | Freeze `plasma.ppu.local-enrollment.v1`, state machine, ticket format, reclaim blocking rule; docs + contract tests | Reviewed protocol; no code path |
+| P2A-0 | B1–B3 (confirmed 2026-11-09) | Freeze `plasma.ppu.local-enrollment.v1`, state machine, ticket format, reclaim blocking rule; docs + contract tests | Reviewed protocol; no code path |
 | P2A-2 | P2A-0 | Boot-time SD ticket consumer, serial dev CLI, enrollment exchange, atomic credential/generation store, Manager enrollment client | Host-only: replay/expiry/wrong device/runtime-written ticket ignored/crash-atomic/blocked-while-unsafe/journals preserved |
 | P2B | P2A-2 | Connect orchestration, derived readiness (replaces 9 `commissioned` gates), PPU-side UNKNOWN import, Manager loopback guard | No READY with unresolved PPU state; non-loopback Manager refuses start |
 | P1 | P2B, B4 | `Connect PPU`, remove token box and Validate & Enable for local profile | Local profile has no cookie/token dependency |
