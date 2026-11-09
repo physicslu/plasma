@@ -58,12 +58,15 @@ Runtime state is separated from the Git worktree:
 ~/.local/state/plasma/local-control-station/
   install.json
   manager-observations.sqlite3
+  registry.json                  # Manager runtime PPU registry (created by Manager)
+  bootstrap-credentials.json     # Manager Bootstrap pairing state (created on pairing)
 
 ~/.local/share/plasma/local-control-station/
   current -> releases/<git-sha-prefix>
   releases/<git-sha-prefix>/
     venv/
     web/
+    catalog/          # committed data/ + release/ trees for the Manager Device Selector
 ```
 
 User units:
@@ -74,6 +77,16 @@ plasma-control-station.service
 ```
 
 The Console and Manager bind to loopback only. Public/LAN exposure is not created by this profile.
+
+## Manager runtime (OPF S5)
+
+The profile Manager runs `python -m plasma_manager.bootstrap_server`, the same Bootstrap-capable Manager entrypoint used by the packaged Control Station runtime. It composes the standard `plasma_manager.server` behavior with the PPU Bootstrap routes (`/api/registry/{alias}/bootstrap/...`) the Console uses for Platform Release Bundle admission and install.
+
+The Manager owns the Catalog-only Device Selector (`GET /api/devices/search`, reached by the Console at `/api/manager/devices/search`). The release venv is a non-editable install and cannot locate repository data, so each immutable release ships the **committed** `data/` and `release/` trees (`git archive HEAD`, no EOL conversion) under `releases/<sha>/catalog/`. The Manager unit sets `PLASMA_DEVICE_CATALOG_MANIFEST`, `PLASMA_IC_SUPPORT_ROOT` and `PLASMA_RUNTIME_EVIDENCE_ROOT` to that release Catalog. A release build fails before activation unless the release's own venv answers a Selector self-test with HTTP 200 from those bytes.
+
+`manager.yaml` sets `manager.registry_state_path` to `~/.local/state/plasma/local-control-station/registry.json`. This is an explicit profile decision (owner-approved PR-L1) that makes the Manager runtime registry durable and mutable, which Validate & Enable, Bootstrap pairing and Static IPv4 commissioning require. The `ppus` list written to `manager.yaml` only **seeds the first start**; once `registry.json` exists it is the Manager-owned inventory, and later `--ppu-alias`/`--ppu-endpoint` changes do not rewrite it. Activation rollback never deletes `registry.json` or `bootstrap-credentials.json`.
+
+Releases built before this contract have no `catalog/` directory. Re-activating such a SHA with the current script is refused; roll back with the script from that older clean checkout.
 
 ## PPU target contract
 
@@ -139,7 +152,7 @@ These are intentional `local-control-station` profile defaults, not replacements
 ./scripts/plasmactl deploy local-control-station
 ```
 
-The profile activates the repository's **current clean committed HEAD**. It does not run `git pull`, merge, checkout, reset, or other source-control mutation.
+The profile activates the repository's **current clean committed HEAD**. It does not run `git pull`, merge, checkout, reset, or other source-control mutation. The source may be a primary clone or a linked `git worktree`; either must be clean.
 
 Deployment flow:
 
@@ -190,7 +203,10 @@ This verifies:
 - Console is in managed mode;
 - Console BFF points to the local Manager;
 - fixed PPU alias is injected into the BFF;
+- the Manager unit runs `plasma_manager.bootstrap_server` and points at the release Device Selector Catalog;
+- `manager.yaml` declares the profile runtime registry state path;
 - Manager liveness passes on loopback;
+- Manager `GET /api/devices/search` returns HTTP 200 on loopback (Manager-owned Catalog, never relayed to a PPU);
 - Console root responds on loopback;
 - a reachable configured PPU exposes the managed Site configuration surface rather than only a restricted diagnostics/status surface.
 

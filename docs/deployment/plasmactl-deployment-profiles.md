@@ -154,7 +154,7 @@ A temporarily unreachable PPU remains non-fatal. If the configured PPU is reacha
 ./scripts/plasmactl verify local-control-station
 ```
 
-This verifies the local runtime/evidence contract, managed-mode BFF wiring, local Manager liveness and local Console health. For a reachable PPU, it also verifies that the configured endpoint exposes the managed Site settings surface instead of only a restricted diagnostics/status surface. It does not qualify PPU execution, Z2, PL, Sites, or real IC programming.
+This verifies the local runtime/evidence contract, managed-mode BFF wiring, the Bootstrap-capable Manager unit with its release Device Selector Catalog and runtime registry state path, local Manager liveness, a loopback Manager Device Selector HTTP 200 and local Console health. For a reachable PPU, it also verifies that the configured endpoint exposes the managed Site settings surface instead of only a restricted diagnostics/status surface. It does not qualify PPU execution, Z2, PL, Sites, or real IC programming.
 
 ### Cross-platform boundary
 
