@@ -214,6 +214,37 @@ export_release_catalog() {
   # Committed bytes only (Catalog loaders verify SHA-256 / Git blob identity).
   git -C "$repo_root" -c core.autocrlf=false -c core.eol=lf \
     archive --format=tar HEAD -- data release | tar -x -C "$destination"
+  # The L3 physical-compatibility loader replay-checks the HIL receipts its
+  # reviewed manifests reference under docs/evidence/. Ship exactly those.
+  local evidence
+  evidence="$("$base_python" -I -B - "$destination/release/physical-compatibility" <<'PY'
+import json, pathlib, sys
+
+found = set()
+def walk(value):
+    if isinstance(value, dict):
+        for item in value.values():
+            walk(item)
+    elif isinstance(value, list):
+        for item in value:
+            walk(item)
+    elif isinstance(value, str) and value.startswith("docs/evidence/"):
+        parts = pathlib.PurePosixPath(value).parts
+        if ".." in parts or value.startswith("/"):
+            raise SystemExit(f"unsafe evidence path: {value}")
+        found.add(value)
+root = pathlib.Path(sys.argv[1])
+for manifest in sorted(root.glob("*.json")) if root.is_dir() else ():
+    walk(json.loads(manifest.read_text(encoding="utf-8")))
+print("\n".join(sorted(found)))
+PY
+)" || die "cannot resolve L3 physical-compatibility evidence paths"
+  if [[ -n "$evidence" ]]; then
+    local -a evidence_paths
+    mapfile -t evidence_paths <<<"$evidence"
+    git -C "$repo_root" -c core.autocrlf=false -c core.eol=lf \
+      archive --format=tar HEAD -- "${evidence_paths[@]}" | tar -x -C "$destination"
+  fi
 }
 
 prepare_release() {
