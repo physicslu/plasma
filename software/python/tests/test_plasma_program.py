@@ -223,28 +223,44 @@ def test_job_http_payload_uses_reference_not_firmware(monkeypatch):
 def test_existing_private_bootstrap_assets_read_only(monkeypatch):
     """New CLI reuses existing device-bound Bootstrap, not fake HTTPS."""
     import ppu_path2_hardware_baseline as enrolled
+    from .bootstrap_request_auth_fixture import AuthenticatedFakePPU
     calls = []
-    class Response:
-        status = 200
-        def read(self, _limit):
-            return json.dumps({"ok": True, "assets": {
-                "schema": "plasma.ppu.active-assets.v1",
-                "state": "ACTIVE", "ready": False,
-                "asset_set_sha256": "a" * 64}}).encode()
+    credential = "x" * 32
+
+    def assets(method, path, raw, headers):
+        assert (method, path) == ("GET", "/v1/assets")
+        return 200, json.dumps({"ok": True, "assets": {
+            "schema": "plasma.ppu.active-assets.v1",
+            "state": "ACTIVE", "ready": False,
+            "asset_set_sha256": "a" * 64}}).encode()
+
+    ppu = AuthenticatedFakePPU(assets, credential=credential,
+                               device_id="ppu-device-" + "0" * 24)
+
     class Connection:
         def __init__(self, host, port, timeout):
             assert (host, port) == (HOST, 18081)
         def request(self, method, path, body, headers):
             calls.append((method, path))
-            assert headers["Authorization"] == "Bearer " + "x" * 32
+            self.result = ppu(method, path, body, headers)
         def getresponse(self):
-            return Response()
+            status, raw, headers = self.result
+            class Response:
+                def read(self, _limit):
+                    return raw
+                def getheaders(self):
+                    return list(headers.items())
+            response = Response()
+            response.status = status
+            return response
         def close(self):
             pass
     monkeypatch.setattr(enrolled.http.client, "HTTPConnection", Connection)
-    client = program.open_bootstrap(HOST, "x" * 32)
+    client = program.open_bootstrap(HOST, credential)
     assert client.assets_status()["asset_set_sha256"] == "a" * 64
-    assert calls == [("GET", "/v1/assets")]
+    # Credential never sent: one PPU challenge, then one MACed read.
+    assert calls == [("GET", "/v1/auth/challenge"), ("GET", "/v1/assets")]
+    assert ppu.authenticated_requests == 1
 
 
 def test_runtime_deploy_refuses_untrusted_kit_before_device_io(monkeypatch):

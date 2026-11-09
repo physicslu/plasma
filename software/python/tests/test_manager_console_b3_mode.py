@@ -29,7 +29,7 @@ class FakeBootstrapClient:
     def __init__(self) -> None:
         self.sent: list[dict] = []
 
-    def start_deployment(self, token: str, body: dict):
+    def start_deployment(self, token: str, device_id, body: dict):
         self.sent.append(body)
         authorization = body["authorization"]
         return 202, {"ok": True, "deployment": {

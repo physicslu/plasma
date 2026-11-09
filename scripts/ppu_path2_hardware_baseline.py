@@ -151,8 +151,24 @@ class DirectSSHAuthenticatedBootstrap:
         self.host = _private_ipv4(host)
         self.module = module
         self._token = token
+        self._device = None
+        self._auth = module._request_auth_module()
         self._connection_factory = connection_factory or http.client.HTTPConnection
         self._physical_direct_baseline = True
+
+    def _send(self, method: str, path: str, raw: bytes | None, headers: Mapping[str, str]):
+        conn = self._connection_factory(self.host, 18081, timeout=15)
+        try:
+            conn.request(method, path, body=raw, headers=dict(headers))
+            response = conn.getresponse()
+            data = response.read(2 * 1024 * 1024 + 1)
+            status = response.status
+            response_headers = dict(response.getheaders())
+        finally:
+            conn.close()
+        if len(data) > 2 * 1024 * 1024:
+            raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_TOO_LARGE")
+        return status, data, response_headers
 
     def _call(self, method: str, path: str, body: Mapping[str, object] | None):
         if (method not in ("GET", "POST")
@@ -166,20 +182,14 @@ class DirectSSHAuthenticatedBootstrap:
                if body is not None else None)
         if raw is not None and len(raw) > 2 * 1024 * 1024:
             raise BaselineError("DIRECT_BOOTSTRAP_REQUEST_TOO_LARGE")
-        conn = self._connection_factory(self.host, 18081, timeout=15)
-        try:
-            conn.request(method, path, body=raw, headers={
-                "Authorization": "Bearer " + self._token,
-                "Accept": "application/json",
-                **({"Content-Type": "application/json"} if raw is not None else {}),
-            })
-            response = conn.getresponse()
-            data = response.read(2 * 1024 * 1024 + 1)
-            status = response.status
-        finally:
-            conn.close()
-        if len(data) > 2 * 1024 * 1024:
-            raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_TOO_LARGE")
+        # Mutual request authentication: the in-memory credential never
+        # crosses the wire; only a PPU-MACed response is accepted.
+        header, context = self.module.BootstrapAPIClient._sign(self, method, path, raw)
+        status, data, response_headers = self._send(method, path, raw, {
+            "Authorization": header,
+            "Accept": "application/json",
+            **({"Content-Type": "application/json"} if raw is not None else {}),
+        })
         if status < 200 or status >= 300:
             reason = ""
             if status == 409:
@@ -199,6 +209,13 @@ class DirectSSHAuthenticatedBootstrap:
             raise self.module.DeploymentAPIError(
                 f"API_HTTP_REJECTED:{status}" + (":" + reason if reason else "")
             )
+        proof = next((value for key, value in response_headers.items()
+                      if key.lower() == self._auth.RESPONSE_HEADER.lower()), None)
+        try:
+            self._auth.verify_response(credential=self._token, context=context,
+                                       status=status, body=data, header=proof)
+        except self._auth.RequestAuthError:
+            raise BaselineError("DIRECT_BOOTSTRAP_RESPONSE_UNAUTHENTICATED") from None
         try:
             response_data = json.loads(data.decode("utf-8"))
         except (ValueError, UnicodeError):

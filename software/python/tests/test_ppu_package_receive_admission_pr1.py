@@ -11,12 +11,14 @@ import pytest
 
 from .test_ppu_generic_package_host_only_gate1 import load, package, SAMPLES, TARGET
 from .ppu_owner_authorization_fixture import machine_id_file
+from .bootstrap_request_auth_fixture import AuthenticatedFakePPU, http_transport
 
 service = load("ppu_package_receive_service_pr1", "ppu-bootstrap-service.py")
 base = load("ppu_package_receive_base_pr1", "ppu-bootstrap.py")
 client = load("ppu_package_receive_client_pr1", "ppu_deploy_api.py")
 TOKEN = "t" * 48
-STATUS = {"identity": {"device_id": "ppu-device-" + "0" * 24}}
+DEVICE = "ppu-device-" + "0" * 24
+STATUS = {"identity": {"device_id": DEVICE}}
 
 
 @pytest.fixture
@@ -38,14 +40,7 @@ def loopback(tmp_path: Path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    def transport(method, path, data, headers):
-        connection = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
-        try:
-            connection.request(method, path, body=data, headers=headers)
-            response = connection.getresponse()
-            return response.status, response.read()
-        finally:
-            connection.close()
+    transport = http_transport(server.server_address[1])
 
     api = client.BootstrapAPIClient(
         "https://ppu.host-only.invalid:18081", TOKEN, transport=transport,
@@ -239,7 +234,7 @@ def test_client_rejects_admission_without_a_nonexecuting_plan():
         raise AssertionError(path)
 
     api = client.BootstrapAPIClient(
-        "https://ppu.host-only.invalid:18081", TOKEN, transport=fake_transport,
+        "https://ppu.host-only.invalid:18081", TOKEN, transport=AuthenticatedFakePPU(fake_transport, credential=TOKEN, device_id=DEVICE),
     )
     with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_RECEIPT_UNKNOWN"):
         api.submit(kind="bundle", upload_id=upload_id, archive_sha256="f" * 64)
@@ -269,7 +264,7 @@ def test_client_rejects_incorrect_kind_in_admission_receipt():
         return 200, json.dumps({"ok": True, "deployment": receipt}).encode()
 
     api = client.BootstrapAPIClient(
-        "https://ppu.host-only.invalid:18081", TOKEN, transport=fake_transport,
+        "https://ppu.host-only.invalid:18081", TOKEN, transport=AuthenticatedFakePPU(fake_transport, credential=TOKEN, device_id=DEVICE),
     )
     with pytest.raises(client.DeploymentOutcomeUnknown, match="API_ADMISSION_RECEIPT_UNKNOWN"):
         api.submit(kind="bundle", upload_id=upload_id, archive_sha256="f" * 64)

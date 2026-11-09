@@ -18,6 +18,7 @@ on:
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_owner_authorization.py"
+      - "scripts/ppu_bootstrap_request_auth.py"
       - "scripts/ppu_package_launcher.py"
       - "scripts/ppu_package_entry.py"
       - "scripts/ppu_package_unit_helper.py"
@@ -46,12 +47,15 @@ on:
       - "software/python/pyproject.toml"
       - "software/python/plasma_manager/bootstrap.py"
       - "software/python/plasma_manager/bootstrap_server.py"
+      - "software/python/plasma_manager/bootstrap_request_auth.py"
+      - "software/python/plasma_manager/verified_bootstrap.py"
       - "software/python/tests/test_manager_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
       - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
+      - "software/python/tests/test_ppu_bootstrap_request_auth.py"
       - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
       - "software/python/tests/test_ppu_user_bundle_v3.py"
@@ -86,6 +90,7 @@ on:
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_owner_authorization.py"
+      - "scripts/ppu_bootstrap_request_auth.py"
       - "scripts/ppu_package_launcher.py"
       - "scripts/ppu_package_entry.py"
       - "scripts/ppu_package_unit_helper.py"
@@ -114,12 +119,15 @@ on:
       - "software/python/pyproject.toml"
       - "software/python/plasma_manager/bootstrap.py"
       - "software/python/plasma_manager/bootstrap_server.py"
+      - "software/python/plasma_manager/bootstrap_request_auth.py"
+      - "software/python/plasma_manager/verified_bootstrap.py"
       - "software/python/tests/test_manager_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
       - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
+      - "software/python/tests/test_ppu_bootstrap_request_auth.py"
       - "software/python/tests/test_ppu_asset_execution_gate1.py"
       - "software/python/tests/test_ppu_fpga_static_qualification_gate1.py"
       - "software/python/tests/test_ppu_user_bundle_v3.py"
@@ -168,6 +176,7 @@ jobs:
           scripts/ppu_unified_deployment.py
           scripts/ppu_asset_set.py
           scripts/ppu_owner_authorization.py
+          scripts/ppu_bootstrap_request_auth.py
           scripts/ppu_asset_execution.py
           scripts/ppu_privileged_source.py
           scripts/ppu-privileged-source-install.py
@@ -200,6 +209,7 @@ jobs:
           software/python/tests/test_ppu_b3_z2_install_gate1.py
           software/python/tests/test_ppu_b3_fpga_load_gate1.py
           software/python/tests/test_ppu_owner_authorization_gate1.py
+          software/python/tests/test_ppu_bootstrap_request_auth.py
           software/python/tests/test_ppu_asset_execution_gate1.py
           software/python/tests/test_ppu_privileged_source_gate1.py
           software/python/tests/test_ppu_fpga_static_qualification_gate1.py
@@ -244,6 +254,7 @@ jobs:
             scripts/ppu-z2-installer-core.py \
             scripts/ppu_asset_set.py \
             scripts/ppu_owner_authorization.py \
+            scripts/ppu_bootstrap_request_auth.py \
             scripts/ppu_asset_execution.py \
             scripts/ppu_privileged_source.py \
             scripts/ppu-privileged-source-install.py \

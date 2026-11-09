@@ -91,6 +91,9 @@ class FakeUpstreamHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, {"ok": True, "role": role, "path": self.path})
             return
 
+        if self.command == "GET" and self.path == "/v1/auth/challenge":
+            self._json(HTTPStatus.OK, {"ok": True, "nonce": "0" * 32})
+            return
         if self.command == "GET" and self.path == "/v1/status":
             self._json(
                 HTTPStatus.OK,
@@ -360,6 +363,9 @@ def run_gate() -> dict[str, Any]:
                     expect_record("bootstrap", "GET", "/v1/status")
                     expect_status(base, "/__plasma/bootstrap/v1/status", 403, method="POST")
                     expect_status(base, "/__plasma/bootstrap/v1/uploads", 403)
+                    expect_status(base, "/__plasma/bootstrap/v1/auth/challenge", 200)
+                    expect_record("bootstrap", "GET", "/v1/auth/challenge")
+                    expect_status(base, "/__plasma/bootstrap/v1/auth/challenge", 403, method="POST")
 
                     expect_status(base, "/__plasma/bootstrap/v1/uploads", 201, method="POST")
                     expect_record("bootstrap", "POST", "/v1/uploads")

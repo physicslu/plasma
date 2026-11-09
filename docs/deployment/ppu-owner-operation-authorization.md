@@ -54,8 +54,8 @@ current journal/Active Set). A B2 receipt is never install authority, a B3
 receipt is never execute authority, and a stage-only authorization cannot be
 widened into activation or FPGA load.
 
-What the MAC is and is not: it adds **no** strength over the Bearer
-credential itself. It binds the user's explicit choice to one exact
+What the MAC is and is not: it adds **no** strength over the paired
+Bootstrap credential itself. It binds the user's explicit choice to one exact
 operation so a receipt or earlier authorization cannot be replayed for a
 different action, Bundle, device or transaction, and rotating the pairing
 credential invalidates every outstanding authorization. It is not a
@@ -86,8 +86,10 @@ under their independent contracts.
 - Manager (paired, device-bound credential) issues the authorization and
   forwards `{kind, upload_id, mode, fpga_load, authorization}`. Callers can
   never supply their own `authorization` field through the Manager.
-- PPU Bootstrap: 401 without the Bearer credential; 409 for any denied
-  binding. B1 upload and B2 admission never install or execute; FPGA load
+- PPU Bootstrap: 401 without a valid `plasma.ppu.bootstrap-request-auth.v1`
+  request proof (the credential itself is never sent; see
+  [Bootstrap request authentication](ppu-bootstrap-request-authentication.md));
+  409 for any denied binding. B1 upload and B2 admission never install or execute; FPGA load
   and Python/Native C execution each still require their own explicit request.
 
 ## Unchanged safety boundaries

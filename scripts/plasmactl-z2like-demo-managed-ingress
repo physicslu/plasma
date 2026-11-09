@@ -196,6 +196,10 @@ server {
         limit_except GET { deny all; }
         proxy_pass $qemu_bootstrap_root/v1/status;
     }
+    location = $bootstrap_prefix/v1/auth/challenge {
+        limit_except GET { deny all; }
+        proxy_pass $qemu_bootstrap_root/v1/auth/challenge;
+    }
     location = $bootstrap_prefix/v1/uploads {
         limit_except POST { deny all; }
         proxy_pass $qemu_bootstrap_root/v1/uploads;

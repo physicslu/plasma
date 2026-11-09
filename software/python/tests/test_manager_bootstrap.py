@@ -14,6 +14,7 @@ from plasma_manager.bootstrap import (
 )
 from plasma_manager.config import PPURegistryEntry
 from plasma_manager.registry import PPURegistryStore
+from plasma_manager.verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
 DEVICE_ID = "ppu-device-0123456789abcdef"
 TOKEN = "t" * 40
@@ -38,7 +39,7 @@ def test_credentials_are_separate_0600_state_and_never_exposed(tmp_path: Path):
     store = BootstrapCredentialStore(path)
     store.set("z2", DEVICE_ID, TOKEN)
     assert path.stat().st_mode & 0o777 == 0o600
-    assert store.token_for("z2", DEVICE_ID) == TOKEN
+    assert store.credential_for("z2") == (DEVICE_ID, TOKEN)
     state = store.public_state("z2")
     assert state["paired"] is True
     assert state["device_id"] == DEVICE_ID
@@ -50,8 +51,18 @@ def test_credentials_are_separate_0600_state_and_never_exposed(tmp_path: Path):
 def test_device_bound_credential_rejects_alias_reuse_for_another_appliance(tmp_path: Path):
     store = BootstrapCredentialStore(tmp_path / "bootstrap-credentials.json")
     store.set("z2", DEVICE_ID, TOKEN)
+
+    class OtherAppliance(FakeBootstrapClient):
+        def status(self, credential=None, device_id=None):
+            _status, payload = super().status(credential, device_id)
+            payload["identity"] = {"device_id": "ppu-device-fedcba9876543210"}
+            return 200, payload
+
+    coordinator = ManagerBootstrapCoordinator(
+        _registry(tmp_path), store, 2.0, client_factory=OtherAppliance)
     with pytest.raises(BootstrapCredentialError, match="different Bootstrap device_id"):
-        store.token_for("z2", "ppu-device-fedcba9876543210")
+        coordinator.create_upload("z2", {"size": 1, "sha256": "0" * 64})
+    assert not any(call[0] == "create_upload" for call in OtherAppliance.instances[-1].calls)
 
 
 def test_insecure_credential_permissions_fail_closed(tmp_path: Path):
@@ -74,8 +85,8 @@ class FakeBootstrapClient:
         self.calls = []
         self.__class__.instances.append(self)
 
-    def status(self):
-        self.calls.append(("status", None, None))
+    def status(self, credential=None, device_id=None):
+        self.calls.append(("status", credential, device_id))
         return 200, {
             "bootstrap": {"state": "bootstrap_ready"},
             "identity": {"device_id": DEVICE_ID},
@@ -83,26 +94,26 @@ class FakeBootstrapClient:
             "capabilities": {"runtime_deployment": True, "fpga_update": False},
         }
 
-    def create_upload(self, token, body):
+    def create_upload(self, token, device_id, body):
         self.calls.append(("create_upload", token, dict(body)))
         return 201, {"ok": True, "upload": {"upload_id": "a" * 32}}
 
-    def append_chunk(self, token, upload_id, body):
+    def append_chunk(self, token, device_id, upload_id, body):
         self.calls.append(("append_chunk", token, {"upload_id": upload_id, **dict(body)}))
         return 200, {"ok": True}
 
-    def commit_upload(self, token, upload_id):
+    def commit_upload(self, token, device_id, upload_id):
         self.calls.append(("commit_upload", token, {"upload_id": upload_id}))
         return 200, {"ok": True}
 
-    def start_deployment(self, token, body):
+    def start_deployment(self, token, device_id, body):
         self.calls.append(("start_deployment", token, dict(body)))
         return 202, {"ok": True, "deployment": {"state": "queued"}}
 
 
 def test_manager_owns_bootstrap_target_and_secret_after_pairing(tmp_path: Path):
     FakeBootstrapClient.instances.clear()
-    coordinator = ManagerBootstrapCoordinator(
+    coordinator = VerifiedManagerBootstrapCoordinator(
         _registry(tmp_path), BootstrapCredentialStore(tmp_path / "credentials.json"), 2.0,
         client_factory=FakeBootstrapClient,
     )
@@ -128,4 +139,5 @@ def test_unpaired_mutation_fails_before_authenticated_ppu_request(tmp_path: Path
     )
     with pytest.raises(BootstrapCredentialError, match="not paired"):
         coordinator.create_upload("z2", {"size": 1, "sha256": "0" * 64})
-    assert FakeBootstrapClient.instances[-1].calls == [("status", None, None)]
+    # Fails from local credential state before any PPU request is made.
+    assert FakeBootstrapClient.instances == []

@@ -116,7 +116,7 @@ The **only target normal-install endpoint** is the existing Z2 PPU Bootstrap `PO
 
 | Entry or subsystem | Current factual behavior | Gate 1 contract / intended endpoint |
 | --- | --- | --- |
-| Console/Manager Bootstrap HTTP | One authenticated PS Runtime install API using the existing device-local Bootstrap Bearer token and bounded upload/transaction | **KEEP** `POST /v1/deployments` as the only product installation API. Existing token proves controlled commissioning authority, **not** registered Master generation, publisher authenticity or production-grade transport confidentiality. |
+| Console/Manager Bootstrap HTTP | One authenticated PS Runtime install API using the existing device-local Bootstrap credential (mutual request authentication; never sent on the wire) and bounded upload/transaction | **KEEP** `POST /v1/deployments` as the only product installation API. Existing token proves controlled commissioning authority, **not** registered Master generation, publisher authenticity or production-grade transport confidentiality. |
 | `plasmactl z2-ps` | Root CLI; install/deploy already routes through Bootstrap deployment coordinator and its journal | **REUSE** existing Coordinator; eventually expose as client of same API for routine upgrades. Keep local factory/root recovery separate. |
 | SWPC `scripts/ppu-deploy` | Independently SSH-executes bounded Z2-side Python installer; separate SWPC/Z2 state, version, compensation and rollback for `wordport`, `openocd-integration`, `abtest` | **MIGRATE** all three to the same Bootstrap API and same Coordinator lock/journal. Current SSH path remains untouched until end-to-end feature parity and physical authority are proven. Do **not** claim it is already migrated. |
 | `ppu_deploy_target.py` | Current engineering installer with pinning, root check, allowed paths and owner scan | **RETIRE LATER**, after reviewed replacement has exact file allowlist, atomic verified transaction, active-device exclusion and rollback, never by deleting its functioning security checks first. |
@@ -220,8 +220,9 @@ action plan. The service never trusts caller-provided target identity, module
 selection, shell commands or publisher claims. Manifest `source_commit`
 is **unverified self-description**, not a source/publisher attestation.
 A matching SHA256 proves integrity against the uploaded digest, not provenance.
-The existing commissioning Bearer API is retained; production TLS and
-publisher authentication remain NOT_QUALIFIED.
+The commissioning API now uses mutual request authentication (no credential on
+the wire); production TLS confidentiality and publisher authentication remain
+NOT_QUALIFIED.
 
 The generic admission branch does not invoke the runtime Installer,
 Coordinator worker, Root Entry, FPGA Manager or DUT; runtime deployment behavior

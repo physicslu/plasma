@@ -22,6 +22,7 @@ from .test_ppu_bundle_v3_packages_contract import bundle_v3
 from .test_ppu_bundle_v3_smoke_execution_gate1 import build_smoke
 from .test_ppu_fpga_static_qualification_gate1 import _b3_server, _commit, bootstrap
 from .test_ppu_package_receive_admission_pr1 import TOKEN, loopback  # noqa: F401
+from .bootstrap_request_auth_fixture import signed_call
 
 ROOT = Path(__file__).resolve().parents[3]
 # Load the Manager issuer by path: the factory Bootstrap CI job installs only
@@ -123,10 +124,13 @@ def test_retired_allowlist_contract_is_gone():
 # --- Real HTTP B1/B2 -----------------------------------------------------------
 
 def _raw_post(api, body, *, token=TOKEN):
-    headers = {"Content-Type": "application/json"}
-    if token is not None:
-        headers["Authorization"] = "Bearer " + token
-    status, raw = api._transport("POST", "/v1/deployments", json.dumps(body).encode(), headers)
+    raw_body = json.dumps(body).encode()
+    if token is None:
+        status, raw, _headers = api._transport(
+            "POST", "/v1/deployments", raw_body, {"Content-Type": "application/json"})
+    else:
+        status, raw = signed_call(api._transport, "POST", "/v1/deployments", raw_body,
+                                  credential=token)
     return status, raw.decode()
 
 
