@@ -364,3 +364,61 @@ def test_swpc_first_install_is_fail_closed_and_cleans_only_a_prechecked_clean_bo
     assert "first install found unmanaged/pre-existing appliance artifact without install evidence" in source
     assert "first install failed; removing only artifacts created inside the clean SWPC Z2-like boundary" in source
     assert "require_clean_first_install_boundary" in source
+
+
+def test_local_control_station_manager_is_bootstrap_capable_with_release_catalog() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    units = source.split("write_units()", 1)[1].split("write_evidence()", 1)[0]
+    assert "-m plasma_manager.bootstrap_server --config $manager_config" in units
+    assert "-m plasma_manager.server --config" not in units
+    assert "Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$current_link/$release_catalog_dir/$catalog_manifest_relative" in units
+    assert "Environment=PLASMA_IC_SUPPORT_ROOT=$current_link/$release_catalog_dir/data/ic-support" in units
+    assert "Environment=PLASMA_RUNTIME_EVIDENCE_ROOT=$current_link/$release_catalog_dir" in units
+    assert 'catalog_manifest_relative="data/device-catalog/production/icpn-v1-manifest.json"' in source
+    # Committed bytes only, exported from the clean HEAD being activated.
+    assert "archive --format=tar HEAD -- data release" in source
+    assert "-c core.autocrlf=false -c core.eol=lf" in source
+
+
+def test_local_control_station_release_build_self_tests_manager_selector() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    prepare = source.split("prepare_release() {", 1)[1].split("write_profile_config()", 1)[0]
+    assert 'export_release_catalog "$staging/$release_catalog_dir"' in prepare
+    assert 'validate_release_selector "$staging" || die' in prepare
+    # A reused release without a working Selector Catalog is refused.
+    assert 'validate_release_selector "$release" ||' in prepare
+    selector = source.split("validate_release_selector() {", 1)[1].split("export_release_catalog()", 1)[0]
+    assert '"$release/venv/bin/python" -I -B' in selector
+    assert "import plasma_manager.bootstrap_server" in selector
+    assert "legacy_device_selector.search_response" in selector
+    assert "status != 200" in selector
+
+
+def test_local_control_station_manager_registry_is_durable_profile_state() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    assert 'registry_state="$state_dir/registry.json"' in source
+    config = source.split("write_manager_config()", 1)[1].split("write_units()", 1)[0]
+    assert 'f"  registry_state_path: {q(registry_state)}\\n"' in config
+    rollback = source.split("rollback() {", 1)[1].split("trap rollback ERR", 1)[0]
+    assert "registry.json" not in rollback
+    assert "bootstrap-credentials" not in rollback
+    assert "registry_state" not in rollback
+
+
+def test_local_control_station_verify_requires_manager_selector_and_bootstrap_unit() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    verify = source.split("verify_profile() {", 1)[1].split("status_profile()", 1)[0]
+    assert 'plasma_manager.bootstrap_server --config $manager_config" "$manager_unit"' in verify
+    assert "registry_state_path" in verify
+    assert '/api/devices/search?$selector_probe_query" "Manager Device Selector"' in verify
+    assert "Manager Device Selector is unavailable" in verify
+    assert verify.index("Manager liveness failed") < verify.index("Manager Device Selector is unavailable")
+
+
+def test_local_control_station_accepts_clean_linked_worktree_source() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    clean = source.split("require_clean_source() {", 1)[1].split("current_sha()", 1)[0]
+    assert '[[ -e "$repo_root/.git" ]]' in clean
+    assert '[[ -d "$repo_root/.git" ]]' not in clean
+    assert "rev-parse --show-toplevel" in clean
+    assert "--untracked-files=normal" in clean

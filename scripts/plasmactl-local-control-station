@@ -19,6 +19,13 @@ unit_dir="$config_home/systemd/user"
 manager_unit="$unit_dir/plasma-local-manager.service"
 console_unit="$unit_dir/plasma-control-station.service"
 unit_marker="# Managed by Plasma local-control-station profile"
+registry_state="$state_dir/registry.json"
+# Manager-owned Device Selector Catalog (OPF S5 / PR-C2). A non-editable venv
+# cannot locate repository data, so each immutable release ships the committed
+# data/release trees and the Manager unit points at them explicitly.
+release_catalog_dir="catalog"
+catalog_manifest_relative="data/device-catalog/production/icpn-v1-manifest.json"
+selector_probe_query="q=STM32F103&limit=1"
 prepared_release=""
 
 # Environment overrides win over persisted profile configuration.
@@ -138,7 +145,10 @@ resolve_base_python() {
 }
 
 require_clean_source() {
-  [[ -d "$repo_root/.git" ]] || die "repository metadata is missing: $repo_root"
+  # A linked git worktree has a .git file rather than a directory.
+  [[ -e "$repo_root/.git" ]] || die "repository metadata is missing: $repo_root"
+  [[ "$(git -C "$repo_root" rev-parse --show-toplevel 2>/dev/null)" == "$repo_root" ]] || \
+    die "repository root is not a git work tree: $repo_root"
   [[ -d "$python_project" && -d "$web_dir" ]] || die "repository layout is incomplete: $repo_root"
   local changes
   changes="$(git -C "$repo_root" status --porcelain --untracked-files=normal)"
@@ -173,11 +183,46 @@ if payload.get("schema_version") != 1 or payload.get("git_sha") != expected:
 PY
 }
 
+# Build-time gate: the release's own venv must serve the Manager Device
+# Selector from the release's own Catalog bytes, with no repository fallback.
+validate_release_selector() {
+  local release="$1" catalog
+  catalog="$release/$release_catalog_dir"
+  [[ -f "$catalog/$catalog_manifest_relative" && -d "$catalog/data/ic-support" ]] || return 1
+  [[ -f "$release/venv/bin/python" ]] || return 1
+  (
+    cd "$catalog"
+    env PLASMA_DEVICE_CATALOG_MANIFEST="$catalog/$catalog_manifest_relative" \
+      PLASMA_IC_SUPPORT_ROOT="$catalog/data/ic-support" \
+      PLASMA_RUNTIME_EVIDENCE_ROOT="$catalog" \
+      "$release/venv/bin/python" -I -B - "$selector_probe_query" <<'PY'
+import sys
+
+import plasma_manager.bootstrap_server  # noqa: F401  Bootstrap routes must be importable
+from plasma_web import legacy_device_selector
+
+status, payload = legacy_device_selector.search_response(sys.argv[1])
+if status != 200 or payload.get("ok") is not True or not payload.get("catalog_size"):
+    raise SystemExit(f"Manager Device Selector self-test failed: HTTP {status}")
+PY
+  ) >/dev/null
+}
+
+export_release_catalog() {
+  local destination="$1"
+  mkdir -p "$destination"
+  # Committed bytes only (Catalog loaders verify SHA-256 / Git blob identity).
+  git -C "$repo_root" -c core.autocrlf=false -c core.eol=lf \
+    archive --format=tar HEAD -- data release | tar -x -C "$destination"
+}
+
 prepare_release() {
   local sha="$1" release staging npm_bin node_bin
   release="$(release_dir_for_sha "$sha")"
   if [[ -e "$release" ]]; then
     validate_release "$release" "$sha" || die "existing release is incomplete or belongs to another revision: $release"
+    validate_release_selector "$release" || \
+      die "existing release lacks a working Manager Device Selector Catalog: $release"
     prepared_release="$release"
     return 0
   fi
@@ -209,6 +254,8 @@ prepare_release() {
   mkdir -p "$staging/web"
   cp -a "$web_dir/dist/standalone/." "$staging/web/"
   [[ -f "$staging/web/server.js" ]] || die "Control Station standalone build did not produce server.js"
+  export_release_catalog "$staging/$release_catalog_dir"
+  validate_release_selector "$staging" || die "Manager Device Selector self-test failed for release ${sha:0:12}"
   "$base_python" - "$staging/release.json" "$sha" <<'PY'
 import json
 import sys
@@ -237,13 +284,16 @@ write_profile_config() {
 write_manager_config() {
   mkdir -p "$config_dir" "$state_dir"
   "$base_python" - "$manager_config" "$manager_host" "$manager_port" \
-    "$state_dir/manager-observations.sqlite3" "$ppu_alias" "$ppu_endpoint" <<'PY'
+    "$state_dir/manager-observations.sqlite3" "$registry_state" "$ppu_alias" "$ppu_endpoint" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-path, host, port, observation_db, alias, endpoint = sys.argv[1:]
+path, host, port, observation_db, registry_state, alias, endpoint = sys.argv[1:]
 q = json.dumps
+# registry_state_path makes the Manager runtime registry durable/mutable
+# (Validate & Enable, Bootstrap pairing). The ppus list below only seeds the
+# FIRST start; once registry.json exists it is the Manager-owned inventory.
 text = (
     "manager:\n"
     f"  host: {q(host)}\n"
@@ -251,6 +301,7 @@ text = (
     "  request_timeout_s: 10.0\n"
     "  poll_interval_s: 2.0\n"
     f"  observation_db_path: {q(observation_db)}\n"
+    f"  registry_state_path: {q(registry_state)}\n"
     "ppus:\n"
     f"  - alias: {q(alias)}\n"
     f"    endpoint: {q(endpoint)}\n"
@@ -275,7 +326,10 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$state_dir
 Environment=PYTHONUNBUFFERED=1
-ExecStart=$current_link/venv/bin/python -m plasma_manager.server --config $manager_config
+Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$current_link/$release_catalog_dir/$catalog_manifest_relative
+Environment=PLASMA_IC_SUPPORT_ROOT=$current_link/$release_catalog_dir/data/ic-support
+Environment=PLASMA_RUNTIME_EVIDENCE_ROOT=$current_link/$release_catalog_dir
+ExecStart=$current_link/venv/bin/python -m plasma_manager.bootstrap_server --config $manager_config
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
@@ -412,7 +466,15 @@ verify_profile() {
   grep -Fq 'Environment=PLASMA_CONTROL_STATION_MODE=managed' "$console_unit" || die "Console unit is not in managed mode"
   grep -Fq "Environment=PLASMA_MANAGER_API_URL=http://$manager_host:$manager_port" "$console_unit" || die "Console unit has the wrong Manager API URL"
   grep -Fq "Environment=PLASMA_MANAGER_PPU_ALIAS=$ppu_alias" "$console_unit" || die "Console unit has the wrong fixed PPU alias"
+  grep -Fq "plasma_manager.bootstrap_server --config $manager_config" "$manager_unit" || \
+    die "Manager unit does not run the Bootstrap-capable Manager"
+  grep -Fq "Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$current_link/$release_catalog_dir/" "$manager_unit" || \
+    die "Manager unit does not point at the release Device Selector Catalog"
+  grep -Fxq "  registry_state_path: \"$registry_state\"" "$manager_config" || \
+    die "Manager configuration lacks the profile runtime registry state path"
   wait_for_http "http://$manager_host:$manager_port/api/health/live" "Manager" || die "Manager liveness failed"
+  wait_for_http "http://$manager_host:$manager_port/api/devices/search?$selector_probe_query" "Manager Device Selector" || \
+    die "Manager Device Selector is unavailable (expected HTTP 200 from the Manager-owned Catalog)"
   wait_for_http "http://$console_host:$console_port/" "Control Station Console" || die "Control Station Console health failed"
   say "PASS: local Control Station Console + Manager are healthy on loopback"
   say "qualification boundary: Control Station runtime only; PPU/PS/PL/Site/IC readiness is separate"
