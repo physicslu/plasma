@@ -1,0 +1,17 @@
+# Owner Console UI screen (H2), run result, transcribed as pasted by the owner 2026-11-09
+# (first characters of the outcome heading were cut off in the owner's copy: "ASS" = "PASS")
+ASS
+PREFLIGHT: PASS
+ACTIVE_SET: ALREADY_ACTIVE
+FLASH_CYCLE_SUBMIT: ACCEPTED
+VERIFY_RECEIPT: PASS
+Job job-20261109-044035-b8cbd4da · success · 100%
+
+Readback SHA256
+8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d
+Verified Bytes
+18768 / 18768
+SAFE_OFF
+VERIFIED
+Job
+job-20261109-044035-b8cbd4da

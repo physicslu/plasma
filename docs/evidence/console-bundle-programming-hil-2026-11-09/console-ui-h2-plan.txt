@@ -1,0 +1,16 @@
+# Owner Console UI screen (H2), Prepare result, transcribed as pasted by the owner 2026-11-09
+PPU / Site
+z2 / Site 2
+IC
+STM32F103C8T6
+Route
+z2-site2-stm32f103c8t6 (openocd-platform-reference → stm32f103c8t6-site2)
+Image
+plasma-blue-pill-cdc.bin · 18768 B · 8d3ffb02b80f…
+Bundle
+4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467
+Active Set
+ACTIVE 4d2837d483be…
+Activation
+Not required: already the Active Set
+I confirm programming STM32F103C8T6 on z2 Site 2 with this exact image.Start Programming
