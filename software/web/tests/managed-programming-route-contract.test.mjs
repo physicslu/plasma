@@ -4,7 +4,7 @@ import test from "node:test";
 
 const workspace = await readFile(new URL("../app/workspace-session.tsx", import.meta.url), "utf8");
 const plasmaApi = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
-const securityTransport = await readFile(new URL("../app/security-transport.ts", import.meta.url), "utf8");
+const gatewayTransport = await readFile(new URL("../app/gateway-transport.ts", import.meta.url), "utf8");
 const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
 const managedRoute = await readFile(new URL("../app/api/manager/ppu/[...path]/route.ts", import.meta.url), "utf8");
 const managedConfig = await readFile(new URL("../app/api/manager/ppu/route.ts", import.meta.url), "utf8");
@@ -21,23 +21,23 @@ test("Control Station bootstrap makes BFF managed discovery authoritative over l
 });
 
 test("Gateway transport isolates bootstrap reads until WorkspaceSession resolves routing", () => {
-  assert.match(securityTransport, /let gatewayRoutingResolved = false/);
-  assert.match(securityTransport, /const gatewayRoutingReady = new Promise/);
-  assert.match(securityTransport, /let directPath = directGatewayPathname\(url\.pathname\)/);
-  assert.match(securityTransport, /if \(!gatewayRoutingResolved && directPath !== null\)/);
-  assert.match(securityTransport, /if \(isStateChanging\(unresolvedMethod\)\) return routingUnresolvedResponse\(\)/);
-  assert.match(securityTransport, /await gatewayRoutingReady/);
-  assert.match(securityTransport, /const rebasedUrl = `\$\{resolvedGatewayApiBase\}\$\{directPath\}\$\{search\}`/);
+  assert.match(gatewayTransport, /let gatewayRoutingResolved = false/);
+  assert.match(gatewayTransport, /const gatewayRoutingReady = new Promise/);
+  assert.match(gatewayTransport, /const directPath = directGatewayPathname\(url\.pathname\)/);
+  assert.match(gatewayTransport, /if \(!gatewayRoutingResolved\) \{/);
+  assert.match(gatewayTransport, /if \(isStateChanging\(requestMethod\(currentInput, init\)\)\) return routingUnresolvedResponse\(\)/);
+  assert.match(gatewayTransport, /await gatewayRoutingReady/);
+  assert.match(gatewayTransport, /const rebasedUrl = `\$\{resolvedGatewayApiBase\}\$\{directPath\}\$\{search\}`/);
   assert.match(workspace, /markGatewayRoutingResolved\(saved, nextMode\);\s*setHydrated\(true\)/);
   assert.match(workspace, /fetch\("\/api\/manager\/ppu"/);
 });
 
 test("Managed routing remains authoritative after bootstrap and rebases stale direct Gateway paths", () => {
-  assert.match(securityTransport, /type GatewayRoutingMode = "managed" \| "standalone"/);
-  assert.match(securityTransport, /gatewayRoutingMode === "managed"/);
-  assert.match(securityTransport, /resolvedGatewayApiBase/);
-  assert.match(securityTransport, /currentInput = rebaseInput\(currentInput, directPath, url\.search\)/);
-  assert.match(securityTransport, /url\.origin === new URL\(resolvedGatewayApiBase\)\.origin/);
+  assert.match(gatewayTransport, /type GatewayRoutingMode = "managed" \| "standalone"/);
+  assert.match(gatewayTransport, /gatewayRoutingMode === "managed"/);
+  assert.match(gatewayTransport, /resolvedGatewayApiBase/);
+  assert.match(gatewayTransport, /currentInput = rebaseInput\(currentInput, directPath, url\.search\)/);
+  assert.doesNotMatch(gatewayTransport, /bearerToken|"Authorization"/);
 });
 
 test("Managed Control Station stays fail-closed and cannot switch to a direct Gateway", () => {
@@ -109,9 +109,9 @@ test("managed non-JSON upstream errors remain HTTP failures instead of transport
   assert.match(communicationHealth, /error instanceof PlasmaApiError && error\.status !== undefined \? "online" : "unreachable"/);
 });
 
-test("security transport recognizes managed PPU paths and keeps idempotency protection", () => {
-  assert.match(securityTransport, /MANAGED_PPU_PREFIX = "\/api\/manager\/ppu"/);
-  assert.match(securityTransport, /pathname\.startsWith\(`\$\{MANAGED_PPU_PREFIX\}\/`\)/);
-  assert.match(securityTransport, /headers\.set\("Authorization", `Bearer \$\{bearerToken\}`\)/);
-  assert.match(securityTransport, /headers\.set\("Idempotency-Key", commandIdFor\(identity\)\)/);
+test("gateway transport recognizes managed PPU paths and carries no browser credential", () => {
+  assert.match(gatewayTransport, /MANAGED_PPU_PREFIX = "\/api\/manager\/ppu"/);
+  assert.match(gatewayTransport, /pathname\.startsWith\(`\$\{MANAGED_PPU_PREFIX\}\/`\)/);
+  // LOM-P2A-2: write authority is the Manager-held controller credential (G13).
+  assert.doesNotMatch(gatewayTransport, /bearerToken|"Authorization"|Idempotency-Key/);
 });

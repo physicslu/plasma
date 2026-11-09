@@ -182,7 +182,6 @@
 - **Current** — [Persistent Integration Host Qualification](architecture/persistent-integration-host-qualification.md)：定義 L4 main-only post-merge qualification、self-hosted/rootful-Docker threat model、fail-closed preflight、runner enrollment boundary，以及為何目前不能把長期 runner 當成 arbitrary-PR execution worker。
 - **Current** — [Persistent Integration Runner Enrollment](development/persistent-integration-runner-enrollment.md)：定義 L4 host readiness、GitHub runner enrollment/restriction、首次 qualification、staleness、upgrade、revoke 與 recovery lifecycle；不把 registration token 或 host provisioning 寫入 repository automation。
 - **Current** — [Integration Host Deployment Guide](development/swpc-deployment.md)
-- **Current** — [Secure Gateway Deployment](development/secure-gateway-deployment.md)
 - **Current** — [Fleet Demo Deployment](development/fleet-demo.md)
 - **Current** — [Mock Continuous Delivery](development/mock-cd.md)
 - **Current** · `engineering SSH route` · `PR #1207` — [通用 PPU 工程模組部署 `ppu-deploy`](development/ppu-deploy-engineering-modules.md)：工程部署路線（Route B），不是產品安裝路徑；Z2 PS WordPort／OpenOCD Python 整合與 SWPC A/B Runner 由同一來源版本協調部署，包含 SHA、互斥、啟用驗證與回滾；目前只有 Host-only 測試，不代表 GitHub PR 已合併或 Z2／SWPC 已部署。

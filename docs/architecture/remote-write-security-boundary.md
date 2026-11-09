@@ -1,6 +1,6 @@
 # Remote Write Security Boundary
 
-Status: backend security boundary, opt-in deployment/browser integration, and initial entry Principal identity/profile flow implemented; canonical Gateway deployment remains the default until secure mode is explicitly enabled
+Status: **RETIRED implementation (2026-11-09).** The opt-in Bearer-principal Gateway described below (`secure_gateway*.py`, `gateway_security.py`, `scripts/plasma-security-deploy`, the browser Bearer transport and `/demo` profile entry) was deleted after a read-only SWPC check found no deployment using it. PPU write authority is now the enrolled controller credential (LOM-P2A-2 G13, [enrollment spec](../development/opf-local-owner-mode-p2a0-enrollment-spec.md) §6.1). The invariants below remain design history; they are not implemented by the current code.
 
 ## Security invariant
 

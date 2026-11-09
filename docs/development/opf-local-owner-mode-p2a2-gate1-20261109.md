@@ -43,7 +43,7 @@ Electrical: a normally-open button between J7-6 and J7-2/3 is safe **only while 
 * Requests before the press: at most one key per 120 s window. A second distinct key destroys all requests and the window stays `CONTENDED` until it ends; the press then arms nothing. No station is ever chosen between competitors.
 * After the press: the window is bound to `request_id` and an ephemeral PPU key; the claim MAC and the credential wrap need the X25519 secret that only the requester holds. Other claims fail and five failures destroy the window.
 * While armed: new requests fail `ENROLLMENT_BUSY`; engineering arm fails `ENROLLMENT_BUSY`.
-* **Residual (owner decision required):** an *active* man-in-the-middle on the management link at the moment of the press can substitute keys (no PPU display for comparison). Passive observers learn nothing. The Engineering CLI and SD entries are not affected. This is not claimed as solved; it matches the already NOT_QUALIFIED confidentiality of this link. Options for a later gate: LED short-authentication pattern on a PL LED, press-count code, or accept for an isolated management link.
+* **Residual — development-only acceptance, unresolved for production:** an *active* man-in-the-middle on the management link at the moment of the press can substitute keys (no PPU display for comparison). Passive observers learn nothing. The Engineering CLI and SD entries are not affected. This is not claimed as solved; it matches the already NOT_QUALIFIED confidentiality of this link. Options for a later gate: LED short-authentication pattern on a PL LED or a press-count code. **Owner decision (2026-11-09):** accepted **for development only, on an isolated management network**. It is **not resolved for the production product**: production use of the button entry requires an explicit mitigation (for example an LED short-authentication pattern or a press-count confirmation) and a new decision before it may be claimed safe. No runtime gate was added.
 
 ## 3. G13 — Gateway `:18080` mutating endpoint inventory
 
@@ -86,7 +86,7 @@ Recovery actions (explicit `explicit_request: true` each time): `site.diagnose` 
 | `ppu_package_action.py` `TOKEN_FILE` / `PLASMA_BOOTSTRAP_TOKEN` | `CONTROLLER_RECORD` / `PLASMA_BOOTSTRAP_CONTROLLER` | Same credential, now revocable |
 | Path 2 remote read of `control-token`; QEMU `provision-token` / `cat control-token` | controller record; Engineering CLI ticket | Lab/engineering paths only |
 
-Not deleted (owner decision needed): the opt-in Bearer-principal Gateway (`secure_gateway.py`, `secure_gateway_app.py`, `gateway_security.py`, `scripts/plasma-security-deploy`) — a separate SWPC user-level launcher, not used by the PPU unit, but a second Gateway authorization model; the legacy-token migration code — required until every deployed PPU has migrated.
+Deleted in the follow-up (owner decision 2026-11-09, after a read-only SWPC check found no user: no `plasma-web` security drop-in, the user-level unit disabled, the live `:18080` Gateway being the Phase 3 PPU runtime, and the security state last written 2026-08-27 by a test): the opt-in Bearer-principal Gateway (`secure_gateway.py`, `secure_gateway_app.py`, `gateway_security.py`, `scripts/plasma-security-deploy`), the browser Bearer transport and `/demo` profile entry, `GET /api/security/me` relays and `E4103`/`E4104`. Not deleted: the legacy-token migration code — required until every deployed PPU has migrated.
 
 ## 6. Compatibility and rollback
 
@@ -115,7 +115,7 @@ See the PR description for the final Production / Test / Documentation Added / D
 ## 9. Open items and Gate 2 readiness
 
 * NOT_RUN: everything on hardware — GPIO wiring and live line ownership, long press on the real button, real enrollment, SD boot consumption on the Z2 (the factory installer now renders and enables `plasma-enroll-boot.service`, oneshot `Before=plasma-bootstrap.service`, `ConditionPathIsMountPoint=/boot`; the PYNQ boot-partition mount point is unverified), admission socket under the real systemd hardening, synchronized deployment, rollback drill.
-* Owner decisions: active-MITM residual of the button entry (§2.1); disposition of the Bearer-principal Gateway (§5).
+* Owner decisions recorded 2026-11-09: button active-MITM residual accepted for development on an isolated network only, **open for production** (§2.1); Bearer-principal Gateway deleted (§5).
 * Gate 2 readiness: Draft PR with green Host-only CI; merge needs Gate 2; deployment and hardware steps need separate approval.
 
 ## 10. Z2 GPIO verification steps (for a separately approved hardware session)

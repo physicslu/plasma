@@ -88,7 +88,6 @@ _MANAGED_GET_PATTERNS = tuple(
         r"^/api/settings/ppu-network$",
         r"^/api/settings/sites$",
         r"^/api/mock/runtime$",
-        r"^/api/security/me$",
         r"^/api/engineering/targets$",
         rf"^/api/jobs/{_SEGMENT}/files/{_SEGMENT}$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/status$",

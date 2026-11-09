@@ -32,13 +32,13 @@ test("WorkspaceSession remains the authoritative browser routing owner", async (
 });
 
 test("Managed transport rebases canonical Gateway paths after routing resolves", async () => {
-  const transport = await source("../app/security-transport.ts");
+  const transport = await source("../app/gateway-transport.ts");
 
   assert.match(transport, /type GatewayRoutingMode = "managed" \| "standalone"/);
   assert.match(transport, /gatewayRoutingMode === "managed"/);
   assert.match(transport, /directGatewayPathname\(url\.pathname\)/);
   assert.match(transport, /rebaseInput\(currentInput, directPath, url\.search\)/);
-  assert.match(transport, /url\.origin === new URL\(resolvedGatewayApiBase\)\.origin/);
+  assert.doesNotMatch(transport, /bearerToken|"Authorization"/);
   assert.match(transport, /const trimmed = apiBase\.trim\(\)/);
   assert.match(transport, /: window\.location\.origin/);
   assert.doesNotMatch(transport, /savedGatewayApiBase/);

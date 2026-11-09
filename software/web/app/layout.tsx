@@ -3,10 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./details.css";
 import "./global-nav.css";
-import "./security-transport.css";
 import { GlobalNav } from "./global-nav";
 import { I18nProvider } from "./i18n";
-import { SecurityTransportProvider } from "./security-transport-provider";
+import { GatewayTransportProvider } from "./gateway-transport-provider";
 import { WorkspaceSessionProvider } from "./workspace-session";
 
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });
@@ -44,10 +43,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={`${sans.variable} ${mono.variable}`}>
         <I18nProvider>
           <WorkspaceSessionProvider>
-            <SecurityTransportProvider>
+            <GatewayTransportProvider>
               <GlobalNav />
               {children}
-            </SecurityTransportProvider>
+            </GatewayTransportProvider>
           </WorkspaceSessionProvider>
         </I18nProvider>
       </body>

@@ -47,7 +47,6 @@ on:
       - "software/python/tests/test_ppu_network_phase2_bootstrap.py"
       - "software/python/tests/test_ppu_network_activation.py"
       - "software/python/tests/test_ppu_network_activation_rest.py"
-      - "software/python/tests/test_ppu_network_activation_security.py"
       - "software/python/tests/test_virtual_ppu_network_lab.py"
       - "software/python/tests/test_static_ipv4_fault_injection_lab.py"
       - "software/python/tests/test_persistent_integration_host_security.py"
@@ -139,7 +138,6 @@ jobs:
           software/python/tests/test_ppu_network_phase2_bootstrap.py
           software/python/tests/test_ppu_network_activation.py
           software/python/tests/test_ppu_network_activation_rest.py
-          software/python/tests/test_ppu_network_activation_security.py
           software/python/tests/test_virtual_ppu_network_lab.py
           software/python/tests/test_static_ipv4_fault_injection_lab.py
           software/python/tests/test_persistent_integration_host_security.py
