@@ -11,6 +11,7 @@ from threading import RLock
 from typing import Any, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
+from . import bootstrap_request_auth as request_auth
 from .client import PPUHTTPError, PPUHttpClient
 from .config import normalize_endpoint
 from .registry import PPURegistryStore, RegistryEntryNotFound, normalize_registry_alias
@@ -195,18 +196,14 @@ class BootstrapCredentialStore:
         with self._lock:
             return normalized in self._credentials
 
-    def token_for(self, alias: str, device_id: str) -> str:
+    def credential_for(self, alias: str) -> tuple[str, str]:
+        """(paired device_id, credential); the device is proven per request."""
         normalized = normalize_registry_alias(alias)
-        expected_device = _valid_device_id(device_id)
         with self._lock:
             credential = self._credentials.get(normalized)
             if credential is None:
                 raise BootstrapCredentialError(f"PPU Bootstrap is not paired: {normalized}")
-            if credential.device_id != expected_device:
-                raise BootstrapCredentialError(
-                    "registered alias now resolves to a different Bootstrap device_id; explicit re-pairing is required"
-                )
-            return credential.token
+            return credential.device_id, credential.token
 
     def set(self, alias: str, device_id: str, token: str) -> None:
         if self.path is None:
@@ -328,34 +325,96 @@ class BootstrapHttpClient:
         self.client = PPUHttpClient(endpoint, timeout_s)
         self.timeout_s = timeout_s
 
+    def _challenge(self, device_id: str) -> str:
+        status, payload, _headers, _body = self._exchange("GET", request_auth.CHALLENGE_PATH)
+        if (status != 200 or payload.get("ok") is not True
+                or payload.get("schema") != request_auth.SCHEMA
+                or not request_auth.valid_nonce(payload.get("nonce"))):
+            raise BootstrapManagerError("PPU Bootstrap request-authentication challenge is unavailable")
+        if payload.get("device_id") != device_id:
+            raise BootstrapCredentialError(
+                "registered alias now resolves to a different Bootstrap device_id; explicit re-pairing is required"
+            )
+        return payload["nonce"]
+
+    def _exchange(
+        self,
+        method: str,
+        path: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        raw: bytes | None = None,
+        timeout_s: float | None = None,
+    ) -> tuple[int, dict[str, Any], dict[str, str], bytes]:
+        request_headers = {"Accept": "application/json", **(headers or {})}
+        if raw is not None:
+            request_headers["Content-Type"] = "application/json"
+        try:
+            status, response_headers, response_body = self.client.relay(
+                method,
+                _bootstrap_api_path(path),
+                headers=request_headers,
+                body=raw,
+                timeout_s=self.timeout_s if timeout_s is None else timeout_s,
+                max_response_bytes=MAX_BOOTSTRAP_RESPONSE_BYTES,
+                extra_response_headers=frozenset({request_auth.RESPONSE_HEADER.lower()}),
+            )
+        except PPUHTTPError as exc:
+            raise BootstrapManagerError(str(exc)) from exc
+        return status, self._payload(response_headers, response_body), response_headers, response_body
+
     def _json(
         self,
         method: str,
         path: str,
         *,
-        token: str | None = None,
+        credential: str | None = None,
+        device_id: str | None = None,
         body: Mapping[str, Any] | None = None,
         timeout_s: float | None = None,
     ) -> tuple[int, dict[str, Any]]:
-        headers = {"Accept": "application/json"}
-        if token is not None:
-            headers["Authorization"] = f"Bearer {token}"
+        """One Bootstrap call; authenticated calls never send the credential.
+
+        With a credential, the request is MACed under a fresh PPU nonce for the
+        paired ``device_id`` and the response is accepted only with the PPU's
+        response MAC. An unauthenticated 401/503 refusal is returned as a
+        failure status; any other unproven response fails closed.
+        """
         raw = None
         if body is not None:
             raw = json.dumps(dict(body), separators=(",", ":")).encode("utf-8")
-            headers["Content-Type"] = "application/json"
-        request_path = _bootstrap_api_path(path)
+        if credential is None:
+            status, payload, _headers, _body = self._exchange(method, path, raw=raw, timeout_s=timeout_s)
+            return status, payload
+        if device_id is None:
+            raise BootstrapManagerError("authenticated Bootstrap call requires the paired device_id")
+        nonce = self._challenge(device_id)
         try:
-            status, response_headers, response_body = self.client.relay(
-                method,
-                request_path,
-                headers=headers,
-                body=raw,
-                timeout_s=self.timeout_s if timeout_s is None else timeout_s,
-                max_response_bytes=MAX_BOOTSTRAP_RESPONSE_BYTES,
+            header, context = request_auth.sign_request(
+                credential=credential, method=method, path=path, body=raw,
+                device_id=device_id, nonce=nonce,
             )
-        except PPUHTTPError as exc:
-            raise BootstrapManagerError(str(exc)) from exc
+        except request_auth.BootstrapRequestAuthError as exc:
+            raise BootstrapCredentialError(str(exc)) from exc
+        status, payload, response_headers, response_body = self._exchange(
+            method, path, headers={"Authorization": header}, raw=raw, timeout_s=timeout_s,
+        )
+        proof = next((value for key, value in response_headers.items()
+                      if key.lower() == request_auth.RESPONSE_HEADER.lower()), None)
+        if proof is None and status in (401, 503):
+            return status, payload
+        try:
+            request_auth.verify_response(
+                credential=credential, context=context, status=status,
+                body=response_body, header=proof,
+            )
+        except request_auth.BootstrapRequestAuthError as exc:
+            raise BootstrapManagerError(
+                "PPU Bootstrap response is not authenticated by the paired device") from exc
+        return status, payload
+
+    @staticmethod
+    def _payload(response_headers: Mapping[str, str], response_body: bytes) -> dict[str, Any]:
         media_type = response_headers.get("Content-Type", response_headers.get("content-type", ""))
         if "application/json" not in media_type:
             raise BootstrapManagerError("PPU Bootstrap returned a non-JSON response")
@@ -365,32 +424,39 @@ class BootstrapHttpClient:
             raise BootstrapManagerError("PPU Bootstrap returned invalid JSON") from exc
         if not isinstance(payload, dict):
             raise BootstrapManagerError("PPU Bootstrap response must be a JSON object")
-        return status, payload
+        return payload
 
-    def status(self) -> tuple[int, dict[str, Any]]:
-        return self._json("GET", "/v1/status")
+    def status(self, credential: str | None = None, device_id: str | None = None) -> tuple[int, dict[str, Any]]:
+        return self._json("GET", "/v1/status", credential=credential, device_id=device_id)
 
-    def create_upload(self, token: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        return self._json("POST", "/v1/uploads", token=token, body=body, timeout_s=10.0)
+    def create_upload(self, credential: str, device_id: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
+        return self._json("POST", "/v1/uploads", credential=credential, device_id=device_id,
+                          body=body, timeout_s=10.0)
 
-    def append_chunk(self, token: str, upload_id: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        return self._json("POST", f"/v1/uploads/{upload_id}/chunks", token=token, body=body, timeout_s=30.0)
+    def append_chunk(self, credential: str, device_id: str, upload_id: str,
+                     body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
+        return self._json("POST", f"/v1/uploads/{upload_id}/chunks", credential=credential,
+                          device_id=device_id, body=body, timeout_s=30.0)
 
-    def commit_upload(self, token: str, upload_id: str) -> tuple[int, dict[str, Any]]:
+    def commit_upload(self, credential: str, device_id: str, upload_id: str) -> tuple[int, dict[str, Any]]:
         return self._json(
             "POST",
             f"/v1/uploads/{upload_id}/commit",
-            token=token,
+            credential=credential,
+            device_id=device_id,
             body={"action": "commit"},
             timeout_s=30.0,
         )
 
-    def start_deployment(self, token: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        return self._json("POST", "/v1/deployments", token=token, body=body, timeout_s=10.0)
+    def start_deployment(self, credential: str, device_id: str,
+                         body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
+        return self._json("POST", "/v1/deployments", credential=credential, device_id=device_id,
+                          body=body, timeout_s=10.0)
 
-    def assets(self, token: str) -> tuple[int, dict[str, Any]]:
-        """PPU-verified Active Asset Set identity (read-only)."""
-        return self._json("GET", "/v1/assets", token=token, timeout_s=10.0)
+    def assets(self, credential: str, device_id: str) -> tuple[int, dict[str, Any]]:
+        """PPU-verified Active Asset Set identity (read-only, response MACed)."""
+        return self._json("GET", "/v1/assets", credential=credential, device_id=device_id,
+                          timeout_s=10.0)
 
 
 def _hex_field(value: object, length: int, label: str) -> str:
@@ -445,14 +511,38 @@ class ManagerBootstrapCoordinator:
         return normalized, record, client, payload, device_id
 
     def _authenticated(self, alias: str):
-        normalized, record, client, payload, device_id = self._live(alias)
-        token = self.credentials.token_for(normalized, device_id)
+        """Paired device proven by a MACed status, never by an anonymous read."""
+        normalized, record = self._entry(alias)
+        device_id, token = self.credentials.credential_for(normalized)
+        client = self.client_factory(bootstrap_endpoint_for_gateway(record.endpoint), self.timeout_s)
+        status, payload = client.status(token, device_id)
+        if status in (401, 503):
+            raise BootstrapCredentialError(
+                "PPU Bootstrap rejected the paired credential; explicit re-pairing is required")
+        bootstrap = payload.get("bootstrap")
+        if status != 200 or not isinstance(bootstrap, dict) or bootstrap.get("state") != "bootstrap_ready":
+            raise BootstrapManagerError("PPU Bootstrap is not ready")
+        if _device_id_from_status(payload) != device_id:
+            raise BootstrapCredentialError(
+                "registered alias now resolves to a different Bootstrap device_id; explicit re-pairing is required"
+            )
         return normalized, record, client, payload, device_id, token
 
     def status(self, alias: str) -> dict[str, Any]:
         normalized, _record, _client, payload, device_id = self._live(alias)
         pairing = dict(self.credentials.public_state(normalized))
-        pairing["device_match"] = pairing.get("device_id") in {None, device_id}
+        # device_match means the paired credential is PROVEN by this device's
+        # MACed status, not merely that an anonymous status echoed the ID.
+        pairing["device_match"] = pairing.get("device_id") is None
+        pairing["device_authenticated"] = False
+        if pairing.get("paired"):
+            try:
+                *_ignored, authenticated, proven_device, _token = self._authenticated(normalized)
+            except BootstrapManagerError:
+                pass
+            else:
+                payload, device_id = authenticated, proven_device
+                pairing["device_match"] = pairing["device_authenticated"] = True
         return {
             "ok": True,
             "ppu_alias": normalized,
@@ -462,20 +552,11 @@ class ManagerBootstrapCoordinator:
             "upstream_status": 200,
         }
 
-    def pair(self, alias: str, token: str) -> dict[str, Any]:
-        normalized, _record, _client, _payload, device_id = self._live(alias)
-        self.credentials.set(normalized, device_id, token)
-        return {
-            "ok": True,
-            "ppu_alias": normalized,
-            "pairing": self.credentials.public_state(normalized),
-            "token_verification": "deferred_until_authenticated_operation",
-        }
 
     def assets(self, alias: str) -> dict[str, Any]:
         """Read the PPU-verified Active Asset Set identity; fail closed when untrusted."""
-        _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)
-        status, payload = client.assets(token)
+        _normalized, _record, client, _payload, device_id, token = self._authenticated(alias)
+        status, payload = client.assets(token, device_id)
         record = payload.get("assets") if status == 200 else None
         if (not isinstance(record, dict)
                 or record.get("schema") != "plasma.ppu.active-assets.v1"
@@ -489,16 +570,16 @@ class ManagerBootstrapCoordinator:
         return record
 
     def create_upload(self, alias: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)
-        return client.create_upload(token, body)
+        _normalized, _record, client, _payload, device_id, token = self._authenticated(alias)
+        return client.create_upload(token, device_id, body)
 
     def append_chunk(self, alias: str, upload_id: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)
-        return client.append_chunk(token, upload_id, body)
+        _normalized, _record, client, _payload, device_id, token = self._authenticated(alias)
+        return client.append_chunk(token, device_id, upload_id, body)
 
     def commit_upload(self, alias: str, upload_id: str) -> tuple[int, dict[str, Any]]:
-        _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)
-        return client.commit_upload(token, upload_id)
+        _normalized, _record, client, _payload, device_id, token = self._authenticated(alias)
+        return client.commit_upload(token, device_id, upload_id)
 
     def start_deployment(self, alias: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
         _normalized, record, client, _payload, device_id, token = self._authenticated(alias)
@@ -530,7 +611,7 @@ class ManagerBootstrapCoordinator:
                 token, action,
                 device_id, digest, admission,
             )
-            status, response = client.start_deployment(token, {
+            status, response = client.start_deployment(token, device_id, {
                 "kind": "bundle", "upload_id": upload_id,
                 "mode": mode, "fpga_load": body["fpga_load"],
                 "authorization": authorization,
@@ -558,7 +639,7 @@ class ManagerBootstrapCoordinator:
                     "generic Bundle requires only kind, upload_id and archive_sha256")
             upload_id = _hex_field(body["upload_id"], 32, "generic Bundle upload_id")
             digest = _hex_field(body["archive_sha256"], 64, "Bundle archive_sha256")
-            status, response = client.start_deployment(token, {
+            status, response = client.start_deployment(token, device_id, {
                 "kind": "bundle", "upload_id": upload_id,
                 "authorization": _issue(token, ADMIT, device_id, digest, upload_id),
             })
@@ -595,4 +676,4 @@ class ManagerBootstrapCoordinator:
             raise BootstrapManagerError(f"unsupported Manager deployment fields: {', '.join(sorted(unexpected))}")
         request = dict(body)
         request["gateway_host"] = _runtime_gateway_host(record.endpoint)
-        return client.start_deployment(token, request)
+        return client.start_deployment(token, device_id, request)

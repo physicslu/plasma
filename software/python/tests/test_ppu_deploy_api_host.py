@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from .bootstrap_request_auth_fixture import AuthenticatedFakePPU
+
 REPO = Path(__file__).resolve().parents[3]
 
 
@@ -44,7 +46,6 @@ class FakeBootstrapTransport:
         self.override: dict[str, object] = {}
 
     def __call__(self, method: str, path: str, raw: bytes | None, headers):
-        assert headers["Authorization"] == "Bearer " + TOKEN
         assert method in ("POST", "GET")
         body = json.loads(raw) if raw is not None else None
         self.calls.append((method, path, body))
@@ -89,7 +90,9 @@ class FakeBootstrapTransport:
 
 def make(tmp_path: Path):
     fake = FakeBootstrapTransport(tmp_path)
-    return client.BootstrapAPIClient("https://ppu.example.test:18081", TOKEN, transport=fake), fake
+    return client.BootstrapAPIClient(
+        "https://ppu.example.test:18081", TOKEN,
+        transport=AuthenticatedFakePPU(fake, credential=TOKEN, device_id=DEVICE)), fake
 
 
 def test_chunked_https_upload_integrates_with_existing_bootstrap_validators(tmp_path: Path):
@@ -158,7 +161,7 @@ def test_client_requires_https_without_embedded_credentials(url: str):
 
 @pytest.mark.parametrize("bad", ["", "a", "bad\nvalue", "\x00" * 48])
 def test_client_rejects_bad_credentials(bad: str):
-    with pytest.raises(client.DeploymentAPIError, match="BEARER"):
+    with pytest.raises(client.DeploymentAPIError, match="BOOTSTRAP_CREDENTIAL_NOT_PROVISIONED"):
         client.BootstrapAPIClient("https://ppu.example.test", bad, transport=lambda *_: (200, b'{"ok":true}'))
 
 
@@ -233,7 +236,9 @@ def test_transport_uncertain_does_not_retry_or_resubmit(tmp_path: Path):
     def broken(method, path, payload, headers):
         calls.append(path)
         raise TimeoutError("simulated outage after Z2 possibly accepted the request")
-    api = client.BootstrapAPIClient("https://ppu.example.test", TOKEN, transport=broken)
+    api = client.BootstrapAPIClient(
+        "https://ppu.example.test", TOKEN,
+        transport=AuthenticatedFakePPU(broken, credential=TOKEN, device_id=DEVICE))
     with pytest.raises(client.DeploymentOutcomeUnknown):
         api.submit(
             kind="ppu-runtime", upload_id="a"*32,
@@ -457,7 +462,8 @@ def test_console_asset_set_mismatch_uploads_whole_bundle_then_b2_b3(tmp_path):
                 _admitted_bundle_record(fake.upload_id, "e"*32, sha=sha)}).encode()
         return fake(method, path, raw, headers)
     api = client.BootstrapAPIClient(
-        "https://ppu.example.test:18081", TOKEN, transport=routed,
+        "https://ppu.example.test:18081", TOKEN,
+        transport=AuthenticatedFakePPU(routed, credential=TOKEN, device_id=DEVICE),
     )
     result = api.reconcile_bundle_assets(archive, fpga_load=True)
     assert result["result"] == "B3_INSTALL_QUEUED"

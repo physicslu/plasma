@@ -3,13 +3,15 @@
 
 The service is intentionally independent from Plasma Server/Gateway. Read-only
 health/status remain available when the product runtime is absent or broken.
-All mutation endpoints require a device-local bearer token provisioned outside
-the product runtime. Release transport is chunked and bounded so the Manager
+All mutation endpoints require mutual request authentication
+(``ppu_bootstrap_request_auth.py``) under the device-local credential provisioned
+outside the product runtime; the credential itself never crosses the wire. Release transport is chunked and bounded so the Manager
 never needs a single multi-hundred-megabyte request.
 
-Bearer authentication over HTTP is acceptable only on the explicitly controlled
-lab/private commissioning link. Production transport confidentiality and
-publisher authenticity are not claimed by this service. Durable deployment API
+Request/response MACs give integrity and mutual credential proof but NOT
+confidentiality; plain HTTP remains acceptable only on the explicitly
+controlled lab/private commissioning link. Production transport
+confidentiality and publisher authenticity are not claimed by this service. Durable deployment API
 state fails closed after a service restart so an interrupted deployment cannot
 be silently overwritten by a later request.
 """
@@ -777,7 +779,18 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         self.mutation_lock = threading.RLock()
         self.deployment_thread: threading.Thread | None = None
         self.recovered_deployment = _recover_interrupted_api_deployment(paths)
+        self.request_auth = _load_script(
+            Path(__file__).with_name("ppu_bootstrap_request_auth.py"),
+            "plasma_ppu_bootstrap_request_auth",
+        )
+        self.nonces = self.request_auth.NonceRegistry()
         super().__init__(address, BootstrapHandler)
+
+    def device_id(self) -> str:
+        try:
+            return self.base_module._machine_device_id(self.bootstrap_paths.machine_id_path)
+        except Exception as exc:
+            raise BootstrapServiceError("bootstrap device identity is unavailable") from exc
 
     def admit_package(self, body: Mapping[str, Any]) -> dict[str, Any]:
         """Receive -> verify -> plan only. NEVER dispatch the runtime Installer.
@@ -1087,6 +1100,9 @@ class BootstrapHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: object) -> None:
         sys.stderr.write("bootstrap-http " + (fmt % args) + "\n")
 
+    _auth_context: Any = None
+    _auth_credential: str | None = None
+
     def _json(self, status: int, payload: Mapping[str, Any]) -> None:
         body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         self.send_response(status)
@@ -1094,10 +1110,20 @@ class BootstrapHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        if self._auth_context is not None and self._auth_credential is not None:
+            # Every response to an authenticated request proves this PPU holds
+            # the paired credential and binds status/body to that request.
+            self.send_header(
+                self.owner.request_auth.RESPONSE_HEADER,
+                self.owner.request_auth.sign_response(
+                    credential=self._auth_credential, context=self._auth_context,
+                    status=int(status), body=body,
+                ),
+            )
         self.end_headers()
         self.wfile.write(body)
 
-    def _body(self) -> dict[str, Any]:
+    def _raw_body(self) -> bytes:
         raw_length = self.headers.get("Content-Length")
         try:
             size = int(raw_length or "0")
@@ -1105,7 +1131,9 @@ class BootstrapHandler(BaseHTTPRequestHandler):
             raise BootstrapServiceError("invalid Content-Length") from exc
         if size <= 0 or size > MAX_JSON_BODY:
             raise BootstrapServiceError("request body size is invalid")
-        raw = self.rfile.read(size)
+        return self.rfile.read(size)
+
+    def _body(self, raw: bytes) -> dict[str, Any]:
         try:
             payload = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -1114,25 +1142,71 @@ class BootstrapHandler(BaseHTTPRequestHandler):
             raise BootstrapServiceError("request body must be a JSON object")
         return payload
 
-    def _authorized(self) -> bool:
+    def _authenticate(self, *, required: bool, read_body: bool) -> tuple[bool, bytes | None]:
+        """Mutual request authentication; returns (proceed, raw body).
+
+        The credential never crosses the wire. Header syntax, device identity
+        and the single-use nonce are checked BEFORE the body is read; the MAC
+        then binds method, exact request target and body SHA256. A former
+        ``Bearer`` header is rejected like any other malformed proof.
+        """
+        auth = self.owner.request_auth
+        self._auth_context = self._auth_credential = None  # never carry proof across requests
+        header = self.headers.get("Authorization")
+        if header is None and not required:
+            return True, None
         try:
-            expected = load_token(self.owner.bootstrap_paths.token_file)
+            credential = load_token(self.owner.bootstrap_paths.token_file)
         except BootstrapServiceError as exc:
             self._json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
                 {"ok": False, "error": "control_not_provisioned", "message": str(exc)},
             )
-            return False
-        header = self.headers.get("Authorization", "")
-        prefix = "Bearer "
-        supplied = header[len(prefix):] if header.startswith(prefix) else ""
-        if not supplied or not hmac.compare_digest(supplied, expected):
+            return False, None
+        try:
+            admitted = auth.admit_request_header(
+                header=header, device_id=self.owner.device_id(), nonces=self.owner.nonces)
+        except (auth.RequestAuthError, BootstrapServiceError):
             self._json(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": "unauthorized"})
-            return False
-        return True
+            return False, None
+        # A malformed body is a request rejection (409 by the caller), read
+        # under the already-consumed nonce and bounded by MAX_JSON_BODY.
+        raw = self._raw_body() if read_body else None
+        try:
+            context = auth.verify_request(
+                credential=credential, admitted=admitted, method=self.command,
+                path=self.path, body=raw,
+            )
+        except (auth.RequestAuthError, BootstrapServiceError):
+            self._json(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": "unauthorized"})
+            return False, None
+        self._auth_context, self._auth_credential = context, credential
+        return True, raw
 
     def do_GET(self) -> None:  # noqa: N802
+        self._auth_context = self._auth_credential = None
         path = urlparse(self.path).path
+        if path == self.owner.request_auth.CHALLENGE_PATH and self.path == path:
+            try:
+                device_id = self.owner.device_id()
+            except BootstrapServiceError as exc:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"ok": False, "error": "bootstrap_state_invalid", "message": str(exc)},
+                )
+                return
+            self._json(HTTPStatus.OK, {
+                "ok": True, "schema": self.owner.request_auth.SCHEMA,
+                "device_id": device_id, "nonce": self.owner.nonces.issue(),
+                "expires_in_s": self.owner.request_auth.NONCE_TTL_S,
+            })
+            return
+        if path in {"/v1/status", "/v1/assets", "/v1/deployment"}:
+            # Read-only discovery stays anonymous; an authenticated read is
+            # MACed so a client can trust the paired device's own status.
+            proceed, _raw = self._authenticate(required=False, read_body=False)
+            if not proceed:
+                return
         if path == "/v1/assets":
             try:
                 deployment = _load_script(
@@ -1196,6 +1270,7 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     "transport_confidentiality": "not_qualified",
                     "publisher_authenticity": "not_qualified",
                     "operation_authorization": "plasma.ppu.owner-operation-authorization.v1",
+                    "request_authentication": self.owner.request_auth.SCHEMA,
                 }
                 payload["deployment"] = _deployment_api_record(self.owner.bootstrap_paths)
                 self._json(HTTPStatus.OK, payload)
@@ -1220,11 +1295,19 @@ class BootstrapHandler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        if not self._authorized():
+        try:
+            proceed, raw = self._authenticate(required=True, read_body=True)
+        except BootstrapServiceError as exc:
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": "bootstrap_request_rejected", "message": str(exc)},
+            )
+            return
+        if not proceed:
             return
         path = urlparse(self.path).path
         try:
-            body = self._body()
+            body = self._body(raw or b"")
             with self.owner.mutation_lock:
                 if path == "/v1/uploads":
                     upload = create_upload(

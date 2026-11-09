@@ -60,14 +60,16 @@ def test_p4_api_restart_reuses_coordinator_rollback_and_reports_failure(tmp_path
 
 
 def test_p4_assets_get_exposes_recovery_without_socket_or_ready_claim(tmp_path):
+    from .bootstrap_request_auth_fixture import auth as request_auth
     co, candidate, _ = stage(tmp_path)
     co.journal.write(co.journal.read(), "recovery_required")
     handler = bootstrap.BootstrapHandler.__new__(bootstrap.BootstrapHandler)
     # BaseHTTPRequestHandler.server owns the existing Bootstrap owner property.
     handler.server = SimpleNamespace(bootstrap_paths=bootstrap.ServicePaths(
         product_root=co.paths.product_root, state_root=co.paths.bootstrap_state_root),
-        base_module=object())
+        base_module=object(), request_auth=request_auth)
     handler.path = "/v1/assets"
+    handler.headers = {}  # anonymous read-only discovery
     replies = []
     handler._json = lambda status, payload: replies.append((status, payload))
     handler.do_GET()

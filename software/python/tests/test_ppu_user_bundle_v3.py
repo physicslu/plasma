@@ -207,7 +207,6 @@ class UserBundleTests(unittest.TestCase):
         calls = []
 
         def transport(method, path, raw, headers):
-            self.assertEqual(headers["Authorization"], "Bearer " + OWNER_TOKEN)
             body = json.loads(raw) if raw else None
             calls.append((method, path, body))
             if path == "/v1/status":
@@ -228,7 +227,11 @@ class UserBundleTests(unittest.TestCase):
             return (202 if result.get("deployment", {}).get("state") == "queued" else 200,
                     json.dumps({"ok": True, **result}).encode())
 
-        api = client.BootstrapAPIClient("https://ppu.example.test", OWNER_TOKEN, transport=transport)
+        from .bootstrap_request_auth_fixture import AuthenticatedFakePPU
+        api = client.BootstrapAPIClient(
+            "https://ppu.example.test", OWNER_TOKEN,
+            transport=AuthenticatedFakePPU(transport, credential=OWNER_TOKEN,
+                                           device_id=device_id(self.paths)))
         uid = api.upload(self.archive.read_bytes())
         admitted = api.submit(kind="bundle", upload_id=uid, archive_sha256=self.digest)
         api.install_bundle(admitted, mode="activate", fpga_load=False)

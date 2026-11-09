@@ -17,6 +17,7 @@ from plasma_manager.bootstrap import (
 )
 from plasma_manager.config import PPURegistryEntry
 from plasma_manager.registry import PPURegistryStore
+from plasma_manager.verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
 
 DEVICE_ID = "ppu-device-0123456789abcdef"
@@ -52,7 +53,8 @@ class FakeRelay:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, dict[str, str], bytes | None]] = []
 
-    def relay(self, method, path, *, headers, body, timeout_s, max_response_bytes):
+    def relay(self, method, path, *, headers, body, timeout_s, max_response_bytes,
+              extra_response_headers=frozenset()):
         self.calls.append((method, path, dict(headers), body))
         return (
             200,
@@ -90,8 +92,8 @@ class FakeBootstrapClient:
         self.calls: list[tuple[str, str | None, dict[str, object] | None]] = []
         self.__class__.instances.append(self)
 
-    def status(self):
-        self.calls.append(("status", None, None))
+    def status(self, credential=None, device_id=None):
+        self.calls.append(("status", credential, device_id))
         return 200, {
             "bootstrap": {"state": "bootstrap_ready"},
             "identity": {"device_id": DEVICE_ID},
@@ -99,19 +101,19 @@ class FakeBootstrapClient:
             "capabilities": {"runtime_deployment": True, "fpga_update": False},
         }
 
-    def create_upload(self, token, body):
+    def create_upload(self, token, device_id, body):
         self.calls.append(("create_upload", token, dict(body)))
         return 201, {"ok": True}
 
-    def append_chunk(self, token, upload_id, body):
+    def append_chunk(self, token, device_id, upload_id, body):
         self.calls.append(("append_chunk", token, {"upload_id": upload_id, **dict(body)}))
         return 200, {"ok": True}
 
-    def commit_upload(self, token, upload_id):
+    def commit_upload(self, token, device_id, upload_id):
         self.calls.append(("commit_upload", token, {"upload_id": upload_id}))
         return 200, {"ok": True}
 
-    def start_deployment(self, token, body):
+    def start_deployment(self, token, device_id, body):
         self.calls.append(("start_deployment", token, dict(body)))
         return 202, {"ok": True, "deployment": {"state": "queued"}}
 
@@ -123,7 +125,7 @@ def test_managed_coordinator_keeps_public_reachability_separate_from_device_bind
     FakeBootstrapClient.instances.clear()
     _managed(monkeypatch)
     monkeypatch.setenv(MANAGED_BOOTSTRAP_RUNTIME_GATEWAY_HOST_ENV, "172.30.77.2")
-    coordinator = ManagerBootstrapCoordinator(
+    coordinator = VerifiedManagerBootstrapCoordinator(
         _registry(tmp_path),
         BootstrapCredentialStore(tmp_path / "bootstrap-credentials.json"),
         2.0,
@@ -161,7 +163,7 @@ def test_managed_deployment_requires_manager_owned_private_runtime_gateway_host(
 ) -> None:
     FakeBootstrapClient.instances.clear()
     _managed(monkeypatch)
-    coordinator = ManagerBootstrapCoordinator(
+    coordinator = VerifiedManagerBootstrapCoordinator(
         _registry(tmp_path),
         BootstrapCredentialStore(tmp_path / "bootstrap-credentials.json"),
         2.0,

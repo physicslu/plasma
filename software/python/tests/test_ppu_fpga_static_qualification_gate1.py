@@ -13,6 +13,7 @@ from .ppu_owner_authorization_fixture import admit_body, install_body, machine_i
 from .ppu_fpga_qualification_fixture import synthetic_image
 from .test_ppu_bundle_v3_packages_contract import ROOT, TARGET, bundle_v3, contract, load
 from .test_ppu_package_receive_admission_pr1 import TOKEN, client, loopback  # noqa: F401
+from .bootstrap_request_auth_fixture import signed_call
 
 qualification = load("ppu_fpga_static_qualification_test", "ppu_fpga_qualification.py")
 bootstrap = load("ppu_fpga_static_qualification_service", "ppu-bootstrap-service.py")
@@ -170,10 +171,9 @@ def test_static_qualification_never_touches_root_loader(tmp_path, monkeypatch):
 
 def _post_deployment(api, paths, upload_id):
     """Raw HTTP so the fail-closed error code in the 409 body stays visible."""
-    status, raw = api._transport(
-        "POST", "/v1/deployments",
-        json.dumps(admit_body(paths, "bundle", upload_id)).encode(),
-        {"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"},
+    status, raw = signed_call(
+        api._transport, "POST", "/v1/deployments",
+        json.dumps(admit_body(paths, "bundle", upload_id)).encode(), credential=TOKEN,
     )
     return status, json.loads(raw)
 
@@ -240,10 +240,9 @@ def test_service_b2_without_owner_authorization_fails_before_fpga(loopback, tmp_
     archive, _ = fpga_bundle(tmp_path / "x")
     raw = archive.read_bytes()
     upload_id = api.upload(raw)
-    status, raw_body = api._transport(
-        "POST", "/v1/deployments",
-        json.dumps({"kind": "bundle", "upload_id": upload_id}).encode(),
-        {"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"},
+    status, raw_body = signed_call(
+        api._transport, "POST", "/v1/deployments",
+        json.dumps({"kind": "bundle", "upload_id": upload_id}).encode(), credential=TOKEN,
     )
     assert status == 409 and "PACKAGE_REQUEST_FIELDS_DENIED" in raw_body.decode()
     assert not paths.deployment_record.exists()

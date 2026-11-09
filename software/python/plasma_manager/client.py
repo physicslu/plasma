@@ -135,6 +135,7 @@ class PPUHttpClient:
         body: bytes | None,
         timeout_s: float,
         max_response_bytes: int,
+        extra_response_headers: frozenset[str] = frozenset(),
     ) -> tuple[int, dict[str, str], bytes]:
         """Relay one Manager-approved PPU REST request.
 
@@ -168,7 +169,7 @@ class PPUHttpClient:
                         "content-type",
                         "content-disposition",
                         "cache-control",
-                    }
+                    } or key.lower() in extra_response_headers
                 }
                 response_data = response.read(max_response_bytes + 1)
         except (URLError, OSError, TimeoutError) as exc:

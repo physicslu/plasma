@@ -38,23 +38,33 @@ _INFLIGHT = frozenset({"queued", "running"})
 
 
 class DeploymentAPIError(RuntimeError):
-    """Fail-closed transport/contract error, never contains a bearer token."""
+    """Fail-closed transport/contract error, never contains credential material."""
 
 
 class DeploymentOutcomeUnknown(DeploymentAPIError):
     """Write or activation outcome is unknown; do not automatically retry."""
 
 
-def _owner_authorization_module():
+def _sibling_module(filename: str, name: str, error: str):
     # Same single producer/verifier as the PPU; never loaded from a Bundle.
-    src = Path(__file__).with_name("ppu_owner_authorization.py")
-    spec = importlib.util.spec_from_file_location("plasma_swpc_owner_authorization", src)
+    src = Path(__file__).with_name(filename)
+    spec = importlib.util.spec_from_file_location(name, src)
     if spec is None or spec.loader is None or src.is_symlink() or not src.is_file():
-        raise DeploymentAPIError("OWNER_AUTHORIZATION_MODULE_UNAVAILABLE")
+        raise DeploymentAPIError(error)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _owner_authorization_module():
+    return _sibling_module("ppu_owner_authorization.py", "plasma_swpc_owner_authorization",
+                           "OWNER_AUTHORIZATION_MODULE_UNAVAILABLE")
+
+
+def _request_auth_module():
+    return _sibling_module("ppu_bootstrap_request_auth.py", "plasma_swpc_bootstrap_request_auth",
+                           "REQUEST_AUTHENTICATION_MODULE_UNAVAILABLE")
 
 
 class _RejectRedirect(HTTPRedirectHandler):
@@ -170,31 +180,45 @@ class DeploymentSubmission:
 
 
 class BootstrapAPIClient:
-    """Paired owner API client; NOT an installer, Root or a per-Bundle allowlist."""
+    """Paired owner API client; NOT an installer, Root or a per-Bundle allowlist.
+
+    Every call uses ``plasma.ppu.bootstrap-request-auth.v1``: the paired
+    credential is never sent; each request is MACed under a fresh PPU nonce
+    and each accepted response must carry the PPU's response MAC. The device
+    identity is pinned from the first challenge unless ``device_id`` is given.
+    """
 
     def __init__(
         self,
         base_url: str,
-        bearer_token: str,
+        credential: str,
         *,
-        transport: Callable[[str, str, bytes | None, Mapping[str, str]], tuple[int, bytes]] | None = None,
+        device_id: str | None = None,
+        transport: Callable[[str, str, bytes | None, Mapping[str, str]],
+                            tuple[int, bytes, Mapping[str, str]]] | None = None,
     ) -> None:
         self.base_url = _endpoint(base_url)
         if (
-            not isinstance(bearer_token, str) or len(bearer_token) < 32
-            or len(bearer_token) > 512
-            or any(ord(ch) < 33 or ord(ch) > 126 for ch in bearer_token)
+            not isinstance(credential, str) or len(credential) < 32
+            or len(credential) > 256
+            or any(ord(ch) < 33 or ord(ch) > 126 for ch in credential)
         ):
-            raise DeploymentAPIError("BEARER_CREDENTIAL_NOT_PROVISIONED")
-        self._token = bearer_token
+            raise DeploymentAPIError("BOOTSTRAP_CREDENTIAL_NOT_PROVISIONED")
+        if device_id is not None and (
+                type(device_id) is not str
+                or not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", device_id)):
+            raise DeploymentAPIError("API_DEVICE_IDENTITY_INVALID")
+        self._token = credential
+        self._device = device_id
+        self._auth = _request_auth_module()
         self._transport = transport or self._https
 
     def _https(
         self, method: str, path: str, payload: bytes | None,
         headers: Mapping[str, str],
-    ) -> tuple[int, bytes]:
+    ) -> tuple[int, bytes, Mapping[str, str]]:
         opener = build_opener(
-            ProxyHandler({}),  # avoid leaking an appliance Bearer token to env-configured proxies
+            ProxyHandler({}),  # never route appliance traffic through env-configured proxies
             HTTPSHandler(context=ssl.create_default_context()),
             _RejectRedirect(),
         )
@@ -204,7 +228,7 @@ class BootstrapAPIClient:
         try:
             with opener.open(request, timeout=15) as response:
                 raw = response.read(_MAX_JSON + 1)
-                return response.status, raw
+                return response.status, raw, dict(response.headers.items())
         except HTTPError as exc:
             # Never echo response headers/body (could contain secrets).
             raise DeploymentAPIError(f"API_HTTP_REJECTED:{exc.code}") from None
@@ -226,29 +250,71 @@ class BootstrapAPIClient:
         )
         if payload is not None and len(payload) > _MAX_JSON:
             raise DeploymentAPIError("API_REQUEST_TOO_LARGE")
+        header, context = self._sign(method, path, payload)
         headers = {
-            "Authorization": "Bearer " + self._token,
+            "Authorization": header,
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
+        status, raw, response_headers = self._send(method, path, payload, headers)
+        if status < 200 or status >= 300:
+            raise DeploymentAPIError(f"API_HTTP_REJECTED:{status}")
+        proof = next((value for key, value in response_headers.items()
+                      if key.lower() == self._auth.RESPONSE_HEADER.lower()), None)
         try:
-            status, raw = self._transport(method, path, payload, headers)
+            self._auth.verify_response(credential=self._token, context=context,
+                                       status=status, body=raw, header=proof)
+        except self._auth.RequestAuthError:
+            # An unproven response is never a receipt; a write may have run.
+            if method == "POST":
+                raise DeploymentOutcomeUnknown("API_RESPONSE_UNAUTHENTICATED_OUTCOME_UNKNOWN") from None
+            raise DeploymentAPIError("API_RESPONSE_UNAUTHENTICATED") from None
+        # The PPU status_document has no top-level ``ok`` flag.
+        return _bounded_json(raw, expected=path != "/v1/status")
+
+    def _send(self, method: str, path: str, payload: bytes | None,
+              headers: Mapping[str, str]) -> tuple[int, bytes, Mapping[str, str]]:
+        try:
+            status, raw, response_headers = self._transport(method, path, payload, headers)
         except DeploymentAPIError:
             raise
         except Exception as exc:
             raise DeploymentOutcomeUnknown(
                 f"API_TRANSPORT_OUTCOME_UNKNOWN:{type(exc).__name__}"
             ) from None
-        if status < 200 or status >= 300:
-            raise DeploymentAPIError(f"API_HTTP_REJECTED:{status}")
-        # The PPU status_document has no top-level ``ok`` flag.
-        return _bounded_json(raw, expected=path != "/v1/status")
+        return status, raw, response_headers
+
+    def _sign(self, method: str, path: str, payload: bytes | None):
+        try:
+            status, raw, _headers = self._send(
+                "GET", self._auth.CHALLENGE_PATH, None, {"Accept": "application/json"})
+        except DeploymentOutcomeUnknown:
+            # Nothing was written yet: a failed challenge is a plain failure.
+            raise DeploymentAPIError("API_CHALLENGE_TRANSPORT_FAILED") from None
+        if status != 200:
+            raise DeploymentAPIError(f"API_CHALLENGE_REJECTED:{status}")
+        challenge = _bounded_json(raw)
+        device_id, nonce = challenge.get("device_id"), challenge.get("nonce")
+        if (challenge.get("schema") != self._auth.SCHEMA or type(device_id) is not str
+                or not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", device_id)
+                or type(nonce) is not str or not _HEX32.fullmatch(nonce)):
+            raise DeploymentAPIError("API_CHALLENGE_INVALID")
+        if self._device is None:
+            self._device = device_id  # pinned; the response MAC proves the key holder
+        elif device_id != self._device:
+            raise DeploymentAPIError("API_DEVICE_IDENTITY_MISMATCH")
+        try:
+            return self._auth.sign_request(credential=self._token, method=method, path=path,
+                                           body=payload, device_id=device_id, nonce=nonce)
+        except self._auth.RequestAuthError:
+            raise DeploymentAPIError("API_REQUEST_AUTHENTICATION_INVALID") from None
 
     def _device_id(self) -> str:
         """The PPU's own Bootstrap identity; authorization is bound to it."""
         identity = self.status().get("identity")
         device_id = identity.get("device_id") if isinstance(identity, dict) else None
-        if type(device_id) is not str or not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", device_id):
+        if (type(device_id) is not str or not re.fullmatch(r"ppu-device-[0-9a-f]{16,64}", device_id)
+                or device_id != self._device):
             raise DeploymentAPIError("API_DEVICE_IDENTITY_UNTRUSTED")
         return device_id
 

@@ -166,7 +166,7 @@ def test_pr3_manager_bundle_admission_uses_same_authenticated_api(tmp_path):
     creds.set("z2", DEVICE_ID, TOKEN)
 
     class AdmissionClient(FakeBootstrapClient):
-        def start_deployment(self, token, body):
+        def start_deployment(self, token, device_id, body):
             self.calls.append(("start_deployment", token, dict(body)))
             return 200, {
                 "ok": True, "deployment": {
@@ -243,7 +243,7 @@ def test_pr3_manager_rejects_untrusted_upstream_install_receipt(tmp_path):
     creds.set("z2", DEVICE_ID, TOKEN)
 
     class CompromisedClient(FakeBootstrapClient):
-        def start_deployment(self, token, body):
+        def start_deployment(self, token, device_id, body):
             return 200, {
                 "ok": True,
                 "deployment": {
@@ -274,7 +274,7 @@ def test_manager_forwards_b3_mode_and_exact_authorization(tmp_path, mode, fpga_l
     creds.set("z2", DEVICE_ID, TOKEN)
 
     class B3Client(FakeBootstrapClient):
-        def start_deployment(self, token, body):
+        def start_deployment(self, token, device_id, body):
             self.calls.append(("start_deployment", token, dict(body)))
             # The real PPU answers a queued B3 with HTTP 202 Accepted.
             return 202, {"ok": True, "deployment": {
@@ -341,7 +341,7 @@ def test_manager_rejects_b3_reply_that_is_not_queued(tmp_path):
     creds.set("z2", DEVICE_ID, TOKEN)
 
     class Odd(FakeBootstrapClient):
-        def start_deployment(self, token, body):
+        def start_deployment(self, token, device_id, body):
             return 200, {"ok": True, "deployment": {"state": "succeeded", "upload_id": "a" * 32}}
 
     manager = ManagerBootstrapCoordinator(
@@ -361,7 +361,7 @@ def test_manager_rejects_b3_reply_with_changed_mode_or_action(tmp_path, change):
     creds.set("z2", DEVICE_ID, TOKEN)
 
     class WrongB3(FakeBootstrapClient):
-        def start_deployment(self, token, body):
+        def start_deployment(self, token, device_id, body):
             receipt = {
                 "state": "queued", "upload_id": "a" * 32,
                 "admission_transaction_id": "e" * 32,
