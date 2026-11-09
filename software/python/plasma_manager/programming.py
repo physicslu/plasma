@@ -79,14 +79,19 @@ class _OutcomeUnknown(Exception):
         self.reason = reason
 
 
-def default_routes_root() -> Path:
+def default_routes_root() -> Path | None:
+    """Explicit route root, else the shared Runtime Evidence Root contract.
+
+    Never derived from this module's location (an installed wheel is not a data
+    directory); ``None`` makes Programming Routes explicitly unavailable.
+    """
     configured = os.environ.get(ROUTES_ENV, "").strip()
     if configured:
         return Path(configured)
-    evidence_root = os.environ.get("PLASMA_RUNTIME_EVIDENCE_ROOT", "").strip()
-    if evidence_root:
-        return Path(evidence_root) / ROUTES_RELATIVE
-    return Path(__file__).resolve().parents[3] / ROUTES_RELATIVE
+    from plasma_web.runtime_evidence_root import default_runtime_evidence_root
+
+    root = default_runtime_evidence_root()
+    return None if root is None else root / ROUTES_RELATIVE
 
 
 def _now() -> str:
@@ -180,7 +185,7 @@ class BundleProgrammingWorkflow:
         self.gateway_client_factory = gateway_client_factory
         self.gate = gate
         self.request_timeout_s = request_timeout_s
-        self.routes_root = routes_root or default_routes_root()
+        self.routes_root = routes_root
         self.journal_path = journal_path
         self.sleep = sleep
         self.monotonic = monotonic
@@ -261,8 +266,11 @@ class BundleProgrammingWorkflow:
 
     def routes(self) -> tuple[bundle_v3.ProgrammingRoute, ...]:
         try:
-            return bundle_v3.load_routes(self.routes_root)
-        except bundle_v3.BundleBuildError as exc:
+            root = self.routes_root if self.routes_root is not None else default_routes_root()
+            if root is None:
+                raise bundle_v3.BundleBuildError("ROUTE_ROOT_UNAVAILABLE")
+            return bundle_v3.load_routes(root)
+        except (bundle_v3.BundleBuildError, ValueError) as exc:
             raise ProgrammingError(503, "programming_routes_unavailable",
                                    f"Programming Routes are unavailable: {exc}") from exc
 
