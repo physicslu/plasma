@@ -1,6 +1,6 @@
 # OPF Local Owner Mode — B1–B5 design direction and refreshed Gap Audit
 
-> **Status: B1–B5 OWNER-CONFIRMED as the design direction (2026-11-09).** Confirmation fixes the direction only. It is **not** a Gate 1 authorization for P2A-0, P2A-2, P2B, P1, P3 or P4, does not authorize the P2A-1 deployment, and the open questions marked below remain to be frozen in P2A-0. Nothing here is implemented except where stated as merged on main.
+> **Status: B1–B5 OWNER-CONFIRMED as the design direction (2026-11-09).** Confirmation fixes the direction only. Subsequent owner actions: P2A-1 was deployed by a separate approval (2026-11-09); P2A-0 Gate 1 was approved and its protocol is frozen in the [P2A-0 specification](opf-local-owner-mode-p2a0-enrollment-spec.md). Nothing here authorizes P2A-2, P2B, P1, P3 or P4. Nothing here is implemented except where stated as merged on main.
 > Normative policy: [ADR-0008](../adr/0008-local-owner-mode.md). Prior audit: [Gate 1 ledger](opf-local-owner-mode-gate1-20261109.md) (§5 = first latest-main refresh). Deployment of the merged P2A-1: [synchronized deployment runbook](../deployment/ppu-lom-p2a1-synchronized-deployment-runbook.md) (**not authorized**).
 > Source: `main` `3c2145f3d` (#1371 + #1372 merged). Read-only audit; no SWPC/Z2/FPGA/DUT access.
 
@@ -42,7 +42,7 @@ Principle: **only a physically bounded, PPU-local action can create or replace t
 
 **Rejected:** PL buttons/switches (readable only through the loaded, possibly user-authored PL image — B5); any HTTP "claim/reset/reclaim" endpoint without a ticket; MAC/IP/subnet adjacency.
 
-**Open questions for P2A-0:** exact boot unit ordering on PYNQ images; FAT write-safety for the delete; ticket format; whether the Control Station or the user generates the ticket; behavior when SD is cloned (see B2).
+**Frozen by P2A-0:** ticket format, ledger-before-delete ordering, 900 s boot-bound window, either the Control Station or the user may generate the ticket, SD cloning accepted as possession (B2). **Still for P2A-2 (implementation):** exact boot-unit ordering on PYNQ images and FAT delete/fsync behavior, verified on hardware under a separate approval.
 
 ### B2 — Identity: per-PPU high-entropy key is the authentication root
 
@@ -55,7 +55,7 @@ Principle: **only a physically bounded, PPU-local action can create or replace t
 
 - **One active controller per PPU** in the first version. The PPU stores `{controller_id, credential, generation}`; the generation is monotonic and durable.
 - **Reclaim** (new computer, lost credential, broken PC) uses the B1 ticket. Transition is **atomic**: write new credential+generation to a temp file, fsync, rename; old credential invalid from that instant, including on open connections. Crash before rename = old controller remains; after rename = new one; never both, never neither.
-- **Blocked while unsafe:** if any Site Job is active, a B3/deployment is `queued/running`, any `OUTCOME_UNKNOWN`/`recovery_required` is unresolved, or a Site is SEALED, reclaim reports the blocker and does not rotate. (**Open for P2A-0:** alternatively allow reclaim while SEALED/UNKNOWN but require the new controller to reconcile before any write — the owner chooses one when approving P2A-0.)
+- **Blocked while unsafe:** if any Site Job is active, a B3/deployment is `queued/running`, any `OUTCOME_UNKNOWN`/`recovery_required` is unresolved, or a Site is SEALED, reclaim reports the blocker and does not rotate. (**Resolved 2026-11-09 — owner chose (b) Recovery-Gated Takeover:** active operations defer takeover (`TAKEOVER_DEFERRED_ACTIVE_OPERATION`); SEALED/UNKNOWN/recovery-required states allow reclaim into `RECOVERY_ONLY` until explicit recovery. Frozen in the [P2A-0 specification](opf-local-owner-mode-p2a0-enrollment-spec.md).)
 - **Never erased by reclaim:** `/var/lib/plasma-bootstrap/deployment*.json`, upload records, Active Set pointer and generation, Site seals, Worker journals, PPU-side programming outcomes. The new Manager must import PPU-side unresolved state before showing `READY` (G4 → P2B).
 - Read-only Monitor consoles (from #1204) are compatible as a later extension; not in the first version.
 
@@ -74,8 +74,8 @@ Principle: **only a physically bounded, PPU-local action can create or replace t
 | PR | Depends on | Scope (each needs its own Gate 1) | Exit |
 | --- | --- | --- | --- |
 | P2A-1 deploy | Owner deployment approval | [Runbook](../deployment/ppu-lom-p2a1-synchronized-deployment-runbook.md) only | Hardware acceptance A1–A9 |
-| P2A-0 | B1–B3 (confirmed 2026-11-09) | Freeze `plasma.ppu.local-enrollment.v1`, state machine, ticket format, reclaim blocking rule; docs + contract tests | Reviewed protocol; no code path |
-| P2A-2 | P2A-0 | Boot-time SD ticket consumer, serial dev CLI, enrollment exchange, atomic credential/generation store, Manager enrollment client | Host-only: replay/expiry/wrong device/runtime-written ticket ignored/crash-atomic/blocked-while-unsafe/journals preserved |
+| P2A-0 | B1–B3 (confirmed 2026-11-09) | **Frozen:** [P2A-0 specification](opf-local-owner-mode-p2a0-enrollment-spec.md) + test-only reference model and 35 Host-only spec tests | Reviewed protocol; no product code path |
+| P2A-2 | P2A-0 | Boot-time SD ticket consumer, serial dev CLI, enrollment exchange, atomic credential/generation store, Manager enrollment client | Real code passes the P2A-0 cases: replay/expiry/wrong device/runtime-written ticket ignored/crash-atomic/Recovery-Gated Takeover/journals preserved; Gateway writes bound to the controller generation (G13) |
 | P2B | P2A-2 | Connect orchestration, derived readiness (replaces 9 `commissioned` gates), PPU-side UNKNOWN import, Manager loopback guard | No READY with unresolved PPU state; non-loopback Manager refuses start |
 | P1 | P2B, B4 | `Connect PPU`, remove token box and Validate & Enable for local profile | Local profile has no cookie/token dependency |
 | P3 | P1, #1278 disposition, B5 | Unified maintenance, auto exact-action proofs, unqualified FPGA refusal | B5 negatives |
