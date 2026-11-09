@@ -199,7 +199,9 @@ def _pyyaml_license() -> tuple[str, str]:
 # Catalog loaders verify SHA-256 / Git blob identity, so the shipped files must
 # be the committed bytes, never a working tree rewritten by checkout settings
 # (e.g. CRLF on Windows runners).
-CATALOG_TREES = ("data", "release")
+# docs/evidence is exported only so the L3 physical-compatibility loader can
+# replay-check its referenced receipts; the trace still ships only files read.
+CATALOG_TREES = ("data", "release", "docs/evidence")
 
 
 def _export_canonical_catalog(repo_root: Path, destination: Path) -> None:
