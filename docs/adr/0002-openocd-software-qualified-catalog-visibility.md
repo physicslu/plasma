@@ -106,6 +106,7 @@ Canonical promotion evidence class 先將不同 Manufacturer／Provider 的來�
 | `BACKEND_CANDIDATE_ROUTE` | 已有 source-backed backend candidate，但仍是 research-only |
 | `REVIEWED_PROGRAMMING_PROVIDER` | 已進入版本化 Programming Provider review／qualification |
 | `PLASMA_VERIFIED_CONFIGURATION` | 已有版本化 PLASMA configuration HIL PASS authority |
+| `PLASMA_FAMILY_READY_DERIVED` | 在明確列出的 L2 `SUPPORTED` exact ICPN 上，透過原廠 Programming Guide、相同版本 OpenOCD CFG／Driver 與逐型號 Flash geometry 校核，從已通過實機 HIL 的代表配置推導 PPU Family Ready；並非該 ICPN 的 HIL PASS |
 
 Manufacturer-specific evidence 名稱、DFP terminology、CFG naming 或 vendor tool 狀態只能由 adapter 映射到上述共同 evidence class；**不得直接成為 Product Level enum 或 visibility rule。**
 
@@ -119,7 +120,7 @@ Promotion edge 與 canonical blocker taxonomy：
 | L1 → L2 | `PROVIDER_QUALIFICATION_INCOMPLETE` | Provider review 已存在，但 state 仍為 UNKNOWN/CANDIDATE |
 | L1 → L2 | `PROVIDER_QUALIFICATION_BLOCKED` | Provider review 明確為 BLOCKED |
 | L1 → L2 | `PROVIDER_DECLARED_UNSUPPORTED` | Provider review 明確為 UNSUPPORTED |
-| L2 → L3 | `PLASMA_VERIFIED_CONFIGURATION_MISSING` | 軟體已 PROGRAMMABLE，但尚無版本化 PLASMA configuration HIL PASS |
+| L2 → L3 | `PLASMA_VERIFIED_CONFIGURATION_MISSING` | 軟體已 PROGRAMMABLE，但尚無版本化實機 HIL PASS，也無經審查、明確列名的 PPU Family Ready 繼承證據 |
 
 此 taxonomy 是 **Manufacturer-neutral**。ST、NXP、Microchip 不得新增同義但 Manufacturer-specific 的 blocker code；各 Manufacturer 的 source adapter 只能提供 evidence，不能直接決定 Product Level。若未來新增新的 canonical route 類型或 Level 3 authority，必須先擴充共同 taxonomy／observer，再讓 CI 通過；不得默默歸類。
 
@@ -145,7 +146,7 @@ IC Detail 的三個操作區塊仍是 **IC Information / Programming / PLASMA Co
 | **Catalog Level 0 — Research Inventory** | **01 IC Information** | **`DISCOVERED`**：完整商用 Exact ICPN 已由 Manufacturer 官方來源無歧義確認；可持續補強 Package、Pin Count、Flash、RAM、Working VDD、I/O Supply、Analog Supply、Temperature、Core 等欄位。`INFORMATION_COMPLETE` 是獨立欄位品質里程碑，不改變 Catalog Level。 | 只進 Internal Research Registry；**一般 User 不可見**。 |
 | **Catalog Level 1 — Programming Candidate** | **02 Programming Research** | **`PROGRAMMING_CANDIDATE`**：Level 0 Exact ICPN 已具至少一條 source-backed Provider／target／driver／algorithm／ROM-IAP／官方 programming route，applicability 可合理映射到該 ICPN／Base／Family，值得做完整 qualification。 | 可進一般 IC Selector，作為 qualification／客戶委託候選；**不可進 Job Picker、不可宣稱可燒錄**。 |
 | **Catalog Level 2 — Programming Qualified** | **02 Programming** | **Catalog Level 1 的子集合**：對精確 ICPN 依原廠 programming evidence 與版本鎖定 Programming Provider 驗證 Silicon ID／Revision、Target／Device mapping、Flash Driver、Bank／Geometry／Security 與宣告的 Erase／Program／Read／Verify 操作。至少一個 `ProgrammingQualification.state == SUPPORTED` 才導出 `PROGRAMMABLE`。 | 家族名稱、共用 Core、單獨 CFG／Driver 字串或 Candidate evidence，都不足以取得 Level 2。 |
-| **Catalog Level 3 — PLASMA Verified** | **03 PLASMA Compatibility** | **Catalog Level 2 的子集合**：至少一筆經審查、版本化的 `PPU_SITE` 或 `SOCKET_ADAPTER` 實體配置，在其明確限定的操作、接線與保護範圍內完成真實 HIL `PASSED`。直接 SWD 接線不需要假造 Socket 身分。 | Level 3 只證明指定配置／操作實測通過；不代表其他 Site、Socket、電壓、FPGA 版本或生產電氣資格通過，也不能免除當次 Job 安全檢查。 |
+| **Catalog Level 3 — PLASMA Verified** | **03 PLASMA Compatibility** | **Catalog Level 2 的子集合**：`PPU_SITE` 或 `SOCKET_ADAPTER` 的直接 HIL `PASSED`，**或**經審查且列名 Exact ICPN 的 `PPU Family Ready` 繼承證據。後者需原廠 Programming Guide、代表型號實際 HIL PASS、同版 Provider/CFG/Driver 及每顆 ICPN 正確的 Flash geometry。 | 直接 HIL 僅證明指定配置；`Family Ready` **不代表此 Exact ICPN 實機 PASS**，也不導出 Socket Ready、生產電氣資格、目前執行許可或其他配置的安全性。 |
 
 ### 四級數量契約：統一以 Unique Exact ICPN 計算
 
@@ -231,13 +232,15 @@ Catalog Level 2 建立獨立的軟體資格權威。Level 1 ICPN 可在一般 IC
 
 ### Catalog Level 3 — PLASMA Compatibility handoff（與軟體資格分離的實機相容性）
 
-**2026-11-09 owner amendment — L3 兩條獨立路徑：** Catalog Level 3 僅能對 Catalog Level 2 `SUPPORTED` 的 Exact ICPN 建立**特定配置實機驗證**。`PPU_SITE` 表示特定 PPU／Site 以直接接線或明確列出的非 Socket 連線完成 HIL；`SOCKET_ADAPTER` 表示特定 Socket／Adapter Revision 已完成其相應實機 HIL。兩類均為 **L3**，各自具有 `PASSED`／`NOT_TESTED` 狀態；沒有第三種 `Both Ready`。若兩類都有 PASS，只顯示兩個獨立 badge，Unique Exact ICPN 的 L3 數量仍只計一次。
+**2026-11-09 owner amendment — L3 兩條獨立路徑：** Catalog Level 3 僅適用 Catalog Level 2 `SUPPORTED` 的 Exact ICPN。`PPU Ready` 可以由特定 PPU／Site 的直接 HIL `PPU_SITE`，或在受控的 `Family Ready` 繼承規則下取得；`Socket Ready` 只能由特定 Socket／Adapter Revision 的 `SOCKET_ADAPTER` 直接實機 HIL 取得。兩條路徑均可**獨立**進入 L3，沒有第三種 `Both Ready`。若兩條路徑都有證據，只顯示兩個獨立 badge，Unique Exact ICPN 的 L3 數量仍只計一次。
 
-L3 計算規則：`L2 SUPPORTED AND (PPU_SITE HIL PASSED OR SOCKET_ADAPTER HIL PASSED)`。在 UI 對應顯示 `PPU Ready` 和／或 `Socket Ready`，但 `Ready` **僅表示封存的指定實驗配置通過相應測試**，不表示目前安裝的 PPU、Site、Socket、電氣條件或 Runtime 可無條件執行。每個 PASS 須鎖定 Exact ICPN／Package、PPU／Site、Debug Interface、實測操作、Readback／SAFE_OFF、PS／PL／Provider 身分與可核對的實體 Job 回執。Socket 路徑還要鎖定 Fixture／Adapter 的 Model 和 Revision；PPU 直接接線則記 `socket=null`、`connection_mode=DIRECT_WIRE`，不得捏造 Socket。
+L3 計算規則：`L2 SUPPORTED AND (PPU_SITE HIL PASSED OR SOCKET_ADAPTER HIL PASSED OR REVIEWED_PPU_FAMILY_READY)`。在 UI 對應顯示 `PPU Ready` 和／或 `Socket Ready`，**不另設 Both Ready 等級**。`PPU Ready` 必須顯式區分 `DIRECT_HIL`（此 Exact ICPN 的實機 PASS）與 `FAMILY_DERIVED`（此 Exact ICPN 的版本化 family-compatibility 推導，並未實機測試）。`Socket Ready` 只能來自個別 Fixture／Adapter 的直接 HIL。`Ready` 是 Catalog 資格註記，並非目前 PPU/Site、電氣條件或 Runtime 可無條件執行。每個直接 HIL PASS 須鎖定 Exact ICPN／Package、PPU／Site、Debug Interface、實測操作、Readback／SAFE_OFF、PS／PL／Provider 身分與可核對的實體 Job 回執。Socket 路徑還要鎖定 Fixture／Adapter 的 Model 和 Revision；PPU 直接接線則記 `socket=null`、`connection_mode=DIRECT_WIRE`，不得捏造 Socket。
+
+**Family Ready 繼承規則（經核准）**：ST 官方 `PM0075 Rev 2` 包含 STM32F103xx Flash Programming 原理，但不是商用完整訂購料號清單；不可依系列字串創造資格。僅允許 Canonical Exact ICPN 已存在、個別 Level 2 `SUPPORTED`、位於受審查版本化 exact allowlist、OpenOCD Provider/Version/Target CFG/Flash Driver 相符，且逐料號 Programming Profile/Flash geometry 與原廠來源鎖符合，方可繼承代表型號的 `PPU_SITE` HIL 證據為 `PPU Ready · Family Ready`。本次 `STM32F103C8T6` 直接 HIL 1 顆；PM0075 交集中的其他 76 顆以 `FAMILY_DERIVED` 標記，其中 medium-density 33 顆 1 KiB erase page，high-density 43 顆 2 KiB erase page。上述 76 顆的 `verified_configurations[]` 應為空，`family_ready` 另記原廠 Guide、版本化來源鎖、共用 CFG/Driver、個別 Profile、代表 HIL ID 和限制；**不能捏造 76 筆 HIL PASS**。後續不同矽晶片、不同 Flash geometry、無 L2 或非 allowlist 料號一律不自動擴張。
 
 **L3 非必要證據：**獨立的目標電壓／電流量測，以及實體線束的 Revision 編號。未量測或未記錄時可標註 `NOT_TESTED`／`NOT_RECORDED`，亦可省略這些可選欄位；**不因此阻止 PPU Ready 或 Socket Ready 晉級**，但不得宣稱該項目已驗證。這不豁免當次操作的供電適用性、接線／Pin Mapping、安全保護、Runtime／Safety Admission，也不等於取得生產電氣資格。**任何 mock、CI 或文件聲稱都不能代替真實 Flash／Readback／SAFE_OFF 回執。**
 
-Catalog Level 3 `PLASMA_VERIFIED` 統計**唯一 Exact ICPN 數**；通過的實體配置或測試次數另外統計。Catalog Level 2 `PROGRAMMABLE` 而兩條路徑都沒有 HIL PASS 的 IC 仍留在 IC Selector，但不得標示 Level 3。**單獨 PPU Site PASS 不等於 Socket Ready。** Job／Batch 對選定 Site 的執行期、安全及供電條件維持 Fail Closed；不得用 Catalog Level 1／2 文件捏造 HIL PASS。
+Catalog Level 3 `PLASMA_VERIFIED` 統計**唯一 Exact ICPN 數**，直接 HIL 與 Family Ready 推導**分開計數**；通過的實體配置或測試次數另外統計。Catalog Level 2 `PROGRAMMABLE` 若沒有直接 HIL PASS、也沒有符合上述限制的 Family Ready 證據，仍停留 Level 2。**單獨 PPU Site PASS 不等於 Socket Ready；PPU Family Ready 更不得捏造個別料號的 HIL PASS。** Job／Batch 對選定 Site 的執行期、安全及供電條件維持 Fail Closed。
 
 ### Visibility and execution boundary
 
@@ -260,7 +263,7 @@ OpenOCD-first CFG／Target／Driver 分析是**Catalog Level 1 的預設研究�
 3. **只由原廠官方來源取得 Exact ICPN**：使用各 Manufacturer 官方 Material／Ordering／Product／Parametric／DFP／Datasheet 等來源，保存 Source URI、Scope、Observation Time 與可取得的原始 Bytes／Hash。不得依 CFG 名稱、Family 前綴或 suffix grammar 創造不存在的料號。
 4. **Catalog Level 1 判定**：只有原廠完整商用 Exact ICPN 身分無歧義者可標為 `IDENTIFIED`。IC Information 各欄獨立使用 `VERIFIED／PARTIAL／UNKNOWN／CONFLICT／NOT_APPLICABLE`，不得用預設值填補未知。
 5. **Catalog Level 2 判定**：只有 Catalog Level 0 `DISCOVERED` 的 Exact ICPN 可進 Programming review；必須完成版本鎖定 Provider、原廠 programming evidence、Silicon／Revision、Flash geometry／security 與宣告操作的適用性驗證，才可標為 `SUPPORTED`。
-6. **Catalog Level 3 判定**：只有 Catalog Level 2 `SUPPORTED` 的 Exact ICPN 可建立 `PPU_SITE` 或 `SOCKET_ADAPTER` 的版本化、限定配置實機驗證；任一路徑 HIL `PASSED` 即可進 L3，另一條路徑狀態不受推定。
+6. **Catalog Level 3 判定**：只有 Catalog Level 2 `SUPPORTED` 的 Exact ICPN 可直接建立 `PPU_SITE` 或 `SOCKET_ADAPTER` 實體 HIL 驗證，或在經審查的 Exact ICPN allowlist／原廠 Guide／Provider／Flash geometry 鎖定條件下繼承 `PPU Family Ready`；L3 UI 必須明確區分直接 PASS 與 `FAMILY_DERIVED`，後者不算個別 ICPN HIL PASS；任何一條資格不推定另一條路徑。
 7. **停止與重啟規則**：證據不足就保留當前 Catalog Level／qualification 的真實狀態與 missing-evidence 清單並停止擴張；只有 Provider 版本、原廠證據或核准產品需求發生實質變化時才重新開案。缺證據不能推論成永久不支援。
 8. **跨 Manufacturer 一致性**：相同證據強度必須得到相同 Catalog Level 判定；不得因 ST、NXP、Microchip 或任何 Manufacturer 使用不同網站／API 就放寬 identity、field、programming 或 HIL 證據門檻。
 

@@ -272,6 +272,27 @@ export type VerifiedPhysicalConfiguration = {
   evidence: Array<{ path: string; sha256: string }>;
 };
 
+export type FamilyReadyEvidence = {
+  evidence_origin: "FAMILY_DERIVED";
+  group_id: string;
+  anchor_configuration_id: string;
+  manufacturer_guide: {
+    document: string;
+    scope: string;
+    uri: string;
+    source_lock_sha256: string;
+  };
+  provider: {
+    provider_id: string;
+    version: string;
+    target_config: string;
+    flash_driver: string;
+  };
+  programming_profile_id: string;
+  erase_unit_bytes: number;
+  limitations: string[];
+};
+
 export type ProgrammingQualification = {
   schema_version: "2.0.0";
   registry_id: string | null;
@@ -321,6 +342,8 @@ export type ProgrammingQualification = {
   physical_programming_qualified: false;
   ppu_ready: boolean;
   socket_ready: boolean;
+  ppu_readiness_source: "DIRECT_HIL" | "FAMILY_DERIVED" | null;
+  family_ready: FamilyReadyEvidence | null;
   verified_configurations: VerifiedPhysicalConfiguration[];
 };
 

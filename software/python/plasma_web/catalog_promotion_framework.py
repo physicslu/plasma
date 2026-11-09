@@ -34,6 +34,7 @@ EVIDENCE_CATALOG_MAPPED_ROUTE = "CATALOG_MAPPED_ROUTE"
 EVIDENCE_BACKEND_CANDIDATE_ROUTE = "BACKEND_CANDIDATE_ROUTE"
 EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER = "REVIEWED_PROGRAMMING_PROVIDER"
 EVIDENCE_PLASMA_VERIFIED_CONFIGURATION = "PLASMA_VERIFIED_CONFIGURATION"
+EVIDENCE_PLASMA_FAMILY_READY = "PLASMA_FAMILY_READY_DERIVED"
 
 PROMOTION_EVIDENCE_CLASSES = (
     EVIDENCE_IDENTITY_ONLY,
@@ -41,6 +42,7 @@ PROMOTION_EVIDENCE_CLASSES = (
     EVIDENCE_BACKEND_CANDIDATE_ROUTE,
     EVIDENCE_REVIEWED_PROGRAMMING_PROVIDER,
     EVIDENCE_PLASMA_VERIFIED_CONFIGURATION,
+    EVIDENCE_PLASMA_FAMILY_READY,
 )
 
 NO_PROGRAMMING_ROUTE_EVIDENCE = "NO_PROGRAMMING_ROUTE_EVIDENCE"
@@ -76,9 +78,9 @@ BLOCKER_TAXONOMY = {
         "A reviewed Programming Provider record explicitly reports UNSUPPORTED."
     ),
     PLASMA_VERIFIED_CONFIGURATION_MISSING: (
-        "Software programming is qualified, but no versioned PLASMA "
-        "PPU/Site or Socket/Adapter versioned configuration HIL PASS has "
-        "promoted the ICPN to Level 3."
+        "Software programming is qualified, but neither a versioned direct "
+        "PPU/Site or Socket/Adapter HIL PASS nor a reviewed exact ICPN "
+        "PPU Family Ready derivation is available."
     ),
 }
 
@@ -177,10 +179,16 @@ class CatalogPromotionFramework:
             _require(
                 qualification.get("state") == "SUPPORTED"
                 and (qualification.get("ppu_ready") or qualification.get("socket_ready"))
-                and bool(qualification.get("verified_configurations")),
-                f"Level 3 needs one canonical verified configuration: {record.vendor}/{record.identifier}",
+                and (bool(qualification.get("verified_configurations"))
+                     or (qualification.get("ppu_readiness_source") == "FAMILY_DERIVED"
+                         and bool(qualification.get("family_ready")))),
+                f"Level 3 needs direct HIL or reviewed family evidence: {record.vendor}/{record.identifier}",
             )
-            evidence_class = EVIDENCE_PLASMA_VERIFIED_CONFIGURATION
+            evidence_class = (
+                EVIDENCE_PLASMA_FAMILY_READY
+                if qualification.get("ppu_readiness_source") == "FAMILY_DERIVED"
+                else EVIDENCE_PLASMA_VERIFIED_CONFIGURATION
+            )
             promotion_edge = None
             blocker = None
 

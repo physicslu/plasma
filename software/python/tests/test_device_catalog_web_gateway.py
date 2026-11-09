@@ -247,16 +247,20 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                 self.assertFalse(qualification["hardware_runtime_ready"])
                 self.assertFalse(qualification["physical_programming_qualified"])
 
-    def test_stm32f103_high_density_wlcsp_package_is_l2_supported(self) -> None:
+    def test_stm32f103_high_density_wlcsp_package_is_l3_family_ready(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F103RCY6TR&limit=1")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
-        self.assertEqual(result["catalog_level"], 2)
+        self.assertEqual(result["catalog_level"], 3)
+        self.assertEqual(result["physical_validation"]["ppu_status"], "family_ready")
+        self.assertEqual(result["physical_validation"]["socket_status"], "no_evidence")
         self.assertTrue(result["job_selectable"])
         qualification = result["programming_qualification"]
         self.assertEqual(qualification["state"], "SUPPORTED")
         self.assertTrue(qualification["reviewed"])
+        self.assertEqual(qualification["ppu_readiness_source"], "FAMILY_DERIVED")
+        self.assertEqual(qualification["verified_configurations"], [])
         self.assertEqual(
             qualification["programming"]["programming_profile_id"],
             "stm32f1-high-density-flash-v0",
@@ -614,16 +618,19 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, l2 = self.request("/api/devices/search?q=STM32F103C8T6TR&levels=2&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(l2["levels"], [2])
-        self.assertGreaterEqual(l2["count"], 1)
-        self.assertEqual(l2["results"][0]["icpn"], "STM32F103C8T6TR")
-        self.assertEqual(l2["results"][0]["catalog_level"], 2)
-        self.assertEqual(l2["results"][0]["catalog_level_state"], "PROGRAMMABLE")
-        self.assertTrue(l2["results"][0]["job_selectable"])
+        self.assertEqual(l2["count"], 0)
+
+        status, family_l3 = self.request("/api/devices/search?q=STM32F103C8T6TR&levels=3&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(family_l3["count"], 1)
+        self.assertEqual(family_l3["results"][0]["catalog_level"], 3)
+        self.assertEqual(family_l3["results"][0]["physical_validation"]["ppu_status"], "family_ready")
+        self.assertTrue(family_l3["results"][0]["job_selectable"])
 
         status, l3 = self.request("/api/devices/search?q=STM32F103C8T6&levels=3&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(l3["levels"], [3])
-        self.assertEqual(l3["total_count"], 1)
+        self.assertGreaterEqual(l3["total_count"], 1)
         self.assertEqual(l3["results"][0]["icpn"], "STM32F103C8T6")
         self.assertTrue(l3["results"][0]["programming_qualification"]["ppu_ready"])
         self.assertFalse(l3["results"][0]["programming_qualification"]["socket_ready"])

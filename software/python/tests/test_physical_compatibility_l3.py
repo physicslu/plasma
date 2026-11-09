@@ -17,7 +17,12 @@ from plasma_web.physical_compatibility import (
     PhysicalCompatibilityRegistry,
     get_default_physical_compatibility_registry,
 )
-from plasma_web.programming_qualification import ProgrammingQualificationRegistry
+from plasma_web.family_ready import FamilyReadyRegistry, get_default_family_ready_registry
+from plasma_web.openocd_software_qualification import get_default_openocd_software_qualification_registry
+from plasma_web.programming_qualification import (
+    ProgrammingQualificationRegistry, get_default_programming_qualification_registry,
+)
+from plasma_web.device_catalog import get_default_device_catalog
 
 
 class _FakeProvider:
@@ -193,3 +198,89 @@ def test_l3_rejects_readback_or_safe_off_spoof_even_with_matching_digest(tmp_pat
     record["evidence"] = [{"path": "docs/evidence/modified.json", "sha256": hashlib.sha256(raw).hexdigest()}]
     with pytest.raises(DeviceCatalogIntegrityError, match="receipt identity, readback"):
         PhysicalCompatibilityRegistry([record], root=tmp_path)
+
+
+def _family_groups() -> list[dict]:
+    root = Path(__file__).resolve().parents[3]
+    payload = json.loads((root / "release/physical-compatibility/l3-family-ready-v1.json")
+                         .read_text(encoding="utf-8"))
+    assert payload["schema"] == "plasma.catalog.l3-family-ready.v1"
+    return payload["family_groups"]
+
+
+def _real_family_registry(groups: list[dict]) -> ProgrammingQualificationRegistry:
+    provider = get_default_openocd_software_qualification_registry()
+    assert provider is not None
+    return ProgrammingQualificationRegistry(
+        get_default_device_catalog(), (provider,),
+        physical_compatibility=get_default_physical_compatibility_registry(),
+        family_ready=FamilyReadyRegistry(groups, root=Path(__file__).resolve().parents[3]),
+    )
+
+
+def test_l3_exact_family_allowlist_77_once_and_separate_hil_from_inference():
+    registry = get_default_programming_qualification_registry()
+    families = get_default_family_ready_registry()
+    assert len(families.exact_keys) == 76
+    assert registry.summary["catalog_level_counts"] == {"0": 204, "1": 5604, "2": 0, "3": 77}
+
+    blue_pill = registry.describe("STMicroelectronics", "STM32F103C8T6")
+    assert blue_pill["ppu_readiness_source"] == "DIRECT_HIL"
+    assert blue_pill["family_ready"] is None
+    assert len(blue_pill["verified_configurations"]) == 1
+    assert blue_pill["socket_ready"] is False
+
+    for vendor, icpn in families.exact_keys:
+        qualification = registry.describe("STMicroelectronics", icpn.upper())
+        assert qualification["state"] == "SUPPORTED"
+        assert qualification["catalog_level"] == 3
+        assert qualification["ppu_ready"] and not qualification["socket_ready"]
+        assert qualification["ppu_readiness_source"] == "FAMILY_DERIVED"
+        assert qualification["verified_configurations"] == []
+        assert qualification["family_ready"]["evidence_origin"] == "FAMILY_DERIVED"
+        assert qualification["execution_authorized"] is False
+        assert qualification["hardware_runtime_ready"] is False
+        assert qualification["family_ready"]["provider"]["target_config"] == "tcl/target/stm32f1x.cfg"
+        assert (qualification["family_ready"]["erase_unit_bytes"]
+                == qualification["programming"]["flash_geometry"]["erase_unit_bytes"])
+
+    assert registry.describe("STMicroelectronics", "STM32F103C8T6TR")["family_ready"]["erase_unit_bytes"] == 1024
+    assert registry.describe("STMicroelectronics", "STM32F103ZCT6")["family_ready"]["erase_unit_bytes"] == 2048
+    unknown = registry.describe("STMicroelectronics", "STM32F103T8U6")
+    assert unknown["catalog_level"] == 1
+    assert not unknown["ppu_ready"]
+    assert unknown["family_ready"] is None
+
+
+def test_family_ready_fails_closed_on_unreviewed_exact_icpn_and_wrong_geometry():
+    groups = _family_groups()
+    groups[0]["profiles"][0]["exact_icpns"].append("STM32F103T8U6")
+    with pytest.raises(DeviceCatalogIntegrityError, match="requires one reviewed L2 Provider"):
+        _real_family_registry(groups)
+
+    groups = _family_groups()
+    groups[0]["profiles"][0]["erase_unit_bytes"] = 2048
+    with pytest.raises(DeviceCatalogIntegrityError, match="Flash geometry or OpenOCD source lock drift"):
+        _real_family_registry(groups)
+
+    groups = _family_groups()
+    groups[0]["profiles"][0]["exact_icpns"].append("STM32F103NOTREAL")
+    with pytest.raises(DeviceCatalogIntegrityError, match="lacks admitted exact ICPN"):
+        _real_family_registry(groups)
+
+
+def test_family_ready_requires_guide_source_lock_and_true_direct_hil_anchor():
+    groups = _family_groups()
+    groups[0]["guide"]["source_lock_sha256"] = "0" * 64
+    with pytest.raises(DeviceCatalogIntegrityError, match="source lock drift"):
+        _real_family_registry(groups)
+
+    groups = _family_groups()
+    groups[0]["anchor_configuration_id"] = "fake-no-physical-hil"
+    with pytest.raises(DeviceCatalogIntegrityError, match="anchor lacks a unique direct PPU HIL PASS"):
+        _real_family_registry(groups)
+
+    groups = _family_groups()
+    groups[0]["profiles"][0]["exact_icpns"].append("STM32F103C8T6")
+    with pytest.raises(DeviceCatalogIntegrityError, match="no fake/duplicate direct HIL"):
+        _real_family_registry(groups)

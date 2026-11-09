@@ -56,6 +56,13 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.match(selector, /原廠料號 · 已確認/);
   assert.match(selector, /未實機測試/);
   assert.match(selector, /實機測試通過/);
+  assert.match(selector, /Family Ready/);
+  assert.match(selector, /此 exact ICPN 未實機驗證/);
+  assert.match(api, /ppu_readiness_source:\s*"DIRECT_HIL"\s*\|\s*"FAMILY_DERIVED"/);
+  assert.match(api, /family_ready:\s*FamilyReadyEvidence\s*\|\s*null/);
+  assert.doesNotMatch(selector, /Site 電氣相容|Site electrical/);
+  assert.doesNotMatch(selector, /<dt>Hardware Ready<\/dt>/);
+  assert.doesNotMatch(selector, /實體燒錄資格|Physical programming/);
   assert.match(selector, /device\.physical_validation\.ppu_status/);
   assert.match(selector, /device\.physical_validation\.socket_status/);
   assert.match(selector, /原廠料號已確認且 OpenOCD 設定已存在/);
@@ -234,8 +241,10 @@ test("selected IC profile presents device, programming, and Plasma compatibility
   assert.match(selector, /PLASMA Compatibility/);
   assert.match(selector, /原廠文件未明確指定/);
   assert.match(selector, /manufacturer_baseline\.sha256/);
-  assert.match(selector, /hardware_runtime_ready/);
-  assert.match(selector, /physical_programming_qualified/);
+  assert.match(selector, /physicalValidationDetail\(selected\.physical_validation\.ppu_status/);
+  assert.match(selector, /physicalValidationDetail\(selected\.physical_validation\.socket_status/);
+  assert.doesNotMatch(selector, /selected\.selected_profile\?\.plasma_compatibility\.hardware_runtime_ready/);
+  assert.doesNotMatch(selector, /selected\.selected_profile\?\.plasma_compatibility\.physical_programming_qualified/);
   assert.match(styles, /\.icSelectorProfileSection\s*\{/);
   assert.match(styles, /\.icSelectorEvidenceDetails\s*\{/);
 });

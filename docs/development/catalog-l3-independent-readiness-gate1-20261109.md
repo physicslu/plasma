@@ -1,8 +1,10 @@
 # PLASMA Catalog L3 — independent PPU Ready / Socket Ready (Gate 1)
 
 **Date:** 2026-11-09
-**Owner decision:** L3 requires one approved physical HIL configuration on *either*
-`PPU_SITE` or `SOCKET_ADAPTER`. Both routes are L3; there is no `Both Ready` tier.
+**Original owner decision:** L3 requires one approved physical HIL configuration on
+either `PPU_SITE` or `SOCKET_ADAPTER`. The approved Family Ready amendment below
+extends PPU Ready with explicitly audited derivation; Socket Ready remains direct
+HIL only. Both routes are L3; there is no `Both Ready` tier.
 **Scope:** ADR-0002, canonical qualification, read-only Manager-owned Selector,
 independent versioned physical evidence, UI badges, Host-only regressions.
 **Excluded:** DUT/PPU operation, SWPC deployment, firmware/RTL modifications,
@@ -47,6 +49,29 @@ Neither flag overrides `execution_authorized=false`, live Site admission, or
   `docs/evidence/console-bundle-programming-hil-2026-11-09/`.
 
 ## L3 scope, optional observations, and execution safety
+
+### Gate 1 amendment: PM0075 Family Ready inheritance (2026-11-09)
+
+Owner approved independent `PPU Ready · Family Ready` projection for vetted
+Exact ICPNs governed by ST PM0075 Rev 2, together with removing three stale
+display-only rows from IC Selector's PLASMA Compatibility section:
+`Site 電氣相容`, `Hardware Ready`, `實體燒錄資格`. The corresponding backend
+runtime/safety fields remain untouched and are **not** waived.
+
+Reviewed allowlist: `release/physical-compatibility/l3-family-ready-v1.json`.
+The 76 entries are each already L2 `SUPPORTED`, pinned to OpenOCD 0.12.0
+`tcl/target/stm32f1x.cfg`, driver `stm32f1x`, manufacturer PM0075 Rev 2
+SHA256 `2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a`.
+The allowed medium-density 33 use 1,024-byte Flash pages; the high-density 43
+use 2,048-byte Flash pages. They are **L3 PPU Ready by reviewed family evidence**
+and **have no per-exact-ICPN HIL receipts**. Only STM32F103C8T6 is
+`DIRECT_HIL`; the other 76 are `FAMILY_DERIVED`. All remain Socket Not Tested.
+
+This is a new L3 product-qualification semantics; it does not assert that
+the 76 ICs or packages were individually flashed, nor permit installation,
+automatic flashing, FPGA loading or bypassing SAFE_OFF/Site Lease/UNKNOWN.
+Cross-Manufacturer Promotion reports the derived evidence in a separate
+`PLASMA_FAMILY_READY_DERIVED` evidence class, not physical HIL PASS count.
 
 The PPU Ready badge means **this particular archived PPU/Site direct-SWD
 configuration** successfully performed the scoped HIL operations. It does

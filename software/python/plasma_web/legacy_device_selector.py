@@ -256,7 +256,8 @@ def _device_search_payload(
         # Project the two independent, versioned L3 tracks from the canonical
         # Programming Qualification Registry; neither grants execution.
         item["physical_validation"]["ppu_status"] = (
-            "passed" if qualification.get("ppu_ready") else "no_evidence"
+            "family_ready" if qualification.get("ppu_readiness_source") == "FAMILY_DERIVED"
+            else "passed" if qualification.get("ppu_ready") else "no_evidence"
         )
         item["physical_validation"]["socket_status"] = (
             "passed" if qualification.get("socket_ready") else "no_evidence"
