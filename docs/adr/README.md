@@ -23,6 +23,7 @@
 | [ADR-0005](0005-independent-swd-ip-guarded-bitbang.md) | **Superseded by ADR-0006** | 歷史 SWD Debug Bitbang 候選架構；非目前實作方向。 |
 | [ADR-0007](0007-ppu-reload-fence-per-site-locking.md) | **Accepted (Owner decision; PR #1189 Draft)** | PPU Image/Reload 共享／獨占 Fence 與 per-Site 獨占鎖；保留 protected Root supervisor.lock，Host-only 驗證並行與 Reload 拒絕，不宣稱實機驗證。 |
 | [ADR-0006](0006-independent-swd-engine-and-future-gpio-bus.md) | **Accepted (Owner decision; PR #1189 Draft)** | 雙獨立 SWD NORMAL Engine，移除 SWD Debug Bitbang／0x3C／0x40；只保留 OFF/NORMAL，未來 GPIO Bus 與 JTAG/SPI/UART/I²C 為獨立周邊，尚未實作。 |
+| [ADR-0008](0008-local-owner-mode.md) | **Accepted policy / implementation pending (Owner decision 2026-11-09)** | PLASMA PPU 預設 Local Owner Mode：無帳號／雲端／License／人工 Token／原廠授權依賴；本機設備控制權與交易安全憑證分離，保留硬體安全／UNKNOWN 復原；P2/P1/P3 實作尚未完成。 |
 
 ## Maintenance rule
 

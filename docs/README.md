@@ -26,6 +26,7 @@
 - **Current** — [Former monolithic contract — entry stub linking the contracts above](development/plasma-autonomous-development-contract-full.md)
 - **Current** — [Documentation maintenance rules — statuses, placement, source priority](development/documentation-maintenance.md)
 - **Reference** · `OPF Bundle v3` · `Host-only Gate 1` — [User Bundle v3 Source-independent Admission Evidence](development/opf-user-bundle-source-agnostic-host-20261106.md)：記錄移除使用者 Bundle Git Source/Publisher 資格限制的 Host-only 實作與測試；新 Z2 B3 仍未實測。
+- **Plan** · `Owner approved 2026-11-09` · `Gate 1` — [OPF Local Owner Mode 授權呼叫鏈稽核與分階段遷移](development/opf-local-owner-mode-gate1-20261109.md)：以最新 main 確認現有 Registry、Bootstrap Token、BFF Cookie、HMAC、PPU 安全守門，提出本機接管與失憑證恢復設計；只做 Host-only 基準測試，不改執行路徑。
 - **Current** — [Glossary — current terms and retired codes](glossary.md)
 
 ## Architecture Decision Records
@@ -40,6 +41,7 @@
 - **Historical** · `superseded by ADR-0006` — [ADR-0005: 獨立 SWD IP 與原 SWD Debug Bitbang 提案](adr/0005-independent-swd-ip-guarded-bitbang.md)：僅供歷史決策追溯。
 - **Plan** · `PR #1189 Draft` — [ADR-0006: 專用 SWD Engine 與未來通用 GPIO Bus](adr/0006-independent-swd-engine-and-future-gpio-bus.md)：SWD 只保留 OFF/NORMAL，未來 GPIO Bus、JTAG、SPI、UART、I²C 分別規劃，未宣稱實作或實機驗收。
 - **Plan** · `Host-only` — [ADR-0007: PPU Image/Reload 與每 Site 並行所有權](adr/0007-ppu-reload-fence-per-site-locking.md)：保留 Root Guard，PPU Fence 共享／獨占及每 Site 獨占鎖；不宣稱 Z2 或 8-Site HIL。
+- **Plan** · `Accepted policy 2026-11-09` · `not implemented` — [ADR-0008: PLASMA PPU Local Owner Mode](adr/0008-local-owner-mode.md)：使用者離線自主設定、安裝與燒錄，不需帳號／License／原廠操作授權；須經本機控制權建立且保留完整硬體與交易安全檢查。
 
 ## PPU architecture and runtime
 
