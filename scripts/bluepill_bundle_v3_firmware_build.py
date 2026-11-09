@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Offline reproducible Blue Pill v0.1/v0.2 Bundle v3 fixture builder.
 
+Thin wrapper over the shared ``plasma_opf.bundle_v3`` writer and the committed
+first-party Programming Route; it only pins the historical firmware digests and
+package names so the two fixture Bundles stay byte-identical.
 This developer tool does not deploy a Bundle, select FPGA, or operate a DUT.
 Only original firmware bytes matching the historical CI digest are accepted.
 The two versions each produce a distinct whole Active Asset Set.
@@ -10,17 +13,21 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import stat
-import zipfile
+import sys
 from pathlib import Path
 
 import ppu_unified_deployment
 
-TARGET = {"platform": "linux-armv7", "board": "pynq-z2",
-          "fpga_part": "xc7z020clg400-1"}
-PROVIDER = "openocd-platform-reference"
-PROFILE = "stm32f103c8t6-site2"
-ICPN = "STM32F103C8T6"
+_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_ROOT / "software" / "python"))
+from plasma_opf import bundle_v3  # noqa: E402  single shared Bundle v3 writer
+
+ROUTE_FILE = _ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6.json"
+_ROUTE = bundle_v3.load_route(ROUTE_FILE)
+TARGET = dict(_ROUTE.target)
+PROVIDER = _ROUTE.provider_id
+PROFILE = _ROUTE.profile_id
+ICPN = _ROUTE.icpn
 SOURCES = {
     "v0.1": {"filename": "plasma-blue-pill-cdc.bin",
              "size": 18768,
@@ -39,10 +46,6 @@ def _sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _json(data: object) -> bytes:
-    return (json.dumps(data, separators=(",", ":"), sort_keys=True) + "\n").encode()
-
-
 def build(variant: str, firmware: Path, output: Path) -> dict[str, object]:
     if variant not in SOURCES:
         raise FixtureDenied("VARIANT_UNKNOWN")
@@ -58,55 +61,15 @@ def build(variant: str, firmware: Path, output: Path) -> dict[str, object]:
         raise FixtureDenied("OUTPUT_EXISTS_OR_UNTRUSTED")
     variant_id = variant.replace(".", "")
     asset_id = f"bluepill-cdc-fw-{variant_id}"
-    members = {
-        f"payload/packages/{PROVIDER}/data/plasma-provider-options.json":
-            _json({"schema": "plasma.ppu.provider-options.v1",
-                   "options": {"type": "object", "properties": {}}}),
-        f"payload/packages/{PROFILE}/data/plasma-provider.json":
-            _json({"schema": "plasma.ppu.provider-capabilities.v1",
-                   "target": ICPN, "provider_package": PROVIDER,
-                   "operations": ["flash_cycle"], "sites": [2],
-                   "transport": "fpga", "driver_abi": "plasma_swd:5",
-                   "fpga_package": None, "max_image_bytes": 65536}),
-        f"payload/packages/{PROFILE}/data/plasma-flash-profile.json":
-            _json({"schema": "plasma.ppu.openocd-flash-profile.v1",
-                   "icpn": ICPN, "target_config": "target/stm32f1x.cfg",
-                   "flash_base": 0x08000000, "flash_size": 65536,
-                   "erase_granularity": 1024}),
-        f"payload/packages/{asset_id}/data/{source['filename']}": contents,
-    }
-
-    def package(pid: str, kind: str, requires: list[str]) -> dict:
-        paths = sorted(p for p in members
-                       if p.startswith(f"payload/packages/{pid}/"))
-        return {"id": pid, "kind": kind, "version": "1.0.0",
-                "requires": requires,
-                "files": [{"path": p, "size": len(members[p]),
-                           "sha256": _sha(members[p]), "executable": False}
-                          for p in paths]}
-
-    manifest = {
-        "schema": "plasma.ppu.bundle.v3",
-        "name": f"bluepill-site2-fw-{variant_id}", "version": "1.0.0",
-        "purpose": "programming", "target": TARGET,
-        # The existing B3 verified-set reader requires this exact action set.
-        "actions": ["install", "verify"],
-        "packages": [
-            package(PROVIDER, "platform-provider", []),
-            package(PROFILE, "programming-profile", [PROVIDER]),
-            package(asset_id, "firmware-asset", [PROFILE]),
-        ],
-    }
-    complete = {"manifest.json": _json(manifest), **members}
+    built = bundle_v3.build_image_bundle(
+        _ROUTE, contents, image_filename=source["filename"],
+        asset_package_id=asset_id, bundle_name=f"bluepill-site2-fw-{variant_id}")
     try:
-        with zipfile.ZipFile(output, "x") as archive:
-            for filename, raw in sorted(complete.items()):
-                entry = zipfile.ZipInfo(filename, date_time=(1980, 1, 1, 0, 0, 0))
-                entry.create_system = 3
-                entry.external_attr = (stat.S_IFREG | 0o644) << 16
-                entry.compress_type = zipfile.ZIP_STORED
-                archive.writestr(entry, raw)
+        with output.open("xb") as stream:
+            stream.write(built.archive)
         digest = _sha(output.read_bytes())
+        if digest != built.archive_sha256:
+            raise FixtureDenied("OUTPUT_WRITE_MISMATCH")
         ppu_unified_deployment.verify_host_only_bundle(
             output, expected_sha256=digest, target_profile=TARGET)
     except BaseException:

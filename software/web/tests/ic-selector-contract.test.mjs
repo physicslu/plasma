@@ -106,7 +106,10 @@ test("shared PMode and EMode picker requests only Level 2 and Level 3 ICPNs", as
   const picker = await source("../app/devices/ic-picker-field.tsx");
 
   assert.match(picker, /Search admitted ICPN/);
-  assert.match(picker, /levels:\s*\[2, 3\]/);
+  // Default stays L2/L3 for PMode/EMode; Bundle programming opts into L1-L3
+  // explicitly because Catalog Level is not an execution gate.
+  assert.match(picker, /levels = \[2, 3\]/);
+  assert.match(picker, /levels,\n/);
   assert.match(picker, /L\{device\.catalog_level\}/);
   assert.match(picker, /Exact ICPN ·/);
   assert.match(picker, /OCD Mapped/);

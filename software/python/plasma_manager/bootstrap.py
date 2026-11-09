@@ -388,6 +388,10 @@ class BootstrapHttpClient:
     def start_deployment(self, token: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
         return self._json("POST", "/v1/deployments", token=token, body=body, timeout_s=10.0)
 
+    def assets(self, token: str) -> tuple[int, dict[str, Any]]:
+        """PPU-verified Active Asset Set identity (read-only)."""
+        return self._json("GET", "/v1/assets", token=token, timeout_s=10.0)
+
 
 def _hex_field(value: object, length: int, label: str) -> str:
     if (type(value) is not str or len(value) != length
@@ -467,6 +471,22 @@ class ManagerBootstrapCoordinator:
             "pairing": self.credentials.public_state(normalized),
             "token_verification": "deferred_until_authenticated_operation",
         }
+
+    def assets(self, alias: str) -> dict[str, Any]:
+        """Read the PPU-verified Active Asset Set identity; fail closed when untrusted."""
+        _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)
+        status, payload = client.assets(token)
+        record = payload.get("assets") if status == 200 else None
+        if (not isinstance(record, dict)
+                or record.get("schema") != "plasma.ppu.active-assets.v1"
+                or record.get("state") not in {"EMPTY", "ACTIVE", "RECOVERY_REQUIRED"}):
+            raise BootstrapManagerError("PPU Active Asset Set status is untrusted")
+        digest = record.get("asset_set_sha256")
+        if record["state"] == "ACTIVE":
+            _hex_field(digest, 64, "Active Asset Set SHA256")
+        elif digest is not None:
+            raise BootstrapManagerError("PPU Active Asset Set status is untrusted")
+        return record
 
     def create_upload(self, alias: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
         _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)

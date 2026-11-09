@@ -91,7 +91,16 @@ for token in string.ascii_uppercase + string.digits:
         offset += 100
         if offset >= page["total_count"]:
             break
-modules = sorted(m for m in sys.modules if m.split(".")[0] in ("plasma_core", "plasma_web"))
+# Console-driven Bundle programming (Gate 1, 2026-11-09): ship the shared
+# Bundle v3 writer and the committed Programming Routes with the Manager.
+from pathlib import Path as _Path
+routes_root = os.path.join(root, "data", "opf", "programming-routes")
+os.environ["PLASMA_PROGRAMMING_ROUTES_ROOT"] = routes_root
+importlib.import_module("plasma_manager.programming")
+bundle_v3 = importlib.import_module("plasma_opf.bundle_v3")
+if not bundle_v3.load_routes(_Path(routes_root)):
+    raise SystemExit("no Programming Routes found")
+modules = sorted(m for m in sys.modules if m.split(".")[0] in ("plasma_core", "plasma_web", "plasma_opf"))
 print(json.dumps({"files": sorted(files), "modules": modules, "records": len(records)}))
 """
 
@@ -306,6 +315,8 @@ def _build_manager_zipapp(repo_root: Path, destination: Path) -> tuple[str, str]
         "__main__.py",
         "plasma_manager/server.py",
         "plasma_manager/bootstrap_server.py",
+        "plasma_manager/programming.py",
+        "plasma_opf/bundle_v3.py",
         "yaml/__init__.py",
     }
     missing = sorted(required - names)
@@ -432,6 +443,8 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
         "__main__.py",
         "plasma_manager/server.py",
         "plasma_manager/bootstrap_server.py",
+        "plasma_manager/programming.py",
+        "plasma_opf/bundle_v3.py",
         "yaml/__init__.py",
     }
     if not required_manager_files <= names:
