@@ -278,13 +278,16 @@ export function installManagerPpuBundle(
   }
   // B3 of the PPU's CURRENT B2-admitted Bundle. The owner choices are the
   // exact admitted SHA-256/transaction and whether to also load its FPGA
-  // Image; never a path, idle claim or token.
+  // Image; never a path, idle claim or token. Both Console choices activate
+  // the Bundle as the Active Set (the Manager requires an explicit mode);
+  // the Console never requests a stage-only install.
   return jsonRequest<DeploymentPayload>(`${root(alias)}/deployments`, {
     method: "POST",
     body: JSON.stringify({
       kind: "bundle", upload_id: admitted.uploadId,
       archive_sha256: admitted.archiveSha256,
       admission_transaction_id: admitted.admissionTransactionId,
+      mode: "activate",
       fpga_load: fpgaLoad,
     }),
   }).then(receipt => {

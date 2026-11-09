@@ -70,6 +70,19 @@ test("B3 Console control sends the exact admitted Bundle and explicit fpga_load 
   assert.match(ui, /deployment\?\.transaction_id === admitted.admissionTransactionId/);
   assert.match(ui, /runtime_site_readmission === "REQUIRED"/);
   assert.doesNotMatch(ui, /install_only/);
-  assert.match(manager, /admission_transaction_id and fpga_load/);
-  assert.match(manager, /INSTALL_FPGA_LOAD if body\["fpga_load"\] else INSTALL/);
+  assert.match(api, /mode: "activate",\n\s*fpga_load: fpgaLoad/);
+  assert.doesNotMatch(api, /stage_only/);
+  assert.match(manager, /admission_transaction_id, mode and fpga_load/);
+  assert.match(manager, /ACTIVATE_FPGA_LOAD if body\["fpga_load"\] else\s+ACTIVATE if mode == "activate" else INSTALL/);
+});
+
+test("B3 Console body key set equals the Manager's required B3 key set", async () => {
+  const [api, manager] = await Promise.all([read("api"), read("manager")]);
+  const fn = api.slice(api.indexOf("export function installManagerPpuBundle"));
+  const body = fn.slice(fn.indexOf("JSON.stringify({") + 16, fn.indexOf("}),"));
+  const consoleKeys = [...body.matchAll(/(\w+):/g)].map(m => m[1]).sort();
+  const required = manager.match(/if set\(body\) != \{([^}]*"admission_transaction_id"[^}]*)\}/);
+  assert.ok(required, "Manager B3 required key set not found");
+  const managerKeys = [...required[1].matchAll(/"(\w+)"/g)].map(m => m[1]).sort();
+  assert.deepEqual(consoleKeys, managerKeys);
 });
