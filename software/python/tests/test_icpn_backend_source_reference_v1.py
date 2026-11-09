@@ -106,7 +106,10 @@ class BackendSourceReferenceTests(unittest.TestCase):
                 self.assertEqual(record["icpn"], icpn)
                 self.assertEqual(record["backend_source_reference"]["provider_id"], provider)
                 self.assertIsNone(record["backend_source_reference"]["installed_binary_sha256"])
-                self.assertEqual(record["physical_validation"]["ppu_status"], "no_evidence")
+                self.assertEqual(
+                    record["physical_validation"]["ppu_status"],
+                    "passed" if icpn == "STM32F103C8T6" else "no_evidence",
+                )
                 self.assertEqual(record["physical_validation"]["socket_status"], "no_evidence")
 
 

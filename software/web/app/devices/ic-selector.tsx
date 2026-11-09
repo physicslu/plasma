@@ -34,6 +34,7 @@ function statusClass(value: string | null): string {
     || value === "engineering_verified"
     || value === "verified"
     || value === "passed"
+    || value === "family_ready"
     || value?.startsWith("verified_")
   ) return "verified";
   if (value === "rejected" || value === "failed" || value === "blocked") return "failed";
@@ -106,11 +107,14 @@ function manufacturerPartLabel(status: string | null, zh: boolean): string {
 }
 
 function physicalValidationLabel(kind: "PPU" | "Socket", status: string, zh: boolean): string {
+  if (status === "family_ready") {
+    return `${kind} Ready · Family Ready ${zh ? "（同家族推導）" : "(family-derived)"}`;
+  }
   if (status === "no_evidence" || status === "not_verified") {
     return `${kind} · ${zh ? "未實機測試" : "Not hardware-tested"}`;
   }
   if (status === "engineering_verified" || status === "verified" || status === "passed") {
-    return `${kind} · ${zh ? "實機測試通過" : "Hardware test passed"}`;
+    return `${kind} Ready · ${zh ? "實機測試通過" : "Hardware test passed"}`;
   }
   if (status === "rejected" || status === "failed" || status === "blocked") {
     return `${kind} · ${zh ? "實機測試未通過" : "Hardware test failed"}`;
@@ -119,6 +123,7 @@ function physicalValidationLabel(kind: "PPU" | "Socket", status: string, zh: boo
 }
 
 function physicalValidationDetail(status: string, zh: boolean): string {
+  if (status === "family_ready") return zh ? "Family Ready · 共用燒錄演算法推導，尚未逐顆實機測試" : "Family Ready · Algorithm-family-derived; no per-ICPN hardware test";
   if (status === "no_evidence" || status === "not_verified") return zh ? "未實機測試" : "Not hardware-tested";
   if (status === "engineering_verified" || status === "verified" || status === "passed") return zh ? "實機測試通過" : "Hardware test passed";
   if (status === "rejected" || status === "failed" || status === "blocked") return zh ? "實機測試未通過" : "Hardware test failed";
@@ -601,15 +606,12 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
                 <span>03</span>
                 <div>
                   <h3>{zh ? "PLASMA Compatibility" : "PLASMA Compatibility"}</h3>
-                  <p>{zh ? "Site / Socket / 實機資格是獨立證據，不由 Catalog 或 OpenOCD 推論" : "Site, socket, and physical qualification remain independent evidence"}</p>
+                  <p>{zh ? "PPU Ready 可由直接 HIL 或經審查的 Family Ready 推導；Socket 必須獨立驗證" : "PPU Ready identifies direct HIL or reviewed family derivation; Socket needs separate evidence"}</p>
                 </div>
               </div>
               <dl>
                 <div><dt>PPU</dt><dd>{physicalValidationDetail(selected.physical_validation.ppu_status, zh)}</dd></div>
                 <div><dt>Socket</dt><dd>{physicalValidationDetail(selected.physical_validation.socket_status, zh)}</dd></div>
-                <div><dt>{zh ? "Site 電氣相容" : "Site electrical"}</dt><dd>{selected.selected_profile ? humanizeStatus(selected.selected_profile.plasma_compatibility.site_electrical_compatibility) : (zh ? "未評估" : "Not evaluated")}</dd></div>
-                <div><dt>Hardware Ready</dt><dd>{selected.selected_profile?.plasma_compatibility.hardware_runtime_ready ? "TRUE" : "FALSE"}</dd></div>
-                <div><dt>{zh ? "實體燒錄資格" : "Physical programming"}</dt><dd>{selected.selected_profile?.plasma_compatibility.physical_programming_qualified ? "QUALIFIED" : "NOT QUALIFIED"}</dd></div>
               </dl>
             </section>
 
@@ -712,6 +714,27 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
               <div><dt>ICPN Evidence</dt><dd>{humanizeStatus(selected.catalog_verification.status)}</dd></div>
               <div><dt>PPU</dt><dd>{physicalValidationDetail(selected.physical_validation.ppu_status, zh)}</dd></div>
               <div><dt>Socket</dt><dd>{physicalValidationDetail(selected.physical_validation.socket_status, zh)}</dd></div>
+              {selected.programming_qualification?.family_ready && (
+                <div><dt>PPU Ready · Family Ready</dt><dd>
+                  {selected.programming_qualification.family_ready.group_id}
+                  {" · "}<a href={selected.programming_qualification.family_ready.manufacturer_guide.uri} target="_blank" rel="noopener noreferrer">{selected.programming_qualification.family_ready.manufacturer_guide.document}</a>
+                  {` · OpenOCD ${selected.programming_qualification.family_ready.provider.target_config}`}
+                  {` · ${selected.programming_qualification.family_ready.erase_unit_bytes} bytes/page`}
+                  {` · ${zh ? "直接 HIL 參考配置" : "Direct HIL anchor"}: ${selected.programming_qualification.family_ready.anchor_configuration_id}`}
+                  {` · ${zh ? "此 exact ICPN 未實機驗證" : "This exact ICPN was not physically tested"}`}
+                </dd></div>
+              )}
+              {selected.programming_qualification?.verified_configurations.map(configuration => (
+                <div key={configuration.configuration_id}>
+                  <dt>{configuration.verification_type === "PPU_SITE" ? "PPU Ready" : "Socket Ready"}</dt>
+                  <dd>
+                    {configuration.configuration_id} · {configuration.ppu_site.model} Site {configuration.ppu_site.site_id}
+                    {` · ${configuration.physical_scope.join(" / ")} · HIL ${configuration.result}`}
+                    {configuration.electrical_measurement && ` · ${zh ? "電氣量測" : "Electrical measurement"}: ${configuration.electrical_measurement}`}
+                    {configuration.limitations.length > 0 && ` · ${zh ? "限制" : "Limits"}: ${configuration.limitations.join("; ")}`}
+                  </dd>
+                </div>
+              ))}
               {selected.selected_profile && (
                 <>
                   <div><dt>{zh ? "Manufacturer Baseline" : "Manufacturer baseline"}</dt><dd><code>{selected.selected_profile.manufacturer_baseline.baseline_id}</code></dd></div>
@@ -732,8 +755,8 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
             <div className="icSelectorBoundary">
               {selected.catalog_level === 3
                 ? (zh
-                  ? "L3 PLASMA Verified：至少一組版本化 PLASMA configuration 已通過 HIL。實際 Job 仍需符合目前 Site、Adapter、Runtime、電氣與安全條件。"
-                  : "L3 PLASMA Verified: at least one versioned PLASMA configuration has passed HIL. The current Site, Adapter, Runtime, electrical, and safety gates still apply.")
+                  ? "L3 PLASMA Verified：PPU Ready 可來自該料號直接實機 HIL 或 Family Ready 共用演算法資格推導（後者不代表該料號已實機 PASS）；Socket Ready 必須獨立實測。實際 Job 仍需符合 Site、Runtime、電氣與安全條件。"
+                  : "L3 PLASMA Verified: PPU Ready may be direct HIL or reviewed Family Ready inference (not a physical PASS for this exact ICPN). Socket Ready requires its own HIL. Current Site, Runtime, electrical and safety gates still apply.")
                 : selected.catalog_level === 1
                 ? (zh
                   ? "L1 Programming Candidate：已有具體、可追溯的 programming route，但尚未完成 qualification。這類 IC 可作為客戶委託 Programming Qualification 的候選，不能直接建立燒錄 Job。"

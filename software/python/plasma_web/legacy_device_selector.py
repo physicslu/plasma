@@ -252,6 +252,16 @@ def _device_search_payload(
         item["catalog_level"] = qualification["catalog_level"]
         item["catalog_level_state"] = qualification["catalog_level_state"]
         item["job_selectable"] = bool(qualification.get("job_selectable", False))
+        # Source Catalog identity is not physical qualification authority.
+        # Project the two independent, versioned L3 tracks from the canonical
+        # Programming Qualification Registry; neither grants execution.
+        item["physical_validation"]["ppu_status"] = (
+            "family_ready" if qualification.get("ppu_readiness_source") == "FAMILY_DERIVED"
+            else "passed" if qualification.get("ppu_ready") else "no_evidence"
+        )
+        item["physical_validation"]["socket_status"] = (
+            "passed" if qualification.get("socket_ready") else "no_evidence"
+        )
 
         candidate = candidates.lookup(record)
         item["backend_candidate"] = candidate

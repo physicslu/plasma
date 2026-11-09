@@ -255,14 +255,52 @@ export type NXPManufacturerDeviceProfile = {
   physical_programming_qualified: false;
 };
 
+export type VerifiedPhysicalConfiguration = {
+  configuration_id: string;
+  verification_type: "PPU_SITE" | "SOCKET_ADAPTER";
+  result: "PASSED";
+  identity: { manufacturer: string; icpn: string; package: string; pin_count: string };
+  ppu_site: { model: string; hardware_revision: string; ppu_id: string; device_id: string; site_id: number };
+  connection_mode: "DIRECT_WIRE" | "SOCKET_ADAPTER";
+  socket: { model: string; revision: string } | null;
+  engine: { provider_id: string; provider_version: string; target_config: string; runtime_sha: string; fpga_image_id: string; abi: string; adapter: string; openocd_binary_sha256: string };
+  physical_scope: string[];
+  electrical_measurement?: string;
+  physical_wiring_revision?: string;
+  limitations: string[];
+  provenance: { manager_alias: string; manager_journal: string; manager_journal_sha256: string; bootstrap_status: string; bootstrap_status_sha256: string };
+  evidence: Array<{ path: string; sha256: string }>;
+};
+
+export type FamilyReadyEvidence = {
+  evidence_origin: "FAMILY_DERIVED";
+  group_id: string;
+  anchor_configuration_id: string;
+  manufacturer_guide: {
+    document: string;
+    scope: string;
+    uri: string;
+    source_lock_sha256: string;
+  };
+  provider: {
+    provider_id: string;
+    version: string;
+    target_config: string;
+    flash_driver: string;
+  };
+  programming_profile_id: string;
+  erase_unit_bytes: number;
+  limitations: string[];
+};
+
 export type ProgrammingQualification = {
   schema_version: "2.0.0";
   registry_id: string | null;
   state: "UNKNOWN" | "CANDIDATE" | "BLOCKED" | "SUPPORTED" | "UNSUPPORTED";
   reviewed: boolean;
   identity_state: "IDENTIFIED" | "NOT_IDENTIFIED";
-  catalog_level: 0 | 1 | 2 | null;
-  catalog_level_state: "DISCOVERED" | "PROGRAMMING_CANDIDATE" | "PROGRAMMABLE" | null;
+  catalog_level: 0 | 1 | 2 | 3 | null;
+  catalog_level_state: "DISCOVERED" | "PROGRAMMING_CANDIDATE" | "PROGRAMMABLE" | "PLASMA_VERIFIED" | null;
   route_evidence?: "backend_candidate_registry";
   provider: {
     provider_id: string;
@@ -302,6 +340,11 @@ export type ProgrammingQualification = {
   installed_runtime_attested: false;
   hardware_runtime_ready: false;
   physical_programming_qualified: false;
+  ppu_ready: boolean;
+  socket_ready: boolean;
+  ppu_readiness_source: "DIRECT_HIL" | "FAMILY_DERIVED" | null;
+  family_ready: FamilyReadyEvidence | null;
+  verified_configurations: VerifiedPhysicalConfiguration[];
 };
 
 /** Source-only upstream snapshot. Never use for Job eligibility or Production binding. */
