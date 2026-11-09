@@ -38,6 +38,8 @@ Each implementation phase is a **separate small Draft PR**, with affected source
 
 ### LOM-P2A — Bootstrap local enrollment and recovery (highest dependency)
 
+> **2026-11-09 refresh:** split into **LOM-P2A-1** (mutual request authentication; credential never on the wire; not blocked by D1), **LOM-P2A-0** (protocol freeze after owner D1/D2/D4 decisions) and **LOM-P2A-2** (enrollment/reclaim below). See [Gate 1 ledger §5](opf-local-owner-mode-gate1-20261109.md#5-latest-main-gap-audit-refresh-claude-code-2026-11-09).
+
 **Likely touched:** `scripts/ppu-bootstrap-service.py`, `software/python/plasma_manager/bootstrap.py`, `verified_bootstrap.py`, credential store and focused tests; device-specific setup helpers only when necessary.
 
 - Define enrollment states and a monotonic limited local-presence window with fresh challenge/nonce; do not choose a button/USB implementation until D1 is proven feasible. The enrollment handshake must authenticate the actual PPU, not merely a claimed Device ID.
