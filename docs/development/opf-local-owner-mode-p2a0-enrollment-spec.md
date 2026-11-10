@@ -115,6 +115,7 @@ ARMED --5 bad proofs--> LOCKED_OUT ; ARMED --900 s or reboot--> EXPIRED
 
 - Normal writes (denied in RECOVERY_ONLY): `bundle.upload`, `bundle.admit`, `bundle.install`, `runtime.deploy`, `fpga.load`, `site.job.submit`, `site.settings.write`, `site.activation`, and the Gateway classes `site.job.cancel`, `ppu.settings.write`, `engineering.write`.
 - Recovery actions (allowed in both modes, explicit request): `status.read`, `site.diagnose`, `site.recover`, `outcome.reconcile`, `recovery.complete`.
+- Bootstrap deployment reconciliation (P0, recovery action, explicit request): `deployment.reconcile` closes one `coordinator_result_unreconciled` Runtime deployment only after the PPU re-verifies the Coordinator receipt, the active release and a fresh G13-admitted PS loopback; see [the P0 recovery report](opf-local-owner-mode-p2a2-p0-runtime-reconcile-20261110.md).
 
 ## Error codes
 

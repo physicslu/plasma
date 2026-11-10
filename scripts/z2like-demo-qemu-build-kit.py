@@ -195,6 +195,7 @@ def build(output_dir: Path) -> dict[str, object]:
         "ppu-z2-installer-core.py",
         "z2-python-runtime.py",
         "openocd-runtime.py",
+        "ppu_runtime_local_readiness.py",
         "z2like-demo-qemu-installer.py",
     ):
         _copy(repo / "scripts" / name, scripts_dir / name)

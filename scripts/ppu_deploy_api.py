@@ -33,7 +33,7 @@ _MAX_UPLOAD = 512 * 1024 * 1024
 _MAX_JSON = 2 * 1024 * 1024
 _HEX32 = re.compile(r"[a-f0-9]{32}\Z")
 _HEX64 = re.compile(r"[a-f0-9]{64}\Z")
-_TERMINAL = frozenset({"succeeded", "admitted", "failed", "recovery_required"})
+_TERMINAL = frozenset({"succeeded", "admitted", "failed", "recovery_required", "reconciled"})
 _INFLIGHT = frozenset({"queued", "running"})
 
 
