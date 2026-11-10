@@ -22,7 +22,8 @@ Clean PYNQ-Z2
   -> verify/install Plasma-owned Python below /opt/plasma/python
   -> verify/install immutable PPU release
   -> systemd Server + Gateway + bounded runtime-activation helper
-  -> local readiness + PS diagnostic loopback
+  -> local read-only readiness (GET only: health + G13 challenge bound to this Bootstrap)
+  -> Manager signed PS loopback (controller-authorized, G13)
   -> Control Station Add PPU / Validate & Enable
   -> Save Site Desired
   -> controlled Runtime Activation when required
@@ -340,7 +341,7 @@ bash scripts/plasmactl verify z2-ps
 bash scripts/plasmactl status z2-ps
 ```
 
-The current verifier proves a real ARMv7 host, active Server/Gateway/runtime-activation helper services, canonical Site Desired ownership, P3 installer evidence, the bounded Server/helper Unix-socket DAC contract, Gateway readiness, local PS diagnostic loopback, and the closed hardware boundary. OpenOCD packaging is qualified separately: CI builds both x86_64 and ARMv7 artifacts, executes the ARMv7 runtime under QEMU, checks the bundled script tree and shared-library closure, and runs a software-only dummy-adapter smoke. That evidence is Programming Engine packaging/runtime evidence only. It does **not** issue the controlled restart transaction merely to make verification pass.
+The current verifier proves a real ARMv7 host, active Server/Gateway/runtime-activation helper services, canonical Site Desired ownership, P3 installer evidence, the bounded Server/helper Unix-socket DAC contract, Gateway readiness, the G13 controller challenge served through the Bootstrap admission socket for the same device (GET only; since LOM-P2A-2 P0 the installer sends no write and never reads the controller credential — the signed PS loopback is the Manager's controller-authorized acceptance), and the closed hardware boundary. OpenOCD packaging is qualified separately: CI builds both x86_64 and ARMv7 artifacts, executes the ARMv7 runtime under QEMU, checks the bundled script tree and shared-library closure, and runs a software-only dummy-adapter smoke. That evidence is Programming Engine packaging/runtime evidence only. It does **not** issue the controlled restart transaction merely to make verification pass.
 
 A real P3 activation acceptance should additionally prove on the exact deployed identity:
 

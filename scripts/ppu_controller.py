@@ -73,6 +73,9 @@ LEGACY_TOKEN_FILE = "control-token"
 FENCE_WAIT_S = 10.0
 MAX_ENROLLMENT_NONCES = 64
 MAX_ADMISSION_LINE = 8192
+# P0 recovery: bounded in-memory record of G13-admitted Gateway responses
+# (hash + identity only, never a credential). Lost on restart by design.
+GATEWAY_RECEIPT_CAPACITY = 32
 
 # Spec-frozen error codes plus the P2A-2 entries (button/engineering/admission).
 SPEC_ERROR_CODES = frozenset({
@@ -110,7 +113,7 @@ NORMAL_WRITES = frozenset({
 })
 RECOVERY_ACTIONS = frozenset({
     "status.read", "site.diagnose", "site.recover", "outcome.reconcile",
-    "recovery.complete",
+    "recovery.complete", "deployment.reconcile",
 })
 RECONCILIATION_DECISIONS = frozenset({
     "CONFIRMED_NOT_EXECUTED", "CONFIRMED_EXECUTED_VERIFIED", "CONFIRMED_FAILED",
@@ -663,6 +666,7 @@ class EnrollmentEngine:
         self._lock = threading.RLock()
         self._button: dict[str, Any] = {"requests": {}, "deadline": None, "contended": False}
         self.request_nonces = request_auth.NonceRegistry()
+        self._gateway_receipts: list[dict[str, Any]] = []
 
     # -- helpers
     def _point(self, name: str) -> None:
@@ -1034,6 +1038,42 @@ class EnrollmentEngine:
         mode = self._mode_allows(record, operation)
         return Admission(context, record["credential"], record["generation"], mode, operation)
 
+    # -- G13 Gateway receipts (P0 Runtime reconciliation evidence) ------------
+    def record_gateway_receipt(self, admission: Admission, *, status: int,
+                               body_sha256: str) -> None:
+        """Remember that THIS PPU admitted and MACed one Gateway response.
+
+        Observation only: the Bootstrap never signs a Gateway write itself. The
+        record holds method/target/status/body digest/generation, no secret.
+        """
+        receipt = {
+            "method": admission.context.method, "target": admission.context.path,
+            "operation": admission.operation, "status": status,
+            "body_sha256": body_sha256, "generation": admission.generation,
+            "recorded_at_epoch_s": time.time(), "recorded_monotonic_s": time.monotonic(),
+        }
+        with self._lock:
+            self._gateway_receipts.append(receipt)
+            del self._gateway_receipts[:-GATEWAY_RECEIPT_CAPACITY]
+
+    def find_gateway_receipt(self, *, method: str, target: str, status: int, body_sha256: str,
+                             generation: int, not_before_epoch_s: float,
+                             max_age_s: float, consume: bool = False) -> dict[str, Any] | None:
+        """Newest matching receipt that is fresh and newer than ``not_before``."""
+        now = time.monotonic()
+        with self._lock:
+            for index in range(len(self._gateway_receipts) - 1, -1, -1):
+                item = self._gateway_receipts[index]
+                if (item["method"] == method and item["target"] == target
+                        and item["status"] == status and item["body_sha256"] == body_sha256
+                        and item["generation"] == generation
+                        and item["recorded_at_epoch_s"] >= not_before_epoch_s
+                        and 0 <= now - item["recorded_monotonic_s"] <= max_age_s):
+                    if consume:
+                        del self._gateway_receipts[index]
+                    return dict(item)
+        return None
+
     # -- explicit recovery actions (§7)
     def recover_site(self, credential: str, site: int, *, explicit_request: bool,
                      operator: str = "controller") -> dict[str, Any]:
@@ -1205,6 +1245,8 @@ class _AdmissionHandler(socketserver.StreamRequestHandler):
                             request_auth._key(admission.credential, "response-key"),
                             request_auth._response_message(admission.context, status, body_sha),
                             hashlib.sha256).hexdigest()
+                        engine.record_gateway_receipt(admission, status=status,
+                                                      body_sha256=body_sha)
                         self._send({"ok": True, "header": f"v1 mac={mac}"})
                     else:
                         return

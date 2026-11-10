@@ -295,6 +295,94 @@ def _stop(process: subprocess.Popen[str]) -> None:
         process.wait(timeout=5)
 
 
+# --- LOM-P2A-2 P0: kit read-only readiness + controlled Runtime reconciliation ---------
+
+_P0_FAULT_INJECTION = r"""
+import json, os, sys
+state = "/var/lib/plasma-bootstrap"
+record = json.load(open(state + "/deployment-api.json"))
+journal = json.load(open(state + "/deployment.json"))
+if (record.get("state") != "succeeded" or journal.get("kind") != "ppu-runtime"
+        or journal.get("state") != "runtime_active"
+        or journal.get("api_transaction_id") != record.get("transaction_id")):
+    sys.exit("P0 fault injection precondition failed")
+record.update(state="recovery_required", error_code="coordinator_result_unreconciled",
+              error="SIMULATION FAULT INJECTION: kit post-install PS loopback refused by G13 "
+                    "(reproduces the Z2 2026-11-09 failure shape)", result=None)
+tmp = state + "/deployment-api.json.new"
+with open(tmp, "w") as stream:
+    json.dump(record, stream, indent=2, sort_keys=True)
+    stream.flush()
+    os.fsync(stream.fileno())
+os.chmod(tmp, 0o600)
+os.replace(tmp, state + "/deployment-api.json")
+print(json.dumps({"transaction_id": record["transaction_id"],
+                  "coordinator_transaction_id": journal["transaction_id"],
+                  "release_id": journal["release_id"], "artifact_sha256": journal["artifact_sha256"]}))
+"""
+
+
+def _p0_kit_readiness(args: argparse.Namespace) -> dict[str, Any]:
+    tool = Path(__file__).resolve().with_name("ppu_runtime_local_readiness.py")
+    subprocess.run(["docker", "cp", str(tool), f"{args.container}:/tmp/ppu_runtime_local_readiness.py"],
+                   check=True, timeout=30)
+    completed = subprocess.run(
+        ["docker", "exec", args.container, "python3", "/tmp/ppu_runtime_local_readiness.py",
+         "--gateway", f"http://{args.ppu_ip}:18080", "--bootstrap", f"http://{args.ppu_ip}:18081"],
+        check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
+    try:
+        evidence = json.loads(completed.stdout)
+    except ValueError:
+        evidence = {}
+    if (completed.returncode != 0 or evidence.get("result") != "PASS"
+            or evidence.get("http_methods_used") != ["GET"]
+            or evidence.get("controller_credential_access") != "NONE"):
+        raise AcceptanceError(f"kit read-only G13 readiness failed in QEMU: {completed.stdout!r}")
+    return evidence
+
+
+def _p0_reconcile(args: argparse.Namespace, manager: str, bootstrap_url: str) -> dict[str, Any]:
+    managed_url = f"{manager}/api/ppus/{args.alias}/gateway/api/engineering/diagnostics/loopback"
+    injected = subprocess.run(["docker", "exec", args.container, "python3", "-c", _P0_FAULT_INJECTION],
+                              check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              text=True, timeout=30)
+    if injected.returncode != 0:
+        raise AcceptanceError(f"P0 simulation fault injection failed: {injected.stderr!r}")
+    identity = json.loads(injected.stdout)
+    status, view = _json_request(bootstrap_url)
+    if view.get("bootstrap", {}).get("deployment", {}).get("state") != "recovery_required":
+        raise AcceptanceError("injected Runtime transaction is not recovery_required")
+    status, blocked = _json_request(managed_url, method="POST", body=_loopback_body("qemu-p0-blocked"))
+    if status != 409 or (blocked.get("error") or {}).get("code") != "ppu_platform_recovery_required":
+        raise AcceptanceError(f"recovery_required did not block Managed writes: {status} {blocked!r}")
+    expected = {key: identity[key] for key in ("coordinator_transaction_id", "release_id", "artifact_sha256")}
+    reconcile_url = f"{bootstrap_url}/deployment/reconcile"
+    status, denied = _json_request(reconcile_url, method="POST", timeout_s=90.0, body={
+        "transaction_id": identity["transaction_id"], "explicit_request": True,
+        "expected": {**expected, "artifact_sha256": "0" * 64}})
+    if status != 409 or denied.get("code") != "RECONCILE_COORDINATOR_IDENTITY_MISMATCH":
+        raise AcceptanceError(f"mismatched reconciliation was not refused: {status} {denied!r}")
+    status, closed = _json_request(reconcile_url, method="POST", timeout_s=90.0, body={
+        "transaction_id": identity["transaction_id"], "expected": expected, "explicit_request": True})
+    _expect(status, 200, closed, "P0 Runtime reconciliation")
+    deployment = closed["reconciliation"]["deployment"]
+    if (deployment.get("state") != "reconciled"
+            or deployment.get("error_code") != "coordinator_result_unreconciled"
+            or deployment.get("result") is not None):
+        raise AcceptanceError(f"reconciled record lost the original failure: {deployment!r}")
+    status, again = _json_request(reconcile_url, method="POST", timeout_s=90.0, body={
+        "transaction_id": identity["transaction_id"], "expected": expected, "explicit_request": True})
+    if status != 409 or again.get("code") != "RECONCILE_STATE_NOT_ELIGIBLE":
+        raise AcceptanceError(f"a closed transaction was reconciled twice: {status} {again!r}")
+    status, resumed = _json_request(managed_url, method="POST", body=_loopback_body("qemu-p0-resumed"))
+    _expect(status, 200, resumed, "Managed PS Loop Test after reconciliation")
+    _assert_ps_loopback(resumed, operation="Managed PS Loop Test after reconciliation")
+    return {"fault_injection": "SIMULATION_ONLY", "managed_write_blocked_while_unreconciled": "PASS",
+            "mismatched_reconciliation_refused": "PASS", "reconciliation": "PASS",
+            "original_error_preserved": "PASS", "second_reconciliation_refused": "PASS",
+            "managed_write_after_reconciliation": "PASS"}
+
+
 def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
     kit = args.kit.resolve()
     sidecar = args.sidecar.resolve()
@@ -550,9 +638,14 @@ def run_acceptance(args: argparse.Namespace) -> dict[str, Any]:
                     f"commissioned Platform PS Loop Test omitted platform admission proof: {platform_commissioned!r}"
                 )
 
+            p0_readiness = _p0_kit_readiness(args)
+            p0_reconcile = _p0_reconcile(args, manager, bootstrap_url)
+
             return {
                 "result": "PASS",
                 "evidence_level": "ci-qemu-armv7-z2like-demo",
+                "p0_kit_readiness_get_only": p0_readiness["result"],
+                "p0_runtime_reconciliation": p0_reconcile,
                 "simulation_environment": "CI Linux host mirroring SWPC topology",
                 "backend": "QEMU ARMv7 simulated Z2",
                 "manager_bootstrap_path": True,

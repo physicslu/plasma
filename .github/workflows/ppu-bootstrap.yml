@@ -46,6 +46,7 @@ on:
       - "pl/hil/fpga_image_guard.py"
       - "pl/hil/fpga_image_admission.py"
       - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu_runtime_local_readiness.py"
       - "docs/deployment/ppu-bootstrap-factory-and-hil.md"
       - "docs/deployment/port-profile-matrix.md"
       - "software/python/pyproject.toml"
@@ -136,6 +137,7 @@ on:
       - "pl/hil/fpga_image_guard.py"
       - "pl/hil/fpga_image_admission.py"
       - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu_runtime_local_readiness.py"
       - "docs/deployment/ppu-bootstrap-factory-and-hil.md"
       - "docs/deployment/port-profile-matrix.md"
       - "software/python/pyproject.toml"
@@ -216,6 +218,7 @@ jobs:
           scripts/ppu_local_enrollment.py
           scripts/ppu_controller.py
           scripts/ppu-enroll.py
+          scripts/ppu_runtime_local_readiness.py
           scripts/ppu_asset_execution.py
           scripts/ppu_privileged_source.py
           scripts/ppu-privileged-source-install.py
@@ -269,6 +272,7 @@ jobs:
           software/python/tests/test_lom_p2a0_enrollment_spec.py
           software/python/tests/test_lom_p2a2_reference_equivalence.py
           software/python/tests/test_lom_p2a2_controller.py
+          software/python/tests/test_lom_p2a2_p0_bootstrap_stdlib.py
 
   factory-bundle:
     needs: bootstrap-scripts
@@ -427,6 +431,8 @@ jobs:
           python -m pytest -q software/python/tests/test_manager_bootstrap.py
           software/python/tests/test_ppu_bootstrap_request_auth.py
           software/python/tests/test_lom_p2a2_gateway_g13.py
+          software/python/tests/test_lom_p2a2_p0_runtime_readiness.py
+          software/python/tests/test_lom_p2a2_p0_runtime_reconcile.py
           software/python/tests/test_manager_bootstrap_rest.py
       - name: Prove production Manager entrypoint composes current Manager with Bootstrap routes
         run: >-

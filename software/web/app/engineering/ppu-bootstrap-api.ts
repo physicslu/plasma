@@ -9,7 +9,7 @@ export type BootstrapRuntimeStatus = {
 
 export type BootstrapDeploymentRecord = {
   transaction_id: string;
-  state: "queued" | "running" | "succeeded" | "failed" | "recovery_required" | string;
+  state: "queued" | "running" | "succeeded" | "failed" | "recovery_required" | "reconciled" | string;
   upload_id: string;
   started_at_epoch_s: number;
   updated_at_epoch_s: number;

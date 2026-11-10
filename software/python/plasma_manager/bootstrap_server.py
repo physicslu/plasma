@@ -452,6 +452,31 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 status, payload = coordinator.recovery_action(alias, body)
                 self._json(status, payload)
                 return
+            if action == "deployment/reconcile":
+                # P0: explicit close of one already-activated Runtime transaction.
+                # Exclusive with every other Manager-launched PPU write.
+                entry = self._resolve_ppu_alias(alias)
+                if entry is None:
+                    self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {
+                        "code": "ppu_not_found", "message": "configured PPU alias was not found"}})
+                    return
+                gate = self._operation_gate()
+                if not gate.try_begin_platform_launch(alias):
+                    self._json(HTTPStatus.CONFLICT, {"ok": False, "error": {
+                        "code": "ppu_control_plane_busy",
+                        "message": "another managed PPU write or Platform launch is in progress"}})
+                    return
+                try:
+                    if self._alias_has_active_execution(alias):
+                        self._json(HTTPStatus.CONFLICT, {"ok": False, "error": {
+                            "code": "ppu_busy", "message": "active PPU Jobs must finish first"}})
+                        return
+                    status, payload = coordinator.reconcile_runtime_deployment(
+                        alias, body, self._ppu_client(alias, entry.endpoint))
+                    self._json(status, payload)
+                    return
+                finally:
+                    gate.end_platform_launch(alias)
             if action == "programming/plans":
                 self._programming_call(
                     lambda: (HTTPStatus.OK, self._programming().plan(alias, body)))

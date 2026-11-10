@@ -182,6 +182,9 @@ def _runtime_environment(current: Path) -> dict[str, str]:
     return env
 
 
+SERVER_CONTROL_SOCKET = Path("/run/plasma-server/control.sock")
+
+
 def _start_runtime(
     *,
     product_root: Path,
@@ -202,8 +205,12 @@ def _start_runtime(
     for directory in (state_root / "output", state_root / "gateway-output", log_root):
         directory.mkdir(parents=True, exist_ok=True)
     env = _runtime_environment(current)
+    # Same Runtime control socket as the Z2 unit (execution lease observed by
+    # the Bootstrap safety probe and the P0 Runtime reconciliation).
+    SERVER_CONTROL_SOCKET.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     server = subprocess.Popen(
-        [sys.executable, str(app), "server", "--config", str(config)],
+        [sys.executable, str(app), "server", "--config", str(config),
+         "--runtime-control-socket", str(SERVER_CONTROL_SOCKET)],
         cwd=state_root,
         env=env,
     )

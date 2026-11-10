@@ -23,9 +23,12 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
+import fcntl
 import hashlib
 import hmac
+import http.client
 import importlib.util
+import ipaddress
 import json
 import os
 import re
@@ -51,7 +54,10 @@ MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 DEPLOYMENT_API_IN_FLIGHT_STATES = {"queued", "running"}
-DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "admitted", "failed", "recovery_required"}
+# ``reconciled``: a ``coordinator_result_unreconciled`` Runtime transaction closed by
+# the explicit P0 reconciliation; the original error stays in the record.
+DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "admitted", "failed", "recovery_required",
+                                  "reconciled"}
 COORDINATOR_SAFE_RESTART_STATES = {
     "runtime_active", "engineering_active", "package_active",
     "bundle_installed", "asset_set_active", "rolled_back", "verify_failed",
@@ -89,6 +95,8 @@ class ServicePaths:
     runtime_control_socket: Path = Path("/run/plasma-server/control.sock")
     reload_fence: Path = Path("/run/lock/plasma-mmio.lock")
     site_recovery_script: Path = Path("/opt/plasma/bootstrap/ppu_site_recovery.py")
+    # The Runtime Gateway port observed by the P0 reconciliation (read-only).
+    gateway_port: int = 18080
 
     @property
     def uploads_root(self) -> Path:
@@ -101,6 +109,15 @@ class ServicePaths:
     @property
     def coordinator_journal(self) -> Path:
         return self.state_root / "deployment.json"
+
+    @property
+    def coordinator_lock(self) -> Path:
+        # The SAME flock the Coordinator holds for every transaction.
+        return self.state_root / "deployment.lock"
+
+    @property
+    def reconciliation_root(self) -> Path:
+        return self.state_root / "deployment-reconciliations"
 
 
 @dataclass(frozen=True)
@@ -785,7 +802,14 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         self.nonces = self.engine.request_nonces
         self.button_watcher = None
         self.admission_server = None
+        self.reconcile_crash_at: str | None = None   # Host-test crash injection only
         super().__init__(address, BootstrapHandler)
+
+    def _reconcile_point(self, name: str) -> None:
+        if name not in RECONCILE_CRASH_POINTS:
+            raise ValueError(name)
+        if self.reconcile_crash_at == name:
+            raise RuntimeError("injected crash at " + name)
 
     # -- LOM-P2A-2 safety observation (read-only; never modifies records)
     def _safety_probe(self) -> Any:
@@ -1177,6 +1201,297 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             return record
 
 
+# --- P0: explicit reconciliation of a Runtime deployment that DID activate ----
+#
+# ``coordinator_result_unreconciled`` means the API worker could not bind the
+# runner result to the Coordinator receipt. The release may already be active.
+# This operation never re-runs, re-sends or rolls back anything. It re-proves,
+# under the API mutation lock AND the Coordinator's own flock, that the exact
+# transaction activated and that the Runtime answers a G13-admitted request,
+# then appends an evidence record and marks the API record ``reconciled``. The
+# original error, the Coordinator journal and every receipt stay untouched.
+
+RECONCILE_ACTION = "runtime.activation.reconcile"
+RECONCILE_SCHEMA = "plasma.ppu.deployment-reconciliation.v1"
+RECONCILE_ERROR_CODE = "coordinator_result_unreconciled"
+RECONCILE_LOOPBACK_TARGET = "/api/engineering/diagnostics/loopback"
+RECONCILE_LOOPBACK_MAX_AGE_S = 300.0
+MAX_RECONCILE_LOOPBACK_BYTES = 64 * 1024
+_GATEWAY_HOST_RE = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?\Z")
+_COORDINATOR_TX_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
+_RELEASE_ID_RE = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]{0,127}\Z")
+RECONCILE_CRASH_POINTS = ("reconcile.after_evidence_record", "reconcile.after_api_record")
+
+
+class ReconciliationDenied(BootstrapServiceError):
+    """A reconciliation precondition failed. Nothing was written."""
+
+    def __init__(self, code: str, detail: Any = None) -> None:
+        super().__init__(code)
+        self.code = code
+        self.detail = detail
+
+
+def _deny(condition: bool, code: str, detail: Any = None) -> None:
+    if not condition:
+        raise ReconciliationDenied(code, detail)
+
+
+def _file_sha256(path: Path) -> str | None:
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return None
+    with os.fdopen(fd, "rb") as stream:
+        return hashlib.sha256(stream.read(MAX_COORDINATOR_JOURNAL_BYTES + 1)).hexdigest()
+
+
+def _gateway_get(host: str, port: int, path: str, timeout_s: float = 5.0) -> tuple[int, Any]:
+    connection = http.client.HTTPConnection(host, port, timeout=timeout_s)
+    try:
+        connection.request("GET", path, headers={"Accept": "application/json"})
+        response = connection.getresponse()
+        raw = response.read(65537)
+        status = response.status
+    finally:
+        connection.close()
+    if len(raw) > 65536:
+        return status, None
+    try:
+        return status, json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return status, None
+
+
+def _validated_reconcile_request(body: Mapping[str, Any]) -> dict[str, Any]:
+    _deny(set(body) == {"action", "transaction_id", "expected", "ps_loopback", "explicit_request"},
+          "RECONCILE_REQUEST_FIELDS_DENIED")
+    _deny(body["action"] == RECONCILE_ACTION, "RECONCILE_ACTION_DENIED")
+    _deny(body["explicit_request"] is True, "RECOVERY_ACTION_NOT_REQUESTED")
+    tx = body["transaction_id"]
+    _deny(type(tx) is str and UPLOAD_ID_RE.fullmatch(tx) is not None, "RECONCILE_TRANSACTION_INVALID")
+    expected = body["expected"]
+    _deny(isinstance(expected, dict)
+          and set(expected) == {"coordinator_transaction_id", "release_id", "artifact_sha256"},
+          "RECONCILE_EXPECTED_FIELDS_DENIED")
+    _deny(type(expected["coordinator_transaction_id"]) is str
+          and _COORDINATOR_TX_RE.fullmatch(expected["coordinator_transaction_id"]) is not None
+          and type(expected["release_id"]) is str
+          and _RELEASE_ID_RE.fullmatch(expected["release_id"]) is not None
+          and type(expected["artifact_sha256"]) is str
+          and HEX64_RE.fullmatch(expected["artifact_sha256"]) is not None,
+          "RECONCILE_EXPECTED_INVALID")
+    proof = body["ps_loopback"]
+    _deny(isinstance(proof, dict) and set(proof) == {"target", "response_base64"}
+          and proof["target"] == RECONCILE_LOOPBACK_TARGET
+          and type(proof["response_base64"]) is str,
+          "RECONCILE_LOOPBACK_PROOF_INVALID")
+    try:
+        response = base64.b64decode(proof["response_base64"], validate=True)
+    except (ValueError, binascii.Error):
+        raise ReconciliationDenied("RECONCILE_LOOPBACK_PROOF_INVALID") from None
+    _deny(0 < len(response) <= MAX_RECONCILE_LOOPBACK_BYTES, "RECONCILE_LOOPBACK_PROOF_INVALID")
+    try:
+        payload = json.loads(response.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise ReconciliationDenied("RECONCILE_LOOPBACK_PROOF_INVALID") from None
+    loopback = payload.get("loopback") if isinstance(payload, dict) else None
+    _deny(isinstance(loopback, dict) and payload.get("ok") is True
+          and loopback.get("endpoint") == "ps" and loopback.get("source") == "ps"
+          and type(loopback.get("tx_crc32")) is str
+          and loopback.get("tx_crc32") == loopback.get("rx_crc32"),
+          "RECONCILE_LOOPBACK_NOT_PASS")
+    return {"transaction_id": tx, "expected": dict(expected), "loopback_response": response}
+
+
+def reconcile_runtime_activation(server: Any, body: Mapping[str, Any]) -> dict[str, Any]:
+    """Close ONE ``coordinator_result_unreconciled`` Runtime transaction.
+
+    Every check below must pass while both locks are held; otherwise a typed
+    ``ReconciliationDenied`` is raised and nothing is written.
+    """
+    request = _validated_reconcile_request(body)
+    tx, expected = request["transaction_id"], request["expected"]
+    paths: ServicePaths = server.bootstrap_paths
+    engine = server.engine
+    with server.mutation_lock:
+        _deny(server.deployment_thread is None or not server.deployment_thread.is_alive(),
+              "RECONCILE_DEPLOYMENT_ACTIVE")
+        paths.state_root.mkdir(parents=True, exist_ok=True)
+        with paths.coordinator_lock.open("a+b") as lock_stream:
+            try:
+                fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise ReconciliationDenied("RECONCILE_COORDINATOR_ACTIVE") from None
+            try:
+                return _reconcile_locked(server, paths, engine, tx, expected,
+                                         request["loopback_response"])
+            finally:
+                fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
+
+
+def _reconcile_locked(server: Any, paths: ServicePaths, engine: Any, tx: str,
+                      expected: Mapping[str, str], loopback_response: bytes) -> dict[str, Any]:
+    record_sha = _file_sha256(paths.deployment_record)
+    journal_sha = _file_sha256(paths.coordinator_journal)
+    # 1. The API record is exactly the unreconciled transaction named.
+    try:
+        record = _deployment_api_record(paths)
+    except BootstrapServiceError as exc:
+        raise ReconciliationDenied("RECONCILE_API_RECORD_UNREADABLE") from exc
+    _deny(record is not None and record["transaction_id"] == tx, "RECONCILE_TRANSACTION_MISMATCH")
+    _deny(record["state"] == "recovery_required" and record.get("error_code") == RECONCILE_ERROR_CODE,
+          "RECONCILE_STATE_NOT_ELIGIBLE", {"state": record["state"],
+                                           "error_code": record.get("error_code")})
+    # 2. The Coordinator receipt names this API transaction and the expected identity.
+    try:
+        journal = _read_coordinator_journal(paths)
+    except BootstrapServiceError as exc:
+        raise ReconciliationDenied("RECONCILE_COORDINATOR_JOURNAL_UNREADABLE") from exc
+    _deny(journal is not None, "RECONCILE_COORDINATOR_RECEIPT_MISSING")
+    _deny(journal.get("api_transaction_id") == tx, "RECONCILE_COORDINATOR_TRANSACTION_MISMATCH")
+    _deny(journal.get("kind") == "ppu-runtime" and journal.get("state") == "runtime_active",
+          "RECONCILE_COORDINATOR_NOT_RUNTIME_ACTIVE",
+          {"kind": journal.get("kind"), "state": journal.get("state")})
+    _deny(journal["transaction_id"] == expected["coordinator_transaction_id"]
+          and journal.get("release_id") == expected["release_id"]
+          and journal.get("artifact_sha256") == expected["artifact_sha256"],
+          "RECONCILE_COORDINATOR_IDENTITY_MISMATCH")
+    activated_at = journal.get("updated_at_epoch_s")
+    _deny(type(activated_at) in (int, float), "RECONCILE_COORDINATOR_RECEIPT_INVALID")
+    # 3. The active release and its installer evidence are this release.
+    product = paths.product_root
+    release_root = product / "releases" / expected["release_id"]
+    try:
+        current = (product / "current").resolve(strict=True)
+        expected_root = release_root.resolve(strict=True)
+    except OSError:
+        raise ReconciliationDenied("RECONCILE_CURRENT_RELEASE_MISMATCH") from None
+    _deny((product / "current").is_symlink() and current == expected_root and current.is_dir(),
+          "RECONCILE_CURRENT_RELEASE_MISMATCH")
+    try:
+        evidence = _read_json(product / "install" / "last-install.json")
+    except BootstrapServiceError:
+        raise ReconciliationDenied("RECONCILE_INSTALL_EVIDENCE_UNREADABLE") from None
+    _deny(evidence.get("result") == "PASS" and evidence.get("release_id") == expected["release_id"]
+          and evidence.get("archive_sha256") == expected["artifact_sha256"],
+          "RECONCILE_INSTALL_EVIDENCE_MISMATCH")
+    gateway_host = evidence.get("gateway_host")
+    _deny(type(gateway_host) is str and _GATEWAY_HOST_RE.fullmatch(gateway_host) is not None,
+          "RECONCILE_INSTALL_EVIDENCE_MISMATCH")
+    # 6. Nothing is running, sealed or otherwise unknown (besides THIS tx).
+    probe = engine.probe
+    _deny(probe.active_operations() == [], "RECONCILE_ACTIVE_OPERATION", probe.active_operations())
+    _deny(probe.seals() == [], "RECONCILE_SITE_SEALED", probe.seals())
+    _deny(probe.extra_blockers() == [], "RECONCILE_STATE_UNOBSERVABLE", probe.extra_blockers())
+    _deny(probe.unknown_outcomes() == ["bootstrap-deployment:" + tx],
+          "RECONCILE_OTHER_UNKNOWN_OUTCOME", probe.unknown_outcomes())
+    _deny(not probe.active_set_recovery_required(), "RECONCILE_COORDINATOR_UNSAFE")
+    # 4. Bootstrap admission socket, Server (lease) and Gateway are serving, and
+    #    the Gateway is bound to THIS controller through the admission socket.
+    try:
+        socket_ok = stat.S_ISSOCK(os.lstat(paths.admission_socket).st_mode)
+    except OSError:
+        socket_ok = False
+    _deny(server.admission_server is not None and socket_ok, "RECONCILE_ADMISSION_SOCKET_UNAVAILABLE")
+    _deny(probe._runtime_lease() == "idle", "RECONCILE_SERVER_NOT_IDLE")
+    record_now = engine.controller()
+    _deny(record_now is not None, "CONTROLLER_NOT_ENROLLED")
+    generation = record_now["generation"]
+    try:
+        ready_status, ready = _gateway_get(gateway_host, paths.gateway_port, "/api/health/ready")
+        challenge_status, challenge = _gateway_get(gateway_host, paths.gateway_port,
+                                                   "/api/auth/challenge")
+    except OSError:
+        raise ReconciliationDenied("RECONCILE_GATEWAY_UNREACHABLE") from None
+    _deny(ready_status == 200 and isinstance(ready, dict) and ready.get("gateway") == "alive"
+          and ready.get("execution") == "ready", "RECONCILE_GATEWAY_NOT_READY")
+    _deny(challenge_status == 200 and isinstance(challenge, dict)
+          and challenge.get("device_id") == engine.device_id
+          and challenge.get("controller_generation") == generation,
+          "RECONCILE_GATEWAY_NOT_BOUND_TO_CONTROLLER")
+    # 5. A fresh, PPU-admitted, PPU-MACed PS loopback after the activation.
+    response_sha = hashlib.sha256(loopback_response).hexdigest()
+    receipt = engine.find_gateway_receipt(
+        method="POST", target=RECONCILE_LOOPBACK_TARGET, status=200, body_sha256=response_sha,
+        generation=generation, not_before_epoch_s=float(activated_at),
+        max_age_s=RECONCILE_LOOPBACK_MAX_AGE_S)
+    _deny(receipt is not None, "RECONCILE_LOOPBACK_NOT_ADMITTED")
+    # 7. Nothing changed the transaction state while we were checking.
+    _deny(_file_sha256(paths.deployment_record) == record_sha
+          and _file_sha256(paths.coordinator_journal) == journal_sha,
+          "RECONCILE_STATE_CHANGED")
+    now = time.time()
+    evidence_record = {
+        "schema": RECONCILE_SCHEMA,
+        "decision": "CONFIRMED_EXECUTED_VERIFIED",
+        "api_transaction_id": tx,
+        "original_api_record": record,
+        "original_api_record_sha256": record_sha,
+        "coordinator_journal_sha256": journal_sha,
+        "coordinator": {key: journal.get(key) for key in (
+            "transaction_id", "kind", "state", "release_id", "artifact_sha256",
+            "api_transaction_id", "sequence", "updated_at_epoch_s")},
+        "verified": {
+            "current_release": str(current), "install_evidence_release_id": evidence["release_id"],
+            "install_evidence_archive_sha256": evidence["archive_sha256"],
+            "gateway": {"host": gateway_host, "port": paths.gateway_port,
+                        "ready": {"gateway": "alive", "execution": "ready"},
+                        "challenge_device_id": challenge["device_id"],
+                        "challenge_controller_generation": generation},
+            "admission_socket": str(paths.admission_socket), "runtime_lease": "idle",
+            "active_operations": [], "seals": [],
+            "ps_loopback": {"target": RECONCILE_LOOPBACK_TARGET, "status": 200,
+                            "response_sha256": response_sha,
+                            "admitted_generation": receipt["generation"],
+                            "admitted_at_epoch_s": receipt["recorded_at_epoch_s"]},
+        },
+        "controller_generation": generation,
+        "reconciled_at_epoch_s": now,
+        "boot_id": engine.boot_id,
+    }
+    evidence_path = paths.reconciliation_root / f"{tx}.json"
+    paths.reconciliation_root.mkdir(mode=0o700, exist_ok=True)
+    try:
+        existing = _read_private_json(evidence_path) if evidence_path.exists() else None
+    except BootstrapServiceError:
+        raise ReconciliationDenied("RECONCILE_EVIDENCE_RECORD_UNREADABLE") from None
+    if existing is not None:
+        # Only a crash after the evidence write may leave one; it must name the
+        # same untouched original record. Append-only: never overwritten.
+        _deny(existing.get("api_transaction_id") == tx
+              and existing.get("original_api_record_sha256") == record_sha,
+              "RECONCILE_EVIDENCE_RECORD_CONFLICT")
+        evidence_record = existing
+    else:
+        _atomic_json(evidence_path, evidence_record)
+    server._reconcile_point("reconcile.after_evidence_record")
+    evidence_sha = _file_sha256(evidence_path)
+    engine.find_gateway_receipt(
+        method="POST", target=RECONCILE_LOOPBACK_TARGET, status=200, body_sha256=response_sha,
+        generation=generation, not_before_epoch_s=float(activated_at),
+        max_age_s=RECONCILE_LOOPBACK_MAX_AGE_S, consume=True)
+    updated = dict(record)
+    # Original error_code/error/result are preserved verbatim; result stays
+    # whatever the runner reported (never a fabricated runner success).
+    updated["state"] = "reconciled"
+    updated["updated_at_epoch_s"] = now
+    updated["reconciliation"] = {
+        "schema": RECONCILE_SCHEMA,
+        "decision": evidence_record["decision"],
+        "evidence_record": f"{paths.reconciliation_root.name}/{tx}.json",
+        "evidence_record_sha256": evidence_sha,
+        "coordinator_transaction_id": journal["transaction_id"],
+        "release_id": journal["release_id"],
+        "reconciled_at_epoch_s": evidence_record["reconciled_at_epoch_s"],
+        "controller_generation": evidence_record["controller_generation"],
+    }
+    _atomic_json(paths.deployment_record, updated)
+    server._reconcile_point("reconcile.after_api_record")
+    sys.stderr.write(f"plasma-bootstrap DEPLOYMENT_RECONCILED:{tx}:{journal['transaction_id']}\n")
+    return {"deployment": updated, "evidence_record_sha256": evidence_sha}
+
+
 class BootstrapHandler(BaseHTTPRequestHandler):
     server_version = "PlasmaBootstrap/1"
 
@@ -1301,6 +1616,8 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     return "fpga.load" if body.get("fpga_load") is True else "bundle.install"
                 return "bundle.admit"
             return "runtime.deploy"
+        if path == "/v1/deployment/reconcile":
+            return "deployment.reconcile"
         if path == "/v1/controller/recovery":
             action = self._body(raw or b"").get("action")
             if action in {"site.diagnose", "site.recover", "outcome.reconcile", "recovery.complete"}:
@@ -1506,6 +1823,16 @@ class BootstrapHandler(BaseHTTPRequestHandler):
             body = self._body(raw or b"")
             if path == "/v1/controller/recovery":
                 self._recovery_action(body)
+                return
+            if path == "/v1/deployment/reconcile":
+                try:
+                    result = reconcile_runtime_activation(self.owner, body)
+                except ReconciliationDenied as exc:
+                    self._json(HTTPStatus.CONFLICT, {
+                        "ok": False, "error": "deployment_reconciliation_denied",
+                        "code": exc.code, "detail": exc.detail})
+                    return
+                self._json(HTTPStatus.OK, {"ok": True, "reconciliation": result})
                 return
             with self.owner.mutation_lock:
                 if path == "/v1/uploads":

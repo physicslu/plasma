@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import secrets
 import threading
@@ -18,6 +19,7 @@ from .bootstrap import (
 
 MAX_GATEWAY_RESPONSE_BYTES = 4 * 1024 * 1024
 _REFUSAL_STATUSES = frozenset({400, 401, 403, 404, 409, 503})
+RECONCILE_LOOPBACK_TARGET = "/api/engineering/diagnostics/loopback"
 
 
 class VerifiedManagerBootstrapCoordinator(ManagerBootstrapCoordinator):
@@ -157,6 +159,49 @@ class VerifiedManagerBootstrapCoordinator(ManagerBootstrapCoordinator):
             request["observed_device_id"] = device_id
         return client._json("POST", "/v1/controller/recovery", credential=token,
                             device_id=device_id, body=request, timeout_s=150.0)
+
+    # -- P0: explicit reconciliation of an already-activated Runtime ----------
+    def reconcile_runtime_deployment(self, alias: str, body: Mapping[str, Any],
+                                     gateway_client: Any) -> tuple[int, dict[str, Any]]:
+        """One fresh signed PS loopback, then ask the PPU to close ONE transaction.
+
+        The Manager supplies only the operator's explicit expectations and the
+        raw loopback response it received under its own controller credential;
+        the PPU re-verifies everything (receipt, release, services, its own G13
+        admission record) and decides. No deployment is re-sent or retried.
+        """
+        if (not isinstance(body, Mapping)
+                or set(body) != {"transaction_id", "expected", "explicit_request"}
+                or body.get("explicit_request") is not True
+                or not isinstance(body.get("expected"), Mapping)):
+            raise ValueError("deployment reconciliation requires transaction_id, expected and "
+                             "explicit_request=true")
+        sequence = int(time.time() * 1000)
+        loopback = {
+            "endpoint": "ps", "test_id": f"p0-reconcile-{sequence}", "sequence": sequence,
+            "pattern": "zero", "seed": "", "payload_length": 1, "payload_base64": "AA==",
+            "tx_crc32": "d202ef8d", "timeout_ms": 5000,
+        }
+        raw_request = json.dumps(loopback, sort_keys=True, separators=(",", ":")).encode()
+        status, _headers, raw_response = self.signed_gateway_post(
+            alias, gateway_client, RECONCILE_LOOPBACK_TARGET,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            body=raw_request, timeout_s=15.0)
+        if status != 200:
+            return status, {"ok": False, "error": "reconcile_loopback_refused",
+                            "message": "the PPU did not admit the signed PS loopback",
+                            "upstream_status": status}
+        _normalized, _record, client, _payload, device_id, token = self._authenticated(alias)
+        request = {
+            "action": "runtime.activation.reconcile",
+            "transaction_id": body["transaction_id"],
+            "expected": dict(body["expected"]),
+            "ps_loopback": {"target": RECONCILE_LOOPBACK_TARGET,
+                            "response_base64": base64.b64encode(raw_response).decode("ascii")},
+            "explicit_request": True,
+        }
+        return client._json("POST", "/v1/deployment/reconcile", credential=token,
+                            device_id=device_id, body=request, timeout_s=60.0)
 
     # -- G13: controller-bound Gateway writes ---------------------------------
     def gateway_signer(self, alias: str):

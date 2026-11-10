@@ -275,9 +275,9 @@ def test_z2_ps_backend_keeps_pynq_python_and_hardware_boundary_closed() -> None:
     assert "/usr/bin/python3" not in source
     assert "PS-only" in source
     assert "PL/FPGA/Site/power/real-IC readiness is separate" in source
-    assert "/api/engineering/diagnostics/loopback" in source
-    assert 'loopback.get("endpoint") != "ps"' in source
-    assert 'loopback.get("source") != "ps"' in source
+    # LOM-P2A-2 P0: the kit sends no Gateway write; read-only G13 readiness only.
+    assert "/api/engineering/diagnostics/loopback" not in source
+    assert '"$readiness_tool" --gateway "$base"' in source
 
 
 def test_unknown_profile_fails_closed() -> None:
