@@ -513,6 +513,12 @@ def job_image_binding(resource: object, asset: object | None = None, *,
     image = None if asset is None else parse_image_asset(asset)
     if image is not None:
         _check_applicable(image, parsed)
+        # C-3 flash_cycle executes erase/write/verify/readback at flash_base.
+        # A non-base Binding would attest a different range than the hardware
+        # actually touched. Other image Operations have separate executors.
+        if operation == "flash_cycle":
+            _need(image["load_address"] == parsed["constraints"]["flash_base"],
+                  "JOB_FLASH_CYCLE_BASE_MISMATCH")
     job_range = _job_range(parsed, operation, image, address, length)
     _need(type(ppu_id) is str and SAFE_PPU_ID.fullmatch(ppu_id) is not None,
           "JOB_BINDING_PPU_INVALID")

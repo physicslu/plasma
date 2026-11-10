@@ -384,6 +384,24 @@ def test_image_operation_range_is_the_image_range():
     assert binding_sha(at_base) != binding_sha(implicit)
 
 
+def test_c3_flash_cycle_binding_rejects_non_base_image_but_program_can_bind_offset():
+    res = resource_with(ALL_OPS)
+    offset = BASE + 2048
+    fw = bundle_v3.image_asset_descriptor(res, FW_A, load_address=offset)
+    # Image applicability and future offset-capable Operations remain distinct
+    # from today's C-3 flash_cycle, which always executes at flash_base.
+    assert bind(res, fw, operation="program")["range"]["address"] == offset
+    assert bind(res, fw, operation="verify")["range"]["address"] == offset
+    with pytest.raises(BundleBuildError, match="JOB_FLASH_CYCLE_BASE_MISMATCH"):
+        bind(res, fw, operation="flash_cycle")
+    at_base = bundle_v3.image_asset_descriptor(res, FW_A)
+    forged = bind(res, at_base, operation="flash_cycle")
+    forged["range"]["address"] = offset
+    with pytest.raises(BundleBuildError, match="JOB_FLASH_CYCLE_BASE_MISMATCH"):
+        bundle_v3.verify_job_binding(forged, res, fw, ppu_id="z2-hil", site_id=2,
+                                     operation="flash_cycle")
+
+
 def test_binding_mismatch_when_operation_differs():
     res = resource_with(ALL_OPS)
     fw = bundle_v3.image_asset_descriptor(res, FW_A)

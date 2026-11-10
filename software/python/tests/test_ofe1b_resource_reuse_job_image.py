@@ -333,6 +333,7 @@ def _denied(stack, body, expect):
     ("wrong_ppu", "JOB_BINDING_MISMATCH"),
     ("foreign_profile", "JOB_BINDING_MISMATCH"),     # Manager claims other Resources
     ("foreign_driver_abi", "JOB_BINDING_MISMATCH"),
+    ("non_base_flash", "JOB_FLASH_CYCLE_BASE_MISMATCH"),
     ("generation_moved", "JOB_RESOURCE_ACTIVE_SET_CHANGED"),
     ("provider_mismatch", "JOB_RESOURCE_PACKAGE_MISMATCH"),
     ("not_wired", "JOB_RESOURCE_IDENTITY_NOT_WIRED"),
@@ -358,6 +359,17 @@ def test_unsafe_or_unproven_job_binding_never_opens_c3(case, expect):
                     body = job_body(stack_resource(max_image_bytes=32768), FW_A)
                 elif case == "foreign_driver_abi":
                     body = job_body(stack_resource(driver_abi="plasma_swd:6"), FW_A)
+                elif case == "non_base_flash":
+                    # A direct, internally consistent Gateway request can
+                    # declare an aligned offset. Admission must reject before
+                    # the C-3 Worker/OpenOCD sees the mismatched range.
+                    shifted = bundle_v3.image_asset_descriptor(
+                        resource, FW_A, load_address=0x08000400)
+                    body["image_asset"] = shifted
+                    body["job_binding"]["image_asset_sha256"] = (
+                        bundle_v3.image_asset_sha256(shifted))
+                    body["job_binding"]["range"]["address"] = 0x08000400
+                    assert gateway_request(body).image == FW_A
                 elif case == "provider_mismatch":
                     body["provider"] = "openocd-platform-reference"
                 elif case == "not_wired":

@@ -280,6 +280,14 @@ passed through unchanged. The request is still signed through the unchanged
 G13 Gateway write path; owner authorization, Site admission and Provider
 capability are not bypassed.
 
+ **C-3 Flash address boundary (OFE-1B safety correction):** `flash_cycle`
+ Job Binding admission additionally requires the Image `load_address` to equal
+ the verified Resource Profile `flash_base`. The current C-3 Adapter always
+ erases, writes, verifies and reads back from `flash_base`; accepting an aligned
+ non-base Binding would misrepresent the actual hardware range. The general
+ Image descriptor still permits aligned offsets for distinct future Operation
+ implementations; this correction does not qualify C-3 offset programming.
+
 ### 8.3 PPU admission (`SiteManager.enqueue` → `_admit_job_binding`)
 
 Inside the existing PPU-wide execution lease (which excludes Asset activation
