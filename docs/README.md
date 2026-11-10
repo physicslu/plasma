@@ -75,6 +75,7 @@
 - **Reference** · `Runtime` · `DEFAULT OFF` — [Reusable Engineering Runtime Dispatcher v1](architecture/plasma-engineering-runtime-dispatch-v1.md)：Path 2 SWPC CLI／Path 3 SWPC Codex 共用 Work Order、Capability、SHA 與一次性保護 Claim；PR 與 push 僅執行 GitHub-hosted 離線測試。尚未啟用 SWPC 執行，隔離 Runner／自動 Gate 1 Dispatch／真實 Publisher 未驗收，不代表可操作任何實體硬體。
 - **Current** — [Facility / PPU / Site Domain Model](architecture/ppu-facility-sites.md)
 - **Current** — [PPU Execution Ownership](architecture/ppu-execution-ownership.md)
+- **Reference** · `Architecture Phase 1 Gate 1` · `source-only` — [PPU Bootstrap / Runtime / Stage C responsibility boundaries](architecture/ppu-bootstrap-runtime-stagec-boundaries.md)：區分 Bootstrap 的 Bundle／Recovery、Runtime 的 Job／Lease 與 C-3 特權硬體控制；程式打包不代表 unit 已安裝或實機驗證。
 - **Current** — [Domain Naming and Identity Policy](architecture/domain-naming-migration.md)
 - **Current** — [Web Product Modes](architecture/web-product-modes.md)
 - **Current** — [Web REST API Contract](architecture/web-rest-api-contract.md)
