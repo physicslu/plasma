@@ -549,3 +549,20 @@ def test_coordinator_reuses_the_bootstrap_installer_copy_routine():
     source = (ROOT / "scripts" / "ppu-bootstrap-deployment.py").read_text()
     assert "bootstrap_installer._copy_scripts(plane.root, install_root)" in source
     assert "shutil.copytree" not in source
+
+
+def test_qemu_simulation_installer_honours_the_full_copy_contract():
+    """The z2like QEMU kit drives the same coordinator, so its simulation
+    installer must verify the control plane and run on_rollback first."""
+    import importlib.util
+    import sys
+    spec = importlib.util.spec_from_file_location(
+        "ppu_full_copy_test_qemu_installer", ROOT / "scripts" / "z2like-demo-qemu-installer.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    assert module.verify_control_plane.__name__ == "verify_control_plane"
+    import inspect
+    assert "on_rollback" in inspect.signature(module.install_release).parameters
+    source = inspect.getsource(module.install_release)
+    assert source.index("on_rollback()") < source.index("_restore_current(paths.current, previous)")
