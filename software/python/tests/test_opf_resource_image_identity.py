@@ -384,22 +384,33 @@ def test_image_operation_range_is_the_image_range():
     assert binding_sha(at_base) != binding_sha(implicit)
 
 
-def test_c3_flash_cycle_binding_rejects_non_base_image_but_program_can_bind_offset():
+def test_flash_cycle_binding_carries_the_image_write_address_not_flash_base():
+    """flash_base is the bank start; the Binding range is the Job write window."""
     res = resource_with(ALL_OPS)
     offset = BASE + 2048
     fw = bundle_v3.image_asset_descriptor(res, FW_A, load_address=offset)
-    # Image applicability and future offset-capable Operations remain distinct
-    # from today's C-3 flash_cycle, which always executes at flash_base.
-    assert bind(res, fw, operation="program")["range"]["address"] == offset
-    assert bind(res, fw, operation="verify")["range"]["address"] == offset
-    with pytest.raises(BundleBuildError, match="JOB_FLASH_CYCLE_BASE_MISMATCH"):
-        bind(res, fw, operation="flash_cycle")
+    for operation in ("flash_cycle", "program", "verify"):
+        assert bind(res, fw, operation=operation)["range"] == {
+            "address": offset, "length": len(FW_A)}
     at_base = bundle_v3.image_asset_descriptor(res, FW_A)
+    assert bind(res, at_base, operation="flash_cycle")["range"]["address"] == BASE
+    # A Binding whose range disagrees with its Image is never admitted.
     forged = bind(res, at_base, operation="flash_cycle")
     forged["range"]["address"] = offset
-    with pytest.raises(BundleBuildError, match="JOB_FLASH_CYCLE_BASE_MISMATCH"):
-        bundle_v3.verify_job_binding(forged, res, fw, ppu_id="z2-hil", site_id=2,
+    with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH|JOB_RANGE_MISMATCH"):
+        bundle_v3.verify_job_binding(forged, res, at_base, ppu_id="z2-hil", site_id=2,
                                      operation="flash_cycle")
+
+
+def test_image_erase_window_not_only_its_bytes_must_fit_the_bank():
+    res = resource_with(ALL_OPS)
+    c = res["constraints"]
+    unit, end = c["erase_granularity"], BASE + c["flash_size"]
+    last = end - unit
+    assert bundle_v3.image_asset_descriptor(res, b"L" * unit, load_address=last)
+    for address, size in ((last, unit + 1), (end, 1), (BASE + 1, 1), (BASE - unit, 1)):
+        with pytest.raises(BundleBuildError, match="IMAGE_ASSET_ADDRESS_INVALID"):
+            bundle_v3.image_asset_descriptor(res, b"L" * size, load_address=address)
 
 
 def test_binding_mismatch_when_operation_differs():

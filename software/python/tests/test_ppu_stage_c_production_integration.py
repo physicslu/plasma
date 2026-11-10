@@ -390,7 +390,7 @@ def test_site_session_bound_to_package_uid_rejects_wrong_uid_peer(tmp_path):
     try:
         main = (b"import json, os, socket, time\nS = os.environ['PLASMA_SITE_WORKER_SOCKET']\n"
                 b"def call(r):\n    s = socket.socket(socket.AF_UNIX); s.connect(S)\n"
-                b"    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v2', **r))+'\\n').encode())\n"
+                b"    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v3', **r))+'\\n').encode())\n"
                 b"    return json.loads(s.makefile().readline())\n"
                 b"time.sleep(0.5)\nprint(json.dumps(call({'op':'probe','site':2})))\n")
         parts = [("tool", "python", [], {"python/main.py": main, "config/plasma-package-resources.json":

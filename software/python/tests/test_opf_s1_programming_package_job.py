@@ -50,7 +50,7 @@ import os
 import socket
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.connect(os.environ['PLASMA_SITE_WORKER_SOCKET'])
-s.sendall((json.dumps({'protocol': 'plasma.ppu.site-worker.v2',
+s.sendall((json.dumps({'protocol': 'plasma.ppu.site-worker.v3',
                       'op': 'probe', 'site': 2}) + '\\n').encode())
 data = b''
 while not data.endswith(b'\\n'):

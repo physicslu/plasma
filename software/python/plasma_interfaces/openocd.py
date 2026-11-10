@@ -39,11 +39,17 @@ class OpenOCDInterface(BaseInterface):
         # Installed by the trusted Runtime composition, never by Job metadata.
         self.opf_flash_executor: Callable[..., Awaitable[dict[str, Any]]] | None = None
         self.opf_flash_preflight: Callable[..., dict[str, Any]] | None = None
-        self._runtime_job: tuple[str, dict[str, Any] | None, float] | None = None
+        self._runtime_job: tuple[str, dict[str, Any] | None, float,
+                                 dict[str, Any] | None] | None = None
 
     def bind_runtime_job(self, job_id: str, active_asset_set: dict[str, Any] | None,
-                         deadline_monotonic: float) -> None:
-        self._runtime_job = (job_id, deepcopy(active_asset_set), deadline_monotonic)
+                         deadline_monotonic: float,
+                         job_binding: dict[str, Any] | None) -> None:
+        """Pin the Runtime-admitted Job context, including the SiteManager-
+        verified Job Binding whose ``range.address`` is the write address
+        (None only for the separate inline / bundle-reference contract)."""
+        self._runtime_job = (job_id, deepcopy(active_asset_set), deadline_monotonic,
+                             deepcopy(job_binding))
 
     @property
     def site_worker_ready(self) -> bool:
@@ -75,6 +81,7 @@ class OpenOCDInterface(BaseInterface):
             self.opf_flash_preflight(
                 active_asset_set=self._runtime_job[1], target=request.target,
                 site_id=request.site_id, image_size=request.image_size,
+                job_binding=self._runtime_job[3],
                 provider=request.metadata.get("provider"), profile=request.metadata.get("profile"))
         except (ValueError, OSError, KeyError, TypeError) as exc:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
@@ -133,6 +140,7 @@ class OpenOCDInterface(BaseInterface):
             active_asset_set=self._runtime_job[1],
             job_deadline_monotonic=self._runtime_job[2],
             image_root=self.normalized_image_root,
+            job_binding=self._runtime_job[3],
         )
         if progress:
             await progress(len(image), len(image))

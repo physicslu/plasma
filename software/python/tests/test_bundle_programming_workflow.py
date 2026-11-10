@@ -128,6 +128,8 @@ class FakeGateway:
         self.busy = busy
         self.job_final = job_final
         self.status_target = status_target
+        # None: report the executed range truthfully; dict: override fields.
+        self.flash_range: dict | None = None
         self.posts: list[dict] = []
         self.polls = 0
 
@@ -179,8 +181,16 @@ class FakeGateway:
                                "result": "PASS" if state == "success" else "FAIL",
                                "readback_sha256": sha if self.readback_ok else "0" * 64,
                                "bytes_verified": len(self.image),
+                               **self._executed_range(binding),
                                "safe_off": self.safe_off}}}}})
         raise AssertionError(f"unexpected Gateway call {method} {path}")
+
+    def _executed_range(self, binding):
+        address, length = binding["range"]["address"], binding["range"]["length"]
+        executed = {"load_address": address, "erase_address": address,
+                    "erase_length": -(-length // 1024) * 1024, "write_address": address,
+                    "verify_address": address, "readback_address": address}
+        return executed if self.flash_range is None else {**executed, **self.flash_range}
 
     def _resources(self):
         if self.resources_state is not None:
@@ -296,6 +306,37 @@ def test_already_active_skips_b1_b2_b3(tmp_path):
     assert len(gateway.posts) == 1
     assert [s["step"] for s in run["steps"]] == [
         "PREFLIGHT", "RESOURCE_REUSE", "FLASH_CYCLE_SUBMIT", "VERIFY_RECEIPT"]
+
+
+@pytest.mark.parametrize("override", [
+    {"erase_address": 0x08000400},           # executed somewhere else
+    {"write_address": 0x08000400},
+    {"readback_address": 0x08000400},
+    {"erase_length": 4096},
+    {"load_address": None, "erase_address": None, "erase_length": None,
+     "write_address": None, "verify_address": None, "readback_address": None},  # no range
+])
+def test_ppu_pass_without_the_binding_flash_range_is_never_a_pass(tmp_path, override):
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    sha = bundle_v3.build_user_image_bundle(route, image(), filename="app.bin").archive_sha256
+    workflow, _coord, gateway = make(tmp_path, coordinator=FakeCoordinator(active_sha=sha))
+    gateway.flash_range = override
+    _planned, run = run_once(workflow)
+    assert run["outcome"] == "FAIL" and run["reason"] == "FLASH_RANGE_MISMATCH"
+    receipt = run["receipt"]
+    assert receipt["expected_flash_range"]["write_address"] == 0x08000000
+    assert receipt["observed_flash_range"] != receipt["expected_flash_range"]
+
+
+def test_binding_echo_with_a_different_range_is_not_confirmed(tmp_path):
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    sha = bundle_v3.build_user_image_bundle(route, image(), filename="app.bin").archive_sha256
+    gateway = FakeGateway(image=image(),
+                          echo={"range": {"address": 0x08000400, "length": len(image())}})
+    workflow, _coord, gateway = make(tmp_path, coordinator=FakeCoordinator(active_sha=sha),
+                                     gateway=gateway)
+    _planned, run = run_once(workflow)
+    assert run["outcome"] == "FAIL" and "JOB_BINDING_NOT_CONFIRMED" in json.dumps(run)
 
 
 @pytest.mark.parametrize("body, code", [

@@ -56,7 +56,8 @@ Engine Selection and Worker Session identity checks remain unchanged.
 `plasma_interfaces.site_worker_c3.run_flash_cycle` implementation already used
 by the current REST Runtime, with an optional qualified Session opener. The
 sequence is: stage Job image, open C-3 Session with the one Bundle Flash
-Profile, `bind_image` with SHA256/size only, `run`, full readback SHA/length
+Profile, `bind_image` with SHA256/size/Job `load_address`, `run`, full readback SHA/length
+and executed-range
 evidence, `close_session`, cleanup. C-3 alone
 owns Site ownership, Job lease verification, operation timeout, SAFE_OFF and
 persistent seals; the existing Runtime alone owns Job retry policy. This PR

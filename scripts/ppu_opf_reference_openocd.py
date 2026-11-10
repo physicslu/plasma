@@ -73,8 +73,38 @@ def _parse_profile(raw: bytes, target: str, image_size: int) -> dict[str, Any]:
     return values
 
 
+def job_flash_window(profile: Mapping[str, Any], *, profile_package: str, site_id: int,
+                     image_size: int, job_binding: Mapping[str, Any] | None) -> dict[str, int]:
+    """The Flash window one Job writes: ``{"load_address", "erase_length"}``.
+
+    ``flash_base`` is the physical start of the Flash bank; the Job write
+    address is the admitted Job Binding ``range.address``. A Job without a
+    Binding is the separate inline / bundle-reference contract, which by
+    definition writes at ``flash_base`` (explicit, not a fallback). Every
+    window is re-proven in-bank, aligned and non-empty, erase rounding included.
+    """
+    if job_binding is None:
+        address = profile["flash_base"]
+    else:
+        job_range = job_binding.get("range")
+        _need(job_binding.get("operation") == "flash_cycle"
+              and job_binding.get("site_id") == site_id
+              and job_binding.get("profile") == profile_package
+              and type(job_range) is dict and set(job_range) == {"address", "length"}
+              and type(job_range["address"]) is int and job_range["length"] == image_size
+              and type(job_range["length"]) is int, "JOB_BINDING_RANGE_MISMATCH")
+        address = job_range["address"]
+    try:
+        checked = ppu_site_worker.parse_flash_profile(dict(profile))
+        erase_address, erase_length = checked.flash_window(address, image_size)
+    except ppu_site_worker.SiteWorkerDenied as exc:
+        raise ReferenceDenied("JOB_" + exc.code) from exc
+    return {"load_address": erase_address, "erase_length": erase_length}
+
+
 def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str, Any] | None,
                             target: str, site_id: int, image_size: int,
+                            job_binding: Mapping[str, Any] | None,
                             provider: str | None = None, profile: str | None = None) -> dict[str, Any]:
     """Verify the pinned Active Bundle Profile; no IC registry or hardware claims."""
     _need(isinstance(active_asset_set, Mapping)
@@ -123,9 +153,11 @@ def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str
         profile = _parse_profile(raw, target, image_size)
     except (KeyError, OSError, TypeError, UnicodeError) as exc:
         raise ReferenceDenied("REFERENCE_PROFILE_INVALID") from exc
+    window = job_flash_window(profile, profile_package=selected["id"], site_id=site_id,
+                              image_size=image_size, job_binding=job_binding)
     return {"asset_set_sha256": digest, "profile_package": selected["id"],
             "provider_package": descriptor["provider_package"],
-            "profile_sha256": entry["sha256"], "profile": profile}
+            "profile_sha256": entry["sha256"], "profile": profile, **window}
 
 
 def qualify_reference(
@@ -209,6 +241,7 @@ async def execute_reference_flash(
     image_root: Path, hardware: Mapping[str, Any],
     job_deadline_monotonic: float,
     job_timeout_s: float,
+    job_binding: Mapping[str, Any] | None,
     engine_record: Path = ppu_site_engine.ENGINE_SELECTION,
     engine_base: Path = ppu_site_engine.ENGINE_BASE,
     require_root: bool = True,
@@ -232,6 +265,8 @@ async def execute_reference_flash(
         selection=selection, policy=policy, target=target, site_id=site_id,
         image_size=len(image), hardware=hardware,
         engine_record=engine_record, engine_base=engine_base, require_root=require_root)
+    window = job_flash_window(binding.profile, profile_package=binding.route.profile_package,
+                              site_id=site_id, image_size=len(image), job_binding=job_binding)
 
     worker_receipt: ppu_opf_site_session.BoundSession | None = None
 
@@ -254,7 +289,8 @@ async def execute_reference_flash(
     result = await run_flash_cycle(
         client, job_id=job_id, site_id=site_id, icpn=binding.profile["icpn"],
         image=image, image_root=image_root, max_runtime_s=math.ceil(job_timeout_s),
-        session_factory=open_session)
+        session_factory=open_session, load_address=window["load_address"],
+        erase_length=window["erase_length"])
     _need(worker_receipt is not None, "WORKER_ENGINE_RECEIPT_MISSING")
     return {**result, "opf_provider_package": binding.route.provider_package,
             "opf_profile_package": binding.route.profile_package,
@@ -264,13 +300,15 @@ async def execute_reference_flash(
             "opf_openocd_sha256": binding.engine.openocd_sha256,
             "opf_engine_selection_sha256": binding.engine.record_sha256,
             "opf_worker_engine_selection_sha256": worker_receipt.worker_engine_selection_sha256,
-            "opf_worker_epoch": worker_receipt.worker_epoch}
+            "opf_worker_epoch": worker_receipt.worker_epoch,
+            "job_binding_sha256": (None if job_binding is None
+                                   else job_binding.get("job_binding_sha256"))}
 
 
 async def execute_runtime_flash(
     client: SiteWorkerControlClient, *, product_root: Path, request: JobRequest,
     active_asset_set: Mapping[str, Any] | None, job_deadline_monotonic: float,
-    image_root: Path,
+    image_root: Path, job_binding: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """Production REST Flash cutover; no direct-C3 fallback.
 
@@ -284,6 +322,7 @@ async def execute_runtime_flash(
         pinned_profile = preflight_runtime_flash(
             product_root=product_root, active_asset_set=active_asset_set,
             target=request.target, site_id=request.site_id, image_size=len(request.image),
+            job_binding=job_binding,
             provider=request.metadata.get("provider"), profile=request.metadata.get("profile"))
         digest = pinned_profile["asset_set_sha256"]
         staged = product_root / "assets" / "staged" / digest
@@ -329,7 +368,8 @@ async def execute_runtime_flash(
             selection=selection, policy=policy, job_id=request.job_id,
             site_id=request.site_id, target=request.target, image=request.image,
             image_root=image_root, hardware=hardware,
-            job_deadline_monotonic=job_deadline_monotonic, job_timeout_s=request.timeout_s)
+            job_deadline_monotonic=job_deadline_monotonic, job_timeout_s=request.timeout_s,
+            job_binding=job_binding)
     except SiteWorkerRefused as exc:
         raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED,
                           "OPF_WORKER_OBSERVATION_DENIED:" + exc.code) from exc
