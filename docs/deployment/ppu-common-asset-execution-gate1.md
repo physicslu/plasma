@@ -117,7 +117,7 @@ No broker framework, network service, session database, second Job engine,
 journal, receipt or FPGA loader.
 
 - `scripts/ppu_site_worker.py` (core): one Unix stream socket, one JSON line
-  request/response, protocol `plasma.ppu.site-worker.v2`. Peer identity is
+  request/response, protocol `plasma.ppu.site-worker.v3`. Peer identity is
   `SO_PEERCRED` + kernel `/proc/<pid>/stat`, never a request claim.
   - Control (`open_session`, `close_session`, `status`): ONLY the trusted
     Runtime process (production: `plasma-server.service` MainPID), and
@@ -152,7 +152,8 @@ journal, receipt or FPGA loader.
   also open a session for its own Site Job: `open_job_session {job_id, sites,
   max_runtime_s}` (no Package peer; the Job must be one of the C-1 lease's
   active `job_ids`, never a Package Action lease) → `bind_image {session_id,
-  profile, image_sha256, image_size}` → control op `run {session_id, site,
+  image_sha256, image_size, load_address}` (wire v3: the Job Binding write
+  address; the Profile is bound at session open) → control op `run {session_id, site,
   operation}` (Runtime-owned sessions only; transport peers can never use
   them) → `close_session`. Job IDs follow the canonical
   `plasma_core.models.JOB_ID_PATTERN` (REST and Package Action IDs alike).

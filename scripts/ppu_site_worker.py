@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
-PROTOCOL = "plasma.ppu.site-worker.v2"
+PROTOCOL = "plasma.ppu.site-worker.v3"
 MAX_REQUEST = 4096
 # Same canonical Job ID rule as plasma_core.models.JOB_ID_PATTERN (REST Jobs
 # and Package Action Jobs share it; a test keeps the two in lockstep).
@@ -107,16 +107,58 @@ class FlashProfile:
         unit = self.erase_granularity
         return -(-size // unit) * unit
 
+    def flash_window(self, load_address: object, size: object) -> tuple[int, int]:
+        """(erase_address, erase_length) for one Image at the Job address.
+
+        ``flash_base`` is only the physical start of the Flash bank; the Job
+        Binding's ``load_address`` is where this Job writes. Both the Image and
+        its whole rounded-up erase range must lie inside the bank, start on an
+        erase boundary and be non-empty. Raises SiteWorkerDenied.
+        """
+        _require(type(load_address) is int and type(size) is int, "FLASH_RANGE_INVALID")
+        end = self.flash_base + self.flash_size
+        _require(size > 0 and self.flash_base <= load_address < end
+                 and (load_address - self.flash_base) % self.erase_granularity == 0,
+                 "FLASH_RANGE_INVALID")
+        length = self.erase_length(size)
+        _require(length >= size and load_address + length <= end, "FLASH_RANGE_INVALID")
+        return load_address, length
+
 
 @dataclass(frozen=True)
 class FlashImage:
+    """Exact Job Image bytes bound to the Job's verified write address."""
     profile: FlashProfile
     payload: bytes
     sha256: str
+    load_address: int
+
+    def __post_init__(self) -> None:
+        self.profile.flash_window(self.load_address, len(self.payload))
 
     @property
     def icpn(self) -> str:
         return self.profile.icpn
+
+    @property
+    def erase_range(self) -> tuple[int, int]:
+        return self.profile.flash_window(self.load_address, len(self.payload))
+
+
+FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
+                      "write_address", "verify_address", "readback_address")
+
+
+def flash_range_expected(image: FlashImage) -> dict[str, int]:
+    """The only range a flash_cycle receipt may report for this bound Image."""
+    erase_address, erase_length = image.erase_range
+    return {"load_address": image.load_address, "erase_address": erase_address,
+            "erase_length": erase_length, "write_address": image.load_address,
+            "verify_address": image.load_address, "readback_address": image.load_address}
+
+
+def flash_range_receipt(result: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: result.get(key) for key in FLASH_RANGE_FIELDS}
 
 
 def parse_flash_profile(raw: object) -> FlashProfile:
@@ -339,13 +381,15 @@ class SiteWorkerCore:
                         "session": sessions[0] if sessions else None}
         if op == "bind_image":
             _require(set(request) == {
-                "protocol", "op", "session_id", "image_sha256", "image_size"
+                "protocol", "op", "session_id", "image_sha256", "image_size", "load_address"
             }, "REQUEST_INVALID")
             _require(type(request["session_id"]) is str
                      and type(request["image_sha256"]) is str
-                     and type(request["image_size"]) is int, "REQUEST_INVALID")
+                     and type(request["image_size"]) is int
+                     and type(request["load_address"]) is int, "REQUEST_INVALID")
             size = request["image_size"]
             digest = request["image_sha256"]
+            load_address = request["load_address"]
             _require(re.fullmatch(r"[0-9a-f]{64}", digest) is not None, "IMAGE_SHA256_INVALID")
             with self._lock:
                 s = self._sessions.get(request["session_id"])
@@ -355,6 +399,9 @@ class SiteWorkerCore:
                 profile = s.profile
                 _require(profile is not None, "PROFILE_NOT_BOUND")
                 _require(0 < size <= profile.flash_size, "IMAGE_SIZE_INVALID")
+                # The Worker re-derives the whole erase window itself; the
+                # Runtime's address is never trusted without this check.
+                erase_address, erase_length = profile.flash_window(load_address, size)
                 if s.provider_route is not None:
                     _require(size <= s.provider_route["max_image_bytes"], "IMAGE_SIZE_INVALID")
                 # Only the trusted Runtime stages this exact Job-owned image.
@@ -376,13 +423,16 @@ class SiteWorkerCore:
                 # existing Runtime owner lease alone does not prove this.
                 _require(all(
                     other is s or other.image is None
-                    or (other.image.sha256 == digest and other.image.profile == profile)
+                    or (other.image.sha256 == digest and other.image.profile == profile
+                        and other.image.load_address == load_address)
                     for other in self._sessions.values()
                 ), "PPU_IMAGE_OR_TARGET_CONFLICT")
-                s.image = FlashImage(profile, payload, digest)
+                s.image = FlashImage(profile, payload, digest, load_address)
                 return {"job_id": s.job_id, "icpn": profile.icpn,
                         "target_config": profile.target_config,
-                        "image_sha256": digest, "image_size": size, "bound": True}
+                        "image_sha256": digest, "image_size": size,
+                        "load_address": load_address, "erase_address": erase_address,
+                        "erase_length": erase_length, "bound": True}
         if op == "run":
             _require(set(request) == {"protocol", "op", "session_id", "site", "operation"}
                      and type(request["session_id"]) is str and type(request["site"]) is int
@@ -604,6 +654,12 @@ class SiteWorkerCore:
                         or result.get("bytes_verified") != len(s.image.payload)):
                     self._seal(site, "READBACK_NOT_VERIFIED", s)
                     raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:READBACK_NOT_VERIFIED")
+                # The Adapter reports the range it actually executed (OpenOCD
+                # erase observation + executed write/verify/readback commands).
+                # Anything but the bound Job window is not a proven PASS.
+                if flash_range_receipt(result) != flash_range_expected(s.image):
+                    self._seal(site, "FLASH_RANGE_NOT_VERIFIED", s)
+                    raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FLASH_RANGE_NOT_VERIFIED")
             # Safe release and exact readback are proven before clearing the
             # durable operation marker, even if a close/cancel raced.
             safe_to_clear_guard = True
@@ -750,10 +806,11 @@ class SiteWorkerClient:
                          max_runtime_s=max_runtime_s, **extra)
 
     def bind_image(
-        self, session_id: str, *, image_sha256: str, image_size: int
+        self, session_id: str, *, image_sha256: str, image_size: int, load_address: int
     ) -> dict[str, Any]:
         return self.call("bind_image", session_id=session_id,
-                         image_sha256=image_sha256, image_size=image_size)
+                         image_sha256=image_sha256, image_size=image_size,
+                         load_address=load_address)
 
     def run(self, session_id: str, *, site: int, operation: str) -> dict[str, Any]:
         return self.call("run", session_id=session_id, site=site, operation=operation)

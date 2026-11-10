@@ -148,8 +148,9 @@ PPU_ID = "local-ppu"
 
 
 def binding_for(resource, image: bytes | None, *, operation="flash_cycle", site=2,
-                ppu_id=PPU_ID, address=None, length=None):
-    asset = None if image is None else bundle_v3.image_asset_descriptor(resource, image)
+                ppu_id=PPU_ID, address=None, length=None, load_address=None):
+    asset = None if image is None else bundle_v3.image_asset_descriptor(
+        resource, image, load_address=load_address)
     binding = bundle_v3.job_image_binding(resource, asset, ppu_id=ppu_id, site_id=site,
                                           operation=operation, address=address, length=length)
     return asset, binding
@@ -382,6 +383,120 @@ def test_unsafe_or_unproven_job_binding_never_opens_c3(case, expect):
                 await _denied(stack, body, expect)
                 assert stack.manager.execution_lease_snapshot()["busy"] is False \
                     or case == "fpga_reload_lock"
+    run(scenario())
+
+
+# --------------------------- Job Binding address end to end (OFE-1B PR-A, Gate 1 B)
+SECOND_PAGE = 0x08000400
+FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
+                      "write_address", "verify_address", "readback_address")
+
+
+def c3_route() -> bundle_v3.ProgrammingRoute:
+    data = json.loads(ROUTE_PATH.read_text())
+    data["provider"]["id"] = C3_PROVIDER
+    data["profile"]["id"] = C3_PROFILE
+    data["profile"]["capabilities"]["provider_package"] = C3_PROVIDER
+    data["profile"]["capabilities"]["sites"] = [1, 2]
+    return bundle_v3.parse_route(data)
+
+
+def route_stack(folder):
+    """C-3 stack whose Active Set is a canonical route-built Bundle (FW_A), so
+    the Runtime uses the REAL ``read_active_resource_identity`` resolver."""
+    built = bundle_v3.build_user_image_bundle(c3_route(), FW_A)
+    return Stack(Path(folder), in_process=True,
+                 bundle_options={"programming_bundle": built}), built
+
+
+def test_real_resolver_reuses_resources_and_writes_firmware_b_at_its_binding_address():
+    async def scenario():
+        with short_tmp() as folder:
+            stack, built = route_stack(folder)
+            async with stack:
+                resource = bundle_v3.resource_set_descriptor(c3_route())
+                assert stack.manager._active_resource_resolver is not None
+                status, ppu = await stack.api("GET", "/api/status?site=2")
+                report = ppu["ppu"]["active_resources"]
+                assert report["state"] == "VERIFIED", report
+                assert report["resource_set_sha256"] == built.resource_set_sha256 \
+                    == bundle_v3.resource_set_sha256(resource)
+                # A at flash_base, then B (same Resources) at the next page.
+                for firmware, address in ((FW_A, 0x08000000), (FW_B, SECOND_PAGE)):
+                    body = job_body(resource, firmware, load_address=address)
+                    assert body["job_binding"]["range"] == {"address": address,
+                                                            "length": len(firmware)}
+                    status, job = await submit(stack, body)
+                    assert status == 202, job
+                    assert job["state"] == "success", json.dumps(job)
+                    cycle = job["result"]["details"]["flash_cycle"]
+                    erase_length = -(-len(firmware) // 1024) * 1024
+                    assert {k: cycle[k] for k in FLASH_RANGE_FIELDS} == {
+                        "load_address": address, "erase_address": address,
+                        "erase_length": erase_length, "write_address": address,
+                        "verify_address": address, "readback_address": address}
+                    assert cycle["job_binding_sha256"] == job["job_binding"]["job_binding_sha256"]
+                    commands = [a for a in stack.sim.argvs[-1] if a.startswith(
+                        ("flash erase_address", "flash write_image", "flash verify_image",
+                         "dump_image"))]
+                    assert commands[0] == f"flash erase_address 0x{address:08x} 0x{erase_length:08x}"
+                    assert all(f" 0x{address:08x} " in c for c in commands[1:])
+                # B landed on page 1 and page 0 still holds A: flash_base was not reused.
+                assert bytes(stack.sim.memory[:len(FW_A)]) == FW_A
+                assert bytes(stack.sim.memory[0x400:0x400 + len(FW_B)]) == FW_B
+                assert len(stack.sim.argvs) == 2
+                assert assets.read_active(stack.opf["product_root"])["asset_set_sha256"] \
+                    == built.archive_sha256
+    run(scenario())
+
+
+@pytest.mark.parametrize("fault", ["forged_erase_report", "write_lands_elsewhere",
+                                   "readback_corrupt"])
+def test_non_base_job_never_passes_unless_the_executed_range_is_proven(fault):
+    async def scenario():
+        with short_tmp() as folder:
+            stack, _built = route_stack(folder)
+            async with stack:
+                resource = bundle_v3.resource_set_descriptor(c3_route())
+                if fault == "forged_erase_report":
+                    stack.sim.erase_report = (0x08000000, 1024)  # OpenOCD erased page 0
+                elif fault == "write_lands_elsewhere":
+                    stack.sim.write_skew = 0x400
+                else:
+                    stack.sim.corrupt = True
+                status, job = await submit(
+                    stack, job_body(resource, FW_B, load_address=SECOND_PAGE))
+                assert status == 202, job
+                assert job["state"] != "success", json.dumps(job)
+                text = json.dumps(job)
+                expect = {"forged_erase_report": "FLASH_RANGE_NOT_OBSERVED",
+                          "write_lands_elsewhere": "OPENOCD_FLASH_FAILED",
+                          "readback_corrupt": "READBACK_MISMATCH"}[fault]
+                assert expect in text, text
+    run(scenario())
+
+
+def test_binding_window_outside_the_bank_is_refused_before_c3():
+    async def scenario():
+        with short_tmp() as folder:
+            stack, _built = route_stack(folder)
+            async with stack:
+                resource = bundle_v3.resource_set_descriptor(c3_route())
+                # Internally consistent forgery: Image bytes fit the last page's
+                # start, but the rounded erase window (2 pages) crosses the end.
+                image = FW_A + b"!"
+                last = 0x08000000 + 0x10000 - 1024
+                asset = {"schema": bundle_v3.IMAGE_ASSET_SCHEMA, "format": "binary",
+                         "sha256": hashlib.sha256(image).hexdigest(), "size": len(image),
+                         "load_address": last, "icpn": resource["constraints"]["icpn"]}
+                forged = job_body(resource, image)
+                forged["image_asset"] = asset
+                forged["job_binding"]["image_asset_sha256"] = bundle_v3.image_asset_sha256(asset)
+                forged["job_binding"]["range"] = {"address": last, "length": len(image)}
+                status, received = await stack.api("POST", "/api/jobs", forged)
+                assert status != 202, received
+                assert "IMAGE_ASSET_ADDRESS_INVALID" in json.dumps(received), received
+                assert stack.sim.argvs == []
     run(scenario())
 
 

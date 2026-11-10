@@ -8,7 +8,9 @@ systemd MainPID) runs one REST Site Job through C-3 as:
 
 The Worker owns Site admission, PS-local OpenOCD, SAFE_OFF verification and
 sealing. The verified Bundle Flash profile is pinned once at Session open;
-bind_image sends only SHA256 and size, never a second Geometry declaration. Wire protocol: ``plasma.ppu.site-worker.v2`` (one JSON line).
+bind_image sends SHA256, size and the verified Job Binding ``load_address``,
+never a second Geometry declaration; the Worker re-derives the erase window from
+the session Profile. Wire protocol: ``plasma.ppu.site-worker.v3`` (one JSON line).
 """
 from __future__ import annotations
 
@@ -22,7 +24,7 @@ from typing import Any, Callable, Mapping
 
 from plasma_core.errors import ErrorCode, PlasmaError
 
-PROTOCOL = "plasma.ppu.site-worker.v2"
+PROTOCOL = "plasma.ppu.site-worker.v3"
 DEFAULT_IMAGE_ROOT = Path("/run/plasma-server/normalized-images")
 
 
@@ -120,13 +122,21 @@ async def run_flash_cycle(
     image_root: Path,
     max_runtime_s: int,
     session_factory: Callable[[], Mapping[str, Any]],
+    load_address: int,
+    erase_length: int,
 ) -> dict[str, Any]:
     """One complete C-3 Flash cycle for one REST Job. Cancellation (task
     cancel / timeout) closes the session, which cancels the in-flight
     OpenOCD operation inside the Worker. An unproven SAFE_OFF remains sealed;
     the staged image is always removed."""
     digest = hashlib.sha256(image).hexdigest()
-    context = {"job_id": job_id, "site_id": site_id, "icpn": icpn}
+    context = {"job_id": job_id, "site_id": site_id, "icpn": icpn,
+               "load_address": load_address}
+    # The one range this Job may touch; the Worker re-derives it independently
+    # and the Adapter must report exactly this executed range.
+    expected_range = {"load_address": load_address, "erase_address": load_address,
+                      "erase_length": erase_length, "write_address": load_address,
+                      "verify_address": load_address, "readback_address": load_address}
     staged = stage_image(image_root, job_id, image)
     session_id: str | None = None
     try:
@@ -134,9 +144,18 @@ async def run_flash_cycle(
             # The verified OPF Session opener owns the single Profile binding.
             opened = await asyncio.to_thread(session_factory)
             session_id = str(opened["session_id"])
-            await asyncio.to_thread(
+            bound = await asyncio.to_thread(
                 client.call, "bind_image", session_id=session_id,
-                image_sha256=digest, image_size=len(image))
+                image_sha256=digest, image_size=len(image), load_address=load_address)
+            if ({k: bound.get(k) for k in ("load_address", "erase_address", "erase_length")}
+                    != {k: expected_range[k]
+                        for k in ("load_address", "erase_address", "erase_length")}):
+                raise PlasmaError(
+                    ErrorCode.INTERFACE_FAILURE,
+                    "C-3 Site Worker bound a different Flash range than the Job Binding",
+                    context={**context, "site_worker_stage": "bind_image",
+                             "site_worker_bind": dict(bound)},
+                )
             result = await asyncio.to_thread(
                 client.call, "run", timeout_s=max_runtime_s + 30.0, session_id=session_id,
                 site=site_id, operation="flash_cycle")
@@ -155,6 +174,13 @@ async def run_flash_cycle(
                 ErrorCode.INTERFACE_FAILURE,
                 "C-3 Flash cycle readback evidence does not match the Job image",
                 context={**context, "expected_sha256": digest, "site_worker_result": result},
+            )
+        if {k: result.get(k) for k in expected_range} != expected_range:
+            raise PlasmaError(
+                ErrorCode.INTERFACE_FAILURE,
+                "C-3 Flash cycle range evidence does not match the Job Binding",
+                context={**context, "expected_range": expected_range,
+                         "site_worker_result": result, "outcome_unknown": True},
             )
         return {**result, "image_sha256": digest, "session_id": session_id}
     finally:

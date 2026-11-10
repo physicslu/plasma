@@ -51,6 +51,8 @@ PLAN_SCHEMA = "plasma.manager.bundle-programming-plan.v2"
 RECEIPT_SCHEMA = "plasma.manager.programming-receipt.v2"
 # Only flash_cycle has a qualified PPU backend (C-3 OpenOCD) and receipt contract.
 RECEIPT_OPERATIONS = frozenset({"flash_cycle"})
+FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
+                      "write_address", "verify_address", "readback_address")
 CONFIRM_TOKEN = "PROGRAM"
 ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED"
 UPLOAD_CHUNK_BYTES = 256 * 1024
@@ -740,6 +742,16 @@ class BundleProgrammingWorkflow:
         binding = plan.binding
         expected_sha = None if plan.image is None else bundle_v3.sha256_hex(plan.image)
         expected_size = None if plan.image is None else len(plan.image)
+        # The Job Binding range is the write window; flash_base is only the
+        # bank start. The PPU reports the range it actually executed.
+        unit = plan.route.flash_profile["erase_granularity"]
+        job_range = binding["range"]
+        expected_range = {
+            "load_address": job_range["address"], "erase_address": job_range["address"],
+            "erase_length": -(-job_range["length"] // unit) * unit,
+            "write_address": job_range["address"], "verify_address": job_range["address"],
+            "readback_address": job_range["address"]}
+        observed_range = {key: flash.get(key) for key in FLASH_RANGE_FIELDS}
         # Expected (Manager plan) / Observed (PPU) / Readback are kept distinct.
         receipt = {
             "schema": RECEIPT_SCHEMA,
@@ -751,6 +763,7 @@ class BundleProgrammingWorkflow:
             "observed_image_size": result.get("image_size"),
             "readback_sha256": flash.get("readback_sha256"),
             "bytes_verified": flash.get("bytes_verified"),
+            "expected_flash_range": expected_range, "observed_flash_range": observed_range,
             "expected_resource_set_sha256": plan.resource_set_sha256,
             "observed_resource_set_sha256": echo.get("resource_set_sha256"),
             "expected_job_binding_sha256": plan.binding_sha256,
@@ -775,6 +788,7 @@ class BundleProgrammingWorkflow:
              and echo.get("resource_set_sha256") == plan.resource_set_sha256
              and echo.get("image_asset_sha256") == binding["image_asset_sha256"]
              and echo.get("operation") == plan.operation
+             and echo.get("range") == job_range
              and echo.get("site_id") == run.site
              and echo.get("ppu_id") == binding["ppu_id"], "JOB_BINDING_NOT_CONFIRMED"),
             (result.get("image_sha256") == expected_sha
@@ -783,6 +797,7 @@ class BundleProgrammingWorkflow:
             (flash.get("result") == "PASS", "FLASH_CYCLE_NOT_PASS"),
             (flash.get("readback_sha256") == expected_sha, "READBACK_SHA256_MISMATCH"),
             (flash.get("bytes_verified") == expected_size, "VERIFIED_BYTES_MISMATCH"),
+            (observed_range == expected_range, "FLASH_RANGE_MISMATCH"),
         ]
         failed = [reason for ok, reason in checks if not ok]
         outcome = "PASS" if not failed else "FAIL"

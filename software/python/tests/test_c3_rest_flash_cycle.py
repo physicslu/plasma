@@ -184,7 +184,8 @@ def test_probe_and_flash_use_identical_site_scoped_openocd_security_preamble(tmp
         "icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
         "flash_base": 0x08000000, "flash_size": 0x10000, "erase_granularity": 1024})
     payload = b"\x01\x02"
-    image = worker.FlashImage(profile, payload, hashlib.sha256(payload).hexdigest())
+    image = worker.FlashImage(profile, payload, hashlib.sha256(payload).hexdigest(),
+                              0x08000000)
     staged, readback = tmp_path / "in.bin", tmp_path / "out.bin"
     probe = adapter._argv(2)
     flash = adapter._flash_argv(2, image, staged, readback)
@@ -255,9 +256,13 @@ def test_session_binds_geometry_once_and_old_bind_wire_is_rejected(tmp_path):
     sid = opened["result"]["session_id"]
     assert core._sessions[sid].profile.icpn == "NEW-IC"
     wire = {"protocol": worker.PROTOCOL, "op": "bind_image", "session_id": sid,
-            "image_sha256": hashlib.sha256(payload).hexdigest(), "image_size": len(payload)}
+            "image_sha256": hashlib.sha256(payload).hexdigest(), "image_size": len(payload),
+            "load_address": 0x08000000}
     old_format = core.handle({**wire, "profile": profile}, peer, "control")
     assert old_format == {"ok": False, "error": "REQUEST_INVALID"}
+    # v2 bind without the Job write address is rejected; there is no default.
+    no_address = {k: v for k, v in wire.items() if k != "load_address"}
+    assert core.handle(no_address, peer, "control") == {"ok": False, "error": "REQUEST_INVALID"}
     bound = core.handle(wire, peer, "control")
     assert bound["ok"] and core._sessions[sid].image.profile is core._sessions[sid].profile
     assert core.handle({"protocol": worker.PROTOCOL, "op": "close_session",
@@ -301,38 +306,52 @@ class FlashSim:
         self.corrupt = False
         self.fail_at = None
         self.hang = threading.Event()  # set -> OpenOCD never exits until killed
+        self.erase_report: tuple[int, int] | None = None  # forged OpenOCD erase report
+        self.write_skew = 0  # simulated write landing away from the command
 
     def run(self, argv, **_kw):
         out = "SITE_ADMISSION_RECORD_ISSUED" if argv[-2] == "admit" else "revoked"
         return subprocess.CompletedProcess(argv, 0, out, "")
 
     def popen(self, argv, **_kw):
+        """Execute at the commanded absolute addresses and print OpenOCD's
+        own range observations (``erased address``/``wrote``/``verified``)."""
         self.argvs.append(list(argv))
         commands = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "-c"]
         rc = 0
+        log = bytearray(SAFE)
+
+        def address(text: str) -> int:
+            return int(text, 0) - self.base
+
         for command in commands:
             path = re.search(r"\{([^{}]+)\}", command)
-            parts = command.split()
+            tail = command[path.end():].split() if path else command.split()
             if command.startswith("flash erase_address "):
                 if self.fail_at == "erase":
                     rc = 5
-                start, length = int(parts[2], 0) - self.base, int(parts[3], 0)
+                start, length = address(tail[2]), int(tail[3], 0)
                 self.memory[start:start + length] = b"\xff" * length
+                erased = self.erase_report or (int(tail[2], 0), length)
+                log += b"erased address 0x%08x (length %d) in 0.1s\n" % erased
             elif command.startswith("flash write_image "):
                 if self.fail_at == "write":
                     rc = 5
-                data = Path(path.group(1)).read_bytes()
-                self.memory[:len(data)] = data
+                data, start = Path(path.group(1)).read_bytes(), address(tail[0])
+                start += self.write_skew
+                self.memory[start:start + len(data)] = data
+                log += b"wrote %d bytes from file image in 0.1s\n" % len(data)
             elif command.startswith("flash verify_image "):
                 if self.fail_at == "verify":
                     rc = 5
-                data = Path(path.group(1)).read_bytes()
-                rc = rc or (0 if self.memory[:len(data)] == data else 5)
+                data, start = Path(path.group(1)).read_bytes(), address(tail[0])
+                rc = rc or (0 if self.memory[start:start + len(data)] == data else 5)
+                log += b"verified %d bytes in 0.1s\n" % len(data)
             elif command.startswith("dump_image "):
-                length = int(parts[-1], 0)
-                data = bytes(self.memory[:length])
+                start, length = address(tail[0]), int(tail[1], 0)
+                data = bytes(self.memory[start:start + length])
                 Path(path.group(1)).write_bytes(b"X" + data[1:] if self.corrupt else data)
-        return _Proc(SAFE, rc, self.hang.is_set())
+        return _Proc(bytes(log), rc, self.hang.is_set())
 
 
 class _Proc:
@@ -789,7 +808,8 @@ def test_unconfirmed_session_close_prevents_safe_failure_retry(tmp_path):
             if op == "open_job_session":
                 return {"session_id": "session"}
             if op == "bind_image":
-                return {"bound": True}
+                return {"bound": True, "load_address": 0x08000000,
+                        "erase_address": 0x08000000, "erase_length": 1024}
             if op == "run":
                 return {"result": "FAIL", "code": "WRITE_FAILED", "safe_off": True}
             raise SiteWorkerRefused("SITE_WORKER_UNREACHABLE")
@@ -799,7 +819,8 @@ def test_unconfirmed_session_close_prevents_safe_failure_retry(tmp_path):
             await run_flash_cycle(
                 RefusingClose(), job_id="job-close-failure", site_id=2,
                 icpn="STM32F103C8T6", image=b"FW", image_root=tmp_path,
-                max_runtime_s=30, session_factory=lambda: {"session_id": "session"})
+                max_runtime_s=30, session_factory=lambda: {"session_id": "session"},
+                load_address=0x08000000, erase_length=1024)
         assert caught.value.recoverable is False
         assert "close did not confirm" in str(caught.value)
         assert list(tmp_path.iterdir()) == []
@@ -976,7 +997,7 @@ def test_target_config_must_exist_in_selected_engine_before_admission(tmp_path):
     image = worker.FlashImage(worker.parse_flash_profile({
         "icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
         "flash_base": 0x08000000, "flash_size": 0x10000, "erase_granularity": 1024}),
-        payload, hashlib.sha256(payload).hexdigest())
+        payload, hashlib.sha256(payload).hexdigest(), 0x08000000)
     with pytest.raises(worker.TransportDenied, match="TARGET_CONFIG_NOT_FOUND"):
         adapter.run(2, "flash_cycle", image=image, deadline=1e12, cancel=threading.Event())
     assert sim.argvs == []
@@ -993,5 +1014,6 @@ def test_image_larger_than_profile_flash_is_refused_at_bind(tmp_path):
                                    "flash_base": 0, "flash_size": 1024,
                                    "erase_granularity": 1024}}, me, "control")["result"]["session_id"]
     reply = core.handle({"protocol": worker.PROTOCOL, "op": "bind_image", "session_id": sid,
-                         "image_sha256": "0" * 64, "image_size": 2048}, me, "control")
+                         "image_sha256": "0" * 64, "image_size": 2048,
+                         "load_address": 0}, me, "control")
     assert reply == {"ok": False, "error": "IMAGE_SIZE_INVALID"}

@@ -39,9 +39,18 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from ppu_site_engine import EngineSelection
-from ppu_site_worker import FlashImage, TransportDenied, TransportFailed, TransportUnknown
+from ppu_site_worker import (FlashImage, SiteWorkerDenied, TransportDenied, TransportFailed,
+                             TransportUnknown)
 
 DPIDR = re.compile(r"SWD DPIDR (0x[0-9a-fA-F]{8})")
+# OpenOCD's own observation of the executed Flash range (command_print output).
+ERASED = re.compile(r"erased address (0x[0-9a-fA-F]+) \(length (\d+)\)")
+WROTE = re.compile(r"\bwrote (\d+) bytes\b")
+VERIFIED = re.compile(r"\bverified (\d+) bytes\b")
+_ERASE_CMD = re.compile(r"flash erase_address (0x[0-9a-f]{8}) (0x[0-9a-f]{8})\Z")
+_WRITE_CMD = re.compile(r"flash write_image \{[^{}]+\} (0x[0-9a-f]{8}) bin\Z")
+_VERIFY_CMD = re.compile(r"flash verify_image \{[^{}]+\} (0x[0-9a-f]{8}) bin\Z")
+_DUMP_CMD = re.compile(r"dump_image \{[^{}]+\} (0x[0-9a-f]{8}) (0x[0-9a-f]{8})\Z")
 DPREG0 = re.compile(r"PLASMA_DPREG0=(0x[0-9a-fA-F]+)")
 SAFE_OFF = "SAFE_OFF_MODE_OFF_VERIFIED"
 ADMIT_TIMEOUT_S = 120
@@ -169,8 +178,11 @@ class Abi5OpenocdAdapter:
                 raise TransportDenied("IMAGE_PATH_INVALID")
             return "{" + raw + "}"
 
-        profile, size = image.profile, len(image.payload)
-        base = f"0x{profile.flash_base:08x}"
+        # The Job Binding address, not the bank's flash_base, is the write
+        # target; FlashImage already proved the whole erase window in-bank.
+        size = len(image.payload)
+        erase_address, erase_length = image.erase_range
+        address = f"0x{image.load_address:08x}"
         source, output = tcl_path(staged), tcl_path(readback)
         return [
             *self._base_argv(site),
@@ -187,13 +199,44 @@ class Abi5OpenocdAdapter:
             # target-state polling and explicitly probe bank 0 before erase.
             "-c", "poll off",
             "-c", "flash probe 0",
-            "-c", f"flash erase_address {base} 0x{profile.erase_length(size):08x}",
-            "-c", f"flash write_image {source} {base} bin",
-            "-c", f"flash verify_image {source} {base} bin",
-            "-c", f"dump_image {output} {base} 0x{size:08x}",
+            "-c", f"flash erase_address 0x{erase_address:08x} 0x{erase_length:08x}",
+            "-c", f"flash write_image {source} {address} bin",
+            "-c", f"flash verify_image {source} {address} bin",
+            "-c", f"dump_image {output} {address} 0x{size:08x}",
             "-c", "reset run",
             "-c", "shutdown",
         ]
+
+    @staticmethod
+    def _executed_flash_range(argv: list[str], log: str, size: int) -> dict[str, int] | None:
+        """Range evidence from what actually ran, never from the request.
+
+        Addresses come from the exact OpenOCD commands executed; the erase
+        range is additionally OpenOCD's own ``erased address`` report, and the
+        written/verified byte counts must equal the Image. Any missing,
+        duplicated or disagreeing observation returns None (not proven).
+        """
+        commands = [argv[i + 1] for i, part in enumerate(argv[:-1]) if part == "-c"]
+
+        def one(pattern: re.Pattern[str]) -> tuple[str, ...] | None:
+            found = [m.groups() for m in map(pattern.match, commands) if m]
+            return found[0] if len(found) == 1 else None
+
+        erase, write, verify, dump = (one(_ERASE_CMD), one(_WRITE_CMD),
+                                      one(_VERIFY_CMD), one(_DUMP_CMD))
+        erased = ERASED.findall(log)
+        wrote, verified = WROTE.findall(log), VERIFIED.findall(log)
+        if (erase is None or write is None or verify is None or dump is None
+                or len(erased) != 1
+                or wrote != [str(size)] or verified != [str(size)]):
+            return None
+        commanded = (int(erase[0], 16), int(erase[1], 16))
+        observed = (int(erased[0][0], 16), int(erased[0][1]))
+        if commanded != observed or int(dump[1], 16) != size:
+            return None
+        return {"erase_address": observed[0], "erase_length": observed[1],
+                "write_address": int(write[0], 16), "verify_address": int(verify[0], 16),
+                "readback_address": int(dump[0], 16)}
 
     def _revoke(self, site: int) -> bool:
         try:
@@ -256,15 +299,19 @@ class Abi5OpenocdAdapter:
                     or not (0 < len(image.payload) <= image.profile.flash_size)
                     or hashlib.sha256(image.payload).hexdigest() != image.sha256):
                 raise TransportDenied("FLASH_IMAGE_NOT_BOUND")
+            try:
+                image.erase_range  # re-prove the Job window before any admission
+            except SiteWorkerDenied:
+                raise TransportDenied("FLASH_RANGE_INVALID") from None
             with tempfile.TemporaryDirectory(prefix="plasma-c3-flash-") as directory:
                 staged = Path(directory) / "normalized-image.bin"
                 readback = Path(directory) / "readback.bin"
                 staged.write_bytes(image.payload)
                 staged.chmod(0o600)
+                argv = self._flash_argv(site, image, staged, readback)
                 log, rc = self._session(
                     site, deadline=deadline, cancel=cancel,
-                    argv=self._flash_argv(site, image, staged, readback),
-                    max_duration_s=300,
+                    argv=argv, max_duration_s=300,
                 )
                 if rc != 0:
                     return {"result": "FAIL", "code": "OPENOCD_FLASH_FAILED",
@@ -278,11 +325,16 @@ class Abi5OpenocdAdapter:
                     return {"result": "FAIL", "code": "READBACK_MISMATCH",
                             "openocd_rc": rc, "expected_sha256": image.sha256,
                             "readback_sha256": observed_sha, "safe_off": True}
+                executed = self._executed_flash_range(argv, log, len(image.payload))
+                if executed is None:
+                    return {"result": "FAIL", "code": "FLASH_RANGE_NOT_OBSERVED",
+                            "openocd_rc": rc, "safe_off": True}
                 return {"result": "PASS", "icpn": image.icpn,
                         "target_config": image.profile.target_config,
                         "adapter_khz": self.adapter_khz,
                         "bytes_verified": len(observed),
                         "readback_sha256": observed_sha,
+                        "load_address": image.load_address, **executed,
                         "openocd_rc": 0, "safe_off": True}
         log, rc = self._session(site, deadline=deadline, cancel=cancel)
         connect, dpreg = DPIDR.findall(log), DPREG0.findall(log)

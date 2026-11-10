@@ -333,7 +333,8 @@ class SiteWorker:
                 logger.event("attempt_started", attempt=attempts)
                 if isinstance(selected_interface, OpenOCDInterface):
                     selected_interface.bind_runtime_job(
-                        request.job_id, runtime.active_asset_set, job_deadline)
+                        request.job_id, runtime.active_asset_set, job_deadline,
+                        runtime.job_binding)
                 elif isinstance(selected_interface, PackageProviderInterface):
                     selected_interface.bind_runtime_job(
                         request.job_id, runtime.active_asset_set, job_deadline,

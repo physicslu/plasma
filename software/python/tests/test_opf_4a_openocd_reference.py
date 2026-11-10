@@ -58,7 +58,11 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                      engine_binary=OPENOCD, options_schema=None,
                      with_control_socket=True, verified_worker=True,
                      with_fpga=True, platform_provider=False, platform_extra_files=None,
-                     profile_count=1, target_icpn=ICPN, other_target=None):
+                     profile_count=1, target_icpn=ICPN, other_target=None,
+                     programming_bundle=None):
+    """``programming_bundle``: a canonical route-built Bundle v3 (OFE-1B
+    ``build_image_bundle``) installed through the real B3 coordinator instead of
+    the synthetic Provider/Profile/FPGA parts."""
     with tempfile.TemporaryDirectory(prefix="opf4a-", dir="/tmp") as directory:
         path = Path(directory)
         c3_profile = {"icpn": target_icpn, "target_config": "target/stm32f1x.cfg",
@@ -103,9 +107,15 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                 other_files["data/plasma-provider.json"] = _json({**desc, "target": other_target})
                 other_files[reference.PROFILE_FILE] = _json({**profile, "icpn": other_target})
             parts.append(("other-profile", parts[1][1], parts[1][2], other_files))
-        archive, digest = bundle_v3(
-            path / "archive", parts=parts,
-            mutate=lambda manifest: manifest.update(actions=["install", "verify"]))
+        if programming_bundle is not None:
+            with_fpga = False
+            archive = path / "archive.zip"
+            archive.write_bytes(programming_bundle.archive)
+            digest = programming_bundle.archive_sha256
+        else:
+            archive, digest = bundle_v3(
+                path / "archive", parts=parts,
+                mutate=lambda manifest: manifest.update(actions=["install", "verify"]))
         co = make_coordinator(path)
         install = co.execute_bundle_v3_install(b3_request(archive, digest))
         assert install["result"] == "PASS"
@@ -180,6 +190,7 @@ def _execute(env, **changes):
                           "image_root", "hardware",
                           "job_deadline_monotonic", "job_timeout_s", "engine_record",
                           "engine_base", "require_root"}}
+    payload["job_binding"] = None  # inline contract: writes at Profile flash_base
     payload.update(changes)
     return asyncio.run(reference.execute_reference_flash(**payload))
 
@@ -199,7 +210,7 @@ def test_bundle_profile_accepts_new_icpn_without_core_registry():
     with installed_bundle(target_icpn=unknown) as env:
         preflight = reference.preflight_runtime_flash(
             product_root=env["product_root"], active_asset_set=env["active_asset_set"],
-            target=unknown, site_id=2, image_size=len(IMAGE))
+            target=unknown, site_id=2, image_size=len(IMAGE), job_binding=None)
         assert preflight["profile"]["icpn"] == unknown
         result = _execute(env)
         assert result["result"] == "PASS" and result["safe_off"] is True
@@ -212,7 +223,7 @@ def test_two_targets_select_their_declared_profiles_in_one_active_bundle():
         for target, profile_id in ((ICPN, PROFILE), (other, "other-profile")):
             pinned = reference.preflight_runtime_flash(
                 product_root=env["product_root"], active_asset_set=env["active_asset_set"],
-                target=target, site_id=2, image_size=len(IMAGE),
+                target=target, site_id=2, image_size=len(IMAGE), job_binding=None,
                 provider=PROVIDER, profile=profile_id)
             assert pinned["profile_package"] == profile_id
             assert pinned["profile"]["icpn"] == target
@@ -224,11 +235,11 @@ def test_bundle_profile_image_bounds_and_target_claim_fail_closed():
         with pytest.raises(ValueError, match="IMAGE_OUT_OF_BOUNDS"):
             reference.preflight_runtime_flash(
                 product_root=env["product_root"], active_asset_set=env["active_asset_set"],
-                target=ICPN, site_id=2, image_size=65537)
+                target=ICPN, site_id=2, image_size=65537, job_binding=None)
         with pytest.raises(ValueError, match="REFERENCE_TARGET_MISMATCH"):
             reference.preflight_runtime_flash(
                 product_root=env["product_root"], active_asset_set=env["active_asset_set"],
-                target="ANOTHER-UNLISTED-MCU", site_id=2, image_size=len(IMAGE))
+                target="ANOTHER-UNLISTED-MCU", site_id=2, image_size=len(IMAGE), job_binding=None)
         assert not env["sim"].argvs and not env["core"]._sessions
 
 
@@ -404,7 +415,7 @@ def _runtime_execute(env, monkeypatch):
         env["client"], product_root=env["product_root"], request=request,
         active_asset_set=env["active_asset_set"],
         job_deadline_monotonic=time.monotonic() + 5,
-        image_root=env["image_root"]))
+        image_root=env["image_root"], job_binding=None))
 
 
 def test_profile_provider_only_runtime_flash_uses_installed_platform(monkeypatch):
@@ -514,3 +525,66 @@ def test_profile_only_runtime_denies_before_session_or_flash(monkeypatch, option
         assert not env["core"]._sessions and not env["core"]._site_owners
         assert not env["sim"].argvs
         assert not env["image_root"].exists() or not list(env["image_root"].iterdir())
+
+
+# --- Job Binding write window (OFE-1B PR-A) -------------------------------------------
+F103_PROFILE = {"icpn": ICPN, "target_config": "target/stm32f1x.cfg",
+                "flash_base": 0x08000000, "flash_size": 65536, "erase_granularity": 1024}
+
+
+def _binding(address=0x08000400, length=20, **changes):
+    return {"operation": "flash_cycle", "site_id": 2, "profile": PROFILE,
+            "range": {"address": address, "length": length}, **changes}
+
+
+def test_job_window_uses_the_binding_address_not_flash_base():
+    window = reference.job_flash_window(F103_PROFILE, profile_package=PROFILE, site_id=2,
+                                        image_size=1500, job_binding=_binding(length=1500))
+    assert window == {"load_address": 0x08000400, "erase_length": 2048}
+
+
+def test_job_without_binding_is_the_explicit_flash_base_contract():
+    window = reference.job_flash_window(F103_PROFILE, profile_package=PROFILE, site_id=2,
+                                        image_size=20, job_binding=None)
+    assert window == {"load_address": 0x08000000, "erase_length": 1024}
+
+
+@pytest.mark.parametrize("binding,code", [
+    (_binding(operation="program"), "JOB_BINDING_RANGE_MISMATCH"),
+    (_binding(site_id=1), "JOB_BINDING_RANGE_MISMATCH"),
+    (_binding(profile="other-profile"), "JOB_BINDING_RANGE_MISMATCH"),
+    (_binding(length=21), "JOB_BINDING_RANGE_MISMATCH"),     # not this Image
+    (_binding(address="0x08000400"), "JOB_BINDING_RANGE_MISMATCH"),
+    (_binding(address=True), "JOB_BINDING_RANGE_MISMATCH"),
+    ({**_binding(), "range": {"address": 0x08000400}}, "JOB_BINDING_RANGE_MISMATCH"),
+    (_binding(address=0x08000200), "JOB_FLASH_RANGE_INVALID"),  # misaligned
+    (_binding(address=0x07FFFC00), "JOB_FLASH_RANGE_INVALID"),  # below the bank
+    (_binding(address=0x08010000), "JOB_FLASH_RANGE_INVALID"),  # at the bank end
+])
+def test_job_window_fails_closed(binding, code):
+    with pytest.raises(ValueError, match=code):
+        reference.job_flash_window(F103_PROFILE, profile_package=PROFILE, site_id=2,
+                                   image_size=20, job_binding=binding)
+
+
+def test_job_window_counts_the_rounded_erase_end():
+    with pytest.raises(ValueError, match="JOB_FLASH_RANGE_INVALID"):
+        reference.job_flash_window(F103_PROFILE, profile_package=PROFILE, site_id=2,
+                                   image_size=1025,
+                                   job_binding=_binding(address=0x0800FC00, length=1025))
+
+
+def test_preflight_pins_the_binding_window_before_any_session():
+    with installed_bundle() as env:
+        pinned = reference.preflight_runtime_flash(
+            product_root=env["product_root"], active_asset_set=env["active_asset_set"],
+            target=ICPN, site_id=2, image_size=len(IMAGE),
+            job_binding=_binding(length=len(IMAGE)), provider=PROVIDER, profile=PROFILE)
+        assert pinned["load_address"] == 0x08000400
+        with pytest.raises(ValueError, match="JOB_FLASH_RANGE_INVALID"):
+            reference.preflight_runtime_flash(
+                product_root=env["product_root"], active_asset_set=env["active_asset_set"],
+                target=ICPN, site_id=2, image_size=len(IMAGE),
+                job_binding=_binding(address=0x08000001, length=len(IMAGE)),
+                provider=PROVIDER, profile=PROFILE)
+        assert not env["sim"].argvs and not env["core"]._sessions

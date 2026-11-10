@@ -9,8 +9,9 @@ calls the existing `ppu_provider_contract.resolve` against the selected,
 verified Active Asset Set and a device-side hardware observation. The
 `ppu_opf_site_session.open_provider_job_session` helper carries that exact
 resolved route to C-3 `open_job_session` control. For Flash, the verified
-Bundle Geometry is also bound once at Session open; `bind_image` only supplies
-the normalized image SHA256 and byte count. The Root Worker does not receive a
+Bundle Geometry is also bound once at Session open; `bind_image` supplies the
+normalized image SHA256, byte count and the Job Binding `load_address` (the
+Worker re-derives the erase window from the bound Geometry). The Root Worker does not receive a
 second `target` field inside the route wire: the bound Profile supplies ICPN.
 Only the trusted Runtime peer can create the Session. Active Set, Provider,
 Profile, descriptor/options digests, Driver/FPGA, operation and Site remain

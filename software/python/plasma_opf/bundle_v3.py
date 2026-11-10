@@ -438,9 +438,15 @@ def _check_applicable(asset: Mapping[str, Any], resource: Mapping[str, Any]) -> 
     c = resource["constraints"]
     _need(asset["icpn"] == c["icpn"], "IMAGE_ASSET_TARGET_MISMATCH")
     _need(asset["size"] <= c["max_image_bytes"], "IMAGE_ASSET_EXCEEDS_PROFILE_MAX_IMAGE")
+    # flash_base is the physical bank start; load_address is where this Image
+    # is written. The whole erase window (size rounded up to erase units),
+    # not only the Image bytes, must stay inside the bank.
+    unit = c["erase_granularity"]
     offset = asset["load_address"] - c["flash_base"]
-    _need(offset >= 0 and offset % c["erase_granularity"] == 0
-          and offset + asset["size"] <= c["flash_size"], "IMAGE_ASSET_ADDRESS_INVALID")
+    erase_length = -(-asset["size"] // unit) * unit
+    _need(offset >= 0 and offset % unit == 0
+          and offset + asset["size"] <= c["flash_size"]
+          and offset + erase_length <= c["flash_size"], "IMAGE_ASSET_ADDRESS_INVALID")
 
 
 def image_asset_descriptor(resource: object, image: bytes, *,

@@ -29,9 +29,11 @@ F103 = {"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
         "flash_base": 0x08000000, "flash_size": 0x10000, "erase_granularity": 1024}
 
 
-def flash_image(payload: bytes, profile=None, digest=None):
-    return worker.FlashImage(worker.parse_flash_profile(dict(profile or F103)), payload,
-                             digest or hashlib.sha256(payload).hexdigest())
+def flash_image(payload: bytes, profile=None, digest=None, load_address=None):
+    profile = dict(profile or F103)
+    return worker.FlashImage(worker.parse_flash_profile(profile), payload,
+                             digest or hashlib.sha256(payload).hexdigest(),
+                             profile["flash_base"] if load_address is None else load_address)
 
 
 class MockAdapter:
@@ -103,7 +105,7 @@ class Rig:
                 f"S={str(self.sock)!r}\n"
                 "def call(req):\n"
                 " s=socket.socket(socket.AF_UNIX); s.connect(S)\n"
-                " s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v2',**req))+'\\n').encode())\n"
+                " s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v3',**req))+'\\n').encode())\n"
                 " d=b''\n"
                 " while not d.endswith(b'\\n'):\n"
                 "  c=s.recv(65536)\n"
@@ -612,7 +614,7 @@ def test_cancel_one_site_does_not_cancel_unrelated_site(tmp_path):
 
 
 @pytest.mark.parametrize("raw", [b"not json\n", b"[]\n", b'{"op":"probe","site":2}\n',
-                                 b"x" * 5000 + b"\n", b'{"protocol":"plasma.ppu.site-worker.v2"}\n'])
+                                 b"x" * 5000 + b"\n", b'{"protocol":"plasma.ppu.site-worker.v3"}\n'])
 def test_malformed_requests_rejected(rig, raw):
     import socket as s
     with s.socket(s.AF_UNIX) as sock:
@@ -625,6 +627,7 @@ def test_malformed_requests_rejected(rig, raw):
 
 class FlashMockAdapter(MockAdapter):
     operations = frozenset({"probe", "flash_cycle"})
+    range_override: dict = {}
 
     def run(self, site, operation, *, deadline, cancel, image=None):
         if operation != "flash_cycle":
@@ -632,8 +635,10 @@ class FlashMockAdapter(MockAdapter):
         assert image is not None
         self.calls.append((site, operation, image.icpn, image.sha256, image.payload))
         self.profiles = getattr(self, "profiles", []) + [image.profile]
+        # A truthful adapter reports the range it executed (the bound window).
         return {"result": "PASS", "bytes_verified": len(image.payload),
-                "readback_sha256": image.sha256, "safe_off": True}
+                "readback_sha256": image.sha256, "safe_off": True,
+                **worker.flash_range_expected(image), **self.range_override}
 
 
 def test_parallel_flash_sessions_reject_different_image_or_mcu(tmp_path):
@@ -653,21 +658,21 @@ def test_parallel_flash_sessions_reject_different_image_or_mcu(tmp_path):
                                             profile=F103)
         second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30,
                                              profile=F103)
-        rig.client.bind_image(first["session_id"], image_sha256=digest, image_size=len(payload))
+        rig.client.bind_image(first["session_id"], image_sha256=digest, image_size=len(payload), load_address=0x08000000)
         with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
             rig.client.bind_image(second["session_id"], image_sha256=other_digest,
-                                  image_size=len(other_payload))
+                                  image_size=len(other_payload), load_address=0x08000000)
         rig.client.close_session(second["session_id"])
         (rig.image_root / (other_job + ".bin")).write_bytes(payload)
         second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30,
                                              profile=different_target)
         with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
-            rig.client.bind_image(second["session_id"], image_sha256=digest, image_size=len(payload))
+            rig.client.bind_image(second["session_id"], image_sha256=digest, image_size=len(payload), load_address=0x08000000)
         rig.client.close_session(second["session_id"])
         second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30,
                                              profile=F103)
         accepted = rig.client.bind_image(second["session_id"], image_sha256=digest,
-                                         image_size=len(payload))
+                                         image_size=len(payload), load_address=0x08000000)
         assert accepted["bound"] is True
         rig.client.close_session(first["session_id"])
         rig.client.close_session(second["session_id"])
@@ -676,7 +681,7 @@ def test_parallel_flash_sessions_reject_different_image_or_mcu(tmp_path):
                                             profile=different_target)
         (rig.image_root / (other_job + ".bin")).write_bytes(other_payload)
         rig.client.bind_image(third["session_id"], image_sha256=other_digest,
-                              image_size=len(other_payload))
+                              image_size=len(other_payload), load_address=0x08000000)
         assert rig.client.close_session(third["session_id"])["sealed_sites"] == []
     finally:
         rig.close()
@@ -692,12 +697,13 @@ def test_c3_binds_exact_firmware_bytes_for_flash_cycle(tmp_path):
         child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
         session = r.open(child, profile=F103)
         binding = r.client.bind_image(
-            session["session_id"], image_sha256=digest, image_size=len(payload)
+            session["session_id"], image_sha256=digest, image_size=len(payload), load_address=0x08000000
         )
         assert binding == {"job_id": JOB, "icpn": "STM32F103C8T6",
                            "target_config": "target/stm32f1x.cfg",
                            "image_sha256": digest, "image_size": len(payload),
-                           "bound": True}
+                           "load_address": 0x08000000, "erase_address": 0x08000000,
+                           "erase_length": 1024, "bound": True}
         # The already-bound immutable bytes do not depend on subsequent file changes.
         (r.image_root / (JOB + ".bin")).write_bytes(b"CORRUPTED-AFTER-BIND")
         [result] = r.go(child)
@@ -707,6 +713,83 @@ def test_c3_binds_exact_firmware_bytes_for_flash_cycle(tmp_path):
         assert r.client.close_session(session["session_id"])["closed"]
     finally:
         r.close()
+
+
+@pytest.mark.parametrize("address,size,code", [
+    (0x08000400, 4, None),
+    (0x0800FC00, 1024, None),
+    (0x0800FC00, 1025, "FLASH_RANGE_INVALID"),
+    (0x08000200, 4, "FLASH_RANGE_INVALID"),
+    (0x07FFFC00, 4, "FLASH_RANGE_INVALID"),
+])
+def test_worker_rederives_the_job_window_at_bind(tmp_path, address, size, code):
+    adapter = FlashMockAdapter()
+    r = Rig(tmp_path, adapter)
+    try:
+        payload = b"W" * size
+        digest = hashlib.sha256(payload).hexdigest()
+        (r.image_root / (JOB + ".bin")).write_bytes(payload)
+        session = r.client.open_job_session(job_id=JOB, sites=[2], max_runtime_s=30,
+                                            profile=F103)
+        if code is not None:
+            with pytest.raises(worker.SiteWorkerDenied, match=code):
+                r.client.bind_image(session["session_id"], image_sha256=digest,
+                                    image_size=size, load_address=address)
+            assert r.core._sessions[session["session_id"]].image is None
+        else:
+            bound = r.client.bind_image(session["session_id"], image_sha256=digest,
+                                        image_size=size, load_address=address)
+            assert (bound["load_address"], bound["erase_address"]) == (address, address)
+            assert bound["erase_length"] == -(-size // 1024) * 1024
+        r.client.close_session(session["session_id"])
+    finally:
+        r.close()
+
+
+@pytest.mark.parametrize("field", worker.FLASH_RANGE_FIELDS)
+def test_adapter_pass_with_any_other_range_seals_the_site(tmp_path, field):
+    adapter = FlashMockAdapter()
+    adapter.range_override = {field: 0x08000000 if field != "erase_length" else 4096}
+    r = Rig(tmp_path, adapter)
+    try:
+        payload = b"RANGE-CHECK"
+        digest = hashlib.sha256(payload).hexdigest()
+        (r.image_root / (JOB + ".bin")).write_bytes(payload)
+        child = r.package("print(json.dumps(call({'op':'flash_cycle','site':2})))\n")
+        session = r.open(child, profile=F103)
+        r.client.bind_image(session["session_id"], image_sha256=digest,
+                            image_size=len(payload), load_address=0x08000400)
+        [result] = r.go(child)
+        assert result == {"ok": False,
+                          "error": "OUTCOME_UNKNOWN_SITE_SEALED:FLASH_RANGE_NOT_VERIFIED"}
+        assert 2 in r.core._sealed
+    finally:
+        r.close()
+
+
+def test_parallel_sessions_must_also_agree_on_the_write_address(tmp_path):
+    adapter = FlashMockAdapter()
+    rig = Rig(tmp_path, adapter)
+    other_job = "2" * 32
+    rig.lease.add(other_job)
+    payload = b"FIRMWARE-A"
+    digest = hashlib.sha256(payload).hexdigest()
+    for job in (JOB, other_job):
+        (rig.image_root / (job + ".bin")).write_bytes(payload)
+    try:
+        first = rig.client.open_job_session(job_id=JOB, sites=[1], max_runtime_s=30,
+                                            profile=F103)
+        second = rig.client.open_job_session(job_id=other_job, sites=[2], max_runtime_s=30,
+                                             profile=F103)
+        rig.client.bind_image(first["session_id"], image_sha256=digest,
+                              image_size=len(payload), load_address=0x08000000)
+        with pytest.raises(worker.SiteWorkerDenied, match="PPU_IMAGE_OR_TARGET_CONFLICT"):
+            rig.client.bind_image(second["session_id"], image_sha256=digest,
+                                  image_size=len(payload), load_address=0x08000400)
+        rig.client.close_session(first["session_id"])
+        rig.client.close_session(second["session_id"])
+    finally:
+        rig.close()
 
 
 def test_c3_rejects_unbound_or_mismatched_firmware(tmp_path):
@@ -719,7 +802,7 @@ def test_c3_rejects_unbound_or_mismatched_firmware(tmp_path):
         session = r.open(child, profile=F103)
         with pytest.raises(worker.SiteWorkerDenied, match="IMAGE_SHA256_MISMATCH"):
             r.client.bind_image(
-                session["session_id"], image_sha256="0" * 64, image_size=len(payload),
+                session["session_id"], image_sha256="0" * 64, image_size=len(payload), load_address=0x08000000,
             )
         [result] = r.go(child)
         assert result == {"ok": False, "error": "IMAGE_NOT_BOUND"}
@@ -785,12 +868,20 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, hang_once=F
 GOOD = b"Info : SWD DPIDR 0x1ba01477\nPLASMA_DPREG0=0x1ba01477\nSAFE_OFF_MODE_OFF_VERIFIED\n"
 
 
+def flash_log(address: int, erase_length: int, size: int) -> bytes:
+    """OpenOCD 0.12 command_print output for the executed Flash range."""
+    return GOOD + (b"erased address 0x%08x (length %d) in 0.031s (32.258 KiB/s)\n"
+                   b"wrote %d bytes from file image.bin in 0.1s (0.2 KiB/s)\n"
+                   b"verified %d bytes in 0.05s (0.4 KiB/s)\n"
+                   % (address, erase_length, size, size))
+
+
 
 def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
     image = b"FLASH-WRITE-READBACK"
     digest = hashlib.sha256(image).hexdigest()
     a, calls, _ = make_abi5(
-        tmp_path, log=GOOD, flash_readback=image
+        tmp_path, log=flash_log(0x08000000, 1024, len(image)), flash_readback=image
     )
     result = a.run(
         2, "flash_cycle", image=flash_image(image),
@@ -799,6 +890,9 @@ def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
     assert result == {"result": "PASS", "icpn": "STM32F103C8T6",
                       "target_config": "target/stm32f1x.cfg", "adapter_khz": 500,
                       "bytes_verified": len(image), "readback_sha256": digest,
+                      "load_address": 0x08000000, "erase_address": 0x08000000,
+                      "erase_length": 1024, "write_address": 0x08000000,
+                      "verify_address": 0x08000000, "readback_address": 0x08000000,
                       "openocd_rc": 0, "safe_off": True}
     argv = calls["popen"][0]
     assert argv[argv.index("-f") + 1] == "target/stm32f1x.cfg"
@@ -822,6 +916,68 @@ def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
     assert any(v.startswith("dump_image ") for v in commands)
     assert not any(v.startswith("swd newdap bp") for v in commands)
     assert calls["run"] == [["admit", "2"], ["revoke", "2"]]
+
+
+def test_abi5_flash_cycle_executes_at_the_bound_job_address_not_flash_base(tmp_path):
+    image = b"A" * 1500  # two 1 KiB pages starting at the third page
+    address = 0x08000800
+    a, calls, _ = make_abi5(tmp_path, log=flash_log(address, 2048, len(image)),
+                            flash_readback=image)
+    result = a.run(2, "flash_cycle", image=flash_image(image, load_address=address),
+                   deadline=time.monotonic() + 30, cancel=threading.Event())
+    assert result["result"] == "PASS"
+    assert {k: result[k] for k in worker.FLASH_RANGE_FIELDS} == {
+        "load_address": address, "erase_address": address, "erase_length": 2048,
+        "write_address": address, "verify_address": address, "readback_address": address}
+    argv = calls["popen"][0]
+    commands = [argv[i + 1] for i, arg in enumerate(argv[:-1]) if arg == "-c"]
+    flash = [c for c in commands if c.startswith(("flash erase", "flash write",
+                                                  "flash verify", "dump_image"))]
+    assert flash[0] == "flash erase_address 0x08000800 0x00000800"
+    assert all(" 0x08000800 " in c for c in flash[1:])
+    assert not any("0x08000000" in c for c in commands)
+
+
+@pytest.mark.parametrize("log", [
+    # OpenOCD reports erasing a different range than commanded.
+    flash_log(0x08000000, 1024, 20),
+    flash_log(0x08000400, 2048, 20),
+    # Missing / duplicated / short write or verify observations.
+    GOOD + b"erased address 0x08000400 (length 1024)\nverified 20 bytes\n",
+    GOOD + b"erased address 0x08000400 (length 1024)\nwrote 20 bytes\n",
+    flash_log(0x08000400, 1024, 20) + b"erased address 0x08000400 (length 1024)\n",
+    flash_log(0x08000400, 1024, 19),
+    GOOD,
+])
+def test_abi5_flash_range_must_be_observed_from_openocd_not_copied(tmp_path, log):
+    image = b"X" * 20
+    a, _calls, _ = make_abi5(tmp_path, log=log, flash_readback=image)
+    result = a.run(2, "flash_cycle", image=flash_image(image, load_address=0x08000400),
+                   deadline=time.monotonic() + 30, cancel=threading.Event())
+    assert result == {"result": "FAIL", "code": "FLASH_RANGE_NOT_OBSERVED",
+                      "openocd_rc": 0, "safe_off": True}
+
+
+@pytest.mark.parametrize("address,size", [
+    (0x08000000 - 1024, 4),            # below the bank
+    (0x08000001, 4),                   # not on an erase boundary
+    (0x08000200, 4),                   # half page
+    (0x08010000, 4),                   # at the bank end
+    (0x0800FC00, 1025),                # bytes fit? no: erase window crosses the end
+    (0x0800F800, 2049),                # rounded erase window crosses the end
+    (0x08000000, 0),                   # empty Image
+    (True, 4),                         # bool is not an address
+    ("0x08000000", 4),
+    (2 ** 64, 4),
+])
+def test_flash_image_window_is_proven_in_bank_aligned_and_non_empty(address, size):
+    with pytest.raises(worker.SiteWorkerDenied, match="FLASH_RANGE_INVALID"):
+        flash_image(b"Z" * size, load_address=address)
+
+
+def test_flash_window_allows_the_last_whole_page_exactly():
+    image = flash_image(b"Z" * 1024, load_address=0x0800FC00)
+    assert image.erase_range == (0x0800FC00, 1024)
 
 
 def test_abi5_flash_cycle_rejects_wrong_readback_with_safe_shutdown(tmp_path):
@@ -965,7 +1121,7 @@ def test_c2_launcher_package_uses_site_worker_end_to_end(tmp_path, rig):
             "S = os.environ['PLASMA_SITE_WORKER_SOCKET']\n"
             "def call(req):\n"
             "    s = socket.socket(socket.AF_UNIX); s.connect(S)\n"
-            "    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v2', **req)) + '\\n').encode())\n"
+            "    s.sendall((json.dumps(dict(protocol='plasma.ppu.site-worker.v3', **req)) + '\\n').encode())\n"
             "    return json.loads(s.makefile().readline())\n"
             "for _ in range(100):\n"
             "    r = call({'op': 'probe', 'site': 2})\n"

@@ -280,6 +280,45 @@ passed through unchanged. The request is still signed through the unchanged
 G13 Gateway write path; owner authorization, Site admission and Provider
 capability are not bypassed.
 
+ **Job write address (OFE-1B PR-A).** Two addresses are distinct: the
+ Profile `flash_base` is only the physical start of the Flash bank; the Job
+ Binding `range.address` (= Image `load_address`) is where this Job writes. An
+ Image is applicable only when its whole erase window — `size` rounded up to
+ `erase_granularity` — starts on an erase boundary inside the bank and ends at
+ or before `flash_base + flash_size` (`IMAGE_ASSET_ADDRESS_INVALID`). Execution
+ uses only the admitted Binding address, end to end:
+
+ 1. `SiteManager._admit_job_binding` stores the verified Binding on the Job;
+    the Runtime passes it to `OpenOCDInterface.bind_runtime_job`.
+ 2. `ppu_opf_reference_openocd.job_flash_window` (preflight and execution)
+    re-proves the window against the pinned Bundle Profile and requires the
+    Binding's operation, Site, Profile and length to match this Job
+    (`JOB_BINDING_RANGE_MISMATCH`, `JOB_FLASH_RANGE_INVALID`).
+ 3. C-3 `bind_image {session_id, image_sha256, image_size, load_address}`
+    (wire `plasma.ppu.site-worker.v3`; the address is mandatory, there is no
+    default) — the Worker re-derives the erase window from the session Profile
+    and never trusts the Runtime value (`FLASH_RANGE_INVALID`). Concurrent
+    Sessions must also agree on the address (`PPU_IMAGE_OR_TARGET_CONFLICT`).
+ 4. The ABI-v5 Adapter erases, writes, verifies and dumps at that address and
+    reports the range it **executed**: erase address/length from OpenOCD's own
+    `erased address … (length …)` output (must equal the command; `wrote` /
+    `verified` byte counts must equal the Image), write/verify/readback
+    addresses from the executed commands. Otherwise `FLASH_RANGE_NOT_OBSERVED`
+    (FAIL, SAFE_OFF proven) — never a copy of the request.
+ 5. The Worker seals the Site (`FLASH_RANGE_NOT_VERIFIED`, existing
+    OUTCOME_UNKNOWN contract) if an Adapter PASS reports any other range; the
+    Runtime (`run_flash_cycle`) and the Manager receipt (`FLASH_RANGE_MISMATCH`,
+    `expected_flash_range` / `observed_flash_range`, Binding echo `range`)
+    refuse PASS on any difference.
+
+ A Job without a Binding (inline `asset_base64` or Bundle-reference) is the
+ separate legacy contract and writes at `flash_base` explicitly; it is not a
+ fallback for a Binding Job. A Manager Resource-reuse Job always carries a
+ Binding and its receipt requires the PPU Binding echo, so dropping the Binding
+ can never yield a reuse PASS. Console still always plans `load_address =
+ flash_base`; user-selected addresses are out of scope (separate Gate 1). Real
+ non-base programming is HIL-unqualified.
+
 ### 8.3 PPU admission (`SiteManager.enqueue` → `_admit_job_binding`)
 
 Inside the existing PPU-wide execution lease (which excludes Asset activation
