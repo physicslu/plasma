@@ -1,0 +1,113 @@
+{
+    "protocol_version": "3.3",
+    "message_type": "response",
+    "ok": true,
+    "job": {
+        "job_id": "job-20261110-132728-d4f178e4",
+        "site_id": 2,
+        "operation": "flash_cycle",
+        "state": "success",
+        "created_at": "2026-11-10T13:27:28.950323+00:00",
+        "started_at": "2026-11-10T13:27:29.283234+00:00",
+        "cancel_requested": false,
+        "stage": "flash_cycle",
+        "stage_state": "completed",
+        "stage_progress_percent": 100.0,
+        "progress_percent": 100.0,
+        "bytes_done": 62800,
+        "bytes_total": 62800,
+        "attempt": 1,
+        "attempt_history": [
+            {
+                "attempt": 1,
+                "state": "success",
+                "started_at": "2026-11-10T13:27:29.328960+00:00",
+                "finished_at": "2026-11-10T13:27:39.722115+00:00",
+                "elapsed_ms": 10393,
+                "retry_scheduled": false,
+                "error": null
+            }
+        ],
+        "retry_exhausted": false,
+        "active_asset_set": {
+            "schema": "plasma.ppu.active-assets.v1",
+            "state": "ACTIVE",
+            "asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+            "generation": 15,
+            "ready": false,
+            "fpga": "NOT_VERIFIED",
+            "profile": "NOT_VERIFIED"
+        },
+        "job_binding": null,
+        "updated_at": "2026-11-10T13:27:39.724178+00:00",
+        "result": {
+            "job_id": "job-20261110-132728-d4f178e4",
+            "site_id": 2,
+            "operation": "flash_cycle",
+            "state": "success",
+            "created_at": "2026-11-10T13:27:28.950323+00:00",
+            "started_at": "2026-11-10T13:27:29.283234+00:00",
+            "finished_at": "2026-11-10T13:27:39.722357+00:00",
+            "elapsed_ms": 10394,
+            "attempts": 1,
+            "retry_exhausted": false,
+            "attempt_history": [
+                {
+                    "attempt": 1,
+                    "state": "success",
+                    "started_at": "2026-11-10T13:27:29.328960+00:00",
+                    "finished_at": "2026-11-10T13:27:39.722115+00:00",
+                    "elapsed_ms": 10393,
+                    "retry_scheduled": false,
+                    "error": null
+                }
+            ],
+            "image_name": "plasma-blue-pill-cdc-v0.2.bin",
+            "image_size": 62800,
+            "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+            "output_files": [],
+            "error": null,
+            "details": {
+                "stages": [
+                    "erase",
+                    "program",
+                    "verify",
+                    "readback"
+                ],
+                "bytes_programmed": 62800,
+                "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+                "flash_cycle": {
+                    "adapter": "z2-abi5-swd-openocd5088",
+                    "adapter_khz": 2000,
+                    "bytes_verified": 62800,
+                    "erase_address": 134217728,
+                    "erase_length": 63488,
+                    "icpn": "STM32F103C8T6",
+                    "load_address": 134217728,
+                    "openocd_rc": 0,
+                    "operation": "flash_cycle",
+                    "readback_address": 134217728,
+                    "readback_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+                    "result": "PASS",
+                    "safe_off": true,
+                    "site": 2,
+                    "target_config": "target/stm32f1x.cfg",
+                    "verify_address": 134217728,
+                    "write_address": 134217728,
+                    "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+                    "session_id": "1a0866d6e5aa1dbb03d96e27825f8f0d",
+                    "opf_provider_package": "openocd-platform-reference",
+                    "opf_profile_package": "stm32f103c8t6-site2",
+                    "opf_asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+                    "opf_profile_sha256": "644a76fd5ed433e568e26f8a57761840f4ab7fe3b66430f797ddf9df23bbbdd0",
+                    "opf_driver_abi": "plasma_swd:5",
+                    "opf_openocd_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+                    "opf_engine_selection_sha256": "c07ba04c7398979adc7860aea5e0ec54ab088fec2c5891b6f9248ed749b31b05",
+                    "opf_worker_engine_selection_sha256": "c07ba04c7398979adc7860aea5e0ec54ab088fec2c5891b6f9248ed749b31b05",
+                    "opf_worker_epoch": "bfc3707abca3c8ba1e3451772a8f59f1",
+                    "job_binding_sha256": null
+                }
+            }
+        }
+    }
+}
