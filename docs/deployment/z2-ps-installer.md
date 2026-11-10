@@ -178,7 +178,11 @@ The installer boundary verifies at least:
 6. PPU runtime identity (no Device Catalog / IC Support is required; a legacy release that still ships them is tolerated, never required);
 7. closed hardware boundary;
 8. explicit Plasma-owned ARMv7 final Python >=3.11;
-9. Server/Gateway canonical configuration identity.
+9. Server/Gateway canonical configuration identity;
+10. the bundled same-commit control plane (`runtime/control-plane/`, PR-B Full-Copy): exact file set and SHA-256 from `control-plane-manifest.json`, the required Bootstrap / Site Worker / Adapter files, and one Site Worker protocol shared by the Runtime client (`plasma_interfaces/site_worker_c3.py`) and the bundled Worker (`ppu_site_worker.py`, currently `plasma.ppu.site-worker.v3`);
+11. the bundled Adapter driver ABI against the selected engine (`/etc/plasma/site-worker-engine.json`), when one is selected.
+
+A release without the control plane (`RELEASE_CONTROL_PLANE_MISSING`), with a Runtime/Worker protocol split (`RELEASE_SITE_WORKER_PROTOCOL_MISMATCH`) or with an unsupported Adapter ABI (`SITE_ADAPTER_ABI_INCOMPATIBLE`) ends `verify_failed` before anything is mutated.
 
 P3 packaging separately verifies the wrapper/core bootstrap pair instead of assuming the repository source tree will be present on the appliance.
 
@@ -314,6 +318,35 @@ verify everything
 If activation fails, the previous release, canonical configuration, Server/Gateway units, helper unit and config-root metadata are restored within the owned boundary. On first-install failure, candidate managed files are removed rather than promoted as an installation.
 
 The installer also records explicit evidence that an upgrade preserved existing canonical configuration and that runtime activation uses the bounded helper contract.
+
+### Full-Copy: Runtime + Bootstrap + Site Worker + Adapter (PR-B)
+
+The PPU Runtime release carries the complete Bootstrap control plane of the same commit (the file set is `ppu-bootstrap-installer.py` `control_plane_files()`: Bootstrap service and deployment engine, enrollment/controller, B3 installer pair and policy, asset helpers, Package Action control plane, Site Worker v3, Site engine and the ABI-5 Adapter, Root parser and privileged source-only inputs). The Bootstrap deployment coordinator installs it inside the **same** transaction, lock and journal as the Runtime; there is no second installer:
+
+```text
+verify release + control plane + Adapter ABI           (verify_failed, nothing mutated)
+  -> stage immutable <release-id>
+  -> Runtime upgrade quiesce (refused while any Site executes)
+  -> control_plane_installing: durable snapshot of every file to be replaced
+       (/var/lib/plasma-bootstrap/control-plane-snapshots/<transaction>/, 0700)
+  -> existing Bootstrap installer _copy_scripts into /opt/plasma/bootstrap
+  -> verify every installed file SHA-256; write control-plane.json
+       (release id, release git SHA, archive SHA-256, Worker protocol, Adapter ABI)
+  -> activating: existing install_release (restarts Package control + Site Worker,
+       then Server + Gateway) -> readiness
+```
+
+Rollback and recovery:
+
+* control-plane copy or post-copy verification fails → the snapshot is restored byte-exact (files that did not exist are removed); Runtime and Worker were never restarted → `rolled_back`.
+* Runtime activation or readiness fails → the installer calls the coordinator's `on_rollback` **before** restarting the previous Runtime: snapshot restored, Package control + Site Worker restarted on it, then the previous release/config/units are restored → `rolled_back`.
+* any restore or rollback step fails, or the process ends mid-transaction → `recovery_required`. The snapshot is kept; the next deployment is refused and nothing is retried or resent automatically.
+
+Device identity (`/etc/machine-id`), Bootstrap controller/enrollment state, Site seals, the engine selection, FPGA/privileged state and the Active Asset Set are outside the copied file set and are never touched.
+
+Runtime binding: at start the Runtime (`plasma_server.package_actions.from_config`) requires `/opt/plasma/bootstrap/control-plane.json` to name the Active release's git SHA and its own Site Worker protocol, and the loaded `ppu_site_worker.PROTOCOL` to match. Otherwise the Runtime exits (`CONTROL_PLANE_RELEASE_UNBOUND`, `CONTROL_PLANE_RELEASE_MISMATCH`, `SITE_WORKER_PROTOCOL_MISMATCH`), so a new Runtime never runs against an old Worker and a deployment readiness check rolls back.
+
+The running `plasma-bootstrap.service` keeps its in-memory code until it is restarted; the deployment result reports `control_plane.bootstrap_service_restart_required` and never restarts it. Once `control-plane.json` exists, `ppu-bootstrap-installer.py` (factory install and `--refresh-only`) refuses with `BOOTSTRAP_MANAGED_BY_FULL_COPY_DEPLOYMENT`; update Bootstrap by deploying the Runtime release of the same commit.
 
 ## Installation on a clean Z2
 

@@ -63,6 +63,10 @@ on:
       - "software/python/tests/test_manager_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
+      - "software/python/tests/test_ppu_full_copy_deployment.py"
+      - "software/python/tests/ppu_control_plane_fixture.py"
+      - "software/python/plasma_server/package_actions.py"
+      - "scripts/ppu-runtime.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
       - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
@@ -154,6 +158,10 @@ on:
       - "software/python/tests/test_manager_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_core.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
+      - "software/python/tests/test_ppu_full_copy_deployment.py"
+      - "software/python/tests/ppu_control_plane_fixture.py"
+      - "software/python/plasma_server/package_actions.py"
+      - "scripts/ppu-runtime.py"
       - "software/python/tests/test_ppu_b3_z2_install_gate1.py"
       - "software/python/tests/test_ppu_b3_fpga_load_gate1.py"
       - "software/python/tests/test_ppu_owner_authorization_gate1.py"
@@ -433,6 +441,7 @@ jobs:
           software/python/tests/test_lom_p2a2_gateway_g13.py
           software/python/tests/test_lom_p2a2_p0_runtime_readiness.py
           software/python/tests/test_lom_p2a2_p0_runtime_reconcile.py
+          software/python/tests/test_ppu_full_copy_deployment.py
           software/python/tests/test_manager_bootstrap_rest.py
       - name: Prove production Manager entrypoint composes current Manager with Bootstrap routes
         run: >-

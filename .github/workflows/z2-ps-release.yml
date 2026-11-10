@@ -11,6 +11,10 @@ on:
       - "scripts/plasmactl-z2-ps"
       - "scripts/ppu_runtime_local_readiness.py"
       - "scripts/ppu-bootstrap-deployment.py"
+      - "scripts/ppu-bootstrap-installer.py"
+      - "scripts/ppu_site_worker.py"
+      - "scripts/ppu_site_engine.py"
+      - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/build-z2-python-runtime.sh"
       - "scripts/openocd-runtime.py"
@@ -43,6 +47,8 @@ on:
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
+      - "software/python/tests/ppu_control_plane_fixture.py"
+      - "software/python/tests/test_ppu_full_copy_deployment.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_openocd_runtime_artifact.py"
       - "software/python/tests/test_openocd_release_cache_contract.py"
@@ -55,6 +61,10 @@ on:
       - "scripts/plasmactl-z2-ps"
       - "scripts/ppu_runtime_local_readiness.py"
       - "scripts/ppu-bootstrap-deployment.py"
+      - "scripts/ppu-bootstrap-installer.py"
+      - "scripts/ppu_site_worker.py"
+      - "scripts/ppu_site_engine.py"
+      - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/build-z2-python-runtime.sh"
       - "scripts/openocd-runtime.py"
@@ -87,6 +97,8 @@ on:
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
+      - "software/python/tests/ppu_control_plane_fixture.py"
+      - "software/python/tests/test_ppu_full_copy_deployment.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_openocd_runtime_artifact.py"
       - "software/python/tests/test_openocd_release_cache_contract.py"
@@ -431,6 +443,7 @@ jobs:
           software/python/tests/test_ppu_release.py
           software/python/tests/test_ppu_z2_installer.py
           software/python/tests/test_z2_bootstrap_deployment_call_graph.py
+          software/python/tests/test_ppu_full_copy_deployment.py
           software/python/tests/test_z2_python_runtime_artifact.py
           software/python/tests/test_openocd_runtime_artifact.py
           software/python/tests/test_z2_ps_release_cache_contract.py

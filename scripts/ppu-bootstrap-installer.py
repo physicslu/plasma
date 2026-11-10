@@ -23,6 +23,7 @@ from typing import Callable, Sequence
 
 REQUIRED_SCRIPTS = (
     "ppu-bootstrap.py",
+    "ppu-bootstrap-installer.py",
     "ppu-bootstrap-service.py",
     "ppu-bootstrap-deployment.py",
     "ppu-bootstrap-kit.py",
@@ -72,8 +73,32 @@ B3_FILES = (
 )
 
 
+# Immutable privileged Root source inputs shipped as source-only data.
+PRIVILEGED_SOURCE_INPUTS = (
+    "software/python/plasma_interfaces/__init__.py",
+    "software/python/plasma_interfaces/linux_mmio.py",
+    "z2/plasma-path2-root-entry",
+)
+
+# PR-B Full-Copy: once a PPU Runtime release has installed its same-commit
+# control plane, this identity record binds the Bootstrap tree to that Runtime
+# release. A separate factory install/refresh would silently break that binding.
+CONTROL_PLANE_IDENTITY = "control-plane.json"
+
+
 class BootstrapInstallError(RuntimeError):
     pass
+
+
+def control_plane_files() -> tuple[str, ...]:
+    """Every file the Bootstrap layer installs, relative to install_root.
+
+    The PPU Runtime release ships exactly this set (same commit) and the
+    deployment coordinator installs it with ``_copy_scripts``.
+    """
+    return (*REQUIRED_SCRIPTS, *B3_FILES,
+            *(f"pl/hil/{name}" for name in ROOT_PARSER_FILES),
+            *PRIVILEGED_SOURCE_INPUTS)
 
 
 @dataclass(frozen=True)
@@ -128,11 +153,7 @@ def _copy_privileged_source_inputs(source_root: Path, install_root: Path) -> Non
     Provisioning under /opt/plasma/privileged is an explicit step after an
     operator qualifies the Z2 runtime, Root Guard and recovery boundary.
     """
-    for relative in (
-        "software/python/plasma_interfaces/__init__.py",
-        "software/python/plasma_interfaces/linux_mmio.py",
-        "z2/plasma-path2-root-entry",
-    ):
+    for relative in PRIVILEGED_SOURCE_INPUTS:
         sources = [
             source_root / relative,
             source_root.parent / relative,
@@ -245,6 +266,11 @@ def install_bootstrap(
     refresh_only: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> dict[str, object]:
+    identity = paths.install_root / CONTROL_PLANE_IDENTITY
+    if identity.exists() or identity.is_symlink():
+        # The Runtime release owns this tree now; update both together through
+        # the Bootstrap deployment coordinator (Full-Copy), never separately.
+        raise BootstrapInstallError("BOOTSTRAP_MANAGED_BY_FULL_COPY_DEPLOYMENT")
     if refresh_only:
         # One-board development B3 upgrade: update ONLY the existing factory
         # scripts, preserving systemd unit, enrollment, token and Runtime.

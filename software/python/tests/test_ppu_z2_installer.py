@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from .ppu_control_plane_fixture import write_control_plane
+
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "ppu-z2-installer.py"
 spec = importlib.util.spec_from_file_location("ppu_z2_installer", SCRIPT)
@@ -32,6 +34,7 @@ def _fake_release(
     hardware_boundary: dict[str, bool] | None = None,
     symlink_member: bool = False,
     legacy_catalog_data: bool = False,
+    control_plane: bool = True,
 ) -> Path:
     bundle = root / "bundle" / "plasma-release"
     runtime = bundle / "runtime"
@@ -49,6 +52,8 @@ def _fake_release(
         if hardware_boundary is not None
         else dict(installer.EXPECTED_HARDWARE_BOUNDARY),
     }
+    if control_plane:
+        runtime_manifest["control_plane"] = write_control_plane(runtime)
     if legacy_catalog_data:
         # Pre-PR-C1 release layout: shipped Catalog data is tolerated, never required.
         catalog = runtime / "data" / "device-catalog" / "production" / "icpn-v1-manifest.json"

@@ -27,6 +27,35 @@ from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
 from plasma_interfaces.package_provider import PackageProviderInterface, TrustedProviderAction
+from plasma_interfaces.site_worker_c3 import PROTOCOL as SITE_WORKER_PROTOCOL
+
+# PR-B Full-Copy: written by the Bootstrap deployment coordinator when it
+# installs a Runtime release's same-commit control plane.
+CONTROL_PLANE_IDENTITY = "control-plane.json"
+CONTROL_PLANE_IDENTITY_SCHEMA = "plasma.ppu.control-plane-identity.v1"
+
+
+def require_control_plane_release(control_plane: Path, product_root: Path) -> dict[str, Any]:
+    """Refuse a control plane that is not the Active Runtime release's own.
+
+    A new Runtime never starts against an old (or separately refreshed)
+    Bootstrap / Site Worker / Adapter tree, and vice versa: the Runtime
+    process exits, so a deployment health check fails and rolls back.
+    """
+    import json
+    try:
+        identity = json.loads((Path(control_plane) / CONTROL_PLANE_IDENTITY).read_text(encoding="utf-8"))
+        release = json.loads((Path(product_root) / "current" / "release.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("CONTROL_PLANE_RELEASE_UNBOUND") from exc
+    if (not isinstance(identity, dict) or identity.get("schema") != CONTROL_PLANE_IDENTITY_SCHEMA
+            or not isinstance(release, dict) or type(release.get("git_sha")) is not str
+            or len(release["git_sha"]) != 40
+            or identity.get("release_git_sha") != release["git_sha"]):
+        raise RuntimeError("CONTROL_PLANE_RELEASE_MISMATCH")
+    if identity.get("site_worker_protocol") != SITE_WORKER_PROTOCOL:
+        raise RuntimeError("SITE_WORKER_PROTOCOL_MISMATCH")
+    return identity
 
 
 def from_config(site_manager: Any, config_path: Path) -> "PackageActionRuntime":
@@ -43,6 +72,7 @@ def from_config(site_manager: Any, config_path: Path) -> "PackageActionRuntime":
     if not isinstance(cfg, dict) or set(cfg) != keys or cfg["schema"] != "plasma.ppu.package-actions-config.v1":
         raise RuntimeError("PACKAGE_ACTIONS_CONFIG_INVALID")
     control_plane = Path(cfg["control_plane"])
+    require_control_plane_release(control_plane, Path(cfg["product_root"]))
     launcher = _load(control_plane, "ppu_package_launcher.py")
     helper = _load(control_plane, "ppu_package_unit_helper.py")
     spawner = launcher.SystemdUnitSpawner(
@@ -51,6 +81,8 @@ def from_config(site_manager: Any, config_path: Path) -> "PackageActionRuntime":
     site_worker = None
     if cfg["site_worker_control_socket"]:
         worker = _load(control_plane, "ppu_site_worker.py")
+        if getattr(worker, "PROTOCOL", None) != SITE_WORKER_PROTOCOL:
+            raise RuntimeError("SITE_WORKER_PROTOCOL_MISMATCH")
         site_worker = worker.SiteWorkerClient(Path(cfg["site_worker_control_socket"]))
     return PackageActionRuntime(site_manager, control_plane=control_plane,
                                 product_root=Path(cfg["product_root"]), state_root=Path(cfg["state_root"]),

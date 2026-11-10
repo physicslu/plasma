@@ -9,6 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from .ppu_control_plane_fixture import verify_real_control_plane
+
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "ppu-bootstrap-deployment.py"
 SPEC = importlib.util.spec_from_file_location("ppu_bootstrap_deployment", SCRIPT)
@@ -48,7 +50,14 @@ class FakeInstaller:
         if self.fail_verify:
             raise RuntimeError("bad digest")
         Path(extract_to).mkdir(parents=True)
-        return SimpleNamespace(release_id="1.2.3-aaaaaaaaaaaa", archive_sha256="d" * 64)
+        return SimpleNamespace(release_id="1.2.3-aaaaaaaaaaaa", archive_sha256="d" * 64,
+                               git_sha="a" * 40)
+
+    def verify_control_plane(self, verified):
+        return verify_real_control_plane(verified)
+
+    def _systemctl(self, *args):
+        self.calls.append(("systemctl", *args))
 
     def validate_plasma_python(self, path, *, product_root):
         self.calls.append("python")
@@ -72,6 +81,8 @@ class FakeInstaller:
     def install_release(self, verified, **kwargs):
         self.calls.append("activate")
         if self.fail_install:
+            if "restored" in self.fail_install:
+                kwargs["on_rollback"]()
             raise RuntimeError(self.fail_install)
         health = kwargs["health_check"](kwargs["gateway_host"])
         return {"result": "PASS", "release_id": verified.release_id, "gateway_readiness": health}

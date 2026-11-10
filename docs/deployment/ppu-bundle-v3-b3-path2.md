@@ -96,6 +96,13 @@ then verify `/v1/status` exposes matching
 `bundle_v3_b3_archive_sha256`. This is a controlled *software capability
 refresh*, not requalification or re-enrollment.
 
+> **PR-B Full-Copy:** `--refresh-only` applies only to a Bootstrap tree that
+> no Runtime release has bound yet. Once a Full-Copy deployment wrote
+> `/opt/plasma/bootstrap/control-plane.json`, the installer refuses with
+> `BOOTSTRAP_MANAGED_BY_FULL_COPY_DEPLOYMENT`; Bootstrap, Site Worker and
+> Adapter are then updated only together with the Runtime release of the same
+> commit (see [Z2 PS installer — Full-Copy](z2-ps-installer.md)).
+
 The approved Path 2 script is
 `scripts/ppu_path2_b3_factory_refresh.py` (exact owner PR HEAD,
 `--host`, `--device-id`, `--source-sha`). It first verifies Z2 identity,
