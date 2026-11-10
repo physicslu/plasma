@@ -159,6 +159,7 @@ def install_release(
     systemctl=_core._systemctl,
     health_check=_core._health_ready,
     ensure_service_account=_core._ensure_service_account,
+    on_rollback=None,
 ) -> dict[str, object]:
     config_path = paths.config_root / "ppu.yaml"
     helper_unit = paths.systemd_root / RUNTIME_ACTIVATION_SERVICE
@@ -205,6 +206,7 @@ def install_release(
             systemctl=systemctl,
             health_check=health_check,
             ensure_service_account=ensure_service_account,
+            on_rollback=on_rollback,
         )
     except Exception as activation_exc:
         helper_rollback_errors: list[str] = []

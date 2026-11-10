@@ -56,6 +56,8 @@ InstallPaths = _core.InstallPaths
 VerifiedRelease = _core.VerifiedRelease
 PythonRuntime = _core.PythonRuntime
 verify_release = _core.verify_release
+# PR-B Full-Copy: the same control-plane verification as the Z2 installer.
+verify_control_plane = _core.verify_control_plane
 _copy_release = _core._copy_release
 _previous_current = _core._previous_current
 
@@ -356,6 +358,12 @@ def _health_ready(gateway_host: str, *, deadline_s: float = 40.0) -> Mapping[str
     return _core._health_ready(gateway_host, deadline_s=deadline_s)
 
 
+def _systemctl(*args: str) -> None:
+    """The userspace supervisor has no systemd units: the coordinator only
+    restarts a control-plane unit whose unit file exists, so never here."""
+    raise Z2InstallerError("QEMU simulation has no systemd: " + " ".join(args))
+
+
 def _restore_current(current: Path, previous: Path | None) -> None:
     if previous is None:
         try:
@@ -376,6 +384,7 @@ def install_release(
     facility_id: str,
     display_name: str,
     health_check=_health_ready,
+    on_rollback=None,
     **_: object,
 ) -> dict[str, object]:
     """Activate one verified ARMv7 release through the userspace supervisor."""
@@ -435,6 +444,14 @@ def install_release(
     try:
         readiness = dict(health_check(gateway_host))
     except Exception as activation_exc:
+        if on_rollback is not None:
+            try:
+                on_rollback()
+            except Exception as exc:
+                _restore_current(paths.current, previous)
+                raise Z2InstallerError(
+                    f"QEMU userspace activation failed ({activation_exc}); rollback also failed ({exc})"
+                ) from activation_exc
         _restore_current(paths.current, previous)
         if previous_config is None:
             try:

@@ -8,6 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from .ppu_control_plane_fixture import verify_real_control_plane
+
 ROOT = Path(__file__).resolve().parents[3]
 Z2_BACKEND = ROOT / "scripts" / "plasmactl-z2-ps"
 BOOTSTRAP_KIT = ROOT / "scripts" / "ppu-bootstrap-kit.py"
@@ -54,7 +56,14 @@ class QualificationInstaller:
 
     def verify_release(self, artifact, *, sidecar, extract_to):
         Path(extract_to).mkdir(parents=True)
-        return SimpleNamespace(release_id="1.2.3-cccccccccccc", archive_sha256="d" * 64)
+        return SimpleNamespace(release_id="1.2.3-cccccccccccc", archive_sha256="d" * 64,
+                               git_sha="c" * 40)
+
+    def verify_control_plane(self, verified):
+        return verify_real_control_plane(verified)
+
+    def _systemctl(self, *args):
+        return None
 
     def validate_plasma_python(self, path, *, product_root):
         return SimpleNamespace(path=path, version="3.12.13", architecture="armv7l", releaselevel="final")
@@ -76,6 +85,7 @@ class QualificationInstaller:
         try:
             kwargs["health_check"](kwargs["gateway_host"])
         except Exception as exc:
+            kwargs["on_rollback"]()
             raise RuntimeError(
                 f"activation failed and previous configuration/release was restored: {exc}"
             ) from exc

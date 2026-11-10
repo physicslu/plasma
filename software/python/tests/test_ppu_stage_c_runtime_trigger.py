@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from .ppu_control_plane_fixture import installed_control_plane
+
 from plasma_core.config import PlasmaConfig, PPUConfig, ServerConfig, SiteConfig
 from plasma_server import runtime_control
 from plasma_server.package_actions import PackageActionRuntime, from_config
@@ -227,8 +229,9 @@ def test_operator_disconnect_cancels_the_action(tmp_path, device, monkeypatch):
 def test_from_config_validates_and_wires_helper_spawner(tmp_path):
     import pwd
     me = pwd.getpwuid(os.getuid()).pw_name
-    cfg = {"schema": "plasma.ppu.package-actions-config.v1", "control_plane": str(ROOT / "scripts"),
-           "product_root": str(tmp_path / "product"), "state_root": str(tmp_path / "state"),
+    control_plane, product = installed_control_plane(tmp_path)
+    cfg = {"schema": "plasma.ppu.package-actions-config.v1", "control_plane": str(control_plane),
+           "product_root": str(product), "state_root": str(tmp_path / "state"),
            "python": sys.executable, "package_user": me,
            "helper_socket": str(tmp_path / "helper.sock"), "site_worker_control_socket": None}
     path = tmp_path / "pa.json"
@@ -257,7 +260,9 @@ def test_rendered_package_actions_config_is_accepted_by_from_config(tmp_path, mo
     import ppu_package_units as units
     cfg = json.loads(units.package_actions_config())
     assert cfg["control_plane"] == "/opt/plasma/bootstrap" and cfg["package_user"] == "plasma-package"
-    cfg.update(control_plane=str(ROOT / "scripts"), package_user=pwd.getpwuid(os.getuid()).pw_name)
+    control_plane, product = installed_control_plane(tmp_path)
+    cfg.update(control_plane=str(control_plane), product_root=str(product),
+               package_user=pwd.getpwuid(os.getuid()).pw_name)
     path = tmp_path / "pa.json"
     path.write_text(json.dumps(cfg))
     rt = from_config(object(), path)

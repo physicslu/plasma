@@ -48,6 +48,13 @@ _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 _API_TRANSACTION_ID = re.compile(r"[0-9a-f]{32}\Z")
 QUALIFICATION_HEALTH_FAILURE = "qualification-injected post-activation health-check failure"
+# PR-B Full-Copy: the Runtime release's same-commit control plane is installed
+# into the Bootstrap tree inside the SAME transaction, lock and journal.
+CONTROL_PLANE_IDENTITY = "control-plane.json"
+CONTROL_PLANE_IDENTITY_SCHEMA = "plasma.ppu.control-plane-identity.v1"
+CONTROL_PLANE_SNAPSHOT_SCHEMA = "plasma.ppu.control-plane-snapshot.v1"
+CONTROL_PLANE_SERVICES = ("plasma-package-control.service", "plasma-site-worker.service")
+ENGINE_SELECTION_NAME = "site-worker-engine.json"
 
 
 class DeploymentError(RuntimeError):
@@ -78,6 +85,14 @@ class DeploymentPaths:
     @property
     def lock(self) -> Path:
         return self.bootstrap_state_root / "deployment.lock"
+
+    @property
+    def bootstrap_install_root(self) -> Path:
+        return self.product_root / "bootstrap"
+
+    @property
+    def control_plane_snapshots(self) -> Path:
+        return self.bootstrap_state_root / "control-plane-snapshots"
 
 
 @dataclass(frozen=True)
@@ -217,6 +232,38 @@ class Journal:
 
 class _RuntimeQuiesceDenied(DeploymentError):
     """The running Runtime refused (or could not grant) its upgrade quiesce gate."""
+
+
+class _ControlPlaneNotMutated(DeploymentError):
+    """Control-plane snapshot could not be taken; nothing was replaced."""
+
+
+class _ControlPlaneInstallFailed(DeploymentError):
+    """Control-plane files may be partially replaced; restore the snapshot."""
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_private_atomic(path: Path, payload: bytes, mode: int) -> None:
+    temporary = path.with_name(path.name + ".new")
+    if path.is_symlink() or temporary.is_symlink():
+        raise DeploymentError(f"CONTROL_PLANE_DESTINATION_SYMLINK:{path.name}")
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "wb", closefd=False) as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+    finally:
+        os.close(fd)
+    os.chmod(temporary, mode)
+    os.replace(temporary, path)
 
 
 RUNTIME_CONTROL_SOCKET = Path("/run/plasma-server/control.sock")
@@ -381,7 +428,8 @@ class DeploymentCoordinator:
         record = self.journal.read()
         current = self._asset_helper().read_active(self.paths.product_root)
         if record is not None and record.state in {
-                "activating", "fpga_loading", "recovery_required", "fpga_identity_failed"}:
+                "control_plane_installing", "activating", "fpga_loading", "recovery_required",
+                "fpga_identity_failed"}:
             current.update(state="RECOVERY_REQUIRED", ready=False,
                            coordinator_state=record.state)
         return current
@@ -1266,6 +1314,158 @@ class DeploymentCoordinator:
                 "not_claimed": ["real engineering deployment", "FPGA load", "SWPC/Z2 rollout"],
             }
 
+    # --- PR-B Full-Copy control plane -------------------------------------------------
+
+    def _verify_control_plane(self, verified: Any) -> Any:
+        """Release control plane + Adapter ABI against the selected engine."""
+        verify = getattr(self.installer, "verify_control_plane", None)
+        if verify is None:
+            raise DeploymentError("RELEASE_CONTROL_PLANE_UNSUPPORTED_INSTALLER")
+        plane = verify(verified)
+        record = self.paths.config_root / ENGINE_SELECTION_NAME
+        if record.exists() or record.is_symlink():
+            # The new Worker pins this selection at startup; an unsupported
+            # driver ABI would leave every Site ENGINE_NOT_READY after restart.
+            try:
+                if record.is_symlink():
+                    raise ValueError("symlink")
+                selection = json.loads(record.read_text(encoding="utf-8"))
+                driver, abi = selection["adapter_driver"], selection["driver_abi"]
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                raise DeploymentError("ENGINE_SELECTION_UNREADABLE") from exc
+            supported = plane.manifest["site_adapter"]["driver_abi"]
+            if type(driver) is not str or type(abi) is not int or abi not in supported.get(driver, ()):
+                raise DeploymentError(
+                    f"SITE_ADAPTER_ABI_INCOMPATIBLE: selected {driver!r} ABI {abi!r}; "
+                    f"release supports {supported}")
+        return plane
+
+    def _snapshot_control_plane(self, transaction_id: str, plane: Any) -> Path:
+        """Durable full copy of every file the release will replace."""
+        install_root = self.paths.bootstrap_install_root
+        snapshots = self.paths.control_plane_snapshots
+        try:
+            if install_root.is_symlink() or snapshots.is_symlink():
+                raise DeploymentError("CONTROL_PLANE_ROOT_SYMLINK")
+            snapshots.mkdir(parents=True, exist_ok=True)
+            os.chmod(snapshots, 0o700)
+            # Only the snapshot of the transaction about to run is kept: an
+            # earlier one belongs to a transaction that reached a terminal state.
+            for old in snapshots.iterdir():
+                if old.is_dir() and not old.is_symlink():
+                    shutil.rmtree(old)
+            target = snapshots / transaction_id
+            target.mkdir(mode=0o700)
+            entries: list[dict[str, Any]] = []
+            for relative in sorted({*plane.files, CONTROL_PLANE_IDENTITY}):
+                path = install_root / relative
+                if path.is_symlink():
+                    raise DeploymentError(f"CONTROL_PLANE_DESTINATION_SYMLINK:{relative}")
+                if not path.exists():
+                    entries.append({"path": relative, "existed": False})
+                    continue
+                if not path.is_file():
+                    raise DeploymentError(f"CONTROL_PLANE_DESTINATION_NOT_FILE:{relative}")
+                stored = target / "files" / relative
+                stored.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, stored)
+                entries.append({"path": relative, "existed": True,
+                                "mode": stat.S_IMODE(path.stat().st_mode),
+                                "sha256": _file_sha256(stored)})
+            index = {"schema": CONTROL_PLANE_SNAPSHOT_SCHEMA, "transaction_id": transaction_id,
+                     "install_root": str(install_root), "entries": entries}
+            _write_private_atomic(target / "index.json",
+                                  (json.dumps(index, indent=2, sort_keys=True) + "\n").encode(), 0o600)
+        except Exception as exc:
+            raise _ControlPlaneNotMutated(f"CONTROL_PLANE_SNAPSHOT_FAILED: {exc}") from exc
+        return target
+
+    def _install_control_plane(self, plane: Any, verified: Any, transaction_id: str) -> dict[str, Any]:
+        """Replace the Bootstrap tree with the release's control plane.
+
+        The copy itself is the existing Bootstrap installer's ``_copy_scripts``
+        shipped in the same verified release (no second installer).
+        """
+        install_root = self.paths.bootstrap_install_root
+        source = plane.root / "ppu-bootstrap-installer.py"
+        # Compiled from the verified bytes without writing __pycache__ into
+        # the verified release tree.
+        name = "plasma_ppu_bootstrap_installer_full_copy"
+        bootstrap_installer = ModuleType(name)
+        bootstrap_installer.__file__ = str(source)
+        sys.modules[name] = bootstrap_installer
+        try:
+            exec(compile(source.read_bytes(), str(source), "exec"), bootstrap_installer.__dict__)
+            bootstrap_installer._copy_scripts(plane.root, install_root)
+        finally:
+            sys.modules.pop(name, None)
+        for relative, digest in plane.files.items():
+            path = install_root / relative
+            if path.is_symlink() or not path.is_file() or _file_sha256(path) != digest:
+                raise DeploymentError(f"CONTROL_PLANE_INSTALL_UNVERIFIED:{relative}")
+        identity = {
+            "schema": CONTROL_PLANE_IDENTITY_SCHEMA,
+            "release_id": verified.release_id,
+            "release_git_sha": verified.git_sha,
+            "release_archive_sha256": verified.archive_sha256,
+            "control_plane_manifest_sha256": plane.manifest_sha256,
+            "site_worker_protocol": plane.site_worker_protocol,
+            "site_adapter": plane.manifest["site_adapter"],
+            "transaction_id": transaction_id,
+        }
+        _write_private_atomic(install_root / CONTROL_PLANE_IDENTITY,
+                              (json.dumps(identity, indent=2, sort_keys=True) + "\n").encode(), 0o644)
+        return identity
+
+    def _restore_control_plane(self, snapshot: Path) -> None:
+        """Put back exactly the snapshot (files absent before are removed)."""
+        try:
+            index = json.loads((snapshot / "index.json").read_text(encoding="utf-8"))
+            if (not isinstance(index, dict) or index.get("schema") != CONTROL_PLANE_SNAPSHOT_SCHEMA
+                    or index.get("install_root") != str(self.paths.bootstrap_install_root)
+                    or not isinstance(index.get("entries"), list)):
+                raise DeploymentError("snapshot index invalid")
+        except (OSError, ValueError) as exc:
+            raise DeploymentError(f"CONTROL_PLANE_RESTORE_FAILED: {exc}") from exc
+        install_root = self.paths.bootstrap_install_root
+        errors: list[str] = []
+        for entry in index["entries"]:
+            relative = entry.get("path") if isinstance(entry, dict) else None
+            if not isinstance(relative, str) or relative.startswith("/") or ".." in Path(relative).parts:
+                errors.append(f"invalid entry {entry!r}")
+                continue
+            path = install_root / relative
+            try:
+                if entry.get("existed") is True:
+                    payload = (snapshot / "files" / relative).read_bytes()
+                    if hashlib.sha256(payload).hexdigest() != entry.get("sha256"):
+                        raise DeploymentError("snapshot copy digest mismatch")
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    _write_private_atomic(path, payload, int(entry["mode"]) & 0o7777)
+                elif path.is_symlink() or path.exists():
+                    path.unlink()
+            except Exception as exc:  # collect every failure; never stop half way
+                errors.append(f"{relative}: {exc}")
+        if errors:
+            raise DeploymentError("CONTROL_PLANE_RESTORE_FAILED: " + "; ".join(errors[:8]))
+
+    def _restart_control_plane_services(self) -> None:
+        systemctl = self.installer._systemctl
+        for unit in CONTROL_PLANE_SERVICES:
+            if (self.paths.systemd_root / unit).is_file():
+                systemctl("restart", unit)
+
+    def _rollback_control_plane(self, snapshot: Path) -> None:
+        """Runtime-activation rollback hook: old files back, Worker on them."""
+        self._restore_control_plane(snapshot)
+        self._restart_control_plane_services()
+
+    @staticmethod
+    def _changed_files(snapshot: Path, plane: Any) -> list[str]:
+        index = json.loads((snapshot / "index.json").read_text(encoding="utf-8"))
+        before = {e["path"]: e.get("sha256") for e in index["entries"]}
+        return sorted(name for name, digest in plane.files.items() if before.get(name) != digest)
+
     def _execute_locked(self, request: DeploymentRequest) -> Mapping[str, Any]:
         now = self.clock()
         record = DeploymentRecord(
@@ -1292,6 +1492,7 @@ class DeploymentCoordinator:
                     request.plasma_python,
                     product_root=self.paths.product_root,
                 )
+                plane = self._verify_control_plane(verified)
             except Exception as exc:
                 self.journal.write(
                     record,
@@ -1306,8 +1507,10 @@ class DeploymentCoordinator:
                 "verified",
                 release_id=verified.release_id,
                 artifact_sha256=verified.archive_sha256,
+                source_commit=verified.git_sha,
             )
             installer_paths = self._installer_paths()
+            snapshot: Path | None = None
             try:
                 self.installer._require_target_baseline()
                 previous = self.installer._previous_current(installer_paths.current)
@@ -1335,6 +1538,16 @@ class DeploymentCoordinator:
                         (self.runtime_restart_quiesce or quiesce_runtime_for_restart)()
                     except Exception as exc:
                         raise _RuntimeQuiesceDenied(str(exc)) from exc
+                # Full-Copy: under the quiesce no Job loads control-plane code
+                # while the same-commit Bootstrap / Worker / Adapter replace it.
+                self.journal.write(record, "control_plane_installing")
+                snapshot = self._snapshot_control_plane(record.transaction_id, plane)
+                try:
+                    identity = self._install_control_plane(plane, verified, record.transaction_id)
+                except Exception as exc:
+                    raise _ControlPlaneInstallFailed(str(exc)) from exc
+                changed = self._changed_files(snapshot, plane)
+                restore = snapshot
                 self.journal.write(record, "activating")
                 evidence = self.installer.install_release(
                     verified,
@@ -1345,12 +1558,37 @@ class DeploymentCoordinator:
                     facility_id=request.facility_id,
                     display_name=request.display_name,
                     health_check=health_check,
+                    # Restore the previous control plane and restart the Worker
+                    # on it BEFORE the previous Runtime is restarted.
+                    on_rollback=lambda: self._rollback_control_plane(restore),
                 )
             except _RuntimeQuiesceDenied as exc:
                 self.journal.write(
                     record, "verify_failed", error_code="runtime_quiesce_denied", error_message=str(exc),
                 )
                 raise DeploymentError(f"runtime upgrade quiesce denied: {exc}") from exc
+            except _ControlPlaneNotMutated as exc:
+                self.journal.write(
+                    record, "verify_failed", error_code="control_plane_snapshot_failed", error_message=str(exc),
+                )
+                raise DeploymentError(f"control plane snapshot failed: {exc}") from exc
+            except _ControlPlaneInstallFailed as exc:
+                # The Runtime and running Worker were never restarted: putting
+                # the previous files back restores the previous consistent set.
+                try:
+                    self._restore_control_plane(snapshot)
+                except Exception as restore_exc:
+                    self.journal.write(
+                        record, "recovery_required", error_code="control_plane_rollback_failed",
+                        error_message=f"{exc}; {restore_exc}",
+                    )
+                    raise DeploymentError(
+                        f"control plane install failed and restore failed: {restore_exc}") from exc
+                self.journal.write(
+                    record, "rolled_back", error_code="control_plane_install_failed_rolled_back",
+                    error_message=str(exc),
+                )
+                raise DeploymentError(f"control plane install failed; previous restored: {exc}") from exc
             except Exception as exc:
                 message = str(exc)
                 if "rollback also failed" in message:
@@ -1371,6 +1609,14 @@ class DeploymentCoordinator:
             "result": "PASS",
             "transaction": asdict(record),
             "installer_evidence": dict(evidence),
+            "control_plane": {
+                "identity": identity,
+                "changed_files": changed,
+                "snapshot": str(snapshot),
+                # The running Bootstrap service keeps its in-memory code until
+                # its own (operator) restart; this transaction never restarts it.
+                "bootstrap_service_restart_required": bool(changed),
+            },
             "capabilities": {"fpga_update": False},
             "not_claimed": [
                 "FPGA bitstream deployment",

@@ -80,7 +80,9 @@ def test_z2_config_directory_permission_migration_is_rollback_safe(
 
 
 def test_ppu_runtime_manifest_requires_gateway_and_server_config_identity() -> None:
-    manifest = runtime._manifest(python_requirement=">=3.11", pyyaml_version="6.0.2")
+    manifest = runtime._manifest(python_requirement=">=3.11", pyyaml_version="6.0.2",
+                                 site_worker_protocol="plasma.ppu.site-worker.v3")
+    assert manifest["control_plane"]["path"] == "control-plane"
     processes = manifest["processes"]
     server_args = processes["server"]["arguments"]
     assert server_args[:3] == ["server", "--config", "<ppu-config>"]

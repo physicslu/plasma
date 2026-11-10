@@ -437,6 +437,123 @@ def _verify_runtime(root: Path) -> dict[str, object]:
     return manifest
 
 
+# PR-B Full-Copy: the PPU Runtime release carries the complete same-commit
+# Bootstrap control plane (Bootstrap, Site Worker, Adapter, asset helpers). The
+# Bootstrap deployment coordinator installs it together with the Runtime.
+CONTROL_PLANE_PATH = "control-plane"
+CONTROL_PLANE_MANIFEST = "control-plane-manifest.json"
+CONTROL_PLANE_SCHEMA = "plasma.ppu.control-plane.v1"
+CONTROL_PLANE_MAX_FILES = 256
+CONTROL_PLANE_REQUIRED = (
+    "ppu-bootstrap-installer.py",
+    "ppu-bootstrap-deployment.py",
+    "ppu_site_worker.py",
+    "ppu_site_worker_service.py",
+    "ppu_site_engine.py",
+    "ppu_site_adapter_abi5.py",
+    "ppu_asset_set.py",
+)
+_SITE_WORKER_PROTOCOL = re.compile(r"plasma\.ppu\.site-worker\.v[1-9][0-9]{0,3}\Z")
+_DRIVER_NAME = re.compile(r"[a-z][a-z0-9_]{0,31}\Z")
+
+
+@dataclass(frozen=True)
+class VerifiedControlPlane:
+    root: Path
+    manifest: Mapping[str, object]
+    manifest_sha256: str
+
+    @property
+    def files(self) -> Mapping[str, str]:
+        return self.manifest["files"]  # type: ignore[return-value]
+
+    @property
+    def site_worker_protocol(self) -> str:
+        return str(self.manifest["site_worker_protocol"])
+
+
+def _control_plane_relative(name: object) -> str:
+    if not isinstance(name, str) or not name or "\\" in name or name.startswith("/"):
+        raise Z2InstallerError(f"unsafe control-plane path: {name!r}")
+    pure = PurePosixPath(name)
+    if (".." in pure.parts or pure.as_posix() != name
+            or any(part in ("", ".") for part in pure.parts)
+            or name == CONTROL_PLANE_MANIFEST):
+        raise Z2InstallerError(f"unsafe control-plane path: {name!r}")
+    return name
+
+
+def verify_control_plane_tree(
+    runtime_dir: Path, runtime_manifest: Mapping[str, object]
+) -> VerifiedControlPlane:
+    """Verify the bundled control plane against the Runtime it ships with.
+
+    Exact file set and SHA-256, one Site Worker protocol shared by the Runtime
+    client and the bundled Worker, and a declared Adapter driver ABI. Nothing is
+    imported or executed here.
+    """
+    declared = runtime_manifest.get("control_plane")
+    if (not isinstance(declared, dict)
+            or set(declared) != {"path", "manifest", "site_worker_protocol"}
+            or declared.get("path") != CONTROL_PLANE_PATH
+            or declared.get("manifest") != CONTROL_PLANE_MANIFEST
+            or not isinstance(declared.get("site_worker_protocol"), str)
+            or not _SITE_WORKER_PROTOCOL.fullmatch(declared["site_worker_protocol"])):
+        raise Z2InstallerError("RELEASE_CONTROL_PLANE_MISSING: Runtime does not declare its control plane")
+    root = runtime_dir / CONTROL_PLANE_PATH
+    manifest_path = root / CONTROL_PLANE_MANIFEST
+    if root.is_symlink() or not root.is_dir() or manifest_path.is_symlink() or not manifest_path.is_file():
+        raise Z2InstallerError("RELEASE_CONTROL_PLANE_MISSING: control-plane payload is absent")
+    manifest = _read_object(manifest_path, "control-plane manifest")
+    if set(manifest) != {"schema", "site_worker_protocol", "site_adapter", "files"} \
+            or manifest.get("schema") != CONTROL_PLANE_SCHEMA:
+        raise Z2InstallerError("RELEASE_CONTROL_PLANE_INVALID: manifest schema")
+    if manifest.get("site_worker_protocol") != declared["site_worker_protocol"]:
+        raise Z2InstallerError(
+            "RELEASE_SITE_WORKER_PROTOCOL_MISMATCH: Runtime "
+            f"{declared['site_worker_protocol']!r} vs Worker {manifest.get('site_worker_protocol')!r}")
+    files = manifest.get("files")
+    if not isinstance(files, dict) or not 0 < len(files) <= CONTROL_PLANE_MAX_FILES:
+        raise Z2InstallerError("RELEASE_CONTROL_PLANE_INVALID: file list")
+    for name, digest in files.items():
+        _control_plane_relative(name)
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise Z2InstallerError(f"RELEASE_CONTROL_PLANE_INVALID: digest for {name!r}")
+    missing_required = sorted(set(CONTROL_PLANE_REQUIRED) - set(files))
+    if missing_required:
+        raise Z2InstallerError(f"RELEASE_CONTROL_PLANE_INCOMPLETE: {missing_required}")
+    adapter = manifest.get("site_adapter")
+    if (not isinstance(adapter, dict) or set(adapter) != {"module", "driver_abi"}
+            or adapter.get("module") not in files
+            or not isinstance(adapter.get("driver_abi"), dict) or not adapter["driver_abi"]
+            or any(not isinstance(k, str) or not _DRIVER_NAME.fullmatch(k)
+                   or not isinstance(v, list) or not v
+                   or any(type(i) is not int or not 0 < i < 1000 for i in v)
+                   for k, v in adapter["driver_abi"].items())):
+        raise Z2InstallerError("RELEASE_CONTROL_PLANE_INVALID: site_adapter ABI")
+    actual = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if not path.is_dir() and path != manifest_path
+    }
+    if actual != set(files):
+        raise Z2InstallerError(
+            "RELEASE_CONTROL_PLANE_INVALID: file set mismatch "
+            f"extra={sorted(actual - set(files))} missing={sorted(set(files) - actual)}")
+    for name, digest in files.items():
+        path = root / name
+        if path.is_symlink() or not path.is_file() or _sha256(path) != digest:
+            raise Z2InstallerError(f"RELEASE_CONTROL_PLANE_INVALID: SHA-256 mismatch for {name}")
+    worker_source = (root / "ppu_site_worker.py").read_text(encoding="utf-8")
+    if f'\nPROTOCOL = "{manifest["site_worker_protocol"]}"\n' not in worker_source:
+        raise Z2InstallerError("RELEASE_SITE_WORKER_PROTOCOL_MISMATCH: bundled Worker source")
+    return VerifiedControlPlane(root, manifest, _sha256(manifest_path))
+
+
+def verify_control_plane(verified: VerifiedRelease) -> VerifiedControlPlane:
+    return verify_control_plane_tree(verified.root / "runtime", verified.runtime_manifest)
+
+
 def verify_release(
     artifact: Path,
     *,
@@ -451,6 +568,7 @@ def verify_release(
     _verify_internal_hashes(root)
     manifest = _verify_release_manifest(root)
     runtime_manifest = _verify_runtime(root)
+    verify_control_plane_tree(root / "runtime", runtime_manifest)
     return VerifiedRelease(root, manifest, runtime_manifest, archive_digest)
 
 
@@ -1001,7 +1119,11 @@ def install_release(
     systemctl: Callable[..., None] = _systemctl,
     health_check: Callable[[str], Mapping[str, object]] = _health_ready,
     ensure_service_account: Callable[[], None] = _ensure_service_account,
+    on_rollback: Callable[[], None] | None = None,
 ) -> dict[str, object]:
+    """``on_rollback`` (Full-Copy) restores the previous control plane and its
+    Worker before the previous Runtime is restarted; its failure is a rollback
+    failure (recovery required), never a silent success."""
     gateway_host = _validate_gateway_host(gateway_host)
     release_target = paths.releases_root / verified.release_id
     previous = _previous_current(paths.current)
@@ -1068,6 +1190,12 @@ def install_release(
             systemctl("restart", "plasma-web.service")
         readiness = dict(health_check(gateway_host))
     except Exception as activation_exc:
+        rollback_errors: list[str] = []
+        if on_rollback is not None:
+            try:
+                on_rollback()
+            except Exception as exc:
+                rollback_errors.append(f"control plane: {exc}")
         try:
             _rollback_activation(
                 paths=paths,
@@ -1077,9 +1205,11 @@ def install_release(
                 systemctl=systemctl,
             )
         except Exception as rollback_exc:
+            rollback_errors.append(str(rollback_exc))
+        if rollback_errors:
             raise Z2InstallerError(
-                f"activation failed ({activation_exc}); rollback also failed ({rollback_exc})"
-            ) from rollback_exc
+                f"activation failed ({activation_exc}); rollback also failed ({'; '.join(rollback_errors)})"
+            ) from activation_exc
         raise Z2InstallerError(
             f"activation failed and previous configuration/release was restored: {activation_exc}"
         ) from activation_exc
