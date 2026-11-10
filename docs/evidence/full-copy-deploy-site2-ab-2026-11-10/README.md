@@ -80,7 +80,7 @@ SHA256 of each file was taken before G2 and after R, and the two lists are ident
 
 ## Files
 
-- `TIMELINE.md` — UTC timeline of the write steps.
+- `timeline.txt` — UTC timeline of the write steps.
 - `runtime-deploy-receipt.txt`, `bundle-a-run-receipt.txt`, `bundle-b-run-receipt.txt` — `PLASMA_PROGRAM=` receipts.
 - `post-deploy-control-plane.txt` — coordinator journal summary, API state, `control-plane.json`, manifest comparison.
 - `ppu-job-job-20261110-132653-11211d38.json`, `ppu-job-job-20261110-132728-d4f178e4.json` — Gateway Job records.
