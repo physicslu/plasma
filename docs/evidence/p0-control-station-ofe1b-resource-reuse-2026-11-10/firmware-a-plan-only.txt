@@ -1,0 +1,47 @@
+2026-11-10T14:13:17Z fwA image plasma-blue-pill-cdc.bin 18768 8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d
+2026-11-10T14:13:17Z plan HTTP 200
+{
+ "resource": {
+  "resource_set_sha256": "39e4bf851bdc0128cfbfd502532d235d05dd0423e4e9ada9c865260f18f5e9a7",
+  "ppu_reported": {
+   "state": "VERIFIED",
+   "asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+   "generation": 15,
+   "resource_set_sha256": "39e4bf851bdc0128cfbfd502532d235d05dd0423e4e9ada9c865260f18f5e9a7"
+  },
+  "reuse": true
+ },
+ "image_asset": {
+  "image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+  "sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+  "size": 18768,
+  "load_address": 134217728,
+  "format": "binary"
+ },
+ "job_binding": {
+  "schema": "plasma.opf.job-image-binding.v1",
+  "resource_set_sha256": "39e4bf851bdc0128cfbfd502532d235d05dd0423e4e9ada9c865260f18f5e9a7",
+  "operation": "flash_cycle",
+  "range": {
+   "address": 134217728,
+   "length": 18768
+  },
+  "image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+  "ppu_id": "z2-hil",
+  "site_id": 2,
+  "icpn": "STM32F103C8T6",
+  "profile": "stm32f103c8t6-site2"
+ },
+ "job_binding_sha256": "10bbf176c63982fb8f4d9bd792f5db2322b47bc1d98fac95cd2ccc63e8484ef0",
+ "active_asset_set": {
+  "state": "ACTIVE",
+  "asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c"
+ },
+ "activation_required": false,
+ "fpga_load": false,
+ "steps": [
+  "RESOURCE_REUSE",
+  "FLASH_CYCLE_JOB",
+  "VERIFY_RECEIPT"
+ ]
+}

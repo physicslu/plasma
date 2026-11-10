@@ -1,0 +1,29 @@
+# read-only observation at 2026-11-10T14:21:22Z (after the HIL; no write)
+ef6493e975bde781e4390510086e3df2e83b878e444c8c350ce30b997f683354  /home/gordon/.local/state/plasma/local-control-station/registry.json
+55d6e699f8b341536271bab5de160549260cc510671b80dccd664b8b9747f9ce  /home/gordon/.local/state/plasma/local-control-station/bootstrap-credentials.json
+/home/gordon/.local/share/plasma/local-control-station/releases/728e55e529b5
+{
+  "architecture": "x86_64",
+  "console_bind": "127.0.0.1:18190",
+  "git_sha": "728e55e529b58ea22d736553c50bee237a9962f4",
+  "hardware_claim": "none",
+  "manager_bind": "127.0.0.1:18280",
+  "platform": "linux",
+  "ppu_alias": "swpc-ppu",
+  "ppu_endpoint": "http://127.0.0.1:18080",
+  "python": "/opt/plasma/python/3.12.13/bin/python3",
+  "release_id": "728e55e529b5",
+  "role": "local-control-station",
+  "schema_version": 1
+}
+NRestarts=0
+Id=plasma-local-manager.service
+ActiveState=active
+ActiveEnterTimestamp=Tue 2026-11-10 22:11:35 CST
+
+NRestarts=0
+Id=plasma-control-station.service
+ActiveState=active
+ActiveEnterTimestamp=Tue 2026-11-10 22:11:36 CST
+12
+/home/gordon/.local/share/plasma/local-control-station/releases/082f018941b5
