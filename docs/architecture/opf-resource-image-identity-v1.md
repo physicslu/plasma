@@ -1,4 +1,9 @@
-# OPF Programming Resource Set / Job Firmware Asset Identity v1 (OFE-1A Gate 1)
+# OPF Programming Resource Set / Job Image Asset Identity v1 (OFE-1A Gate 1)
+
+Terminology: the owner request's "Job Firmware Asset" is named **Job Image
+Asset** in code and schemas, following the canonical Programming Asset /
+Normalized Image vocabulary enforced by
+`scripts/tests/test-canonical-terminology-guard.py`.
 
 Status: **Contract v1, Host-only.** Informational identity only. It is **not**
 an execution, activation or admission authority. Resource reuse is **not**
@@ -43,7 +48,7 @@ inconsistent fields fail closed with a fixed `BundleBuildError` reason code.
 | `abi` | `{driver_abi, transport}`; `transport` must be `fpga` |
 | `constraints` | `icpn`, `sites`, `operations`, `max_image_bytes`, `target_config`, `flash_base`, `flash_size`, `erase_granularity` |
 | `fpga_package` | `null`, or the id of exactly one `fpga-image` Package in `packages` |
-| `firmware_package_kind` | Bundle v3 kind of the Job Firmware Package (route data, e.g. `firmware-asset`); may not be a Resource kind |
+| `image_package_kind` | Bundle v3 kind of the Job Firmware Package (route data, e.g. `firmware-asset`); may not be a Resource kind |
 | `packages[]` | Bundle v3 Package entries exactly as the manifest stores them: `id`, `kind`, `version`, `requires`, `files[{path,size,sha256,executable}]` |
 
 Rules: exactly one `platform-provider` and one `programming-profile` (the
@@ -64,20 +69,20 @@ Sets are representable in the descriptor but `identity_from_manifest` refuses
 them (`BUNDLE_PACKAGE_SET_UNSUPPORTED`) until a reviewed contract version
 covers them.
 
-### 3.2 Job Firmware Asset — `plasma.opf.job-firmware-asset.v1`
+### 3.2 Job Image Asset (Firmware) — `plasma.opf.job-image-asset.v1`
 
 `{format, sha256, size, load_address, icpn}`. `format` is `binary` only (same
 vocabulary as `plasma_core.assets.ProgrammingAssetFormat.BINARY`, the only
 validated Image normalizer); a raw binary is one contiguous segment at
 `load_address`, so no segment list exists in v1. HEX/SREC/ELF segments require a
-new contract version. `verify_firmware_asset` fails closed unless the bytes
+new contract version. `verify_image_asset` fails closed unless the bytes
 match `sha256`/`size` and the declaration fits the Resource constraints:
 same ICPN, `size ≤ max_image_bytes`, `load_address` inside flash and aligned
 to `erase_granularity`, end within `flash_size`.
 
-### 3.3 Job Binding — `plasma.opf.job-firmware-binding.v1`
+### 3.3 Job Binding — `plasma.opf.job-image-binding.v1`
 
-`{resource_set_sha256, firmware_asset_sha256, ppu_id, site_id, icpn, profile}`.
+`{resource_set_sha256, image_asset_sha256, ppu_id, site_id, icpn, profile}`.
 `site_id` must be in the Profile's `sites`; Firmware must be applicable.
 `verify_job_binding` recomputes the expected binding and accepts only an exact
 match (`JOB_BINDING_MISMATCH` otherwise). No PPU Job id exists before
@@ -99,7 +104,7 @@ verified bytes is never trusted on its own.
 
 `software/python/plasma_opf/bundle_v3.py` (no new module, no Bundle v4, no
 `plasma.ppu.bundle.v3` wire change). `ProgrammingBundle` gains informational
-`resource_set_sha256` / `firmware_asset_sha256`, and its `summary()` (the
+`resource_set_sha256` / `image_asset_sha256`, and its `summary()` (the
 Manager plan's `bundle` block) states `identity_authority: archive_sha256`.
 
 ## 4. What stays authoritative (unchanged)
@@ -136,14 +141,14 @@ Manager plan's `bundle` block) states `identity_authority: archive_sha256`.
    Asset path that already exists (`_inline_asset` →
    `ProgrammingAsset.from_upload` → `normalize_image`, `gateway_base.py:420-438,
    557-566`): declared name/type/format/size/SHA256 are checked against the
-   bytes. Add only the `firmware_asset` + `job_binding` descriptors to the Job
+   bytes. Add only the `image_asset` + `job_binding` descriptors to the Job
    request, as an exclusive third source (not combinable with the Bundle
    reference or legacy inline asset), `flash_cycle` only, `max_retries=0`.
    No new staging cache in 1B; the Job carries its bytes once.
 3. **Binding checks at admission.** Inside `SiteManager.enqueue` under the
    existing execution lease (`site_manager.py:479-541`): pin the Active Set,
    re-derive `resource_set_sha256` from it, `verify_job_binding` with this
-   PPU's `ppu_id` and the Job `site_id`, `verify_firmware_asset` over the
+   PPU's `ppu_id` and the Job `site_id`, `verify_image_asset` over the
    received bytes and the PPU-derived Resource descriptor. Any mismatch →
    `OPERATION_UNSUPPORTED` before the Site Worker starts.
 4. **No Package mixing.** Provider/Profile/Driver come only from the single
@@ -175,6 +180,6 @@ two-Site HIL evidence (plan §5 item 3) is required before any reuse claim.
 
 | Item | Status |
 |---|---|
-| Host-only identity tests (`software/python/tests/test_opf_resource_firmware_identity.py`) | Host-only |
+| Host-only identity tests (`software/python/tests/test_opf_resource_image_identity.py`) | Host-only |
 | Existing Bundle v3 / Site 2 workflow regression tests | Host-only |
 | PPU-side Resource verification, Firmware-only Job, HIL | **NOT_RUN** (OFE-1B) |

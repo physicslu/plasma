@@ -59,12 +59,12 @@ def test_same_resources_different_firmware_same_resource_identity():
     b = bundle_v3.build_user_image_bundle(route(), FW_B, filename="other-name.bin")
     assert a.archive_sha256 != b.archive_sha256  # Bundle identity still couples them
     assert a.resource_set_sha256 == b.resource_set_sha256
-    assert a.firmware_asset_sha256 != b.firmware_asset_sha256
+    assert a.image_asset_sha256 != b.image_asset_sha256
     # Identity derived from the actual archive bytes agrees with the writer.
     for built, payload in ((a, FW_A), (b, FW_B)):
         res, fw = bundle_v3.identity_from_archive(built.archive)
         assert bundle_v3.resource_set_sha256(res) == built.resource_set_sha256
-        assert bundle_v3.firmware_asset_sha256(fw) == built.firmware_asset_sha256
+        assert bundle_v3.image_asset_sha256(fw) == built.image_asset_sha256
         assert fw["sha256"] == hashlib.sha256(payload).hexdigest()
         assert fw["size"] == len(payload) and fw["load_address"] == 0x08000000
 
@@ -77,7 +77,7 @@ def test_firmware_filename_and_package_naming_do_not_affect_identities():
                                        version="9.9.9")
     assert one.archive_sha256 != two.archive_sha256
     assert one.resource_set_sha256 == two.resource_set_sha256
-    assert one.firmware_asset_sha256 == two.firmware_asset_sha256
+    assert one.image_asset_sha256 == two.image_asset_sha256
 
 
 def test_identity_is_deterministic_and_canonical():
@@ -86,7 +86,7 @@ def test_identity_is_deterministic_and_canonical():
     shuffled = json.loads(json.dumps(resource()))
     shuffled = dict(reversed(list(shuffled.items())))
     assert bundle_v3.resource_set_sha256(shuffled) == first[0]
-    fw = [bundle_v3.firmware_asset_sha256(bundle_v3.firmware_asset_descriptor(resource(), FW_A))
+    fw = [bundle_v3.image_asset_sha256(bundle_v3.image_asset_descriptor(resource(), FW_A))
           for _ in range(3)]
     assert len(set(fw)) == 1
     descriptor = resource()
@@ -145,14 +145,14 @@ def test_fpga_and_dependency_changes_change_resource_identity():
 
 def test_job_binding_is_exact_and_verifiable():
     res = resource()
-    fw = bundle_v3.firmware_asset_descriptor(res, FW_A)
-    binding = bundle_v3.job_firmware_binding(res, fw, ppu_id="z2-hil", site_id=2)
+    fw = bundle_v3.image_asset_descriptor(res, FW_A)
+    binding = bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2)
     assert binding["resource_set_sha256"] == bundle_v3.resource_set_sha256(res)
-    assert binding["firmware_asset_sha256"] == bundle_v3.firmware_asset_sha256(fw)
+    assert binding["image_asset_sha256"] == bundle_v3.image_asset_sha256(fw)
     assert binding["profile"] == "stm32f103c8t6-site2" and binding["icpn"] == "STM32F103C8T6"
     digest = bundle_v3.verify_job_binding(binding, res, fw, ppu_id="z2-hil", site_id=2)
     assert len(digest) == 64
-    fw_b = bundle_v3.firmware_asset_descriptor(res, FW_B)
+    fw_b = bundle_v3.image_asset_descriptor(res, FW_B)
     for kwargs, fw_x in (({"ppu_id": "other-ppu", "site_id": 2}, fw),
                          ({"ppu_id": "z2-hil", "site_id": 2}, fw_b)):
         with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
@@ -224,28 +224,28 @@ def test_firmware_substitution_in_archive_is_detected():
 
 
 @pytest.mark.parametrize("change, code", [
-    ({"sha256": "0" * 64}, "FIRMWARE_SHA256_MISMATCH"),
-    ({"size": len(FW_A) + 1}, "FIRMWARE_SIZE_MISMATCH"),
-    ({"load_address": 0x08000000 + 512}, "FIRMWARE_ADDRESS_INVALID"),
-    ({"load_address": 0x08000000 - 1024}, "FIRMWARE_ADDRESS_INVALID"),
-    ({"load_address": 0x08000000 + 65536}, "FIRMWARE_ADDRESS_INVALID"),
-    ({"icpn": "STM32F103CBT6"}, "FIRMWARE_TARGET_MISMATCH"),
-    ({"format": "intel_hex"}, "FIRMWARE_FORMAT_UNSUPPORTED"),
-    ({"size": True}, "FIRMWARE_ASSET_FIELDS_INVALID"),
-    ({"extra": 1}, "FIRMWARE_ASSET_FIELDS_INVALID"),
+    ({"sha256": "0" * 64}, "IMAGE_ASSET_SHA256_MISMATCH"),
+    ({"size": len(FW_A) + 1}, "IMAGE_ASSET_SIZE_MISMATCH"),
+    ({"load_address": 0x08000000 + 512}, "IMAGE_ASSET_ADDRESS_INVALID"),
+    ({"load_address": 0x08000000 - 1024}, "IMAGE_ASSET_ADDRESS_INVALID"),
+    ({"load_address": 0x08000000 + 65536}, "IMAGE_ASSET_ADDRESS_INVALID"),
+    ({"icpn": "STM32F103CBT6"}, "IMAGE_ASSET_TARGET_MISMATCH"),
+    ({"format": "intel_hex"}, "IMAGE_ASSET_FORMAT_UNSUPPORTED"),
+    ({"size": True}, "IMAGE_ASSET_FIELDS_INVALID"),
+    ({"extra": 1}, "IMAGE_ASSET_FIELDS_INVALID"),
 ])
 def test_firmware_asset_mismatch_fails_closed(change, code):
     res = resource()
-    descriptor = {**bundle_v3.firmware_asset_descriptor(res, FW_A), **change}
+    descriptor = {**bundle_v3.image_asset_descriptor(res, FW_A), **change}
     with pytest.raises(BundleBuildError, match=code):
-        bundle_v3.verify_firmware_asset(descriptor, FW_A, res)
+        bundle_v3.verify_image_asset(descriptor, FW_A, res)
 
 
 def test_firmware_exceeding_profile_is_refused():
-    with pytest.raises(BundleBuildError, match="FIRMWARE_EXCEEDS_PROFILE_MAX_IMAGE"):
-        bundle_v3.firmware_asset_descriptor(resource(), b"\xff" * (65536 + 1))
-    with pytest.raises(BundleBuildError, match="FIRMWARE_EMPTY"):
-        bundle_v3.firmware_asset_descriptor(resource(), b"")
+    with pytest.raises(BundleBuildError, match="IMAGE_ASSET_EXCEEDS_PROFILE_MAX_IMAGE"):
+        bundle_v3.image_asset_descriptor(resource(), b"\xff" * (65536 + 1))
+    with pytest.raises(BundleBuildError, match="IMAGE_ASSET_EMPTY"):
+        bundle_v3.image_asset_descriptor(resource(), b"")
 
 
 def _mut(fn):
@@ -277,7 +277,7 @@ PROVIDER_ID = "openocd-platform-reference"
     (_mut(lambda d: d["constraints"].update(sites=[3, 2])), "RESOURCE_CONSTRAINTS_INVALID"),
     (_mut(lambda d: d["constraints"].update(flash_size=65537)), "RESOURCE_CONSTRAINTS_INVALID"),
     (_mut(lambda d: d["constraints"].update(max_image_bytes=True)), "RESOURCE_CONSTRAINTS_INVALID"),
-    (_mut(lambda d: d.update(firmware_package_kind="platform-provider")), "RESOURCE_FIRMWARE_KIND_INVALID"),
+    (_mut(lambda d: d.update(image_package_kind="platform-provider")), "RESOURCE_IMAGE_KIND_INVALID"),
     (_mut(lambda d: d.update(schema="plasma.opf.programming-resource-set.v2")),
      "RESOURCE_SET_SCHEMA_UNSUPPORTED"),
     (_mut(lambda d: d.pop("constraints")), "RESOURCE_SET_FIELDS_INVALID"),
@@ -297,16 +297,16 @@ def test_invalid_or_incomplete_resource_descriptor_fails_closed(descriptor, code
 ])
 def test_job_binding_refuses_wrong_site_or_ppu(kwargs, code):
     res = resource()
-    fw = bundle_v3.firmware_asset_descriptor(res, FW_A)
+    fw = bundle_v3.image_asset_descriptor(res, FW_A)
     with pytest.raises(BundleBuildError, match=code):
-        bundle_v3.job_firmware_binding(res, fw, **kwargs)
+        bundle_v3.job_image_binding(res, fw, **kwargs)
 
 
 def test_job_binding_refuses_firmware_for_other_target():
     res = resource()
-    fw = {**bundle_v3.firmware_asset_descriptor(res, FW_A), "icpn": "STM32F103CBT6"}
-    with pytest.raises(BundleBuildError, match="FIRMWARE_TARGET_MISMATCH"):
-        bundle_v3.job_firmware_binding(res, fw, ppu_id="z2-hil", site_id=2)
+    fw = {**bundle_v3.image_asset_descriptor(res, FW_A), "icpn": "STM32F103CBT6"}
+    with pytest.raises(BundleBuildError, match="IMAGE_ASSET_TARGET_MISMATCH"):
+        bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2)
 
 
 def test_bundle_with_extra_or_fpga_package_is_outside_contract():
@@ -369,8 +369,8 @@ def test_resource_identity_is_not_an_active_set_identity(tmp_path):
 
 @pytest.mark.parametrize("extra", [
     {"resource_set_sha256": "a" * 64},
-    {"firmware_asset_sha256": "b" * 64},
-    {"job_binding": {"schema": "plasma.opf.job-firmware-binding.v1"}},
+    {"image_asset_sha256": "b" * 64},
+    {"job_binding": {"schema": "plasma.opf.job-image-binding.v1"}},
 ])
 def test_gateway_job_request_refuses_new_identity_fields(extra):
     body = {"site_id": 2, "operation": "flash_cycle", "target": "STM32F103C8T6",

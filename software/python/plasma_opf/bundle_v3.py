@@ -241,26 +241,26 @@ def safe_image_filename(filename: object) -> str:
 
 
 # --------------------------------------------------------------------------
-# OFE-1A identity contract (docs/architecture/opf-resource-firmware-identity-v1.md)
+# OFE-1A identity contract (docs/architecture/opf-resource-image-identity-v1.md)
 #
-# Programming Resource Set: every Bundle v3 Package except the Job Firmware,
+# Programming Resource Set: every Bundle v3 Package except the Job Image,
 # plus Target platform, Driver ABI and hardware constraints, each Package
-# pinned by exact per-file content SHA256. Job Firmware Asset: firmware
+# pinned by exact per-file content SHA256. Job Image Asset: image
 # content SHA256/size/format/load address and target applicability. Job
-# Binding: exact (Resource, Firmware, PPU, Site, ICPN, Profile) tuple.
+# Binding: exact (Resource, Image, PPU, Site, ICPN, Profile) tuple.
 #
 # These identities are NOT an execution authority yet. Until OFE-1B adds
 # PPU-side verification, the Bundle archive SHA256 remains the only Active
 # Asset Set, B1/B2/B3 and Job identity, and nothing here may skip B1/B2/B3.
 # --------------------------------------------------------------------------
 RESOURCE_SET_SCHEMA = "plasma.opf.programming-resource-set.v1"
-FIRMWARE_ASSET_SCHEMA = "plasma.opf.job-firmware-asset.v1"
-JOB_BINDING_SCHEMA = "plasma.opf.job-firmware-binding.v1"
+IMAGE_ASSET_SCHEMA = "plasma.opf.job-image-asset.v1"
+JOB_BINDING_SCHEMA = "plasma.opf.job-image-binding.v1"
 # Same vocabulary as plasma_core.assets.ProgrammingAssetFormat; only raw binary
 # has a validated Image normalizer and a single contiguous segment today.
-FIRMWARE_FORMATS = frozenset({"binary"})
+IMAGE_FORMATS = frozenset({"binary"})
 RESOURCE_KINDS = frozenset({"platform-provider", "programming-profile", "fpga-image"})
-MAX_RESOURCE_PACKAGES = 31  # Bundle v3 verifier allows 32 Packages incl. Firmware.
+MAX_RESOURCE_PACKAGES = 31  # Bundle v3 verifier allows 32 Packages incl. Image.
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 SAFE_PPU_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z")
 PROVIDER_OPTIONS_FILE = "plasma-provider-options.json"
@@ -299,7 +299,7 @@ def _resource_packages(route: ProgrammingRoute,
 
 
 def resource_set_descriptor(route: ProgrammingRoute) -> dict[str, Any]:
-    """Canonical Resource descriptor; Firmware bytes and filename never enter it."""
+    """Canonical Resource descriptor; Image bytes and filename never enter it."""
     _need(isinstance(route, ProgrammingRoute), "ROUTE_REQUIRED")
     caps, flash = route.capabilities, route.flash_profile
     return parse_resource_set({
@@ -315,7 +315,7 @@ def resource_set_descriptor(route: ProgrammingRoute) -> dict[str, Any]:
             "erase_granularity": flash["erase_granularity"],
         },
         "fpga_package": caps["fpga_package"],
-        "firmware_package_kind": route.image_package_kind,
+        "image_package_kind": route.image_package_kind,
         "packages": _resource_packages(route, _resource_members(route)),
     })
 
@@ -334,7 +334,7 @@ def parse_resource_set(payload: object) -> dict[str, Any]:
     """
     _need(type(payload) is dict and set(payload) == {
         "schema", "target", "abi", "constraints", "fpga_package",
-        "firmware_package_kind", "packages"}, "RESOURCE_SET_FIELDS_INVALID")
+        "image_package_kind", "packages"}, "RESOURCE_SET_FIELDS_INVALID")
     _need(payload["schema"] == RESOURCE_SET_SCHEMA, "RESOURCE_SET_SCHEMA_UNSUPPORTED")
     target = payload["target"]
     _need(type(target) is dict and set(target) == {"platform", "board", "fpga_part"}
@@ -362,9 +362,9 @@ def parse_resource_set(payload: object) -> dict[str, Any]:
         and c["flash_base"] >= 0 and c["flash_size"] > 0 and c["erase_granularity"] > 0
         and c["flash_size"] % c["erase_granularity"] == 0
         and c["max_image_bytes"] <= c["flash_size"], "RESOURCE_CONSTRAINTS_INVALID")
-    fw_kind = payload["firmware_package_kind"]
+    fw_kind = payload["image_package_kind"]
     _need(type(fw_kind) is str and SAFE_NAME.fullmatch(fw_kind) is not None
-          and fw_kind not in RESOURCE_KINDS, "RESOURCE_FIRMWARE_KIND_INVALID")
+          and fw_kind not in RESOURCE_KINDS, "RESOURCE_IMAGE_KIND_INVALID")
     packages = payload["packages"]
     _need(type(packages) is list and 2 <= len(packages) <= MAX_RESOURCE_PACKAGES,
           "RESOURCE_PACKAGES_INVALID")
@@ -415,63 +415,63 @@ def resource_set_sha256(descriptor: object) -> str:
     return sha256_hex(canonical_json(parse_resource_set(descriptor)))
 
 
-def parse_firmware_asset(payload: object) -> dict[str, Any]:
+def parse_image_asset(payload: object) -> dict[str, Any]:
     _need(type(payload) is dict and set(payload) == {
         "schema", "format", "sha256", "size", "load_address", "icpn"}
-        and payload["schema"] == FIRMWARE_ASSET_SCHEMA, "FIRMWARE_ASSET_FIELDS_INVALID")
-    _need(payload["format"] in FIRMWARE_FORMATS, "FIRMWARE_FORMAT_UNSUPPORTED")
+        and payload["schema"] == IMAGE_ASSET_SCHEMA, "IMAGE_ASSET_FIELDS_INVALID")
+    _need(payload["format"] in IMAGE_FORMATS, "IMAGE_ASSET_FORMAT_UNSUPPORTED")
     _need(type(payload["sha256"]) is str and HEX64.fullmatch(payload["sha256"]) is not None
           and _is_int(payload["size"]) and 0 < payload["size"] <= MAX_IMAGE_BYTES
           and _is_int(payload["load_address"]) and payload["load_address"] >= 0
           and type(payload["icpn"]) is str and 0 < len(payload["icpn"]) <= 96,
-          "FIRMWARE_ASSET_FIELDS_INVALID")
+          "IMAGE_ASSET_FIELDS_INVALID")
     return dict(payload)
 
 
-def _check_applicable(firmware: Mapping[str, Any], resource: Mapping[str, Any]) -> None:
+def _check_applicable(asset: Mapping[str, Any], resource: Mapping[str, Any]) -> None:
     c = resource["constraints"]
-    _need(firmware["icpn"] == c["icpn"], "FIRMWARE_TARGET_MISMATCH")
-    _need(firmware["size"] <= c["max_image_bytes"], "FIRMWARE_EXCEEDS_PROFILE_MAX_IMAGE")
-    offset = firmware["load_address"] - c["flash_base"]
+    _need(asset["icpn"] == c["icpn"], "IMAGE_ASSET_TARGET_MISMATCH")
+    _need(asset["size"] <= c["max_image_bytes"], "IMAGE_ASSET_EXCEEDS_PROFILE_MAX_IMAGE")
+    offset = asset["load_address"] - c["flash_base"]
     _need(offset >= 0 and offset % c["erase_granularity"] == 0
-          and offset + firmware["size"] <= c["flash_size"], "FIRMWARE_ADDRESS_INVALID")
+          and offset + asset["size"] <= c["flash_size"], "IMAGE_ASSET_ADDRESS_INVALID")
 
 
-def firmware_asset_descriptor(resource: object, image: bytes, *,
-                              load_address: int | None = None,
-                              firmware_format: str = "binary") -> dict[str, Any]:
-    """Firmware identity from actual bytes; the filename never enters it."""
+def image_asset_descriptor(resource: object, image: bytes, *,
+                           load_address: int | None = None,
+                           image_format: str = "binary") -> dict[str, Any]:
+    """Image identity from actual bytes; the filename never enters it."""
     parsed = parse_resource_set(resource)
-    _need(type(image) is bytes and len(image) > 0, "FIRMWARE_EMPTY")
+    _need(type(image) is bytes and len(image) > 0, "IMAGE_ASSET_EMPTY")
     descriptor = {
-        "schema": FIRMWARE_ASSET_SCHEMA, "format": firmware_format,
+        "schema": IMAGE_ASSET_SCHEMA, "format": image_format,
         "sha256": sha256_hex(image), "size": len(image),
         "load_address": (parsed["constraints"]["flash_base"]
                          if load_address is None else load_address),
         "icpn": parsed["constraints"]["icpn"],
     }
-    return verify_firmware_asset(descriptor, image, parsed)
+    return verify_image_asset(descriptor, image, parsed)
 
 
-def verify_firmware_asset(descriptor: object, image: bytes,
-                          resource: object) -> dict[str, Any]:
+def verify_image_asset(descriptor: object, image: bytes,
+                       resource: object) -> dict[str, Any]:
     """Fail closed unless declared SHA/size/format/address match bytes and Profile."""
-    firmware = parse_firmware_asset(descriptor)
-    _need(type(image) is bytes and len(image) == firmware["size"], "FIRMWARE_SIZE_MISMATCH")
-    _need(sha256_hex(image) == firmware["sha256"], "FIRMWARE_SHA256_MISMATCH")
-    _check_applicable(firmware, parse_resource_set(resource))
-    return firmware
+    asset = parse_image_asset(descriptor)
+    _need(type(image) is bytes and len(image) == asset["size"], "IMAGE_ASSET_SIZE_MISMATCH")
+    _need(sha256_hex(image) == asset["sha256"], "IMAGE_ASSET_SHA256_MISMATCH")
+    _check_applicable(asset, parse_resource_set(resource))
+    return asset
 
 
-def firmware_asset_sha256(descriptor: object) -> str:
-    return sha256_hex(canonical_json(parse_firmware_asset(descriptor)))
+def image_asset_sha256(descriptor: object) -> str:
+    return sha256_hex(canonical_json(parse_image_asset(descriptor)))
 
 
-def job_firmware_binding(resource: object, firmware: object, *,
-                         ppu_id: str, site_id: int) -> dict[str, Any]:
-    """Exact Resource + Firmware + PPU + Site + Target/Profile binding (no I/O)."""
+def job_image_binding(resource: object, asset: object, *,
+                      ppu_id: str, site_id: int) -> dict[str, Any]:
+    """Exact Resource + Image + PPU + Site + Target/Profile binding (no I/O)."""
     parsed = parse_resource_set(resource)
-    fw = parse_firmware_asset(firmware)
+    fw = parse_image_asset(asset)
     _check_applicable(fw, parsed)
     _need(type(ppu_id) is str and SAFE_PPU_ID.fullmatch(ppu_id) is not None,
           "JOB_BINDING_PPU_INVALID")
@@ -481,23 +481,23 @@ def job_firmware_binding(resource: object, firmware: object, *,
     return {
         "schema": JOB_BINDING_SCHEMA,
         "resource_set_sha256": resource_set_sha256(parsed),
-        "firmware_asset_sha256": firmware_asset_sha256(fw),
+        "image_asset_sha256": image_asset_sha256(fw),
         "ppu_id": ppu_id, "site_id": site_id,
         "icpn": parsed["constraints"]["icpn"], "profile": profile["id"],
     }
 
 
-def verify_job_binding(binding: object, resource: object, firmware: object, *,
+def verify_job_binding(binding: object, resource: object, asset: object, *,
                        ppu_id: str, site_id: int) -> str:
     """Return the binding SHA256 only for the exact expected tuple."""
-    expected = job_firmware_binding(resource, firmware, ppu_id=ppu_id, site_id=site_id)
+    expected = job_image_binding(resource, asset, ppu_id=ppu_id, site_id=site_id)
     _need(type(binding) is dict and canonical_json(binding) == canonical_json(expected),
           "JOB_BINDING_MISMATCH")
     return sha256_hex(canonical_json(expected))
 
 
 def identity_from_manifest(manifest: object, read_file) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Derive (Resource, Firmware) descriptors from one programming Bundle v3.
+    """Derive (Resource, Image) descriptors from one programming Bundle v3.
 
     ``read_file(path)`` returns stored member bytes (ZIP member or B3 staged
     file). Every byte read is checked against the manifest SHA256/size; the
@@ -512,14 +512,14 @@ def identity_from_manifest(manifest: object, read_file) -> tuple[dict[str, Any],
     packages = manifest["packages"]
     _need(all(type(p) is dict and type(p.get("kind")) is str for p in packages),
           "BUNDLE_MANIFEST_UNSUPPORTED")
-    firmware_pkgs = [p for p in packages if p["kind"] not in RESOURCE_KINDS]
+    image_pkgs = [p for p in packages if p["kind"] not in RESOURCE_KINDS]
     providers = [p for p in packages if p["kind"] == "platform-provider"]
     profiles = [p for p in packages if p["kind"] == "programming-profile"]
     # Route-built programming Bundles carry no FPGA Package today (fpga_package
     # must be null); anything else is outside this contract version.
-    _need(len(packages) == 3 and len(firmware_pkgs) == 1 and len(providers) == 1
+    _need(len(packages) == 3 and len(image_pkgs) == 1 and len(providers) == 1
           and len(profiles) == 1, "BUNDLE_PACKAGE_SET_UNSUPPORTED")
-    provider, profile, fw_pkg = providers[0], profiles[0], firmware_pkgs[0]
+    provider, profile, fw_pkg = providers[0], profiles[0], image_pkgs[0]
 
     def read(entry: object) -> bytes:
         _need(type(entry) is dict and type(entry.get("path")) is str
@@ -561,8 +561,8 @@ def identity_from_manifest(manifest: object, read_file) -> tuple[dict[str, Any],
           and files[0].get("executable") is False
           and type(files[0].get("path")) is str
           and files[0]["path"].startswith(f"payload/packages/{fw_pkg.get('id')}/data/")
-          and files[0]["path"].endswith(".bin"), "BUNDLE_FIRMWARE_PACKAGE_INVALID")
-    return resource, firmware_asset_descriptor(resource, read(files[0]))
+          and files[0]["path"].endswith(".bin"), "BUNDLE_IMAGE_PACKAGE_INVALID")
+    return resource, image_asset_descriptor(resource, read(files[0]))
 
 
 def identity_from_archive(archive: bytes) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -587,7 +587,7 @@ def identity_from_archive(archive: bytes) -> tuple[dict[str, Any], dict[str, Any
 def verify_resource_set(expected: object, manifest: object, read_file) -> str:
     """Fail closed unless stored Bundle bytes reproduce the expected Resource Set."""
     want = parse_resource_set(expected)
-    actual, _firmware = identity_from_manifest(manifest, read_file)
+    actual, _image = identity_from_manifest(manifest, read_file)
     _need(canonical_json(actual) == canonical_json(want), "RESOURCE_SET_MISMATCH")
     return resource_set_sha256(actual)
 
@@ -609,7 +609,7 @@ class ProgrammingBundle:
     # OFE-1A identity contract (informational). ``archive_sha256`` stays the
     # ONLY Active Asset Set / B1-B3 / Job authority; see module docstring.
     resource_set_sha256: str
-    firmware_asset_sha256: str
+    image_asset_sha256: str
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -627,7 +627,7 @@ class ProgrammingBundle:
             "image_size": self.image_size,
             "icpn": self.icpn,
             "resource_set_sha256": self.resource_set_sha256,
-            "firmware_asset_sha256": self.firmware_asset_sha256,
+            "image_asset_sha256": self.image_asset_sha256,
             "identity_authority": "archive_sha256",
         }
 
@@ -674,7 +674,7 @@ def build_image_bundle(
     }
     archive = canonical_zip({"manifest.json": canonical_json(manifest), **members})
     resource = resource_set_descriptor(route)
-    firmware = firmware_asset_descriptor(resource, image)
+    asset = image_asset_descriptor(resource, image)
     return ProgrammingBundle(
         archive=archive, archive_sha256=sha256_hex(archive),
         bundle_name=bundle_name, version=version, target=dict(route.target),
@@ -683,7 +683,7 @@ def build_image_bundle(
         image_sha256=sha256_hex(image), image_size=len(image),
         icpn=route.icpn,
         resource_set_sha256=resource_set_sha256(resource),
-        firmware_asset_sha256=firmware_asset_sha256(firmware),
+        image_asset_sha256=image_asset_sha256(asset),
     )
 
 
