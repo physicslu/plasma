@@ -29,6 +29,9 @@ Bounded managed PPU routing/relay — not a central universal scheduler. See [Ma
 
 ## Programming data
 
+### OPF (Open Programming Framework)
+**OPF** is the portable, Host-independent programming framework contract covering Provider capabilities, operations and results. A **Provider** is a pluggable implementation under OPF, not the expansion of the OPF acronym. The former name **Open Provider Framework** is historical; this terminology update does not change identifiers, on-wire schemas, Job execution ownership or hardware safety rules. See [OPF architecture](architecture/opf-architecture.md).
+
 ### Programming Asset / Normalized Image
 A **Programming Asset** is the user-supplied input (e.g. a firmware file); the **Normalized Image** is the execution model derived from it. See [Common contract](development/plasma-development-common.md).
 

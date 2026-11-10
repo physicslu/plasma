@@ -1,4 +1,6 @@
-# PLASMA OPF — Open Provider Framework architecture
+# PLASMA OPF — Open Programming Framework architecture
+
+**Terminology (2026-11-10):** **OPF** now stands for **Open Programming Framework**. The former name, **Open Provider Framework**, is historical. This is a documentation-only naming change; the OPF Core/Provider separation, executable contracts, identifiers, and qualification boundaries are unchanged.
 
 **Status (2026-11-08):** Host-independent OPF boundary approved in merged #1348; Linux standalone Python fake Provider implemented/Host-only tested in merged #1349. PPU S1-C cutover is merged #1347 with merged #1350 C-3 Fail-Closed hardening. New-path Site 2 A/B OpenOCD Flash/Readback/SAFE_OFF each has one real HIL PASS; other Host transports, C-2 physical Providers and multi-Site remain unqualified. The historical OPF-1 through OPF-5 plan was PPU-integrated and did not itself establish portability.
 **Governance:** [Core convergence / deletion-first roadmap (PR #1343)](plasma-core-convergence-and-deletion-first-roadmap.md). The [2026-11-04 Bundle-driven Programming Decision (PR #1298)](unified-bundle-driven-programming-decision-2026-11-04.md) continues to govern **PLASMA PPU product execution**, not every independent use of OPF.

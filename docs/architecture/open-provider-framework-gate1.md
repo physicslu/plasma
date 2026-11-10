@@ -1,9 +1,11 @@
-# Open Provider Framework — Gate 1 Host-only contract
+# Open Programming Framework — Gate 1 Host-only contract
 
-**Owner scope:** 2026-11-04 Open Provider Framework Gate 1, grounded in the
+**Owner scope (historical label):** 2026-11-04 Open Provider Framework Gate 1, grounded in the
 [Unified Bundle-driven Programming Decision](unified-bundle-driven-programming-decision-2026-11-04.md).
 Engineering and Production share the same PPU execution path. Console policy
 remains separate. This contract does not authorize Z2 deployment or DUT work.
+
+**Current terminology (2026-11-10):** **Open Programming Framework (OPF)** replaces the former expansion **Open Provider Framework**. The original Gate 1 owner-scope label is retained as historical provenance; no executable contract changes.
 
 ## Vertical slice
 
