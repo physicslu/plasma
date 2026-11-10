@@ -1,0 +1,42 @@
+ 
+
+== time 2026-11-10T14:12:58Z boot_id 4cefdc0c-f586-4d19-b126-1d8e1108c8f1
+== release /opt/plasma/releases/0.2.1-6cf7057ce546
+== units active active active active active 
+== unit start
+MainPID=9956	Id=plasma-bootstrap.service	ActiveEnterTimestamp=Tue 2026-11-10 21:25:11 CST	
+MainPID=9486	Id=plasma-web.service	ActiveEnterTimestamp=Tue 2026-11-10 21:23:44 CST	
+MainPID=9476	Id=plasma-server.service	ActiveEnterTimestamp=Tue 2026-11-10 21:23:44 CST	
+MainPID=9403	Id=plasma-site-worker.service	ActiveEnterTimestamp=Tue 2026-11-10 21:23:38 CST	
+== active.json
+{"activated_epoch_s": 1794317247.1366675, "asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c", "generation": 15, "manifest_sha256": "2cdd41fa9f873772235745b7287c98e5fe7ed13d25ebc347356bcfd3d8789a8b", "previous_asset_set_sha256": "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a", "schema": "plasma.ppu.active-assets.v1"}
+
+== hashes
+f6688d8ecea8a94518419883cd528fa27d640cd56159696d6c1c9871ce74842f  /run/plasma-z2-swd05/fpga-image-identity.json
+c5b728da554c9c41eb9e45db8ee39a34753d2ca4cb170a6d5cecded9f3604002  /etc/machine-id
+edba779a8ee479d32c2d98d29d11dfb466b2a65c437fc2e6b58b52008e2496fd  /var/lib/plasma-bootstrap/controller/controller.json
+c4a2af5993618d2582ec72c5d8fc1136b87b2e4f0be8baf64f75e8fe00d7db0c  /var/lib/plasma-bootstrap/deployment-api.json
+7f7d0923d9f1dcc11353b70537be7584cec5cccc33bceb55cffbaf344eac6c43  /var/lib/plasma-bootstrap/deployment.json
+609d4308f3671e9bf2db210e4843dcc536467c6c41c20b7ae1089255a11eb8fa  /opt/plasma/bootstrap/control-plane.json
+c07ba04c7398979adc7860aea5e0ec54ab088fec2c5891b6f9248ed749b31b05  /etc/plasma/site-worker-engine.json
+== fpga identity mtime
+2026-11-03 22:48:11.307063134 +0800 /run/plasma-z2-swd05/fpga-image-identity.json
+2026-11-06 10:32:11.406275782 +0800 /sys/class/fpga_manager/fpga0/state
+operating
+== deployment
+api succeeded bddf7fe6e8c44d5987481a723baafaac activate
+coord asset_set_active 9b2e8c35-9a53-4dc2-81ea-127b9962ac61 7
+controller gen 2 NORMAL 253e8a1f418dee474d5c2d2f27197d3f
+== uploads count 114
+== seals/locks
+-rw------- 1 root root 0 Oct 24 13:57 /run/plasma-z2-swd05/supervisor.lock
+-rw------- 1 root root 0 Nov 10 06:37 /var/lib/plasma-bootstrap/controller/records.lock
+-rw------- 1 root root 0 Sep 15 23:21 /var/lib/plasma-bootstrap/deployment.lock
+== openocd
+none
+== modules
+== jobs
+job-20261110-132728-d4f178e4
+job-20261110-132653-11211d38
+job-20261109-083059-f5de74b6
+job-20261109-044035-b8cbd4da

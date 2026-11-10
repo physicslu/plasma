@@ -1,0 +1,8 @@
+2026-11-10T14:10:29Z P0 start main 728e55e529b58ea22d736553c50bee237a9962f4; SWPC CS before 082f018941b5; Z2 Runtime 0.2.1-6cf7057ce546 ctl gen2 NORMAL Active 387b9c8c gen15 resource_set 39e4bf85 VERIFIED Site2 idle
+2026-11-10T14:10:40Z A1 CS deploy start
+2026-11-10T14:11:37Z A1 CS deploy rc=0
+2026-11-10T14:13:31Z B3 Firmware A run start
+2026-11-10T14:13:42Z B3 Firmware A run done
+2026-11-10T14:13:58Z B5 Firmware B run start
+2026-11-10T14:14:11Z B5 Firmware B run done
+2026-11-10T14:14:50Z FINAL P0-A PASS (CS 728e55e529b5, rollback pin 082f018941b5; registry/credentials SHA unchanged; Manager->z2 paired+device_authenticated ctl gen2; BFF->Gateway 200). P0-B PASS: fwA run 2055adfc job-20261110-141332-5efbd172 binding 10bbf176 readback 8d3ffb02 18768/18768; fwB run 6cfc26eb job-20261110-141359-ae092c6f binding 83bb4aec readback e691ab23 62800/62800; resource_set 39e4bf85 both; RESOURCE_REUSE (no B1/B2/B3); Z2 before/after snapshot identical except job list (Active gen15, uploads 114, deployment records, FPGA identity f6688d8e, service PIDs). Non-base address: BLOCKED (no proven destructible page; Manager plan has no address input for image operations).
