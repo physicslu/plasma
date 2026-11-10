@@ -1,0 +1,423 @@
+"""Host-only OFE-1A: Programming Resource Set vs Job Firmware Asset identity.
+
+No PPU, Bootstrap, FPGA, DUT or real Flash. The staged Active Set built here
+is a synthetic B3-receipt fixture from canonical Bundle bytes, not live B3
+proof. These identities are informational: every test that touches the
+execution path proves the Bundle archive SHA256 is still the only authority.
+"""
+from __future__ import annotations
+
+import copy
+import hashlib
+import io
+import json
+import sys
+import zipfile
+from pathlib import Path
+
+import pytest
+
+from plasma_opf import bundle_v3
+from plasma_opf.bundle_v3 import BundleBuildError
+from plasma_web.gateway_base import PlasmaWebHandler
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ppu_asset_set as assets  # noqa: E402
+import ppu_unified_deployment  # noqa: E402
+from test_bundle_programming_workflow import (  # noqa: E402
+    ALIAS, FakeCoordinator, FakeGateway, image, make, plan_body, run_once,
+)
+from plasma_manager.programming import CONFIRM_TOKEN  # noqa: E402
+
+ROUTES = ROOT / "data/opf/programming-routes"
+FW_A = bytes(range(256)) * 4
+FW_B = bytes(reversed(range(256))) * 4 + b"\x01"
+
+
+def route():
+    return bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+
+
+def route_payload():
+    return json.loads((ROUTES / "z2-site2-stm32f103c8t6.json").read_text())
+
+
+def resource():
+    return bundle_v3.resource_set_descriptor(route())
+
+
+def zip_members(archive: bytes) -> dict[str, bytes]:
+    with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+        return {name: bundle.read(name) for name in bundle.namelist()}
+
+
+# ------------------------------------------------------------------ positive
+def test_same_resources_different_firmware_same_resource_identity():
+    a = bundle_v3.build_user_image_bundle(route(), FW_A, filename="a.bin")
+    b = bundle_v3.build_user_image_bundle(route(), FW_B, filename="other-name.bin")
+    assert a.archive_sha256 != b.archive_sha256  # Bundle identity still couples them
+    assert a.resource_set_sha256 == b.resource_set_sha256
+    assert a.firmware_asset_sha256 != b.firmware_asset_sha256
+    # Identity derived from the actual archive bytes agrees with the writer.
+    for built, payload in ((a, FW_A), (b, FW_B)):
+        res, fw = bundle_v3.identity_from_archive(built.archive)
+        assert bundle_v3.resource_set_sha256(res) == built.resource_set_sha256
+        assert bundle_v3.firmware_asset_sha256(fw) == built.firmware_asset_sha256
+        assert fw["sha256"] == hashlib.sha256(payload).hexdigest()
+        assert fw["size"] == len(payload) and fw["load_address"] == 0x08000000
+
+
+def test_firmware_filename_and_package_naming_do_not_affect_identities():
+    one = bundle_v3.build_image_bundle(route(), FW_A, image_filename="x.bin",
+                                       asset_package_id="fw-one", bundle_name="bundle-one")
+    two = bundle_v3.build_image_bundle(route(), FW_A, image_filename="y.bin",
+                                       asset_package_id="fw-two", bundle_name="bundle-two",
+                                       version="9.9.9")
+    assert one.archive_sha256 != two.archive_sha256
+    assert one.resource_set_sha256 == two.resource_set_sha256
+    assert one.firmware_asset_sha256 == two.firmware_asset_sha256
+
+
+def test_identity_is_deterministic_and_canonical():
+    first = [bundle_v3.resource_set_sha256(resource()) for _ in range(3)]
+    assert len(set(first)) == 1
+    shuffled = json.loads(json.dumps(resource()))
+    shuffled = dict(reversed(list(shuffled.items())))
+    assert bundle_v3.resource_set_sha256(shuffled) == first[0]
+    fw = [bundle_v3.firmware_asset_sha256(bundle_v3.firmware_asset_descriptor(resource(), FW_A))
+          for _ in range(3)]
+    assert len(set(fw)) == 1
+    descriptor = resource()
+    assert descriptor["fpga_package"] is None
+    assert [p["kind"] for p in descriptor["packages"]] == ["platform-provider", "programming-profile"]
+    assert descriptor["abi"] == {"driver_abi": "plasma_swd:5", "transport": "fpga"}
+
+
+def test_bundle_v3_wire_and_writer_bytes_unchanged():
+    built = bundle_v3.build_image_bundle(
+        route(), image(), image_filename="plasma-blue-pill-cdc.bin",
+        asset_package_id="bluepill-cdc-fw-v01", bundle_name="bluepill-site2-fw-v01")
+    assert built.archive_sha256 == "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a"
+    manifest = json.loads(zip_members(built.archive)["manifest.json"])
+    assert manifest["schema"] == "plasma.ppu.bundle.v3"
+    assert "resource_set_sha256" not in json.dumps(manifest)  # no wire-schema change
+    assert built.summary()["identity_authority"] == "archive_sha256"
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda r: r["provider"]["options"]["options"].update(extra={"type": "string"}),
+    lambda r: r["provider"].update(version="1.0.1"),
+    lambda r: r["profile"].update(version="1.0.1"),
+    lambda r: r["profile"]["capabilities"].update(driver_abi="plasma_swd:6"),
+    lambda r: r["profile"]["capabilities"].update(sites=[2, 3]),
+    lambda r: r["profile"]["capabilities"].update(max_image_bytes=32768),
+    lambda r: r["profile"]["flash_profile"].update(target_config="target/other.cfg"),
+    lambda r: r["profile"]["flash_profile"].update(erase_granularity=2048),
+    lambda r: r["target"].update(board="pynq-z1"),
+    lambda r: r["target"].update(fpga_part="xc7z010clg400-1"),
+])
+def test_any_resource_change_changes_resource_identity(mutate):
+    baseline = bundle_v3.resource_set_sha256(resource())
+    payload = route_payload()
+    mutate(payload)
+    changed = bundle_v3.resource_set_descriptor(bundle_v3.parse_route(payload))
+    assert bundle_v3.resource_set_sha256(changed) != baseline
+
+
+def test_fpga_and_dependency_changes_change_resource_identity():
+    base = resource()
+    fpga = copy.deepcopy(base)
+    fpga["packages"].append({"id": "fpga-a", "kind": "fpga-image", "version": "1.0.0",
+                             "requires": [], "files": [{
+                                 "path": "payload/packages/fpga-a/data/top.bit", "size": 4,
+                                 "sha256": "1" * 64, "executable": False}]})
+    fpga["fpga_package"] = "fpga-a"
+    other = copy.deepcopy(fpga)
+    other["packages"][-1]["files"][0]["sha256"] = "2" * 64
+    shas = {bundle_v3.resource_set_sha256(d) for d in (base, fpga, other)}
+    assert len(shas) == 3
+    dep = copy.deepcopy(fpga)
+    dep["packages"][-1]["requires"] = [base["packages"][0]["id"]]
+    assert bundle_v3.resource_set_sha256(dep) not in shas
+
+
+def test_job_binding_is_exact_and_verifiable():
+    res = resource()
+    fw = bundle_v3.firmware_asset_descriptor(res, FW_A)
+    binding = bundle_v3.job_firmware_binding(res, fw, ppu_id="z2-hil", site_id=2)
+    assert binding["resource_set_sha256"] == bundle_v3.resource_set_sha256(res)
+    assert binding["firmware_asset_sha256"] == bundle_v3.firmware_asset_sha256(fw)
+    assert binding["profile"] == "stm32f103c8t6-site2" and binding["icpn"] == "STM32F103C8T6"
+    digest = bundle_v3.verify_job_binding(binding, res, fw, ppu_id="z2-hil", site_id=2)
+    assert len(digest) == 64
+    fw_b = bundle_v3.firmware_asset_descriptor(res, FW_B)
+    for kwargs, fw_x in (({"ppu_id": "other-ppu", "site_id": 2}, fw),
+                         ({"ppu_id": "z2-hil", "site_id": 2}, fw_b)):
+        with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
+            bundle_v3.verify_job_binding(binding, res, fw_x, **kwargs)
+
+
+def test_staged_active_set_reproduces_resource_identity(tmp_path):
+    built = bundle_v3.build_user_image_bundle(route(), FW_A, filename="a.bin")
+    product, stage = stage_active(tmp_path, built)
+    manifest = json.loads((stage / "manifest.json").read_bytes())
+    sha = bundle_v3.verify_resource_set(resource(), manifest,
+                                        lambda path: (stage / path).read_bytes())
+    assert sha == built.resource_set_sha256
+
+
+# ------------------------------------------------------------------ negative
+def tampered_archive(built, path_suffix: str, new: bytes, *, fix_manifest: bool) -> bytes:
+    members = zip_members(built.archive)
+    manifest = json.loads(members["manifest.json"])
+    (path,) = [p for p in members if p.endswith(path_suffix)]
+    members[path] = new
+    if fix_manifest:
+        for package in manifest["packages"]:
+            for entry in package["files"]:
+                if entry["path"] == path:
+                    entry.update(size=len(new), sha256=hashlib.sha256(new).hexdigest())
+    members["manifest.json"] = bundle_v3.canonical_json(manifest)
+    return bundle_v3.canonical_zip(members)
+
+
+@pytest.mark.parametrize("suffix, mutate", [
+    ("plasma-provider-options.json", lambda o: o["options"].update(x=1)),
+    ("plasma-provider.json", lambda o: o.update(driver_abi="plasma_swd:6")),
+    ("plasma-provider.json", lambda o: o.update(sites=[1, 2])),
+    ("plasma-flash-profile.json", lambda o: o.update(flash_base=0)),
+])
+def test_provider_profile_driver_or_constraint_substitution_is_resource_mismatch(suffix, mutate):
+    built = bundle_v3.build_user_image_bundle(route(), FW_A)
+    member = json.loads([v for k, v in zip_members(built.archive).items() if k.endswith(suffix)][0])
+    mutate(member)
+    # Consistent manifest (attacker recomputed hashes): identity differs -> mismatch.
+    forged = tampered_archive(built, suffix, bundle_v3.canonical_json(member), fix_manifest=True)
+    res, _fw = bundle_v3.identity_from_archive(forged)
+    assert bundle_v3.resource_set_sha256(res) != built.resource_set_sha256
+    with zipfile.ZipFile(io.BytesIO(forged)) as z:
+        manifest = json.loads(z.read("manifest.json"))
+        with pytest.raises(BundleBuildError, match="RESOURCE_SET_MISMATCH"):
+            bundle_v3.verify_resource_set(resource(), manifest, z.read)
+    # Bytes swapped without updating the manifest SHA -> file mismatch.
+    swapped = tampered_archive(built, suffix, bundle_v3.canonical_json(member), fix_manifest=False)
+    with pytest.raises(BundleBuildError, match="BUNDLE_FILE_MISMATCH"):
+        bundle_v3.identity_from_archive(swapped)
+
+
+def test_non_canonical_resource_bytes_fail_closed():
+    built = bundle_v3.build_user_image_bundle(route(), FW_A)
+    raw = [v for k, v in zip_members(built.archive).items()
+           if k.endswith("plasma-provider.json")][0]
+    pretty = json.dumps(json.loads(raw), indent=2).encode()
+    forged = tampered_archive(built, "plasma-provider.json", pretty, fix_manifest=True)
+    with pytest.raises(BundleBuildError, match="BUNDLE_RESOURCE_NOT_CANONICAL"):
+        bundle_v3.identity_from_archive(forged)
+
+
+def test_firmware_substitution_in_archive_is_detected():
+    built = bundle_v3.build_user_image_bundle(route(), FW_A)
+    with pytest.raises(BundleBuildError, match="BUNDLE_FILE_MISMATCH"):
+        bundle_v3.identity_from_archive(tampered_archive(built, ".bin", FW_B, fix_manifest=False))
+
+
+@pytest.mark.parametrize("change, code", [
+    ({"sha256": "0" * 64}, "FIRMWARE_SHA256_MISMATCH"),
+    ({"size": len(FW_A) + 1}, "FIRMWARE_SIZE_MISMATCH"),
+    ({"load_address": 0x08000000 + 512}, "FIRMWARE_ADDRESS_INVALID"),
+    ({"load_address": 0x08000000 - 1024}, "FIRMWARE_ADDRESS_INVALID"),
+    ({"load_address": 0x08000000 + 65536}, "FIRMWARE_ADDRESS_INVALID"),
+    ({"icpn": "STM32F103CBT6"}, "FIRMWARE_TARGET_MISMATCH"),
+    ({"format": "intel_hex"}, "FIRMWARE_FORMAT_UNSUPPORTED"),
+    ({"size": True}, "FIRMWARE_ASSET_FIELDS_INVALID"),
+    ({"extra": 1}, "FIRMWARE_ASSET_FIELDS_INVALID"),
+])
+def test_firmware_asset_mismatch_fails_closed(change, code):
+    res = resource()
+    descriptor = {**bundle_v3.firmware_asset_descriptor(res, FW_A), **change}
+    with pytest.raises(BundleBuildError, match=code):
+        bundle_v3.verify_firmware_asset(descriptor, FW_A, res)
+
+
+def test_firmware_exceeding_profile_is_refused():
+    with pytest.raises(BundleBuildError, match="FIRMWARE_EXCEEDS_PROFILE_MAX_IMAGE"):
+        bundle_v3.firmware_asset_descriptor(resource(), b"\xff" * (65536 + 1))
+    with pytest.raises(BundleBuildError, match="FIRMWARE_EMPTY"):
+        bundle_v3.firmware_asset_descriptor(resource(), b"")
+
+
+def _mut(fn):
+    d = resource()
+    fn(d)
+    return d
+
+
+PROVIDER_ID = "openocd-platform-reference"
+
+
+@pytest.mark.parametrize("descriptor, code", [
+    (_mut(lambda d: d["packages"][1].update(requires=[])), "RESOURCE_DEPENDENCY_MISSING"),
+    (_mut(lambda d: d["packages"][1].update(requires=["missing-pkg"])), "RESOURCE_DEPENDENCY_MISSING"),
+    (_mut(lambda d: d["packages"].reverse()), "RESOURCE_DEPENDENCY_MISSING"),
+    (_mut(lambda d: d["packages"].append(copy.deepcopy(d["packages"][0]))), "RESOURCE_PACKAGE_CONFLICT"),
+    (_mut(lambda d: d["packages"][1]["files"].append(copy.deepcopy(d["packages"][1]["files"][0]))),
+     "RESOURCE_PACKAGE_CONFLICT"),
+    (_mut(lambda d: d["packages"].pop(0)), "RESOURCE_PACKAGES_INVALID"),
+    (_mut(lambda d: d["packages"][0].update(kind="firmware-asset")), "RESOURCE_PACKAGE_INVALID"),
+    (_mut(lambda d: d["packages"][0]["files"][0].update(sha256="ABC")), "RESOURCE_FILE_DESCRIPTOR_INVALID"),
+    (_mut(lambda d: d["packages"][0]["files"][0].update(path="payload/packages/x/../y")),
+     "RESOURCE_FILE_DESCRIPTOR_INVALID"),
+    (_mut(lambda d: d["packages"][0].update(version="v 1")), "RESOURCE_PACKAGE_INVALID"),
+    (_mut(lambda d: d.update(fpga_package="nonexistent")), "RESOURCE_FPGA_PACKAGE_INVALID"),
+    (_mut(lambda d: d["abi"].update(transport="usb")), "RESOURCE_ABI_INVALID"),
+    (_mut(lambda d: d["abi"].pop("driver_abi")), "RESOURCE_ABI_INVALID"),
+    (_mut(lambda d: d["target"].update(board="../x")), "RESOURCE_TARGET_INVALID"),
+    (_mut(lambda d: d["constraints"].update(sites=[3, 2])), "RESOURCE_CONSTRAINTS_INVALID"),
+    (_mut(lambda d: d["constraints"].update(flash_size=65537)), "RESOURCE_CONSTRAINTS_INVALID"),
+    (_mut(lambda d: d["constraints"].update(max_image_bytes=True)), "RESOURCE_CONSTRAINTS_INVALID"),
+    (_mut(lambda d: d.update(firmware_package_kind="platform-provider")), "RESOURCE_FIRMWARE_KIND_INVALID"),
+    (_mut(lambda d: d.update(schema="plasma.opf.programming-resource-set.v2")),
+     "RESOURCE_SET_SCHEMA_UNSUPPORTED"),
+    (_mut(lambda d: d.pop("constraints")), "RESOURCE_SET_FIELDS_INVALID"),
+    (_mut(lambda d: d.update(archive_sha256="0" * 64)), "RESOURCE_SET_FIELDS_INVALID"),
+    ([], "RESOURCE_SET_FIELDS_INVALID"),
+])
+def test_invalid_or_incomplete_resource_descriptor_fails_closed(descriptor, code):
+    with pytest.raises(BundleBuildError, match=code):
+        bundle_v3.resource_set_sha256(descriptor)
+
+
+@pytest.mark.parametrize("kwargs, code", [
+    ({"ppu_id": "z2-hil", "site_id": 1}, "JOB_BINDING_SITE_NOT_IN_PROFILE"),
+    ({"ppu_id": "z2-hil", "site_id": True}, "JOB_BINDING_SITE_NOT_IN_PROFILE"),
+    ({"ppu_id": "", "site_id": 2}, "JOB_BINDING_PPU_INVALID"),
+    ({"ppu_id": "../z2", "site_id": 2}, "JOB_BINDING_PPU_INVALID"),
+])
+def test_job_binding_refuses_wrong_site_or_ppu(kwargs, code):
+    res = resource()
+    fw = bundle_v3.firmware_asset_descriptor(res, FW_A)
+    with pytest.raises(BundleBuildError, match=code):
+        bundle_v3.job_firmware_binding(res, fw, **kwargs)
+
+
+def test_job_binding_refuses_firmware_for_other_target():
+    res = resource()
+    fw = {**bundle_v3.firmware_asset_descriptor(res, FW_A), "icpn": "STM32F103CBT6"}
+    with pytest.raises(BundleBuildError, match="FIRMWARE_TARGET_MISMATCH"):
+        bundle_v3.job_firmware_binding(res, fw, ppu_id="z2-hil", site_id=2)
+
+
+def test_bundle_with_extra_or_fpga_package_is_outside_contract():
+    built = bundle_v3.build_user_image_bundle(route(), FW_A)
+    members = zip_members(built.archive)
+    manifest = json.loads(members["manifest.json"])
+    manifest["packages"].append({"id": "fpga-x", "kind": "fpga-image", "version": "1",
+                                 "requires": [], "files": []})
+    with pytest.raises(BundleBuildError, match="BUNDLE_PACKAGE_SET_UNSUPPORTED"):
+        bundle_v3.identity_from_manifest(manifest, lambda p: members[p])
+
+
+# ---------------------------- no bypass of Active Set / B1-B3 / Job admission
+def stage_active(tmp_path: Path, built) -> tuple[Path, Path]:
+    """Synthetic structurally B3-verified staged Set from canonical Bundle bytes."""
+    product = tmp_path / "product"
+    stage = product / "assets/staged" / built.archive_sha256
+    members = zip_members(built.archive)
+    for name, blob in members.items():
+        target = stage / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(blob)
+    manifest = json.loads(members["manifest.json"])
+    (stage / "b3-install.json").write_bytes(bundle_v3.canonical_json({
+        "schema": "plasma.ppu.b3-install.v1", "archive_sha256": built.archive_sha256,
+        "manifest_sha256": hashlib.sha256(members["manifest.json"]).hexdigest(),
+        "bundle_name": manifest["name"], "bundle_version": manifest["version"],
+        "files_verified": len(members) - 1,
+    }))
+    (product / "assets/active.json").write_bytes(bundle_v3.canonical_json({
+        "schema": assets.SCHEMA, "generation": 1, "asset_set_sha256": built.archive_sha256}))
+    assert assets.read_active(product)["asset_set_sha256"] == built.archive_sha256
+    return product, stage
+
+
+def test_resource_identity_is_not_an_active_set_identity(tmp_path):
+    a = bundle_v3.build_user_image_bundle(route(), FW_A, filename="a.bin")
+    b = bundle_v3.build_user_image_bundle(route(), FW_B, filename="b.bin")
+    product, _stage = stage_active(tmp_path, a)
+    ok = assets.resolve_active_firmware(
+        product, asset_set_sha256=a.archive_sha256, asset_package_id=a.asset_package_id,
+        profile_package_id=a.profile_id, asset_sha256=a.image_sha256)
+    assert ok["image"] == FW_A
+    # Resource identity presented as the Active Set: refused.
+    with pytest.raises(assets.AssetSetError, match="ACTIVE_SET_MISMATCH"):
+        assets.resolve_active_firmware(
+            product, asset_set_sha256=a.resource_set_sha256,
+            asset_package_id=a.asset_package_id, profile_package_id=a.profile_id,
+            asset_sha256=a.image_sha256)
+    # Same Resource Set, different Firmware: not resolvable from A's Active Set.
+    with pytest.raises(assets.AssetSetError):
+        assets.resolve_active_firmware(
+            product, asset_set_sha256=a.archive_sha256, asset_package_id=b.asset_package_id,
+            profile_package_id=b.profile_id, asset_sha256=b.image_sha256)
+    with pytest.raises(assets.AssetSetError, match="ACTIVE_SET_MISMATCH"):
+        assets.resolve_active_firmware(
+            product, asset_set_sha256=b.archive_sha256, asset_package_id=b.asset_package_id,
+            profile_package_id=b.profile_id, asset_sha256=b.image_sha256)
+
+
+@pytest.mark.parametrize("extra", [
+    {"resource_set_sha256": "a" * 64},
+    {"firmware_asset_sha256": "b" * 64},
+    {"job_binding": {"schema": "plasma.opf.job-firmware-binding.v1"}},
+])
+def test_gateway_job_request_refuses_new_identity_fields(extra):
+    body = {"site_id": 2, "operation": "flash_cycle", "target": "STM32F103C8T6",
+            "provider": PROVIDER_ID, "profile": "stm32f103c8t6-site2",
+            "asset_set_sha256": "a" * 64, "asset_package_id": "img-0000000000000000",
+            "bundle_asset_sha256": "c" * 64, **extra}
+    handler = object.__new__(PlasmaWebHandler)
+    with pytest.raises(ValueError):
+        handler._job_request(body, client_id="plasma-web")
+
+
+def test_same_resources_new_firmware_still_requires_b1_b2_b3(tmp_path):
+    """Equal Resource identity never skips B1/B2/B3 or owner authorization (OFE-1B)."""
+    other = bundle_v3.build_user_image_bundle(route(), FW_B, filename="app.bin")
+    current = bundle_v3.build_user_image_bundle(route(), image(), filename="app.bin")
+    assert other.resource_set_sha256 == current.resource_set_sha256
+    workflow, coord, gateway = make(
+        tmp_path, coordinator=FakeCoordinator(active_sha=other.archive_sha256))
+    planned, run = run_once(workflow)
+    assert planned["activation_required"] is True
+    assert planned["steps"][:3] == ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"]
+    assert planned["bundle"]["resource_set_sha256"] == other.resource_set_sha256
+    assert run["outcome"] == "PASS"
+    assert coord.calls.count("B2") == 1 and coord.calls.count("B3") == 1
+    assert gateway.posts[0]["asset_set_sha256"] == current.archive_sha256
+    assert set(gateway.posts[0]) == {
+        "site_id", "operation", "timeout_s", "target", "provider", "profile",
+        "asset_set_sha256", "asset_package_id", "bundle_asset_sha256"}
+
+
+def test_active_set_reporting_resource_identity_is_not_trusted(tmp_path):
+    """A PPU/coordinator echoing the Resource SHA as Active never skips activation."""
+    current = bundle_v3.build_user_image_bundle(route(), image(), filename="app.bin")
+    workflow, coord, _gateway = make(
+        tmp_path, coordinator=FakeCoordinator(active_sha=current.resource_set_sha256))
+    planned = workflow.plan(ALIAS, plan_body())["plan"]
+    assert planned["activation_required"] is True
+    started = workflow.start(ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
+    run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+    assert "B3" in coord.calls and run["outcome"] == "PASS"
+
+
+def test_user_bundle_still_passes_host_only_b3_verifier(tmp_path):
+    built = bundle_v3.build_user_image_bundle(route(), FW_B, filename="b.bin")
+    path = tmp_path / "b.zip"
+    path.write_bytes(built.archive)
+    verified = ppu_unified_deployment.verify_host_only_bundle(
+        path, expected_sha256=built.archive_sha256, target_profile=route().target)
+    assert [p.kind for p in verified.packages] == [
+        "platform-provider", "programming-profile", "firmware-asset"]
