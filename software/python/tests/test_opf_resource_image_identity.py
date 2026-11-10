@@ -146,15 +146,19 @@ def test_fpga_and_dependency_changes_change_resource_identity():
 def test_job_binding_is_exact_and_verifiable():
     res = resource()
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
-    binding = bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2)
+    binding = bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2,
+                                          operation="flash_cycle")
     assert binding["resource_set_sha256"] == bundle_v3.resource_set_sha256(res)
     assert binding["image_asset_sha256"] == bundle_v3.image_asset_sha256(fw)
     assert binding["profile"] == "stm32f103c8t6-site2" and binding["icpn"] == "STM32F103C8T6"
-    digest = bundle_v3.verify_job_binding(binding, res, fw, ppu_id="z2-hil", site_id=2)
+    assert binding["operation"] == "flash_cycle"
+    assert binding["range"] == {"address": 0x08000000, "length": len(FW_A)}
+    digest = bundle_v3.verify_job_binding(binding, res, fw, ppu_id="z2-hil", site_id=2,
+                                          operation="flash_cycle")
     assert len(digest) == 64
     fw_b = bundle_v3.image_asset_descriptor(res, FW_B)
-    for kwargs, fw_x in (({"ppu_id": "other-ppu", "site_id": 2}, fw),
-                         ({"ppu_id": "z2-hil", "site_id": 2}, fw_b)):
+    for kwargs, fw_x in (({"ppu_id": "other-ppu", "site_id": 2, "operation": "flash_cycle"}, fw),
+                         ({"ppu_id": "z2-hil", "site_id": 2, "operation": "flash_cycle"}, fw_b)):
         with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
             bundle_v3.verify_job_binding(binding, res, fw_x, **kwargs)
 
@@ -299,14 +303,190 @@ def test_job_binding_refuses_wrong_site_or_ppu(kwargs, code):
     res = resource()
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
     with pytest.raises(BundleBuildError, match=code):
-        bundle_v3.job_image_binding(res, fw, **kwargs)
+        bundle_v3.job_image_binding(res, fw, operation="flash_cycle", **kwargs)
 
 
 def test_job_binding_refuses_firmware_for_other_target():
     res = resource()
     fw = {**bundle_v3.image_asset_descriptor(res, FW_A), "icpn": "STM32F103CBT6"}
     with pytest.raises(BundleBuildError, match="IMAGE_ASSET_TARGET_MISMATCH"):
-        bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2)
+        bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2, operation="flash_cycle")
+
+
+# ------------------------------------------- user-selected Operation (Gate 2)
+BASE = 0x08000000
+ALL_OPS = ["erase", "program", "verify", "read", "flash_cycle"]
+
+
+def resource_with(operations):
+    d = resource()
+    d["constraints"]["operations"] = list(operations)
+    return d
+
+
+def bind(res, asset=None, **kw):
+    return bundle_v3.job_image_binding(res, asset, ppu_id=kw.pop("ppu_id", "z2-hil"),
+                                       site_id=kw.pop("site_id", 2), **kw)
+
+
+def binding_sha(binding):
+    return bundle_v3.sha256_hex(bundle_v3.canonical_json(binding))
+
+
+def test_operation_vocabulary_matches_core_operation_enum():
+    from plasma_core.enums import Operation
+    assert set(bundle_v3.OPERATIONS) == {o.value for o in Operation} - {"status", "cancel"}
+    assert bundle_v3.IMAGE_OPERATIONS == {"program", "verify", "flash_cycle"}
+
+
+def test_operation_and_image_change_binding_identity():
+    res = resource_with(ALL_OPS)
+    fw_a = bundle_v3.image_asset_descriptor(res, FW_A)
+    fw_b = bundle_v3.image_asset_descriptor(res, FW_B)
+    shas = {binding_sha(bind(res, fw, operation=op))
+            for op in ("program", "verify", "flash_cycle") for fw in (fw_a, fw_b)}
+    assert len(shas) == 6
+    # Resource identity is independent of which Operation a Job selects.
+    assert bundle_v3.resource_set_sha256(res) != bundle_v3.resource_set_sha256(resource())
+    assert all(bind(res, fw_a, operation=op)["resource_set_sha256"]
+               == bundle_v3.resource_set_sha256(res) for op in ("program", "verify"))
+
+
+def test_erase_and_read_need_no_image_and_range_changes_binding():
+    res = resource_with(ALL_OPS)
+    erase_all = bind(res, operation="erase", address=BASE, length=65536)
+    erase_one = bind(res, operation="erase", address=BASE + 1024, length=1024)
+    read_a = bind(res, operation="read", address=BASE, length=256)
+    read_b = bind(res, operation="read", address=BASE + 1, length=256)
+    read_c = bind(res, operation="read", address=BASE, length=257)
+    assert erase_all["image_asset_sha256"] is None and read_a["image_asset_sha256"] is None
+    assert erase_all["range"] == {"address": BASE, "length": 65536}
+    assert len({binding_sha(b) for b in (erase_all, erase_one, read_a, read_b, read_c)}) == 5
+    # Same range, different Operation: different identity.
+    assert binding_sha(bind(res, operation="read", address=BASE, length=1024)) \
+        != binding_sha(bind(res, operation="erase", address=BASE, length=1024))
+    digest = bundle_v3.verify_job_binding(read_a, res, ppu_id="z2-hil", site_id=2,
+                                          operation="read", address=BASE, length=256)
+    assert digest == binding_sha(read_a)
+    with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
+        bundle_v3.verify_job_binding(read_a, res, ppu_id="z2-hil", site_id=2,
+                                     operation="read", address=BASE, length=255)
+
+
+def test_image_operation_range_is_the_image_range():
+    res = resource_with(ALL_OPS)
+    fw = bundle_v3.image_asset_descriptor(res, FW_A, load_address=BASE + 2048)
+    implicit = bind(res, fw, operation="program")
+    explicit = bind(res, fw, operation="program", address=BASE + 2048, length=len(FW_A))
+    assert implicit == explicit
+    assert implicit["range"] == {"address": BASE + 2048, "length": len(FW_A)}
+    at_base = bind(res, bundle_v3.image_asset_descriptor(res, FW_A), operation="program")
+    assert binding_sha(at_base) != binding_sha(implicit)
+
+
+def test_binding_mismatch_when_operation_differs():
+    res = resource_with(ALL_OPS)
+    fw = bundle_v3.image_asset_descriptor(res, FW_A)
+    binding = bind(res, fw, operation="verify")
+    with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
+        bundle_v3.verify_job_binding(binding, res, fw, ppu_id="z2-hil", site_id=2,
+                                     operation="program")
+
+
+@pytest.mark.parametrize("operation", ["status", "cancel", "write", "FLASH_CYCLE", "", None, 1])
+def test_unknown_operation_is_refused(operation):
+    res = resource_with(ALL_OPS)
+    with pytest.raises(BundleBuildError, match="JOB_OPERATION_UNSUPPORTED"):
+        bind(res, operation=operation, address=BASE, length=1024)
+
+
+@pytest.mark.parametrize("operation", ["erase", "program", "verify", "read"])
+def test_operation_not_declared_by_profile_is_refused(operation):
+    # The committed Site 2 route declares only flash_cycle.
+    res = resource()
+    fw = bundle_v3.image_asset_descriptor(res, FW_A)
+    asset = fw if operation in bundle_v3.IMAGE_OPERATIONS else None
+    with pytest.raises(BundleBuildError, match="JOB_OPERATION_NOT_IN_PROFILE"):
+        bind(res, asset, operation=operation, address=BASE, length=1024)
+
+
+def test_flash_cycle_not_declared_is_refused():
+    res = resource_with(["read"])
+    fw = bundle_v3.image_asset_descriptor(res, FW_A)
+    with pytest.raises(BundleBuildError, match="JOB_OPERATION_NOT_IN_PROFILE"):
+        bind(res, fw, operation="flash_cycle")
+
+
+@pytest.mark.parametrize("operation, use_image, address, length, code", [
+    ("program", False, None, None, "JOB_IMAGE_ASSET_REQUIRED"),
+    ("verify", False, None, None, "JOB_IMAGE_ASSET_REQUIRED"),
+    ("flash_cycle", False, None, None, "JOB_IMAGE_ASSET_REQUIRED"),
+    ("program", True, BASE + 1024, len(FW_A), "JOB_RANGE_MISMATCH"),
+    ("verify", True, BASE, len(FW_A) + 1, "JOB_RANGE_MISMATCH"),
+    ("flash_cycle", True, BASE, None, "JOB_RANGE_MISMATCH"),
+    ("flash_cycle", True, BASE, True, "JOB_RANGE_MISMATCH"),
+    ("erase", True, BASE, 1024, "JOB_IMAGE_ASSET_NOT_ALLOWED"),
+    ("read", True, BASE, 1024, "JOB_IMAGE_ASSET_NOT_ALLOWED"),
+    ("erase", False, None, None, "JOB_RANGE_REQUIRED"),
+    ("read", False, BASE, None, "JOB_RANGE_REQUIRED"),
+    ("read", False, True, 4, "JOB_RANGE_REQUIRED"),
+    ("erase", False, BASE + 512, 1024, "JOB_RANGE_INVALID"),
+    ("erase", False, BASE, 1000, "JOB_RANGE_INVALID"),
+    ("erase", False, BASE, 65536 + 1024, "JOB_RANGE_INVALID"),
+    ("read", False, BASE - 1, 16, "JOB_RANGE_INVALID"),
+    ("read", False, BASE, 0, "JOB_RANGE_INVALID"),
+    ("read", False, BASE + 65536 - 8, 16, "JOB_RANGE_INVALID"),
+])
+def test_operation_image_and_range_rules_fail_closed(operation, use_image, address, length, code):
+    res = resource_with(ALL_OPS)
+    fw = bundle_v3.image_asset_descriptor(res, FW_A) if use_image else None
+    with pytest.raises(BundleBuildError, match=code):
+        bind(res, fw, operation=operation, address=address, length=length)
+
+
+@pytest.mark.parametrize("operations, ok", [
+    (["read"], True),
+    (["erase", "read"], True),
+    (ALL_OPS, True),
+    ([], False),
+    (["flash_cycle", "flash_cycle"], False),
+    (["flash_cycle", "status"], False),
+    (["write"], False),
+    ("flash_cycle", False),
+])
+def test_resource_operations_need_not_include_flash_cycle(operations, ok):
+    descriptor = resource_with([]) if isinstance(operations, str) else resource_with(operations)
+    if isinstance(operations, str):
+        descriptor["constraints"]["operations"] = operations
+    if ok:
+        assert len(bundle_v3.resource_set_sha256(descriptor)) == 64
+    else:
+        with pytest.raises(BundleBuildError, match="RESOURCE_CONSTRAINTS_INVALID"):
+            bundle_v3.resource_set_sha256(descriptor)
+
+
+def test_executable_route_still_requires_flash_cycle():
+    """Descriptor relaxation opens no execution: the Bundle-building Route keeps
+    requiring flash_cycle, the only operation the C-3 Runtime route executes."""
+    payload = route_payload()
+    payload["profile"]["capabilities"]["operations"] = ["read"]
+    with pytest.raises(BundleBuildError, match="ROUTE_CAPABILITIES_INVALID"):
+        bundle_v3.parse_route(payload)
+    payload["profile"]["capabilities"]["operations"] = ["flash_cycle", "bogus"]
+    with pytest.raises(BundleBuildError, match="RESOURCE_CONSTRAINTS_INVALID"):
+        bundle_v3.build_user_image_bundle(bundle_v3.parse_route(payload), FW_A)
+
+
+@pytest.mark.parametrize("operation", ["erase", "program", "verify", "read"])
+def test_gateway_bundle_reference_stays_flash_cycle_only(operation):
+    """Runtime admission unchanged: the Bundle Asset reference is flash_cycle only."""
+    body = {"site_id": 2, "operation": operation, "target": "STM32F103C8T6",
+            "provider": PROVIDER_ID, "profile": "stm32f103c8t6-site2",
+            "asset_set_sha256": "a" * 64, "asset_package_id": "img-0000000000000000",
+            "bundle_asset_sha256": "c" * 64}
+    handler = object.__new__(PlasmaWebHandler)
+    with pytest.raises(ValueError):
+        handler._job_request(body, client_id="plasma-web")
 
 
 def test_bundle_with_extra_or_fpga_package_is_outside_contract():

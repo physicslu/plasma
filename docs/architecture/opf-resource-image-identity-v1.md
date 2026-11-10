@@ -61,6 +61,16 @@ version, dependency, target, Driver ABI, FPGA Package or constraint changes the
 Resource SHA256. Firmware bytes, Firmware filename, Firmware Package id, Bundle
 name and Bundle version never enter it.
 
+Operations: `constraints.operations` is a non-empty, duplicate-free subset of
+`OPERATIONS = (erase, program, verify, read, flash_cycle)` — exactly the
+programming members of `plasma_core.enums.Operation` (`status`/`cancel` are
+control operations and are refused). A Resource descriptor is **not** required
+to declare `flash_cycle`. Declaring an Operation is a capability claim only and
+grants no execution: the Bundle-building Programming Route (`parse_route`)
+still requires `flash_cycle`, and the PPU Runtime route admission
+(`execution_router.py:84-93`, C-3 OpenOCD = `flash_cycle` only) and the Gateway
+Bundle reference (`flash_cycle` only) remain the execution authorities.
+
 Driver: the current route-built Bundle has no Driver Package. The Driver is
 identified by `abi.driver_abi` (also inside the Profile capabilities file whose
 SHA256 is pinned); the actual Driver ABI is still verified by the PPU at Job
@@ -82,8 +92,21 @@ to `erase_granularity`, end within `flash_size`.
 
 ### 3.3 Job Binding — `plasma.opf.job-image-binding.v1`
 
-`{resource_set_sha256, image_asset_sha256, ppu_id, site_id, icpn, profile}`.
-`site_id` must be in the Profile's `sites`; Firmware must be applicable.
+`{resource_set_sha256, operation, range{address,length}, image_asset_sha256,
+ppu_id, site_id, icpn, profile}`; every field enters the canonical SHA256.
+
+| Operation | Image Asset | `range` |
+|---|---|---|
+| `program`, `verify`, `flash_cycle` | required (`JOB_IMAGE_ASSET_REQUIRED`), must be applicable | exactly the Image range (`load_address`, `size`); a caller-supplied range must equal it (`JOB_RANGE_MISMATCH`) |
+| `erase` | refused (`JOB_IMAGE_ASSET_NOT_ALLOWED`); `image_asset_sha256: null` | required (`JOB_RANGE_REQUIRED`); inside flash; start and length aligned to `erase_granularity` (`JOB_RANGE_INVALID`); whole-chip erase = `(flash_base, flash_size)` |
+| `read` | refused; `image_asset_sha256: null` | required; inside flash, `length > 0` |
+
+`operation` is selected by the user and must be in `OPERATIONS`
+(`JOB_OPERATION_UNSUPPORTED`) and declared by the Resource Profile
+(`JOB_OPERATION_NOT_IN_PROFILE`). Addresses are absolute target addresses. v1
+has one contiguous range per Job; multi-section reads (Gateway
+`map_data.sections`) need a new contract version.
+`site_id` must be in the Profile's `sites`.
 `verify_job_binding` recomputes the expected binding and accepts only an exact
 match (`JOB_BINDING_MISMATCH` otherwise). No PPU Job id exists before
 submission; OFE-1B binds the accepted Job id in the receipt.
@@ -143,14 +166,30 @@ Manager plan's `bundle` block) states `identity_authority: archive_sha256`.
    557-566`): declared name/type/format/size/SHA256 are checked against the
    bytes. Add only the `image_asset` + `job_binding` descriptors to the Job
    request, as an exclusive third source (not combinable with the Bundle
-   reference or legacy inline asset), `flash_cycle` only, `max_retries=0`.
-   No new staging cache in 1B; the Job carries its bytes once.
+   reference or legacy inline asset), `max_retries=0`. The Job `operation` is
+   the **user-selected** Operation carried in the Binding (not a fixed
+   `flash_cycle`); `program`/`verify`/`flash_cycle` carry the Image bytes,
+   `erase`/`read` carry only the Binding range. No new staging cache in 1B;
+   the Job carries its bytes once.
+
+   **2a. User-selected Operation + Provider Capability Validation.** Console
+   offers only Operations declared by the resolved Route Profile; the Manager
+   builds the Binding with `job_image_binding(operation=…, address/length)`
+   and refuses undeclared Operations before any PPU write. The PPU re-checks
+   the same Binding against the Profile of its pinned Active Set **and** the
+   Runtime route admission (`ExecutionRouter.resolve_route`): an Operation the
+   Profile declares but the Site's Provider route does not implement (today:
+   anything except `flash_cycle` on C-3 OpenOCD) fails closed with the
+   existing `OPERATION_UNSUPPORTED`. Enabling another Operation on hardware is
+   a separate Provider change with its own Gate and HIL evidence; the Route
+   parser's `flash_cycle` requirement is relaxed only together with it.
 3. **Binding checks at admission.** Inside `SiteManager.enqueue` under the
    existing execution lease (`site_manager.py:479-541`): pin the Active Set,
    re-derive `resource_set_sha256` from it, `verify_job_binding` with this
    PPU's `ppu_id` and the Job `site_id`, `verify_image_asset` over the
    received bytes and the PPU-derived Resource descriptor. Any mismatch →
-   `OPERATION_UNSUPPORTED` before the Site Worker starts.
+   `OPERATION_UNSUPPORTED` before the Site Worker starts. The Job's
+   `operation` and range (`map_data` for `read`) must equal the Binding's.
 4. **No Package mixing.** Provider/Profile/Driver come only from the single
    pinned Active Set; the Job names Provider/Profile ids that must equal the
    Active Set's Packages, and the Resource SHA256 covers their content. A
@@ -159,7 +198,10 @@ Manager plan's `bundle` block) states `identity_authority: archive_sha256`.
    Firmware SHA and binding SHA; Job submission stays exactly-once with the
    existing `OUTCOME_UNKNOWN` latch. Receipt `_verify` adds checks that the PPU
    echoed the same binding SHA256 and Firmware SHA256 (readback SHA256 must
-   equal Firmware SHA256 — already enforced). No replay.
+   equal Firmware SHA256 — already enforced). Receipt checks become
+   Operation-specific (e.g. `read` returns readback SHA256 of the bound range,
+   `erase` reports the erased range; SAFE_OFF required for every Operation).
+   No replay.
 6. **Firmware-only Job does not reinstall.** Manager computes
    `activation_required = PPU Active resource_set_sha256 ≠ plan resource_set_sha256`
    **only** when the PPU reports a verified Resource SHA256 and the Job uses the
@@ -168,6 +210,16 @@ Manager plan's `bundle` block) states `identity_authority: archive_sha256`.
 7. **Single Active Resource Set / FPGA reload lock.** Unchanged: the Active Set
    pointer remains the only Resource authority, and the PPU-wide execution
    lease still excludes activation and FPGA reload for the whole Job.
+
+OFE-1B fix list (known, intentionally not changed in OFE-1A):
+
+- `programming.py:626-627` — the Manager receipt dict literal repeats
+  `image_sha256` / `image_size`; the plan-side values are silently overwritten
+  by the PPU-reported values, so the receipt does not record both. `_verify`
+  still compares them in its checks, so the PASS/FAIL decision is unaffected.
+  Fix: distinct keys (e.g. `expected_image_*` vs `reported_image_*`).
+- Manager `_submit_once` hardcodes `"operation": "flash_cycle"`; replace with
+  the Binding's Operation once 2a lands.
 
 Risks and dependencies for 1B: Runtime + Control-plane redeploy on Z2 (owner
 Gate); Gateway request schema addition must be signed under the G13 write
@@ -182,4 +234,4 @@ two-Site HIL evidence (plan §5 item 3) is required before any reuse claim.
 |---|---|
 | Host-only identity tests (`software/python/tests/test_opf_resource_image_identity.py`) | Host-only |
 | Existing Bundle v3 / Site 2 workflow regression tests | Host-only |
-| PPU-side Resource verification, Firmware-only Job, HIL | **NOT_RUN** (OFE-1B) |
+| PPU-side Resource verification, Firmware-only Job, user-selected non-`flash_cycle` Operation on hardware, HIL | **NOT_RUN** (OFE-1B) |

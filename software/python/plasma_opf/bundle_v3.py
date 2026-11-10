@@ -247,7 +247,7 @@ def safe_image_filename(filename: object) -> str:
 # plus Target platform, Driver ABI and hardware constraints, each Package
 # pinned by exact per-file content SHA256. Job Image Asset: image
 # content SHA256/size/format/load address and target applicability. Job
-# Binding: exact (Resource, Image, PPU, Site, ICPN, Profile) tuple.
+# Binding: exact (Resource, Operation, range, Image, PPU, Site, ICPN, Profile).
 #
 # These identities are NOT an execution authority yet. Until OFE-1B adds
 # PPU-side verification, the Bundle archive SHA256 remains the only Active
@@ -259,6 +259,12 @@ JOB_BINDING_SCHEMA = "plasma.opf.job-image-binding.v1"
 # Same vocabulary as plasma_core.assets.ProgrammingAssetFormat; only raw binary
 # has a validated Image normalizer and a single contiguous segment today.
 IMAGE_FORMATS = frozenset({"binary"})
+# User-selectable programming Operations: exactly the programming members of
+# plasma_core.enums.Operation (status/cancel are control operations). A Profile
+# declares the subset it supports; declaring one here grants NO execution: the
+# PPU Runtime route admission (execution_router) stays the execution authority.
+OPERATIONS = ("erase", "program", "verify", "read", "flash_cycle")
+IMAGE_OPERATIONS = frozenset({"program", "verify", "flash_cycle"})
 RESOURCE_KINDS = frozenset({"platform-provider", "programming-profile", "fpga-image"})
 MAX_RESOURCE_PACKAGES = 31  # Bundle v3 verifier allows 32 Packages incl. Image.
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -352,8 +358,8 @@ def parse_resource_set(payload: object) -> dict[str, Any]:
         and type(c["sites"]) is list and bool(c["sites"])
         and all(_is_int(s) and s > 0 for s in c["sites"])
         and c["sites"] == sorted(set(c["sites"]))
-        and type(c["operations"]) is list and "flash_cycle" in c["operations"]
-        and all(type(o) is str and SAFE_NAME.fullmatch(o) for o in c["operations"])
+        and type(c["operations"]) is list and bool(c["operations"])
+        and all(type(o) is str and o in OPERATIONS for o in c["operations"])
         and len(set(c["operations"])) == len(c["operations"])
         and type(c["target_config"]) is str and bool(c["target_config"])
         and all(_is_int(c[k]) for k in (
@@ -467,12 +473,47 @@ def image_asset_sha256(descriptor: object) -> str:
     return sha256_hex(canonical_json(parse_image_asset(descriptor)))
 
 
-def job_image_binding(resource: object, asset: object, *,
-                      ppu_id: str, site_id: int) -> dict[str, Any]:
-    """Exact Resource + Image + PPU + Site + Target/Profile binding (no I/O)."""
+def _job_range(parsed: Mapping[str, Any], operation: str, asset: Mapping[str, Any] | None,
+               address: object, length: object) -> dict[str, int]:
+    """The exact memory range an Operation acts on; part of the Binding identity."""
+    c = parsed["constraints"]
+    if operation in IMAGE_OPERATIONS:
+        _need(asset is not None, "JOB_IMAGE_ASSET_REQUIRED")
+        derived = {"address": asset["load_address"], "length": asset["size"]}
+        _need(address is None and length is None
+              or address == derived["address"] and length == derived["length"]
+              and _is_int(address) and _is_int(length), "JOB_RANGE_MISMATCH")
+        return derived
+    # erase / read act on an explicit range and carry no Image Asset.
+    _need(asset is None, "JOB_IMAGE_ASSET_NOT_ALLOWED")
+    _need(_is_int(address) and _is_int(length), "JOB_RANGE_REQUIRED")
+    offset = address - c["flash_base"]
+    _need(offset >= 0 and length > 0 and offset + length <= c["flash_size"],
+          "JOB_RANGE_INVALID")
+    if operation == "erase":
+        _need(offset % c["erase_granularity"] == 0
+              and length % c["erase_granularity"] == 0, "JOB_RANGE_INVALID")
+    return {"address": address, "length": length}
+
+
+def job_image_binding(resource: object, asset: object | None = None, *,
+                      ppu_id: str, site_id: int, operation: str,
+                      address: int | None = None,
+                      length: int | None = None) -> dict[str, Any]:
+    """Exact Resource + Operation + range + Image + PPU + Site + Profile binding.
+
+    ``operation`` is user-selected and must be declared by the Resource Profile.
+    ``program``/``verify``/``flash_cycle`` require an applicable Image Asset and
+    act on exactly its range; ``erase``/``read`` take an explicit range and no
+    Image Asset. No I/O; a valid Binding authorizes nothing by itself.
+    """
     parsed = parse_resource_set(resource)
-    fw = parse_image_asset(asset)
-    _check_applicable(fw, parsed)
+    _need(type(operation) is str and operation in OPERATIONS, "JOB_OPERATION_UNSUPPORTED")
+    _need(operation in parsed["constraints"]["operations"], "JOB_OPERATION_NOT_IN_PROFILE")
+    image = None if asset is None else parse_image_asset(asset)
+    if image is not None:
+        _check_applicable(image, parsed)
+    job_range = _job_range(parsed, operation, image, address, length)
     _need(type(ppu_id) is str and SAFE_PPU_ID.fullmatch(ppu_id) is not None,
           "JOB_BINDING_PPU_INVALID")
     _need(_is_int(site_id) and site_id in parsed["constraints"]["sites"],
@@ -481,16 +522,19 @@ def job_image_binding(resource: object, asset: object, *,
     return {
         "schema": JOB_BINDING_SCHEMA,
         "resource_set_sha256": resource_set_sha256(parsed),
-        "image_asset_sha256": image_asset_sha256(fw),
+        "operation": operation, "range": job_range,
+        "image_asset_sha256": None if image is None else image_asset_sha256(image),
         "ppu_id": ppu_id, "site_id": site_id,
         "icpn": parsed["constraints"]["icpn"], "profile": profile["id"],
     }
 
 
-def verify_job_binding(binding: object, resource: object, asset: object, *,
-                       ppu_id: str, site_id: int) -> str:
+def verify_job_binding(binding: object, resource: object, asset: object | None = None, *,
+                       ppu_id: str, site_id: int, operation: str,
+                       address: int | None = None, length: int | None = None) -> str:
     """Return the binding SHA256 only for the exact expected tuple."""
-    expected = job_image_binding(resource, asset, ppu_id=ppu_id, site_id=site_id)
+    expected = job_image_binding(resource, asset, ppu_id=ppu_id, site_id=site_id,
+                                 operation=operation, address=address, length=length)
     _need(type(binding) is dict and canonical_json(binding) == canonical_json(expected),
           "JOB_BINDING_MISMATCH")
     return sha256_hex(canonical_json(expected))
