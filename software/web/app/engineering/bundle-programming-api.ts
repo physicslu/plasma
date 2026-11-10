@@ -1,11 +1,11 @@
 import { BootstrapApiError } from "./ppu-bootstrap-api";
 
-// Console-driven Bundle programming (owner Gate 1, 2026-11-09).
+// Console-driven Bundle programming (owner Gate 1, 2026-11-09; OFE-1B).
 // Browser -> same-origin BFF -> Manager. The Manager resolves the
-// Programming Route, builds the canonical Bundle v3, issues owner
-// authorizations, runs B1/B2/B3 only when the Active Set differs and
-// submits exactly one flash_cycle Job. The Browser never builds or signs
-// a Bundle and never talks to the PPU directly.
+// Programming Route, compares the Resource Set the PPU itself derived from
+// its Active Set, runs B1/B2/B3 only when the Resources differ and submits
+// exactly one Job with the user-selected Operation and its Job Binding.
+// The Browser never builds or signs a Bundle and never talks to the PPU.
 
 export const PROGRAMMING_CONFIRM_TOKEN = "PROGRAM";
 export const PROGRAMMING_ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED";
@@ -26,10 +26,17 @@ export type ProgrammingRoute = {
   flash_size: number;
 };
 
+// Exactly the programming Operations of the Job Binding contract; the
+// Route Profile decides which of them a Site offers.
+export const PROGRAMMING_OPERATIONS = ["flash_cycle", "program", "verify", "erase", "read"] as const;
+export type ProgrammingOperation = typeof PROGRAMMING_OPERATIONS[number];
+export const IMAGE_OPERATIONS: ReadonlySet<string> = new Set(["flash_cycle", "program", "verify"]);
+
 export type ProgrammingPlan = {
   plan_id: string;
   ppu_alias: string;
   site_id: number;
+  operation: ProgrammingOperation;
   route: ProgrammingRoute;
   bundle: {
     archive_sha256: string;
@@ -42,7 +49,31 @@ export type ProgrammingPlan = {
     image_sha256: string;
     image_size: number;
     icpn: string;
+  } | null;
+  resource: {
+    resource_set_sha256: string;
+    ppu_reported: {
+      state: string;
+      asset_set_sha256: string | null;
+      generation: number | null;
+      resource_set_sha256: string | null;
+    };
+    reuse: boolean;
   };
+  image_asset: {
+    image_asset_sha256: string;
+    sha256: string;
+    size: number;
+    load_address: number;
+    format: string;
+  } | null;
+  job_binding: {
+    operation: ProgrammingOperation;
+    range: { address: number; length: number };
+    image_asset_sha256: string | null;
+    resource_set_sha256: string;
+  };
+  job_binding_sha256: string;
   active_asset_set: { state: string; asset_set_sha256: string | null };
   activation_required: boolean;
   fpga_load: false;
@@ -70,15 +101,26 @@ export type ProgrammingRun = {
     bytes_total?: number | null;
   } | null;
   receipt: {
+    schema: "plasma.manager.programming-receipt.v2";
     job_id: string | null;
     job_state: string | null;
+    operation: string | null;
+    site_id: number | null;
+    target: string;
+    expected_image_sha256: string | null;
+    expected_image_size: number | null;
+    observed_image_sha256: string | null;
+    observed_image_size: number | null;
     readback_sha256: string | null;
-    image_sha256: string;
-    image_size: number;
     bytes_verified: number | null;
+    expected_resource_set_sha256: string;
+    observed_resource_set_sha256: string | null;
+    expected_job_binding_sha256: string;
+    observed_job_binding_sha256: string | null;
+    active_asset_set_sha256: string | null;
+    resource_reuse: boolean;
     safe_off: boolean | null;
     flash_result: string | null;
-    asset_set_sha256: string;
     elapsed_ms: number | null;
   } | null;
   job_submission_count: number;
@@ -127,18 +169,24 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-export async function planProgramming(
-  alias: string,
-  input: { icpn: string; siteId: number; image: Uint8Array; filename: string },
-): Promise<ProgrammingPlan> {
+export type PlanInput =
+  | { icpn: string; siteId: number; operation: "flash_cycle" | "program" | "verify"; image: Uint8Array; filename: string }
+  | { icpn: string; siteId: number; operation: "erase" | "read"; address: number; length: number };
+
+export async function planProgramming(alias: string, input: PlanInput): Promise<ProgrammingPlan> {
+  // The user's Operation is sent as chosen; the Manager never rewrites it.
+  const body = "image" in input
+    ? {
+      icpn: input.icpn, site_id: input.siteId, operation: input.operation,
+      image_base64: bytesToBase64(input.image), image_filename: input.filename,
+    }
+    : {
+      icpn: input.icpn, site_id: input.siteId, operation: input.operation,
+      address: input.address, length: input.length,
+    };
   const payload = await request<{ ok: true; plan: ProgrammingPlan }>(`${base(alias)}/plans`, {
     method: "POST",
-    body: JSON.stringify({
-      icpn: input.icpn,
-      site_id: input.siteId,
-      image_base64: bytesToBase64(input.image),
-      image_filename: input.filename,
-    }),
+    body: JSON.stringify(body),
   });
   return payload.plan;
 }

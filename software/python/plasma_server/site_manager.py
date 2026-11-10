@@ -20,6 +20,7 @@ from plasma_interfaces.fpga import FPGAInterface
 from plasma_interfaces.mock import MockActivityTracker, MockInterface
 from plasma_interfaces.openocd import OpenOCDInterface
 from plasma_interfaces.package_provider import PackageProviderInterface, TrustedProviderAction
+from plasma_opf import bundle_v3
 
 from .execution_router import RoutedProgrammingHandler, SiteExecutionRouter
 from .job_manager import JobRegistry, JobRuntime
@@ -27,6 +28,8 @@ from .runtime_control import RuntimeQuiesceGate
 from .site_worker import SiteWorker
 
 InterfaceFactory = Callable[[SiteConfig], BaseInterface]
+# OFE-1B Job Image source (Gateway-validated, PPU re-verified at admission).
+JOB_BINDING_KEYS = frozenset({"job_binding", "job_image_asset"})
 
 
 @dataclass(slots=True)
@@ -71,6 +74,8 @@ class SiteManager:
         self._active_asset_set_reader = active_asset_set_reader
         # Wired by the trusted PPU PackageActionRuntime, never from a Job or ZIP.
         self._bundle_firmware_resolver: Callable[..., dict[str, Any]] | None = None
+        # OFE-1B: PPU-derived Resource identity of the Active Set (same wiring rule).
+        self._active_resource_resolver: Callable[[], dict[str, Any]] | None = None
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
         self.interfaces: dict[int, BaseInterface] = {}
@@ -427,6 +432,114 @@ class SiteManager:
             return {**lease.snapshot(),
                     "delegated_package_job_ids": sorted(self._delegated_package_jobs)}
 
+    def _resolve_active_resources(self) -> dict[str, Any]:
+        """PPU-derived Resource identity; any resolver failure fails closed."""
+        if self._active_resource_resolver is None:
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                              "JOB_RESOURCE_IDENTITY_NOT_WIRED")
+        try:
+            identity = self._active_resource_resolver()
+        except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                              "JOB_RESOURCE_IDENTITY_UNAVAILABLE:" + str(exc)[:160]) from exc
+        try:
+            digest = bundle_v3.resource_set_sha256(identity["resource_set"])
+        except (bundle_v3.BundleBuildError, KeyError, TypeError) as exc:
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                              "JOB_RESOURCE_IDENTITY_INVALID") from exc
+        if (identity.get("state") != "VERIFIED"
+                or identity.get("resource_set_sha256") != digest
+                or type(identity.get("asset_set_sha256")) is not str
+                or type(identity.get("generation")) is not int):
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                              "JOB_RESOURCE_IDENTITY_INVALID")
+        return identity
+
+    def _admit_job_binding(self, request: JobRequest, pinned: Any) -> dict[str, Any]:
+        """OFE-1B Job Image admission inside the existing PPU execution lease.
+
+        The PPU re-derives the Resource Set from its own pinned Active Set and
+        accepts only the exact Binding of (Resource, Operation, range, Image,
+        this PPU, Site, ICPN, Profile). The Manager's Resource claim is only
+        compared, never trusted. Execution authority stays with the route.
+        """
+        meta = request.metadata
+        binding, asset = meta.get("job_binding"), meta.get("job_image_asset")
+        image_operation = request.operation.value in bundle_v3.IMAGE_OPERATIONS
+        if (request.max_retries != 0 or request.image_ref is not None
+                or type(binding) is not dict
+                or type(meta.get("provider")) is not str
+                or type(meta.get("profile")) is not str
+                or (image_operation and (type(asset) is not dict or not request.image))
+                or (not image_operation and (asset is not None or request.image))):
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "JOB_BINDING_NOT_QUALIFIED")
+        if type(pinned) is not dict or pinned.get("state") != "ACTIVE":
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "JOB_RESOURCE_NOT_ACTIVE")
+        identity = self._resolve_active_resources()
+        if (identity["asset_set_sha256"] != pinned.get("asset_set_sha256")
+                or identity["generation"] != pinned.get("generation")):
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                              "JOB_RESOURCE_ACTIVE_SET_CHANGED")
+        resource = identity["resource_set"]
+        kinds = {p["kind"]: p["id"] for p in resource["packages"]}
+        if (meta["provider"] != kinds.get("platform-provider")
+                or meta["profile"] != kinds.get("programming-profile")):
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "JOB_RESOURCE_PACKAGE_MISMATCH")
+        if request.target != resource["constraints"]["icpn"]:
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "JOB_TARGET_MISMATCH")
+        job_range = binding.get("range") if type(binding.get("range")) is dict else {}
+        address = None if image_operation else job_range.get("address")
+        length = None if image_operation else job_range.get("length")
+        try:
+            image = (bundle_v3.verify_image_asset(asset, request.image, resource)
+                     if image_operation else None)
+            binding_sha256 = bundle_v3.verify_job_binding(
+                binding, resource, image, ppu_id=self.config.ppu.id,
+                site_id=request.site_id, operation=request.operation.value,
+                address=address, length=length)
+        except bundle_v3.BundleBuildError as exc:
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                              f"JOB_BINDING_DENIED:{exc}") from exc
+        if request.operation is Operation.READ:
+            sections = request.map_data.get("sections") if isinstance(request.map_data, dict) else None
+            if (not isinstance(sections, list) or len(sections) != 1
+                    or not isinstance(sections[0], dict)
+                    or sections[0].get("address") != binding["range"]["address"]
+                    or sections[0].get("length") != binding["range"]["length"]):
+                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "JOB_RANGE_MISMATCH")
+        return {
+            "schema": bundle_v3.JOB_BINDING_SCHEMA,
+            "job_binding_sha256": binding_sha256,
+            "resource_set_sha256": identity["resource_set_sha256"],
+            "image_asset_sha256": binding["image_asset_sha256"],
+            "operation": binding["operation"], "range": dict(binding["range"]),
+            "ppu_id": binding["ppu_id"], "site_id": binding["site_id"],
+            "icpn": binding["icpn"], "profile": binding["profile"],
+            "asset_set_sha256": identity["asset_set_sha256"],
+            "generation": identity["generation"],
+        }
+
+    def active_resources_snapshot(self) -> dict[str, Any]:
+        """Read-only PPU-derived Resource identity for the Manager reuse decision."""
+        if self._active_resource_resolver is None:
+            return {"state": "UNSUPPORTED"}
+        try:
+            identity = self._resolve_active_resources()
+        except PlasmaError as exc:
+            return {"state": "UNAVAILABLE", "reason": exc.message[:200]}
+        resource = identity["resource_set"]
+        kinds = {p["kind"]: p["id"] for p in resource["packages"]}
+        return {
+            "state": "VERIFIED",
+            "asset_set_sha256": identity["asset_set_sha256"],
+            "generation": identity["generation"],
+            "resource_set_sha256": identity["resource_set_sha256"],
+            "provider": kinds["platform-provider"], "profile": kinds["programming-profile"],
+            "icpn": resource["constraints"]["icpn"],
+            "sites": list(resource["constraints"]["sites"]),
+            "operations": list(resource["constraints"]["operations"]),
+        }
+
     def enqueue(self, request: JobRequest, *,
                 trusted_provider: TrustedProviderAction | None = None) -> asyncio.Future[JobResult]:
         if not self._started:
@@ -488,6 +601,12 @@ class SiteManager:
                 "bundle_asset_sha256",
             }
             selected = bundle_keys.intersection(request.metadata)
+            binding_selected = bool(JOB_BINDING_KEYS.intersection(request.metadata))
+            if selected and binding_selected:
+                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                  "JOB_IMAGE_SOURCE_NOT_EXCLUSIVE")
+            if binding_selected:
+                runtime.job_binding = self._admit_job_binding(request, pinned)
             if selected:
                 if (selected != bundle_keys
                         or request.operation is not Operation.FLASH_CYCLE
@@ -664,7 +783,12 @@ class SiteManager:
                     "target": config.target if config.enabled else None,
                 }
             )
+        ppu = self.ppu_snapshot()
+        if site_id is not None:
+            # Site-scoped status (Manager readiness) carries the PPU-derived
+            # Resource identity; unscoped UI polling does not pay for it.
+            ppu["active_resources"] = self.active_resources_snapshot()
         return {
-            "ppu": self.ppu_snapshot(),
+            "ppu": ppu,
             "sites": sites,
         }

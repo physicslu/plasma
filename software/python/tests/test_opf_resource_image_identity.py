@@ -562,32 +562,41 @@ def test_gateway_job_request_refuses_new_identity_fields(extra):
         handler._job_request(body, client_id="plasma-web")
 
 
-def test_same_resources_new_firmware_still_requires_b1_b2_b3(tmp_path):
-    """Equal Resource identity never skips B1/B2/B3 or owner authorization (OFE-1B)."""
+def test_same_resources_new_firmware_reuses_ppu_verified_resources(tmp_path):
+    """OFE-1B replaces the OFE-1A rule: equal PPU-derived Resources skip B1/B2/B3."""
     other = bundle_v3.build_user_image_bundle(route(), FW_B, filename="app.bin")
     current = bundle_v3.build_user_image_bundle(route(), image(), filename="app.bin")
     assert other.resource_set_sha256 == current.resource_set_sha256
     workflow, coord, gateway = make(
         tmp_path, coordinator=FakeCoordinator(active_sha=other.archive_sha256))
     planned, run = run_once(workflow)
-    assert planned["activation_required"] is True
-    assert planned["steps"][:3] == ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"]
-    assert planned["bundle"]["resource_set_sha256"] == other.resource_set_sha256
+    assert planned["activation_required"] is False
+    assert planned["steps"][0] == "RESOURCE_REUSE"
+    assert planned["resource"]["resource_set_sha256"] == other.resource_set_sha256
     assert run["outcome"] == "PASS"
-    assert coord.calls.count("B2") == 1 and coord.calls.count("B3") == 1
-    assert gateway.posts[0]["asset_set_sha256"] == current.archive_sha256
+    assert not {"B1_create", "B2", "B3"} & set(coord.calls)
+    assert coord.active_sha == other.archive_sha256
     assert set(gateway.posts[0]) == {
         "site_id", "operation", "timeout_s", "target", "provider", "profile",
-        "asset_set_sha256", "asset_package_id", "bundle_asset_sha256"}
+        "job_binding", "image_asset", "asset_base64"}
 
 
 def test_active_set_reporting_resource_identity_is_not_trusted(tmp_path):
-    """A PPU/coordinator echoing the Resource SHA as Active never skips activation."""
+    """A Resource SHA presented as the Active Set is no PPU-verified identity."""
     current = bundle_v3.build_user_image_bundle(route(), image(), filename="app.bin")
-    workflow, coord, _gateway = make(
-        tmp_path, coordinator=FakeCoordinator(active_sha=current.resource_set_sha256))
+    coord = FakeCoordinator(active_sha=current.resource_set_sha256)
+
+    class PPU(FakeGateway):
+        def _resources(self):
+            # Real PPU: no staged Set under that SHA -> verify_staged fails.
+            if self.coordinator.active_sha == current.resource_set_sha256:
+                return {"state": "UNAVAILABLE", "reason": "ASSET_SET_NOT_STAGED"}
+            return super()._resources()
+
+    workflow, coord, _gateway = make(tmp_path, coordinator=coord,
+                                     gateway=PPU(image=image(), coordinator=coord))
     planned = workflow.plan(ALIAS, plan_body())["plan"]
-    assert planned["activation_required"] is True
+    assert planned["activation_required"] is True and planned["resource"]["reuse"] is False
     started = workflow.start(ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
     run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
     assert "B3" in coord.calls and run["outcome"] == "PASS"

@@ -6,13 +6,18 @@ the Manager then
 1. resolves a committed Programming Route (Provider + Profile Packages),
 2. builds the canonical Bundle v3 with the shared ``plasma_opf.bundle_v3``
    writer,
-3. compares the PPU-verified Active Asset Set and, only when different, runs
-   the EXISTING Manager Bootstrap B1 upload, B2 admission and B3 ``activate``
-   (``fpga_load=false``) through ``ManagerBootstrapCoordinator`` which issues
-   the device-bound owner authorizations,
-4. submits exactly one ``flash_cycle`` Job to the PPU Gateway ``/api/jobs``,
-5. observes ``/api/status?job=`` and verifies readback SHA256, verified bytes
-   and SAFE_OFF.
+3. compares the Programming Resource Set the PPU derived from its own
+   verified Active Set (OFE-1B; never the Manager's claim) with the Route's
+   Resource Set. Same Resources: B1/B2/B3 are skipped and only the Job Image
+   travels. Different or unprovable-but-replaceable Resources: the EXISTING
+   Manager Bootstrap B1 upload, B2 admission and B3 ``activate``
+   (``fpga_load=false``) run through ``ManagerBootstrapCoordinator`` which
+   issues the device-bound owner authorizations,
+4. submits exactly one Job with the user-selected Operation and its exact
+   Job Binding (Resource, Operation, range, Image, PPU, Site, ICPN, Profile)
+   to the PPU Gateway ``/api/jobs``; the PPU re-verifies the Binding,
+5. observes ``/api/status?job=`` and verifies the PPU-echoed Binding,
+   Image identity, readback SHA256, verified bytes and SAFE_OFF.
 
 This module is deliberately NOT a deployment coordinator or execution router.
 The PPU Bootstrap coordinator stays the only Bundle install/activation
@@ -42,7 +47,10 @@ from plasma_opf import bundle_v3
 ROUTES_ENV = "PLASMA_PROGRAMMING_ROUTES_ROOT"
 ROUTES_RELATIVE = Path("data/opf/programming-routes")
 RUN_SCHEMA = "plasma.manager.bundle-programming-run.v1"
-PLAN_SCHEMA = "plasma.manager.bundle-programming-plan.v1"
+PLAN_SCHEMA = "plasma.manager.bundle-programming-plan.v2"
+RECEIPT_SCHEMA = "plasma.manager.programming-receipt.v2"
+# Only flash_cycle has a qualified PPU backend (C-3 OpenOCD) and receipt contract.
+RECEIPT_OPERATIONS = frozenset({"flash_cycle"})
 CONFIRM_TOKEN = "PROGRAM"
 ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED"
 UPLOAD_CHUNK_BYTES = 256 * 1024
@@ -104,9 +112,15 @@ class _Plan:
     alias: str
     site: int
     created_monotonic: float
-    bundle: bundle_v3.ProgrammingBundle
+    bundle: bundle_v3.ProgrammingBundle | None
     route: bundle_v3.ProgrammingRoute
     payload: dict[str, Any]
+    operation: str
+    resource_set_sha256: str
+    image: bytes | None
+    image_asset: dict[str, Any] | None
+    binding: dict[str, Any]
+    binding_sha256: str
 
 
 @dataclass
@@ -306,7 +320,8 @@ class BundleProgrammingWorkflow:
         if target is not None and (row.get("interface") != "openocd" or row.get("target") != target):
             raise _StepFailure("SITE_TARGET_NOT_FROM_ACTIVE_SET")
         return {"ppu_id": ppu.get("ppu_id"), "site_id": site, "state": "idle",
-                "target": row.get("target")}
+                "target": row.get("target"),
+                "active_resources": ppu.get("active_resources")}
 
     def _unknown_latched(self, alias: str) -> _Run | None:
         for run in self._runs.values():
@@ -324,19 +339,59 @@ class BundleProgrammingWorkflow:
     def list_routes(self) -> dict[str, Any]:
         return {"ok": True, "routes": [r.summary() for r in self.routes()]}
 
+    def _ppu_resources(self, alias: str, site: int) -> tuple[str, dict[str, Any]]:
+        """PPU id + the Resource identity the PPU derived from its Active Set."""
+        record = self._record(alias)
+        try:
+            client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+            status = self._gateway_get(client, f"/api/status?site={site}")
+        except Exception as exc:  # noqa: BLE001 - read-only; never guess a reuse decision
+            raise ProgrammingError(503, "ppu_resource_identity_unknown",
+                                   "PPU Resource identity could not be read; nothing was changed") from exc
+        ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
+        report = ppu.get("active_resources")
+        ppu_id = ppu.get("ppu_id")
+        if not isinstance(report, dict) or report.get("state") == "UNSUPPORTED":
+            raise ProgrammingError(409, "ppu_runtime_resource_identity_unsupported",
+                                   "PPU Runtime does not report a verified Resource identity (OFE-1B)")
+        if type(ppu_id) is not str or not ppu_id:
+            raise ProgrammingError(503, "ppu_resource_identity_unknown", "PPU identity is missing")
+        return ppu_id, report
+
     def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        if not isinstance(body, Mapping) or not {"icpn", "site_id", "image_base64"} <= set(body) \
-                or set(body) - {"icpn", "site_id", "image_base64", "image_filename"}:
+        allowed = {"icpn", "site_id", "operation", "image_base64", "image_filename",
+                   "address", "length"}
+        if not isinstance(body, Mapping) or not {"icpn", "site_id", "operation"} <= set(body) \
+                or set(body) - allowed:
             raise ProgrammingError(400, "invalid_request",
-                                   "plan requires icpn, site_id, image_base64 and optional image_filename")
-        icpn, site = body["icpn"], body["site_id"]
+                                   "plan requires icpn, site_id, operation and the Operation's "
+                                   "image_base64 or address/length")
+        icpn, site, operation = body["icpn"], body["site_id"], body["operation"]
         if type(icpn) is not str or not icpn.strip() or len(icpn) > 96:
             raise ProgrammingError(400, "invalid_request", "icpn is invalid")
         if type(site) is not int or isinstance(site, bool) or not 1 <= site <= 64:
             raise ProgrammingError(400, "invalid_request", "site_id is invalid")
-        image = _strict_base64(body["image_base64"])
-        if not 0 < len(image) <= bundle_v3.MAX_IMAGE_BYTES:
-            raise ProgrammingError(413, "image_too_large", "image exceeds the Console upload limit")
+        # The Operation is the user's choice; the Manager never rewrites it.
+        if type(operation) is not str or operation not in bundle_v3.OPERATIONS:
+            raise ProgrammingError(400, "invalid_request",
+                                   f"operation must be one of {', '.join(bundle_v3.OPERATIONS)}")
+        image_operation = operation in bundle_v3.IMAGE_OPERATIONS
+        image: bytes | None = None
+        address = length = None
+        if image_operation:
+            if "image_base64" not in body or {"address", "length"} & set(body):
+                raise ProgrammingError(400, "invalid_request",
+                                       f"{operation} requires image_base64 and takes its range from the Image")
+            image = _strict_base64(body["image_base64"])
+            if not 0 < len(image) <= bundle_v3.MAX_IMAGE_BYTES:
+                raise ProgrammingError(413, "image_too_large", "image exceeds the Console upload limit")
+        else:
+            if {"image_base64", "image_filename"} & set(body) or not {"address", "length"} <= set(body):
+                raise ProgrammingError(400, "invalid_request",
+                                       f"{operation} requires explicit address and length and no image")
+            address, length = body["address"], body["length"]
+            if any(type(v) is not int or isinstance(v, bool) or v < 0 for v in (address, length)):
+                raise ProgrammingError(400, "invalid_request", "address and length must be integers")
         self._require_commissioned(alias)
         matches = bundle_v3.resolve_routes(self.routes(), icpn=icpn.strip(), site=site)
         if not matches:
@@ -346,9 +401,17 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(409, "programming_route_ambiguous",
                                    "more than one Programming Route matches; refusing to guess")
         route = matches[0]
+        if operation not in route.capabilities["operations"]:
+            raise ProgrammingError(422, "operation_not_in_profile",
+                                   f"Programming Profile {route.profile_id} does not declare {operation}")
+        built = image_asset = None
         try:
-            built = bundle_v3.build_user_image_bundle(
-                route, image, filename=body.get("image_filename"))
+            resource = bundle_v3.resource_set_descriptor(route)
+            resource_sha = bundle_v3.resource_set_sha256(resource)
+            if image is not None:
+                built = bundle_v3.build_user_image_bundle(
+                    route, image, filename=body.get("image_filename"))
+                image_asset = bundle_v3.image_asset_descriptor(resource, image)
         except bundle_v3.BundleBuildError as exc:
             raise ProgrammingError(422, "bundle_incompatible", str(exc)) from exc
         platform = self.coordinator.status(alias)
@@ -363,18 +426,55 @@ class BundleProgrammingWorkflow:
         if active.get("state") == "RECOVERY_REQUIRED":
             raise ProgrammingError(409, "ppu_recovery_required",
                                    "PPU Active Asset Set requires explicit recovery")
-        activation_required = not (active.get("state") == "ACTIVE"
-                                   and active.get("asset_set_sha256") == built.archive_sha256)
+        ppu_id, report = self._ppu_resources(alias, site)
+        if report.get("state") == "VERIFIED":
+            if not (active.get("state") == "ACTIVE"
+                    and report.get("asset_set_sha256") == active.get("asset_set_sha256")):
+                raise ProgrammingError(409, "active_set_report_inconsistent",
+                                       "PPU Runtime and Bootstrap report different Active Sets")
+            resource_reuse = report.get("resource_set_sha256") == resource_sha
+        elif report.get("state") == "UNAVAILABLE":
+            # No provable Resource identity (e.g. EMPTY or a non-canonical Set):
+            # never skip deployment on a guess.
+            resource_reuse = False
+        else:
+            raise ProgrammingError(409, "ppu_runtime_resource_identity_unsupported",
+                                   "PPU Resource identity report is not recognized")
+        activation_required = not resource_reuse
+        if activation_required and built is None:
+            raise ProgrammingError(409, "resource_activation_requires_image",
+                                   f"{operation} needs these Programming Resources already Active; "
+                                   "program an Image first")
+        try:
+            binding = bundle_v3.job_image_binding(
+                resource, image_asset, ppu_id=ppu_id, site_id=site, operation=operation,
+                address=address, length=length)
+        except bundle_v3.BundleBuildError as exc:
+            raise ProgrammingError(422, "job_binding_invalid", str(exc)) from exc
+        binding_sha = bundle_v3.sha256_hex(bundle_v3.canonical_json(binding))
         plan_id = secrets.token_hex(16)
         payload = {
             "schema": PLAN_SCHEMA, "plan_id": plan_id, "ppu_alias": alias,
-            "site_id": site, "route": route.summary(), "bundle": built.summary(),
+            "site_id": site, "operation": operation, "route": route.summary(),
+            "bundle": None if built is None else built.summary(),
+            "resource": {
+                "resource_set_sha256": resource_sha,
+                "ppu_reported": {k: report.get(k) for k in (
+                    "state", "asset_set_sha256", "generation", "resource_set_sha256")},
+                "reuse": resource_reuse,
+            },
+            "image_asset": None if image_asset is None else {
+                "image_asset_sha256": bundle_v3.image_asset_sha256(image_asset),
+                "sha256": image_asset["sha256"], "size": image_asset["size"],
+                "load_address": image_asset["load_address"], "format": image_asset["format"]},
+            "job_binding": binding, "job_binding_sha256": binding_sha,
             "active_asset_set": {"state": active.get("state"),
                                  "asset_set_sha256": active.get("asset_set_sha256")},
             "activation_required": activation_required,
             "fpga_load": False,
-            "steps": (["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] if activation_required else [])
-                     + ["FLASH_CYCLE_JOB", "VERIFY_RECEIPT"],
+            "steps": (["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] if activation_required
+                      else ["RESOURCE_REUSE"])
+                     + [f"{operation.upper()}_JOB", "VERIFY_RECEIPT"],
             "catalog_gate": "NOT_USED",
             "confirm_required": CONFIRM_TOKEN,
         }
@@ -384,7 +484,10 @@ class BundleProgrammingWorkflow:
                 del self._plans[key]
             while len(self._plans) >= MAX_PLANS:
                 del self._plans[min(self._plans, key=lambda k: self._plans[k].created_monotonic)]
-            self._plans[plan_id] = _Plan(plan_id, alias, site, now, built, route, payload)
+            self._plans[plan_id] = _Plan(
+                plan_id, alias, site, now, built, route, payload, operation=operation,
+                resource_set_sha256=resource_sha, image=image, image_asset=image_asset,
+                binding=binding, binding_sha256=binding_sha)
         return {"ok": True, "plan": payload}
 
     def start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -451,17 +554,30 @@ class BundleProgrammingWorkflow:
             self._update(run, state="preflight")
             self._readiness(client, run.site, None)
             self._step(run, "PREFLIGHT", "PASS")
-            if plan.payload["activation_required"]:
+            activated = plan.payload["activation_required"]
+            if activated:
                 self._activate(run, plan)
-            else:
-                self._step(run, "ACTIVE_SET", "ALREADY_ACTIVE",
-                           asset_set_sha256=plan.bundle.archive_sha256)
             active = self.coordinator.assets(run.alias)
+            expected_set = (plan.bundle.archive_sha256 if activated
+                            else plan.payload["active_asset_set"]["asset_set_sha256"])
             if not (active.get("state") == "ACTIVE"
-                    and active.get("asset_set_sha256") == plan.bundle.archive_sha256):
-                raise _StepFailure("ACTIVE_SET_MISMATCH_AFTER_ACTIVATION")
+                    and active.get("asset_set_sha256") == expected_set):
+                raise _StepFailure("ACTIVE_SET_MISMATCH_AFTER_ACTIVATION" if activated
+                                   else "ACTIVE_SET_CHANGED_SINCE_PLAN")
             self._update(run, state="submitting")
-            self._readiness(client, run.site, plan.route.icpn)
+            ready = self._readiness(client, run.site, plan.route.icpn)
+            # The PPU itself must prove the Resources the Job is bound to.
+            report = ready.get("active_resources")
+            if not (isinstance(report, dict) and report.get("state") == "VERIFIED"
+                    and report.get("asset_set_sha256") == expected_set
+                    and report.get("resource_set_sha256") == plan.resource_set_sha256
+                    and ready.get("ppu_id") == plan.binding["ppu_id"]):
+                raise _StepFailure("RESOURCE_IDENTITY_NOT_CONFIRMED")
+            if not activated:
+                self._step(run, "RESOURCE_REUSE", "PPU_VERIFIED",
+                           asset_set_sha256=expected_set,
+                           resource_set_sha256=plan.resource_set_sha256,
+                           generation=report.get("generation"))
             job_id = self._submit_once(run, plan, client)
             self._update(run, state="running")
             job = self._poll_job(run, client, job_id)
@@ -559,14 +675,16 @@ class BundleProgrammingWorkflow:
             self.sleep(self.poll_interval_s)
 
     def _submit_once(self, run: _Run, plan: _Plan, client: Any) -> str:
-        bundle = plan.bundle
-        payload = {
-            "site_id": run.site, "operation": "flash_cycle", "timeout_s": 180.0,
-            "target": bundle.icpn, "provider": bundle.provider_id, "profile": bundle.profile_id,
-            "asset_set_sha256": bundle.archive_sha256,
-            "asset_package_id": bundle.asset_package_id,
-            "bundle_asset_sha256": bundle.image_sha256,
+        # Job Image source (OFE-1B): the user's Operation + exact Binding; the
+        # Image travels once with the Job, never as a new Resource Bundle.
+        payload: dict[str, Any] = {
+            "site_id": run.site, "operation": plan.operation, "timeout_s": 180.0,
+            "target": plan.route.icpn, "provider": plan.route.provider_id,
+            "profile": plan.route.profile_id, "job_binding": plan.binding,
         }
+        if plan.image is not None:
+            payload["image_asset"] = plan.image_asset
+            payload["asset_base64"] = base64.b64encode(plan.image).decode("ascii")
         if not self.gate.try_begin_managed_write(run.alias):
             raise _StepFailure("PPU_PLATFORM_MAINTENANCE_STARTING", outcome="BLOCKED")
         try:
@@ -593,7 +711,7 @@ class BundleProgrammingWorkflow:
         except Exception as exc:
             raise _OutcomeUnknown("JOB_ID_UNKNOWN_DO_NOT_RESUBMIT") from exc
         self._update(run, job={"job_id": job_id, "state": job.get("state")})
-        self._step(run, "FLASH_CYCLE_SUBMIT", "ACCEPTED", job_id=job_id)
+        self._step(run, f"{plan.operation.upper()}_SUBMIT", "ACCEPTED", job_id=job_id)
         return job_id
 
     def _poll_job(self, run: _Run, client: Any, job_id: str) -> dict[str, Any]:
@@ -615,18 +733,33 @@ class BundleProgrammingWorkflow:
             self.sleep(self.poll_interval_s)
 
     def _verify(self, run: _Run, plan: _Plan, job: dict[str, Any]) -> None:
-        bundle = plan.bundle
         result = job.get("result") if isinstance(job.get("result"), dict) else {}
         details = result.get("details") if isinstance(result.get("details"), dict) else {}
         flash = details.get("flash_cycle") if isinstance(details.get("flash_cycle"), dict) else {}
+        echo = job.get("job_binding") if isinstance(job.get("job_binding"), dict) else {}
+        binding = plan.binding
+        expected_sha = None if plan.image is None else bundle_v3.sha256_hex(plan.image)
+        expected_size = None if plan.image is None else len(plan.image)
+        # Expected (Manager plan) / Observed (PPU) / Readback are kept distinct.
         receipt = {
+            "schema": RECEIPT_SCHEMA,
             "job_id": job.get("job_id"), "job_state": job.get("state"),
             "site_id": job.get("site_id"), "operation": job.get("operation"),
-            "asset_set_sha256": bundle.archive_sha256,
-            "image_sha256": bundle.image_sha256, "image_size": bundle.image_size,
-            "image_sha256": result.get("image_sha256"), "image_size": result.get("image_size"),
+            "target": plan.route.icpn, "ppu_id": binding["ppu_id"],
+            "expected_image_sha256": expected_sha, "expected_image_size": expected_size,
+            "observed_image_sha256": result.get("image_sha256"),
+            "observed_image_size": result.get("image_size"),
             "readback_sha256": flash.get("readback_sha256"),
             "bytes_verified": flash.get("bytes_verified"),
+            "expected_resource_set_sha256": plan.resource_set_sha256,
+            "observed_resource_set_sha256": echo.get("resource_set_sha256"),
+            "expected_job_binding_sha256": plan.binding_sha256,
+            "observed_job_binding_sha256": echo.get("job_binding_sha256"),
+            "expected_image_asset_sha256": binding["image_asset_sha256"],
+            "observed_image_asset_sha256": echo.get("image_asset_sha256"),
+            "active_asset_set_sha256": echo.get("asset_set_sha256"),
+            "active_generation": echo.get("generation"),
+            "resource_reuse": not plan.payload["activation_required"],
             "safe_off": flash.get("safe_off"), "flash_result": flash.get("result"),
             "attempts": result.get("attempts"), "error": result.get("error"),
             "elapsed_ms": result.get("elapsed_ms"),
@@ -634,14 +767,22 @@ class BundleProgrammingWorkflow:
         # SAFE_OFF first so an unsafe end state is always the reported reason.
         checks = [
             (flash.get("safe_off") is True, "SAFE_OFF_NOT_VERIFIED"),
+            (plan.operation in RECEIPT_OPERATIONS, "OPERATION_RECEIPT_UNSUPPORTED"),
             (job.get("state") == "success" and result.get("state") == "success", "JOB_NOT_SUCCESS"),
-            (job.get("site_id") == run.site and job.get("operation") == "flash_cycle", "JOB_IDENTITY_MISMATCH"),
-            (result.get("image_sha256") == bundle.image_sha256
-             and result.get("image_size") == bundle.image_size, "IMAGE_IDENTITY_MISMATCH"),
+            (job.get("site_id") == run.site and job.get("operation") == plan.operation,
+             "JOB_IDENTITY_MISMATCH"),
+            (echo.get("job_binding_sha256") == plan.binding_sha256
+             and echo.get("resource_set_sha256") == plan.resource_set_sha256
+             and echo.get("image_asset_sha256") == binding["image_asset_sha256"]
+             and echo.get("operation") == plan.operation
+             and echo.get("site_id") == run.site
+             and echo.get("ppu_id") == binding["ppu_id"], "JOB_BINDING_NOT_CONFIRMED"),
+            (result.get("image_sha256") == expected_sha
+             and result.get("image_size") == expected_size, "IMAGE_IDENTITY_MISMATCH"),
             (result.get("attempts") == 1, "JOB_ATTEMPTS_NOT_ONE"),
             (flash.get("result") == "PASS", "FLASH_CYCLE_NOT_PASS"),
-            (flash.get("readback_sha256") == bundle.image_sha256, "READBACK_SHA256_MISMATCH"),
-            (flash.get("bytes_verified") == bundle.image_size, "VERIFIED_BYTES_MISMATCH"),
+            (flash.get("readback_sha256") == expected_sha, "READBACK_SHA256_MISMATCH"),
+            (flash.get("bytes_verified") == expected_size, "VERIFIED_BYTES_MISMATCH"),
         ]
         failed = [reason for ok, reason in checks if not ok]
         outcome = "PASS" if not failed else "FAIL"

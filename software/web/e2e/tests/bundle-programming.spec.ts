@@ -9,6 +9,8 @@ const FIRMWARE = Buffer.from(Array.from({ length: 4096 }, (_, i) => i % 251));
 const BUNDLE_SHA = "a".repeat(64);
 const IMAGE_SHA = "f".repeat(64);
 const RUN_ID = "d".repeat(32);
+const RESOURCE_SHA = "9".repeat(64);
+const BINDING_SHA = "8".repeat(64);
 
 const registry = {
   ok: true, service: "plasma-manager", contract_version: "1", mutable: true, storage: "file",
@@ -52,13 +54,21 @@ const device = {
 
 function plan(activationRequired: boolean) {
   return {
-    plan_id: "e".repeat(32), ppu_alias: ALIAS, site_id: 2, route,
+    plan_id: "e".repeat(32), ppu_alias: ALIAS, site_id: 2, operation: "flash_cycle", route,
     bundle: { archive_sha256: BUNDLE_SHA, archive_size: 5000, bundle_name: "stm32f103c8t6-site2-img-ffffffffffff",
       provider: route.provider, profile: route.profile, asset_package_id: "img-ffffffffffffffff",
       image_filename: "app.bin", image_sha256: IMAGE_SHA, image_size: FIRMWARE.length, icpn: route.icpn },
-    active_asset_set: { state: "ACTIVE", asset_set_sha256: activationRequired ? "b".repeat(64) : BUNDLE_SHA },
+    resource: { resource_set_sha256: RESOURCE_SHA, reuse: !activationRequired,
+      ppu_reported: { state: "VERIFIED", asset_set_sha256: "b".repeat(64), generation: 3,
+        resource_set_sha256: activationRequired ? "7".repeat(64) : RESOURCE_SHA } },
+    image_asset: { image_asset_sha256: "6".repeat(64), sha256: IMAGE_SHA, size: FIRMWARE.length,
+      load_address: 134217728, format: "binary" },
+    job_binding: { operation: "flash_cycle", range: { address: 134217728, length: FIRMWARE.length },
+      image_asset_sha256: "6".repeat(64), resource_set_sha256: RESOURCE_SHA },
+    job_binding_sha256: BINDING_SHA,
+    active_asset_set: { state: "ACTIVE", asset_set_sha256: "b".repeat(64) },
     activation_required: activationRequired, fpga_load: false,
-    steps: [...(activationRequired ? ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] : []), "FLASH_CYCLE_JOB", "VERIFY_RECEIPT"],
+    steps: [...(activationRequired ? ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] : ["RESOURCE_REUSE"]), "FLASH_CYCLE_JOB", "VERIFY_RECEIPT"],
     catalog_gate: "NOT_USED", confirm_required: "PROGRAM",
   };
 }
@@ -80,9 +90,16 @@ function run(outcome: Outcome | null, reason: string | null = null, safeOff = tr
     activation: { b3_transaction_id: "c".repeat(32) },
     job: { job_id: "job-20261109-120000-0123abcd", state: outcome ? "success" : "running", progress_percent: outcome ? 100 : 40 },
     receipt: outcome && outcome !== "OUTCOME_UNKNOWN" ? {
-      job_id: "job-20261109-120000-0123abcd", job_state: "success", readback_sha256: IMAGE_SHA,
-      image_sha256: IMAGE_SHA, image_size: FIRMWARE.length, bytes_verified: FIRMWARE.length,
-      safe_off: safeOff, flash_result: "PASS", asset_set_sha256: BUNDLE_SHA, elapsed_ms: 10000,
+      schema: "plasma.manager.programming-receipt.v2",
+      job_id: "job-20261109-120000-0123abcd", job_state: "success", operation: "flash_cycle",
+      site_id: 2, target: route.icpn, readback_sha256: IMAGE_SHA,
+      expected_image_sha256: IMAGE_SHA, expected_image_size: FIRMWARE.length,
+      observed_image_sha256: IMAGE_SHA, observed_image_size: FIRMWARE.length,
+      bytes_verified: FIRMWARE.length,
+      expected_resource_set_sha256: RESOURCE_SHA, observed_resource_set_sha256: RESOURCE_SHA,
+      expected_job_binding_sha256: BINDING_SHA, observed_job_binding_sha256: BINDING_SHA,
+      active_asset_set_sha256: BUNDLE_SHA, resource_reuse: false,
+      safe_off: safeOff, flash_result: "PASS", elapsed_ms: 10000,
     } : null,
     job_submission_count: 1, auto_retry: "DISABLED", acknowledged: false,
   };
@@ -91,7 +108,7 @@ function run(outcome: Outcome | null, reason: string | null = null, safeOff = tr
 const json = (body: unknown, status = 200) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
 
 type Mocks = {
-  planStatus?: number; planBody?: unknown; activationRequired?: boolean;
+  planStatus?: number; planBody?: unknown; activationRequired?: boolean; routes?: unknown[];
   startStatus?: number; startBody?: unknown; final?: ReturnType<typeof run>;
 };
 
@@ -103,7 +120,7 @@ async function mockManager(page: Page, mocks: Mocks = {}) {
   await page.route(/\/api\/manager\/devices\/search\?/, r => r.fulfill(json({
     ok: true, scope: "customer_ic_selector", query: "STM32", levels: [1, 2, 3], catalog_size: 1,
     count: 1, total_count: 1, limit: 8, offset: 0, results: [device] })));
-  await page.route(/\/bootstrap\/programming\/routes$/, r => r.fulfill(json({ ok: true, routes: [route] })));
+  await page.route(/\/bootstrap\/programming\/routes$/, r => r.fulfill(json({ ok: true, routes: mocks.routes ?? [route] })));
   await page.route(/\/bootstrap\/programming\/plans$/, async (r: Route) => {
     counters.plans += 1;
     counters.planBodies.push(r.request().postDataJSON());
@@ -124,6 +141,17 @@ async function mockManager(page: Page, mocks: Mocks = {}) {
   return counters;
 }
 
+async function openAndSelectIc(page: Page) {
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "PPU", exact: true }).click();
+  await page.getByRole("button", { name: "Platform", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Bundle Programming" });
+  await expect(panel).toBeVisible();
+  await panel.getByLabel("Target IC").fill("STM32F103");
+  await panel.getByRole("option", { name: /STM32F103C8T6/ }).click();
+  return panel;
+}
+
 async function openAndSelect(page: Page) {
   await page.goto("/engineering");
   await page.getByRole("button", { name: "PPU", exact: true }).click();
@@ -140,12 +168,16 @@ async function openAndSelect(page: Page) {
 test("User programs image: IC → image → PPU/Site → Bundle → B1/B2/B3 → flash_cycle → receipt", async ({ page }) => {
   const counters = await mockManager(page);
   const panel = await openAndSelect(page);
-  await panel.getByRole("button", { name: "Prepare Bundle" }).click();
-  await expect(panel.getByTestId("plan-bundle-sha")).toHaveText(BUNDLE_SHA);
-  await expect(panel.getByTestId("plan-activation")).toContainText("B3 activate (no FPGA load)");
+  await expect(panel.getByLabel("Programming Operation")).toHaveValue("flash_cycle");
+  await panel.getByRole("button", { name: "Prepare Programming" }).click();
+  await expect(panel.getByTestId("plan-resource-sha")).toHaveText(RESOURCE_SHA);
+  await expect(panel.getByTestId("plan-operation")).toHaveText("flash_cycle");
+  await expect(panel.getByTestId("plan-activation")).toContainText("B3 activate Bundle");
+  await expect(panel.getByTestId("plan-activation")).toContainText("(no FPGA load)");
   const body = counters.planBodies[0];
   expect(body.icpn).toBe("STM32F103C8T6");
   expect(body.site_id).toBe(2);
+  expect(body.operation).toBe("flash_cycle");
   expect(Buffer.from(String(body.image_base64), "base64").equals(FIRMWARE)).toBe(true);
   const start = panel.getByRole("button", { name: "Start Programming" });
   await expect(start).toBeDisabled(); // explicit confirmation required
@@ -158,11 +190,35 @@ test("User programs image: IC → image → PPU/Site → Bundle → B1/B2/B3 →
   expect(counters.starts).toBe(1);
 });
 
-test("Already-active Bundle skips activation in the plan", async ({ page }) => {
+test("Same PPU-verified Resources skip activation in the plan", async ({ page }) => {
   await mockManager(page, { activationRequired: false });
   const panel = await openAndSelect(page);
-  await panel.getByRole("button", { name: "Prepare Bundle" }).click();
+  await panel.getByRole("button", { name: "Prepare Programming" }).click();
   await expect(panel.getByTestId("plan-activation")).toContainText("Not required");
+  await expect(panel.getByTestId("plan-activation")).toContainText("no B1/B2/B3");
+});
+
+test("Operation choice is limited to the Route Profile; erase/read send a range, no image", async ({ page }) => {
+  const wide = { ...route, operations: ["flash_cycle", "erase", "read"] };
+  const counters = await mockManager(page, {
+    routes: [wide],
+    planStatus: 409,
+    planBody: { ok: false, error: { code: "resource_activation_requires_image", message: "program an Image first" } },
+  });
+  const panel = await openAndSelectIc(page);
+  const select = panel.getByLabel("Programming Operation");
+  await expect(select.locator("option")).toHaveText(["flash_cycle", "erase", "read"]);
+  await select.selectOption("erase");
+  await expect(panel.getByLabel("Image file")).toHaveCount(0);
+  const prepare = panel.getByRole("button", { name: "Prepare Programming" });
+  await expect(prepare).toBeDisabled();
+  await panel.getByLabel("Range address").fill("0x08000000");
+  await panel.getByLabel("Range length").fill("1024");
+  await prepare.click();
+  await expect(panel.getByRole("alert")).toContainText("program an Image first");
+  const body = counters.planBodies[0];
+  expect(body).toEqual({ icpn: "STM32F103C8T6", site_id: 2, operation: "erase", address: 134217728, length: 1024 });
+  expect(counters.starts).toBe(0);
 });
 
 test("Incompatible selection is rejected at planning and nothing starts", async ({ page }) => {
@@ -170,7 +226,7 @@ test("Incompatible selection is rejected at planning and nothing starts", async 
     planStatus: 422, planBody: { ok: false, error: { code: "bundle_incompatible", message: "IMAGE_EXCEEDS_PROFILE_MAX_IMAGE" } },
   });
   const panel = await openAndSelect(page);
-  await panel.getByRole("button", { name: "Prepare Bundle" }).click();
+  await panel.getByRole("button", { name: "Prepare Programming" }).click();
   await expect(panel.getByRole("alert")).toContainText("IMAGE_EXCEEDS_PROFILE_MAX_IMAGE");
   await expect(panel.getByRole("button", { name: "Start Programming" })).toHaveCount(0);
   expect(counters.starts).toBe(0);
@@ -181,7 +237,7 @@ test("Missing Bundle plan and permission denial are surfaced without retry", asy
     startStatus: 404, startBody: { ok: false, error: { code: "programming_plan_not_found", message: "programming plan (Bundle) is missing or expired; prepare again" } },
   });
   const panel = await openAndSelect(page);
-  await panel.getByRole("button", { name: "Prepare Bundle" }).click();
+  await panel.getByRole("button", { name: "Prepare Programming" }).click();
   await panel.getByLabel("Confirm programming").check();
   await panel.getByRole("button", { name: "Start Programming" }).click();
   await expect(panel.getByRole("alert")).toContainText("missing or expired");
@@ -190,14 +246,14 @@ test("Missing Bundle plan and permission denial are surfaced without retry", asy
   await page.unroute(/\/bootstrap\/programming\/plans$/);
   await page.route(/\/bootstrap\/programming\/plans$/, r => r.fulfill(json(
     { ok: false, error: { code: "maintenance_authorization_required", message: "Browser maintenance authorization is required" } }, 403)));
-  await panel.getByRole("button", { name: "Prepare Bundle" }).click();
+  await panel.getByRole("button", { name: "Prepare Programming" }).click();
   await expect(panel.getByRole("alert")).toContainText("maintenance authorization is required");
 });
 
 test("OUTCOME_UNKNOWN is shown, never resubmitted, and needs explicit acknowledgement", async ({ page }) => {
   const counters = await mockManager(page, { final: run("OUTCOME_UNKNOWN", "JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT") });
   const panel = await openAndSelect(page);
-  await panel.getByRole("button", { name: "Prepare Bundle" }).click();
+  await panel.getByRole("button", { name: "Prepare Programming" }).click();
   await panel.getByLabel("Confirm programming").check();
   await panel.getByRole("button", { name: "Start Programming" }).click();
   await expect(panel.getByTestId("run-outcome")).toHaveText("OUTCOME UNKNOWN");
@@ -212,7 +268,7 @@ test("OUTCOME_UNKNOWN is shown, never resubmitted, and needs explicit acknowledg
 test("SAFE_OFF failure is a distinct FAIL", async ({ page }) => {
   await mockManager(page, { final: run("FAIL", "SAFE_OFF_NOT_VERIFIED", false) });
   const panel = await openAndSelect(page);
-  await panel.getByRole("button", { name: "Prepare Bundle" }).click();
+  await panel.getByRole("button", { name: "Prepare Programming" }).click();
   await panel.getByLabel("Confirm programming").check();
   await panel.getByRole("button", { name: "Start Programming" }).click();
   await expect(panel.getByTestId("run-outcome")).toHaveText("FAIL");
@@ -225,10 +281,10 @@ test("Manager HTTP timeout on run status keeps the run unresolved and never resu
   await page.route(new RegExp(`/bootstrap/programming/runs/${RUN_ID}$`), r => r.fulfill(json(
     { ok: false, error: { code: "manager_unavailable", message: "Manager Bootstrap path is unavailable" } }, 503)));
   const panel = await openAndSelect(page);
-  await panel.getByRole("button", { name: "Prepare Bundle" }).click();
+  await panel.getByRole("button", { name: "Prepare Programming" }).click();
   await panel.getByLabel("Confirm programming").check();
   await panel.getByRole("button", { name: "Start Programming" }).click();
   await expect(panel.getByRole("alert")).toContainText("Manager Bootstrap path is unavailable");
-  await expect(panel.getByRole("button", { name: "Prepare Bundle" })).toBeDisabled();
+  await expect(panel.getByRole("button", { name: "Prepare Programming" })).toBeDisabled();
   expect(counters.starts).toBe(1);
 });

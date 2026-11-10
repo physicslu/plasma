@@ -7,8 +7,11 @@ import {
   acknowledgeProgrammingRun,
   getProgrammingRoutes,
   getProgrammingRun,
+  IMAGE_OPERATIONS,
   planProgramming,
+  PROGRAMMING_OPERATIONS,
   startProgramming,
+  type PlanInput,
   type ProgrammingPlan,
   type ProgrammingRoute,
   type ProgrammingRun,
@@ -37,6 +40,9 @@ export default function BundleProgramming({ alias }: { alias: string }) {
   const [device, setDevice] = useState<DeviceSearchResult | null>(null);
   const [chosenSite, setChosenSite] = useState<number | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [chosenOperation, setChosenOperation] = useState<string | null>(null);
+  const [rangeAddress, setRangeAddress] = useState("");
+  const [rangeLength, setRangeLength] = useState("");
   const [planState, setPlanState] = useState<{ key: string; plan: ProgrammingPlan } | null>(null);
   const [confirmedPlanId, setConfirmedPlanId] = useState<string | null>(null);
   const [pollTick, setPollTick] = useState(0);
@@ -62,23 +68,48 @@ export default function BundleProgramming({ alias }: { alias: string }) {
   }, [icpn, routes]);
 
   const siteId = chosenSite != null && siteOptions.includes(chosenSite) ? chosenSite : siteOptions[0] ?? null;
+  // Offer only Operations the matching Route Profile declares; the user picks one.
+  const operationOptions = useMemo(() => {
+    if (!icpn || !routes || siteId == null) return [];
+    const declared = new Set(routes
+      .filter(route => route.icpn === icpn && route.sites.includes(siteId))
+      .flatMap(route => route.operations));
+    return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
+  }, [icpn, routes, siteId]);
+  const operation = chosenOperation != null && (operationOptions as readonly string[]).includes(chosenOperation)
+    ? chosenOperation
+    : operationOptions[0] ?? null;
+  const needsImage = operation != null && IMAGE_OPERATIONS.has(operation);
+  const address = /^(0x[0-9a-f]+|[0-9]+)$/i.test(rangeAddress.trim()) ? Number(rangeAddress.trim()) : null;
+  const length = /^(0x[0-9a-f]+|[0-9]+)$/i.test(rangeLength.trim()) ? Number(rangeLength.trim()) : null;
   // A prepared plan (and its confirmation) is valid only for the exact selection it was built from.
-  const selectionKey = `${alias}|${icpn ?? ""}|${siteId ?? ""}|${file ? `${file.name}:${file.size}:${file.lastModified}` : ""}`;
+  const selectionKey = `${alias}|${icpn ?? ""}|${siteId ?? ""}|${operation ?? ""}|${needsImage
+    ? (file ? `${file.name}:${file.size}:${file.lastModified}` : "")
+    : `${address ?? ""}:${length ?? ""}`}`;
   const plan = planState?.key === selectionKey ? planState.plan : null;
   const confirmed = plan != null && confirmedPlanId === plan.plan_id;
 
   const runActive = run != null && run.outcome == null;
-  const canPrepare = Boolean(icpn && siteId != null && file && !busy && !runActive);
+  const inputReady = needsImage ? file != null : address != null && length != null;
+  const canPrepare = Boolean(icpn && siteId != null && operation && inputReady && !busy && !runActive);
   const canStart = Boolean(plan && confirmed && !busy && !runActive);
 
   async function prepare() {
-    if (!icpn || siteId == null || !file) return;
+    if (!icpn || siteId == null || !operation || !inputReady) return;
     setBusy("plan");
     setError(null);
     setRun(null);
     try {
-      const image = new Uint8Array(await file.arrayBuffer());
-      const next = await planProgramming(alias, { icpn, siteId, image, filename: file.name });
+      let input: PlanInput;
+      if (needsImage && file) {
+        input = {
+          icpn, siteId, operation: operation as "flash_cycle" | "program" | "verify",
+          image: new Uint8Array(await file.arrayBuffer()), filename: file.name,
+        };
+      } else {
+        input = { icpn, siteId, operation: operation as "erase" | "read", address: address ?? 0, length: length ?? 0 };
+      }
+      const next = await planProgramming(alias, input);
       setPlanState({ key: selectionKey, plan: next });
       setConfirmedPlanId(null);
     } catch (reason) {
@@ -143,8 +174,9 @@ export default function BundleProgramming({ alias }: { alias: string }) {
           <small>PROGRAMMING</small>
           <h3>Bundle Programming</h3>
           <p>
-            Select IC, image and Site. The Manager builds the Bundle, activates it only when the PPU Active Set
-            differs, then submits one flash_cycle Job. No automatic retry.
+            Select IC, Site, Operation and its image or range. The Manager reuses the PPU&apos;s verified Programming
+            Resources when they are identical (no B1/B2/B3, no FPGA load), otherwise activates the canonical Bundle,
+            then submits one Job with your Operation. No automatic retry.
           </p>
         </div>
       </header>
@@ -162,15 +194,41 @@ export default function BundleProgramming({ alias }: { alias: string }) {
           />
         </label>
         <label>
-          <span>Image (.bin)</span>
-          <input
-            type="file"
-            accept=".bin,application/octet-stream"
-            aria-label="Image file"
-            disabled={Boolean(busy) || runActive}
-            onChange={event => setFile(event.target.files?.[0] ?? null)}
-          />
+          <span>Operation</span>
+          <select
+            aria-label="Programming Operation"
+            value={operation ?? ""}
+            disabled={!operationOptions.length || Boolean(busy) || runActive}
+            onChange={event => setChosenOperation(event.target.value)}
+          >
+            {operationOptions.map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
         </label>
+        {needsImage ? (
+          <label>
+            <span>Image (.bin)</span>
+            <input
+              type="file"
+              accept=".bin,application/octet-stream"
+              aria-label="Image file"
+              disabled={Boolean(busy) || runActive}
+              onChange={event => setFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+        ) : operation != null && (
+          <>
+            <label>
+              <span>Address</span>
+              <input aria-label="Range address" value={rangeAddress} placeholder="0x08000000"
+                disabled={Boolean(busy) || runActive} onChange={event => setRangeAddress(event.target.value)} />
+            </label>
+            <label>
+              <span>Length (bytes)</span>
+              <input aria-label="Range length" value={rangeLength} placeholder="1024"
+                disabled={Boolean(busy) || runActive} onChange={event => setRangeLength(event.target.value)} />
+            </label>
+          </>
+        )}
         <label>
           <span>Site</span>
           <select
@@ -188,7 +246,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
           </p>
         )}
         <button className="ppuSiteButton" type="button" disabled={!canPrepare} onClick={() => void prepare()}>
-          {busy === "plan" ? "Preparing Bundle…" : "Prepare Bundle"}
+          {busy === "plan" ? "Preparing…" : "Prepare Programming"}
         </button>
       </div>
 
@@ -198,14 +256,23 @@ export default function BundleProgramming({ alias }: { alias: string }) {
         <section aria-label="Programming plan" className="ppuSiteCard">
           <dl>
             <dt>PPU / Site</dt><dd>{plan.ppu_alias} / Site {plan.site_id}</dd>
-            <dt>IC</dt><dd>{plan.bundle.icpn}</dd>
+            <dt>IC</dt><dd>{plan.route.icpn}</dd>
+            <dt>Operation</dt><dd data-testid="plan-operation">{plan.operation}</dd>
             <dt>Route</dt><dd>{plan.route.route_id} ({plan.route.provider} → {plan.route.profile})</dd>
-            <dt>Image</dt><dd>{plan.bundle.image_filename} · {plan.bundle.image_size} B · <code>{short(plan.bundle.image_sha256)}</code></dd>
-            <dt>Bundle</dt><dd data-testid="plan-bundle-sha"><code>{plan.bundle.archive_sha256}</code></dd>
+            {plan.bundle && (
+              <>
+                <dt>Image</dt><dd>{plan.bundle.image_filename} · {plan.bundle.image_size} B · <code>{short(plan.bundle.image_sha256)}</code></dd>
+              </>
+            )}
+            <dt>Range</dt>
+            <dd>0x{plan.job_binding.range.address.toString(16)} · {plan.job_binding.range.length} B</dd>
+            <dt>Resources</dt><dd data-testid="plan-resource-sha"><code>{plan.resource.resource_set_sha256}</code></dd>
             <dt>Active Set</dt><dd>{plan.active_asset_set.state} <code>{short(plan.active_asset_set.asset_set_sha256)}</code></dd>
             <dt>Activation</dt>
             <dd data-testid="plan-activation">
-              {plan.activation_required ? "Required: B1 upload → B2 admit → B3 activate (no FPGA load)" : "Not required: already the Active Set"}
+              {plan.activation_required
+                ? `Required: B1 upload → B2 admit → B3 activate Bundle ${short(plan.bundle?.archive_sha256)} (no FPGA load)`
+                : "Not required: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load)"}
             </dd>
           </dl>
           <label>
@@ -215,7 +282,8 @@ export default function BundleProgramming({ alias }: { alias: string }) {
               onChange={event => setConfirmedPlanId(event.target.checked ? plan.plan_id : null)}
               aria-label="Confirm programming"
             />
-            I confirm programming {plan.bundle.icpn} on {plan.ppu_alias} Site {plan.site_id} with this exact image.
+            I confirm {plan.operation} on {plan.route.icpn} at {plan.ppu_alias} Site {plan.site_id} with this exact
+            {plan.image_asset ? " image" : " range"}.
           </label>
           <button className="ppuSiteButton primary" type="button" disabled={!canStart} onClick={() => void start()}>
             {busy === "start" ? "Starting…" : "Start Programming"}
@@ -238,8 +306,15 @@ export default function BundleProgramming({ alias }: { alias: string }) {
           )}
           {run.receipt && (
             <dl aria-label="Programming receipt">
+              <dt>Expected Image</dt><dd><code>{run.receipt.expected_image_sha256 ?? "—"}</code></dd>
+              <dt>PPU Observed Image</dt><dd><code>{run.receipt.observed_image_sha256 ?? "—"}</code></dd>
               <dt>Readback SHA256</dt><dd data-testid="receipt-readback"><code>{run.receipt.readback_sha256 ?? "—"}</code></dd>
-              <dt>Verified Bytes</dt><dd data-testid="receipt-bytes">{run.receipt.bytes_verified ?? "—"} / {run.receipt.image_size}</dd>
+              <dt>Verified Bytes</dt><dd data-testid="receipt-bytes">{run.receipt.bytes_verified ?? "—"} / {run.receipt.expected_image_size ?? "—"}</dd>
+              <dt>Resources</dt>
+              <dd data-testid="receipt-resource">
+                {run.receipt.resource_reuse ? "Reused" : "Activated"} · <code>{short(run.receipt.observed_resource_set_sha256)}</code>
+              </dd>
+              <dt>Job Binding</dt><dd><code>{short(run.receipt.observed_job_binding_sha256)}</code></dd>
               <dt>SAFE_OFF</dt><dd data-testid="receipt-safe-off">{run.receipt.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}</dd>
               <dt>Job</dt><dd>{run.receipt.job_id ?? "—"}</dd>
             </dl>

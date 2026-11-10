@@ -17,6 +17,7 @@ from plasma_core.assets import ProgrammingAsset
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest, validate_job_id
+from plasma_opf import bundle_v3
 
 from .diagnostics import execute_ps_loopback
 from .openocd_control_plane import execute_openocd_control_plane
@@ -437,6 +438,91 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             raise ValueError("asset_size does not match decoded Asset length")
         return asset
 
+    @staticmethod
+    def _job_image_request(body: dict[str, Any], operation: Operation, *,
+                           client_id: str, default_timeout_s: float) -> JobRequest:
+        """OFE-1B Job Image source: independent of the Resource Bundle.
+
+        Exclusive with the Bundle reference and the legacy inline Asset. The
+        Gateway checks Image SHA256/size/format/payload and the Binding's
+        self-consistency; the PPU SiteManager re-derives the Resource Set and
+        verifies the complete Binding under the Job lease. ``operation`` is the
+        user's; it is never rewritten. No retry, no staging cache.
+        """
+        image_operation = operation.value in bundle_v3.IMAGE_OPERATIONS
+        common = {"site_id", "operation", "timeout_s", "target", "provider", "profile", "job_binding"}
+        required = {"site_id", "operation", "target", "provider", "profile", "job_binding"}
+        if image_operation:
+            common |= {"image_asset", "asset_base64"}
+            required |= {"image_asset", "asset_base64"}
+        _require_declared_keys(body, allowed=common, required=required, label="Job Image request")
+        site_id = _parse_site_id(body["site_id"])
+        binding = body["job_binding"]
+        for key in ("target", "provider", "profile"):
+            if not isinstance(body[key], str) or not body[key]:
+                raise ValueError(f"{key} must be a non-empty string")
+        job_range = binding.get("range") if isinstance(binding, dict) else None
+        if (not isinstance(binding, dict) or binding.get("schema") != bundle_v3.JOB_BINDING_SCHEMA
+                or binding.get("operation") != operation.value
+                or binding.get("site_id") != site_id
+                or binding.get("icpn") != body["target"]
+                or binding.get("profile") != body["profile"]
+                or not isinstance(job_range, dict)
+                or type(job_range.get("address")) is not int
+                or type(job_range.get("length")) is not int):
+            raise ValueError("job_binding does not match this Job request")
+        image = b""
+        metadata: dict[str, Any] = {
+            "provider": body["provider"], "profile": body["profile"], "job_binding": binding,
+        }
+        map_data: dict[str, Any] = {}
+        if image_operation:
+            try:
+                declared = bundle_v3.parse_image_asset(body["image_asset"])
+            except bundle_v3.BundleBuildError as exc:
+                raise ValueError(f"image_asset is invalid: {exc}") from exc
+            if binding.get("image_asset_sha256") != bundle_v3.image_asset_sha256(declared):
+                raise ValueError("job_binding does not bind this image_asset")
+            if binding.get("icpn") != declared["icpn"]:
+                raise ValueError("image_asset target does not match job_binding")
+            encoded = body["asset_base64"]
+            if not isinstance(encoded, str) or not encoded:
+                raise ValueError("asset_base64 is required")
+            try:
+                data = base64.b64decode(encoded, validate=True)
+            except ValueError as exc:
+                raise ValueError("asset_base64 is invalid") from exc
+            # Reuse the existing Programming Asset -> Normalized Image path.
+            asset = ProgrammingAsset.from_upload(
+                name=f"job-image-{declared['sha256'][:16]}.bin", asset_type="image",
+                asset_format=declared["format"], data=data, sha256=declared["sha256"])
+            if asset.size != declared["size"]:
+                raise ValueError("image_asset size does not match decoded Image length")
+            normalized = asset.normalize_image()
+            if normalized.data != data:
+                raise ValueError("Job Image normalization changed the payload")
+            image = normalized.data
+            metadata.update({
+                "job_image_asset": declared,
+                "image_name": normalized.name,
+                "source_asset_name": asset.name,
+                "source_asset_sha256": asset.sha256,
+                "source_asset_type": asset.asset_type.value,
+                "source_asset_format": asset.asset_format.value,
+            })
+        else:
+            if binding.get("image_asset_sha256") is not None:
+                raise ValueError(f"{operation.value} carries no Image")
+            if operation is Operation.READ:
+                map_data = {"sections": [{"name": "flash", "address": job_range["address"],
+                                          "length": job_range["length"]}]}
+        return JobRequest(
+            site_id=site_id, operation=operation, image=image, map_data=map_data,
+            timeout_s=float(body.get("timeout_s", default_timeout_s)),
+            client_id=client_id, target=body["target"], metadata=metadata,
+            max_retries=0,
+        )
+
     def _job_request(
         self,
         body: dict[str, Any],
@@ -463,6 +549,8 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "asset_set_sha256",
                 "asset_package_id",
                 "bundle_asset_sha256",
+                "job_binding",
+                "image_asset",
                 "session_id",
                 "target",
                 "provider",
@@ -492,6 +580,12 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 raise ValueError("Bundle Programming Asset reference must be a complete, exclusive flash_cycle input")
             if not all(type(body[key]) is str and body[key] for key in bundle_fields):
                 raise ValueError("Bundle Programming Asset reference fields must be nonempty strings")
+
+        if "job_binding" in body or "image_asset" in body:
+            if bundle_selected or not allow_inline_asset:
+                raise ValueError("Job Image source must not be combined with a Bundle Programming Asset reference")
+            return self._job_image_request(body, operation, client_id=client_id,
+                                           default_timeout_s=default_timeout_s)
 
         common_fields = {"site_id", "operation", "timeout_s", "map_data", "target", "provider", "profile"}
         image_operations = {Operation.PROGRAM, Operation.VERIFY, Operation.FLASH_CYCLE}
