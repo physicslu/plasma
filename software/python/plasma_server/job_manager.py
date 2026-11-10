@@ -32,6 +32,8 @@ class JobRuntime:
     attempt_history: list[JobAttemptResult] = field(default_factory=list)
     retry_exhausted: bool = False
     active_asset_set: dict[str, Any] | None = None
+    # OFE-1B: PPU-verified Job Binding identity, echoed for the Manager receipt.
+    job_binding: dict[str, Any] | None = None
     trusted_provider: Any | None = field(default=None, repr=False)
     updated_at: str = ""
 
@@ -65,6 +67,7 @@ class JobRuntime:
             "attempt_history": [item.to_dict(protocol_version) for item in self.attempt_history],
             "retry_exhausted": self.retry_exhausted,
             "active_asset_set": self.active_asset_set,
+            "job_binding": self.job_binding,
             "updated_at": self.updated_at,
         }
         if self.result:

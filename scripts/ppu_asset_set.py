@@ -248,6 +248,62 @@ def resolve_active_firmware(
     }
 
 
+RESOURCES_SCHEMA = "plasma.ppu.active-resources.v1"
+
+
+def read_active_resource_identity(product_root: Path) -> dict[str, Any]:
+    """PPU-derived Programming Resource identity of the ONE Active Set (OFE-1B).
+
+    Derived only from the B3-verified staged bytes of the current Active Set
+    (``read_active`` -> ``verify_staged``) with the shared OFE-1A
+    ``identity_from_manifest``; a Console/Manager Resource claim is never an
+    input. Provider and Profile come from the same pinned Set, so Packages of
+    different Bundles cannot mix. The Active pointer/generation must be
+    unchanged across the derivation. Opens no hardware, switches nothing and
+    authorizes nothing: the caller compares it with a Job Binding.
+    """
+    before = read_active(product_root)
+    if before["state"] != "ACTIVE":
+        raise AssetSetError("ASSET_SET_RESOURCE_NOT_ACTIVE")
+    try:
+        from plasma_opf import bundle_v3
+    except ImportError as exc:  # Bootstrap control plane does not ship plasma_opf.
+        raise AssetSetError("ASSET_SET_RESOURCE_IDENTITY_UNAVAILABLE") from exc
+    _assets, staged, _active = _root(product_root)
+    target = staged / before["asset_set_sha256"]
+    manifest = _json_file(target / "manifest.json")
+    # verify_staged already pinned every declared file by size/SHA256 and
+    # denied symlinked parents; only manifest-declared paths may be read.
+    declared = {entry["path"] for package in manifest["packages"]
+                for entry in package["files"]}
+
+    def read_file(path: str) -> bytes:
+        if path not in declared:
+            raise AssetSetError("ASSET_SET_RESOURCE_FILE_UNDECLARED")
+        location = target / path
+        if location.is_symlink() or not location.is_file():
+            raise AssetSetError("ASSET_SET_FILE_UNTRUSTED")
+        return location.read_bytes()
+
+    try:
+        resource, _image = bundle_v3.identity_from_manifest(manifest, read_file)
+        digest = bundle_v3.resource_set_sha256(resource)
+    except bundle_v3.BundleBuildError as exc:
+        raise AssetSetError(f"ASSET_SET_RESOURCE_IDENTITY_INVALID:{exc}") from exc
+    after = read_active(product_root)
+    if (after["state"] != "ACTIVE"
+            or after["asset_set_sha256"] != before["asset_set_sha256"]
+            or after["generation"] != before["generation"]):
+        raise AssetSetError("ASSET_SET_RESOURCE_ACTIVE_SET_CHANGED")
+    return {
+        "schema": RESOURCES_SCHEMA, "state": "VERIFIED",
+        "asset_set_sha256": before["asset_set_sha256"],
+        "generation": before["generation"],
+        "resource_set": resource,
+        "resource_set_sha256": digest,
+    }
+
+
 @contextmanager
 def held_runtime_asset_lease(
     socket_path: Path = Path("/run/plasma-server/control.sock"),

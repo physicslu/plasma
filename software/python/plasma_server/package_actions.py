@@ -107,6 +107,13 @@ class PackageActionRuntime:
             active_helper = _load(control_plane, "ppu_asset_set.py")
             site_manager._bundle_firmware_resolver = partial(
                 active_helper.resolve_active_firmware, self.product_root)
+        # OFE-1B: PPU-derived Resource identity of the pinned Active Set, used by
+        # SiteManager Job Binding admission under the same Job lease.
+        if (hasattr(site_manager, "_active_resource_resolver")
+                and site_manager._active_resource_resolver is None):
+            resource_helper = _load(control_plane, "ppu_asset_set.py")
+            site_manager._active_resource_resolver = partial(
+                resource_helper.read_active_resource_identity, self.product_root)
         self.state_root = Path(state_root)
         self.owner_credential = owner_credential
         self.spawner = spawner

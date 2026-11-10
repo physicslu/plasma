@@ -5,9 +5,11 @@ Asset** in code and schemas, following the canonical Programming Asset /
 Normalized Image vocabulary enforced by
 `scripts/tests/test-canonical-terminology-guard.py`.
 
-Status: **Contract v1, Host-only.** Informational identity only. It is **not**
-an execution, activation or admission authority. Resource reuse is **not**
-implemented and must not be claimed until OFE-1B passes its own Gate.
+Status: **Contract v1; OFE-1B Gate 1 integration implemented, Host-only.**
+OFE-1A defined the identities. OFE-1B (§8) makes the PPU derive the Resource
+identity from its own verified Active Set and admits an independent Job Image
+under an exact Job Binding. Resource reuse is **Host-only PASS, NOT_RUN on
+hardware**; it must not be claimed as hardware-verified before HIL (§8.6).
 
 Base: `main` `efaf3609be23568d4f907fc81c166c2c31cd5328` (same as the OFE-0
 audit base). Plan of record: OPF Frontend post-LOM plan (PR #1377, §4.1 OFE-1).
@@ -139,7 +141,7 @@ Manager plan's `bundle` block) states `identity_authority: archive_sha256`.
 - B1/B2/B3, owner authorization, Site lease, PPU-wide execution lease / FPGA
   reload exclusion, SAFE_OFF, SEALED, OUTCOME_UNKNOWN, no Job auto-retry,
   Site 2 STM32F103C8T6 `flash_cycle`: unchanged.
-- Gateway `_job_request` does not accept any new identity field (undeclared
+- (OFE-1A only; superseded by §8.2) Gateway `_job_request` did not accept any new identity field (undeclared
   keys rejected); `resolve_active_firmware` refuses a Resource SHA presented as
   an Active Set.
 
@@ -152,7 +154,7 @@ Manager plan's `bundle` block) states `identity_authority: archive_sha256`.
 | Bundle-embedded Firmware Package (`firmware-asset` in the Active Set) | **Kept** as the only execution path until OFE-1B replaces it |
 | Nothing deleted in OFE-1A | No retired path exists yet; deleting the embedded Firmware path is OFE-1B scope |
 
-## 6. OFE-1B minimal integration plan (design only; not implemented)
+## 6. OFE-1B minimal integration plan (OFE-1A design; implemented as §8)
 
 1. **PPU verifies the Active Resource Set.** Extend `ppu_asset_set.read_active`
    (or one helper next to `resolve_active_firmware`) to return
@@ -234,4 +236,131 @@ two-Site HIL evidence (plan §5 item 3) is required before any reuse claim.
 |---|---|
 | Host-only identity tests (`software/python/tests/test_opf_resource_image_identity.py`) | Host-only |
 | Existing Bundle v3 / Site 2 workflow regression tests | Host-only |
-| PPU-side Resource verification, Firmware-only Job, user-selected non-`flash_cycle` Operation on hardware, HIL | **NOT_RUN** (OFE-1B) |
+| OFE-1B Host-only (`test_ofe1b_resource_reuse_job_image.py`, `test_bundle_programming_workflow.py`) | Host-only PASS |
+| PPU-side Resource reuse, Firmware-only Job on Z2, user-selected non-`flash_cycle` Operation on hardware, HIL | **NOT_RUN** |
+
+## 8. OFE-1B Gate 1 — Resource reuse + Operation-aware Job Image (implemented)
+
+Same Programming Resources + different Firmware + user-selected Operation,
+without B1/B2/B3, Driver/Provider reinstall or FPGA reload, under a Single
+Active Asset Set. No new Bundle schema, Job router, execution engine or
+staging store; `plasma.ppu.bundle.v3` is unchanged.
+
+### 8.1 PPU Resource identity (`scripts/ppu_asset_set.py`)
+
+`read_active_resource_identity(product_root)` → `plasma.ppu.active-resources.v1`
+`{state: VERIFIED, asset_set_sha256, generation, resource_set, resource_set_sha256}`.
+It runs `read_active` (→ `verify_staged`: B3 receipt, every file size/SHA256,
+no symlink/extra file), derives the descriptor with `identity_from_manifest`
+over **manifest-declared paths only**, and re-reads `active.json`: a changed
+pointer or generation fails closed (`ASSET_SET_RESOURCE_ACTIVE_SET_CHANGED`).
+EMPTY Set, non-canonical/hand-built Provider-Profile Packages, Packages from
+different Bundles (only one pinned Set is read) and a missing `plasma_opf`
+(Bootstrap process) all fail closed. Wired by `PackageActionRuntime` into
+`SiteManager._active_resource_resolver` (same rule as the Bundle Firmware
+resolver: trusted control plane, never from a Job or ZIP).
+
+### 8.2 Job Image source (Gateway `POST /api/jobs`)
+
+A third, **exclusive** Job source (not combinable with the Bundle reference
+`asset_set_sha256/asset_package_id/bundle_asset_sha256`, the legacy inline
+`asset_name/...`, `session_id`, `offset/length/map_data`):
+
+| Operation | Required fields |
+|---|---|
+| `flash_cycle`, `program`, `verify` | `site_id, operation, target, provider, profile, job_binding, image_asset, asset_base64` |
+| `erase`, `read` | `site_id, operation, target, provider, profile, job_binding` (range only from the Binding) |
+
+The Gateway checks the Binding's self-consistency (schema, Operation, Site,
+ICPN, Profile, `image_asset_sha256` = H(`image_asset`)) and the Image bytes via
+the existing `ProgrammingAsset.from_upload` → `normalize_image` path (SHA256,
+size, `binary` format, payload unchanged). `read` gets exactly one
+`map_data` section = the Binding range. `max_retries = 0`. The Operation is
+passed through unchanged. The request is still signed through the unchanged
+G13 Gateway write path; owner authorization, Site admission and Provider
+capability are not bypassed.
+
+### 8.3 PPU admission (`SiteManager.enqueue` → `_admit_job_binding`)
+
+Inside the existing PPU-wide execution lease (which excludes Asset activation
+and FPGA reload for the whole Job), after pinning `read_active`:
+
+1. resolver output must be `VERIFIED` with the same `asset_set_sha256` and
+   `generation` as the pinned Set (`JOB_RESOURCE_ACTIVE_SET_CHANGED`);
+2. Job `provider`/`profile` = the Set's Provider/Profile Package ids
+   (`JOB_RESOURCE_PACKAGE_MISMATCH`), Job `target` = Profile ICPN;
+3. `verify_image_asset` over the received bytes (image Operations) and
+   `verify_job_binding` with **this PPU's** `ppu_id` and the Job `site_id`
+   against the **PPU-derived** Resource descriptor (`JOB_BINDING_DENIED:<code>`);
+4. `read`: the single section must equal the Binding range;
+5. then the unchanged `ExecutionRouter`: C-3 OpenOCD admits only
+   `flash_cycle`; every other Operation fails `OPERATION_UNSUPPORTED`
+   (`C-3 supports only flash_cycle`) and is never rewritten.
+
+All denials are `OPERATION_UNSUPPORTED` before the Site Worker starts.
+The accepted Binding is echoed in the Job snapshot as `job_binding`
+`{job_binding_sha256, resource_set_sha256, image_asset_sha256, operation,
+range, ppu_id, site_id, icpn, profile, asset_set_sha256, generation}`.
+`/api/status?site=N` (Site-scoped only) adds `ppu.active_resources`
+(`VERIFIED` summary, `UNAVAILABLE` + reason, or `UNSUPPORTED` when not wired).
+
+### 8.4 Manager workflow (`plasma_manager/programming.py`)
+
+Plan `plasma.manager.bundle-programming-plan.v2` requires a user-selected
+`operation` (one of `erase/program/verify/read/flash_cycle`; anything else,
+including `blank_check`/`probe`, is 400). The Operation must be declared by
+the Route Profile (`operation_not_in_profile`, 422). Image Operations take
+`image_base64`; `erase`/`read` take `address`/`length` and no Image.
+
+| PPU `active_resources` | Bootstrap Active Set | Decision |
+|---|---|---|
+| `VERIFIED`, same Set, Resource SHA = Route Resource SHA | ACTIVE | **Reuse**: skip B1/B2/B3 (`RESOURCE_REUSE`), no FPGA load |
+| `VERIFIED`, different Resource SHA | ACTIVE | Canonical Bundle v3 → B1/B2/B3 (`fpga_load=false`) |
+| `UNAVAILABLE` (EMPTY, non-canonical Set) | any | Canonical Bundle v3 → B1/B2/B3 |
+| `VERIFIED` but different Set than Bootstrap | — | 409 `active_set_report_inconsistent` |
+| `UNSUPPORTED` / unknown state | — | 409 `ppu_runtime_resource_identity_unsupported` |
+| status read fails | — | 503 `ppu_resource_identity_unknown` |
+
+Activation needed but no Image (`erase`/`read`) → 409
+`resource_activation_requires_image`. Before submission the Manager requires
+the Bootstrap Active Set to be the activated archive (or, for reuse, the
+Set seen at plan time: `ACTIVE_SET_CHANGED_SINCE_PLAN`) **and** the PPU to
+report `VERIFIED` with the plan Resource SHA and the bound `ppu_id`
+(`RESOURCE_IDENTITY_NOT_CONFIRMED`). Exactly one `POST /api/jobs` with the
+Job Image source; OUTCOME_UNKNOWN latch, no auto-retry, journal (no Image
+bytes), SEALED/Recovery: unchanged.
+
+### 8.5 Receipt `plasma.manager.programming-receipt.v2`
+
+Fixes the duplicate `image_sha256`/`image_size` keys (old `programming.py:626-627`).
+Distinct fields: `expected_image_sha256/size` (Manager), `observed_image_sha256/size`
+(PPU Job result), `readback_sha256`/`bytes_verified`, `expected_/observed_resource_set_sha256`,
+`expected_/observed_job_binding_sha256`, `expected_/observed_image_asset_sha256`,
+`active_asset_set_sha256`/`active_generation`, `operation`/`target`/`site_id`/`ppu_id`,
+`resource_reuse`, `safe_off`/`flash_result`. PASS requires, in order:
+SAFE_OFF, an Operation with a qualified receipt (`flash_cycle` only —
+others `OPERATION_RECEIPT_UNSUPPORTED`), Job success, Job Site/Operation,
+the PPU-echoed Binding (SHA, Resource, Image Asset, Operation, Site, PPU),
+expected = observed Image, one attempt, flash PASS, readback = expected SHA,
+verified bytes = expected size. HTTP 200/202 or a Provider "success" alone is
+never PASS.
+
+### 8.6 Deletion / replacement, deployment and HIL
+
+| Old | Action |
+|---|---|
+| Manager `_submit_once` hardcoded `operation: flash_cycle` + Bundle reference | **Replaced** by the user Operation + Job Image source |
+| Manager receipt duplicate keys / `ALREADY_ACTIVE` archive-only decision | **Replaced** by receipt v2 / PPU-derived Resource decision |
+| Gateway/SiteManager Bundle reference + `resolve_active_firmware` | **Kept**: still used by `scripts/plasma_program.py` (CLI) and the root Package Action path; candidate for deletion when those migrate |
+
+Deploy (owner-approved, separate from Gate 2): PPU Runtime + control plane
+(`ppu.pyz` with `plasma_server`, `plasma_web`, `plasma_opf`;
+`ppu_asset_set.py`), Manager (`plasma_manager`, `plasma_opf`) and Console
+together. A new Manager against an old Runtime fails closed (409
+`ppu_runtime_resource_identity_unsupported`); it never falls back.
+
+Minimal HIL (NOT_RUN): on Z2 Site 2, (1) Firmware A → `flash_cycle` PASS
+(B1/B2/B3 if the Active Set is the old hand-built Set), (2) Firmware B →
+plan `RESOURCE_REUSE`, no B1/B2/B3, no FPGA load, Active Set/generation
+unchanged, readback = B, (3) a tampered Binding (`ppu_id`) is refused with no
+OpenOCD spawn, (4) `erase` is refused `OPERATION_UNSUPPORTED`.
