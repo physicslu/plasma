@@ -32,11 +32,16 @@ export const PROGRAMMING_OPERATIONS = ["flash_cycle", "program", "verify", "eras
 export type ProgrammingOperation = typeof PROGRAMMING_OPERATIONS[number];
 export const IMAGE_OPERATIONS: ReadonlySet<string> = new Set(["flash_cycle", "program", "verify"]);
 
+// One Programming Source per Image Operation: a Programming Image the Manager
+// wraps in the canonical Bundle, or the user's own canonical Bundle v3.
+export type ProgrammingSource = "image" | "bundle";
+
 export type ProgrammingPlan = {
   plan_id: string;
   ppu_alias: string;
   site_id: number;
   operation: ProgrammingOperation;
+  source: ProgrammingSource | "range";
   route: ProgrammingRoute;
   bundle: {
     archive_sha256: string;
@@ -169,8 +174,11 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+export type ImageOperation = "flash_cycle" | "program" | "verify";
+
 export type PlanInput =
-  | { icpn: string; siteId: number; operation: "flash_cycle" | "program" | "verify"; image: Uint8Array; filename: string }
+  | { icpn: string; siteId: number; operation: ImageOperation; image: Uint8Array; filename: string }
+  | { icpn: string; siteId: number; operation: ImageOperation; bundle: Uint8Array }
   | { icpn: string; siteId: number; operation: "erase" | "read"; address: number; length: number };
 
 export async function planProgramming(alias: string, input: PlanInput): Promise<ProgrammingPlan> {
@@ -179,6 +187,12 @@ export async function planProgramming(alias: string, input: PlanInput): Promise<
     ? {
       icpn: input.icpn, site_id: input.siteId, operation: input.operation,
       image_base64: bytesToBase64(input.image), image_filename: input.filename,
+    }
+    : "bundle" in input
+    ? {
+      // The user's own Bundle bytes, unchanged; the Manager admits or refuses them.
+      icpn: input.icpn, site_id: input.siteId, operation: input.operation,
+      bundle_base64: bytesToBase64(input.bundle),
     }
     : {
       icpn: input.icpn, site_id: input.siteId, operation: input.operation,

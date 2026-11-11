@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
+import { ProgrammingRunView } from "../operator-ui/programming-run-view";
 import {
   acknowledgeProgrammingRun,
   getProgrammingRoutes,
@@ -24,14 +25,6 @@ const PICKER_LEVELS: Array<1 | 2 | 3> = [1, 2, 3];
 
 function short(value: string | null | undefined): string {
   return value ? `${value.slice(0, 12)}…` : "—";
-}
-
-function outcomeLabel(run: ProgrammingRun): string {
-  if (run.outcome === "PASS") return "PASS";
-  if (run.outcome === "FAIL") return "FAIL";
-  if (run.outcome === "BLOCKED") return "BLOCKED";
-  if (run.outcome === "OUTCOME_UNKNOWN") return "OUTCOME UNKNOWN";
-  return run.state.toUpperCase();
 }
 
 export default function BundleProgramming({ alias }: { alias: string }) {
@@ -173,6 +166,10 @@ export default function BundleProgramming({ alias }: { alias: string }) {
         <div>
           <small>PROGRAMMING</small>
           <h3>Bundle Programming</h3>
+          <p data-testid="platform-programming-scope">
+            Maintenance and diagnostic entry. Normal programming is EMode → Programming (Single PPU) and
+            PMode → Factory Console; all three use the same Manager programming plan and run.
+          </p>
           <p>
             Select IC, Site, Operation and its image or range. The Manager reuses the PPU&apos;s verified Programming
             Resources when they are identical (no B1/B2/B3, no FPGA load), otherwise activates the canonical Bundle,
@@ -292,47 +289,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
       )}
 
       {run && (
-        <section aria-label="Programming run" className="ppuSiteCard">
-          <h4 data-testid="run-outcome">{outcomeLabel(run)}</h4>
-          {run.reason && <p data-testid="run-reason">Reason: {run.reason}</p>}
-          <ol aria-label="Programming steps">
-            {run.steps.map((step, index) => <li key={`${step.step}-${index}`}>{step.step}: {step.result}</li>)}
-          </ol>
-          {run.job && (
-            <p data-testid="run-job">
-              Job {run.job.job_id ?? "—"} · {run.job.state ?? "—"}
-              {run.job.progress_percent != null ? ` · ${run.job.progress_percent}%` : ""}
-            </p>
-          )}
-          {run.receipt && (
-            <dl aria-label="Programming receipt">
-              <dt>Expected Image</dt><dd><code>{run.receipt.expected_image_sha256 ?? "—"}</code></dd>
-              <dt>PPU Observed Image</dt><dd><code>{run.receipt.observed_image_sha256 ?? "—"}</code></dd>
-              <dt>Readback SHA256</dt><dd data-testid="receipt-readback"><code>{run.receipt.readback_sha256 ?? "—"}</code></dd>
-              <dt>Verified Bytes</dt><dd data-testid="receipt-bytes">{run.receipt.bytes_verified ?? "—"} / {run.receipt.expected_image_size ?? "—"}</dd>
-              <dt>Resources</dt>
-              <dd data-testid="receipt-resource">
-                {run.receipt.resource_reuse ? "Reused" : "Activated"} · <code>{short(run.receipt.observed_resource_set_sha256)}</code>
-              </dd>
-              <dt>Job Binding</dt><dd><code>{short(run.receipt.observed_job_binding_sha256)}</code></dd>
-              <dt>SAFE_OFF</dt><dd data-testid="receipt-safe-off">{run.receipt.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}</dd>
-              <dt>Job</dt><dd>{run.receipt.job_id ?? "—"}</dd>
-            </dl>
-          )}
-          {run.outcome === "OUTCOME_UNKNOWN" && (
-            <div role="alert" className="ppuRegistryMessage error">
-              <p>
-                The device-side outcome is unknown. Nothing was resubmitted. Reconcile the PPU Job/Bootstrap state
-                (and any SEALED Site) through the normal recovery procedure before programming this PPU again.
-              </p>
-              {!run.acknowledged && (
-                <button className="ppuSiteButton" type="button" disabled={busy === "ack"} onClick={() => void acknowledge()}>
-                  Acknowledge reconciliation
-                </button>
-              )}
-            </div>
-          )}
-        </section>
+        <ProgrammingRunView run={run} onAcknowledge={() => void acknowledge()} acknowledging={busy === "ack"} />
       )}
     </section>
   );

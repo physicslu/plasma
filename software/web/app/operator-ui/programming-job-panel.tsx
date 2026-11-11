@@ -5,6 +5,8 @@ import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
 import { OperatorPanel, OperatorPanelToggle } from "./operator-panel";
+import type { ProgrammingSource } from "../engineering/bundle-programming-api";
+import { ProgrammingSourceSelector } from "./programming-source-selector";
 import "./programming-job-controls.css";
 import "./production-workflow-guidance.css";
 
@@ -40,6 +42,15 @@ export type ProgrammingJobPolicy = {
   stopAriaLabel: string;
   stopOptions: ProgrammingJobPolicyOption[];
   onStopChange: (value: string) => void;
+  /** Shown under the controls, e.g. why a policy is unavailable. */
+  note?: ReactNode;
+};
+
+/** Image / Bundle selector; only the formal managed backend offers it. */
+export type ProgrammingJobSource = {
+  value: ProgrammingSource;
+  disabled: boolean;
+  onChange: (source: ProgrammingSource) => void;
 };
 
 export type ProgrammingJobImage = {
@@ -51,6 +62,8 @@ export type ProgrammingJobImage = {
   browseDisabled: boolean;
   inputDisabled: boolean;
   inputAriaLabel: string;
+  /** File types offered by the picker; defaults to a binary Image. */
+  accept?: string;
   onFileChange: (file: File | null, event: ChangeEvent<HTMLInputElement>) => void;
 };
 
@@ -66,8 +79,10 @@ export function ProgrammingJobPanel({
   targetDisabled,
   targetPlaceholder,
   targetLabel,
+  targetLevels,
   imageLabel,
   image,
+  source,
   operationsLabel,
   operations,
   policyLabel,
@@ -93,8 +108,11 @@ export function ProgrammingJobPanel({
   targetDisabled: boolean;
   targetPlaceholder?: string;
   targetLabel: string;
+  /** Catalog Levels offered by the IC Picker (display filter, never a gate). */
+  targetLevels?: Array<1 | 2 | 3>;
   imageLabel: string;
   image: ProgrammingJobImage;
+  source?: ProgrammingJobSource;
   operationsLabel: string;
   operations: ProgrammingJobOperation[];
   policyLabel: string;
@@ -141,11 +159,24 @@ export function ProgrammingJobPanel({
               onChange={onTargetChange}
               disabled={targetDisabled}
               placeholder={targetPlaceholder}
+              levels={targetLevels}
             />
           </div>
 
           <div className="programmingJobField programmingJobImageField" data-programming-job-field="image">
             <strong>2. {imageLabel}</strong>
+            {source && (
+              <ProgrammingSourceSelector
+                value={source.value}
+                disabled={source.disabled}
+                ariaLabel={`${modeLabel} Programming Source`}
+                onChange={next => {
+                  // A file picked for one Source must never be sent as the other.
+                  if (imageInputRef.current) imageInputRef.current.value = "";
+                  source.onChange(next);
+                }}
+              />
+            )}
             <div className="programmingJobImageControl">
               <span data-image-source={image.source} title={image.title ?? image.name}>{image.name}</span>
               <button type="button" disabled={image.browseDisabled} onClick={() => imageInputRef.current?.click()}>{image.browseLabel}</button>
@@ -153,7 +184,7 @@ export function ProgrammingJobPanel({
                 ref={imageInputRef}
                 type="file"
                 aria-label={image.inputAriaLabel}
-                accept=".bin,application/octet-stream"
+                accept={image.accept ?? ".bin,application/octet-stream"}
                 hidden
                 disabled={image.inputDisabled}
                 onChange={event => image.onFileChange(event.target.files?.[0] ?? null, event)}
@@ -193,6 +224,7 @@ export function ProgrammingJobPanel({
                 </select>
               </label>
             </div>
+            {policy.note && <small className="programmingJobPolicyNote" data-programming-job-policy="note">{policy.note}</small>}
           </div>
         </div>
       )}

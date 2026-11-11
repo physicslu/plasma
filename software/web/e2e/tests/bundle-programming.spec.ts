@@ -240,9 +240,11 @@ test("Resource Reuse: same PPU-verified Resources → no B1/B2/B3 → one flash_
   ]);
 
   // Receipt: Reused Resources, the planned Binding, readback, bytes and SAFE_OFF.
-  await expect(panel.getByTestId("receipt-resource")).toHaveText(`Reused · ${short(RESOURCE_SHA)}`);
+  await expect(panel.getByTestId("receipt-resource")).toHaveText("Reused");
+  await expect(panel.getByTestId("receipt-resource-sha")).toHaveText(RESOURCE_SHA);
+  await expect(panel.getByTestId("receipt-binding-sha")).toHaveText(BINDING_SHA);
   const receipt = panel.getByLabel("Programming receipt");
-  await expect(receipt).toContainText(`Job Binding${short(BINDING_SHA)}`);
+  await expect(receipt).toContainText(`Job Binding SHA256${BINDING_SHA}`);
   await expect(panel.getByTestId("receipt-readback")).toHaveText(IMAGE_SHA);
   await expect(panel.getByTestId("receipt-bytes")).toHaveText(`${FIRMWARE.length} / ${FIRMWARE.length}`);
   await expect(panel.getByTestId("receipt-safe-off")).toHaveText("VERIFIED");

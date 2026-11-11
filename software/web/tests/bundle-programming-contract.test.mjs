@@ -33,8 +33,11 @@ test("Console starts a plan at most once and never auto-resubmits", async () => 
   const ui = await read("app/engineering/bundle-programming.tsx");
   assert.match(ui, /if \(startedRef\.current === plan\.plan_id\) return;/);
   assert.equal((ui.match(/startProgramming\(/g) ?? []).length, 1);
-  assert.match(ui, /Nothing was resubmitted/);
-  assert.match(ui, /Acknowledge reconciliation/);
+  // The run / receipt / OUTCOME_UNKNOWN view is the one shared with EMode and PMode.
+  const view = await read("app/operator-ui/programming-run-view.tsx");
+  assert.match(ui, /<ProgrammingRunView run=\{run\}/);
+  assert.match(view, /Nothing was resubmitted/);
+  assert.match(view, /Acknowledge reconciliation/);
   // Catalog Level is a display filter only for programming.
   assert.match(ui, /const PICKER_LEVELS: Array<1 \| 2 \| 3> = \[1, 2, 3\]/);
 });

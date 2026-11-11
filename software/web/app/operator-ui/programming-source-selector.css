@@ -1,0 +1,56 @@
+.programmingSourceSelector {
+  display: inline-flex;
+  gap: 0;
+  margin-bottom: 6px;
+  border: 1px solid var(--border, #c7ced8);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.programmingSourceSelector button {
+  min-width: 88px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.programmingSourceSelector button + button {
+  border-left: 1px solid var(--border, #c7ced8);
+}
+
+.programmingSourceSelector button.is-selected {
+  background: var(--accent, #1f6feb);
+  color: #fff;
+}
+
+.programmingSourceSelector button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.programmingJobPolicyNote {
+  display: block;
+  margin-top: 4px;
+}
+
+.programmingRunView dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px 12px;
+  margin: 6px 0;
+}
+
+.programmingRunView dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.programmingRunView [data-run-verdict="PASS"] { color: var(--pass, #1a7f37); }
+.programmingRunView [data-run-verdict="FAIL"],
+.programmingRunView [data-run-verdict="BLOCKED"],
+.programmingRunView [data-run-verdict="OUTCOME_UNKNOWN"] { color: var(--fail, #cf222e); }
