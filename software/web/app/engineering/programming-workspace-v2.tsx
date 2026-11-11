@@ -12,6 +12,7 @@ import {
 } from "../gateway-settings-api";
 import { useI18n } from "../i18n";
 import { BatchSummary } from "../operator-ui/batch-summary";
+import { OperatorPanelHeader } from "../operator-ui/operator-panel";
 import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
 import {
   cancelJob,
@@ -994,16 +995,19 @@ function StandaloneProgrammingWorkspace() {
 
         <div className="productionProgrammingWorkflow">
           <section className={`productionProgrammingCard targetingCard ${setupCollapsed ? "is-collapsed" : ""}`}>
-            <header>
-              1. SYSTEM SETUP &amp; TARGETING
-              <button
-                type="button"
-                className="engineeringPanelToggle"
-                aria-label={`${setupCollapsed ? "Expand" : "Collapse"} System Setup`}
-                aria-expanded={!setupCollapsed}
-                onClick={() => setSetupCollapsed(current => !current)}
-              >{setupCollapsed ? "展開⌄" : "收合⌃"}</button>
-            </header>
+            <OperatorPanelHeader
+              number={1}
+              title="SYSTEM SETUP & TARGETING"
+              actions={(
+                <button
+                  type="button"
+                  className="engineeringPanelToggle"
+                  aria-label={`${setupCollapsed ? "Expand" : "Collapse"} System Setup`}
+                  aria-expanded={!setupCollapsed}
+                  onClick={() => setSetupCollapsed(current => !current)}
+                >{setupCollapsed ? "展開⌄" : "收合⌃"}</button>
+              )}
+            />
             <div className="cardBody" hidden={setupCollapsed}>
               <h2>SERVER TOPOLOGY</h2>
               <label className="workflowField">
@@ -1115,10 +1119,11 @@ function StandaloneProgrammingWorkspace() {
         {catalogError && <div className="engineeringBoundaryNote warning"><b>{programmingUnavailableLabel}</b><span>{catalogError}</span></div>}
 
         <section className="productionProgrammingCard liveSiteStatus overviewCard" aria-label="Engineering Site status">
-          <header>
-            <span>3. LIVE SITE STATUS</span>
-            <small>{ppu?.display_name ?? selectedPPU?.display_name ?? "Selected PPU"} · {sites.length} Sites · Batch selected {selectedSiteIds.length} · REST polling 500 ms</small>
-          </header>
+          <OperatorPanelHeader
+            number={3}
+            title="LIVE SITE STATUS"
+            meta={`${ppu?.display_name ?? selectedPPU?.display_name ?? "Selected PPU"} · ${sites.length} Sites · Batch selected ${selectedSiteIds.length} · REST polling 500 ms`}
+          />
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
             <table className="channelTable">
               <thead>

@@ -251,7 +251,7 @@ test("Production Set stays visible while the operator changes next-Batch PPU/Sit
   await facility.check();
 
   await page.getByRole("button", { name: /收起|Hide/ }).click();
-  await expect(page.getByRole("region", { name: "PRODUCTION SITE SELECTION" }).locator(".operatorPanelBody")).toBeHidden();
+  await expect(page.getByRole("region", { name: "SYSTEM SETUP & TARGETING" }).locator(".operatorPanelBody")).toBeHidden();
   await expect(live.locator(".factorySiteLedCard")).toHaveCount(2);
 });
 

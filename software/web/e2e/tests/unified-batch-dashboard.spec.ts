@@ -197,7 +197,7 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
   await expect(kpis.getByText("TOTAL IC", { exact: true })).toBeVisible();
   await expect(kpis.getByText("BATCH TIME", { exact: true })).toBeVisible();
 
-  const productionSelection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
+  const productionSelection = page.getByRole("region", { name: "SYSTEM SETUP & TARGETING" });
   await expect(productionSelection).toBeVisible();
   await expandProductionTree(page);
   const ppu1site1 = page.getByRole("checkbox", { name: "Production Set mock-facility-01 mock-facility-01-ppu-01 SITE-01" });

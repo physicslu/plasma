@@ -92,7 +92,7 @@ test("Production Programming Job stays contained on iPad landscape", async ({ pa
   await openProduction(page, { width: 1194, height: 834 });
   await expectConstrainedProgrammingJob(page);
 
-  const selection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
+  const selection = page.getByRole("region", { name: "SYSTEM SETUP & TARGETING" });
   await selection.getByRole("button", { name: /收起|Hide/ }).click();
   await expect(selection.locator(".operatorPanelBody")).toBeHidden();
   await expectConstrainedProgrammingJob(page);
