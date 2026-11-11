@@ -43,6 +43,7 @@ import {
   startEngineeringServerBatch,
   useEngineeringServerBatchState,
 } from "./engineering-server-batch";
+import ManagedProgrammingWorkspace from "./managed-programming-workspace";
 import "./programming-workspace-base.css";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
@@ -225,7 +226,16 @@ function serverSiteStage(site: BatchSiteSnapshot, stopping: boolean): Stage {
   return site.state;
 }
 
+// The formal Control Station (Managed routing) programs through the Manager
+// only: Registry / Fleet / Programming Routes -> plan -> run. The workspace
+// below is the Standalone Mock development runtime and is never reached there.
 export default function ProgrammingWorkspaceV2() {
+  const { hydrated, apiMode } = useWorkspaceSession();
+  if (!hydrated) return null;
+  return apiMode === "managed" ? <ManagedProgrammingWorkspace /> : <StandaloneProgrammingWorkspace />;
+}
+
+function StandaloneProgrammingWorkspace() {
   const { locale, t } = useI18n();
   const {
     hydrated: workspaceHydrated,

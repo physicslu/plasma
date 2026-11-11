@@ -142,7 +142,7 @@ test("Engineering v2 advertises only the implemented binary Programming Image no
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
 
-  assert.match(sharedJob, /accept="\.bin,application\/octet-stream"/);
+  assert.match(sharedJob, /accept=\{image\.accept \?\? "\.bin,application\/octet-stream"\}/);
   assert.match(workspace, /imageLabel="Programming Image"/);
   assert.match(workspace, /Binary Programming Image \(\.bin\)\./);
   assert.doesNotMatch(sharedJob, /\.hex/);
