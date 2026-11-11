@@ -449,9 +449,18 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         verifies the complete Binding under the Job lease. ``operation`` is the
         user's; it is never rewritten. No retry, no staging cache.
         """
-        image_operation = operation.value in bundle_v3.IMAGE_OPERATIONS
-        common = {"site_id", "operation", "timeout_s", "target", "provider", "profile", "job_binding"}
-        required = {"site_id", "operation", "target", "provider", "profile", "job_binding"}
+        programming = operation is Operation.PROGRAMMING
+        if programming:
+            try:
+                operations = bundle_v3.normalize_operations(body.get("operations"))
+            except bundle_v3.BundleBuildError as exc:
+                raise ValueError(f"operations list is invalid: {exc}") from exc
+            image_operation = bundle_v3.operations_take_image(operations)
+        else:
+            image_operation = operation.value in bundle_v3.IMAGE_OPERATIONS
+        selector = "operations" if programming else "operation"
+        common = {"site_id", selector, "timeout_s", "target", "provider", "profile", "job_binding"}
+        required = {"site_id", selector, "target", "provider", "profile", "job_binding"}
         if image_operation:
             common |= {"image_asset", "asset_base64"}
             required |= {"image_asset", "asset_base64"}
@@ -464,6 +473,8 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         job_range = binding.get("range") if isinstance(binding, dict) else None
         if (not isinstance(binding, dict) or binding.get("schema") != bundle_v3.JOB_BINDING_SCHEMA
                 or binding.get("operation") != operation.value
+                or (programming and binding.get("operations") != operations)
+                or (not programming and "operations" in binding)
                 or binding.get("site_id") != site_id
                 or binding.get("icpn") != body["target"]
                 or binding.get("profile") != body["profile"]
@@ -551,14 +562,23 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "bundle_asset_sha256",
                 "job_binding",
                 "image_asset",
+                "operations",
                 "session_id",
                 "target",
                 "provider",
                 "profile",
             },
-            required={"site_id", "operation"},
+            required={"site_id", "operation"} if "operations" not in body else {"site_id", "operations"},
             label="job request",
         )
+        if "operations" in body:
+            # Formal model: one programming Job with an ordered operations list.
+            if "operation" in body or "job_binding" not in body or not allow_inline_asset:
+                raise ValueError(
+                    "an operations list is one programming Job with a Job Binding and no "
+                    "separate operation")
+            return self._job_image_request(body, Operation.PROGRAMMING, client_id=client_id,
+                                           default_timeout_s=default_timeout_s)
         operation = Operation(str(body["operation"]))
         if operation not in {
             Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ,

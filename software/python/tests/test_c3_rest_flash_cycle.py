@@ -308,6 +308,7 @@ class FlashSim:
         self.hang = threading.Event()  # set -> OpenOCD never exits until killed
         self.erase_report: tuple[int, int] | None = None  # forged OpenOCD erase report
         self.write_skew = 0  # simulated write landing away from the command
+        self.nor = False  # True: a write can only clear bits (real NOR Flash)
 
     def run(self, argv, **_kw):
         out = "SITE_ADMISSION_RECORD_ISSUED" if argv[-2] == "admit" else "revoked"
@@ -329,16 +330,23 @@ class FlashSim:
             tail = command[path.end():].split() if path else command.split()
             if command.startswith("flash erase_address "):
                 if self.fail_at == "erase":
-                    rc = 5
+                    rc = 5  # OpenOCD stops at the first failing command
+                    break
                 start, length = address(tail[2]), int(tail[3], 0)
                 self.memory[start:start + length] = b"\xff" * length
                 erased = self.erase_report or (int(tail[2], 0), length)
                 log += b"erased address 0x%08x (length %d) in 0.1s\n" % erased
             elif command.startswith("flash write_image "):
                 if self.fail_at == "write":
-                    rc = 5
+                    rc = 5  # OpenOCD stops at the first failing command
+                    break
                 data, start = Path(path.group(1)).read_bytes(), address(tail[0])
                 start += self.write_skew
+                current = bytes(self.memory[start:start + len(data)])
+                if self.nor and any(new & ~old for old, new in zip(current, data)):
+                    # Programming a non-erased cell fails; nothing is erased.
+                    rc = 5
+                    break
                 self.memory[start:start + len(data)] = data
                 log += b"wrote %d bytes from file image in 0.1s\n" % len(data)
             elif command.startswith("flash verify_image "):
@@ -929,13 +937,16 @@ def test_rest_job_unsupported_target_never_reaches_c3():
     run(scenario())
 
 
-def test_c3_path_offers_only_the_complete_flash_cycle():
+def test_c3_path_offers_no_separate_single_operation_job():
+    """erase / program / verify are steps of one ``programming`` Job (an
+    operations list under a Job Binding), never Jobs of their own."""
     async def scenario():
         with short_tmp() as directory:
             async with Stack(Path(directory)) as stack:
                 status, payload = await stack.api("POST", "/api/jobs",
                                                   {"site_id": 2, "operation": "erase"})
-                assert status == 400 and "C-3 supports only flash_cycle" in payload["error"]["message"]
+                assert status == 400
+                assert "separate erase Job is not offered" in payload["error"]["message"]
                 assert stack.sim.argvs == []
     run(scenario())
 

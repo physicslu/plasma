@@ -335,7 +335,12 @@ def binding_sha(binding):
 
 def test_operation_vocabulary_matches_core_operation_enum():
     from plasma_core.enums import Operation
-    assert set(bundle_v3.OPERATIONS) == {o.value for o in Operation} - {"status", "cancel"}
+    # ``programming`` is the Job kind that runs a list of these basic
+    # operations; a Profile never declares it.
+    assert set(bundle_v3.OPERATIONS) == {o.value for o in Operation} - {
+        "status", "cancel", bundle_v3.PROGRAMMING}
+    assert Operation.PROGRAMMING.value == bundle_v3.PROGRAMMING
+    assert set(bundle_v3.SEQUENCE_OPERATIONS) < set(bundle_v3.OPERATIONS)
     assert bundle_v3.IMAGE_OPERATIONS == {"program", "verify", "flash_cycle"}
 
 
@@ -494,16 +499,18 @@ def test_resource_operations_need_not_include_flash_cycle(operations, ok):
             bundle_v3.resource_set_sha256(descriptor)
 
 
-def test_executable_route_still_requires_flash_cycle():
-    """Descriptor relaxation opens no execution: the Bundle-building Route keeps
-    requiring flash_cycle, the only operation the C-3 Runtime route executes."""
+def test_route_declares_only_known_basic_operations():
+    """A Route declares basic operations only. Declaring one opens no
+    execution by itself: the C-3 Runtime runs a declared list as one
+    ``programming`` Job, ``read`` as its own Job and the legacy ``flash_cycle``."""
     payload = route_payload()
-    payload["profile"]["capabilities"]["operations"] = ["read"]
-    with pytest.raises(BundleBuildError, match="ROUTE_CAPABILITIES_INVALID"):
-        bundle_v3.parse_route(payload)
-    payload["profile"]["capabilities"]["operations"] = ["flash_cycle", "bogus"]
-    with pytest.raises(BundleBuildError, match="RESOURCE_CONSTRAINTS_INVALID"):
-        bundle_v3.build_user_image_bundle(bundle_v3.parse_route(payload), FW_A)
+    payload["profile"]["capabilities"]["operations"] = ["erase", "program", "verify", "read"]
+    assert bundle_v3.parse_route(payload).capabilities["operations"] == [
+        "erase", "program", "verify", "read"]
+    for bad in ([], ["flash_cycle", "bogus"], ["programming"], ["read", "read"]):
+        payload["profile"]["capabilities"]["operations"] = bad
+        with pytest.raises(BundleBuildError, match="ROUTE_CAPABILITIES_INVALID"):
+            bundle_v3.parse_route(payload)
 
 
 @pytest.mark.parametrize("operation", ["erase", "program", "verify", "read"])

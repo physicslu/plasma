@@ -1012,7 +1012,7 @@ def test_abi5_probe_uses_existing_admission_and_fixed_openocd_argv(tmp_path):
     assert argv[0].endswith("/bin/openocd") and "plasma_swd site 2" in argv
     for banned in ("program", "flash", "reset", "mww", "exec", "halt"):
         assert not any(banned in item for item in argv)
-    assert a.supported_sites == {1, 2} and a.operations == {"probe", "flash_cycle"}
+    assert a.supported_sites == {1, 2} and a.operations == {"probe", "flash_cycle", "programming", "read"}
 
 
 @pytest.mark.parametrize("kw,exc,code", [

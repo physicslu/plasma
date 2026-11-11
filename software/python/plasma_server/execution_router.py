@@ -82,9 +82,19 @@ class SiteExecutionRouter:
         if (self.site.interface == "openocd"
                 and isinstance(self.interface, OpenOCDInterface)
                 and self.interface.site_worker_ready):
-            if request.operation is not Operation.FLASH_CYCLE:
-                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                  "C-3 supports only flash_cycle")
+            if request.operation not in OpenOCDInterface.OPERATIONS:
+                raise PlasmaError(
+                    ErrorCode.OPERATION_UNSUPPORTED,
+                    "C-3 runs programming (an operations list), read or the legacy "
+                    "flash_cycle; a separate " + request.operation.value + " Job is not offered")
+            # programming / read have no default range or list: they run only
+            # under an exact Job Binding, which SiteManager verifies under the
+            # Job lease before execution.
+            if (request.operation is not Operation.FLASH_CYCLE
+                    and not isinstance(request.metadata.get("job_binding"), dict)):
+                raise PlasmaError(
+                    ErrorCode.OPERATION_UNSUPPORTED,
+                    f"C-3 {request.operation.value} requires a Job Binding")
             return self._decorate(request, route={
                 "mode": OPENOCD_ROUTE, "target": request.target,
                 "backend_implementation_state": "opf_bundle_c3_site_worker",

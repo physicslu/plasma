@@ -189,3 +189,7 @@ Web-specific boundaries are owned by [plasma-web.md](plasma-web.md); hardware va
 cd software/python
 .venv/bin/python -m pytest -q
 ```
+
+## Programming operations (one Job, `operations` list)
+
+Erase / Program / Verify run as ONE `programming` Job with an ordered `operations` list (one Job ID, lease, Job Binding and receipt); `read` is an independent Job; `flash_cycle` is the unchanged legacy contract. Normative detail: [OPF Programming Operations v1](../architecture/opf-programming-operations-v1.md). Host-only tests are not a hardware qualification of any operation.

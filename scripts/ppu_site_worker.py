@@ -34,6 +34,7 @@ Hardware specifics live behind a replaceable adapter (see
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -56,7 +57,31 @@ MAX_REQUEST = 4096
 JOB_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 SESSION_ID = re.compile(r"[0-9a-f]{32}\Z")
 CONTROL_OPS = frozenset({"open_session", "open_job_session", "close_session", "status",
-                         "bind_image", "run"})
+                         "bind_image", "bind_range", "run"})
+# Flash operations of one bound Profile. ``programming`` runs the session's
+# ordered ``operations`` list (erase -> program -> verify) as ONE operation;
+# ``read`` is an independent operation; ``flash_cycle`` is the legacy cycle.
+PROGRAMMING = "programming"
+SEQUENCE_OPERATIONS = ("erase", "program", "verify")
+FLASH_OPERATIONS = frozenset({"flash_cycle", PROGRAMMING, "read"})
+
+
+def parse_operations(raw: object) -> tuple[str, ...]:
+    """A legal ``programming`` list: unique, in the fixed order, never empty.
+
+    ``erase`` + ``verify`` without ``program`` has no defined expected data
+    (a blank IC can never equal the Image) and is refused.
+    """
+    _require(type(raw) in (list, tuple) and bool(raw)
+             and all(type(item) is str for item in raw)
+             and list(raw) == [op for op in SEQUENCE_OPERATIONS if op in raw],
+             "OPERATIONS_INVALID")
+    _require(list(raw) != ["erase", "verify"], "OPERATIONS_ERASE_VERIFY_UNSUPPORTED")
+    return tuple(raw)
+
+
+def needs_image(operations: tuple[str, ...]) -> bool:
+    return "program" in operations or "verify" in operations
 TARGET_CONFIG = re.compile(r"target/[A-Za-z0-9_][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9_][A-Za-z0-9._-]{0,63}){0,3}\.cfg\Z")
 MAX_SESSION_S = 3600
 OWNER_PACKAGE = "package_action"
@@ -145,6 +170,93 @@ class FlashImage:
         return self.profile.flash_window(self.load_address, len(self.payload))
 
 
+@dataclass(frozen=True)
+class FlashRange:
+    """Exact Job range of an ``erase`` or ``read`` (no Image), bound once."""
+    profile: FlashProfile
+    operation: str
+    address: int
+    length: int
+
+    def __post_init__(self) -> None:
+        profile = self.profile
+        _require(self.operation in ("erase", "read") and type(self.address) is int
+                 and type(self.length) is int, "FLASH_RANGE_INVALID")
+        offset = self.address - profile.flash_base
+        _require(self.length > 0 and offset >= 0
+                 and offset + self.length <= profile.flash_size, "FLASH_RANGE_INVALID")
+        if self.operation == "erase":
+            _require(offset % profile.erase_granularity == 0
+                     and self.length % profile.erase_granularity == 0, "FLASH_RANGE_INVALID")
+
+    @property
+    def icpn(self) -> str:
+        return self.profile.icpn
+
+
+def programming_receipt_error(operations: tuple[str, ...], result: Mapping[str, Any], *,
+                              image: FlashImage | None,
+                              flash_range: FlashRange | None) -> str | None:
+    """Why a ``programming`` PASS is not proven (None: every step is proven)."""
+    steps = result.get("steps")
+    if (result.get("operations") != list(operations) or type(steps) is not dict
+            or set(steps) != set(operations)):
+        return "OPERATIONS_NOT_VERIFIED"
+    for operation in operations:
+        if type(steps[operation]) is not dict:
+            return "OPERATIONS_NOT_VERIFIED"
+        error = operation_receipt_error(operation, steps[operation], image=image,
+                                        flash_range=flash_range)
+        if error is not None:
+            return error
+    return None
+
+
+def operation_receipt_error(operation: str, result: Mapping[str, Any], *,
+                            image: FlashImage | None,
+                            flash_range: FlashRange | None) -> str | None:
+    """Why one step's (or a read's) PASS evidence is not proven (None: proven).
+
+    The Adapter reports what it executed and observed; a PASS is accepted only
+    for exactly the bound Image / range. With an Image the erase range is the
+    Image's whole erase window. ``flash_cycle`` keeps its own checks.
+    """
+    if operation == "program":
+        if (image is None or result.get("write_address") != image.load_address
+                or result.get("bytes_written") != len(image.payload)):
+            return "PROGRAM_RANGE_NOT_VERIFIED"
+    elif operation == "verify":
+        if (image is None or result.get("verify_address") != image.load_address
+                or result.get("readback_sha256") != image.sha256
+                or result.get("bytes_verified") != len(image.payload)):
+            return "VERIFY_NOT_VERIFIED"
+    elif operation == "erase":
+        expected = (image.erase_range if image is not None
+                    else None if flash_range is None
+                    else (flash_range.address, flash_range.length))
+        if (expected is None
+                or (result.get("erase_address"), result.get("erase_length")) != expected
+                # Erase-only proves a blank range; before Program the write
+                # itself is the next proven step.
+                or (image is None and (result.get("blank_verified") is not True
+                                       or result.get("bytes_verified") != expected[1]))):
+            return "ERASE_RANGE_NOT_VERIFIED"
+    elif operation == "read":
+        data = result.get("data_base64")
+        try:
+            raw = base64.b64decode(data, validate=True) if type(data) is str else None
+        except ValueError:
+            raw = None
+        if (flash_range is None or raw is None
+                or result.get("read_address") != flash_range.address
+                or result.get("read_length") != flash_range.length
+                or len(raw) != flash_range.length
+                or result.get("bytes_read") != flash_range.length
+                or result.get("sha256") != hashlib.sha256(raw).hexdigest()):
+            return "READ_RESULT_NOT_VERIFIED"
+    return None
+
+
 FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
                       "write_address", "verify_address", "readback_address")
 
@@ -186,7 +298,9 @@ class SiteTransportAdapter(Protocol):
     def identity(self) -> Mapping[str, Any]: ...
     def startup_sealed_sites(self) -> set[int]: ...
     def run(self, site: int, operation: str, *, deadline: float,
-            cancel: threading.Event, image: FlashImage | None = None) -> Mapping[str, Any]: ...
+            cancel: threading.Event, image: FlashImage | None = None,
+            flash_range: FlashRange | None = None,
+            operations: tuple[str, ...] | None = None) -> Mapping[str, Any]: ...
 
 
 def _require(ok: bool, code: str) -> None:
@@ -209,6 +323,7 @@ class _Session:
     closed: bool = False
     sealed_during: set[int] = field(default_factory=set)
     image: FlashImage | None = None
+    flash_range: FlashRange | None = None
     profile: FlashProfile | None = None
     provider_route: Mapping[str, Any] | None = None
 
@@ -394,7 +509,12 @@ class SiteWorkerCore:
             with self._lock:
                 s = self._sessions.get(request["session_id"])
                 _require(s is not None and not s.closed, "SESSION_UNKNOWN")
-                _require(s.image is None, "IMAGE_ALREADY_BOUND")
+                _require(s.image is None and s.flash_range is None, "IMAGE_ALREADY_BOUND")
+                _require(s.provider_route is None
+                         or s.provider_route["operation"] == "flash_cycle"
+                         or (s.provider_route["operation"] == PROGRAMMING
+                             and needs_image(tuple(s.provider_route["operations"]))),
+                         "OPERATION_TAKES_NO_IMAGE")
                 _require(self.clock() < s.expires, "SESSION_EXPIRED")
                 profile = s.profile
                 _require(profile is not None, "PROFILE_NOT_BOUND")
@@ -433,6 +553,34 @@ class SiteWorkerCore:
                         "image_sha256": digest, "image_size": size,
                         "load_address": load_address, "erase_address": erase_address,
                         "erase_length": erase_length, "bound": True}
+        if op == "bind_range":
+            _require(set(request) == {"protocol", "op", "session_id", "address", "length"}
+                     and type(request["session_id"]) is str
+                     and type(request["address"]) is int
+                     and type(request["length"]) is int, "REQUEST_INVALID")
+            with self._lock:
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None and not s.closed, "SESSION_UNKNOWN")
+                _require(s.image is None and s.flash_range is None, "RANGE_ALREADY_BOUND")
+                _require(self.clock() < s.expires, "SESSION_EXPIRED")
+                profile = s.profile
+                _require(profile is not None, "PROFILE_NOT_BOUND")
+                # Only a Runtime Job whose verified route is a read or an
+                # erase-only programming list binds a range; the Worker
+                # re-proves it against the session Profile.
+                route = s.provider_route
+                _require(s.owner_kind == OWNER_REST_JOB and route is not None
+                         and (route["operation"] == "read"
+                              or (route["operation"] == PROGRAMMING
+                                  and route["operations"] == ["erase"])),
+                         "OPERATION_TAKES_NO_RANGE")
+                operation = "read" if route["operation"] == "read" else "erase"
+                s.flash_range = FlashRange(profile, operation,
+                                           request["address"], request["length"])
+                return {"job_id": s.job_id, "icpn": profile.icpn,
+                        "target_config": profile.target_config, "operation": operation,
+                        "address": s.flash_range.address, "length": s.flash_range.length,
+                        "bound": True}
         if op == "run":
             _require(set(request) == {"protocol", "op", "session_id", "site", "operation"}
                      and type(request["session_id"]) is str and type(request["site"]) is int
@@ -497,7 +645,13 @@ class SiteWorkerCore:
                 "asset_set_sha256", "provider_package", "profile_package",
                 "descriptor_sha256", "options_schema_sha256", "options_sha256",
                 "operation", "site_id", "transport", "driver_abi",
-                "fpga_package", "max_image_bytes"}, "PROVIDER_ROUTE_INVALID")
+                "fpga_package", "max_image_bytes"} | (
+                    {"operations"} if route.get("operation") == PROGRAMMING else set()),
+                "PROVIDER_ROUTE_INVALID")
+            if route["operation"] == PROGRAMMING:
+                # The ordered list is pinned in the session route, like the
+                # single operation of every other route.
+                route = {**route, "operations": list(parse_operations(route["operations"]))}
             _require(all(type(route[key]) is str and bool(route[key]) for key in (
                 "asset_set_sha256", "provider_package", "profile_package",
                 "descriptor_sha256", "options_schema_sha256", "options_sha256",
@@ -509,7 +663,7 @@ class SiteWorkerCore:
                      and (route["driver_abi"] is None or type(route["driver_abi"]) is str)
                      and (route["fpga_package"] is None or type(route["fpga_package"]) is str),
                      "PROVIDER_ROUTE_INVALID")
-            if route["operation"] == "flash_cycle":
+            if route["operation"] in FLASH_OPERATIONS:
                 _require(profile is not None, "PROFILE_REQUIRED")
             deadline = request["deadline_monotonic"]
             _require(type(deadline) in (int, float) and self.clock() < deadline
@@ -587,8 +741,22 @@ class SiteWorkerCore:
             _require(self.clock() < s.expires, "SESSION_EXPIRED")
             _require(site in s.sites, "SITE_NOT_AUTHORIZED")
             _require(site not in self._sealed, "SITE_SEALED")
+            steps: tuple[str, ...] | None = None
             if op == "flash_cycle":
                 _require(s.image is not None, "IMAGE_NOT_BOUND")
+            elif op == PROGRAMMING:
+                _require(s.provider_route is not None
+                         and s.provider_route["operation"] == PROGRAMMING,
+                         "OPERATIONS_NOT_BOUND")
+                steps = tuple(s.provider_route["operations"])
+                if needs_image(steps):
+                    _require(s.image is not None, "IMAGE_NOT_BOUND")
+                else:
+                    _require(s.flash_range is not None
+                             and s.flash_range.operation == "erase", "RANGE_NOT_BOUND")
+            elif op == "read":
+                _require(s.flash_range is not None and s.flash_range.operation == "read",
+                         "RANGE_NOT_BOUND")
         _require(self.lease_verifier(s.job_id, s.owner_kind), "JOB_LEASE_NOT_HELD")
         if dict(self.adapter.identity()) != s.identity:
             with self._lock:
@@ -608,6 +776,16 @@ class SiteWorkerCore:
                 if op == "flash_cycle":
                     result = dict(self.adapter.run(
                         site, op, deadline=s.expires, cancel=s.cancel, image=s.image
+                    ))
+                elif op == PROGRAMMING:
+                    result = dict(self.adapter.run(
+                        site, op, deadline=s.expires, cancel=s.cancel, image=s.image,
+                        flash_range=s.flash_range, operations=steps
+                    ))
+                elif op == "read":
+                    result = dict(self.adapter.run(
+                        site, op, deadline=s.expires, cancel=s.cancel,
+                        flash_range=s.flash_range
                     ))
                 else:
                     result = dict(self.adapter.run(
@@ -660,9 +838,24 @@ class SiteWorkerCore:
                 if flash_range_receipt(result) != flash_range_expected(s.image):
                     self._seal(site, "FLASH_RANGE_NOT_VERIFIED", s)
                     raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FLASH_RANGE_NOT_VERIFIED")
+            unproven = None
+            if result.get("result") == "PASS" and op == PROGRAMMING:
+                unproven = programming_receipt_error(
+                    steps, result, image=s.image, flash_range=s.flash_range)
+            elif result.get("result") == "PASS" and op == "read":
+                unproven = operation_receipt_error(
+                    op, result, image=None, flash_range=s.flash_range)
+            if unproven is not None and op == PROGRAMMING and steps != ("verify",):
+                # A write whose executed range is not proven is never a PASS
+                # and never a retryable failure.
+                self._seal(site, unproven, s)
+                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + unproven)
             # Safe release and exact readback are proven before clearing the
             # durable operation marker, even if a close/cancel raced.
             safe_to_clear_guard = True
+            if unproven is not None:
+                # verify-only / read never write: SAFE_OFF is proven, the result is not.
+                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + unproven)
             # A cancelled or invalidated Session must not claim Job PASS even
             # when its adapter eventually completes with proven SAFE_OFF.
             # Serialize the final decision against close/restart invalidation.
@@ -804,6 +997,9 @@ class SiteWorkerClient:
             extra["profile"] = dict(profile)
         return self.call("open_job_session", job_id=job_id, sites=sites,
                          max_runtime_s=max_runtime_s, **extra)
+
+    def bind_range(self, session_id: str, *, address: int, length: int) -> dict[str, Any]:
+        return self.call("bind_range", session_id=session_id, address=address, length=length)
 
     def bind_image(
         self, session_id: str, *, image_sha256: str, image_size: int, load_address: int

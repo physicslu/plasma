@@ -11,8 +11,10 @@ import { getManagerPpuBootstrap, sha256Hex, type ManagerBootstrapStatus } from "
 import {
   getProgrammingRoutes,
   getProgrammingRun,
+  getReadOutput,
   IMAGE_OPERATIONS,
   planProgramming,
+  SEQUENCE_OPERATIONS,
   PROGRAMMING_OPERATIONS,
   startProgramming,
   type ImageOperation,
@@ -20,7 +22,10 @@ import {
   type ProgrammingPlan,
   type ProgrammingRoute,
   type ProgrammingRun,
+  type PlanInput,
   type ProgrammingSource,
+  type SequenceOperation,
+  type SingleOperation,
 } from "../engineering/bundle-programming-api";
 import { getManagerFleet, getManagerRegistry, type ManagerRegistryPayload } from "../engineering/ppu-registry-api";
 import type { FleetPPUView, FleetSiteView, FleetWebPayload } from "../fleet/fleet-contract";
@@ -224,7 +229,7 @@ export function routeOperations(
   routes: ProgrammingRoute[] | null,
   icpn: string | null,
   siteId: number | null,
-): ProgrammingOperation[] {
+): SingleOperation[] {
   if (!routes || !icpn || siteId == null) return [];
   const declared = new Set(routes
     .filter(route => route.icpn === icpn && route.sites.includes(siteId))
@@ -233,19 +238,48 @@ export function routeOperations(
 }
 
 /** Operations any committed Route declares for this IC (multi-Site selection). */
-export function routeOperationsForIc(routes: ProgrammingRoute[] | null, icpn: string | null): ProgrammingOperation[] {
+export function routeOperationsForIc(routes: ProgrammingRoute[] | null, icpn: string | null): SingleOperation[] {
   if (!routes || !icpn) return [];
   const declared = new Set(routes.filter(route => route.icpn === icpn).flatMap(route => route.operations));
   return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
 }
 
-export const PROGRAMMING_OPERATION_LABELS: Record<ProgrammingOperation, { code: string; label: string }> = {
+export const PROGRAMMING_OPERATION_LABELS: Record<
+  SingleOperation | "erase" | "program" | "verify",
+  { code: string; label: string }
+> = {
   flash_cycle: { code: "F", label: "Flash Cycle" },
   program: { code: "P", label: "Program" },
   verify: { code: "V", label: "Verify" },
   erase: { code: "E", label: "Erase" },
   read: { code: "R", label: "Read" },
 };
+
+/** E / P / V steps a committed Route declares for this IC on this Site (fixed order). */
+export function routeSequenceOperations(
+  routes: ProgrammingRoute[] | null,
+  icpn: string | null,
+  siteId: number | null,
+): SequenceOperation[] {
+  if (!routes || !icpn || siteId == null) return [];
+  const declared = new Set(routes
+    .filter(route => route.icpn === icpn && route.sites.includes(siteId))
+    .flatMap(route => route.operations));
+  return SEQUENCE_OPERATIONS.filter(operation => declared.has(operation));
+}
+
+/** The Route whose Profile declares every one of these basic operations (the Manager picks the same one). */
+export function routeDeclaring(
+  routes: ProgrammingRoute[] | null,
+  icpn: string | null,
+  siteId: number | null,
+  operations: readonly string[],
+): ProgrammingRoute | null {
+  if (!routes || !icpn || siteId == null || !operations.length) return null;
+  const matches = routes.filter(route => route.icpn === icpn && route.sites.includes(siteId)
+    && operations.every(operation => route.operations.includes(operation)));
+  return matches.length === 1 ? matches[0] : null;
+}
 
 export function isImageOperation(operation: string | null): operation is ImageOperation {
   return operation != null && IMAGE_OPERATIONS.has(operation);
@@ -280,10 +314,15 @@ export type ManagedRunRequest = {
   alias: string;
   siteId: number;
   icpn: string;
-  operation: ImageOperation;
   source: ProgrammingSource;
-  file: File;
-};
+} & (
+  // One programming Job with an ordered E / P / V list and its Image or Bundle.
+  | { operations: readonly SequenceOperation[]; operation?: undefined; file: File }
+  // An erase-only list: no Image, an explicit erase range.
+  | { operations: readonly ["erase"]; operation?: undefined; file: null; range: { address: number; length: number } }
+  // Legacy complete cycle (PMode).
+  | { operation: ImageOperation; operations?: undefined; file: File }
+);
 
 export type LockedInput = { name: string; size: number; sha256: string; source: ProgrammingSource };
 
@@ -319,13 +358,25 @@ function errorParts(reason: unknown): { status: number | null; code: string | nu
   };
 }
 
-function planEchoMismatch(plan: ProgrammingPlan, request: ManagedRunRequest, sha256: string): string | null {
+function planEchoMismatch(plan: ProgrammingPlan, request: ManagedRunRequest, sha256: string | null): string | null {
   if (plan.ppu_alias !== request.alias) return "PPU";
   if (plan.site_id !== request.siteId) return "Site";
-  if (plan.operation !== request.operation) return "Operation";
+  if (request.operations) {
+    // Exactly the selected list, as one programming Job; never another Operation.
+    if (plan.operation !== "programming"
+      || JSON.stringify(plan.operations) !== JSON.stringify(request.operations)
+      || JSON.stringify(plan.job_binding.operations) !== JSON.stringify(request.operations)) return "Operations";
+  } else if (plan.operation !== request.operation || plan.operations != null) {
+    return "Operation";
+  }
   if (plan.route.icpn !== request.icpn) return "IC";
-  if (plan.source !== request.source) return "Programming Source";
   if (plan.fpga_load !== false) return "FPGA Load";
+  if (request.file === null) {
+    const range = plan.job_binding.range;
+    return plan.source === "range" && plan.image_asset == null
+      && range.address === request.range.address && range.length === request.range.length ? null : "Erase range";
+  }
+  if (plan.source !== request.source) return "Programming Source";
   const lockedSha = request.source === "bundle" ? plan.bundle?.archive_sha256 : plan.image_asset?.sha256;
   if (lockedSha !== sha256) return request.source === "bundle" ? "Bundle SHA256" : "Programming Image SHA256";
   return null;
@@ -343,23 +394,31 @@ export async function runManagedProgramming(
   events: ManagedRunEvents = {},
   signal?: AbortSignal,
 ): Promise<ProgrammingRun> {
-  let bytes: Uint8Array;
-  let sha256: string;
-  try {
-    bytes = new Uint8Array(await request.file.arrayBuffer());
-    if (bytes.length === 0) throw new Error("the selected file is empty");
-    sha256 = await sha256Hex(bytes);
-  } catch (reason) {
-    throw new ManagedProgrammingBlocked("lock", "file_unreadable",
-      `The selected ${request.source === "bundle" ? "Bundle" : "Programming Image"} could not be read: ${errorParts(reason).message}`);
+  let bytes: Uint8Array | null = null;
+  let sha256: string | null = null;
+  if (request.file !== null) {
+    try {
+      bytes = new Uint8Array(await request.file.arrayBuffer());
+      if (bytes.length === 0) throw new Error("the selected file is empty");
+      sha256 = await sha256Hex(bytes);
+    } catch (reason) {
+      throw new ManagedProgrammingBlocked("lock", "file_unreadable",
+        `The selected ${request.source === "bundle" ? "Bundle" : "Programming Image"} could not be read: ${errorParts(reason).message}`);
+    }
+    events.onLocked?.({ name: request.file.name, size: bytes.length, sha256, source: request.source });
   }
-  events.onLocked?.({ name: request.file.name, size: bytes.length, sha256, source: request.source });
 
+  const target = { icpn: request.icpn, siteId: request.siteId };
+  const selector = request.operations
+    ? { operations: request.operations } : { operation: request.operation };
+  const input: PlanInput = request.file === null
+    ? { ...target, operations: ["erase"], ...request.range }
+    : request.source === "bundle"
+      ? { ...target, ...selector, bundle: bytes! }
+      : { ...target, ...selector, image: bytes!, filename: request.file.name };
   let plan: ProgrammingPlan;
   try {
-    plan = await planProgramming(request.alias, request.source === "bundle"
-      ? { icpn: request.icpn, siteId: request.siteId, operation: request.operation, bundle: bytes }
-      : { icpn: request.icpn, siteId: request.siteId, operation: request.operation, image: bytes, filename: request.file.name });
+    plan = await planProgramming(request.alias, input);
   } catch (reason) {
     const { code, message } = errorParts(reason);
     throw new ManagedProgrammingBlocked("plan", code, message);
@@ -384,12 +443,21 @@ export async function runManagedProgramming(
       `The start request outcome is unknown (${message}). Nothing was resubmitted.`);
   }
   events.onRun?.(run);
+  return observeRun(request.alias, run, events, signal);
+}
 
+async function observeRun(
+  alias: string,
+  started: ProgrammingRun,
+  events: ManagedRunEvents,
+  signal?: AbortSignal,
+): Promise<ProgrammingRun> {
+  let run = started;
   while (run.outcome == null) {
     await new Promise(resolve => setTimeout(resolve, MANAGED_POLL_MS));
     if (signal?.aborted) return run;
     try {
-      run = await getProgrammingRun(request.alias, run.run_id);
+      run = await getProgrammingRun(alias, run.run_id);
       events.onRun?.(run);
     } catch (reason) {
       // Reads are safe to repeat; the run itself is never resubmitted.
@@ -397,6 +465,71 @@ export async function runManagedProgramming(
     }
   }
   return run;
+}
+
+export type ManagedReadRequest = { alias: string; siteId: number; icpn: string; address: number; length: number };
+export type ManagedReadResult = {
+  run: ProgrammingRun;
+  /** The verified bytes; null unless the run is PASS and the download re-hashed correctly. */
+  data: Uint8Array | null;
+  /** Why a PASS run has no usable download. */
+  downloadError: string | null;
+};
+
+/**
+ * Read Memory: an independent Job (never part of a Batch, never counted in
+ * PASS / FAIL / Yield). Plan -> exactly one start -> observe -> fetch the
+ * binary through the Manager and re-hash it against the receipt.
+ */
+export async function runManagedRead(
+  request: ManagedReadRequest,
+  events: ManagedRunEvents = {},
+  signal?: AbortSignal,
+): Promise<ManagedReadResult> {
+  let plan: ProgrammingPlan;
+  try {
+    plan = await planProgramming(request.alias, {
+      icpn: request.icpn, siteId: request.siteId, operation: "read",
+      address: request.address, length: request.length,
+    });
+  } catch (reason) {
+    const { code, message } = errorParts(reason);
+    throw new ManagedProgrammingBlocked("plan", code, message);
+  }
+  const range = plan.job_binding.range;
+  if (plan.ppu_alias !== request.alias || plan.site_id !== request.siteId || plan.operation !== "read"
+    || plan.operations != null || plan.source !== "range" || plan.image_asset != null
+    || plan.activation_required !== false || plan.fpga_load !== false
+    || plan.route.icpn !== request.icpn
+    || range.address !== request.address || range.length !== request.length) {
+    throw new ManagedProgrammingBlocked("plan", "plan_echo_mismatch",
+      "The Manager plan is not exactly this Read Memory request; nothing was started.");
+  }
+  events.onPlan?.(plan);
+  let run: ProgrammingRun;
+  try {
+    run = await startProgramming(request.alias, plan.plan_id);
+  } catch (reason) {
+    const { status, code, message } = errorParts(reason);
+    if (status != null && status >= 400 && status < 500) {
+      throw new ManagedProgrammingBlocked("start", code, message);
+    }
+    throw new ManagedStartOutcomeUnknown(plan.plan_id,
+      `The Read Memory start outcome is unknown (${message}). Nothing was resubmitted.`);
+  }
+  events.onRun?.(run);
+  run = await observeRun(request.alias, run, events, signal);
+  if (runVerdict(run).verdict !== "PASS") return { run, data: null, downloadError: null };
+  const output = run.receipt?.read_output;
+  try {
+    const data = await getReadOutput(request.alias, run.run_id);
+    if (!output || data.length !== output.bytes || await sha256Hex(data) !== output.sha256) {
+      return { run, data: null, downloadError: "The downloaded bytes do not match the receipt SHA256." };
+    }
+    return { run, data, downloadError: null };
+  } catch (reason) {
+    return { run, data: null, downloadError: errorParts(reason).message };
+  }
 }
 
 export type RunVerdict = "RUNNING" | "PASS" | "FAIL" | "BLOCKED" | "OUTCOME_UNKNOWN";
@@ -417,8 +550,15 @@ export function runVerdict(run: ProgrammingRun): { verdict: RunVerdict; reason: 
     : !receipt.job_id ? "JOB_ID_MISSING"
     : receipt.observed_job_binding_sha256 !== receipt.expected_job_binding_sha256 ? "JOB_BINDING_NOT_CONFIRMED"
     : receipt.observed_resource_set_sha256 !== receipt.expected_resource_set_sha256 ? "RESOURCE_SET_NOT_CONFIRMED"
-    : receipt.expected_image_sha256 != null && receipt.readback_sha256 !== receipt.expected_image_sha256
+    // A readback is owed only when the Job verifies: the legacy cycle or a list with Verify.
+    : (receipt.operation === "flash_cycle" || receipt.operations?.includes("verify"))
+      && (receipt.expected_image_sha256 == null || receipt.readback_sha256 !== receipt.expected_image_sha256)
       ? "READBACK_SHA256_MISMATCH"
+    : receipt.operation === "programming"
+      && JSON.stringify(receipt.observed_operations) !== JSON.stringify(receipt.operations)
+      ? "OPERATIONS_NOT_CONFIRMED"
+    : receipt.operation === "read" && receipt.read_output?.available !== true
+      ? "READ_OUTPUT_UNAVAILABLE"
     : null;
   return failed ? { verdict: "FAIL", reason: failed } : { verdict: "PASS", reason: null };
 }
@@ -442,7 +582,10 @@ const BLOCK_GUIDANCE: Record<string, string> = {
   ppu_runtime_not_active: "The PPU Runtime is not active.",
   ppu_recovery_required: "The PPU Active Asset Set requires explicit recovery (PPU → Platform).",
   programming_route_not_found: "No Programming Route declares this IC on this Site.",
-  operation_not_in_profile: "The Programming Profile does not declare this Operation.",
+  operation_not_in_profile: "No Programming Profile for this IC and Site declares the selected Operations.",
+  operations_invalid: "The selected Operations are not a supported combination.",
+  resource_activation_requires_image: "The PPU does not hold these Programming Resources yet. Run a Job with a Programming Image (Program) first; an Erase-only or Read Job cannot activate Resources.",
+  job_binding_invalid: "The address range is outside the Flash range of the Programming Profile.",
   bundle_resource_not_qualified: "The Bundle's Programming Resources differ from the qualified Programming Route for this IC and Site. A Bundle declaration cannot replace hardware qualification.",
   bundle_incompatible: "The Bundle is not an admissible canonical Bundle v3 for this IC and Site.",
   programming_outcome_unknown_unresolved: "An earlier run on this PPU ended OUTCOME UNKNOWN. Reconcile and acknowledge it before programming again.",

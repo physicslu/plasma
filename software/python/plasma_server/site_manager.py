@@ -465,7 +465,19 @@ class SiteManager:
         """
         meta = request.metadata
         binding, asset = meta.get("job_binding"), meta.get("job_image_asset")
-        image_operation = request.operation.value in bundle_v3.IMAGE_OPERATIONS
+        operations = None
+        if request.operation is Operation.PROGRAMMING:
+            # The ordered list is part of the Binding identity; it is
+            # re-validated here and never taken from anywhere else.
+            try:
+                operations = bundle_v3.normalize_operations(
+                    binding.get("operations") if type(binding) is dict else None)
+            except bundle_v3.BundleBuildError as exc:
+                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                  f"JOB_BINDING_DENIED:{exc}") from exc
+            image_operation = bundle_v3.operations_take_image(operations)
+        else:
+            image_operation = request.operation.value in bundle_v3.IMAGE_OPERATIONS
         if (request.max_retries != 0 or request.image_ref is not None
                 or type(binding) is not dict
                 or type(meta.get("provider")) is not str
@@ -496,7 +508,7 @@ class SiteManager:
             binding_sha256 = bundle_v3.verify_job_binding(
                 binding, resource, image, ppu_id=self.config.ppu.id,
                 site_id=request.site_id, operation=request.operation.value,
-                address=address, length=length)
+                address=address, length=length, operations=operations)
         except bundle_v3.BundleBuildError as exc:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                               f"JOB_BINDING_DENIED:{exc}") from exc
@@ -513,6 +525,7 @@ class SiteManager:
             "resource_set_sha256": identity["resource_set_sha256"],
             "image_asset_sha256": binding["image_asset_sha256"],
             "operation": binding["operation"], "range": dict(binding["range"]),
+            **({} if operations is None else {"operations": list(operations)}),
             "ppu_id": binding["ppu_id"], "site_id": binding["site_id"],
             "icpn": binding["icpn"], "profile": binding["profile"],
             "asset_set_sha256": identity["asset_set_sha256"],

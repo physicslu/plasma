@@ -103,6 +103,38 @@ class ProgrammingOperationHandler(BaseHandler):
                 details={"stages": ["program"], "bytes_programmed": request.image_size}
             )
 
+        if operation is Operation.PROGRAMMING:
+            # The ordered list is the admitted Job Binding's; it has no default.
+            binding = request.metadata.get("job_binding")
+            operations = binding.get("operations") if isinstance(binding, dict) else None
+            if (not isinstance(operations, list) or not operations
+                    or operations != [op for op in ("erase", "program", "verify")
+                                      if op in operations]
+                    or operations == ["erase", "verify"]):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT,
+                                  "programming requires a Job Binding operations list")
+            if bool(request.image) != ("program" in operations or "verify" in operations):
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "programming takes an Image exactly when it programs or verifies")
+            evidence = await self._stage(
+                "programming",
+                stage_callback,
+                lambda progress: self.interface.run_operations(
+                    tuple(operations), request.image, progress),
+                stage_index=0,
+                stage_count=1,
+                byte_progress=True,
+            )
+            return ExecutionOutput(
+                details={
+                    "stages": list(operations),
+                    "operations": list(operations),
+                    "image_sha256": request.image_sha256 if request.image else None,
+                    "programming": dict(evidence or {}),
+                }
+            )
+
         if operation is Operation.FLASH_CYCLE:
             if not request.image:
                 raise PlasmaError(
@@ -165,13 +197,20 @@ class ProgrammingOperationHandler(BaseHandler):
                 )
             return ExecutionOutput(
                 read_sections=output,
-                details={"stages": [f"read_{item['name']}" for item in sections]},
+                details={"stages": [f"read_{item['name']}" for item in sections],
+                         **self._read_evidence()},
             )
 
         raise PlasmaError(
             ErrorCode.OPERATION_UNSUPPORTED,
             f"operation '{operation.value}' is not handled by ProgrammingOperationHandler",
         )
+
+    def _read_evidence(self) -> dict[str, Any]:
+        """Interface receipt of a read (e.g. the C-3 Worker's SAFE_OFF, range
+        and SHA256 evidence); the bytes themselves are the Job output file."""
+        evidence = getattr(self.interface, "operation_evidence", None)
+        return {"read": dict(evidence)} if isinstance(evidence, dict) else {}
 
     @staticmethod
     def _read_sections(map_data: dict[str, Any]) -> list[dict[str, Any]]:

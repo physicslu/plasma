@@ -19,6 +19,10 @@ SCHEMA = "plasma.ppu.provider-capabilities.v1"
 DESCRIPTOR = "data/plasma-provider.json"
 PLATFORM_OPTIONS = "data/plasma-provider-options.json"
 OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
+# One Job running an ordered erase -> program -> verify ``operations`` list.
+# A Profile never declares it: it declares the basic operations of the list.
+PROGRAMMING = "programming"
+SEQUENCE_OPERATIONS = ("erase", "program", "verify")
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
 PACKAGE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 
@@ -64,12 +68,15 @@ class ProviderRoute:
     options_schema_sha256: str
     options_sha256: str
     options_json: bytes
+    # Only for ``operation == "programming"``: the ordered basic operations.
+    operations: tuple[str, ...] | None = None
 
 
 def resolve(
     product_root: Path, *, asset_set_sha256: str, target: str,
     provider: str, profile: str, operation: str, site_id: int, image_size: int,
     hardware: Mapping[str, Any], options: Mapping[str, Any],
+    operations: tuple[str, ...] | None = None,
 ) -> ProviderRoute:
     """Resolve one route from verified bytes and observed capabilities.
 
@@ -87,7 +94,14 @@ def resolve(
           "PROVIDER_REF_INVALID")
     _need(type(profile) is str and PACKAGE_ID.fullmatch(profile) is not None,
           "PROFILE_REF_INVALID")
-    _need(type(operation) is str and operation in OPERATIONS
+    if operation == PROGRAMMING:
+        _need(type(operations) is tuple and bool(operations)
+              and all(type(op) is str for op in operations)
+              and operations == tuple(op for op in SEQUENCE_OPERATIONS if op in operations)
+              and operations != ("erase", "verify"), "JOB_OPERATIONS_INVALID")
+    else:
+        _need(operations is None, "JOB_OPERATIONS_INVALID")
+    _need(type(operation) is str and (operation in OPERATIONS or operation == PROGRAMMING)
           and type(site_id) is int and site_id >= 1
           and type(image_size) is int and image_size >= 0,
           "JOB_CONTRACT_INVALID")
@@ -166,7 +180,9 @@ def resolve(
               and provider_paths == {provider_prefix + PLATFORM_OPTIONS}
               and all(entry["executable"] is False for entry in selected_provider["files"])),
           "PROVIDER_ENTRYPOINT_MISSING")
-    _need(operation in desc["operations"], "OPERATION_UNSUPPORTED")
+    # Every basic operation of the Job must be declared by the Profile.
+    _need(all(op in desc["operations"] for op in (operations or (operation,))),
+          "OPERATION_UNSUPPORTED")
     observed_sites = hardware.get("sites")
     _need(type(observed_sites) in (list, tuple)
           and all(type(observed_site) is int and observed_site >= 1
@@ -227,4 +243,5 @@ def resolve(
                          target, operation, site_id, desc["transport"],
                          desc["driver_abi"], desc["fpga_package"],
                          desc["max_image_bytes"], schema_sha,
-                         hashlib.sha256(options_json).hexdigest(), options_json)
+                         hashlib.sha256(options_json).hexdigest(), options_json,
+                         operations)

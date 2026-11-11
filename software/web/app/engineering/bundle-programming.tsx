@@ -96,11 +96,11 @@ export default function BundleProgramming({ alias }: { alias: string }) {
       let input: PlanInput;
       if (needsImage && file) {
         input = {
-          icpn, siteId, operation: operation as "flash_cycle" | "program" | "verify",
+          icpn, siteId, operation: "flash_cycle",
           image: new Uint8Array(await file.arrayBuffer()), filename: file.name,
         };
       } else {
-        input = { icpn, siteId, operation: operation as "erase" | "read", address: address ?? 0, length: length ?? 0 };
+        input = { icpn, siteId, operation: "read", address: address ?? 0, length: length ?? 0 };
       }
       const next = await planProgramming(alias, input);
       setPlanState({ key: selectionKey, plan: next });

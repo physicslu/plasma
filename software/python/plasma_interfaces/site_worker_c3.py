@@ -6,6 +6,11 @@ systemd MainPID) runs one REST Site Job through C-3 as:
   stage Job-owned Normalized Image -> open_job_session(profile)
   -> bind_image(image identity) -> run(flash_cycle) -> close_session -> remove staged image
 
+A ``programming`` Job runs its ordered erase / program / verify ``operations``
+list in ONE session: a list with program or verify binds its Image the same
+way; an erase-only list and an independent ``read`` Job carry no Image and bind
+their exact Job range with ``bind_range`` (``run_job_operations``).
+
 The Worker owns Site admission, PS-local OpenOCD, SAFE_OFF verification and
 sealing. The verified Bundle Flash profile is pinned once at Session open;
 bind_image sends SHA256, size and the verified Job Binding ``load_address``,
@@ -15,6 +20,7 @@ the session Profile. Wire protocol: ``plasma.ppu.site-worker.v3`` (one JSON line
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import os
@@ -210,3 +216,170 @@ def _close_quietly(client: SiteWorkerControlClient, session_id: str) -> Mapping[
         return client.call("close_session", session_id=session_id)
     except SiteWorkerRefused:
         return None
+
+
+PROGRAMMING = "programming"
+SEQUENCE_OPERATIONS = ("erase", "program", "verify")
+
+
+def _steps_error(operations: tuple[str, ...], result: Mapping[str, Any], *, address: int,
+                 length: int, erase_range: tuple[int, int] | None,
+                 digest: str | None) -> str | None:
+    """Runtime-side re-check of the Worker ``programming`` receipt (None: proven)."""
+    steps = result.get("steps")
+    if (result.get("operations") != list(operations) or not isinstance(steps, dict)
+            or set(steps) != set(operations)
+            or not all(isinstance(steps[op], dict) for op in operations)):
+        return "operations"
+    if "erase" in operations:
+        erase = steps["erase"]
+        if ((erase.get("erase_address"), erase.get("erase_length")) != erase_range
+                or (operations == ("erase",) and (erase.get("blank_verified") is not True
+                                                  or erase.get("bytes_verified") != length))):
+            return "erase"
+    if "program" in operations:
+        program = steps["program"]
+        if program.get("write_address") != address or program.get("bytes_written") != length:
+            return "program"
+    if "verify" in operations:
+        verify = steps["verify"]
+        if (verify.get("verify_address") != address or verify.get("bytes_verified") != length
+                or verify.get("readback_sha256") != digest):
+            return "verify"
+    return None
+
+
+async def run_job_operations(
+    client: SiteWorkerControlClient,
+    *,
+    operation: str,
+    operations: tuple[str, ...] | None,
+    job_id: str,
+    site_id: int,
+    icpn: str,
+    image: bytes | None,
+    image_root: Path,
+    max_runtime_s: int,
+    session_factory: Callable[[], Mapping[str, Any]],
+    address: int,
+    length: int,
+    erase_range: tuple[int, int] | None = None,
+) -> dict[str, Any]:
+    """One ``programming`` Job (ordered erase / program / verify list) or one
+    independent ``read`` Job, in ONE C-3 session.
+
+    Same session, cancellation, close and SAFE_OFF contract as
+    ``run_flash_cycle``. A list containing program or verify binds the exact
+    Job Image; erase-only and read bind the exact Job range and stage nothing.
+    A ``read`` returns its bytes under ``data`` only after length and SHA256
+    are proven.
+    """
+    if operation == PROGRAMMING:
+        steps = tuple(operations or ())
+        if (not steps or steps != tuple(op for op in SEQUENCE_OPERATIONS if op in steps)
+                or steps == ("erase", "verify")):
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                              "C-3 programming operations list is not supported")
+    elif operation == "read" and operations is None:
+        steps = ("read",)
+    else:
+        raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                          f"C-3 has no {operation} Job operation")
+    image_operation = "program" in steps or "verify" in steps
+    if image_operation != bool(image) or (image_operation and len(image) != length):
+        raise PlasmaError(ErrorCode.INVALID_ARGUMENT,
+                          f"C-3 {operation} Image does not match the Job range")
+    writes = "erase" in steps or "program" in steps
+    digest = hashlib.sha256(image).hexdigest() if image_operation else None
+    context = {"job_id": job_id, "site_id": site_id, "icpn": icpn, "operation": operation,
+               "operations": list(steps), "address": address, "length": length}
+    staged = stage_image(image_root, job_id, image) if image_operation else None
+    session_id: str | None = None
+    try:
+        try:
+            opened = await asyncio.to_thread(session_factory)
+            session_id = str(opened["session_id"])
+            if image_operation:
+                bound = await asyncio.to_thread(
+                    client.call, "bind_image", session_id=session_id,
+                    image_sha256=digest, image_size=length, load_address=address)
+                bound_ok = (bound.get("load_address") == address
+                            and bound.get("image_size") == length
+                            and bound.get("image_sha256") == digest
+                            and (erase_range is None
+                                 or (bound.get("erase_address"), bound.get("erase_length"))
+                                 == erase_range))
+            else:
+                bound = await asyncio.to_thread(
+                    client.call, "bind_range", session_id=session_id,
+                    address=address, length=length)
+                bound_ok = (bound.get("address") == address and bound.get("length") == length
+                            and bound.get("operation") == steps[0])
+            if not bound_ok:
+                raise PlasmaError(
+                    ErrorCode.INTERFACE_FAILURE,
+                    "C-3 Site Worker bound a different range than the Job Binding",
+                    context={**context, "site_worker_stage": "bind",
+                             "site_worker_bind": dict(bound)},
+                )
+            result = await asyncio.to_thread(
+                client.call, "run", timeout_s=max_runtime_s + 30.0, session_id=session_id,
+                site=site_id, operation=operation)
+        except SiteWorkerRefused as exc:
+            stage = "open" if session_id is None else "run"
+            raise _refusal(stage, exc, **context) from None
+        if result.get("result") != "PASS":
+            raise PlasmaError(
+                ErrorCode.INTERFACE_FAILURE,
+                f"C-3 {operation} failed: {result.get('code', 'FAIL')}",
+                recoverable=result.get("safe_off") is True,
+                context={**context, "site_worker_result": result},
+            )
+        data = None
+        if operation == "read":
+            try:
+                data = base64.b64decode(result.get("data_base64") or "", validate=True)
+            except ValueError:
+                data = b""
+            result = {k: v for k, v in result.items() if k != "data_base64"}
+            mismatch = (None if (len(data) == length
+                                 and hashlib.sha256(data).hexdigest() == result.get("sha256")
+                                 and result.get("read_address") == address
+                                 and result.get("read_length") == length
+                                 and result.get("bytes_read") == length) else "read")
+        else:
+            mismatch = _steps_error(
+                steps, result, address=address, length=length,
+                erase_range=erase_range if image_operation else (address, length),
+                digest=digest)
+        if mismatch is not None:
+            raise PlasmaError(
+                ErrorCode.INTERFACE_FAILURE,
+                f"C-3 {operation} evidence ({mismatch}) does not match the Job Binding",
+                context={**context, "site_worker_result": result,
+                         "outcome_unknown": writes},
+            )
+        evidence = {**result, "session_id": session_id}
+        if digest is not None:
+            evidence["image_sha256"] = digest
+        if data is not None:
+            evidence["data"] = data
+        return evidence
+    finally:
+        try:
+            if session_id is not None:
+                closed = await asyncio.shield(asyncio.to_thread(
+                    _close_quietly, client, session_id))
+                if closed is None or not closed.get("closed") or closed.get("sealed_sites"):
+                    raise PlasmaError(
+                        ErrorCode.INTERFACE_FAILURE,
+                        "C-3 Site Worker close did not confirm hardware release",
+                        context={**context, "site_worker_stage": "close",
+                                 "outcome_unknown": True},
+                    )
+        finally:
+            if staged is not None:
+                try:
+                    staged.unlink()
+                except FileNotFoundError:
+                    pass
