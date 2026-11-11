@@ -995,7 +995,7 @@ function StandaloneProgrammingWorkspace() {
         <div className="productionProgrammingWorkflow">
           <section className={`productionProgrammingCard targetingCard ${setupCollapsed ? "is-collapsed" : ""}`}>
             <header>
-              SYSTEM SETUP &amp; TARGETING
+              1. SYSTEM SETUP &amp; TARGETING
               <button
                 type="button"
                 className="engineeringPanelToggle"
@@ -1116,7 +1116,7 @@ function StandaloneProgrammingWorkspace() {
 
         <section className="productionProgrammingCard liveSiteStatus overviewCard" aria-label="Engineering Site status">
           <header>
-            <span>LIVE SITE STATUS</span>
+            <span>3. LIVE SITE STATUS</span>
             <small>{ppu?.display_name ?? selectedPPU?.display_name ?? "Selected PPU"} · {sites.length} Sites · Batch selected {selectedSiteIds.length} · REST polling 500 ms</small>
           </header>
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">

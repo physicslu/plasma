@@ -12,6 +12,7 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
   const sharedPanel = await source("../app/operator-ui/operator-panel.tsx");
   const refresh = await source("../app/engineering/engineering-workspace-refresh.css");
+  const managedWorkspace = await source("../app/engineering/managed-programming-workspace.tsx");
 
   assert.match(page, /ProgrammingWorkspaceV2/);
   assert.match(workspace, /SINGLE PPU PROGRAMMING/);
@@ -23,11 +24,16 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.match(workspace, /LIVE SITE STATUS/);
   assert.match(workspace, /aria-label=\{`\$\{setupCollapsed \? "Expand" : "Collapse"\} System Setup`\}/);
   assert.match(workspace, /<ProgrammingJobPanel[\s\S]*mode="engineering"/);
-  assert.match(sharedJob, /fieldNumberPrefix = mode === "engineering" \? "2-" : ""/);
-  assert.match(sharedJob, /\{fieldNumberPrefix\}1\. \{targetLabel\}/);
-  assert.match(sharedJob, /\{fieldNumberPrefix\}2\. \{imageLabel\}/);
-  assert.match(sharedJob, /\{fieldNumberPrefix\}3\. \{operationsLabel\}/);
-  assert.match(sharedJob, /\{fieldNumberPrefix\}4\. \{policyLabel\}/);
+  assert.match(managedWorkspace, /targetLabel="2-1\. Target IC"/);
+  assert.match(managedWorkspace, /imageLabel="2-2\. Programming Source"/);
+  assert.match(managedWorkspace, /operationsLabel="2-3\. Operations"/);
+  assert.match(managedWorkspace, /policyLabel="2-4\. Batch Policy"/);
+  assert.match(sharedJob, /const formatFieldLabel = \(index: number, label: string\)/);
+  assert.match(sharedJob, /label\.startsWith\(prefix\) \? label : `\$\{prefix\}\$\{label\}`/);
+  assert.match(sharedJob, /formatFieldLabel\(1, targetLabel\)/);
+  assert.match(sharedJob, /formatFieldLabel\(2, imageLabel\)/);
+  assert.match(sharedJob, /formatFieldLabel\(3, operationsLabel\)/);
+  assert.match(sharedJob, /formatFieldLabel\(4, policyLabel\)/);
   assert.match(workspace, /collapsed=\{programmingJobCollapsed\}/);
   assert.match(sharedJob, /<OperatorPanelToggle/);
   assert.match(sharedPanel, /export function OperatorPanelToggle/);
@@ -39,9 +45,9 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.doesNotMatch(refresh, /recentEvents/);
 
   assert.match(refresh, /grid-template-columns:\s*minmax\(0, 1fr\)/);
-  assert.match(refresh, /content:\s*"1\. "/);
-  assert.match(refresh, /content:\s*"3\. "/);
-  assert.doesNotMatch(refresh, /1\. SYSTEM SETUP|3\. LIVE SITE STATUS|font-size:\s*0/);
+  assert.match(workspace, /1\. SYSTEM SETUP &amp; TARGETING/);
+  assert.match(workspace, /3\. LIVE SITE STATUS/);
+  assert.doesNotMatch(refresh, /targetingCard > header::before|liveSiteStatus > header > span::before|font-size:\s*0/);
 });
 
 test("Engineering shell uses the approved dark EMode sidebar and supports collapse", async () => {

@@ -134,7 +134,11 @@ export function ProgrammingJobPanel({
   const { locale } = useI18n();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const modeLabel = mode === "production" ? "Production" : "Engineering";
-  const fieldNumberPrefix = mode === "engineering" ? "2-" : "";
+  const formatFieldLabel = (index: number, label: string) => {
+    const section = mode === "engineering" ? `2-${index}` : String(index);
+    const prefix = `${section}. `;
+    return label.startsWith(prefix) ? label : `${prefix}${label}`;
+  };
   const statusText = typeof statusValue === "string" ? statusValue : null;
   const readinessGuidance = statusText ? batchReadinessGuidanceFromLabel(statusText, locale) : null;
   const disabledStartTitle = startDisabled && statusText !== "BATCH READY" ? readinessGuidance ?? undefined : undefined;
@@ -158,7 +162,7 @@ export function ProgrammingJobPanel({
       {!collapsed && (
         <div className="programmingJobGrid" data-programming-job-fields={mode}>
           <div className="programmingJobField" data-programming-job-field="target">
-            <strong>{fieldNumberPrefix}1. {targetLabel}</strong>
+            <strong>{formatFieldLabel(1, targetLabel)}</strong>
             <ICPickerField
               value={targetDevice}
               onChange={onTargetChange}
@@ -169,7 +173,7 @@ export function ProgrammingJobPanel({
           </div>
 
           <div className="programmingJobField programmingJobImageField" data-programming-job-field="image">
-            <strong>{fieldNumberPrefix}2. {imageLabel}</strong>
+            <strong>{formatFieldLabel(2, imageLabel)}</strong>
             {source && (
               <ProgrammingSourceSelector
                 value={source.value}
@@ -200,7 +204,7 @@ export function ProgrammingJobPanel({
           </div>
 
           <div className="programmingJobField" data-programming-job-field="operations">
-            <strong>{fieldNumberPrefix}3. {operationsLabel}</strong>
+            <strong>{formatFieldLabel(3, operationsLabel)}</strong>
             <div className="programmingJobOperationChecks" role="group" aria-label={`${modeLabel} batch operations`}>
               {operations.map(operation => (
                 <label key={operation.key}>
@@ -220,7 +224,7 @@ export function ProgrammingJobPanel({
           </div>
 
           <div className="programmingJobField" data-programming-job-field="policy">
-            <strong>{fieldNumberPrefix}4. {policyLabel}</strong>
+            <strong>{formatFieldLabel(4, policyLabel)}</strong>
             <div className="programmingJobPolicyControls">
               <label>{policy.repeatLabel}<input data-programming-job-policy="repeat" aria-label={policy.repeatAriaLabel} type="number" min="1" max="10000" value={policy.repeatValue} disabled={policy.repeatDisabled} onChange={event => policy.onRepeatChange(event.target.value)} /></label>
               <label>{policy.retryLabel}<input data-programming-job-policy="retry" aria-label={policy.retryAriaLabel} type="number" min="0" max={policy.retryMax ?? 20} value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
