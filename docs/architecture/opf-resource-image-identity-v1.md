@@ -345,11 +345,35 @@ range, ppu_id, site_id, icpn, profile, asset_set_sha256, generation}`.
 
 ### 8.4 Manager workflow (`plasma_manager/programming.py`)
 
-Plan `plasma.manager.bundle-programming-plan.v2` requires a user-selected
+Plan `plasma.manager.bundle-programming-plan.v3` requires a user-selected
 `operation` (one of `erase/program/verify/read/flash_cycle`; anything else,
 including `blank_check`/`probe`, is 400). The Operation must be declared by
 the Route Profile (`operation_not_in_profile`, 422). Image Operations take
-`image_base64`; `erase`/`read` take `address`/`length` and no Image.
+exactly one **Programming Source**: `image_base64` (Image) or
+`bundle_base64` (Bundle); `erase`/`read` take `address`/`length` and no
+source. The plan reports `source` = `image` / `bundle` / `range`.
+
+**Bundle source** (Unified Programming Integration, 2026-11-11). The user
+supplies their own canonical Bundle v3. `bundle_v3.route_bundle_from_archive`
+admits it against the Route resolved from the selected IC and Site only when:
+
+1. the archive is bounded (`MAX_BUNDLE_ARCHIVE_BYTES`, ≤ 64 members) and
+   `identity_from_archive` proves manifest / Packages / Files / SHA256;
+2. the Bundle's Programming Resource Set — target platform, Provider,
+   Profile, driver ABI, transport, FPGA requirement, Operations, Sites and
+   flash geometry — is **byte-identical** to the committed Route's
+   (`BUNDLE_IC_MISMATCH`, `BUNDLE_TARGET_MISMATCH`, otherwise 422
+   `bundle_resource_not_qualified` / `BUNDLE_RESOURCE_NOT_ROUTE`). A Bundle
+   declaration never replaces hardware qualification;
+3. the shared writer reproduces the exact archive bytes from the Route and
+   the Bundle's single Image (`BUNDLE_NOT_CANONICAL`).
+
+A Bundle with several Image Packages or an FPGA Package fails closed with
+`BUNDLE_PACKAGE_SET_UNSUPPORTED`: this contract version has neither an Image
+selection field nor a Bundle-source FPGA Load path. An admitted Bundle then
+takes the same decision table below; on a cache miss B1/B2/B3 carry the
+user's own archive bytes (its `archive_sha256` becomes the Active Set). All
+Bundle-source denials happen at plan time, before any PPU contact.
 
 | PPU `active_resources` | Bootstrap Active Set | Decision |
 |---|---|---|

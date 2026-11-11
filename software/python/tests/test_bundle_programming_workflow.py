@@ -740,3 +740,219 @@ def test_observed_image_differs_from_expected_fails(tmp_path):
     assert run["outcome"] == "FAIL" and run["reason"] == "IMAGE_IDENTITY_MISMATCH"
     assert run["receipt"]["observed_image_sha256"] == "1" * 64
     assert run["receipt"]["expected_image_sha256"] == hashlib.sha256(image()).hexdigest()
+
+
+# ---------------------------------------------------------------- Bundle source
+# Unified Programming Integration (2026-11-11): the user supplies their own
+# canonical Bundle v3. Host-only; fake PPU / fake Provider.
+
+def _route():
+    return bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+
+
+def user_bundle(raw: bytes | None = None, *, route=None, version: str = "2.3.0"):
+    return bundle_v3.build_image_bundle(
+        route or _route(), image() if raw is None else raw,
+        image_filename="customer-app.bin", asset_package_id="customer-fw",
+        bundle_name="customer-release", version=version)
+
+
+def bundle_body(archive: bytes, *, site: int = 2, icpn: str = ICPN,
+                operation: str = "flash_cycle", **extra):
+    return {"icpn": icpn, "site_id": site, "operation": operation,
+            "bundle_base64": base64.b64encode(archive).decode(), **extra}
+
+
+def _variant_route(**flash):
+    data = json.loads((ROUTES / "z2-site2-stm32f103c8t6.json").read_text())
+    target = flash.pop("target", None)
+    if target:
+        data["target"].update(target)
+    data["profile"]["flash_profile"].update(flash)
+    return bundle_v3.parse_route(data)
+
+
+def _rezip(archive: bytes, mutate) -> bytes:
+    import io
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(archive)) as source:
+        contents = {name: source.read(name) for name in source.namelist()}
+    mutate(contents)
+    return bundle_v3.canonical_zip(contents)
+
+
+def test_bundle_source_cache_miss_admits_the_users_exact_archive(tmp_path):
+    workflow, coord, gateway = make(tmp_path)
+    built = user_bundle()
+    planned, run = plan_run(workflow, bundle_body(built.archive))
+    assert planned["source"] == "bundle" and planned["activation_required"] is True
+    assert planned["bundle"]["archive_sha256"] == built.archive_sha256
+    assert planned["bundle"]["bundle_name"] == "customer-release"
+    assert planned["steps"][:3] == ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"]
+    assert run["outcome"] == "PASS", run
+    # B1 carried the user's own bytes; B3 activated exactly that identity.
+    assert bytes(coord.uploaded) == built.archive and coord.active_sha == built.archive_sha256
+    assert coord.b3_body["fpga_load"] is False
+    assert len(gateway.posts) == 1 and run["job_submission_count"] == 1
+    post = gateway.posts[0]
+    assert base64.b64decode(post["asset_base64"]) == image()
+    assert post["job_binding"] == planned["job_binding"]
+    assert not {"bundle_base64", "asset_set_sha256"} & set(post)
+    receipt = run["receipt"]
+    assert receipt["resource_reuse"] is False and receipt["safe_off"] is True
+    assert receipt["readback_sha256"] == hashlib.sha256(image()).hexdigest()
+
+
+def test_bundle_source_reuses_ppu_verified_resources_without_b1_b2_b3(tmp_path):
+    workflow, coord, gateway = make(tmp_path)
+    _plan_a, run_a = plan_run(workflow, plan_body(image()))  # Firmware source activates
+    assert run_a["outcome"] == "PASS"
+    active, calls = coord.active_sha, list(coord.calls)
+    gateway.polls = 0
+    built = user_bundle(other_image())
+    planned, run = plan_run(workflow, bundle_body(built.archive))
+    assert planned["source"] == "bundle"
+    assert planned["resource"]["reuse"] is True and planned["activation_required"] is False
+    assert planned["steps"][0] == "RESOURCE_REUSE"
+    assert run["outcome"] == "PASS", run
+    assert coord.active_sha == active  # the Active Set is untouched
+    assert not {"B1_create", "B2", "B3"} & set(coord.calls[len(calls):])
+    assert base64.b64decode(gateway.posts[-1]["asset_base64"]) == other_image()
+    assert run["receipt"]["resource_reuse"] is True
+    assert run["receipt"]["observed_job_binding_sha256"] == planned["job_binding_sha256"]
+
+
+def test_firmware_and_bundle_sources_share_one_resource_and_binding_identity(tmp_path):
+    workflow, _coord, _gateway = make(tmp_path)
+    firmware = workflow.plan(ALIAS, plan_body(image()))["plan"]
+    bundle = workflow.plan(ALIAS, bundle_body(user_bundle().archive))["plan"]
+    assert firmware["source"] == "image" and bundle["source"] == "bundle"
+    for key in ("resource", "image_asset", "job_binding", "job_binding_sha256", "route"):
+        assert firmware[key] == bundle[key], key
+    assert firmware["bundle"]["archive_sha256"] != bundle["bundle"]["archive_sha256"]
+
+
+def _two_images(contents):
+    manifest = json.loads(contents["manifest.json"])
+    extra = json.loads(json.dumps(manifest["packages"][-1]))
+    extra["id"] = "second-fw"
+    path = "payload/packages/second-fw/data/second.bin"
+    extra["files"][0]["path"] = path
+    contents[path] = contents[manifest["packages"][-1]["files"][0]["path"]]
+    manifest["packages"].append(extra)
+    contents["manifest.json"] = bundle_v3.canonical_json(manifest)
+
+
+def _fpga_package(contents):
+    manifest = json.loads(contents["manifest.json"])
+    path = "payload/packages/pl-image/data/design.bit"
+    contents[path] = b"\x00" * 16
+    manifest["packages"].append({
+        "id": "pl-image", "kind": "fpga-image", "version": "1.0.0", "requires": [],
+        "files": [{"path": path, "size": 16, "executable": False,
+                   "sha256": hashlib.sha256(contents[path]).hexdigest()}]})
+    contents["manifest.json"] = bundle_v3.canonical_json(manifest)
+
+
+def _tamper_image(contents):
+    path = next(p for p in contents if p.endswith("customer-app.bin"))
+    contents[path] = contents[path][:-1] + bytes([contents[path][-1] ^ 0xFF])
+
+
+@pytest.mark.parametrize("make_archive, status, code, reason", [
+    (lambda: b"not a zip archive", 422, "bundle_incompatible", "BUNDLE_ARCHIVE_INVALID"),
+    (lambda: user_bundle(route=_variant_route(target={"board": "other-board"})).archive,
+     422, "bundle_incompatible", "BUNDLE_TARGET_MISMATCH"),
+    # A Bundle may not bring its own flash geometry / Provider configuration.
+    (lambda: user_bundle(route=_variant_route(flash_size=131072)).archive,
+     422, "bundle_resource_not_qualified", "BUNDLE_RESOURCE_NOT_ROUTE"),
+    (lambda: user_bundle(route=_variant_route(target_config="target/stm32f4x.cfg")).archive,
+     422, "bundle_resource_not_qualified", "BUNDLE_RESOURCE_NOT_ROUTE"),
+    (lambda: _rezip(user_bundle().archive, lambda c: c.update({"payload/extra.sh": b"#!/bin/sh\n"})),
+     422, "bundle_incompatible", "BUNDLE_NOT_CANONICAL"),
+    (lambda: _rezip(user_bundle().archive, _tamper_image),
+     422, "bundle_incompatible", "BUNDLE_FILE_MISMATCH"),
+    # Several Images need an explicit choice this contract version cannot express.
+    (lambda: _rezip(user_bundle().archive, _two_images),
+     422, "bundle_incompatible", "BUNDLE_PACKAGE_SET_UNSUPPORTED"),
+    # FPGA reload has no qualified Bundle-source execution path: fail closed.
+    (lambda: _rezip(user_bundle().archive, _fpga_package),
+     422, "bundle_incompatible", "BUNDLE_PACKAGE_SET_UNSUPPORTED"),
+    (lambda: b"\x00" * (bundle_v3.MAX_BUNDLE_ARCHIVE_BYTES + 1),
+     413, "bundle_too_large", None),
+])
+def test_incompatible_bundle_fails_closed_before_any_ppu_contact(
+        tmp_path, make_archive, status, code, reason):
+    workflow, coord, gateway = make(tmp_path)
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.plan(ALIAS, bundle_body(make_archive()))
+    assert (caught.value.status, caught.value.code) == (status, code)
+    if reason is not None:
+        assert caught.value.message == reason
+    assert coord.calls == [] and gateway.posts == [] and workflow._plans == {}
+
+
+def test_bundle_for_another_ic_or_site_is_refused(tmp_path):
+    workflow, coord, gateway = make(tmp_path)
+    archive = user_bundle().archive
+    for body, code in (
+            (bundle_body(archive, icpn="STM32F407VGT6"), "programming_route_not_found"),
+            (bundle_body(archive, site=1), "programming_route_not_found")):
+        with pytest.raises(ProgrammingError) as caught:
+            workflow.plan(ALIAS, body)
+        assert caught.value.code == code
+    assert coord.calls == [] and gateway.posts == []
+
+
+@pytest.mark.parametrize("body", [
+    lambda a: {**bundle_body(a), "image_base64": base64.b64encode(image()).decode()},
+    lambda a: bundle_body(a, image_filename="app.bin"),
+    lambda a: bundle_body(a, address=0x08000000, length=1024),
+    lambda a: {**bundle_body(a, operation="erase"), "address": 0x08000000, "length": 1024},
+    lambda a: {**bundle_body(a), "bundle_base64": "not base64!"},
+    lambda a: {**bundle_body(a), "bundle_base64": ""},
+])
+def test_bundle_source_request_shape_is_strict(tmp_path, body):
+    workflow, coord, gateway = make(tmp_path)
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.plan(ALIAS, body(user_bundle().archive))
+    assert caught.value.status == 400
+    assert coord.calls == [] and gateway.posts == []
+
+
+def test_bundle_source_operation_must_be_declared_by_the_profile(tmp_path):
+    workflow, coord, gateway = make(tmp_path)
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.plan(ALIAS, bundle_body(user_bundle().archive, operation="program"))
+    assert caught.value.code == "operation_not_in_profile"
+    assert coord.calls == [] and gateway.posts == []
+
+
+def test_bundle_source_plan_is_single_use_and_never_resubmits_after_unknown(tmp_path):
+    workflow, _coord, gateway = make(
+        tmp_path, gateway=FakeGateway(image=image(), post_raises=True))
+    planned = workflow.plan(ALIAS, bundle_body(user_bundle().archive))["plan"]
+    start = {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN}
+    run = workflow.run_status(ALIAS, workflow.start(ALIAS, start)["run"]["run_id"])["run"]
+    assert run["outcome"] == "OUTCOME_UNKNOWN" and run["job_submission_count"] == 1
+    assert run["auto_retry"] == "DISABLED" and len(gateway.posts) == 1
+    with pytest.raises(ProgrammingError) as consumed:
+        workflow.start(ALIAS, start)
+    assert consumed.value.code == "programming_plan_not_found"
+    again = workflow.plan(ALIAS, bundle_body(user_bundle().archive))["plan"]
+    with pytest.raises(ProgrammingError) as latched:
+        workflow.start(ALIAS, {"plan_id": again["plan_id"], "confirm": CONFIRM_TOKEN})
+    assert latched.value.code == "programming_outcome_unknown_unresolved"
+    assert len(gateway.posts) == 1
+
+
+def test_user_bundle_passes_the_host_only_ppu_bundle_verifier(tmp_path):
+    route = _route()
+    built, raw = bundle_v3.route_bundle_from_archive(route, user_bundle().archive)
+    assert raw == image() and built.archive == user_bundle().archive
+    path = tmp_path / "customer.zip"
+    path.write_bytes(built.archive)
+    verified = ppu_unified_deployment.verify_host_only_bundle(
+        path, expected_sha256=built.archive_sha256, target_profile=route.target)
+    assert [p.kind for p in verified.packages] == [
+        "platform-provider", "programming-profile", "firmware-asset"]
