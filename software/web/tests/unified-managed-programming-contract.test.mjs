@@ -152,7 +152,10 @@ test("EMode sections are numbered 1 / 2 (2-1 … 2-4) / 3 / 4 and no current fea
   assert.match(jobControlsCss, /@container engineering-programming \(max-width: 700px\)/);
   assert.match(sourceSelectorCss, /width:\s*fit-content/);
   assert.match(sourceSelectorCss, /min-height:\s*var\(--operator-control-min-height\)/);
-  assert.match(icPickerCss, /\.engineeringProgrammingV2 \.programmingJobGrid \.icPickerInput input\s*\{[\s\S]*font-size:\s*var\(--operator-control-font-size\)/);
+  // The IC picker keeps its own EMode size (40px / 12px); the Programming Job never shrinks it.
+  assert.doesNotMatch(icPickerCss, /\.programmingJobGrid \.icPickerInput/);
+  // Field padding and row gap stay the shared PMode / EMode values.
+  assert.doesNotMatch(jobControlsCss, /data-programming-job-fields="engineering"\] \.programmingJobField\s*\{[^}]*(padding|row-gap)/);
   // The numbering never costs a feature: per-Site READ + Save File Picker,
   // Batch Attempts, the run view and Start Outcome Reconciliation stay.
   assert.match(emode, /showSaveFilePicker/);

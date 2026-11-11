@@ -49,19 +49,25 @@
 
 /* EMode: the 2-N labels get a wider, top-aligned label column. */
 .engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField {
-  padding: 8px 10px;
   grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
   align-items: start;
   column-gap: 10px;
-  row-gap: 6px;
 }
 
 .engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField > strong {
   justify-self: stretch;
   min-width: 0;
-  padding-top: 9px;
+  /* Centre the label on the first control line of its row. */
+  min-height: var(--operator-control-min-height);
+  display: flex;
+  align-items: center;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* The IC picker keeps its EMode height, so its label centres on that. */
+.engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField[data-programming-job-field="target"] {
+  align-items: center;
 }
 
 .programmingJobField > small,
@@ -73,10 +79,21 @@
   line-height: 1.35;
 }
 
+/* Source selector, file picker, details and hint stack in the control column. */
 .programmingJobImageContent {
   min-width: 0;
   display: grid;
   gap: 5px;
+}
+
+.programmingJobImageField {
+  align-items: start;
+}
+
+.programmingJobImageField > strong {
+  min-height: var(--operator-control-min-height);
+  display: flex;
+  align-items: center;
 }
 
 .programmingJobImageContent > small {
@@ -85,8 +102,7 @@
 
 .programmingJobImageControl {
   min-width: 0;
-  height: var(--operator-control-min-height);
-  box-sizing: border-box;
+  min-height: var(--operator-control-min-height);
   border: 1px solid var(--line-strong, #bdd0d9);
   border-radius: 5px;
   background: var(--panel, #fff);
@@ -108,15 +124,13 @@
 }
 
 .programmingJobImageControl > button {
-  min-height: 0;
-  height: calc(var(--operator-control-min-height) - 2px);
+  min-height: calc(var(--operator-control-min-height) - 2px);
   border: 0;
   border-left: 1px solid var(--line-strong, #bdd0d9);
   background: linear-gradient(180deg, #fbfcfd, #f1f5f8);
   color: var(--text, #172033);
   font-size: var(--operator-control-font-size);
   font-weight: 700;
-  line-height: 1;
   cursor: pointer;
 }
 
@@ -182,9 +196,7 @@
 
 .programmingJobPolicyControls input,
 .programmingJobPolicyControls select {
-  width: auto;
-  height: var(--operator-control-min-height);
-  min-height: 0;
+  min-height: var(--operator-control-min-height);
   box-sizing: border-box;
   border: 1px solid var(--line-strong, #bdd0d9);
   border-radius: 5px;
@@ -192,7 +204,6 @@
   color: var(--text, #172033);
   padding: 0 8px;
   font-size: var(--operator-control-font-size);
-  line-height: 1;
 }
 
 .programmingJobPolicyControls input {

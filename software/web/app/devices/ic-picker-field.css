@@ -122,16 +122,6 @@
 /* EMode retains its current readable evidence treatment. */
 .engineeringProgrammingV2 .icPickerMenu small { text-transform: uppercase; }
 
-.engineeringProgrammingV2 .programmingJobGrid .icPickerInput {
-  min-height: var(--operator-control-min-height);
-  border-radius: 5px;
-}
-
-.engineeringProgrammingV2 .programmingJobGrid .icPickerInput input {
-  height: calc(var(--operator-control-min-height) - 2px);
-  font-size: var(--operator-control-font-size);
-}
-
 [data-theme="dark"] .factoryConsoleV2 .icPickerInput,
 [data-theme="dark"] .factoryConsoleV2 .icPickerMenu {
   background: var(--panel);

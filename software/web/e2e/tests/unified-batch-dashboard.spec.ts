@@ -303,11 +303,10 @@ test("PMode and EMode share one IC picker style owner while preserving approved 
     inputHeight: "32px",
     inputSize: "10px",
   });
-  // The EMode Programming Job picker follows the shared operator control height.
   expect(engineeringStyle).toMatchObject({
-    minHeight: "32px",
-    radius: "5px",
-    inputHeight: "30px",
-    inputSize: "10px",
+    minHeight: "40px",
+    radius: "7px",
+    inputHeight: "38px",
+    inputSize: "12px",
   });
 });
