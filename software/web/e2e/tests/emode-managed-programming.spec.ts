@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import {
-  BUNDLE, FIRMWARE, RESOURCE_SHA, Z2, legacyRequests, mockManager, route, type Counters, type MockPpu,
+  BUNDLE, FIRMWARE, RESOURCE_SHA, Z2, flashBytes, legacyRequests, mockManager, operationsRoute, route,
+  type Counters, type MockPpu,
 } from "./managed-programming-helpers";
 
 // Host-only Console acceptance of EMode → Programming (Single PPU) on the
@@ -26,7 +29,7 @@ async function selectIc(page: Page) {
   return job;
 }
 
-async function configure(page: Page, source: "image" | "bundle" = "firmware") {
+async function configure(page: Page, source: "image" | "bundle" = "image") {
   const workspace = await open(page);
   const job = await selectIc(page);
   await workspace.getByLabel("Select SITE 2 for programming").check();
@@ -66,24 +69,270 @@ test("topology comes from Manager Registry / Fleet / Routes; Alias and PPU ID st
   expect(writes(counters)).toEqual([]);
 });
 
-test("Image is the default Source; only Route Operations are offered; legacy policies are disabled", async ({ page }) => {
+test("Image is the default Source; E / P / V are three checked, independent checkboxes; Repeat stays disabled", async ({ page }) => {
   await mockManager(page);
   const { job, start } = await configure(page);
   await expect(job.getByRole("radio", { name: "Programming Image", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(job.getByRole("radio", { name: "Bundle", exact: true })).toHaveAttribute("aria-checked", "false");
   const operations = job.locator("[data-programming-job-operation]");
-  await expect(operations).toHaveCount(1);
-  await expect(operations).toHaveAttribute("data-programming-job-operation", "flash_cycle");
-  await expect(operations).toBeChecked();
-  await expect(job.getByLabel("Site Retry Limit")).toBeDisabled();
-  await expect(job.getByLabel("Site Retry Limit")).toHaveValue("0");
+  // Exactly E, P, V in the fixed order: no Read, no flash_cycle.
+  expect(await operations.evaluateAll(nodes => nodes.map(node => node.getAttribute("data-programming-job-operation"))))
+    .toEqual(["erase", "program", "verify"]);
+  for (const name of ["erase", "program", "verify"]) {
+    const box = job.getByLabel(`Engineering operation ${name}`);
+    await expect(box).toBeChecked();
+    await box.uncheck();
+    await expect(box).not.toBeChecked();
+    for (const other of ["erase", "program", "verify"].filter(item => item !== name)) {
+      await expect(job.getByLabel(`Engineering operation ${other}`)).toBeChecked();
+    }
+    await box.check();
+  }
   await expect(job.getByLabel("Repeat Count")).toBeDisabled();
   await expect(job.getByLabel("Repeat Count")).toHaveValue("1");
-  await expect(job.getByLabel("Engineering Stop Policy")).toBeDisabled();
   await expect(job.locator('[data-programming-job-policy="note"]')).toContainText(/attempts = 1 · auto retry DISABLED/);
-  await expect(job.getByRole("button", { name: /ABORT/ })).toBeDisabled();
+  await expect(job.locator('[data-programming-job-policy="note"]')).toContainText(/Repeat (固定為 1|is fixed at 1)/);
   await expect(page.getByRole("button", { name: "Prepare Programming" })).toHaveCount(0);
   await expect(start).toBeEnabled();
+});
+
+const COMBINATIONS: Array<{ uncheck: string[]; operations: string[]; image: boolean }> = [
+  { uncheck: ["program", "verify"], operations: ["erase"], image: false },
+  { uncheck: ["erase", "verify"], operations: ["program"], image: true },
+  { uncheck: ["erase", "program"], operations: ["verify"], image: true },
+  { uncheck: ["verify"], operations: ["erase", "program"], image: true },
+  { uncheck: ["erase"], operations: ["program", "verify"], image: true },
+  { uncheck: [], operations: ["erase", "program", "verify"], image: true },
+];
+
+for (const combination of COMBINATIONS) {
+  test(`${combination.operations.join(" + ")} runs as ONE programming Job with exactly that operations list`, async ({ page }) => {
+    const counters = await mockManager(page);
+    const workspace = await open(page);
+    const job = await selectIc(page);
+    await workspace.getByLabel("Select SITE 2 for programming").check();
+    for (const name of combination.uncheck) await job.getByLabel(`Engineering operation ${name}`).uncheck();
+    const start = job.getByRole("button", { name: /START PROGRAMMING/ });
+    if (combination.image) {
+      await expect(start).toBeDisabled(); // an Image is required exactly when P or V is selected
+      await job.getByLabel("Engineering Programming Image file").setInputFiles(firmwareFile);
+    }
+    await expect(start).toBeEnabled();
+    await start.dblclick();
+    await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+    // One plan, one run, one Job: the list is sent as chosen, never as flash_cycle.
+    expect(counters.plans).toHaveLength(1);
+    expect(counters.starts).toHaveLength(1);
+    const body = counters.plans[0].body;
+    expect(body.operations).toEqual(combination.operations);
+    expect(body).not.toHaveProperty("operation");
+    if (combination.image) {
+      expect(Buffer.from(String(body.image_base64), "base64").equals(FIRMWARE)).toBe(true);
+      expect(body).not.toHaveProperty("address");
+    } else {
+      // Erase only: no Programming Image, the whole Flash range of the Profile.
+      expect(body).not.toHaveProperty("image_base64");
+      expect(body).not.toHaveProperty("bundle_base64");
+      expect(body).toMatchObject({ address: 134217728, length: 65536 });
+    }
+    await expect(workspace.getByTestId("receipt-operations")).toContainText(combination.operations.join(" → "));
+    await expect(workspace.getByTestId("receipt-operations")).toContainText("one Job");
+    for (const name of combination.operations) {
+      await expect(workspace.getByTestId(`receipt-step-${name}`)).toBeVisible();
+    }
+    for (const name of combination.uncheck) {
+      await expect(workspace.getByTestId(`receipt-step-${name}`)).toHaveCount(0);
+    }
+    await expect(workspace.getByTestId("plan-operation")).toHaveText(combination.operations.join(" → "));
+    await expect(workspace.getByTestId("run-policy")).toContainText("attempts 1 · auto retry DISABLED");
+    expect(legacyRequests(counters)).toEqual([]);
+  });
+}
+
+test("no Operation, or Erase + Verify without Program, never reaches the Manager", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { workspace, job, start } = await configure(page);
+  await job.getByLabel("Engineering operation program").uncheck();
+  await expect(start).toBeDisabled();
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("OPERATIONS INVALID");
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("Erase + Verify without Program is not supported");
+  await job.getByLabel("Engineering operation erase").uncheck();
+  await job.getByLabel("Engineering operation verify").uncheck();
+  await expect(start).toBeDisabled();
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("NO OP");
+  expect(writes(counters)).toEqual([]);
+});
+
+test("an Operation no Programming Route declares is disabled, not a fake capability", async ({ page }) => {
+  const counters = await mockManager(page, { routes: [route(), operationsRoute([2], ["program", "verify", "read"])] });
+  const { workspace, job, start } = await configure(page);
+  await expect(job.getByLabel("Engineering operation erase")).toBeDisabled();
+  await expect(job.getByLabel("Engineering operation erase")).not.toBeChecked();
+  await expect(job.getByLabel("Engineering operation program")).toBeChecked();
+  await start.click();
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  expect(counters.plans[0].body.operations).toEqual(["program", "verify"]);
+});
+
+test("a deployment with only the legacy flash_cycle Route offers no E / P / V and no Read", async ({ page }) => {
+  const counters = await mockManager(page, { routes: [route()] });
+  const { workspace, job, start } = await configure(page);
+  for (const name of ["erase", "program", "verify"]) {
+    await expect(job.getByLabel(`Engineering operation ${name}`)).toBeDisabled();
+  }
+  await expect(start).toBeDisabled();
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("OPERATIONS UNAVAILABLE");
+  await expect(workspace.getByTestId("read-memory-start")).toBeDisabled();
+  expect(writes(counters)).toEqual([]);
+});
+
+test("the file picker shows the real name, size and format, truncates long names and can re-select", async ({ page }) => {
+  await mockManager(page);
+  const workspace = await open(page);
+  const job = await selectIc(page);
+  await workspace.getByLabel("Select SITE 2 for programming").check();
+  const name = job.locator("[data-image-source]");
+  const browse = job.locator(".programmingJobImageControl button");
+  await expect(name).toContainText("Select programming image (.bin)");
+  await expect(browse).toHaveText("Browse...");
+  await expect(job.locator("[data-image-details]")).toHaveCount(0);
+  const long = `${"very-long-customer-release-name-".repeat(8)}v1.2.3.bin`;
+  await job.getByLabel("Engineering Programming Image file").setInputFiles({ ...firmwareFile, name: long });
+  await expect(name).toHaveText(long);
+  await expect(name).toHaveAttribute("title", long);
+  await expect(name).toHaveAttribute("data-image-source", "user_image");
+  await expect(job.locator("[data-image-details]")).toHaveText("4.0 KiB (4096 B) · Raw binary (.bin)");
+  await expect(browse).toHaveText("Change...");
+  // The long name is clipped inside its box: the layout does not grow.
+  const control = await job.locator(".programmingJobImageControl").boundingBox();
+  const field = await job.locator('[data-programming-job-field="image"]').boundingBox();
+  expect(control!.x + control!.width).toBeLessThanOrEqual(field!.x + field!.width + 1);
+  expect(await name.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true);
+  // No local path is ever shown.
+  await expect(job.locator('[data-programming-job-field="image"]')).not.toContainText(/[A-Za-z]:\\|\/home\/|fakepath/);
+  await job.getByLabel("Engineering Programming Image file").setInputFiles({ ...firmwareFile, name: "second.bin", buffer: Buffer.alloc(10, 1) });
+  await expect(name).toHaveText("second.bin");
+  await expect(job.locator("[data-image-details]")).toHaveText("10 B · Raw binary (.bin)");
+  await job.getByRole("radio", { name: "Bundle", exact: true }).click();
+  await expect(job.locator("[data-image-details]")).toHaveCount(0);
+  await job.getByLabel("Engineering Programming Bundle file").setInputFiles(bundleFile);
+  await expect(name).toHaveText("customer-release.zip");
+  await expect(job.locator("[data-image-details]")).toHaveText("5.9 KiB (6000 B) · Canonical Bundle v3 (.zip)");
+});
+
+// ------------------------------------------------------------------ Read Memory
+
+async function readSetup(page: Page) {
+  const workspace = await open(page);
+  await selectIc(page);
+  await workspace.getByLabel("Select SITE 2 for programming").check();
+  const card = workspace.getByTestId("read-memory");
+  return { workspace, card, button: card.getByTestId("read-memory-start") };
+}
+
+test("Read Memory is an independent button and Job: bytes, SHA256 and a verified binary download", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { workspace, card, button } = await readSetup(page);
+  // Read is not an Operation checkbox and not a Batch Policy.
+  await expect(workspace.locator('[data-programming-job-operation="read"]')).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Engineering Programming Job" }).getByTestId("read-memory")).toHaveCount(0);
+  // Read needs no Programming Image.
+  await expect(button).toBeEnabled();
+  await card.getByLabel("Read Memory Start Address").fill("0x08000100");
+  await card.getByLabel("Read Memory Length").fill("300");
+  await button.dblclick();
+  await expect(card.getByTestId("read-memory-verdict")).toHaveText("PASS");
+  expect(counters.plans).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
+  expect(counters.plans[0].body).toEqual({ icpn: "STM32F103C8T6", site_id: 2, operation: "read", address: 0x08000100, length: 300 });
+  const expected = flashBytes(0x08000100, 300);
+  const digest = createHash("sha256").update(expected).digest("hex");
+  await expect(card.getByTestId("read-memory-bytes")).toHaveText("300");
+  await expect(card.getByTestId("read-memory-sha")).toHaveText(digest);
+  const link = card.getByTestId("read-memory-download");
+  await expect(link).toHaveAttribute("download", "read-STM32F103C8T6-0x08000100-300.bin");
+  const [download] = await Promise.all([page.waitForEvent("download"), link.click()]);
+  expect((await readFile(await download.path())).equals(expected)).toBe(true);
+  expect(counters.downloads).toHaveLength(1);
+  // Not a Batch: no Batch run, no PASS / FAIL / Yield, no Site result.
+  await expect(workspace.getByTestId("run-outcome")).toHaveCount(0);
+  const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
+  await expect(summary).toContainText("Run Preview");
+  await expect(summary).not.toContainText("100.0%");
+  await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("—");
+  // The Browser reached the Manager only; never a PPU.
+  expect(legacyRequests(counters)).toEqual([]);
+});
+
+test("Read Memory validates the address range against the Programming Profile before any request", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { card, button } = await readSetup(page);
+  const address = card.getByLabel("Read Memory Start Address");
+  const length = card.getByLabel("Read Memory Length");
+  // Defaults: the whole Flash range of the Profile.
+  await expect(address).toHaveAttribute("placeholder", "0x08000000");
+  await expect(length).toHaveAttribute("placeholder", "65536");
+  await expect(button).toBeEnabled();
+  for (const [start, size, label] of [
+    ["0x40021000", "4", "OUT OF RANGE"],      // MMIO is never readable
+    ["0x08000000", "65537", "OUT OF RANGE"],
+    ["0x0800FFFF", "2", "OUT OF RANGE"],
+    ["0x07FFFFFF", "16", "OUT OF RANGE"],
+    ["zz", "16", "ADDRESS INVALID"],
+    ["0x08000000", "0", "LENGTH INVALID"],
+    ["0x08000000", "-4", "LENGTH INVALID"],
+  ]) {
+    await address.fill(start);
+    await length.fill(size);
+    await expect(button).toBeDisabled();
+    await expect(card.getByTestId("read-memory-readiness")).toContainText(label);
+  }
+  await address.fill("0x0800FFFF");
+  await length.fill("1");
+  await expect(button).toBeEnabled();
+  expect(writes(counters)).toEqual([]);
+});
+
+test("a Read Memory failure, unknown outcome or unprovable download never offers a binary", async ({ page }) => {
+  let mode = "fail";
+  const counters = await mockManager(page, { script: () => mode === "fail" ? { outcome: "FAIL", reason: "SAFE_OFF_NOT_VERIFIED", safeOff: false }
+    : mode === "tamper" ? { readTamper: true } : { outcome: "OUTCOME_UNKNOWN", reason: "JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT" } });
+  const { workspace, card, button } = await readSetup(page);
+  await button.click();
+  await expect(card.getByTestId("read-memory-verdict")).toContainText("FAIL · SAFE_OFF_NOT_VERIFIED");
+  await expect(card.getByTestId("read-memory-download")).toHaveCount(0);
+  await expect(card.getByTestId("read-memory-bytes")).toHaveText("—");
+  mode = "tamper";
+  await button.click();
+  await expect(card.getByTestId("read-memory-verdict")).toHaveText("PASS");
+  await expect(card.getByTestId("read-memory-download")).toHaveCount(0);
+  await expect(card.getByTestId("read-memory-no-download")).toContainText("do not match the receipt SHA256");
+  mode = "unknown";
+  await button.click();
+  await expect(card.getByTestId("read-memory-verdict")).toContainText("OUTCOME UNKNOWN");
+  await expect(card.getByTestId("read-memory-download")).toHaveCount(0);
+  // An unknown Read is never resubmitted and locks the PPU like any unknown run.
+  await expect(workspace.getByTestId("managed-unresolved")).toBeVisible();
+  await expect(button).toBeDisabled();
+  await expect(page.getByRole("button", { name: /START PROGRAMMING/ })).toBeDisabled();
+  expect(counters.starts).toHaveLength(3);
+});
+
+test("Read Memory and a Batch run lock each other out on the Site", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ runningPolls: 4 }) });
+  const { workspace, job, start } = await configure(page);
+  const button = workspace.getByTestId("read-memory-start");
+  await start.click();
+  await expect(button).toBeDisabled(); // a programming run owns the Site
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS", { timeout: 20_000 });
+  await button.click();
+  await expect(start).toBeDisabled(); // and a Read locks Start
+  await expect(job.getByLabel("Engineering operation erase")).toBeDisabled();
+  await expect(workspace.getByTestId("read-memory-verdict")).toHaveText("PASS", { timeout: 20_000 });
+  await expect(start).toBeEnabled();
+  expect(counters.plans.map(plan => plan.body.operation ?? "programming")).toEqual(["programming", "read"]);
+  // The Read did not disturb the Batch result.
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
 });
 
 test("one Start plans and executes: Firmware Resource Reuse → one Job → PASS receipt", async ({ page }) => {
@@ -97,10 +346,23 @@ test("one Start plans and executes: Firmware Resource Reuse → one Job → PASS
   expect(counters.plans[0].alias).toBe("z2");
   expect(body.icpn).toBe("STM32F103C8T6");
   expect(body.site_id).toBe(2);
-  expect(body.operation).toBe("flash_cycle");
+  expect(body.operations).toEqual(["erase", "program", "verify"]);
+  expect(body).not.toHaveProperty("operation"); // E + P + V is never mapped to flash_cycle
   expect(Buffer.from(String(body.image_base64), "base64").equals(FIRMWARE)).toBe(true);
   expect(body).not.toHaveProperty("bundle_base64");
   expect(counters.starts[0].body).toEqual({ plan_id: expect.stringMatching(/^[0-9a-f]{32}$/), confirm: "PROGRAM" });
+  // No standing PROGRAMMING PLAN panel; the Backend plan ran and its technical
+  // result is in Receipts & Diagnostics and in the Log.
+  await expect(workspace.getByTestId("managed-plan")).toHaveCount(0);
+  await expect(workspace.getByLabel("Programming plan", { exact: true })).toHaveCount(0);
+  await expect(workspace.locator("header").filter({ hasText: "PROGRAMMING PLAN" })).toHaveCount(0);
+  const diagnostics = workspace.getByTestId("run-plan-diagnostics");
+  await expect(diagnostics.getByTestId("plan-id")).toHaveText(/^[0-9a-f]{32}$/);
+  await expect(diagnostics.getByTestId("plan-route")).toContainText("z2-site2-stm32f103c8t6-operations");
+  await expect(diagnostics.getByTestId("plan-binding-sha")).toHaveText(/^z2-site2-plan1/);
+  await expect(workspace.getByTestId("receipt-range")).toHaveText("0x08000000 + 4096 B");
+  await expect(page.getByText(/\[PLAN\] .*Route z2-site2-stm32f103c8t6-operations/)).toHaveCount(1);
+  await expect(page.getByText(/\[PLAN\] Range 0x08000000 \+ 4096 B · Resource SHA256 9{64}/)).toHaveCount(1);
   await expect(workspace.getByTestId("plan-source")).toHaveText("image");
   await expect(workspace.getByTestId("plan-activation")).toContainText("Resource Reuse");
   await expect(workspace.getByTestId("plan-resource-sha")).toHaveText(RESOURCE_SHA);
@@ -127,7 +389,7 @@ test("Firmware cache miss runs B1/B2/B3 through the Manager, then one Job", asyn
   await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
   await expect(workspace.getByTestId("plan-activation")).toContainText("B1 upload → B2 admit → B3 activate (no FPGA load)");
   const steps = workspace.getByRole("list", { name: "Programming steps" });
-  for (const step of ["B1_UPLOAD: PASS", "B2_ADMIT: PASS", "B3_ACTIVATE: PASS", "FLASH_CYCLE_SUBMIT: ACCEPTED", "VERIFY_RECEIPT: PASS"]) {
+  for (const step of ["B1_UPLOAD: PASS", "B2_ADMIT: PASS", "B3_ACTIVATE: PASS", "PROGRAMMING_SUBMIT: ACCEPTED", "VERIFY_RECEIPT: PASS"]) {
     await expect(steps).toContainText(step);
   }
   await expect(workspace.getByTestId("receipt-resource")).toHaveText("Activated");
@@ -300,7 +562,7 @@ test("a start refused by the Manager (unresolved OUTCOME_UNKNOWN latch) is a def
 });
 
 test("incomplete or invalid settings never reach the Manager", async ({ page }) => {
-  const counters = await mockManager(page, { routes: [route([2], ["flash_cycle"])] });
+  const counters = await mockManager(page);
   const workspace = await open(page);
   const start = page.getByRole("button", { name: /START PROGRAMMING/ });
   await expect(workspace.getByTestId("managed-readiness")).toContainText("NO TARGET");
