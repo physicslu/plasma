@@ -14,6 +14,7 @@ import {
   getProgrammingRun,
   getReadOutput,
   IMAGE_OPERATIONS,
+  issueBatchStart,
   planProgramming,
   SEQUENCE_OPERATIONS,
   PROGRAMMING_OPERATIONS,
@@ -31,6 +32,7 @@ import {
   type ProgrammingSource,
   type SequenceOperation,
   type SingleOperation,
+  type StartReconciliation,
 } from "../engineering/bundle-programming-api";
 import { getManagerFleet, getManagerRegistry, type ManagerRegistryPayload } from "../engineering/ppu-registry-api";
 import type { FleetPPUView, FleetSiteView, FleetWebPayload } from "../fleet/fleet-contract";
@@ -346,11 +348,96 @@ export class ManagedProgrammingBlocked extends Error {
   }
 }
 
+/** What a lost Start was for: enough to reconcile it with the Manager later. */
+export type StartIdentity = {
+  /** Manager-issued: the run's plan ID, or the Batch start ID. */
+  startId: string;
+  kind: "run" | "batch";
+  siteId: number;
+  operation: string;
+  /** Known for a run (from its plan); a Batch plans inside the Manager. */
+  jobBindingSha256: string | null;
+};
+
 /** The single start request left the Browser but its outcome is unknown. Never resubmitted. */
 export class ManagedStartOutcomeUnknown extends Error {
-  constructor(readonly planId: string, message: string) {
+  constructor(readonly planId: string, message: string, readonly identity: StartIdentity | null = null) {
     super(message);
     this.name = "ManagedStartOutcomeUnknown";
+  }
+}
+
+export type StartHoldIdentity = {
+  alias: string; siteId: number; kind: "READ" | "PROGRAMMING";
+  startId: string | null; jobBindingSha256: string | null;
+};
+
+export type StartReconciliationDecision =
+  /** The hold may be released (the operator's click is the acknowledgement). */
+  | { action: "RELEASE"; summary: string }
+  /** The Manager run is OUTCOME UNKNOWN: its own acknowledge comes first. */
+  | { action: "ACKNOWLEDGE_RUN"; runId: string; summary: string }
+  /** Never admitted so far, but a delayed request still could be: void it. */
+  | { action: "VOID"; summary: string }
+  | { action: "BLOCKED"; summary: string };
+
+/**
+ * What the Manager's reconciliation allows for one held Start. Pure.
+ *
+ * The answer must be about THIS start on THIS PPU, Site and Job Binding;
+ * anything else, and anything the Manager cannot prove, keeps the hold.
+ */
+export function decideStartReconciliation(
+  hold: StartHoldIdentity, answer: StartReconciliation,
+): StartReconciliationDecision {
+  const blocked = (summary: string): StartReconciliationDecision => ({ action: "BLOCKED", summary });
+  if (!hold.startId) return blocked("this hold has no Manager start ID to reconcile");
+  if (answer.schema !== "plasma.manager.programming-start-reconciliation.v1" || answer.read_only !== true) {
+    return blocked("the Manager answer is not a Start reconciliation");
+  }
+  if (answer.start_id !== hold.startId || answer.ppu_alias !== hold.alias) {
+    return blocked("the Manager answered for another start or PPU");
+  }
+  const identity = answer.identity;
+  if (identity) {
+    const wantedKind = hold.kind === "READ" ? "run" : "batch";
+    const siteKnown = identity.site_id != null;
+    if (answer.kind !== wantedKind || identity.ppu_alias !== hold.alias
+      || (siteKnown && identity.site_id !== hold.siteId)
+      // Only a Batch that was never admitted has no Site on record yet.
+      || (!siteKnown && !(wantedKind === "batch" && (answer.state === "ACCEPTANCE_PENDING" || answer.state === "NOT_ACCEPTED")))
+      || (hold.kind === "READ" && identity.operation !== "read")
+      || (hold.kind === "PROGRAMMING" && identity.operation !== "programming")
+      || (hold.jobBindingSha256 != null && identity.job_binding_sha256 !== hold.jobBindingSha256)) {
+      return blocked("the Manager record does not match this PPU, Site, Operation or Job Binding");
+    }
+  } else if (answer.state !== "OUTCOME_UNKNOWN") {
+    return blocked("the Manager answer carries no identity");
+  }
+  const reason = answer.reason ?? "no reason reported";
+  switch (answer.state) {
+    case "NOT_ACCEPTED":
+      return { action: "RELEASE", summary: `the Manager proves the Start was never admitted (${reason}); no Job was submitted` };
+    case "ACCEPTANCE_PENDING":
+      return { action: "VOID", summary: `the Manager has not admitted this Start, but a delayed request still could be for ${answer.expires_in_s ?? "?"} s` };
+    case "ACCEPTED_RUNNING":
+      return blocked(`the Manager admitted this Start and it is still running (${answer.run?.run_id ?? answer.batch?.batch_id ?? "?"})`);
+    case "TERMINAL_CONFIRMED": {
+      const id = answer.run ? `Run ${answer.run.run_id}` : answer.batch ? `Batch ${answer.batch.batch_id}` : null;
+      if (!id || !answer.outcome || answer.outcome === "OUTCOME_UNKNOWN") return blocked("the Manager reports no definite result");
+      return { action: "RELEASE", summary: `the Manager admitted this Start as ${id} and it ended ${answer.outcome}${answer.reason ? ` (${answer.reason})` : ""}` };
+    }
+    case "OUTCOME_UNKNOWN":
+      if (answer.unknown_run_id && answer.acknowledged === false) {
+        return { action: "ACKNOWLEDGE_RUN", runId: answer.unknown_run_id,
+          summary: `the Manager admitted this Start; Run ${answer.unknown_run_id} ended OUTCOME UNKNOWN (${reason}) and is not acknowledged` };
+      }
+      if (answer.unknown_run_id && answer.acknowledged === true) {
+        return { action: "RELEASE", summary: `Run ${answer.unknown_run_id} ended OUTCOME UNKNOWN and its reconciliation is acknowledged on the Manager` };
+      }
+      return blocked(`the Manager cannot prove what became of this Start (${reason})`);
+    default:
+      return blocked("the Manager reported an unrecognized reconciliation state");
   }
 }
 
@@ -445,7 +532,9 @@ export async function runManagedProgramming(
       throw new ManagedProgrammingBlocked("start", code, message);
     }
     throw new ManagedStartOutcomeUnknown(plan.plan_id,
-      `The start request outcome is unknown (${message}). Nothing was resubmitted.`);
+      `The start request outcome is unknown (${message}). Nothing was resubmitted.`,
+      { startId: plan.plan_id, kind: "run", siteId: plan.site_id, operation: plan.operation,
+        jobBindingSha256: plan.job_binding_sha256 });
   }
   events.onRun?.(run);
   return observeRun(request.alias, run, events, signal);
@@ -520,7 +609,9 @@ export async function runManagedRead(
       throw new ManagedProgrammingBlocked("start", code, message);
     }
     throw new ManagedStartOutcomeUnknown(plan.plan_id,
-      `The Read Memory start outcome is unknown (${message}). Nothing was resubmitted.`);
+      `The Read Memory start outcome is unknown (${message}). Nothing was resubmitted.`,
+      { startId: plan.plan_id, kind: "run", siteId: plan.site_id, operation: "read",
+        jobBindingSha256: plan.job_binding_sha256 });
   }
   events.onRun?.(run);
   run = await observeRun(request.alias, run, events, signal);
@@ -577,17 +668,29 @@ export async function runManagedBatch(
     : request.source === "bundle"
       ? { ...common, operations: request.operations, bundle: bytes! }
       : { ...common, operations: request.operations, image: bytes!, filename: request.file.name };
+  // The Manager issues the start ID first, so a lost Batch answer can be
+  // reconciled. Issuing it submits nothing: a failure here is a refusal.
+  let startId: string;
+  try {
+    startId = await issueBatchStart(request.alias);
+    if (!/^[0-9a-f]{32}$/.test(startId)) throw new Error("the Manager issued no start ID");
+  } catch (reason) {
+    const { code, message } = errorParts(reason);
+    throw new ManagedProgrammingBlocked("plan", code,
+      `The Manager did not issue a start ID (${message}); nothing was started.`);
+  }
   let batch: ProgrammingBatch;
   try {
-    batch = await startProgrammingBatch(request.alias, input);
+    batch = await startProgrammingBatch(request.alias, input, startId);
   } catch (reason) {
     const { status, code, message } = errorParts(reason);
     // A 4xx is a definite refusal: no Batch exists and no Job was submitted.
     if (status != null && status >= 400 && status < 500) {
       throw new ManagedProgrammingBlocked("plan", code, message);
     }
-    throw new ManagedStartOutcomeUnknown("batch",
-      `The Batch request outcome is unknown (${message}). Nothing was resubmitted.`);
+    throw new ManagedStartOutcomeUnknown(startId,
+      `The Batch request outcome is unknown (${message}). Nothing was resubmitted.`,
+      { startId, kind: "batch", siteId: request.siteId, operation: "programming", jobBindingSha256: null });
   }
   events.onBatch?.(batch);
   while (batch.outcome == null) {

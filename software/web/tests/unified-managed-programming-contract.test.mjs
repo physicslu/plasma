@@ -13,6 +13,7 @@ const core = await read("app/programming/managed-programming.ts");
 const emode = await read("app/engineering/managed-programming-workspace.tsx");
 const router = await read("app/engineering/programming-workspace-v2.tsx");
 const api = await read("app/engineering/bundle-programming-api.ts");
+const bff = await read("app/api/manager/bootstrap-bff.ts");
 const panel = await read("app/operator-ui/programming-job-panel.tsx");
 const selector = await read("app/operator-ui/programming-source-selector.tsx");
 const view = await read("app/operator-ui/programming-run-view.tsx");
@@ -91,11 +92,34 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
   assert.match(emode, /showSaveFilePicker/);
   // A lost Start answer (READ or Programming) holds the PPU until the operator
   // reconciles it; it is never a FAIL, never resent and never auto-acknowledged.
-  assert.match(emode, /if \(unknown\) holdStart\(alias, id, "READ", reason\.message\);/);
-  assert.match(emode, /holdStart\(context\.alias, context\.siteId, "PROGRAMMING", reason\.message\);/);
+  assert.match(emode, /if \(unknown\) holdStart\(alias, id, "READ", reason\.message, reason\.identity\);/);
+  assert.match(emode, /holdStart\(context\.alias, context\.siteId, "PROGRAMMING", reason\.message, reason\.identity\);/);
   assert.match(emode, /if \(startHold\) \{\s*return notReady\("OUTCOME UNKNOWN",/);
   assert.match(emode, /window\.localStorage\.setItem\(START_HOLD_KEY/);
-  assert.doesNotMatch(emode, /useEffect\([^)]*releaseStartHold/);
+  // The hold is released on the Manager's reconciliation of that exact start,
+  // never on a Site being idle alone, and never from an effect.
+  assert.doesNotMatch(emode, /releaseStartHold/);
+  assert.doesNotMatch(emode, /useEffect\([^)]*reconcileStartHold/);
+  const reconcile = emode.slice(emode.indexOf("async function reconcileStartHold"), emode.indexOf("async function acknowledge()"));
+  assert.match(reconcile, /getStartReconciliation\(hold\.alias, hold\.startId\)/);
+  assert.match(reconcile, /decideStartReconciliation\(hold, answer\)/);
+  assert.ok(reconcile.indexOf("decision.action !== \"RELEASE\"") < reconcile.indexOf("loadManagedTopology()"),
+    "the Fleet idle check only follows a Manager answer that allows release");
+  assert.ok(reconcile.indexOf("loadManagedTopology()") < reconcile.indexOf("delete next[hold.alias]"));
+  // The two writes are explicit operator steps, sent only when the fresh answer asks for them.
+  assert.match(reconcile, /step === "ACKNOWLEDGE_RUN" && decision\.action === "ACKNOWLEDGE_RUN"/);
+  assert.match(reconcile, /step === "VOID" && decision\.action === "VOID"/);
+  assert.match(reconcile, /if \(!hold\.startId\) \{[\s\S]*?return;/);
+  // Core: a lost Start carries the Manager-issued start ID; a Batch gets one first.
+  assert.match(core, /startId = await issueBatchStart\(request\.alias\);[\s\S]*startProgrammingBatch\(request\.alias, input, startId\)/);
+  assert.doesNotMatch(core, /new ManagedStartOutcomeUnknown\("batch"/);
+  assert.match(core, /export function decideStartReconciliation\(/);
+  assert.match(core, /answer\.start_id !== hold\.startId \|\| answer\.ppu_alias !== hold\.alias/);
+  assert.match(core, /hold\.jobBindingSha256 != null && identity\.job_binding_sha256 !== hold\.jobBindingSha256/);
+  // The Browser reaches the three endpoints through the BFF allowlist only.
+  assert.match(bff, /\/\^programming\\\/starts\$\//);
+  assert.match(bff, /programming\/starts\/\$\{RUN_ID\}\/void\$/);
+  assert.match(bff, /BOOTSTRAP_GET_ACTIONS = \[[\s\S]*programming\/starts\/\$\{RUN_ID\}\$/);
   assert.match(emode, /name === "AbortError"[\s\S]{0,200}no Job was submitted[\s\S]{0,80}return;/);
   assert.match(emode, /runManagedRead\(/);
   assert.match(core, /operation: "read",/);

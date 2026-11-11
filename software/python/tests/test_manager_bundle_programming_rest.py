@@ -55,6 +55,16 @@ class StubWorkflow:
         self.calls.append(("ack", alias, run_id, dict(body)))
         return {"ok": True, "run": {"run_id": run_id, "acknowledged": True}}
 
+    def issue_batch_start(self, alias, body):
+        self.calls.append(("issue", alias, dict(body)))
+        return {"ok": True, "start": {"start_id": RUN_ID, "kind": "batch"}}
+
+    def void_start(self, alias, start_id, body):
+        self.calls.append(("void", alias, start_id, dict(body)))
+        if body != {"void": "VOID_UNSTARTED_START"}:
+            raise ProgrammingError(400, "invalid_request", "void requires void=VOID_UNSTARTED_START")
+        return {"ok": True, "reconciliation": {"start_id": start_id, "state": "NOT_ACCEPTED"}}
+
 
 class StubBatches:
     def __init__(self):
@@ -67,6 +77,10 @@ class StubBatches:
     def status(self, alias, batch_id):
         self.calls.append(("status", alias, batch_id))
         return {"ok": True, "batch": {"batch_id": batch_id, "outcome": "PASS"}}
+
+    def reconcile_start(self, alias, start_id):
+        self.calls.append(("reconcile", alias, start_id))
+        return {"ok": True, "reconciliation": {"start_id": start_id, "state": "OUTCOME_UNKNOWN"}}
 
     def request_stop(self, alias, batch_id, body):
         self.calls.append(("stop", alias, batch_id, dict(body)))
@@ -192,3 +206,27 @@ def test_batch_start_status_and_stop_are_wired(manager):
     for path in (f"{BASE}/batches/{RUN_ID}/cancel", f"{BASE}/batches/{RUN_ID}/abort",
                  f"{BASE}/runs/{RUN_ID}/cancel"):
         assert call("POST", path, {"x": 1})[0] == 404
+
+
+def test_start_reconciliation_issue_and_void_are_wired(manager):
+    call, workflow, _poller = manager
+    batches = BootstrapPlasmaManagerHandler.programming_batches
+    status, payload = call("POST", f"{BASE}/starts", {"kind": "batch"})
+    assert status == 200 and payload["start"]["start_id"] == RUN_ID
+    status, payload = call("GET", f"{BASE}/starts/{RUN_ID}")
+    assert status == 200 and payload["reconciliation"]["state"] == "OUTCOME_UNKNOWN"
+    status, payload = call("POST", f"{BASE}/starts/{RUN_ID}/void", {"void": "VOID_UNSTARTED_START"})
+    assert status == 200 and payload["reconciliation"]["state"] == "NOT_ACCEPTED"
+    assert call("POST", f"{BASE}/starts/{RUN_ID}/void", {"void": "x"})[0] == 400
+    assert [c[0] for c in workflow.calls] == ["issue", "void", "void"]
+    assert batches.calls == [("reconcile", "z2", RUN_ID)]
+
+
+def test_reconciliation_is_a_get_only_and_takes_a_strict_start_id(manager):
+    call, workflow, _poller = manager
+    batches = BootstrapPlasmaManagerHandler.programming_batches
+    for path in (f"{BASE}/starts/not-an-id", f"{BASE}/starts/{'D' * 32}", f"{BASE}/starts"):
+        assert call("GET", path)[0] in (400, 404, 405)
+    # A POST to the reconciliation path is never a query and changes nothing.
+    assert call("POST", f"{BASE}/starts/{RUN_ID}", {})[0] in (400, 404, 405)
+    assert workflow.calls == [] and batches.calls == []
