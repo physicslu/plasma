@@ -83,8 +83,13 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
   assert.match(emode, /normalizeOperations\(selectedOperations\)/);
   assert.doesNotMatch(emode, /flash_cycle/);
   assert.doesNotMatch(emode, /code: "R"|label: "Read"/);
-  // Read Memory: its own button and Job, through the Manager only.
-  assert.match(emode, /aria-label="Read Memory"/);
+  // READ: one button per LIVE SITE STATUS row, its own Job, through the Manager only.
+  assert.doesNotMatch(emode, /READ MEMORY|aria-label="Read Memory|data-testid="read-memory/);
+  assert.match(emode, /aria-label=\{`Read SITE \$\{site\.site_id\} Flash`\}/);
+  // The whole Flash of the Programming Route; the destination is chosen before any Job.
+  assert.match(emode, /const address = route\.flash_base;\s*const length = route\.flash_size;/);
+  assert.match(emode, /showSaveFilePicker/);
+  assert.match(emode, /name === "AbortError"[\s\S]{0,200}no Job was submitted[\s\S]{0,80}return;/);
   assert.match(emode, /runManagedRead\(/);
   assert.match(core, /operation: "read",/);
   assert.doesNotMatch(emode, /\/api\/jobs|gateway-api|getReadOutput\(/);
