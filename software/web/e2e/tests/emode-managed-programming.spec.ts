@@ -222,12 +222,15 @@ test("the file picker shows the real name, size and format, truncates long names
 
 // ------------------------------------------------------------------ READ (Site row)
 
-type PickerMode = "save" | "cancel" | "none" | "write-fail";
+type PickerMode = "save" | "cancel" | "deny" | "security" | "none" | "write-fail" | "opfs";
 type PickerProbe = { calls: Array<string | null>; saves: Array<{ name: string; bytes: number[] }> };
 
 /**
  * Replace the native Save File Picker before the page loads: a real picker
  * would block a headless Browser. "none" removes it (Firefox / Safari).
+ * "opfs" returns a real Chromium FileSystemFileHandle (Origin Private File
+ * System), so the write path runs on the Browser's own implementation. None of
+ * these modes is an acceptance of the native picker dialog itself.
  */
 async function stubSavePicker(page: Page, mode: PickerMode) {
   await page.addInitScript(pickerMode => {
@@ -241,6 +244,12 @@ async function stubSavePicker(page: Page, mode: PickerMode) {
     host.showSaveFilePicker = async (options?: { suggestedName?: string }) => {
       probe.calls.push(options?.suggestedName ?? null);
       if (pickerMode === "cancel") throw new DOMException("The user aborted a request.", "AbortError");
+      if (pickerMode === "deny") throw new DOMException("The request is not allowed by the user agent.", "NotAllowedError");
+      if (pickerMode === "security") throw new DOMException("Must be handling a user gesture.", "SecurityError");
+      if (pickerMode === "opfs") {
+        const root = await navigator.storage.getDirectory();
+        return root.getFileHandle("dump.bin", { create: true });
+      }
       const chunks: number[] = [];
       return {
         name: "dump.bin",
@@ -389,6 +398,123 @@ test("a verified READ that cannot be written to the chosen file is kept as a dow
   const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
   expect((await readFile(await download.path())).equals(FULL_FLASH)).toBe(true);
   expect((await pickerProbe(page)).saves).toEqual([]);
+});
+
+test("a refused Save File Picker (permission denied) submits no READ Job", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { button, status, save, log } = await readSetup(page, "deny");
+  await button.click();
+  await expect(status).toHaveText("BLOCKED");
+  await expect(status).toHaveAttribute("title", /Save File Picker was refused.*No Job was submitted/);
+  await expect(log).toContainText("[READ] BLOCKED · SITE-02 · the Save File Picker was refused");
+  await expect(save).toHaveCount(0);
+  await expect(button).toBeEnabled();
+  expect(counters.plans).toEqual([]);
+  expect(writes(counters)).toEqual([]);
+});
+
+test("a Save File Picker the Browser blocks falls back to the Browser download", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { button, status, save, log } = await readSetup(page, "security");
+  await button.click();
+  await expect(status).toHaveText("PASS");
+  await expect(log).toContainText("this Browser blocks the Save File Picker here");
+  const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+  expect((await readFile(await download.path())).equals(FULL_FLASH)).toBe(true);
+  expect(counters.starts).toHaveLength(1);
+});
+
+test("the verified READ is written through a real Chromium FileSystemFileHandle", async ({ page }) => {
+  await mockManager(page);
+  const { button, status, log } = await readSetup(page, "opfs");
+  await button.click();
+  await expect(status).toHaveText("PASS");
+  await expect(log).toContainText("[READ] SAVED · SITE-02 · dump.bin · 65536 B");
+  const saved = await page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    const file = await (await root.getFileHandle("dump.bin")).getFile();
+    return Array.from(new Uint8Array(await file.arrayBuffer()));
+  });
+  expect(Buffer.from(saved).equals(FULL_FLASH)).toBe(true);
+});
+
+const lostStart = { startStatus: 504, startError: { code: "manager_unavailable", message: "Manager Bootstrap path is unavailable" } };
+
+test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming Start, held across a reload until acknowledged", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  const counters = await mockManager(page, { script: () => lostStart });
+  const { workspace, start } = await configure(page);
+  const button = workspace.getByRole("button", { name: "Read SITE 2 Flash" });
+  const status = workspace.getByRole("status", { name: "SITE 2 Read status" });
+  const hold = workspace.getByTestId("managed-start-hold");
+  await expect(start).toBeEnabled();
+  await button.click();
+  // Unknown, not FAIL; nothing written.
+  await expect(status).toHaveText("OUTCOME UNKNOWN");
+  await expect(hold).toContainText("the READ Start request on PPU z2 · SITE-02 got no answer");
+  await expect(hold).toContainText("Nothing was resubmitted");
+  expect((await pickerProbe(page)).saves).toEqual([]);
+  // The PPU is held: neither a second READ nor a Programming Start can be sent.
+  await expect(button).toBeDisabled();
+  await expect(start).toBeDisabled();
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("OUTCOME UNKNOWN");
+  await button.click({ force: true });
+  await start.click({ force: true });
+  await page.waitForTimeout(2500);
+  expect(counters.plans).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
+  expect(counters.batches).toHaveLength(0);
+  expect(counters.polls).toBe(0);
+  // A reload does not drop the hold.
+  const reloaded = await configure(page);
+  await expect(reloaded.workspace.getByTestId("managed-start-hold")).toBeVisible();
+  await expect(reloaded.workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeDisabled();
+  await expect(reloaded.start).toBeDisabled();
+  expect(counters.starts).toHaveLength(1);
+  // Only the operator releases it, after the Manager Fleet shows the Site idle. Nothing is acknowledged automatically.
+  expect(counters.acks).toBe(0);
+  await reloaded.workspace.getByRole("button", { name: "Acknowledge Start reconciliation" }).click();
+  await expect(reloaded.workspace.getByTestId("managed-start-hold")).toHaveCount(0);
+  await expect(reloaded.workspace.getByLabel("Engineering job log")).toContainText("[ACK] Start OUTCOME UNKNOWN reconciled by the operator · PPU z2 · SITE-02 idle, no Job");
+  await expect(reloaded.workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeEnabled();
+  await expect(reloaded.start).toBeEnabled();
+  expect(counters.starts).toHaveLength(1);
+  expect(counters.acks).toBe(0);
+});
+
+test("a lost Programming Start answer also holds READ on the same PPU", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  const counters = await mockManager(page, { batchStatus: 504 });
+  const { workspace, start } = await configure(page);
+  const button = workspace.getByRole("button", { name: "Read SITE 2 Flash" });
+  await start.click();
+  await expect(workspace.getByTestId("managed-start-unknown")).toContainText("The Batch request outcome is unknown");
+  await expect(workspace.getByTestId("managed-start-hold")).toContainText("the PROGRAMMING Start request on PPU z2");
+  await expect(button).toBeDisabled();
+  await expect(start).toBeDisabled();
+  await button.click({ force: true });
+  await start.click({ force: true });
+  await page.waitForTimeout(1500);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.starts).toHaveLength(0);
+  expect((await pickerProbe(page)).calls).toEqual([]);
+});
+
+test("the Start hold is kept while the Manager Fleet shows the Site busy", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  await page.addInitScript(() => window.localStorage.setItem("plasma.emode.start-outcome-unknown.v1", JSON.stringify({
+    z2: { alias: "z2", siteId: 2, kind: "READ", detail: "The Read Memory start outcome is unknown (timeout).", at: "2026-11-11T00:00:00.000Z" },
+  })));
+  const counters = await mockManager(page, { ppus: [{ ...Z2, busySites: [2] }] });
+  const workspace = await open(page);
+  await selectIc(page);
+  const hold = workspace.getByTestId("managed-start-hold");
+  await expect(hold).toBeVisible();
+  await workspace.getByRole("button", { name: "Acknowledge Start reconciliation" }).click();
+  await expect(workspace.getByTestId("managed-status-note")).toContainText("The Start hold on PPU z2 was kept: SITE-02 is");
+  await expect(hold).toBeVisible();
+  await expect(workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeDisabled();
+  expect(writes(counters)).toEqual([]);
 });
 
 test("READ is unavailable on a busy or disabled Site and absent where no Route declares Read", async ({ page }) => {

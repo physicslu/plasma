@@ -100,6 +100,37 @@ function saveFilePicker(): SaveFilePicker | null {
 type Readiness = { ready: boolean; label: string; reason: string };
 type RunContext = { alias: string; siteId: number; startedAt: number; finishedAt: number | null };
 
+// A Start request whose answer was lost (timeout, 5xx, dropped connection): the
+// Manager may or may not have submitted a Job. The Manager stays the authority
+// (one-shot plan, journal, one active run per PPU, OUTCOME UNKNOWN latch); this
+// hold only keeps THIS Console from sending another write to the PPU until the
+// operator reconciles it. It is stored so a reload cannot drop it.
+const START_HOLD_KEY = "plasma.emode.start-outcome-unknown.v1";
+type StartHold = { alias: string; siteId: number; kind: "READ" | "PROGRAMMING"; detail: string; at: string };
+let heldStarts: Record<string, StartHold> = {};
+
+function readStartHolds(): Record<string, StartHold> {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(START_HOLD_KEY) ?? "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      heldStarts = { ...heldStarts, ...(parsed as Record<string, StartHold>) };
+    }
+  } catch {
+    // Storage unavailable: the hold still lives for this page.
+  }
+  return heldStarts;
+}
+
+function writeStartHolds(next: Record<string, StartHold>) {
+  heldStarts = next;
+  try {
+    if (Object.keys(next).length) window.localStorage.setItem(START_HOLD_KEY, JSON.stringify(next));
+    else window.localStorage.removeItem(START_HOLD_KEY);
+  } catch {
+    // Storage unavailable: the hold still lives for this page.
+  }
+}
+
 function siteLabel(siteId: number): string {
   return `SITE-${String(siteId).padStart(2, "0")}`;
 }
@@ -170,6 +201,9 @@ export default function ManagedProgrammingWorkspace() {
   const [startUnknown, setStartUnknown] = useState<string | null>(null);
   const [unresolved, setUnresolved] = useState<ProgrammingRun | null>(null);
   const [acknowledging, setAcknowledging] = useState(false);
+  // null until the stored holds are read: nothing may start before that.
+  const [startHolds, setStartHolds] = useState<Record<string, StartHold> | null>(null);
+  const [releasingHold, setReleasingHold] = useState(false);
   const [statusNote, setStatusNote] = useState<string | null>(null);
 
   // READ: an independent Job per Site row, never part of the Batch above.
@@ -204,6 +238,11 @@ export default function ManagedProgrammingWorkspace() {
   useEffect(() => () => {
     abortRef.current?.abort();
     for (const url of readUrls.current.values()) URL.revokeObjectURL(url);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStartHolds(readStartHolds()), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Registry + Fleet: the only topology source.
@@ -274,6 +313,7 @@ export default function ManagedProgrammingWorkspace() {
     ? platform.availability
     : platformAvailability(null, null);
   const icpn = targetDevice?.icpn ?? targetDevice?.identifier ?? null;
+  const startHold = ppu && startHolds ? startHolds[ppu.alias] ?? null : null;
   const reading = readPhase !== "idle";
   // One Site, one Job: a Batch run and a READ Job lock each other out.
   const active = phase !== "idle" || reading;
@@ -300,9 +340,14 @@ export default function ManagedProgrammingWorkspace() {
       return notReady("MANAGER OFFLINE", topologyError ?? "Connecting to the Manager Registry.");
     }
     if (!ppu) return notReady("NO PPU", "No commissioned PPU is registered. Register one in PPU → Registration.");
-    const ppuBlock = fromAvailability(ppu.availability) ?? fromAvailability(platformState)
+    if (!startHolds) return notReady("CHECKING", "Checking for an unreconciled Start request.");
+    if (startHold) {
+      return notReady("OUTCOME UNKNOWN",
+        `A ${startHold.kind} Start request on this PPU has an unknown outcome. Nothing is submitted to this PPU until it is reconciled and acknowledged.`);
+    }
+    const unavailable = fromAvailability(ppu.availability) ?? fromAvailability(platformState)
       ?? fromAvailability(routesAvailability(routesState));
-    if (ppuBlock) return ppuBlock;
+    if (unavailable) return unavailable;
     if (unresolved && unresolved.ppu_alias === ppu.alias && !unresolved.acknowledged) {
       return notReady("OUTCOME UNKNOWN",
         "The previous run on this PPU ended OUTCOME UNKNOWN. Reconcile the PPU and acknowledge it; nothing is resubmitted.");
@@ -364,6 +409,48 @@ export default function ManagedProgrammingWorkspace() {
     for (const url of readUrls.current.values()) URL.revokeObjectURL(url);
     readUrls.current = new Map();
     setSiteReads({});
+  }
+
+  function holdStart(alias: string, siteId: number, kind: StartHold["kind"], detail: string) {
+    const next = { ...readStartHolds(), [alias]: { alias, siteId, kind, detail, at: new Date().toISOString() } };
+    writeStartHolds(next);
+    setStartHolds(next);
+  }
+
+  // Operator reconciliation of a lost Start answer. Never automatic: it reads
+  // the Manager Fleet and releases the hold only when the Site is idle with no
+  // Job. The Manager's own latch and run guards still decide the next Start.
+  async function releaseStartHold() {
+    if (!startHold || releasingHold || active) return;
+    const hold = startHold;
+    setReleasingHold(true);
+    try {
+      const fresh = await loadManagedTopology();
+      setTopology(fresh);
+      const target = fresh.ppus.find(item => item.alias === hold.alias);
+      const site = target?.sites.find(item => item.site_id === hold.siteId);
+      const refusal = !target ? "the PPU is not in the Manager Registry"
+        : !target.availability.ready ? `${target.availability.label} — ${target.availability.reason}`
+        : !site || !site.enabled ? `${siteLabel(hold.siteId)} is not reported enabled by the PPU`
+        : site.current_job_id || site.state !== "idle"
+          ? `${siteLabel(hold.siteId)} is ${site.state.toUpperCase()}${site.current_job_id ? ` (Job ${site.current_job_id})` : ""}`
+        : null;
+      if (refusal) {
+        setStatusNote(`The Start hold on PPU ${hold.alias} was kept: ${refusal}.`);
+        appendLog(`[ACK] REFUSED · Start OUTCOME UNKNOWN on PPU ${hold.alias} is not reconciled · ${refusal}`, true, "USR");
+        return;
+      }
+      const next = { ...readStartHolds() };
+      delete next[hold.alias];
+      writeStartHolds(next);
+      setStartHolds(next);
+      setStatusNote(null);
+      appendLog(`[ACK] Start OUTCOME UNKNOWN reconciled by the operator · PPU ${hold.alias} · ${siteLabel(hold.siteId)} idle, no Job (Manager Fleet) · the result of the lost ${hold.kind} request stays unknown`, false, "USR");
+    } catch (reason) {
+      setStatusNote(`The Start hold was kept: ${reason instanceof Error ? reason.message : "the Manager Fleet could not be read"}.`);
+    } finally {
+      setReleasingHold(false);
+    }
   }
 
   function clearRunState() {
@@ -504,6 +591,7 @@ export default function ManagedProgrammingWorkspace() {
         appendLog(`[BLOCKED] ${reason.stage.toUpperCase()} · ${message} · no Job was submitted`, true);
       } else if (reason instanceof ManagedStartOutcomeUnknown) {
         setStartUnknown(reason.message);
+        holdStart(context.alias, context.siteId, "PROGRAMMING", reason.message);
         appendLog(`[OUTCOME UNKNOWN] ${reason.message}`, true);
       } else {
         const message = reason instanceof Error ? reason.message : "Programming failed";
@@ -571,8 +659,14 @@ export default function ManagedProgrammingWorkspace() {
             appendLog(`[READ] CANCELLED · ${label} · no file was chosen · no Job was submitted`, false, "USR");
             return;
           }
-          appendLog(`[READ] ${label} · the Save File Picker is blocked by this Browser (${
-            reason instanceof Error ? reason.message : "unknown error"}) · the verified binary will be offered as a download`, true);
+          const detail = reason instanceof Error ? reason.message : "unknown error";
+          if ((reason as { name?: string } | null)?.name !== "SecurityError") {
+            // Permission denied (or any other refusal): the destination was not granted, so nothing is read.
+            finish("BLOCKED", `The Save File Picker was refused: ${detail}. No Job was submitted.`);
+            appendLog(`[READ] BLOCKED · ${label} · the Save File Picker was refused (${detail}) · no Job was submitted`, true);
+            return;
+          }
+          appendLog(`[READ] ${label} · this Browser blocks the Save File Picker here (${detail}) · the verified binary will be offered as a download`, true);
         }
       } else {
         appendLog(`[READ] ${label} · this Browser has no Save File Picker · the verified binary will be offered as a download`, false, "SYS");
@@ -631,6 +725,8 @@ export default function ManagedProgrammingWorkspace() {
         : unknown ? `OUTCOME UNKNOWN — ${reason.message} Check the PPU before reading again.`
         : reason instanceof Error ? reason.message : "READ failed";
       finish(blocked ? "BLOCKED" : unknown ? "OUTCOME UNKNOWN" : "FAIL", message);
+      // A lost Start answer is not a FAIL: hold every further Start on this PPU.
+      if (unknown) holdStart(alias, id, "READ", reason.message);
       appendLog(`[READ] ${label} · ${message}`, true);
     } finally {
       setReadPhase("idle");
@@ -847,7 +943,19 @@ export default function ManagedProgrammingWorkspace() {
                 <span>OUTCOME UNKNOWN — {startUnknown} Check the PPU before programming again.</span>
               </div>
             )}
-            {statusNote && <div className="warning engineeringOperationWarning" role="status">{statusNote}</div>}
+            {startHold && (
+              <div className="warning engineeringOperationWarning" role="alert" data-testid="managed-start-hold">
+                <span>
+                  OUTCOME UNKNOWN — the {startHold.kind} Start request on PPU {startHold.alias} · {siteLabel(startHold.siteId)} got
+                  no answer ({startHold.detail}) It may or may not have reached the PPU. Nothing is submitted to this PPU
+                  until you check it and acknowledge.
+                </span>
+                <button type="button" className="engineeringAcknowledge" disabled={releasingHold || active} onClick={() => void releaseStartHold()}>
+                  Acknowledge Start reconciliation
+                </button>
+              </div>
+            )}
+            {statusNote && <div className="warning engineeringOperationWarning" role="status" data-testid="managed-status-note">{statusNote}</div>}
           </div>
         </div>
 
@@ -901,7 +1009,7 @@ export default function ManagedProgrammingWorkspace() {
               Run {unresolved.run_id} on PPU {unresolved.ppu_alias} ended OUTCOME UNKNOWN. Nothing was resubmitted.
               Reconcile the PPU through the normal recovery procedure, then acknowledge.
             </span>
-            <button type="button" disabled={acknowledging} onClick={() => void acknowledge()}>Acknowledge reconciliation</button>
+            <button type="button" className="engineeringAcknowledge" disabled={acknowledging} onClick={() => void acknowledge()}>Acknowledge reconciliation</button>
           </div>
         )}
 

@@ -89,6 +89,13 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
   // The whole Flash of the Programming Route; the destination is chosen before any Job.
   assert.match(emode, /const address = route\.flash_base;\s*const length = route\.flash_size;/);
   assert.match(emode, /showSaveFilePicker/);
+  // A lost Start answer (READ or Programming) holds the PPU until the operator
+  // reconciles it; it is never a FAIL, never resent and never auto-acknowledged.
+  assert.match(emode, /if \(unknown\) holdStart\(alias, id, "READ", reason\.message\);/);
+  assert.match(emode, /holdStart\(context\.alias, context\.siteId, "PROGRAMMING", reason\.message\);/);
+  assert.match(emode, /if \(startHold\) \{\s*return notReady\("OUTCOME UNKNOWN",/);
+  assert.match(emode, /window\.localStorage\.setItem\(START_HOLD_KEY/);
+  assert.doesNotMatch(emode, /useEffect\([^)]*releaseStartHold/);
   assert.match(emode, /name === "AbortError"[\s\S]{0,200}no Job was submitted[\s\S]{0,80}return;/);
   assert.match(emode, /runManagedRead\(/);
   assert.match(core, /operation: "read",/);

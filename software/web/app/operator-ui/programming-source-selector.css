@@ -74,8 +74,17 @@
 .siteReadButton {
   min-height: 28px;
   padding: 0 12px;
+  border: 1px solid var(--line, #c7ced8);
+  border-radius: 4px;
+  background: var(--panel, #fff);
+  color: inherit;
   font-weight: 800;
   cursor: pointer;
+}
+
+.siteReadButton:hover:not(:disabled) {
+  border-color: var(--cyan, #0e7490);
+  color: var(--cyan, #0e7490);
 }
 
 .siteReadButton:disabled {
@@ -88,4 +97,17 @@
 
 .siteReadDownload {
   font-weight: 700;
+  color: var(--cyan, #0e7490);
+  text-decoration: underline;
+}
+
+/* Acknowledge buttons carry text; the warning's default button is a 26px icon. */
+.engineeringProgrammingV2 .engineeringOperationWarning button.engineeringAcknowledge {
+  width: auto;
+  height: auto;
+  min-height: 28px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
