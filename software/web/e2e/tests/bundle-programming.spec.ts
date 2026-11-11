@@ -11,6 +11,8 @@ const IMAGE_SHA = "f".repeat(64);
 const RUN_ID = "d".repeat(32);
 const RESOURCE_SHA = "9".repeat(64);
 const BINDING_SHA = "8".repeat(64);
+const ACTIVE_SET_SHA = "b".repeat(64);
+const short = (sha: string) => `${sha.slice(0, 12)}…`;
 
 const registry = {
   ok: true, service: "plasma-manager", contract_version: "1", mutable: true, storage: "file",
@@ -59,14 +61,14 @@ function plan(activationRequired: boolean) {
       provider: route.provider, profile: route.profile, asset_package_id: "img-ffffffffffffffff",
       image_filename: "app.bin", image_sha256: IMAGE_SHA, image_size: FIRMWARE.length, icpn: route.icpn },
     resource: { resource_set_sha256: RESOURCE_SHA, reuse: !activationRequired,
-      ppu_reported: { state: "VERIFIED", asset_set_sha256: "b".repeat(64), generation: 3,
+      ppu_reported: { state: "VERIFIED", asset_set_sha256: ACTIVE_SET_SHA, generation: 3,
         resource_set_sha256: activationRequired ? "7".repeat(64) : RESOURCE_SHA } },
     image_asset: { image_asset_sha256: "6".repeat(64), sha256: IMAGE_SHA, size: FIRMWARE.length,
       load_address: 134217728, format: "binary" },
     job_binding: { operation: "flash_cycle", range: { address: 134217728, length: FIRMWARE.length },
       image_asset_sha256: "6".repeat(64), resource_set_sha256: RESOURCE_SHA },
     job_binding_sha256: BINDING_SHA,
-    active_asset_set: { state: "ACTIVE", asset_set_sha256: "b".repeat(64) },
+    active_asset_set: { state: "ACTIVE", asset_set_sha256: ACTIVE_SET_SHA },
     activation_required: activationRequired, fpga_load: false,
     steps: [...(activationRequired ? ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] : ["RESOURCE_REUSE"]), "FLASH_CYCLE_JOB", "VERIFY_RECEIPT"],
     catalog_gate: "NOT_USED", confirm_required: "PROGRAM",
@@ -75,19 +77,26 @@ function plan(activationRequired: boolean) {
 
 type Outcome = "PASS" | "FAIL" | "OUTCOME_UNKNOWN";
 
-function run(outcome: Outcome | null, reason: string | null = null, safeOff = true) {
+// A Resource Reuse run never activates: no B1/B2/B3 step and an empty
+// activation record, exactly as the Manager journals it.
+function run(outcome: Outcome | null, reason: string | null = null, safeOff = true, reuse = false) {
   const steps = [
     { step: "PREFLIGHT", result: "PASS", at: "t" },
-    { step: "B1_UPLOAD", result: "PASS", at: "t" },
-    { step: "B2_ADMIT", result: "PASS", at: "t" },
-    { step: "B3_ACTIVATE", result: "PASS", at: "t" },
+    ...(reuse
+      ? [{ step: "RESOURCE_REUSE", result: "PPU_VERIFIED", at: "t", asset_set_sha256: ACTIVE_SET_SHA,
+          resource_set_sha256: RESOURCE_SHA, generation: 3 }]
+      : [
+        { step: "B1_UPLOAD", result: "PASS", at: "t" },
+        { step: "B2_ADMIT", result: "PASS", at: "t" },
+        { step: "B3_ACTIVATE", result: "PASS", at: "t" },
+      ]),
     { step: "FLASH_CYCLE_SUBMIT", result: "ACCEPTED", at: "t" },
   ];
   return {
     schema: "plasma.manager.bundle-programming-run.v1", run_id: RUN_ID, ppu_alias: ALIAS, site_id: 2,
     plan: {}, state: outcome ? "finished" : "running", outcome, reason, created_at: "t", updated_at: "t",
     steps: outcome === "PASS" ? [...steps, { step: "VERIFY_RECEIPT", result: "PASS", at: "t" }] : steps,
-    activation: { b3_transaction_id: "c".repeat(32) },
+    activation: reuse ? {} : { b3_transaction_id: "c".repeat(32) },
     job: { job_id: "job-20261109-120000-0123abcd", state: outcome ? "success" : "running", progress_percent: outcome ? 100 : 40 },
     receipt: outcome && outcome !== "OUTCOME_UNKNOWN" ? {
       schema: "plasma.manager.programming-receipt.v2",
@@ -98,7 +107,7 @@ function run(outcome: Outcome | null, reason: string | null = null, safeOff = tr
       bytes_verified: FIRMWARE.length,
       expected_resource_set_sha256: RESOURCE_SHA, observed_resource_set_sha256: RESOURCE_SHA,
       expected_job_binding_sha256: BINDING_SHA, observed_job_binding_sha256: BINDING_SHA,
-      active_asset_set_sha256: BUNDLE_SHA, resource_reuse: false,
+      active_asset_set_sha256: reuse ? ACTIVE_SET_SHA : BUNDLE_SHA, resource_reuse: reuse,
       safe_off: safeOff, flash_result: "PASS", elapsed_ms: 10000,
     } : null,
     job_submission_count: 1, auto_retry: "DISABLED", acknowledged: false,
@@ -113,7 +122,10 @@ type Mocks = {
 };
 
 async function mockManager(page: Page, mocks: Mocks = {}) {
-  const counters = { plans: 0, starts: 0, polls: 0, acks: 0, planBodies: [] as Array<Record<string, unknown>> };
+  const counters = { plans: 0, starts: 0, polls: 0, acks: 0, planBodies: [] as Array<Record<string, unknown>>,
+    startBodies: [] as Array<Record<string, unknown>> };
+  // Default run records follow the plan: a reuse plan yields a reuse run.
+  const reuse = mocks.activationRequired === false;
   await page.route(/\/api\/manager\/registry$/, r => r.fulfill(json(registry)));
   await page.route(/\/api\/fleet$/, r => r.fulfill(json({ ok: true, contract_version: "1", ppus: [] })));
   await page.route(/\/api\/manager\/registry\/z2\/bootstrap$/, r => r.fulfill(json(bootstrapStatus)));
@@ -128,11 +140,13 @@ async function mockManager(page: Page, mocks: Mocks = {}) {
   });
   await page.route(/\/bootstrap\/programming\/runs$/, async (r: Route) => {
     counters.starts += 1;
-    await r.fulfill(json(mocks.startBody ?? { ok: true, run: run(null) }, mocks.startStatus ?? 202));
+    counters.startBodies.push(r.request().postDataJSON());
+    await r.fulfill(json(mocks.startBody ?? { ok: true, run: run(null, null, true, reuse) }, mocks.startStatus ?? 202));
   });
   await page.route(new RegExp(`/bootstrap/programming/runs/${RUN_ID}$`), async (r: Route) => {
     counters.polls += 1;
-    await r.fulfill(json({ ok: true, run: counters.polls < 2 ? run(null) : (mocks.final ?? run("PASS")) }));
+    await r.fulfill(json({ ok: true, run: counters.polls < 2
+      ? run(null, null, true, reuse) : (mocks.final ?? run("PASS", null, true, reuse)) }));
   });
   await page.route(new RegExp(`/bootstrap/programming/runs/${RUN_ID}/acknowledge$`), async (r: Route) => {
     counters.acks += 1;
@@ -190,12 +204,54 @@ test("User programs image: IC → image → PPU/Site → Bundle → B1/B2/B3 →
   expect(counters.starts).toBe(1);
 });
 
-test("Same PPU-verified Resources skip activation in the plan", async ({ page }) => {
-  await mockManager(page, { activationRequired: false });
+test("Resource Reuse: same PPU-verified Resources → no B1/B2/B3 → one flash_cycle → Reused receipt", async ({ page }) => {
+  const counters = await mockManager(page, { activationRequired: false });
   const panel = await openAndSelect(page);
   await panel.getByRole("button", { name: "Prepare Programming" }).click();
-  await expect(panel.getByTestId("plan-activation")).toContainText("Not required");
-  await expect(panel.getByTestId("plan-activation")).toContainText("no B1/B2/B3");
+
+  // The plan the Console received: PPU-reported VERIFIED Resources equal to the Route's.
+  const planned = plan(false);
+  expect(planned.resource.reuse).toBe(true);
+  expect(planned.resource.ppu_reported.state).toBe("VERIFIED");
+  expect(planned.resource.ppu_reported.resource_set_sha256).toBe(planned.resource.resource_set_sha256);
+  expect(planned.job_binding.resource_set_sha256).toBe(planned.resource.resource_set_sha256);
+
+  // What the user sees before starting.
+  await expect(panel.getByTestId("plan-resource-sha")).toHaveText(RESOURCE_SHA);
+  const activation = panel.getByTestId("plan-activation");
+  await expect(activation).toContainText("Not required");
+  await expect(activation).toContainText("the PPU verified identical Programming Resources");
+  await expect(activation).toContainText("no B1/B2/B3");
+  await expect(activation).toContainText("no FPGA load");
+  await expect(activation).not.toContainText("B1 upload");
+
+  // Explicit confirmation gates Start; a double click still submits once.
+  const start = panel.getByRole("button", { name: "Start Programming" });
+  await expect(start).toBeDisabled();
+  expect(counters.starts).toBe(0);
+  await panel.getByLabel("Confirm programming").check();
+  await expect(start).toBeEnabled();
+  await start.dblclick();
+
+  await expect(panel.getByTestId("run-outcome")).toHaveText("PASS");
+  const steps = panel.getByRole("list", { name: "Programming steps" }).getByRole("listitem");
+  await expect(steps).toHaveText([
+    "PREFLIGHT: PASS", "RESOURCE_REUSE: PPU_VERIFIED", "FLASH_CYCLE_SUBMIT: ACCEPTED", "VERIFY_RECEIPT: PASS",
+  ]);
+
+  // Receipt: Reused Resources, the planned Binding, readback, bytes and SAFE_OFF.
+  await expect(panel.getByTestId("receipt-resource")).toHaveText(`Reused · ${short(RESOURCE_SHA)}`);
+  const receipt = panel.getByLabel("Programming receipt");
+  await expect(receipt).toContainText(`Job Binding${short(BINDING_SHA)}`);
+  await expect(panel.getByTestId("receipt-readback")).toHaveText(IMAGE_SHA);
+  await expect(panel.getByTestId("receipt-bytes")).toHaveText(`${FIRMWARE.length} / ${FIRMWARE.length}`);
+  await expect(panel.getByTestId("receipt-safe-off")).toHaveText("VERIFIED");
+
+  // Exactly one plan and one start, bound to that plan; nothing is resubmitted.
+  await page.waitForTimeout(1500);
+  expect(counters.plans).toBe(1);
+  expect(counters.starts).toBe(1);
+  expect(counters.startBodies).toEqual([{ plan_id: planned.plan_id, confirm: "PROGRAM" }]);
 });
 
 test("Operation choice is limited to the Route Profile; erase/read send a range, no image", async ({ page }) => {
