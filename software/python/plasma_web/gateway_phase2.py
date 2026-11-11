@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from plasma_core.config import load_config
 from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway as canonical_gateway
@@ -240,6 +241,12 @@ class SiteConfigurationSupportMixin:
     @classmethod
     def configure_site_configuration(cls, config_path: Path) -> None:
         cls.site_configuration = SiteConfigurationController(config_path)
+        # Job output downloads are served from the Server's output root, which
+        # the same PPU YAML declares; the Gateway's --output-root may differ.
+        try:
+            cls.job_output_root = load_config(config_path).server.output_root.resolve()
+        except PlasmaError:
+            cls.job_output_root = None
 
     @staticmethod
     def _site_settings_id(path: str) -> int | None:
