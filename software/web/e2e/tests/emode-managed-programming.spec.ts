@@ -182,7 +182,7 @@ test("a deployment with only the legacy flash_cycle Route offers no E / P / V an
   }
   await expect(start).toBeDisabled();
   await expect(workspace.getByTestId("managed-readiness")).toContainText("OPERATIONS UNAVAILABLE");
-  await expect(workspace.getByTestId("read-memory-start")).toBeDisabled();
+  await expect(workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toHaveCount(0);
   expect(writes(counters)).toEqual([]);
 });
 
@@ -220,119 +220,348 @@ test("the file picker shows the real name, size and format, truncates long names
   await expect(job.locator("[data-image-details]")).toHaveText("5.9 KiB (6000 B) · Canonical Bundle v3 (.zip)");
 });
 
-// ------------------------------------------------------------------ Read Memory
+// ------------------------------------------------------------------ READ (Site row)
 
-async function readSetup(page: Page) {
-  const workspace = await open(page);
-  await selectIc(page);
-  await workspace.getByLabel("Select SITE 2 for programming").check();
-  const card = workspace.getByTestId("read-memory");
-  return { workspace, card, button: card.getByTestId("read-memory-start") };
+type PickerMode = "save" | "cancel" | "deny" | "security" | "none" | "write-fail" | "opfs";
+type PickerProbe = { calls: Array<string | null>; saves: Array<{ name: string; bytes: number[] }> };
+
+/**
+ * Replace the native Save File Picker before the page loads: a real picker
+ * would block a headless Browser. "none" removes it (Firefox / Safari).
+ * "opfs" returns a real Chromium FileSystemFileHandle (Origin Private File
+ * System), so the write path runs on the Browser's own implementation. None of
+ * these modes is an acceptance of the native picker dialog itself.
+ */
+async function stubSavePicker(page: Page, mode: PickerMode) {
+  await page.addInitScript(pickerMode => {
+    const host = window as unknown as Record<string, unknown>;
+    const probe: PickerProbe = { calls: [], saves: [] };
+    host.__readPicker = probe;
+    if (pickerMode === "none") {
+      host.showSaveFilePicker = undefined;
+      return;
+    }
+    host.showSaveFilePicker = async (options?: { suggestedName?: string }) => {
+      probe.calls.push(options?.suggestedName ?? null);
+      if (pickerMode === "cancel") throw new DOMException("The user aborted a request.", "AbortError");
+      if (pickerMode === "deny") throw new DOMException("The request is not allowed by the user agent.", "NotAllowedError");
+      if (pickerMode === "security") throw new DOMException("Must be handling a user gesture.", "SecurityError");
+      if (pickerMode === "opfs") {
+        const root = await navigator.storage.getDirectory();
+        return root.getFileHandle("dump.bin", { create: true });
+      }
+      const chunks: number[] = [];
+      return {
+        name: "dump.bin",
+        createWritable: async () => ({
+          write: async (chunk: Blob) => {
+            if (pickerMode === "write-fail") throw new Error("disk full");
+            chunks.push(...new Uint8Array(await chunk.arrayBuffer()));
+          },
+          close: async () => { probe.saves.push({ name: "dump.bin", bytes: chunks }); },
+        }),
+      };
+    };
+  }, mode);
 }
 
-test("Read Memory is an independent button and Job: bytes, SHA256 and a verified binary download", async ({ page }) => {
+function pickerProbe(page: Page): Promise<PickerProbe> {
+  return page.evaluate(() => (window as unknown as { __readPicker: PickerProbe }).__readPicker);
+}
+
+async function readSetup(page: Page, mode: PickerMode) {
+  await stubSavePicker(page, mode);
+  const workspace = await open(page);
+  await selectIc(page);
+  return {
+    workspace,
+    button: workspace.getByRole("button", { name: "Read SITE 2 Flash" }),
+    status: workspace.getByRole("status", { name: "SITE 2 Read status" }),
+    save: workspace.getByRole("link", { name: "Save SITE 2 Read binary" }),
+    log: workspace.getByLabel("Engineering job log"),
+  };
+}
+
+const FULL_FLASH = flashBytes(0x08000000, 65536);
+
+test("READ sits on the qualified Site row, reads the whole Flash and writes the verified bytes to the chosen file", async ({ page }) => {
   const counters = await mockManager(page);
-  const { workspace, card, button } = await readSetup(page);
-  // Read is not an Operation checkbox and not a Batch Policy.
+  const { workspace, button, status, save, log } = await readSetup(page, "save");
+  // No standalone READ MEMORY block, no Address / Length inputs, not an Operation.
+  await expect(workspace.getByTestId("read-memory")).toHaveCount(0);
+  await expect(workspace.getByText("READ MEMORY")).toHaveCount(0);
+  await expect(workspace.getByLabel("Read Memory Start Address")).toHaveCount(0);
+  await expect(workspace.getByLabel("Read Memory Length")).toHaveCount(0);
   await expect(workspace.locator('[data-programming-job-operation="read"]')).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Engineering Programming Job" }).getByTestId("read-memory")).toHaveCount(0);
-  // Read needs no Programming Image.
+  // One button per Site whose Programming Route declares Read; it lives in LIVE SITE STATUS.
+  const live = workspace.getByRole("region", { name: "Engineering Site selection" });
+  await expect(live.getByRole("button", { name: /^Read SITE \d+ Flash$/ })).toHaveCount(1);
+  // READ needs neither a Programming Image nor the Batch Site checkbox.
+  await expect(workspace.getByLabel("Select SITE 2 for programming")).not.toBeChecked();
   await expect(button).toBeEnabled();
-  await card.getByLabel("Read Memory Start Address").fill("0x08000100");
-  await card.getByLabel("Read Memory Length").fill("300");
+  await expect(button).toHaveText("READ");
   await button.dblclick();
-  await expect(card.getByTestId("read-memory-verdict")).toHaveText("PASS");
+  await expect(status).toHaveText("PASS");
   expect(counters.plans).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
-  expect(counters.plans[0].body).toEqual({ icpn: "STM32F103C8T6", site_id: 2, operation: "read", address: 0x08000100, length: 300 });
-  const expected = flashBytes(0x08000100, 300);
-  const digest = createHash("sha256").update(expected).digest("hex");
-  await expect(card.getByTestId("read-memory-bytes")).toHaveText("300");
-  await expect(card.getByTestId("read-memory-sha")).toHaveText(digest);
-  const link = card.getByTestId("read-memory-download");
-  await expect(link).toHaveAttribute("download", "read-STM32F103C8T6-0x08000100-300.bin");
-  const [download] = await Promise.all([page.waitForEvent("download"), link.click()]);
-  expect((await readFile(await download.path())).equals(expected)).toBe(true);
+  // Flash Base and Flash Size of the Programming Route: the whole Flash.
+  expect(counters.plans[0].body).toEqual({ icpn: "STM32F103C8T6", site_id: 2, operation: "read", address: 0x08000000, length: 65536 });
+  const probe = await pickerProbe(page);
+  expect(probe.calls).toEqual(["read-STM32F103C8T6-z2-site2.bin"]);
+  expect(probe.saves).toHaveLength(1);
+  expect(Buffer.from(probe.saves[0].bytes).equals(FULL_FLASH)).toBe(true);
   expect(counters.downloads).toHaveLength(1);
-  // Not a Batch: no Batch run, no PASS / FAIL / Yield, no Site result.
+  await expect(save).toHaveCount(0);
+  // The row stays short; the evidence is in the Log.
+  await expect(workspace.getByTestId("site-read-2")).toHaveText("READPASS");
+  const digest = createHash("sha256").update(FULL_FLASH).digest("hex");
+  await expect(log).toContainText(`[READ] SAVED · SITE-02 · dump.bin · 65536 B · SHA256 ${digest}`);
+  await expect(log).toContainText(/\[READ\] PASS · SITE-02 · Run \S+ · Job \S+ · SAFE_OFF VERIFIED/);
+  // Not a Batch: no Batch run, no PASS / FAIL / Yield, no E / P / V Site result.
   await expect(workspace.getByTestId("run-outcome")).toHaveCount(0);
+  await expect(workspace.getByTestId("batch-attempts")).toHaveCount(0);
+  expect(counters.batches).toHaveLength(0);
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("Run Preview");
   await expect(summary).not.toContainText("100.0%");
-  await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("—");
+  await expect(live.locator("tr", { hasText: "SITE-02" }).locator(".engineeringResult")).toHaveText("—");
   // The Browser reached the Manager only; never a PPU.
   expect(legacyRequests(counters)).toEqual([]);
 });
 
-test("Read Memory validates the address range against the Programming Profile before any request", async ({ page }) => {
+test("cancelling the Save File Picker submits no READ Job", async ({ page }) => {
   const counters = await mockManager(page);
-  const { card, button } = await readSetup(page);
-  const address = card.getByLabel("Read Memory Start Address");
-  const length = card.getByLabel("Read Memory Length");
-  // Defaults: the whole Flash range of the Profile.
-  await expect(address).toHaveAttribute("placeholder", "0x08000000");
-  await expect(length).toHaveAttribute("placeholder", "65536");
+  const { button, status, log } = await readSetup(page, "cancel");
+  await button.click();
+  await expect(log).toContainText("[READ] CANCELLED · SITE-02 · no file was chosen · no Job was submitted");
   await expect(button).toBeEnabled();
-  for (const [start, size, label] of [
-    ["0x40021000", "4", "OUT OF RANGE"],      // MMIO is never readable
-    ["0x08000000", "65537", "OUT OF RANGE"],
-    ["0x0800FFFF", "2", "OUT OF RANGE"],
-    ["0x07FFFFFF", "16", "OUT OF RANGE"],
-    ["zz", "16", "ADDRESS INVALID"],
-    ["0x08000000", "0", "LENGTH INVALID"],
-    ["0x08000000", "-4", "LENGTH INVALID"],
-  ]) {
-    await address.fill(start);
-    await length.fill(size);
-    await expect(button).toBeDisabled();
-    await expect(card.getByTestId("read-memory-readiness")).toContainText(label);
-  }
-  await address.fill("0x0800FFFF");
-  await length.fill("1");
-  await expect(button).toBeEnabled();
+  await expect(button).toHaveText("READ");
+  await expect(status).toHaveCount(0);
+  expect((await pickerProbe(page)).calls).toHaveLength(1);
+  expect(counters.plans).toEqual([]);
+  expect(counters.starts).toEqual([]);
+  expect(counters.downloads).toEqual([]);
   expect(writes(counters)).toEqual([]);
 });
 
-test("a Read Memory failure, unknown outcome or unprovable download never offers a binary", async ({ page }) => {
+test("a READ failure, a SHA256 mismatch or an unknown outcome writes nothing and is never retried", async ({ page }) => {
   let mode = "fail";
   const counters = await mockManager(page, { script: () => mode === "fail" ? { outcome: "FAIL", reason: "SAFE_OFF_NOT_VERIFIED", safeOff: false }
     : mode === "tamper" ? { readTamper: true } : { outcome: "OUTCOME_UNKNOWN", reason: "JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT" } });
-  const { workspace, card, button } = await readSetup(page);
+  const { workspace, button, status, save, log } = await readSetup(page, "save");
   await button.click();
-  await expect(card.getByTestId("read-memory-verdict")).toContainText("FAIL · SAFE_OFF_NOT_VERIFIED");
-  await expect(card.getByTestId("read-memory-download")).toHaveCount(0);
-  await expect(card.getByTestId("read-memory-bytes")).toHaveText("—");
+  await expect(status).toHaveText("FAIL");
+  await expect(status).toHaveAttribute("title", "SAFE_OFF_NOT_VERIFIED");
+  await expect(log).toContainText("[READ] FAIL · SAFE_OFF_NOT_VERIFIED · SITE-02");
+  await expect(save).toHaveCount(0);
+  // The Manager says PASS but the bytes do not re-hash to the receipt SHA256.
   mode = "tamper";
   await button.click();
-  await expect(card.getByTestId("read-memory-verdict")).toHaveText("PASS");
-  await expect(card.getByTestId("read-memory-download")).toHaveCount(0);
-  await expect(card.getByTestId("read-memory-no-download")).toContainText("do not match the receipt SHA256");
+  await expect(status).toHaveText("FAIL");
+  await expect(status).toHaveAttribute("title", /do not match the receipt SHA256/);
+  await expect(log).toContainText("binary rejected: The downloaded bytes do not match the receipt SHA256.");
+  await expect(save).toHaveCount(0);
   mode = "unknown";
   await button.click();
-  await expect(card.getByTestId("read-memory-verdict")).toContainText("OUTCOME UNKNOWN");
-  await expect(card.getByTestId("read-memory-download")).toHaveCount(0);
-  // An unknown Read is never resubmitted and locks the PPU like any unknown run.
+  await expect(status).toHaveText("OUTCOME UNKNOWN");
+  await expect(save).toHaveCount(0);
+  // An unknown READ is never resubmitted and locks the PPU like any unknown run.
   await expect(workspace.getByTestId("managed-unresolved")).toBeVisible();
   await expect(button).toBeDisabled();
   await expect(page.getByRole("button", { name: /START PROGRAMMING/ })).toBeDisabled();
   expect(counters.starts).toHaveLength(3);
+  const probe = await pickerProbe(page);
+  expect(probe.calls).toHaveLength(3);
+  expect(probe.saves).toEqual([]);
+  await expect(log).toContainText("[READ] SITE-02 · nothing was written to dump.bin");
 });
 
-test("Read Memory and a Batch run lock each other out on the Site", async ({ page }) => {
+test("without a Save File Picker the verified READ is offered through the Browser download", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { button, status, save, log } = await readSetup(page, "none");
+  await button.click();
+  await expect(status).toHaveText("PASS");
+  await expect(log).toContainText("this Browser has no Save File Picker · the verified binary will be offered as a download");
+  await expect(save).toHaveAttribute("download", "read-STM32F103C8T6-0x08000000-65536.bin");
+  const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+  expect((await readFile(await download.path())).equals(FULL_FLASH)).toBe(true);
+  expect(counters.plans).toHaveLength(1);
+  expect(counters.downloads).toHaveLength(1);
+});
+
+test("a verified READ that cannot be written to the chosen file is kept as a download", async ({ page }) => {
+  await mockManager(page);
+  const { button, status, save, log } = await readSetup(page, "write-fail");
+  await button.click();
+  await expect(status).toHaveText("SAVE FAILED");
+  await expect(log).toContainText("[READ] SAVE FAILED · SITE-02 · dump.bin · disk full");
+  const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+  expect((await readFile(await download.path())).equals(FULL_FLASH)).toBe(true);
+  expect((await pickerProbe(page)).saves).toEqual([]);
+});
+
+test("a refused Save File Picker (permission denied) submits no READ Job", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { button, status, save, log } = await readSetup(page, "deny");
+  await button.click();
+  await expect(status).toHaveText("BLOCKED");
+  await expect(status).toHaveAttribute("title", /Save File Picker was refused.*No Job was submitted/);
+  await expect(log).toContainText("[READ] BLOCKED · SITE-02 · the Save File Picker was refused");
+  await expect(save).toHaveCount(0);
+  await expect(button).toBeEnabled();
+  expect(counters.plans).toEqual([]);
+  expect(writes(counters)).toEqual([]);
+});
+
+test("a Save File Picker the Browser blocks falls back to the Browser download", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { button, status, save, log } = await readSetup(page, "security");
+  await button.click();
+  await expect(status).toHaveText("PASS");
+  await expect(log).toContainText("this Browser blocks the Save File Picker here");
+  const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+  expect((await readFile(await download.path())).equals(FULL_FLASH)).toBe(true);
+  expect(counters.starts).toHaveLength(1);
+});
+
+test("the verified READ is written through a real Chromium FileSystemFileHandle", async ({ page }) => {
+  await mockManager(page);
+  const { button, status, log } = await readSetup(page, "opfs");
+  await button.click();
+  await expect(status).toHaveText("PASS");
+  await expect(log).toContainText("[READ] SAVED · SITE-02 · dump.bin · 65536 B");
+  const saved = await page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    const file = await (await root.getFileHandle("dump.bin")).getFile();
+    return Array.from(new Uint8Array(await file.arrayBuffer()));
+  });
+  expect(Buffer.from(saved).equals(FULL_FLASH)).toBe(true);
+});
+
+const lostStart = { startStatus: 504, startError: { code: "manager_unavailable", message: "Manager Bootstrap path is unavailable" } };
+
+test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming Start, held across a reload until acknowledged", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  const counters = await mockManager(page, { script: () => lostStart });
+  const { workspace, start } = await configure(page);
+  const button = workspace.getByRole("button", { name: "Read SITE 2 Flash" });
+  const status = workspace.getByRole("status", { name: "SITE 2 Read status" });
+  const hold = workspace.getByTestId("managed-start-hold");
+  await expect(start).toBeEnabled();
+  await button.click();
+  // Unknown, not FAIL; nothing written.
+  await expect(status).toHaveText("OUTCOME UNKNOWN");
+  await expect(hold).toContainText("the READ Start request on PPU z2 · SITE-02 got no answer");
+  await expect(hold).toContainText("Nothing was resubmitted");
+  expect((await pickerProbe(page)).saves).toEqual([]);
+  // The PPU is held: neither a second READ nor a Programming Start can be sent.
+  await expect(button).toBeDisabled();
+  await expect(start).toBeDisabled();
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("OUTCOME UNKNOWN");
+  await button.click({ force: true });
+  await start.click({ force: true });
+  await page.waitForTimeout(2500);
+  expect(counters.plans).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
+  expect(counters.batches).toHaveLength(0);
+  expect(counters.polls).toBe(0);
+  // A reload does not drop the hold.
+  const reloaded = await configure(page);
+  await expect(reloaded.workspace.getByTestId("managed-start-hold")).toBeVisible();
+  await expect(reloaded.workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeDisabled();
+  await expect(reloaded.start).toBeDisabled();
+  expect(counters.starts).toHaveLength(1);
+  // Only the operator releases it, after the Manager Fleet shows the Site idle. Nothing is acknowledged automatically.
+  expect(counters.acks).toBe(0);
+  await reloaded.workspace.getByRole("button", { name: "Acknowledge Start reconciliation" }).click();
+  await expect(reloaded.workspace.getByTestId("managed-start-hold")).toHaveCount(0);
+  await expect(reloaded.workspace.getByLabel("Engineering job log")).toContainText("[ACK] Start OUTCOME UNKNOWN reconciled by the operator · PPU z2 · SITE-02 idle, no Job");
+  await expect(reloaded.workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeEnabled();
+  await expect(reloaded.start).toBeEnabled();
+  expect(counters.starts).toHaveLength(1);
+  expect(counters.acks).toBe(0);
+});
+
+test("a lost Programming Start answer also holds READ on the same PPU", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  const counters = await mockManager(page, { batchStatus: 504 });
+  const { workspace, start } = await configure(page);
+  const button = workspace.getByRole("button", { name: "Read SITE 2 Flash" });
+  await start.click();
+  await expect(workspace.getByTestId("managed-start-unknown")).toContainText("The Batch request outcome is unknown");
+  await expect(workspace.getByTestId("managed-start-hold")).toContainText("the PROGRAMMING Start request on PPU z2");
+  await expect(button).toBeDisabled();
+  await expect(start).toBeDisabled();
+  await button.click({ force: true });
+  await start.click({ force: true });
+  await page.waitForTimeout(1500);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.starts).toHaveLength(0);
+  expect((await pickerProbe(page)).calls).toEqual([]);
+});
+
+test("the Start hold is kept while the Manager Fleet shows the Site busy", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  await page.addInitScript(() => window.localStorage.setItem("plasma.emode.start-outcome-unknown.v1", JSON.stringify({
+    z2: { alias: "z2", siteId: 2, kind: "READ", detail: "The Read Memory start outcome is unknown (timeout).", at: "2026-11-11T00:00:00.000Z" },
+  })));
+  const counters = await mockManager(page, { ppus: [{ ...Z2, busySites: [2] }] });
+  const workspace = await open(page);
+  await selectIc(page);
+  const hold = workspace.getByTestId("managed-start-hold");
+  await expect(hold).toBeVisible();
+  await workspace.getByRole("button", { name: "Acknowledge Start reconciliation" }).click();
+  await expect(workspace.getByTestId("managed-status-note")).toContainText("The Start hold on PPU z2 was kept: SITE-02 is");
+  await expect(hold).toBeVisible();
+  await expect(workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeDisabled();
+  expect(writes(counters)).toEqual([]);
+});
+
+test("READ is unavailable on a busy or disabled Site and absent where no Route declares Read", async ({ page }) => {
+  // Site 2: Route + busy. Site 3: enabled, no Route. Site 4: Route, disabled on the PPU.
+  const counters = await mockManager(page, {
+    ppus: [{ ...Z2, enabledSites: [2, 3], busySites: [2] }],
+    routes: [operationsRoute([2, 4])],
+  });
+  const { workspace, button } = await readSetup(page, "save");
+  const live = workspace.getByRole("region", { name: "Engineering Site selection" });
+  await expect(live.getByRole("button", { name: /^Read SITE \d+ Flash$/ })).toHaveCount(2);
+  await expect(workspace.getByRole("button", { name: "Read SITE 3 Flash" })).toHaveCount(0);
+  await expect(workspace.getByTestId("site-read-3")).toHaveText("—");
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveAttribute("title", "The Site is busy or not idle.");
+  const disabled = workspace.getByRole("button", { name: "Read SITE 4 Flash" });
+  await expect(disabled).toBeDisabled();
+  await expect(disabled).toHaveAttribute("title", "The Site is disabled on the PPU.");
+  await button.click({ force: true });
+  await disabled.click({ force: true });
+  expect((await pickerProbe(page)).calls).toEqual([]);
+  expect(writes(counters)).toEqual([]);
+});
+
+test("READ and a Batch run lock each other out and READ keeps the E / P / V result", async ({ page }) => {
+  await stubSavePicker(page, "save");
   const counters = await mockManager(page, { script: () => ({ runningPolls: 4 }) });
   const { workspace, job, start } = await configure(page);
-  const button = workspace.getByTestId("read-memory-start");
+  const button = workspace.getByRole("button", { name: "Read SITE 2 Flash" });
+  const result = workspace.locator('tr[data-site-selected="true"] .engineeringResult');
   await start.click();
   await expect(button).toBeDisabled(); // a programming run owns the Site
   await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS", { timeout: 20_000 });
+  await expect(result).toHaveText("PASS");
+  const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
+  await expect(summary).toContainText("100.0%");
   await button.click();
-  await expect(start).toBeDisabled(); // and a Read locks Start
+  await expect(button).toHaveText("READING");
+  await expect(start).toBeDisabled(); // and a READ locks Start
   await expect(job.getByLabel("Engineering operation erase")).toBeDisabled();
-  await expect(workspace.getByTestId("read-memory-verdict")).toHaveText("PASS", { timeout: 20_000 });
+  await expect(workspace.getByRole("status", { name: "SITE 2 Read status" })).toHaveText("PASS", { timeout: 20_000 });
   await expect(start).toBeEnabled();
   expect(counters.plans.map(plan => plan.body.operation ?? "programming")).toEqual(["programming", "read"]);
-  // The Read did not disturb the Batch result.
+  // The READ did not disturb the Batch result or the Yield.
   await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(result).toHaveText("PASS");
+  await expect(summary).toContainText("100.0%");
 });
 
 test("one Start plans and executes: Firmware Resource Reuse → one Job → PASS receipt", async ({ page }) => {
@@ -810,13 +1039,17 @@ test("a lost Batch response is OUTCOME UNKNOWN: the Browser never resends it", a
   expect(counters.polls).toBe(0);
 });
 
-test("Read Memory ignores the Batch Policy: one Job, no Batch, no retry", async ({ page }) => {
+test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page }) => {
+  await stubSavePicker(page, "save");
   const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "READ_NOT_PASS" }) });
   const { workspace, job } = await configure(page);
   await setPolicy(job, "5");
-  await workspace.getByTestId("read-memory-start").click();
-  await expect(workspace.getByTestId("read-memory-verdict")).toContainText("FAIL · READ_NOT_PASS");
+  await workspace.getByRole("button", { name: "Read SITE 2 Flash" }).click();
+  const status = workspace.getByRole("status", { name: "SITE 2 Read status" });
+  await expect(status).toHaveText("FAIL");
+  await expect(status).toHaveAttribute("title", "READ_NOT_PASS");
   expect(counters.batches).toHaveLength(0);
   expect(counters.starts).toHaveLength(1);
   await expect(workspace.getByTestId("batch-attempts")).toHaveCount(0);
+  await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("—");
 });

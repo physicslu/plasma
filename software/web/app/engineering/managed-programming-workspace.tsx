@@ -79,15 +79,57 @@ const ALL_OPERATIONS: Record<SequenceOperation, boolean> = { erase: true, progra
 
 type ConnectionState = "connecting" | "online" | "offline";
 type Phase = "idle" | "locking" | "planning" | "starting" | "running";
-type ReadPhase = "idle" | "planning" | "running" | "downloading";
-type ReadResult = {
-  run: ProgrammingRun;
-  url: string | null;
-  filename: string | null;
-  downloadError: string | null;
+type ReadPhase = "idle" | "choosing" | "planning" | "running" | "saving";
+// One line per Site: the evidence (Job, SHA256, SAFE_OFF) lives in the Log.
+type SiteRead = {
+  status: "PASS" | "FAIL" | "BLOCKED" | "OUTCOME UNKNOWN" | "SAVE FAILED";
+  detail: string;
+  /** Verified bytes offered as a Browser download (no Save File Picker, or the write failed). */
+  download: { url: string; filename: string } | null;
 };
+type SaveFilePicker = (options?: {
+  suggestedName?: string;
+  types?: Array<{ description?: string; accept: Record<string, string[]> }>;
+}) => Promise<FileSystemFileHandle>;
+
+/** The native Save File Picker; null where the Browser has none (Firefox, Safari, insecure origin). */
+function saveFilePicker(): SaveFilePicker | null {
+  const picker = (window as unknown as { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
+  return typeof picker === "function" ? picker.bind(window) : null;
+}
 type Readiness = { ready: boolean; label: string; reason: string };
 type RunContext = { alias: string; siteId: number; startedAt: number; finishedAt: number | null };
+
+// A Start request whose answer was lost (timeout, 5xx, dropped connection): the
+// Manager may or may not have submitted a Job. The Manager stays the authority
+// (one-shot plan, journal, one active run per PPU, OUTCOME UNKNOWN latch); this
+// hold only keeps THIS Console from sending another write to the PPU until the
+// operator reconciles it. It is stored so a reload cannot drop it.
+const START_HOLD_KEY = "plasma.emode.start-outcome-unknown.v1";
+type StartHold = { alias: string; siteId: number; kind: "READ" | "PROGRAMMING"; detail: string; at: string };
+let heldStarts: Record<string, StartHold> = {};
+
+function readStartHolds(): Record<string, StartHold> {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(START_HOLD_KEY) ?? "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      heldStarts = { ...heldStarts, ...(parsed as Record<string, StartHold>) };
+    }
+  } catch {
+    // Storage unavailable: the hold still lives for this page.
+  }
+  return heldStarts;
+}
+
+function writeStartHolds(next: Record<string, StartHold>) {
+  heldStarts = next;
+  try {
+    if (Object.keys(next).length) window.localStorage.setItem(START_HOLD_KEY, JSON.stringify(next));
+    else window.localStorage.removeItem(START_HOLD_KEY);
+  } catch {
+    // Storage unavailable: the hold still lives for this page.
+  }
+}
 
 function siteLabel(siteId: number): string {
   return `SITE-${String(siteId).padStart(2, "0")}`;
@@ -115,14 +157,6 @@ function fileFormat(file: File, source: ProgrammingSource): string {
 
 function hex(value: number): string {
   return `0x${value.toString(16).toUpperCase().padStart(8, "0")}`;
-}
-
-/** Decimal or 0x-prefixed hexadecimal; null when it is not a non-negative integer. */
-function parseInteger(text: string): number | null {
-  const trimmed = text.trim();
-  if (!/^(0x[0-9a-f]+|[0-9]+)$/i.test(trimmed)) return null;
-  const value = Number(trimmed);
-  return Number.isSafeInteger(value) ? value : null;
 }
 
 /** Wall-clock time of a user action (Start); never read while rendering. */
@@ -167,15 +201,15 @@ export default function ManagedProgrammingWorkspace() {
   const [startUnknown, setStartUnknown] = useState<string | null>(null);
   const [unresolved, setUnresolved] = useState<ProgrammingRun | null>(null);
   const [acknowledging, setAcknowledging] = useState(false);
+  // null until the stored holds are read: nothing may start before that.
+  const [startHolds, setStartHolds] = useState<Record<string, StartHold> | null>(null);
+  const [releasingHold, setReleasingHold] = useState(false);
   const [statusNote, setStatusNote] = useState<string | null>(null);
 
-  // Read Memory: an independent Job, never part of the Batch above.
-  const [readAddress, setReadAddress] = useState("");
-  const [readLength, setReadLength] = useState("");
+  // READ: an independent Job per Site row, never part of the Batch above.
   const [readPhase, setReadPhase] = useState<ReadPhase>("idle");
-  const [readRun, setReadRun] = useState<ProgrammingRun | null>(null);
-  const [readResult, setReadResult] = useState<ReadResult | null>(null);
-  const [readMessage, setReadMessage] = useState<string | null>(null);
+  const [readSiteId, setReadSiteId] = useState<number | null>(null);
+  const [siteReads, setSiteReads] = useState<Record<number, SiteRead>>({});
 
   const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);
   const [clock, setClock] = useState(() => Date.now());
@@ -184,7 +218,7 @@ export default function ManagedProgrammingWorkspace() {
 
   const startLock = useRef(false);
   const loggedAttempts = useRef(new Map<number, string>());
-  const readUrl = useRef<string | null>(null);
+  const readUrls = useRef(new Map<number, string>());
   const logSequence = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -203,7 +237,12 @@ export default function ManagedProgrammingWorkspace() {
 
   useEffect(() => () => {
     abortRef.current?.abort();
-    if (readUrl.current) URL.revokeObjectURL(readUrl.current);
+    for (const url of readUrls.current.values()) URL.revokeObjectURL(url);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStartHolds(readStartHolds()), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Registry + Fleet: the only topology source.
@@ -274,8 +313,9 @@ export default function ManagedProgrammingWorkspace() {
     ? platform.availability
     : platformAvailability(null, null);
   const icpn = targetDevice?.icpn ?? targetDevice?.identifier ?? null;
+  const startHold = ppu && startHolds ? startHolds[ppu.alias] ?? null : null;
   const reading = readPhase !== "idle";
-  // One Site, one Job: a Batch run and a Read Memory Job lock each other out.
+  // One Site, one Job: a Batch run and a READ Job lock each other out.
   const active = phase !== "idle" || reading;
 
   const capabilities = useMemo(
@@ -291,19 +331,23 @@ export default function ManagedProgrammingWorkspace() {
   const operations = normalizeOperations(selectedOperations);
   const needsImage = operations != null && operationsTakeImage(operations);
   const jobRoute = operations ? routeDeclaring(routes, icpn, siteId, operations) : null;
-  const readRoute = routeDeclaring(routes, icpn, siteId, ["read"]);
 
-  // What a Batch run and a Read Memory Job both need before anything else.
-  const baseBlock: Readiness | null = (() => {
+  // What a Batch run and a READ Job both need of the PPU, before any Site.
+  const ppuBlock: Readiness | null = (() => {
     if (phase !== "idle") return notReady("RUNNING", "A programming run is in progress; this selection is locked.");
-    if (reading) return notReady("READING", "A Read Memory Job is in progress on this Site.");
+    if (reading) return notReady("READING", "A READ Job is in progress on this PPU.");
     if (connection !== "online" || !topology) {
       return notReady("MANAGER OFFLINE", topologyError ?? "Connecting to the Manager Registry.");
     }
     if (!ppu) return notReady("NO PPU", "No commissioned PPU is registered. Register one in PPU → Registration.");
-    const ppuBlock = fromAvailability(ppu.availability) ?? fromAvailability(platformState)
+    if (!startHolds) return notReady("CHECKING", "Checking for an unreconciled Start request.");
+    if (startHold) {
+      return notReady("OUTCOME UNKNOWN",
+        `A ${startHold.kind} Start request on this PPU has an unknown outcome. Nothing is submitted to this PPU until it is reconciled and acknowledged.`);
+    }
+    const unavailable = fromAvailability(ppu.availability) ?? fromAvailability(platformState)
       ?? fromAvailability(routesAvailability(routesState));
-    if (ppuBlock) return ppuBlock;
+    if (unavailable) return unavailable;
     if (unresolved && unresolved.ppu_alias === ppu.alias && !unresolved.acknowledged) {
       return notReady("OUTCOME UNKNOWN",
         "The previous run on this PPU ended OUTCOME UNKNOWN. Reconcile the PPU and acknowledge it; nothing is resubmitted.");
@@ -312,9 +356,9 @@ export default function ManagedProgrammingWorkspace() {
     if (!routeSites(routes, icpn).length) {
       return notReady("NO ROUTE", `No Programming Route declares ${icpn}; this IC cannot be programmed on a managed PPU yet.`);
     }
-    if (siteId == null) return notReady("NO SITE", `Select one Site qualified for ${icpn}.`);
     return null;
   })();
+  const baseBlock = ppuBlock ?? (siteId == null ? notReady("NO SITE", `Select one Site qualified for ${icpn}.`) : null);
 
   const readiness: Readiness = (() => {
     if (baseBlock) return baseBlock;
@@ -343,27 +387,70 @@ export default function ManagedProgrammingWorkspace() {
     return { ready: true, label: "BATCH READY", reason: "" };
   })();
 
-  const readStart = parseInteger(readAddress.trim() || (readRoute ? hex(readRoute.flash_base) : ""));
-  const readSize = parseInteger(readLength.trim() || (readRoute ? String(readRoute.flash_size) : ""));
-  const readReadiness: Readiness = (() => {
-    if (baseBlock) return baseBlock;
-    if (!readRoute) return notReady("READ UNAVAILABLE", `No Programming Route declares Read for ${icpn} on this Site.`);
-    if (readStart == null) return notReady("ADDRESS INVALID", "Start Address must be decimal or 0x hexadecimal.");
-    if (readSize == null || readSize <= 0) return notReady("LENGTH INVALID", "Length must be a positive number of bytes.");
-    const end = readRoute.flash_base + readRoute.flash_size;
-    if (readStart < readRoute.flash_base || readStart + readSize > end) {
-      return notReady("OUT OF RANGE",
-        `Only the Flash range ${hex(readRoute.flash_base)}–${hex(end - 1)} of the Programming Profile can be read.`);
-    }
-    return { ready: true, label: "READ READY", reason: "" };
-  })();
+  /** Why READ is unavailable on this Site right now; null when it can start. */
+  function readBlockReason(id: number): string | null {
+    if (ppuBlock) return ppuBlock.reason;
+    const capability = capabilities.get(id);
+    return capability?.programmable ? null : capability?.reason ?? "The Site is not available.";
+  }
+
+  function dropSiteRead(id: number) {
+    const url = readUrls.current.get(id);
+    if (url) URL.revokeObjectURL(url);
+    readUrls.current.delete(id);
+    setSiteReads(current => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
 
   function clearReadState() {
-    if (readUrl.current) URL.revokeObjectURL(readUrl.current);
-    readUrl.current = null;
-    setReadRun(null);
-    setReadResult(null);
-    setReadMessage(null);
+    for (const url of readUrls.current.values()) URL.revokeObjectURL(url);
+    readUrls.current = new Map();
+    setSiteReads({});
+  }
+
+  function holdStart(alias: string, siteId: number, kind: StartHold["kind"], detail: string) {
+    const next = { ...readStartHolds(), [alias]: { alias, siteId, kind, detail, at: new Date().toISOString() } };
+    writeStartHolds(next);
+    setStartHolds(next);
+  }
+
+  // Operator reconciliation of a lost Start answer. Never automatic: it reads
+  // the Manager Fleet and releases the hold only when the Site is idle with no
+  // Job. The Manager's own latch and run guards still decide the next Start.
+  async function releaseStartHold() {
+    if (!startHold || releasingHold || active) return;
+    const hold = startHold;
+    setReleasingHold(true);
+    try {
+      const fresh = await loadManagedTopology();
+      setTopology(fresh);
+      const target = fresh.ppus.find(item => item.alias === hold.alias);
+      const site = target?.sites.find(item => item.site_id === hold.siteId);
+      const refusal = !target ? "the PPU is not in the Manager Registry"
+        : !target.availability.ready ? `${target.availability.label} — ${target.availability.reason}`
+        : !site || !site.enabled ? `${siteLabel(hold.siteId)} is not reported enabled by the PPU`
+        : site.current_job_id || site.state !== "idle"
+          ? `${siteLabel(hold.siteId)} is ${site.state.toUpperCase()}${site.current_job_id ? ` (Job ${site.current_job_id})` : ""}`
+        : null;
+      if (refusal) {
+        setStatusNote(`The Start hold on PPU ${hold.alias} was kept: ${refusal}.`);
+        appendLog(`[ACK] REFUSED · Start OUTCOME UNKNOWN on PPU ${hold.alias} is not reconciled · ${refusal}`, true, "USR");
+        return;
+      }
+      const next = { ...readStartHolds() };
+      delete next[hold.alias];
+      writeStartHolds(next);
+      setStartHolds(next);
+      setStatusNote(null);
+      appendLog(`[ACK] Start OUTCOME UNKNOWN reconciled by the operator · PPU ${hold.alias} · ${siteLabel(hold.siteId)} idle, no Job (Manager Fleet) · the result of the lost ${hold.kind} request stays unknown`, false, "USR");
+    } catch (reason) {
+      setStatusNote(`The Start hold was kept: ${reason instanceof Error ? reason.message : "the Manager Fleet could not be read"}.`);
+    } finally {
+      setReleasingHold(false);
+    }
   }
 
   function clearRunState() {
@@ -430,7 +517,6 @@ export default function ManagedProgrammingWorkspace() {
     const next = siteId === id ? null : id;
     setChosenSiteId(next);
     clearRunState();
-    clearReadState();
     appendLog(`[SITE] SELECTION · ${next == null ? "none" : siteLabel(next)}`, false, "USR");
   }
 
@@ -505,6 +591,7 @@ export default function ManagedProgrammingWorkspace() {
         appendLog(`[BLOCKED] ${reason.stage.toUpperCase()} · ${message} · no Job was submitted`, true);
       } else if (reason instanceof ManagedStartOutcomeUnknown) {
         setStartUnknown(reason.message);
+        holdStart(context.alias, context.siteId, "PROGRAMMING", reason.message);
         appendLog(`[OUTCOME UNKNOWN] ${reason.message}`, true);
       } else {
         const message = reason instanceof Error ? reason.message : "Programming failed";
@@ -534,46 +621,116 @@ export default function ManagedProgrammingWorkspace() {
     }
   }
 
-  async function readMemory() {
+  // READ on one Site row: choose the destination first, then one independent
+  // Job over the whole Flash range of the Programming Route. Cancelling the
+  // Save File Picker submits nothing.
+  async function readSite(id: number) {
+    const route = routeDeclaring(routes, icpn, id, ["read"]);
     // Same synchronous lock as Start: a double click never submits twice.
-    if (startLock.current || !readReadiness.ready || !ppu || siteId == null || !icpn
-      || readStart == null || readSize == null) return;
+    if (startLock.current || readBlockReason(id) != null || !ppu || !icpn || !route) return;
     startLock.current = true;
-    const abort = new AbortController();
-    abortRef.current = abort;
-    clearReadState();
-    setReadPhase("planning");
-    appendLog(`[READ] START · PPU ${ppu.alias} · ${siteLabel(siteId)} · ${icpn} · ${hex(readStart)} + ${readSize} B · independent Job, not part of the Batch`, false, "USR");
+    const alias = ppu.alias;
+    const address = route.flash_base;
+    const length = route.flash_size;
+    const label = siteLabel(id);
+    const suggestedName = `read-${icpn}-${alias}-site${id}.bin`.replace(/[^A-Za-z0-9._-]/g, "_");
+    const finish = (status: SiteRead["status"], detail: string, download: SiteRead["download"] = null) => {
+      if (download) readUrls.current.set(id, download.url);
+      setSiteReads(current => ({ ...current, [id]: { status, detail, download } }));
+    };
+    const offerDownload = (data: Uint8Array, filename: string) => ({
+      url: URL.createObjectURL(new Blob([data.slice().buffer], { type: "application/octet-stream" })),
+      filename,
+    });
+    dropSiteRead(id);
+    setReadSiteId(id);
+    setReadPhase("choosing");
     try {
-      const result = await runManagedRead({ alias: ppu.alias, siteId, icpn, address: readStart, length: readSize }, {
+      let handle: FileSystemFileHandle | null = null;
+      const picker = saveFilePicker();
+      if (picker) {
+        try {
+          handle = await picker({
+            suggestedName,
+            types: [{ description: "Binary image", accept: { "application/octet-stream": [".bin"] } }],
+          });
+        } catch (reason) {
+          if ((reason as { name?: string } | null)?.name === "AbortError") {
+            appendLog(`[READ] CANCELLED · ${label} · no file was chosen · no Job was submitted`, false, "USR");
+            return;
+          }
+          const detail = reason instanceof Error ? reason.message : "unknown error";
+          if ((reason as { name?: string } | null)?.name !== "SecurityError") {
+            // Permission denied (or any other refusal): the destination was not granted, so nothing is read.
+            finish("BLOCKED", `The Save File Picker was refused: ${detail}. No Job was submitted.`);
+            appendLog(`[READ] BLOCKED · ${label} · the Save File Picker was refused (${detail}) · no Job was submitted`, true);
+            return;
+          }
+          appendLog(`[READ] ${label} · this Browser blocks the Save File Picker here (${detail}) · the verified binary will be offered as a download`, true);
+        }
+      } else {
+        appendLog(`[READ] ${label} · this Browser has no Save File Picker · the verified binary will be offered as a download`, false, "SYS");
+      }
+      const abort = new AbortController();
+      abortRef.current = abort;
+      setReadPhase("planning");
+      appendLog(`[READ] START · PPU ${alias} · ${label} · ${icpn} · ${hex(address)} + ${length} B (whole Flash) · ${
+        handle ? `save to ${handle.name}` : "Browser download"} · independent Job, not part of the Batch`, false, "USR");
+      const result = await runManagedRead({ alias, siteId: id, icpn, address, length }, {
         onPlan: next => appendLog(`[READ] PLAN ${next.plan_id} · Route ${next.route.route_id} · Job Binding SHA256 ${next.job_binding_sha256}`, false, "DAT"),
-        onRun: next => {
-          setReadRun(next);
-          setReadPhase(next.outcome == null ? "running" : "downloading");
-        },
-        onPollError: message => setReadMessage(message),
+        onRun: next => setReadPhase(next.outcome == null ? "running" : "saving"),
+        onPollError: message => setStatusNote(message),
       }, abort.signal);
       const { verdict, reason } = runVerdict(result.run);
       const output = result.run.receipt?.read_output ?? null;
-      let url: string | null = null;
-      if (result.data) {
-        url = URL.createObjectURL(new Blob([result.data.slice().buffer], { type: "application/octet-stream" }));
-        readUrl.current = url;
-      }
-      setReadRun(result.run);
-      setReadResult({ run: result.run, url, filename: output?.filename ?? null, downloadError: result.downloadError });
-      appendLog(`[READ] ${verdict}${reason ? ` · ${reason}` : ""} · Run ${result.run.run_id} · Job ${result.run.receipt?.job_id ?? "—"}${
-        output ? ` · ${output.bytes} B · SHA256 ${output.sha256 ?? "—"}` : ""}${result.downloadError ? ` · download: ${result.downloadError}` : ""}`,
+      appendLog(`[READ] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · ${label} · Run ${result.run.run_id} · Job ${result.run.receipt?.job_id ?? "—"} · SAFE_OFF ${
+        result.run.receipt?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${
+        output ? ` · ${output.bytes} B · SHA256 ${output.sha256 ?? "—"}` : ""}${result.downloadError ? ` · binary rejected: ${result.downloadError}` : ""}`,
         verdict !== "PASS" || Boolean(result.downloadError), "PPU");
       if (result.run.outcome === "OUTCOME_UNKNOWN") setUnresolved(result.run);
+      if (verdict !== "PASS") {
+        finish(verdict === "RUNNING" ? "FAIL" : verdict === "OUTCOME_UNKNOWN" ? "OUTCOME UNKNOWN" : verdict,
+          reason ?? "The READ Job did not pass.");
+        if (handle) appendLog(`[READ] ${label} · nothing was written to ${handle.name}`, true);
+        return;
+      }
+      if (!result.data) {
+        // PASS without bytes that re-hash to the receipt SHA256 is not a usable READ.
+        finish("FAIL", result.downloadError ?? "No verified binary is available.");
+        if (handle) appendLog(`[READ] ${label} · nothing was written to ${handle.name}`, true);
+        return;
+      }
+      const filename = output?.filename ?? suggestedName;
+      if (!handle) {
+        finish("PASS", "SHA256 verified. Use SAVE to download the binary.", offerDownload(result.data, filename));
+        appendLog(`[READ] ${label} · ${result.data.length} B verified · offered as Browser download ${filename}`, false, "DAT");
+        return;
+      }
+      try {
+        const writable = await handle.createWritable();
+        await writable.write(new Blob([result.data.slice().buffer], { type: "application/octet-stream" }));
+        await writable.close();
+        finish("PASS", `SHA256 verified; saved to ${handle.name}.`);
+        appendLog(`[READ] SAVED · ${label} · ${handle.name} · ${result.data.length} B · SHA256 ${output?.sha256 ?? "—"}`, false, "DAT");
+      } catch (reason) {
+        const message = reason instanceof Error ? reason.message : "write failed";
+        finish("SAVE FAILED", `The verified binary could not be written to ${handle.name}: ${message}. Use SAVE to download it.`,
+          offerDownload(result.data, filename));
+        appendLog(`[READ] SAVE FAILED · ${label} · ${handle.name} · ${message} · the verified binary is offered as a download instead`, true);
+      }
     } catch (reason) {
-      const message = reason instanceof ManagedProgrammingBlocked ? `Not started — ${describeBlocked(reason)}`
-        : reason instanceof ManagedStartOutcomeUnknown ? `OUTCOME UNKNOWN — ${reason.message} Check the PPU before reading again.`
-        : reason instanceof Error ? reason.message : "Read Memory failed";
-      setReadMessage(message);
-      appendLog(`[READ] ${message}`, true);
+      const blocked = reason instanceof ManagedProgrammingBlocked;
+      const unknown = reason instanceof ManagedStartOutcomeUnknown;
+      const message = blocked ? `Not started — ${describeBlocked(reason)}`
+        : unknown ? `OUTCOME UNKNOWN — ${reason.message} Check the PPU before reading again.`
+        : reason instanceof Error ? reason.message : "READ failed";
+      finish(blocked ? "BLOCKED" : unknown ? "OUTCOME UNKNOWN" : "FAIL", message);
+      // A lost Start answer is not a FAIL: hold every further Start on this PPU.
+      if (unknown) holdStart(alias, id, "READ", reason.message);
+      appendLog(`[READ] ${label} · ${message}`, true);
     } finally {
       setReadPhase("idle");
+      setReadSiteId(null);
       startLock.current = false;
     }
   }
@@ -585,7 +742,6 @@ export default function ManagedProgrammingWorkspace() {
       const next = await acknowledgeProgrammingRun(unresolved.ppu_alias, unresolved.run_id);
       setUnresolved(next.acknowledged ? null : next);
       setRun(current => current?.run_id === next.run_id ? next : current);
-      setReadRun(current => current?.run_id === next.run_id ? next : current);
       appendLog(`[ACK] OUTCOME UNKNOWN reconciled · Run ${next.run_id}`, false, "USR");
     } catch (reason) {
       setStatusNote(reason instanceof Error ? reason.message : "Acknowledge failed");
@@ -622,13 +778,6 @@ export default function ManagedProgrammingWorkspace() {
     ? `每次 Attempt 為獨立 Job（attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}）。Retry：僅在明確 FAIL、SAFE_OFF 已驗證且 Site 已釋放時，由 Manager 以新的 Plan／Job 重試；OUTCOME UNKNOWN 永不重送。Stop Policy 與 STOP QUEUING 只停止尚未提交的 Attempt，不取消執行中的 Job。Repeat 固定為 1（暫不實作）。`
     : `Each attempt is its own Job (attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}). Retry: the Manager submits a new Plan / Job only after a definite FAIL with SAFE_OFF verified and the Site released; OUTCOME UNKNOWN is never resubmitted. Stop Policy and STOP QUEUING only stop attempts that are not submitted yet; a running Job is never cancelled. Repeat is fixed at 1 (not implemented).`;
   const fileDetails = file ? `${formatBytes(file.size)} · ${fileFormat(file, source)}` : null;
-  const readVerdict = readRun ? runVerdict(readRun).verdict : null;
-  const readOutput = readResult?.run.receipt?.read_output ?? null;
-  const readStatus = readPhase === "planning" ? "PLANNING"
-    : readPhase === "downloading" ? "FETCHING OUTPUT"
-    : readRun && readRun.outcome == null ? runStageLabel(readRun)
-    : readVerdict ? readVerdict.replace("_", " ") : readReadiness.label;
-  const readProgress = readRun ? runProgressPercent(readRun) : null;
   const phaseLabel = phase === "locking" ? "LOCKING" : phase === "planning" ? "PLANNING"
     : phase === "starting" ? "STARTING" : run && run.outcome == null ? runStageLabel(run) : readiness.label;
 
@@ -794,70 +943,21 @@ export default function ManagedProgrammingWorkspace() {
                 <span>OUTCOME UNKNOWN — {startUnknown} Check the PPU before programming again.</span>
               </div>
             )}
-            {statusNote && <div className="warning engineeringOperationWarning" role="status">{statusNote}</div>}
+            {startHold && (
+              <div className="warning engineeringOperationWarning" role="alert" data-testid="managed-start-hold">
+                <span>
+                  OUTCOME UNKNOWN — the {startHold.kind} Start request on PPU {startHold.alias} · {siteLabel(startHold.siteId)} got
+                  no answer ({startHold.detail}) It may or may not have reached the PPU. Nothing is submitted to this PPU
+                  until you check it and acknowledge.
+                </span>
+                <button type="button" className="engineeringAcknowledge" disabled={releasingHold || active} onClick={() => void releaseStartHold()}>
+                  Acknowledge Start reconciliation
+                </button>
+              </div>
+            )}
+            {statusNote && <div className="warning engineeringOperationWarning" role="status" data-testid="managed-status-note">{statusNote}</div>}
           </div>
         </div>
-
-        <section className="productionProgrammingCard readMemoryCard" aria-label="Read Memory" data-testid="read-memory">
-          <header><span>READ MEMORY</span><small>Independent Job · not part of the Batch · never erases, programs or reloads</small></header>
-          <div className="cardBody readMemoryBody">
-            <label className="workflowField">
-              <span>Start Address</span>
-              <input
-                aria-label="Read Memory Start Address"
-                value={readAddress}
-                placeholder={readRoute ? hex(readRoute.flash_base) : "0x08000000"}
-                disabled={active}
-                onChange={event => { setReadAddress(event.target.value); clearReadState(); }}
-              />
-            </label>
-            <label className="workflowField">
-              <span>Length (bytes)</span>
-              <input
-                aria-label="Read Memory Length"
-                value={readLength}
-                placeholder={readRoute ? String(readRoute.flash_size) : "65536"}
-                disabled={active}
-                onChange={event => { setReadLength(event.target.value); clearReadState(); }}
-              />
-            </label>
-            <button
-              type="button"
-              className="readMemoryButton"
-              data-testid="read-memory-start"
-              disabled={!readReadiness.ready}
-              title={readReadiness.ready ? undefined : readReadiness.reason}
-              onClick={() => void readMemory()}
-            >READ MEMORY</button>
-            <div className="readMemoryStatus" role="status" aria-label="Read Memory status" data-testid="read-memory-status"
-              data-read-verdict={readVerdict ?? ""}>
-              <small>READ STATUS</small>
-              <b>{readStatus}{readProgress != null && readRun?.outcome == null ? ` · ${Math.round(readProgress)}%` : ""}</b>
-            </div>
-          </div>
-          {!readReadiness.ready && !reading && phase === "idle" && readReadiness.label !== readiness.label && (
-            <div className="engineeringBoundaryNote warning" role="status" data-testid="read-memory-readiness">
-              <b>{readReadiness.label}</b><span>{readReadiness.reason}</span>
-            </div>
-          )}
-          {readMessage && <div className="warning engineeringOperationWarning" role="alert" data-testid="read-memory-message">{readMessage}</div>}
-          {readResult && (
-            <dl className="cardBody programmingRunView" aria-label="Read Memory result" data-testid="read-memory-result">
-              <dt>Result</dt><dd data-testid="read-memory-verdict">{runVerdict(readResult.run).verdict.replace("_", " ")}{runVerdict(readResult.run).reason ? ` · ${runVerdict(readResult.run).reason}` : ""}</dd>
-              <dt>Range</dt><dd>{readOutput ? `${hex(readOutput.address)} + ${readOutput.bytes} B` : "—"}</dd>
-              <dt>Bytes Read</dt><dd data-testid="read-memory-bytes">{readOutput && runVerdict(readResult.run).verdict === "PASS" ? readOutput.bytes : "—"}</dd>
-              <dt>SHA256</dt><dd data-testid="read-memory-sha"><code>{readOutput?.sha256 ?? "—"}</code></dd>
-              <dt>Job ID</dt><dd><code>{readResult.run.receipt?.job_id ?? "—"}</code></dd>
-              <dt>SAFE_OFF</dt><dd>{readResult.run.receipt?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}</dd>
-              <dt>Binary</dt>
-              <dd>
-                {readResult.url && readResult.filename
-                  ? <a href={readResult.url} download={readResult.filename} data-testid="read-memory-download">Download {readResult.filename}</a>
-                  : <span data-testid="read-memory-no-download">{readResult.downloadError ?? "No verified binary is available."}</span>}
-              </dd>
-            </dl>
-          )}
-        </section>
 
         {batch && (
           <section className="productionProgrammingCard" aria-label="Batch attempts" data-testid="batch-attempts"
@@ -909,7 +1009,7 @@ export default function ManagedProgrammingWorkspace() {
               Run {unresolved.run_id} on PPU {unresolved.ppu_alias} ended OUTCOME UNKNOWN. Nothing was resubmitted.
               Reconcile the PPU through the normal recovery procedure, then acknowledge.
             </span>
-            <button type="button" disabled={acknowledging} onClick={() => void acknowledge()}>Acknowledge reconciliation</button>
+            <button type="button" className="engineeringAcknowledge" disabled={acknowledging} onClick={() => void acknowledge()}>Acknowledge reconciliation</button>
           </div>
         )}
 
@@ -921,7 +1021,7 @@ export default function ManagedProgrammingWorkspace() {
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
             <table className="channelTable">
               <thead>
-                <tr><th>SELECT</th><th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>PROGRAMMING CAPABILITY</th></tr>
+                <tr><th>SELECT</th><th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>READ</th><th>PROGRAMMING CAPABILITY</th></tr>
               </thead>
               <tbody className="targetSitesSection">
                 {(ppu?.sites ?? []).map(site => {
@@ -933,6 +1033,11 @@ export default function ManagedProgrammingWorkspace() {
                   const rowVerdict = ownsRun && batch ? batchVerdict(batch).verdict : null;
                   const state = ownsRun && run.outcome == null ? runStageLabel(run)
                     : site.enabled ? site.state.toUpperCase() : "DISABLED";
+                  // READ: one button per Site whose Programming Route declares Read.
+                  const canRead = routeDeclaring(routes, icpn, site.site_id, ["read"]) != null;
+                  const readBlocked = canRead ? readBlockReason(site.site_id) : null;
+                  const readingHere = readSiteId === site.site_id && readPhase !== "idle" && readPhase !== "choosing";
+                  const siteRead = siteReads[site.site_id] ?? null;
                   return (
                     <tr key={site.site_id} data-site-selected={selected ? "true" : "false"} data-site-enabled={site.enabled ? "true" : "false"}
                       data-site-programmable={capability?.programmable ? "true" : "false"}>
@@ -952,6 +1057,26 @@ export default function ManagedProgrammingWorkspace() {
                         ? <b>—</b>
                         : <div className="tableProgress"><div className="track"><i style={{ width: `${progress}%` }} /></div><b>{Math.round(progress)}%</b></div>}</td>
                       <td><b className="engineeringResult" data-result={rowVerdict ?? "—"}>{rowVerdict == null || rowVerdict === "RUNNING" ? "—" : rowVerdict.replace("_", " ")}</b></td>
+                      <td className="siteReadCell" data-testid={`site-read-${site.site_id}`}>
+                        {canRead ? (
+                          <button
+                            type="button"
+                            className="siteReadButton"
+                            aria-label={`Read SITE ${site.site_id} Flash`}
+                            title={readBlocked ?? "Read the whole Flash to a file (independent Job)"}
+                            disabled={readBlocked != null}
+                            onClick={() => void readSite(site.site_id)}
+                          >{readingHere ? "READING" : "READ"}</button>
+                        ) : <b>—</b>}
+                        {siteRead && !readingHere && (
+                          <b className="siteReadStatus" role="status" aria-label={`SITE ${site.site_id} Read status`}
+                            data-read-status={siteRead.status} title={siteRead.detail}>{siteRead.status}</b>
+                        )}
+                        {siteRead?.download && !readingHere && (
+                          <a className="siteReadDownload" href={siteRead.download.url} download={siteRead.download.filename}
+                            aria-label={`Save SITE ${site.site_id} Read binary`}>SAVE</a>
+                        )}
+                      </td>
                       <td><b>{capability?.label ?? "—"}</b>{capability?.reason && <small>{capability.reason}</small>}</td>
                     </tr>
                   );
