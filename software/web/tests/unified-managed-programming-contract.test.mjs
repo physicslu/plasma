@@ -51,8 +51,11 @@ test("ONLINE and Programming capability are judged separately with exact reasons
 });
 
 test("one Start: lock -> plan -> exactly one start -> observe; no retry of any write", () => {
-  assert.equal((core.match(/planProgramming\(/g) ?? []).length, 1);
-  assert.equal((core.match(/startProgramming\(/g) ?? []).length, 1);
+  // Two entry points, each with exactly one plan and one start: the Batch
+  // programming Job and the independent Read Memory Job.
+  assert.equal((core.match(/planProgramming\(/g) ?? []).length, 2);
+  assert.equal((core.match(/startProgramming\(/g) ?? []).length, 2);
+  assert.match(core, /export async function runManagedRead\(/);
   assert.equal((emode.match(/runManagedProgramming\(/g) ?? []).length, 1);
   assert.doesNotMatch(emode, /planProgramming\(|startProgramming\(/);
   // The only loop is the read-only status poll.

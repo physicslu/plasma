@@ -38,6 +38,7 @@ def open_provider_job_session(
     profile: Mapping[str, Any] | None = None,
     expected_engine_selection_sha256: str | None = None,
     expected_worker_identity: Mapping[str, Any] | None = None,
+    operations: tuple[str, ...] | None = None,
 ) -> BoundSession:
     """Resolve once, then pin the exact route and the Job's existing deadline.
 
@@ -49,7 +50,7 @@ def open_provider_job_session(
         product_root, asset_set_sha256=asset_set_sha256, target=target,
         provider=selected.provider, profile=selected.profile,
         operation=operation, site_id=site_id, image_size=image_size,
-        hardware=hardware, options=selected.options)
+        hardware=hardware, options=selected.options, operations=operations)
     if (not math.isfinite(job_deadline_monotonic)
             or job_timeout_s != selected.timeout_ms / 1000.0):
         raise ValueError("JOB_TIMEOUT_BINDING_MISMATCH")
@@ -60,7 +61,9 @@ def open_provider_job_session(
     # C-3's integer max is only an admission ceiling; its effective expiry is
     # the same absolute monotonic deadline used by the PPU Job.
     route_wire = {key: value for key, value in asdict(route).items()
-                  if key not in ("options_json", "target")}
+                  if key not in ("options_json", "target", "operations")}
+    if route.operations is not None:
+        route_wire["operations"] = list(route.operations)
     extra = ({"expected_engine_selection_sha256": expected_engine_selection_sha256}
              if expected_engine_selection_sha256 is not None else {})
     if profile is not None:

@@ -51,6 +51,32 @@ class BaseInterface(ABC):
             context={"scheme": image_ref.scheme},
         )
 
+    async def run_operations(
+        self,
+        operations: tuple[str, ...],
+        image: bytes,
+        progress: ProgressCallback | None = None,
+    ) -> dict[str, object]:
+        """One ``programming`` Job: the ordered erase / program / verify list.
+
+        The default composes this interface's own operations in the given
+        order, running only the listed ones. An interface with one hardware
+        session per Job (C-3 OpenOCD) overrides it and returns its evidence.
+        """
+        for operation in operations:
+            if operation == "erase":
+                await self.erase(progress)
+            elif operation == "program":
+                await self.program(image, 0, progress)
+            elif operation == "verify":
+                await self.verify(image, 0, progress)
+            else:
+                raise PlasmaError(
+                    ErrorCode.OPERATION_UNSUPPORTED,
+                    f"'{operation}' is not a programming operation",
+                )
+        return {}
+
     async def flash_cycle(
         self,
         image: bytes,

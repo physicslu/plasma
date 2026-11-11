@@ -882,7 +882,9 @@ export default function FactoryConsoleV2() {
 
   // Managed readiness: ONLINE and Programming capability are separate facts.
   const icpn = targetDevice?.icpn ?? targetDevice?.identifier ?? null;
-  const managedOperationOptions = managed ? routeOperationsForIc(managedRoutes?.routes ?? null, icpn) : [];
+  // PMode runs Image Operations only; a Route's range Operation (Read) is not offered here.
+  const managedOperationOptions = managed
+    ? routeOperationsForIc(managedRoutes?.routes ?? null, icpn).filter(isImageOperation) : [];
   const managedOperation = chosenManagedOperation != null && (managedOperationOptions as string[]).includes(chosenManagedOperation)
     ? chosenManagedOperation
     : managedOperationOptions.length === 1 ? managedOperationOptions[0] : null;

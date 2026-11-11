@@ -18,11 +18,16 @@ the Manager then
    the committed Route and the shared writer reproduces its exact bytes
    (``bundle_v3.route_bundle_from_archive``); from there it takes the SAME
    Resource Reuse / B1-B3 / Job path as an Image source,
-4. submits exactly one Job with the user-selected Operation and its exact
-   Job Binding (Resource, Operation, range, Image, PPU, Site, ICPN, Profile)
-   to the PPU Gateway ``/api/jobs``; the PPU re-verifies the Binding,
-5. observes ``/api/status?job=`` and verifies the PPU-echoed Binding,
-   Image identity, readback SHA256, verified bytes and SAFE_OFF.
+4. submits exactly one Job with its exact Job Binding (Resource, Operation,
+   range, Image, PPU, Site, ICPN, Profile) to the PPU Gateway ``/api/jobs``;
+   the PPU re-verifies the Binding. The formal model is ONE ``programming``
+   Job carrying the user's ordered ``operations`` list (erase -> program ->
+   verify; any legal selection, all three included): one Job ID, one Site
+   lease, one Binding and one receipt. ``read`` is an independent Job whose
+   bytes the Manager fetches and re-hashes. ``flash_cycle`` is the legacy
+   complete cycle, kept unchanged until the new model is HIL qualified,
+5. observes ``/api/status?job=`` and verifies the PPU-echoed Binding, Image
+   identity, every listed step's range / readback evidence and SAFE_OFF.
 
 This module is deliberately NOT a deployment coordinator or execution router.
 The PPU Bootstrap coordinator stays the only Bundle install/activation
@@ -53,9 +58,13 @@ ROUTES_ENV = "PLASMA_PROGRAMMING_ROUTES_ROOT"
 ROUTES_RELATIVE = Path("data/opf/programming-routes")
 RUN_SCHEMA = "plasma.manager.bundle-programming-run.v1"
 PLAN_SCHEMA = "plasma.manager.bundle-programming-plan.v3"
-RECEIPT_SCHEMA = "plasma.manager.programming-receipt.v2"
-# Only flash_cycle has a qualified PPU backend (C-3 OpenOCD) and receipt contract.
-RECEIPT_OPERATIONS = frozenset({"flash_cycle"})
+RECEIPT_SCHEMA = "plasma.manager.programming-receipt.v3"
+# Job kinds with a PPU backend (C-3 OpenOCD) and a receipt contract. A single
+# erase / program / verify is never a Job: it is a step of ``programming``.
+PROGRAMMING = bundle_v3.PROGRAMMING
+RECEIPT_OPERATIONS = frozenset({"flash_cycle", PROGRAMMING, "read"})
+READ_OUTPUT_MAX_BYTES = 16 * 1024 * 1024
+MAX_READ_OUTPUTS_RETAINED = 8
 FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
                       "write_address", "verify_address", "readback_address")
 CONFIRM_TOKEN = "PROGRAM"
@@ -123,6 +132,7 @@ class _Plan:
     route: bundle_v3.ProgrammingRoute
     payload: dict[str, Any]
     operation: str
+    operations: list[str] | None
     resource_set_sha256: str
     image: bytes | None
     image_asset: dict[str, Any] | None
@@ -219,6 +229,7 @@ class BundleProgrammingWorkflow:
         self._lock = threading.RLock()
         self._plans: dict[str, _Plan] = {}
         self._runs: dict[str, _Run] = {}
+        self._read_outputs: dict[str, bytes] = {}
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
@@ -367,23 +378,50 @@ class BundleProgrammingWorkflow:
         return ppu_id, report
 
     def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        allowed = {"icpn", "site_id", "operation", "image_base64", "image_filename",
-                   "bundle_base64", "address", "length"}
-        if not isinstance(body, Mapping) or not {"icpn", "site_id", "operation"} <= set(body) \
-                or set(body) - allowed:
+        allowed = {"icpn", "site_id", "operation", "operations", "image_base64",
+                   "image_filename", "bundle_base64", "address", "length"}
+        if not isinstance(body, Mapping) or not {"icpn", "site_id"} <= set(body) \
+                or len({"operation", "operations"} & set(body)) != 1 or set(body) - allowed:
             raise ProgrammingError(400, "invalid_request",
-                                   "plan requires icpn, site_id, operation and the Operation's "
-                                   "image_base64, bundle_base64 or address/length")
-        icpn, site, operation = body["icpn"], body["site_id"], body["operation"]
+                                   "plan requires icpn, site_id, exactly one of operations "
+                                   "(erase/program/verify list) or operation (read, flash_cycle) "
+                                   "and its image_base64, bundle_base64 or address/length")
+        icpn, site = body["icpn"], body["site_id"]
+        operations: list[str] | None = None
+        if "operations" in body:
+            # The formal model: one programming Job with the user's ordered list.
+            try:
+                operations = bundle_v3.normalize_operations(body["operations"])
+            except bundle_v3.BundleBuildError as exc:
+                raise ProgrammingError(
+                    422 if str(exc) == "JOB_OPERATIONS_ERASE_VERIFY_UNSUPPORTED" else 400,
+                    "operations_invalid",
+                    "Erase + Verify without Program is not supported: Verify compares the IC "
+                    "with the Programming Image, which an erased IC can never equal"
+                    if str(exc) == "JOB_OPERATIONS_ERASE_VERIFY_UNSUPPORTED" else
+                    "operations must be a non-empty erase -> program -> verify list "
+                    "in that order without repeats") from exc
+            operation = PROGRAMMING
+        else:
+            operation = body["operation"]
+            if operation in bundle_v3.SEQUENCE_OPERATIONS:
+                raise ProgrammingError(
+                    400, "invalid_request",
+                    f"{operation} is a step of one programming Job; send operations: "
+                    f"[\"{operation}\"] instead of a separate operation")
         if type(icpn) is not str or not icpn.strip() or len(icpn) > 96:
             raise ProgrammingError(400, "invalid_request", "icpn is invalid")
         if type(site) is not int or isinstance(site, bool) or not 1 <= site <= 64:
             raise ProgrammingError(400, "invalid_request", "site_id is invalid")
         # The Operation is the user's choice; the Manager never rewrites it.
-        if type(operation) is not str or operation not in bundle_v3.OPERATIONS:
+        if operations is None and (type(operation) is not str
+                                   or operation not in ("read", "flash_cycle")):
             raise ProgrammingError(400, "invalid_request",
-                                   f"operation must be one of {', '.join(bundle_v3.OPERATIONS)}")
-        image_operation = operation in bundle_v3.IMAGE_OPERATIONS
+                                   "operation must be read or flash_cycle")
+        image_operation = (bundle_v3.operations_take_image(operations)
+                           if operations is not None
+                           else operation in bundle_v3.IMAGE_OPERATIONS)
+        label = "+".join(operations) if operations is not None else operation
         image: bytes | None = None
         archive: bytes | None = None
         address = length = None
@@ -393,7 +431,7 @@ class BundleProgrammingWorkflow:
             if len(sources) != 1 or {"address", "length"} & set(body) \
                     or ("bundle_base64" in body and "image_filename" in body):
                 raise ProgrammingError(400, "invalid_request",
-                                       f"{operation} requires exactly one of image_base64 or "
+                                       f"{label} requires exactly one of image_base64 or "
                                        "bundle_base64 and takes its range from the Image")
             if "bundle_base64" in body:
                 archive = _strict_base64(body["bundle_base64"], "bundle")
@@ -409,22 +447,28 @@ class BundleProgrammingWorkflow:
             if {"image_base64", "image_filename", "bundle_base64"} & set(body) \
                     or not {"address", "length"} <= set(body):
                 raise ProgrammingError(400, "invalid_request",
-                                       f"{operation} requires explicit address and length and no image")
+                                       f"{label} requires explicit address and length and no image")
             address, length = body["address"], body["length"]
             if any(type(v) is not int or isinstance(v, bool) or v < 0 for v in (address, length)):
                 raise ProgrammingError(400, "invalid_request", "address and length must be integers")
         self._require_commissioned(alias)
-        matches = bundle_v3.resolve_routes(self.routes(), icpn=icpn.strip(), site=site)
-        if not matches:
+        routes = self.routes()
+        required = operations or [operation]
+        if not bundle_v3.resolve_routes(routes, icpn=icpn.strip(), site=site):
             raise ProgrammingError(422, "programming_route_not_found",
                                    "no Programming Route declares this IC on this Site")
+        # The Route is the one whose Profile declares every basic operation of
+        # this Job (the legacy flash_cycle Route stays its own Resource Set).
+        matches = bundle_v3.resolve_routes(routes, icpn=icpn.strip(), site=site,
+                                           operations=required)
+        if not matches:
+            raise ProgrammingError(
+                422, "operation_not_in_profile",
+                "no Programming Profile for this IC and Site declares " + ", ".join(required))
         if len(matches) > 1:
             raise ProgrammingError(409, "programming_route_ambiguous",
                                    "more than one Programming Route matches; refusing to guess")
         route = matches[0]
-        if operation not in route.capabilities["operations"]:
-            raise ProgrammingError(422, "operation_not_in_profile",
-                                   f"Programming Profile {route.profile_id} does not declare {operation}")
         built = image_asset = None
         try:
             resource = bundle_v3.resource_set_descriptor(route)
@@ -471,12 +515,12 @@ class BundleProgrammingWorkflow:
         activation_required = not resource_reuse
         if activation_required and built is None:
             raise ProgrammingError(409, "resource_activation_requires_image",
-                                   f"{operation} needs these Programming Resources already Active; "
+                                   f"{label} needs these Programming Resources already Active; "
                                    "program an Image first")
         try:
             binding = bundle_v3.job_image_binding(
                 resource, image_asset, ppu_id=ppu_id, site_id=site, operation=operation,
-                address=address, length=length)
+                address=address, length=length, operations=operations)
         except bundle_v3.BundleBuildError as exc:
             raise ProgrammingError(422, "job_binding_invalid", str(exc)) from exc
         binding_sha = bundle_v3.sha256_hex(bundle_v3.canonical_json(binding))
@@ -484,6 +528,8 @@ class BundleProgrammingWorkflow:
         payload = {
             "schema": PLAN_SCHEMA, "plan_id": plan_id, "ppu_alias": alias,
             "site_id": site, "operation": operation,
+            # The ordered list one programming Job runs (null: read / legacy flash_cycle).
+            "operations": operations,
             "source": ("bundle" if archive is not None
                        else "image" if image is not None else "range"),
             "route": route.summary(),
@@ -505,7 +551,8 @@ class BundleProgrammingWorkflow:
             "fpga_load": False,
             "steps": (["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] if activation_required
                       else ["RESOURCE_REUSE"])
-                     + [f"{operation.upper()}_JOB", "VERIFY_RECEIPT"],
+                     + [f"{operation.upper()}_JOB", "VERIFY_RECEIPT"]
+                     + (["FETCH_READ_OUTPUT"] if operation == "read" else []),
             "catalog_gate": "NOT_USED",
             "confirm_required": CONFIRM_TOKEN,
         }
@@ -517,7 +564,7 @@ class BundleProgrammingWorkflow:
                 del self._plans[min(self._plans, key=lambda k: self._plans[k].created_monotonic)]
             self._plans[plan_id] = _Plan(
                 plan_id, alias, site, now, built, route, payload, operation=operation,
-                resource_set_sha256=resource_sha, image=image, image_asset=image_asset,
+                operations=operations, resource_set_sha256=resource_sha, image=image, image_asset=image_asset,
                 binding=binding, binding_sha256=binding_sha)
         return {"ok": True, "plan": payload}
 
@@ -612,7 +659,7 @@ class BundleProgrammingWorkflow:
             job_id = self._submit_once(run, plan, client)
             self._update(run, state="running")
             job = self._poll_job(run, client, job_id)
-            self._verify(run, plan, job)
+            self._verify(run, plan, job, client)
         except _OutcomeUnknown as exc:
             self._update(run, state="finished", outcome="OUTCOME_UNKNOWN", reason=exc.reason)
         except _StepFailure as exc:
@@ -709,9 +756,12 @@ class BundleProgrammingWorkflow:
         # Job Image source (OFE-1B): the user's Operation + exact Binding; the
         # Image travels once with the Job, never as a new Resource Bundle.
         payload: dict[str, Any] = {
-            "site_id": run.site, "operation": plan.operation, "timeout_s": 180.0,
+            "site_id": run.site, "timeout_s": 180.0,
             "target": plan.route.icpn, "provider": plan.route.provider_id,
             "profile": plan.route.profile_id, "job_binding": plan.binding,
+            # A programming Job is addressed by its list, never by one operation.
+            **({"operation": plan.operation} if plan.operations is None
+               else {"operations": plan.operations}),
         }
         if plan.image is not None:
             payload["image_asset"] = plan.image_asset
@@ -763,10 +813,93 @@ class BundleProgrammingWorkflow:
                 raise _OutcomeUnknown("JOB_RESULT_UNKNOWN_DO_NOT_RESUBMIT")
             self.sleep(self.poll_interval_s)
 
-    def _verify(self, run: _Run, plan: _Plan, job: dict[str, Any]) -> None:
+    # --------------------------------------------------------------- read output
+    def _read_output_path(self, run_id: str) -> Path | None:
+        if self.journal_path is None:
+            return None
+        return self.journal_path.with_name("programming-read-outputs") / f"{run_id}.bin"
+
+    def _store_read_output(self, run: _Run, data: bytes) -> None:
+        self._read_outputs[run.run_id] = data
+        while len(self._read_outputs) > MAX_READ_OUTPUTS_RETAINED:
+            del self._read_outputs[next(iter(self._read_outputs))]
+        path = self._read_output_path(run.run_id)
+        if path is None:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chmod(name, 0o600)
+            os.replace(name, path)
+        except BaseException:
+            Path(name).unlink(missing_ok=True)
+            raise
+        kept = sorted(path.parent.glob("*.bin"), key=lambda item: item.stat().st_mtime)
+        for stale in kept[:-MAX_READ_OUTPUTS_RETAINED]:
+            stale.unlink(missing_ok=True)
+
+    def _fetch_read_output(self, client: Any, job: Mapping[str, Any], *, length: int,
+                           sha256: object) -> tuple[bytes | None, str | None]:
+        """Fetch the Job's one output file through the PPU Gateway and prove it.
+
+        Reading the file is repeatable and changes nothing on the PPU; any
+        doubt about its bytes is a FAIL of the read, never a guess.
+        """
+        result = job.get("result") if isinstance(job.get("result"), dict) else {}
+        files = result.get("output_files")
+        if not (isinstance(files, list) and len(files) == 1 and type(files[0]) is str):
+            return None, "READ_OUTPUT_MISSING"
+        name = files[0].rsplit("/", 1)[-1]
+        try:
+            status, _headers, body = client.relay(
+                "GET", f"/api/jobs/{quote(str(job.get('job_id')), safe='')}/files/"
+                       f"{quote(name, safe='')}",
+                headers={"Accept": "application/octet-stream"}, body=None,
+                timeout_s=self.request_timeout_s, max_response_bytes=READ_OUTPUT_MAX_BYTES)
+        except Exception:  # noqa: BLE001 - a read-only fetch; the Job itself is over
+            return None, "READ_OUTPUT_FETCH_FAILED"
+        if status != 200:
+            return None, f"READ_OUTPUT_HTTP_{status}"
+        if len(body) != length or bundle_v3.sha256_hex(body) != sha256:
+            return None, "READ_OUTPUT_INTEGRITY_MISMATCH"
+        return bytes(body), None
+
+    def read_output(self, alias: str, run_id: str) -> tuple[bytes, dict[str, Any]]:
+        """The verified bytes of a PASS read run, re-hashed before every download."""
+        with self._lock:
+            run = self._runs.get(run_id)
+            if run is None or run.alias != alias:
+                raise ProgrammingError(404, "programming_run_not_found",
+                                       "programming run was not found")
+            receipt = run.receipt if isinstance(run.receipt, dict) else {}
+            output = receipt.get("read_output")
+            if run.outcome != "PASS" or not isinstance(output, dict):
+                raise ProgrammingError(409, "read_output_unavailable",
+                                       "only a PASS Read Memory run has a downloadable output")
+            data = self._read_outputs.get(run_id)
+        if data is None:
+            path = self._read_output_path(run_id)
+            try:
+                data = path.read_bytes() if path is not None else None
+            except OSError:
+                data = None
+        if (data is None or len(data) != output.get("bytes")
+                or bundle_v3.sha256_hex(data) != output.get("sha256")):
+            raise ProgrammingError(410, "read_output_unavailable",
+                                   "the Read Memory output is no longer retained; read again")
+        return data, dict(output)
+
+    def _verify(self, run: _Run, plan: _Plan, job: dict[str, Any], client: Any = None) -> None:
         result = job.get("result") if isinstance(job.get("result"), dict) else {}
         details = result.get("details") if isinstance(result.get("details"), dict) else {}
-        flash = details.get("flash_cycle") if isinstance(details.get("flash_cycle"), dict) else {}
+        # The Job kind's own evidence block: flash_cycle / programming / read.
+        evidence = details.get(plan.operation) if isinstance(details.get(plan.operation), dict) else {}
+        flash = evidence if plan.operation == "flash_cycle" else {}
+        steps = evidence.get("steps") if isinstance(evidence.get("steps"), dict) else {}
         echo = job.get("job_binding") if isinstance(job.get("job_binding"), dict) else {}
         binding = plan.binding
         expected_sha = None if plan.image is None else bundle_v3.sha256_hex(plan.image)
@@ -775,24 +908,84 @@ class BundleProgrammingWorkflow:
         # bank start. The PPU reports the range it actually executed.
         unit = plan.route.flash_profile["erase_granularity"]
         job_range = binding["range"]
-        expected_range = {
-            "load_address": job_range["address"], "erase_address": job_range["address"],
-            "erase_length": -(-job_range["length"] // unit) * unit,
-            "write_address": job_range["address"], "verify_address": job_range["address"],
-            "readback_address": job_range["address"]}
-        observed_range = {key: flash.get(key) for key in FLASH_RANGE_FIELDS}
-        # Expected (Manager plan) / Observed (PPU) / Readback are kept distinct.
+        address, length = job_range["address"], job_range["length"]
+        erase_length = -(-length // unit) * unit
+        operations = plan.operations
+        expected_range: dict[str, Any] | None = None
+        observed_range: dict[str, Any] | None = None
+        if plan.operation == "flash_cycle":
+            expected_range = {
+                "load_address": address, "erase_address": address,
+                "erase_length": erase_length,
+                "write_address": address, "verify_address": address,
+                "readback_address": address}
+            observed_range = {key: flash.get(key) for key in FLASH_RANGE_FIELDS}
+
+        def step(name: str) -> dict[str, Any]:
+            return steps.get(name) if isinstance(steps.get(name), dict) else {}
+
+        # Expected (Manager plan) / Observed (PPU) per listed step.
+        expected_steps: dict[str, Any] | None = None
+        observed_steps: dict[str, Any] | None = None
+        if operations is not None:
+            expected_steps, observed_steps = {}, {}
+            if "erase" in operations:
+                expected_steps["erase"] = {"erase_address": address, "erase_length": erase_length}
+                if operations == ["erase"]:
+                    expected_steps["erase"].update(blank_verified=True, bytes_verified=length)
+                observed_steps["erase"] = {k: step("erase").get(k) for k in expected_steps["erase"]}
+            if "program" in operations:
+                expected_steps["program"] = {"write_address": address, "bytes_written": length,
+                                             "image_sha256": expected_sha}
+                observed_steps["program"] = {k: step("program").get(k)
+                                             for k in expected_steps["program"]}
+            if "verify" in operations:
+                expected_steps["verify"] = {"verify_address": address, "bytes_verified": length,
+                                            "readback_sha256": expected_sha}
+                observed_steps["verify"] = {k: step("verify").get(k)
+                                            for k in expected_steps["verify"]}
+        read_output: dict[str, Any] | None = None
+        read_error: str | None = None
+        read_bytes: bytes | None = None
+        read_range_ok = True
+        if plan.operation == "read":
+            read_range_ok = (evidence.get("read_address") == address
+                             and evidence.get("read_length") == length
+                             and evidence.get("bytes_read") == length
+                             and type(evidence.get("sha256")) is str)
+            if (read_range_ok and evidence.get("safe_off") is True
+                    and evidence.get("result") == "PASS" and job.get("state") == "success"):
+                read_bytes, read_error = self._fetch_read_output(
+                    client, job, length=length, sha256=evidence.get("sha256"))
+            else:
+                read_error = "READ_OUTPUT_NOT_FETCHED"
+            read_output = {"address": address, "bytes": length,
+                           "sha256": evidence.get("sha256"),
+                           "filename": f"read-{plan.route.icpn}-0x{address:08x}-{length}.bin",
+                           "available": read_bytes is not None}
+        if plan.operation == "flash_cycle":
+            readback_sha, bytes_verified = flash.get("readback_sha256"), flash.get("bytes_verified")
+        elif operations is not None and "verify" in operations:
+            readback_sha = step("verify").get("readback_sha256")
+            bytes_verified = step("verify").get("bytes_verified")
+        else:
+            readback_sha = bytes_verified = None
         receipt = {
             "schema": RECEIPT_SCHEMA,
             "job_id": job.get("job_id"), "job_state": job.get("state"),
             "site_id": job.get("site_id"), "operation": job.get("operation"),
+            "operations": operations,
+            "observed_operations": (evidence.get("operations") if operations is not None
+                                    else None),
             "target": plan.route.icpn, "ppu_id": binding["ppu_id"],
             "expected_image_sha256": expected_sha, "expected_image_size": expected_size,
             "observed_image_sha256": result.get("image_sha256"),
             "observed_image_size": result.get("image_size"),
-            "readback_sha256": flash.get("readback_sha256"),
-            "bytes_verified": flash.get("bytes_verified"),
+            "readback_sha256": readback_sha,
+            "bytes_verified": bytes_verified,
             "expected_flash_range": expected_range, "observed_flash_range": observed_range,
+            "expected_steps": expected_steps, "observed_steps": observed_steps,
+            "range": dict(job_range), "read_output": read_output,
             "expected_resource_set_sha256": plan.resource_set_sha256,
             "observed_resource_set_sha256": echo.get("resource_set_sha256"),
             "expected_job_binding_sha256": plan.binding_sha256,
@@ -802,13 +995,17 @@ class BundleProgrammingWorkflow:
             "active_asset_set_sha256": echo.get("asset_set_sha256"),
             "active_generation": echo.get("generation"),
             "resource_reuse": not plan.payload["activation_required"],
-            "safe_off": flash.get("safe_off"), "flash_result": flash.get("result"),
+            "safe_off": evidence.get("safe_off"), "flash_result": evidence.get("result"),
             "attempts": result.get("attempts"), "error": result.get("error"),
             "elapsed_ms": result.get("elapsed_ms"),
         }
+        # An erase-only / read Job carries no Image: the PPU reports none.
+        image_ok = (result.get("image_sha256") == expected_sha
+                    and (result.get("image_size") == expected_size
+                         if plan.image is not None else not result.get("image_size")))
         # SAFE_OFF first so an unsafe end state is always the reported reason.
         checks = [
-            (flash.get("safe_off") is True, "SAFE_OFF_NOT_VERIFIED"),
+            (evidence.get("safe_off") is True, "SAFE_OFF_NOT_VERIFIED"),
             (plan.operation in RECEIPT_OPERATIONS, "OPERATION_RECEIPT_UNSUPPORTED"),
             (job.get("state") == "success" and result.get("state") == "success", "JOB_NOT_SUCCESS"),
             (job.get("site_id") == run.site and job.get("operation") == plan.operation,
@@ -817,19 +1014,49 @@ class BundleProgrammingWorkflow:
              and echo.get("resource_set_sha256") == plan.resource_set_sha256
              and echo.get("image_asset_sha256") == binding["image_asset_sha256"]
              and echo.get("operation") == plan.operation
+             and echo.get("operations") == operations
              and echo.get("range") == job_range
              and echo.get("site_id") == run.site
              and echo.get("ppu_id") == binding["ppu_id"], "JOB_BINDING_NOT_CONFIRMED"),
-            (result.get("image_sha256") == expected_sha
-             and result.get("image_size") == expected_size, "IMAGE_IDENTITY_MISMATCH"),
+            (image_ok, "IMAGE_IDENTITY_MISMATCH"),
             (result.get("attempts") == 1, "JOB_ATTEMPTS_NOT_ONE"),
-            (flash.get("result") == "PASS", "FLASH_CYCLE_NOT_PASS"),
-            (flash.get("readback_sha256") == expected_sha, "READBACK_SHA256_MISMATCH"),
-            (flash.get("bytes_verified") == expected_size, "VERIFIED_BYTES_MISMATCH"),
-            (observed_range == expected_range, "FLASH_RANGE_MISMATCH"),
         ]
+        if plan.operation == "flash_cycle":
+            checks += [
+                (flash.get("result") == "PASS", "FLASH_CYCLE_NOT_PASS"),
+                (flash.get("readback_sha256") == expected_sha, "READBACK_SHA256_MISMATCH"),
+                (flash.get("bytes_verified") == expected_size, "VERIFIED_BYTES_MISMATCH"),
+                (observed_range == expected_range, "FLASH_RANGE_MISMATCH"),
+            ]
+        elif operations is not None:
+            checks += [
+                (evidence.get("result") == "PASS", "PROGRAMMING_NOT_PASS"),
+                # Exactly the planned list ran: nothing skipped, nothing added.
+                (evidence.get("operations") == operations and set(steps) == set(operations),
+                 "OPERATIONS_MISMATCH"),
+                *[(observed_steps[name] == expected_steps[name],
+                   f"{name.upper()}_EVIDENCE_MISMATCH") for name in operations],
+            ]
+        else:
+            checks += [
+                (evidence.get("result") == "PASS", "READ_NOT_PASS"),
+                (read_range_ok, "READ_RANGE_MISMATCH"),
+                (read_error is None, read_error or "READ_OUTPUT_MISSING"),
+            ]
         failed = [reason for ok, reason in checks if not ok]
         outcome = "PASS" if not failed else "FAIL"
+        if outcome == "PASS" and read_bytes is not None:
+            try:
+                self._store_read_output(run, read_bytes)
+            except OSError:
+                outcome, failed = "FAIL", ["READ_OUTPUT_STORE_FAILED"]
+                receipt["read_output"]["available"] = False
+        elif read_output is not None:
+            read_output["available"] = False
+        if plan.operation == "read":
+            self._step(run, "FETCH_READ_OUTPUT",
+                       "PASS" if read_output and read_output["available"] else "FAIL",
+                       bytes=length, sha256=evidence.get("sha256"))
         self._step(run, "VERIFY_RECEIPT", outcome, failed_checks=failed)
         self._update(run, state="finished", outcome=outcome,
                      reason=None if not failed else failed[0], receipt=receipt)

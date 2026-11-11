@@ -123,6 +123,10 @@ class ProgrammingRoute:
         }
 
 
+# Basic operations a Route Profile may declare (same set as OPERATIONS below).
+ROUTE_OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
+
+
 def parse_route(payload: object) -> ProgrammingRoute:
     """Validate one route with the same rules the Bundle builders enforce."""
     _need(type(payload) is dict and set(payload) <= {
@@ -169,7 +173,9 @@ def parse_route(payload: object) -> ProgrammingRoute:
           and type(caps["target"]) is str and bool(caps["target"])
           and caps["transport"] == "fpga" and caps["fpga_package"] is None
           and type(caps["driver_abi"]) is str and bool(caps["driver_abi"])
-          and type(caps["operations"]) is list and "flash_cycle" in caps["operations"]
+          and type(caps["operations"]) is list and bool(caps["operations"])
+          and all(type(op) is str and op in ROUTE_OPERATIONS for op in caps["operations"])
+          and len(set(caps["operations"])) == len(caps["operations"])
           and type(caps["sites"]) is list and bool(caps["sites"])
           and all(type(s) is int and s > 0 for s in caps["sites"])
           and caps["sites"] == sorted(set(caps["sites"]))
@@ -218,10 +224,14 @@ def load_routes(root: Path) -> tuple[ProgrammingRoute, ...]:
     return routes
 
 
-def resolve_routes(routes: tuple[ProgrammingRoute, ...], *, icpn: str,
-                   site: int) -> tuple[ProgrammingRoute, ...]:
-    """Routes whose Profile declares this exact target and Site."""
-    return tuple(r for r in routes if r.icpn == icpn and site in r.sites)
+def resolve_routes(routes: tuple[ProgrammingRoute, ...], *, icpn: str, site: int,
+                   operations: tuple[str, ...] | list[str] | None = None,
+                   ) -> tuple[ProgrammingRoute, ...]:
+    """Routes whose Profile declares this exact target and Site and, when
+    given, every one of the Job's basic ``operations``."""
+    return tuple(r for r in routes if r.icpn == icpn and site in r.sites
+                 and (operations is None
+                      or all(op in r.capabilities["operations"] for op in operations)))
 
 
 def user_image_identity(image_sha256: str, profile_id: str) -> tuple[str, str]:
@@ -265,6 +275,31 @@ IMAGE_FORMATS = frozenset({"binary"})
 # PPU Runtime route admission (execution_router) stays the execution authority.
 OPERATIONS = ("erase", "program", "verify", "read", "flash_cycle")
 IMAGE_OPERATIONS = frozenset({"program", "verify", "flash_cycle"})
+# The formal execution model: ONE ``programming`` Job runs an ordered
+# ``operations`` list drawn from erase -> program -> verify. Every legal E/P/V
+# selection (all three included) is this one Job kind with one Job Binding and
+# one receipt; a Profile declares the basic operations, never ``programming``.
+# ``flash_cycle`` is the legacy complete cycle; ``read`` is an independent Job.
+PROGRAMMING = "programming"
+SEQUENCE_OPERATIONS = ("erase", "program", "verify")
+
+
+def normalize_operations(operations: object) -> list[str]:
+    """A legal ``programming`` list: non-empty, unique, in the fixed order.
+
+    ``erase`` + ``verify`` without ``program`` is refused: Verify compares the
+    IC with the Programming Image, which a just-erased IC can never equal.
+    """
+    _need(type(operations) in (list, tuple) and bool(operations)
+          and all(type(op) is str for op in operations)
+          and list(operations) == [op for op in SEQUENCE_OPERATIONS if op in operations],
+          "JOB_OPERATIONS_INVALID")
+    _need(list(operations) != ["erase", "verify"], "JOB_OPERATIONS_ERASE_VERIFY_UNSUPPORTED")
+    return list(operations)
+
+
+def operations_take_image(operations: object) -> bool:
+    return "program" in operations or "verify" in operations
 RESOURCE_KINDS = frozenset({"platform-provider", "programming-profile", "fpga-image"})
 MAX_RESOURCE_PACKAGES = 31  # Bundle v3 verifier allows 32 Packages incl. Image.
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -480,10 +515,12 @@ def image_asset_sha256(descriptor: object) -> str:
 
 
 def _job_range(parsed: Mapping[str, Any], operation: str, asset: Mapping[str, Any] | None,
-               address: object, length: object) -> dict[str, int]:
+               address: object, length: object,
+               operations: list[str] | None = None) -> dict[str, int]:
     """The exact memory range an Operation acts on; part of the Binding identity."""
     c = parsed["constraints"]
-    if operation in IMAGE_OPERATIONS:
+    if operation in IMAGE_OPERATIONS or (
+            operations is not None and operations_take_image(operations)):
         _need(asset is not None, "JOB_IMAGE_ASSET_REQUIRED")
         derived = {"address": asset["load_address"], "length": asset["size"]}
         _need(address is None and length is None
@@ -496,7 +533,7 @@ def _job_range(parsed: Mapping[str, Any], operation: str, asset: Mapping[str, An
     offset = address - c["flash_base"]
     _need(offset >= 0 and length > 0 and offset + length <= c["flash_size"],
           "JOB_RANGE_INVALID")
-    if operation == "erase":
+    if operation == "erase" or operations is not None:
         _need(offset % c["erase_granularity"] == 0
               and length % c["erase_granularity"] == 0, "JOB_RANGE_INVALID")
     return {"address": address, "length": length}
@@ -505,8 +542,14 @@ def _job_range(parsed: Mapping[str, Any], operation: str, asset: Mapping[str, An
 def job_image_binding(resource: object, asset: object | None = None, *,
                       ppu_id: str, site_id: int, operation: str,
                       address: int | None = None,
-                      length: int | None = None) -> dict[str, Any]:
+                      length: int | None = None,
+                      operations: object | None = None) -> dict[str, Any]:
     """Exact Resource + Operation + range + Image + PPU + Site + Profile binding.
+
+    ``operation == "programming"`` binds the ordered ``operations`` list (each
+    declared by the Profile): with program or verify it requires the Image
+    Asset and acts on exactly its range (an erase covers that Image's erase
+    window); erase-only takes an explicit erase-aligned range and no Image.
 
     ``operation`` is user-selected and must be declared by the Resource Profile.
     ``program``/``verify``/``flash_cycle`` require an applicable Image Asset and
@@ -514,12 +557,19 @@ def job_image_binding(resource: object, asset: object | None = None, *,
     Image Asset. No I/O; a valid Binding authorizes nothing by itself.
     """
     parsed = parse_resource_set(resource)
-    _need(type(operation) is str and operation in OPERATIONS, "JOB_OPERATION_UNSUPPORTED")
-    _need(operation in parsed["constraints"]["operations"], "JOB_OPERATION_NOT_IN_PROFILE")
+    steps = None
+    if operation == PROGRAMMING:
+        steps = normalize_operations(operations)
+        _need(all(op in parsed["constraints"]["operations"] for op in steps),
+              "JOB_OPERATION_NOT_IN_PROFILE")
+    else:
+        _need(operations is None, "JOB_OPERATIONS_INVALID")
+        _need(type(operation) is str and operation in OPERATIONS, "JOB_OPERATION_UNSUPPORTED")
+        _need(operation in parsed["constraints"]["operations"], "JOB_OPERATION_NOT_IN_PROFILE")
     image = None if asset is None else parse_image_asset(asset)
     if image is not None:
         _check_applicable(image, parsed)
-    job_range = _job_range(parsed, operation, image, address, length)
+    job_range = _job_range(parsed, operation, image, address, length, steps)
     _need(type(ppu_id) is str and SAFE_PPU_ID.fullmatch(ppu_id) is not None,
           "JOB_BINDING_PPU_INVALID")
     _need(_is_int(site_id) and site_id in parsed["constraints"]["sites"],
@@ -532,15 +582,20 @@ def job_image_binding(resource: object, asset: object | None = None, *,
         "image_asset_sha256": None if image is None else image_asset_sha256(image),
         "ppu_id": ppu_id, "site_id": site_id,
         "icpn": parsed["constraints"]["icpn"], "profile": profile["id"],
+        # Only a ``programming`` Binding carries the list; a legacy
+        # flash_cycle / read Binding keeps its exact previous identity.
+        **({} if steps is None else {"operations": steps}),
     }
 
 
 def verify_job_binding(binding: object, resource: object, asset: object | None = None, *,
                        ppu_id: str, site_id: int, operation: str,
-                       address: int | None = None, length: int | None = None) -> str:
+                       address: int | None = None, length: int | None = None,
+                       operations: object | None = None) -> str:
     """Return the binding SHA256 only for the exact expected tuple."""
     expected = job_image_binding(resource, asset, ppu_id=ppu_id, site_id=site_id,
-                                 operation=operation, address=address, length=length)
+                                 operation=operation, address=address, length=length,
+                                 operations=operations)
     _need(type(binding) is dict and canonical_json(binding) == canonical_json(expected),
           "JOB_BINDING_MISMATCH")
     return sha256_hex(canonical_json(expected))

@@ -338,9 +338,10 @@ def _denied(stack, body, expect):
     ("provider_mismatch", "JOB_RESOURCE_PACKAGE_MISMATCH"),
     ("not_wired", "JOB_RESOURCE_IDENTITY_NOT_WIRED"),
     ("resolver_fails", "JOB_RESOURCE_IDENTITY_UNAVAILABLE"),
-    ("erase_backend", "C-3 supports only flash_cycle"),
-    ("read_backend", "C-3 supports only flash_cycle"),
-    ("program_backend", "C-3 supports only flash_cycle"),
+    # A single erase / program is never a Job of its own on C-3: they are
+    # steps of one ``programming`` Job (tests/test_c3_programming_operations.py).
+    ("erase_backend", "separate erase Job is not offered"),
+    ("program_backend", "separate program Job is not offered"),
     ("not_in_profile", "JOB_OPERATION_NOT_IN_PROFILE"),
     ("fpga_reload_lock", "quiesced"),
 ])
@@ -370,9 +371,6 @@ def test_unsafe_or_unproven_job_binding_never_opens_c3(case, expect):
                 elif case == "erase_backend":
                     body = job_body(resource, None, operation="erase",
                                     address=0x08000000, length=1024)
-                elif case == "read_backend":
-                    body = job_body(resource, None, operation="read",
-                                    address=0x08000000, length=64)
                 elif case == "program_backend":
                     body = job_body(resource, FW_A, operation="program")
                 elif case == "not_in_profile":

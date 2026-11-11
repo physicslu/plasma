@@ -45,6 +45,12 @@ class StubWorkflow:
         self.calls.append(("run", alias, run_id))
         return {"ok": True, "run": {"run_id": run_id, "outcome": None}}
 
+    def read_output(self, alias, run_id):
+        self.calls.append(("output", alias, run_id))
+        if run_id != RUN_ID:
+            raise ProgrammingError(409, "read_output_unavailable", "no output")
+        return b"\x00\x01READ", {"filename": "read-IC-0x08000000-6.bin", "sha256": "a" * 64}
+
     def acknowledge(self, alias, run_id, body):
         self.calls.append(("ack", alias, run_id, dict(body)))
         return {"ok": True, "run": {"run_id": run_id, "acknowledged": True}}
@@ -129,3 +135,21 @@ def test_unlisted_programming_paths_are_not_allowlisted(manager, method, path):
     status, payload = call(method, path, {} if method == "POST" else None)
     assert status == 404 and payload["error"]["code"] == "bootstrap_route_not_allowed"
     assert workflow.calls == []
+
+
+def test_read_output_is_a_binary_download_with_its_sha256(manager):
+    call, workflow, _poller = manager
+    status, payload = call("GET", f"{BASE}/runs/{'e' * 32}/output")
+    assert status == 409 and payload["error"]["code"] == "read_output_unavailable"
+    import urllib.request
+    server = next(c.cell_contents for c in call.__closure__
+                  if isinstance(c.cell_contents, ThreadingHTTPServer))
+    with urllib.request.urlopen(
+            f"http://127.0.0.1:{server.server_address[1]}{BASE}/runs/{RUN_ID}/output") as response:
+        assert response.status == 200 and response.read() == b"\x00\x01READ"
+        assert response.headers["Content-Type"] == "application/octet-stream"
+        assert response.headers["X-Plasma-Read-Sha256"] == "a" * 64
+        assert response.headers["Content-Disposition"] == \
+            'attachment; filename="read-IC-0x08000000-6.bin"'
+        assert response.headers["Cache-Control"] == "no-store"
+    assert ("output", "z2", RUN_ID) in workflow.calls

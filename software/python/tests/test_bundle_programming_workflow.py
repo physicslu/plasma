@@ -130,6 +130,12 @@ class FakeGateway:
         self.status_target = status_target
         # None: report the executed range truthfully; dict: override fields.
         self.flash_range: dict | None = None
+        # programming / read Jobs: per-step evidence overrides and IC content.
+        self.step_override: dict = {}
+        self.drop_steps: tuple = ()
+        self.read_data: bytes | None = None
+        self.read_file_tamper = False
+        self.downloads = 0
         self.posts: list[dict] = []
         self.polls = 0
 
@@ -168,22 +174,69 @@ class FakeGateway:
                 echo = {"job_binding_sha256": bundle_v3.sha256_hex(bundle_v3.canonical_json(binding)),
                         **{k: binding[k] for k in ("resource_set_sha256", "image_asset_sha256",
                                                    "operation", "range", "ppu_id", "site_id")},
+                        **({"operations": binding["operations"]}
+                           if "operations" in binding else {}),
                         "asset_set_sha256": self.coordinator.active_sha, "generation": 1}
                 if isinstance(self.echo, dict):
                     echo.update(self.echo)
+            # A programming Job is addressed by its operations list.
+            kind = post.get("operation", "programming")
+            result = "PASS" if state == "success" else "FAIL"
+            has_image = "asset_base64" in post
+            address, length = binding["range"]["address"], binding["range"]["length"]
+            output_files = []
+            if kind == "flash_cycle":
+                evidence = {"result": result,
+                            "readback_sha256": sha if self.readback_ok else "0" * 64,
+                            "bytes_verified": len(self.image),
+                            **self._executed_range(binding), "safe_off": self.safe_off}
+            elif kind == "programming":
+                operations = post["operations"]
+                steps = {}
+                if "erase" in operations:
+                    steps["erase"] = {"erase_address": address,
+                                      "erase_length": -(-length // 1024) * 1024}
+                    if operations == ["erase"]:
+                        steps["erase"].update(blank_verified=True, bytes_verified=length)
+                if "program" in operations:
+                    steps["program"] = {"write_address": address, "bytes_written": length,
+                                        "image_sha256": sha}
+                if "verify" in operations:
+                    steps["verify"] = {"verify_address": address, "bytes_verified": length,
+                                       "readback_sha256": sha if self.readback_ok else "0" * 64}
+                for name, change in self.step_override.items():
+                    steps[name] = {**steps.get(name, {}), **change}
+                for name in self.drop_steps:
+                    steps.pop(name, None)
+                evidence = {"result": result, "operations": operations, "steps": steps,
+                            "safe_off": self.safe_off}
+            else:
+                data = self._read_bytes(length)
+                evidence = {"result": result, "read_address": address, "read_length": length,
+                            "bytes_read": length, "sha256": hashlib.sha256(data).hexdigest(),
+                            "safe_off": self.safe_off}
+                if state == "success":
+                    output_files = ["/var/lib/plasma/output/job/read_SITE2_flash.bin"]
             return self._resp(200, {"job": {
                 "job_id": "job-20261109-120000-0123abcd", "state": state, "site_id": 2,
-                "operation": post["operation"], "stage": "verify", "progress_percent": 50,
+                "operation": kind, "stage": "verify", "progress_percent": 50,
                 "job_binding": echo,
-                "result": {"state": state, "image_sha256": sha, "image_size": len(sent),
+                "result": {"state": state, "image_sha256": sha if has_image else None,
+                           "image_size": len(sent) if has_image else 0,
                            "attempts": 1, "elapsed_ms": 10000, "error": None,
-                           "details": {"flash_cycle": {
-                               "result": "PASS" if state == "success" else "FAIL",
-                               "readback_sha256": sha if self.readback_ok else "0" * 64,
-                               "bytes_verified": len(self.image),
-                               **self._executed_range(binding),
-                               "safe_off": self.safe_off}}}}})
+                           "output_files": output_files,
+                           "details": {kind: evidence}}}})
+        if method == "GET" and path.endswith("/files/read_SITE2_flash.bin"):
+            self.downloads += 1
+            length = self.posts[-1]["job_binding"]["range"]["length"]
+            data = self._read_bytes(length)
+            if self.read_file_tamper:
+                data = b"X" + data[1:]
+            return 200, {"Content-Type": "application/octet-stream"}, data
         raise AssertionError(f"unexpected Gateway call {method} {path}")
+
+    def _read_bytes(self, length):
+        return (self.read_data if self.read_data is not None else bytes(range(256)) * 300)[:length]
 
     def _executed_range(self, binding):
         address, length = binding["range"]["address"], binding["range"]["length"]
@@ -599,11 +652,58 @@ def test_operation_contract_is_validated_before_ppu(tmp_path, change, status, co
     assert coord.calls == [] and gateway.posts == []
 
 
+def legacy_only_routes(tmp_path) -> Path:
+    """Only the legacy flash_cycle Route (as on a not-yet-updated deployment)."""
+    root = tmp_path / "legacy-routes"
+    root.mkdir()
+    name = "z2-site2-stm32f103c8t6.json"
+    (root / name).write_text((ROUTES / name).read_text())
+    return root
+
+
+OPS_ROUTE = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
+OPS_RESOURCE_SHA = bundle_v3.resource_set_sha256(bundle_v3.resource_set_descriptor(OPS_ROUTE))
+LEGAL_LISTS = [["erase"], ["program"], ["verify"], ["erase", "program"],
+               ["program", "verify"], ["erase", "program", "verify"]]
+
+
+def ops_body(operations, raw: bytes | None = None, **extra):
+    if not bundle_v3.operations_take_image(operations):
+        return {"icpn": ICPN, "site_id": 2, "operations": operations,
+                "address": 0x08000000, "length": 2048, **extra}
+    raw = image() if raw is None else raw
+    return {"icpn": ICPN, "site_id": 2, "operations": operations,
+            "image_base64": base64.b64encode(raw).decode(), "image_filename": "app.bin", **extra}
+
+
+def ops_workflow(tmp_path, *, active=True, **gateway_kw):
+    """The PPU already holds the operations Route's Resources (Resource Reuse)."""
+    coord = FakeCoordinator(active_sha="e" * 64) if active else FakeCoordinator()
+    gateway = FakeGateway(image=image(), coordinator=coord,
+                          resource_for=lambda _a: OPS_RESOURCE_SHA, **gateway_kw)
+    workflow, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway)
+    return workflow, coord, gateway
+
+
+def test_committed_routes_keep_legacy_flash_cycle_separate_from_the_operations_route():
+    legacy = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    assert legacy.capabilities["operations"] == ["flash_cycle"]  # legacy identity untouched
+    assert OPS_ROUTE.capabilities["operations"] == ["erase", "program", "verify", "read"]
+    assert OPS_RESOURCE_SHA != ROUTE_RESOURCE_SHA
+    routes = bundle_v3.load_routes(ROUTES)
+    pick = lambda ops: [r.route_id for r in bundle_v3.resolve_routes(  # noqa: E731
+        routes, icpn=ICPN, site=2, operations=ops)]
+    assert pick(["flash_cycle"]) == ["z2-site2-stm32f103c8t6"]
+    for ops in LEGAL_LISTS + [["read"]]:
+        assert pick(ops) == ["z2-site2-stm32f103c8t6-operations"]
+
+
 def test_operation_not_declared_by_profile_is_refused(tmp_path):
     workflow, coord, gateway = make(tmp_path)
-    for op in ("program", "verify"):
+    workflow.routes_root = legacy_only_routes(tmp_path)
+    for operations in (["program"], ["erase", "program", "verify"]):
         with pytest.raises(ProgrammingError) as caught:
-            workflow.plan(ALIAS, plan_body(operation=op))
+            workflow.plan(ALIAS, ops_body(operations))
         assert caught.value.code == "operation_not_in_profile"
     with pytest.raises(ProgrammingError) as caught:
         workflow.plan(ALIAS, {"icpn": ICPN, "site_id": 2, "operation": "read",
@@ -612,48 +712,96 @@ def test_operation_not_declared_by_profile_is_refused(tmp_path):
     assert coord.calls == [] and gateway.posts == []
 
 
-def wide_routes(tmp_path) -> Path:
-    """Route copy whose Profile also declares erase/program/verify/read (Host-only)."""
-    root = tmp_path / "routes"
-    root.mkdir()
-    data = json.loads((ROUTES / "z2-site2-stm32f103c8t6.json").read_text())
-    data["profile"]["capabilities"]["operations"] = [
-        "flash_cycle", "erase", "program", "verify", "read"]
-    (root / "z2-site2-stm32f103c8t6.json").write_text(json.dumps(data))
-    return root
+@pytest.mark.parametrize("body, status", [
+    ({"operations": []}, 400),
+    ({"operations": ["program", "erase"]}, 400),
+    ({"operations": ["erase", "erase"]}, 400),
+    ({"operations": ["read"]}, 400),
+    ({"operations": ["flash_cycle"]}, 400),
+    ({"operations": "erase"}, 400),
+    ({"operations": ["erase", "verify"]}, 422),          # no defined expected data
+    ({"operations": ["program"], "operation": "flash_cycle"}, 400),
+    ({"operation": "program"}, 400),                      # a step, never its own Job
+    ({"operation": "verify"}, 400),
+])
+def test_operations_list_contract_is_validated_before_ppu(tmp_path, body, status):
+    workflow, coord, gateway = ops_workflow(tmp_path)
+    request = {**ops_body(["program"]), **body}
+    if "operation" in body and "operations" not in body:
+        del request["operations"]
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.plan(ALIAS, request)
+    assert caught.value.status == status
+    assert caught.value.code == ("operations_invalid" if "operation" not in body
+                                 else "invalid_request")
+    assert coord.calls == [] and gateway.posts == []
 
 
-def wide_resource_sha(root: Path) -> str:
-    route = bundle_v3.load_route(root / "z2-site2-stm32f103c8t6.json")
-    return bundle_v3.resource_set_sha256(bundle_v3.resource_set_descriptor(route))
+@pytest.mark.parametrize("operations", LEGAL_LISTS, ids=lambda ops: "+".join(ops))
+def test_every_legal_list_is_one_job_with_one_binding_and_one_receipt(tmp_path, operations):
+    workflow, coord, gateway = ops_workflow(tmp_path)
+    planned, run = plan_run(workflow, ops_body(operations))
+    assert planned["operation"] == "programming" and planned["operations"] == operations
+    assert planned["route"]["route_id"] == "z2-site2-stm32f103c8t6-operations"
+    assert planned["steps"] == ["RESOURCE_REUSE", "PROGRAMMING_JOB", "VERIFY_RECEIPT"]
+    # Exactly ONE Job: its list travels as ``operations``; never ``flash_cycle``.
+    [post] = gateway.posts
+    assert post["operations"] == operations and "operation" not in post
+    assert post["job_binding"]["operation"] == "programming"
+    assert post["job_binding"]["operations"] == operations
+    assert ("asset_base64" in post) == bundle_v3.operations_take_image(operations)
+    assert run["outcome"] == "PASS", run
+    assert run["job_submission_count"] == 1 and run["auto_retry"] == "DISABLED"
+    receipt = run["receipt"]
+    assert receipt["schema"] == "plasma.manager.programming-receipt.v3"
+    assert receipt["operation"] == "programming"
+    assert receipt["operations"] == receipt["observed_operations"] == operations
+    assert set(receipt["expected_steps"]) == set(operations)
+    assert receipt["observed_steps"] == receipt["expected_steps"]
+    assert receipt["expected_flash_range"] is None and receipt["read_output"] is None
+    assert receipt["safe_off"] is True
+    assert receipt["observed_job_binding_sha256"] == planned["job_binding_sha256"]
+    if operations == ["erase"]:
+        assert receipt["expected_image_sha256"] is None
+        assert receipt["expected_steps"]["erase"] == {
+            "erase_address": 0x08000000, "erase_length": 2048,
+            "blank_verified": True, "bytes_verified": 2048}
+    if "verify" in operations:
+        assert receipt["readback_sha256"] == receipt["expected_image_sha256"]
+    assert "B1_create" not in coord.calls
 
 
-def test_user_operation_is_submitted_unchanged_and_unsupported_backend_fails(tmp_path):
-    routes = wide_routes(tmp_path)
-    coord = FakeCoordinator(active_sha="e" * 64)
-    gateway = FakeGateway(image=image(), coordinator=coord, post_status=422,
-                          resource_for=lambda _a: wide_resource_sha(routes))
-    workflow, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway)
-    workflow.routes_root = routes
-    planned, run = plan_run(workflow, plan_body(operation="program"))
-    assert planned["operation"] == "program" and planned["steps"][-2] == "PROGRAM_JOB"
-    # The Manager never rewrites the user's Operation into flash_cycle.
-    assert gateway.posts[0]["operation"] == "program"
-    assert gateway.posts[0]["job_binding"]["operation"] == "program"
-    # PPU C-3 rejects it (OPERATION_UNSUPPORTED): definitive FAIL, no retry.
-    assert run["outcome"] == "FAIL" and run["reason"] == "JOB_SUBMISSION_REJECTED_HTTP_422"
-    assert len(gateway.posts) == 1
+@pytest.mark.parametrize("fault, reason", [
+    ({"step_override": {"program": {"write_address": 0x08000400}}}, "PROGRAM_EVIDENCE_MISMATCH"),
+    ({"step_override": {"erase": {"erase_length": 65536}}}, "ERASE_EVIDENCE_MISMATCH"),
+    ({"readback_ok": False}, "VERIFY_EVIDENCE_MISMATCH"),
+    ({"drop_steps": ("verify",)}, "OPERATIONS_MISMATCH"),          # a listed step did not run
+    ({"step_override": {"read": {"bytes_read": 1}}}, "OPERATIONS_MISMATCH"),  # an extra step
+    ({"safe_off": False}, "SAFE_OFF_NOT_VERIFIED"),
+    ({"job_final": "failed"}, "JOB_NOT_SUCCESS"),
+    ({"echo": {"operations": ["program", "verify"]}}, "JOB_BINDING_NOT_CONFIRMED"),
+])
+def test_programming_success_claim_without_proof_of_every_step_is_not_a_pass(
+        tmp_path, fault, reason):
+    kwargs = {k: v for k, v in fault.items() if k not in ("step_override", "drop_steps")}
+    workflow, _c, gateway = ops_workflow(tmp_path, **kwargs)
+    gateway.step_override = fault.get("step_override", {})
+    gateway.drop_steps = fault.get("drop_steps", ())
+    _planned, run = plan_run(workflow, ops_body(["erase", "program", "verify"]))
+    assert run["outcome"] == "FAIL" and run["reason"] == reason
+    assert len(gateway.posts) == 1  # never resubmitted
 
 
-def test_non_flash_cycle_success_claim_is_not_a_pass(tmp_path):
-    routes = wide_routes(tmp_path)
-    coord = FakeCoordinator(active_sha="e" * 64)
-    gateway = FakeGateway(image=image(), coordinator=coord,
-                          resource_for=lambda _a: wide_resource_sha(routes))
-    workflow, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway)
-    workflow.routes_root = routes
-    _planned, run = plan_run(workflow, plan_body(operation="verify"))
-    assert run["outcome"] == "FAIL" and run["reason"] == "OPERATION_RECEIPT_UNSUPPORTED"
+def test_legacy_flash_cycle_request_still_uses_the_unchanged_legacy_route(tmp_path):
+    workflow, _c, gateway = make(tmp_path)
+    planned, run = run_once(workflow)
+    assert planned["operation"] == "flash_cycle" and planned["operations"] is None
+    assert planned["route"]["route_id"] == "z2-site2-stm32f103c8t6"
+    assert planned["resource"]["resource_set_sha256"] == ROUTE_RESOURCE_SHA
+    post = gateway.posts[0]
+    assert post["operation"] == "flash_cycle" and "operations" not in post
+    assert "operations" not in post["job_binding"]
+    assert run["outcome"] == "PASS" and run["receipt"]["expected_steps"] is None
 
 
 @pytest.mark.parametrize("op, address, length, code", [
@@ -663,15 +811,12 @@ def test_non_flash_cycle_success_claim_is_not_a_pass(tmp_path):
     ("erase", 0x08000000, 1000, "job_binding_invalid"),
     ("read", 0x08000000, 0x20000, "job_binding_invalid"),  # beyond flash
     ("read", 0, 16, "job_binding_invalid"),
+    ("read", 0x40021000, 4, "job_binding_invalid"),        # MMIO is never readable
 ])
 def test_erase_read_ranges_follow_flash_geometry(tmp_path, op, address, length, code):
-    routes = wide_routes(tmp_path)
-    coord = FakeCoordinator(active_sha="e" * 64)
-    gateway = FakeGateway(image=image(), coordinator=coord,
-                          resource_for=lambda _a: wide_resource_sha(routes))
-    workflow, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway)
-    workflow.routes_root = routes
-    body = {"icpn": ICPN, "site_id": 2, "operation": op, "address": address, "length": length}
+    workflow, _c, gateway = ops_workflow(tmp_path)
+    selector = {"operations": ["erase"]} if op == "erase" else {"operation": "read"}
+    body = {"icpn": ICPN, "site_id": 2, **selector, "address": address, "length": length}
     if code is not None:
         with pytest.raises(ProgrammingError) as caught:
             workflow.plan(ALIAS, body)
@@ -679,19 +824,94 @@ def test_erase_read_ranges_follow_flash_geometry(tmp_path, op, address, length, 
         return
     planned = workflow.plan(ALIAS, body)["plan"]
     assert planned["bundle"] is None and planned["image_asset"] is None
+    assert planned["source"] == "range"
     assert planned["job_binding"]["range"] == {"address": address, "length": length}
     assert planned["job_binding"]["image_asset_sha256"] is None
 
 
 def test_erase_without_active_matching_resources_needs_an_image_first(tmp_path):
-    routes = wide_routes(tmp_path)
     workflow, coord, gateway = make(tmp_path)
-    workflow.routes_root = routes
-    with pytest.raises(ProgrammingError) as caught:
-        workflow.plan(ALIAS, {"icpn": ICPN, "site_id": 2, "operation": "erase",
-                              "address": 0x08000000, "length": 1024})
-    assert caught.value.code == "resource_activation_requires_image"
+    for body in (ops_body(["erase"]),
+                 {"icpn": ICPN, "site_id": 2, "operation": "read",
+                  "address": 0x08000000, "length": 64}):
+        with pytest.raises(ProgrammingError) as caught:
+            workflow.plan(ALIAS, body)
+        assert caught.value.code == "resource_activation_requires_image"
     assert "B1_create" not in coord.calls and gateway.posts == []
+
+
+# --------------------------------------------------------------- Read Memory
+
+READ_BODY = {"icpn": ICPN, "site_id": 2, "operation": "read",
+             "address": 0x08000010, "length": 777}
+
+
+def test_read_is_an_independent_job_whose_output_the_manager_fetches_and_proves(tmp_path):
+    workflow, coord, gateway = ops_workflow(tmp_path)
+    planned, run = plan_run(workflow, READ_BODY)
+    assert planned["operation"] == "read" and planned["operations"] is None
+    assert planned["steps"] == ["RESOURCE_REUSE", "READ_JOB", "VERIFY_RECEIPT",
+                                "FETCH_READ_OUTPUT"]
+    [post] = gateway.posts
+    assert post["operation"] == "read" and "operations" not in post
+    assert "asset_base64" not in post and "image_asset" not in post
+    assert run["outcome"] == "PASS", run
+    expected = (bytes(range(256)) * 300)[:777]
+    output = run["receipt"]["read_output"]
+    assert output == {"address": 0x08000010, "bytes": 777,
+                      "sha256": hashlib.sha256(expected).hexdigest(),
+                      "filename": f"read-{ICPN}-0x08000010-777.bin", "available": True}
+    assert run["receipt"]["expected_image_sha256"] is None
+    data, meta = workflow.read_output(ALIAS, run["run_id"])
+    assert data == expected and meta["sha256"] == output["sha256"]
+    # Nothing was erased, programmed, activated or reloaded for a Read.
+    assert "B1_create" not in coord.calls and gateway.downloads == 1
+    # A restarted Manager still serves the journalled, re-hashed bytes.
+    again, _c2, _g2 = ops_workflow(tmp_path)
+    assert again.read_output(ALIAS, run["run_id"])[0] == expected
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.read_output("other", run["run_id"])
+    assert caught.value.status == 404
+
+
+@pytest.mark.parametrize("fault, reason", [
+    ({"read_file_tamper": True}, "READ_OUTPUT_INTEGRITY_MISMATCH"),
+    ({"safe_off": False}, "SAFE_OFF_NOT_VERIFIED"),
+    ({"job_final": "failed"}, "JOB_NOT_SUCCESS"),
+])
+def test_read_failure_or_unprovable_bytes_never_offers_a_download(tmp_path, fault, reason):
+    tamper = fault.pop("read_file_tamper", False) if isinstance(fault, dict) else False
+    workflow, _c, gateway = ops_workflow(tmp_path, **fault)
+    gateway.read_file_tamper = tamper
+    _planned, run = plan_run(workflow, READ_BODY)
+    assert run["outcome"] == "FAIL" and run["reason"] == reason
+    assert run["receipt"]["read_output"]["available"] is False
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.read_output(ALIAS, run["run_id"])
+    assert caught.value.code == "read_output_unavailable"
+    assert len(gateway.posts) == 1
+
+
+def test_read_unknown_outcome_latches_and_is_never_resubmitted(tmp_path):
+    workflow, _c, gateway = ops_workflow(tmp_path, post_raises=True)
+    _planned, run = plan_run(workflow, READ_BODY)
+    assert run["outcome"] == "OUTCOME_UNKNOWN" and len(gateway.posts) == 1
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.start(ALIAS, {"plan_id": workflow.plan(ALIAS, READ_BODY)["plan"]["plan_id"],
+                               "confirm": CONFIRM_TOKEN})
+    assert caught.value.code == "programming_outcome_unknown_unresolved"
+
+
+def test_read_is_refused_while_a_programming_run_owns_the_ppu(tmp_path):
+    workflow, _c, gateway = ops_workflow(tmp_path)
+    pending = []
+    workflow.spawn = pending.append  # the first run stays in progress
+    first = workflow.plan(ALIAS, ops_body(["erase", "program", "verify"]))["plan"]
+    workflow.start(ALIAS, {"plan_id": first["plan_id"], "confirm": CONFIRM_TOKEN})
+    read = workflow.plan(ALIAS, READ_BODY)["plan"]
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.start(ALIAS, {"plan_id": read["plan_id"], "confirm": CONFIRM_TOKEN})
+    assert caught.value.code == "programming_run_in_progress" and gateway.posts == []
 
 
 @pytest.mark.parametrize("echo, reason", [
@@ -713,7 +933,7 @@ def test_receipt_keeps_expected_observed_and_readback_distinct(tmp_path):
     workflow, _c, _g = make(tmp_path, gateway=gateway)
     planned, run = run_once(workflow)
     receipt = run["receipt"]
-    assert receipt["schema"] == "plasma.manager.programming-receipt.v2"
+    assert receipt["schema"] == "plasma.manager.programming-receipt.v3"
     assert "image_sha256" not in receipt and "image_size" not in receipt
     assert receipt["expected_image_size"] == receipt["observed_image_size"] == len(image())
     assert receipt["expected_resource_set_sha256"] == planned["resource"]["resource_set_sha256"]
@@ -920,12 +1140,24 @@ def test_bundle_source_request_shape_is_strict(tmp_path, body):
     assert coord.calls == [] and gateway.posts == []
 
 
-def test_bundle_source_operation_must_be_declared_by_the_profile(tmp_path):
+def test_bundle_source_must_carry_the_resources_of_the_route_that_declares_its_operations(tmp_path):
+    """A Bundle built for the legacy flash_cycle Route cannot run an operations
+    list: its Profile does not declare those operations (fail closed)."""
     workflow, coord, gateway = make(tmp_path)
+    body = bundle_body(user_bundle().archive)
+    del body["operation"]
     with pytest.raises(ProgrammingError) as caught:
-        workflow.plan(ALIAS, bundle_body(user_bundle().archive, operation="program"))
-    assert caught.value.code == "operation_not_in_profile"
+        workflow.plan(ALIAS, {**body, "operations": ["erase", "program", "verify"]})
+    assert caught.value.code == "bundle_resource_not_qualified"
     assert coord.calls == [] and gateway.posts == []
+    # The same list with a Bundle of the operations Route is admitted.
+    own = user_bundle(route=OPS_ROUTE)
+    admitted = bundle_body(own.archive)
+    del admitted["operation"]
+    planned = workflow.plan(
+        ALIAS, {**admitted, "operations": ["erase", "program", "verify"]})["plan"]
+    assert planned["source"] == "bundle" and planned["operations"] == ["erase", "program", "verify"]
+    assert planned["bundle"]["archive_sha256"] == own.archive_sha256
 
 
 def test_bundle_source_plan_is_single_use_and_never_resubmits_after_unknown(tmp_path):

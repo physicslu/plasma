@@ -23,6 +23,7 @@ from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
 BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 PROGRAMMING_RUN_RE = re.compile(r"^programming/runs/([0-9a-f]{32})$")
+PROGRAMMING_OUTPUT_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/output$")
 PROGRAMMING_ACK_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/acknowledge$")
 
 
@@ -268,6 +269,26 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             run_id = run_match.group(1)
             self._programming_call(
                 lambda: (HTTPStatus.OK, self._programming().run_status(alias, run_id)))
+            return
+        output_match = PROGRAMMING_OUTPUT_RE.fullmatch(action)
+        if output_match is not None:
+            # Read Memory binary: Console -> BFF -> Manager only; the Manager
+            # re-hashes the retained bytes against the run receipt first.
+            try:
+                data, output = self._programming().read_output(alias, output_match.group(1))
+            except ProgrammingError as exc:
+                self._json(exc.status, exc.payload())
+                return
+            except Exception as exc:
+                self._bootstrap_error(exc)
+                return
+            self._raw_response(HTTPStatus.OK, {
+                "Content-Type": "application/octet-stream",
+                "Content-Length": str(len(data)),
+                "Content-Disposition": f'attachment; filename="{output["filename"]}"',
+                "X-Plasma-Read-Sha256": str(output["sha256"]),
+                "X-Content-Type-Options": "nosniff",
+            }, data)
             return
         if action:
             self._json(
