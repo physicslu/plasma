@@ -1,0 +1,1 @@
+2026-11-11T00:20:29.343857+0000 SWPC python[1924197]: {"event": "manager_managed_ppu_relay", "http_status": 200, "method": "GET", "path": "/api/settings/ppu-network", "ppu_alias": "z2", "result": "pass-through"}
