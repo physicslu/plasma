@@ -20,6 +20,19 @@ import type {
   Operation,
   SiteSnapshot,
 } from "../plasma-api";
+import { ProgrammingRunView } from "../operator-ui/programming-run-view";
+import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
+import {
+  isImageOperation,
+  loadManagedTopology,
+  loadProgrammingRoutes,
+  MANAGED_JOB_POLICY,
+  PROGRAMMING_OPERATION_LABELS,
+  routeOperationsForIc,
+  type ManagedTopology,
+  type ProgrammingSource,
+  type RoutesState,
+} from "../programming/managed-programming";
 import { resolveProgrammingCapabilities } from "../programming-capabilities";
 import {
   cancelServerBatch,
@@ -42,6 +55,13 @@ import {
   type GatewayHealthState,
 } from "./communication-health";
 import { isRecoverablePPUStatusError, ppuRetryDelayMs } from "./ppu-status-recovery";
+import {
+  managedBatchBlocker,
+  managedFactoryCatalog,
+  managedPpuStatus,
+  ManagedProductionBatch,
+  type ManagedSiteRecord,
+} from "./managed-factory-backend";
 import ProductionLogPanel, { type ProductionLogEntry } from "./production-log-panel";
 import "./factory-console-v2.css";
 
@@ -371,6 +391,7 @@ export default function FactoryConsoleV2() {
   const {
     hydrated: workspaceHydrated,
     apiBase,
+    apiMode,
     engineeringSessionId: sessionId,
     ensureEngineeringSession,
     programmingImage: imageAsset,
@@ -402,6 +423,18 @@ export default function FactoryConsoleV2() {
   const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [programmingJobCollapsed, setProgrammingJobCollapsed] = useState(false);
+
+  // Formal Control Station: Manager Registry / Fleet / Programming Routes and
+  // Manager programming runs. The Standalone Mock runtime keeps the legacy path.
+  const managed = apiMode === "managed";
+  const [managedTopology, setManagedTopology] = useState<ManagedTopology | null>(null);
+  const [managedRoutes, setManagedRoutes] = useState<RoutesState | null>(null);
+  const [programmingSource, setProgrammingSource] = useState<ProgrammingSource>("image");
+  const [managedFile, setManagedFile] = useState<File | null>(null);
+  const [chosenManagedOperation, setChosenManagedOperation] = useState<string | null>(null);
+  const [managedRecords, setManagedRecords] = useState<ManagedSiteRecord[]>([]);
+  const managedBatchRef = useRef<ManagedProductionBatch | null>(null);
+  const managedStartLock = useRef(false);
 
   const logSequence = useRef(0);
   const activityReleaseRef = useRef<(() => void) | null>(null);
@@ -487,7 +520,13 @@ export default function FactoryConsoleV2() {
       if (pollGenerationRef.current !== generation) return;
       let next: ServerBatchSnapshot;
       try {
-        next = await getServerBatch(apiBase, batchId);
+        const managedBatch = managedBatchRef.current;
+        if (managedBatch?.batchId === batchId) {
+          next = managedBatch.snapshot();
+          setManagedRecords(managedBatch.records());
+        } else {
+          next = await getServerBatch(apiBase, batchId);
+        }
       } catch (error) {
         if (pollGenerationRef.current !== generation) return;
         consecutiveFailures += 1;
@@ -528,6 +567,11 @@ export default function FactoryConsoleV2() {
       return;
     }
 
+    // Managed: Site status is the Manager Fleet observation of that Alias.
+    const readStatus = async (targetBase: string, alias: string) => (
+      managed ? managedPpuStatus(await loadManagedTopology(), alias) : await getPPUStatus(targetBase)
+    );
+
     const runtimeForStatus = (item: (typeof targets)[number], status: Awaited<ReturnType<typeof getPPUStatus>>): PPURuntime => {
       const selected = new Set(item.siteIds);
       return {
@@ -543,14 +587,15 @@ export default function FactoryConsoleV2() {
       if (runtimeRecoveryGenerationRef.current !== generation) return;
       const targetBase = engineeringTargetApiBase(apiBase, item.facility.facility_id, item.target.ppu_id);
       try {
-        const status = await getPPUStatus(targetBase);
+        const status = await readStatus(targetBase, item.target.ppu_id);
         if (runtimeRecoveryGenerationRef.current !== generation) return;
         setGatewayHealth("online");
         setRuntimes(current => ({ ...current, [item.key]: runtimeForStatus(item, status) }));
         appendLog(`[PPU] STATUS RESTORED · ${item.target.display_name}`);
       } catch (error) {
         if (runtimeRecoveryGenerationRef.current !== generation) return;
-        setGatewayHealth(gatewayHealthFromError(error));
+        if (managed) setGatewayHealth("online");
+        else setGatewayHealth(gatewayHealthFromError(error));
         const detail = error instanceof Error ? error.message : text.loadFailed;
         setRuntimes(current => {
           const previous = current[item.key];
@@ -569,10 +614,12 @@ export default function FactoryConsoleV2() {
     } satisfies PPURuntime])));
     const results = await Promise.allSettled(targets.map(async item => {
       const targetBase = engineeringTargetApiBase(apiBase, item.facility.facility_id, item.target.ppu_id);
-      return { item, status: await getPPUStatus(targetBase) };
+      return { item, status: await readStatus(targetBase, item.target.ppu_id) };
     }));
     if (runtimeRecoveryGenerationRef.current !== generation) return;
-    setGatewayHealth(gatewayHealthFromSettled(results));
+    // Managed: the Manager answered; an unobservable PPU is a PPU fault, not a Gateway fault.
+    if (managed) setGatewayHealth("online");
+    else setGatewayHealth(gatewayHealthFromSettled(results));
     setRuntimes(current => {
       const next = { ...current };
       results.forEach((result, index) => {
@@ -597,21 +644,34 @@ export default function FactoryConsoleV2() {
       appendLog(`[PPU] STATUS ERROR · ${item.target.display_name} · RECONNECTING`, "WARN");
       void recoverTarget(item, 1);
     });
-  }, [apiBase, appendLog, text.loadFailed]);
+  }, [apiBase, appendLog, managed, text.loadFailed]);
 
   useEffect(() => {
     if (!workspaceHydrated) return;
     let stopped = false;
     void (async () => {
       try {
-        const nextCatalog = await getEngineeringTargets(apiBase);
+        let nextCatalog: EngineeringTargetCatalog;
+        if (managed) {
+          const topology = await loadManagedTopology();
+          const routes = topology.ppus[0]
+            ? await loadProgrammingRoutes(topology.ppus[0].alias)
+            : { routes: [], error: null };
+          if (stopped) return;
+          setManagedTopology(topology);
+          setManagedRoutes(routes);
+          nextCatalog = managedFactoryCatalog(topology);
+        } else {
+          nextCatalog = await getEngineeringTargets(apiBase);
+        }
         if (stopped) return;
         setGatewayHealth("online");
         setCatalog(nextCatalog);
         setProviderError(null);
         appendLog(`[PROVIDER] ${nextCatalog.provider.toUpperCase()} · ${nextCatalog.facility_count} Facilities · ${nextCatalog.ppu_count} PPUs · ${nextCatalog.site_count} Sites`);
 
-        const stored = readStoredBatch();
+        // A managed batch lives in the Console session and is not restorable.
+        const stored = managed ? null : readStoredBatch();
         if (stored?.apiBase === apiBase) {
           try {
             const restored = await getServerBatch(apiBase, stored.batchId);
@@ -657,7 +717,22 @@ export default function FactoryConsoleV2() {
       runtimeRecoveryGenerationRef.current += 1;
       endActivity();
     };
-  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, pollServerBatch, setBatchSelection, workspaceHydrated]);
+  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, managed, pollServerBatch, setBatchSelection, workspaceHydrated]);
+
+  useEffect(() => () => managedBatchRef.current?.dispose(), []);
+
+  // Managed: keep the Fleet observation current so capability is never judged on a stale view.
+  useEffect(() => {
+    if (!managed || !catalog) return;
+    let stopped = false;
+    const timer = window.setInterval(() => {
+      void loadManagedTopology().then(next => { if (!stopped) setManagedTopology(next); }).catch(() => {});
+    }, 5000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [catalog, managed]);
 
   const serverBatchState = batchSnapshot?.state ?? null;
   const serverBatchRunning = serverBatchState === "queued" || serverBatchState === "running" || serverBatchState === "stopping";
@@ -789,7 +864,7 @@ export default function FactoryConsoleV2() {
   const requiresImage = selectedOperations.some(operation => operation === "program" || operation === "verify");
   const programmingCapabilities = resolveProgrammingCapabilities(catalog);
   const syntheticProgrammingImageAvailable = programmingCapabilities.synthetic_programming_image;
-  const batchReadiness = evaluateBatchReadiness({
+  const legacyReadiness = evaluateBatchReadiness({
     providerOnline: gatewayHealth === "online" && Boolean(catalog && !providerError),
     targetValid: !programmingCapabilities.target_device_required || Boolean(targetDevice),
     selectedSiteCount: batchCounts.sites,
@@ -803,6 +878,41 @@ export default function FactoryConsoleV2() {
     batchRunning: serverBatchState === "queued" || serverBatchState === "running" || batchSubmitting,
     batchCancelling: serverBatchState === "stopping" || batchAborting,
   });
+
+  // Managed readiness: ONLINE and Programming capability are separate facts.
+  const icpn = targetDevice?.icpn ?? targetDevice?.identifier ?? null;
+  const managedOperationOptions = managed ? routeOperationsForIc(managedRoutes?.routes ?? null, icpn) : [];
+  const managedOperation = chosenManagedOperation != null && (managedOperationOptions as string[]).includes(chosenManagedOperation)
+    ? chosenManagedOperation
+    : managedOperationOptions.length === 1 ? managedOperationOptions[0] : null;
+  const managedSourceLimit = programmingSource === "bundle" ? 1024 * 1024 + 256 * 1024 : 1024 * 1024;
+  const managedReadiness = ((): { code: typeof legacyReadiness.code; label: string; ready: boolean; reason: string } => {
+    const blocked = (code: typeof legacyReadiness.code, label: string, reason: string) => ({ code, label, ready: false, reason });
+    if (legacyReadiness.code === "running" || legacyReadiness.code === "cancelling") return { ...legacyReadiness, reason: "" };
+    if (!catalog) return blocked("programming-unavailable", "MANAGER OFFLINE", providerError ?? "The Manager Registry is unavailable.");
+    if (!icpn) return blocked("no-target", "NO TARGET", "Select a Target IC.");
+    if (!batchCounts.sites) return blocked("no-site", "NO SITE", "Select at least one Site.");
+    if (!managedRoutes?.routes) {
+      return blocked("programming-unavailable", "ROUTES UNAVAILABLE", managedRoutes?.error ?? "Programming Routes are unavailable.");
+    }
+    const blocker = managedBatchBlocker(managedTopology, managedRoutes.routes, icpn,
+      batchTargets.map(active => ({ alias: active.target.ppu_id, siteIds: active.siteIds })));
+    if (blocker) return blocked("programming-unavailable", blocker.label, blocker.reason);
+    if (!managedOperation) return blocked("no-op", "NO OP", "Select one Operation.");
+    if (!isImageOperation(managedOperation)) {
+      return blocked("programming-unavailable", "OPERATION UNAVAILABLE", `${managedOperation} needs an explicit address range.`);
+    }
+    if (!managedFile) {
+      return programmingSource === "bundle"
+        ? blocked("image-required", "BUNDLE REQUIRED", "Select your canonical Bundle v3 (.zip).")
+        : blocked("image-required", "IMAGE REQUIRED", "Select a Programming Image (.bin).");
+    }
+    if (managedFile.size <= 0 || managedFile.size > managedSourceLimit) {
+      return blocked("image-invalid", "FILE INVALID", `The selected file must be 1 to ${managedSourceLimit} bytes.`);
+    }
+    return { code: "batch-ready", label: "BATCH READY", ready: true, reason: "" };
+  })();
+  const batchReadiness = managed ? managedReadiness : legacyReadiness;
   const batchStatusState = batchSubmitting
     ? "submitting"
     : batchAborting
@@ -940,7 +1050,59 @@ export default function FactoryConsoleV2() {
     setSelectedOperations(current => current.includes(operation) ? current.filter(item => item !== operation) : [...current, operation]);
   }
 
+  // Managed: switching the Programming Source only clears local state.
+  function changeProgrammingSource(next: ProgrammingSource) {
+    if (batchRunning || next === programmingSource) return;
+    setProgrammingSource(next);
+    setManagedFile(null);
+    setBatchSnapshot(null);
+    setManagedRecords([]);
+    setOperatorWarning(null);
+    appendLog(`[SOURCE] ${next.toUpperCase()} · previous file and results cleared`);
+  }
+
+  // Managed Start Production: every Site is its own Manager plan + run.
+  async function executeManagedBatch() {
+    if (!catalog || batchRunning || managedStartLock.current) return;
+    if (!managedReadiness.ready || !icpn || !managedFile || !isImageOperation(managedOperation)) {
+      setOperatorWarning(`${managedReadiness.label} · ${managedReadiness.reason}`);
+      appendLog(`[BAT] BLOCKED · ${managedReadiness.label} · ${managedReadiness.reason}`, "WARN");
+      return;
+    }
+    managedStartLock.current = true;
+    const batch = new ManagedProductionBatch({
+      targets: batchTargets.map(active => ({
+        facilityId: active.facility.facility_id, alias: active.target.ppu_id, siteIds: [...active.siteIds],
+      })),
+      icpn,
+      operation: managedOperation,
+      source: programmingSource,
+      file: managedFile,
+      failedSiteStopThreshold: thresholdValue,
+    });
+    managedBatchRef.current?.dispose();
+    managedBatchRef.current = batch;
+    setOperatorWarning(null);
+    setClockNow(Date.now());
+    terminalBatchRef.current = null;
+    setBatchObservationState("connected");
+    setManagedRecords([]);
+    beginActivity();
+    appendLog(`[BAT] START PRODUCTION · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${managedOperation.toUpperCase()} · ${icpn} · ${programmingSource.toUpperCase()} ${managedFile.name} · attempts ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}`);
+    applyBatchSnapshot(batch.snapshot(), catalog);
+    const generation = ++pollGenerationRef.current;
+    void batch.execute().finally(() => { managedStartLock.current = false; });
+    void pollServerBatch(batch.batchId, catalog, generation).catch(error => {
+      endActivity();
+      appendLog(`[BAT] OBSERVATION ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
+    });
+  }
+
   async function executeBatch() {
+    if (managed) {
+      await executeManagedBatch();
+      return;
+    }
     if (!catalog || batchRunning) return;
     if (!targetDevice && programmingCapabilities.target_device_required) {
       setOperatorWarning(text.chooseTarget);
@@ -1015,6 +1177,13 @@ export default function FactoryConsoleV2() {
   async function abortBatch() {
     const activeBatchId = batchSnapshot?.batch_id;
     if (!activeBatchId || !serverBatchRunning || serverBatchState === "stopping" || batchAborting) return;
+    const managedBatch = managedBatchRef.current;
+    if (managedBatch?.batchId === activeBatchId) {
+      // Stops queuing further Sites; a submitted run is never cancelled from the Console.
+      appendLog(`[BAT] ABORT REQUESTED · ${activeBatchId} · no further Site will start; the run in flight is not cancelled`, "WARN");
+      if (catalog) applyBatchSnapshot(managedBatch.stop(), catalog);
+      return;
+    }
     setBatchCommandState("aborting");
     appendLog(`[BAT] ABORT REQUESTED · ${activeBatchId}`, "WARN");
     try {
@@ -1038,7 +1207,7 @@ export default function FactoryConsoleV2() {
   const programmingUnavailable = !catalog && gatewayHealth === "online" && Boolean(providerError);
 
   return (
-    <main className="factoryConsoleV2">
+    <main className="factoryConsoleV2" data-programming-backend={managed ? "manager" : "standalone"}>
       <section className="factoryConsoleShell">
         <header className="factoryConsoleHeader">
           <h1>{text.title}</h1>
@@ -1165,8 +1334,29 @@ export default function FactoryConsoleV2() {
               onTargetChange={setTargetDevice}
               targetDisabled={batchRunning}
               targetLabel={text.targetIc}
-              imageLabel={text.image}
-              image={{
+              targetLevels={managed ? [1, 2, 3] : undefined}
+              imageLabel={managed ? "Programming Source" : text.image}
+              source={managed ? { value: programmingSource, disabled: batchRunning, onChange: changeProgrammingSource } : undefined}
+              image={managed ? {
+                name: managedFile?.name
+                  ?? (programmingSource === "bundle" ? "Select canonical Bundle v3 (.zip)…" : "Select programming image (.bin)…"),
+                title: managedFile?.name,
+                source: managedFile ? `user_${programmingSource}` : "none",
+                hint: programmingSource === "bundle"
+                  ? "Your own canonical Bundle v3. The Manager verifies it against the qualified Programming Route."
+                  : "Binary Programming Image (.bin). The Manager builds the canonical Bundle v3.",
+                browseLabel: text.browse,
+                browseDisabled: batchRunning,
+                inputDisabled: batchRunning,
+                inputAriaLabel: `Production Programming ${programmingSource === "bundle" ? "Bundle" : "Image"} file`,
+                accept: PROGRAMMING_SOURCE_ACCEPT[programmingSource],
+                onFileChange: file => {
+                  setManagedFile(file);
+                  setBatchSnapshot(null);
+                  setManagedRecords([]);
+                  if (file) appendLog(`[IMG] SELECTED ${programmingSource.toUpperCase()} · ${file.name} · ${file.size} bytes`);
+                },
+              } : {
                 name: imageAsset?.name ?? (requiresImage && syntheticProgrammingImageAvailable ? "Mock Synthetic Image" : "Select programming image (.bin)…"),
                 title: imageAsset?.name,
                 source: imageAsset ? "user" : requiresImage && syntheticProgrammingImageAvailable ? "mock_synthetic" : "none",
@@ -1187,7 +1377,15 @@ export default function FactoryConsoleV2() {
                 },
               }}
               operationsLabel={text.operations}
-              operations={operationOrder.map(operation => ({
+              operations={managed ? managedOperationOptions.map(operation => ({
+                // Only Operations a committed Programming Route declares for the IC.
+                key: operation,
+                code: PROGRAMMING_OPERATION_LABELS[operation].code,
+                label: PROGRAMMING_OPERATION_LABELS[operation].label,
+                checked: managedOperation === operation,
+                disabled: batchRunning || !isImageOperation(operation),
+                onChange: () => setChosenManagedOperation(managedOperation === operation ? null : operation),
+              })) : operationOrder.map(operation => ({
                 key: operation,
                 code: operationCodes[operation],
                 label: t(`operation.${operation}`),
@@ -1198,13 +1396,16 @@ export default function FactoryConsoleV2() {
               policyLabel={text.batchPolicy}
               policy={{
                 repeatLabel: text.repeat,
-                repeatValue: repeatCount,
-                repeatDisabled: batchRunning,
+                repeatValue: managed ? String(MANAGED_JOB_POLICY.attempts) : repeatCount,
+                repeatDisabled: managed || batchRunning,
                 repeatAriaLabel: "Repeat Count",
                 onRepeatChange: setRepeatCount,
                 retryLabel: text.retry,
-                retryValue: siteRetryLimit,
-                retryDisabled: batchRunning,
+                retryValue: managed ? "0" : siteRetryLimit,
+                retryDisabled: managed || batchRunning,
+                note: managed
+                  ? `Formal Flash Job: attempts = ${MANAGED_JOB_POLICY.attempts} per Site · auto retry ${MANAGED_JOB_POLICY.auto_retry}. Repeat and Retry are disabled. Stop Policy and ABORT only stop queuing further Sites; one Site runs at a time.`
+                  : undefined,
                 retryAriaLabel: "Site Retry Limit",
                 onRetryChange: setSiteRetryLimit,
                 stopLabel: text.stopPolicy,
@@ -1228,6 +1429,11 @@ export default function FactoryConsoleV2() {
               onAbort={abortBatch}
             />
 
+            {managed && !batchReadiness.ready && !batchRunning && managedReadiness.reason && (
+              <div className="factoryWarning" role="status" data-testid="managed-readiness">
+                <span><b>{managedReadiness.label}</b> · {managedReadiness.reason}</span>
+              </div>
+            )}
             {operatorWarning && <div className="factoryWarning" role="alert"><span>{operatorWarning}</span><button type="button" onClick={() => setOperatorWarning(null)}>×</button></div>}
 
             <OperatorPanel
@@ -1340,6 +1546,27 @@ export default function FactoryConsoleV2() {
                 </div>
               )}
             </OperatorPanel>
+
+            {managed && managedRecords.some(record => record.run || record.note) && (
+              <OperatorPanel
+                number={4}
+                title="RECEIPTS & DIAGNOSTICS"
+                className="factoryReceipts"
+                meta="One Manager programming run per Site · Host Console view of the Manager receipts"
+              >
+                {managedRecords.filter(record => record.run || record.note).map(record => (
+                  <details key={record.key} data-receipt-site={record.key} open={Boolean(record.note)}>
+                    <summary>
+                      <b>{record.alias} · PPU ID {record.ppuId ?? "unknown"} · {siteLabel(record.siteId)}</b>
+                      {record.note && <span data-testid="receipt-note"> · {record.note}</span>}
+                    </summary>
+                    {record.run && (
+                      <ProgrammingRunView run={record.run} ariaLabel={`Programming run ${record.alias} ${siteLabel(record.siteId)}`} />
+                    )}
+                  </details>
+                ))}
+              </OperatorPanel>
+            )}
 
             {batchSnapshot && batchSnapshot.error?.message && <div className="factoryRuntimeError">{batchSnapshot.error.error_code ? `${batchSnapshot.error.error_code} · ` : ""}{batchSnapshot.error.message}</div>}
 
