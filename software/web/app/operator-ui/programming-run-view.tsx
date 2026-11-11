@@ -18,11 +18,14 @@ export function ProgrammingRunView({
   onAcknowledge,
   acknowledging = false,
   ariaLabel = "Programming run",
+  executionInterface,
 }: {
   run: ProgrammingRun;
   onAcknowledge?: () => void;
   acknowledging?: boolean;
   ariaLabel?: string;
+  /** Site interface the PPU reported (e.g. "openocd", "mock"); tells a Mock result from hardware. */
+  executionInterface?: string | null;
 }) {
   const { verdict, reason } = runVerdict(run);
   const progress = runProgressPercent(run);
@@ -34,6 +37,13 @@ export function ProgrammingRunView({
       <p data-testid="run-policy">
         Run {run.run_id} · PPU {run.ppu_alias} · Site {run.site_id} · attempts {run.job_submission_count} · auto retry {run.auto_retry}
       </p>
+      {executionInterface !== undefined && (
+        <p data-testid="run-evidence" data-run-evidence={executionInterface === "mock" ? "mock" : "ppu"}>
+          {executionInterface === "mock"
+            ? "MOCK RESULT · Site interface mock · not hardware evidence and never a hardware qualification"
+            : `Site interface: ${executionInterface ?? "not reported"}`}
+        </p>
+      )}
       <ol aria-label="Programming steps">
         {run.steps.map((step, index) => <li key={`${step.step}-${index}`}>{step.step}: {step.result}</li>)}
       </ol>

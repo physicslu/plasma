@@ -203,7 +203,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
         </label>
         {needsImage ? (
           <label>
-            <span>Image (.bin)</span>
+            <span>Programming Image (.bin)</span>
             <input
               type="file"
               accept=".bin,application/octet-stream"
@@ -258,7 +258,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
             <dt>Route</dt><dd>{plan.route.route_id} ({plan.route.provider} → {plan.route.profile})</dd>
             {plan.bundle && (
               <>
-                <dt>Image</dt><dd>{plan.bundle.image_filename} · {plan.bundle.image_size} B · <code>{short(plan.bundle.image_sha256)}</code></dd>
+                <dt>Programming Image</dt><dd>{plan.bundle.image_filename} · {plan.bundle.image_size} B · <code>{short(plan.bundle.image_sha256)}</code></dd>
               </>
             )}
             <dt>Range</dt>

@@ -46,7 +46,7 @@ export type ProgrammingJobPolicy = {
   note?: ReactNode;
 };
 
-/** Image / Bundle selector; only the formal managed backend offers it. */
+/** Programming Image / Bundle selector; only the formal managed backend offers it. */
 export type ProgrammingJobSource = {
   value: ProgrammingSource;
   disabled: boolean;

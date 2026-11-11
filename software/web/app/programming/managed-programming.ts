@@ -312,7 +312,7 @@ function planEchoMismatch(plan: ProgrammingPlan, request: ManagedRunRequest, sha
   if (plan.source !== request.source) return "Programming Source";
   if (plan.fpga_load !== false) return "FPGA Load";
   const lockedSha = request.source === "bundle" ? plan.bundle?.archive_sha256 : plan.image_asset?.sha256;
-  if (lockedSha !== sha256) return request.source === "bundle" ? "Bundle SHA256" : "Image SHA256";
+  if (lockedSha !== sha256) return request.source === "bundle" ? "Bundle SHA256" : "Programming Image SHA256";
   return null;
 }
 
@@ -336,7 +336,7 @@ export async function runManagedProgramming(
     sha256 = await sha256Hex(bytes);
   } catch (reason) {
     throw new ManagedProgrammingBlocked("lock", "file_unreadable",
-      `The selected ${request.source === "bundle" ? "Bundle" : "Image"} could not be read: ${errorParts(reason).message}`);
+      `The selected ${request.source === "bundle" ? "Bundle" : "Programming Image"} could not be read: ${errorParts(reason).message}`);
   }
   events.onLocked?.({ name: request.file.name, size: bytes.length, sha256, source: request.source });
 

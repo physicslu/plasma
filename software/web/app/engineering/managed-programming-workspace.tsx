@@ -588,7 +588,14 @@ export default function ManagedProgrammingWorkspace() {
           </section>
         )}
 
-        {run && <ProgrammingRunView run={run} ariaLabel="Programming run" />}
+        {run && (
+          <ProgrammingRunView
+            run={run}
+            ariaLabel="Programming run"
+            executionInterface={topology?.ppus.find(item => item.alias === run.ppu_alias)
+              ?.sites.find(item => item.site_id === run.site_id)?.interface ?? null}
+          />
+        )}
         {unresolved && !unresolved.acknowledged && (
           <div className="warning engineeringOperationWarning" role="alert" data-testid="managed-unresolved">
             <span>

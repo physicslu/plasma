@@ -9,6 +9,7 @@
 
 .programmingSourceSelector button {
   min-width: 88px;
+  white-space: nowrap;
   padding: 4px 12px;
   border: 0;
   border-radius: 0;

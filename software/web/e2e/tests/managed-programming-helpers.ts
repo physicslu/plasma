@@ -24,6 +24,8 @@ export type MockPpu = {
   paired?: boolean;
   runtimeState?: string;
   deploymentState?: string | null;
+  /** Site interface the PPU reports: "openocd" (hardware path) or "mock". */
+  siteInterface?: string;
 };
 
 export const Z2: MockPpu = { alias: "z2", ppuId: "z2-hil", facilityId: "lab", enabledSites: [2] };
@@ -59,7 +61,7 @@ function fleetView(ppu: MockPpu) {
     return {
       site_id: siteId, enabled: on, state: !on ? "disabled" : busy ? "running" : "idle",
       current_job_id: busy ? "job-busy" : null, latest_job: null,
-      interface: on ? "openocd" : null, target: on ? "STM32F103C8T6" : null,
+      interface: on ? ppu.siteInterface ?? "openocd" : null, target: on ? "STM32F103C8T6" : null,
     };
   });
   return {
@@ -104,6 +106,8 @@ export type RunScript = {
   outcome?: RunOutcome;
   reason?: string | null;
   safeOff?: boolean;
+  /** false: the receipt readback SHA256 differs from the expected Image. */
+  readbackOk?: boolean;
   /** Number of status reads that still report a running Job. */
   runningPolls?: number;
 };
@@ -237,7 +241,7 @@ export async function mockManager(page: Page, options: {
         schema: "plasma.manager.programming-receipt.v2", job_id: jobId, job_state: "success", operation: "flash_cycle",
         site_id: planned.siteId, target: "STM32F103C8T6",
         expected_image_sha256: imageSha, expected_image_size: size, observed_image_sha256: imageSha, observed_image_size: size,
-        readback_sha256: imageSha, bytes_verified: size,
+        readback_sha256: script.readbackOk === false ? sha("0") : imageSha, bytes_verified: size,
         expected_resource_set_sha256: RESOURCE_SHA, observed_resource_set_sha256: RESOURCE_SHA,
         expected_job_binding_sha256: planned.payload.job_binding_sha256, observed_job_binding_sha256: planned.payload.job_binding_sha256,
         active_asset_set_sha256: ACTIVE_SET_SHA, resource_reuse: !activation,

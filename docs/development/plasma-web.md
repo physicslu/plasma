@@ -58,7 +58,7 @@ Manager programming plan + run → PPU Runtime.
   Runtime active, no recovery) and Programming capability (a committed
   Programming Route declares the IC on the Site, Site enabled and idle).
   The UI only reads; it never enrolls, rotates a credential or recovers.
-- Programming Source: `Image` (default; a Programming Image such as a `.bin`) or `Bundle`, mutually exclusive.
+- Programming Source: `Programming Image` (default; e.g. a `.bin`) or `Bundle`, mutually exclusive. These two labels are used on every page (shared `ProgrammingSourceSelector`); the wire values stay `image` / `bundle`.
   Switching clears the file, plan, run view and validation state and issues
   no request.
 - One **Start Programming**: lock inputs + SHA256 → Manager plan → exactly

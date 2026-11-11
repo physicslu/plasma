@@ -2,7 +2,7 @@ import type { ProgrammingSource } from "../engineering/bundle-programming-api";
 import "./programming-source-selector.css";
 
 export const PROGRAMMING_SOURCES: Array<{ value: ProgrammingSource; label: string }> = [
-  { value: "image", label: "Image" },
+  { value: "image", label: "Programming Image" },
   { value: "bundle", label: "Bundle" },
 ];
 
@@ -11,7 +11,11 @@ export const PROGRAMMING_SOURCE_ACCEPT: Record<ProgrammingSource, string> = {
   bundle: ".zip,application/zip",
 };
 
-/** Shared by EMode and PMode: two mutually exclusive Programming Sources. */
+/**
+ * Shared by EMode and PMode: two mutually exclusive Programming Sources.
+ * The product labels are "Programming Image" and "Bundle" on every page; the
+ * wire values stay `image` / `bundle`.
+ */
 export function ProgrammingSourceSelector({
   value,
   onChange,

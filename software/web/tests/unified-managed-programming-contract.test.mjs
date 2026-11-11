@@ -83,7 +83,7 @@ test("Image is the default Source; switching clears file, plan and validation st
   assert.match(emode, /useState<ProgrammingSource>\("image"\)/);
   assert.match(emode, /function changeSource\(next: ProgrammingSource\) \{\s*if \(active \|\| next === source\) return;\s*setSource\(next\);\s*setFile\(null\);\s*clearRunState\(\);/);
   assert.match(selector, /role="radiogroup"/);
-  assert.match(selector, /\{ value: "image", label: "Image" \},\s*\{ value: "bundle", label: "Bundle" \}/);
+  assert.match(selector, /\{ value: "image", label: "Programming Image" \},\s*\{ value: "bundle", label: "Bundle" \}/);
   assert.match(panel, /imageInputRef\.current\.value = "";\s*source\.onChange\(next\);/);
 });
 
@@ -102,6 +102,15 @@ test("UI PASS needs the Manager receipt, single submission, verified SAFE_OFF an
   // Progress is the PPU-reported value or nothing: no synthetic percentage.
   assert.match(core, /const value = run\.job\?\.progress_percent;/);
   assert.doesNotMatch(core + emode, /Math\.random|fakeProgress|simulat/i);
+});
+
+test("the Source label is one product name everywhere and a Mock result is marked as such", async () => {
+  const platform = await read("app/engineering/bundle-programming.tsx");
+  assert.match(selector, /label: "Programming Image"/);
+  assert.doesNotMatch(selector, /label: "Image"/);
+  assert.match(platform, /<span>Programming Image \(\.bin\)<\/span>/);
+  assert.match(view, /MOCK RESULT · Site interface mock · not hardware evidence/);
+  assert.match(view, /data-run-evidence=\{executionInterface === "mock" \? "mock" : "ppu"\}/);
 });
 
 test("receipt keeps full Job ID and SHA256 identities for diagnosis", () => {

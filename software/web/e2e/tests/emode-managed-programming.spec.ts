@@ -69,7 +69,7 @@ test("topology comes from Manager Registry / Fleet / Routes; Alias and PPU ID st
 test("Image is the default Source; only Route Operations are offered; legacy policies are disabled", async ({ page }) => {
   await mockManager(page);
   const { job, start } = await configure(page);
-  await expect(job.getByRole("radio", { name: "Image", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(job.getByRole("radio", { name: "Programming Image", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(job.getByRole("radio", { name: "Bundle", exact: true })).toHaveAttribute("aria-checked", "false");
   const operations = job.locator("[data-programming-job-operation]");
   await expect(operations).toHaveCount(1);
@@ -146,7 +146,7 @@ test("switching Firmware ↔ Bundle clears file, plan and run state and creates 
 
   await job.getByRole("radio", { name: "Bundle", exact: true }).click();
   await expect(job.getByRole("radio", { name: "Bundle", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(job.getByRole("radio", { name: "Image", exact: true })).toHaveAttribute("aria-checked", "false");
+  await expect(job.getByRole("radio", { name: "Programming Image", exact: true })).toHaveAttribute("aria-checked", "false");
   await expect(job.locator("[data-image-source]")).toHaveAttribute("data-image-source", "none");
   await expect(job.locator("[data-image-source]")).toContainText("Select canonical Bundle v3");
   await expect(workspace.getByTestId("managed-plan")).toHaveCount(0);
@@ -155,7 +155,7 @@ test("switching Firmware ↔ Bundle clears file, plan and run state and creates 
   await expect(workspace.getByTestId("managed-readiness")).toContainText("BUNDLE REQUIRED");
   expect(await job.getByLabel("Engineering Programming Bundle file").evaluate(input => (input as HTMLInputElement).files?.length)).toBe(0);
 
-  await job.getByRole("radio", { name: "Image", exact: true }).click();
+  await job.getByRole("radio", { name: "Programming Image", exact: true }).click();
   await expect(workspace.getByTestId("managed-readiness")).toContainText("IMAGE REQUIRED");
   await expect(start).toBeDisabled();
   // Switching alone never plans, starts, deploys or flashes.
@@ -331,4 +331,74 @@ test("Manager Registry unreachable shows the backend offline instead of an empty
   await expect(workspace.getByTestId("managed-backend")).toContainText("OFFLINE");
   await expect(workspace.getByTestId("managed-readiness")).toContainText("MANAGER OFFLINE");
   await expect(workspace.getByTestId("managed-readiness")).toContainText("Manager Registry unavailable");
+});
+
+test("Readback mismatch is FAIL, whether the Manager reports it or a PASS record carries a wrong readback", async ({ page }) => {
+  await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "READBACK_SHA256_MISMATCH", readbackOk: false }) });
+  const { workspace, start } = await configure(page);
+  await start.click();
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("FAIL");
+  await expect(workspace.getByTestId("run-reason")).toHaveText("Reason: READBACK_SHA256_MISMATCH");
+  await expect(workspace.getByTestId("receipt-readback")).toHaveText("0".repeat(64));
+  await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("FAIL");
+});
+
+test("a PASS record whose readback differs from the expected Image is shown as FAIL", async ({ page }) => {
+  await mockManager(page, { script: () => ({ outcome: "PASS", readbackOk: false }) });
+  const { workspace, start } = await configure(page);
+  await start.click();
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("FAIL");
+  await expect(workspace.getByTestId("run-reason")).toHaveText("Reason: READBACK_SHA256_MISMATCH");
+});
+
+test("switching the Programming Source cannot bypass an unresolved OUTCOME_UNKNOWN lock", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "OUTCOME_UNKNOWN", reason: "JOB_RESULT_UNKNOWN_DO_NOT_RESUBMIT" }) });
+  const { workspace, job, start } = await configure(page);
+  await start.click();
+  await expect(workspace.getByTestId("managed-unresolved")).toBeVisible();
+  await job.getByRole("radio", { name: "Bundle", exact: true }).click();
+  await job.getByLabel("Engineering Programming Bundle file").setInputFiles(bundleFile);
+  await expect(workspace.getByTestId("managed-unresolved")).toBeVisible();
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("OUTCOME UNKNOWN");
+  await expect(start).toBeDisabled();
+  await job.getByRole("radio", { name: "Programming Image", exact: true }).click();
+  await expect(start).toBeDisabled();
+  expect(counters.plans).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
+});
+
+test("the Mock-only Engineering provider answering 503 (real PPU Runtime) no longer affects the managed page", async ({ page }) => {
+  const counters = await mockManager(page);
+  let providerCalls = 0;
+  await page.route("**/api/manager/ppu/api/engineering/**", async r => {
+    providerCalls += 1;
+    await r.fulfill({ status: 503, contentType: "application/json",
+      body: JSON.stringify({ ok: false, provider: "unavailable", error: { message: "Engineering PPU provider is not enabled" } }) });
+  });
+  const { workspace, start } = await configure(page);
+  await expect(workspace.locator("tbody tr")).toHaveCount(8);
+  await expect(workspace.getByLabel("Selected Engineering PPU")).toContainText("PPU ID: z2-hil");
+  await start.click();
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  expect(providerCalls).toBe(0);
+  expect(legacyRequests(counters)).toEqual([]);
+});
+
+test("a run on a Mock Site is labelled a Mock result; a hardware-path Site is not", async ({ page }) => {
+  await mockManager(page, { ppus: [{ ...Z2, siteInterface: "mock" }] });
+  const mock = await configure(page);
+  await mock.start.click();
+  await expect(mock.workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(mock.workspace.getByTestId("run-evidence")).toHaveAttribute("data-run-evidence", "mock");
+  await expect(mock.workspace.getByTestId("run-evidence")).toContainText("MOCK RESULT");
+  await expect(mock.workspace.getByTestId("run-evidence")).toContainText("never a hardware qualification");
+});
+
+test("a run on an openocd Site reports its interface and carries no Mock label", async ({ page }) => {
+  await mockManager(page);
+  const { workspace, start } = await configure(page);
+  await start.click();
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(workspace.getByTestId("run-evidence")).toHaveAttribute("data-run-evidence", "ppu");
+  await expect(workspace.getByTestId("run-evidence")).toHaveText("Site interface: openocd");
 });
