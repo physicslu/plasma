@@ -23,6 +23,11 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.match(workspace, /LIVE SITE STATUS/);
   assert.match(workspace, /aria-label=\{`\$\{setupCollapsed \? "Expand" : "Collapse"\} System Setup`\}/);
   assert.match(workspace, /<ProgrammingJobPanel[\s\S]*mode="engineering"/);
+  assert.match(sharedJob, /fieldNumberPrefix = mode === "engineering" \? "2-" : ""/);
+  assert.match(sharedJob, /\{fieldNumberPrefix\}1\. \{targetLabel\}/);
+  assert.match(sharedJob, /\{fieldNumberPrefix\}2\. \{imageLabel\}/);
+  assert.match(sharedJob, /\{fieldNumberPrefix\}3\. \{operationsLabel\}/);
+  assert.match(sharedJob, /\{fieldNumberPrefix\}4\. \{policyLabel\}/);
   assert.match(workspace, /collapsed=\{programmingJobCollapsed\}/);
   assert.match(sharedJob, /<OperatorPanelToggle/);
   assert.match(sharedPanel, /export function OperatorPanelToggle/);
