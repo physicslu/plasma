@@ -9,7 +9,6 @@ import { ProgrammingRunView } from "../operator-ui/programming-run-view";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import {
   describeBlocked,
-  isImageOperation,
   loadManagedTopology,
   loadPlatformAvailability,
   loadProgrammingRoutes,
@@ -17,23 +16,31 @@ import {
   ManagedProgrammingBlocked,
   ManagedStartOutcomeUnknown,
   platformAvailability,
-  routeOperations,
+  routeDeclaring,
   routesAvailability,
+  routeSequenceOperations,
   routeSites,
   runManagedProgramming,
+  runManagedRead,
   runProgressPercent,
   runStageLabel,
   runVerdict,
   siteCapability,
   type LockedInput,
   type ManagedAvailability,
+  type ManagedRunRequest,
   type ManagedTopology,
-  type ProgrammingPlan,
   type ProgrammingRun,
   type ProgrammingSource,
   type RoutesState,
 } from "../programming/managed-programming";
-import { acknowledgeProgrammingRun } from "./bundle-programming-api";
+import {
+  acknowledgeProgrammingRun,
+  normalizeOperations,
+  operationsTakeImage,
+  SEQUENCE_OPERATIONS,
+  type SequenceOperation,
+} from "./bundle-programming-api";
 import EngineeringLogPanel, {
   engineeringLogCategoryLabel,
   type EngineeringLogCategory,
@@ -56,16 +63,24 @@ const MAX_SOURCE_BYTES: Record<ProgrammingSource, number> = {
 };
 // Catalog Level is not a programming gate; the Programming Route decides.
 const PICKER_LEVELS: Array<1 | 2 | 3> = [1, 2, 3];
-const OPERATION_LABELS: Record<string, { code: string; label: string }> = {
-  flash_cycle: { code: "F", label: "Flash Cycle" },
+// Three basic Operations, freely combined; the order is always E -> P -> V and
+// the whole selection runs as ONE programming Job. Read is not one of them.
+const OPERATION_LABELS: Record<SequenceOperation, { code: string; label: string }> = {
+  erase: { code: "E", label: "Erase" },
   program: { code: "P", label: "Program" },
   verify: { code: "V", label: "Verify" },
-  erase: { code: "E", label: "Erase" },
-  read: { code: "R", label: "Read" },
 };
+const ALL_OPERATIONS: Record<SequenceOperation, boolean> = { erase: true, program: true, verify: true };
 
 type ConnectionState = "connecting" | "online" | "offline";
 type Phase = "idle" | "locking" | "planning" | "starting" | "running";
+type ReadPhase = "idle" | "planning" | "running" | "downloading";
+type ReadResult = {
+  run: ProgrammingRun;
+  url: string | null;
+  filename: string | null;
+  downloadError: string | null;
+};
 type Readiness = { ready: boolean; label: string; reason: string };
 type RunContext = { alias: string; siteId: number; startedAt: number; finishedAt: number | null };
 
@@ -78,6 +93,31 @@ function formatElapsed(milliseconds: number | null): string {
   const total = Math.floor(milliseconds / 1000);
   return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60]
     .map(value => String(value).padStart(2, "0")).join(":");
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB (${bytes} B)`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB (${bytes} B)`;
+}
+
+/** Format shown next to the picked file; only what the Browser exposes (never a local path). */
+function fileFormat(file: File, source: ProgrammingSource): string {
+  const extension = /\.([A-Za-z0-9]{1,8})$/.exec(file.name)?.[1]?.toLowerCase();
+  if (source === "bundle") return extension === "zip" ? "Canonical Bundle v3 (.zip)" : `Bundle (.${extension ?? "?"})`;
+  return extension === "bin" ? "Raw binary (.bin)" : `Binary image (.${extension ?? "no extension"})`;
+}
+
+function hex(value: number): string {
+  return `0x${value.toString(16).toUpperCase().padStart(8, "0")}`;
+}
+
+/** Decimal or 0x-prefixed hexadecimal; null when it is not a non-negative integer. */
+function parseInteger(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^(0x[0-9a-f]+|[0-9]+)$/i.test(trimmed)) return null;
+  const value = Number(trimmed);
+  return Number.isSafeInteger(value) ? value : null;
 }
 
 function notReady(label: string, reason: string): Readiness {
@@ -102,11 +142,10 @@ export default function ManagedProgrammingWorkspace() {
   const [source, setSource] = useState<ProgrammingSource>("image");
   const [file, setFile] = useState<File | null>(null);
   const [chosenSiteId, setChosenSiteId] = useState<number | null>(null);
-  const [chosenOperation, setChosenOperation] = useState<string | null>(null);
+  const [checkedOperations, setCheckedOperations] = useState(ALL_OPERATIONS);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [locked, setLocked] = useState<LockedInput | null>(null);
-  const [plan, setPlan] = useState<ProgrammingPlan | null>(null);
   const [run, setRun] = useState<ProgrammingRun | null>(null);
   const [runContext, setRunContext] = useState<RunContext | null>(null);
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
@@ -115,12 +154,21 @@ export default function ManagedProgrammingWorkspace() {
   const [acknowledging, setAcknowledging] = useState(false);
   const [statusNote, setStatusNote] = useState<string | null>(null);
 
+  // Read Memory: an independent Job, never part of the Batch above.
+  const [readAddress, setReadAddress] = useState("");
+  const [readLength, setReadLength] = useState("");
+  const [readPhase, setReadPhase] = useState<ReadPhase>("idle");
+  const [readRun, setReadRun] = useState<ProgrammingRun | null>(null);
+  const [readResult, setReadResult] = useState<ReadResult | null>(null);
+  const [readMessage, setReadMessage] = useState<string | null>(null);
+
   const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);
   const [clock, setClock] = useState(() => Date.now());
   const [setupCollapsed, setSetupCollapsed] = useState(false);
   const [jobCollapsed, setJobCollapsed] = useState(false);
 
   const startLock = useRef(false);
+  const readUrl = useRef<string | null>(null);
   const logSequence = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -137,7 +185,10 @@ export default function ManagedProgrammingWorkspace() {
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    if (readUrl.current) URL.revokeObjectURL(readUrl.current);
+  }, []);
 
   // Registry + Fleet: the only topology source.
   useEffect(() => {
@@ -207,7 +258,9 @@ export default function ManagedProgrammingWorkspace() {
     ? platform.availability
     : platformAvailability(null, null);
   const icpn = targetDevice?.icpn ?? targetDevice?.identifier ?? null;
-  const active = phase !== "idle";
+  const reading = readPhase !== "idle";
+  // One Site, one Job: a Batch run and a Read Memory Job lock each other out.
+  const active = phase !== "idle" || reading;
 
   const capabilities = useMemo(
     () => new Map((ppu?.sites ?? []).map(site => [site.site_id, siteCapability(site, routes, icpn)] as const)),
@@ -215,13 +268,19 @@ export default function ManagedProgrammingWorkspace() {
   );
   // A Site stays selected only while it is programmable for the selected IC.
   const siteId = chosenSiteId != null && capabilities.get(chosenSiteId)?.programmable ? chosenSiteId : null;
-  const operationOptions = useMemo(() => routeOperations(routes, icpn, siteId), [routes, icpn, siteId]);
-  const operation = chosenOperation != null && (operationOptions as string[]).includes(chosenOperation)
-    ? chosenOperation
-    : operationOptions.length === 1 ? operationOptions[0] : null;
+  // Only Operations a committed Route Profile declares can be selected.
+  const declaredOperations = useMemo(() => routeSequenceOperations(routes, icpn, siteId), [routes, icpn, siteId]);
+  const selectedOperations = SEQUENCE_OPERATIONS.filter(
+    item => checkedOperations[item] && declaredOperations.includes(item));
+  const operations = normalizeOperations(selectedOperations);
+  const needsImage = operations != null && operationsTakeImage(operations);
+  const jobRoute = operations ? routeDeclaring(routes, icpn, siteId, operations) : null;
+  const readRoute = routeDeclaring(routes, icpn, siteId, ["read"]);
 
-  const readiness: Readiness = (() => {
-    if (active) return notReady("RUNNING", "A programming run is in progress; this selection is locked.");
+  // What a Batch run and a Read Memory Job both need before anything else.
+  const baseBlock: Readiness | null = (() => {
+    if (phase !== "idle") return notReady("RUNNING", "A programming run is in progress; this selection is locked.");
+    if (reading) return notReady("READING", "A Read Memory Job is in progress on this Site.");
     if (connection !== "online" || !topology) {
       return notReady("MANAGER OFFLINE", topologyError ?? "Connecting to the Manager Registry.");
     }
@@ -238,10 +297,25 @@ export default function ManagedProgrammingWorkspace() {
       return notReady("NO ROUTE", `No Programming Route declares ${icpn}; this IC cannot be programmed on a managed PPU yet.`);
     }
     if (siteId == null) return notReady("NO SITE", `Select one Site qualified for ${icpn}.`);
-    if (!operation) return notReady("NO OP", "Select one Operation.");
-    if (!isImageOperation(operation)) {
-      return notReady("OPERATION UNAVAILABLE", `${operation} needs an explicit address range, which this page does not collect.`);
+    return null;
+  })();
+
+  const readiness: Readiness = (() => {
+    if (baseBlock) return baseBlock;
+    if (!declaredOperations.length) {
+      return notReady("OPERATIONS UNAVAILABLE",
+        `No Programming Route declares Erase, Program or Verify for ${icpn} on this Site.`);
     }
+    if (!selectedOperations.length) return notReady("NO OP", "Select at least one of Erase, Program and Verify.");
+    if (!operations) {
+      return notReady("OPERATIONS INVALID",
+        "Erase + Verify without Program is not supported: Verify compares the IC with the Programming Image, "
+        + "which an erased IC can never equal. Add Program, or run Erase alone (it proves the range blank).");
+    }
+    if (!jobRoute) {
+      return notReady("NO ROUTE", `No single Programming Route declares ${operations.join(" + ")} for ${icpn} on this Site.`);
+    }
+    if (!needsImage) return { ready: true, label: "BATCH READY", reason: "" };
     if (!file) {
       return source === "bundle"
         ? notReady("BUNDLE REQUIRED", "Select your canonical Bundle v3 (.zip).")
@@ -253,9 +327,31 @@ export default function ManagedProgrammingWorkspace() {
     return { ready: true, label: "BATCH READY", reason: "" };
   })();
 
+  const readStart = parseInteger(readAddress.trim() || (readRoute ? hex(readRoute.flash_base) : ""));
+  const readSize = parseInteger(readLength.trim() || (readRoute ? String(readRoute.flash_size) : ""));
+  const readReadiness: Readiness = (() => {
+    if (baseBlock) return baseBlock;
+    if (!readRoute) return notReady("READ UNAVAILABLE", `No Programming Route declares Read for ${icpn} on this Site.`);
+    if (readStart == null) return notReady("ADDRESS INVALID", "Start Address must be decimal or 0x hexadecimal.");
+    if (readSize == null || readSize <= 0) return notReady("LENGTH INVALID", "Length must be a positive number of bytes.");
+    const end = readRoute.flash_base + readRoute.flash_size;
+    if (readStart < readRoute.flash_base || readStart + readSize > end) {
+      return notReady("OUT OF RANGE",
+        `Only the Flash range ${hex(readRoute.flash_base)}–${hex(end - 1)} of the Programming Profile can be read.`);
+    }
+    return { ready: true, label: "READ READY", reason: "" };
+  })();
+
+  function clearReadState() {
+    if (readUrl.current) URL.revokeObjectURL(readUrl.current);
+    readUrl.current = null;
+    setReadRun(null);
+    setReadResult(null);
+    setReadMessage(null);
+  }
+
   function clearRunState() {
     setLocked(null);
-    setPlan(null);
     setRun(null);
     setRunContext(null);
     setBlockedMessage(null);
@@ -268,6 +364,7 @@ export default function ManagedProgrammingWorkspace() {
     setSelectedAlias(alias);
     setChosenSiteId(null);
     clearRunState();
+    clearReadState();
     if (alias) appendLog(`[TARGET] SELECT · PPU ${alias}`, false, "USR");
   }
 
@@ -280,6 +377,7 @@ export default function ManagedProgrammingWorkspace() {
     if (active) return;
     setTargetDevice(device);
     clearRunState();
+    clearReadState();
     if (device) appendLog(`[TARGET IC] SELECT · ${device.vendor} / ${device.icpn ?? device.identifier}`, false, "USR");
   }
 
@@ -300,27 +398,46 @@ export default function ManagedProgrammingWorkspace() {
     appendLog(next ? `[IMG] SELECT ${source.toUpperCase()} · ${next.name} · ${next.size} B` : "[IMG] CLEAR", false, "USR");
   }
 
+  function toggleOperation(item: SequenceOperation) {
+    if (active) return;
+    const next = { ...checkedOperations, [item]: !checkedOperations[item] };
+    setCheckedOperations(next);
+    clearRunState();
+    const list = SEQUENCE_OPERATIONS.filter(name => next[name] && declaredOperations.includes(name));
+    appendLog(`[OPS] ${list.length ? list.map(name => name.toUpperCase()).join(" → ") : "none"}`, false, "USR");
+  }
+
   function toggleSite(id: number) {
     if (active) return;
     const next = siteId === id ? null : id;
     setChosenSiteId(next);
     clearRunState();
+    clearReadState();
     appendLog(`[SITE] SELECTION · ${next == null ? "none" : siteLabel(next)}`, false, "USR");
   }
 
   async function start() {
     // Double-click protection: the lock is taken synchronously, before any await.
-    if (startLock.current || !readiness.ready || !ppu || siteId == null || !icpn || !file
-      || !isImageOperation(operation)) return;
+    if (startLock.current || !readiness.ready || !ppu || siteId == null || !icpn || !operations || !jobRoute
+      || (needsImage && !file)) return;
     startLock.current = true;
-    const request = { alias: ppu.alias, siteId, icpn, operation, source, file };
+    const request: ManagedRunRequest = needsImage && file
+      ? { alias: ppu.alias, siteId, icpn, operations, source, file }
+      // Erase only: no Programming Image; the whole Flash range of the Profile.
+      : {
+        alias: ppu.alias, siteId, icpn, operations: ["erase"], source, file: null,
+        range: { address: jobRoute.flash_base, length: jobRoute.flash_size },
+      };
+    const operationLabel = operations.map(item => item.toUpperCase()).join(" → ");
     const context: RunContext = { alias: ppu.alias, siteId, startedAt: Date.now(), finishedAt: null };
     const abort = new AbortController();
     abortRef.current = abort;
     clearRunState();
     setRunContext(context);
     setPhase("locking");
-    appendLog(`[START] ${operation.toUpperCase()} · PPU ${ppu.alias} (${ppu.ppuId ?? "—"}) · ${siteLabel(siteId)} · ${icpn} · ${source.toUpperCase()} ${file.name}`, false, "USR");
+    appendLog(`[START] ${operationLabel} · PPU ${ppu.alias} (${ppu.ppuId ?? "—"}) · ${siteLabel(siteId)} · ${icpn} · ${
+      request.file ? `${source.toUpperCase()} ${request.file.name}` : `no Programming Image · ${hex(request.range.address)} + ${request.range.length} B`
+    }`, false, "USR");
     try {
       const final = await runManagedProgramming(request, {
         onLocked: input => {
@@ -329,9 +446,13 @@ export default function ManagedProgrammingWorkspace() {
           appendLog(`[LOCK] ${input.source.toUpperCase()} · ${input.name} · ${input.size} B · SHA256 ${input.sha256}`, false, "DAT");
         },
         onPlan: next => {
-          setPlan(next);
+          // The Backend plan always runs; its technical result lives in the Log
+          // and in Receipts & Diagnostics, not in a standing panel.
           setPhase("starting");
-          appendLog(`[PLAN] ${next.plan_id} · ${next.activation_required ? "B1/B2/B3 activation" : "Resource Reuse"} · Binding ${next.job_binding_sha256}`);
+          const range = next.job_binding.range;
+          appendLog(`[PLAN] ${next.plan_id} · Route ${next.route.route_id} (${next.route.provider} → ${next.route.profile}) · Source ${next.source} · Operations ${(next.operations ?? [next.operation]).join(" → ")}`, false, "DAT");
+          appendLog(`[PLAN] Range ${hex(range.address)} + ${range.length} B · Resource SHA256 ${next.resource.resource_set_sha256} · Job Binding SHA256 ${next.job_binding_sha256}`, false, "DAT");
+          appendLog(`[PLAN] ${next.activation_required ? "Activation: B1 upload → B2 admit → B3 activate (no FPGA load)" : "Resource Reuse: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load)"}`, false, "DAT");
         },
         onRun: next => {
           setRun(next);
@@ -364,6 +485,50 @@ export default function ManagedProgrammingWorkspace() {
     }
   }
 
+  async function readMemory() {
+    // Same synchronous lock as Start: a double click never submits twice.
+    if (startLock.current || !readReadiness.ready || !ppu || siteId == null || !icpn
+      || readStart == null || readSize == null) return;
+    startLock.current = true;
+    const abort = new AbortController();
+    abortRef.current = abort;
+    clearReadState();
+    setReadPhase("planning");
+    appendLog(`[READ] START · PPU ${ppu.alias} · ${siteLabel(siteId)} · ${icpn} · ${hex(readStart)} + ${readSize} B · independent Job, not part of the Batch`, false, "USR");
+    try {
+      const result = await runManagedRead({ alias: ppu.alias, siteId, icpn, address: readStart, length: readSize }, {
+        onPlan: next => appendLog(`[READ] PLAN ${next.plan_id} · Route ${next.route.route_id} · Job Binding SHA256 ${next.job_binding_sha256}`, false, "DAT"),
+        onRun: next => {
+          setReadRun(next);
+          setReadPhase(next.outcome == null ? "running" : "downloading");
+        },
+        onPollError: message => setReadMessage(message),
+      }, abort.signal);
+      const { verdict, reason } = runVerdict(result.run);
+      const output = result.run.receipt?.read_output ?? null;
+      let url: string | null = null;
+      if (result.data) {
+        url = URL.createObjectURL(new Blob([result.data.slice().buffer], { type: "application/octet-stream" }));
+        readUrl.current = url;
+      }
+      setReadRun(result.run);
+      setReadResult({ run: result.run, url, filename: output?.filename ?? null, downloadError: result.downloadError });
+      appendLog(`[READ] ${verdict}${reason ? ` · ${reason}` : ""} · Run ${result.run.run_id} · Job ${result.run.receipt?.job_id ?? "—"}${
+        output ? ` · ${output.bytes} B · SHA256 ${output.sha256 ?? "—"}` : ""}${result.downloadError ? ` · download: ${result.downloadError}` : ""}`,
+        verdict !== "PASS" || Boolean(result.downloadError), "PPU");
+      if (result.run.outcome === "OUTCOME_UNKNOWN") setUnresolved(result.run);
+    } catch (reason) {
+      const message = reason instanceof ManagedProgrammingBlocked ? `Not started — ${describeBlocked(reason)}`
+        : reason instanceof ManagedStartOutcomeUnknown ? `OUTCOME UNKNOWN — ${reason.message} Check the PPU before reading again.`
+        : reason instanceof Error ? reason.message : "Read Memory failed";
+      setReadMessage(message);
+      appendLog(`[READ] ${message}`, true);
+    } finally {
+      setReadPhase("idle");
+      startLock.current = false;
+    }
+  }
+
   async function acknowledge() {
     if (!unresolved || acknowledging) return;
     setAcknowledging(true);
@@ -371,6 +536,7 @@ export default function ManagedProgrammingWorkspace() {
       const next = await acknowledgeProgrammingRun(unresolved.ppu_alias, unresolved.run_id);
       setUnresolved(next.acknowledged ? null : next);
       setRun(current => current?.run_id === next.run_id ? next : current);
+      setReadRun(current => current?.run_id === next.run_id ? next : current);
       appendLog(`[ACK] OUTCOME UNKNOWN reconciled · Run ${next.run_id}`, false, "USR");
     } catch (reason) {
       setStatusNote(reason instanceof Error ? reason.message : "Acknowledge failed");
@@ -397,12 +563,22 @@ export default function ManagedProgrammingWorkspace() {
     ?? (source === "bundle" ? "Select canonical Bundle v3 (.zip)..." : "Select programming image (.bin)...");
   const imageHint = locked
     ? `Locked ${locked.source} · ${locked.size} B · SHA256 ${locked.sha256}`
+    : operations && !needsImage
+      ? "Erase only: no Programming Image is used; the Flash range of the Programming Profile is erased and proven blank."
     : source === "bundle"
       ? "Your own canonical Bundle v3. The Manager verifies it against the qualified Programming Route."
       : "Binary Programming Image (.bin). The Manager builds the canonical Bundle v3.";
   const policyNote = locale === "zh-TW"
-    ? `正式 Flash Job：attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}。Repeat／Retry／Stop Policy 與 ABORT 尚無正式執行契約，已停用。`
-    : `Formal Flash Job: attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}. Repeat / Retry / Stop Policy and ABORT have no formal execution contract and are disabled.`;
+    ? `單一 Programming Job：attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}。Repeat 固定為 1（暫不實作）。Retry／Stop Policy 需要 Manager Batch Coordinator，此版本停用。`
+    : `One Programming Job: attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}. Repeat is fixed at 1 (not implemented). Retry / Stop Policy need the Manager Batch Coordinator and are disabled in this release.`;
+  const fileDetails = file ? `${formatBytes(file.size)} · ${fileFormat(file, source)}` : null;
+  const readVerdict = readRun ? runVerdict(readRun).verdict : null;
+  const readOutput = readResult?.run.receipt?.read_output ?? null;
+  const readStatus = readPhase === "planning" ? "PLANNING"
+    : readPhase === "downloading" ? "FETCHING OUTPUT"
+    : readRun && readRun.outcome == null ? runStageLabel(readRun)
+    : readVerdict ? readVerdict.replace("_", " ") : readReadiness.label;
+  const readProgress = readRun ? runProgressPercent(readRun) : null;
   const phaseLabel = phase === "locking" ? "LOCKING" : phase === "planning" ? "PLANNING"
     : phase === "starting" ? "STARTING" : run && run.outcome == null ? runStageLabel(run) : readiness.label;
 
@@ -499,7 +675,8 @@ export default function ManagedProgrammingWorkspace() {
                 title: imageName,
                 source: file ? `user_${source}` : "none",
                 hint: imageHint,
-                browseLabel: "Browse...",
+                details: fileDetails,
+                browseLabel: file ? "Change..." : "Browse...",
                 browseDisabled: active,
                 inputDisabled: active,
                 inputAriaLabel: `Engineering Programming ${sourceLabel} file`,
@@ -507,15 +684,15 @@ export default function ManagedProgrammingWorkspace() {
                 onFileChange: next => selectFile(next),
               }}
               operationsLabel="Operations"
-              operations={operationOptions.map(item => ({
+              operations={SEQUENCE_OPERATIONS.map(item => ({
                 key: item,
-                code: OPERATION_LABELS[item]?.code ?? "?",
-                label: OPERATION_LABELS[item]?.label ?? item,
-                checked: operation === item,
-                // Only what the Route declares is listed; range Operations need inputs this page lacks.
-                disabled: active || !isImageOperation(item),
+                code: OPERATION_LABELS[item].code,
+                label: OPERATION_LABELS[item].label,
+                // An Operation no Route declares stays unchecked and disabled: never a fake capability.
+                checked: checkedOperations[item] && (declaredOperations.includes(item) || siteId == null),
+                disabled: active || (siteId != null && !declaredOperations.includes(item)),
                 ariaLabel: `Engineering operation ${item}`,
-                onChange: () => { setChosenOperation(operation === item ? null : item); clearRunState(); },
+                onChange: () => toggleOperation(item),
               }))}
               policyLabel="Batch Policy"
               policy={{
@@ -542,13 +719,13 @@ export default function ManagedProgrammingWorkspace() {
               onStart={start}
               statusLabel="BATCH STATUS"
               statusValue={phaseLabel}
-              statusClassName={`readiness-${readiness.ready ? "batch-ready" : active ? "running" : "programming-unavailable"}`}
+              statusClassName={`readiness-${readiness.ready ? "batch-ready" : phase !== "idle" ? "running" : "programming-unavailable"}`}
               abortLabel="ABORT"
               abortDisabled
               onAbort={() => {}}
             />
 
-            {!readiness.ready && !active && (
+            {!readiness.ready && phase === "idle" && (
               <div className="engineeringBoundaryNote warning" role="status" data-testid="managed-readiness">
                 <b>{readiness.label}</b><span>{readiness.reason}</span>
               </div>
@@ -567,26 +744,66 @@ export default function ManagedProgrammingWorkspace() {
           </div>
         </div>
 
-        {plan && (
-          <section className="productionProgrammingCard" aria-label="Programming plan" data-testid="managed-plan">
-            <header><span>PROGRAMMING PLAN</span><small>Built and verified by the Manager for this Start</small></header>
-            <dl className="cardBody programmingRunView">
-              <dt>PPU / Site</dt><dd>{plan.ppu_alias} / Site {plan.site_id}</dd>
-              <dt>Route</dt><dd>{plan.route.route_id} ({plan.route.provider} → {plan.route.profile})</dd>
-              <dt>Source</dt><dd data-testid="plan-source">{plan.source}</dd>
-              <dt>Operation</dt><dd data-testid="plan-operation">{plan.operation}</dd>
-              <dt>Range</dt><dd>0x{plan.job_binding.range.address.toString(16)} · {plan.job_binding.range.length} B</dd>
-              <dt>Resource SHA256</dt><dd data-testid="plan-resource-sha"><code>{plan.resource.resource_set_sha256}</code></dd>
-              <dt>Job Binding SHA256</dt><dd data-testid="plan-binding-sha"><code>{plan.job_binding_sha256}</code></dd>
-              <dt>Resources</dt>
-              <dd data-testid="plan-activation">
-                {plan.activation_required
-                  ? "Activation: B1 upload → B2 admit → B3 activate (no FPGA load)"
-                  : "Resource Reuse: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load)"}
+        <section className="productionProgrammingCard readMemoryCard" aria-label="Read Memory" data-testid="read-memory">
+          <header><span>READ MEMORY</span><small>Independent Job · not part of the Batch · never erases, programs or reloads</small></header>
+          <div className="cardBody readMemoryBody">
+            <label className="workflowField">
+              <span>Start Address</span>
+              <input
+                aria-label="Read Memory Start Address"
+                value={readAddress}
+                placeholder={readRoute ? hex(readRoute.flash_base) : "0x08000000"}
+                disabled={active}
+                onChange={event => { setReadAddress(event.target.value); clearReadState(); }}
+              />
+            </label>
+            <label className="workflowField">
+              <span>Length (bytes)</span>
+              <input
+                aria-label="Read Memory Length"
+                value={readLength}
+                placeholder={readRoute ? String(readRoute.flash_size) : "65536"}
+                disabled={active}
+                onChange={event => { setReadLength(event.target.value); clearReadState(); }}
+              />
+            </label>
+            <button
+              type="button"
+              className="readMemoryButton"
+              data-testid="read-memory-start"
+              disabled={!readReadiness.ready}
+              title={readReadiness.ready ? undefined : readReadiness.reason}
+              onClick={() => void readMemory()}
+            >READ MEMORY</button>
+            <div className="readMemoryStatus" role="status" aria-label="Read Memory status" data-testid="read-memory-status"
+              data-read-verdict={readVerdict ?? ""}>
+              <small>READ STATUS</small>
+              <b>{readStatus}{readProgress != null && readRun?.outcome == null ? ` · ${Math.round(readProgress)}%` : ""}</b>
+            </div>
+          </div>
+          {!readReadiness.ready && !reading && phase === "idle" && readReadiness.label !== readiness.label && (
+            <div className="engineeringBoundaryNote warning" role="status" data-testid="read-memory-readiness">
+              <b>{readReadiness.label}</b><span>{readReadiness.reason}</span>
+            </div>
+          )}
+          {readMessage && <div className="warning engineeringOperationWarning" role="alert" data-testid="read-memory-message">{readMessage}</div>}
+          {readResult && (
+            <dl className="cardBody programmingRunView" aria-label="Read Memory result" data-testid="read-memory-result">
+              <dt>Result</dt><dd data-testid="read-memory-verdict">{runVerdict(readResult.run).verdict.replace("_", " ")}{runVerdict(readResult.run).reason ? ` · ${runVerdict(readResult.run).reason}` : ""}</dd>
+              <dt>Range</dt><dd>{readOutput ? `${hex(readOutput.address)} + ${readOutput.bytes} B` : "—"}</dd>
+              <dt>Bytes Read</dt><dd data-testid="read-memory-bytes">{readOutput && runVerdict(readResult.run).verdict === "PASS" ? readOutput.bytes : "—"}</dd>
+              <dt>SHA256</dt><dd data-testid="read-memory-sha"><code>{readOutput?.sha256 ?? "—"}</code></dd>
+              <dt>Job ID</dt><dd><code>{readResult.run.receipt?.job_id ?? "—"}</code></dd>
+              <dt>SAFE_OFF</dt><dd>{readResult.run.receipt?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}</dd>
+              <dt>Binary</dt>
+              <dd>
+                {readResult.url && readResult.filename
+                  ? <a href={readResult.url} download={readResult.filename} data-testid="read-memory-download">Download {readResult.filename}</a>
+                  : <span data-testid="read-memory-no-download">{readResult.downloadError ?? "No verified binary is available."}</span>}
               </dd>
             </dl>
-          </section>
-        )}
+          )}
+        </section>
 
         {run && (
           <ProgrammingRunView

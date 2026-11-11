@@ -58,6 +58,8 @@ export type ProgrammingJobImage = {
   title?: string;
   source?: string;
   hint: ReactNode;
+  /** Size and format of the picked file, shown under its name. */
+  details?: ReactNode;
   browseLabel: string;
   browseDisabled: boolean;
   inputDisabled: boolean;
@@ -190,6 +192,7 @@ export function ProgrammingJobPanel({
                 onChange={event => image.onFileChange(event.target.files?.[0] ?? null, event)}
               />
             </div>
+            {image.details && <small className="programmingJobImageDetails" data-image-details>{image.details}</small>}
             <small>{image.hint}</small>
           </div>
 

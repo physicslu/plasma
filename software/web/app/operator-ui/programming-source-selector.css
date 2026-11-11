@@ -55,3 +55,55 @@
 .programmingRunView [data-run-verdict="FAIL"],
 .programmingRunView [data-run-verdict="BLOCKED"],
 .programmingRunView [data-run-verdict="OUTCOME_UNKNOWN"] { color: var(--fail, #cf222e); }
+
+.programmingJobImageDetails {
+  font-weight: 700;
+  color: var(--text, #172033);
+  overflow-wrap: anywhere;
+}
+
+.readMemoryBody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr)) max-content minmax(140px, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.readMemoryBody input {
+  width: 100%;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.readMemoryButton {
+  min-height: 34px;
+  padding: 0 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.readMemoryButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.readMemoryStatus {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.readMemoryStatus b {
+  overflow-wrap: anywhere;
+}
+
+.readMemoryStatus[data-read-verdict="PASS"] b { color: var(--pass, #1a7f37); }
+.readMemoryStatus[data-read-verdict="FAIL"] b,
+.readMemoryStatus[data-read-verdict="BLOCKED"] b,
+.readMemoryStatus[data-read-verdict="OUTCOME_UNKNOWN"] b { color: var(--fail, #cf222e); }
+
+@media (max-width: 760px) {
+  .readMemoryBody {
+    grid-template-columns: 1fr;
+  }
+}

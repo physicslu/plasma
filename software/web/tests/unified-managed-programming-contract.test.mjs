@@ -69,9 +69,32 @@ test("one Start: lock -> plan -> exactly one start -> observe; no retry of any w
 
 test("Start is double-click safe and the manual Prepare step is gone from EMode", () => {
   assert.match(emode, /if \(startLock\.current \|\| !readiness\.ready/);
-  assert.match(emode, /startLock\.current = true;\s*const request =/);
+  assert.match(emode, /startLock\.current = true;\s*const request: ManagedRunRequest =/);
   assert.doesNotMatch(emode, /Prepare Programming|Confirm programming|confirmedPlanId/);
   assert.match(emode, /startLabel="START PROGRAMMING"/);
+});
+
+test("EMode Operations are E / P / V checkboxes sent as one operations list; Read is a separate Job", () => {
+  // Three basic Operations, default all checked, one programming Job.
+  assert.match(emode, /const ALL_OPERATIONS: Record<SequenceOperation, boolean> = \{ erase: true, program: true, verify: true \}/);
+  assert.match(emode, /operations=\{SEQUENCE_OPERATIONS\.map\(/);
+  assert.match(emode, /normalizeOperations\(selectedOperations\)/);
+  assert.doesNotMatch(emode, /flash_cycle/);
+  assert.doesNotMatch(emode, /code: "R"|label: "Read"/);
+  // Read Memory: its own button and Job, through the Manager only.
+  assert.match(emode, /aria-label="Read Memory"/);
+  assert.match(emode, /runManagedRead\(/);
+  assert.match(core, /operation: "read",/);
+  assert.doesNotMatch(emode, /\/api\/jobs|gateway-api|getReadOutput\(/);
+  // The Erase + Verify refusal is explicit, never a silent different action.
+  assert.match(emode, /Erase \+ Verify without Program is not supported/);
+});
+
+test("the standing PROGRAMMING PLAN panel is gone; the Backend plan still runs and is logged", () => {
+  assert.doesNotMatch(emode, /PROGRAMMING PLAN|managed-plan|aria-label="Programming plan"/);
+  assert.match(core, /plan = await planProgramming\(request\.alias, input\)/);
+  assert.match(emode, /\[PLAN\] \$\{next\.plan_id\} · Route/);
+  assert.match(emode, /Resource SHA256 \$\{next\.resource\.resource_set_sha256\} · Job Binding SHA256/);
 });
 
 test("Retry / Repeat / Stop Policy and ABORT are disabled for formal Flash Jobs", () => {

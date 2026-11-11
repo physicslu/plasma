@@ -104,3 +104,12 @@ npm run lint
 npm test
 npm run validate:artifact
 ```
+
+## EMode Single PPU Programming — Operations, Read Memory, Programming Source (2026-11-11)
+
+- **Operations** are exactly three checkboxes, `E Erase`, `P Program`, `V Verify`, all checked by default and freely combined. The whole selection is sent as one ordered `operations` list and runs as ONE programming Job (never `flash_cycle`). An Operation no Programming Route declares is unchecked and disabled. No selection, or Erase + Verify without Program, disables Start with an explicit reason.
+- **Erase only** needs no Programming Image; it erases the Flash range of the Programming Profile.
+- **Read Memory** is its own block and button (Start Address, Length, status, Bytes Read, SHA256, binary download). It is an independent Job: not a checkbox, not part of the Batch, not counted in PASS / FAIL / Yield and not subject to Repeat / Retry / Stop Policy. Only the Profile Flash range can be read. The binary comes from the Manager through the same-origin BFF and is re-hashed against the receipt before it is offered; the Browser never contacts a PPU.
+- **Programming Source** stays `[ Programming Image ] [ Bundle ]` (wire `image` / `bundle`). The picker shows the real file name (clipped, full name as tooltip), size and format, and `Change...` to re-select; no local path is shown. Switching the Source clears the file, the run and the plan state and submits nothing.
+- There is **no standing PROGRAMMING PLAN panel**. Start still locks the inputs and runs the Backend plan; Plan ID, Route, Source, Operations, Range, Resource SHA256 and Job Binding SHA256 are written to the Log and shown under Receipts & Diagnostics of the run.
+- **Repeat** is fixed at 1 and disabled.

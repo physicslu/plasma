@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Page, Route } from "@playwright/test";
 
 // Host-only helpers for the unified managed Programming UI (EMode + PMode).
@@ -37,6 +38,17 @@ export function route(sites = [2], operations = ["flash_cycle"]) {
     operations, driver_abi: "plasma_swd:5", transport: "fpga", max_image_bytes: 65536,
     target_config: "target/stm32f1x.cfg", flash_base: 134217728, flash_size: 65536,
   };
+}
+
+/** The Route of one programming Job (E / P / V list) and of the independent Read Job. */
+export function operationsRoute(sites = [2], operations = ["erase", "program", "verify", "read"]) {
+  return { ...route(sites, operations), route_id: "z2-site2-stm32f103c8t6-operations",
+    profile: "stm32f103c8t6-site2-operations" };
+}
+
+/** What the mock IC holds: Read Memory returns this pattern from its address. */
+export function flashBytes(address: number, length: number): Buffer {
+  return Buffer.from(Array.from({ length }, (_, i) => (address + i) % 247));
 }
 
 const device = {
@@ -110,11 +122,19 @@ export type RunScript = {
   readbackOk?: boolean;
   /** Number of status reads that still report a running Job. */
   runningPolls?: number;
+  /** The list the PPU claims it ran (default: exactly the planned list). */
+  observedOperations?: string[];
+  /** true: the Read Memory download differs from the receipt SHA256. */
+  readTamper?: boolean;
+  /** HTTP status of the Read Memory download (default 200). */
+  readDownloadStatus?: number;
 };
 
 export type Counters = {
   plans: Array<{ alias: string; body: Record<string, unknown> }>;
   starts: Array<{ alias: string; body: Record<string, unknown> }>;
+  /** Read Memory binary downloads (run IDs). */
+  downloads: string[];
   polls: number;
   acks: number;
   requests: string[];
@@ -136,7 +156,7 @@ export async function mockManager(page: Page, options: {
   registryStatus?: number;
 } = {}) {
   const ppus = options.ppus ?? [Z2];
-  const counters: Counters = { plans: [], starts: [], polls: 0, acks: 0, requests: [], mutations: [] };
+  const counters: Counters = { plans: [], starts: [], downloads: [], polls: 0, acks: 0, requests: [], mutations: [] };
   const plans = new Map<string, { alias: string; siteId: number; body: Record<string, unknown>; script: RunScript; payload: Record<string, unknown> }>();
   const runs = new Map<string, { alias: string; planId: string; polls: number; acknowledged: boolean }>();
   let sequence = 0;
@@ -167,7 +187,7 @@ export async function mockManager(page: Page, options: {
   });
   await page.route(/\/bootstrap\/programming\/routes$/, r => r.fulfill(options.routesStatus
     ? json({ ok: false, error: { code: "programming_routes_unavailable", message: "Programming Routes are unavailable: ROUTE_ROOT_UNAVAILABLE" } }, options.routesStatus)
-    : json({ ok: true, routes: options.routes ?? [route()] })));
+    : json({ ok: true, routes: options.routes ?? [route(), operationsRoute()] })));
 
   await page.route(/\/bootstrap\/programming\/plans$/, async (r: Route) => {
     const alias = new URL(r.request().url()).pathname.split("/")[4];
@@ -178,33 +198,36 @@ export async function mockManager(page: Page, options: {
     if (script.planError) return r.fulfill(json({ ok: false, error: script.planError }, script.planStatus ?? 422));
     sequence += 1;
     const planId = hex32(sequence);
-    const source = "bundle_base64" in body ? "bundle" : "image";
-    const bytes = Buffer.from(String(body.bundle_base64 ?? body.image_base64), "base64");
-    const digest = await page.evaluate(async base64 => {
-      const raw = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-      const hash = await crypto.subtle.digest("SHA-256", raw);
-      return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
-    }, bytes.toString("base64"));
+    // One programming Job carries `operations`; read / legacy flash_cycle a single `operation`.
+    const operations = Array.isArray(body.operations) ? body.operations as string[] : null;
+    const kind = operations ? "programming" : String(body.operation);
+    const hasImage = "bundle_base64" in body || "image_base64" in body;
+    const source = "bundle_base64" in body ? "bundle" : hasImage ? "image" : "range";
+    const bytes = hasImage ? Buffer.from(String(body.bundle_base64 ?? body.image_base64), "base64") : Buffer.alloc(0);
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    const range = hasImage ? { address: 134217728, length: bytes.length }
+      : { address: Number(body.address), length: Number(body.length) };
     const activation = script.activationRequired ?? false;
     const ppu = ppus.find(item => item.alias === alias);
+    const planRoute = kind === "flash_cycle" ? route() : operationsRoute();
     const payload = {
       schema: "plasma.manager.bundle-programming-plan.v3", plan_id: planId, ppu_alias: alias, site_id: siteId,
-      operation: body.operation, source, route: route(),
-      bundle: { archive_sha256: source === "bundle" ? digest : sha("a"), archive_size: bytes.length, bundle_name: "bundle",
-        provider: "openocd-platform-reference", profile: "stm32f103c8t6-site2", asset_package_id: "fw",
-        image_filename: "image.bin", image_sha256: source === "bundle" ? sha("5") : digest, image_size: bytes.length, icpn: "STM32F103C8T6" },
+      operation: kind, operations, source, route: planRoute,
+      bundle: hasImage ? { archive_sha256: source === "bundle" ? digest : sha("a"), archive_size: bytes.length, bundle_name: "bundle",
+        provider: planRoute.provider, profile: planRoute.profile, asset_package_id: "fw",
+        image_filename: "image.bin", image_sha256: source === "bundle" ? sha("5") : digest, image_size: bytes.length, icpn: "STM32F103C8T6" } : null,
       resource: { resource_set_sha256: RESOURCE_SHA, reuse: !activation,
         ppu_reported: { state: "VERIFIED", asset_set_sha256: ACTIVE_SET_SHA, generation: 3,
           resource_set_sha256: activation ? sha("7") : RESOURCE_SHA } },
-      image_asset: { image_asset_sha256: sha("6"), sha256: source === "bundle" ? sha("5") : digest, size: bytes.length,
-        load_address: 134217728, format: "binary" },
-      job_binding: { operation: body.operation, range: { address: 134217728, length: bytes.length },
-        image_asset_sha256: sha("6"), resource_set_sha256: RESOURCE_SHA, ppu_id: ppu?.ppuId, site_id: siteId },
+      image_asset: hasImage ? { image_asset_sha256: sha("6"), sha256: source === "bundle" ? sha("5") : digest, size: bytes.length,
+        load_address: 134217728, format: "binary" } : null,
+      job_binding: { operation: kind, ...(operations ? { operations } : {}), range,
+        image_asset_sha256: hasImage ? sha("6") : null, resource_set_sha256: RESOURCE_SHA, ppu_id: ppu?.ppuId, site_id: siteId },
       // Binding identity is unique per (PPU, Site, plan): never shared.
       job_binding_sha256: `${alias}-site${siteId}-plan${sequence}`.padEnd(64, "0").slice(0, 64),
       active_asset_set: { state: "ACTIVE", asset_set_sha256: ACTIVE_SET_SHA },
       activation_required: activation, fpga_load: false,
-      steps: [...(activation ? ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] : ["RESOURCE_REUSE"]), "FLASH_CYCLE_JOB", "VERIFY_RECEIPT"],
+      steps: [...(activation ? ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] : ["RESOURCE_REUSE"]), `${kind.toUpperCase()}_JOB`, "VERIFY_RECEIPT"],
       catalog_gate: "NOT_USED", confirm_required: "PROGRAM",
     };
     plans.set(planId, { alias, siteId, body, script, payload });
@@ -218,30 +241,51 @@ export async function mockManager(page: Page, options: {
     const finished = state.polls > (script.runningPolls ?? 1);
     const outcome = finished ? script.outcome ?? "PASS" : null;
     const activation = Boolean(planned.payload.activation_required);
-    const imageSha = (planned.payload.image_asset as { sha256: string }).sha256;
-    const size = (planned.payload.image_asset as { size: number }).size;
+    const asset = planned.payload.image_asset as { sha256: string; size: number } | null;
+    const imageSha = asset?.sha256 ?? null;
+    const size = asset?.size ?? null;
+    const kind = String(planned.payload.operation);
+    const operations = planned.payload.operations as string[] | null;
+    const range = (planned.payload.job_binding as { range: { address: number; length: number } }).range;
+    const readback = script.readbackOk === false ? sha("0") : imageSha;
+    const expectedSteps: Record<string, Record<string, unknown>> = {};
+    if (operations?.includes("erase")) {
+      expectedSteps.erase = { erase_address: range.address, erase_length: Math.ceil(range.length / 1024) * 1024,
+        ...(operations.length === 1 ? { blank_verified: true, bytes_verified: range.length } : {}) };
+    }
+    if (operations?.includes("program")) expectedSteps.program = { write_address: range.address, bytes_written: range.length, image_sha256: imageSha };
+    if (operations?.includes("verify")) expectedSteps.verify = { verify_address: range.address, bytes_verified: range.length, readback_sha256: imageSha };
+    const observedSteps = { ...expectedSteps,
+      ...(expectedSteps.verify ? { verify: { ...expectedSteps.verify, readback_sha256: readback } } : {}) };
+    const verifies = kind === "flash_cycle" || Boolean(operations?.includes("verify"));
+    const readSha = createHash("sha256").update(flashBytes(range.address, range.length)).digest("hex");
     const jobId = `job-${planned.alias}-site${planned.siteId}-${state.planId.slice(-4)}`;
     const steps = [
       { step: "PREFLIGHT", result: "PASS", at: "t" },
       ...(activation
         ? [{ step: "B1_UPLOAD", result: "PASS", at: "t" }, { step: "B2_ADMIT", result: "PASS", at: "t" }, { step: "B3_ACTIVATE", result: "PASS", at: "t" }]
         : [{ step: "RESOURCE_REUSE", result: "PPU_VERIFIED", at: "t" }]),
-      { step: "FLASH_CYCLE_SUBMIT", result: "ACCEPTED", at: "t" },
+      { step: `${kind.toUpperCase()}_SUBMIT`, result: "ACCEPTED", at: "t" },
       ...(outcome === "PASS" || outcome === "FAIL" ? [{ step: "VERIFY_RECEIPT", result: outcome, at: "t" }] : []),
     ];
     const safeOff = script.safeOff ?? true;
     return {
       schema: "plasma.manager.bundle-programming-run.v1", run_id: runId, ppu_alias: planned.alias, site_id: planned.siteId,
-      plan: {}, state: outcome ? "finished" : "running", outcome,
+      plan: planned.payload, state: outcome ? "finished" : "running", outcome,
       reason: outcome === "PASS" ? null : outcome ? script.reason ?? `${outcome}_REASON` : null,
       created_at: "t", updated_at: "t", steps, activation: activation ? { b3_transaction_id: "c".repeat(32) } : {},
-      job: { job_id: jobId, state: outcome ? (outcome === "PASS" ? "success" : "failed") : "running", stage: "flash_cycle",
+      job: { job_id: jobId, state: outcome ? (outcome === "PASS" ? "success" : "failed") : "running", stage: kind,
         progress_percent: outcome ? 100 : 40 },
       receipt: outcome === "PASS" || outcome === "FAIL" ? {
-        schema: "plasma.manager.programming-receipt.v2", job_id: jobId, job_state: "success", operation: "flash_cycle",
+        schema: "plasma.manager.programming-receipt.v3", job_id: jobId, job_state: "success", operation: kind,
+        operations, observed_operations: operations ? script.observedOperations ?? operations : null,
+        expected_steps: operations ? expectedSteps : null, observed_steps: operations ? observedSteps : null,
+        range, read_output: kind === "read" ? { address: range.address, bytes: range.length, sha256: readSha,
+          filename: `read-STM32F103C8T6-0x${range.address.toString(16).padStart(8, "0")}-${range.length}.bin`,
+          available: outcome === "PASS" } : null,
         site_id: planned.siteId, target: "STM32F103C8T6",
         expected_image_sha256: imageSha, expected_image_size: size, observed_image_sha256: imageSha, observed_image_size: size,
-        readback_sha256: script.readbackOk === false ? sha("0") : imageSha, bytes_verified: size,
+        readback_sha256: verifies ? readback : null, bytes_verified: verifies ? size : null,
         expected_resource_set_sha256: RESOURCE_SHA, observed_resource_set_sha256: RESOURCE_SHA,
         expected_job_binding_sha256: planned.payload.job_binding_sha256, observed_job_binding_sha256: planned.payload.job_binding_sha256,
         active_asset_set_sha256: ACTIVE_SET_SHA, resource_reuse: !activation,
@@ -274,6 +318,19 @@ export async function mockManager(page: Page, options: {
     if (!state) return r.fulfill(json({ ok: false, error: { code: "programming_run_not_found", message: "not found" } }, 404));
     state.polls += 1;
     await r.fulfill(json({ ok: true, run: runRecord(runId) }));
+  });
+  await page.route(/\/bootstrap\/programming\/runs\/[0-9a-f]{32}\/output$/, async (r: Route) => {
+    const runId = new URL(r.request().url()).pathname.split("/").slice(-2)[0];
+    counters.downloads.push(runId);
+    const planned = plans.get(runs.get(runId)!.planId)!;
+    if (planned.script.readDownloadStatus) {
+      return r.fulfill(json({ ok: false, error: { code: "read_output_unavailable", message: "the Read Memory output is no longer retained; read again" } },
+        planned.script.readDownloadStatus));
+    }
+    const range = (planned.payload.job_binding as { range: { address: number; length: number } }).range;
+    const data = flashBytes(range.address, range.length);
+    if (planned.script.readTamper) data[0] ^= 0xff;
+    await r.fulfill({ status: 200, contentType: "application/octet-stream", body: data });
   });
   await page.route(/\/bootstrap\/programming\/runs\/[0-9a-f]{32}\/acknowledge$/, async (r: Route) => {
     counters.acks += 1;
