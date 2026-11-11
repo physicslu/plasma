@@ -13,6 +13,11 @@ the Manager then
    Manager Bootstrap B1 upload, B2 admission and B3 ``activate``
    (``fpga_load=false``) run through ``ManagerBootstrapCoordinator`` which
    issues the device-bound owner authorizations,
+   A user may instead supply their own canonical Bundle v3 (Bundle source).
+   It is admitted only when its Programming Resources are byte-identical to
+   the committed Route and the shared writer reproduces its exact bytes
+   (``bundle_v3.route_bundle_from_archive``); from there it takes the SAME
+   Resource Reuse / B1-B3 / Job path as a Firmware source,
 4. submits exactly one Job with the user-selected Operation and its exact
    Job Binding (Resource, Operation, range, Image, PPU, Site, ICPN, Profile)
    to the PPU Gateway ``/api/jobs``; the PPU re-verifies the Binding,
@@ -47,7 +52,7 @@ from plasma_opf import bundle_v3
 ROUTES_ENV = "PLASMA_PROGRAMMING_ROUTES_ROOT"
 ROUTES_RELATIVE = Path("data/opf/programming-routes")
 RUN_SCHEMA = "plasma.manager.bundle-programming-run.v1"
-PLAN_SCHEMA = "plasma.manager.bundle-programming-plan.v2"
+PLAN_SCHEMA = "plasma.manager.bundle-programming-plan.v3"
 RECEIPT_SCHEMA = "plasma.manager.programming-receipt.v2"
 # Only flash_cycle has a qualified PPU backend (C-3 OpenOCD) and receipt contract.
 RECEIPT_OPERATIONS = frozenset({"flash_cycle"})
@@ -169,13 +174,14 @@ class _Run:
         return run
 
 
-def _strict_base64(value: object) -> bytes:
+def _strict_base64(value: object, field: str = "image") -> bytes:
     if type(value) is not str or not value:
-        raise ProgrammingError(400, "image_invalid", "image_base64 is required")
+        raise ProgrammingError(400, f"{field}_invalid", f"{field}_base64 is required")
     try:
         return base64.b64decode(value.encode("ascii"), validate=True)
     except (binascii.Error, UnicodeEncodeError) as exc:
-        raise ProgrammingError(400, "image_invalid", "image_base64 is not strict base64") from exc
+        raise ProgrammingError(400, f"{field}_invalid",
+                               f"{field}_base64 is not strict base64") from exc
 
 
 class BundleProgrammingWorkflow:
@@ -362,12 +368,12 @@ class BundleProgrammingWorkflow:
 
     def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
         allowed = {"icpn", "site_id", "operation", "image_base64", "image_filename",
-                   "address", "length"}
+                   "bundle_base64", "address", "length"}
         if not isinstance(body, Mapping) or not {"icpn", "site_id", "operation"} <= set(body) \
                 or set(body) - allowed:
             raise ProgrammingError(400, "invalid_request",
                                    "plan requires icpn, site_id, operation and the Operation's "
-                                   "image_base64 or address/length")
+                                   "image_base64, bundle_base64 or address/length")
         icpn, site, operation = body["icpn"], body["site_id"], body["operation"]
         if type(icpn) is not str or not icpn.strip() or len(icpn) > 96:
             raise ProgrammingError(400, "invalid_request", "icpn is invalid")
@@ -379,16 +385,29 @@ class BundleProgrammingWorkflow:
                                    f"operation must be one of {', '.join(bundle_v3.OPERATIONS)}")
         image_operation = operation in bundle_v3.IMAGE_OPERATIONS
         image: bytes | None = None
+        archive: bytes | None = None
         address = length = None
         if image_operation:
-            if "image_base64" not in body or {"address", "length"} & set(body):
+            # Exactly one Programming Source: a Firmware Image or a user Bundle.
+            sources = {"image_base64", "bundle_base64"} & set(body)
+            if len(sources) != 1 or {"address", "length"} & set(body) \
+                    or ("bundle_base64" in body and "image_filename" in body):
                 raise ProgrammingError(400, "invalid_request",
-                                       f"{operation} requires image_base64 and takes its range from the Image")
-            image = _strict_base64(body["image_base64"])
-            if not 0 < len(image) <= bundle_v3.MAX_IMAGE_BYTES:
-                raise ProgrammingError(413, "image_too_large", "image exceeds the Console upload limit")
+                                       f"{operation} requires exactly one of image_base64 or "
+                                       "bundle_base64 and takes its range from the Image")
+            if "bundle_base64" in body:
+                archive = _strict_base64(body["bundle_base64"], "bundle")
+                if len(archive) > bundle_v3.MAX_BUNDLE_ARCHIVE_BYTES:
+                    raise ProgrammingError(413, "bundle_too_large",
+                                           "Bundle exceeds the Console upload limit")
+            else:
+                image = _strict_base64(body["image_base64"])
+                if not 0 < len(image) <= bundle_v3.MAX_IMAGE_BYTES:
+                    raise ProgrammingError(413, "image_too_large",
+                                           "image exceeds the Console upload limit")
         else:
-            if {"image_base64", "image_filename"} & set(body) or not {"address", "length"} <= set(body):
+            if {"image_base64", "image_filename", "bundle_base64"} & set(body) \
+                    or not {"address", "length"} <= set(body):
                 raise ProgrammingError(400, "invalid_request",
                                        f"{operation} requires explicit address and length and no image")
             address, length = body["address"], body["length"]
@@ -410,12 +429,19 @@ class BundleProgrammingWorkflow:
         try:
             resource = bundle_v3.resource_set_descriptor(route)
             resource_sha = bundle_v3.resource_set_sha256(resource)
-            if image is not None:
+            if archive is not None:
+                # Bundle source: the user's own canonical Bundle, never rebuilt
+                # under another identity and never trusted for its declarations.
+                built, image = bundle_v3.route_bundle_from_archive(route, archive)
+            elif image is not None:
                 built = bundle_v3.build_user_image_bundle(
                     route, image, filename=body.get("image_filename"))
+            if image is not None:
                 image_asset = bundle_v3.image_asset_descriptor(resource, image)
         except bundle_v3.BundleBuildError as exc:
-            raise ProgrammingError(422, "bundle_incompatible", str(exc)) from exc
+            code = ("bundle_resource_not_qualified"
+                    if str(exc) == "BUNDLE_RESOURCE_NOT_ROUTE" else "bundle_incompatible")
+            raise ProgrammingError(422, code, str(exc)) from exc
         platform = self.coordinator.status(alias)
         pairing = platform.get("pairing") or {}
         if pairing.get("paired") is not True or pairing.get("device_match") is not True:
@@ -457,7 +483,10 @@ class BundleProgrammingWorkflow:
         plan_id = secrets.token_hex(16)
         payload = {
             "schema": PLAN_SCHEMA, "plan_id": plan_id, "ppu_alias": alias,
-            "site_id": site, "operation": operation, "route": route.summary(),
+            "site_id": site, "operation": operation,
+            "source": ("bundle" if archive is not None
+                       else "firmware" if image is not None else "range"),
+            "route": route.summary(),
             "bundle": None if built is None else built.summary(),
             "resource": {
                 "resource_set_sha256": resource_sha,

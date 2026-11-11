@@ -737,6 +737,63 @@ def build_image_bundle(
     )
 
 
+MAX_BUNDLE_ARCHIVE_BYTES = MAX_IMAGE_BYTES + 256 * 1024
+
+
+def route_bundle_from_archive(route: ProgrammingRoute,
+                              archive: bytes) -> tuple[ProgrammingBundle, bytes]:
+    """Admit a user-supplied programming Bundle v3 against one Programming Route.
+
+    Bundle source contract (Unified Programming Integration, 2026-11-11). The
+    archive is accepted only when BOTH hold:
+
+    * its Programming Resources (target platform, Provider, Profile, driver
+      ABI, transport, FPGA requirement, operations, Sites, flash geometry) are
+      byte-identical to the committed Route's Resource Set, so a Bundle
+      declaration can never replace hardware qualification, and
+    * the shared writer (:func:`build_image_bundle`) reproduces the exact
+      archive bytes from the Route and the Bundle's single Image, so nothing
+      outside the canonical Bundle -> Packages -> Files layout travels.
+
+    A Bundle with several Image Packages, an FPGA Package or any other Package
+    set is outside this contract version and fails closed. Returns the
+    canonical Bundle and its Image bytes; no I/O, no deployment.
+    """
+    _need(isinstance(route, ProgrammingRoute), "ROUTE_REQUIRED")
+    _need(type(archive) is bytes and 0 < len(archive) <= MAX_BUNDLE_ARCHIVE_BYTES,
+          "BUNDLE_ARCHIVE_INVALID")
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+            infos = bundle.infolist()
+            # Bounded before any member is read (a deflated member may expand).
+            _need(len(infos) <= 64 and sum(i.file_size for i in infos)
+                  <= MAX_BUNDLE_ARCHIVE_BYTES, "BUNDLE_ARCHIVE_INVALID")
+            resource, _asset = identity_from_archive(archive)
+            expected = resource_set_descriptor(route)
+            _need(resource["constraints"]["icpn"] == expected["constraints"]["icpn"],
+                  "BUNDLE_IC_MISMATCH")
+            _need(resource["target"] == expected["target"], "BUNDLE_TARGET_MISMATCH")
+            _need(canonical_json(resource) == canonical_json(expected),
+                  "BUNDLE_RESOURCE_NOT_ROUTE")
+            manifest = json.loads(bundle.read("manifest.json"),
+                                  object_pairs_hook=_unique_pairs)
+            image_pkg = next(p for p in manifest["packages"]
+                             if p["kind"] not in RESOURCE_KINDS)
+            path = image_pkg["files"][0]["path"]
+            image = bundle.read(path)
+            rebuilt = build_image_bundle(
+                route, image, image_filename=path.rsplit("/", 1)[1],
+                asset_package_id=image_pkg["id"], bundle_name=manifest["name"],
+                version=manifest["version"])
+    except BundleBuildError:
+        raise
+    except (zipfile.BadZipFile, KeyError, IndexError, StopIteration, TypeError,
+            ValueError, UnicodeError) as exc:
+        raise BundleBuildError("BUNDLE_ARCHIVE_INVALID") from exc
+    _need(rebuilt.archive == archive, "BUNDLE_NOT_CANONICAL")
+    return rebuilt, image
+
+
 def build_user_image_bundle(route: ProgrammingRoute, image: bytes, *,
                                filename: object = None) -> ProgrammingBundle:
     """Console path: deterministic identities derived from the image digest."""
