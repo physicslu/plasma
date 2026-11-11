@@ -438,9 +438,23 @@ test("the verified READ is written through a real Chromium FileSystemFileHandle"
   expect(Buffer.from(saved).equals(FULL_FLASH)).toBe(true);
 });
 
+// The Start request never reached the Manager's admission (HTTP 504 before it).
 const lostStart = { startStatus: 504, startError: { code: "manager_unavailable", message: "Manager Bootstrap path is unavailable" } };
+const HOLD_KEY = "plasma.emode.start-outcome-unknown.v1";
+const RECONCILE = "Reconcile Start with Manager";
 
-test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming Start, held across a reload until acknowledged", async ({ page }) => {
+function holdParts(workspace: Awaited<ReturnType<typeof open>>) {
+  return {
+    hold: workspace.getByTestId("managed-start-hold"),
+    reconcile: workspace.getByRole("button", { name: RECONCILE }),
+    step: workspace.getByTestId("managed-start-hold-step"),
+    note: workspace.getByTestId("managed-status-note"),
+    read: workspace.getByRole("button", { name: "Read SITE 2 Flash" }),
+    log: workspace.getByLabel("Engineering job log"),
+  };
+}
+
+test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming Start, held across a reload until the Manager reconciles it", async ({ page }) => {
   await stubSavePicker(page, "save");
   const counters = await mockManager(page, { script: () => lostStart });
   const { workspace, start } = await configure(page);
@@ -453,6 +467,8 @@ test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming
   await expect(status).toHaveText("OUTCOME UNKNOWN");
   await expect(hold).toContainText("the READ Start request on PPU z2 · SITE-02 got no answer");
   await expect(hold).toContainText("Nothing was resubmitted");
+  // The hold names the Manager-issued start (the plan ID) it will reconcile.
+  await expect(hold).toContainText(`reconciles Start ${"1".padStart(32, "0")}`);
   expect((await pickerProbe(page)).saves).toEqual([]);
   // The PPU is held: neither a second READ nor a Programming Start can be sent.
   await expect(button).toBeDisabled();
@@ -465,56 +481,312 @@ test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming
   expect(counters.starts).toHaveLength(1);
   expect(counters.batches).toHaveLength(0);
   expect(counters.polls).toBe(0);
+  // Nothing is reconciled, voided or acknowledged on its own.
+  expect(counters.reconciles).toEqual([]);
   // A reload does not drop the hold.
   const reloaded = await configure(page);
-  await expect(reloaded.workspace.getByTestId("managed-start-hold")).toBeVisible();
-  await expect(reloaded.workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeDisabled();
+  const after = holdParts(reloaded.workspace);
+  await expect(after.hold).toBeVisible();
+  await expect(after.read).toBeDisabled();
   await expect(reloaded.start).toBeDisabled();
-  expect(counters.starts).toHaveLength(1);
-  // Only the operator releases it, after the Manager Fleet shows the Site idle. Nothing is acknowledged automatically.
-  expect(counters.acks).toBe(0);
-  await reloaded.workspace.getByRole("button", { name: "Acknowledge Start reconciliation" }).click();
-  await expect(reloaded.workspace.getByTestId("managed-start-hold")).toHaveCount(0);
-  await expect(reloaded.workspace.getByLabel("Engineering job log")).toContainText("[ACK] Start OUTCOME UNKNOWN reconciled by the operator · PPU z2 · SITE-02 idle, no Job");
-  await expect(reloaded.workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeEnabled();
+  // The Site is idle, yet that alone releases nothing: the Manager still holds
+  // a startable plan, so a delayed Start request could still be admitted.
+  await after.reconcile.click();
+  await expect(after.note).toContainText("the Manager has not admitted this Start, but a delayed request still could be");
+  await expect(after.hold).toBeVisible();
+  await expect(after.read).toBeDisabled();
+  expect(counters.voids).toEqual([]);
+  // The operator voids the unstarted Start; only then is "never admitted" proven.
+  await expect(after.step).toHaveText("Void the unstarted Start");
+  await after.step.click();
+  await expect(after.hold).toHaveCount(0);
+  await expect(after.log).toContainText("voided on the Manager before admission");
+  await expect(after.log).toContainText("the Manager proves the Start was never admitted (START_VOIDED_BEFORE_ADMISSION); no Job was submitted · SITE-02 idle, no Job");
+  await expect(after.read).toBeEnabled();
   await expect(reloaded.start).toBeEnabled();
+  expect(counters.voids).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
+  expect(counters.jobs).toEqual([]);
   expect(counters.acks).toBe(0);
 });
 
-test("a lost Programming Start answer also holds READ on the same PPU", async ({ page }) => {
+test("a READ Start the Manager admitted whose answer was lost is reconciled to its real run: still running, then PASS", async ({ page }) => {
   await stubSavePicker(page, "save");
-  const counters = await mockManager(page, { batchStatus: 504 });
+  const counters = await mockManager(page, { script: () => ({ startLost: true, runningPolls: 1 }) });
   const { workspace, start } = await configure(page);
-  const button = workspace.getByRole("button", { name: "Read SITE 2 Flash" });
-  await start.click();
-  await expect(workspace.getByTestId("managed-start-unknown")).toContainText("The Batch request outcome is unknown");
-  await expect(workspace.getByTestId("managed-start-hold")).toContainText("the PROGRAMMING Start request on PPU z2");
-  await expect(button).toBeDisabled();
+  const parts = holdParts(workspace);
+  await parts.read.click();
+  await expect(parts.hold).toContainText("the READ Start request on PPU z2");
+  // The Site reads idle in the Fleet, but the Manager says the Job is running.
+  await parts.reconcile.click();
+  await expect(parts.note).toContainText("the Manager admitted this Start and it is still running");
+  await expect(parts.hold).toBeVisible();
+  await expect(parts.step).toHaveCount(0);
+  await expect(parts.read).toBeDisabled();
   await expect(start).toBeDisabled();
-  await button.click({ force: true });
-  await start.click({ force: true });
-  await page.waitForTimeout(1500);
-  expect(counters.batches).toHaveLength(1);
-  expect(counters.starts).toHaveLength(0);
+  // Later: the same run ended PASS. The hold is released against that run.
+  await parts.reconcile.click();
+  await expect(parts.hold).toHaveCount(0);
+  await expect(parts.log).toContainText(/reconciled with the Manager · the Manager admitted this Start as Run [0-9a-f]{32} and it ended PASS/);
+  await expect(parts.read).toBeEnabled();
+  // Exactly one start was ever sent; reconciling created no Job, no ack, no void.
+  expect(counters.plans).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
+  expect(counters.reconciles).toHaveLength(2);
+  expect(counters.acks).toBe(0);
+  expect(counters.voids).toEqual([]);
+  // The lost READ wrote nothing: its bytes were never fetched or saved.
+  expect((await pickerProbe(page)).saves).toEqual([]);
+  expect(counters.downloads).toEqual([]);
+});
+
+test("a lost READ Start that ended FAIL on the Manager is released as FAIL, never as PASS or retried", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  const counters = await mockManager(page, { script: () => ({ startLost: true, runningPolls: 0, outcome: "FAIL", reason: "READ_OUTPUT_INTEGRITY_MISMATCH" }) });
+  const { workspace } = await configure(page);
+  const parts = holdParts(workspace);
+  await parts.read.click();
+  await expect(parts.hold).toBeVisible();
+  await parts.reconcile.click();
+  await expect(parts.hold).toHaveCount(0);
+  await expect(parts.log).toContainText("it ended FAIL (READ_OUTPUT_INTEGRITY_MISMATCH)");
+  expect(counters.starts).toHaveLength(1);
+  expect((await pickerProbe(page)).saves).toEqual([]);
+});
+
+test("a lost Start whose Manager run is OUTCOME UNKNOWN stays held until the operator acknowledges that run", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  const counters = await mockManager(page, { script: () => ({
+    startLost: true, runningPolls: 0, outcome: "OUTCOME_UNKNOWN", reason: "JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT" }) });
+  const { workspace, start } = await configure(page);
+  const parts = holdParts(workspace);
+  await parts.read.click();
+  await expect(parts.hold).toBeVisible();
+  // Reconciling any number of times acknowledges nothing and resubmits nothing.
+  for (let i = 0; i < 3; i += 1) {
+    await parts.reconcile.click();
+    await expect(parts.note).toContainText("ended OUTCOME UNKNOWN (JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT) and is not acknowledged");
+    await expect(parts.reconcile).toBeEnabled();
+  }
+  await expect(parts.hold).toBeVisible();
+  await expect(parts.read).toBeDisabled();
+  await expect(start).toBeDisabled();
+  expect(counters.acks).toBe(0);
+  expect(counters.starts).toHaveLength(1);
+  // The explicit operator acknowledgement of THAT Manager run releases it.
+  await expect(parts.step).toHaveText("Acknowledge Run reconciliation");
+  await parts.step.click();
+  await expect(parts.hold).toHaveCount(0);
+  await expect(parts.log).toContainText("the device result stays unknown");
+  expect(counters.acks).toBe(1);
+  expect(counters.starts).toHaveLength(1);
+  expect(counters.voids).toEqual([]);
+});
+
+const heldRead = (extra: Record<string, unknown> = {}) => ({ z2: {
+  alias: "z2", siteId: 2, kind: "READ", detail: "The Read Memory start outcome is unknown (timeout).",
+  at: "2026-11-11T00:00:00.000Z", startId: "9".repeat(32), jobBindingSha256: "a".repeat(64), ...extra } });
+const provenNotAccepted = (view: Record<string, unknown>) => ({ ...view, kind: "run", state: "NOT_ACCEPTED",
+  reason: "START_NEVER_ADMITTED_AND_NO_LONGER_ADMISSIBLE",
+  identity: { ppu_alias: "z2", site_id: 2, ppu_id: "z2-hil", operation: "read", operations: null, job_binding_sha256: "a".repeat(64) } });
+
+async function seededHold(page: Page, holds: unknown, options: Parameters<typeof mockManager>[1] = {}) {
+  await stubSavePicker(page, "save");
+  await page.addInitScript(([key, value]) => window.localStorage.setItem(key, value), [HOLD_KEY, JSON.stringify(holds)]);
+  const counters = await mockManager(page, options);
+  // A busy Site cannot be selected for programming; the hold is PPU-wide anyway.
+  const busy = (options.ppus ?? []).some(ppu => ppu.busySites?.length);
+  if (busy) {
+    const workspace = await open(page);
+    const job = await selectIc(page);
+    return { counters, workspace, job, start: job.getByRole("button", { name: /START PROGRAMMING/ }), ...holdParts(workspace) };
+  }
+  const { workspace, job, start } = await configure(page);
+  return { counters, workspace, job, start, ...holdParts(workspace) };
+}
+
+test("an idle Site never releases a Start the Manager has no record of", async ({ page }) => {
+  // Journal lost / rolled back / never recorded: the Manager cannot prove anything.
+  const held = await seededHold(page, heldRead());
+  await expect(held.hold).toBeVisible();
+  for (let i = 0; i < 2; i += 1) {
+    await held.reconcile.click();
+    await expect(held.note).toContainText("the Manager cannot prove what became of this Start (START_NOT_RECORDED)");
+  }
+  await expect(held.hold).toBeVisible();
+  await expect(held.step).toHaveCount(0);
+  await expect(held.read).toBeDisabled();
+  await expect(held.start).toBeDisabled();
+  await expect(held.log).toContainText("[RECONCILE] HOLD KEPT");
+  expect(writes(held.counters)).toEqual([]);
+});
+
+const mismatches: Array<[string, (view: Record<string, unknown>) => Record<string, unknown>, RegExp]> = [
+  ["another start ID", view => ({ ...provenNotAccepted(view), start_id: "8".repeat(32) }), /answered for another start or PPU/],
+  ["another PPU", view => ({ ...provenNotAccepted(view), ppu_alias: "z9" }), /answered for another start or PPU/],
+  ["another Site", view => ({ ...provenNotAccepted(view), identity: { ...(provenNotAccepted(view).identity), site_id: 1 } }), /does not match this PPU, Site, Operation or Job Binding/],
+  ["another Job Binding", view => ({ ...provenNotAccepted(view), identity: { ...(provenNotAccepted(view).identity), job_binding_sha256: "b".repeat(64) } }), /does not match this PPU, Site, Operation or Job Binding/],
+  ["another Operation", view => ({ ...provenNotAccepted(view), identity: { ...(provenNotAccepted(view).identity), operation: "programming" } }), /does not match this PPU, Site, Operation or Job Binding/],
+  ["a Batch instead of a run", view => ({ ...provenNotAccepted(view), kind: "batch" }), /does not match this PPU, Site, Operation or Job Binding/],
+  ["no identity", view => ({ ...provenNotAccepted(view), identity: null }), /carries no identity/],
+  ["another schema", view => ({ ...provenNotAccepted(view), schema: "plasma.manager.other.v1" }), /not a Start reconciliation/],
+  ["a result without a run", view => ({ ...provenNotAccepted(view), state: "TERMINAL_CONFIRMED", outcome: "PASS" }), /reports no definite result/],
+];
+for (const [name, edit, message] of mismatches) {
+  test(`a reconciliation answer for ${name} keeps the hold`, async ({ page }) => {
+    const held = await seededHold(page, heldRead(), { reconcile: edit });
+    await held.reconcile.click();
+    await expect(held.note).toContainText(message);
+    await expect(held.hold).toBeVisible();
+    await expect(held.read).toBeDisabled();
+    await expect(held.start).toBeDisabled();
+    expect(writes(held.counters)).toEqual([]);
+  });
+}
+
+test("the exact answer for this start releases the hold (control for the mismatch cases)", async ({ page }) => {
+  const held = await seededHold(page, heldRead(), { reconcile: provenNotAccepted });
+  await held.reconcile.click();
+  await expect(held.hold).toHaveCount(0);
+  await expect(held.read).toBeEnabled();
+  expect(writes(held.counters)).toEqual([]);
+});
+
+test("the Start hold is kept when the Manager cannot be asked", async ({ page }) => {
+  const held = await seededHold(page, heldRead(), { reconcile: () => 503 });
+  await held.reconcile.click();
+  await expect(held.note).toContainText("the Manager could not be asked (manager_unavailable: Manager unavailable)");
+  await expect(held.hold).toBeVisible();
+  await expect(held.read).toBeDisabled();
+  expect(held.counters.reconciles).toHaveLength(1);
+  expect(writes(held.counters)).toEqual([]);
+});
+
+test("a hold recorded without a Manager start ID can never be released by this Console", async ({ page }) => {
+  // Written before start IDs existed: there is nothing to ask the Manager about.
+  const held = await seededHold(page, { z2: { alias: "z2", siteId: 2, kind: "READ", detail: "old", at: "2026-11-11T00:00:00.000Z" } });
+  await expect(held.hold).toContainText("(no Manager start ID recorded)");
+  await held.reconcile.click();
+  await expect(held.note).toContainText("recorded without a Manager start ID");
+  await expect(held.hold).toBeVisible();
+  await expect(held.read).toBeDisabled();
+  await expect(held.start).toBeDisabled();
+  expect(held.counters.reconciles).toEqual([]);
+  expect(writes(held.counters)).toEqual([]);
+});
+
+test("the Start hold is kept while the Manager Fleet shows the Site busy, even with a proven Manager answer", async ({ page }) => {
+  const held = await seededHold(page, heldRead(), { ppus: [{ ...Z2, busySites: [2] }], reconcile: provenNotAccepted });
+  await held.reconcile.click();
+  await expect(held.note).toContainText("the Manager proves the Start was never admitted");
+  await expect(held.note).toContainText("but SITE-02 is RUNNING (Job job-busy)");
+  await expect(held.hold).toBeVisible();
+  await expect(held.read).toBeDisabled();
+  expect(writes(held.counters)).toEqual([]);
+});
+
+test("re-selecting the IC, Site, Source or Operations cannot bypass the Start hold", async ({ page }) => {
+  const held = await seededHold(page, heldRead());
+  await held.job.getByRole("radio", { name: "Bundle", exact: true }).click();
+  await held.job.getByLabel("Engineering Programming Bundle file").setInputFiles(bundleFile);
+  await expect(held.start).toBeDisabled();
+  await held.job.getByRole("radio", { name: "Programming Image", exact: true }).click();
+  await held.job.getByLabel("Engineering Programming Image file").setInputFiles(firmwareFile);
+  await held.workspace.getByLabel("Select SITE 2 for programming").uncheck();
+  await held.workspace.getByLabel("Select SITE 2 for programming").check();
+  await selectIc(page);
+  await expect(held.hold).toBeVisible();
+  await expect(held.start).toBeDisabled();
+  await expect(held.read).toBeDisabled();
+  await held.read.click({ force: true });
+  await held.start.click({ force: true });
+  await page.waitForTimeout(1000);
+  expect(writes(held.counters)).toEqual([]);
   expect((await pickerProbe(page)).calls).toEqual([]);
 });
 
-test("the Start hold is kept while the Manager Fleet shows the Site busy", async ({ page }) => {
+test("a hold taken in one tab blocks another tab of the same Browser without a reload", async ({ page, context }) => {
   await stubSavePicker(page, "save");
-  await page.addInitScript(() => window.localStorage.setItem("plasma.emode.start-outcome-unknown.v1", JSON.stringify({
-    z2: { alias: "z2", siteId: 2, kind: "READ", detail: "The Read Memory start outcome is unknown (timeout).", at: "2026-11-11T00:00:00.000Z" },
-  })));
-  const counters = await mockManager(page, { ppus: [{ ...Z2, busySites: [2] }] });
-  const workspace = await open(page);
-  await selectIc(page);
-  const hold = workspace.getByTestId("managed-start-hold");
-  await expect(hold).toBeVisible();
-  await workspace.getByRole("button", { name: "Acknowledge Start reconciliation" }).click();
-  await expect(workspace.getByTestId("managed-status-note")).toContainText("The Start hold on PPU z2 was kept: SITE-02 is");
-  await expect(hold).toBeVisible();
-  await expect(workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toBeDisabled();
-  expect(writes(counters)).toEqual([]);
+  await mockManager(page, { script: () => ({ startLost: true, runningPolls: 0 }) });
+  const first = await configure(page);
+  const other = await context.newPage();
+  await stubSavePicker(other, "save");
+  const otherCounters = await mockManager(other);
+  const second = await configure(other);
+  const otherParts = holdParts(second.workspace);
+  await expect(otherParts.read).toBeEnabled();
+  await holdParts(first.workspace).read.click();
+  await expect(holdParts(first.workspace).hold).toBeVisible();
+  // The other tab learns of the hold through the storage event.
+  await expect(otherParts.hold).toContainText("the READ Start request on PPU z2");
+  await expect(otherParts.read).toBeDisabled();
+  await expect(second.start).toBeDisabled();
+  await otherParts.read.click({ force: true });
+  await second.start.click({ force: true });
+  await other.waitForTimeout(1000);
+  expect(writes(otherCounters)).toEqual([]);
+});
+
+test("a lost Programming Start answer also holds READ on the same PPU; a Batch that was never admitted is voided, not guessed", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  const counters = await mockManager(page, { batchStatus: 504 });
+  const { workspace, start } = await configure(page);
+  const parts = holdParts(workspace);
+  await start.click();
+  await expect(workspace.getByTestId("managed-start-unknown")).toContainText("The Batch request outcome is unknown");
+  await expect(parts.hold).toContainText("the PROGRAMMING Start request on PPU z2");
+  await expect(parts.read).toBeDisabled();
+  await expect(start).toBeDisabled();
+  await parts.read.click({ force: true });
+  await start.click({ force: true });
+  await page.waitForTimeout(1500);
+  // The Manager issued the start ID before the one Batch request.
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.batches[0].body.start_id).toBe(counters.issued[0]);
+  expect(counters.starts).toHaveLength(0);
+  expect((await pickerProbe(page)).calls).toEqual([]);
+  await parts.reconcile.click();
+  await expect(parts.note).toContainText("the Manager has not admitted this Start");
+  await expect(parts.hold).toBeVisible();
+  await parts.step.click();
+  await expect(parts.hold).toHaveCount(0);
+  expect(counters.voids).toEqual(counters.issued);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.jobs).toEqual([]);
+});
+
+test("a Batch the Manager admitted whose answer was lost is reconciled to that Batch and blocks READ meanwhile", async ({ page }) => {
+  await stubSavePicker(page, "save");
+  const counters = await mockManager(page, { batchLost: true, script: () => ({ runningPolls: 1 }) });
+  const { workspace, start } = await configure(page);
+  const parts = holdParts(workspace);
+  await start.click();
+  await expect(parts.hold).toContainText("the PROGRAMMING Start request on PPU z2");
+  await expect(parts.read).toBeDisabled();
+  await parts.reconcile.click();
+  await expect(parts.note).toContainText("the Manager admitted this Start and it is still running");
+  await expect(parts.read).toBeDisabled();
+  await parts.reconcile.click();
+  await expect(parts.hold).toHaveCount(0);
+  await expect(parts.log).toContainText(/the Manager admitted this Start as Batch [0-9a-f]{32} and it ended PASS/);
+  // One Batch, one Job; reconciling never sent another.
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.jobs).toHaveLength(1);
+  expect(counters.acks).toBe(0);
+  expect(counters.voids).toEqual([]);
+  // The reconciled Batch is not counted as a result of this page: Yield is untouched.
+  await expect(parts.read).toBeEnabled();
+});
+
+test("a Batch start ID the Manager does not issue is a refusal: no Batch request, no hold", async ({ page }) => {
+  const counters = await mockManager(page, { issueStatus: 503 });
+  const { workspace, start } = await configure(page);
+  await start.click();
+  await expect(workspace.getByLabel("Engineering job log")).toContainText("The Manager did not issue a start ID");
+  await expect(workspace.getByTestId("managed-start-hold")).toHaveCount(0);
+  expect(counters.batches).toHaveLength(0);
+  expect(counters.jobs).toEqual([]);
 });
 
 test("READ is unavailable on a busy or disabled Site and absent where no Route declares Read", async ({ page }) => {

@@ -31,6 +31,10 @@ const BOOTSTRAP_POST_ACTIONS = [
   // EMode Batch (Manager-owned Retry / Stop Policy). Stop is "stop queuing".
   /^programming\/batches$/,
   new RegExp(`^programming/batches/${RUN_ID}/stop$`),
+  // Start Outcome Reconciliation: issue a Batch start ID, and void a start
+  // the Manager never admitted. Neither submits anything to a PPU.
+  /^programming\/starts$/,
+  new RegExp(`^programming/starts/${RUN_ID}/void$`),
 ];
 // Read Memory binary of a PASS read run. The Manager re-hashes the bytes
 // against the run receipt; the Browser never reads from a PPU.
@@ -40,6 +44,8 @@ const BOOTSTRAP_GET_ACTIONS = [
   /^programming\/routes$/,
   new RegExp(`^programming/runs/${RUN_ID}$`),
   new RegExp(`^programming/batches/${RUN_ID}$`),
+  // Read-only: what became of a Start whose answer never arrived.
+  new RegExp(`^programming/starts/${RUN_ID}$`),
   READ_OUTPUT_ACTION,
 ];
 

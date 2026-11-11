@@ -35,6 +35,12 @@ authority, and the PPU Runtime stays the only Job router, lease owner and
 SAFE_OFF/SEALED authority. The Manager never retries a write whose outcome is
 unknown, never clears SEALED and never loads FPGA. An OUTCOME_UNKNOWN run
 latches the PPU alias until an operator explicitly acknowledges reconciliation.
+
+Start Outcome Reconciliation (docs/architecture/
+programming-start-reconciliation-v1.md): every Start carries a Manager-issued
+``start_id`` (a run's ``plan_id``, or the ID issued for a Batch). The issue and
+the admission are journalled before any answer can be lost, so a Console that
+never saw the Start answer can ask, read-only, what became of it.
 """
 from __future__ import annotations
 
@@ -67,6 +73,10 @@ READ_OUTPUT_MAX_BYTES = 16 * 1024 * 1024
 MAX_READ_OUTPUTS_RETAINED = 8
 FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
                       "write_address", "verify_address", "readback_address")
+START_SCHEMA = "plasma.manager.programming-start-reconciliation.v1"
+VOID_TOKEN = "VOID_UNSTARTED_START"
+MAX_STARTS_RETAINED = 256
+MAX_PENDING_BATCH_STARTS = 16
 CONFIRM_TOKEN = "PROGRAM"
 ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED"
 UPLOAD_CHUNK_BYTES = 256 * 1024
@@ -230,6 +240,10 @@ class BundleProgrammingWorkflow:
         self._plans: dict[str, _Plan] = {}
         self._runs: dict[str, _Run] = {}
         self._read_outputs: dict[str, bytes] = {}
+        # Start admission records (journalled) and the Batch start IDs that
+        # may still be admitted (memory only, like plans: a restart ends them).
+        self._starts: dict[str, dict[str, Any]] = {}
+        self._pending_batch_starts: dict[str, tuple[str, float]] = {}
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
@@ -247,6 +261,13 @@ class BundleProgrammingWorkflow:
                     run.outcome = "OUTCOME_UNKNOWN"
                     run.reason = "MANAGER_RESTARTED_DURING_RUN"
                 self._runs[run.run_id] = run
+            starts = data.get("starts") if isinstance(data, dict) else None
+            for item in starts or []:
+                if (type(item["start_id"]) is not str or type(item["ppu_alias"]) is not str
+                        or item["kind"] not in ("run", "batch")
+                        or item["state"] not in ("ISSUED", "CONSUMED", "VOIDED")):
+                    raise ValueError("start record")
+                self._starts[item["start_id"]] = dict(item)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise RuntimeError("Bundle programming journal is unreadable; refusing to start") from exc
 
@@ -254,8 +275,14 @@ class BundleProgrammingWorkflow:
         if self.journal_path is None:
             return
         runs = sorted(self._runs.values(), key=lambda r: r.created_at)[-MAX_RUNS_RETAINED:]
+        starts = sorted(self._starts.values(), key=lambda s: s["issued_at"])
+        for stale in starts[:-MAX_STARTS_RETAINED]:
+            # A dropped record is never read as "not accepted": an unrecorded
+            # start_id reconciles to OUTCOME_UNKNOWN.
+            del self._starts[stale["start_id"]]
         payload = {"schema": "plasma.manager.bundle-programming-journal.v1",
-                   "runs": [r.as_dict() for r in runs]}
+                   "runs": [r.as_dict() for r in runs],
+                   "starts": starts[-MAX_STARTS_RETAINED:]}
         parent = self.journal_path.parent
         parent.mkdir(parents=True, exist_ok=True)
         fd, name = tempfile.mkstemp(prefix=f".{self.journal_path.name}.", dir=parent)
@@ -593,6 +620,19 @@ class BundleProgrammingWorkflow:
                 plan_id, alias, site, now, built, route, payload, operation=operation,
                 operations=operations, resource_set_sha256=resource_sha, image=image, image_asset=image_asset,
                 binding=binding, binding_sha256=binding_sha)
+            # The plan_id is the run's start_id: its issue is journalled so a
+            # start that never arrives can later be proven "not accepted".
+            self._starts[plan_id] = {
+                "start_id": plan_id, "kind": "run", "ppu_alias": alias, "site_id": site,
+                "ppu_id": ppu_id, "operation": operation, "operations": operations,
+                "job_binding_sha256": binding_sha, "state": "ISSUED",
+                "run_id": None, "batch_id": None, "issued_at": _now(), "updated_at": _now()}
+            try:
+                self._persist_locked()
+            except BaseException:
+                self._plans.pop(plan_id, None)
+                self._starts.pop(plan_id, None)
+                raise
         return {"ok": True, "plan": payload}
 
     def start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -620,9 +660,215 @@ class BundleProgrammingWorkflow:
             run = _Run(run_id=secrets.token_hex(16), alias=alias, site=plan.site,
                        plan=plan.payload)
             self._runs[run.run_id] = run
-            self._persist_locked()
+            # Admission is journalled together with the run, before anything
+            # is spawned and before the answer (which may be lost) is sent.
+            record = self._starts.setdefault(plan.plan_id, {
+                "start_id": plan.plan_id, "kind": "run", "ppu_alias": alias,
+                "site_id": plan.site, "ppu_id": plan.binding.get("ppu_id"),
+                "operation": plan.operation, "operations": plan.operations,
+                "job_binding_sha256": plan.binding_sha256, "batch_id": None,
+                "issued_at": _now()})
+            record.update(state="CONSUMED", run_id=run.run_id, updated_at=_now())
+            try:
+                self._persist_locked()
+            except BaseException:
+                # Not journalled: nothing is spawned and no run is kept. The
+                # start record stays CONSUMED in memory (reconciles UNKNOWN).
+                del self._runs[run.run_id]
+                raise
         self.spawn(lambda: self._execute(run, plan))
         return {"ok": True, "run": run.as_dict()}
+
+    # ------------------------------------------------ start outcome reconciliation
+    def issue_batch_start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
+        """Issue the start_id one Batch start must carry. Submits nothing."""
+        if not isinstance(body, Mapping) or dict(body) != {"kind": "batch"}:
+            raise ProgrammingError(400, "invalid_request", "a start ID is issued for kind=batch only")
+        self._require_commissioned(alias)
+        with self._lock:
+            now = self.monotonic()
+            for key in [k for k, (_a, at) in self._pending_batch_starts.items()
+                        if now - at > PLAN_TTL_S]:
+                del self._pending_batch_starts[key]
+            while len(self._pending_batch_starts) >= MAX_PENDING_BATCH_STARTS:
+                del self._pending_batch_starts[min(
+                    self._pending_batch_starts, key=lambda k: self._pending_batch_starts[k][1])]
+            start_id = secrets.token_hex(16)
+            self._pending_batch_starts[start_id] = (alias, now)
+            self._starts[start_id] = {
+                "start_id": start_id, "kind": "batch", "ppu_alias": alias, "site_id": None,
+                "ppu_id": None, "operation": PROGRAMMING, "operations": None,
+                "job_binding_sha256": None, "state": "ISSUED",
+                "run_id": None, "batch_id": None, "issued_at": _now(), "updated_at": _now()}
+            try:
+                self._persist_locked()
+            except BaseException:
+                self._pending_batch_starts.pop(start_id, None)
+                self._starts.pop(start_id, None)
+                raise
+            return {"ok": True, "start": {"start_id": start_id, "kind": "batch",
+                                          "ppu_alias": alias, "expires_in_s": PLAN_TTL_S}}
+
+    def _batch_start_startable(self, alias: str, start_id: object) -> bool:
+        pending = self._pending_batch_starts.get(start_id) if type(start_id) is str else None
+        return (pending is not None and pending[0] == alias
+                and self.monotonic() - pending[1] <= PLAN_TTL_S)
+
+    def require_batch_start(self, alias: str, start_id: object) -> None:
+        with self._lock:
+            if not self._batch_start_startable(alias, start_id):
+                raise ProgrammingError(
+                    409, "programming_start_not_startable",
+                    "this start ID was not issued for this PPU, was already used, was "
+                    "voided or expired; nothing was started")
+
+    def consume_batch_start(self, alias: str, start_id: str, batch_id: str, site: int) -> None:
+        """One start ID admits one Batch; journalled before the Batch exists."""
+        with self._lock:
+            self.require_batch_start(alias, start_id)
+            del self._pending_batch_starts[start_id]
+            record = self._starts.setdefault(start_id, {
+                "start_id": start_id, "kind": "batch", "ppu_alias": alias, "ppu_id": None,
+                "operation": PROGRAMMING, "operations": None, "job_binding_sha256": None,
+                "run_id": None, "issued_at": _now()})
+            record.update(state="CONSUMED", batch_id=batch_id, site_id=site, updated_at=_now())
+            self._persist_locked()
+
+    def void_start(self, alias: str, start_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
+        """Operator: a start that was never admitted may never be admitted.
+
+        Removes only an unconsumed plan / Batch start ID. It cannot touch a
+        run, a Batch, a Job or a PPU, and it refuses an admitted start.
+        """
+        if not isinstance(body, Mapping) or dict(body) != {"void": VOID_TOKEN}:
+            raise ProgrammingError(400, "invalid_request", f"void requires void={VOID_TOKEN}")
+        with self._lock:
+            record = self._starts.get(start_id)
+            if record is None or record["ppu_alias"] != alias:
+                raise ProgrammingError(404, "programming_start_not_found",
+                                       "no start with this ID is recorded for this PPU")
+            admitted = any((run.plan or {}).get("plan_id") == start_id
+                           for run in self._runs.values())
+            if record["state"] != "ISSUED" or admitted:
+                raise ProgrammingError(409, "programming_start_not_voidable",
+                                       "only a start that was never admitted can be voided")
+            self._plans.pop(start_id, None)
+            self._pending_batch_starts.pop(start_id, None)
+            record.update(state="VOIDED", updated_at=_now())
+            self._persist_locked()
+        return self.reconcile_start(alias, start_id)
+
+    def reconcile_start(self, alias: str, start_id: str,
+                        find_batch: Callable[[str], dict[str, Any] | None] | None = None,
+                        ) -> dict[str, Any]:
+        """What became of one Start. Read-only: journal and memory only.
+
+        Never contacts a PPU, never submits, retries or acknowledges. A Site
+        being idle or a plan being gone is not evidence here; ``NOT_ACCEPTED``
+        needs a journalled issue record that was never consumed AND a start
+        that can no longer be admitted. Anything unprovable is OUTCOME_UNKNOWN.
+        """
+        self._record(alias)
+        batch = find_batch(start_id) if find_batch is not None else None
+        with self._lock:
+            record = self._starts.get(start_id)
+            run = next((r for r in self._runs.values()
+                        if (r.plan or {}).get("plan_id") == start_id), None)
+            view: dict[str, Any] = {
+                "schema": START_SCHEMA, "start_id": start_id, "ppu_alias": alias,
+                "kind": None, "state": "OUTCOME_UNKNOWN", "reason": None, "outcome": None,
+                "identity": None, "run": None, "batch": None, "acknowledged": None,
+                "unknown_run_id": None, "expires_in_s": None,
+                "read_only": True, "auto_retry": "DISABLED",
+            }
+
+            def unknown(reason: str) -> dict[str, Any]:
+                view.update(state="OUTCOME_UNKNOWN", reason=reason)
+                return {"ok": True, "reconciliation": view}
+
+            if record is not None and record["ppu_alias"] != alias:
+                return unknown("START_IDENTITY_MISMATCH")
+            if run is not None:
+                plan = run.plan or {}
+                if run.alias != alias:
+                    return unknown("START_IDENTITY_MISMATCH")
+                if record is not None and (
+                        record["kind"] != "run" or record["state"] != "CONSUMED"
+                        or record.get("run_id") != run.run_id
+                        or record.get("site_id") != run.site
+                        or record.get("job_binding_sha256") != plan.get("job_binding_sha256")):
+                    return unknown("JOURNAL_INCONSISTENT")
+                binding = plan.get("job_binding") if isinstance(plan.get("job_binding"), dict) else {}
+                view.update(kind="run", run=run.as_dict(), outcome=run.outcome, identity={
+                    "ppu_alias": run.alias, "site_id": run.site, "ppu_id": binding.get("ppu_id"),
+                    "operation": plan.get("operation"), "operations": plan.get("operations"),
+                    "job_binding_sha256": plan.get("job_binding_sha256")})
+                if run.outcome is None:
+                    view.update(state="ACCEPTED_RUNNING", reason="RUN_IN_PROGRESS")
+                elif run.outcome == "OUTCOME_UNKNOWN":
+                    view.update(reason=run.reason or "RUN_OUTCOME_UNKNOWN",
+                                acknowledged=run.acknowledged, unknown_run_id=run.run_id)
+                elif run.outcome in ("PASS", "FAIL", "BLOCKED"):
+                    view.update(state="TERMINAL_CONFIRMED", reason=run.reason)
+                else:
+                    return unknown("RUN_OUTCOME_UNRECOGNIZED")
+                return {"ok": True, "reconciliation": view}
+            if batch is not None:
+                if batch.get("ppu_alias") != alias or batch.get("start_id") != start_id:
+                    return unknown("START_IDENTITY_MISMATCH")
+                if record is not None and (
+                        record["kind"] != "batch" or record["state"] != "CONSUMED"
+                        or record.get("batch_id") != batch.get("batch_id")
+                        or record.get("site_id") != batch.get("site_id")):
+                    return unknown("JOURNAL_INCONSISTENT")
+                attempts = batch.get("attempts") or []
+                view.update(kind="batch", batch=batch, outcome=batch.get("outcome"), identity={
+                    "ppu_alias": alias, "site_id": batch.get("site_id"), "ppu_id": None,
+                    "operation": PROGRAMMING, "operations": batch.get("operations"),
+                    "job_binding_sha256": (attempts[-1].get("job_binding_sha256")
+                                           if attempts else None)})
+                outcome = batch.get("outcome")
+                if outcome is None:
+                    view.update(state="ACCEPTED_RUNNING", reason="BATCH_IN_PROGRESS")
+                elif outcome == "OUTCOME_UNKNOWN":
+                    current = batch.get("current_run")
+                    view.update(reason=batch.get("reason") or "BATCH_OUTCOME_UNKNOWN")
+                    if isinstance(current, dict) and current.get("outcome") == "OUTCOME_UNKNOWN":
+                        view.update(acknowledged=bool(current.get("acknowledged")),
+                                    unknown_run_id=current.get("run_id"))
+                elif outcome in ("PASS", "FAIL", "BLOCKED", "STOPPED"):
+                    view.update(state="TERMINAL_CONFIRMED", reason=batch.get("reason"))
+                else:
+                    return unknown("BATCH_OUTCOME_UNRECOGNIZED")
+                return {"ok": True, "reconciliation": view}
+            if record is None:
+                return unknown("START_NOT_RECORDED")
+            view.update(kind=record["kind"], identity={
+                "ppu_alias": record["ppu_alias"], "site_id": record.get("site_id"),
+                "ppu_id": record.get("ppu_id"), "operation": record.get("operation"),
+                "operations": record.get("operations"),
+                "job_binding_sha256": record.get("job_binding_sha256")})
+            if record["state"] == "VOIDED":
+                view.update(state="NOT_ACCEPTED", reason="START_VOIDED_BEFORE_ADMISSION")
+            elif record["state"] == "CONSUMED":
+                # Admitted, but the run / Batch record is gone: never "not run".
+                return unknown("ADMITTED_RECORD_MISSING")
+            else:
+                now = self.monotonic()
+                plan_held = self._plans.get(start_id)
+                left = None
+                if record["kind"] == "run" and plan_held is not None and plan_held.alias == alias:
+                    left = PLAN_TTL_S - (now - plan_held.created_monotonic)
+                elif record["kind"] == "batch" and self._batch_start_startable(alias, start_id):
+                    left = PLAN_TTL_S - (now - self._pending_batch_starts[start_id][1])
+                if left is not None and left >= 0:
+                    # A delayed Start request could still be admitted.
+                    view.update(state="ACCEPTANCE_PENDING", reason="START_STILL_ADMISSIBLE",
+                                expires_in_s=int(left))
+                else:
+                    view.update(state="NOT_ACCEPTED",
+                                reason="START_NEVER_ADMITTED_AND_NO_LONGER_ADMISSIBLE")
+            return {"ok": True, "reconciliation": view}
 
     def run_status(self, alias: str, run_id: str) -> dict[str, Any]:
         with self._lock:

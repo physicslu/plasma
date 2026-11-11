@@ -346,10 +346,14 @@ export type BatchInput = (
   | { icpn: string; siteId: number; operations: readonly ["erase"]; address: number; length: number }
 ) & { retryLimit: number; stopPolicy: StopPolicy };
 
-export async function startProgrammingBatch(alias: string, input: BatchInput): Promise<ProgrammingBatch> {
+export async function startProgrammingBatch(
+  alias: string, input: BatchInput, startId?: string,
+): Promise<ProgrammingBatch> {
   const common = {
     icpn: input.icpn, site_id: input.siteId, operations: [...input.operations],
     retry_limit: input.retryLimit, stop_policy: input.stopPolicy, repeat: 1,
+    // Manager-issued: admits at most one Batch and can be reconciled later.
+    ...(startId ? { start_id: startId } : {}),
   };
   const body = "image" in input
     ? { ...common, image_base64: bytesToBase64(input.image), image_filename: input.filename }
@@ -375,4 +379,68 @@ export async function stopProgrammingBatch(alias: string, batchId: string): Prom
     body: JSON.stringify({ stop: PROGRAMMING_STOP_TOKEN }),
   });
   return payload.batch;
+}
+
+// ------------------------------------------------ Start Outcome Reconciliation
+// Every Start carries a Manager-issued start ID: a run's `plan_id`, or the ID
+// issued here for a Batch. The Manager journals the issue and the admission,
+// so a Console that never saw the Start answer can ask what became of it.
+export const PROGRAMMING_VOID_TOKEN = "VOID_UNSTARTED_START";
+
+export type StartReconciliationState =
+  | "NOT_ACCEPTED"          // proven: never admitted and can no longer be
+  | "ACCEPTANCE_PENDING"    // not admitted yet; a delayed request still could be
+  | "ACCEPTED_RUNNING"
+  | "TERMINAL_CONFIRMED"    // PASS / FAIL / BLOCKED / STOPPED
+  | "OUTCOME_UNKNOWN";      // the run is unknown, or nothing can be proven
+
+export type StartReconciliation = {
+  schema: "plasma.manager.programming-start-reconciliation.v1";
+  start_id: string;
+  ppu_alias: string;
+  kind: "run" | "batch" | null;
+  state: StartReconciliationState;
+  reason: string | null;
+  outcome: ProgrammingBatchOutcome | null;
+  /** What the Manager journalled for this start; null when it has no record. */
+  identity: {
+    ppu_alias: string;
+    site_id: number | null;
+    ppu_id: string | null;
+    operation: string | null;
+    operations: string[] | null;
+    job_binding_sha256: string | null;
+  } | null;
+  run: ProgrammingRun | null;
+  batch: ProgrammingBatch | null;
+  /** OUTCOME_UNKNOWN run only: its Manager latch and the run to acknowledge. */
+  acknowledged: boolean | null;
+  unknown_run_id: string | null;
+  expires_in_s: number | null;
+  read_only: true;
+  auto_retry: "DISABLED";
+};
+
+/** Issue the start ID one Batch start must carry. Submits nothing. */
+export async function issueBatchStart(alias: string): Promise<string> {
+  const payload = await request<{ ok: true; start: { start_id: string } }>(`${base(alias)}/starts`, {
+    method: "POST",
+    body: JSON.stringify({ kind: "batch" }),
+  });
+  return payload.start.start_id;
+}
+
+/** Read-only. Repeating it never submits, retries or acknowledges anything. */
+export async function getStartReconciliation(alias: string, startId: string): Promise<StartReconciliation> {
+  const payload = await request<{ ok: true; reconciliation: StartReconciliation }>(`${base(alias)}/starts/${startId}`);
+  return payload.reconciliation;
+}
+
+/** Operator: a start the Manager never admitted may never be admitted. */
+export async function voidStart(alias: string, startId: string): Promise<StartReconciliation> {
+  const payload = await request<{ ok: true; reconciliation: StartReconciliation }>(`${base(alias)}/starts/${startId}/void`, {
+    method: "POST",
+    body: JSON.stringify({ void: PROGRAMMING_VOID_TOKEN }),
+  });
+  return payload.reconciliation;
 }

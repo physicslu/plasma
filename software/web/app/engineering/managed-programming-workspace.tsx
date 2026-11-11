@@ -14,6 +14,7 @@ import {
   loadPlatformAvailability,
   loadProgrammingRoutes,
   MANAGED_JOB_POLICY,
+  decideStartReconciliation,
   ManagedProgrammingBlocked,
   ManagedStartOutcomeUnknown,
   platformAvailability,
@@ -35,9 +36,12 @@ import {
   type ProgrammingRun,
   type ProgrammingSource,
   type RoutesState,
+  type StartIdentity,
 } from "../programming/managed-programming";
 import {
   acknowledgeProgrammingRun,
+  getStartReconciliation,
+  voidStart,
   MAX_RETRY_LIMIT,
   normalizeOperations,
   operationsTakeImage,
@@ -106,7 +110,15 @@ type RunContext = { alias: string; siteId: number; startedAt: number; finishedAt
 // hold only keeps THIS Console from sending another write to the PPU until the
 // operator reconciles it. It is stored so a reload cannot drop it.
 const START_HOLD_KEY = "plasma.emode.start-outcome-unknown.v1";
-type StartHold = { alias: string; siteId: number; kind: "READ" | "PROGRAMMING"; detail: string; at: string };
+// The hold is UX recovery only: it remembers WHICH Manager start to ask about.
+// Whether that start ran, and how it ended, is the Manager's journal alone.
+type StartHold = {
+  alias: string; siteId: number; kind: "READ" | "PROGRAMMING"; detail: string; at: string;
+  /** Manager-issued start ID (run plan ID / Batch start ID); null: not reconcilable. */
+  startId: string | null;
+  jobBindingSha256: string | null;
+};
+type HoldStep = { startId: string; action: "ACKNOWLEDGE_RUN" | "VOID" };
 let heldStarts: Record<string, StartHold> = {};
 
 function readStartHolds(): Record<string, StartHold> {
@@ -204,6 +216,8 @@ export default function ManagedProgrammingWorkspace() {
   // null until the stored holds are read: nothing may start before that.
   const [startHolds, setStartHolds] = useState<Record<string, StartHold> | null>(null);
   const [releasingHold, setReleasingHold] = useState(false);
+  // The explicit second operator step the Manager's last answer asked for.
+  const [holdStep, setHoldStep] = useState<HoldStep | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
 
   // READ: an independent Job per Site row, never part of the Batch above.
@@ -242,7 +256,15 @@ export default function ManagedProgrammingWorkspace() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStartHolds(readStartHolds()), 0);
-    return () => window.clearTimeout(timer);
+    // A hold taken in another tab of this Browser blocks this tab too.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === START_HOLD_KEY) setStartHolds({ ...readStartHolds() });
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   // Registry + Fleet: the only topology source.
@@ -411,20 +433,59 @@ export default function ManagedProgrammingWorkspace() {
     setSiteReads({});
   }
 
-  function holdStart(alias: string, siteId: number, kind: StartHold["kind"], detail: string) {
-    const next = { ...readStartHolds(), [alias]: { alias, siteId, kind, detail, at: new Date().toISOString() } };
+  function holdStart(alias: string, siteId: number, kind: StartHold["kind"], detail: string, identity: StartIdentity | null) {
+    const next = { ...readStartHolds(), [alias]: {
+      alias, siteId, kind, detail, at: new Date().toISOString(),
+      startId: identity?.startId ?? null, jobBindingSha256: identity?.jobBindingSha256 ?? null,
+    } };
     writeStartHolds(next);
     setStartHolds(next);
+    setHoldStep(null);
   }
 
-  // Operator reconciliation of a lost Start answer. Never automatic: it reads
-  // the Manager Fleet and releases the hold only when the Site is idle with no
-  // Job. The Manager's own latch and run guards still decide the next Start.
-  async function releaseStartHold() {
+  // Operator reconciliation of a lost Start answer, decided by the Manager.
+  // Every click asks the Manager (read-only) what became of that exact start.
+  // The hold is released only when the Manager proves the start was never
+  // admitted, or names the run / Batch it became with a definite result or an
+  // acknowledged OUTCOME UNKNOWN, AND the Site is idle with no Job. A Site
+  // being idle is never enough. The two writes (acknowledge the Manager run,
+  // void an unstarted start) are separate explicit operator clicks and are
+  // only sent when the fresh answer still asks for them.
+  async function reconcileStartHold(step: "RECONCILE" | HoldStep["action"]) {
     if (!startHold || releasingHold || active) return;
     const hold = startHold;
+    const label = `${hold.kind} Start ${hold.startId ?? "without a Manager start ID"} on PPU ${hold.alias}`;
+    const keep = (why: string) => {
+      setStatusNote(`The Start hold on PPU ${hold.alias} was kept: ${why}.`);
+      appendLog(`[RECONCILE] HOLD KEPT · ${label} · ${why}`, true, "USR");
+    };
     setReleasingHold(true);
     try {
+      if (!hold.startId) {
+        setHoldStep(null);
+        keep("it was recorded without a Manager start ID, so the Manager cannot reconcile it");
+        return;
+      }
+      let answer = await getStartReconciliation(hold.alias, hold.startId);
+      let decision = decideStartReconciliation(hold, answer);
+      if (step === "ACKNOWLEDGE_RUN" && decision.action === "ACKNOWLEDGE_RUN") {
+        const runId = decision.runId;
+        const acknowledged = await acknowledgeProgrammingRun(hold.alias, runId);
+        setUnresolved(current => current?.run_id === runId && acknowledged.acknowledged ? null : current);
+        appendLog(`[ACK] OUTCOME UNKNOWN reconciled by the operator · Run ${runId} · the device result stays unknown`, false, "USR");
+        answer = await getStartReconciliation(hold.alias, hold.startId);
+        decision = decideStartReconciliation(hold, answer);
+      } else if (step === "VOID" && decision.action === "VOID") {
+        answer = await voidStart(hold.alias, hold.startId);
+        appendLog(`[VOID] ${label} was voided on the Manager before admission; it can never start`, false, "USR");
+        decision = decideStartReconciliation(hold, answer);
+      }
+      setHoldStep(decision.action === "ACKNOWLEDGE_RUN" || decision.action === "VOID"
+        ? { startId: hold.startId, action: decision.action } : null);
+      if (decision.action !== "RELEASE") {
+        keep(decision.summary);
+        return;
+      }
       const fresh = await loadManagedTopology();
       setTopology(fresh);
       const target = fresh.ppus.find(item => item.alias === hold.alias);
@@ -436,8 +497,7 @@ export default function ManagedProgrammingWorkspace() {
           ? `${siteLabel(hold.siteId)} is ${site.state.toUpperCase()}${site.current_job_id ? ` (Job ${site.current_job_id})` : ""}`
         : null;
       if (refusal) {
-        setStatusNote(`The Start hold on PPU ${hold.alias} was kept: ${refusal}.`);
-        appendLog(`[ACK] REFUSED · Start OUTCOME UNKNOWN on PPU ${hold.alias} is not reconciled · ${refusal}`, true, "USR");
+        keep(`${decision.summary}, but ${refusal}`);
         return;
       }
       const next = { ...readStartHolds() };
@@ -445,9 +505,9 @@ export default function ManagedProgrammingWorkspace() {
       writeStartHolds(next);
       setStartHolds(next);
       setStatusNote(null);
-      appendLog(`[ACK] Start OUTCOME UNKNOWN reconciled by the operator · PPU ${hold.alias} · ${siteLabel(hold.siteId)} idle, no Job (Manager Fleet) · the result of the lost ${hold.kind} request stays unknown`, false, "USR");
+      appendLog(`[RECONCILE] ${label} reconciled with the Manager · ${decision.summary} · ${siteLabel(hold.siteId)} idle, no Job (Manager Fleet)`, false, "USR");
     } catch (reason) {
-      setStatusNote(`The Start hold was kept: ${reason instanceof Error ? reason.message : "the Manager Fleet could not be read"}.`);
+      keep(`the Manager could not be asked (${reason instanceof Error ? reason.message : "request failed"})`);
     } finally {
       setReleasingHold(false);
     }
@@ -591,7 +651,7 @@ export default function ManagedProgrammingWorkspace() {
         appendLog(`[BLOCKED] ${reason.stage.toUpperCase()} · ${message} · no Job was submitted`, true);
       } else if (reason instanceof ManagedStartOutcomeUnknown) {
         setStartUnknown(reason.message);
-        holdStart(context.alias, context.siteId, "PROGRAMMING", reason.message);
+        holdStart(context.alias, context.siteId, "PROGRAMMING", reason.message, reason.identity);
         appendLog(`[OUTCOME UNKNOWN] ${reason.message}`, true);
       } else {
         const message = reason instanceof Error ? reason.message : "Programming failed";
@@ -726,7 +786,7 @@ export default function ManagedProgrammingWorkspace() {
         : reason instanceof Error ? reason.message : "READ failed";
       finish(blocked ? "BLOCKED" : unknown ? "OUTCOME UNKNOWN" : "FAIL", message);
       // A lost Start answer is not a FAIL: hold every further Start on this PPU.
-      if (unknown) holdStart(alias, id, "READ", reason.message);
+      if (unknown) holdStart(alias, id, "READ", reason.message, reason.identity);
       appendLog(`[READ] ${label} · ${message}`, true);
     } finally {
       setReadPhase("idle");
@@ -948,11 +1008,17 @@ export default function ManagedProgrammingWorkspace() {
                 <span>
                   OUTCOME UNKNOWN — the {startHold.kind} Start request on PPU {startHold.alias} · {siteLabel(startHold.siteId)} got
                   no answer ({startHold.detail}) It may or may not have reached the PPU. Nothing is submitted to this PPU
-                  until you check it and acknowledge.
+                  until the Manager reconciles Start {startHold.startId ?? "(no Manager start ID recorded)"}.
                 </span>
-                <button type="button" className="engineeringAcknowledge" disabled={releasingHold || active} onClick={() => void releaseStartHold()}>
-                  Acknowledge Start reconciliation
+                <button type="button" className="engineeringAcknowledge" disabled={releasingHold || active} onClick={() => void reconcileStartHold("RECONCILE")}>
+                  Reconcile Start with Manager
                 </button>
+                {holdStep && holdStep.startId === startHold.startId && (
+                  <button type="button" className="engineeringAcknowledge" data-testid="managed-start-hold-step"
+                    disabled={releasingHold || active} onClick={() => void reconcileStartHold(holdStep.action)}>
+                    {holdStep.action === "VOID" ? "Void the unstarted Start" : "Acknowledge Run reconciliation"}
+                  </button>
+                )}
               </div>
             )}
             {statusNote && <div className="warning engineeringOperationWarning" role="status" data-testid="managed-status-note">{statusNote}</div>}

@@ -115,6 +115,8 @@ export type RunScript = {
   planError?: { code: string; message: string };
   startStatus?: number;
   startError?: { code: string; message: string };
+  /** true: the Manager admits the run but the Start answer never arrives (HTTP 504). */
+  startLost?: boolean;
   outcome?: RunOutcome;
   reason?: string | null;
   safeOff?: boolean;
@@ -141,6 +143,10 @@ export type Counters = {
   jobs: string[];
   polls: number;
   acks: number;
+  /** Start Outcome Reconciliation: issued Batch start IDs, read-only queries, voids. */
+  issued: string[];
+  reconciles: string[];
+  voids: string[];
   requests: string[];
   mutations: string[];
 };
@@ -162,9 +168,20 @@ export async function mockManager(page: Page, options: {
   /** Batch request refusal / lost response. */
   batchStatus?: number;
   batchError?: { code: string; message: string };
+  /** true: the Manager admits the Batch but the answer never arrives (HTTP 504). */
+  batchLost?: boolean;
+  /** Fault injection on the reconciliation answer: an HTTP status, or an edited view. */
+  reconcile?: (view: Record<string, unknown>) => Record<string, unknown> | number;
+  /** HTTP status of the Batch start ID issue (default 200). */
+  issueStatus?: number;
 } = {}) {
   const ppus = options.ppus ?? [Z2];
-  const counters: Counters = { plans: [], starts: [], downloads: [], batches: [], stops: [], jobs: [], polls: 0, acks: 0, requests: [], mutations: [] };
+  const counters: Counters = { plans: [], starts: [], downloads: [], batches: [], stops: [], jobs: [], polls: 0, acks: 0, issued: [], reconciles: [], voids: [], requests: [], mutations: [] };
+  // Journalled start admissions, as the Manager keeps them.
+  type StartRecord = { alias: string; kind: "run" | "batch"; state: "ISSUED" | "CONSUMED" | "VOIDED"; siteId: number | null;
+    operation: string; operations: string[] | null; bindingSha: string | null; runId: string | null; batchId: string | null };
+  const startRecords = new Map<string, StartRecord>();
+  const pendingBatchStarts = new Set<string>();
   const plans = new Map<string, { alias: string; siteId: number; body: Record<string, unknown>; script: RunScript; payload: Record<string, unknown> }>();
   const runs = new Map<string, { alias: string; planId: string; polls: number; acknowledged: boolean }>();
   let sequence = 0;
@@ -236,6 +253,8 @@ export async function mockManager(page: Page, options: {
       catalog_gate: "NOT_USED", confirm_required: "PROGRAM",
     };
     plans.set(planId, { alias, siteId, body, script, payload });
+    startRecords.set(planId, { alias, kind: "run", state: "ISSUED", siteId, operation: kind, operations,
+      bindingSha: payload.job_binding_sha256, runId: null, batchId: null });
     return { payload };
   }
 
@@ -314,7 +333,7 @@ export async function mockManager(page: Page, options: {
     const body = r.request().postDataJSON() as Record<string, unknown>;
     counters.starts.push({ alias, body });
     const planned = plans.get(String(body.plan_id));
-    if (!planned || runs.has(`run:${body.plan_id}`)) {
+    if (!planned || runs.has(`run:${body.plan_id}`) || startRecords.get(String(body.plan_id))?.state === "VOIDED") {
       return r.fulfill(json({ ok: false, error: { code: "programming_plan_not_found", message: "plan is missing or already consumed" } }, 404));
     }
     if (planned.script.startError) {
@@ -323,6 +342,11 @@ export async function mockManager(page: Page, options: {
     const runId = hex32(0xf000 + counters.starts.length);
     runs.set(runId, { alias, planId: String(body.plan_id), polls: 0, acknowledged: false });
     runs.set(`run:${body.plan_id}`, runs.get(runId)!);
+    Object.assign(startRecords.get(String(body.plan_id))!, { state: "CONSUMED", runId });
+    if (planned.script.startLost) {
+      // Admitted and journalled; only the answer is lost.
+      return r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Manager Bootstrap path is unavailable" } }, 504));
+    }
     await r.fulfill(json({ ok: true, run: runRecord(runId) }, 202));
   });
   await page.route(/\/bootstrap\/programming\/runs\/[0-9a-f]{32}$/, async (r: Route) => {
@@ -335,7 +359,7 @@ export async function mockManager(page: Page, options: {
   });
   // ---- EMode Batch: the mock Manager applies the same Retry / Stop contract.
   type MockBatch = {
-    alias: string; body: Record<string, unknown>; stopRequested: boolean;
+    alias: string; body: Record<string, unknown>; stopRequested: boolean; startId: string | null;
     attempts: Array<{ attempt: number; planId: string; runId: string; retry: Record<string, unknown> | null }>;
     outcome: string | null; reason: string | null;
   };
@@ -345,6 +369,7 @@ export async function mockManager(page: Page, options: {
     const runId = hex32(0xb000 + runs.size + 1);
     runs.set(runId, { alias: batch.alias, planId, polls: 0, acknowledged: false });
     batch.attempts.push({ attempt: batch.attempts.length + 1, planId, runId, retry: null });
+    Object.assign(startRecords.get(planId)!, { state: "CONSUMED", runId });
     counters.starts.push({ alias: batch.alias, body: { plan_id: planId, confirm: "PROGRAM" } });
     counters.jobs.push(runRecord(runId).job.job_id);
   }
@@ -395,7 +420,7 @@ export async function mockManager(page: Page, options: {
     });
     const last = batch.attempts[batch.attempts.length - 1];
     return {
-      schema: "plasma.manager.programming-batch.v1", batch_id: batchId, ppu_alias: batch.alias,
+      schema: "plasma.manager.programming-batch.v1", batch_id: batchId, ppu_alias: batch.alias, start_id: batch.startId,
       site_id: Number(batch.body.site_id), icpn: "STM32F103C8T6", operations: batch.body.operations,
       source: "bundle_base64" in batch.body ? "bundle" : "image_base64" in batch.body ? "image" : "range",
       policy: { repeat: 1, retry_limit: Number(batch.body.retry_limit ?? 0), stop_policy: batch.body.stop_policy ?? { kind: "never" } },
@@ -415,6 +440,10 @@ export async function mockManager(page: Page, options: {
     if (options.batchStatus) {
       return r.fulfill(json({ ok: false, error: options.batchError ?? { code: "manager_unavailable", message: "Manager unavailable" } }, options.batchStatus));
     }
+    const startId = "start_id" in body ? String(body.start_id) : null;
+    if (startId !== null && !(pendingBatchStarts.has(startId) && startRecords.get(startId)?.alias === alias)) {
+      return r.fulfill(json({ ok: false, error: { code: "programming_start_not_startable", message: "this start ID was not issued for this PPU, was already used, was voided or expired; nothing was started" } }, 409));
+    }
     const made = makePlan(alias, body, 1);
     if (!made.payload) return r.fulfill(json({ ok: false, error: made.error }, made.status));
     const planned = plans.get(String(made.payload.plan_id))!;
@@ -423,9 +452,16 @@ export async function mockManager(page: Page, options: {
       return r.fulfill(json({ ok: false, error: planned.script.startError }, planned.script.startStatus ?? 409));
     }
     const batchId = hex32(0xba000 + batches.size + 1);
-    const batch: MockBatch = { alias, body, stopRequested: false, attempts: [], outcome: null, reason: null };
+    const batch: MockBatch = { alias, body, stopRequested: false, startId, attempts: [], outcome: null, reason: null };
+    if (startId !== null) {
+      pendingBatchStarts.delete(startId);
+      Object.assign(startRecords.get(startId)!, { state: "CONSUMED", batchId, siteId: Number(body.site_id) });
+    }
     batches.set(batchId, batch);
     submitAttempt(batch, String(made.payload.plan_id));
+    if (options.batchLost) {
+      return r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Manager unavailable" } }, 504));
+    }
     await r.fulfill(json({ ok: true, batch: batchRecord(batchId) }, 202));
   });
   await page.route(/\/bootstrap\/programming\/batches\/[0-9a-f]{32}$/, async (r: Route) => {
@@ -461,6 +497,88 @@ export async function mockManager(page: Page, options: {
     const state = runs.get(runId)!;
     state.acknowledged = true;
     await r.fulfill(json({ ok: true, run: runRecord(runId) }));
+  });
+
+  // ---- Start Outcome Reconciliation (same contract as plasma_manager.programming).
+  function reconciliation(alias: string, startId: string): Record<string, unknown> {
+    const record = startRecords.get(startId);
+    const view: Record<string, unknown> = {
+      schema: "plasma.manager.programming-start-reconciliation.v1", start_id: startId, ppu_alias: alias,
+      kind: null, state: "OUTCOME_UNKNOWN", reason: null, outcome: null, identity: null, run: null, batch: null,
+      acknowledged: null, unknown_run_id: null, expires_in_s: null, read_only: true, auto_retry: "DISABLED",
+    };
+    if (!record) return { ...view, reason: "START_NOT_RECORDED" };
+    if (record.alias !== alias) return { ...view, reason: "START_IDENTITY_MISMATCH" };
+    view.kind = record.kind;
+    view.identity = { ppu_alias: record.alias, site_id: record.siteId, ppu_id: ppus.find(item => item.alias === alias)?.ppuId ?? null,
+      operation: record.operation, operations: record.operations, job_binding_sha256: record.bindingSha };
+    if (record.state === "VOIDED") return { ...view, state: "NOT_ACCEPTED", reason: "START_VOIDED_BEFORE_ADMISSION" };
+    if (record.state === "ISSUED") {
+      return { ...view, state: "ACCEPTANCE_PENDING", reason: "START_STILL_ADMISSIBLE", expires_in_s: 1800 };
+    }
+    if (record.kind === "run") {
+      const state = runs.get(record.runId!)!;
+      state.polls += 1;  // the Job advances with time, not because it was asked about
+      const run = runRecord(record.runId!);
+      Object.assign(view, { run, outcome: run.outcome });
+      if (run.outcome === null) return { ...view, state: "ACCEPTED_RUNNING", reason: "RUN_IN_PROGRESS" };
+      if (run.outcome === "OUTCOME_UNKNOWN") {
+        return { ...view, reason: run.reason, acknowledged: state.acknowledged, unknown_run_id: record.runId };
+      }
+      return { ...view, state: "TERMINAL_CONFIRMED", reason: run.reason };
+    }
+    const batch = batches.get(record.batchId!)!;
+    advance(batch);
+    const shown = batchRecord(record.batchId!);
+    (view.identity as Record<string, unknown>).operations = shown.operations;
+    (view.identity as Record<string, unknown>).job_binding_sha256 = shown.attempts[shown.attempts.length - 1]?.job_binding_sha256 ?? null;
+    Object.assign(view, { batch: shown, outcome: shown.outcome });
+    if (shown.outcome === null) return { ...view, state: "ACCEPTED_RUNNING", reason: "BATCH_IN_PROGRESS" };
+    if (shown.outcome === "OUTCOME_UNKNOWN") {
+      const current = shown.current_run;
+      return { ...view, reason: shown.reason, acknowledged: current ? current.acknowledged : null,
+        unknown_run_id: current?.outcome === "OUTCOME_UNKNOWN" ? current.run_id : null };
+    }
+    return { ...view, state: "TERMINAL_CONFIRMED", reason: shown.reason };
+  }
+
+  await page.route(/\/bootstrap\/programming\/starts$/, async (r: Route) => {
+    const alias = new URL(r.request().url()).pathname.split("/")[4];
+    if (options.issueStatus) {
+      return r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Manager unavailable" } }, options.issueStatus));
+    }
+    const startId = hex32(0x5a000 + counters.issued.length + 1);
+    counters.issued.push(startId);
+    pendingBatchStarts.add(startId);
+    startRecords.set(startId, { alias, kind: "batch", state: "ISSUED", siteId: null, operation: "programming",
+      operations: null, bindingSha: null, runId: null, batchId: null });
+    await r.fulfill(json({ ok: true, start: { start_id: startId, kind: "batch", ppu_alias: alias, expires_in_s: 1800 } }));
+  });
+  await page.route(/\/bootstrap\/programming\/starts\/[0-9a-f]{32}$/, async (r: Route) => {
+    const parts = new URL(r.request().url()).pathname.split("/");
+    const startId = parts.pop()!;
+    counters.reconciles.push(startId);
+    const view = reconciliation(parts[4], startId);
+    const edited = options.reconcile ? options.reconcile(view) : view;
+    if (typeof edited === "number") {
+      return r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Manager unavailable" } }, edited));
+    }
+    await r.fulfill(json({ ok: true, reconciliation: edited }));
+  });
+  await page.route(/\/bootstrap\/programming\/starts\/[0-9a-f]{32}\/void$/, async (r: Route) => {
+    const parts = new URL(r.request().url()).pathname.split("/");
+    const startId = parts.slice(-2)[0];
+    counters.voids.push(startId);
+    const record = startRecords.get(startId);
+    if (!record || record.alias !== parts[4]) {
+      return r.fulfill(json({ ok: false, error: { code: "programming_start_not_found", message: "no start with this ID is recorded for this PPU" } }, 404));
+    }
+    if (record.state !== "ISSUED") {
+      return r.fulfill(json({ ok: false, error: { code: "programming_start_not_voidable", message: "only a start that was never admitted can be voided" } }, 409));
+    }
+    record.state = "VOIDED";
+    pendingBatchStarts.delete(startId);
+    await r.fulfill(json({ ok: true, reconciliation: reconciliation(parts[4], startId) }));
   });
   return counters;
 }

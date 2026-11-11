@@ -28,6 +28,8 @@ PROGRAMMING_OUTPUT_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/output$")
 PROGRAMMING_BATCH_RE = re.compile(r"^programming/batches/([0-9a-f]{32})$")
 PROGRAMMING_BATCH_STOP_RE = re.compile(r"^programming/batches/([0-9a-f]{32})/stop$")
 PROGRAMMING_ACK_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/acknowledge$")
+PROGRAMMING_START_RE = re.compile(r"^programming/starts/([0-9a-f]{32})$")
+PROGRAMMING_START_VOID_RE = re.compile(r"^programming/starts/([0-9a-f]{32})/void$")
 
 
 class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
@@ -294,6 +296,13 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             self._programming_call(
                 lambda: (HTTPStatus.OK, self._batches().status(alias, batch_id)))
             return
+        start_match = PROGRAMMING_START_RE.fullmatch(action)
+        if start_match is not None:
+            # Start Outcome Reconciliation: read-only, journal and memory only.
+            start_id = start_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().reconcile_start(alias, start_id)))
+            return
         output_match = PROGRAMMING_OUTPUT_RE.fullmatch(action)
         if output_match is not None:
             # Read Memory binary: Console -> BFF -> Manager only; the Manager
@@ -539,6 +548,18 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                     return
                 self._programming_call(
                     lambda: (HTTPStatus.ACCEPTED, self._batches().start(alias, body)))
+                return
+            if action == "programming/starts":
+                # Issues a start ID only: nothing is planned, queued or submitted.
+                self._programming_call(
+                    lambda: (HTTPStatus.OK, self._programming().issue_batch_start(alias, body)))
+                return
+            void_match = PROGRAMMING_START_VOID_RE.fullmatch(action)
+            if void_match is not None:
+                # Drops an unconsumed plan / start ID; refuses an admitted start.
+                start_id = void_match.group(1)
+                self._programming_call(
+                    lambda: (HTTPStatus.OK, self._programming().void_start(alias, start_id, body)))
                 return
             stop_match = PROGRAMMING_BATCH_STOP_RE.fullmatch(action)
             if stop_match is not None:

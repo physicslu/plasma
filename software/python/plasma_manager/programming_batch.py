@@ -57,6 +57,7 @@ BATCH_TERMINAL = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN", "BLOCKED", "STOPP
 PLAN_KEYS = frozenset({"icpn", "site_id", "operations", "image_base64", "image_filename",
                        "bundle_base64", "address", "length"})
 POLICY_KEYS = frozenset({"retry_limit", "stop_policy", "repeat"})
+START_KEYS = frozenset({"start_id"})
 
 
 def _now() -> str:
@@ -233,7 +234,7 @@ class ProgrammingBatchCoordinator:
 
     # --------------------------------------------------------------------- API
     def start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        if (not isinstance(body, Mapping) or set(body) - PLAN_KEYS - POLICY_KEYS
+        if (not isinstance(body, Mapping) or set(body) - PLAN_KEYS - POLICY_KEYS - START_KEYS
                 or "operations" not in body):
             raise ProgrammingError(
                 400, "invalid_request",
@@ -241,7 +242,13 @@ class ProgrammingBatchCoordinator:
                 "Image, Bundle or erase range, and optional retry_limit / stop_policy")
         policy = parse_policy(body)
         plan_body = {key: body[key] for key in body if key in PLAN_KEYS}
+        # Optional Manager-issued start ID (Start Outcome Reconciliation). A
+        # start that carries one is admitted at most once and is refused when
+        # the ID is unknown, used, voided or expired.
+        start_id = body.get("start_id")
         with self._lock:
+            if "start_id" in body:
+                self.workflow.require_batch_start(alias, start_id)
             if any(b["ppu_alias"] == alias and b["outcome"] is None
                    for b in self._batches.values()):
                 raise ProgrammingError(409, "programming_batch_in_progress",
@@ -263,16 +270,36 @@ class ProgrammingBatchCoordinator:
             planned = self.workflow.plan(alias, plan_body)["plan"]
             batch = {
                 "schema": BATCH_SCHEMA, "batch_id": secrets.token_hex(16), "ppu_alias": alias,
+                "start_id": start_id,
                 "site_id": planned["site_id"], "operations": planned["operations"],
                 "source": planned["source"], "icpn": planned["route"]["icpn"],
                 "policy": policy, "state": "running", "outcome": None, "reason": None,
                 "stop_requested": False, "attempts": [],
                 "created_at": _now(), "updated_at": _now(),
             }
+            if start_id is not None:
+                # Admission is journalled first: from here on the start can
+                # never reconcile as "not accepted".
+                self.workflow.consume_batch_start(
+                    alias, start_id, batch["batch_id"], planned["site_id"])
             self._batches[batch["batch_id"]] = batch
-            self._persist_locked()
+            try:
+                self._persist_locked()
+            except BaseException:
+                del self._batches[batch["batch_id"]]
+                raise
         self.spawn(lambda: self._execute(batch, plan_body, planned))
         return {"ok": True, "batch": self._view(batch)}
+
+    def reconcile_start(self, alias: str, start_id: str) -> dict[str, Any]:
+        """Read-only: what became of the Start that carried ``start_id``."""
+        def find_batch(wanted: str) -> dict[str, Any] | None:
+            with self._lock:
+                for batch in self._batches.values():
+                    if batch.get("start_id") == wanted:
+                        return self._view(batch)
+            return None
+        return self.workflow.reconcile_start(alias, start_id, find_batch)
 
     def status(self, alias: str, batch_id: str) -> dict[str, Any]:
         with self._lock:
