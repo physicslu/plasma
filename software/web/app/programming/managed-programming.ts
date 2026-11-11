@@ -232,6 +232,21 @@ export function routeOperations(
   return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
 }
 
+/** Operations any committed Route declares for this IC (multi-Site selection). */
+export function routeOperationsForIc(routes: ProgrammingRoute[] | null, icpn: string | null): ProgrammingOperation[] {
+  if (!routes || !icpn) return [];
+  const declared = new Set(routes.filter(route => route.icpn === icpn).flatMap(route => route.operations));
+  return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
+}
+
+export const PROGRAMMING_OPERATION_LABELS: Record<ProgrammingOperation, { code: string; label: string }> = {
+  flash_cycle: { code: "F", label: "Flash Cycle" },
+  program: { code: "P", label: "Program" },
+  verify: { code: "V", label: "Verify" },
+  erase: { code: "E", label: "Erase" },
+  read: { code: "R", label: "Read" },
+};
+
 export function isImageOperation(operation: string | null): operation is ImageOperation {
   return operation != null && IMAGE_OPERATIONS.has(operation);
 }

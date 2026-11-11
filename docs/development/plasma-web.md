@@ -71,6 +71,31 @@ Manager programming plan + run → PPU Runtime.
 - Browser (Playwright) and Mock results are Host-only evidence and never
   physical PPU / FPGA / DUT acceptance.
 
+### PMode Factory Console on the Manager backend
+
+PMode keeps its Facility → PPU → Site UI. On a Managed Control Station the
+catalog is the Manager Registry + Fleet (PPU key = Manager Alias) and a
+production batch is a **sequence of independent Manager programming runs**
+(`software/web/app/fleet/managed-factory-backend.ts`): per-PPU admission on a
+fresh observation, one plan / Site lease / Resource check / Job Binding per
+Site, `attempts = 1`, no retry. An `OUTCOME_UNKNOWN` run stops the later
+Sites of that PPU only; Stop Policy and ABORT only stop queuing.
+
+The page states this mode to the operator
+(`Sequential / Session-based / Non-durable · NOT PRODUCTION QUALIFIED`), its
+ready label is `SEQUENTIAL BATCH READY`, and each receipt names the Site
+interface so a Mock result is never read as hardware evidence.
+
+Not implemented, and not to be claimed:
+
+- **Durable Manager-owned production batch.** The batch lives in the Console
+  session; a reload stops queuing (an in-flight run finishes in the Manager).
+- **Concurrency.** One run at a time. Parallel Sites on one PPU and parallel
+  PPUs are not physically qualified.
+- **Production qualification.** Only PYNQ-Z2 Site 2 has physical evidence.
+  `site_count` is topology, never capability: a Site is programmable only
+  when a committed Programming Route declares the IC on it.
+
 ## Web validation commands
 
 ```bash
