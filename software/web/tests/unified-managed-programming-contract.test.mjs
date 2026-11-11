@@ -56,11 +56,13 @@ test("one Start: lock -> plan -> exactly one start -> observe; no retry of any w
   assert.equal((core.match(/planProgramming\(/g) ?? []).length, 2);
   assert.equal((core.match(/startProgramming\(/g) ?? []).length, 2);
   assert.match(core, /export async function runManagedRead\(/);
-  assert.equal((emode.match(/runManagedProgramming\(/g) ?? []).length, 1);
+  // EMode starts one Manager Batch; PMode keeps the single-run entry point.
+  assert.equal((emode.match(/runManagedBatch\(/g) ?? []).length, 1);
   assert.doesNotMatch(emode, /planProgramming\(|startProgramming\(/);
-  // The only loop is the read-only status poll.
-  assert.equal((core.match(/\bwhile \(/g) ?? []).length, 1);
+  // The only loops are the read-only status polls (run, Batch).
+  assert.equal((core.match(/\bwhile \(/g) ?? []).length, 2);
   assert.match(core, /while \(run\.outcome == null\)/);
+  assert.match(core, /while \(batch\.outcome == null\)/);
   assert.doesNotMatch(core, /for \(let (retry|attempt)/);
   assert.match(core, /MANAGED_JOB_POLICY = Object\.freeze\(\{ attempts: 1, auto_retry: "DISABLED" as const \}\)/);
   assert.match(core, /status != null && status >= 400 && status < 500/);
@@ -69,7 +71,7 @@ test("one Start: lock -> plan -> exactly one start -> observe; no retry of any w
 
 test("Start is double-click safe and the manual Prepare step is gone from EMode", () => {
   assert.match(emode, /if \(startLock\.current \|\| !readiness\.ready/);
-  assert.match(emode, /startLock\.current = true;\s*const request: ManagedRunRequest =/);
+  assert.match(emode, /startLock\.current = true;\s*const policy = \{ retryLimit, stopPolicy \};\s*const request: ManagedBatchRequest =/);
   assert.doesNotMatch(emode, /Prepare Programming|Confirm programming|confirmedPlanId/);
   assert.match(emode, /startLabel="START PROGRAMMING"/);
 });
@@ -93,16 +95,26 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
 test("the standing PROGRAMMING PLAN panel is gone; the Backend plan still runs and is logged", () => {
   assert.doesNotMatch(emode, /PROGRAMMING PLAN|managed-plan|aria-label="Programming plan"/);
   assert.match(core, /plan = await planProgramming\(request\.alias, input\)/);
-  assert.match(emode, /\[PLAN\] \$\{next\.plan_id\} · Route/);
-  assert.match(emode, /Resource SHA256 \$\{next\.resource\.resource_set_sha256\} · Job Binding SHA256/);
+  assert.match(emode, /\[PLAN\] \$\{planned\.plan_id\} · Route/);
+  assert.match(emode, /Resource SHA256 \$\{planned\.resource\.resource_set_sha256\} · Job Binding SHA256/);
 });
 
-test("Retry / Repeat / Stop Policy and ABORT are disabled for formal Flash Jobs", () => {
-  assert.match(emode, /repeatDisabled: true/);
-  assert.match(emode, /retryValue: "0",\s*retryDisabled: true/);
-  assert.match(emode, /stopDisabled: true/);
-  assert.match(emode, /abortDisabled\s/);
+test("EMode Batch Policy: Repeat disabled; Retry / Stop Policy are decided by the Manager, never the Browser", () => {
+  assert.match(emode, /repeatValue: String\(MANAGED_JOB_POLICY\.attempts\),\s*repeatDisabled: true/);
+  // One Batch request; the Browser has no retry loop and no plan / start of its own.
+  assert.equal((emode.match(/runManagedBatch\(/g) ?? []).length, 1);
+  assert.equal((core.match(/startProgrammingBatch\(/g) ?? []).length, 1);
+  assert.doesNotMatch(emode, /runManagedProgramming\(|planProgramming\(|startProgramming\(/);
+  assert.doesNotMatch(emode, /for \(let (retry|attempt)|while \(/);
+  assert.match(emode, /retryMax: MAX_RETRY_LIMIT/);
+  assert.match(emode, /\{ kind: "failed_sites", threshold: 1 \}/);
+  // The stop control is "stop queuing": it is never labelled or wired as an abort / cancel.
+  assert.match(emode, /"STOP QUEUING"/);
+  assert.doesNotMatch(emode, /abortLabel="ABORT"|cancelJob|\/cancel/);
+  assert.match(emode, /stopProgrammingBatch\(/);
   assert.doesNotMatch(emode, /siteRetryLimit|site_retry_limit|repeat_count/);
+  // PASS is counted once per Batch, from the Batch verdict.
+  assert.match(emode, /const verdict = batch \? batchVerdict\(batch\)\.verdict : null;/);
 });
 
 test("Image is the default Source; switching clears file, plan and validation state only", () => {

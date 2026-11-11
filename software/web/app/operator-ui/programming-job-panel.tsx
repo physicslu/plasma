@@ -34,6 +34,8 @@ export type ProgrammingJobPolicy = {
   retryLabel: string;
   retryValue: string;
   retryDisabled: boolean;
+  /** Upper bound of the Retry input (default 20). */
+  retryMax?: number;
   retryAriaLabel: string;
   onRetryChange: (value: string) => void;
   stopLabel: string;
@@ -220,7 +222,7 @@ export function ProgrammingJobPanel({
             <strong>4. {policyLabel}</strong>
             <div className="programmingJobPolicyControls">
               <label>{policy.repeatLabel}<input data-programming-job-policy="repeat" aria-label={policy.repeatAriaLabel} type="number" min="1" max="10000" value={policy.repeatValue} disabled={policy.repeatDisabled} onChange={event => policy.onRepeatChange(event.target.value)} /></label>
-              <label>{policy.retryLabel}<input data-programming-job-policy="retry" aria-label={policy.retryAriaLabel} type="number" min="0" max="20" value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
+              <label>{policy.retryLabel}<input data-programming-job-policy="retry" aria-label={policy.retryAriaLabel} type="number" min="0" max={policy.retryMax ?? 20} value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
               <label>{policy.stopLabel}
                 <select data-programming-job-policy="stop" aria-label={policy.stopAriaLabel} value={policy.stopValue} disabled={policy.stopDisabled} onChange={event => policy.onStopChange(event.target.value)}>
                   {policy.stopOptions.map(option => <option value={option.value} key={option.value || "never"}>{option.label}</option>)}

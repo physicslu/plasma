@@ -664,3 +664,159 @@ test("a run on an openocd Site reports its interface and carries no Mock label",
   await expect(workspace.getByTestId("run-evidence")).toHaveAttribute("data-run-evidence", "ppu");
   await expect(workspace.getByTestId("run-evidence")).toHaveText("Site interface: openocd");
 });
+
+// ------------------------------------------------- Batch Policy: Retry / Stop
+
+async function setPolicy(job: ReturnType<Page["getByRole"]>, retry: string, stop: "never" | "1" = "never") {
+  await job.getByLabel("Site Retry Limit").fill(retry);
+  await job.getByLabel("Engineering Stop Policy").selectOption(stop);
+}
+
+test("Batch Policy: Repeat stays 1 and disabled; Retry and Stop Policy are real, bounded controls", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { workspace, job, start } = await configure(page);
+  await expect(job.getByLabel("Repeat Count")).toBeDisabled();
+  await expect(job.getByLabel("Repeat Count")).toHaveValue("1");
+  const retry = job.getByLabel("Site Retry Limit");
+  await expect(retry).toBeEnabled();
+  await expect(retry).toHaveValue("0");
+  await expect(retry).toHaveAttribute("max", "5");
+  await retry.fill("99");
+  await expect(retry).toHaveValue("5"); // clamped to the Manager limit
+  await retry.fill("2");
+  const stop = job.getByLabel("Engineering Stop Policy");
+  await expect(stop).toBeEnabled();
+  expect(await stop.locator("option").allTextContents()).toEqual(["Never", "1 failed Site"]);
+  await stop.selectOption("1");
+  // The button is "stop queuing", never an abort of a hardware Job.
+  await expect(job.getByRole("button", { name: /ABORT/ })).toHaveCount(0);
+  await expect(job.getByRole("button", { name: /STOP QUEUING/ })).toBeDisabled();
+  await expect(job.locator('[data-programming-job-policy="note"]')).toContainText(/OUTCOME UNKNOWN (永不重送|is never resubmitted)/);
+  await start.click();
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.batches[0].body).toMatchObject({
+    repeat: 1, retry_limit: 2, stop_policy: { kind: "failed_sites", threshold: 1 },
+    operations: ["erase", "program", "verify"],
+  });
+  await expect(workspace.getByTestId("batch-policy")).toContainText("Repeat 1 · Retry limit 2 · Stop Policy 1 failed Site");
+  // PASS on the first attempt: one Job, no retry.
+  expect(counters.jobs).toHaveLength(1);
+});
+
+test("a definite FAIL is retried by the Manager with a new plan, run and Job; the Batch counts once", async ({ page }) => {
+  const counters = await mockManager(page, {
+    script: (_alias, _site, attempt) => attempt === 1 ? { outcome: "FAIL", reason: "VERIFY_EVIDENCE_MISMATCH", readbackOk: false } : {},
+  });
+  const { workspace, job, start } = await configure(page);
+  await setPolicy(job, "2");
+  await start.dblclick();
+  await expect(workspace.getByTestId("batch-result")).toContainText("Batch PASS · 2 attempt(s) · counted once", { timeout: 20_000 });
+  // Exactly one Batch request from the Browser; the Manager submitted two Jobs.
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.jobs).toHaveLength(2);
+  expect(new Set(counters.jobs).size).toBe(2);
+  expect(new Set(counters.starts.map(item => item.body.plan_id)).size).toBe(2);
+  const first = workspace.getByTestId("batch-attempt-1");
+  const second = workspace.getByTestId("batch-attempt-2");
+  await expect(first).toContainText("FAIL");
+  await expect(first).toContainText("RETRY · DEFINITE_FAIL_SAFE_OFF_VERIFIED");
+  await expect(first).toContainText("VERIFIED");
+  await expect(second).toContainText("PASS");
+  // One IC: PASS 1, FAIL 0, Yield 100 %; the failed attempt is not a FAIL IC.
+  const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
+  await expect(summary).toContainText("100.0%");
+  await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("PASS");
+  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(workspace.getByTestId("run-policy")).toContainText("attempts 1 · auto retry DISABLED");
+  await expect(page.getByText(/\[ATTEMPT 1\] FAIL .* RETRY \(DEFINITE_FAIL_SAFE_OFF_VERIFIED\)/)).toHaveCount(1);
+  expect(legacyRequests(counters)).toEqual([]);
+});
+
+test("the Retry limit bounds the attempts; an exhausted Batch is one FAIL", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "PROGRAMMING_NOT_PASS" }) });
+  const { workspace, job, start } = await configure(page);
+  await setPolicy(job, "1");
+  await start.click();
+  await expect(workspace.getByTestId("batch-result")).toContainText("Batch FAIL · RETRY_LIMIT_EXHAUSTED · 2 attempt(s)", { timeout: 20_000 });
+  expect(counters.jobs).toHaveLength(2);
+  const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
+  await expect(summary).toContainText("0.0%");
+  await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("FAIL");
+});
+
+test("OUTCOME UNKNOWN is never retried, whatever the Retry limit, and stays latched", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "OUTCOME_UNKNOWN", reason: "JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT" }) });
+  const { workspace, job, start } = await configure(page);
+  await setPolicy(job, "5");
+  await start.click();
+  await expect(workspace.getByTestId("batch-result")).toContainText("Batch OUTCOME UNKNOWN · JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT · 1 attempt(s)");
+  expect(counters.jobs).toHaveLength(1);
+  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("—"); // no retry decision
+  await expect(workspace.getByTestId("managed-unresolved")).toBeVisible();
+  await expect(start).toBeDisabled();
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("OUTCOME UNKNOWN");
+});
+
+test("a FAIL without verified SAFE_OFF is not retried", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "SAFE_OFF_NOT_VERIFIED", safeOff: false }) });
+  const { workspace, job, start } = await configure(page);
+  await setPolicy(job, "3");
+  await start.click();
+  await expect(workspace.getByTestId("batch-result")).toContainText("RETRY_NOT_ELIGIBLE_SAFE_OFF_NOT_VERIFIED · 1 attempt(s)");
+  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("NO RETRY · SAFE_OFF_NOT_VERIFIED");
+  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("NOT VERIFIED");
+  expect(counters.jobs).toHaveLength(1);
+});
+
+test("Stop Policy '1 failed Site' stops queuing after the first FAIL even with retries left", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "PROGRAMMING_NOT_PASS" }) });
+  const { workspace, job, start } = await configure(page);
+  await setPolicy(job, "3", "1");
+  await start.click();
+  await expect(workspace.getByTestId("batch-result")).toContainText("STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED · 1 attempt(s)");
+  expect(counters.jobs).toHaveLength(1);
+});
+
+test("STOP QUEUING only stops unsubmitted attempts: the running Job is observed to its end, never cancelled", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "PROGRAMMING_NOT_PASS", runningPolls: 4 }) });
+  const { workspace, job, start } = await configure(page);
+  await setPolicy(job, "3");
+  await start.click();
+  const stop = job.getByRole("button", { name: /STOP QUEUING/ });
+  await expect(stop).toBeEnabled();
+  await stop.click();
+  await expect(job.getByRole("button", { name: /STOP REQUESTED/ })).toBeDisabled();
+  // The submitted Job is still running and is reported as running, not cancelled.
+  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("RUNNING");
+  await expect(workspace.getByTestId("batch-policy")).toContainText("stop queuing requested");
+  await expect(workspace.getByTestId("batch-result")).toContainText("Batch FAIL · STOP_REQUESTED_NO_FURTHER_ATTEMPT · 1 attempt(s)", { timeout: 20_000 });
+  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("FAIL"); // its real result
+  expect(counters.jobs).toHaveLength(1);
+  expect(counters.stops).toEqual([JSON.stringify({ stop: "STOP_QUEUING" })]);
+  // No cancel / abort / reset / recovery request ever left the Browser.
+  expect(counters.mutations.filter(entry => /cancel|abort|reset|recovery|lease/i.test(entry))).toEqual([]);
+  await expect(page.getByText(/\[STOP QUEUING\] .* the running Job is not cancelled/)).toHaveCount(1);
+});
+
+test("a lost Batch response is OUTCOME UNKNOWN: the Browser never resends it", async ({ page }) => {
+  const counters = await mockManager(page, { batchStatus: 504 });
+  const { workspace, job, start } = await configure(page);
+  await setPolicy(job, "3");
+  await start.click();
+  await expect(workspace.getByTestId("managed-start-unknown")).toContainText("The Batch request outcome is unknown");
+  await expect(workspace.getByTestId("managed-start-unknown")).toContainText("Nothing was resubmitted");
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.polls).toBe(0);
+});
+
+test("Read Memory ignores the Batch Policy: one Job, no Batch, no retry", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "READ_NOT_PASS" }) });
+  const { workspace, job } = await configure(page);
+  await setPolicy(job, "5");
+  await workspace.getByTestId("read-memory-start").click();
+  await expect(workspace.getByTestId("read-memory-verdict")).toContainText("FAIL · READ_NOT_PASS");
+  expect(counters.batches).toHaveLength(0);
+  expect(counters.starts).toHaveLength(1);
+  await expect(workspace.getByTestId("batch-attempts")).toHaveCount(0);
+});

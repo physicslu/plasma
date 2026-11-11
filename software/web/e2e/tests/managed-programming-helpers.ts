@@ -135,6 +135,10 @@ export type Counters = {
   starts: Array<{ alias: string; body: Record<string, unknown> }>;
   /** Read Memory binary downloads (run IDs). */
   downloads: string[];
+  /** EMode Batch requests, stop-queuing requests and Jobs the mock PPU accepted. */
+  batches: Array<{ alias: string; body: Record<string, unknown> }>;
+  stops: string[];
+  jobs: string[];
   polls: number;
   acks: number;
   requests: string[];
@@ -152,11 +156,15 @@ export async function mockManager(page: Page, options: {
   ppus?: MockPpu[];
   routes?: unknown[];
   routesStatus?: number;
-  script?: (alias: string, siteId: number) => RunScript;
+  /** `attempt` is 1 for a single run and the attempt number inside a Batch. */
+  script?: (alias: string, siteId: number, attempt: number) => RunScript;
   registryStatus?: number;
+  /** Batch request refusal / lost response. */
+  batchStatus?: number;
+  batchError?: { code: string; message: string };
 } = {}) {
   const ppus = options.ppus ?? [Z2];
-  const counters: Counters = { plans: [], starts: [], downloads: [], polls: 0, acks: 0, requests: [], mutations: [] };
+  const counters: Counters = { plans: [], starts: [], downloads: [], batches: [], stops: [], jobs: [], polls: 0, acks: 0, requests: [], mutations: [] };
   const plans = new Map<string, { alias: string; siteId: number; body: Record<string, unknown>; script: RunScript; payload: Record<string, unknown> }>();
   const runs = new Map<string, { alias: string; planId: string; polls: number; acknowledged: boolean }>();
   let sequence = 0;
@@ -189,13 +197,10 @@ export async function mockManager(page: Page, options: {
     ? json({ ok: false, error: { code: "programming_routes_unavailable", message: "Programming Routes are unavailable: ROUTE_ROOT_UNAVAILABLE" } }, options.routesStatus)
     : json({ ok: true, routes: options.routes ?? [route(), operationsRoute()] })));
 
-  await page.route(/\/bootstrap\/programming\/plans$/, async (r: Route) => {
-    const alias = new URL(r.request().url()).pathname.split("/")[4];
-    const body = r.request().postDataJSON() as Record<string, unknown>;
-    counters.plans.push({ alias, body });
+  function makePlan(alias: string, body: Record<string, unknown>, attempt: number) {
     const siteId = Number(body.site_id);
-    const script = options.script?.(alias, siteId) ?? {};
-    if (script.planError) return r.fulfill(json({ ok: false, error: script.planError }, script.planStatus ?? 422));
+    const script = options.script?.(alias, siteId, attempt) ?? {};
+    if (script.planError) return { error: script.planError, status: script.planStatus ?? 422 };
     sequence += 1;
     const planId = hex32(sequence);
     // One programming Job carries `operations`; read / legacy flash_cycle a single `operation`.
@@ -231,7 +236,16 @@ export async function mockManager(page: Page, options: {
       catalog_gate: "NOT_USED", confirm_required: "PROGRAM",
     };
     plans.set(planId, { alias, siteId, body, script, payload });
-    await r.fulfill(json({ ok: true, plan: payload }));
+    return { payload };
+  }
+
+  await page.route(/\/bootstrap\/programming\/plans$/, async (r: Route) => {
+    const alias = new URL(r.request().url()).pathname.split("/")[4];
+    const body = r.request().postDataJSON() as Record<string, unknown>;
+    counters.plans.push({ alias, body });
+    const made = makePlan(alias, body, 1);
+    if (!made.payload) return r.fulfill(json({ ok: false, error: made.error }, made.status));
+    await r.fulfill(json({ ok: true, plan: made.payload }));
   });
 
   function runRecord(runId: string) {
@@ -319,6 +333,115 @@ export async function mockManager(page: Page, options: {
     state.polls += 1;
     await r.fulfill(json({ ok: true, run: runRecord(runId) }));
   });
+  // ---- EMode Batch: the mock Manager applies the same Retry / Stop contract.
+  type MockBatch = {
+    alias: string; body: Record<string, unknown>; stopRequested: boolean;
+    attempts: Array<{ attempt: number; planId: string; runId: string; retry: Record<string, unknown> | null }>;
+    outcome: string | null; reason: string | null;
+  };
+  const batches = new Map<string, MockBatch>();
+
+  function submitAttempt(batch: MockBatch, planId: string) {
+    const runId = hex32(0xb000 + runs.size + 1);
+    runs.set(runId, { alias: batch.alias, planId, polls: 0, acknowledged: false });
+    batch.attempts.push({ attempt: batch.attempts.length + 1, planId, runId, retry: null });
+    counters.starts.push({ alias: batch.alias, body: { plan_id: planId, confirm: "PROGRAM" } });
+    counters.jobs.push(runRecord(runId).job.job_id);
+  }
+
+  function advance(batch: MockBatch) {
+    if (batch.outcome || !batch.attempts.length) return;
+    const last = batch.attempts[batch.attempts.length - 1];
+    runs.get(last.runId)!.polls += 1;
+    const run = runRecord(last.runId);
+    if (!run.outcome) return;
+    if (run.outcome !== "FAIL") {
+      batch.outcome = run.outcome;
+      batch.reason = run.reason;
+      return;
+    }
+    const retryLimit = Number(batch.body.retry_limit ?? 0);
+    const stop = batch.body.stop_policy as { kind: string } | undefined;
+    const eligible = run.receipt?.safe_off === true;
+    const why = eligible ? "DEFINITE_FAIL_SAFE_OFF_VERIFIED" : "SAFE_OFF_NOT_VERIFIED";
+    let final: string | null;
+    if (last.attempt > retryLimit) final = retryLimit ? "RETRY_LIMIT_EXHAUSTED" : run.reason;
+    else if (!eligible) final = `RETRY_NOT_ELIGIBLE_${why}`;
+    else if (stop?.kind === "failed_sites") final = "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED";
+    else if (batch.stopRequested) final = "STOP_REQUESTED_NO_FURTHER_ATTEMPT";
+    else final = null;
+    last.retry = { eligible, reason: why, decision: final === null ? "RETRY" : "NO_RETRY" };
+    if (final !== null) {
+      batch.outcome = "FAIL";
+      batch.reason = final;
+      return;
+    }
+    const { operations, image_base64, image_filename, bundle_base64, address, length, icpn, site_id } = batch.body;
+    const planBody = Object.fromEntries(Object.entries({
+      icpn, site_id, operations, image_base64, image_filename, bundle_base64, address, length,
+    }).filter(([, value]) => value !== undefined));
+    const made = makePlan(batch.alias, planBody, last.attempt + 1);
+    submitAttempt(batch, String(made.payload!.plan_id));
+  }
+
+  function batchRecord(batchId: string) {
+    const batch = batches.get(batchId)!;
+    const attempts = batch.attempts.map(item => {
+      const run = runRecord(item.runId);
+      return { attempt: item.attempt, plan_id: item.planId, run_id: item.runId, job_id: run.job.job_id,
+        job_binding_sha256: plans.get(item.planId)!.payload.job_binding_sha256,
+        state: run.outcome ? "finished" : "running", outcome: run.outcome, reason: run.reason,
+        safe_off: run.receipt?.safe_off ?? null, retry: item.retry };
+    });
+    const last = batch.attempts[batch.attempts.length - 1];
+    return {
+      schema: "plasma.manager.programming-batch.v1", batch_id: batchId, ppu_alias: batch.alias,
+      site_id: Number(batch.body.site_id), icpn: "STM32F103C8T6", operations: batch.body.operations,
+      source: "bundle_base64" in batch.body ? "bundle" : "image_base64" in batch.body ? "image" : "range",
+      policy: { repeat: 1, retry_limit: Number(batch.body.retry_limit ?? 0), stop_policy: batch.body.stop_policy ?? { kind: "never" } },
+      state: batch.outcome ? "finished" : "running", outcome: batch.outcome, reason: batch.reason,
+      stop_requested: batch.stopRequested, attempts, current_run: last ? runRecord(last.runId) : null,
+      counts: { pass: batch.outcome === "PASS" ? 1 : 0, fail: batch.outcome === "FAIL" ? 1 : 0, attempts: attempts.length },
+      auto_retry: "DISABLED",
+    };
+  }
+
+  await page.route(/\/bootstrap\/programming\/batches$/, async (r: Route) => {
+    const alias = new URL(r.request().url()).pathname.split("/")[4];
+    const body = r.request().postDataJSON() as Record<string, unknown>;
+    counters.batches.push({ alias, body });
+    // A Batch request carries the plan inputs; every attempt is one plan + one start.
+    counters.plans.push({ alias, body });
+    if (options.batchStatus) {
+      return r.fulfill(json({ ok: false, error: options.batchError ?? { code: "manager_unavailable", message: "Manager unavailable" } }, options.batchStatus));
+    }
+    const made = makePlan(alias, body, 1);
+    if (!made.payload) return r.fulfill(json({ ok: false, error: made.error }, made.status));
+    const planned = plans.get(String(made.payload.plan_id))!;
+    if (planned.script.startError) {
+      counters.starts.push({ alias, body: { plan_id: made.payload.plan_id, confirm: "PROGRAM" } });
+      return r.fulfill(json({ ok: false, error: planned.script.startError }, planned.script.startStatus ?? 409));
+    }
+    const batchId = hex32(0xba000 + batches.size + 1);
+    const batch: MockBatch = { alias, body, stopRequested: false, attempts: [], outcome: null, reason: null };
+    batches.set(batchId, batch);
+    submitAttempt(batch, String(made.payload.plan_id));
+    await r.fulfill(json({ ok: true, batch: batchRecord(batchId) }, 202));
+  });
+  await page.route(/\/bootstrap\/programming\/batches\/[0-9a-f]{32}$/, async (r: Route) => {
+    counters.polls += 1;
+    const batchId = new URL(r.request().url()).pathname.split("/").pop()!;
+    advance(batches.get(batchId)!);
+    await r.fulfill(json({ ok: true, batch: batchRecord(batchId) }));
+  });
+  await page.route(/\/bootstrap\/programming\/batches\/[0-9a-f]{32}\/stop$/, async (r: Route) => {
+    const batchId = new URL(r.request().url()).pathname.split("/").slice(-2)[0];
+    counters.stops.push(JSON.stringify(r.request().postDataJSON()));
+    const batch = batches.get(batchId)!;
+    if (!batch.outcome) batch.stopRequested = true;
+    await r.fulfill(json({ ok: true, batch: batchRecord(batchId) }));
+  });
+
   await page.route(/\/bootstrap\/programming\/runs\/[0-9a-f]{32}\/output$/, async (r: Route) => {
     const runId = new URL(r.request().url()).pathname.split("/").slice(-2)[0];
     counters.downloads.push(runId);

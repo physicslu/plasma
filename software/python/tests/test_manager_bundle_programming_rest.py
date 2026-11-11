@@ -56,12 +56,31 @@ class StubWorkflow:
         return {"ok": True, "run": {"run_id": run_id, "acknowledged": True}}
 
 
+class StubBatches:
+    def __init__(self):
+        self.calls: list[tuple] = []
+
+    def start(self, alias, body):
+        self.calls.append(("start", alias, dict(body)))
+        return {"ok": True, "batch": {"batch_id": RUN_ID, "outcome": None}}
+
+    def status(self, alias, batch_id):
+        self.calls.append(("status", alias, batch_id))
+        return {"ok": True, "batch": {"batch_id": batch_id, "outcome": "PASS"}}
+
+    def request_stop(self, alias, batch_id, body):
+        self.calls.append(("stop", alias, batch_id, dict(body)))
+        if body != {"stop": "STOP_QUEUING"}:
+            raise ProgrammingError(400, "invalid_request", "stop requires stop=STOP_QUEUING")
+        return {"ok": True, "batch": {"batch_id": batch_id, "stop_requested": True}}
+
+
 @pytest.fixture
 def manager(tmp_path: Path):
     registry = PPURegistryStore((), tmp_path / "registry.json")
     registry.add(alias="z2", endpoint="http://192.168.2.99:18080")
     names = ("config", "registry_store", "poller", "bootstrap_coordinator",
-             "operation_gate", "programming_workflow")
+             "operation_gate", "programming_workflow", "programming_batches")
     previous = {n: getattr(BootstrapPlasmaManagerHandler, n) for n in names}
     workflow = StubWorkflow()
     poller = FakePoller()
@@ -72,6 +91,7 @@ def manager(tmp_path: Path):
     BootstrapPlasmaManagerHandler.bootstrap_coordinator = coordinator
     BootstrapPlasmaManagerHandler.operation_gate = PPUOperationGate()
     BootstrapPlasmaManagerHandler.programming_workflow = workflow
+    BootstrapPlasmaManagerHandler.programming_batches = StubBatches()
     server = ThreadingHTTPServer(("127.0.0.1", 0), BootstrapPlasmaManagerHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -153,3 +173,22 @@ def test_read_output_is_a_binary_download_with_its_sha256(manager):
             'attachment; filename="read-IC-0x08000000-6.bin"'
         assert response.headers["Cache-Control"] == "no-store"
     assert ("output", "z2", RUN_ID) in workflow.calls
+
+
+def test_batch_start_status_and_stop_are_wired(manager):
+    call, _workflow, _poller = manager
+    batches = BootstrapPlasmaManagerHandler.programming_batches
+    status, payload = call("POST", f"{BASE}/batches", {
+        "icpn": "X", "site_id": 2, "operations": ["erase"], "retry_limit": 1})
+    assert status == 202 and payload["batch"]["batch_id"] == RUN_ID
+    status, payload = call("GET", f"{BASE}/batches/{RUN_ID}")
+    assert status == 200 and payload["batch"]["outcome"] == "PASS"
+    status, payload = call("POST", f"{BASE}/batches/{RUN_ID}/stop", {"stop": "STOP_QUEUING"})
+    assert status == 200 and payload["batch"]["stop_requested"] is True
+    status, payload = call("POST", f"{BASE}/batches/{RUN_ID}/stop", {"stop": "cancel"})
+    assert status == 400 and payload["error"]["code"] == "invalid_request"
+    assert [c[0] for c in batches.calls] == ["start", "status", "stop", "stop"]
+    # No cancel / abort route exists for a submitted Job.
+    for path in (f"{BASE}/batches/{RUN_ID}/cancel", f"{BASE}/batches/{RUN_ID}/abort",
+                 f"{BASE}/runs/{RUN_ID}/cancel"):
+        assert call("POST", path, {"x": 1})[0] == 404
