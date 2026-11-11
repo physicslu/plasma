@@ -315,9 +315,10 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             except Exception as exc:
                 self._bootstrap_error(exc)
                 return
+            # _raw_response is the only Content-Length producer; a second one
+            # here made Node.js fetch reject the response (duplicate header).
             self._raw_response(HTTPStatus.OK, {
                 "Content-Type": "application/octet-stream",
-                "Content-Length": str(len(data)),
                 "Content-Disposition": f'attachment; filename="{output["filename"]}"',
                 "X-Plasma-Read-Sha256": str(output["sha256"]),
                 "X-Content-Type-Options": "nosniff",
