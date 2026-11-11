@@ -826,7 +826,7 @@ def test_firmware_and_bundle_sources_share_one_resource_and_binding_identity(tmp
     workflow, _coord, _gateway = make(tmp_path)
     firmware = workflow.plan(ALIAS, plan_body(image()))["plan"]
     bundle = workflow.plan(ALIAS, bundle_body(user_bundle().archive))["plan"]
-    assert firmware["source"] == "firmware" and bundle["source"] == "bundle"
+    assert firmware["source"] == "image" and bundle["source"] == "bundle"
     for key in ("resource", "image_asset", "job_binding", "job_binding_sha256", "route"):
         assert firmware[key] == bundle[key], key
     assert firmware["bundle"]["archive_sha256"] != bundle["bundle"]["archive_sha256"]

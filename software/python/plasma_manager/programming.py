@@ -17,7 +17,7 @@ the Manager then
    It is admitted only when its Programming Resources are byte-identical to
    the committed Route and the shared writer reproduces its exact bytes
    (``bundle_v3.route_bundle_from_archive``); from there it takes the SAME
-   Resource Reuse / B1-B3 / Job path as a Firmware source,
+   Resource Reuse / B1-B3 / Job path as an Image source,
 4. submits exactly one Job with the user-selected Operation and its exact
    Job Binding (Resource, Operation, range, Image, PPU, Site, ICPN, Profile)
    to the PPU Gateway ``/api/jobs``; the PPU re-verifies the Binding,
@@ -388,7 +388,7 @@ class BundleProgrammingWorkflow:
         archive: bytes | None = None
         address = length = None
         if image_operation:
-            # Exactly one Programming Source: a Firmware Image or a user Bundle.
+            # Exactly one Programming Source: a Programming Image or a user Bundle.
             sources = {"image_base64", "bundle_base64"} & set(body)
             if len(sources) != 1 or {"address", "length"} & set(body) \
                     or ("bundle_base64" in body and "image_filename" in body):
@@ -485,7 +485,7 @@ class BundleProgrammingWorkflow:
             "schema": PLAN_SCHEMA, "plan_id": plan_id, "ppu_alias": alias,
             "site_id": site, "operation": operation,
             "source": ("bundle" if archive is not None
-                       else "firmware" if image is not None else "range"),
+                       else "image" if image is not None else "range"),
             "route": route.summary(),
             "bundle": None if built is None else built.summary(),
             "resource": {

@@ -349,9 +349,9 @@ Plan `plasma.manager.bundle-programming-plan.v3` requires a user-selected
 `operation` (one of `erase/program/verify/read/flash_cycle`; anything else,
 including `blank_check`/`probe`, is 400). The Operation must be declared by
 the Route Profile (`operation_not_in_profile`, 422). Image Operations take
-exactly one **Programming Source**: `image_base64` (Firmware) or
+exactly one **Programming Source**: `image_base64` (Image) or
 `bundle_base64` (Bundle); `erase`/`read` take `address`/`length` and no
-source. The plan reports `source` = `firmware` / `bundle` / `range`.
+source. The plan reports `source` = `image` / `bundle` / `range`.
 
 **Bundle source** (Unified Programming Integration, 2026-11-11). The user
 supplies their own canonical Bundle v3. `bundle_v3.route_bundle_from_archive`
