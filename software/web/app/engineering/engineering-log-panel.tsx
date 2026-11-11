@@ -55,9 +55,10 @@ function engineeringLogText(entry: EngineeringLogEntry): string {
 type EngineeringLogPanelProps = {
   logs: EngineeringLogEntry[];
   onClear: () => void;
+  title?: string;
 };
 
-export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPanelProps) {
+export default function EngineeringLogPanel({ logs, onClear, title = "4. ENGINEERING JOB LOG" }: EngineeringLogPanelProps) {
   const { t } = useI18n();
   const { sessionAuditEntries, clearSessionAuditEntries } = useWorkspaceSession();
   const allLogs = useMemo<OperatorLogEntry[]>(() => {
@@ -89,7 +90,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
   return (
     <OperatorLogPanel
       entries={allLogs}
-      title={t("engineeringProgramming.jobLog")}
+      title={title}
       clearLabel={t("engineeringProgramming.clear")}
       onClear={clearLog}
       downloadFilenamePrefix="plasma-engineering"

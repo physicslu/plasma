@@ -76,20 +76,35 @@ test("Start is double-click safe and the manual Prepare step is gone from EMode"
   assert.match(emode, /startLabel="START PROGRAMMING"/);
 });
 
-test("EMode Operations are E / P / V checkboxes sent as one operations list; Read is a separate Job", () => {
+test("EMode operations are E / P / V only and the Read Memory, Batch Attempts, and detailed result panels are removed from the page", () => {
   // Three basic Operations, default all checked, one programming Job.
   assert.match(emode, /const ALL_OPERATIONS: Record<SequenceOperation, boolean> = \{ erase: true, program: true, verify: true \}/);
   assert.match(emode, /operations=\{SEQUENCE_OPERATIONS\.map\(/);
   assert.match(emode, /normalizeOperations\(selectedOperations\)/);
   assert.doesNotMatch(emode, /flash_cycle/);
   assert.doesNotMatch(emode, /code: "R"|label: "Read"/);
-  // Read Memory: its own button and Job, through the Manager only.
-  assert.match(emode, /aria-label="Read Memory"/);
+  // Read Memory is not rendered in the Engineering page, though the backend API remains available.
+  assert.doesNotMatch(emode, /aria-label="Read Memory"/);
+  assert.doesNotMatch(emode, /READ MEMORY/);
   assert.match(emode, /runManagedRead\(/);
   assert.match(core, /operation: "read",/);
   assert.doesNotMatch(emode, /\/api\/jobs|gateway-api|getReadOutput\(/);
+  // Batch Attempts and detailed Execution Result panels are intentionally removed from the UI.
+  assert.doesNotMatch(emode, /BATCH ATTEMPTS|batch-attempts/);
+  assert.doesNotMatch(emode, /ProgrammingRunView|aria-label="Programming run"/);
   // The Erase + Verify refusal is explicit, never a silent different action.
   assert.match(emode, /Erase \+ Verify without Program is not supported/);
+});
+
+test("EMode keeps the required numbered section layout: 1, 2, 3, and 2-1 through 2-4", () => {
+  assert.match(emode, /1\. SYSTEM SETUP &amp; TARGETING/);
+  assert.match(emode, /2\. PROGRAMMING JOB/);
+  assert.match(emode, /2-1\. Target IC/);
+  assert.match(emode, /2-2\. Programming Source/);
+  assert.match(emode, /2-3\. Operations/);
+  assert.match(emode, /2-4\. Batch Policy/);
+  assert.match(emode, /3\. LIVE SITE STATUS/);
+  assert.match(emode, /4\. ENGINEERING JOB LOG/);
 });
 
 test("the standing PROGRAMMING PLAN panel is gone; the Backend plan still runs and is logged", () => {
