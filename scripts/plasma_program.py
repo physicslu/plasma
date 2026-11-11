@@ -69,7 +69,7 @@ class Selection:
 
 
 def read_bundle(path: Path, *, site: int, package: str | None,
-                image: Path | None = None) -> Selection:
+                image: Path | None = None, runtime_deploy: bool = False) -> Selection:
     """Validate the canonical Bundle with the existing verifier, no extraction."""
     require(type(site) is int and site >= 1, "SITE_INVALID")
     require(not path.is_symlink() and path.is_file()
@@ -123,11 +123,21 @@ def read_bundle(path: Path, *, site: int, package: str | None,
     require(sha256(raw_firmware) == entry["sha256"]
             and len(raw_firmware) == entry["size"] and len(raw_firmware) > 0,
             "FIRMWARE_SHA_OR_SIZE_MISMATCH")
+    declared_operations = descriptor.get("operations")
+    # A Runtime upgrade validates the currently installed Bundle identity; it
+    # must not require a legacy Flash Job operation merely to deploy software.
+    # flash/run still submit a hard-coded flash_cycle Job and MUST retain that
+    # narrower admission until they implement the Operations Job contract.
     require(descriptor.get("schema") == "plasma.ppu.provider-capabilities.v1"
             and descriptor.get("provider_package") == provider["id"]
             and descriptor.get("target") and type(descriptor.get("sites")) is list
             and site in descriptor["sites"]
-            and "flash_cycle" in descriptor.get("operations", []),
+            and type(declared_operations) is list and bool(declared_operations)
+            and all(type(op) is str and op in
+                    {"erase", "program", "verify", "read", "flash_cycle"}
+                    for op in declared_operations)
+            and len(declared_operations) == len(set(declared_operations))
+            and (runtime_deploy or "flash_cycle" in declared_operations),
             "SITE_OR_TARGET_NOT_QUALIFIED")
     if image is not None:
         require(not image.is_symlink() and image.is_file()
@@ -577,7 +587,8 @@ def main(argv: list[str] | None = None) -> int:
         validate_host(args.host, args.device_id)
         validate_source_pin(args.source_sha)
         selection = read_bundle(args.bundle, site=args.site,
-                                package=args.firmware_package, image=args.image)
+                                package=args.firmware_package, image=args.image,
+                                runtime_deploy=(args.command == "runtime-deploy"))
         receipt.update(bundle_sha256=selection.bundle_sha,
                        firmware_sha256=selection.firmware_sha,
                        firmware_package=selection.firmware_package,
