@@ -5,7 +5,6 @@ import type { DeviceSearchResult } from "../device-catalog-api";
 import { useI18n } from "../i18n";
 import { BatchSummary } from "../operator-ui/batch-summary";
 import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
-import { ProgrammingRunView } from "../operator-ui/programming-run-view";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import {
   batchVerdict,
@@ -169,13 +168,15 @@ export default function ManagedProgrammingWorkspace() {
   const [acknowledging, setAcknowledging] = useState(false);
   const [statusNote, setStatusNote] = useState<string | null>(null);
 
-  // Read Memory: an independent Job, never part of the Batch above.
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  // Read Memory stays available as a backend contract, but the EMode UI intentionally hides it.
   const [readAddress, setReadAddress] = useState("");
   const [readLength, setReadLength] = useState("");
   const [readPhase, setReadPhase] = useState<ReadPhase>("idle");
   const [readRun, setReadRun] = useState<ProgrammingRun | null>(null);
   const [readResult, setReadResult] = useState<ReadResult | null>(null);
   const [readMessage, setReadMessage] = useState<string | null>(null);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);
   const [clock, setClock] = useState(() => Date.now());
@@ -534,6 +535,7 @@ export default function ManagedProgrammingWorkspace() {
     }
   }
 
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   async function readMemory() {
     // Same synchronous lock as Start: a double click never submits twice.
     if (startLock.current || !readReadiness.ready || !ppu || siteId == null || !icpn
@@ -618,16 +620,20 @@ export default function ManagedProgrammingWorkspace() {
     : source === "bundle"
       ? "Your own canonical Bundle v3. The Manager verifies it against the qualified Programming Route."
       : "Binary Programming Image (.bin). The Manager builds the canonical Bundle v3.";
+  const engineeringJobLogTitle = "4. ENGINEERING JOB LOG";
   const policyNote = locale === "zh-TW"
     ? `每次 Attempt 為獨立 Job（attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}）。Retry：僅在明確 FAIL、SAFE_OFF 已驗證且 Site 已釋放時，由 Manager 以新的 Plan／Job 重試；OUTCOME UNKNOWN 永不重送。Stop Policy 與 STOP QUEUING 只停止尚未提交的 Attempt，不取消執行中的 Job。Repeat 固定為 1（暫不實作）。`
     : `Each attempt is its own Job (attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}). Retry: the Manager submits a new Plan / Job only after a definite FAIL with SAFE_OFF verified and the Site released; OUTCOME UNKNOWN is never resubmitted. Stop Policy and STOP QUEUING only stop attempts that are not submitted yet; a running Job is never cancelled. Repeat is fixed at 1 (not implemented).`;
   const fileDetails = file ? `${formatBytes(file.size)} · ${fileFormat(file, source)}` : null;
   const readVerdict = readRun ? runVerdict(readRun).verdict : null;
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const readOutput = readResult?.run.receipt?.read_output ?? null;
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const readStatus = readPhase === "planning" ? "PLANNING"
     : readPhase === "downloading" ? "FETCHING OUTPUT"
     : readRun && readRun.outcome == null ? runStageLabel(readRun)
     : readVerdict ? readVerdict.replace("_", " ") : readReadiness.label;
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const readProgress = readRun ? runProgressPercent(readRun) : null;
   const phaseLabel = phase === "locking" ? "LOCKING" : phase === "planning" ? "PLANNING"
     : phase === "starting" ? "STARTING" : run && run.outcome == null ? runStageLabel(run) : readiness.label;
@@ -657,7 +663,7 @@ export default function ManagedProgrammingWorkspace() {
         <div className="productionProgrammingWorkflow">
           <section className={`productionProgrammingCard targetingCard ${setupCollapsed ? "is-collapsed" : ""}`}>
             <header>
-              SYSTEM SETUP &amp; TARGETING
+              1. SYSTEM SETUP &amp; TARGETING
               <button
                 type="button"
                 className="engineeringPanelToggle"
@@ -707,7 +713,7 @@ export default function ManagedProgrammingWorkspace() {
           <div className="productionProgrammingRight">
             <ProgrammingJobPanel
               mode="engineering"
-              title="PROGRAMMING JOB"
+              title="2. PROGRAMMING JOB"
               collapsed={jobCollapsed}
               onToggleCollapsed={() => setJobCollapsed(current => !current)}
               expandLabel={locale === "zh-TW" ? "展開" : "Show"}
@@ -716,9 +722,9 @@ export default function ManagedProgrammingWorkspace() {
               onTargetChange={selectTargetDevice}
               targetDisabled={active}
               targetPlaceholder="Search ICPN / IC identifier..."
-              targetLabel="Target IC"
+              targetLabel="2-1. Target IC"
               targetLevels={PICKER_LEVELS}
-              imageLabel="Programming Source"
+              imageLabel="2-2. Programming Source"
               source={{ value: source, disabled: active, onChange: changeSource }}
               image={{
                 name: imageName,
@@ -733,7 +739,7 @@ export default function ManagedProgrammingWorkspace() {
                 accept: PROGRAMMING_SOURCE_ACCEPT[source],
                 onFileChange: next => selectFile(next),
               }}
-              operationsLabel="Operations"
+              operationsLabel="2-3. Operations"
               operations={SEQUENCE_OPERATIONS.map(item => ({
                 key: item,
                 code: OPERATION_LABELS[item].code,
@@ -744,7 +750,7 @@ export default function ManagedProgrammingWorkspace() {
                 ariaLabel: `Engineering operation ${item}`,
                 onChange: () => toggleOperation(item),
               }))}
-              policyLabel="Batch Policy"
+              policyLabel="2-4. Batch Policy"
               policy={{
                 repeatLabel: "Repeat",
                 repeatValue: String(MANAGED_JOB_POLICY.attempts),
@@ -798,111 +804,6 @@ export default function ManagedProgrammingWorkspace() {
           </div>
         </div>
 
-        <section className="productionProgrammingCard readMemoryCard" aria-label="Read Memory" data-testid="read-memory">
-          <header><span>READ MEMORY</span><small>Independent Job · not part of the Batch · never erases, programs or reloads</small></header>
-          <div className="cardBody readMemoryBody">
-            <label className="workflowField">
-              <span>Start Address</span>
-              <input
-                aria-label="Read Memory Start Address"
-                value={readAddress}
-                placeholder={readRoute ? hex(readRoute.flash_base) : "0x08000000"}
-                disabled={active}
-                onChange={event => { setReadAddress(event.target.value); clearReadState(); }}
-              />
-            </label>
-            <label className="workflowField">
-              <span>Length (bytes)</span>
-              <input
-                aria-label="Read Memory Length"
-                value={readLength}
-                placeholder={readRoute ? String(readRoute.flash_size) : "65536"}
-                disabled={active}
-                onChange={event => { setReadLength(event.target.value); clearReadState(); }}
-              />
-            </label>
-            <button
-              type="button"
-              className="readMemoryButton"
-              data-testid="read-memory-start"
-              disabled={!readReadiness.ready}
-              title={readReadiness.ready ? undefined : readReadiness.reason}
-              onClick={() => void readMemory()}
-            >READ MEMORY</button>
-            <div className="readMemoryStatus" role="status" aria-label="Read Memory status" data-testid="read-memory-status"
-              data-read-verdict={readVerdict ?? ""}>
-              <small>READ STATUS</small>
-              <b>{readStatus}{readProgress != null && readRun?.outcome == null ? ` · ${Math.round(readProgress)}%` : ""}</b>
-            </div>
-          </div>
-          {!readReadiness.ready && !reading && phase === "idle" && readReadiness.label !== readiness.label && (
-            <div className="engineeringBoundaryNote warning" role="status" data-testid="read-memory-readiness">
-              <b>{readReadiness.label}</b><span>{readReadiness.reason}</span>
-            </div>
-          )}
-          {readMessage && <div className="warning engineeringOperationWarning" role="alert" data-testid="read-memory-message">{readMessage}</div>}
-          {readResult && (
-            <dl className="cardBody programmingRunView" aria-label="Read Memory result" data-testid="read-memory-result">
-              <dt>Result</dt><dd data-testid="read-memory-verdict">{runVerdict(readResult.run).verdict.replace("_", " ")}{runVerdict(readResult.run).reason ? ` · ${runVerdict(readResult.run).reason}` : ""}</dd>
-              <dt>Range</dt><dd>{readOutput ? `${hex(readOutput.address)} + ${readOutput.bytes} B` : "—"}</dd>
-              <dt>Bytes Read</dt><dd data-testid="read-memory-bytes">{readOutput && runVerdict(readResult.run).verdict === "PASS" ? readOutput.bytes : "—"}</dd>
-              <dt>SHA256</dt><dd data-testid="read-memory-sha"><code>{readOutput?.sha256 ?? "—"}</code></dd>
-              <dt>Job ID</dt><dd><code>{readResult.run.receipt?.job_id ?? "—"}</code></dd>
-              <dt>SAFE_OFF</dt><dd>{readResult.run.receipt?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}</dd>
-              <dt>Binary</dt>
-              <dd>
-                {readResult.url && readResult.filename
-                  ? <a href={readResult.url} download={readResult.filename} data-testid="read-memory-download">Download {readResult.filename}</a>
-                  : <span data-testid="read-memory-no-download">{readResult.downloadError ?? "No verified binary is available."}</span>}
-              </dd>
-            </dl>
-          )}
-        </section>
-
-        {batch && (
-          <section className="productionProgrammingCard" aria-label="Batch attempts" data-testid="batch-attempts"
-            data-batch-verdict={batchVerdict(batch).verdict}>
-            <header>
-              <span>BATCH ATTEMPTS</span>
-              <small data-testid="batch-policy">
-                Batch {batch.batch_id} · Repeat {batch.policy.repeat} · Retry limit {batch.policy.retry_limit} · Stop Policy {batch.policy.stop_policy.kind === "never" ? "never" : "1 failed Site"}
-                {batch.stop_requested ? " · stop queuing requested" : ""}
-              </small>
-            </header>
-            <div className="channelTableWrap">
-              <table className="channelTable">
-                <thead><tr><th>ATTEMPT</th><th>RESULT</th><th>REASON</th><th>JOB ID</th><th>RUN ID</th><th>SAFE_OFF</th><th>RETRY DECISION</th></tr></thead>
-                <tbody>
-                  {batch.attempts.map(attempt => (
-                    <tr key={attempt.attempt} data-testid={`batch-attempt-${attempt.attempt}`}>
-                      <td><b>{attempt.attempt} / {batch.policy.retry_limit + 1}</b></td>
-                      <td><b className="engineeringResult" data-result={attempt.outcome ?? "RUNNING"}>{(attempt.outcome ?? "RUNNING").replace("_", " ")}</b></td>
-                      <td>{attempt.reason ?? "—"}</td>
-                      <td><code>{attempt.job_id ?? "—"}</code></td>
-                      <td><code>{attempt.run_id ?? "—"}</code></td>
-                      <td>{attempt.safe_off === true ? "VERIFIED" : attempt.outcome ? "NOT VERIFIED" : "—"}</td>
-                      <td>{attempt.retry ? `${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} · ${attempt.retry.reason}` : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {batch.outcome != null && (
-              <p className="cardBody" data-testid="batch-result">
-                Batch {batchVerdict(batch).verdict.replace("_", " ")}{batchVerdict(batch).reason ? ` · ${batchVerdict(batch).reason}` : ""} · {batch.attempts.length} attempt(s) · counted once
-              </p>
-            )}
-          </section>
-        )}
-
-        {run && (
-          <ProgrammingRunView
-            run={run}
-            ariaLabel="Programming run"
-            executionInterface={topology?.ppus.find(item => item.alias === run.ppu_alias)
-              ?.sites.find(item => item.site_id === run.site_id)?.interface ?? null}
-          />
-        )}
         {unresolved && !unresolved.acknowledged && (
           <div className="warning engineeringOperationWarning" role="alert" data-testid="managed-unresolved">
             <span>
@@ -915,7 +816,7 @@ export default function ManagedProgrammingWorkspace() {
 
         <section className="productionProgrammingCard liveSiteStatus overviewCard" aria-label="Engineering Site status">
           <header>
-            <span>LIVE SITE STATUS</span>
+            <span>3. LIVE SITE STATUS</span>
             <small>{ppu?.displayName ?? "Selected PPU"} · {ppu?.sites.length ?? 0} Sites · Selected {siteId == null ? 0 : 1} · Manager Fleet polling {TOPOLOGY_POLL_MS / 1000} s</small>
           </header>
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
@@ -961,7 +862,7 @@ export default function ManagedProgrammingWorkspace() {
           </div>
         </section>
 
-        <EngineeringLogPanel logs={logs} onClear={() => setLogs([])} />
+        <EngineeringLogPanel logs={logs} onClear={() => setLogs([])} title={engineeringJobLogTitle} />
       </main>
     </section>
   );
