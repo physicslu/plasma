@@ -1,0 +1,24 @@
+Timeline reconstructed from raw records. All times UTC. SWPC and Z2 clocks are separate; no clock offset was measured.
+Source tags: [M] manager-run-48ed5e17a6555c269afc6808d4f266f6.json  [G] ppu-job-20261111-002355-13e83290.json
+             [B] z2-journal-job-window.txt  [S] swpc-service-journal-0020-0025.txt  [Z] z2-snapshot.txt / z2-job-scope.txt
+
+2026-11-10T13:23:38Z..13:25:11  [Z] Z2 plasma-site-worker / plasma-server / plasma-web / plasma-bootstrap last started (21:23:38..21:25:11 CST)
+2026-11-10T14:11:35Z..14:11:36  SWPC plasma-local-manager / plasma-control-station last started (control-station-release-identity.txt; NRestarts 0)
+2026-11-10T14:14:30Z            Previous Z2 snapshot (../p0-control-station-ofe1b-resource-reuse-2026-11-10/z2-snapshot-after.txt)
+2026-11-11T00:20:29.343857Z     [S] Manager relays GET /api/settings/ppu-network for alias z2 (only SWPC service log line in 00:20..00:25)
+2026-11-11T00:23:48.869132Z     [B] Z2 Bootstrap GET /v1/assets 200 (consistent with a plan request; the plan itself is not journaled)
+2026-11-11T00:23:55.355266Z     [M] Manager run 48ed5e17a6555c269afc6808d4f266f6 created (plan 9521e014c4c90e92386214cc4e9c46ee)
+2026-11-11T00:23:55.533730Z     [M] step PREFLIGHT: PASS
+2026-11-11T00:23:55.693508Z     [B] Z2 Bootstrap GET /v1/assets 200
+2026-11-11T00:23:55.872759Z     [M] step RESOURCE_REUSE: PPU_VERIFIED (resource set 39e4bf85..., asset set 387b9c8c..., generation 15)
+2026-11-11T00:23:55.913594Z     [G] Z2 Job job-20261111-002355-13e83290 created
+2026-11-11T00:23:56.254316Z     [G] Job started
+2026-11-11T00:23:56.267263Z     [M] step FLASH_CYCLE_SUBMIT: ACCEPTED (job_submission_count 1)
+2026-11-11T00:23:56.270780Z     [G] attempt 1 started
+2026-11-11T00:24:03.206Z        [Z] /run/plasma-z2-swd05 directory mtime (fpga-image-identity.json inside it keeps mtime 2026-11-03)
+2026-11-11T00:24:03.495006Z     [G] attempt 1 finished: success, elapsed 7224 ms
+2026-11-11T00:24:03.495183Z     [G] Job finished: success, attempts 1, bytes_verified 18768, safe_off true
+2026-11-11T00:24:04.313461Z     [M] step VERIFY_RECEIPT: PASS, failed_checks []
+2026-11-11T00:24:04.316550Z     [M] run finished, outcome PASS (journal file mtime 00:24:04.316562Z)
+2026-11-11T00:23:40Z..00:24:20  [B] Z2 Bootstrap HTTP log: GET /v1/status, /v1/auth/challenge, /v1/assets only; no POST; no other plasma unit logged
+2026-11-11T00:28Z..00:33Z       Read-only evidence collection (Gateway GETs, Manager GETs, Z2 snapshot 00:29:46Z, job-scope 00:32:40Z, journal 00:32:44Z)
