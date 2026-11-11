@@ -17,7 +17,26 @@ from pathlib import Path
 
 from plasma_web.gateway_phase2 import Phase2PlasmaWebHandler
 
-from test_site_configuration_rest import CONFIG
+CONFIG = """
+ppu:
+  id: ppu-output-root-01
+  facility_id: test-lab
+  model: virtual
+  display_name: Output Root Test PPU
+server:
+  host: 127.0.0.1
+  port: 9900
+  max_supported_sites: 8
+  max_concurrent_jobs: 2
+  max_queue_depth_per_site: 4
+  output_root: output
+  log_root: logs
+  max_metadata_bytes: 65536
+  max_map_bytes: 1048576
+  max_binary_bytes: 67108864
+sites:
+  - {id: 1, enabled: true, interface: mock, target: TARGET-A}
+"""
 
 JOB = "job-20261111-044222-e26d4720"
 NAME = "read_SITE2_flash.bin"
