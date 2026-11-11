@@ -216,7 +216,8 @@ def _parser() -> argparse.ArgumentParser:
         help="Explicit host lab/emulator mode: writes are NOT controller-bound (never on a PPU)",
     )
     parser.add_argument("--network-activation-socket", type=Path)
-    parser.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"))
+    parser.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"),
+                        action=phase2.ExplicitPpuConfig)
 
     provider = parser.add_mutually_exclusive_group()
     provider.add_argument(
@@ -269,7 +270,9 @@ def _configure_handler(handler: type[Phase3PlasmaWebHandler], args: argparse.Nam
         plasma_host=args.plasma_host,
         plasma_port=args.plasma_port,
     )
-    handler.configure_site_configuration(args.ppu_config)
+    handler.configure_site_configuration(
+        args.ppu_config,
+        job_output_from_config=getattr(args, "ppu_config_explicit", False))
 
 
 def _build_provider(args: argparse.Namespace) -> EngineeringPPUProvider | None:

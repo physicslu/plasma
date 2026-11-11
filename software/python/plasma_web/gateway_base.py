@@ -96,6 +96,10 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
     max_body_bytes = 24 * 1024 * 1024
     allowed_origins = frozenset({"*"})
     output_root = Path("output")
+    # Where the Plasma Server writes Job output (its ``server.output_root``).
+    # The Gateway's own ``output_root`` holds Gateway state and may be a
+    # different directory; ``None`` means both share ``output_root``.
+    job_output_root: Path | None = None
     static_root: Path | None = None
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -402,7 +406,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         validate_job_id(job_id)
         if not filename or Path(filename).name != filename or filename in {".", ".."}:
             raise ValueError("invalid output filename")
-        job_directory = (self.output_root / job_id).resolve()
+        job_directory = ((self.job_output_root or self.output_root) / job_id).resolve()
         result_path = job_directory / "result.json"
         if not result_path.is_file():
             raise ValueError("job output is not available")
