@@ -294,3 +294,85 @@ export async function getReadOutput(alias: string, runId: string): Promise<Uint8
   }
   return new Uint8Array(await response.arrayBuffer());
 }
+
+// ---------------------------------------------------------------- EMode Batch
+// Manager-owned Retry / Stop Policy. The Manager decides whether another
+// attempt is submitted; every attempt is its own plan, run and PPU Job.
+export const PROGRAMMING_STOP_TOKEN = "STOP_QUEUING";
+export const MAX_RETRY_LIMIT = 5;
+
+export type StopPolicy = { kind: "never" } | { kind: "failed_sites"; threshold: 1 };
+export type BatchPolicy = { repeat: 1; retry_limit: number; stop_policy: StopPolicy };
+export type ProgrammingBatchOutcome = ProgrammingRunOutcome | "STOPPED";
+
+export type ProgrammingBatchAttempt = {
+  attempt: number;
+  plan_id: string;
+  run_id: string | null;
+  job_id: string | null;
+  job_binding_sha256: string;
+  state: string;
+  outcome: ProgrammingRunOutcome | null;
+  reason: string | null;
+  safe_off: boolean | null;
+  /** Why a FAIL was or was not followed by another attempt. */
+  retry: { eligible: boolean; reason: string; decision: "RETRY" | "NO_RETRY" } | null;
+};
+
+export type ProgrammingBatch = {
+  schema: "plasma.manager.programming-batch.v1";
+  batch_id: string;
+  ppu_alias: string;
+  site_id: number;
+  icpn: string;
+  operations: SequenceOperation[];
+  source: ProgrammingSource | "range";
+  policy: BatchPolicy;
+  state: string;
+  outcome: ProgrammingBatchOutcome | null;
+  reason: string | null;
+  stop_requested: boolean;
+  attempts: ProgrammingBatchAttempt[];
+  /** The run of the latest attempt (same record as a single run). */
+  current_run: ProgrammingRun | null;
+  /** One Batch is one IC: counted once, by its final outcome. */
+  counts: { pass: number; fail: number; attempts: number };
+  auto_retry: "DISABLED";
+};
+
+export type BatchInput = (
+  | { icpn: string; siteId: number; operations: readonly SequenceOperation[]; image: Uint8Array; filename: string }
+  | { icpn: string; siteId: number; operations: readonly SequenceOperation[]; bundle: Uint8Array }
+  | { icpn: string; siteId: number; operations: readonly ["erase"]; address: number; length: number }
+) & { retryLimit: number; stopPolicy: StopPolicy };
+
+export async function startProgrammingBatch(alias: string, input: BatchInput): Promise<ProgrammingBatch> {
+  const common = {
+    icpn: input.icpn, site_id: input.siteId, operations: [...input.operations],
+    retry_limit: input.retryLimit, stop_policy: input.stopPolicy, repeat: 1,
+  };
+  const body = "image" in input
+    ? { ...common, image_base64: bytesToBase64(input.image), image_filename: input.filename }
+    : "bundle" in input
+    ? { ...common, bundle_base64: bytesToBase64(input.bundle) }
+    : { ...common, address: input.address, length: input.length };
+  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${base(alias)}/batches`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return payload.batch;
+}
+
+export async function getProgrammingBatch(alias: string, batchId: string): Promise<ProgrammingBatch> {
+  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${base(alias)}/batches/${batchId}`);
+  return payload.batch;
+}
+
+/** Stop queuing: no further attempt is submitted. Never cancels a submitted Job. */
+export async function stopProgrammingBatch(alias: string, batchId: string): Promise<ProgrammingBatch> {
+  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${base(alias)}/batches/${batchId}/stop`, {
+    method: "POST",
+    body: JSON.stringify({ stop: PROGRAMMING_STOP_TOKEN }),
+  });
+  return payload.batch;
+}

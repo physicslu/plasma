@@ -8,6 +8,7 @@ import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
 import { ProgrammingRunView } from "../operator-ui/programming-run-view";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import {
+  batchVerdict,
   describeBlocked,
   loadManagedTopology,
   loadPlatformAvailability,
@@ -20,7 +21,7 @@ import {
   routesAvailability,
   routeSequenceOperations,
   routeSites,
-  runManagedProgramming,
+  runManagedBatch,
   runManagedRead,
   runProgressPercent,
   runStageLabel,
@@ -28,18 +29,22 @@ import {
   siteCapability,
   type LockedInput,
   type ManagedAvailability,
-  type ManagedRunRequest,
+  type ManagedBatchRequest,
   type ManagedTopology,
+  type ProgrammingBatch,
   type ProgrammingRun,
   type ProgrammingSource,
   type RoutesState,
 } from "../programming/managed-programming";
 import {
   acknowledgeProgrammingRun,
+  MAX_RETRY_LIMIT,
   normalizeOperations,
   operationsTakeImage,
   SEQUENCE_OPERATIONS,
+  stopProgrammingBatch,
   type SequenceOperation,
+  type StopPolicy,
 } from "./bundle-programming-api";
 import EngineeringLogPanel, {
   engineeringLogCategoryLabel,
@@ -120,6 +125,11 @@ function parseInteger(text: string): number | null {
   return Number.isSafeInteger(value) ? value : null;
 }
 
+/** Wall-clock time of a user action (Start); never read while rendering. */
+function wallClock(): number {
+  return Date.now();
+}
+
 function notReady(label: string, reason: string): Readiness {
   return { ready: false, label, reason };
 }
@@ -147,6 +157,11 @@ export default function ManagedProgrammingWorkspace() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [locked, setLocked] = useState<LockedInput | null>(null);
   const [run, setRun] = useState<ProgrammingRun | null>(null);
+  // Batch Policy: Manager-owned Retry and Stop Policy. Repeat is fixed at 1.
+  const [retryLimit, setRetryLimit] = useState(0);
+  const [stopPolicy, setStopPolicy] = useState<StopPolicy>({ kind: "never" });
+  const [batch, setBatch] = useState<ProgrammingBatch | null>(null);
+  const [stopping, setStopping] = useState(false);
   const [runContext, setRunContext] = useState<RunContext | null>(null);
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const [startUnknown, setStartUnknown] = useState<string | null>(null);
@@ -168,6 +183,7 @@ export default function ManagedProgrammingWorkspace() {
   const [jobCollapsed, setJobCollapsed] = useState(false);
 
   const startLock = useRef(false);
+  const loggedAttempts = useRef(new Map<number, string>());
   const readUrl = useRef<string | null>(null);
   const logSequence = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -352,6 +368,8 @@ export default function ManagedProgrammingWorkspace() {
 
   function clearRunState() {
     setLocked(null);
+    setBatch(null);
+    loggedAttempts.current = new Map();
     setRun(null);
     setRunContext(null);
     setBlockedMessage(null);
@@ -421,15 +439,16 @@ export default function ManagedProgrammingWorkspace() {
     if (startLock.current || !readiness.ready || !ppu || siteId == null || !icpn || !operations || !jobRoute
       || (needsImage && !file)) return;
     startLock.current = true;
-    const request: ManagedRunRequest = needsImage && file
-      ? { alias: ppu.alias, siteId, icpn, operations, source, file }
+    const policy = { retryLimit, stopPolicy };
+    const request: ManagedBatchRequest = needsImage && file
+      ? { alias: ppu.alias, siteId, icpn, operations, source, file, ...policy }
       // Erase only: no Programming Image; the whole Flash range of the Profile.
       : {
         alias: ppu.alias, siteId, icpn, operations: ["erase"], source, file: null,
-        range: { address: jobRoute.flash_base, length: jobRoute.flash_size },
+        range: { address: jobRoute.flash_base, length: jobRoute.flash_size }, ...policy,
       };
     const operationLabel = operations.map(item => item.toUpperCase()).join(" → ");
-    const context: RunContext = { alias: ppu.alias, siteId, startedAt: Date.now(), finishedAt: null };
+    const context: RunContext = { alias: ppu.alias, siteId, startedAt: wallClock(), finishedAt: null };
     const abort = new AbortController();
     abortRef.current = abort;
     clearRunState();
@@ -437,34 +456,48 @@ export default function ManagedProgrammingWorkspace() {
     setPhase("locking");
     appendLog(`[START] ${operationLabel} · PPU ${ppu.alias} (${ppu.ppuId ?? "—"}) · ${siteLabel(siteId)} · ${icpn} · ${
       request.file ? `${source.toUpperCase()} ${request.file.name}` : `no Programming Image · ${hex(request.range.address)} + ${request.range.length} B`
-    }`, false, "USR");
+    } · Retry ${retryLimit} · Stop Policy ${stopPolicy.kind === "never" ? "never" : "1 failed Site"} · Repeat 1`, false, "USR");
     try {
-      const final = await runManagedProgramming(request, {
+      const final = await runManagedBatch(request, {
         onLocked: input => {
           setLocked(input);
           setPhase("planning");
           appendLog(`[LOCK] ${input.source.toUpperCase()} · ${input.name} · ${input.size} B · SHA256 ${input.sha256}`, false, "DAT");
         },
-        onPlan: next => {
-          // The Backend plan always runs; its technical result lives in the Log
-          // and in Receipts & Diagnostics, not in a standing panel.
-          setPhase("starting");
-          const range = next.job_binding.range;
-          appendLog(`[PLAN] ${next.plan_id} · Route ${next.route.route_id} (${next.route.provider} → ${next.route.profile}) · Source ${next.source} · Operations ${(next.operations ?? [next.operation]).join(" → ")}`, false, "DAT");
-          appendLog(`[PLAN] Range ${hex(range.address)} + ${range.length} B · Resource SHA256 ${next.resource.resource_set_sha256} · Job Binding SHA256 ${next.job_binding_sha256}`, false, "DAT");
-          appendLog(`[PLAN] ${next.activation_required ? "Activation: B1 upload → B2 admit → B3 activate (no FPGA load)" : "Resource Reuse: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load)"}`, false, "DAT");
-        },
-        onRun: next => {
-          setRun(next);
-          setPhase("running");
+        onBatch: next => {
+          setBatch(next);
+          setRun(next.current_run);
+          setPhase(next.attempts.length ? "running" : "starting");
           setStatusNote(null);
+          // The Backend plan runs for every attempt; its technical result lives
+          // in the Log and in Receipts & Diagnostics, not in a standing panel.
+          for (const attempt of next.attempts) {
+            const seen = loggedAttempts.current.get(attempt.attempt);
+            if (seen === undefined) {
+              loggedAttempts.current.set(attempt.attempt, "planned");
+              appendLog(`[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}] Plan ${attempt.plan_id} · Job Binding SHA256 ${attempt.job_binding_sha256}`, false, "DAT");
+              const planned = next.current_run?.plan;
+              if (planned?.plan_id === attempt.plan_id) {
+                const range = planned.job_binding.range;
+                appendLog(`[PLAN] ${planned.plan_id} · Route ${planned.route.route_id} (${planned.route.provider} → ${planned.route.profile}) · Source ${planned.source} · Operations ${(planned.operations ?? [planned.operation]).join(" → ")}`, false, "DAT");
+                appendLog(`[PLAN] Range ${hex(range.address)} + ${range.length} B · Resource SHA256 ${planned.resource.resource_set_sha256} · Job Binding SHA256 ${planned.job_binding_sha256}`, false, "DAT");
+                appendLog(`[PLAN] ${planned.activation_required ? "Activation: B1 upload → B2 admit → B3 activate (no FPGA load)" : "Resource Reuse: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load)"}`, false, "DAT");
+              }
+            }
+            if (attempt.outcome && seen !== "finished") {
+              loggedAttempts.current.set(attempt.attempt, "finished");
+              const retry = attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "no retry"} (${attempt.retry.reason})` : "";
+              appendLog(`[ATTEMPT ${attempt.attempt}] ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"}${retry}`,
+                attempt.outcome !== "PASS", "PPU");
+            }
+          }
         },
         onPollError: message => setStatusNote(message),
       }, abort.signal);
-      const { verdict, reason } = runVerdict(final);
-      appendLog(`[RESULT] ${verdict}${reason ? ` · ${reason}` : ""} · Run ${final.run_id} · Job ${final.receipt?.job_id ?? final.job?.job_id ?? "—"}`,
+      const { verdict, reason } = batchVerdict(final);
+      appendLog(`[RESULT] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · Batch ${final.batch_id} · ${final.attempts.length} attempt(s) · counted once`,
         verdict !== "PASS", "PPU");
-      if (final.outcome === "OUTCOME_UNKNOWN") setUnresolved(final);
+      if (final.outcome === "OUTCOME_UNKNOWN" && final.current_run) setUnresolved(final.current_run);
     } catch (reason) {
       if (reason instanceof ManagedProgrammingBlocked) {
         const message = describeBlocked(reason);
@@ -482,6 +515,22 @@ export default function ManagedProgrammingWorkspace() {
       setRunContext(current => current ? { ...current, finishedAt: Date.now() } : current);
       setPhase("idle");
       startLock.current = false;
+    }
+  }
+
+  // Stop queuing: no further attempt is submitted. A submitted Job is never
+  // cancelled, its lease never released and the PPU never reset by this.
+  async function stopQueuing() {
+    if (!batch || batch.outcome != null || batch.stop_requested || stopping) return;
+    setStopping(true);
+    try {
+      const next = await stopProgrammingBatch(batch.ppu_alias, batch.batch_id);
+      setBatch(next);
+      appendLog(`[STOP QUEUING] Batch ${next.batch_id} · no further attempt will be submitted · the running Job is not cancelled`, false, "USR");
+    } catch (reason) {
+      setStatusNote(`Stop queuing failed: ${reason instanceof Error ? reason.message : "request failed"}`);
+    } finally {
+      setStopping(false);
     }
   }
 
@@ -545,7 +594,8 @@ export default function ManagedProgrammingWorkspace() {
     }
   }
 
-  const verdict = run ? runVerdict(run).verdict : null;
+  // One Batch is one IC: counted once by its final verdict, whatever the attempts.
+  const verdict = batch ? batchVerdict(batch).verdict : null;
   const pass = verdict === "PASS" ? 1 : 0;
   const fail = verdict === "FAIL" ? 1 : 0;
   const elapsed = runContext ? (runContext.finishedAt ?? clock) - runContext.startedAt : null;
@@ -569,8 +619,8 @@ export default function ManagedProgrammingWorkspace() {
       ? "Your own canonical Bundle v3. The Manager verifies it against the qualified Programming Route."
       : "Binary Programming Image (.bin). The Manager builds the canonical Bundle v3.";
   const policyNote = locale === "zh-TW"
-    ? `單一 Programming Job：attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}。Repeat 固定為 1（暫不實作）。Retry／Stop Policy 需要 Manager Batch Coordinator，此版本停用。`
-    : `One Programming Job: attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}. Repeat is fixed at 1 (not implemented). Retry / Stop Policy need the Manager Batch Coordinator and are disabled in this release.`;
+    ? `每次 Attempt 為獨立 Job（attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}）。Retry：僅在明確 FAIL、SAFE_OFF 已驗證且 Site 已釋放時，由 Manager 以新的 Plan／Job 重試；OUTCOME UNKNOWN 永不重送。Stop Policy 與 STOP QUEUING 只停止尚未提交的 Attempt，不取消執行中的 Job。Repeat 固定為 1（暫不實作）。`
+    : `Each attempt is its own Job (attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}). Retry: the Manager submits a new Plan / Job only after a definite FAIL with SAFE_OFF verified and the Site released; OUTCOME UNKNOWN is never resubmitted. Stop Policy and STOP QUEUING only stop attempts that are not submitted yet; a running Job is never cancelled. Repeat is fixed at 1 (not implemented).`;
   const fileDetails = file ? `${formatBytes(file.size)} · ${fileFormat(file, source)}` : null;
   const readVerdict = readRun ? runVerdict(readRun).verdict : null;
   const readOutput = readResult?.run.receipt?.read_output ?? null;
@@ -702,16 +752,20 @@ export default function ManagedProgrammingWorkspace() {
                 repeatAriaLabel: "Repeat Count",
                 onRepeatChange: () => {},
                 retryLabel: "Retry",
-                retryValue: "0",
-                retryDisabled: true,
+                retryValue: String(retryLimit),
+                retryDisabled: active,
+                retryMax: MAX_RETRY_LIMIT,
                 retryAriaLabel: "Site Retry Limit",
-                onRetryChange: () => {},
+                onRetryChange: value => {
+                  const parsed = Number.parseInt(value, 10);
+                  setRetryLimit(Number.isFinite(parsed) ? Math.min(MAX_RETRY_LIMIT, Math.max(0, parsed)) : 0);
+                },
                 stopLabel: "Stop Policy",
-                stopValue: "unavailable",
-                stopDisabled: true,
+                stopValue: stopPolicy.kind === "never" ? "never" : "1",
+                stopDisabled: active,
                 stopAriaLabel: "Engineering Stop Policy",
-                stopOptions: [{ value: "unavailable", label: "Unavailable" }],
-                onStopChange: () => {},
+                stopOptions: [{ value: "never", label: "Never" }, { value: "1", label: "1 failed Site" }],
+                onStopChange: value => setStopPolicy(value === "1" ? { kind: "failed_sites", threshold: 1 } : { kind: "never" }),
                 note: policyNote,
               }}
               startLabel="START PROGRAMMING"
@@ -720,9 +774,9 @@ export default function ManagedProgrammingWorkspace() {
               statusLabel="BATCH STATUS"
               statusValue={phaseLabel}
               statusClassName={`readiness-${readiness.ready ? "batch-ready" : phase !== "idle" ? "running" : "programming-unavailable"}`}
-              abortLabel="ABORT"
-              abortDisabled
-              onAbort={() => {}}
+              abortLabel={batch?.stop_requested && batch.outcome == null ? "STOP REQUESTED" : "STOP QUEUING"}
+              abortDisabled={!batch || batch.outcome != null || batch.stop_requested || stopping}
+              onAbort={stopQueuing}
             />
 
             {!readiness.ready && phase === "idle" && (
@@ -805,6 +859,42 @@ export default function ManagedProgrammingWorkspace() {
           )}
         </section>
 
+        {batch && (
+          <section className="productionProgrammingCard" aria-label="Batch attempts" data-testid="batch-attempts"
+            data-batch-verdict={batchVerdict(batch).verdict}>
+            <header>
+              <span>BATCH ATTEMPTS</span>
+              <small data-testid="batch-policy">
+                Batch {batch.batch_id} · Repeat {batch.policy.repeat} · Retry limit {batch.policy.retry_limit} · Stop Policy {batch.policy.stop_policy.kind === "never" ? "never" : "1 failed Site"}
+                {batch.stop_requested ? " · stop queuing requested" : ""}
+              </small>
+            </header>
+            <div className="channelTableWrap">
+              <table className="channelTable">
+                <thead><tr><th>ATTEMPT</th><th>RESULT</th><th>REASON</th><th>JOB ID</th><th>RUN ID</th><th>SAFE_OFF</th><th>RETRY DECISION</th></tr></thead>
+                <tbody>
+                  {batch.attempts.map(attempt => (
+                    <tr key={attempt.attempt} data-testid={`batch-attempt-${attempt.attempt}`}>
+                      <td><b>{attempt.attempt} / {batch.policy.retry_limit + 1}</b></td>
+                      <td><b className="engineeringResult" data-result={attempt.outcome ?? "RUNNING"}>{(attempt.outcome ?? "RUNNING").replace("_", " ")}</b></td>
+                      <td>{attempt.reason ?? "—"}</td>
+                      <td><code>{attempt.job_id ?? "—"}</code></td>
+                      <td><code>{attempt.run_id ?? "—"}</code></td>
+                      <td>{attempt.safe_off === true ? "VERIFIED" : attempt.outcome ? "NOT VERIFIED" : "—"}</td>
+                      <td>{attempt.retry ? `${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} · ${attempt.retry.reason}` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {batch.outcome != null && (
+              <p className="cardBody" data-testid="batch-result">
+                Batch {batchVerdict(batch).verdict.replace("_", " ")}{batchVerdict(batch).reason ? ` · ${batchVerdict(batch).reason}` : ""} · {batch.attempts.length} attempt(s) · counted once
+              </p>
+            )}
+          </section>
+        )}
+
         {run && (
           <ProgrammingRunView
             run={run}
@@ -839,7 +929,8 @@ export default function ManagedProgrammingWorkspace() {
                   const selected = siteId === site.site_id;
                   const ownsRun = run != null && runContext?.alias === ppu?.alias && runContext?.siteId === site.site_id;
                   const progress = ownsRun ? runProgressPercent(run) : null;
-                  const rowVerdict = ownsRun ? runVerdict(run).verdict : null;
+                  // The Site result is the Batch verdict, not an intermediate attempt.
+                  const rowVerdict = ownsRun && batch ? batchVerdict(batch).verdict : null;
                   const state = ownsRun && run.outcome == null ? runStageLabel(run)
                     : site.enabled ? site.state.toUpperCase() : "DISABLED";
                   return (

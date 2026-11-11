@@ -161,13 +161,16 @@ class FakeGateway:
             if self.post_raises:
                 raise TimeoutError("job POST response lost")
             return self._resp(self.post_status, {"ok": True, "job": {
-                "job_id": "job-20261109-120000-0123abcd", "state": "queued"}})
+                "job_id": self._job_id(), "state": "queued"}})
         if method == "GET" and path.startswith("/api/status?job="):
             self.polls += 1
             post = self.posts[-1]
             sent = base64.b64decode(post["asset_base64"]) if "asset_base64" in post else self.image
             sha = hashlib.sha256(sent).hexdigest()
-            state = "running" if self.polls == 1 else self.job_final
+            # ``job_final`` may script one final state per submitted Job.
+            final = (self.job_final if isinstance(self.job_final, str)
+                     else self.job_final[min(len(self.posts), len(self.job_final)) - 1])
+            state = "running" if self.polls == 1 else final
             binding = post["job_binding"]
             echo = None
             if self.echo:
@@ -218,7 +221,7 @@ class FakeGateway:
                 if state == "success":
                     output_files = ["/var/lib/plasma/output/job/read_SITE2_flash.bin"]
             return self._resp(200, {"job": {
-                "job_id": "job-20261109-120000-0123abcd", "state": state, "site_id": 2,
+                "job_id": self._job_id(), "state": state, "site_id": 2,
                 "operation": kind, "stage": "verify", "progress_percent": 50,
                 "job_binding": echo,
                 "result": {"state": state, "image_sha256": sha if has_image else None,
@@ -234,6 +237,10 @@ class FakeGateway:
                 data = b"X" + data[1:]
             return 200, {"Content-Type": "application/octet-stream"}, data
         raise AssertionError(f"unexpected Gateway call {method} {path}")
+
+    def _job_id(self):
+        # Every submitted Job has its own identity.
+        return "job-20261109-120000-%08x" % (0x0123abcd + len(self.posts) - 1)
 
     def _read_bytes(self, length):
         return (self.read_data if self.read_data is not None else bytes(range(256)) * 300)[:length]

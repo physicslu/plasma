@@ -9,6 +9,7 @@
 
 import { getManagerPpuBootstrap, sha256Hex, type ManagerBootstrapStatus } from "../engineering/ppu-bootstrap-api";
 import {
+  getProgrammingBatch,
   getProgrammingRoutes,
   getProgrammingRun,
   getReadOutput,
@@ -17,7 +18,11 @@ import {
   SEQUENCE_OPERATIONS,
   PROGRAMMING_OPERATIONS,
   startProgramming,
+  startProgrammingBatch,
+  type BatchInput,
   type ImageOperation,
+  type ProgrammingBatch,
+  type StopPolicy,
   type ProgrammingOperation,
   type ProgrammingPlan,
   type ProgrammingRoute,
@@ -30,7 +35,7 @@ import {
 import { getManagerFleet, getManagerRegistry, type ManagerRegistryPayload } from "../engineering/ppu-registry-api";
 import type { FleetPPUView, FleetSiteView, FleetWebPayload } from "../fleet/fleet-contract";
 
-export type { ProgrammingOperation, ProgrammingPlan, ProgrammingRoute, ProgrammingRun, ProgrammingSource };
+export type { ProgrammingBatch, ProgrammingOperation, ProgrammingPlan, ProgrammingRoute, ProgrammingRun, ProgrammingSource, StopPolicy };
 
 // Formal Flash Job policy (initial release). Repeat / Retry / Stop policies of
 // the Mock batch runtime have no qualified execution contract here.
@@ -532,6 +537,92 @@ export async function runManagedRead(
   }
 }
 
+export type ManagedBatchRequest = Extract<ManagedRunRequest, { operations: readonly SequenceOperation[] }>
+  & { retryLimit: number; stopPolicy: StopPolicy };
+
+export type ManagedBatchEvents = {
+  onLocked?: (input: LockedInput) => void;
+  onBatch?: (batch: ProgrammingBatch) => void;
+  onPollError?: (message: string) => void;
+};
+
+/**
+ * EMode Start: lock -> exactly one Batch request -> observe. The Manager
+ * plans every attempt, submits each Job once and alone decides, by its Retry
+ * and Stop Policy contract, whether another attempt follows. The Browser
+ * never retries anything: a lost Batch response is OUTCOME UNKNOWN.
+ */
+export async function runManagedBatch(
+  request: ManagedBatchRequest,
+  events: ManagedBatchEvents = {},
+  signal?: AbortSignal,
+): Promise<ProgrammingBatch> {
+  let bytes: Uint8Array | null = null;
+  if (request.file !== null) {
+    try {
+      bytes = new Uint8Array(await request.file.arrayBuffer());
+      if (bytes.length === 0) throw new Error("the selected file is empty");
+      events.onLocked?.({ name: request.file.name, size: bytes.length, sha256: await sha256Hex(bytes), source: request.source });
+    } catch (reason) {
+      throw new ManagedProgrammingBlocked("lock", "file_unreadable",
+        `The selected ${request.source === "bundle" ? "Bundle" : "Programming Image"} could not be read: ${errorParts(reason).message}`);
+    }
+  }
+  const common = {
+    icpn: request.icpn, siteId: request.siteId,
+    retryLimit: request.retryLimit, stopPolicy: request.stopPolicy,
+  };
+  const input: BatchInput = request.file === null
+    ? { ...common, operations: ["erase"], ...request.range }
+    : request.source === "bundle"
+      ? { ...common, operations: request.operations, bundle: bytes! }
+      : { ...common, operations: request.operations, image: bytes!, filename: request.file.name };
+  let batch: ProgrammingBatch;
+  try {
+    batch = await startProgrammingBatch(request.alias, input);
+  } catch (reason) {
+    const { status, code, message } = errorParts(reason);
+    // A 4xx is a definite refusal: no Batch exists and no Job was submitted.
+    if (status != null && status >= 400 && status < 500) {
+      throw new ManagedProgrammingBlocked("plan", code, message);
+    }
+    throw new ManagedStartOutcomeUnknown("batch",
+      `The Batch request outcome is unknown (${message}). Nothing was resubmitted.`);
+  }
+  events.onBatch?.(batch);
+  while (batch.outcome == null) {
+    await new Promise(resolve => setTimeout(resolve, MANAGED_POLL_MS));
+    if (signal?.aborted) return batch;
+    try {
+      batch = await getProgrammingBatch(request.alias, batch.batch_id);
+      events.onBatch?.(batch);
+    } catch (reason) {
+      events.onPollError?.(`${errorParts(reason).message}; nothing was resubmitted`);
+    }
+  }
+  return batch;
+}
+
+export type BatchVerdict = RunVerdict | "STOPPED";
+
+/**
+ * Batch verdict. PASS needs the Manager Batch outcome AND a last run whose
+ * receipt passes `runVerdict` for exactly the requested list on this PPU/Site.
+ */
+export function batchVerdict(batch: ProgrammingBatch): { verdict: BatchVerdict; reason: string | null } {
+  if (batch.outcome == null) return { verdict: "RUNNING", reason: null };
+  if (batch.outcome !== "PASS") return { verdict: batch.outcome, reason: batch.reason };
+  const run = batch.current_run;
+  if (!run) return { verdict: "FAIL", reason: "RUN_RECORD_MISSING" };
+  const last = runVerdict(run);
+  if (last.verdict !== "PASS") return { verdict: "FAIL", reason: last.reason ?? "LAST_RUN_NOT_PASS" };
+  if (run.ppu_alias !== batch.ppu_alias || run.site_id !== batch.site_id
+    || JSON.stringify(run.receipt?.operations) !== JSON.stringify(batch.operations)) {
+    return { verdict: "FAIL", reason: "RUN_DOES_NOT_MATCH_BATCH" };
+  }
+  return { verdict: "PASS", reason: null };
+}
+
 export type RunVerdict = "RUNNING" | "PASS" | "FAIL" | "BLOCKED" | "OUTCOME_UNKNOWN";
 
 /**
@@ -590,6 +681,8 @@ const BLOCK_GUIDANCE: Record<string, string> = {
   bundle_incompatible: "The Bundle is not an admissible canonical Bundle v3 for this IC and Site.",
   programming_outcome_unknown_unresolved: "An earlier run on this PPU ended OUTCOME UNKNOWN. Reconcile and acknowledge it before programming again.",
   programming_run_in_progress: "Another programming run is in progress on this PPU.",
+  programming_batch_in_progress: "Another programming Batch is in progress on this PPU.",
+  repeat_not_supported: "Repeat is not implemented; it stays 1.",
   ppu_resource_identity_unknown: "The PPU Resource identity could not be read; nothing was changed.",
   ppu_runtime_resource_identity_unsupported: "The PPU Runtime does not report a verified Resource identity.",
   maintenance_authorization_required: "This Control Station session is not authorized for PPU writes.",

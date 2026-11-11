@@ -354,6 +354,33 @@ class BundleProgrammingWorkflow:
                 return run
         return None
 
+    def retry_block(self, alias: str, site: int) -> str | None:
+        """Why another attempt may NOT be submitted now (None: nothing blocks).
+
+        Read-only. Used by the Batch coordinator after a definite FAIL: the
+        PPU must be reachable, its Site idle with no Job and no held execution
+        lease, no run of this PPU active or OUTCOME_UNKNOWN, and the Active
+        Asset Set must not require recovery. Any doubt blocks the retry.
+        """
+        with self._lock:
+            if self._unknown_latched(alias) is not None:
+                return "OUTCOME_UNKNOWN_UNRESOLVED"
+            if self._active_run(alias) is not None:
+                return "RUN_IN_PROGRESS"
+        try:
+            record = self._record(alias)
+            if getattr(record, "lifecycle", None) != "commissioned":
+                return "PPU_NOT_ENABLED"
+            if self.coordinator.assets(alias).get("state") == "RECOVERY_REQUIRED":
+                return "PPU_RECOVERY_REQUIRED"
+            client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+            self._readiness(client, site, None)
+        except _StepFailure as exc:
+            return exc.reason
+        except Exception as exc:  # noqa: BLE001 - unreadable state is never "released"
+            return f"PPU_STATE_UNREADABLE_{type(exc).__name__}"
+        return None
+
     # --------------------------------------------------------------------- API
     def list_routes(self) -> dict[str, Any]:
         return {"ok": True, "routes": [r.summary() for r in self.routes()]}

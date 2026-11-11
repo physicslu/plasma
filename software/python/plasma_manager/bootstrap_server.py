@@ -17,6 +17,7 @@ from .bootstrap import (
 )
 from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
 from .programming import BundleProgrammingWorkflow, ProgrammingError
+from .programming_batch import ProgrammingBatchCoordinator
 from .registry import RegistryEntryNotFound
 from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
@@ -24,6 +25,8 @@ BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 PROGRAMMING_RUN_RE = re.compile(r"^programming/runs/([0-9a-f]{32})$")
 PROGRAMMING_OUTPUT_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/output$")
+PROGRAMMING_BATCH_RE = re.compile(r"^programming/batches/([0-9a-f]{32})$")
+PROGRAMMING_BATCH_STOP_RE = re.compile(r"^programming/batches/([0-9a-f]{32})/stop$")
 PROGRAMMING_ACK_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/acknowledge$")
 
 
@@ -37,6 +40,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
 
     bootstrap_coordinator: ManagerBootstrapCoordinator | None = None
     programming_workflow: BundleProgrammingWorkflow | None = None
+    programming_batches: ProgrammingBatchCoordinator | None = None
     runtime_client_factory = PPUHttpClient
     _bootstrap_init_lock = RLock()
 
@@ -91,6 +95,20 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                     journal_path=journal,
                 )
             return cls.programming_workflow
+
+    def _batches(self) -> ProgrammingBatchCoordinator:
+        cls = type(self)
+        if cls.programming_batches is not None:
+            return cls.programming_batches
+        workflow = self._programming()
+        with cls._bootstrap_init_lock:
+            if cls.programming_batches is None:
+                config = self._config()
+                journal = (config.registry_state_path.with_name("programming-batches.json")
+                           if config.registry_state_path is not None else None)
+                cls.programming_batches = ProgrammingBatchCoordinator(
+                    workflow, journal_path=journal)
+            return cls.programming_batches
 
     def _programming_call(self, call) -> None:
         try:
@@ -269,6 +287,12 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             run_id = run_match.group(1)
             self._programming_call(
                 lambda: (HTTPStatus.OK, self._programming().run_status(alias, run_id)))
+            return
+        batch_match = PROGRAMMING_BATCH_RE.fullmatch(action)
+        if batch_match is not None:
+            batch_id = batch_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().status(alias, batch_id)))
             return
         output_match = PROGRAMMING_OUTPUT_RE.fullmatch(action)
         if output_match is not None:
@@ -508,6 +532,20 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                     return
                 self._programming_call(
                     lambda: (HTTPStatus.ACCEPTED, self._programming().start(alias, body)))
+                return
+            if action == "programming/batches":
+                # A Batch submits Jobs: same Platform safety gate as a single run.
+                if not self._bootstrap_mutation_allowed(alias):
+                    return
+                self._programming_call(
+                    lambda: (HTTPStatus.ACCEPTED, self._batches().start(alias, body)))
+                return
+            stop_match = PROGRAMMING_BATCH_STOP_RE.fullmatch(action)
+            if stop_match is not None:
+                # Stop queuing only: allowed in any Platform state, changes nothing on the PPU.
+                batch_id = stop_match.group(1)
+                self._programming_call(
+                    lambda: (HTTPStatus.OK, self._batches().request_stop(alias, batch_id, body)))
                 return
             ack_match = PROGRAMMING_ACK_RE.fullmatch(action)
             if ack_match is not None:
