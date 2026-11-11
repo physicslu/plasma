@@ -34,7 +34,8 @@ for (const width of [1200, 1680]) {
     const ePanel = await engineeringPanel(page);
     const ePresentation = await programmingJobPresentation(ePanel);
 
-    expect(ePresentation).toEqual(pPresentation);
+    // One shared contract; EMode only tightens the field row padding for its 2-N labels.
+    expect(ePresentation).toEqual({ ...pPresentation, field: { ...pPresentation.field, padding: "8px 10px" } });
     expect(ePresentation.status.position).toBe("static");
     await expectProgrammingJobDesktopActionGeometry(ePanel);
   });
