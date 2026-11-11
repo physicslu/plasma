@@ -15,6 +15,8 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_web import gateway_phase2, gateway_phase3
 from plasma_web.gateway_phase2 import Phase2PlasmaWebHandler
 
 CONFIG = """
@@ -97,13 +99,30 @@ class GatewayJobOutputRootTests(unittest.TestCase):
         status, _body = self._get()
         self.assertEqual(status, 400)
 
-    def test_unreadable_ppu_config_keeps_the_shared_output_root(self) -> None:
-        self.handler.configure_site_configuration(Path(self.temp.name) / "missing.yaml")
+    def test_named_but_unreadable_ppu_config_is_an_error_not_a_fallback(self) -> None:
+        missing = Path(self.temp.name) / "missing.yaml"
+        with self.assertRaises(PlasmaError) as raised:
+            self.handler.configure_site_configuration(missing)
+        self.assertEqual(raised.exception.code, ErrorCode.CONFIG_INVALID)
+        self.assertIn(str(missing), raised.exception.message)
+
+    def test_gateway_started_without_ppu_config_keeps_the_shared_output_root(self) -> None:
+        for module in (gateway_phase2, gateway_phase3):
+            args = module._parser().parse_args([])
+            self.assertFalse(getattr(args, "ppu_config_explicit", False))
+        self.handler.configure_site_configuration(
+            args.ppu_config, job_output_from_config=False)
         self.assertIsNone(self.handler.job_output_root)
         self._write_job(self.gateway_output, b"\x07")
         status, body = self._get()
         self.assertEqual(status, 200)
         self.assertEqual(body, b"\x07")
+
+    def test_ppu_config_flag_is_recorded_as_explicit_by_both_entry_points(self) -> None:
+        for module in (gateway_phase2, gateway_phase3):
+            args = module._parser().parse_args(["--ppu-config", str(self.config)])
+            self.assertIs(args.ppu_config_explicit, True)
+            self.assertEqual(args.ppu_config, self.config)
 
 
 if __name__ == "__main__":

@@ -227,6 +227,14 @@ class PPUNetworkActivationSupportMixin:
         return False
 
 
+class ExplicitPpuConfig(argparse.Action):
+    """Record that --ppu-config was given, not merely defaulted."""
+
+    def __call__(self, parser, namespace, values, option_string=None) -> None:
+        setattr(namespace, self.dest, values)
+        setattr(namespace, f"{self.dest}_explicit", True)
+
+
 class SiteConfigurationSupportMixin:
     """Expose PPU-owned desired Site configuration without pretending hot apply.
 
@@ -239,14 +247,18 @@ class SiteConfigurationSupportMixin:
     site_configuration: SiteConfigurationController | None = None
 
     @classmethod
-    def configure_site_configuration(cls, config_path: Path) -> None:
+    def configure_site_configuration(
+        cls, config_path: Path, *, job_output_from_config: bool = True,
+    ) -> None:
         cls.site_configuration = SiteConfigurationController(config_path)
         # Job output downloads are served from the Server's output root, which
         # the same PPU YAML declares; the Gateway's --output-root may differ.
-        try:
-            cls.job_output_root = load_config(config_path).server.output_root.resolve()
-        except PlasmaError:
-            cls.job_output_root = None
+        # A PPU config that was named but cannot be loaded is an error, never
+        # a silent return to the Gateway root. Only a Gateway started without
+        # --ppu-config keeps the previous shared-root default.
+        cls.job_output_root = (
+            load_config(config_path).server.output_root.resolve()
+            if job_output_from_config else None)
 
     @staticmethod
     def _site_settings_id(path: str) -> int | None:
@@ -562,7 +574,8 @@ def _parser() -> argparse.ArgumentParser:
         help="Allowed Web origin; repeat for multiple origins (prototype default: *)",
     )
     parser.add_argument("--network-activation-socket", type=Path)
-    parser.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"))
+    parser.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"),
+                        action=ExplicitPpuConfig)
     parser.add_argument(
         "--engineering-mock",
         action="store_true",
@@ -599,7 +612,9 @@ def _configure_handler(handler: type[Phase2PlasmaWebHandler], args: argparse.Nam
         plasma_host=args.plasma_host,
         plasma_port=args.plasma_port,
     )
-    handler.configure_site_configuration(args.ppu_config)
+    handler.configure_site_configuration(
+        args.ppu_config,
+        job_output_from_config=getattr(args, "ppu_config_explicit", False))
 
 
 def _build_provider(args: argparse.Namespace) -> SharedImageMockEngineeringPPUProvider | None:
