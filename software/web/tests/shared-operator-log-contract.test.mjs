@@ -15,7 +15,7 @@ test("PMode and EMode adapt domain logs into one OperatorLogPanel primitive", as
 
   assert.match(shared, /export function OperatorLogPanel/);
   assert.match(shared, /import \{ OperatorPanelHeader \} from "\.\/operator-panel"/);
-  assert.match(shared, /<OperatorPanelHeader title=\{title\} actions=\{actions\} \/>/);
+  assert.match(shared, /<OperatorPanelHeader number=\{number\} title=\{title\} actions=\{actions\} \/>/);
   assert.match(shared, /className={`logCard operatorLogCard/);
   assert.match(shared, /className="operatorLogFilters"/);
   assert.match(shared, /import "\.\/operator-log-panel\.css"/);

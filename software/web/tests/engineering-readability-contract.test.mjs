@@ -66,14 +66,16 @@ test("Engineering readability owns only Engineering targeting and live Site body
 });
 
 test("Engineering numbering is metadata only and shared Operator Panel owns first-level title presentation", async () => {
-  const [css, refresh, panelCss] = await Promise.all([
+  const [css, refresh, panelCss, programmingWorkspace] = await Promise.all([
     source(readabilityPath),
     source(refreshPath),
     source(panelCssPath),
+    source(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url)),
   ]);
 
-  assert.match(refresh, /\.engineeringProgrammingV2 \.targetingCard > header::before\s*\{\s*content:\s*"1\. ";/);
-  assert.match(refresh, /\.engineeringProgrammingV2 \.liveSiteStatus > header > span::before\s*\{\s*content:\s*"3\. ";/);
+  assert.match(programmingWorkspace, /1\. SYSTEM SETUP &amp; TARGETING/);
+  assert.match(programmingWorkspace, /3\. LIVE SITE STATUS/);
+  assert.doesNotMatch(refresh, /targetingCard > header::before|liveSiteStatus > header > span::before/);
   assert.doesNotMatch(refresh, /font-size:\s*0/);
   assert.doesNotMatch(refresh, /content:\s*"1\. SYSTEM SETUP|content:\s*"3\. LIVE SITE STATUS/);
   assert.match(panelCss, /\.operatorPanelHeader,[\s\S]*\.productionProgrammingCard > header/);

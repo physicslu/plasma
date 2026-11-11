@@ -134,6 +134,8 @@ export function ProgrammingJobPanel({
   const { locale } = useI18n();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const modeLabel = mode === "production" ? "Production" : "Engineering";
+  // EMode fields are sub-items of section 2 (2-1 … 2-4); PMode keeps 1 … 4.
+  const fieldNumber = (index: number) => (mode === "engineering" ? `2-${index}.` : `${index}.`);
   const statusText = typeof statusValue === "string" ? statusValue : null;
   const readinessGuidance = statusText ? batchReadinessGuidanceFromLabel(statusText, locale) : null;
   const disabledStartTitle = startDisabled && statusText !== "BATCH READY" ? readinessGuidance ?? undefined : undefined;
@@ -157,7 +159,7 @@ export function ProgrammingJobPanel({
       {!collapsed && (
         <div className="programmingJobGrid" data-programming-job-fields={mode}>
           <div className="programmingJobField" data-programming-job-field="target">
-            <strong>1. {targetLabel}</strong>
+            <strong>{fieldNumber(1)} {targetLabel}</strong>
             <ICPickerField
               value={targetDevice}
               onChange={onTargetChange}
@@ -168,38 +170,40 @@ export function ProgrammingJobPanel({
           </div>
 
           <div className="programmingJobField programmingJobImageField" data-programming-job-field="image">
-            <strong>2. {imageLabel}</strong>
-            {source && (
-              <ProgrammingSourceSelector
-                value={source.value}
-                disabled={source.disabled}
-                ariaLabel={`${modeLabel} Programming Source`}
-                onChange={next => {
-                  // A file picked for one Source must never be sent as the other.
-                  if (imageInputRef.current) imageInputRef.current.value = "";
-                  source.onChange(next);
-                }}
-              />
-            )}
-            <div className="programmingJobImageControl">
-              <span data-image-source={image.source} title={image.title ?? image.name}>{image.name}</span>
-              <button type="button" disabled={image.browseDisabled} onClick={() => imageInputRef.current?.click()}>{image.browseLabel}</button>
-              <input
-                ref={imageInputRef}
-                type="file"
-                aria-label={image.inputAriaLabel}
-                accept={image.accept ?? ".bin,application/octet-stream"}
-                hidden
-                disabled={image.inputDisabled}
-                onChange={event => image.onFileChange(event.target.files?.[0] ?? null, event)}
-              />
+            <strong>{fieldNumber(2)} {imageLabel}</strong>
+            <div className="programmingJobImageContent">
+              {source && (
+                <ProgrammingSourceSelector
+                  value={source.value}
+                  disabled={source.disabled}
+                  ariaLabel={`${modeLabel} Programming Source`}
+                  onChange={next => {
+                    // A file picked for one Source must never be sent as the other.
+                    if (imageInputRef.current) imageInputRef.current.value = "";
+                    source.onChange(next);
+                  }}
+                />
+              )}
+              <div className="programmingJobImageControl">
+                <span data-image-source={image.source} title={image.title ?? image.name}>{image.name}</span>
+                <button type="button" disabled={image.browseDisabled} onClick={() => imageInputRef.current?.click()}>{image.browseLabel}</button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  aria-label={image.inputAriaLabel}
+                  accept={image.accept ?? ".bin,application/octet-stream"}
+                  hidden
+                  disabled={image.inputDisabled}
+                  onChange={event => image.onFileChange(event.target.files?.[0] ?? null, event)}
+                />
+              </div>
+              {image.details && <small className="programmingJobImageDetails" data-image-details>{image.details}</small>}
+              <small className="programmingJobImageHint">{image.hint}</small>
             </div>
-            {image.details && <small className="programmingJobImageDetails" data-image-details>{image.details}</small>}
-            <small>{image.hint}</small>
           </div>
 
           <div className="programmingJobField" data-programming-job-field="operations">
-            <strong>3. {operationsLabel}</strong>
+            <strong>{fieldNumber(3)} {operationsLabel}</strong>
             <div className="programmingJobOperationChecks" role="group" aria-label={`${modeLabel} batch operations`}>
               {operations.map(operation => (
                 <label key={operation.key}>
@@ -219,7 +223,7 @@ export function ProgrammingJobPanel({
           </div>
 
           <div className="programmingJobField" data-programming-job-field="policy">
-            <strong>4. {policyLabel}</strong>
+            <strong>{fieldNumber(4)} {policyLabel}</strong>
             <div className="programmingJobPolicyControls">
               <label>{policy.repeatLabel}<input data-programming-job-policy="repeat" aria-label={policy.repeatAriaLabel} type="number" min="1" max="10000" value={policy.repeatValue} disabled={policy.repeatDisabled} onChange={event => policy.onRepeatChange(event.target.value)} /></label>
               <label>{policy.retryLabel}<input data-programming-job-policy="retry" aria-label={policy.retryAriaLabel} type="number" min="0" max={policy.retryMax ?? 20} value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
