@@ -866,7 +866,7 @@ export default function ManagedProgrammingWorkspace() {
         <div className="productionProgrammingWorkflow">
           <section className={`productionProgrammingCard targetingCard ${setupCollapsed ? "is-collapsed" : ""}`}>
             <header>
-              SYSTEM SETUP &amp; TARGETING
+              1. SYSTEM SETUP &amp; TARGETING
               <button
                 type="button"
                 className="engineeringPanelToggle"
@@ -1081,7 +1081,7 @@ export default function ManagedProgrammingWorkspace() {
 
         <section className="productionProgrammingCard liveSiteStatus overviewCard" aria-label="Engineering Site status">
           <header>
-            <span>LIVE SITE STATUS</span>
+            <span>3. LIVE SITE STATUS</span>
             <small>{ppu?.displayName ?? "Selected PPU"} · {ppu?.sites.length ?? 0} Sites · Selected {siteId == null ? 0 : 1} · Manager Fleet polling {TOPOLOGY_POLL_MS / 1000} s</small>
           </header>
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">

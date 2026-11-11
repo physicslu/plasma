@@ -128,6 +128,41 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
   assert.match(emode, /Erase \+ Verify without Program is not supported/);
 });
 
+test("EMode sections are numbered 1 / 2 (2-1 … 2-4) / 3 / 4 and no current feature is removed for it", async () => {
+  const logPanel = await read("app/engineering/engineering-log-panel.tsx");
+  const jobControlsCss = await read("app/operator-ui/programming-job-controls.css");
+  const sourceSelectorCss = await read("app/operator-ui/programming-source-selector.css");
+  const icPickerCss = await read("app/devices/ic-picker-field.css");
+  assert.match(emode, /1\. SYSTEM SETUP &amp; TARGETING/);
+  // One number per title: OperatorPanel renders "2." / "4."; the title carries none.
+  assert.match(emode, /title="PROGRAMMING JOB"/);
+  assert.match(panel, /number=\{2\}/);
+  assert.match(panel, /mode === "engineering" \? `2-\$\{index\}\.` : `\$\{index\}\.`/);
+  for (const [index, label] of [[1, "targetLabel"], [2, "imageLabel"], [3, "operationsLabel"], [4, "policyLabel"]]) {
+    assert.ok(panel.includes(`<strong>{fieldNumber(${index})} {${label}}</strong>`));
+  }
+  assert.match(emode, /targetLabel="Target IC"/);
+  assert.match(emode, /imageLabel="Programming Source"/);
+  assert.match(emode, /operationsLabel="Operations"/);
+  assert.match(emode, /policyLabel="Batch Policy"/);
+  assert.match(emode, /3\. LIVE SITE STATUS/);
+  assert.match(logPanel, /number=\{4\}/);
+  // Compact aligned controls of the numbered Programming Job.
+  assert.match(panel, /className="programmingJobImageContent"/);
+  assert.match(jobControlsCss, /@container engineering-programming \(max-width: 700px\)/);
+  assert.match(sourceSelectorCss, /width:\s*fit-content/);
+  assert.match(sourceSelectorCss, /min-height:\s*var\(--operator-control-min-height\)/);
+  assert.match(icPickerCss, /\.engineeringProgrammingV2 \.programmingJobGrid \.icPickerInput input\s*\{[\s\S]*font-size:\s*var\(--operator-control-font-size\)/);
+  // The numbering never costs a feature: per-Site READ + Save File Picker,
+  // Batch Attempts, the run view and Start Outcome Reconciliation stay.
+  assert.match(emode, /showSaveFilePicker/);
+  assert.match(emode, /BATCH ATTEMPTS/);
+  assert.match(emode, /data-testid="batch-attempts"/);
+  assert.match(emode, /<ProgrammingRunView/);
+  assert.match(emode, /async function reconcileStartHold/);
+  assert.match(emode, /const ALL_OPERATIONS: Record<SequenceOperation, boolean> = \{ erase: true, program: true, verify: true \}/);
+});
+
 test("the standing PROGRAMMING PLAN panel is gone; the Backend plan still runs and is logged", () => {
   assert.doesNotMatch(emode, /PROGRAMMING PLAN|managed-plan|aria-label="Programming plan"/);
   assert.match(core, /plan = await planProgramming\(request\.alias, input\)/);

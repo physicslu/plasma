@@ -126,7 +126,8 @@ test("Programming Job keeps approved body structure without owning Panel Header 
   assert.match(sharedCss, /\.programmingJobField > strong\s*\{[\s\S]*font-size:\s*var\(--operator-field-label-font-size\)/);
   assert.match(sharedCss, /\.programmingJobImageControl\s*\{[\s\S]*min-height:\s*var\(--operator-control-min-height\)/);
   assert.match(sharedCss, /\.programmingJobOperationChecks input\s*\{[\s\S]*width:\s*var\(--operator-checkbox-size\)/);
-  assert.match(sharedCss, /\.programmingJobPolicyControls input,[\s\S]*\.programmingJobPolicyControls select\s*\{[\s\S]*min-height:\s*var\(--operator-control-min-height\)/);
+  assert.match(sharedCss, /\.programmingJobPolicyControls input,[\s\S]*\.programmingJobPolicyControls select\s*\{[\s\S]*height:\s*var\(--operator-control-min-height\)/);
+  assert.match(sharedCss, /\.engineeringProgrammingV2 \.programmingJobGrid\[data-programming-job-fields="engineering"\] \.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 180px\) minmax\(0, 1fr\)[\s\S]*align-items:\s*start/);
   assert.match(sharedCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.08fr\) minmax\(0, 1fr\)/);
   assert.match(sharedCss, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);
   assert.match(sharedCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);

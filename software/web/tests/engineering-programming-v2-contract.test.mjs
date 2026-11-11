@@ -34,9 +34,11 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.doesNotMatch(refresh, /recentEvents/);
 
   assert.match(refresh, /grid-template-columns:\s*minmax\(0, 1fr\)/);
-  assert.match(refresh, /content:\s*"1\. "/);
-  assert.match(refresh, /content:\s*"3\. "/);
-  assert.doesNotMatch(refresh, /1\. SYSTEM SETUP|3\. LIVE SITE STATUS|font-size:\s*0/);
+  // Section numbers are real heading text, never CSS generated content.
+  assert.match(workspace, /1\. SYSTEM SETUP &amp; TARGETING/);
+  assert.match(workspace, /3\. LIVE SITE STATUS/);
+  assert.match(sharedJob, /mode === "engineering" \? `2-\$\{index\}\.` : `\$\{index\}\.`/);
+  assert.doesNotMatch(refresh, /targetingCard > header::before|liveSiteStatus > header > span::before|font-size:\s*0/);
 });
 
 test("Engineering shell uses the approved dark EMode sidebar and supports collapse", async () => {

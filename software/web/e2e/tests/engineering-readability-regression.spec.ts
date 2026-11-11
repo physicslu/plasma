@@ -158,10 +158,11 @@ test("Engineering first-level Panel titles share one operator header baseline wh
     expect(await titleSignature(title)).toEqual(baselineTitle);
   }
 
-  const setupPseudo = await page.locator(".targetingCard > header").evaluate(element => getComputedStyle(element, "::before").content);
-  const livePseudo = await page.locator(".liveSiteStatus > header > span").evaluate(element => getComputedStyle(element, "::before").content);
-  expect(setupPseudo).toContain("1.");
-  expect(livePseudo).toContain("3.");
+  // Section numbers are real heading text, not CSS generated content.
+  await expect(page.locator(".targetingCard > header")).toContainText("1. SYSTEM SETUP & TARGETING");
+  await expect(page.locator(".liveSiteStatus > header > span")).toHaveText("3. LIVE SITE STATUS");
+  await expect(job.locator(".operatorPanelTitle")).toHaveText(/^2\.\s*PROGRAMMING JOB$/);
+  await expect(page.locator(".engineeringOperatorLog .operatorPanelTitle")).toHaveText(/^4\.\s*ENGINEERING JOB LOG$/);
 
   const setupLabels = page.locator(".targetingCard .workflowField > span");
   await expect(setupLabels).toHaveCount(2);

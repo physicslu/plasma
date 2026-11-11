@@ -99,10 +99,11 @@ function expectRightAlignedRail(metric: Awaited<ReturnType<typeof rowMetrics>>, 
 function expectProgrammingJobRail(metric: Awaited<ReturnType<typeof rowMetrics>>) {
   expect(metric.labelOffset).toBeGreaterThanOrEqual(8);
   expect(metric.labelOffset).toBeLessThanOrEqual(12);
-  expect(metric.controlOffset).toBeGreaterThanOrEqual(144);
-  expect(metric.controlOffset).toBeLessThanOrEqual(148);
+  // EMode 2-N labels: 10px padding + 180px label column + 10px gap.
+  expect(metric.controlOffset).toBeGreaterThanOrEqual(198);
+  expect(metric.controlOffset).toBeLessThanOrEqual(202);
   expect(metric.textAlign).toBe("left");
-  expect(metric.justifySelf).toBe("start");
+  expect(metric.justifySelf).toBe("stretch");
 }
 
 test("Engineering targeting remains compact while shared Programming Job uses the operator density rail", async ({ page }) => {

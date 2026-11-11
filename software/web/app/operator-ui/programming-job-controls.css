@@ -47,7 +47,25 @@
   white-space: nowrap;
 }
 
-.programmingJobField > small {
+/* EMode: the 2-N labels get a wider, top-aligned label column. */
+.engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField {
+  padding: 8px 10px;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
+  row-gap: 6px;
+}
+
+.engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField > strong {
+  justify-self: stretch;
+  min-width: 0;
+  padding-top: 9px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.programmingJobField > small,
+.programmingJobImageContent > small {
   grid-column: 2;
   margin: 0;
   color: var(--text-soft, #51606f);
@@ -55,9 +73,20 @@
   line-height: 1.35;
 }
 
+.programmingJobImageContent {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.programmingJobImageContent > small {
+  grid-column: 1;
+}
+
 .programmingJobImageControl {
   min-width: 0;
-  min-height: var(--operator-control-min-height);
+  height: var(--operator-control-min-height);
+  box-sizing: border-box;
   border: 1px solid var(--line-strong, #bdd0d9);
   border-radius: 5px;
   background: var(--panel, #fff);
@@ -79,13 +108,15 @@
 }
 
 .programmingJobImageControl > button {
-  min-height: calc(var(--operator-control-min-height) - 2px);
+  min-height: 0;
+  height: calc(var(--operator-control-min-height) - 2px);
   border: 0;
   border-left: 1px solid var(--line-strong, #bdd0d9);
   background: linear-gradient(180deg, #fbfcfd, #f1f5f8);
   color: var(--text, #172033);
   font-size: var(--operator-control-font-size);
   font-weight: 700;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -151,7 +182,9 @@
 
 .programmingJobPolicyControls input,
 .programmingJobPolicyControls select {
-  min-height: var(--operator-control-min-height);
+  width: auto;
+  height: var(--operator-control-min-height);
+  min-height: 0;
   box-sizing: border-box;
   border: 1px solid var(--line-strong, #bdd0d9);
   border-radius: 5px;
@@ -159,6 +192,7 @@
   color: var(--text, #172033);
   padding: 0 8px;
   font-size: var(--operator-control-font-size);
+  line-height: 1;
 }
 
 .programmingJobPolicyControls input {
@@ -318,7 +352,8 @@
     gap: 6px;
   }
 
-  .programmingJobField > small {
+  .programmingJobField > small,
+  .programmingJobImageContent {
     grid-column: 1;
   }
 
@@ -335,5 +370,36 @@
     padding: 8px;
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+}
+
+@container engineering-programming (max-width: 700px) {
+  .engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField {
+    grid-template-columns: minmax(142px, 160px) minmax(0, 1fr);
+  }
+
+  .engineeringProgrammingV2 .programmingJobOperationChecks,
+  .engineeringProgrammingV2 .programmingJobPolicyControls {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  .engineeringProgrammingV2 .programmingJobGrid .icPickerMenu button {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container engineering-programming (max-width: 480px) {
+  .engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField > small,
+  .engineeringProgrammingV2 .programmingJobImageContent {
+    grid-column: 1;
+  }
+
+  .engineeringProgrammingV2 .programmingJobActionBar {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
