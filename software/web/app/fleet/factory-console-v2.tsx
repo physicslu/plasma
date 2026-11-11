@@ -59,6 +59,7 @@ import {
   managedBatchBlocker,
   managedFactoryCatalog,
   managedPpuStatus,
+  MANAGED_PRODUCTION_MODE,
   ManagedProductionBatch,
   type ManagedSiteRecord,
 } from "./managed-factory-backend";
@@ -910,7 +911,8 @@ export default function FactoryConsoleV2() {
     if (managedFile.size <= 0 || managedFile.size > managedSourceLimit) {
       return blocked("image-invalid", "FILE INVALID", `The selected file must be 1 to ${managedSourceLimit} bytes.`);
     }
-    return { code: "batch-ready", label: "BATCH READY", ready: true, reason: "" };
+    // Ready for the restricted sequential mode only; never a generic production READY.
+    return { code: "batch-ready", label: MANAGED_PRODUCTION_MODE.readyLabel, ready: true, reason: "" };
   })();
   const batchReadiness = managed ? managedReadiness : legacyReadiness;
   const batchStatusState = batchSubmitting
@@ -1215,6 +1217,15 @@ export default function FactoryConsoleV2() {
             <i /><span>{gatewayLabel} · {ppuHealth.label}</span><b>PMode</b>
           </div>
         </header>
+
+        {managed && (
+          <div className="factoryWarning factoryProductionMode" role="note" data-testid="managed-production-mode">
+            <span>
+              <b>{MANAGED_PRODUCTION_MODE.label} · {MANAGED_PRODUCTION_MODE.qualification}</b>
+              {" — "}{MANAGED_PRODUCTION_MODE.detail}
+            </span>
+          </div>
+        )}
 
         {!catalog && (
           <section className="factoryConsoleNotice" role="status">
@@ -1561,7 +1572,11 @@ export default function FactoryConsoleV2() {
                       {record.note && <span data-testid="receipt-note"> · {record.note}</span>}
                     </summary>
                     {record.run && (
-                      <ProgrammingRunView run={record.run} ariaLabel={`Programming run ${record.alias} ${siteLabel(record.siteId)}`} />
+                      <ProgrammingRunView
+                        run={record.run}
+                        ariaLabel={`Programming run ${record.alias} ${siteLabel(record.siteId)}`}
+                        executionInterface={record.siteInterface}
+                      />
                     )}
                   </details>
                 ))}

@@ -80,6 +80,19 @@ export function managedPpuStatus(topology: ManagedTopology, alias: string): PPUS
   };
 }
 
+/**
+ * What this execution mode is, stated to the operator on the page. It is a
+ * restricted, attended mode, not an unattended production system.
+ */
+export const MANAGED_PRODUCTION_MODE = Object.freeze({
+  label: "Sequential / Session-based / Non-durable",
+  qualification: "NOT PRODUCTION QUALIFIED",
+  readyLabel: "SEQUENTIAL BATCH READY",
+  detail: "One Site runs at a time (no parallel Sites or PPUs). The batch lives in this Console session: "
+    + "reloading or closing the page stops queuing and nothing is resumed; a run already submitted finishes in the "
+    + "Manager. Physical evidence exists for PYNQ-Z2 Site 2 only; multi-Site and multi-PPU production are not qualified.",
+});
+
 export type ManagedBatchReadiness = { ready: boolean; label: string; reason: string };
 
 /** Every selected Site must be programmable on its own PPU; one blocker blocks the batch Start. */
@@ -128,6 +141,8 @@ export type ManagedSiteRecord = {
   alias: string;
   ppuId: string | null;
   siteId: number;
+  /** Site interface the PPU reported at admission ("openocd", "mock", ...). */
+  siteInterface: string | null;
   run: ProgrammingRun | null;
   /** Why the Site did not produce a run (blocked, stopped, cancelled). */
   note: string | null;
@@ -155,6 +170,7 @@ export class ManagedProductionBatch {
       alias: target.alias,
       ppuId: null,
       siteId,
+      siteInterface: null,
       run: null,
       note: null,
       state: "ready" as ServerBatchSiteState,
@@ -181,7 +197,8 @@ export class ManagedProductionBatch {
   }
 
   records(): ManagedSiteRecord[] {
-    return this.entries.map(({ key, alias, ppuId, siteId, run, note }) => ({ key, alias, ppuId, siteId, run, note }));
+    return this.entries.map(({ key, alias, ppuId, siteId, siteInterface, run, note }) => (
+      { key, alias, ppuId, siteId, siteInterface, run, note }));
   }
 
   private failures(): number {
@@ -223,6 +240,7 @@ export class ManagedProductionBatch {
         continue;
       }
       const site = admitted.ppu?.sites.find(item => item.site_id === entry.siteId);
+      entry.siteInterface = site?.interface ?? null;
       const capability = site ? siteCapability(site, admitted.routes, this.input.icpn) : null;
       if (!capability?.programmable) {
         this.close(entry, "error", `BLOCKED before any Job: ${capability?.reason ?? "the Site is not reported by the PPU."}`);

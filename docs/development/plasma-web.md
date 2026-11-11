@@ -81,6 +81,11 @@ fresh observation, one plan / Site lease / Resource check / Job Binding per
 Site, `attempts = 1`, no retry. An `OUTCOME_UNKNOWN` run stops the later
 Sites of that PPU only; Stop Policy and ABORT only stop queuing.
 
+The page states this mode to the operator
+(`Sequential / Session-based / Non-durable · NOT PRODUCTION QUALIFIED`), its
+ready label is `SEQUENTIAL BATCH READY`, and each receipt names the Site
+interface so a Mock result is never read as hardware evidence.
+
 Not implemented, and not to be claimed:
 
 - **Durable Manager-owned production batch.** The batch lives in the Console

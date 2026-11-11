@@ -198,7 +198,7 @@ test("ABORT stops queuing; the submitted run is observed to its end and nothing 
 test("Image is the default Source; switching to Bundle clears the file and issues no request", async ({ page }) => {
   const counters = await mockManager(page, { ppus: [Z2] });
   const { job, start } = await prepare(page, [["z2", [2]]]);
-  await expect(job.getByRole("radio", { name: "Image", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(job.getByRole("radio", { name: "Programming Image", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(start).toBeEnabled();
   await expect(job.getByLabel("Site Retry Limit")).toBeDisabled();
   await expect(job.getByLabel("Site Retry Limit")).toHaveValue("0");
@@ -240,4 +240,44 @@ test("an incompatible Bundle fails closed on every Site without a single Job", a
   await expect(receipt(page, "z2", 2)).toContainText("bundle_resource_not_qualified");
   await expect(receipt(page, "line2", 2)).toContainText("BLOCKED before any Job");
   expect(counters.starts).toHaveLength(0);
+});
+
+test("the page states the restricted mode: Sequential / Session-based / Non-durable, not production qualified", async ({ page }) => {
+  await mockManager(page, { ppus: [Z2, LINE2] });
+  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
+  const mode = page.getByTestId("managed-production-mode");
+  await expect(mode).toContainText("Sequential / Session-based / Non-durable");
+  await expect(mode).toContainText("NOT PRODUCTION QUALIFIED");
+  await expect(mode).toContainText("PYNQ-Z2 Site 2 only");
+  // Ready means ready for this restricted mode, never a generic production READY.
+  await expect(start).toBeEnabled();
+  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/SEQUENTIAL BATCH READY/);
+  await expect(page.locator("main")).not.toContainText(/PRODUCTION READY/i);
+});
+
+test("non-durable: a reload during the batch stops queuing; nothing is resumed or resubmitted", async ({ page }) => {
+  const counters = await mockManager(page, { ppus: [Z2, LINE2], script: () => ({ runningPolls: 4 }) });
+  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
+  await start.click();
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
+  expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
+  await page.reload();
+  await expect(page.getByTestId("managed-production-mode")).toBeVisible();
+  await page.waitForTimeout(6000); // longer than the in-flight run
+  // The second PPU was never planned or started, and the first was not sent again.
+  expect(counters.plans.map(item => item.alias)).toEqual(["z2"]);
+  expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
+  await expect(page.getByRole("status", { name: "BATCH STATUS" })).not.toHaveText(/RUNNING|SUCCESS/);
+});
+
+test("a Mock PPU result and a hardware-path result are labelled differently in the same batch", async ({ page }) => {
+  await mockManager(page, { ppus: [Z2, { ...LINE2, siteInterface: "mock" }] });
+  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
+  await start.click();
+  await finished(page);
+  await receipt(page, "z2", 2).locator("summary").click();
+  await receipt(page, "line2", 2).locator("summary").click();
+  await expect(receipt(page, "z2", 2).getByTestId("run-evidence")).toHaveText("Site interface: openocd");
+  await expect(receipt(page, "line2", 2).getByTestId("run-evidence")).toContainText("MOCK RESULT");
+  await expect(receipt(page, "line2", 2).getByTestId("run-evidence")).toContainText("never a hardware qualification");
 });
