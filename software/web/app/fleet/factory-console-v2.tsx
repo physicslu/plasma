@@ -882,13 +882,12 @@ export default function FactoryConsoleV2() {
 
   // Managed readiness: ONLINE and Programming capability are separate facts.
   const icpn = targetDevice?.icpn ?? targetDevice?.identifier ?? null;
-  const managedOperationOptions = managed ? routeOperationsForIc(managedRoutes?.routes ?? null, icpn) : [];
+  // PMode runs Image Operations only; a Route's range Operation (Read) is not offered here.
+  const managedOperationOptions = managed
+    ? routeOperationsForIc(managedRoutes?.routes ?? null, icpn).filter(isImageOperation) : [];
   const managedOperation = chosenManagedOperation != null && (managedOperationOptions as string[]).includes(chosenManagedOperation)
     ? chosenManagedOperation
-    // Preselect the one Operation this page can run (an Image Operation); a
-    // listed range Operation such as Read stays visible but is never chosen for it.
-    : managedOperationOptions.filter(isImageOperation).length === 1
-      ? managedOperationOptions.filter(isImageOperation)[0] : null;
+    : managedOperationOptions.length === 1 ? managedOperationOptions[0] : null;
   const managedSourceLimit = programmingSource === "bundle" ? 1024 * 1024 + 256 * 1024 : 1024 * 1024;
   const managedReadiness = ((): { code: typeof legacyReadiness.code; label: string; ready: boolean; reason: string } => {
     const blocked = (code: typeof legacyReadiness.code, label: string, reason: string) => ({ code, label, ready: false, reason });

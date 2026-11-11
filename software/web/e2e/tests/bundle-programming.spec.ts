@@ -256,7 +256,7 @@ test("Resource Reuse: same PPU-verified Resources → no B1/B2/B3 → one flash_
   expect(counters.startBodies).toEqual([{ plan_id: planned.plan_id, confirm: "PROGRAM" }]);
 });
 
-test("Operation choice is limited to the Route Profile; erase/read send a range, no image", async ({ page }) => {
+test("Operation choice is limited to single-operation Jobs of the Route Profile; read sends a range, no image", async ({ page }) => {
   const wide = { ...route, operations: ["flash_cycle", "erase", "read"] };
   const counters = await mockManager(page, {
     routes: [wide],
@@ -265,8 +265,9 @@ test("Operation choice is limited to the Route Profile; erase/read send a range,
   });
   const panel = await openAndSelectIc(page);
   const select = panel.getByLabel("Programming Operation");
-  await expect(select.locator("option")).toHaveText(["flash_cycle", "erase", "read"]);
-  await select.selectOption("erase");
+  // erase / program / verify are steps of one programming Job (EMode), never a Job of their own.
+  await expect(select.locator("option")).toHaveText(["flash_cycle", "read"]);
+  await select.selectOption("read");
   await expect(panel.getByLabel("Image file")).toHaveCount(0);
   const prepare = panel.getByRole("button", { name: "Prepare Programming" });
   await expect(prepare).toBeDisabled();
@@ -275,7 +276,7 @@ test("Operation choice is limited to the Route Profile; erase/read send a range,
   await prepare.click();
   await expect(panel.getByRole("alert")).toContainText("program an Image first");
   const body = counters.planBodies[0];
-  expect(body).toEqual({ icpn: "STM32F103C8T6", site_id: 2, operation: "erase", address: 134217728, length: 1024 });
+  expect(body).toEqual({ icpn: "STM32F103C8T6", site_id: 2, operation: "read", address: 134217728, length: 1024 });
   expect(counters.starts).toBe(0);
 });
 
