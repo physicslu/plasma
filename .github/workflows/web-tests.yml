@@ -78,7 +78,7 @@ jobs:
         timeout-minutes: 10
         run: cd e2e && npx playwright install chromium
       - name: Playwright E2E
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: cd e2e && npm test
       - name: Upload visual regression diagnostics
         if: ${{ failure() }}

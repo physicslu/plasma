@@ -97,8 +97,8 @@ const MAX_LOG_ENTRIES = 1000;
 const POLL_INTERVAL_MS = 500;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
 const terminalStates = new Set<JobState>(["success", "failed", "error", "cancelled", "timeout", "aborted"]);
-const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
-const operationCodes: Record<Operation, string> = { erase: "E", program: "P", verify: "V", read: "R" };
+const operationOrder: Operation[] = ["erase", "program", "verify"];
+const operationCodes: Record<Exclude<Operation, "read">, string> = { erase: "E", program: "P", verify: "V" };
 
 class GatewayUnavailableError extends Error {
   constructor(message: string) {
@@ -308,6 +308,7 @@ function StandaloneProgrammingWorkspace() {
     ? engineeringTargetApiBase(apiBase, selection.facilityId, selection.ppuId)
     : null;
   const selectedSiteIds = selectedSiteIdsState ?? [];
+  const selectedBatchOperations = operationOrder.filter(operation => selectedOperations.includes(operation));
   const selectedSites = sites.filter(site => selectedSiteIds.includes(site.id));
   const selectableSiteIds = sites
     .filter(site => site.enabled && !isRunning(site))
@@ -323,19 +324,19 @@ function StandaloneProgrammingWorkspace() {
     providerOnline: connection === "online" && Boolean(catalog),
     targetValid: Boolean(targetApiBase && selectedPPU),
     selectedSiteCount: selectedSiteIds.length,
-    selectedOperationCount: selectedOperations.length,
+    selectedOperationCount: selectedBatchOperations.length,
     requiresImage,
     imagePresent: Boolean(imageAsset) || syntheticProgrammingImageAvailable || Boolean(batchSnapshot?.asset),
     imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_ASSET_BYTES,
-    readSelected: selectedOperations.includes("read"),
+    readSelected: false,
     readParamsValid: true,
     allSitesExecutable,
     batchRunning: batchRunning && !batchCancelling,
     batchCancelling,
   });
   const noOperationWarning = locale === "zh-TW"
-    ? "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。"
-    : "No operation selected. Select at least one of Erase, Program, Verify, or Read.";
+    ? "未選擇任何操作。請至少選擇 Erase、Program 或 Verify 其中一項。"
+    : "No operation selected. Select at least one of Erase, Program, or Verify.";
   const programmingUnavailableLabel = locale === "zh-TW" ? "燒錄功能目前不可用" : "Programming unavailable";
   const dismissWarning = locale === "zh-TW" ? "關閉警告" : "Dismiss warning";
   const syntheticImageLabel = "Mock Synthetic Image";
@@ -510,7 +511,7 @@ function StandaloneProgrammingWorkspace() {
         siteSelectionTarget.current = `${first.facility_id}/${first.ppu_id}`;
         setSelectedSiteIdsState(ids);
       }
-      setSelectedOperations([...snapshot.operations]);
+      setSelectedOperations(snapshot.operations.filter(operation => operation !== "read"));
       setRepeatCount(String(snapshot.execution_policy.repeat_count));
       setSiteRetryLimit(String(snapshot.execution_policy.site_retry_limit));
       setStopPolicy(snapshot.execution_policy.failed_site_stop_threshold === null
@@ -908,7 +909,7 @@ function StandaloneProgrammingWorkspace() {
     }
 
     const siteIds = [...selectedSiteIds];
-    const operations = operationOrder.filter(operation => selectedOperations.includes(operation));
+    const operations = selectedBatchOperations;
     const readDetail = operations.includes("read") ? " · read MAIN FLASH" : "";
     setOperatorWarning(null);
     trackedJobs.current = {};
@@ -1140,7 +1141,7 @@ function StandaloneProgrammingWorkspace() {
                       <span>BATCH</span>
                     </label>
                   </th>
-                  <th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>OPERATIONS (E/P/V/R)</th>
+                  <th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>OPERATIONS (E/P/V)</th>
                 </tr>
               </thead>
               <tbody className="targetSitesSection">
@@ -1171,6 +1172,16 @@ function StandaloneProgrammingWorkspace() {
                       <td><b className="engineeringResult" data-result={resultLabel(displayStage)}>{resultLabel(displayStage)}</b></td>
                       <td><div className="rowActions engineeringV2Actions">
                         {operationOrder.map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.id} ${t(`operation.${operation}`)}`} title={t(`operation.${operation}`)} disabled={operationDisabled(site, operation)} onClick={() => runSingleSite(site.id, operation)}>{operationCodes[operation]}</button>)}
+                        <button
+                          type="button"
+                          className="readMemoryJob"
+                          aria-label={`SITE ${site.id} Read Memory`}
+                          title="Read Memory"
+                          disabled={operationDisabled(site, "read")}
+                          onClick={() => runSingleSite(site.id, "read")}
+                        >
+                          R
+                        </button>
                         <button className="stop" aria-label={`Cancel SITE ${site.id}`} disabled={batchRunning || !isRunning(site)} onClick={() => void cancelSite(site.id)}>■</button>
                         {site.stage === "success" && site.jobId && site.outputFile && targetApiBase && <a className="rowDownload" aria-label={`Download SITE ${site.id} read file`} href={readDownloadUrl(targetApiBase, site.jobId, site.outputFile)}>↓</a>}
                       </div></td>

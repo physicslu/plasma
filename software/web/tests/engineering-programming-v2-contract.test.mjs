@@ -115,6 +115,20 @@ test("Engineering keeps direct single-Site jobs separate from server-owned Batch
   assert.match(controller, /cancelServerBatch\(/);
 });
 
+test("Engineering Read Memory is an independent per-Site Job, not a Batch operation", async () => {
+  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const driver = await source("../e2e/tests/programming-job-test-helpers.ts");
+
+  assert.match(workspace, /const operationOrder: Operation\[\] = \["erase", "program", "verify"\]/);
+  assert.match(workspace, /const selectedBatchOperations = operationOrder\.filter\(operation => selectedOperations\.includes\(operation\)\)/);
+  assert.match(workspace, /readSelected: false/);
+  assert.match(workspace, /snapshot\.operations\.filter\(operation => operation !== "read"\)/);
+  assert.match(workspace, /aria-label=\{`SITE \$\{site\.id\} Read Memory`\}/);
+  assert.match(workspace, /onClick=\{\(\) => runSingleSite\(site\.id, "read"\)\}/);
+  assert.match(workspace, /OPERATIONS \(E\/P\/V\)/);
+  assert.match(driver, /engineering: \["erase", "program", "verify"\]/);
+});
+
 test("Engineering Target IC is optional and crosses both direct-Job and server-Batch boundaries", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");

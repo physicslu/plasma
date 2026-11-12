@@ -270,8 +270,9 @@ test("Emode v2 keeps workspace density while Programming Job follows the shared 
   expect(operations!.y).toBeLessThanOrEqual(policy!.y);
   await expectProgrammingJobDesktopActionGeometry(job);
 
-  await programmingJobOperation(job, "read").check();
-  await expect(programmingJobOperation(job, "read")).toBeChecked();
+  await programmingJobOperation(job, "verify").check();
+  await expect(programmingJobOperation(job, "verify")).toBeChecked();
+  await expect(page.getByLabel("SITE 1 Read Memory")).toBeVisible();
 
   const passKpi = await page.locator('[data-kpi="pass"]').evaluate(element => {
     const style = getComputedStyle(element);

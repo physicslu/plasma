@@ -288,6 +288,10 @@ test("Engineering Programming renders the approved workflow and binds Target IC 
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
   await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
+  await expect(page.getByLabel("Engineering batch read")).toHaveCount(0);
+  await expect(page.getByLabel("SITE 1 Read Memory")).toBeVisible();
+  await expect(page.getByLabel("SITE 2 Read Memory")).toBeVisible();
+  await expect(page.getByText("OPERATIONS (E/P/V)", { exact: true })).toBeVisible();
 
   const layout = await page.locator(".engineeringProgrammingV2").evaluate(root => {
     const box = (selector: string) => root.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
@@ -346,6 +350,20 @@ test("Engineering Programming renders the approved workflow and binds Target IC 
   await expect(siteOne.locator(".engineeringResult")).toHaveText("PASS");
 });
 
+test("Read Memory starts an independent single-Site Job without submitting a Batch", async ({ page }) => {
+  const submissions: Array<Record<string, unknown>> = [];
+  const batchSubmissions: Array<Record<string, unknown>> = [];
+  await installApi(page, submissions, batchSubmissions);
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+
+  await page.getByLabel("SITE 1 Read Memory").click();
+  await expect.poll(() => submissions.length).toBe(1);
+  expect(submissions[0].site_id).toBe(1);
+  expect(submissions[0].operation).toBe("read");
+  expect(batchSubmissions).toHaveLength(0);
+});
+
 test("unselected Sites stay visible and START PROGRAMMING snapshots only checked Sites into one server Batch", async ({ page }) => {
   const directSubmissions: Array<Record<string, unknown>> = [];
   const batchSubmissions: Array<Record<string, unknown>> = [];
@@ -362,6 +380,7 @@ test("unselected Sites stay visible and START PROGRAMMING snapshots only checked
   await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
 
   await programmingJobOperation(job, "erase").check();
+  await programmingJobOperation(job, "read").waitFor({ state: "detached" });
   await programmingJobPolicy(job, "repeat").fill("2");
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary.getByText("BATCH SUMMARY", { exact: true })).toBeVisible();

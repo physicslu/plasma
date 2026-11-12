@@ -57,7 +57,8 @@ test("shared component exposes semantic operation, policy and action test hooks"
 test("PMode and EMode runtime tests consume one Programming Job test driver", () => {
   assert.match(sharedDriver, /expectedFields:[^\n]*\["target", "image", "operations", "policy"\]/);
   assert.match(sharedDriver, /expectedActions:[^\n]*\["start", "status", "abort"\]/);
-  assert.match(sharedDriver, /expectedOperations:[^\n]*\["erase", "program", "verify", "read"\]/);
+  assert.match(sharedDriver, /engineering:\s*\["erase", "program", "verify"\]/);
+  assert.match(sharedDriver, /production:\s*\["erase", "program", "verify", "read"\]/);
   assert.match(sharedDriver, /expectedPolicies:[^\n]*\["repeat", "retry", "stop"\]/);
   assert.match(sharedDriver, /export async function expectProgrammingJobContract/);
   assert.match(sharedDriver, /export function programmingJobOperation/);

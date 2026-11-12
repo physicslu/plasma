@@ -8,7 +8,10 @@ export type ProgrammingJobPolicy = "repeat" | "retry" | "stop";
 
 const expectedFields: ProgrammingJobField[] = ["target", "image", "operations", "policy"];
 const expectedActions: ProgrammingJobAction[] = ["start", "status", "abort"];
-const expectedOperations: ProgrammingJobOperation[] = ["erase", "program", "verify", "read"];
+const expectedOperationsByMode: Record<ProgrammingJobMode, ProgrammingJobOperation[]> = {
+  engineering: ["erase", "program", "verify"],
+  production: ["erase", "program", "verify", "read"],
+};
 const expectedPolicies: ProgrammingJobPolicy[] = ["repeat", "retry", "stop"];
 
 function modeName(mode: ProgrammingJobMode) {
@@ -68,9 +71,11 @@ export async function programmingJobPolicyOrder(panel: Locator) {
 
 export async function expectProgrammingJobContract(panel: Locator) {
   await expect(panel).toBeVisible();
+  const panelLabel = await panel.getAttribute("aria-label");
+  const mode: ProgrammingJobMode = panelLabel?.startsWith("Production") ? "production" : "engineering";
   expect(await programmingJobFieldOrder(panel)).toEqual(expectedFields);
   expect(await programmingJobActionOrder(panel)).toEqual(expectedActions);
-  expect(await programmingJobOperationOrder(panel)).toEqual(expectedOperations);
+  expect(await programmingJobOperationOrder(panel)).toEqual(expectedOperationsByMode[mode]);
   expect(await programmingJobPolicyOrder(panel)).toEqual(expectedPolicies);
 
   await expect(programmingJobAction(panel, "start")).toHaveCount(1);
