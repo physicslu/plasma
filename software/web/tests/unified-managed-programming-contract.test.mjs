@@ -133,11 +133,14 @@ test("EMode sections are numbered 1 / 2 (2-1 … 2-4) / 3 / 4 and no current fea
   const jobControlsCss = await read("app/operator-ui/programming-job-controls.css");
   const sourceSelectorCss = await read("app/operator-ui/programming-source-selector.css");
   const icPickerCss = await read("app/devices/ic-picker-field.css");
-  assert.match(emode, /1\. SYSTEM SETUP &amp; TARGETING/);
-  // One number per title: OperatorPanel renders "2." / "4."; the title carries none.
+  assert.match(emode, /<OperatorPanelHeader\s+number=\{1\}\s+title="SYSTEM SETUP & TARGETING"/);
+  // One number per title: the shared header renders "1." … "4."; no title carries one.
   assert.match(emode, /title="PROGRAMMING JOB"/);
-  assert.match(panel, /number=\{2\}/);
-  assert.match(panel, /mode === "engineering" \? `2-\$\{index\}\.` : `\$\{index\}\.`/);
+  assert.match(panel, /export const PROGRAMMING_JOB_SECTION = 2;/);
+  assert.match(panel, /number=\{PROGRAMMING_JOB_SECTION\}/);
+  // One source of the sub-item numbering: 2-1 … 2-4 in EMode and PMode alike.
+  assert.match(panel, /const fieldNumber = \(index: number\) => `\$\{PROGRAMMING_JOB_SECTION\}-\$\{index\}\.`/);
+  assert.doesNotMatch(panel, /mode === "engineering" \? `2-/);
   for (const [index, label] of [[1, "targetLabel"], [2, "imageLabel"], [3, "operationsLabel"], [4, "policyLabel"]]) {
     assert.ok(panel.includes(`<strong>{fieldNumber(${index})} {${label}}</strong>`));
   }
@@ -145,7 +148,7 @@ test("EMode sections are numbered 1 / 2 (2-1 … 2-4) / 3 / 4 and no current fea
   assert.match(emode, /imageLabel="Programming Source"/);
   assert.match(emode, /operationsLabel="Operations"/);
   assert.match(emode, /policyLabel="Batch Policy"/);
-  assert.match(emode, /3\. LIVE SITE STATUS/);
+  assert.match(emode, /<OperatorPanelHeader\s+number=\{3\}\s+title="LIVE SITE STATUS"/);
   assert.match(logPanel, /number=\{4\}/);
   // Compact aligned controls of the numbered Programming Job.
   assert.match(panel, /className="programmingJobImageContent"/);
@@ -157,12 +160,10 @@ test("EMode sections are numbered 1 / 2 (2-1 … 2-4) / 3 / 4 and no current fea
   // Field padding and row gap stay the shared PMode / EMode values.
   assert.doesNotMatch(jobControlsCss, /data-programming-job-fields="engineering"\] \.programmingJobField\s*\{[^}]*(padding|row-gap)/);
   // The numbering never costs a feature: per-Site READ + Save File Picker,
-  // Batch Attempts, the run view and Start Outcome Reconciliation stay.
+  // Retry / Stop Policy and Start Outcome Reconciliation stay.
   assert.match(emode, /showSaveFilePicker/);
-  assert.match(emode, /BATCH ATTEMPTS/);
-  assert.match(emode, /data-testid="batch-attempts"/);
-  assert.match(emode, /<ProgrammingRunView/);
   assert.match(emode, /async function reconcileStartHold/);
+  assert.match(emode, /async function stopQueuing/);
   assert.match(emode, /const ALL_OPERATIONS: Record<SequenceOperation, boolean> = \{ erase: true, program: true, verify: true \}/);
 });
 
@@ -272,14 +273,13 @@ test("PMode isolates PPUs: per-PPU admission, per-PPU OUTCOME_UNKNOWN latch, sto
   assert.match(factoryBackend, /if \(verdict === "PASS"\) \{\s*entry\.pass = true;/);
 });
 
-test("PMode shares the Source selector, policy and receipt view with EMode", () => {
+test("PMode shares the Source selector and policy with EMode", () => {
   assert.match(factory, /useState<ProgrammingSource>\("image"\)/);
   assert.match(factory, /source=\{managed \? \{ value: programmingSource, disabled: batchRunning, onChange: changeProgrammingSource \} : undefined\}/);
   assert.match(factory, /function changeProgrammingSource\(next: ProgrammingSource\) \{\s*if \(batchRunning \|\| next === programmingSource\) return;\s*setProgrammingSource\(next\);\s*setManagedFile\(null\);/);
   assert.match(factory, /repeatDisabled: managed \|\| batchRunning/);
   assert.match(factory, /retryValue: managed \? "0" : siteRetryLimit/);
-  assert.match(factory, /<ProgrammingRunView\s+run=\{record\.run\}/);
-  assert.match(factory, /executionInterface=\{record\.siteInterface\}/);
+  assert.match(factory, /executionInterface: record\.siteInterface/);
 });
 
 test("PMode states its limits on the page and never shows a generic production READY", () => {
@@ -291,4 +291,64 @@ test("PMode states its limits on the page and never shows a generic production R
   assert.doesNotMatch(factory + factoryBackend, /PRODUCTION READY|Production Ready/);
   // No persistence of a managed batch: nothing to resume after a reload.
   assert.doesNotMatch(factoryBackend, /sessionStorage|localStorage|writeStoredBatch/);
+});
+
+// ------------------------------------------- EMode / PMode UI cleanup (Gate 1)
+
+test("the duplicated result UI is removed from both modes, not hidden", async () => {
+  const runLog = await read("app/programming/programming-run-log.ts");
+  // EMode: no BATCH ATTEMPTS table and no standing ProgrammingRunView.
+  assert.doesNotMatch(emode, /BATCH ATTEMPTS|batch-attempts|batch-attempt-|data-testid="batch-result"|data-testid="batch-policy"/);
+  assert.doesNotMatch(emode, /ProgrammingRunView/);
+  // PMode: no RECEIPTS & DIAGNOSTICS panel and no per-Site receipt card.
+  assert.doesNotMatch(factory, /RECEIPTS & DIAGNOSTICS|factoryReceipts|data-receipt-site|receipt-note/);
+  assert.doesNotMatch(factory, /ProgrammingRunView/);
+  // Removed, never collapsed or hidden by CSS.
+  for (const source of [emode, factory]) {
+    assert.doesNotMatch(source, /display:\s*none[^}]*(receipt|attempt)/i);
+  }
+  // The shared run view itself stays: the Platform / Bundle Programming page owns it.
+  const bundleUi = await read("app/engineering/bundle-programming.tsx");
+  assert.match(bundleUi, /<ProgrammingRunView run=\{run\}/);
+  // Both modes write the traceable run record to their Log instead.
+  assert.match(runLog, /export function programmingRunLogLines/);
+  for (const field of ["Run \\$\\{run.run_id\\}", "SAFE_OFF", "Job Binding SHA256", "Resource SHA256"]) {
+    assert.match(runLog, new RegExp(field));
+  }
+  assert.match(emode, /programmingRunLogLines\(finishedRun, \{ executionInterface \}\)/);
+  assert.match(factory, /programmingRunLogLines\(record\.run, \{ executionInterface: record\.siteInterface \}\)/);
+  // The Log summarises the Manager record; it never prints the whole JSON Receipt.
+  assert.doesNotMatch(runLog, /JSON\.stringify/);
+});
+
+test("EMode and PMode number the same four chapters and the same Programming Job sub-items", async () => {
+  const logPanel = await read("app/engineering/engineering-log-panel.tsx");
+  const productionLog = await read("app/fleet/production-log-panel.tsx");
+  // 1 / 2 / 3 / 4 in both modes, from the one shared header component.
+  assert.match(emode, /<OperatorPanelHeader\s+number=\{1\}\s+title="SYSTEM SETUP & TARGETING"/);
+  assert.match(emode, /<OperatorPanelHeader\s+number=\{3\}\s+title="LIVE SITE STATUS"/);
+  assert.match(logPanel, /number=\{4\}/);
+  assert.match(factory, /systemSetup: "SYSTEM SETUP & TARGETING"/);
+  assert.match(factory, /number=\{1\}\s+title=\{text\.systemSetup\}/);
+  assert.match(factory, /number=\{3\}\s+title=\{text\.liveStatus\}/);
+  assert.match(factory, /<ProductionLogPanel number=\{4\}/);
+  assert.match(productionLog, /number=\{number\}/);
+  // PMode keeps its own Site presentation and its domain name in the meta line.
+  assert.match(factory, /productionSelection: "PRODUCTION SITE SELECTION"/);
+  assert.match(factory, /productionTree/);
+  // 2-1 … 2-4 for both modes, from one rule in the shared panel.
+  assert.match(panel, /const fieldNumber = \(index: number\) => `\$\{PROGRAMMING_JOB_SECTION\}-\$\{index\}\.`/);
+  assert.doesNotMatch(panel, /`\$\{index\}\.`/);
+});
+
+test("removing the duplicated UI keeps the Manager evidence and the safety gates", () => {
+  // Admission, Job Binding, Resource identity and Start reconciliation are untouched.
+  assert.match(core, /plan = await planProgramming\(request\.alias, input\)/);
+  assert.match(emode, /async function reconcileStartHold/);
+  assert.match(emode, /managed-start-hold/);
+  assert.match(emode, /managed-unresolved/);
+  assert.match(factoryBackend, /OUTCOME UNKNOWN \(\$\{reason \?\? "unknown"\}\); nothing was resubmitted/);
+  assert.match(factoryBackend, /records\(\): ManagedSiteRecord\[\]/);
+  // PMode still logs every Site outcome, including the ones that never ran.
+  assert.match(factory, /\[SITE\] \$\{site\} · \$\{record\.note\}/);
 });

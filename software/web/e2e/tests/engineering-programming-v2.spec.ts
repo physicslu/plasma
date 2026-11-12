@@ -278,10 +278,10 @@ test("Engineering Programming renders the approved workflow and binds Target IC 
   const job = programmingJob(page, "engineering");
   await expectProgrammingJobContract(job);
   await expect(page.getByRole("heading", { name: "SINGLE PPU PROGRAMMING" })).toBeVisible();
-  await expect(page.locator(".targetingCard > header")).toContainText("1. SYSTEM SETUP & TARGETING");
+  await expect(page.locator(".targetingCard .operatorPanelTitle")).toHaveText(/^1\.\s*SYSTEM SETUP & TARGETING$/);
   await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
   await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("3. LIVE SITE STATUS", { exact: true })).toBeVisible();
+  await expect(page.locator(".liveSiteStatus .operatorPanelTitle")).toHaveText(/^3\.\s*LIVE SITE STATUS/);
   await expect(page.locator(".engineeringProgrammingV2 .recentEvents")).toHaveCount(0);
   await expect(page.getByText("RECENT EVENTS", { exact: true })).toHaveCount(0);
   await expect(programmingJobPolicy(job, "retry")).toHaveValue("3");

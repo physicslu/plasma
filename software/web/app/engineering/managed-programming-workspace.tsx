@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { useI18n } from "../i18n";
 import { BatchSummary } from "../operator-ui/batch-summary";
+import { OperatorPanelHeader } from "../operator-ui/operator-panel";
 import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
-import { ProgrammingRunView } from "../operator-ui/programming-run-view";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
+import { programmingRunLogLines, safeOffLogLabel } from "../programming/programming-run-log";
 import {
   batchVerdict,
   describeBlocked,
@@ -232,6 +233,7 @@ export default function ManagedProgrammingWorkspace() {
 
   const startLock = useRef(false);
   const loggedAttempts = useRef(new Map<number, string>());
+  const loggedBatchId = useRef<string | null>(null);
   const readUrls = useRef(new Map<number, string>());
   const logSequence = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -517,6 +519,7 @@ export default function ManagedProgrammingWorkspace() {
     setLocked(null);
     setBatch(null);
     loggedAttempts.current = new Map();
+    loggedBatchId.current = null;
     setRun(null);
     setRunContext(null);
     setBlockedMessage(null);
@@ -594,6 +597,8 @@ export default function ManagedProgrammingWorkspace() {
         range: { address: jobRoute.flash_base, length: jobRoute.flash_size }, ...policy,
       };
     const operationLabel = operations.map(item => item.toUpperCase()).join(" → ");
+    // Site interface the PPU reports: a Mock result is never hardware evidence.
+    const executionInterface = ppu.sites.find(item => item.site_id === siteId)?.interface ?? null;
     const context: RunContext = { alias: ppu.alias, siteId, startedAt: wallClock(), finishedAt: null };
     const abort = new AbortController();
     abortRef.current = abort;
@@ -611,6 +616,11 @@ export default function ManagedProgrammingWorkspace() {
           appendLog(`[LOCK] ${input.source.toUpperCase()} · ${input.name} · ${input.size} B · SHA256 ${input.sha256}`, false, "DAT");
         },
         onBatch: next => {
+          if (loggedBatchId.current !== next.batch_id) {
+            loggedBatchId.current = next.batch_id;
+            appendLog(`[BATCH] ${next.batch_id} · Repeat ${next.policy.repeat} · Retry limit ${next.policy.retry_limit} · Stop Policy ${
+              next.policy.stop_policy.kind === "never" ? "never" : "1 failed Site"}`, false, "BAT");
+          }
           setBatch(next);
           setRun(next.current_run);
           setPhase(next.attempts.length ? "running" : "starting");
@@ -632,9 +642,17 @@ export default function ManagedProgrammingWorkspace() {
             }
             if (attempt.outcome && seen !== "finished") {
               loggedAttempts.current.set(attempt.attempt, "finished");
-              const retry = attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "no retry"} (${attempt.retry.reason})` : "";
-              appendLog(`[ATTEMPT ${attempt.attempt}] ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"}${retry}`,
+              const retry = attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} (${attempt.retry.reason})` : "";
+              appendLog(`[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}] ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOffLogLabel(attempt.safe_off, true)}${retry}`,
                 attempt.outcome !== "PASS", "PPU");
+              // The Log is the only on-screen operation record: the Manager run
+              // identities and its Receipt summary, never the whole JSON Receipt.
+              const finishedRun = next.current_run?.run_id === attempt.run_id ? next.current_run : null;
+              if (finishedRun) {
+                for (const line of programmingRunLogLines(finishedRun, { executionInterface })) {
+                  appendLog(line, attempt.outcome !== "PASS", "PPU");
+                }
+              }
             }
           }
         },
@@ -865,16 +883,19 @@ export default function ManagedProgrammingWorkspace() {
 
         <div className="productionProgrammingWorkflow">
           <section className={`productionProgrammingCard targetingCard ${setupCollapsed ? "is-collapsed" : ""}`}>
-            <header>
-              1. SYSTEM SETUP &amp; TARGETING
-              <button
-                type="button"
-                className="engineeringPanelToggle"
-                aria-label={`${setupCollapsed ? "Expand" : "Collapse"} System Setup`}
-                aria-expanded={!setupCollapsed}
-                onClick={() => setSetupCollapsed(current => !current)}
-              >{setupCollapsed ? "展開⌄" : "收合⌃"}</button>
-            </header>
+            <OperatorPanelHeader
+              number={1}
+              title="SYSTEM SETUP & TARGETING"
+              actions={(
+                <button
+                  type="button"
+                  className="engineeringPanelToggle"
+                  aria-label={`${setupCollapsed ? "Expand" : "Collapse"} System Setup`}
+                  aria-expanded={!setupCollapsed}
+                  onClick={() => setSetupCollapsed(current => !current)}
+                >{setupCollapsed ? "展開⌄" : "收合⌃"}</button>
+              )}
+            />
             <div className="cardBody" hidden={setupCollapsed}>
               <h2>SERVER TOPOLOGY</h2>
               <label className="workflowField">
@@ -1025,50 +1046,6 @@ export default function ManagedProgrammingWorkspace() {
           </div>
         </div>
 
-        {batch && (
-          <section className="productionProgrammingCard" aria-label="Batch attempts" data-testid="batch-attempts"
-            data-batch-verdict={batchVerdict(batch).verdict}>
-            <header>
-              <span>BATCH ATTEMPTS</span>
-              <small data-testid="batch-policy">
-                Batch {batch.batch_id} · Repeat {batch.policy.repeat} · Retry limit {batch.policy.retry_limit} · Stop Policy {batch.policy.stop_policy.kind === "never" ? "never" : "1 failed Site"}
-                {batch.stop_requested ? " · stop queuing requested" : ""}
-              </small>
-            </header>
-            <div className="channelTableWrap">
-              <table className="channelTable">
-                <thead><tr><th>ATTEMPT</th><th>RESULT</th><th>REASON</th><th>JOB ID</th><th>RUN ID</th><th>SAFE_OFF</th><th>RETRY DECISION</th></tr></thead>
-                <tbody>
-                  {batch.attempts.map(attempt => (
-                    <tr key={attempt.attempt} data-testid={`batch-attempt-${attempt.attempt}`}>
-                      <td><b>{attempt.attempt} / {batch.policy.retry_limit + 1}</b></td>
-                      <td><b className="engineeringResult" data-result={attempt.outcome ?? "RUNNING"}>{(attempt.outcome ?? "RUNNING").replace("_", " ")}</b></td>
-                      <td>{attempt.reason ?? "—"}</td>
-                      <td><code>{attempt.job_id ?? "—"}</code></td>
-                      <td><code>{attempt.run_id ?? "—"}</code></td>
-                      <td>{attempt.safe_off === true ? "VERIFIED" : attempt.outcome ? "NOT VERIFIED" : "—"}</td>
-                      <td>{attempt.retry ? `${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} · ${attempt.retry.reason}` : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {batch.outcome != null && (
-              <p className="cardBody" data-testid="batch-result">
-                Batch {batchVerdict(batch).verdict.replace("_", " ")}{batchVerdict(batch).reason ? ` · ${batchVerdict(batch).reason}` : ""} · {batch.attempts.length} attempt(s) · counted once
-              </p>
-            )}
-          </section>
-        )}
-
-        {run && (
-          <ProgrammingRunView
-            run={run}
-            ariaLabel="Programming run"
-            executionInterface={topology?.ppus.find(item => item.alias === run.ppu_alias)
-              ?.sites.find(item => item.site_id === run.site_id)?.interface ?? null}
-          />
-        )}
         {unresolved && !unresolved.acknowledged && (
           <div className="warning engineeringOperationWarning" role="alert" data-testid="managed-unresolved">
             <span>
@@ -1080,10 +1057,11 @@ export default function ManagedProgrammingWorkspace() {
         )}
 
         <section className="productionProgrammingCard liveSiteStatus overviewCard" aria-label="Engineering Site status">
-          <header>
-            <span>3. LIVE SITE STATUS</span>
-            <small>{ppu?.displayName ?? "Selected PPU"} · {ppu?.sites.length ?? 0} Sites · Selected {siteId == null ? 0 : 1} · Manager Fleet polling {TOPOLOGY_POLL_MS / 1000} s</small>
-          </header>
+          <OperatorPanelHeader
+            number={3}
+            title="LIVE SITE STATUS"
+            meta={`${ppu?.displayName ?? "Selected PPU"} · ${ppu?.sites.length ?? 0} Sites · Selected ${siteId == null ? 0 : 1} · Manager Fleet polling ${TOPOLOGY_POLL_MS / 1000} s`}
+          />
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
             <table className="channelTable">
               <thead>

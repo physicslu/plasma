@@ -34,9 +34,10 @@ test("Engineering desktop alignment owns only the compact targeting rail", async
   }
 
   assert.ok(programmingJobCss.includes(".programmingJobField {"));
-  assert.ok(programmingJobCss.includes("grid-template-columns: 128px minmax(0, 1fr);"));
-  assert.ok(programmingJobCss.includes("column-gap: 8px;"));
-  assert.ok(programmingJobCss.includes("justify-self: start;\n  text-align: left;"));
+  // One shared label column for EMode and PMode (both number the fields 2-N).
+  assert.ok(programmingJobCss.includes("grid-template-columns: minmax(0, 180px) minmax(0, 1fr);"));
+  assert.ok(programmingJobCss.includes("column-gap: 10px;"));
+  assert.ok(programmingJobCss.includes("justify-self: stretch;\n  min-width: 0;"));
   assert.equal(programmingJobCss.includes("clamp(190px, 15vw, 260px)"), false);
 });
 

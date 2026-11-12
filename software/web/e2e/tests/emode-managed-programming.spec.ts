@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   BUNDLE, FIRMWARE, RESOURCE_SHA, Z2, flashBytes, legacyRequests, mockManager, operationsRoute, route,
   type Counters, type MockPpu,
@@ -9,6 +9,10 @@ import {
 // Host-only Console acceptance of EMode → Programming (Single PPU) on the
 // formal Manager backend. Mock Manager / Mock PPU / Fake Provider at the
 // Browser boundary: NOT physical PPU, FPGA or DUT evidence.
+
+// The Engineering Job Log is the only on-screen record of a Manager run: the
+// BATCH ATTEMPTS table and the standing run view were removed from EMode.
+const jobLog = (workspace: Locator) => workspace.getByLabel("Engineering job log");
 
 const firmwareFile = { name: "app.bin", mimeType: "application/octet-stream", buffer: FIRMWARE };
 const bundleFile = { name: "customer-release.zip", mimeType: "application/zip", buffer: BUNDLE };
@@ -119,7 +123,7 @@ for (const combination of COMBINATIONS) {
     }
     await expect(start).toBeEnabled();
     await start.dblclick();
-    await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+    await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
     // One plan, one run, one Job: the list is sent as chosen, never as flash_cycle.
     expect(counters.plans).toHaveLength(1);
     expect(counters.starts).toHaveLength(1);
@@ -135,16 +139,14 @@ for (const combination of COMBINATIONS) {
       expect(body).not.toHaveProperty("bundle_base64");
       expect(body).toMatchObject({ address: 134217728, length: 65536 });
     }
-    await expect(workspace.getByTestId("receipt-operations")).toContainText(combination.operations.join(" → "));
-    await expect(workspace.getByTestId("receipt-operations")).toContainText("one Job");
-    for (const name of combination.operations) {
-      await expect(workspace.getByTestId(`receipt-step-${name}`)).toBeVisible();
-    }
+    // The Log carries the planned list, the list the PPU ran and the policy.
+    const operations = combination.operations.join(" → ");
+    await expect(jobLog(workspace)).toContainText(`Operations ${operations} (one Job · PPU ran: ${operations})`);
     for (const name of combination.uncheck) {
-      await expect(workspace.getByTestId(`receipt-step-${name}`)).toHaveCount(0);
+      await expect(jobLog(workspace)).not.toContainText(`PPU ran: ${name}`);
     }
-    await expect(workspace.getByTestId("plan-operation")).toHaveText(combination.operations.join(" → "));
-    await expect(workspace.getByTestId("run-policy")).toContainText("attempts 1 · auto retry DISABLED");
+    await expect(jobLog(workspace)).toContainText(`· Operations ${operations}`);
+    await expect(jobLog(workspace)).toContainText("attempts 1 · auto retry DISABLED");
     expect(legacyRequests(counters)).toEqual([]);
   });
 }
@@ -170,7 +172,7 @@ test("an Operation no Programming Route declares is disabled, not a fake capabil
   await expect(job.getByLabel("Engineering operation erase")).not.toBeChecked();
   await expect(job.getByLabel("Engineering operation program")).toBeChecked();
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   expect(counters.plans[0].body.operations).toEqual(["program", "verify"]);
 });
 
@@ -318,8 +320,8 @@ test("READ sits on the qualified Site row, reads the whole Flash and writes the 
   await expect(log).toContainText(`[READ] SAVED · SITE-02 · dump.bin · 65536 B · SHA256 ${digest}`);
   await expect(log).toContainText(/\[READ\] PASS · SITE-02 · Run \S+ · Job \S+ · SAFE_OFF VERIFIED/);
   // Not a Batch: no Batch run, no PASS / FAIL / Yield, no E / P / V Site result.
-  await expect(workspace.getByTestId("run-outcome")).toHaveCount(0);
-  await expect(workspace.getByTestId("batch-attempts")).toHaveCount(0);
+  await expect(jobLog(workspace)).not.toContainText("[RUN] ");
+  await expect(jobLog(workspace)).not.toContainText("[ATTEMPT");
   expect(counters.batches).toHaveLength(0);
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("Run Preview");
@@ -819,7 +821,7 @@ test("READ and a Batch run lock each other out and READ keeps the E / P / V resu
   const result = workspace.locator('tr[data-site-selected="true"] .engineeringResult');
   await start.click();
   await expect(button).toBeDisabled(); // a programming run owns the Site
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS", { timeout: 20_000 });
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·", { timeout: 20_000 });
   await expect(result).toHaveText("PASS");
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("100.0%");
@@ -831,7 +833,7 @@ test("READ and a Batch run lock each other out and READ keeps the E / P / V resu
   await expect(start).toBeEnabled();
   expect(counters.plans.map(plan => plan.body.operation ?? "programming")).toEqual(["programming", "read"]);
   // The READ did not disturb the Batch result or the Yield.
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   await expect(result).toHaveText("PASS");
   await expect(summary).toContainText("100.0%");
 });
@@ -840,7 +842,7 @@ test("one Start plans and executes: Firmware Resource Reuse → one Job → PASS
   const counters = await mockManager(page);
   const { workspace, start } = await configure(page);
   await start.dblclick(); // a double click still submits exactly one plan and one run
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   expect(counters.plans).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
   const body = counters.plans[0].body;
@@ -852,31 +854,30 @@ test("one Start plans and executes: Firmware Resource Reuse → one Job → PASS
   expect(Buffer.from(String(body.image_base64), "base64").equals(FIRMWARE)).toBe(true);
   expect(body).not.toHaveProperty("bundle_base64");
   expect(counters.starts[0].body).toEqual({ plan_id: expect.stringMatching(/^[0-9a-f]{32}$/), confirm: "PROGRAM" });
-  // No standing PROGRAMMING PLAN panel; the Backend plan ran and its technical
-  // result is in Receipts & Diagnostics and in the Log.
+  // No standing PROGRAMMING PLAN panel and no standing run view; the Backend
+  // plan ran and its technical result is in the Engineering Job Log only.
   await expect(workspace.getByTestId("managed-plan")).toHaveCount(0);
   await expect(workspace.getByLabel("Programming plan", { exact: true })).toHaveCount(0);
+  await expect(workspace.getByLabel("Programming run", { exact: true })).toHaveCount(0);
   await expect(workspace.locator("header").filter({ hasText: "PROGRAMMING PLAN" })).toHaveCount(0);
-  const diagnostics = workspace.getByTestId("run-plan-diagnostics");
-  await expect(diagnostics.getByTestId("plan-id")).toHaveText(/^[0-9a-f]{32}$/);
-  await expect(diagnostics.getByTestId("plan-route")).toContainText("z2-site2-stm32f103c8t6-operations");
-  await expect(diagnostics.getByTestId("plan-binding-sha")).toHaveText(/^z2-site2-plan1/);
-  await expect(workspace.getByTestId("receipt-range")).toHaveText("0x08000000 + 4096 B");
-  await expect(page.getByText(/\[PLAN\] .*Route z2-site2-stm32f103c8t6-operations/)).toHaveCount(1);
-  await expect(page.getByText(/\[PLAN\] Range 0x08000000 \+ 4096 B · Resource SHA256 9{64}/)).toHaveCount(1);
-  await expect(workspace.getByTestId("plan-source")).toHaveText("image");
-  await expect(workspace.getByTestId("plan-activation")).toContainText("Resource Reuse");
-  await expect(workspace.getByTestId("plan-resource-sha")).toHaveText(RESOURCE_SHA);
-  await expect(workspace.getByRole("list", { name: "Programming steps" })).toContainText("RESOURCE_REUSE: PPU_VERIFIED");
-  await expect(workspace.getByRole("list", { name: "Programming steps" })).not.toContainText("B1_UPLOAD");
-  // Receipt: full identities, readback and SAFE_OFF.
-  await expect(workspace.getByTestId("receipt-job")).toHaveText(/^job-z2-site2-/);
-  await expect(workspace.getByTestId("receipt-readback")).toHaveText(/^[0-9a-f]{64}$/);
-  await expect(workspace.getByTestId("receipt-resource")).toHaveText("Reused");
-  await expect(workspace.getByTestId("receipt-resource-sha")).toHaveText(RESOURCE_SHA);
-  await expect(workspace.getByTestId("receipt-binding-sha")).toHaveText(/^z2-site2-plan1/);
-  await expect(workspace.getByTestId("receipt-safe-off")).toHaveText("VERIFIED");
-  await expect(workspace.getByTestId("run-policy")).toContainText("attempts 1 · auto retry DISABLED");
+  await expect(workspace.getByTestId("run-plan-diagnostics")).toHaveCount(0);
+  const log = jobLog(workspace);
+  await expect(log).toContainText(/\[PLAN\] [0-9a-f]{32} · Route z2-site2-stm32f103c8t6-operations/);
+  await expect(log).toContainText(/\[PLAN\] Range 0x08000000 \+ 4096 B · Resource SHA256 9{64}/);
+  await expect(log).toContainText("· Source image ·");
+  await expect(log).toContainText("[PLAN] Resource Reuse: the PPU verified identical Programming Resources");
+  await expect(log).toContainText(`Resource SHA256 ${RESOURCE_SHA}`);
+  await expect(log).toContainText("RESOURCE_REUSE: PPU_VERIFIED");
+  await expect(log).not.toContainText("B1_UPLOAD");
+  // Receipt summary in the Log: full identities, readback, range and SAFE_OFF.
+  await expect(log).toContainText(/\[RECEIPT\] Job job-z2-site2-/);
+  await expect(log).toContainText(/Readback SHA256 [0-9a-f]{64}/);
+  await expect(log).toContainText("Range 0x08000000 + 4096 B · Resources Reused");
+  await expect(log).toContainText(/Job Binding SHA256 z2-site2-plan1/);
+  await expect(log).toContainText("SAFE_OFF VERIFIED");
+  await expect(log).toContainText("attempts 1 · auto retry DISABLED");
+  // The whole JSON Receipt is never printed back onto the page.
+  await expect(workspace).not.toContainText("observed_steps");
   const row = workspace.locator('tr[data-site-selected="true"]');
   await expect(row.locator(".engineeringResult")).toHaveText("PASS");
   await expect(page.getByRole("region", { name: "Engineering Batch Summary" })).toContainText("100.0%");
@@ -887,13 +888,12 @@ test("Firmware cache miss runs B1/B2/B3 through the Manager, then one Job", asyn
   const counters = await mockManager(page, { script: () => ({ activationRequired: true }) });
   const { workspace, start } = await configure(page);
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
-  await expect(workspace.getByTestId("plan-activation")).toContainText("B1 upload → B2 admit → B3 activate (no FPGA load)");
-  const steps = workspace.getByRole("list", { name: "Programming steps" });
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
+  await expect(jobLog(workspace)).toContainText("B1 upload → B2 admit → B3 activate (no FPGA load)");
   for (const step of ["B1_UPLOAD: PASS", "B2_ADMIT: PASS", "B3_ACTIVATE: PASS", "PROGRAMMING_SUBMIT: ACCEPTED", "VERIFY_RECEIPT: PASS"]) {
-    await expect(steps).toContainText(step);
+    await expect(jobLog(workspace)).toContainText(step);
   }
-  await expect(workspace.getByTestId("receipt-resource")).toHaveText("Activated");
+  await expect(jobLog(workspace)).toContainText("Resources Activated");
   expect(counters.plans).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
   // The Browser itself never uploads, admits or activates anything.
@@ -904,7 +904,7 @@ test("switching Firmware ↔ Bundle clears file, plan and run state and creates 
   const counters = await mockManager(page);
   const { workspace, job, start } = await configure(page);
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   const before = writes(counters).length;
 
   await job.getByRole("radio", { name: "Bundle", exact: true }).click();
@@ -913,7 +913,8 @@ test("switching Firmware ↔ Bundle clears file, plan and run state and creates 
   await expect(job.locator("[data-image-source]")).toHaveAttribute("data-image-source", "none");
   await expect(job.locator("[data-image-source]")).toContainText("Select canonical Bundle v3");
   await expect(workspace.getByTestId("managed-plan")).toHaveCount(0);
-  await expect(workspace.getByTestId("run-outcome")).toHaveCount(0);
+  // The run state is cleared; the Log keeps the record of what already ran.
+  await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("—");
   await expect(start).toBeDisabled();
   await expect(workspace.getByTestId("managed-readiness")).toContainText("BUNDLE REQUIRED");
   expect(await job.getByLabel("Engineering Programming Bundle file").evaluate(input => (input as HTMLInputElement).files?.length)).toBe(0);
@@ -929,26 +930,26 @@ test("Bundle Resource Reuse: the user's Bundle bytes go to the Manager unchanged
   const counters = await mockManager(page);
   const { workspace, start } = await configure(page, "bundle");
   await start.dblclick();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   expect(counters.plans).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
   const body = counters.plans[0].body;
   expect(Buffer.from(String(body.bundle_base64), "base64").equals(BUNDLE)).toBe(true);
   expect(body).not.toHaveProperty("image_base64");
   expect(body).not.toHaveProperty("image_filename");
-  await expect(workspace.getByTestId("plan-source")).toHaveText("bundle");
-  await expect(workspace.getByTestId("plan-activation")).toContainText("Resource Reuse");
-  await expect(workspace.getByTestId("receipt-resource")).toHaveText("Reused");
-  await expect(workspace.getByTestId("receipt-safe-off")).toHaveText("VERIFIED");
+  await expect(jobLog(workspace)).toContainText("· Source bundle ·");
+  await expect(jobLog(workspace)).toContainText("[PLAN] Resource Reuse:");
+  await expect(jobLog(workspace)).toContainText("Resources Reused");
+  await expect(jobLog(workspace)).toContainText("SAFE_OFF VERIFIED");
 });
 
 test("Bundle cache miss is admitted and activated by the Manager (B1/B2/B3) → PASS", async ({ page }) => {
   const counters = await mockManager(page, { script: () => ({ activationRequired: true }) });
   const { workspace, start } = await configure(page, "bundle");
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
-  await expect(workspace.getByRole("list", { name: "Programming steps" })).toContainText("B3_ACTIVATE: PASS");
-  await expect(workspace.getByTestId("receipt-resource")).toHaveText("Activated");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
+  await expect(jobLog(workspace)).toContainText("B3_ACTIVATE: PASS");
+  await expect(jobLog(workspace)).toContainText("Resources Activated");
   expect(counters.starts).toHaveLength(1);
 });
 
@@ -962,7 +963,7 @@ test("incompatible Bundle fails closed: no run, no Job, exact reason", async ({ 
   await expect(blocked).toContainText("bundle_resource_not_qualified");
   await expect(blocked).toContainText("cannot replace hardware qualification");
   await expect(blocked).toContainText("BUNDLE_RESOURCE_NOT_ROUTE");
-  await expect(workspace.getByTestId("run-outcome")).toHaveCount(0);
+  await expect(jobLog(workspace)).not.toContainText("[RUN] ");
   expect(counters.plans).toHaveLength(1);
   expect(counters.starts).toHaveLength(0);
 });
@@ -972,8 +973,8 @@ test("Manager OUTCOME_UNKNOWN is never resubmitted and latches Start until ackno
     outcome: "OUTCOME_UNKNOWN", reason: "JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT" }) });
   const { workspace, start } = await configure(page);
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("OUTCOME UNKNOWN");
-  await expect(workspace.getByTestId("run-reason")).toContainText("DO_NOT_RESUBMIT");
+  await expect(jobLog(workspace)).toContainText("[RUN] OUTCOME UNKNOWN ·");
+  await expect(jobLog(workspace)).toContainText("DO_NOT_RESUBMIT");
   await expect(workspace.getByTestId("managed-unresolved")).toContainText("Nothing was resubmitted");
   await expect(start).toBeDisabled();
   await expect(workspace.getByTestId("managed-readiness")).toContainText("OUTCOME UNKNOWN");
@@ -1003,9 +1004,9 @@ test("SAFE_OFF not verified is never PASS, even if a run record claims PASS", as
   await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "SAFE_OFF_NOT_VERIFIED", safeOff: false }) });
   const first = await configure(page);
   await first.start.click();
-  await expect(first.workspace.getByTestId("run-outcome")).toHaveText("FAIL");
-  await expect(first.workspace.getByTestId("run-reason")).toHaveText("Reason: SAFE_OFF_NOT_VERIFIED");
-  await expect(first.workspace.getByTestId("receipt-safe-off")).toHaveText("NOT VERIFIED");
+  await expect(jobLog(first.workspace)).toContainText("[RUN] FAIL ·");
+  await expect(jobLog(first.workspace)).toContainText("[RUN] FAIL · SAFE_OFF_NOT_VERIFIED ·");
+  await expect(jobLog(first.workspace)).toContainText("SAFE_OFF NOT VERIFIED");
   await expect(first.workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("FAIL");
 });
 
@@ -1013,8 +1014,8 @@ test("a PASS claim without verified SAFE_OFF in the receipt is shown as FAIL", a
   await mockManager(page, { script: () => ({ outcome: "PASS", safeOff: false }) });
   const { workspace, start } = await configure(page);
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("FAIL");
-  await expect(workspace.getByTestId("run-reason")).toHaveText("Reason: SAFE_OFF_NOT_VERIFIED");
+  await expect(jobLog(workspace)).toContainText("[RUN] FAIL ·");
+  await expect(jobLog(workspace)).toContainText("[RUN] FAIL · SAFE_OFF_NOT_VERIFIED ·");
   await expect(page.getByRole("region", { name: "Engineering Batch Summary" })).toContainText("0.0%");
 });
 
@@ -1100,9 +1101,9 @@ test("Readback mismatch is FAIL, whether the Manager reports it or a PASS record
   await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "READBACK_SHA256_MISMATCH", readbackOk: false }) });
   const { workspace, start } = await configure(page);
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("FAIL");
-  await expect(workspace.getByTestId("run-reason")).toHaveText("Reason: READBACK_SHA256_MISMATCH");
-  await expect(workspace.getByTestId("receipt-readback")).toHaveText("0".repeat(64));
+  await expect(jobLog(workspace)).toContainText("[RUN] FAIL ·");
+  await expect(jobLog(workspace)).toContainText("[RUN] FAIL · READBACK_SHA256_MISMATCH ·");
+  await expect(jobLog(workspace)).toContainText(`Readback SHA256 ${"0".repeat(64)}`);
   await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("FAIL");
 });
 
@@ -1110,8 +1111,8 @@ test("a PASS record whose readback differs from the expected Image is shown as F
   await mockManager(page, { script: () => ({ outcome: "PASS", readbackOk: false }) });
   const { workspace, start } = await configure(page);
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("FAIL");
-  await expect(workspace.getByTestId("run-reason")).toHaveText("Reason: READBACK_SHA256_MISMATCH");
+  await expect(jobLog(workspace)).toContainText("[RUN] FAIL ·");
+  await expect(jobLog(workspace)).toContainText("[RUN] FAIL · READBACK_SHA256_MISMATCH ·");
 });
 
 test("switching the Programming Source cannot bypass an unresolved OUTCOME_UNKNOWN lock", async ({ page }) => {
@@ -1142,7 +1143,7 @@ test("the Mock-only Engineering provider answering 503 (real PPU Runtime) no lon
   await expect(workspace.locator("tbody tr")).toHaveCount(8);
   await expect(workspace.getByLabel("Selected Engineering PPU")).toContainText("PPU ID: z2-hil");
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   expect(providerCalls).toBe(0);
   expect(legacyRequests(counters)).toEqual([]);
 });
@@ -1151,19 +1152,18 @@ test("a run on a Mock Site is labelled a Mock result; a hardware-path Site is no
   await mockManager(page, { ppus: [{ ...Z2, siteInterface: "mock" }] });
   const mock = await configure(page);
   await mock.start.click();
-  await expect(mock.workspace.getByTestId("run-outcome")).toHaveText("PASS");
-  await expect(mock.workspace.getByTestId("run-evidence")).toHaveAttribute("data-run-evidence", "mock");
-  await expect(mock.workspace.getByTestId("run-evidence")).toContainText("MOCK RESULT");
-  await expect(mock.workspace.getByTestId("run-evidence")).toContainText("never a hardware qualification");
+  await expect(jobLog(mock.workspace)).toContainText("[RUN] PASS ·");
+  await expect(jobLog(mock.workspace)).toContainText("[EVIDENCE] MOCK RESULT · Site interface mock");
+  await expect(jobLog(mock.workspace)).toContainText("never a hardware qualification");
 });
 
 test("a run on an openocd Site reports its interface and carries no Mock label", async ({ page }) => {
   await mockManager(page);
   const { workspace, start } = await configure(page);
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
-  await expect(workspace.getByTestId("run-evidence")).toHaveAttribute("data-run-evidence", "ppu");
-  await expect(workspace.getByTestId("run-evidence")).toHaveText("Site interface: openocd");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
+  await expect(jobLog(workspace)).toContainText("[EVIDENCE] Site interface: openocd");
+  await expect(jobLog(workspace)).not.toContainText("MOCK RESULT");
 });
 
 // ------------------------------------------------- Batch Policy: Retry / Stop
@@ -1194,13 +1194,13 @@ test("Batch Policy: Repeat stays 1 and disabled; Retry and Stop Policy are real,
   await expect(job.getByRole("button", { name: /STOP QUEUING/ })).toBeDisabled();
   await expect(job.locator('[data-programming-job-policy="note"]')).toContainText(/OUTCOME UNKNOWN (永不重送|is never resubmitted)/);
   await start.click();
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   expect(counters.batches).toHaveLength(1);
   expect(counters.batches[0].body).toMatchObject({
     repeat: 1, retry_limit: 2, stop_policy: { kind: "failed_sites", threshold: 1 },
     operations: ["erase", "program", "verify"],
   });
-  await expect(workspace.getByTestId("batch-policy")).toContainText("Repeat 1 · Retry limit 2 · Stop Policy 1 failed Site");
+  await expect(jobLog(workspace)).toContainText("Repeat 1 · Retry limit 2 · Stop Policy 1 failed Site");
   // PASS on the first attempt: one Job, no retry.
   expect(counters.jobs).toHaveLength(1);
 });
@@ -1212,25 +1212,22 @@ test("a definite FAIL is retried by the Manager with a new plan, run and Job; th
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "2");
   await start.dblclick();
-  await expect(workspace.getByTestId("batch-result")).toContainText("Batch PASS · 2 attempt(s) · counted once", { timeout: 20_000 });
+  await expect(jobLog(workspace)).toContainText(/\[RESULT\] PASS · Batch \S+ · 2 attempt\(s\) · counted once/, { timeout: 20_000 });
   // Exactly one Batch request from the Browser; the Manager submitted two Jobs.
   expect(counters.batches).toHaveLength(1);
   expect(counters.jobs).toHaveLength(2);
   expect(new Set(counters.jobs).size).toBe(2);
   expect(new Set(counters.starts.map(item => item.body.plan_id)).size).toBe(2);
-  const first = workspace.getByTestId("batch-attempt-1");
-  const second = workspace.getByTestId("batch-attempt-2");
-  await expect(first).toContainText("FAIL");
-  await expect(first).toContainText("RETRY · DEFINITE_FAIL_SAFE_OFF_VERIFIED");
-  await expect(first).toContainText("VERIFIED");
-  await expect(second).toContainText("PASS");
+  const log = jobLog(workspace);
+  await expect(log).toContainText(/\[ATTEMPT 1\/3\] FAIL · VERIFY_EVIDENCE_MISMATCH · Run \S+ · Job \S+ · SAFE_OFF VERIFIED · RETRY \(DEFINITE_FAIL_SAFE_OFF_VERIFIED\)/);
+  await expect(log).toContainText(/\[ATTEMPT 2\/3\] PASS · Run \S+ · Job \S+ · SAFE_OFF VERIFIED/);
   // One IC: PASS 1, FAIL 0, Yield 100 %; the failed attempt is not a FAIL IC.
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("100.0%");
   await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("PASS");
-  await expect(workspace.getByTestId("run-outcome")).toHaveText("PASS");
-  await expect(workspace.getByTestId("run-policy")).toContainText("attempts 1 · auto retry DISABLED");
-  await expect(page.getByText(/\[ATTEMPT 1\] FAIL .* RETRY \(DEFINITE_FAIL_SAFE_OFF_VERIFIED\)/)).toHaveCount(1);
+  await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
+  await expect(jobLog(workspace)).toContainText("attempts 1 · auto retry DISABLED");
+
   expect(legacyRequests(counters)).toEqual([]);
 });
 
@@ -1239,7 +1236,7 @@ test("the Retry limit bounds the attempts; an exhausted Batch is one FAIL", asyn
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "1");
   await start.click();
-  await expect(workspace.getByTestId("batch-result")).toContainText("Batch FAIL · RETRY_LIMIT_EXHAUSTED · 2 attempt(s)", { timeout: 20_000 });
+  await expect(jobLog(workspace)).toContainText(/\[RESULT\] FAIL · RETRY_LIMIT_EXHAUSTED · Batch \S+ · 2 attempt\(s\)/, { timeout: 20_000 });
   expect(counters.jobs).toHaveLength(2);
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("0.0%");
@@ -1251,9 +1248,9 @@ test("OUTCOME UNKNOWN is never retried, whatever the Retry limit, and stays latc
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "5");
   await start.click();
-  await expect(workspace.getByTestId("batch-result")).toContainText("Batch OUTCOME UNKNOWN · JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT · 1 attempt(s)");
+  await expect(jobLog(workspace)).toContainText(/\[RESULT\] OUTCOME UNKNOWN · JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT · Batch \S+ · 1 attempt\(s\)/);
   expect(counters.jobs).toHaveLength(1);
-  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("—"); // no retry decision
+  await expect(jobLog(workspace)).not.toContainText("RETRY ("); // no retry decision
   await expect(workspace.getByTestId("managed-unresolved")).toBeVisible();
   await expect(start).toBeDisabled();
   await expect(workspace.getByTestId("managed-readiness")).toContainText("OUTCOME UNKNOWN");
@@ -1264,9 +1261,8 @@ test("a FAIL without verified SAFE_OFF is not retried", async ({ page }) => {
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "3");
   await start.click();
-  await expect(workspace.getByTestId("batch-result")).toContainText("RETRY_NOT_ELIGIBLE_SAFE_OFF_NOT_VERIFIED · 1 attempt(s)");
-  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("NO RETRY · SAFE_OFF_NOT_VERIFIED");
-  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("NOT VERIFIED");
+  await expect(jobLog(workspace)).toContainText(/RETRY_NOT_ELIGIBLE_SAFE_OFF_NOT_VERIFIED · Batch \S+ · 1 attempt\(s\)/);
+  await expect(jobLog(workspace)).toContainText("SAFE_OFF NOT VERIFIED · NO RETRY (SAFE_OFF_NOT_VERIFIED)");
   expect(counters.jobs).toHaveLength(1);
 });
 
@@ -1275,7 +1271,7 @@ test("Stop Policy '1 failed Site' stops queuing after the first FAIL even with r
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "3", "1");
   await start.click();
-  await expect(workspace.getByTestId("batch-result")).toContainText("STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED · 1 attempt(s)");
+  await expect(jobLog(workspace)).toContainText(/STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED · Batch \S+ · 1 attempt\(s\)/);
   expect(counters.jobs).toHaveLength(1);
 });
 
@@ -1289,10 +1285,9 @@ test("STOP QUEUING only stops unsubmitted attempts: the running Job is observed 
   await stop.click();
   await expect(job.getByRole("button", { name: /STOP REQUESTED/ })).toBeDisabled();
   // The submitted Job is still running and is reported as running, not cancelled.
-  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("RUNNING");
-  await expect(workspace.getByTestId("batch-policy")).toContainText("stop queuing requested");
-  await expect(workspace.getByTestId("batch-result")).toContainText("Batch FAIL · STOP_REQUESTED_NO_FURTHER_ATTEMPT · 1 attempt(s)", { timeout: 20_000 });
-  await expect(workspace.getByTestId("batch-attempt-1")).toContainText("FAIL"); // its real result
+  await expect(jobLog(workspace)).toContainText("no further attempt will be submitted · the running Job is not cancelled");
+  await expect(jobLog(workspace)).toContainText(/\[RESULT\] FAIL · STOP_REQUESTED_NO_FURTHER_ATTEMPT · Batch \S+ · 1 attempt\(s\)/, { timeout: 20_000 });
+  await expect(jobLog(workspace)).toContainText(/\[ATTEMPT 1\/4\] FAIL · PROGRAMMING_NOT_PASS/); // its real result
   expect(counters.jobs).toHaveLength(1);
   expect(counters.stops).toEqual([JSON.stringify({ stop: "STOP_QUEUING" })]);
   // No cancel / abort / reset / recovery request ever left the Browser.
@@ -1322,6 +1317,6 @@ test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page
   await expect(status).toHaveAttribute("title", "READ_NOT_PASS");
   expect(counters.batches).toHaveLength(0);
   expect(counters.starts).toHaveLength(1);
-  await expect(workspace.getByTestId("batch-attempts")).toHaveCount(0);
+  await expect(jobLog(workspace)).not.toContainText("[ATTEMPT");
   await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("—");
 });

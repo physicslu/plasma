@@ -42,7 +42,9 @@ async function prepare(page: Page, selection: Array<[string, number[]]>, source:
 const site = (page: Page, alias: string, siteId: number) =>
   page.locator(`[data-production-ppu="${alias}"] [data-production-site="${siteId}"]`);
 const summary = (page: Page) => page.getByRole("region", { name: "Production Batch Summary" });
-const receipt = (page: Page, alias: string, siteId: number) => page.locator(`[data-receipt-site="${alias}:${siteId}"]`);
+// The FACTORY LOG is the only on-screen operation record in PMode: the
+// RECEIPTS & DIAGNOSTICS panel and its per-Site run views were removed.
+const factoryLog = (page: Page) => page.getByLabel("Production batch log");
 const writes = (counters: Counters) => counters.mutations.filter(entry => !entry.endsWith("/api/manager/ppu"));
 
 async function finished(page: Page) {
@@ -89,14 +91,17 @@ test("multi-PPU production: one Manager run per PPU/Site with isolated Job, Reso
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "success");
   await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "success");
   await expect(summary(page)).toContainText("100.0%");
-  await receipt(page, "z2", 2).locator("summary").click();
-  await receipt(page, "line2", 2).locator("summary").click();
-  await expect(receipt(page, "z2", 2).getByTestId("receipt-job")).toHaveText(/^job-z2-site2-/);
-  await expect(receipt(page, "line2", 2).getByTestId("receipt-job")).toHaveText(/^job-line2-site2-/);
-  await expect(receipt(page, "z2", 2).getByTestId("receipt-binding-sha")).toHaveText(/^z2-site2-plan1/);
-  await expect(receipt(page, "line2", 2).getByTestId("receipt-binding-sha")).toHaveText(/^line2-site2-plan2/);
-  await expect(receipt(page, "z2", 2).getByTestId("run-policy")).toContainText("PPU z2 · Site 2 · attempts 1 · auto retry DISABLED");
-  await expect(receipt(page, "line2", 2).getByTestId("receipt-safe-off")).toHaveText("VERIFIED");
+  // One traceable Log record per Site: Run, Job, verdict, SAFE_OFF, identities.
+  const log = factoryLog(page);
+  await expect(log).toContainText(/\[RECEIPT\] Job job-z2-site2-/);
+  await expect(log).toContainText(/\[RECEIPT\] Job job-line2-site2-/);
+  await expect(log).toContainText(/Job Binding SHA256 z2-site2-plan1/);
+  await expect(log).toContainText(/Job Binding SHA256 line2-site2-plan2/);
+  await expect(log).toContainText("PPU z2 · Site 2 · SAFE_OFF VERIFIED · attempts 1 · auto retry DISABLED · PPU z2 · PPU ID z2-hil · SITE-02");
+  await expect(log).toContainText("PPU line2 · Site 2 · SAFE_OFF VERIFIED");
+  // The whole JSON Receipt is never printed back onto the page.
+  await expect(page.locator("main")).not.toContainText("observed_steps");
+  await expect(page.locator("[data-receipt-site]")).toHaveCount(0);
   expect(legacyRequests(counters)).toEqual([]);
 });
 
@@ -111,7 +116,7 @@ test("multi-Site PASS / FAIL / Yield: a failed Site is counted once and never re
   await expect(site(page, "z2", 1)).toHaveAttribute("data-site-state", "success");
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "faulted");
   await expect(summary(page)).toContainText("50.0%");
-  await expect(receipt(page, "z2", 2)).toContainText("READBACK_SHA256_MISMATCH");
+  await expect(factoryLog(page)).toContainText("[RUN] FAIL · READBACK_SHA256_MISMATCH");
   await page.waitForTimeout(1500);
   expect(counters.plans).toHaveLength(2);
   expect(counters.starts).toHaveLength(2);
@@ -130,8 +135,8 @@ test("OUTCOME_UNKNOWN latches only its own PPU: no resubmission, later Sites of 
   await expect(site(page, "z2", 1)).toHaveAttribute("data-site-state", "error");
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "stopped");
   await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "success");
-  await expect(receipt(page, "z2", 1)).toContainText("nothing was resubmitted");
-  await expect(receipt(page, "z2", 2)).toContainText("unresolved OUTCOME UNKNOWN");
+  await expect(factoryLog(page)).toContainText("nothing was resubmitted");
+  await expect(factoryLog(page)).toContainText("unresolved OUTCOME UNKNOWN");
   await page.waitForTimeout(1500);
   expect(counters.starts.map(item => [item.alias])).toEqual([["z2"], ["line2"]]);
   expect(counters.plans.map(item => [item.alias, item.body.site_id])).toEqual([["z2", 1], ["line2", 2]]);
@@ -157,8 +162,8 @@ test("partial batch: a PPU in Recovery is blocked before any Job while the healt
   await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/PARTIAL/);
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "success");
   await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "error");
-  await expect(receipt(page, "line2", 2)).toContainText("BLOCKED before any Job");
-  await expect(receipt(page, "line2", 2)).toContainText("RECOVERY REQUIRED");
+  await expect(factoryLog(page)).toContainText("[SITE] PPU line2 · PPU ID line2-01 · SITE-02 · BLOCKED before any Job");
+  await expect(factoryLog(page)).toContainText("RECOVERY REQUIRED");
   expect(counters.plans.map(item => item.alias)).toEqual(["z2"]);
   expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
   expect(counters.requests.filter(entry => /enrollment|recovery/.test(entry))).toEqual([]);
@@ -175,7 +180,7 @@ test("Stop Policy only prevents further starts: no retry and no duplicate progra
   await expect(site(page, "z2", 1)).toHaveAttribute("data-site-state", "faulted");
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "stopped");
   await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "stopped");
-  await expect(receipt(page, "line2", 2)).toContainText("Stop Policy reached 1 failed Site(s)");
+  await expect(factoryLog(page)).toContainText("Stop Policy reached 1 failed Site(s)");
   await page.waitForTimeout(1500);
   expect(counters.plans).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
@@ -224,10 +229,8 @@ test("Bundle source production: every Site plan carries the user's Bundle bytes 
     expect(planned.body).not.toHaveProperty("image_base64");
   }
   // Resource Reuse on one PPU and Admission on the other are independent decisions.
-  await receipt(page, "z2", 2).locator("summary").click();
-  await receipt(page, "line2", 2).locator("summary").click();
-  await expect(receipt(page, "z2", 2).getByTestId("receipt-resource")).toHaveText("Reused");
-  await expect(receipt(page, "line2", 2).getByTestId("receipt-resource")).toHaveText("Activated");
+  await expect(factoryLog(page)).toContainText(/Resources Reused · Verified \d+ \/ \d+ B/);
+  await expect(factoryLog(page)).toContainText("Resources Activated");
 });
 
 test("an incompatible Bundle fails closed on every Site without a single Job", async ({ page }) => {
@@ -237,8 +240,8 @@ test("an incompatible Bundle fails closed on every Site without a single Job", a
   await start.click();
   await finished(page);
   await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/ERROR/);
-  await expect(receipt(page, "z2", 2)).toContainText("bundle_resource_not_qualified");
-  await expect(receipt(page, "line2", 2)).toContainText("BLOCKED before any Job");
+  await expect(factoryLog(page)).toContainText("bundle_resource_not_qualified");
+  await expect(factoryLog(page)).toContainText("[SITE] PPU line2 · PPU ID line2-01 · SITE-02 · BLOCKED before any Job");
   expect(counters.starts).toHaveLength(0);
 });
 
@@ -275,9 +278,7 @@ test("a Mock PPU result and a hardware-path result are labelled differently in t
   const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
   await start.click();
   await finished(page);
-  await receipt(page, "z2", 2).locator("summary").click();
-  await receipt(page, "line2", 2).locator("summary").click();
-  await expect(receipt(page, "z2", 2).getByTestId("run-evidence")).toHaveText("Site interface: openocd");
-  await expect(receipt(page, "line2", 2).getByTestId("run-evidence")).toContainText("MOCK RESULT");
-  await expect(receipt(page, "line2", 2).getByTestId("run-evidence")).toContainText("never a hardware qualification");
+  await expect(factoryLog(page)).toContainText("[EVIDENCE] Site interface: openocd · PPU z2 · PPU ID z2-hil · SITE-02");
+  await expect(factoryLog(page)).toContainText("[EVIDENCE] MOCK RESULT · Site interface mock");
+  await expect(factoryLog(page)).toContainText("never a hardware qualification");
 });

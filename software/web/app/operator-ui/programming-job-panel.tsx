@@ -10,6 +10,15 @@ import { ProgrammingSourceSelector } from "./programming-source-selector";
 import "./programming-job-controls.css";
 import "./production-workflow-guidance.css";
 
+/**
+ * Console chapter that owns the Programming Job in every mode.
+ *
+ * The chapter order is identical in EMode and PMode:
+ * 1. SYSTEM SETUP & TARGETING · 2. PROGRAMMING JOB · 3. LIVE SITE STATUS ·
+ * 4. ENGINEERING JOB LOG / FACTORY LOG.
+ */
+export const PROGRAMMING_JOB_SECTION = 2;
+
 export type ProgrammingJobOperation = {
   key: string;
   code: string;
@@ -134,15 +143,16 @@ export function ProgrammingJobPanel({
   const { locale } = useI18n();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const modeLabel = mode === "production" ? "Production" : "Engineering";
-  // EMode fields are sub-items of section 2 (2-1 … 2-4); PMode keeps 1 … 4.
-  const fieldNumber = (index: number) => (mode === "engineering" ? `2-${index}.` : `${index}.`);
+  // Single source of the Programming Job numbering for both modes: the fields
+  // are sub-items of section 2, so they are 2-1 … 2-4 in EMode and PMode alike.
+  const fieldNumber = (index: number) => `${PROGRAMMING_JOB_SECTION}-${index}.`;
   const statusText = typeof statusValue === "string" ? statusValue : null;
   const readinessGuidance = statusText ? batchReadinessGuidanceFromLabel(statusText, locale) : null;
   const disabledStartTitle = startDisabled && statusText !== "BATCH READY" ? readinessGuidance ?? undefined : undefined;
 
   return (
     <OperatorPanel
-      number={2}
+      number={PROGRAMMING_JOB_SECTION}
       title={title}
       className={`programmingJobPanel unifiedBatchControlStack ${collapsed ? "is-collapsed" : ""}`}
       ariaLabel={`${modeLabel} Programming Job`}

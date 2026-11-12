@@ -20,7 +20,7 @@ import type {
   Operation,
   SiteSnapshot,
 } from "../plasma-api";
-import { ProgrammingRunView } from "../operator-ui/programming-run-view";
+import { programmingRunLogLines } from "../programming/programming-run-log";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import {
   isImageOperation,
@@ -122,6 +122,7 @@ const copy = {
     loading: "正在載入 Programming Provider…",
     offline: "Programming 功能目前不可用。PPU 與 Gateway 連線狀態獨立判定。",
     gatewayUnreachable: "Plasma Web REST Gateway 無法連線。",
+    systemSetup: "SYSTEM SETUP & TARGETING",
     productionSelection: "PRODUCTION SITE SELECTION",
     productionSelectionHint: "Tree 定義 Production Set；進入量產後仍可在 Live Site Status 決定下一個 Batch 的 PPU / Site membership。",
     showSelection: "展開",
@@ -172,6 +173,7 @@ const copy = {
     loading: "Loading Programming Provider…",
     offline: "Programming is currently unavailable. PPU and Gateway connectivity are reported independently.",
     gatewayUnreachable: "Plasma Web REST Gateway is unreachable.",
+    systemSetup: "SYSTEM SETUP & TARGETING",
     productionSelection: "PRODUCTION SITE SELECTION",
     productionSelectionHint: "The tree defines the Production Set. Live Site Status independently defines the next Batch PPU / Site membership.",
     showSelection: "Show",
@@ -433,7 +435,9 @@ export default function FactoryConsoleV2() {
   const [programmingSource, setProgrammingSource] = useState<ProgrammingSource>("image");
   const [managedFile, setManagedFile] = useState<File | null>(null);
   const [chosenManagedOperation, setChosenManagedOperation] = useState<string | null>(null);
-  const [managedRecords, setManagedRecords] = useState<ManagedSiteRecord[]>([]);
+  // Per-Site Manager runs are written to the Factory Log, the single on-screen
+  // operation record; the Manager keeps the full Run / Job / Receipt evidence.
+  const loggedRecords = useRef(new Map<string, string>());
   const managedBatchRef = useRef<ManagedProductionBatch | null>(null);
   const managedStartLock = useRef(false);
 
@@ -453,6 +457,24 @@ export default function FactoryConsoleV2() {
       text: message,
     }].slice(-500));
   }, []);
+
+  /** One Log record per Site as soon as its Manager run or its note is final. */
+  const logManagedRecords = useCallback((records: ManagedSiteRecord[]) => {
+    for (const record of records) {
+      const finished = record.run?.outcome != null;
+      if (!finished && !record.note) continue;
+      const signature = `${record.run?.run_id ?? "—"}:${record.run?.outcome ?? "—"}:${record.note ?? "—"}`;
+      if (loggedRecords.current.get(record.key) === signature) continue;
+      loggedRecords.current.set(record.key, signature);
+      const site = `PPU ${record.alias} · PPU ID ${record.ppuId ?? "unknown"} · ${siteLabel(record.siteId)}`;
+      if (record.run) {
+        for (const line of programmingRunLogLines(record.run, { executionInterface: record.siteInterface })) {
+          appendLog(`${line} · ${site}`, record.run.outcome === "PASS" ? "INFO" : "ERROR");
+        }
+      }
+      if (record.note) appendLog(`[SITE] ${site} · ${record.note}`, "WARN");
+    }
+  }, [appendLog]);
 
   const beginActivity = useCallback(() => {
     if (activityReleaseRef.current) return;
@@ -524,7 +546,7 @@ export default function FactoryConsoleV2() {
         const managedBatch = managedBatchRef.current;
         if (managedBatch?.batchId === batchId) {
           next = managedBatch.snapshot();
-          setManagedRecords(managedBatch.records());
+          logManagedRecords(managedBatch.records());
         } else {
           next = await getServerBatch(apiBase, batchId);
         }
@@ -555,7 +577,7 @@ export default function FactoryConsoleV2() {
     }
     endActivity();
     appendLog(`[BAT] OBSERVATION TIMEOUT · ${batchId}`, "ERROR");
-  }, [apiBase, appendLog, applyBatchSnapshot, endActivity]);
+  }, [apiBase, appendLog, applyBatchSnapshot, endActivity, logManagedRecords]);
 
   const loadSelectionRuntimes = useCallback(async (sourceCatalog: EngineeringTargetCatalog, selection: SelectionMap) => {
     const generation = ++runtimeRecoveryGenerationRef.current;
@@ -1060,7 +1082,7 @@ export default function FactoryConsoleV2() {
     setProgrammingSource(next);
     setManagedFile(null);
     setBatchSnapshot(null);
-    setManagedRecords([]);
+    loggedRecords.current.clear();
     setOperatorWarning(null);
     appendLog(`[SOURCE] ${next.toUpperCase()} · previous file and results cleared`);
   }
@@ -1090,7 +1112,7 @@ export default function FactoryConsoleV2() {
     setClockNow(Date.now());
     terminalBatchRef.current = null;
     setBatchObservationState("connected");
-    setManagedRecords([]);
+    loggedRecords.current.clear();
     beginActivity();
     appendLog(`[BAT] START PRODUCTION · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${managedOperation.toUpperCase()} · ${icpn} · ${programmingSource.toUpperCase()} ${managedFile.name} · attempts ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}`);
     applyBatchSnapshot(batch.snapshot(), catalog);
@@ -1249,7 +1271,7 @@ export default function FactoryConsoleV2() {
 
             <OperatorPanel
               number={1}
-              title={text.productionSelection}
+              title={text.systemSetup}
               className={`productionSiteSelection ${selectorCollapsed ? "is-collapsed" : ""}`}
               meta={`${text.productionSet}: ${productionSetCounts.sites} Sites / ${productionSetCounts.ppus} PPUs`}
               actions={(
@@ -1263,7 +1285,7 @@ export default function FactoryConsoleV2() {
                 </button>
               )}
             >
-              <p className="selectionHint">{text.productionSelectionHint}</p>
+              <p className="selectionHint"><b>{text.productionSelection}</b> — {text.productionSelectionHint}</p>
               <div className="productionTreeToolbar">
                 <div>
                   <button type="button" onClick={selectEverything} disabled={batchRunning}>{text.selectAll}</button>
@@ -1366,7 +1388,7 @@ export default function FactoryConsoleV2() {
                 onFileChange: file => {
                   setManagedFile(file);
                   setBatchSnapshot(null);
-                  setManagedRecords([]);
+                  loggedRecords.current.clear();
                   if (file) appendLog(`[IMG] SELECTED ${programmingSource.toUpperCase()} · ${file.name} · ${file.size} bytes`);
                 },
               } : {
@@ -1560,34 +1582,9 @@ export default function FactoryConsoleV2() {
               )}
             </OperatorPanel>
 
-            {managed && managedRecords.some(record => record.run || record.note) && (
-              <OperatorPanel
-                number={4}
-                title="RECEIPTS & DIAGNOSTICS"
-                className="factoryReceipts"
-                meta="One Manager programming run per Site · Host Console view of the Manager receipts"
-              >
-                {managedRecords.filter(record => record.run || record.note).map(record => (
-                  <details key={record.key} data-receipt-site={record.key} open={Boolean(record.note)}>
-                    <summary>
-                      <b>{record.alias} · PPU ID {record.ppuId ?? "unknown"} · {siteLabel(record.siteId)}</b>
-                      {record.note && <span data-testid="receipt-note"> · {record.note}</span>}
-                    </summary>
-                    {record.run && (
-                      <ProgrammingRunView
-                        run={record.run}
-                        ariaLabel={`Programming run ${record.alias} ${siteLabel(record.siteId)}`}
-                        executionInterface={record.siteInterface}
-                      />
-                    )}
-                  </details>
-                ))}
-              </OperatorPanel>
-            )}
-
             {batchSnapshot && batchSnapshot.error?.message && <div className="factoryRuntimeError">{batchSnapshot.error.error_code ? `${batchSnapshot.error.error_code} · ` : ""}{batchSnapshot.error.message}</div>}
 
-            <ProductionLogPanel logs={logs} title={text.factoryLog} clearLabel={text.clearLog} onClear={() => setLogs([])} />
+            <ProductionLogPanel number={4} logs={logs} title={text.factoryLog} clearLabel={text.clearLog} onClear={() => setLogs([])} />
           </>
         )}
       </section>

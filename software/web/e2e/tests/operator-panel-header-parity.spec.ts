@@ -150,24 +150,6 @@ async function toggleSignature(locator: Locator) {
   });
 }
 
-async function directTextGeometry(locator: Locator, text: string) {
-  return locator.evaluate((element, expectedText) => {
-    const textNode = Array.from(element.childNodes).find(node =>
-      node.nodeType === Node.TEXT_NODE && node.textContent?.includes(expectedText),
-    );
-    if (!textNode) throw new Error(`Missing direct text node containing ${expectedText}`);
-    const range = document.createRange();
-    range.selectNodeContents(textNode);
-    const textRect = range.getBoundingClientRect();
-    const headerRect = element.getBoundingClientRect();
-    return {
-      left: textRect.left - headerRect.left,
-      width: textRect.width,
-      headerWidth: headerRect.width,
-    };
-  }, text);
-}
-
 async function expectSameSignatures(locators: Locator[], signature: (locator: Locator) => Promise<Record<string, string>>) {
   for (const locator of locators) await expect(locator).toBeVisible();
   const baseline = await signature(locators[0]);
@@ -232,9 +214,9 @@ test("PMode and EMode first-level Panel Header Title and Toggle computed styles 
 
   const titles = [
     page.locator(".batchSummary .operatorPanelTitle > strong"),
-    page.locator(".targetingCard > header"),
+    page.locator(".targetingCard .operatorPanelTitle > strong"),
     page.locator(".programmingJobPanel .operatorPanelTitle > strong"),
-    page.locator(".liveSiteStatus > header > span"),
+    page.locator(".liveSiteStatus .operatorPanelTitle > strong"),
     page.locator(".engineeringOperatorLog .operatorPanelTitle > strong"),
   ];
   for (const title of titles) {
@@ -251,7 +233,13 @@ test("PMode and EMode first-level Panel Header Title and Toggle computed styles 
   }
 
   const setupHeader = page.locator(".targetingCard > header");
-  const setupTitle = await directTextGeometry(setupHeader, "SYSTEM SETUP & TARGETING");
+  // The title is the shared header's <strong>, anchored to the left edge.
+  await expect(page.locator(".targetingCard .operatorPanelTitle > strong")).toHaveText("SYSTEM SETUP & TARGETING");
+  const setupTitle = await page.locator(".targetingCard .operatorPanelTitle > strong").evaluate(node => {
+    const headerRect = node.closest("header")!.getBoundingClientRect();
+    const rect = node.getBoundingClientRect();
+    return { left: rect.left - headerRect.left, width: rect.width, headerWidth: headerRect.width };
+  });
   expect(setupTitle.left).toBeLessThan(64);
   expect(setupTitle.left).toBeLessThan(setupTitle.headerWidth / 4);
 

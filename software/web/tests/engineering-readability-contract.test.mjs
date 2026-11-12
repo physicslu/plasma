@@ -73,8 +73,8 @@ test("Engineering numbering is metadata only and shared Operator Panel owns firs
     source(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url)),
   ]);
 
-  assert.match(programmingWorkspace, /1\. SYSTEM SETUP &amp; TARGETING/);
-  assert.match(programmingWorkspace, /3\. LIVE SITE STATUS/);
+  assert.match(programmingWorkspace, /<OperatorPanelHeader\s+number=\{1\}\s+title="SYSTEM SETUP & TARGETING"/);
+  assert.match(programmingWorkspace, /<OperatorPanelHeader\s+number=\{3\}\s+title="LIVE SITE STATUS"/);
   assert.doesNotMatch(refresh, /targetingCard > header::before|liveSiteStatus > header > span::before/);
   assert.doesNotMatch(refresh, /font-size:\s*0/);
   assert.doesNotMatch(refresh, /content:\s*"1\. SYSTEM SETUP|content:\s*"3\. LIVE SITE STATUS/);

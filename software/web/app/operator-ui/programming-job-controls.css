@@ -26,47 +26,40 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+/*
+ * One label column for every mode: both EMode and PMode number the fields
+ * 2-1 … 2-4, and "2-2. Programming Source" does not fit a 128px column at the
+ * shared 11px / 800 label font (it overlapped the control in PMode).
+ */
 .programmingJobField {
   min-width: 0;
   padding: 9px 10px;
   border-bottom: 1px solid var(--line, #d4dee8);
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
-  align-items: center;
-  column-gap: 8px;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
   row-gap: 4px;
 }
 
 .programmingJobField > strong {
-  justify-self: start;
-  text-align: left;
-  color: var(--text, #172033);
-  font-size: var(--operator-field-label-font-size);
-  font-weight: 800;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-/* EMode: the 2-N labels get a wider, top-aligned label column. */
-.engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField {
-  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
-  align-items: start;
-  column-gap: 10px;
-}
-
-.engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField > strong {
   justify-self: stretch;
   min-width: 0;
   /* Centre the label on the first control line of its row. */
   min-height: var(--operator-control-min-height);
   display: flex;
   align-items: center;
+  text-align: left;
+  color: var(--text, #172033);
+  font-size: var(--operator-field-label-font-size);
+  font-weight: 800;
+  line-height: 1.2;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
-/* The IC picker keeps its EMode height, so its label centres on that. */
-.engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField[data-programming-job-field="target"] {
+/* The IC picker keeps its own height, so its label centres on that. */
+.programmingJobField[data-programming-job-field="target"] {
   align-items: center;
 }
 
@@ -385,7 +378,7 @@
 }
 
 @container engineering-programming (max-width: 700px) {
-  .engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField {
+  .engineeringProgrammingV2 .programmingJobField {
     grid-template-columns: minmax(142px, 160px) minmax(0, 1fr);
   }
 
@@ -401,11 +394,11 @@
 }
 
 @container engineering-programming (max-width: 480px) {
-  .engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField {
+  .engineeringProgrammingV2 .programmingJobField {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .engineeringProgrammingV2 .programmingJobGrid[data-programming-job-fields="engineering"] .programmingJobField > small,
+  .engineeringProgrammingV2 .programmingJobField > small,
   .engineeringProgrammingV2 .programmingJobImageContent {
     grid-column: 1;
   }

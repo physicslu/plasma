@@ -15,7 +15,7 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
 
   assert.match(page, /ProgrammingWorkspaceV2/);
   assert.match(workspace, /SINGLE PPU PROGRAMMING/);
-  assert.match(workspace, /SYSTEM SETUP &amp; TARGETING/);
+  assert.match(workspace, /title="SYSTEM SETUP & TARGETING"/);
   assert.match(workspace, /PROGRAMMING JOB/);
   assert.match(workspace, /Target IC/);
   assert.match(workspace, /Programming Image/);
@@ -34,10 +34,11 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.doesNotMatch(refresh, /recentEvents/);
 
   assert.match(refresh, /grid-template-columns:\s*minmax\(0, 1fr\)/);
-  // Section numbers are real heading text, never CSS generated content.
-  assert.match(workspace, /1\. SYSTEM SETUP &amp; TARGETING/);
-  assert.match(workspace, /3\. LIVE SITE STATUS/);
-  assert.match(sharedJob, /mode === "engineering" \? `2-\$\{index\}\.` : `\$\{index\}\.`/);
+  // Section numbers come from the shared OperatorPanelHeader, never from CSS
+  // generated content, and both modes use the same chapter order.
+  assert.match(workspace, /<OperatorPanelHeader\s+number=\{1\}\s+title="SYSTEM SETUP & TARGETING"/);
+  assert.match(workspace, /<OperatorPanelHeader\s+number=\{3\}\s+title="LIVE SITE STATUS"/);
+  assert.match(sharedJob, /const fieldNumber = \(index: number\) => `\$\{PROGRAMMING_JOB_SECTION\}-\$\{index\}\.`/);
   assert.doesNotMatch(refresh, /targetingCard > header::before|liveSiteStatus > header > span::before|font-size:\s*0/);
 });
 
