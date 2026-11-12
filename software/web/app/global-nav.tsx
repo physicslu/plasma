@@ -14,6 +14,7 @@ import {
 } from "./batch-execution-activity";
 import { PRODUCT_MODE_ROUTES, productModeForPath } from "./product-mode";
 import { PLASMA_PRODUCT_VERSION } from "./product-version";
+import { PLASMA_BUILD_IDENTITY, consoleBuildLabel, consoleBuildDetails } from "./build-identity";
 import ThemeSwitch from "./theme-switch";
 
 function subscribeHydration(): () => void {
@@ -71,6 +72,10 @@ export function GlobalNav() {
         <b>PLASMA</b>
         <small className="globalAppNavVersion">{`v${PLASMA_PRODUCT_VERSION}`}</small>
       </Link>
+      <span className="globalAppNavBuild" data-testid="global-build-id"
+        title={consoleBuildDetails(PLASMA_BUILD_IDENTITY)}>
+        {consoleBuildLabel(PLASMA_BUILD_IDENTITY)}
+      </span>
 
       <div className="globalNavControls">
         <nav className="globalProductNav" aria-label={t("mode.label")}>
