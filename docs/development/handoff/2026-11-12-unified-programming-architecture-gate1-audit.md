@@ -4,7 +4,7 @@
 這些仍依 [AGENTS.md](../../../AGENTS.md) 的 Gate 1 / Gate 2 規則。
 
 本稽核全程唯讀：未修改程式、未建立 PR、未部署、未操作 SWPC/Z2/DUT，
-未更動 `/storage/projects/plasma` 的既有 Dirty Worktree。
+未更動共用 repo checkout 的既有 Dirty Worktree。
 
 每項結論標註 **CONFIRMED**（已在原始碼或執行環境證實）/ **INFERRED**（由證據推論）/
 **NOT_VERIFIED**（本次未查證）。
@@ -18,8 +18,8 @@
 | `origin/main` HEAD | `3d6f3c6b2ff4e874128c5882d47daaf35d5ab98d`（Merge PR #1409，2026-11-12 10:36 +0800） | CONFIRMED |
 | PR #1406 HEAD | `04b1c049aeca2dc7f5f7651d95d1ecf5f99d03ca`（Draft、base `main`、14 檔 +110/−30） | CONFIRMED |
 | #1406 merge-base | `3d6f3c6b2ff4…`（已 rebase 到目前 main，無落後） | CONFIRMED |
-| 本地共用 checkout | `/storage/projects/plasma` = `b74a9893e`（branch `engineering-programming-ui-cleanup-gate1`，8 檔 Dirty）— 未觸碰 | CONFIRMED |
-| 稽核讀取來源 | `/storage/projects/plasma-deploy-3d6f3c6b2ff4`（= origin/main，clean）、`/storage/projects/plasma/.work/swpc-local-recovery-20261112`（= #1406 HEAD，clean） | CONFIRMED |
+| 本地共用 repo checkout | `b74a9893e`（branch `engineering-programming-ui-cleanup-gate1`，8 檔 Dirty）— 未觸碰 | CONFIRMED |
+| 稽核讀取來源 | 兩個 clean worktree：一個在 `3d6f3c6b2ff4`（= origin/main），一個在 `04b1c049a`（= #1406 HEAD） | CONFIRMED |
 | SWPC Control Station 線上版本 | `~/.local/share/plasma/local-control-station/releases/3d6f3c6b2ff4`（= origin/main，2026-11-12 11:17 部署） | CONFIRMED |
 | Z2 Runtime | 本次未連線查證 | NOT_VERIFIED |
 
