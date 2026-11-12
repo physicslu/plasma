@@ -2,6 +2,7 @@ import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
+import { buildIdentityForVite } from "./build/build-identity.mjs";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -53,13 +54,16 @@ const localBindingConfig = {
     : [],
 };
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ command }) => {
+  const buildIdentity = buildIdentityForVite({ mode: command === "serve" ? "dev" : "build" });
+  const define = { __PLASMA_BUILD_IDENTITY__: JSON.stringify(buildIdentity) };
   if (isProductBuild) {
     // Product packaging is a self-hosted Node runtime. Do not pull Wrangler,
     // Cloudflare Worker bindings, or the integration-host proxy into this
     // build. next.config.ts enables Vinext standalone output for this mode.
     return {
       plugins: [vinext()],
+      define,
     };
   }
 
@@ -97,6 +101,7 @@ export default defineConfig(async () => {
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),
     },
+    define,
     plugins: [
       vinext(),
       sites(),
