@@ -1242,15 +1242,6 @@ export default function FactoryConsoleV2() {
           </div>
         </header>
 
-        {managed && (
-          <div className="factoryWarning factoryProductionMode" role="note" data-testid="managed-production-mode">
-            <span>
-              <b>{MANAGED_PRODUCTION_MODE.label} · {MANAGED_PRODUCTION_MODE.qualification}</b>
-              {" — "}{MANAGED_PRODUCTION_MODE.detail}
-            </span>
-          </div>
-        )}
-
         {!catalog && (
           <section className="factoryConsoleNotice" role="status">
             <b style={programmingUnavailable ? { color: "#475569" } : undefined}>
