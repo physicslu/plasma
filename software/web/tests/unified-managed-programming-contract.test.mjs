@@ -282,14 +282,13 @@ test("PMode shares the Source selector and policy with EMode", () => {
   assert.match(factory, /executionInterface: record\.siteInterface/);
 });
 
-test("PMode states its limits on the page and never shows a generic production READY", () => {
-  assert.match(factoryBackend, /label: "Sequential \/ Session-based \/ Non-durable"/);
-  assert.match(factoryBackend, /qualification: "NOT PRODUCTION QUALIFIED"/);
+test("PMode keeps sequential readiness and does not render a standing qualification banner", () => {
   assert.match(factoryBackend, /readyLabel: "SEQUENTIAL BATCH READY"/);
-  assert.match(factory, /data-testid="managed-production-mode"/);
-  assert.match(factory, /label: MANAGED_PRODUCTION_MODE\.readyLabel, ready: true/);
+  assert.doesNotMatch(factory, /data-testid="managed-production-mode"/);
+  assert.doesNotMatch(factory, /factoryProductionMode/);
+  assert.match(factory, /label: MANAGED_PRODUCTION_MODE\\.readyLabel, ready: true/);
   assert.doesNotMatch(factory + factoryBackend, /PRODUCTION READY|Production Ready/);
-  // No persistence of a managed batch: nothing to resume after a reload.
+  // A reload must never resume or resubmit an in-flight managed batch.
   assert.doesNotMatch(factoryBackend, /sessionStorage|localStorage|writeStoredBatch/);
 });
 
