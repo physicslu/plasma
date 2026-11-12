@@ -27,7 +27,9 @@ function gitCommand(args) {
 export function inspectSourceGit() {
   const sha = cleanSha(gitCommand(["rev-parse", "--verify", "HEAD"]));
   const status = gitCommand(["status", "--porcelain", "--untracked-files=normal"]);
-  return { sha, dirty: status === null || status.length > 0 };
+  // A packaged source tree may have no .git; trust explicit pinned build
+  // metadata there, but never infer an unpinned SHA.
+  return { sha, dirty: sha !== null && (status === null || status.length > 0) };
 }
 
 export function identityFromProvenance({
