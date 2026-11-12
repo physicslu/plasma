@@ -26,6 +26,11 @@ erase; ``verify`` = read back the Image range and compare, never a write.
 geometry with a real hardware baseline; deriving Sites from the loaded PL is a
 separate Root/FPGA change).
 
+Every result carries the safe release this adapter actually observed. One
+place proves it -- ``_session``, which refuses to return unless the native
+ps_owner reported ``SAFE_OFF_MODE_OFF_VERIFIED`` -- and that one observation
+is what each receipt reports. No operation writes ``safe_off`` itself.
+
 The OpenOCD install is the deployment-selected engine (see
 ``ppu_site_worker_service.load_engine``), never a versioned constant here.
 """
@@ -42,6 +47,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -64,6 +70,37 @@ SAFE_OFF = "SAFE_OFF_MODE_OFF_VERIFIED"
 ADMIT_TIMEOUT_S = 120
 OPENOCD_MAX_S = 45
 CLEANUP_PROBE_MAX_S = 5
+
+
+@dataclass(frozen=True, slots=True)
+class SafeOff:
+    """What one OpenOCD session observed about leaving the Site safe.
+
+    No operation writes ``safe_off`` as a literal. Every receipt reports this
+    observation, so a session that stops proving a safe release stops claiming
+    one: the claim and its evidence cannot drift apart.
+
+    ``verified`` is the condition the root evidence record already kept
+    privately -- the native ps_owner marker AND the root admission actually
+    revoked AND no cancellation or timeout -- which is strictly stronger than
+    the marker alone.
+    """
+
+    marker_present: bool
+    admission_revoked: bool
+    termination_reason: str | None
+
+    @property
+    def verified(self) -> bool:
+        return (self.marker_present and self.admission_revoked
+                and self.termination_reason is None)
+
+    def receipt(self) -> dict[str, Any]:
+        """The safe-release fields every Adapter result carries."""
+        return {"safe_off": self.verified,
+                "safe_off_evidence": {"marker_present": self.marker_present,
+                                      "admission_revoked": self.admission_revoked,
+                                      "termination_reason": self.termination_reason}}
 
 
 class Abi5OpenocdAdapter:
@@ -245,9 +282,6 @@ class Abi5OpenocdAdapter:
         base = {"icpn": bound.icpn, "target_config": bound.profile.target_config,
                 "adapter_khz": self.adapter_khz}
 
-        def failed(code: str, rc: Any, **extra: Any) -> dict[str, Any]:
-            return {"result": "FAIL", "code": code, "openocd_rc": rc, "safe_off": True, **extra}
-
         with tempfile.TemporaryDirectory(prefix="plasma-c3-op-") as directory:
             staged = Path(directory) / "normalized-image.bin"
             readback = Path(directory) / "readback.bin"
@@ -265,8 +299,13 @@ class Abi5OpenocdAdapter:
             if reads_back:
                 actions.append(f"dump_image {self._tcl_path(readback)} 0x{address:08x} 0x{length:08x}")
             argv = self._operation_argv(site, bound, actions)
-            log, rc = self._session(site, deadline=deadline, cancel=cancel,
-                                    argv=argv, max_duration_s=300)
+            log, rc, safe_off = self._session(site, deadline=deadline, cancel=cancel,
+                                              argv=argv, max_duration_s=300)
+
+            def failed(code: str, rc: Any, **extra: Any) -> dict[str, Any]:
+                return {"result": "FAIL", "code": code, "openocd_rc": rc,
+                        **safe_off.receipt(), **extra}
+
             erased, wrote = ERASED.findall(log), WROTE.findall(log)
             if rc != 0:
                 # OpenOCD stops at the first failing command.
@@ -304,7 +343,7 @@ class Abi5OpenocdAdapter:
                     return {"result": "PASS", **base, "read_address": address,
                             "read_length": length, "bytes_read": length, "sha256": observed_sha,
                             "data_base64": base64.b64encode(observed).decode("ascii"),
-                            "openocd_rc": 0, "safe_off": True}
+                            "openocd_rc": 0, **safe_off.receipt()}
                 if operations[-1] == "verify":
                     if observed != image.payload:
                         return failed("VERIFY_MISMATCH", rc, failed_step="verify",
@@ -319,7 +358,7 @@ class Abi5OpenocdAdapter:
                     steps["erase"].update(blank_verified=True, bytes_verified=length,
                                           readback_sha256=observed_sha)
             return {"result": "PASS", **base, "operations": list(operations), "steps": steps,
-                    "load_address": address, "openocd_rc": 0, "safe_off": True}
+                    "load_address": address, "openocd_rc": 0, **safe_off.receipt()}
 
     def _flash_argv(self, site: int, image: FlashImage, staged: Path, readback: Path) -> list[str]:
         """Flash sequence for the session-bound profile; no caller-supplied Tcl."""
@@ -398,7 +437,7 @@ class Abi5OpenocdAdapter:
         return r.returncode == 0 and not os.path.lexists(self._record(site))
 
     def _save_openocd_evidence(self, site: int, raw: bytes, rc: int | None,
-                               reason: str | None, revoked: bool) -> None:
+                               safe_off: SafeOff) -> None:
         """Persist raw child output before any unknown-outcome error is raised.
 
         Never return these root-private paths or raw text to the Runtime/API.
@@ -418,7 +457,6 @@ class Abi5OpenocdAdapter:
             output.flush()
             os.fsync(output.fileno())
 
-        marker = SAFE_OFF.encode("ascii") in raw
         record = {
             "schema": "plasma.ppu.openocd-evidence.v1",
             "site": site,
@@ -427,10 +465,10 @@ class Abi5OpenocdAdapter:
             "stdout_bytes": len(raw),
             "stdout_sha256": hashlib.sha256(raw).hexdigest(),
             "openocd_rc": rc,
-            "safe_off_marker_present": marker,
-            "safe_off_verified": reason is None and revoked and marker,
-            "admission_revoked": revoked,
-            "termination_reason": reason,
+            "safe_off_marker_present": safe_off.marker_present,
+            "safe_off_verified": safe_off.verified,
+            "admission_revoked": safe_off.admission_revoked,
+            "termination_reason": safe_off.termination_reason,
         }
         metadata = Path(filename).with_suffix(".json")
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
@@ -472,39 +510,41 @@ class Abi5OpenocdAdapter:
                 staged.write_bytes(image.payload)
                 staged.chmod(0o600)
                 argv = self._flash_argv(site, image, staged, readback)
-                log, rc = self._session(
+                log, rc, safe_off = self._session(
                     site, deadline=deadline, cancel=cancel,
                     argv=argv, max_duration_s=300,
                 )
                 if rc != 0:
                     return {"result": "FAIL", "code": "OPENOCD_FLASH_FAILED",
-                            "openocd_rc": rc, "safe_off": True}
+                            "openocd_rc": rc, **safe_off.receipt()}
                 if not readback.is_file():
                     return {"result": "FAIL", "code": "READBACK_MISSING",
-                            "openocd_rc": rc, "safe_off": True}
+                            "openocd_rc": rc, **safe_off.receipt()}
                 observed = readback.read_bytes()
                 observed_sha = hashlib.sha256(observed).hexdigest()
                 if observed != image.payload:
                     return {"result": "FAIL", "code": "READBACK_MISMATCH",
                             "openocd_rc": rc, "expected_sha256": image.sha256,
-                            "readback_sha256": observed_sha, "safe_off": True}
+                            "readback_sha256": observed_sha, **safe_off.receipt()}
                 executed = self._executed_flash_range(argv, log, len(image.payload))
                 if executed is None:
                     return {"result": "FAIL", "code": "FLASH_RANGE_NOT_OBSERVED",
-                            "openocd_rc": rc, "safe_off": True}
+                            "openocd_rc": rc, **safe_off.receipt()}
                 return {"result": "PASS", "icpn": image.icpn,
                         "target_config": image.profile.target_config,
                         "adapter_khz": self.adapter_khz,
                         "bytes_verified": len(observed),
                         "readback_sha256": observed_sha,
                         "load_address": image.load_address, **executed,
-                        "openocd_rc": 0, "safe_off": True}
-        log, rc = self._session(site, deadline=deadline, cancel=cancel)
+                        "openocd_rc": 0, **safe_off.receipt()}
+        log, rc, safe_off = self._session(site, deadline=deadline, cancel=cancel)
         connect, dpreg = DPIDR.findall(log), DPREG0.findall(log)
         values = {int(v, 16) for v in connect + dpreg}
         if rc == 0 and connect and dpreg and len(values) == 1:
-            return {"result": "PASS", "dpidr": "0x%08x" % values.pop(), "safe_off": True}
-        return {"result": "FAIL", "code": "DPIDR_NOT_READ", "openocd_rc": rc, "safe_off": True}
+            return {"result": "PASS", "dpidr": "0x%08x" % values.pop(),
+                    **safe_off.receipt()}
+        return {"result": "FAIL", "code": "DPIDR_NOT_READ", "openocd_rc": rc,
+                **safe_off.receipt()}
 
     def verify_safe_off(self, site: int, *, deadline: float) -> Mapping[str, Any]:
         """Operator recovery evidence: one admitted OpenOCD session (read-only
@@ -512,15 +552,21 @@ class Abi5OpenocdAdapter:
         Raises TransportDenied / TransportUnknown exactly like ``run``."""
         if site not in self.supported_sites:
             raise TransportDenied("OPERATION_OR_SITE_NOT_SUPPORTED")
-        log, rc = self._session(site, deadline=deadline, cancel=threading.Event(),
-                                cleanup_probe=False)
+        log, rc, safe_off = self._session(site, deadline=deadline,
+                                          cancel=threading.Event(), cleanup_probe=False)
         return {"result": "SAFE_OFF_VERIFIED", "openocd_rc": rc,
-                "log_sha256": hashlib.sha256(log.encode()).hexdigest()}
+                "log_sha256": hashlib.sha256(log.encode()).hexdigest(),
+                **safe_off.receipt()}
 
     def _session(self, site: int, *, deadline: float, cancel: threading.Event,
                  argv: list[str] | None = None,
                  max_duration_s: float = OPENOCD_MAX_S,
-                 cleanup_probe: bool = True) -> tuple[str, Any]:
+                 cleanup_probe: bool = True) -> tuple[str, Any, SafeOff]:
+        """Run one admitted OpenOCD session and observe its safe release.
+
+        Returns only on a session that proved SAFE_OFF; the returned
+        observation is the single source every receipt reports."""
+
         # The admission record and native ps_owner lock protect this Site.
         # A different Site's OpenOCD process does not block this Site.
         if os.path.lexists(self._record(site)):
@@ -593,8 +639,10 @@ class Abi5OpenocdAdapter:
                 cleanup_error = True
         finally:
             revoked = self._revoke(site)
+        safe_off = SafeOff(marker_present=SAFE_OFF.encode("ascii") in raw,
+                           admission_revoked=revoked, termination_reason=reason)
         try:
-            self._save_openocd_evidence(site, raw, rc, reason, revoked)
+            self._save_openocd_evidence(site, raw, rc, safe_off)
         except Exception:
             raise TransportUnknown("OPENOCD_EVIDENCE_WRITE_FAILED") from None
         if not revoked:
@@ -615,7 +663,7 @@ class Abi5OpenocdAdapter:
                 raise TransportUnknown((reason or operation_error) + ":CLEANUP_UNVERIFIED:" +
                                        getattr(exc, "code", type(exc).__name__)) from None
             raise TransportFailed(reason or "OPENOCD_EXCEPTION:" + operation_error)
-        if SAFE_OFF not in log:
+        if not safe_off.marker_present:
             # Native ps_owner reports these before any MMIO or SWD access.
             # Another process may legitimately hold the Site lock; that is
             # current ownership, not a permanent fault in this Job's Site.
@@ -623,4 +671,7 @@ class Abi5OpenocdAdapter:
                 if "plasma_swd: " + denied in log:
                     raise TransportDenied(denied)
             raise TransportUnknown("SAFE_OFF_NOT_VERIFIED")
-        return log, rc
+        # Reached only with the marker observed, the admission revoked and no
+        # termination reason, so ``safe_off.verified`` is an observation here,
+        # never an assumption.
+        return log, rc, safe_off

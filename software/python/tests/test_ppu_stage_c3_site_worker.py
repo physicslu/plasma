@@ -867,6 +867,14 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, hang_once=F
 
 GOOD = b"Info : SWD DPIDR 0x1ba01477\nPLASMA_DPREG0=0x1ba01477\nSAFE_OFF_MODE_OFF_VERIFIED\n"
 
+# Every Adapter receipt reports the safe release it observed, never a literal:
+# the ps_owner marker AND the revoked root admission AND no cancel / timeout.
+SAFE_OFF_RECEIPT = {"safe_off": True,
+                    "safe_off_evidence": {"marker_present": True,
+                                          "admission_revoked": True,
+                                          "termination_reason": None}}
+
+
 
 def flash_log(address: int, erase_length: int, size: int) -> bytes:
     """OpenOCD 0.12 command_print output for the executed Flash range."""
@@ -893,7 +901,7 @@ def test_abi5_flash_cycle_uses_target_config_and_verified_readback(tmp_path):
                       "load_address": 0x08000000, "erase_address": 0x08000000,
                       "erase_length": 1024, "write_address": 0x08000000,
                       "verify_address": 0x08000000, "readback_address": 0x08000000,
-                      "openocd_rc": 0, "safe_off": True}
+                      "openocd_rc": 0, **SAFE_OFF_RECEIPT}
     argv = calls["popen"][0]
     assert argv[argv.index("-f") + 1] == "target/stm32f1x.cfg"
     assert "plasma_swd site 2" in argv
@@ -955,7 +963,7 @@ def test_abi5_flash_range_must_be_observed_from_openocd_not_copied(tmp_path, log
     result = a.run(2, "flash_cycle", image=flash_image(image, load_address=0x08000400),
                    deadline=time.monotonic() + 30, cancel=threading.Event())
     assert result == {"result": "FAIL", "code": "FLASH_RANGE_NOT_OBSERVED",
-                      "openocd_rc": 0, "safe_off": True}
+                      "openocd_rc": 0, **SAFE_OFF_RECEIPT}
 
 
 @pytest.mark.parametrize("address,size", [
@@ -1006,7 +1014,7 @@ def test_abi5_flash_cycle_requires_bound_image_before_admission(tmp_path):
 def test_abi5_probe_uses_existing_admission_and_fixed_openocd_argv(tmp_path):
     a, calls, _ = make_abi5(tmp_path, log=GOOD)
     out = a.run(2, "probe", deadline=time.monotonic() + 30, cancel=threading.Event())
-    assert out == {"result": "PASS", "dpidr": "0x1ba01477", "safe_off": True}
+    assert out == {"result": "PASS", "dpidr": "0x1ba01477", **SAFE_OFF_RECEIPT}
     assert calls["run"] == [["admit", "2"], ["revoke", "2"]]
     argv = calls["popen"][0]
     assert argv[0].endswith("/bin/openocd") and "plasma_swd site 2" in argv
