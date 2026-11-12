@@ -286,7 +286,7 @@ test("PMode keeps sequential readiness and does not render a standing qualificat
   assert.match(factoryBackend, /readyLabel: "SEQUENTIAL BATCH READY"/);
   assert.doesNotMatch(factory, /data-testid="managed-production-mode"/);
   assert.doesNotMatch(factory, /factoryProductionMode/);
-  assert.match(factory, /label: MANAGED_PRODUCTION_MODE\\.readyLabel, ready: true/);
+  assert.match(factory, /label: MANAGED_PRODUCTION_MODE\.readyLabel, ready: true/);
   assert.doesNotMatch(factory + factoryBackend, /PRODUCTION READY|Production Ready/);
   // A reload must never resume or resubmit an in-flight managed batch.
   assert.doesNotMatch(factoryBackend, /sessionStorage|localStorage|writeStoredBatch/);
