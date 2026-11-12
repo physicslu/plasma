@@ -245,13 +245,10 @@ test("an incompatible Bundle fails closed on every Site without a single Job", a
   expect(counters.starts).toHaveLength(0);
 });
 
-test("the page states the restricted mode: Sequential / Session-based / Non-durable, not production qualified", async ({ page }) => {
+test("PMode omits the static qualification banner but retains restricted sequential readiness", async ({ page }) => {
   await mockManager(page, { ppus: [Z2, LINE2] });
   const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  const mode = page.getByTestId("managed-production-mode");
-  await expect(mode).toContainText("Sequential / Session-based / Non-durable");
-  await expect(mode).toContainText("NOT PRODUCTION QUALIFIED");
-  await expect(mode).toContainText("PYNQ-Z2 Site 2 only");
+  await expect(page.getByTestId("managed-production-mode")).toHaveCount(0);
   // Ready means ready for this restricted mode, never a generic production READY.
   await expect(start).toBeEnabled();
   await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/SEQUENTIAL BATCH READY/);
@@ -265,7 +262,7 @@ test("non-durable: a reload during the batch stops queuing; nothing is resumed o
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
   expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
   await page.reload();
-  await expect(page.getByTestId("managed-production-mode")).toBeVisible();
+  await expect(page.getByTestId("managed-production-mode")).toHaveCount(0);
   await page.waitForTimeout(6000); // longer than the in-flight run
   // The second PPU was never planned or started, and the first was not sent again.
   expect(counters.plans.map(item => item.alias)).toEqual(["z2"]);
