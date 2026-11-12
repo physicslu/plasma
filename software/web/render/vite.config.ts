@@ -1,6 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
+import { buildIdentityForVite } from "../build/build-identity.mjs";
 
 const renderRoot = fileURLToPath(new URL("./", import.meta.url));
 const webRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -11,6 +12,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     "process.env.NEXT_PUBLIC_PLASMA_API_URL": "window.location.origin",
+    __PLASMA_BUILD_IDENTITY__: JSON.stringify(buildIdentityForVite({ mode: "build" })),
   },
   resolve: {
     alias: {
