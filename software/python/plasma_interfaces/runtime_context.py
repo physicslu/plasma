@@ -1,7 +1,7 @@
 """The trusted per-Job execution context an interface may act on.
 
-``RuntimeJobContext`` is the single channel through which SiteWorker hands one
-Job attempt's authority to the selected interface. It is built only by the PPU
+``RuntimeJobContext`` is the one way SiteWorker hands a single Job attempt's
+authority to the selected interface. It is built only by the PPU
 Runtime, never from ``JobRequest.metadata``: what the Manager claims reaches an
 interface only after SiteManager has admitted it under the PPU execution lease.
 

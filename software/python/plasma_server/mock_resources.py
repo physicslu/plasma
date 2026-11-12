@@ -26,7 +26,7 @@ MOCK_PROVIDER_ID = "mock-platform-provider"
 MOCK_PROFILE_ID = "mock-programming-profile"
 MOCK_ROUTE_ID = "mock-site-simulated"
 MOCK_TARGET_CONFIG = "target/mock-simulated.cfg"
-MOCK_IMAGE_PACKAGE_KIND = "firmware-asset"
+MOCK_IMAGE_PACKAGE_KIND = "mock-programming-asset"
 MOCK_DRIVER_ABI = "mock-simulated:1"
 MOCK_PLATFORM = {"platform": "mock", "board": "mock-site", "fpga_part": "none"}
 # Mock Sites offer the basic operations a Profile may declare. ``programming``
