@@ -21,12 +21,15 @@ spec.loader.exec_module(source)
 
 def fixture(tmp_path, monkeypatch):
     root = tmp_path / "trusted-fpga-code"
-    root.mkdir()
+    root.mkdir(mode=0o700)
     checksums = {}
     for rel in sorted(source.CODE_FILES):
         src = ROOT / rel
         target = root / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
+        directory = root
+        for part in Path(rel).parts[:-1]:
+            directory /= part
+            directory.mkdir(mode=0o700, exist_ok=True)
         shutil.copyfile(src, target)
         target.chmod(0o644)
         checksums[rel] = hashlib.sha256(target.read_bytes()).hexdigest()
@@ -74,9 +77,13 @@ def test_privileged_source_denies_mutation(tmp_path, monkeypatch, attack, code):
         source_file.unlink()
         source_file.symlink_to(ROOT / "pl/hil/fpga_image_root.py")
     elif attack == "unlisted_py":
-        (root / "pl/hil/unreviewed.py").write_text("print('attack')")
+        unexpected = root / "pl/hil/unreviewed.py"
+        unexpected.write_text("print('attack')")
+        unexpected.chmod(0o644)
     elif attack == "unlisted_pyc":
-        (root / "pl/hil/__pycache__.pyc").write_bytes(b"bytecode")
+        unexpected = root / "pl/hil/__pycache__.pyc"
+        unexpected.write_bytes(b"bytecode")
+        unexpected.chmod(0o644)
     elif attack == "world_writable":
         source_file.chmod(0o666)
     elif attack == "manifest_missing":
@@ -102,12 +109,15 @@ def test_privileged_source_cli_denies_parameters_and_unprivileged(monkeypatch, c
 
 def _installer_fixture(tmp_path, monkeypatch):
     factory = tmp_path / "factory"
-    factory.mkdir()
+    factory.mkdir(mode=0o700)
     files = list(source.CODE_FILES) + ["ppu_privileged_source.py"]
     for rel in files:
         src = ROOT / (("scripts/" + rel) if rel == "ppu_privileged_source.py" else rel)
         dst = factory / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
+        directory = factory
+        for part in Path(rel).parts[:-1]:
+            directory /= part
+            directory.mkdir(mode=0o700, exist_ok=True)
         shutil.copyfile(src, dst)
         dst.chmod(0o644)
     spec = importlib.util.spec_from_file_location(
