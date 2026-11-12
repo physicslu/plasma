@@ -86,8 +86,18 @@ Common preamble and ending are the ones qualified for `flash_cycle`
 ## Receipts and failure classes
 
 * PPU Job result: `details.programming = {result, operations, steps: {erase, program, verify},
-  safe_off, job_binding_sha256, …}`; `details.read = {read_address, read_length, bytes_read,
-  sha256, safe_off, …}` and the bytes as the Job output file.
+  safe_off, safe_off_evidence, job_binding_sha256, …}`; `details.read = {read_address,
+  read_length, bytes_read, sha256, safe_off, safe_off_evidence, …}` and the bytes as the Job
+  output file.
+* `safe_off` is an observation, not a declaration. The ABI-v5 adapter proves a safe release in
+  exactly one place — the OpenOCD session, which refuses to return without the native ps_owner
+  `SAFE_OFF_MODE_OFF_VERIFIED` line — and every receipt reports that one observation.
+  `safe_off_evidence = {marker_present, admission_revoked, termination_reason}` carries the
+  three conditions behind it, so `safe_off` is true only with the marker observed, the root
+  Site admission actually revoked and no cancellation or timeout. This is the same record the
+  root evidence file keeps; the receipt and that file cannot disagree. Four downstream gates
+  check `safe_off` (root Site Worker seal, Runtime `recoverable`, Manager receipt verify, Batch
+  receipt); they guard against *any* adapter, while this adapter fails closed on its own.
 * Manager receipt `plasma.manager.programming-receipt.v3`: `operations`,
   `observed_operations`, `expected_steps` / `observed_steps`, `range`, `read_output`. PASS needs
   SAFE_OFF, the echoed Binding (including the list), one attempt, exactly the planned list

@@ -87,11 +87,19 @@ def evidence(directory, count=1):
     return records
 
 
+# Every Adapter receipt reports the safe release it observed, never a literal:
+# the ps_owner marker AND the revoked root admission AND no cancel / timeout.
+SAFE_OFF_RECEIPT = {"safe_off": True,
+                    "safe_off_evidence": {"marker_present": True,
+                                          "admission_revoked": True,
+                                          "termination_reason": None}}
+
+
 def test_success_persists_exact_stdout_and_safe_off_receipt(tmp_path):
     raw = GOOD + b"raw-byte:\xff\n"
     adapter, calls = rig(tmp_path, log=raw)
     result = attempt(adapter)
-    assert result == {"result": "PASS", "dpidr": "0x1ba01477", "safe_off": True}
+    assert result == {"result": "PASS", "dpidr": "0x1ba01477", **SAFE_OFF_RECEIPT}
     [(logged, info)] = evidence(tmp_path / "private")
     assert logged == raw
     assert info["openocd_rc"] == 0
@@ -124,7 +132,7 @@ def test_openocd_failure_with_safe_off_does_not_claim_probe_pass(tmp_path):
     adapter, _ = rig(tmp_path, log=GOOD, rc=42)
     assert attempt(adapter) == {
         "result": "FAIL", "code": "DPIDR_NOT_READ", "openocd_rc": 42,
-        "safe_off": True,
+        **SAFE_OFF_RECEIPT,
     }
     [(_raw, info)] = evidence(tmp_path / "private")
     assert info["openocd_rc"] == 42 and info["safe_off_verified"] is True
