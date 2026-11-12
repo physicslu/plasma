@@ -14,8 +14,7 @@ from plasma_core.failure_policy import terminal_state_for_error
 from plasma_core.job_logging import JobEventLogger, OutputManager
 from plasma_core.models import ErrorDetail, ExecutionOutput, JobAttemptResult, JobResult, iso_now
 from plasma_handlers.base import BaseHandler
-from plasma_interfaces.openocd import OpenOCDInterface
-from plasma_interfaces.package_provider import PackageProviderInterface
+from plasma_interfaces.runtime_context import RuntimeJobContext
 
 from .job_manager import JobRuntime
 
@@ -331,14 +330,18 @@ class SiteWorker:
                 attempt_started_at = iso_now()
                 attempt_started_monotonic = time.monotonic()
                 logger.event("attempt_started", attempt=attempts)
-                if isinstance(selected_interface, OpenOCDInterface):
-                    selected_interface.bind_runtime_job(
-                        request.job_id, runtime.active_asset_set, job_deadline,
-                        runtime.job_binding)
-                elif isinstance(selected_interface, PackageProviderInterface):
-                    selected_interface.bind_runtime_job(
-                        request.job_id, runtime.active_asset_set, job_deadline,
-                        runtime.trusted_provider)
+                # Every interface is bound through the same trusted context,
+                # rebuilt for each attempt. SiteWorker never decides which
+                # authorization an interface may use: the context carries at
+                # most one, and the interface refuses what it cannot consume.
+                selected_interface.bind_runtime_job(RuntimeJobContext(
+                    job_id=request.job_id,
+                    site_id=request.site_id,
+                    deadline_monotonic=job_deadline,
+                    active_asset_set=runtime.active_asset_set,
+                    admitted_job_binding=runtime.job_binding,
+                    trusted_provider=runtime.trusted_provider,
+                ))
                 runtime.active_task = asyncio.create_task(
                     self.handler.execute(request, stage_callback),
                     name=f"{request.job_id}-attempt-{attempts}",

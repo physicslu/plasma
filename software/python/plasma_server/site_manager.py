@@ -576,10 +576,20 @@ class SiteManager:
                     or request.operation.value != trusted_provider.route.operation
                     or request.max_retries != 0):
                 raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_NOT_AUTHORIZED")
-        elif (request.metadata.get("provider") is not None
-              and not (isinstance(self.interfaces[request.site_id], OpenOCDInterface)
-                       and self.interfaces[request.site_id].site_worker_ready)):
-            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_NOT_AUTHORIZED")
+        elif request.metadata.get("provider") is not None:
+            interface = self.interfaces[request.site_id]
+            # Provider and Profile are part of a Job Binding's own identity, so
+            # an interface that admits Bindings may carry them -- the Binding is
+            # still re-verified under the Job lease before anything executes.
+            # The C-3 path also carries them for the separate bundle-reference
+            # flash_cycle contract, which has no Binding.
+            admits_binding = (getattr(interface, "CONSUMES_JOB_BINDING", False)
+                              and bool(JOB_BINDING_KEYS.intersection(request.metadata)))
+            c3_ready = (isinstance(interface, OpenOCDInterface)
+                        and interface.site_worker_ready)
+            if not (admits_binding or c3_ready):
+                raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                  "PROVIDER_JOB_NOT_AUTHORIZED")
         if request.target is None and site_config.interface != "mock":
             # Real hardware: explicit Job target or the operator's explicit
             # Site selection only; never a product default. (The Mock

@@ -6,6 +6,7 @@ from .mock import MockActivityTracker, MockInterface
 from .openocd import OpenOCDInterface
 from .openocd_rpc import OpenOCDRpcClient
 from .openocd_worker import OpenOCDWorker, OpenOCDWorkerStatus
+from .runtime_context import RuntimeJobContext
 
 __all__ = [
     "BaseInterface",
@@ -16,4 +17,5 @@ __all__ = [
     "OpenOCDRpcClient",
     "OpenOCDWorker",
     "OpenOCDWorkerStatus",
+    "RuntimeJobContext",
 ]
