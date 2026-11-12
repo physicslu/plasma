@@ -47,6 +47,15 @@
   opacity: .78;
 }
 
+.globalAppNavBuild {
+  color: var(--text-soft);
+  font: 600 9px var(--font-sans);
+  letter-spacing: .02em;
+  white-space: nowrap;
+  opacity: .85;
+  cursor: help;
+}
+
 .globalNavControls,
 .globalAppNav nav,
 .globalLocale {

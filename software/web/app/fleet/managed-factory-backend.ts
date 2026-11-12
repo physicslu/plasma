@@ -80,17 +80,9 @@ export function managedPpuStatus(topology: ManagedTopology, alias: string): PPUS
   };
 }
 
-/**
- * What this execution mode is, stated to the operator on the page. It is a
- * restricted, attended mode, not an unattended production system.
- */
+/** Managed PMode is restricted to sequential, attended, session-based operation. */
 export const MANAGED_PRODUCTION_MODE = Object.freeze({
-  label: "Sequential / Session-based / Non-durable",
-  qualification: "NOT PRODUCTION QUALIFIED",
   readyLabel: "SEQUENTIAL BATCH READY",
-  detail: "One Site runs at a time (no parallel Sites or PPUs). The batch lives in this Console session: "
-    + "reloading or closing the page stops queuing and nothing is resumed; a run already submitted finishes in the "
-    + "Manager. Physical evidence exists for PYNQ-Z2 Site 2 only; multi-Site and multi-PPU production are not qualified.",
 });
 
 export type ManagedBatchReadiness = { ready: boolean; label: string; reason: string };
