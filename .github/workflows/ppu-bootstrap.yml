@@ -250,6 +250,10 @@ jobs:
           pl/hil/fpga_image_admission.py
       - name: Install test runner
         run: python -m pip install pytest
+      - name: Verify privileged source under group-writable default umask
+        run: |
+          umask 002
+          python -m pytest -q software/python/tests/test_ppu_privileged_source_gate1.py
       - name: Run factory Bootstrap contract regressions
         run: >-
           python -m pytest -q

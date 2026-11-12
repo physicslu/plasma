@@ -87,7 +87,10 @@ def provision(
                 raise ProvisionDenied("PRIVILEGED_PROVISION_SYMLINK_DENIED")
             _trusted(original, uid, folder=False)
             target = stage / rel
-            target.parent.mkdir(parents=True, exist_ok=True)
+            directory = stage
+            for part in Path(rel).parts[:-1]:
+                directory /= part
+                directory.mkdir(mode=0o700, exist_ok=True)
             shutil.copyfile(original, target)
             target.chmod(0o644)
             inventory[rel] = hashlib.sha256(target.read_bytes()).hexdigest()
