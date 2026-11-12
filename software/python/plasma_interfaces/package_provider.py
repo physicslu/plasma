@@ -14,6 +14,7 @@ from typing import Any, Callable, Mapping
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
 from .base import BaseInterface, ProgressCallback
+from .runtime_context import RuntimeJobContext
 
 
 @dataclass(frozen=True, repr=False)
@@ -46,10 +47,20 @@ class PackageProviderInterface(BaseInterface):
             raise RuntimeError("PACKAGE_PROVIDER_ALREADY_WIRED")
         self._run = run
 
-    def bind_runtime_job(self, job_id: str, active_asset_set: dict[str, Any] | None,
-                         deadline_monotonic: float, trusted: TrustedProviderAction | None) -> None:
+    def bind_runtime_job(self, context: RuntimeJobContext) -> None:
+        """Bind the Runtime-resolved trusted Provider Action for this attempt.
+
+        This path is authorized by a ``TrustedProviderAction`` alone. An
+        admitted Job Binding authorizes the C-3 execution path and is never
+        accepted here in its place.
+        """
+        context = self._require_runtime_context(context)
+        trusted = context.trusted_provider
+        active_asset_set = context.active_asset_set
         if (self._run is None or not isinstance(trusted, TrustedProviderAction)
-                or trusted.asset_request.job_id != job_id
+                or context.admitted_job_binding is not None
+                or trusted.asset_request.job_id != context.job_id
+                or trusted.route.site_id != context.site_id
                 or active_asset_set is None
                 or active_asset_set.get("asset_set_sha256") != trusted.route.asset_set_sha256):
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_NOT_AUTHORIZED")

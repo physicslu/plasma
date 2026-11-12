@@ -84,9 +84,12 @@ with the switch, not after it:
 * `plasma_server/execution_router.py` admits the OPF Package Provider route only for
   `Operation.FLASH_CYCLE`. That constraint is lifted to the `programming` Job kind.
 * `plasma_handlers/programming.py` dispatches `Operation.PROGRAMMING` to
-  `interface.run_operations(...)`. `plasma_interfaces/openocd.py` implements it;
-  `plasma_interfaces/mock.py` does **not** and has no `OPERATIONS` set. Mock/CD is kept (D-2), so
-  the mock interface gains `run_operations` and per-step evidence **before** the switch.
+  `interface.run_operations(...)`. `plasma_interfaces/openocd.py` overrides it;
+  `plasma_interfaces/mock.py` did not, and so inherited the generic composition that
+  `BaseInterface.run_operations` provides. **That was a divergence, not a refusal**: the inherited
+  default writes at offset 0 instead of the Binding's address, erases the whole simulated device
+  instead of the Image's window, and returns no step evidence at all. A Mock Site is kept (D-2),
+  so it gains its own `run_operations` with read-back evidence **before** the switch (PR-B1).
 
 Retiring `flash_cycle` changes the Programming Profile, therefore the Resource Set SHA256,
 therefore every PPU needs one B1/B2/B3 reactivation. See §8.6 for why this must happen once.

@@ -22,20 +22,32 @@
 
 ---
 
-## 1. 兩個擋住排程的發現
+## 1. 擋住排程的發現
 
-### P0-A — Mock 介面不支援 `operations[]`
+> **2026-11-12 更正。** 本節原為「兩個發現」。PR-B1 實作時找到第三個（P0-C），
+> 是 Gate 1 唯讀稽核沒有抓到的。
+
+### P0-A — Mock 介面的 `operations[]` 語意偏離
+
+> **2026-11-12 更正。** 本節原本寫「Mock 缺 `run_operations`，收到 `programming` 會直接失敗」。
+> 字面成立（`mock.py` 自己沒有這個方法），但機制敘述錯誤，而且方向相反 ——
+> `BaseInterface.run_operations` **有**預設實作，Mock 繼承它，所以不是 fail-closed。
 
 `plasma_handlers/programming.py` 的 `Operation.PROGRAMMING` 分支呼叫 `interface.run_operations(...)`。
 
 | 介面 | `OPERATIONS` 集合 | `run_operations` |
 | --- | --- | --- |
-| `plasma_interfaces/openocd.py` | 有（`FLASH_CYCLE`／`PROGRAMMING`／`READ`） | 有 |
-| `plasma_interfaces/mock.py` | **無** | **無** |
+| `plasma_interfaces/openocd.py` | 有（`FLASH_CYCLE`／`PROGRAMMING`／`READ`） | 覆寫 |
+| `plasma_interfaces/mock.py` | 無（不需要；只有 openocd 分支會查） | 繼承 Base 預設 |
 
-決策 D-1 讓 PMode 立刻切到 `operations[]`，決策 D-2 第 5 點要求保留 Mock/CD。兩者相加的結果是：
-**Mock Site 一旦收到 `programming` Job 會直接失敗**，且無法產生 `_verify` 需要的逐步 evidence
-（`steps.erase/program/verify` 的 range 與 SHA），所有 Mock 批次都會以 `OPERATIONS_MISMATCH` FAIL。
+Base 預設依序呼叫自己的 `erase`／`program`／`verify`，因此 Mock Site 會**跑完並回報成功**，但：
+
+1. 寫在偏移 0，而不是 Job Binding 的位址 —— 預設實作的簽章根本不帶位址。
+2. 擦掉整片模擬裝置，而不是 Image 的擦除視窗。
+3. 回傳 `{}`，沒有 `steps`、沒有 `result`、沒有 `safe_off`。
+
+Manager `_verify` 的第一道檢查是 `safe_off is True`，所以最終仍會 FAIL，但是以
+`SAFE_OFF_NOT_VERIFIED` 而非 `OPERATIONS_MISMATCH`，且是在裝置已被錯誤寫入之後。
 
 處置：獨立成 **PR-B1**，排在 PR-D 之前。這是硬前置，不是「逐步遷移」的一部分。
 
@@ -46,6 +58,22 @@
 那是 **managed** PMode 路徑，不是 legacy。
 
 處置：拆成「HTTP client（刪除）」與「snapshot 型別（遷移）」兩半。
+
+### P0-C — `enqueue` 在 admission 之前就擋掉帶 Provider metadata 的 Job
+
+> 2026-11-12 PR-B1 實作時發現，Gate 1 唯讀稽核未抓到。
+
+`plasma_server/site_manager.py` 的 `enqueue` 在 `_admit_job_binding` **之前**有一道閘：
+任何帶 `provider` metadata 的 Job，若該 Site 不是「就緒的 OpenOCD」，一律以
+`PROVIDER_JOB_NOT_AUTHORIZED` 拒絕。
+
+Job Binding 的身分包含 `provider` 與 `profile`，所以**任何** Binding Job 都必然帶這兩個欄位。
+結果是 Mock Site 連 Binding 都送不進去，這道閘比 P0-A 更早觸發。
+
+處置（PR-B1 已做）：改以介面能力判定而非 `isinstance` 鏈 ——
+`BaseInterface.CONSUMES_JOB_BINDING` 宣告該介面是否執行已 admit 的 Binding，
+`enqueue` 放行「宣告消化 Binding 且確實帶 Binding」的 Job。C-3 的 bundle-reference
+`flash_cycle`（無 Binding）維持原分支。既有的允許／拒絕集合未因此縮小或擴大到其他情形。
 
 ---
 
