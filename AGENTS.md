@@ -84,3 +84,14 @@ Report: exact SHA, Path, executor/Runner, run/job ID (if any), observed result, 
 Do not read or publish private prompts, SSH credentials, API tokens, raw Codex transcripts, operator home directories or unrelated files. Credentials stay in the owner-controlled private store (see Embedded contract). No hardware access without approved Gate 1 scope.
 
 Root AGENTS.md is deliberately concise to fit the default Codex project instruction budget. This does **not** relax any constraint present in the full domain or Path contracts.
+
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+
+- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
+- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
+
+If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
+<!-- CODEGRAPH_END -->
