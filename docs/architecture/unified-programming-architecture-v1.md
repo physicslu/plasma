@@ -145,6 +145,19 @@ nothing is resubmitted: an interrupted attempt that may have reached a PPU ends 
 one that provably did not ends `BLOCKED`. This extends the existing per-Batch rule to a per-Site
 judgement.
 
+The journal carries that judgement across the restart, so its schema change is part of this
+contract. It moves from a single `site_id` with a flat attempt list to `targets[]` keyed by
+`job_key` (§5.1), and the Batch record version moves with it. A journal written by the previous
+schema is **migrated on read** into a single-Target Batch; it is not refused. The reason is the
+interrupted attempt itself: that record is exactly what this section must judge, and refusing to
+load it would silently discard an `OUTCOME_UNKNOWN` the safety contract exists to preserve.
+
+The migration reshapes and never reinterprets. It invents no attempt, promotes no outcome, and
+leaves an interrupted attempt interrupted for §5.4 to judge under the same rule it would have
+received before the upgrade. The compatibility read is a dated item, not a permanent one: it may
+be removed once no deployed Manager can still hold a journal of the old schema, and until that is
+shown, it stays.
+
 ### 5.5 Stop
 
 `request_stop` means **stop queuing**. It never cancels a submitted Job, releases a lease, resets a
