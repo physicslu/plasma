@@ -110,6 +110,19 @@ def body(targets, **extra):
             "image_filename": "app.bin", **extra}
 
 
+def with_start(workflow, targets, **extra):
+    """A canonical Batch body carrying the Manager-issued start it must have.
+
+    The start is issued for the Batch's first Target. Which PPU issued it is
+    deliberately not what the Manager validates against the Target Set order
+    - that is its own test below.
+    """
+    if "start_id" not in extra:
+        extra["start_id"] = workflow.issue_batch_start(
+            targets[0]["ppu_alias"], {"kind": "batch"})["start"]["start_id"]
+    return body(targets, **extra)
+
+
 def one(alias, *sites):
     return {"ppu_alias": alias, "site_ids": list(sites)}
 
@@ -132,9 +145,11 @@ def units_of(batch):
     ([one("z2", 2), one("z2", 3)], "invalid_request"),
 ])
 def test_an_invalid_target_set_refuses_the_whole_batch(tmp_path, targets, code):
-    batches, _w, gateways, _c = rig(tmp_path)
+    batches, workflow, gateways, _c = rig(tmp_path)
+    # Carry a real start so the refusal is about the Target Set, nothing else.
+    start_id = workflow.issue_batch_start("z2", {"kind": "batch"})["start"]["start_id"]
     with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch(body(targets))
+        batches.start_batch(with_start(workflow, targets, start_id=start_id))
     assert caught.value.code == code
     assert batches._batches == {} and gateways["z2"].posts == []
 
@@ -159,9 +174,9 @@ def test_the_stop_threshold_is_bounded_by_the_batch_site_count():
 
 
 def test_a_threshold_a_batch_could_never_reach_is_refused(tmp_path):
-    batches, _w, _g, _c = rig(tmp_path, aliases=("z2",))
+    batches, workflow, _g, _c = rig(tmp_path, aliases=("z2",))
     with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch(body([one("z2", 2)],
+        batches.start_batch(with_start(workflow, [one("z2", 2)],
                                  stop_policy={"kind": "failed_sites", "threshold": 2}))
     assert caught.value.code == "invalid_request" and batches._batches == {}
 
@@ -193,7 +208,7 @@ def test_no_number_of_passes_dilutes_one_unknown():
 
 def test_two_ppus_each_run_their_own_sites(tmp_path):
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"))
-    started = batches.start_batch(body([one("z2", 2, 3), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2, 3), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     assert batch["outcome"] == "PASS" and batch["execution_status"] == "COMPLETED"
     assert units_of(batch) == [("z2", 2, "PASS", "FINISHED"), ("z2", 3, "PASS", "FINISHED"),
@@ -208,9 +223,9 @@ def test_two_ppus_each_run_their_own_sites(tmp_path):
 
 
 def test_a_failing_ppu_does_not_stop_an_unrelated_one(tmp_path):
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"),
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"),
                                     per_alias={"z2": {"job_final": "failed"}})
-    started = batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     assert batch["outcome"] == "FAIL"
     assert units_of(batch) == [("z2", 2, "FAIL", "FINISHED"), ("z2b", 2, "PASS", "FINISHED")]
@@ -220,7 +235,7 @@ def test_a_failing_ppu_does_not_stop_an_unrelated_one(tmp_path):
 def test_an_unknown_outcome_latches_its_own_ppu_only(tmp_path):
     batches, workflow, gateways, _c = rig(
         tmp_path, aliases=("z2", "z2b"), per_alias={"z2": {"post_raises": True}})
-    started = batches.start_batch(body([one("z2", 2, 3), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2, 3), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     # Safety outranks the PASS next to it.
     assert batch["outcome"] == "OUTCOME_UNKNOWN"
@@ -237,14 +252,14 @@ def test_an_unknown_outcome_latches_its_own_ppu_only(tmp_path):
 
 
 def test_a_blocked_ppu_leaves_the_rest_of_the_batch_running(tmp_path):
-    batches, _w, gateways, coordinators = rig(tmp_path, aliases=("z2", "z2b"))
+    batches, workflow, gateways, coordinators = rig(tmp_path, aliases=("z2", "z2b"))
     original = coordinators["z2"].assets
 
     def recovery_required(alias):
         return {**original(alias), "state": "RECOVERY_REQUIRED"}
 
     coordinators["z2"].assets = recovery_required
-    started = batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     # Some Targets ran and one never could: that is PARTIAL, not FAIL.
     assert batch["outcome"] == "PARTIAL"
@@ -254,11 +269,11 @@ def test_a_blocked_ppu_leaves_the_rest_of_the_batch_running(tmp_path):
 
 
 def test_a_blocked_target_spends_no_retry_budget_and_misses_no_threshold(tmp_path):
-    batches, _w, _g, coordinators = rig(tmp_path, aliases=("z2", "z2b"),
+    batches, workflow, _g, coordinators = rig(tmp_path, aliases=("z2", "z2b"),
                                         per_alias={"z2b": {"job_final": "failed"}})
     original = coordinators["z2"].assets
     coordinators["z2"].assets = lambda alias: {**original(alias), "state": "RECOVERY_REQUIRED"}
-    started = batches.start_batch(body(
+    started = batches.start_batch(with_start(workflow, 
         [one("z2", 2), one("z2b", 2)], retry_limit=0,
         stop_policy={"kind": "failed_sites", "threshold": 2}))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
@@ -275,7 +290,7 @@ def test_a_batch_whose_targets_are_all_blocked_is_still_admitted(tmp_path):
         coordinators[alias].assets = (
             lambda _a, original=original: {**original(_a), "state": "RECOVERY_REQUIRED"})
     start_id = workflow.issue_batch_start("z2", {"kind": "batch"})["start"]["start_id"]
-    started = batches.start_batch(body([one("z2", 2, 3), one("z2b", 2)], start_id=start_id))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2, 3), one("z2b", 2)], start_id=start_id))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     # A Batch nobody can run is still a Batch: admitted, journalled and
     # reconcilable, with every Target carrying its own reason.
@@ -288,7 +303,7 @@ def test_a_batch_whose_targets_are_all_blocked_is_still_admitted(tmp_path):
     # The start was consumed by the admission; replaying it is a 409, and the
     # Batch is findable by read-only reconciliation.
     with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch(body([one("z2", 2)], start_id=start_id))
+        batches.start_batch(with_start(workflow, [one("z2", 2)], start_id=start_id))
     assert caught.value.code == "programming_start_not_startable"
     reconciled = batches.reconcile_start("z2", start_id)["reconciliation"]
     assert reconciled["state"] == "TERMINAL_CONFIRMED"
@@ -296,28 +311,29 @@ def test_a_batch_whose_targets_are_all_blocked_is_still_admitted(tmp_path):
 
 
 def test_an_invalid_specification_is_refused_even_when_no_ppu_is_ready(tmp_path):
-    batches, _w, gateways, coordinators = rig(tmp_path, aliases=("z2",))
+    batches, workflow, gateways, coordinators = rig(tmp_path, aliases=("z2",))
     original = coordinators["z2"].assets
     coordinators["z2"].assets = lambda _a: {**original(_a), "state": "RECOVERY_REQUIRED"}
     # Every PPU is unready, but the request itself is illegal. An unusable
     # specification must never be mistaken for a legitimately BLOCKED Batch.
     with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch({**body([one("z2", 2)]), "operations": ["erase", "verify"]})
+        batches.start_batch({**with_start(workflow, [one("z2", 2)]),
+                             "operations": ["erase", "verify"]})
     assert caught.value.code == "operations_invalid"
     assert batches._batches == {} and gateways["z2"].posts == []
 
 
 def test_an_unknown_target_refuses_the_whole_batch(tmp_path):
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2",))
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2",))
     with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch(body([one("z2", 2), one("absent", 2)]))
+        batches.start_batch(with_start(workflow, [one("z2", 2), one("absent", 2)]))
     assert caught.value.code == "ppu_not_found"
     assert batches._batches == {} and gateways["z2"].posts == []
 
 
 def test_the_stop_policy_counts_sites_across_ppus(tmp_path):
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), job_final="failed")
-    started = batches.start_batch(body(
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), job_final="failed")
+    started = batches.start_batch(with_start(workflow, 
         [one("z2", 2, 3), one("z2b", 2)], retry_limit=0,
         stop_policy={"kind": "failed_sites", "threshold": 2}))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
@@ -331,7 +347,7 @@ def test_the_stop_policy_counts_sites_across_ppus(tmp_path):
 def test_the_bundle_is_built_once_for_every_site_behind_one_route(tmp_path):
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"))
     before = workflow._bundle_builds
-    started = batches.start_batch(body([one("z2", 2, 3), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2, 3), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     assert batch["outcome"] == "PASS"
     # One Route and one Image: built once, reused for all three Sites.
@@ -347,7 +363,7 @@ def test_the_bundle_is_built_once_for_every_site_behind_one_route(tmp_path):
 # ------------------------------------------------------- compatibility entry
 
 def test_the_alias_entry_is_the_same_engine_and_the_same_record(tmp_path):
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
     started = batches.start(
         "z2", {"icpn": ICPN, "site_id": 2, "operations": FULL,
                "image_base64": base64.b64encode(image()).decode(),
@@ -363,8 +379,8 @@ def test_the_alias_entry_is_the_same_engine_and_the_same_record(tmp_path):
 
 
 def test_a_multi_ppu_batch_is_not_readable_through_the_alias_entry(tmp_path):
-    batches, _w, _g, _c = rig(tmp_path, aliases=("z2", "z2b"))
-    started = batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+    batches, workflow, _g, _c = rig(tmp_path, aliases=("z2", "z2b"))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch_id = started["batch"]["batch_id"]
     with pytest.raises(ProgrammingError) as caught:
         batches.status("z2", batch_id)
@@ -373,7 +389,7 @@ def test_a_multi_ppu_batch_is_not_readable_through_the_alias_entry(tmp_path):
 
 
 def test_the_alias_entry_refuses_a_target_set(tmp_path):
-    batches, _w, _g, _c = rig(tmp_path, aliases=("z2",))
+    batches, workflow, _g, _c = rig(tmp_path, aliases=("z2",))
     with pytest.raises(ProgrammingError) as caught:
         batches.start("z2", body([one("z2", 2)]))
     assert caught.value.code == "invalid_request" and batches._batches == {}
@@ -425,7 +441,7 @@ def test_a_v1_journal_is_read_and_never_written(tmp_path):
         "legacy.json.v2")
 
     # A new Batch writes v2 beside it, and still does not touch v1.
-    reloaded.start_batch(body([one("z2", 2)]))
+    reloaded.start_batch(with_start(workflow, [one("z2", 2)]))
     assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
     v2 = json.loads((tmp_path / "legacy.json.v2").read_text(encoding="utf-8"))
     assert v2["schema"].endswith("journal.v2")
@@ -440,14 +456,13 @@ def test_a_second_restart_reads_both_journals_once(tmp_path):
     digest = write_legacy(path, [legacy_batch("a" * 32)])
     first = ProgrammingBatchCoordinator(workflow, journal_path=path,
                                         spawn=lambda target: target())
-    new_id = first.start_batch(body([one("z2", 2)]))["batch"]["batch_id"]
+    new_id = first.start_batch(with_start(workflow, [one("z2", 2)]))["batch"]["batch_id"]
     second = ProgrammingBatchCoordinator(workflow, journal_path=path,
                                          spawn=lambda target: target())
     assert set(second._batches) == {"a" * 32, new_id}      # each loaded once
     assert second.status_batch("a" * 32)["batch"]["outcome"] == "PASS"
     assert second.status_batch(new_id)["batch"]["outcome"] == "PASS"
     assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
-    assert second._journal_conflicts == []
 
 
 @pytest.mark.parametrize("attempts, outcome, reason", [
@@ -474,32 +489,61 @@ def test_a_v1_interrupted_attempt_is_judged_not_guessed(tmp_path, attempts, outc
     assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
 
 
-def test_a_batch_id_in_both_journals_takes_the_v2_record(tmp_path):
-    _b, workflow, _g, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
-    path = tmp_path / "legacy.json"
-    write_legacy(path, [legacy_batch("d" * 32, outcome="PASS")])
-    v2_batch = migrate_batch_record(legacy_batch("d" * 32, outcome="FAIL"))
-    path.with_name("legacy.json.v2").write_text(json.dumps(
-        {"schema": "plasma.manager.programming-batch-journal.v2",
-         "batches": [v2_batch]}), encoding="utf-8")
-    reloaded = ProgrammingBatchCoordinator(workflow, journal_path=path)
-    # v2 is the later writer, so it wins - and the disagreement is recorded,
-    # not silently resolved.
-    assert reloaded.status_batch("d" * 32)["batch"]["outcome"] == "FAIL"
-    assert reloaded._journal_conflicts == [{"kind": "batch_id", "id": "d" * 32}]
-    # The Batch is now owned by v2 and is written there.
-    assert "d" * 32 not in reloaded._legacy_ids
+def write_v2(path, batches):
+    path.write_text(json.dumps({"schema": "plasma.manager.programming-batch-journal.v2",
+                                "batches": batches}), encoding="utf-8")
 
 
-def test_a_start_id_claimed_by_two_batches_is_recorded(tmp_path):
+def test_the_same_batch_in_both_journals_is_loaded_once(tmp_path):
     _b, workflow, _g, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
     path = tmp_path / "legacy.json"
-    one_batch = legacy_batch("e" * 32)
-    other = legacy_batch("f" * 32)
-    one_batch["start_id"] = other["start_id"] = "0" * 32
-    write_legacy(path, [one_batch, other])
+    record = legacy_batch("d" * 32, outcome="PASS")
+    write_legacy(path, [record])
+    # The same transaction, told the same way by both files, is no conflict.
+    write_v2(path.with_name("legacy.json.v2"), [migrate_batch_record(record)])
     reloaded = ProgrammingBatchCoordinator(workflow, journal_path=path)
-    assert reloaded._journal_conflicts == [{"kind": "start_id", "id": "0" * 32}]
+    assert reloaded.status_batch("d" * 32)["batch"]["outcome"] == "PASS"
+    assert "d" * 32 not in reloaded._legacy_ids   # the v2 writer owns it now
+
+
+@pytest.mark.parametrize("v2_outcome", ["FAIL", "PASS", None])
+def test_two_journals_that_disagree_about_a_batch_fail_closed(tmp_path, v2_outcome):
+    _b, workflow, _g, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
+    path = tmp_path / "legacy.json"
+    write_legacy(path, [legacy_batch("d" * 32, outcome="OUTCOME_UNKNOWN")])
+    write_v2(path.with_name("legacy.json.v2"),
+             [migrate_batch_record(legacy_batch("d" * 32, outcome=v2_outcome))])
+    # There is no safe winner: taking the later writer can bury an
+    # OUTCOME_UNKNOWN an operator still has to reconcile, and taking the older
+    # one can lose a Job that really ran.
+    with pytest.raises(RuntimeError, match="disagree about a transaction identity"):
+        ProgrammingBatchCoordinator(workflow, journal_path=path)
+
+
+def test_a_start_id_claimed_by_two_batches_fails_closed(tmp_path):
+    _b, workflow, _g, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
+    path = tmp_path / "legacy.json"
+    first_batch = legacy_batch("e" * 32)
+    second_batch = legacy_batch("f" * 32)
+    first_batch["start_id"] = second_batch["start_id"] = "0" * 32
+    write_legacy(path, [first_batch, second_batch])
+    # One start admits at most one Batch. Two is an identity that cannot be
+    # proven, whichever file each came from.
+    with pytest.raises(RuntimeError, match="is claimed by"):
+        ProgrammingBatchCoordinator(workflow, journal_path=path)
+
+
+def test_a_start_id_split_across_the_two_journals_fails_closed(tmp_path):
+    _b, workflow, _g, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
+    path = tmp_path / "legacy.json"
+    legacy_one = legacy_batch("e" * 32)
+    legacy_one["start_id"] = "0" * 32
+    write_legacy(path, [legacy_one])
+    other = migrate_batch_record(legacy_batch("f" * 32))
+    other["start_id"] = "0" * 32
+    write_v2(path.with_name("legacy.json.v2"), [other])
+    with pytest.raises(RuntimeError, match="is claimed by"):
+        ProgrammingBatchCoordinator(workflow, journal_path=path)
 
 
 @pytest.mark.parametrize("raw", [
@@ -533,7 +577,7 @@ def test_a_restart_judges_every_site_and_resubmits_nothing(tmp_path):
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"),
                                           spawn_batch=held.append)
     workflow.spawn = held.append
-    started = batches.start_batch(body([one("z2", 2, 3), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2, 3), one("z2b", 2)]))
     batch_job = held.pop()
 
     class Died(BaseException):
@@ -568,7 +612,7 @@ def test_a_stop_mid_batch_leaves_the_running_site_alone_and_queues_nothing(tmp_p
         return original(method, path, **kw)
 
     gateways["z2"].relay = relay
-    started = batches.start_batch(body([one("z2", 2, 3), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2, 3), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     assert seen["view"]["batch"]["stop_requested"] is True
     assert seen["view"]["batch"]["outcome"] is None  # the running attempt is not cut
@@ -617,7 +661,7 @@ def break_gateway(gateways, alias, exc):
 ])
 def test_one_broken_ppu_is_isolated_and_the_healthy_one_still_runs(
         tmp_path, fault, domain, reason_fragment):
-    batches, _w, gateways, coordinators = rig(tmp_path, aliases=("z2", "z2b"))
+    batches, workflow, gateways, coordinators = rig(tmp_path, aliases=("z2", "z2b"))
     if fault == "busy":
         gateways["z2"].busy = True
     elif fault == "recovery":
@@ -628,7 +672,7 @@ def test_one_broken_ppu_is_isolated_and_the_healthy_one_still_runs(
         break_gateway(gateways, "z2", ConnectionError("runtime unreachable"))
     else:
         break_assets(coordinators, "z2", raises=RuntimeError("platform state unreadable"))
-    started = batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     broken, healthy = batch["units"]
     # Nothing was submitted for the broken PPU, so the doubt stays local to it.
@@ -645,7 +689,7 @@ def test_one_broken_ppu_is_isolated_and_the_healthy_one_still_runs(
 def test_a_ppu_that_goes_quiet_after_submitting_is_unknown_not_blocked(tmp_path):
     batches, workflow, gateways, _c = rig(
         tmp_path, aliases=("z2", "z2b"), per_alias={"z2": {"post_raises": True}})
-    started = batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     lost, healthy = batch["units"]
     # A Job may have reached it. That is never reduced to BLOCKED, and it is
@@ -666,9 +710,9 @@ SHARED_GATES = [
 
 @pytest.mark.parametrize("label, gate", SHARED_GATES, ids=[s[0] for s in SHARED_GATES])
 def test_a_shared_control_failure_stops_the_whole_batch_at_admission(tmp_path, label, gate):
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
     with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+        batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     # Not one PPU's problem: nothing is admitted and nothing is submitted.
     assert caught.value.code == "manager_shared_control_failure"
     assert caught.value.status == 503
@@ -685,8 +729,8 @@ def test_a_shared_control_failure_mid_batch_submits_nothing_further(tmp_path):
         seen["n"] += 1
         return None if seen["n"] <= 3 else ("SHARED_CONTROL_FAILURE", "SCHEDULER_STATE_CORRUPT")
 
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
-    started = batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
+    started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     assert batch["failure_domain"] == "SHARED_CONTROL_FAILURE"
     done, stopped = batch["units"]
@@ -702,9 +746,9 @@ def test_a_gate_that_cannot_be_executed_is_shared_not_local(tmp_path):
     def gate(alias):
         raise RuntimeError("fleet poller is not configured")
 
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
     with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+        batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     # "I could not tell" is never read as "only this PPU is affected".
     assert caught.value.code == "manager_shared_control_failure"
     assert "GATE_NOT_EXECUTABLE_RuntimeError" in caught.value.message
@@ -712,7 +756,7 @@ def test_a_gate_that_cannot_be_executed_is_shared_not_local(tmp_path):
 
 
 def test_a_journal_that_cannot_be_written_stops_submission_and_says_so(tmp_path):
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"))
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"))
     original = batches._persist_locked
     state = {"writes": 0}
 
@@ -724,7 +768,7 @@ def test_a_journal_that_cannot_be_written_stops_submission_and_says_so(tmp_path)
         original()
 
     batches._persist_locked = persist
-    started = batches.start_batch(body([one("z2", 2), one("z2b", 2)]))
+    started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     assert batch["failure_domain"] == "SHARED_CONTROL_FAILURE"
     # The Batch does not claim a state it could not store.
@@ -737,9 +781,38 @@ def test_a_shared_failure_starts_no_new_job_and_no_retry(tmp_path):
     def gate(alias):
         return ("SHARED_CONTROL_FAILURE", "AUTHORITY_CONTROL_UNUSABLE")
 
-    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"),
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"),
                                     platform_gate=gate, job_final="failed")
     with pytest.raises(ProgrammingError):
-        batches.start_batch(body([one("z2", 2), one("z2b", 2)], retry_limit=3))
+        batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)], retry_limit=3))
     assert gateways["z2"].posts == [] and gateways["z2b"].posts == []
     assert batches._batches == {}
+
+
+# ------------------------------------------------------- the start is required
+
+def test_the_canonical_resource_requires_a_manager_issued_start(tmp_path):
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
+    with pytest.raises(ProgrammingError) as caught:
+        batches.start_batch(body([one("z2", 2)]))
+    # The start_id is the sole idempotency token: a Batch without one could
+    # not be reconciled after a lost answer, so it is not a Batch.
+    assert caught.value.code == "invalid_request" and caught.value.status == 400
+    assert "start_id" in caught.value.message
+    assert batches._batches == {} and gateways["z2"].posts == []
+    # With one, the same request is admitted.
+    admitted = batches.start_batch(with_start(workflow, [one("z2", 2)]))["batch"]
+    assert admitted["outcome"] == "PASS" and admitted["start_id"] is not None
+
+
+def test_the_alias_entry_still_accepts_a_start_that_omits_the_token(tmp_path):
+    batches, _w, gateways, _c = rig(tmp_path, aliases=("z2",), sites=(2,))
+    # Deployed callers of the compatibility entry do not send one yet, and
+    # PR-B does not break them; PR-C migrates them to the canonical resource.
+    started = batches.start(
+        "z2", {"icpn": ICPN, "site_id": 2, "operations": FULL,
+               "image_base64": base64.b64encode(image()).decode(),
+               "image_filename": "app.bin", "retry_limit": 0})
+    assert started["batch"]["outcome"] == "PASS"
+    assert started["batch"]["start_id"] is None
+    assert len(gateways["z2"].posts) == 1

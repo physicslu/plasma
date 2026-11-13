@@ -333,9 +333,6 @@ class ProgrammingBatchCoordinator:
         #: are never copied into the v2 file, so the v1 journal remains the
         #: one and only record of its own Batches.
         self._legacy_ids: set[str] = set()
-        #: Batch or start IDs the two journals disagreed about. v2 wins, and
-        #: the disagreement is recorded rather than silently resolved.
-        self._journal_conflicts: list[dict[str, str]] = []
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
@@ -381,28 +378,81 @@ class ProgrammingBatchCoordinator:
                     _schema, v2_records = self._read_journal(self._v2_path)
             else:
                 v2_records = records
+        # Migrated on read, never refused: an interrupted attempt in a legacy
+        # record is exactly what the restart rule has to judge.
+        legacy = {}
         for record in legacy_records:
-            # Migrated on read, never refused: an interrupted attempt in it is
-            # exactly the record the restart rule has to judge.
             batch = migrate_batch_record(record)
-            self._legacy_ids.add(batch["batch_id"])
+            legacy[batch["batch_id"]] = batch
+        current = {record["batch_id"]: record for record in v2_records}
+        self._refuse_conflicting_identities(legacy, current)
+        for batch_id, batch in legacy.items():
+            if batch_id in current:
+                # Both files tell the same story; the v2 writer owns it from
+                # here, and the legacy copy is not loaded twice.
+                continue
+            self._legacy_ids.add(batch_id)
             self._admit_loaded(batch)
         for record in v2_records:
-            batch_id = record["batch_id"]
-            if batch_id in self._legacy_ids:
-                self._journal_conflicts.append({"kind": "batch_id", "id": batch_id})
-                self._legacy_ids.discard(batch_id)
             self._admit_loaded(record)
-        starts: dict[str, str] = {}
-        for batch in self._batches.values():
-            start_id = batch.get("start_id")
-            if start_id is None:
-                continue
-            if start_id in starts and starts[start_id] != batch["batch_id"]:
-                self._journal_conflicts.append({"kind": "start_id", "id": start_id})
-            starts[start_id] = batch["batch_id"]
         with self._lock:
             self._persist_locked()
+
+    @staticmethod
+    def _transaction_identity(batch: Mapping[str, Any]) -> dict[str, Any]:
+        """What two records of one Batch must agree on to be the same Batch.
+
+        Timestamps and bookkeeping are left out; what is compared is the
+        transaction: which start admitted it, what it was aimed at, what it
+        concluded, and every Job identity and SAFE_OFF result underneath.
+        """
+        return {
+            "start_id": batch.get("start_id"),
+            "targets": batch.get("targets"),
+            "outcome": batch.get("outcome"),
+            "units": [{
+                "ppu_alias": unit.get("ppu_alias"), "site_id": unit.get("site_id"),
+                "outcome": unit.get("outcome"),
+                "attempts": [{key: attempt.get(key) for key in
+                              ("attempt", "plan_id", "run_id", "job_id",
+                               "job_binding_sha256", "outcome", "safe_off")}
+                             for attempt in unit.get("attempts") or []],
+            } for unit in batch.get("units") or []],
+        }
+
+    def _refuse_conflicting_identities(self, legacy: Mapping[str, Any],
+                                       current: Mapping[str, Any]) -> None:
+        """Fail closed on a transaction identity that cannot be proven.
+
+        Two journals may hold the same Batch - that is normal, and harmless
+        while they say the same thing. When they do not, there is no safe way
+        to pick a winner: preferring the later writer can bury an
+        ``OUTCOME_UNKNOWN`` that an operator still has to reconcile, and
+        preferring the older one can lose a Job that really ran. The same is
+        true of a start ID that two different Batches claim, since one start
+        admits at most one Batch. Either way the Manager refuses to start and
+        says exactly which identity it could not prove; an operator reconciles
+        it. Deleting the v2 journal is NOT the remedy - it holds real
+        transactions.
+        """
+        conflicts = []
+        for batch_id, record in current.items():
+            older = legacy.get(batch_id)
+            if older is not None and (self._transaction_identity(older)
+                                      != self._transaction_identity(record)):
+                conflicts.append(f"batch_id {batch_id} differs between the journals")
+        claimed: dict[str, str] = {}
+        for batch_id, record in list(legacy.items()) + list(current.items()):
+            start_id = record.get("start_id")
+            if start_id is None:
+                continue
+            if claimed.setdefault(start_id, batch_id) != batch_id:
+                conflicts.append(
+                    f"start_id {start_id} is claimed by {claimed[start_id]} and {batch_id}")
+        if conflicts:
+            raise RuntimeError(
+                "Programming batch journals disagree about a transaction identity; "
+                "refusing to start without reconciliation: " + "; ".join(sorted(conflicts)))
 
     def _admit_loaded(self, batch: dict[str, Any]) -> None:
         if batch.get("outcome") is None:
@@ -553,8 +603,13 @@ class ProgrammingBatchCoordinator:
 
     # --------------------------------------------------------------------- API
     def start_batch(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        """The canonical Manager-owned entry: a Batch over a Target Set."""
-        return self._start(body)
+        """The canonical Manager-owned entry: a Batch over a Target Set.
+
+        A Batch carries a Manager-issued ``start_id`` (§5.1, §5.3). It is the
+        sole idempotency token, and a Batch without one cannot be reconciled
+        after a lost answer, so the canonical resource requires it.
+        """
+        return self._start(body, require_start=True)
 
     def start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
         """The alias-scoped compatibility entry (§5.8).
@@ -570,9 +625,12 @@ class ProgrammingBatchCoordinator:
                 "Image, Bundle or erase range, and optional retry_limit / stop_policy")
         normalised = {key: value for key, value in body.items() if key != LEGACY_SITE_KEY}
         normalised[TARGET_KEY] = [{"ppu_alias": alias, "site_ids": [body[LEGACY_SITE_KEY]]}]
+        # The compatibility entry keeps accepting a start that omits the
+        # token, as it always has. Tightening it would break deployed callers
+        # before PR-C migrates them, and this entry exists to not do that.
         return self._start(normalised)
 
-    def _start(self, body: Mapping[str, Any]) -> dict[str, Any]:
+    def _start(self, body: Mapping[str, Any], *, require_start: bool = False) -> dict[str, Any]:
         if (not isinstance(body, Mapping)
                 or set(body) - PLAN_KEYS - {TARGET_KEY} - POLICY_KEYS - START_KEYS
                 or "operations" not in body or TARGET_KEY not in body):
@@ -580,6 +638,10 @@ class ProgrammingBatchCoordinator:
                 400, "invalid_request",
                 "a batch requires icpn, targets, an operations list with its Programming "
                 "Image, Bundle or erase range, and optional retry_limit / stop_policy")
+        if require_start and "start_id" not in body:
+            raise ProgrammingError(
+                400, "invalid_request",
+                "a Batch requires a Manager-issued start_id; obtain one first")
         targets = parse_targets(body)
         policy = parse_policy(body, site_count(targets))
         plan_body = {key: body[key] for key in body if key in PLAN_KEYS}

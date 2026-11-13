@@ -120,6 +120,15 @@ plan + run + single PPU Job. An attempt is journalled **before** it is submitted
 A Batch start carries a Manager-issued `start_id` obtained first
 (`plasma_manager/programming.py` `issue_batch_start` → `consume_batch_start`). It is admitted at
 most once; an unknown, used, voided or expired ID is refused with `409` and nothing is submitted.
+The canonical resource **requires** it: a Batch without one could not be reconciled after a lost
+answer, so a request that omits it is refused `400` and nothing is recorded. The compatibility
+entry keeps accepting a start that omits it, as it always has, because tightening it would break
+deployed callers before PR-C migrates them (§5.8).
+
+The `start_id` is validated against the PPU it was **issued for**, resolved from the pending
+record, not against whichever Target happens to be listed first. The token is an idempotency
+guard and never an authority: each Target's own authority is verified independently, so the order
+of the Target Set cannot make a legal start illegal.
 
 Admission separates **validity** from **readiness**, and they are refused differently.
 
@@ -170,12 +179,20 @@ schema, and until that is shown, it stays.
 The two schemas live in two files. If the configured journal holds a record of the previous
 schema, that file becomes the legacy journal — opened, never written: not overwritten, truncated,
 deleted, or renamed out of the way — and the v2 writer takes a file of its own beside it
-(`<journal>.v2`). A restarting Manager reads both, legacy first and v2 over it; a Batch named by
-both is taken from v2, the later writer, and the disagreement is recorded rather than silently
-resolved. There is still one Batch engine and one in-memory model: the two files are two sources
-of history, not two implementations. A Batch loaded from the legacy journal is never copied into
-the v2 file, so the legacy file remains the only record of its own Batches. No configuration
-changes; the v2 path is derived, and rolling back is deleting the derived file.
+(`<journal>.v2`). A restarting Manager reads both, legacy first and v2 over it. There is still one Batch engine
+and one in-memory model: the two files are two sources of history, not two implementations. A
+Batch loaded from the legacy journal is never copied into the v2 file, so the legacy file remains
+the only record of its own Batches. No configuration changes; the v2 path is derived.
+
+**A transaction identity that cannot be proven fails closed.** Both journals may hold the same
+Batch, and while they say the same thing about it — the same start, the same Target Set, the same
+outcome, the same Job identities and SAFE_OFF results — that is no conflict and it is loaded
+once. When they disagree there is no safe winner: preferring the later writer can bury an
+`OUTCOME_UNKNOWN` an operator still has to reconcile, and preferring the older one can lose a Job
+that really ran. The same holds for a `start_id` that two Batches claim, from either file, since
+one start admits at most one Batch. The Manager then refuses to start and names the identity it
+could not prove, and an operator reconciles it. **Deleting the v2 journal is not the remedy** —
+it holds real transactions; it is not a rollback path for a disagreement.
 
 The v2 journal commits durably, with evidence good enough to recover from a crash rather than
 merely to describe one. An attempt is journalled before it is submitted, and the record survives a
