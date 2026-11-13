@@ -113,7 +113,9 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
   assert.match(reconcile, /step === "VOID" && decision\.action === "VOID"/);
   assert.match(reconcile, /if \(!hold\.startId\) \{[\s\S]*?return;/);
   // Core: a lost Start carries the Manager-issued start ID; a Batch gets one first.
-  assert.match(core, /startId = await issueBatchStart\(\);[\s\S]*startProgrammingBatch\(input, startId\)/);
+  // The Manager issues the start under no PPU; the alias the Console passes
+  // is the BFF's capability check and never reaches the Manager record.
+  assert.match(core, /startId = await issueBatchStart\(request\.alias\);[\s\S]*startProgrammingBatch\(input, startId\)/);
   assert.doesNotMatch(core, /new ManagedStartOutcomeUnknown\("batch"/);
   assert.match(core, /export function decideStartReconciliation\(/);
   // A Batch start names no PPU until a Target Set is admitted with it; a
@@ -375,8 +377,19 @@ test("PR-C: the Console reaches the canonical Batch resource, never an alias-sco
   assert.match(route, /const PROGRAMMING_BROWSER_PREFIX = "\/api\/manager\/programming";/);
   assert.match(route, /relayManagerProgrammingRequest\(request, resource\)/);
   // Starting a Batch submits Jobs: every Target PPU must be enrolled here.
+  // EVERY canonical mutation carries the capability of every PPU it concerns,
+  // which is what the alias-scoped routes it replaces required. Stop and void
+  // resolve that PPU from the Manager's own record, so a caller's claim can
+  // never widen them; a claim is used only where no PPU exists yet.
   assert.match(bff, /for \(const alias of aliases\) \{\s*if \(!hasMaintenanceCapability\(request, alias\)\) return maintenanceCapabilityRequired\(\);/);
   assert.match(bff, /if \(!maintenanceMutationOriginAllowed\(request\)\) return maintenanceCapabilityRequired\(\);/);
+  assert.match(bff, /aliases = await authorizedAliases\(normalizedResource, body, declared\);/);
+  assert.match(bff, /const stop = \/\^batches\\\/\(\[0-9a-f\]\{32\}\)\\\/stop\$\/\.exec\(resource\);/);
+  assert.match(bff, /const recorded = aliasesOfTargets\(view\?\.identity\?\.targets\);/);
+  // Fail closed: an operation whose PPU cannot be established is refused.
+  assert.match(bff, /if \(aliases === null \|\| aliases\.length === 0\)/);
+  // The claim is never forwarded to the Manager.
+  assert.match(bff, /`\$\{managerApiBase\(\)\}\/api\/programming\/\$\{normalizedResource\}`/);
 });
 
 test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () => {

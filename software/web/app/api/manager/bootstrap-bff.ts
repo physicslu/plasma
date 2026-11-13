@@ -221,17 +221,85 @@ export async function relayManagerBootstrapRequest(
   }
 }
 
+/** One Manager programming resource, read for authorisation only. */
+async function managerProgrammingRead(resource: string): Promise<unknown | null> {
+  try {
+    const response = await fetch(`${managerApiBase()}/api/programming/${resource}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOOTSTRAP_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function aliasesOfTargets(targets: unknown): string[] {
+  if (!Array.isArray(targets)) return [];
+  const aliases: string[] = [];
+  for (const target of targets) {
+    if (target == null || typeof target !== "object") return [];
+    const alias = (target as { ppu_alias?: unknown }).ppu_alias;
+    if (typeof alias !== "string" || !validPpuAlias(alias.trim())) return [];
+    aliases.push(alias.trim());
+  }
+  return aliases;
+}
+
+/**
+ * The PPUs a canonical mutation acts on, or null when they cannot be proven.
+ *
+ * Every one of these changes transaction or scheduling state, so each is
+ * authorised exactly as the alias-scoped route it replaces was: by the
+ * maintenance capability of the PPU it concerns. Where the Manager knows that
+ * PPU - a Batch's Target Set, an admitted start's record - the Manager's
+ * record decides, so a caller's claim can never widen anything. Only where no
+ * PPU exists yet (a start that was issued and never admitted) does the caller
+ * declare the PPU it is acting for, which is the same boundary the old
+ * alias-scoped `programming/starts` route enforced through its path.
+ */
+async function authorizedAliases(
+  resource: string, body: ArrayBuffer | undefined, declared: string | null,
+): Promise<string[] | null | "unreadable"> {
+  if (resource === "batches") return body ? targetAliases(body) : null;
+  const stop = /^batches\/([0-9a-f]{32})\/stop$/.exec(resource);
+  if (stop) {
+    // Stop queuing changes the Manager's scheduling state for these PPUs.
+    const payload = await managerProgrammingRead(`batches/${stop[1]}`) as
+      { batch?: { targets?: unknown } } | null;
+    if (payload === null) return "unreadable";
+    const aliases = aliasesOfTargets(payload?.batch?.targets);
+    return aliases.length ? aliases : null;
+  }
+  const voided = /^starts\/([0-9a-f]{32})\/void$/.exec(resource);
+  if (voided) {
+    const payload = await managerProgrammingRead(`starts/${voided[1]}`) as
+      { reconciliation?: { ppu_alias?: unknown; identity?: { targets?: unknown } | null } } | null;
+    if (payload === null) return "unreadable";
+    const view = payload?.reconciliation;
+    const recorded = aliasesOfTargets(view?.identity?.targets);
+    if (recorded.length) return recorded;
+    const single = view?.ppu_alias;
+    // An empty string is never a PPU identity (ADR 5.8): only a real alias is.
+    if (typeof single === "string" && validPpuAlias(single.trim())) return [single.trim()];
+    return declared ? [declared] : null;
+  }
+  // Issuing a start: nothing is admitted yet, so the caller declares the PPU.
+  return declared ? [declared] : null;
+}
+
 /**
  * The canonical Manager-owned programming resources: the Batch and the start
  * it is admitted with (ADR 5.8). Neither sits under a PPU alias, because
  * neither is owned by a PPU.
  *
- * Authorisation follows what the request actually operates. Starting a Batch
- * submits Jobs to every PPU in its Target Set, so the browser must hold the
- * maintenance capability for EVERY one of them: one Target's enrollment never
- * speaks for another's. Issuing a start, voiding one and stopping the queue
- * reach no PPU at all - they are still refused unless they come from the
- * Control Station's own origin, which is what keeps them off a foreign page.
+ * A canonical resource is not a lower bar. Every mutation here carries the
+ * same-origin check AND the maintenance capability of every PPU it concerns,
+ * which is what the alias-scoped routes it replaces required. A read is
+ * allowlisted and carries no capability, exactly as the alias-scoped GET did.
  */
 export async function relayManagerProgrammingRequest(
   request: Request,
@@ -260,23 +328,43 @@ export async function relayManagerProgrammingRequest(
         },
       });
     }
+    let aliases: string[] | null | "unreadable";
     try {
       maintenanceCapabilityConfigured();
       if (!maintenanceMutationOriginAllowed(request)) return maintenanceCapabilityRequired();
-      if (normalizedResource === "batches") {
-        const aliases = targetAliases(body);
-        if (aliases === null) {
-          return json(400, {
-            ok: false,
-            error: {
-              code: "invalid_request",
-              message: "a Batch requires a Target Set naming each PPU it would operate",
-            },
-          });
-        }
-        for (const alias of aliases) {
-          if (!hasMaintenanceCapability(request, alias)) return maintenanceCapabilityRequired();
-        }
+      // Declared by the caller, never forwarded to the Manager: it is a claim
+      // about which PPU this Console acts for, and it only ever narrows.
+      const claimed = new URL(request.url).searchParams.get("ppu_alias");
+      const declared = claimed != null && validPpuAlias(claimed.trim()) ? claimed.trim() : null;
+      aliases = await authorizedAliases(normalizedResource, body, declared);
+    } catch {
+      return maintenanceCapabilityMisconfigured();
+    }
+    if (aliases === "unreadable") {
+      // The Manager could not be asked whose PPU this is. That is an outage,
+      // not a refusal, and nothing was sent to it.
+      return json(503, {
+        ok: false,
+        error: {
+          code: "manager_unavailable",
+          message: "Manager programming path is unavailable",
+        },
+      });
+    }
+    if (aliases === null || aliases.length === 0) {
+      // Fail closed: an operation whose PPU cannot be established is refused
+      // rather than authorised against nothing.
+      return json(400, {
+        ok: false,
+        error: {
+          code: "invalid_request",
+          message: "this programming request must name the PPU it acts on",
+        },
+      });
+    }
+    try {
+      for (const alias of aliases) {
+        if (!hasMaintenanceCapability(request, alias)) return maintenanceCapabilityRequired();
       }
     } catch {
       return maintenanceCapabilityMisconfigured();

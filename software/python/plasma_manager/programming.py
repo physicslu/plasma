@@ -77,6 +77,10 @@ START_SCHEMA = "plasma.manager.programming-start-reconciliation.v1"
 VOID_TOKEN = "VOID_UNSTARTED_START"
 MAX_STARTS_RETAINED = 256
 MAX_PENDING_BATCH_STARTS = 16
+#: A start that belongs to the Manager and to no PPU (ADR 5.8). It is the
+#: record's own statement of scope: the empty ``ppu_alias`` beside it is a
+#: rollback placeholder and is never read as a PPU identity or authority.
+MANAGER_SCOPE = "manager"
 CONFIRM_TOKEN = "PROGRAM"
 ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED"
 UPLOAD_CHUNK_BYTES = 256 * 1024
@@ -156,16 +160,20 @@ def _now() -> str:
 def _journal_start(record: Mapping[str, Any]) -> dict[str, Any]:
     """One start record as the journal stores it.
 
-    A Batch start carries no PPU (ADR 5.8), but ``ppu_alias`` is still
-    written as a string: a Manager rolled back to a release that predates
-    PR-C validates the field's type and would otherwise refuse to start
-    rather than read its own journal. The empty string is read back as
-    "no PPU" by this release and as a PPU that matches nothing by an
-    older one, which is what a rolled-back reader should conclude.
+    A Batch start carries no PPU (ADR 5.8), and the record says so **in its
+    own field**: ``start_scope`` is ``MANAGER_SCOPE`` and is the only thing
+    that identifies a canonical start. ``ppu_alias`` is still written as a
+    string because a Manager rolled back to a release that predates PR-C
+    validates that field's type and would otherwise refuse to start rather
+    than read its own journal. That string is a **placeholder, never an
+    identity**: it is empty, it is never an alias, it authorises nothing, and
+    this release reads it back as "no PPU". A rolled-back reader sees a PPU
+    that matches nothing, which is the only safe reading available to it.
     """
     item = dict(record)
     if item.get("ppu_alias") is None:
         item["ppu_alias"] = ""
+        item["start_scope"] = MANAGER_SCOPE
     return item
 
 
@@ -312,10 +320,18 @@ class BundleProgrammingWorkflow:
                         or item["state"] not in ("ISSUED", "CONSUMED", "VOIDED")):
                     raise ValueError("start record")
                 record = dict(item)
-                if record["kind"] == "batch" and record["ppu_alias"] == "":
-                    # Written by this release for a Batch start, which has no
-                    # PPU. Older releases wrote a real alias here.
+                canonical = (record.get("start_scope") == MANAGER_SCOPE
+                             or record["ppu_alias"] == "")
+                if canonical:
+                    # Manager-scoped: no PPU, and the placeholder is never
+                    # allowed to become one. A run start always has a real
+                    # PPU, so one claiming this scope is a broken record.
+                    if record["kind"] != "batch" or record["ppu_alias"] != "":
+                        raise ValueError("start record")
                     record["ppu_alias"] = None
+                    record["start_scope"] = MANAGER_SCOPE
+                elif not record["ppu_alias"]:
+                    raise ValueError("start record")
                 self._starts[item["start_id"]] = record
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise RuntimeError("Bundle programming journal is unreadable; refusing to start") from exc
@@ -822,7 +838,8 @@ class BundleProgrammingWorkflow:
             start_id = secrets.token_hex(16)
             self._pending_batch_starts[start_id] = now
             self._starts[start_id] = {
-                "start_id": start_id, "kind": "batch", "ppu_alias": None, "site_id": None,
+                "start_id": start_id, "kind": "batch", "ppu_alias": None,
+                "start_scope": MANAGER_SCOPE, "site_id": None,
                 "targets": None,
                 "ppu_id": None, "operation": PROGRAMMING, "operations": None,
                 "job_binding_sha256": None, "state": "ISSUED",
@@ -860,7 +877,8 @@ class BundleProgrammingWorkflow:
             self.require_batch_start(start_id)
             del self._pending_batch_starts[start_id]
             record = self._starts.setdefault(start_id, {
-                "start_id": start_id, "kind": "batch", "ppu_alias": None, "ppu_id": None,
+                "start_id": start_id, "kind": "batch", "ppu_alias": None,
+                "start_scope": MANAGER_SCOPE, "ppu_id": None,
                 "operation": PROGRAMMING, "operations": None, "job_binding_sha256": None,
                 "run_id": None, "issued_at": _now()})
             sites = [site for target in targets for site in target["site_ids"]]

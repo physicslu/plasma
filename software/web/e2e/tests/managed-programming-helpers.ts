@@ -504,7 +504,9 @@ export async function mockManager(page: Page, options: {
     const batch = batches.get(batchId)!;
     const attemptsOf = (unit: MockUnit) => unit.attempts.map(item => {
       const run = runRecord(item.runId);
-      return { attempt: item.attempt, plan_id: item.planId, run_id: item.runId, job_id: run.job.job_id,
+      return { attempt: item.attempt,
+        job_key: { batch_id: batchId, ppu_alias: batch.alias, site_id: unit.siteId, attempt: item.attempt },
+        plan_id: item.planId, run_id: item.runId, job_id: run.job.job_id,
         job_binding_sha256: plans.get(item.planId)!.payload.job_binding_sha256,
         state: run.outcome ? "finished" : "running", outcome: run.outcome, reason: run.reason,
         safe_off: run.receipt?.safe_off ?? null, retry: item.retry };
@@ -677,7 +679,8 @@ export async function mockManager(page: Page, options: {
   }
 
   // The canonical start resource: Manager-owned, issued under no PPU.
-  await page.route(/\/api\/manager\/programming\/starts$/, async (r: Route) => {
+  // The BFF takes `?ppu_alias=` for its capability check; the Manager never sees it.
+  await page.route(/\/api\/manager\/programming\/starts(\?|$)/, async (r: Route) => {
     if (options.issueStatus) {
       return r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Manager unavailable" } }, options.issueStatus));
     }
@@ -698,7 +701,7 @@ export async function mockManager(page: Page, options: {
     }
     await r.fulfill(json({ ok: true, reconciliation: edited }));
   });
-  await page.route(/\/api\/manager\/programming\/starts\/[0-9a-f]{32}\/void$/, async (r: Route) => {
+  await page.route(/\/api\/manager\/programming\/starts\/[0-9a-f]{32}\/void(\?|$)/, async (r: Route) => {
     const startId = new URL(r.request().url()).pathname.split("/").slice(-2)[0];
     counters.voids.push(startId);
     const record = startRecords.get(startId);

@@ -701,7 +701,7 @@ export async function runManagedBatch(
   // reconciled. Issuing it submits nothing: a failure here is a refusal.
   let startId: string;
   try {
-    startId = await issueBatchStart();
+    startId = await issueBatchStart(request.alias);
     if (!/^[0-9a-f]{32}$/.test(startId)) throw new Error("the Manager issued no start ID");
   } catch (reason) {
     const { code, message } = errorParts(reason);
@@ -756,9 +756,15 @@ export function batchSiteVerdict(
   if (unit.outcome !== "PASS") return { verdict: unit.outcome, reason: unit.reason };
   const attempt = unit.attempts[unit.attempts.length - 1];
   if (!attempt) return { verdict: "FAIL", reason: "ATTEMPT_RECORD_MISSING" };
+  const key = attempt.job_key;
   const failed = attempt.outcome !== "PASS" ? "LAST_ATTEMPT_NOT_PASS"
+    // Site identity: the attempt must be the Manager's record of THIS Site of
+    // THIS PPU in THIS Batch, never another Site's evidence read across.
+    : key == null || key.ppu_alias !== unit.ppu_alias || key.site_id !== unit.site_id
+      || key.batch_id !== batch.batch_id ? "ATTEMPT_IDENTITY_MISMATCH"
     : attempt.safe_off !== true ? "SAFE_OFF_NOT_VERIFIED"
     : !attempt.job_binding_sha256 ? "JOB_BINDING_MISSING"
+    : !attempt.run_id ? "RUN_ID_MISSING"
     : null;
   if (failed) return { verdict: "FAIL", reason: failed };
   if (run) {

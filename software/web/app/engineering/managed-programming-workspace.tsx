@@ -521,7 +521,7 @@ export default function ManagedProgrammingWorkspace() {
         answer = await getStartReconciliation(hold.startId);
         decision = decideStartReconciliation(held, answer);
       } else if (step === "VOID" && decision.action === "VOID") {
-        answer = await voidStart(hold.startId);
+        answer = await voidStart(hold.startId, hold.alias);
         appendLog(`[VOID] ${label} was voided on the Manager before admission; it can never start`, false, "USR");
         decision = decideStartReconciliation(held, answer);
       }

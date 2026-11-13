@@ -350,6 +350,34 @@ direct-Gateway batch path (§11), which is a different path.
 Console source having switched is **not** evidence that a deployed consumer has. Any consumer that
 could not be confirmed would have been a blocking item; none remained.
 
+**Authorisation is not relaxed by the move.** A canonical resource is not a lower bar than the
+alias-scoped route it replaces. Every mutation on it carries the Control Station's same-origin
+check **and** the maintenance capability of every PPU it concerns:
+
+| Operation | Whose capability | How the PPU is established |
+| --- | --- | --- |
+| `POST /api/programming/batches` | every Target | the Target Set in the request |
+| `POST …/batches/<id>/stop` | every Target of that Batch | read back from the Manager's own record |
+| `POST …/starts/<id>/void` | the start's PPU, when it has one | the Manager's record; otherwise the caller's declaration |
+| `POST /api/programming/starts` | the PPU the operator is acting for | the caller's declaration (nothing is admitted yet) |
+| `GET …/batches/<id>`, `GET …/starts/<id>` | — | read-only, allowlisted, exactly as the alias-scoped GET was |
+
+Where the Manager knows the PPU, **the Manager's record decides**, so a caller's declaration can
+only narrow and never widen. A declaration is accepted only where no PPU exists yet, which is the
+same boundary the retired alias-scoped `programming/starts` route enforced through its path. An
+operation whose PPU cannot be established is refused rather than authorised against nothing. The
+declaration is a BFF parameter and is never forwarded to the Manager: it is not part of the
+contract, the record or the Batch.
+
+**The canonical start's persistence is backward-compatible, and the placeholder is never an
+identity.** A Batch start has no PPU, and the journal record says so in its own field
+(`start_scope: "manager"`). Beside it, `ppu_alias` is written as the empty string, because a
+Manager rolled back to a pre-PR-C release type-validates that field and would otherwise refuse to
+start rather than read its own journal. The empty string is a rollback placeholder only: it is
+never an alias, it addresses no PPU, it authorises nothing, and a record that claims Manager scope
+while carrying a PPU - or a run start carrying the placeholder - is refused on load. A rolled-back
+Manager reads it as a PPU that matches nothing, which is the only safe reading available to it.
+
 ## 6. Batch Policy
 
 | Field | Default | Range |

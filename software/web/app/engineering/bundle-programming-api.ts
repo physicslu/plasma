@@ -316,6 +316,8 @@ export type ProgrammingBatchOutcome = ProgrammingRunOutcome | "PARTIAL" | "STOPP
 
 export type ProgrammingBatchAttempt = {
   attempt: number;
+  /** The Manager's identity for this attempt: which PPU, Site and try it was. */
+  job_key: { batch_id: string; ppu_alias: string; site_id: number; attempt: number };
   plan_id: string;
   run_id: string | null;
   job_id: string | null;
@@ -477,15 +479,21 @@ export type StartReconciliation = {
 };
 
 /**
- * Issue the start ID one Batch start must carry. Submits nothing, and names
- * no PPU: the Batch is Manager-owned, and each Target's authority is checked
- * when the Batch is admitted.
+ * Issue the start ID one Batch start must carry. Submits nothing.
+ *
+ * The Manager issues it under no PPU: the Batch is Manager-owned, and each
+ * Target's authority is checked when the Batch is admitted. `alias` is the
+ * PPU this Console is acting for; it is NOT sent to the Manager and never
+ * reaches the record. The BFF uses it to require this operator's maintenance
+ * capability for that PPU, which is the boundary the retired alias-scoped
+ * route enforced through its path.
  */
-export async function issueBatchStart(): Promise<string> {
-  const payload = await request<{ ok: true; start: { start_id: string } }>(`${PROGRAMMING}/starts`, {
-    method: "POST",
-    body: JSON.stringify({ kind: "batch" }),
-  });
+export async function issueBatchStart(alias: string): Promise<string> {
+  const payload = await request<{ ok: true; start: { start_id: string } }>(
+    `${PROGRAMMING}/starts?ppu_alias=${encodeURIComponent(alias)}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "batch" }),
+    });
   return payload.start.start_id;
 }
 
@@ -496,10 +504,16 @@ export async function getStartReconciliation(startId: string): Promise<StartReco
   return payload.reconciliation;
 }
 
-/** Operator: a start the Manager never admitted may never be admitted. */
-export async function voidStart(startId: string): Promise<StartReconciliation> {
+/**
+ * Operator: a start the Manager never admitted may never be admitted.
+ *
+ * `alias` is the PPU this Console is acting for, for the BFF capability check
+ * only. When the Manager already has a PPU on record for this start, that
+ * record decides and this claim cannot widen it.
+ */
+export async function voidStart(startId: string, alias: string): Promise<StartReconciliation> {
   const payload = await request<{ ok: true; reconciliation: StartReconciliation }>(
-    `${PROGRAMMING}/starts/${startId}/void`, {
+    `${PROGRAMMING}/starts/${startId}/void?ppu_alias=${encodeURIComponent(alias)}`, {
       method: "POST",
       body: JSON.stringify({ void: PROGRAMMING_VOID_TOKEN }),
     });
