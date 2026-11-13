@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { buildIdentityForVite, identityFromProvenance } from "../build/build-identity.mjs";
 
 const SHA = "abcdef1234567890abcdef1234567890abcdef12";
 const OTHER = "1234567890abcdef1234567890abcdef12345678";
 const VERSION = "0.2.1";
+
+test("Console header renders Build followed by the short SHA", () => {
+  const label = readFileSync(new URL("../app/build-identity.ts", import.meta.url), "utf8");
+  const nav = readFileSync(new URL("../app/global-nav.tsx", import.meta.url), "utf8");
+  assert.ok(label.includes(`Build ${identity.shortSha}`));
+  assert.ok(nav.includes("consoleBuildLabel(PLASMA_BUILD_IDENTITY)"));
+});
 
 test("a clean source build binds the full git SHA and 12-digit Release ID", () => {
   const identity = identityFromProvenance({
