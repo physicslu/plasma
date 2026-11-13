@@ -421,3 +421,30 @@ def test_a_restart_judges_every_site_and_resubmits_nothing(tmp_path):
     assert batch["units"][1]["reason"] == "MANAGER_RESTARTED_BEFORE_SUBMISSION"
     assert batch["outcome"] == "OUTCOME_UNKNOWN"
     assert gateways["z2b"].posts == []  # nothing was submitted for the other PPU
+
+
+def test_a_stop_mid_batch_leaves_the_running_site_alone_and_queues_nothing(tmp_path):
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"))
+    original = gateways["z2"].relay
+    seen = {}
+
+    def relay(method, path, **kw):
+        # The operator presses stop while the first Site's Job is running.
+        if method == "GET" and path.startswith("/api/status?job=") and not seen:
+            batch_id = next(iter(batches._batches))
+            seen["view"] = batches.request_stop_batch(batch_id, {"stop": "STOP_QUEUING"})
+        return original(method, path, **kw)
+
+    gateways["z2"].relay = relay
+    started = batches.start_batch(body([one("z2", 2, 3), one("z2b", 2)]))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert seen["view"]["batch"]["stop_requested"] is True
+    assert seen["view"]["batch"]["outcome"] is None  # the running attempt is not cut
+    # The running Site finished for real; every Site after it queued nothing.
+    assert units_of(batch) == [("z2", 2, "PASS", "FINISHED"),
+                               ("z2", 3, None, "SKIPPED"),
+                               ("z2b", 2, None, "SKIPPED")]
+    assert all(u["reason"] == "STOP_REQUESTED_NOTHING_SUBMITTED" for u in batch["units"][1:])
+    assert batch["execution_status"] == "STOPPED" and batch["outcome"] == "PARTIAL"
+    assert len(gateways["z2"].posts) == 1 and gateways["z2b"].posts == []
+    assert workflow._active_run("z2") is None
