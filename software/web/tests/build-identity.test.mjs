@@ -8,13 +8,15 @@ const VERSION = "0.2.1";
 
 test("a clean source build binds the full git SHA and 12-digit Release ID", () => {
   const identity = identityFromProvenance({
-    productVersion: VERSION, mode: "build", gitSha: SHA, dirty: false, source: "git-checkout",
+    productVersion: VERSION, mode: "build", gitSha: SHA, dirty: false,
+    source: "git-checkout", worktreeStatus: "clean",
   });
   assert.equal(identity.mode, "build");
   assert.equal(identity.gitSha, SHA);
   assert.equal(identity.shortSha, "abcdef123456");
   assert.equal(identity.releaseId, "0.2.1-abcdef123456");
   assert.equal(identity.productVersion, VERSION);
+  assert.equal(identity.worktreeStatus, "clean");
 });
 
 test("a new commit changes the build identity without changing Product Version", () => {
@@ -24,13 +26,15 @@ test("a new commit changes the build identity without changing Product Version",
   assert.notEqual(first.releaseId, second.releaseId);
 });
 
-test("a dirty source never claims an exact immutable build", () => {
+test("source revision is still identified when the working tree differs", () => {
   const result = identityFromProvenance({
     productVersion: VERSION, mode: "build", gitSha: SHA, dirty: true,
   });
-  assert.equal(result.mode, "unknown");
-  assert.equal(result.gitSha, null);
-  assert.equal(result.releaseId, null);
+  assert.equal(result.mode, "build");
+  assert.equal(result.gitSha, SHA);
+  assert.equal(result.releaseId, "0.2.1-abcdef123456");
+  assert.equal(result.dirty, true);
+  assert.equal(result.worktreeStatus, "changed");
 });
 
 test("development has no release claim even when git HEAD is valid", () => {
@@ -89,13 +93,16 @@ test("a pinned Render or package SHA is checked against the checkout", () => {
   assert.equal(emptyMetadata.mode, "unknown");
 });
 
-test("dirty checkout cannot be made immutable by matching metadata", () => {
+test("matching Git SHA stays valid but a dirty checkout is reported separately", () => {
   const identity = buildIdentityForVite({
     mode: "build", env: { RENDER_GIT_COMMIT: SHA },
-    gitProbe: () => ({ sha: SHA, dirty: true }),
+    gitProbe: () => ({ sha: SHA, dirty: true, headState: "ok", statusState: "ok" }),
+    requireGitCheckout: true,
   });
-  assert.equal(identity.mode, "unknown");
+  assert.equal(identity.mode, "build");
+  assert.equal(identity.gitSha, SHA);
   assert.equal(identity.dirty, true);
+  assert.equal(identity.worktreeStatus, "changed");
 });
 
 test("an absent checkout without a pinned source is explicitly UNKNOWN", () => {
@@ -130,10 +137,23 @@ test("Render gate distinguishes source, metadata, and Git execution failures", (
   assert.equal(resolve(probe(), { RENDER_GIT_COMMIT: "invalid" }).failureReason, "sha-metadata-invalid");
   assert.equal(resolve(probe(), { RENDER_GIT_COMMIT: OTHER }).failureReason, "sha-mismatch");
   assert.equal(resolve(probe(), { RENDER_GIT_COMMIT: SHA, PLASMA_BUILD_GIT_SHA: OTHER }).failureReason, "sha-mismatch");
-  assert.equal(resolve(probe({ dirty: true, untracked: 1 })).failureReason, "dirty-source");
-  assert.equal(resolve(probe({ dirty: true, trackedModified: 1 })).failureReason, "dirty-source");
-  assert.equal(resolve(probe({ dirty: true, statusState: "timeout" })).failureReason, "git-status-timeout");
-  assert.equal(resolve(probe({ dirty: true, statusState: "error" })).failureReason, "git-status-error");
+  assert.equal(resolve(probe({ dirty: true, untracked: 1 })).worktreeStatus, "changed");
+  assert.equal(resolve(probe({ dirty: true, trackedModified: 1 })).mode, "build");
+  const timeout = resolve(probe({ dirty: true, statusState: "timeout" }));
+  assert.equal(timeout.mode, "build");
+  assert.equal(timeout.worktreeStatus, "unverified");
+  const statusError = resolve(probe({ dirty: true, statusState: "error" }));
+  assert.equal(statusError.mode, "build");
+  assert.equal(statusError.worktreeStatus, "unverified");
   assert.equal(resolve(probe({ sha: null, headState: "timeout" })).failureReason, "git-head-timeout");
   assert.equal(resolve(probe({ sha: null, headState: "error" })).failureReason, "git-head-error");
+});
+
+test("Render identity fails closed on missing checkout even with pinned metadata", () => {
+  const result = buildIdentityForVite({
+    mode: "build", env: { RENDER_GIT_COMMIT: SHA }, requireGitCheckout: true,
+    gitProbe: () => ({ sha: null, dirty: false, headState: "error", statusState: "error" }),
+  });
+  assert.equal(result.mode, "unknown");
+  assert.equal(result.failureReason, "git-head-error");
 });
