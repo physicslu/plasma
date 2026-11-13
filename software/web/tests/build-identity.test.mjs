@@ -10,7 +10,7 @@ const VERSION = "0.2.1";
 test("Console header renders Build followed by the short SHA", () => {
   const label = readFileSync(new URL("../app/build-identity.ts", import.meta.url), "utf8");
   const nav = readFileSync(new URL("../app/global-nav.tsx", import.meta.url), "utf8");
-  assert.ok(label.includes(`Build ${identity.shortSha}`));
+  assert.ok(label.includes("`Build ${identity.shortSha}`"));
   assert.ok(nav.includes("consoleBuildLabel(PLASMA_BUILD_IDENTITY)"));
 });
 
