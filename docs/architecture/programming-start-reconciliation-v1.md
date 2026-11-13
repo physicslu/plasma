@@ -17,7 +17,7 @@ Every Start carries a **Manager-issued `start_id`** (32 hex):
 | Start | `start_id` | Issued by |
 |---|---|---|
 | run (READ, single programming run) | the plan's `plan_id` | `POST programming/plans` (existing) |
-| EMode Batch | a start ID | `POST programming/starts` `{"kind":"batch"}` (new) |
+| EMode Batch | a start ID | `POST /api/programming/starts` `{"kind":"batch"}` — Manager-owned, under no PPU since PR-C |
 
 The Console therefore holds the identity **before** the Start request leaves.
 A Batch request carries it as `start_id`; a `start_id` admits at most one

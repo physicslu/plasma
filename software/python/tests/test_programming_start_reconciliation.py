@@ -25,8 +25,9 @@ FULL = ["erase", "program", "verify"]
 UNRECORDED = "0" * 32
 
 
-def rec(target, start_id, alias=ALIAS):
-    return target.reconcile_start(alias, start_id)["reconciliation"]
+def rec(target, start_id):
+    """Reconciliation is Manager-owned and names no PPU (PR-C, ADR 5.8)."""
+    return target.reconcile_start(start_id)["reconciliation"]
 
 
 def lost_read_start(workflow):
@@ -48,7 +49,14 @@ def batch_rig(tmp_path, *, spawn_batch=None, **gateway_kw):
 
 
 def issue(workflow):
-    return workflow.issue_batch_start(ALIAS, {"kind": "batch"})["start"]["start_id"]
+    return workflow.issue_batch_start({"kind": "batch"})["start"]["start_id"]
+
+
+def start_batch(batches, request):
+    """A single-Target canonical Batch, as the Console sends one."""
+    site = request.get("site_id", 2)
+    rest = {key: value for key, value in request.items() if key != "site_id"}
+    return batches.start_batch({**rest, "targets": [{"ppu_alias": ALIAS, "site_ids": [site]}]})
 
 
 # ------------------------------------------------- answer lost, run was admitted
@@ -245,30 +253,25 @@ def test_a_dropped_admission_record_never_reads_as_not_accepted(tmp_path, monkey
     assert (view["state"], view["reason"]) == ("OUTCOME_UNKNOWN", "START_NOT_RECORDED")
 
 
-def test_another_ppu_cannot_reconcile_or_void_this_start(tmp_path):
+def test_a_record_naming_another_ppu_than_the_run_leaks_nothing(tmp_path):
     workflow, _c, _g = ops_workflow(tmp_path)
     planned = lost_read_start(workflow)
-
-    class TwoPpus:
-        def record_by_alias(self, alias):
-            from types import SimpleNamespace
-            return SimpleNamespace(alias=alias, endpoint="http://192.0.2.10:18080",
-                                   lifecycle="commissioned")
-
-    workflow.registry = TwoPpus()
-    view = rec(workflow, planned["plan_id"], alias="other")
+    # The PPU is an ANSWER, read off the run and the journalled record, never
+    # a question the caller asks with. When the two disagree, the Manager
+    # proves nothing and says so rather than picking one of them.
+    workflow._starts[planned["plan_id"]]["ppu_alias"] = "other"
+    view = rec(workflow, planned["plan_id"])
     assert (view["state"], view["reason"]) == ("OUTCOME_UNKNOWN", "START_IDENTITY_MISMATCH")
-    assert view["run"] is None and view["identity"] is None  # nothing leaks across PPUs
-    with pytest.raises(ProgrammingError) as caught:
-        workflow.void_start("other", planned["plan_id"], {"void": VOID_TOKEN})
-    assert caught.value.code == "programming_start_not_found"
+    assert view["run"] is None and view["identity"] is None
 
 
-def test_unknown_ppu_alias_is_refused(tmp_path):
+def test_reconciliation_names_no_ppu_and_refuses_no_caller(tmp_path):
     workflow, _c, _g = ops_workflow(tmp_path)
-    with pytest.raises(ProgrammingError) as caught:
-        workflow.reconcile_start("nope", UNRECORDED)
-    assert caught.value.code == "ppu_not_found"
+    # A Batch start belongs to no PPU, so an unrecorded ID cannot be refused
+    # as "not this PPU's": it is simply unprovable, which is never NOT_ACCEPTED.
+    view = rec(workflow, UNRECORDED)
+    assert (view["state"], view["reason"]) == ("OUTCOME_UNKNOWN", "START_NOT_RECORDED")
+    assert view["ppu_alias"] is None and view["identity"] is None
 
 
 # ------------------------------------------------- read-only and Site-idle proof
@@ -317,13 +320,13 @@ def test_read_unknown_blocks_programming_and_programming_unknown_blocks_read(tmp
         # Partial admission: the Batch request is valid, so it is admitted and
         # journalled. The latch is that PPU's readiness, so its only Target is
         # BLOCKED and no Job is submitted.
-        admitted = batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id})["batch"]
+        admitted = start_batch(batches, {**ops_body(FULL), "start_id": start_id})["batch"]
         assert admitted["outcome"] == "BLOCKED"
         assert admitted["units"][0]["reason"] == "ADMISSION_OUTCOME_UNKNOWN_UNRESOLVED"
         assert len(gateway.posts) == 1
         # That admission consumed the start. Replaying it is still a 409.
         with pytest.raises(ProgrammingError) as caught:
-            batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id})
+            start_batch(batches, {**ops_body(FULL), "start_id": start_id})
         assert caught.value.code == "programming_start_not_startable"
         assert len(gateway.posts) == 1
         assert rec(workflow, planned["plan_id"])["state"] == "OUTCOME_UNKNOWN"
@@ -337,9 +340,9 @@ def test_void_makes_an_unstarted_start_provably_not_accepted(tmp_path):
     workflow, coord, gateway = ops_workflow(tmp_path)
     planned = workflow.plan(ALIAS, READ_BODY)["plan"]
     with pytest.raises(ProgrammingError) as caught:
-        workflow.void_start(ALIAS, planned["plan_id"], {"void": "yes"})
+        workflow.void_start(planned["plan_id"], {"void": "yes"})
     assert caught.value.code == "invalid_request"
-    view = workflow.void_start(ALIAS, planned["plan_id"], {"void": VOID_TOKEN})["reconciliation"]
+    view = workflow.void_start(planned["plan_id"], {"void": VOID_TOKEN})["reconciliation"]
     assert (view["state"], view["reason"]) == ("NOT_ACCEPTED", "START_VOIDED_BEFORE_ADMISSION")
     # The delayed Start request arrives after the void: refused, nothing runs.
     with pytest.raises(ProgrammingError) as caught:
@@ -353,10 +356,10 @@ def test_an_admitted_start_can_never_be_voided(tmp_path):
     workflow, _c, gateway = ops_workflow(tmp_path, post_raises=True)
     planned = lost_read_start(workflow)
     with pytest.raises(ProgrammingError) as caught:
-        workflow.void_start(ALIAS, planned["plan_id"], {"void": VOID_TOKEN})
+        workflow.void_start(planned["plan_id"], {"void": VOID_TOKEN})
     assert caught.value.code == "programming_start_not_voidable"
     with pytest.raises(ProgrammingError) as caught:
-        workflow.void_start(ALIAS, UNRECORDED, {"void": VOID_TOKEN})
+        workflow.void_start(UNRECORDED, {"void": VOID_TOKEN})
     assert caught.value.code == "programming_start_not_found"
     view = rec(workflow, planned["plan_id"])
     assert view["state"] == "OUTCOME_UNKNOWN" and view["acknowledged"] is False
@@ -367,10 +370,10 @@ def test_an_admitted_start_can_never_be_voided(tmp_path):
 def test_batch_start_id_is_issued_by_the_manager_and_admits_exactly_one_batch(tmp_path):
     batches, workflow, gateway = batch_rig(tmp_path)
     with pytest.raises(ProgrammingError):
-        workflow.issue_batch_start(ALIAS, {})
+        workflow.issue_batch_start({})
     start_id = issue(workflow)
     assert rec(batches, start_id)["state"] == "ACCEPTANCE_PENDING"
-    started = batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id})
+    started = start_batch(batches, {**ops_body(FULL), "start_id": start_id})
     assert started["batch"]["start_id"] == start_id
     view = rec(batches, start_id)
     assert (view["state"], view["kind"], view["outcome"]) == ("TERMINAL_CONFIRMED", "batch", "PASS")
@@ -381,23 +384,27 @@ def test_batch_start_id_is_issued_by_the_manager_and_admits_exactly_one_batch(tm
     # The same ID again (a duplicated or replayed request) starts nothing.
     for bad in (start_id, UNRECORDED, 7):
         with pytest.raises(ProgrammingError) as caught:
-            batches.start(ALIAS, {**ops_body(FULL), "start_id": bad})
+            start_batch(batches, {**ops_body(FULL), "start_id": bad})
         assert caught.value.code == "programming_start_not_startable"
     assert len(gateway.posts) == 1
     assert len(json.loads((tmp_path / "batches.json").read_text())["batches"]) == 1
 
 
-def test_batch_without_a_start_id_is_unchanged(tmp_path):
+def test_a_batch_without_a_start_id_is_refused_and_submits_nothing(tmp_path):
     batches, _w, gateway = batch_rig(tmp_path)
-    started = batches.start(ALIAS, ops_body(FULL))
-    assert started["batch"]["start_id"] is None and len(gateway.posts) == 1
+    # Since PR-C there is one door and it requires the token: a Batch that
+    # could not be reconciled after a lost answer is not admitted at all.
+    with pytest.raises(ProgrammingError) as caught:
+        start_batch(batches, ops_body(FULL))
+    assert caught.value.code == "invalid_request" and caught.value.status == 400
+    assert gateway.posts == [] and batches._batches == {}
 
 
 def test_lost_batch_answer_running_then_failed(tmp_path):
     held: list = []
     batches, workflow, gateway = batch_rig(tmp_path, spawn_batch=held.append, job_final="failed")
     start_id = issue(workflow)
-    batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id})
+    start_batch(batches, {**ops_body(FULL), "start_id": start_id})
     assert rec(batches, start_id)["state"] == "ACCEPTED_RUNNING"
     held.pop()()
     view = rec(batches, start_id)
@@ -408,7 +415,7 @@ def test_lost_batch_answer_running_then_failed(tmp_path):
 def test_lost_batch_answer_with_an_unknown_attempt_points_at_the_run_to_acknowledge(tmp_path):
     batches, workflow, gateway = batch_rig(tmp_path, post_raises=True)
     start_id = issue(workflow)
-    batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id, "retry_limit": 2})
+    start_batch(batches, {**ops_body(FULL), "start_id": start_id, "retry_limit": 2})
     view = rec(batches, start_id)
     assert view["state"] == "OUTCOME_UNKNOWN" and view["acknowledged"] is False
     assert view["unknown_run_id"] == view["batch"]["attempts"][0]["run_id"]
@@ -418,10 +425,10 @@ def test_lost_batch_answer_with_an_unknown_attempt_points_at_the_run_to_acknowle
 def test_batch_start_that_never_arrived_restart_and_void(tmp_path):
     batches, workflow, gateway = batch_rig(tmp_path)
     kept, voided = issue(workflow), issue(workflow)
-    view = workflow.void_start(ALIAS, voided, {"void": VOID_TOKEN})["reconciliation"]
+    view = workflow.void_start(voided, {"void": VOID_TOKEN})["reconciliation"]
     assert view["state"] == "NOT_ACCEPTED"
     with pytest.raises(ProgrammingError) as caught:
-        batches.start(ALIAS, {**ops_body(FULL), "start_id": voided})
+        start_batch(batches, {**ops_body(FULL), "start_id": voided})
     assert caught.value.code == "programming_start_not_startable"
     coord = FakeCoordinator(active_sha="e" * 64)
     gateway2 = FakeGateway(image=image(), coordinator=coord,
@@ -431,14 +438,14 @@ def test_batch_start_that_never_arrived_restart_and_void(tmp_path):
                                            spawn=lambda target: target())
     assert rec(batches2, kept)["state"] == "NOT_ACCEPTED"
     with pytest.raises(ProgrammingError):
-        batches2.start(ALIAS, {**ops_body(FULL), "start_id": kept})
+        start_batch(batches2, {**ops_body(FULL), "start_id": kept})
     assert gateway.posts == [] and gateway2.posts == []
 
 
 def test_batch_admitted_but_its_record_is_gone_is_unknown(tmp_path):
     batches, workflow, gateway = batch_rig(tmp_path)
     start_id = issue(workflow)
-    batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id})
+    start_batch(batches, {**ops_body(FULL), "start_id": start_id})
     (tmp_path / "batches.json").unlink()
     coord = FakeCoordinator(active_sha="e" * 64)
     workflow2, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway)
@@ -453,7 +460,7 @@ def test_batch_restart_during_an_attempt_is_unknown(tmp_path):
     workflow.spawn = held.append
     batches.spawn = held.append
     start_id = issue(workflow)
-    batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id})
+    start_batch(batches, {**ops_body(FULL), "start_id": start_id})
 
     class Died(BaseException):
         pass

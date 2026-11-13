@@ -28,17 +28,27 @@ BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 PROGRAMMING_RUN_RE = re.compile(r"^programming/runs/([0-9a-f]{32})$")
 PROGRAMMING_OUTPUT_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/output$")
-PROGRAMMING_BATCH_RE = re.compile(r"^programming/batches/([0-9a-f]{32})$")
 # The Batch is owned by the Manager, not by a PPU, so its canonical resource
-# does not sit under one. The alias-scoped routes above stay as a short-term
-# compatibility entry into the SAME engine and retire in PR-C.
+# does not sit under one. The alias-scoped compatibility entry, and the
+# alias-scoped start resource that served it, retired in PR-C (ADR 5.8)
+# after every consumer was migrated.
 CANONICAL_BATCHES = "/api/programming/batches"
 CANONICAL_BATCH_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})$")
 CANONICAL_BATCH_STOP_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})/stop$")
-PROGRAMMING_BATCH_STOP_RE = re.compile(r"^programming/batches/([0-9a-f]{32})/stop$")
+CANONICAL_STARTS = "/api/programming/starts"
+CANONICAL_START_RE = re.compile(r"^/api/programming/starts/([0-9a-f]{32})$")
+CANONICAL_START_VOID_RE = re.compile(r"^/api/programming/starts/([0-9a-f]{32})/void$")
 PROGRAMMING_ACK_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/acknowledge$")
-PROGRAMMING_START_RE = re.compile(r"^programming/starts/([0-9a-f]{32})$")
-PROGRAMMING_START_VOID_RE = re.compile(r"^programming/starts/([0-9a-f]{32})/void$")
+#: Retired in PR-C. A Console tab loaded before the Control Station was
+#: upgraded still holds the old JavaScript and will ask for these.
+RETIRED_PROGRAMMING_ACTIONS = (
+    re.compile(r"^programming/batches$"),
+    re.compile(r"^programming/batches/[0-9a-f]{32}$"),
+    re.compile(r"^programming/batches/[0-9a-f]{32}/stop$"),
+    re.compile(r"^programming/starts$"),
+    re.compile(r"^programming/starts/[0-9a-f]{32}$"),
+    re.compile(r"^programming/starts/[0-9a-f]{32}/void$"),
+)
 
 
 class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
@@ -290,15 +300,37 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         return ("ppu_platform_state_invalid",
                 f"Runtime state {runtime_state!r} is not eligible for normal Platform maintenance")
 
-    def _canonical_batch_post(self, path: str) -> bool:
-        """The canonical Manager-owned Batch resource. Not under a PPU.
+    def _retired_programming_route(self, action: str) -> bool:
+        """The alias-scoped Batch and start routes retired in PR-C (ADR 5.8).
+
+        410 rather than 404: the route existed and is gone, so a Console
+        still running the pre-upgrade JavaScript can say so instead of
+        reporting a PPU that cannot be found. It is a definite refusal -
+        nothing was planned, queued or submitted - and 5.3 reads a 4xx as a
+        refusal, never as an unknown outcome.
+        """
+        if not any(pattern.fullmatch(action) for pattern in RETIRED_PROGRAMMING_ACTIONS):
+            return False
+        self._json(HTTPStatus.GONE, {"ok": False, "error": {
+            "code": "programming_route_retired",
+            "message": ("this alias-scoped programming route retired: a Batch and its "
+                        "start are owned by the Manager, not by a PPU, and live at "
+                        "/api/programming/batches and /api/programming/starts. Nothing "
+                        "was started. Reload the Console to load the current version."),
+        }})
+        return True
+
+    def _canonical_programming_post(self, path: str) -> bool:
+        """The canonical Manager-owned Batch and start resources. Not under a PPU.
 
         The Platform gate is NOT applied once here for one alias: a Batch
         spans PPUs, so the gate is evaluated per Target by the coordinator at
         admission and again immediately before each PPU is operated.
         """
         stop_match = CANONICAL_BATCH_STOP_RE.fullmatch(path)
-        if stop_match is None and path != CANONICAL_BATCHES:
+        void_match = CANONICAL_START_VOID_RE.fullmatch(path)
+        if (stop_match is None and void_match is None
+                and path not in (CANONICAL_BATCHES, CANONICAL_STARTS)):
             return False
         try:
             body = self._read_json_object()
@@ -310,6 +342,19 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             # Stop queuing only: allowed in any Platform state.
             self._programming_call(
                 lambda: (HTTPStatus.OK, self._batches().request_stop_batch(batch_id, body)))
+            return True
+        if void_match is not None:
+            # Drops an unconsumed start ID; refuses an admitted start. It
+            # cannot touch a run, a Batch, a Job or a PPU.
+            start_id = void_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._programming().void_start(start_id, body)))
+            return True
+        if path == CANONICAL_STARTS:
+            # Issues a start ID only: nothing is planned, queued or submitted,
+            # and no PPU is read or named.
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._programming().issue_batch_start(body)))
             return True
         self._programming_call(
             lambda: (HTTPStatus.ACCEPTED, self._batches().start_batch(body)))
@@ -325,18 +370,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             self._programming_call(
                 lambda: (HTTPStatus.OK, self._programming().run_status(alias, run_id)))
             return
-        batch_match = PROGRAMMING_BATCH_RE.fullmatch(action)
-        if batch_match is not None:
-            batch_id = batch_match.group(1)
-            self._programming_call(
-                lambda: (HTTPStatus.OK, self._batches().status(alias, batch_id)))
-            return
-        start_match = PROGRAMMING_START_RE.fullmatch(action)
-        if start_match is not None:
-            # Start Outcome Reconciliation: read-only, journal and memory only.
-            start_id = start_match.group(1)
-            self._programming_call(
-                lambda: (HTTPStatus.OK, self._batches().reconcile_start(alias, start_id)))
+        if self._retired_programming_route(action):
             return
         output_match = PROGRAMMING_OUTPUT_RE.fullmatch(action)
         if output_match is not None:
@@ -578,31 +612,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 self._programming_call(
                     lambda: (HTTPStatus.ACCEPTED, self._programming().start(alias, body)))
                 return
-            if action == "programming/batches":
-                # A Batch submits Jobs: same Platform safety gate as a single run.
-                if not self._bootstrap_mutation_allowed(alias):
-                    return
-                self._programming_call(
-                    lambda: (HTTPStatus.ACCEPTED, self._batches().start(alias, body)))
-                return
-            if action == "programming/starts":
-                # Issues a start ID only: nothing is planned, queued or submitted.
-                self._programming_call(
-                    lambda: (HTTPStatus.OK, self._programming().issue_batch_start(alias, body)))
-                return
-            void_match = PROGRAMMING_START_VOID_RE.fullmatch(action)
-            if void_match is not None:
-                # Drops an unconsumed plan / start ID; refuses an admitted start.
-                start_id = void_match.group(1)
-                self._programming_call(
-                    lambda: (HTTPStatus.OK, self._programming().void_start(alias, start_id, body)))
-                return
-            stop_match = PROGRAMMING_BATCH_STOP_RE.fullmatch(action)
-            if stop_match is not None:
-                # Stop queuing only: allowed in any Platform state, changes nothing on the PPU.
-                batch_id = stop_match.group(1)
-                self._programming_call(
-                    lambda: (HTTPStatus.OK, self._batches().request_stop(alias, batch_id, body)))
+            if self._retired_programming_route(action):
                 return
             ack_match = PROGRAMMING_ACK_RE.fullmatch(action)
             if ack_match is not None:
@@ -682,6 +692,13 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             self._programming_call(
                 lambda: (HTTPStatus.OK, self._batches().status_batch(batch_id)))
             return
+        start_match = CANONICAL_START_RE.fullmatch(parsed.path)
+        if start_match is not None:
+            # Start Outcome Reconciliation: read-only, journal and memory only.
+            start_id = start_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().reconcile_start(start_id)))
+            return
         bootstrap = self._parse_bootstrap_route(parsed.path)
         if bootstrap is not None:
             alias, action = bootstrap
@@ -691,7 +708,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
-        if self._canonical_batch_post(parsed.path):
+        if self._canonical_programming_post(parsed.path):
             return
         bootstrap = self._parse_bootstrap_route(parsed.path)
         if bootstrap is not None:

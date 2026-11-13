@@ -51,18 +51,21 @@ An HTTP 4xx rejection, a missing receipt or any unreadable state is **not** a re
 Controls only attempts that are not submitted yet.
 
 * `{"kind": "never"}`
-* `{"kind": "failed_sites", "threshold": 1}` — once the Site has a FAIL attempt nothing further
-  is submitted, even with retries left (a Batch has one Site; 1 is the only threshold).
-* `POST …/programming/batches/<id>/stop` with `{"stop": "STOP_QUEUING"}` — the Console's
+* `{"kind": "failed_sites", "threshold": 1..N}` — once that many Sites have failed, nothing
+  further is submitted, even with retries left. N is the Batch's own Site count (PR-C; before it
+  a Batch had one Site and 1 was the only threshold).
+* `POST /api/programming/batches/<id>/stop` with `{"stop": "STOP_QUEUING"}` — the Console's
   **STOP QUEUING** button. It never cancels a submitted Job, releases a Site lease, cancels an
   unknown run, resets a PPU or clears recovery state; the running attempt is observed to its
   real end. There is no cancel / abort route.
 
 ## Outcomes and counting
 
-Batch outcome: `PASS`, `FAIL`, `OUTCOME_UNKNOWN`, `BLOCKED`, `STOPPED` (stop requested before
-anything was submitted). A Batch is one IC and is counted once by its final outcome
-(`counts.pass` / `counts.fail`); failed attempts that were retried are not FAIL ICs.
+Batch outcome: `PASS`, `FAIL`, `PARTIAL`, `OUTCOME_UNKNOWN`, `BLOCKED`. Worst wins
+(`OUTCOME_UNKNOWN > FAIL > PARTIAL > PASS`). **One Site is one IC**, counted once by that Site's
+own final outcome (`counts.pass` / `counts.fail` / `counts.blocked` / `counts.unknown` over
+`counts.sites`); failed attempts that were retried are not FAIL ICs. Before PR-C a Batch was one
+Site, so the Batch outcome and the Site outcome were the same thing; they are not any more.
 
 ## Restart
 
@@ -73,6 +76,8 @@ started, the attempt's own outcome when the run had finished, otherwise `OUTCOME
 
 ## API
 
-`POST …/bootstrap/programming/batches` (202), `GET …/batches/<id>`, `POST …/batches/<id>/stop`.
+`POST /api/programming/batches` (202), `GET /api/programming/batches/<id>`,
+`POST /api/programming/batches/<id>/stop`. The Batch is Manager-owned, so none of these sits
+under a PPU alias; the alias-scoped entry retired in PR-C (architecture contract §5.8).
 A Batch is refused up front (no Batch, no plan) while another Batch or run is in progress or an
 `OUTCOME_UNKNOWN` run is unacknowledged on that PPU.

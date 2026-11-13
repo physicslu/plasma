@@ -27,12 +27,17 @@
 取代，而不是被判定為 legacy。
 
 其退場責任明確**從 PR-F 移至 PR-C**。PR-B 保留它為短期相容入口且不修改 `software/web`；
-PR-C 完成 Consumer 遷移與下列 Gate 後直接移除，條件見
-[架構契約 §5.8](../../architecture/unified-programming-architecture-v1.md)：
-Consumer Inventory（EMode／PMode／Console BFF／CLI 與 scripts／API clients／測試與 fixtures／
-已部署的 SWPC Control Station）、start 與 status／query 與 stop 與 reconcile 與
-error／outcome handling 全數遷移、host-only regression 與 API contract 與 Console E2E 通過、
-以及明確的部署順序。
+PR-C 已完成 Consumer 遷移並移除該入口，條件與逐條達成紀錄見
+[架構契約 §5.8](../../architecture/unified-programming-architecture-v1.md)。
+
+**狀態（PR-C，2026-11-13）：已退場。** 實際移除的是
+`POST /api/registry/<alias>/bootstrap/programming/batches` 與同一 alias 下的
+`programming/starts`（發證／reconcile／void）；兩者現在回 `410 programming_route_retired`。
+Consumer Inventory 的結論是：只有 `software/web` 與測試在用，**CLI、scripts 與 API clients 皆無消費者**
+（`scripts/runtime_acceptance/*` 打的是 legacy Gateway `/api/batches`，屬本清冊範圍）。
+PPU 自己擁有的 plan／run／acknowledge／Read output 仍留在 alias 之下，PR-C 未觸碰。
+
+這不影響本清冊：Legacy Gateway Batch 仍未退場，第 6 條仍然有效。
 
 **Console 原始碼已切換不等於已部署的 consumer 已遷移。** 任何無法確認的外部 consumer
 列為明確阻塞項，舊端點就留著。

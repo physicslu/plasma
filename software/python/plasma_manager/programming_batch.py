@@ -95,7 +95,6 @@ EXECUTED_OUTCOMES = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN"})
 PLAN_KEYS = frozenset({"icpn", "operations", "image_base64", "image_filename",
                        "bundle_base64", "address", "length"})
 TARGET_KEY = "targets"
-LEGACY_SITE_KEY = "site_id"
 POLICY_KEYS = frozenset({"retry_limit", "stop_policy", "repeat"})
 START_KEYS = frozenset({"start_id"})
 
@@ -584,19 +583,11 @@ class ProgrammingBatchCoordinator:
             view["site_id"] = units[0]["site_id"]
         return view
 
-    @staticmethod
-    def _single_alias(batch: Mapping[str, Any]) -> str | None:
-        """The alias of a single-Target, single-Site Batch, else None."""
-        targets = batch["targets"]
-        if len(targets) == 1 and len(targets[0]["site_ids"]) == 1:
-            return targets[0]["ppu_alias"]
-        return None
-
-    def _get(self, batch_id: str, alias: str | None = None) -> dict[str, Any]:
-        """``alias`` is the compatibility entry: it reads only a Batch that is
-        a single Target on that PPU, exactly as it could before."""
+    def _get(self, batch_id: str) -> dict[str, Any]:
+        """A Batch is read by its own ID. It is owned by the Manager, not by
+        a PPU, so there is no PPU to read it through (ADR 5.8)."""
         batch = self._batches.get(batch_id)
-        if batch is None or (alias is not None and self._single_alias(batch) != alias):
+        if batch is None:
             raise ProgrammingError(404, "programming_batch_not_found",
                                    "programming batch was not found")
         return batch
@@ -607,30 +598,15 @@ class ProgrammingBatchCoordinator:
 
         A Batch carries a Manager-issued ``start_id`` (§5.1, §5.3). It is the
         sole idempotency token, and a Batch without one cannot be reconciled
-        after a lost answer, so the canonical resource requires it.
+        after a lost answer, so it is required.
+
+        The alias-scoped compatibility entry retired in PR-C (§5.8): every
+        consumer was migrated to this resource first, and the Manager keeps
+        exactly one door into the engine rather than two sets of semantics.
         """
-        return self._start(body, require_start=True)
+        return self._start(body)
 
-    def start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        """The alias-scoped compatibility entry (§5.8).
-
-        It is a door into the same engine, not a second path: the body is
-        normalised into a single-Target Batch and judged by exactly the same
-        admission, isolation and outcome rules.
-        """
-        if not isinstance(body, Mapping) or TARGET_KEY in body or LEGACY_SITE_KEY not in body:
-            raise ProgrammingError(
-                400, "invalid_request",
-                "a batch requires icpn, site_id, an operations list with its Programming "
-                "Image, Bundle or erase range, and optional retry_limit / stop_policy")
-        normalised = {key: value for key, value in body.items() if key != LEGACY_SITE_KEY}
-        normalised[TARGET_KEY] = [{"ppu_alias": alias, "site_ids": [body[LEGACY_SITE_KEY]]}]
-        # The compatibility entry keeps accepting a start that omits the
-        # token, as it always has. Tightening it would break deployed callers
-        # before PR-C migrates them, and this entry exists to not do that.
-        return self._start(normalised)
-
-    def _start(self, body: Mapping[str, Any], *, require_start: bool = False) -> dict[str, Any]:
+    def _start(self, body: Mapping[str, Any]) -> dict[str, Any]:
         if (not isinstance(body, Mapping)
                 or set(body) - PLAN_KEYS - {TARGET_KEY} - POLICY_KEYS - START_KEYS
                 or "operations" not in body or TARGET_KEY not in body):
@@ -638,14 +614,14 @@ class ProgrammingBatchCoordinator:
                 400, "invalid_request",
                 "a batch requires icpn, targets, an operations list with its Programming "
                 "Image, Bundle or erase range, and optional retry_limit / stop_policy")
-        if require_start and "start_id" not in body:
+        if "start_id" not in body:
             raise ProgrammingError(
                 400, "invalid_request",
                 "a Batch requires a Manager-issued start_id; obtain one first")
         targets = parse_targets(body)
         policy = parse_policy(body, site_count(targets))
         plan_body = {key: body[key] for key in body if key in PLAN_KEYS}
-        start_id = body.get("start_id")
+        start_id = body["start_id"]
         aliases = [target["ppu_alias"] for target in targets]
         # Validity first (§5.3), and all of it before any PPU is read. A Batch
         # whose specification is illegal is refused even when every PPU in it
@@ -658,16 +634,11 @@ class ProgrammingBatchCoordinator:
             # request and resend the same token.
             for alias in aliases:
                 self.workflow._require_commissioned(alias)
-            start_alias = aliases[0]
-            if "start_id" in body:
-                # Validate the start against the PPU it was ISSUED for, not
-                # against whichever Target happens to be listed first: the
-                # token is an idempotency guard, and every Target's authority
-                # was checked on its own just above.
-                issued_for = self.workflow.batch_start_alias(start_id)
-                if issued_for in aliases:
-                    start_alias = issued_for
-                self.workflow.require_batch_start(start_alias, start_id)
+            # The token is an idempotency guard, never an authority, and it is
+            # not issued under a PPU: every Target's own authority was checked
+            # on its own just above (§5.3, §5.8). No Target Set ordering can
+            # therefore make a legal start illegal.
+            self.workflow.require_batch_start(start_id)
             if any(batch["outcome"] is None
                    and {t["ppu_alias"] for t in batch["targets"]} & set(aliases)
                    for batch in self._batches.values()):
@@ -681,22 +652,32 @@ class ProgrammingBatchCoordinator:
                       "status": "NOT_RUN", "outcome": None, "reason": None,
                       "failure_domain": None, "attempts": []}
                      for target in targets for site in target["site_ids"]]
-            for alias, target in zip(aliases, targets):
-                verdict = self._admission_block(alias, target["site_ids"][0])
-                if verdict is None:
-                    continue
-                domain, reason = verdict
-                if domain == SHARED_CONTROL_FAILURE:
-                    # Not one PPU's problem. Nothing is admitted, nothing is
-                    # journalled and the start_id is not consumed.
-                    raise ProgrammingError(
-                        503, "manager_shared_control_failure",
-                        f"Manager shared safety control is not usable ({reason}); "
-                        "no programming Job was submitted")
+            for target in targets:
+                alias = target["ppu_alias"]
+                # The two gates have different scopes, so they are asked
+                # differently. The Platform gate judges the PPU: one verdict
+                # covers every Site of that PPU. The Target gate judges ONE
+                # Site and is asked per Site - a busy Site 1 is not evidence
+                # about Site 2, and blocking Site 2 for it would report a
+                # Site that was never read as BLOCKED.
+                platform = self._platform_block(alias)
                 for unit in units:
-                    if unit["ppu_alias"] == alias:
-                        unit.update(status="BLOCKED", outcome="BLOCKED",
-                                    reason=f"ADMISSION_{reason}", failure_domain=domain)
+                    if unit["ppu_alias"] != alias:
+                        continue
+                    verdict = (platform if platform is not None
+                               else self._site_block(alias, unit["site_id"]))
+                    if verdict is None:
+                        continue
+                    domain, reason = verdict
+                    if domain == SHARED_CONTROL_FAILURE:
+                        # Not one PPU's problem. Nothing is admitted, nothing
+                        # is journalled and the start_id is not consumed.
+                        raise ProgrammingError(
+                            503, "manager_shared_control_failure",
+                            f"Manager shared safety control is not usable ({reason}); "
+                            "no programming Job was submitted")
+                    unit.update(status="BLOCKED", outcome="BLOCKED",
+                                reason=f"ADMISSION_{reason}", failure_domain=domain)
             batch = {
                 "schema": BATCH_SCHEMA, "batch_id": secrets.token_hex(16),
                 "start_id": start_id,
@@ -710,12 +691,11 @@ class ProgrammingBatchCoordinator:
                 "journal_persisted": True,
                 "created_at": _now(), "updated_at": _now(),
             }
-            if start_id is not None:
-                # Admission is journalled first: from here on the start can
-                # never reconcile as "not accepted". Partial admission has
-                # still consumed it, so a BLOCKED Target needs a NEW start.
-                self.workflow.consume_batch_start(
-                    start_alias, start_id, batch["batch_id"], batch["targets"])
+            # Admission is journalled first: from here on the start can
+            # never reconcile as "not accepted". Partial admission has still
+            # consumed it, so a BLOCKED Target needs a NEW start.
+            self.workflow.consume_batch_start(
+                start_id, batch["batch_id"], batch["targets"])
             self._batches[batch["batch_id"]] = batch
             try:
                 self._persist_locked()
@@ -725,31 +705,47 @@ class ProgrammingBatchCoordinator:
         self.spawn(lambda: self._execute(batch, plan_body))
         return {"ok": True, "batch": self._view(batch)}
 
-    def _admission_block(self, alias: str, site: int) -> tuple[str, str] | None:
-        """Whether one Target may be operated, and whose failure it is if not.
-
-        Both gates are asked. The Platform gate proves the PPU is safe to
-        mutate at all; the Target gate proves this Site is released. Either
-        one blocks this Target alone - unless what failed is the Manager's own
-        shared control, which stops the Batch instead.
-
-        An exception escaping either gate is NOT assumed to be local. Both
-        classify every PPU-scoped failure themselves, so anything left is a
-        failure of the machinery that was meant to judge, and the only safe
-        reading of "I could not tell" is to stop submitting.
-        """
+    def _platform_block(self, alias: str) -> tuple[str, str] | None:
+        """Whether this PPU may be mutated at all. PPU-scoped: one verdict
+        covers every Site of that PPU, and asking it once per PPU is also
+        what keeps a Batch from reading the same Platform state N times."""
+        if self.platform_gate is None:
+            return None
         try:
-            if self.platform_gate is not None:
-                verdict = self.platform_gate(alias)
-                if verdict is not None:
-                    return verdict
+            return self.platform_gate(alias)
+        except ProgrammingError as exc:
+            return TARGET_NOT_READY, exc.code.upper()
+        except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
+            return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
+
+    def _site_block(self, alias: str, site: int) -> tuple[str, str] | None:
+        """Whether THIS Site is released. Site-scoped: a verdict about one
+        Site is never read as a verdict about another Site of the same PPU."""
+        try:
             return self.workflow.target_block(alias, site)
         except ProgrammingError as exc:
             return TARGET_NOT_READY, exc.code.upper()
         except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
             return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
-    def reconcile_start(self, alias: str, start_id: str) -> dict[str, Any]:
+    def _admission_block(self, alias: str, site: int) -> tuple[str, str] | None:
+        """Both gates for ONE Site, as the executor asks them immediately
+        before operating that Site.
+
+        The Platform gate proves the PPU is safe to mutate at all; the Target
+        gate proves this Site is released. Either one blocks this Target alone
+        - unless what failed is the Manager's own shared control, which stops
+        the Batch instead.
+
+        An exception escaping either gate is NOT assumed to be local. Both
+        classify every PPU-scoped failure themselves, so anything left is a
+        failure of the machinery that was meant to judge, and the only safe
+        reading of "I could not tell" is to stop submitting.
+        """
+        platform = self._platform_block(alias)
+        return platform if platform is not None else self._site_block(alias, site)
+
+    def reconcile_start(self, start_id: str) -> dict[str, Any]:
         """Read-only: what became of the Start that carried ``start_id``."""
         def find_batch(wanted: str) -> dict[str, Any] | None:
             with self._lock:
@@ -757,32 +753,20 @@ class ProgrammingBatchCoordinator:
                     if batch.get("start_id") == wanted:
                         return self._view(batch)
             return None
-        return self.workflow.reconcile_start(alias, start_id, find_batch)
-
-    def status(self, alias: str, batch_id: str) -> dict[str, Any]:
-        with self._lock:
-            return {"ok": True, "batch": self._view(self._get(batch_id, alias))}
+        return self.workflow.reconcile_start(start_id, find_batch)
 
     def status_batch(self, batch_id: str) -> dict[str, Any]:
         with self._lock:
             return {"ok": True, "batch": self._view(self._get(batch_id))}
 
-    def request_stop(self, alias: str, batch_id: str,
-                     body: Mapping[str, Any] | None = None) -> dict[str, Any]:
-        return self._request_stop(batch_id, body, alias=alias)
-
     def request_stop_batch(self, batch_id: str,
                            body: Mapping[str, Any] | None = None) -> dict[str, Any]:
-        return self._request_stop(batch_id, body)
-
-    def _request_stop(self, batch_id: str, body: Mapping[str, Any] | None,
-                      alias: str | None = None) -> dict[str, Any]:
         """Stop queuing. Never cancels, resets or releases anything on the PPU."""
         if body is not None and dict(body) != {"stop": STOP_TOKEN}:
             raise ProgrammingError(400, "invalid_request",
                                    f"stop requires stop={STOP_TOKEN}")
         with self._lock:
-            batch = self._get(batch_id, alias)
+            batch = self._get(batch_id)
             if batch["outcome"] is None and not batch["stop_requested"]:
                 batch["stop_requested"] = True
                 batch["updated_at"] = _now()

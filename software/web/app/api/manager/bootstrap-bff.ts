@@ -28,13 +28,9 @@ const BOOTSTRAP_POST_ACTIONS = [
   /^programming\/plans$/,
   /^programming\/runs$/,
   new RegExp(`^programming/runs/${RUN_ID}/acknowledge$`),
-  // EMode Batch (Manager-owned Retry / Stop Policy). Stop is "stop queuing".
-  /^programming\/batches$/,
-  new RegExp(`^programming/batches/${RUN_ID}/stop$`),
-  // Start Outcome Reconciliation: issue a Batch start ID, and void a start
-  // the Manager never admitted. Neither submits anything to a PPU.
-  /^programming\/starts$/,
-  new RegExp(`^programming/starts/${RUN_ID}/void$`),
+  // The EMode Batch and its start are NOT here: a Batch is owned by the
+  // Manager, not by a PPU, and lives at /api/manager/programming (PR-C,
+  // ADR 5.8). A PPU-scoped run, plan and acknowledgement still belong here.
 ];
 // Read Memory binary of a PASS read run. The Manager re-hashes the bytes
 // against the run receipt; the Browser never reads from a PPU.
@@ -43,10 +39,21 @@ const BOOTSTRAP_GET_ACTIONS = [
   /^$/,
   /^programming\/routes$/,
   new RegExp(`^programming/runs/${RUN_ID}$`),
-  new RegExp(`^programming/batches/${RUN_ID}$`),
-  // Read-only: what became of a Start whose answer never arrived.
-  new RegExp(`^programming/starts/${RUN_ID}$`),
   READ_OUTPUT_ACTION,
+];
+
+// The canonical Manager-owned programming resources. They are not under a
+// PPU alias, and they stay under /api/manager so the maintenance capability
+// cookie (Path=/api/manager) is still presented with them.
+const PROGRAMMING_POST_RESOURCES = [
+  /^batches$/,
+  new RegExp(`^batches/${RUN_ID}/stop$`),
+  /^starts$/,
+  new RegExp(`^starts/${RUN_ID}/void$`),
+];
+const PROGRAMMING_GET_RESOURCES = [
+  new RegExp(`^batches/${RUN_ID}$`),
+  new RegExp(`^starts/${RUN_ID}$`),
 ];
 
 function json(status: number, payload: object): Response {
@@ -63,6 +70,33 @@ function bootstrapActionAllowed(method: string, action: string): boolean {
   if (method === "GET") return BOOTSTRAP_GET_ACTIONS.some(pattern => pattern.test(action));
   if (method !== "POST") return false;
   return BOOTSTRAP_POST_ACTIONS.some(pattern => pattern.test(action));
+}
+
+function programmingResourceAllowed(method: string, resource: string): boolean {
+  if (method === "GET") return PROGRAMMING_GET_RESOURCES.some(pattern => pattern.test(resource));
+  if (method !== "POST") return false;
+  return PROGRAMMING_POST_RESOURCES.some(pattern => pattern.test(resource));
+}
+
+/** The PPUs a Batch request would operate, or null when it names none. */
+function targetAliases(body: ArrayBuffer): string[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(body));
+  } catch {
+    return null;
+  }
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const targets = (parsed as { targets?: unknown }).targets;
+  if (!Array.isArray(targets) || targets.length === 0) return null;
+  const aliases: string[] = [];
+  for (const target of targets) {
+    if (target == null || typeof target !== "object" || Array.isArray(target)) return null;
+    const alias = (target as { ppu_alias?: unknown }).ppu_alias;
+    if (typeof alias !== "string" || !validPpuAlias(alias.trim())) return null;
+    aliases.push(alias.trim());
+  }
+  return aliases;
 }
 
 function responseHeaders(response: Response): Headers {
@@ -183,6 +217,109 @@ export async function relayManagerBootstrapRequest(
     return json(503, {
       ok: false,
       error: { code: "manager_unavailable", message: "Manager Bootstrap path is unavailable" },
+    });
+  }
+}
+
+/**
+ * The canonical Manager-owned programming resources: the Batch and the start
+ * it is admitted with (ADR 5.8). Neither sits under a PPU alias, because
+ * neither is owned by a PPU.
+ *
+ * Authorisation follows what the request actually operates. Starting a Batch
+ * submits Jobs to every PPU in its Target Set, so the browser must hold the
+ * maintenance capability for EVERY one of them: one Target's enrollment never
+ * speaks for another's. Issuing a start, voiding one and stopping the queue
+ * reach no PPU at all - they are still refused unless they come from the
+ * Control Station's own origin, which is what keeps them off a foreign page.
+ */
+export async function relayManagerProgrammingRequest(
+  request: Request,
+  resource: string,
+): Promise<Response> {
+  const normalizedResource = resource.replace(/^\/+|\/+$/g, "");
+  if (!programmingResourceAllowed(request.method, normalizedResource)) {
+    return json(404, {
+      ok: false,
+      error: {
+        code: "programming_route_not_allowed",
+        message: "Manager programming browser route is not allowlisted",
+      },
+    });
+  }
+
+  let body: ArrayBuffer | undefined;
+  if (request.method === "POST") {
+    body = await request.arrayBuffer();
+    if (body.byteLength <= 0 || body.byteLength > MAX_BOOTSTRAP_BROWSER_REQUEST_BYTES) {
+      return json(413, {
+        ok: false,
+        error: {
+          code: "bootstrap_request_too_large",
+          message: "Bootstrap browser request exceeds BFF limit",
+        },
+      });
+    }
+    try {
+      maintenanceCapabilityConfigured();
+      if (!maintenanceMutationOriginAllowed(request)) return maintenanceCapabilityRequired();
+      if (normalizedResource === "batches") {
+        const aliases = targetAliases(body);
+        if (aliases === null) {
+          return json(400, {
+            ok: false,
+            error: {
+              code: "invalid_request",
+              message: "a Batch requires a Target Set naming each PPU it would operate",
+            },
+          });
+        }
+        for (const alias of aliases) {
+          if (!hasMaintenanceCapability(request, alias)) return maintenanceCapabilityRequired();
+        }
+      }
+    } catch {
+      return maintenanceCapabilityMisconfigured();
+    }
+  }
+
+  try {
+    if (!managerRoutingRequired()) {
+      return json(503, {
+        ok: false,
+        error: {
+          code: "manager_not_enabled",
+          message: "Manager mode is not enabled for this Control Station",
+        },
+      });
+    }
+    const response = await fetch(`${managerApiBase()}/api/programming/${normalizedResource}`, {
+      method: request.method,
+      headers: {
+        Accept: "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      body,
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOOTSTRAP_TIMEOUT_MS),
+    });
+    const payload = await response.arrayBuffer();
+    const mediaType = (response.headers.get("Content-Type") ?? "").toLowerCase();
+    if (!mediaType.includes("application/json")) {
+      return json(response.status >= 400 ? response.status : 502, {
+        ok: false,
+        error: {
+          code: "bootstrap_upstream_non_json",
+          message: "Manager programming route returned a non-JSON response",
+          upstream_status: response.status,
+        },
+      });
+    }
+    return new Response(payload, { status: response.status, headers: responseHeaders(response) });
+  } catch {
+    return json(503, {
+      ok: false,
+      error: { code: "manager_unavailable", message: "Manager programming path is unavailable" },
     });
   }
 }

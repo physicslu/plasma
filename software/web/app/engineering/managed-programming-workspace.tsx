@@ -9,7 +9,9 @@ import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import { programmingRunLogLines, safeOffLogLabel } from "../programming/programming-run-log";
 import {
+  batchSiteVerdict,
   batchVerdict,
+  runOfUnit,
   describeBlocked,
   loadManagedTopology,
   loadPlatformAvailability,
@@ -103,7 +105,7 @@ function saveFilePicker(): SaveFilePicker | null {
   return typeof picker === "function" ? picker.bind(window) : null;
 }
 type Readiness = { ready: boolean; label: string; reason: string };
-type RunContext = { alias: string; siteId: number; startedAt: number; finishedAt: number | null };
+type RunContext = { alias: string; siteIds: number[]; startedAt: number; finishedAt: number | null };
 
 // A Start request whose answer was lost (timeout, 5xx, dropped connection): the
 // Manager may or may not have submitted a Job. The Manager stays the authority
@@ -114,11 +116,22 @@ const START_HOLD_KEY = "plasma.emode.start-outcome-unknown.v1";
 // The hold is UX recovery only: it remembers WHICH Manager start to ask about.
 // Whether that start ran, and how it ended, is the Manager's journal alone.
 type StartHold = {
-  alias: string; siteId: number; kind: "READ" | "PROGRAMMING"; detail: string; at: string;
+  alias: string;
+  /** Every Site the lost Start was for. A READ holds exactly one. */
+  siteIds: number[];
+  /** Written by releases before PR-C, when a Batch was one Site. */
+  siteId?: number;
+  kind: "READ" | "PROGRAMMING"; detail: string; at: string;
   /** Manager-issued start ID (run plan ID / Batch start ID); null: not reconcilable. */
   startId: string | null;
   jobBindingSha256: string | null;
 };
+
+/** A hold stored before this release holds one Site; it still blocks. */
+function holdSites(hold: StartHold): number[] {
+  if (Array.isArray(hold.siteIds) && hold.siteIds.length) return hold.siteIds;
+  return hold.siteId == null ? [] : [hold.siteId];
+}
 type HoldStep = { startId: string; action: "ACKNOWLEDGE_RUN" | "VOID" };
 let heldStarts: Record<string, StartHold> = {};
 
@@ -198,7 +211,9 @@ export default function ManagedProgrammingWorkspace() {
   const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
   const [source, setSource] = useState<ProgrammingSource>("image");
   const [file, setFile] = useState<File | null>(null);
-  const [chosenSiteId, setChosenSiteId] = useState<number | null>(null);
+  // EMode covers many Sites of ONE PPU: the Manager schedules them
+  // sequentially as one Batch and judges each Site on its own.
+  const [chosenSiteIds, setChosenSiteIds] = useState<number[]>([]);
   const [checkedOperations, setCheckedOperations] = useState(ALL_OPERATIONS);
 
   const [phase, setPhase] = useState<Phase>("idle");
@@ -347,14 +362,33 @@ export default function ManagedProgrammingWorkspace() {
     [ppu, routes, icpn],
   );
   // A Site stays selected only while it is programmable for the selected IC.
-  const siteId = chosenSiteId != null && capabilities.get(chosenSiteId)?.programmable ? chosenSiteId : null;
-  // Only Operations a committed Route Profile declares can be selected.
-  const declaredOperations = useMemo(() => routeSequenceOperations(routes, icpn, siteId), [routes, icpn, siteId]);
+  const siteIds = useMemo(
+    () => chosenSiteIds.filter(id => capabilities.get(id)?.programmable).sort((left, right) => left - right),
+    [chosenSiteIds, capabilities],
+  );
+  // Only Operations a committed Route Profile declares can be selected, and a
+  // Batch is one list for every Site in it: an Operation only SOME Sites
+  // declare is not offered, because the Manager would refuse that Site alone.
+  const declaredOperations = useMemo(() => {
+    if (!siteIds.length) return routeSequenceOperations(routes, icpn, null);
+    return siteIds
+      .map(id => routeSequenceOperations(routes, icpn, id))
+      .reduce((shared, declared) => shared.filter(item => declared.includes(item)));
+  }, [routes, icpn, siteIds]);
   const selectedOperations = SEQUENCE_OPERATIONS.filter(
     item => checkedOperations[item] && declaredOperations.includes(item));
   const operations = normalizeOperations(selectedOperations);
   const needsImage = operations != null && operationsTakeImage(operations);
-  const jobRoute = operations ? routeDeclaring(routes, icpn, siteId, operations) : null;
+  // One Route per selected Site. A Site without one is not programmable here.
+  const jobRoutes = useMemo(
+    () => (operations ? siteIds.map(id => routeDeclaring(routes, icpn, id, operations)) : []),
+    [operations, siteIds, routes, icpn],
+  );
+  const jobRoute = jobRoutes.length && jobRoutes.every(route => route != null) ? jobRoutes[0] : null;
+  // Erase carries ONE range for the whole Batch, so every selected Site must
+  // declare the same Flash range; otherwise the range would be wrong for one.
+  const rangesAgree = jobRoute != null && jobRoutes.every(
+    route => route?.flash_base === jobRoute.flash_base && route?.flash_size === jobRoute.flash_size);
 
   // What a Batch run and a READ Job both need of the PPU, before any Site.
   const ppuBlock: Readiness | null = (() => {
@@ -382,7 +416,8 @@ export default function ManagedProgrammingWorkspace() {
     }
     return null;
   })();
-  const baseBlock = ppuBlock ?? (siteId == null ? notReady("NO SITE", `Select one Site qualified for ${icpn}.`) : null);
+  const baseBlock = ppuBlock
+    ?? (!siteIds.length ? notReady("NO SITE", `Select at least one Site qualified for ${icpn}.`) : null);
 
   const readiness: Readiness = (() => {
     if (baseBlock) return baseBlock;
@@ -397,7 +432,14 @@ export default function ManagedProgrammingWorkspace() {
         + "which an erased IC can never equal. Add Program, or run Erase alone (it proves the range blank).");
     }
     if (!jobRoute) {
-      return notReady("NO ROUTE", `No single Programming Route declares ${operations.join(" + ")} for ${icpn} on this Site.`);
+      const missing = siteIds.filter((_id, index) => jobRoutes[index] == null).map(siteLabel).join(", ");
+      return notReady("NO ROUTE",
+        `No single Programming Route declares ${operations.join(" + ")} for ${icpn} on ${missing || "this Site"}.`);
+    }
+    if (!needsImage && !rangesAgree) {
+      return notReady("RANGE DIFFERS",
+        "The selected Sites declare different Flash ranges. An Erase Batch carries one range for every "
+        + "Site, so run them as separate Batches.");
     }
     if (!needsImage) return { ready: true, label: "BATCH READY", reason: "" };
     if (!file) {
@@ -435,9 +477,9 @@ export default function ManagedProgrammingWorkspace() {
     setSiteReads({});
   }
 
-  function holdStart(alias: string, siteId: number, kind: StartHold["kind"], detail: string, identity: StartIdentity | null) {
+  function holdStart(alias: string, sites: number[], kind: StartHold["kind"], detail: string, identity: StartIdentity | null) {
     const next = { ...readStartHolds(), [alias]: {
-      alias, siteId, kind, detail, at: new Date().toISOString(),
+      alias, siteIds: [...sites], kind, detail, at: new Date().toISOString(),
       startId: identity?.startId ?? null, jobBindingSha256: identity?.jobBindingSha256 ?? null,
     } };
     writeStartHolds(next);
@@ -468,19 +510,20 @@ export default function ManagedProgrammingWorkspace() {
         keep("it was recorded without a Manager start ID, so the Manager cannot reconcile it");
         return;
       }
-      let answer = await getStartReconciliation(hold.alias, hold.startId);
-      let decision = decideStartReconciliation(hold, answer);
+      const held = { ...hold, siteIds: holdSites(hold) };
+      let answer = await getStartReconciliation(hold.startId);
+      let decision = decideStartReconciliation(held, answer);
       if (step === "ACKNOWLEDGE_RUN" && decision.action === "ACKNOWLEDGE_RUN") {
         const runId = decision.runId;
         const acknowledged = await acknowledgeProgrammingRun(hold.alias, runId);
         setUnresolved(current => current?.run_id === runId && acknowledged.acknowledged ? null : current);
         appendLog(`[ACK] OUTCOME UNKNOWN reconciled by the operator · Run ${runId} · the device result stays unknown`, false, "USR");
-        answer = await getStartReconciliation(hold.alias, hold.startId);
-        decision = decideStartReconciliation(hold, answer);
+        answer = await getStartReconciliation(hold.startId);
+        decision = decideStartReconciliation(held, answer);
       } else if (step === "VOID" && decision.action === "VOID") {
-        answer = await voidStart(hold.alias, hold.startId);
+        answer = await voidStart(hold.startId);
         appendLog(`[VOID] ${label} was voided on the Manager before admission; it can never start`, false, "USR");
-        decision = decideStartReconciliation(hold, answer);
+        decision = decideStartReconciliation(held, answer);
       }
       setHoldStep(decision.action === "ACKNOWLEDGE_RUN" || decision.action === "VOID"
         ? { startId: hold.startId, action: decision.action } : null);
@@ -491,13 +534,19 @@ export default function ManagedProgrammingWorkspace() {
       const fresh = await loadManagedTopology();
       setTopology(fresh);
       const target = fresh.ppus.find(item => item.alias === hold.alias);
-      const site = target?.sites.find(item => item.site_id === hold.siteId);
+      // EVERY Site the lost Start was for must read idle. One busy Site is
+      // enough to keep the hold: the Manager may still be on it.
+      const siteRefusal = holdSites(held).map(id => {
+        const site = target?.sites.find(item => item.site_id === id);
+        if (!site || !site.enabled) return `${siteLabel(id)} is not reported enabled by the PPU`;
+        if (site.current_job_id || site.state !== "idle") {
+          return `${siteLabel(id)} is ${site.state.toUpperCase()}${site.current_job_id ? ` (Job ${site.current_job_id})` : ""}`;
+        }
+        return null;
+      }).find(reason => reason != null) ?? null;
       const refusal = !target ? "the PPU is not in the Manager Registry"
         : !target.availability.ready ? `${target.availability.label} — ${target.availability.reason}`
-        : !site || !site.enabled ? `${siteLabel(hold.siteId)} is not reported enabled by the PPU`
-        : site.current_job_id || site.state !== "idle"
-          ? `${siteLabel(hold.siteId)} is ${site.state.toUpperCase()}${site.current_job_id ? ` (Job ${site.current_job_id})` : ""}`
-        : null;
+        : siteRefusal;
       if (refusal) {
         keep(`${decision.summary}, but ${refusal}`);
         return;
@@ -507,7 +556,7 @@ export default function ManagedProgrammingWorkspace() {
       writeStartHolds(next);
       setStartHolds(next);
       setStatusNote(null);
-      appendLog(`[RECONCILE] ${label} reconciled with the Manager · ${decision.summary} · ${siteLabel(hold.siteId)} idle, no Job (Manager Fleet)`, false, "USR");
+      appendLog(`[RECONCILE] ${label} reconciled with the Manager · ${decision.summary} · ${holdSites(held).map(siteLabel).join(", ") || "no Site recorded"} idle, no Job (Manager Fleet)`, false, "USR");
     } catch (reason) {
       keep(`the Manager could not be asked (${reason instanceof Error ? reason.message : "request failed"})`);
     } finally {
@@ -530,7 +579,7 @@ export default function ManagedProgrammingWorkspace() {
   function selectAlias(alias: string | null) {
     if (active || alias === selectedAlias) return;
     setSelectedAlias(alias);
-    setChosenSiteId(null);
+    setChosenSiteIds([]);
     clearRunState();
     clearReadState();
     if (alias) appendLog(`[TARGET] SELECT · PPU ${alias}`, false, "USR");
@@ -577,37 +626,45 @@ export default function ManagedProgrammingWorkspace() {
 
   function toggleSite(id: number) {
     if (active) return;
-    const next = siteId === id ? null : id;
-    setChosenSiteId(next);
+    const next = chosenSiteIds.includes(id)
+      ? chosenSiteIds.filter(item => item !== id)
+      : [...chosenSiteIds, id].sort((left, right) => left - right);
+    setChosenSiteIds(next);
     clearRunState();
-    appendLog(`[SITE] SELECTION · ${next == null ? "none" : siteLabel(next)}`, false, "USR");
+    // A Batch over fewer Sites than before can no longer reach the old
+    // threshold, so the Stop Policy falls back to the Batch's Site count.
+    setStopPolicy(current => (current.kind === "failed_sites" && current.threshold > next.length
+      ? (next.length ? { kind: "failed_sites", threshold: next.length } : { kind: "never" })
+      : current));
+    appendLog(`[SITE] SELECTION · ${next.length ? next.map(siteLabel).join(", ") : "none"}`, false, "USR");
   }
 
   async function start() {
     // Double-click protection: the lock is taken synchronously, before any await.
-    if (startLock.current || !readiness.ready || !ppu || siteId == null || !icpn || !operations || !jobRoute
+    if (startLock.current || !readiness.ready || !ppu || !siteIds.length || !icpn || !operations || !jobRoute
       || (needsImage && !file)) return;
     startLock.current = true;
     const policy = { retryLimit, stopPolicy };
+    const started = [...siteIds];
     const request: ManagedBatchRequest = needsImage && file
-      ? { alias: ppu.alias, siteId, icpn, operations, source, file, ...policy }
+      ? { alias: ppu.alias, siteIds: started, icpn, operations, source, file, ...policy }
       // Erase only: no Programming Image; the whole Flash range of the Profile.
       : {
-        alias: ppu.alias, siteId, icpn, operations: ["erase"], source, file: null,
+        alias: ppu.alias, siteIds: started, icpn, operations: ["erase"], source, file: null,
         range: { address: jobRoute.flash_base, length: jobRoute.flash_size }, ...policy,
       };
     const operationLabel = operations.map(item => item.toUpperCase()).join(" → ");
     // Site interface the PPU reports: a Mock result is never hardware evidence.
-    const executionInterface = ppu.sites.find(item => item.site_id === siteId)?.interface ?? null;
-    const context: RunContext = { alias: ppu.alias, siteId, startedAt: wallClock(), finishedAt: null };
+    const executionInterface = ppu.sites.find(item => item.site_id === started[0])?.interface ?? null;
+    const context: RunContext = { alias: ppu.alias, siteIds: started, startedAt: wallClock(), finishedAt: null };
     const abort = new AbortController();
     abortRef.current = abort;
     clearRunState();
     setRunContext(context);
     setPhase("locking");
-    appendLog(`[START] ${operationLabel} · PPU ${ppu.alias} (${ppu.ppuId ?? "—"}) · ${siteLabel(siteId)} · ${icpn} · ${
+    appendLog(`[START] ${operationLabel} · PPU ${ppu.alias} (${ppu.ppuId ?? "—"}) · ${started.map(siteLabel).join(", ")} (${started.length} Site${started.length === 1 ? "" : "s"}) · ${icpn} · ${
       request.file ? `${source.toUpperCase()} ${request.file.name}` : `no Programming Image · ${hex(request.range.address)} + ${request.range.length} B`
-    } · Retry ${retryLimit} · Stop Policy ${stopPolicy.kind === "never" ? "never" : "1 failed Site"} · Repeat 1`, false, "USR");
+    } · Retry ${retryLimit} · Stop Policy ${stopPolicy.kind === "never" ? "never" : `${stopPolicy.threshold} failed Site${stopPolicy.threshold === 1 ? "" : "s"}`} · Repeat 1 · sequential`, false, "USR");
     try {
       const final = await runManagedBatch(request, {
         onLocked: input => {
@@ -618,8 +675,10 @@ export default function ManagedProgrammingWorkspace() {
         onBatch: next => {
           if (loggedBatchId.current !== next.batch_id) {
             loggedBatchId.current = next.batch_id;
-            appendLog(`[BATCH] ${next.batch_id} · Repeat ${next.policy.repeat} · Retry limit ${next.policy.retry_limit} · Stop Policy ${
-              next.policy.stop_policy.kind === "never" ? "never" : "1 failed Site"}`, false, "BAT");
+            appendLog(`[BATCH] ${next.batch_id} · ${next.counts.sites} Site(s) · Repeat ${next.policy.repeat} · Retry limit ${next.policy.retry_limit} · Stop Policy ${
+              next.policy.stop_policy.kind === "never"
+                ? "never"
+                : `${next.policy.stop_policy.threshold} failed Site(s)`}`, false, "BAT");
           }
           setBatch(next);
           setRun(next.current_run);
@@ -659,7 +718,15 @@ export default function ManagedProgrammingWorkspace() {
         onPollError: message => setStatusNote(message),
       }, abort.signal);
       const { verdict, reason } = batchVerdict(final);
-      appendLog(`[RESULT] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · Batch ${final.batch_id} · ${final.attempts.length} attempt(s) · counted once`,
+      for (const unit of final.units) {
+        const site = batchSiteVerdict(final, unit, runOfUnit(final, unit));
+        appendLog(`[SITE RESULT] ${siteLabel(unit.site_id)} · ${site.verdict.replace("_", " ")}${site.reason ? ` · ${site.reason}` : ""}${
+          unit.failure_domain ? ` · ${unit.failure_domain}` : ""} · ${unit.attempts.length} attempt(s)`,
+          site.verdict !== "PASS", "PPU");
+      }
+      appendLog(`[RESULT] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · Batch ${final.batch_id} · ${
+        final.counts.sites} Site(s) · PASS ${final.counts.pass} · FAIL ${final.counts.fail} · BLOCKED ${
+        final.counts.blocked} · UNKNOWN ${final.counts.unknown} · ${final.attempts.length} attempt(s) · one IC per Site`,
         verdict !== "PASS", "PPU");
       if (final.outcome === "OUTCOME_UNKNOWN" && final.current_run) setUnresolved(final.current_run);
     } catch (reason) {
@@ -669,7 +736,7 @@ export default function ManagedProgrammingWorkspace() {
         appendLog(`[BLOCKED] ${reason.stage.toUpperCase()} · ${message} · no Job was submitted`, true);
       } else if (reason instanceof ManagedStartOutcomeUnknown) {
         setStartUnknown(reason.message);
-        holdStart(context.alias, context.siteId, "PROGRAMMING", reason.message, reason.identity);
+        holdStart(context.alias, context.siteIds, "PROGRAMMING", reason.message, reason.identity);
         appendLog(`[OUTCOME UNKNOWN] ${reason.message}`, true);
       } else {
         const message = reason instanceof Error ? reason.message : "Programming failed";
@@ -689,7 +756,7 @@ export default function ManagedProgrammingWorkspace() {
     if (!batch || batch.outcome != null || batch.stop_requested || stopping) return;
     setStopping(true);
     try {
-      const next = await stopProgrammingBatch(batch.ppu_alias, batch.batch_id);
+      const next = await stopProgrammingBatch(batch.batch_id);
       setBatch(next);
       appendLog(`[STOP QUEUING] Batch ${next.batch_id} · no further attempt will be submitted · the running Job is not cancelled`, false, "USR");
     } catch (reason) {
@@ -804,7 +871,7 @@ export default function ManagedProgrammingWorkspace() {
         : reason instanceof Error ? reason.message : "READ failed";
       finish(blocked ? "BLOCKED" : unknown ? "OUTCOME UNKNOWN" : "FAIL", message);
       // A lost Start answer is not a FAIL: hold every further Start on this PPU.
-      if (unknown) holdStart(alias, id, "READ", reason.message, reason.identity);
+      if (unknown) holdStart(alias, [id], "READ", reason.message, reason.identity);
       appendLog(`[READ] ${label} · ${message}`, true);
     } finally {
       setReadPhase("idle");
@@ -828,14 +895,19 @@ export default function ManagedProgrammingWorkspace() {
     }
   }
 
-  // One Batch is one IC: counted once by its final verdict, whatever the attempts.
+  // One Site is one IC: counted once by its own final verdict, whatever the
+  // attempts. The Batch verdict is the aggregate and never a Site's result.
   const verdict = batch ? batchVerdict(batch).verdict : null;
-  const pass = verdict === "PASS" ? 1 : 0;
-  const fail = verdict === "FAIL" ? 1 : 0;
+  const siteVerdicts = batch
+    ? batch.units.map(unit => batchSiteVerdict(batch, unit, runOfUnit(batch, unit)).verdict)
+    : [];
+  const pass = siteVerdicts.filter(item => item === "PASS").length;
+  const fail = siteVerdicts.filter(item => item === "FAIL").length;
+  const siteCount = batch ? batch.counts.sites : (runContext?.siteIds.length ?? siteIds.length);
   const elapsed = runContext ? (runContext.finishedAt ?? clock) - runContext.startedAt : null;
   const kpis = [
-    { key: "sites", label: "SITES", value: siteId == null && !runContext ? 0 : 1 },
-    { key: "total-ic", label: "TOTAL IC", value: siteId == null && !runContext ? 0 : 1 },
+    { key: "sites", label: "SITES", value: siteCount },
+    { key: "total-ic", label: "TOTAL IC", value: siteCount },
     { key: "processed-ic", label: "PROCESSED IC", value: pass + fail },
     { key: "pass", label: "PASS", value: pass, tone: "pass" as const },
     { key: "fail", label: "FAIL", value: fail, tone: "fail" as const },
@@ -969,8 +1041,8 @@ export default function ManagedProgrammingWorkspace() {
                 code: OPERATION_LABELS[item].code,
                 label: OPERATION_LABELS[item].label,
                 // An Operation no Route declares stays unchecked and disabled: never a fake capability.
-                checked: checkedOperations[item] && (declaredOperations.includes(item) || siteId == null),
-                disabled: active || (siteId != null && !declaredOperations.includes(item)),
+                checked: checkedOperations[item] && (declaredOperations.includes(item) || !siteIds.length),
+                disabled: active || (siteIds.length > 0 && !declaredOperations.includes(item)),
                 ariaLabel: `Engineering operation ${item}`,
                 onChange: () => toggleOperation(item),
               }))}
@@ -991,11 +1063,24 @@ export default function ManagedProgrammingWorkspace() {
                   setRetryLimit(Number.isFinite(parsed) ? Math.min(MAX_RETRY_LIMIT, Math.max(0, parsed)) : 0);
                 },
                 stopLabel: "Stop Policy",
-                stopValue: stopPolicy.kind === "never" ? "never" : "1",
+                stopValue: stopPolicy.kind === "never" ? "never" : String(stopPolicy.threshold),
                 stopDisabled: active,
                 stopAriaLabel: "Engineering Stop Policy",
-                stopOptions: [{ value: "never", label: "Never" }, { value: "1", label: "1 failed Site" }],
-                onStopChange: value => setStopPolicy(value === "1" ? { kind: "failed_sites", threshold: 1 } : { kind: "never" }),
+                // A threshold no Batch could reach is not a policy: the list
+                // stops at the number of Sites this Batch actually covers.
+                stopOptions: [
+                  { value: "never", label: "Never" },
+                  ...siteIds.map((_id, index) => ({
+                    value: String(index + 1),
+                    label: `${index + 1} failed Site${index === 0 ? "" : "s"}`,
+                  })),
+                ],
+                onStopChange: value => {
+                  const threshold = Number.parseInt(value, 10);
+                  setStopPolicy(Number.isFinite(threshold) && threshold >= 1 && threshold <= siteIds.length
+                    ? { kind: "failed_sites", threshold }
+                    : { kind: "never" });
+                },
                 note: policyNote,
               }}
               startLabel="START PROGRAMMING"
@@ -1027,7 +1112,7 @@ export default function ManagedProgrammingWorkspace() {
             {startHold && (
               <div className="warning engineeringOperationWarning" role="alert" data-testid="managed-start-hold">
                 <span>
-                  OUTCOME UNKNOWN — the {startHold.kind} Start request on PPU {startHold.alias} · {siteLabel(startHold.siteId)} got
+                  OUTCOME UNKNOWN — the {startHold.kind} Start request on PPU {startHold.alias} · {holdSites(startHold).map(siteLabel).join(", ") || "no Site recorded"} got
                   no answer ({startHold.detail}) It may or may not have reached the PPU. Nothing is submitted to this PPU
                   until the Manager reconciles Start {startHold.startId ?? "(no Manager start ID recorded)"}.
                 </span>
@@ -1060,7 +1145,7 @@ export default function ManagedProgrammingWorkspace() {
           <OperatorPanelHeader
             number={3}
             title="LIVE SITE STATUS"
-            meta={`${ppu?.displayName ?? "Selected PPU"} · ${ppu?.sites.length ?? 0} Sites · Selected ${siteId == null ? 0 : 1} · Manager Fleet polling ${TOPOLOGY_POLL_MS / 1000} s`}
+            meta={`${ppu?.displayName ?? "Selected PPU"} · ${ppu?.sites.length ?? 0} Sites · Selected ${siteIds.length} · sequential · Manager Fleet polling ${TOPOLOGY_POLL_MS / 1000} s`}
           />
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
             <table className="channelTable">
@@ -1070,12 +1155,19 @@ export default function ManagedProgrammingWorkspace() {
               <tbody className="targetSitesSection">
                 {(ppu?.sites ?? []).map(site => {
                   const capability = capabilities.get(site.site_id);
-                  const selected = siteId === site.site_id;
-                  const ownsRun = run != null && runContext?.alias === ppu?.alias && runContext?.siteId === site.site_id;
-                  const progress = ownsRun ? runProgressPercent(run) : null;
-                  // The Site result is the Batch verdict, not an intermediate attempt.
-                  const rowVerdict = ownsRun && batch ? batchVerdict(batch).verdict : null;
-                  const state = ownsRun && run.outcome == null ? runStageLabel(run)
+                  const selected = siteIds.includes(site.site_id);
+                  const unit = batch?.units.find(item => item.site_id === site.site_id
+                    && item.ppu_alias === (ppu?.alias ?? "")) ?? null;
+                  // The run the Browser holds belongs to ONE Site at a time:
+                  // the Batch is sequential, so another Site's row shows none.
+                  const siteRun = run != null && runContext?.alias === ppu?.alias
+                    && run.site_id === site.site_id && run.ppu_alias === ppu?.alias ? run : null;
+                  const progress = siteRun ? runProgressPercent(siteRun) : null;
+                  // The Site result is that Site's own verdict, never the
+                  // Batch aggregate and never an intermediate attempt.
+                  const rowVerdict = batch && unit
+                    ? batchSiteVerdict(batch, unit, runOfUnit(batch, unit)).verdict : null;
+                  const state = siteRun && siteRun.outcome == null ? runStageLabel(siteRun)
                     : site.enabled ? site.state.toUpperCase() : "DISABLED";
                   // READ: one button per Site whose Programming Route declares Read.
                   const canRead = routeDeclaring(routes, icpn, site.site_id, ["read"]) != null;

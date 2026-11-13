@@ -153,6 +153,22 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _journal_start(record: Mapping[str, Any]) -> dict[str, Any]:
+    """One start record as the journal stores it.
+
+    A Batch start carries no PPU (ADR 5.8), but ``ppu_alias`` is still
+    written as a string: a Manager rolled back to a release that predates
+    PR-C validates the field's type and would otherwise refuse to start
+    rather than read its own journal. The empty string is read back as
+    "no PPU" by this release and as a PPU that matches nothing by an
+    older one, which is what a rolled-back reader should conclude.
+    """
+    item = dict(record)
+    if item.get("ppu_alias") is None:
+        item["ppu_alias"] = ""
+    return item
+
+
 @dataclass
 class _Plan:
     plan_id: str
@@ -268,7 +284,10 @@ class BundleProgrammingWorkflow:
         # Start admission records (journalled) and the Batch start IDs that
         # may still be admitted (memory only, like plans: a restart ends them).
         self._starts: dict[str, dict[str, Any]] = {}
-        self._pending_batch_starts: dict[str, tuple[str, float]] = {}
+        #: Batch start IDs that may still be admitted, by issue time. A Batch
+        #: start is Manager-owned and carries no PPU (PR-C, ADR 5.8): the
+        #: token is an idempotency guard, never an authority.
+        self._pending_batch_starts: dict[str, float] = {}
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
@@ -292,7 +311,12 @@ class BundleProgrammingWorkflow:
                         or item["kind"] not in ("run", "batch")
                         or item["state"] not in ("ISSUED", "CONSUMED", "VOIDED")):
                     raise ValueError("start record")
-                self._starts[item["start_id"]] = dict(item)
+                record = dict(item)
+                if record["kind"] == "batch" and record["ppu_alias"] == "":
+                    # Written by this release for a Batch start, which has no
+                    # PPU. Older releases wrote a real alias here.
+                    record["ppu_alias"] = None
+                self._starts[item["start_id"]] = record
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise RuntimeError("Bundle programming journal is unreadable; refusing to start") from exc
 
@@ -307,7 +331,7 @@ class BundleProgrammingWorkflow:
             del self._starts[stale["start_id"]]
         payload = {"schema": "plasma.manager.bundle-programming-journal.v1",
                    "runs": [r.as_dict() for r in runs],
-                   "starts": starts[-MAX_STARTS_RETAINED:]}
+                   "starts": [_journal_start(s) for s in starts[-MAX_STARTS_RETAINED:]]}
         parent = self.journal_path.parent
         parent.mkdir(parents=True, exist_ok=True)
         fd, name = tempfile.mkstemp(prefix=f".{self.journal_path.name}.", dir=parent)
@@ -447,19 +471,6 @@ class BundleProgrammingWorkflow:
         """``target_block`` as a bare reason (None: nothing blocks a retry)."""
         verdict = self.target_block(alias, site)
         return None if verdict is None else verdict[1]
-
-    def batch_start_alias(self, start_id: object) -> str | None:
-        """The PPU a still-admissible Batch start was issued for.
-
-        The start ID is an idempotency token, not an authority: each Target's
-        own authority is verified independently. Resolving the PPU it was
-        ISSUED for, rather than reading it off the first Target, keeps a legal
-        start legal however the Target Set happens to be ordered.
-        """
-        with self._lock:
-            pending = (self._pending_batch_starts.get(start_id)
-                       if type(start_id) is str else None)
-            return None if pending is None else pending[0]
 
     # --------------------------------------------------------------------- API
     def list_routes(self) -> dict[str, Any]:
@@ -790,23 +801,28 @@ class BundleProgrammingWorkflow:
         return {"ok": True, "run": run.as_dict()}
 
     # ------------------------------------------------ start outcome reconciliation
-    def issue_batch_start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        """Issue the start_id one Batch start must carry. Submits nothing."""
+    def issue_batch_start(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """Issue the start_id one Batch start must carry. Submits nothing.
+
+        The Batch is owned by the Manager, not by a PPU, so the token it is
+        admitted with is not issued under one either (ADR 5.8). Issuing it
+        plans nothing, reads no PPU and authorises nothing: every Target of
+        the Batch has its own authority verified at admission (ADR 5.3).
+        """
         if not isinstance(body, Mapping) or dict(body) != {"kind": "batch"}:
             raise ProgrammingError(400, "invalid_request", "a start ID is issued for kind=batch only")
-        self._require_commissioned(alias)
         with self._lock:
             now = self.monotonic()
-            for key in [k for k, (_a, at) in self._pending_batch_starts.items()
+            for key in [k for k, at in self._pending_batch_starts.items()
                         if now - at > PLAN_TTL_S]:
                 del self._pending_batch_starts[key]
             while len(self._pending_batch_starts) >= MAX_PENDING_BATCH_STARTS:
                 del self._pending_batch_starts[min(
-                    self._pending_batch_starts, key=lambda k: self._pending_batch_starts[k][1])]
+                    self._pending_batch_starts, key=lambda k: self._pending_batch_starts[k])]
             start_id = secrets.token_hex(16)
-            self._pending_batch_starts[start_id] = (alias, now)
+            self._pending_batch_starts[start_id] = now
             self._starts[start_id] = {
-                "start_id": start_id, "kind": "batch", "ppu_alias": alias, "site_id": None,
+                "start_id": start_id, "kind": "batch", "ppu_alias": None, "site_id": None,
                 "targets": None,
                 "ppu_id": None, "operation": PROGRAMMING, "operations": None,
                 "job_binding_sha256": None, "state": "ISSUED",
@@ -818,22 +834,21 @@ class BundleProgrammingWorkflow:
                 self._starts.pop(start_id, None)
                 raise
             return {"ok": True, "start": {"start_id": start_id, "kind": "batch",
-                                          "ppu_alias": alias, "expires_in_s": PLAN_TTL_S}}
+                                          "ppu_alias": None, "expires_in_s": PLAN_TTL_S}}
 
-    def _batch_start_startable(self, alias: str, start_id: object) -> bool:
-        pending = self._pending_batch_starts.get(start_id) if type(start_id) is str else None
-        return (pending is not None and pending[0] == alias
-                and self.monotonic() - pending[1] <= PLAN_TTL_S)
+    def _batch_start_startable(self, start_id: object) -> bool:
+        issued_at = self._pending_batch_starts.get(start_id) if type(start_id) is str else None
+        return issued_at is not None and self.monotonic() - issued_at <= PLAN_TTL_S
 
-    def require_batch_start(self, alias: str, start_id: object) -> None:
+    def require_batch_start(self, start_id: object) -> None:
         with self._lock:
-            if not self._batch_start_startable(alias, start_id):
+            if not self._batch_start_startable(start_id):
                 raise ProgrammingError(
                     409, "programming_start_not_startable",
-                    "this start ID was not issued for this PPU, was already used, was "
-                    "voided or expired; nothing was started")
+                    "this start ID is unknown, was already used, was voided or "
+                    "expired; nothing was started")
 
-    def consume_batch_start(self, alias: str, start_id: str, batch_id: str,
+    def consume_batch_start(self, start_id: str, batch_id: str,
                             targets: list[dict[str, Any]]) -> None:
         """One start ID admits one Batch; journalled before the Batch exists.
 
@@ -842,10 +857,10 @@ class BundleProgrammingWorkflow:
         consumed this ID: those Targets need a NEW start, never a replay.
         """
         with self._lock:
-            self.require_batch_start(alias, start_id)
+            self.require_batch_start(start_id)
             del self._pending_batch_starts[start_id]
             record = self._starts.setdefault(start_id, {
-                "start_id": start_id, "kind": "batch", "ppu_alias": alias, "ppu_id": None,
+                "start_id": start_id, "kind": "batch", "ppu_alias": None, "ppu_id": None,
                 "operation": PROGRAMMING, "operations": None, "job_binding_sha256": None,
                 "run_id": None, "issued_at": _now()})
             sites = [site for target in targets for site in target["site_ids"]]
@@ -855,19 +870,21 @@ class BundleProgrammingWorkflow:
                           updated_at=_now())
             self._persist_locked()
 
-    def void_start(self, alias: str, start_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
+    def void_start(self, start_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
         """Operator: a start that was never admitted may never be admitted.
 
         Removes only an unconsumed plan / Batch start ID. It cannot touch a
-        run, a Batch, a Job or a PPU, and it refuses an admitted start.
+        run, a Batch, a Job or a PPU, and it refuses an admitted start. The
+        PPU, if the start has one, is read off the journalled record: a Batch
+        start has none, and a caller naming one could not prove anything.
         """
         if not isinstance(body, Mapping) or dict(body) != {"void": VOID_TOKEN}:
             raise ProgrammingError(400, "invalid_request", f"void requires void={VOID_TOKEN}")
         with self._lock:
             record = self._starts.get(start_id)
-            if record is None or record["ppu_alias"] != alias:
+            if record is None:
                 raise ProgrammingError(404, "programming_start_not_found",
-                                       "no start with this ID is recorded for this PPU")
+                                       "no start with this ID is recorded")
             admitted = any((run.plan or {}).get("plan_id") == start_id
                            for run in self._runs.values())
             if record["state"] != "ISSUED" or admitted:
@@ -877,9 +894,9 @@ class BundleProgrammingWorkflow:
             self._pending_batch_starts.pop(start_id, None)
             record.update(state="VOIDED", updated_at=_now())
             self._persist_locked()
-        return self.reconcile_start(alias, start_id)
+        return self.reconcile_start(start_id)
 
-    def reconcile_start(self, alias: str, start_id: str,
+    def reconcile_start(self, start_id: str,
                         find_batch: Callable[[str], dict[str, Any] | None] | None = None,
                         ) -> dict[str, Any]:
         """What became of one Start. Read-only: journal and memory only.
@@ -888,15 +905,17 @@ class BundleProgrammingWorkflow:
         being idle or a plan being gone is not evidence here; ``NOT_ACCEPTED``
         needs a journalled issue record that was never consumed AND a start
         that can no longer be admitted. Anything unprovable is OUTCOME_UNKNOWN.
+
+        The PPU is an ANSWER here, never a question: it is read off the run,
+        the Batch Target Set or the journalled record. A Batch start has none.
         """
-        self._record(alias)
         batch = find_batch(start_id) if find_batch is not None else None
         with self._lock:
             record = self._starts.get(start_id)
             run = next((r for r in self._runs.values()
                         if (r.plan or {}).get("plan_id") == start_id), None)
             view: dict[str, Any] = {
-                "schema": START_SCHEMA, "start_id": start_id, "ppu_alias": alias,
+                "schema": START_SCHEMA, "start_id": start_id, "ppu_alias": None,
                 "kind": None, "state": "OUTCOME_UNKNOWN", "reason": None, "outcome": None,
                 "identity": None, "run": None, "batch": None, "acknowledged": None,
                 "unknown_run_id": None, "expires_in_s": None,
@@ -907,11 +926,9 @@ class BundleProgrammingWorkflow:
                 view.update(state="OUTCOME_UNKNOWN", reason=reason)
                 return {"ok": True, "reconciliation": view}
 
-            if record is not None and record["ppu_alias"] != alias:
-                return unknown("START_IDENTITY_MISMATCH")
             if run is not None:
                 plan = run.plan or {}
-                if run.alias != alias:
+                if record is not None and record["ppu_alias"] != run.alias:
                     return unknown("START_IDENTITY_MISMATCH")
                 if record is not None and (
                         record["kind"] != "run" or record["state"] != "CONSUMED"
@@ -920,6 +937,7 @@ class BundleProgrammingWorkflow:
                         or record.get("job_binding_sha256") != plan.get("job_binding_sha256")):
                     return unknown("JOURNAL_INCONSISTENT")
                 binding = plan.get("job_binding") if isinstance(plan.get("job_binding"), dict) else {}
+                view.update(ppu_alias=run.alias)
                 view.update(kind="run", run=run.as_dict(), outcome=run.outcome, identity={
                     "ppu_alias": run.alias, "site_id": run.site, "ppu_id": binding.get("ppu_id"),
                     "operation": plan.get("operation"), "operations": plan.get("operations"),
@@ -938,17 +956,21 @@ class BundleProgrammingWorkflow:
                 targets = batch.get("targets") or []
                 aliases = [target["ppu_alias"] for target in targets]
                 sites = [site for target in targets for site in target["site_ids"]]
-                if alias not in aliases or batch.get("start_id") != start_id:
+                if batch.get("start_id") != start_id or not aliases:
                     return unknown("START_IDENTITY_MISMATCH")
                 if record is not None and (
                         record["kind"] != "batch" or record["state"] != "CONSUMED"
                         or record.get("batch_id") != batch.get("batch_id")
                         or record.get("targets") != targets):
                     return unknown("JOURNAL_INCONSISTENT")
+                # One Target: the Batch has a PPU. Several: it has none, and
+                # saying otherwise would name a PPU the Batch does not belong to.
+                single = aliases[0] if len(aliases) == 1 else None
+                view.update(ppu_alias=single)
                 attempts = [attempt for unit in batch.get("units") or []
                             for attempt in unit.get("attempts") or []]
                 view.update(kind="batch", batch=batch, outcome=batch.get("outcome"), identity={
-                    "ppu_alias": alias, "site_id": sites[0] if len(sites) == 1 else None,
+                    "ppu_alias": single, "site_id": sites[0] if len(sites) == 1 else None,
                     "targets": targets, "ppu_id": None,
                     "operation": PROGRAMMING, "operations": batch.get("operations"),
                     "job_binding_sha256": (attempts[-1].get("job_binding_sha256")
@@ -969,6 +991,7 @@ class BundleProgrammingWorkflow:
                 return {"ok": True, "reconciliation": view}
             if record is None:
                 return unknown("START_NOT_RECORDED")
+            view.update(ppu_alias=record["ppu_alias"])
             view.update(kind=record["kind"], identity={
                 "ppu_alias": record["ppu_alias"], "site_id": record.get("site_id"),
                 "targets": record.get("targets"),
@@ -984,10 +1007,10 @@ class BundleProgrammingWorkflow:
                 now = self.monotonic()
                 plan_held = self._plans.get(start_id)
                 left = None
-                if record["kind"] == "run" and plan_held is not None and plan_held.alias == alias:
+                if record["kind"] == "run" and plan_held is not None:
                     left = PLAN_TTL_S - (now - plan_held.created_monotonic)
-                elif record["kind"] == "batch" and self._batch_start_startable(alias, start_id):
-                    left = PLAN_TTL_S - (now - self._pending_batch_starts[start_id][1])
+                elif record["kind"] == "batch" and self._batch_start_startable(start_id):
+                    left = PLAN_TTL_S - (now - self._pending_batch_starts[start_id])
                 if left is not None and left >= 0:
                     # A delayed Start request could still be admitted.
                     view.update(state="ACCEPTANCE_PENDING", reason="START_STILL_ADMISSIBLE",

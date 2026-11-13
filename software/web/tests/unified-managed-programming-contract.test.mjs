@@ -72,7 +72,7 @@ test("one Start: lock -> plan -> exactly one start -> observe; no retry of any w
 
 test("Start is double-click safe and the manual Prepare step is gone from EMode", () => {
   assert.match(emode, /if \(startLock\.current \|\| !readiness\.ready/);
-  assert.match(emode, /startLock\.current = true;\s*const policy = \{ retryLimit, stopPolicy \};\s*const request: ManagedBatchRequest =/);
+  assert.match(emode, /startLock\.current = true;\s*const policy = \{ retryLimit, stopPolicy \};\s*const started = \[\.\.\.siteIds\];\s*const request: ManagedBatchRequest =/);
   assert.doesNotMatch(emode, /Prepare Programming|Confirm programming|confirmedPlanId/);
   assert.match(emode, /startLabel="START PROGRAMMING"/);
 });
@@ -92,8 +92,8 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
   assert.match(emode, /showSaveFilePicker/);
   // A lost Start answer (READ or Programming) holds the PPU until the operator
   // reconciles it; it is never a FAIL, never resent and never auto-acknowledged.
-  assert.match(emode, /if \(unknown\) holdStart\(alias, id, "READ", reason\.message, reason\.identity\);/);
-  assert.match(emode, /holdStart\(context\.alias, context\.siteId, "PROGRAMMING", reason\.message, reason\.identity\);/);
+  assert.match(emode, /if \(unknown\) holdStart\(alias, \[id\], "READ", reason\.message, reason\.identity\);/);
+  assert.match(emode, /holdStart\(context\.alias, context\.siteIds, "PROGRAMMING", reason\.message, reason\.identity\);/);
   assert.match(emode, /if \(startHold\) \{\s*return notReady\("OUTCOME UNKNOWN",/);
   assert.match(emode, /window\.localStorage\.setItem\(START_HOLD_KEY/);
   // The hold is released on the Manager's reconciliation of that exact start,
@@ -101,8 +101,10 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
   assert.doesNotMatch(emode, /releaseStartHold/);
   assert.doesNotMatch(emode, /useEffect\([^)]*reconcileStartHold/);
   const reconcile = emode.slice(emode.indexOf("async function reconcileStartHold"), emode.indexOf("async function acknowledge()"));
-  assert.match(reconcile, /getStartReconciliation\(hold\.alias, hold\.startId\)/);
-  assert.match(reconcile, /decideStartReconciliation\(hold, answer\)/);
+  // Reconciliation is Manager-owned: it names the start, never a PPU (PR-C).
+  assert.match(reconcile, /getStartReconciliation\(hold\.startId\)/);
+  assert.doesNotMatch(reconcile, /getStartReconciliation\(hold\.alias|voidStart\(hold\.alias/);
+  assert.match(reconcile, /decideStartReconciliation\(held, answer\)/);
   assert.ok(reconcile.indexOf("decision.action !== \"RELEASE\"") < reconcile.indexOf("loadManagedTopology()"),
     "the Fleet idle check only follows a Manager answer that allows release");
   assert.ok(reconcile.indexOf("loadManagedTopology()") < reconcile.indexOf("delete next[hold.alias]"));
@@ -111,15 +113,18 @@ test("EMode Operations are E / P / V checkboxes sent as one operations list; Rea
   assert.match(reconcile, /step === "VOID" && decision\.action === "VOID"/);
   assert.match(reconcile, /if \(!hold\.startId\) \{[\s\S]*?return;/);
   // Core: a lost Start carries the Manager-issued start ID; a Batch gets one first.
-  assert.match(core, /startId = await issueBatchStart\(request\.alias\);[\s\S]*startProgrammingBatch\(request\.alias, input, startId\)/);
+  assert.match(core, /startId = await issueBatchStart\(\);[\s\S]*startProgrammingBatch\(input, startId\)/);
   assert.doesNotMatch(core, /new ManagedStartOutcomeUnknown\("batch"/);
   assert.match(core, /export function decideStartReconciliation\(/);
-  assert.match(core, /answer\.start_id !== hold\.startId \|\| answer\.ppu_alias !== hold\.alias/);
+  // A Batch start names no PPU until a Target Set is admitted with it; a
+  // DIFFERENT PPU is still a mismatch.
+  assert.match(core, /answer\.start_id !== hold\.startId\s*\|\| \(answer\.ppu_alias != null && answer\.ppu_alias !== hold\.alias\)/);
   assert.match(core, /hold\.jobBindingSha256 != null && identity\.job_binding_sha256 !== hold\.jobBindingSha256/);
-  // The Browser reaches the three endpoints through the BFF allowlist only.
-  assert.match(bff, /\/\^programming\\\/starts\$\//);
-  assert.match(bff, /programming\/starts\/\$\{RUN_ID\}\/void\$/);
-  assert.match(bff, /BOOTSTRAP_GET_ACTIONS = \[[\s\S]*programming\/starts\/\$\{RUN_ID\}\$/);
+  // The Browser reaches the canonical start resource through the BFF
+  // allowlist only, and the retired alias-scoped one is not in it (PR-C).
+  assert.match(bff, /PROGRAMMING_POST_RESOURCES = \[[\s\S]*\/\^starts\$\/[\s\S]*starts\/\$\{RUN_ID\}\/void\$/);
+  assert.match(bff, /PROGRAMMING_GET_RESOURCES = \[[\s\S]*starts\/\$\{RUN_ID\}\$/);
+  assert.doesNotMatch(bff, /programming\\\/batches|programming\/batches\/\$\{RUN_ID\}|programming\\\/starts/);
   assert.match(emode, /name === "AbortError"[\s\S]{0,200}no Job was submitted[\s\S]{0,80}return;/);
   assert.match(emode, /runManagedRead\(/);
   assert.match(core, /operation: "read",/);
@@ -182,7 +187,7 @@ test("EMode Batch Policy: Repeat disabled; Retry / Stop Policy are decided by th
   assert.doesNotMatch(emode, /runManagedProgramming\(|planProgramming\(|startProgramming\(/);
   assert.doesNotMatch(emode, /for \(let (retry|attempt)|while \(/);
   assert.match(emode, /retryMax: MAX_RETRY_LIMIT/);
-  assert.match(emode, /\{ kind: "failed_sites", threshold: 1 \}/);
+  assert.match(emode, /\{ kind: "failed_sites", threshold \}/);
   // The stop control is "stop queuing": it is never labelled or wired as an abort / cancel.
   assert.match(emode, /"STOP QUEUING"/);
   assert.doesNotMatch(emode, /abortLabel="ABORT"|cancelJob|\/cancel/);
@@ -350,4 +355,56 @@ test("removing the duplicated UI keeps the Manager evidence and the safety gates
   assert.match(factoryBackend, /records\(\): ManagedSiteRecord\[\]/);
   // PMode still logs every Site outcome, including the ones that never ran.
   assert.match(factory, /\[SITE\] \$\{site\} · \$\{record\.note\}/);
+});
+
+// --------------------------------------------------------------------- PR-C
+// The Batch and its start are Manager-owned resources, and EMode covers many
+// Sites of one PPU as ONE Batch the Manager schedules sequentially.
+
+test("PR-C: the Console reaches the canonical Batch resource, never an alias-scoped one", async () => {
+  const route = await read("app/api/manager/programming/[...path]/route.ts");
+  assert.match(api, /const PROGRAMMING = "\/api\/manager\/programming";/);
+  for (const path of ["batches", "batches/\\$\\{batchId\\}", "batches/\\$\\{batchId\\}/stop",
+    "starts", "starts/\\$\\{startId\\}", "starts/\\$\\{startId\\}/void"]) {
+    assert.match(api, new RegExp(`\\$\\{PROGRAMMING\\}/${path}`));
+  }
+  // No Batch or start is addressed under a PPU any more.
+  assert.doesNotMatch(api, /\$\{base\(alias\)\}\/(batches|starts)/);
+  // The BFF route sits under /api/manager so the maintenance capability
+  // cookie (Path=/api/manager) is still presented with it.
+  assert.match(route, /const PROGRAMMING_BROWSER_PREFIX = "\/api\/manager\/programming";/);
+  assert.match(route, /relayManagerProgrammingRequest\(request, resource\)/);
+  // Starting a Batch submits Jobs: every Target PPU must be enrolled here.
+  assert.match(bff, /for \(const alias of aliases\) \{\s*if \(!hasMaintenanceCapability\(request, alias\)\) return maintenanceCapabilityRequired\(\);/);
+  assert.match(bff, /if \(!maintenanceMutationOriginAllowed\(request\)\) return maintenanceCapabilityRequired\(\);/);
+});
+
+test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () => {
+  assert.match(emode, /const \[chosenSiteIds, setChosenSiteIds\] = useState<number\[\]>\(\[\]\);/);
+  assert.match(emode, /const next = chosenSiteIds\.includes\(id\)/);
+  assert.match(api, /targets: \[\{ ppu_alias: input\.alias, site_ids: \[\.\.\.input\.siteIds\] \}\]/);
+  // One PPU per Batch in EMode: the Target Set is built from one alias.
+  assert.doesNotMatch(emode, /ppu_alias:|targets:/);
+  // The Operations offered are the ones EVERY selected Site declares.
+  assert.match(emode, /\.reduce\(\(shared, declared\) => shared\.filter\(item => declared\.includes\(item\)\)\)/);
+  // An Erase Batch carries one range, so the Sites must agree on it.
+  assert.match(emode, /const rangesAgree = /);
+  assert.match(emode, /notReady\("RANGE DIFFERS"/);
+  // The Stop Policy threshold never exceeds the Batch's own Site count.
+  assert.match(emode, /\.\.\.siteIds\.map\(\(_id, index\) => \(\{/);
+  assert.match(emode, /threshold >= 1 && threshold <= siteIds\.length/);
+});
+
+test("PR-C: every Site is judged on its own, and the Batch verdict never replaces a Site's", () => {
+  assert.match(core, /export function batchSiteVerdict\(/);
+  assert.match(core, /export function runOfUnit\(/);
+  // The aggregate is necessary but not sufficient: every Site must pass too.
+  assert.match(core, /for \(const unit of batch\.units\) \{\s*const judged = batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\);/);
+  assert.match(core, /if \(!run\) return \{ verdict: "FAIL", reason: "RUN_RECORD_MISSING" \};/);
+  // The Site row shows that Site's verdict, not the Batch aggregate.
+  assert.match(emode, /const rowVerdict = batch && unit\s*\? batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\)\.verdict : null;/);
+  // Sequential execution: the run the Browser holds belongs to one Site.
+  assert.match(emode, /run\.site_id === site\.site_id && run\.ppu_alias === ppu\?\.alias \? run : null/);
+  // A lost Start answer holds every Site it was for.
+  assert.match(emode, /const siteRefusal = holdSites\(held\)\.map\(id => \{/);
 });

@@ -40,8 +40,21 @@ def body(retry_limit=0, stop_policy=None, operations=FULL, **extra):
     return request
 
 
+def start(batches, alias, request):
+    """The alias-scoped entry retired in PR-C (ADR 5.8).
+
+    These tests drive the SAME engine through the canonical resource: one
+    Manager-issued start, one Target, one Site - exactly what the alias
+    entry normalised its body into.
+    """
+    start_id = batches.workflow.issue_batch_start({"kind": "batch"})["start"]["start_id"]
+    targets = [{"ppu_alias": alias, "site_ids": [request.get("site_id", 2)]}]
+    rest = {key: value for key, value in request.items() if key != "site_id"}
+    return batches.start_batch({**rest, "targets": targets, "start_id": start_id})
+
+
 def final(batches, started):
-    return batches.status(ALIAS, started["batch"]["batch_id"])["batch"]
+    return batches.status_batch(started["batch"]["batch_id"])["batch"]
 
 
 # ------------------------------------------------------------------ policy
@@ -62,7 +75,7 @@ def final(batches, started):
 def test_policy_is_validated_and_repeat_is_not_implemented(tmp_path, policy, code):
     batches, _w, gateway = rig(tmp_path)
     with pytest.raises(ProgrammingError) as caught:
-        batches.start(ALIAS, {**ops_body(FULL), **policy})
+        start(batches, ALIAS, {**ops_body(FULL), **policy})
     assert caught.value.code == code and gateway.posts == []
     assert json.loads((tmp_path / "batches.json").read_text())["batches"] == [] \
         if (tmp_path / "batches.json").exists() else True
@@ -79,7 +92,7 @@ def test_a_batch_takes_an_operations_list_never_a_read_or_flash_cycle(tmp_path):
                     {**ops_body(FULL), "operation": "flash_cycle"},
                     {k: v for k, v in ops_body(FULL).items() if k != "operations"}):
         with pytest.raises(ProgrammingError) as caught:
-            batches.start(ALIAS, request)
+            start(batches, ALIAS, request)
         assert caught.value.code == "invalid_request"
     assert gateway.posts == []
 
@@ -88,7 +101,7 @@ def test_a_batch_takes_an_operations_list_never_a_read_or_flash_cycle(tmp_path):
 
 def test_pass_on_the_first_attempt_is_one_job_and_counts_once(tmp_path):
     batches, _w, gateway = rig(tmp_path)
-    batch = final(batches, batches.start(ALIAS, body(retry_limit=3)))
+    batch = final(batches, start(batches, ALIAS, body(retry_limit=3)))
     assert batch["outcome"] == "PASS" and batch["state"] == "finished"
     assert len(batch["attempts"]) == 1 and len(gateway.posts) == 1
     assert batch["counts"] == {"pass": 1, "fail": 0, "blocked": 0, "unknown": 0,
@@ -101,7 +114,7 @@ def test_pass_on_the_first_attempt_is_one_job_and_counts_once(tmp_path):
 
 def test_definite_fail_is_retried_with_a_new_plan_run_and_job_then_passes(tmp_path):
     batches, workflow, gateway = rig(tmp_path, job_final=["failed", "success"])
-    batch = final(batches, batches.start(ALIAS, body(retry_limit=2)))
+    batch = final(batches, start(batches, ALIAS, body(retry_limit=2)))
     assert batch["outcome"] == "PASS"
     first, second = batch["attempts"]
     assert (first["outcome"], second["outcome"]) == ("FAIL", "PASS")
@@ -123,7 +136,7 @@ def test_definite_fail_is_retried_with_a_new_plan_run_and_job_then_passes(tmp_pa
 
 def test_retry_limit_bounds_the_attempts_and_the_batch_fails_once(tmp_path):
     batches, _w, gateway = rig(tmp_path, job_final="failed")
-    batch = final(batches, batches.start(ALIAS, body(retry_limit=2)))
+    batch = final(batches, start(batches, ALIAS, body(retry_limit=2)))
     assert batch["outcome"] == "FAIL" and batch["reason"] == "RETRY_LIMIT_EXHAUSTED"
     assert len(batch["attempts"]) == 3 == len(gateway.posts)
     assert [a["retry"]["decision"] for a in batch["attempts"]] == ["RETRY", "RETRY", "NO_RETRY"]
@@ -133,7 +146,7 @@ def test_retry_limit_bounds_the_attempts_and_the_batch_fails_once(tmp_path):
 
 def test_retry_limit_zero_never_retries_and_keeps_the_run_reason(tmp_path):
     batches, _w, gateway = rig(tmp_path, job_final="failed")
-    batch = final(batches, batches.start(ALIAS, body(retry_limit=0)))
+    batch = final(batches, start(batches, ALIAS, body(retry_limit=0)))
     assert batch["outcome"] == "FAIL" and batch["reason"] == "JOB_NOT_SUCCESS"
     assert len(gateway.posts) == 1
 
@@ -151,7 +164,7 @@ def test_retry_limit_zero_never_retries_and_keeps_the_run_reason(tmp_path):
 ])
 def test_only_a_definite_safe_fail_is_ever_retried(tmp_path, gateway_kw, outcome, why):
     batches, workflow, gateway = rig(tmp_path, **gateway_kw)
-    batch = final(batches, batches.start(ALIAS, body(retry_limit=3)))
+    batch = final(batches, start(batches, ALIAS, body(retry_limit=3)))
     assert batch["outcome"] == outcome
     assert len(batch["attempts"]) == 1 and len(gateway.posts) == 1  # never resubmitted
     if outcome == "OUTCOME_UNKNOWN":
@@ -159,7 +172,7 @@ def test_only_a_definite_safe_fail_is_ever_retried(tmp_path, gateway_kw, outcome
         # Still latched. A new Batch is a valid request, so it is admitted and
         # journalled - but the latch is that PPU's readiness, so its only
         # Target is BLOCKED and nothing is submitted.
-        again = batches.start(ALIAS, body(retry_limit=1))["batch"]
+        again = start(batches, ALIAS, body(retry_limit=1))["batch"]
         assert again["outcome"] == "BLOCKED" and again["execution_status"] == "COMPLETED"
         assert again["units"][0]["reason"] == "ADMISSION_OUTCOME_UNKNOWN_UNRESOLVED"
         assert again["units"][0]["failure_domain"] == "TARGET_NOT_READY"
@@ -184,7 +197,7 @@ def test_retry_is_refused_when_the_ppu_is_not_released(tmp_path):
         return original(method, path, **kw)
 
     gateway.relay = relay
-    batch = final(batches, batches.start(ALIAS, body(retry_limit=3)))
+    batch = final(batches, start(batches, ALIAS, body(retry_limit=3)))
     assert batch["outcome"] == "FAIL"
     assert batch["reason"] == "RETRY_NOT_ELIGIBLE_PPU_NOT_RELEASED_SITE_NOT_READY_OR_BUSY"
     assert len(gateway.posts) == 1
@@ -203,7 +216,7 @@ def test_recovery_required_blocks_a_retry(tmp_path):
             else state
 
     workflow.coordinator.assets = assets
-    batch = final(batches, batches.start(ALIAS, body(retry_limit=2)))
+    batch = final(batches, start(batches, ALIAS, body(retry_limit=2)))
     assert batch["outcome"] == "FAIL"
     assert batch["reason"] == "RETRY_NOT_ELIGIBLE_PPU_NOT_RELEASED_PPU_RECOVERY_REQUIRED"
     assert len(gateway.posts) == 1
@@ -213,7 +226,7 @@ def test_recovery_required_blocks_a_retry(tmp_path):
 
 def test_stop_policy_failed_sites_stops_queuing_after_the_first_fail(tmp_path):
     batches, _w, gateway = rig(tmp_path, job_final="failed")
-    batch = final(batches, batches.start(
+    batch = final(batches, start(batches,
         ALIAS, body(retry_limit=3, stop_policy={"kind": "failed_sites", "threshold": 1})))
     assert batch["outcome"] == "FAIL"
     assert batch["reason"] == "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED"
@@ -231,11 +244,11 @@ def test_stop_request_only_stops_queuing_and_never_touches_the_running_job(tmp_p
         # The operator presses stop while the first Job is running.
         if method == "GET" and path.startswith("/api/status?job=") and not stopped:
             batch_id = next(iter(batches._batches))
-            stopped["view"] = batches.request_stop(ALIAS, batch_id, {"stop": "STOP_QUEUING"})
+            stopped["view"] = batches.request_stop_batch(batch_id, {"stop": "STOP_QUEUING"})
         return original(method, path, **kw)
 
     gateway.relay = relay
-    batch = final(batches, batches.start(ALIAS, body(retry_limit=3)))
+    batch = final(batches, start(batches, ALIAS, body(retry_limit=3)))
     assert stopped["view"]["batch"]["stop_requested"] is True
     assert stopped["view"]["batch"]["outcome"] is None  # the running attempt is not cut
     # The running Job was observed to its real end; nothing was cancelled.
@@ -250,12 +263,12 @@ def test_stop_request_only_stops_queuing_and_never_touches_the_running_job(tmp_p
 def test_stop_before_any_submission_submits_nothing(tmp_path):
     pending = []
     batches, _w, gateway = rig(tmp_path, spawn_batch=pending.append)
-    started = batches.start(ALIAS, body(retry_limit=1))
+    started = start(batches, ALIAS, body(retry_limit=1))
     assert started["batch"]["outcome"] is None and started["batch"]["attempts"] == []
     with pytest.raises(ProgrammingError) as caught:
-        batches.request_stop(ALIAS, started["batch"]["batch_id"], {"stop": "now"})
+        batches.request_stop_batch(started["batch"]["batch_id"], {"stop": "now"})
     assert caught.value.code == "invalid_request"
-    batches.request_stop(ALIAS, started["batch"]["batch_id"], {"stop": "STOP_QUEUING"})
+    batches.request_stop_batch(started["batch"]["batch_id"], {"stop": "STOP_QUEUING"})
     pending.pop()()
     batch = final(batches, started)
     # Execution status and outcome are separate now: STOPPED is the status,
@@ -268,8 +281,8 @@ def test_stop_before_any_submission_submits_nothing(tmp_path):
 
 def test_stop_never_ends_or_acknowledges_an_unknown_run(tmp_path):
     batches, workflow, gateway = rig(tmp_path, post_raises=True)
-    started = batches.start(ALIAS, body(retry_limit=2))
-    batch = batches.request_stop(ALIAS, started["batch"]["batch_id"], {"stop": "STOP_QUEUING"})["batch"]
+    started = start(batches, ALIAS, body(retry_limit=2))
+    batch = batches.request_stop_batch(started["batch"]["batch_id"], {"stop": "STOP_QUEUING"})["batch"]
     assert batch["outcome"] == "OUTCOME_UNKNOWN" and batch["stop_requested"] is False
     assert workflow._unknown_latched(ALIAS) is not None
 
@@ -279,13 +292,13 @@ def test_stop_never_ends_or_acknowledges_an_unknown_run(tmp_path):
 def test_one_batch_per_ppu_and_refused_plan_creates_no_batch(tmp_path):
     pending = []
     batches, _w, gateway = rig(tmp_path, spawn_batch=pending.append)
-    batches.start(ALIAS, body())
+    start(batches, ALIAS, body())
     with pytest.raises(ProgrammingError) as caught:
-        batches.start(ALIAS, body())
+        start(batches, ALIAS, body())
     assert caught.value.code == "programming_batch_in_progress"
     other, _w2, gateway2 = rig(tmp_path / "other")
     with pytest.raises(ProgrammingError) as caught:
-        other.start(ALIAS, body(operations=["erase", "verify"]))
+        start(other, ALIAS, body(operations=["erase", "verify"]))
     assert caught.value.code == "operations_invalid"
     assert other._batches == {} and gateway2.posts == [] and gateway.posts == []
 
@@ -294,9 +307,9 @@ def test_manager_restart_never_resubmits_and_closes_the_batch_conservatively(tmp
     # 1) Stopped before any submission: nothing reached the PPU.
     pending = []
     batches, workflow, gateway = rig(tmp_path, spawn_batch=pending.append)
-    started = batches.start(ALIAS, body(retry_limit=2))
+    started = start(batches, ALIAS, body(retry_limit=2))
     again = ProgrammingBatchCoordinator(workflow, journal_path=tmp_path / "batches.json")
-    batch = again.status(ALIAS, started["batch"]["batch_id"])["batch"]
+    batch = again.status_batch(started["batch"]["batch_id"])["batch"]
     assert (batch["outcome"], batch["reason"]) == ("BLOCKED", "MANAGER_RESTARTED_BEFORE_SUBMISSION")
     assert gateway.posts == []
 
@@ -306,7 +319,7 @@ def test_manager_restart_never_resubmits_and_closes_the_batch_conservatively(tmp
     batches, workflow, gateway = rig(root)
     workflow.spawn = held.append  # the run never executes (Manager dies)
     batches.spawn = lambda target: held.append(target)
-    started = batches.start(ALIAS, body(retry_limit=2))
+    started = start(batches, ALIAS, body(retry_limit=2))
     batch_job = held.pop()
 
     class Died(BaseException):
@@ -325,13 +338,13 @@ def test_manager_restart_never_resubmits_and_closes_the_batch_conservatively(tmp
                            resource_for=lambda _a: OPS_RESOURCE_SHA)
     workflow2, _c, _g = remake(root, coordinator=coord, gateway=gateway2)
     reloaded = ProgrammingBatchCoordinator(workflow2, journal_path=root / "batches.json")
-    batch = reloaded.status(ALIAS, started["batch"]["batch_id"])["batch"]
+    batch = reloaded.status_batch(started["batch"]["batch_id"])["batch"]
     assert (batch["outcome"], batch["reason"]) == (
         "OUTCOME_UNKNOWN", "MANAGER_RESTARTED_DURING_ATTEMPT")
     assert len(batch["attempts"]) == 1 and batch["attempts"][0]["outcome"] == "OUTCOME_UNKNOWN"
     assert gateway.posts == [] and gateway2.posts == []  # nothing was (re)submitted
     # A Batch started while that PPU is latched is admitted and submits nothing.
-    again = reloaded.start(ALIAS, body())["batch"]
+    again = start(reloaded, ALIAS, body())["batch"]
     assert again["outcome"] == "BLOCKED"
     assert again["units"][0]["reason"] == "ADMISSION_OUTCOME_UNKNOWN_UNRESOLVED"
     assert gateway.posts == [] and gateway2.posts == []

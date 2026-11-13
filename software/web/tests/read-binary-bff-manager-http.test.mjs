@@ -202,8 +202,17 @@ test("the READ binary path adds no retry and no second Content-Length producer",
     readFile(new URL("../../python/plasma_manager/bootstrap_server.py", import.meta.url), "utf8"),
     readFile(new URL("../../python/plasma_manager/server.py", import.meta.url), "utf8"),
   ]);
-  assert.equal(bff.match(/\bfetch\(/g).length, 1);
-  assert.doesNotMatch(bff, /\bfor\s*\(|\bwhile\s*\(|attempt/i);
+  // One fetch per relay: neither the alias-scoped Bootstrap relay nor the
+  // canonical programming relay ever repeats a request.
+  const relays = bff.split("export async function ").slice(1);
+  assert.equal(relays.length, 2);
+  for (const relay of relays) assert.equal(relay.match(/\bfetch\(/g).length, 1);
+  assert.doesNotMatch(bff, /\bwhile\s*\(|attempt/i);
+  // The only loops read the Target Set and check each Target's capability.
+  // Neither sends anything, so neither can become a retry.
+  assert.deepEqual(
+    [...bff.matchAll(/\bfor \(const (\w+) of (\w+)\)/g)].map(match => `${match[1]} of ${match[2]}`),
+    ["target of targets", "alias of aliases"]);
   assert.doesNotMatch(handler, /["']Content-Length["']/);
   assert.match(server, /def _raw_response[\s\S]*?send_header\("Content-Length", str\(len\(body\)\)\)/);
 });

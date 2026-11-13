@@ -23,6 +23,7 @@ import {
   type BatchInput,
   type ImageOperation,
   type ProgrammingBatch,
+  type ProgrammingBatchUnit,
   type StopPolicy,
   type ProgrammingOperation,
   type ProgrammingPlan,
@@ -353,7 +354,8 @@ export type StartIdentity = {
   /** Manager-issued: the run's plan ID, or the Batch start ID. */
   startId: string;
   kind: "run" | "batch";
-  siteId: number;
+  /** One Site for a run; every Site the Batch covers on this PPU. */
+  siteIds: readonly number[];
   operation: string;
   /** Known for a run (from its plan); a Batch plans inside the Manager. */
   jobBindingSha256: string | null;
@@ -368,7 +370,7 @@ export class ManagedStartOutcomeUnknown extends Error {
 }
 
 export type StartHoldIdentity = {
-  alias: string; siteId: number; kind: "READ" | "PROGRAMMING";
+  alias: string; siteIds: readonly number[]; kind: "READ" | "PROGRAMMING";
   startId: string | null; jobBindingSha256: string | null;
 };
 
@@ -387,6 +389,22 @@ export type StartReconciliationDecision =
  * The answer must be about THIS start on THIS PPU, Site and Job Binding;
  * anything else, and anything the Manager cannot prove, keeps the hold.
  */
+/**
+ * The Sites this start is on record for, ascending, or null when the Manager
+ * has none yet. A Batch records its whole Target Set; a run records one Site.
+ */
+function recordedSites(
+  identity: NonNullable<StartReconciliation["identity"]>, alias: string,
+): number[] | null {
+  const targets = identity.targets;
+  if (targets != null) {
+    const mine = targets.filter(target => target.ppu_alias === alias);
+    if (mine.length === 0) return [];
+    return mine.flatMap(target => [...target.site_ids]).sort((left, right) => left - right);
+  }
+  return identity.site_id == null ? null : [identity.site_id];
+}
+
 export function decideStartReconciliation(
   hold: StartHoldIdentity, answer: StartReconciliation,
 ): StartReconciliationDecision {
@@ -395,17 +413,24 @@ export function decideStartReconciliation(
   if (answer.schema !== "plasma.manager.programming-start-reconciliation.v1" || answer.read_only !== true) {
     return blocked("the Manager answer is not a Start reconciliation");
   }
-  if (answer.start_id !== hold.startId || answer.ppu_alias !== hold.alias) {
+  // A Batch start names no PPU until a Target Set is admitted with it, so a
+  // missing alias is not a mismatch; a DIFFERENT alias still is.
+  if (answer.start_id !== hold.startId
+    || (answer.ppu_alias != null && answer.ppu_alias !== hold.alias)) {
     return blocked("the Manager answered for another start or PPU");
   }
   const identity = answer.identity;
   if (identity) {
     const wantedKind = hold.kind === "READ" ? "run" : "batch";
-    const siteKnown = identity.site_id != null;
-    if (answer.kind !== wantedKind || identity.ppu_alias !== hold.alias
-      || (siteKnown && identity.site_id !== hold.siteId)
+    const wantedSites = [...hold.siteIds].sort((left, right) => left - right);
+    const recorded = recordedSites(identity, hold.alias);
+    const sitesKnown = recorded !== null;
+    if (answer.kind !== wantedKind
+      || (identity.ppu_alias != null && identity.ppu_alias !== hold.alias)
+      || (identity.ppu_alias == null && wantedKind !== "batch")
+      || (sitesKnown && JSON.stringify(recorded) !== JSON.stringify(wantedSites))
       // Only a Batch that was never admitted has no Site on record yet.
-      || (!siteKnown && !(wantedKind === "batch" && (answer.state === "ACCEPTANCE_PENDING" || answer.state === "NOT_ACCEPTED")))
+      || (!sitesKnown && !(wantedKind === "batch" && (answer.state === "ACCEPTANCE_PENDING" || answer.state === "NOT_ACCEPTED")))
       || (hold.kind === "READ" && identity.operation !== "read")
       || (hold.kind === "PROGRAMMING" && identity.operation !== "programming")
       || (hold.jobBindingSha256 != null && identity.job_binding_sha256 !== hold.jobBindingSha256)) {
@@ -533,7 +558,7 @@ export async function runManagedProgramming(
     }
     throw new ManagedStartOutcomeUnknown(plan.plan_id,
       `The start request outcome is unknown (${message}). Nothing was resubmitted.`,
-      { startId: plan.plan_id, kind: "run", siteId: plan.site_id, operation: plan.operation,
+      { startId: plan.plan_id, kind: "run", siteIds: [plan.site_id], operation: plan.operation,
         jobBindingSha256: plan.job_binding_sha256 });
   }
   events.onRun?.(run);
@@ -610,7 +635,7 @@ export async function runManagedRead(
     }
     throw new ManagedStartOutcomeUnknown(plan.plan_id,
       `The Read Memory start outcome is unknown (${message}). Nothing was resubmitted.`,
-      { startId: plan.plan_id, kind: "run", siteId: plan.site_id, operation: "read",
+      { startId: plan.plan_id, kind: "run", siteIds: [plan.site_id], operation: "read",
         jobBindingSha256: plan.job_binding_sha256 });
   }
   events.onRun?.(run);
@@ -628,8 +653,12 @@ export async function runManagedRead(
   }
 }
 
-export type ManagedBatchRequest = Extract<ManagedRunRequest, { operations: readonly SequenceOperation[] }>
-  & { retryLimit: number; stopPolicy: StopPolicy };
+/** Distributes over the request union, so narrowing by `file` still works. */
+type WithoutSite<T> = T extends unknown ? Omit<T, "siteId"> : never;
+
+export type ManagedBatchRequest =
+  WithoutSite<Extract<ManagedRunRequest, { operations: readonly SequenceOperation[] }>>
+  & { siteIds: readonly number[]; retryLimit: number; stopPolicy: StopPolicy };
 
 export type ManagedBatchEvents = {
   onLocked?: (input: LockedInput) => void;
@@ -660,7 +689,7 @@ export async function runManagedBatch(
     }
   }
   const common = {
-    icpn: request.icpn, siteId: request.siteId,
+    icpn: request.icpn, alias: request.alias, siteIds: [...request.siteIds],
     retryLimit: request.retryLimit, stopPolicy: request.stopPolicy,
   };
   const input: BatchInput = request.file === null
@@ -672,7 +701,7 @@ export async function runManagedBatch(
   // reconciled. Issuing it submits nothing: a failure here is a refusal.
   let startId: string;
   try {
-    startId = await issueBatchStart(request.alias);
+    startId = await issueBatchStart();
     if (!/^[0-9a-f]{32}$/.test(startId)) throw new Error("the Manager issued no start ID");
   } catch (reason) {
     const { code, message } = errorParts(reason);
@@ -681,7 +710,7 @@ export async function runManagedBatch(
   }
   let batch: ProgrammingBatch;
   try {
-    batch = await startProgrammingBatch(request.alias, input, startId);
+    batch = await startProgrammingBatch(input, startId);
   } catch (reason) {
     const { status, code, message } = errorParts(reason);
     // A 4xx is a definite refusal: no Batch exists and no Job was submitted.
@@ -690,14 +719,15 @@ export async function runManagedBatch(
     }
     throw new ManagedStartOutcomeUnknown(startId,
       `The Batch request outcome is unknown (${message}). Nothing was resubmitted.`,
-      { startId, kind: "batch", siteId: request.siteId, operation: "programming", jobBindingSha256: null });
+      { startId, kind: "batch", siteIds: [...request.siteIds],
+        operation: "programming", jobBindingSha256: null });
   }
   events.onBatch?.(batch);
   while (batch.outcome == null) {
     await new Promise(resolve => setTimeout(resolve, MANAGED_POLL_MS));
     if (signal?.aborted) return batch;
     try {
-      batch = await getProgrammingBatch(request.alias, batch.batch_id);
+      batch = await getProgrammingBatch(batch.batch_id);
       events.onBatch?.(batch);
     } catch (reason) {
       events.onPollError?.(`${errorParts(reason).message}; nothing was resubmitted`);
@@ -706,24 +736,58 @@ export async function runManagedBatch(
   return batch;
 }
 
-export type BatchVerdict = RunVerdict | "STOPPED";
+export type BatchVerdict = RunVerdict | "PARTIAL" | "STOPPED";
 
 /**
- * Batch verdict. PASS needs the Manager Batch outcome AND a last run whose
- * receipt passes `runVerdict` for exactly the requested list on this PPU/Site.
+ * One Site's verdict. PASS needs that Site's Manager outcome AND the receipt
+ * of its last attempt passing `runVerdict` for exactly the requested list on
+ * exactly that PPU and Site. A Site whose run record is missing is not a PASS.
  */
-export function batchVerdict(batch: ProgrammingBatch): { verdict: BatchVerdict; reason: string | null } {
-  if (batch.outcome == null) return { verdict: "RUNNING", reason: null };
-  if (batch.outcome !== "PASS") return { verdict: batch.outcome, reason: batch.reason };
-  const run = batch.current_run;
+export function batchSiteVerdict(
+  batch: ProgrammingBatch, unit: ProgrammingBatchUnit, run: ProgrammingRun | null,
+): { verdict: BatchVerdict; reason: string | null } {
+  if (unit.outcome == null) return { verdict: "RUNNING", reason: null };
+  if (unit.outcome !== "PASS") return { verdict: unit.outcome, reason: unit.reason };
   if (!run) return { verdict: "FAIL", reason: "RUN_RECORD_MISSING" };
   const last = runVerdict(run);
   if (last.verdict !== "PASS") return { verdict: "FAIL", reason: last.reason ?? "LAST_RUN_NOT_PASS" };
-  if (run.ppu_alias !== batch.ppu_alias || run.site_id !== batch.site_id
+  if (run.ppu_alias !== unit.ppu_alias || run.site_id !== unit.site_id
     || JSON.stringify(run.receipt?.operations) !== JSON.stringify(batch.operations)) {
     return { verdict: "FAIL", reason: "RUN_DOES_NOT_MATCH_BATCH" };
   }
   return { verdict: "PASS", reason: null };
+}
+
+/**
+ * Batch verdict, derived from the Sites and never instead of them.
+ *
+ * The Manager's aggregate is necessary but not sufficient: a PASS also needs
+ * EVERY Site to pass `batchSiteVerdict`, and the Browser only ever holds the
+ * run of the latest attempt, so a Site whose run it cannot see is not proven.
+ * Worst wins, in the Manager's own priority order.
+ */
+export function batchVerdict(batch: ProgrammingBatch): { verdict: BatchVerdict; reason: string | null } {
+  if (batch.outcome == null) return { verdict: "RUNNING", reason: null };
+  if (batch.outcome !== "PASS" && batch.outcome !== "PARTIAL") {
+    return { verdict: batch.outcome, reason: batch.reason };
+  }
+  const order: BatchVerdict[] = ["OUTCOME_UNKNOWN", "FAIL", "BLOCKED", "PARTIAL", "RUNNING", "PASS"];
+  let worst: { verdict: BatchVerdict; reason: string | null } = { verdict: "PASS", reason: null };
+  for (const unit of batch.units) {
+    const judged = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
+    if (order.indexOf(judged.verdict) < order.indexOf(worst.verdict)) worst = judged;
+  }
+  if (batch.outcome === "PARTIAL" && worst.verdict === "PASS") {
+    return { verdict: "PARTIAL", reason: batch.reason };
+  }
+  return worst;
+}
+
+/** The run the Browser holds for one Site: the latest attempt's, or none. */
+export function runOfUnit(batch: ProgrammingBatch, unit: ProgrammingBatchUnit): ProgrammingRun | null {
+  const run = batch.current_run;
+  if (!run) return null;
+  return run.ppu_alias === unit.ppu_alias && run.site_id === unit.site_id ? run : null;
 }
 
 export type RunVerdict = "RUNNING" | "PASS" | "FAIL" | "BLOCKED" | "OUTCOME_UNKNOWN";

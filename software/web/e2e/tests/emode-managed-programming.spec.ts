@@ -1212,7 +1212,9 @@ test("a definite FAIL is retried by the Manager with a new plan, run and Job; th
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "2");
   await start.dblclick();
-  await expect(jobLog(workspace)).toContainText(/\[RESULT\] PASS · Batch \S+ · 2 attempt\(s\) · counted once/, { timeout: 20_000 });
+  await expect(jobLog(workspace)).toContainText(
+    /\[RESULT\] PASS · Batch \S+ · 1 Site\(s\) · PASS 1 · FAIL 0 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\) · one IC per Site/,
+    { timeout: 20_000 });
   // Exactly one Batch request from the Browser; the Manager submitted two Jobs.
   expect(counters.batches).toHaveLength(1);
   expect(counters.jobs).toHaveLength(2);
@@ -1261,7 +1263,7 @@ test("a FAIL without verified SAFE_OFF is not retried", async ({ page }) => {
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "3");
   await start.click();
-  await expect(jobLog(workspace)).toContainText(/RETRY_NOT_ELIGIBLE_SAFE_OFF_NOT_VERIFIED · Batch \S+ · 1 attempt\(s\)/);
+  await expect(jobLog(workspace)).toContainText(/RETRY_NOT_ELIGIBLE_SAFE_OFF_NOT_VERIFIED · Batch \S+ · 1 Site\(s\).*1 attempt\(s\)/);
   await expect(jobLog(workspace)).toContainText("SAFE_OFF NOT VERIFIED · NO RETRY (SAFE_OFF_NOT_VERIFIED)");
   expect(counters.jobs).toHaveLength(1);
 });
@@ -1271,7 +1273,7 @@ test("Stop Policy '1 failed Site' stops queuing after the first FAIL even with r
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "3", "1");
   await start.click();
-  await expect(jobLog(workspace)).toContainText(/STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED · Batch \S+ · 1 attempt\(s\)/);
+  await expect(jobLog(workspace)).toContainText(/STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED · Batch \S+ · 1 Site\(s\).*1 attempt\(s\)/);
   expect(counters.jobs).toHaveLength(1);
 });
 
@@ -1319,4 +1321,42 @@ test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page
   expect(counters.starts).toHaveLength(1);
   await expect(jobLog(workspace)).not.toContainText("[ATTEMPT");
   await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("—");
+});
+
+// --------------------------------------------------------------------- PR-C
+test("EMode programs many Sites of one PPU as ONE Batch, and each Site is judged on its own", async ({ page }) => {
+  const counters = await mockManager(page, {
+    ppus: [{ ...Z2, enabledSites: [2, 3] }],
+    routes: [route([2, 3]), operationsRoute([2, 3])],
+    // Site 3 fails definitely; Site 2 passes. One Site's result is never the other's.
+    script: (_alias, site) => (site === 3 ? { outcome: "FAIL", reason: "PROGRAMMING_NOT_PASS" } : {}),
+  });
+  const workspace = await open(page);
+  const job = await selectIc(page);
+  await workspace.getByLabel("Select SITE 2 for programming").check();
+  await workspace.getByLabel("Select SITE 3 for programming").check();
+  await job.getByLabel("Engineering Programming Image file").setInputFiles(firmwareFile);
+  await expect(workspace.locator('tr[data-site-selected="true"]')).toHaveCount(2);
+  await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
+
+  await expect(jobLog(workspace)).toContainText(
+    /\[RESULT\] FAIL · \S+ · Batch \S+ · 2 Site\(s\) · PASS 1 · FAIL 1 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\) · one IC per Site/,
+    { timeout: 20_000 });
+  // ONE Batch carrying ONE Target Set, and one Job per Site: the Manager
+  // walks the Sites sequentially and the Browser never starts a second Batch.
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.batches[0].body.targets).toEqual([{ ppu_alias: "z2", site_ids: [2, 3] }]);
+  expect(counters.batches[0].body).not.toHaveProperty("site_id");
+  expect(counters.jobs).toHaveLength(2);
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.batches[0].body.start_id).toBe(counters.issued[0]);
+  // Every Site carries its own verdict, and the aggregate never replaces it.
+  await expect(jobLog(workspace)).toContainText("[SITE RESULT] SITE-02 · PASS");
+  await expect(jobLog(workspace)).toContainText("[SITE RESULT] SITE-03 · FAIL");
+  await expect(jobLog(workspace)).toContainText("SITE-02, SITE-03 (2 Sites)");
+  // The Batch is one IC per Site: two ICs, one PASS and one FAIL.
+  const kpis = workspace.getByLabel("Engineering Site status");
+  await expect(workspace.locator('tr[data-site-selected="true"]')).toHaveCount(2);
+  await expect(kpis).toBeVisible();
+  expect(legacyRequests(counters)).toEqual([]);
 });
