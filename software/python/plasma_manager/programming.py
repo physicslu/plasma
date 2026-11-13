@@ -697,6 +697,7 @@ class BundleProgrammingWorkflow:
             self._pending_batch_starts[start_id] = (alias, now)
             self._starts[start_id] = {
                 "start_id": start_id, "kind": "batch", "ppu_alias": alias, "site_id": None,
+                "targets": None,
                 "ppu_id": None, "operation": PROGRAMMING, "operations": None,
                 "job_binding_sha256": None, "state": "ISSUED",
                 "run_id": None, "batch_id": None, "issued_at": _now(), "updated_at": _now()}
@@ -722,8 +723,14 @@ class BundleProgrammingWorkflow:
                     "this start ID was not issued for this PPU, was already used, was "
                     "voided or expired; nothing was started")
 
-    def consume_batch_start(self, alias: str, start_id: str, batch_id: str, site: int) -> None:
-        """One start ID admits one Batch; journalled before the Batch exists."""
+    def consume_batch_start(self, alias: str, start_id: str, batch_id: str,
+                            targets: list[dict[str, Any]]) -> None:
+        """One start ID admits one Batch; journalled before the Batch exists.
+
+        The record carries the whole Target Set, because that is what was
+        admitted. A Batch admitted with some Targets BLOCKED has still
+        consumed this ID: those Targets need a NEW start, never a replay.
+        """
         with self._lock:
             self.require_batch_start(alias, start_id)
             del self._pending_batch_starts[start_id]
@@ -731,7 +738,11 @@ class BundleProgrammingWorkflow:
                 "start_id": start_id, "kind": "batch", "ppu_alias": alias, "ppu_id": None,
                 "operation": PROGRAMMING, "operations": None, "job_binding_sha256": None,
                 "run_id": None, "issued_at": _now()})
-            record.update(state="CONSUMED", batch_id=batch_id, site_id=site, updated_at=_now())
+            sites = [site for target in targets for site in target["site_ids"]]
+            record.update(state="CONSUMED", batch_id=batch_id,
+                          targets=[dict(target) for target in targets],
+                          site_id=sites[0] if len(sites) == 1 else None,
+                          updated_at=_now())
             self._persist_locked()
 
     def void_start(self, alias: str, start_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -814,16 +825,21 @@ class BundleProgrammingWorkflow:
                     return unknown("RUN_OUTCOME_UNRECOGNIZED")
                 return {"ok": True, "reconciliation": view}
             if batch is not None:
-                if batch.get("ppu_alias") != alias or batch.get("start_id") != start_id:
+                targets = batch.get("targets") or []
+                aliases = [target["ppu_alias"] for target in targets]
+                sites = [site for target in targets for site in target["site_ids"]]
+                if alias not in aliases or batch.get("start_id") != start_id:
                     return unknown("START_IDENTITY_MISMATCH")
                 if record is not None and (
                         record["kind"] != "batch" or record["state"] != "CONSUMED"
                         or record.get("batch_id") != batch.get("batch_id")
-                        or record.get("site_id") != batch.get("site_id")):
+                        or record.get("targets") != targets):
                     return unknown("JOURNAL_INCONSISTENT")
-                attempts = batch.get("attempts") or []
+                attempts = [attempt for unit in batch.get("units") or []
+                            for attempt in unit.get("attempts") or []]
                 view.update(kind="batch", batch=batch, outcome=batch.get("outcome"), identity={
-                    "ppu_alias": alias, "site_id": batch.get("site_id"), "ppu_id": None,
+                    "ppu_alias": alias, "site_id": sites[0] if len(sites) == 1 else None,
+                    "targets": targets, "ppu_id": None,
                     "operation": PROGRAMMING, "operations": batch.get("operations"),
                     "job_binding_sha256": (attempts[-1].get("job_binding_sha256")
                                            if attempts else None)})
@@ -836,7 +852,7 @@ class BundleProgrammingWorkflow:
                     if isinstance(current, dict) and current.get("outcome") == "OUTCOME_UNKNOWN":
                         view.update(acknowledged=bool(current.get("acknowledged")),
                                     unknown_run_id=current.get("run_id"))
-                elif outcome in ("PASS", "FAIL", "BLOCKED", "STOPPED"):
+                elif outcome in ("PASS", "FAIL", "PARTIAL", "BLOCKED"):
                     view.update(state="TERMINAL_CONFIRMED", reason=batch.get("reason"))
                 else:
                     return unknown("BATCH_OUTCOME_UNRECOGNIZED")
@@ -845,6 +861,7 @@ class BundleProgrammingWorkflow:
                 return unknown("START_NOT_RECORDED")
             view.update(kind=record["kind"], identity={
                 "ppu_alias": record["ppu_alias"], "site_id": record.get("site_id"),
+                "targets": record.get("targets"),
                 "ppu_id": record.get("ppu_id"), "operation": record.get("operation"),
                 "operations": record.get("operations"),
                 "job_binding_sha256": record.get("job_binding_sha256")})

@@ -91,7 +91,8 @@ def test_pass_on_the_first_attempt_is_one_job_and_counts_once(tmp_path):
     batch = final(batches, batches.start(ALIAS, body(retry_limit=3)))
     assert batch["outcome"] == "PASS" and batch["state"] == "finished"
     assert len(batch["attempts"]) == 1 and len(gateway.posts) == 1
-    assert batch["counts"] == {"pass": 1, "fail": 0, "attempts": 1}
+    assert batch["counts"] == {"pass": 1, "fail": 0, "blocked": 0, "unknown": 0,
+                               "sites": 1, "attempts": 1}
     assert batch["policy"] == {"repeat": 1, "retry_limit": 3, "stop_policy": {"kind": "never"}}
     assert batch["auto_retry"] == "DISABLED" and batch["operations"] == FULL
     assert batch["current_run"]["outcome"] == "PASS"
@@ -116,7 +117,8 @@ def test_definite_fail_is_retried_with_a_new_plan_run_and_job_then_passes(tmp_pa
         run = workflow.run_status(ALIAS, run_id)["run"]
         assert run["job_submission_count"] == 1 and run["auto_retry"] == "DISABLED"
     # The Batch is ONE IC: one PASS, no FAIL, never double counted.
-    assert batch["counts"] == {"pass": 1, "fail": 0, "attempts": 2}
+    assert batch["counts"] == {"pass": 1, "fail": 0, "blocked": 0, "unknown": 0,
+                               "sites": 1, "attempts": 2}
 
 
 def test_retry_limit_bounds_the_attempts_and_the_batch_fails_once(tmp_path):
@@ -125,7 +127,8 @@ def test_retry_limit_bounds_the_attempts_and_the_batch_fails_once(tmp_path):
     assert batch["outcome"] == "FAIL" and batch["reason"] == "RETRY_LIMIT_EXHAUSTED"
     assert len(batch["attempts"]) == 3 == len(gateway.posts)
     assert [a["retry"]["decision"] for a in batch["attempts"]] == ["RETRY", "RETRY", "NO_RETRY"]
-    assert batch["counts"] == {"pass": 0, "fail": 1, "attempts": 3}
+    assert batch["counts"] == {"pass": 0, "fail": 1, "blocked": 0, "unknown": 0,
+                               "sites": 1, "attempts": 3}
 
 
 def test_retry_limit_zero_never_retries_and_keeps_the_run_reason(tmp_path):
@@ -252,8 +255,12 @@ def test_stop_before_any_submission_submits_nothing(tmp_path):
     batches.request_stop(ALIAS, started["batch"]["batch_id"], {"stop": "STOP_QUEUING"})
     pending.pop()()
     batch = final(batches, started)
-    assert batch["outcome"] == "STOPPED" and batch["reason"] == "STOP_REQUESTED_NOTHING_SUBMITTED"
-    assert gateway.posts == [] and batch["counts"] == {"pass": 0, "fail": 0, "attempts": 0}
+    # Execution status and outcome are separate now: STOPPED is the status,
+    # and the outcome is what the Targets say - nothing executed, so BLOCKED.
+    assert batch["execution_status"] == "STOPPED"
+    assert batch["outcome"] == "BLOCKED" and batch["reason"] == "STOP_REQUESTED_NOTHING_SUBMITTED"
+    assert gateway.posts == [] and batch["counts"] == {
+        "pass": 0, "fail": 0, "blocked": 0, "unknown": 0, "sites": 1, "attempts": 0}
 
 
 def test_stop_never_ends_or_acknowledges_an_unknown_run(tmp_path):
