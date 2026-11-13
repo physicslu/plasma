@@ -16,7 +16,10 @@ from .bootstrap import (
     ManagerBootstrapCoordinator,
 )
 from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
-from .programming import BundleProgrammingWorkflow, ProgrammingError
+from .programming import (
+    SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
+    BundleProgrammingWorkflow, ProgrammingError,
+)
 from .programming_batch import ProgrammingBatchCoordinator
 from .registry import RegistryEntryNotFound
 from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
@@ -225,23 +228,32 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         return False
 
     @classmethod
-    def platform_gate_reason(cls, alias: str) -> str | None:
-        """The same gate as a reason string, for a caller that is not a request.
+    def platform_gate_reason(cls, alias: str) -> tuple[str, str] | None:
+        """The same gate, classified by failure domain, for a non-request caller.
 
         The Batch coordinator re-evaluates this immediately before it operates
         each PPU, long after the request that admitted the Batch is gone, so it
         cannot borrow a live handler. The probe below carries no instance state
-        at all: every helper it reaches reads class-level Manager state (the
-        fleet poller, the Bootstrap coordinator, the registry), which is what
-        this judgement is made of. A PPU whose Platform state cannot be read is
-        never "ready".
+        at all: every helper it reaches reads class-level Manager state - the
+        fleet poller, the Bootstrap coordinator, the registry - which is what
+        this judgement is made of.
+
+        Those three ARE the shared control. If any of them is missing, this
+        gate cannot be executed at all, and that is not one PPU's problem: it
+        is reported as a shared failure rather than quietly degrading into
+        "no fleet entry, therefore idle", which would let an unjudged PPU
+        through. A failure while reading ONE PPU's Platform state is local to
+        that PPU, and nothing has been submitted for it at this point.
         """
+        if cls.registry_store is None or cls.poller is None or cls.bootstrap_coordinator is None:
+            return SHARED_CONTROL_FAILURE, "MANAGER_CONTROL_PLANE_UNAVAILABLE"
         probe = object.__new__(cls)
         try:
             block = cls._platform_mutation_block(probe, alias)
         except Exception as exc:  # noqa: BLE001 - unreadable is never ready
-            return f"PPU_PLATFORM_STATE_UNREADABLE_{type(exc).__name__}"
-        return block[0].upper() if block is not None else None
+            return (TARGET_STATE_UNAVAILABLE,
+                    f"PPU_PLATFORM_STATE_UNREADABLE_{type(exc).__name__}")
+        return None if block is None else (TARGET_NOT_READY, block[0].upper())
 
     def _platform_mutation_block(self, alias: str) -> tuple[str, str] | None:
         # Platform maintenance authorization is independent from programming

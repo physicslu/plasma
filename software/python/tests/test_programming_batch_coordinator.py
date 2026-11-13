@@ -156,12 +156,15 @@ def test_only_a_definite_safe_fail_is_ever_retried(tmp_path, gateway_kw, outcome
     assert len(batch["attempts"]) == 1 and len(gateway.posts) == 1  # never resubmitted
     if outcome == "OUTCOME_UNKNOWN":
         assert batch["attempts"][0]["retry"] is None
-        # Still latched: neither a new Batch nor a single run can start.
-        with pytest.raises(ProgrammingError) as caught:
-            batches.start(ALIAS, body(retry_limit=1))
-        assert caught.value.code == "programming_outcome_unknown_unresolved"
-        assert len(batches._batches) == 1  # the refused request created no Batch
-        assert len(gateway.posts) == 1
+        # Still latched. A new Batch is a valid request, so it is admitted and
+        # journalled - but the latch is that PPU's readiness, so its only
+        # Target is BLOCKED and nothing is submitted.
+        again = batches.start(ALIAS, body(retry_limit=1))["batch"]
+        assert again["outcome"] == "BLOCKED" and again["execution_status"] == "COMPLETED"
+        assert again["units"][0]["reason"] == "ADMISSION_OUTCOME_UNKNOWN_UNRESOLVED"
+        assert again["units"][0]["failure_domain"] == "TARGET_NOT_READY"
+        assert again["units"][0]["attempts"] == []
+        assert len(gateway.posts) == 1  # never resubmitted
     else:
         assert batch["reason"] == why
         assert batch["attempts"][0]["retry"]["decision"] == "NO_RETRY"
@@ -327,9 +330,11 @@ def test_manager_restart_never_resubmits_and_closes_the_batch_conservatively(tmp
         "OUTCOME_UNKNOWN", "MANAGER_RESTARTED_DURING_ATTEMPT")
     assert len(batch["attempts"]) == 1 and batch["attempts"][0]["outcome"] == "OUTCOME_UNKNOWN"
     assert gateway.posts == [] and gateway2.posts == []  # nothing was (re)submitted
-    with pytest.raises(ProgrammingError) as caught:
-        reloaded.start(ALIAS, body())
-    assert caught.value.code == "programming_outcome_unknown_unresolved"
+    # A Batch started while that PPU is latched is admitted and submits nothing.
+    again = reloaded.start(ALIAS, body())["batch"]
+    assert again["outcome"] == "BLOCKED"
+    assert again["units"][0]["reason"] == "ADMISSION_OUTCOME_UNKNOWN_UNRESOLVED"
+    assert gateway.posts == [] and gateway2.posts == []
 
 
 def test_unreadable_batch_journal_refuses_to_start(tmp_path):

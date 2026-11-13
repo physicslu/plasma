@@ -89,6 +89,24 @@ MAX_RUNS_RETAINED = 64
 JOB_TERMINAL = frozenset({"success", "failed", "error", "cancelled", "timeout", "aborted"})
 RUN_TERMINAL = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN", "BLOCKED"})
 
+#: Failure domains. What failed decides who is stopped, and an exception
+#: type, an HTTP status or a timeout never decides this on its own.
+#:  * ``TARGET_NOT_READY``        - this PPU says, readably, that it cannot be
+#:                                  operated now. Block this Target.
+#:  * ``TARGET_STATE_UNAVAILABLE``- this PPU's own state cannot be read while
+#:                                  nothing has been submitted for it. The
+#:                                  doubt is local: block this Target.
+#:  * ``TARGET_TRANSACTION_UNKNOWN`` - a Job for this PPU may have been
+#:                                  submitted and its result is unknown. Latch
+#:                                  this PPU; never resend.
+#:  * ``SHARED_CONTROL_FAILURE``  - the Manager's own shared safety control is
+#:                                  not usable. Nothing further is submitted,
+#:                                  for any PPU.
+TARGET_NOT_READY = "TARGET_NOT_READY"
+TARGET_STATE_UNAVAILABLE = "TARGET_STATE_UNAVAILABLE"
+TARGET_TRANSACTION_UNKNOWN = "TARGET_TRANSACTION_UNKNOWN"
+SHARED_CONTROL_FAILURE = "SHARED_CONTROL_FAILURE"
+
 
 class ProgrammingError(Exception):
     def __init__(self, status: int, code: str, message: str) -> None:
@@ -388,32 +406,60 @@ class BundleProgrammingWorkflow:
                 return run
         return None
 
-    def retry_block(self, alias: str, site: int) -> str | None:
-        """Why another attempt may NOT be submitted now (None: nothing blocks).
+    def target_block(self, alias: str, site: int) -> tuple[str, str] | None:
+        """Why this Target may not be operated now, and WHOSE failure it is.
 
-        Read-only. Used by the Batch coordinator after a definite FAIL: the
-        PPU must be reachable, its Site idle with no Job and no held execution
-        lease, no run of this PPU active or OUTCOME_UNKNOWN, and the Active
-        Asset Set must not require recovery. Any doubt blocks the retry.
+        Read-only. The PPU must be reachable, its Site idle with no Job and no
+        held execution lease, no run of this PPU active or OUTCOME_UNKNOWN,
+        and the Active Asset Set must not require recovery. Any doubt blocks
+        it.
+
+        Every answer here is about ONE PPU, and says so. A PPU that readably
+        refuses is ``TARGET_NOT_READY``; a PPU whose own state cannot be read
+        is ``TARGET_STATE_UNAVAILABLE``, which is still local because nothing
+        has been submitted for it. Nothing in this method may conclude that
+        the Manager's shared control failed - that judgement belongs to the
+        caller that owns the shared control.
         """
         with self._lock:
             if self._unknown_latched(alias) is not None:
-                return "OUTCOME_UNKNOWN_UNRESOLVED"
+                return TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED"
             if self._active_run(alias) is not None:
-                return "RUN_IN_PROGRESS"
+                return TARGET_NOT_READY, "RUN_IN_PROGRESS"
         try:
             record = self._record(alias)
-            if getattr(record, "lifecycle", None) != "commissioned":
-                return "PPU_NOT_ENABLED"
+        except ProgrammingError as exc:
+            return TARGET_NOT_READY, exc.code.upper()
+        if getattr(record, "lifecycle", None) != "commissioned":
+            return TARGET_NOT_READY, "PPU_NOT_ENABLED"
+        try:
             if self.coordinator.assets(alias).get("state") == "RECOVERY_REQUIRED":
-                return "PPU_RECOVERY_REQUIRED"
+                return TARGET_NOT_READY, "PPU_RECOVERY_REQUIRED"
             client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
             self._readiness(client, site, None)
         except _StepFailure as exc:
-            return exc.reason
+            return TARGET_NOT_READY, exc.reason
         except Exception as exc:  # noqa: BLE001 - unreadable state is never "released"
-            return f"PPU_STATE_UNREADABLE_{type(exc).__name__}"
+            return TARGET_STATE_UNAVAILABLE, f"PPU_STATE_UNREADABLE_{type(exc).__name__}"
         return None
+
+    def retry_block(self, alias: str, site: int) -> str | None:
+        """``target_block`` as a bare reason (None: nothing blocks a retry)."""
+        verdict = self.target_block(alias, site)
+        return None if verdict is None else verdict[1]
+
+    def batch_start_alias(self, start_id: object) -> str | None:
+        """The PPU a still-admissible Batch start was issued for.
+
+        The start ID is an idempotency token, not an authority: each Target's
+        own authority is verified independently. Resolving the PPU it was
+        ISSUED for, rather than reading it off the first Target, keeps a legal
+        start legal however the Target Set happens to be ordered.
+        """
+        with self._lock:
+            pending = (self._pending_batch_starts.get(start_id)
+                       if type(start_id) is str else None)
+            return None if pending is None else pending[0]
 
     # --------------------------------------------------------------------- API
     def list_routes(self) -> dict[str, Any]:
@@ -478,7 +524,14 @@ class BundleProgrammingWorkflow:
             self._bundle_cache[key] = value
         return value
 
-    def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
+    def _parse_request(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """Everything a programming request can be judged on by itself.
+
+        No PPU, registry, Route or Bundle is touched here. A Batch has to be
+        able to call a request invalid before it reads any Target's readiness,
+        so an illegal operations list or an unusable Image is refused even
+        when every PPU in the Target Set happens to be unready.
+        """
         allowed = {"icpn", "site_id", "operation", "operations", "image_base64",
                    "image_filename", "bundle_base64", "address", "length"}
         if not isinstance(body, Mapping) or not {"icpn", "site_id"} <= set(body) \
@@ -552,6 +605,26 @@ class BundleProgrammingWorkflow:
             address, length = body["address"], body["length"]
             if any(type(v) is not int or isinstance(v, bool) or v < 0 for v in (address, length)):
                 raise ProgrammingError(400, "invalid_request", "address and length must be integers")
+        return {"icpn": icpn, "site": site, "operations": operations,
+                "operation": operation, "image_operation": image_operation,
+                "label": label, "image": image, "archive": archive,
+                "address": address, "length": length}
+
+    def validate_specification(self, body: Mapping[str, Any]) -> None:
+        """Validate a Batch-level programming specification. Touches no PPU.
+
+        A Batch carries no Site of its own, so a Site in range stands in for
+        one. Nothing Site-specific is decided here, and each Target's own Site
+        was already validated with the Target Set.
+        """
+        self._parse_request({**dict(body), "site_id": 1})
+
+    def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
+        parsed = self._parse_request(body)
+        icpn, site = parsed["icpn"], parsed["site"]
+        operations, operation = parsed["operations"], parsed["operation"]
+        label, image, archive = parsed["label"], parsed["image"], parsed["archive"]
+        address, length = parsed["address"], parsed["length"]
         self._require_commissioned(alias)
         routes = self.routes()
         required = operations or [operation]

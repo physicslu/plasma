@@ -75,7 +75,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from .programming import BundleProgrammingWorkflow, JOB_TERMINAL, ProgrammingError
+from .programming import (
+    SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
+    TARGET_TRANSACTION_UNKNOWN, BundleProgrammingWorkflow, JOB_TERMINAL, ProgrammingError,
+)
 
 BATCH_SCHEMA = "plasma.manager.programming-batch.v2"
 JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v2"
@@ -245,25 +248,11 @@ REQUEST_INVALID_CODES = frozenset({
     "invalid_request", "operations_invalid", "image_too_large", "bundle_too_large",
 })
 
-#: A readiness reason refuses the whole Batch only when it blocked EVERY
-#: Target, and then it is reported with the code that reason has always had.
-NOTHING_READY_ERRORS = {
-    "OUTCOME_UNKNOWN_UNRESOLVED": (409, "programming_outcome_unknown_unresolved",
-                                   "a run on this PPU ended OUTCOME_UNKNOWN; reconcile "
-                                   "and acknowledge first"),
-    "RUN_IN_PROGRESS": (409, "programming_run_in_progress",
-                        "another programming run is in progress on this PPU"),
-    "PPU_RECOVERY_REQUIRED": (409, "ppu_recovery_required",
-                              "PPU Active Asset Set requires explicit recovery"),
-    "PPU_NOT_ENABLED": (409, "ppu_not_enabled",
-                        "PPU must complete Validate & Enable before programming"),
-}
-
-
-def nothing_ready_error(reason: str) -> ProgrammingError:
-    status, code, message = NOTHING_READY_ERRORS.get(
-        reason, (409, "ppu_not_ready", f"no Target PPU is ready to be operated: {reason}"))
-    return ProgrammingError(status, code, message)
+def _source_of(body: Mapping[str, Any]) -> str:
+    """The Programming Source a Batch carries, read from the request alone."""
+    if "bundle_base64" in body:
+        return "bundle"
+    return "image" if "image_base64" in body else "range"
 
 
 def _unit_status(outcome: str | None, *, stopped: bool = False) -> str:
@@ -335,56 +324,90 @@ class ProgrammingBatchCoordinator:
         self.poll_interval_s = poll_interval_s
         self._lock = threading.RLock()
         self._batches: dict[str, dict[str, Any]] = {}
+        #: Where a journal of the previous schema lives, if one does. It is
+        #: opened, never written: not overwritten, truncated, deleted or
+        #: renamed out of the way. The v2 writer keeps its own file.
+        self._legacy_path: Path | None = None
+        self._v2_path: Path | None = journal_path
+        #: Batches that came from the legacy journal. They stay in memory and
+        #: are never copied into the v2 file, so the v1 journal remains the
+        #: one and only record of its own Batches.
+        self._legacy_ids: set[str] = set()
+        #: Batch or start IDs the two journals disagreed about. v2 wins, and
+        #: the disagreement is recorded rather than silently resolved.
+        self._journal_conflicts: list[dict[str, str]] = []
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
-    def _load_journal(self) -> None:
-        if self.journal_path is None or not self.journal_path.exists():
-            return
+    def _read_journal(self, path: Path) -> tuple[str, list[Any]]:
+        """One journal file, by schema. An unreadable journal fails closed."""
         try:
-            raw = self.journal_path.read_text(encoding="utf-8")
-            data = json.loads(raw)
+            data = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 raise ValueError("schema")
             schema = data.get("schema")
             if schema not in (JOURNAL_SCHEMA, LEGACY_JOURNAL_SCHEMA):
                 raise ValueError("schema")
-            for record in data["batches"]:
-                # A journal of the previous schema is migrated, never refused:
-                # an interrupted attempt in it is exactly the record the
-                # restart rule has to judge.
-                batch = (migrate_batch_record(record)
-                         if schema == LEGACY_JOURNAL_SCHEMA else record)
-                if batch.get("outcome") is None:
-                    self._close_interrupted(batch)
-                self._batches[batch["batch_id"]] = batch
+            batches = data["batches"]
+            if not isinstance(batches, list):
+                raise ValueError("batches")
+            return schema, batches
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise RuntimeError(
                 "Programming batch journal is unreadable; refusing to start") from exc
-        if schema == LEGACY_JOURNAL_SCHEMA:
-            # The migration is read-only, and this is where that is enforced:
-            # the next write is v2, so the original bytes are kept beside it
-            # before anything replaces them. The evidence an operator may have
-            # to reconcile stays exactly as the interrupted Manager left it.
-            self._retain_legacy_journal(raw)
+
+    def _load_journal(self) -> None:
+        """Load the legacy journal, then the v2 one on top of it.
+
+        The configured path is whatever the last Manager wrote there. If that
+        is a journal of the previous schema, it becomes the legacy file - read
+        and never written - and the v2 writer takes a file of its own beside
+        it. A Manager restarting afterwards reads both: v1 for its history,
+        v2 for everything since. Neither is a second Batch engine; both load
+        into the one canonical in-memory model, and where the two name the
+        same Batch, v2 is the later writer and wins.
+        """
+        if self.journal_path is None:
+            return
+        legacy_records: list[Any] = []
+        v2_records: list[Any] = []
+        if self.journal_path.exists():
+            schema, records = self._read_journal(self.journal_path)
+            if schema == LEGACY_JOURNAL_SCHEMA:
+                self._legacy_path = self.journal_path
+                self._v2_path = self.journal_path.with_name(self.journal_path.name + ".v2")
+                legacy_records = records
+                if self._v2_path.exists():
+                    _schema, v2_records = self._read_journal(self._v2_path)
+            else:
+                v2_records = records
+        for record in legacy_records:
+            # Migrated on read, never refused: an interrupted attempt in it is
+            # exactly the record the restart rule has to judge.
+            batch = migrate_batch_record(record)
+            self._legacy_ids.add(batch["batch_id"])
+            self._admit_loaded(batch)
+        for record in v2_records:
+            batch_id = record["batch_id"]
+            if batch_id in self._legacy_ids:
+                self._journal_conflicts.append({"kind": "batch_id", "id": batch_id})
+                self._legacy_ids.discard(batch_id)
+            self._admit_loaded(record)
+        starts: dict[str, str] = {}
+        for batch in self._batches.values():
+            start_id = batch.get("start_id")
+            if start_id is None:
+                continue
+            if start_id in starts and starts[start_id] != batch["batch_id"]:
+                self._journal_conflicts.append({"kind": "start_id", "id": start_id})
+            starts[start_id] = batch["batch_id"]
         with self._lock:
             self._persist_locked()
 
-    def _retain_legacy_journal(self, raw: str) -> None:
-        kept = self.journal_path.with_name(self.journal_path.name + ".v1")
-        if kept.exists():
-            return
-        fd, name = tempfile.mkstemp(prefix=f".{kept.name}.", dir=kept.parent)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                stream.write(raw)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.chmod(name, 0o400)
-            os.replace(name, kept)
-        except BaseException:
-            Path(name).unlink(missing_ok=True)
-            raise
+    def _admit_loaded(self, batch: dict[str, Any]) -> None:
+        if batch.get("outcome") is None:
+            self._close_interrupted(batch)
+        self._batches[batch["batch_id"]] = batch
 
     def _close_interrupted(self, batch: dict[str, Any]) -> None:
         """A Batch the Manager was stopped in: decide from the run journal,
@@ -421,20 +444,28 @@ class ProgrammingBatchCoordinator:
                      updated_at=_now())
 
     def _persist_locked(self) -> None:
-        if self.journal_path is None:
+        """Write the v2 journal, atomically, and never the legacy one.
+
+        Batches that came from the legacy journal are left out: that file is
+        still their only record, and copying them here would turn a read into
+        a rewrite by another route.
+        """
+        if self._v2_path is None:
             return
-        kept = sorted(self._batches.values(), key=lambda b: b["created_at"])[-MAX_BATCHES_RETAINED:]
+        owned = [batch for batch in self._batches.values()
+                 if batch["batch_id"] not in self._legacy_ids]
+        kept = sorted(owned, key=lambda b: b["created_at"])[-MAX_BATCHES_RETAINED:]
         payload = {"schema": JOURNAL_SCHEMA, "batches": kept}
-        parent = self.journal_path.parent
+        parent = self._v2_path.parent
         parent.mkdir(parents=True, exist_ok=True)
-        fd, name = tempfile.mkstemp(prefix=f".{self.journal_path.name}.", dir=parent)
+        fd, name = tempfile.mkstemp(prefix=f".{self._v2_path.name}.", dir=parent)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 json.dump(payload, stream, sort_keys=True)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.chmod(name, 0o600)
-            os.replace(name, self.journal_path)
+            os.replace(name, self._v2_path)
         except BaseException:
             Path(name).unlink(missing_ok=True)
             raise
@@ -554,54 +585,67 @@ class ProgrammingBatchCoordinator:
         plan_body = {key: body[key] for key in body if key in PLAN_KEYS}
         start_id = body.get("start_id")
         aliases = [target["ppu_alias"] for target in targets]
+        # Validity first (§5.3), and all of it before any PPU is read. A Batch
+        # whose specification is illegal is refused even when every PPU in it
+        # happens to be unready, so an unusable Image can never be mistaken
+        # for a legitimately BLOCKED Batch.
+        self.workflow.validate_specification(plan_body)
         with self._lock:
-            # Validity first (§5.3). An unknown or unauthorised Target refuses
-            # the WHOLE Batch and leaves the start_id unconsumed, so the
-            # operator may correct the request and resend the same token.
+            # An unknown or unauthorised Target refuses the WHOLE Batch and
+            # leaves the start_id unconsumed, so the operator may correct the
+            # request and resend the same token.
             for alias in aliases:
                 self.workflow._require_commissioned(alias)
+            start_alias = aliases[0]
             if "start_id" in body:
-                self.workflow.require_batch_start(aliases[0], start_id)
+                # Validate the start against the PPU it was ISSUED for, not
+                # against whichever Target happens to be listed first: the
+                # token is an idempotency guard, and every Target's authority
+                # was checked on its own just above.
+                issued_for = self.workflow.batch_start_alias(start_id)
+                if issued_for in aliases:
+                    start_alias = issued_for
+                self.workflow.require_batch_start(start_alias, start_id)
             if any(batch["outcome"] is None
                    and {t["ppu_alias"] for t in batch["targets"]} & set(aliases)
                    for batch in self._batches.values()):
                 raise ProgrammingError(409, "programming_batch_in_progress",
                                        "another programming batch is in progress on this PPU")
-            # Readiness second: it never refuses a Batch that still has
-            # somewhere to run. A Target that is not ready is admitted BLOCKED
-            # with its own reason; the others still run.
+            # Readiness second. It never refuses the Batch: a Target that is
+            # not ready is admitted BLOCKED with its own reason, and a Batch
+            # in which EVERY Target is BLOCKED is still admitted, journalled
+            # and reconcilable - it simply submits nothing.
             units = [{"ppu_alias": target["ppu_alias"], "site_id": site,
-                      "status": "NOT_RUN", "outcome": None, "reason": None, "attempts": []}
+                      "status": "NOT_RUN", "outcome": None, "reason": None,
+                      "failure_domain": None, "attempts": []}
                      for target in targets for site in target["site_ids"]]
             for alias, target in zip(aliases, targets):
-                reason = self._admission_block(alias, target["site_ids"][0])
-                if reason is None:
+                verdict = self._admission_block(alias, target["site_ids"][0])
+                if verdict is None:
                     continue
+                domain, reason = verdict
+                if domain == SHARED_CONTROL_FAILURE:
+                    # Not one PPU's problem. Nothing is admitted, nothing is
+                    # journalled and the start_id is not consumed.
+                    raise ProgrammingError(
+                        503, "manager_shared_control_failure",
+                        f"Manager shared safety control is not usable ({reason}); "
+                        "no programming Job was submitted")
                 for unit in units:
                     if unit["ppu_alias"] == alias:
                         unit.update(status="BLOCKED", outcome="BLOCKED",
-                                    reason=f"ADMISSION_{reason}")
-            first = self._first_plan(plan_body, units)
-            if first is None:
-                # Nothing can run at all. With no other Target left to protect,
-                # partial admission has nothing to do: refuse the Batch, record
-                # nothing and leave the start_id unconsumed, exactly as a
-                # single-Target Batch has always been refused.
-                raise nothing_ready_error(
-                    next((unit["reason"].removeprefix("ADMISSION_") for unit in units
-                          if unit["reason"]), "NO_TARGET"))
-            first_index, first_plan = first
+                                    reason=f"ADMISSION_{reason}", failure_domain=domain)
             batch = {
                 "schema": BATCH_SCHEMA, "batch_id": secrets.token_hex(16),
                 "start_id": start_id,
                 "targets": [dict(target, site_ids=list(target["site_ids"]))
                             for target in targets],
                 "operations": plan_body["operations"],
-                "source": first_plan.get("source"),
-                "icpn": (first_plan.get("route") or {}).get("icpn") or plan_body.get("icpn"),
+                "source": _source_of(plan_body), "icpn": plan_body.get("icpn"),
                 "policy": policy, "state": "running",
                 "execution_status": "RUNNING", "outcome": None, "reason": None,
-                "stop_requested": False, "units": units,
+                "stop_requested": False, "failure_domain": None, "units": units,
+                "journal_persisted": True,
                 "created_at": _now(), "updated_at": _now(),
             }
             if start_id is not None:
@@ -609,59 +653,39 @@ class ProgrammingBatchCoordinator:
                 # never reconcile as "not accepted". Partial admission has
                 # still consumed it, so a BLOCKED Target needs a NEW start.
                 self.workflow.consume_batch_start(
-                    aliases[0], start_id, batch["batch_id"], batch["targets"])
+                    start_alias, start_id, batch["batch_id"], batch["targets"])
             self._batches[batch["batch_id"]] = batch
             try:
                 self._persist_locked()
             except BaseException:
                 del self._batches[batch["batch_id"]]
                 raise
-        self.spawn(lambda: self._execute(batch, plan_body, first_index, first_plan))
+        self.spawn(lambda: self._execute(batch, plan_body))
         return {"ok": True, "batch": self._view(batch)}
 
-    def _first_plan(self, plan_body: Mapping[str, Any],
-                    units: list[dict[str, Any]]) -> tuple[int, Mapping[str, Any]] | None:
-        """Plan the first runnable Site synchronously, as a Batch always has.
-
-        A refused request must create no Batch, and the Batch's identities are
-        fixed before anything is queued. The two kinds of refusal part here: a
-        refusal about the REQUEST (malformed, unusable image) refuses
-        everything, while a refusal about a PPU or a Route blocks only that
-        Site and the next one is tried.
-        """
-        for index, unit in enumerate(units):
-            if unit["outcome"] is not None:
-                continue
-            try:
-                plan = self.workflow.plan(
-                    unit["ppu_alias"], {**plan_body, "site_id": unit["site_id"]})["plan"]
-            except ProgrammingError as exc:
-                if exc.code in REQUEST_INVALID_CODES:
-                    raise
-                unit.update(status="BLOCKED", outcome="BLOCKED",
-                            reason=f"ADMISSION_{exc.code}")
-                continue
-            return index, plan
-        return None
-
-    def _admission_block(self, alias: str, site: int) -> str | None:
-        """Readiness of one Target PPU. Never raises: a PPU that cannot be
-        read is not ready, and that is a per-Target answer, not a Batch one.
+    def _admission_block(self, alias: str, site: int) -> tuple[str, str] | None:
+        """Whether one Target may be operated, and whose failure it is if not.
 
         Both gates are asked. The Platform gate proves the PPU is safe to
-        mutate at all; ``retry_block`` proves this Site is released. Either
-        one blocks this Target alone.
+        mutate at all; the Target gate proves this Site is released. Either
+        one blocks this Target alone - unless what failed is the Manager's own
+        shared control, which stops the Batch instead.
+
+        An exception escaping either gate is NOT assumed to be local. Both
+        classify every PPU-scoped failure themselves, so anything left is a
+        failure of the machinery that was meant to judge, and the only safe
+        reading of "I could not tell" is to stop submitting.
         """
         try:
             if self.platform_gate is not None:
-                blocked = self.platform_gate(alias)
-                if blocked is not None:
-                    return blocked
-            return self.workflow.retry_block(alias, site)
+                verdict = self.platform_gate(alias)
+                if verdict is not None:
+                    return verdict
+            return self.workflow.target_block(alias, site)
         except ProgrammingError as exc:
-            return exc.code
-        except Exception as exc:  # noqa: BLE001 - unreadable is never "ready"
-            return f"PPU_STATE_UNREADABLE_{type(exc).__name__}"
+            return TARGET_NOT_READY, exc.code.upper()
+        except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
+            return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
     def reconcile_start(self, alias: str, start_id: str) -> dict[str, Any]:
         """Read-only: what became of the Start that carried ``start_id``."""
@@ -704,42 +728,69 @@ class ProgrammingBatchCoordinator:
             return {"ok": True, "batch": self._view(batch)}
 
     # ---------------------------------------------------------------- execution
-    def _execute(self, batch: dict[str, Any], plan_body: Mapping[str, Any],
-                 first_index: int, first_plan: Mapping[str, Any]) -> None:
+    def _execute(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
         try:
-            self._run_units(batch, plan_body, first_index, first_plan)
+            self._run_units(batch, plan_body)
         except Exception as exc:  # noqa: BLE001 - never retried, never a guessed result
             # The machinery that judges Targets failed, not a Target. One PPU
             # being unready is isolated; being unable to tell is not (§5.7).
-            with self._lock:
-                for unit in batch["units"]:
-                    if unit["outcome"] is None:
-                        unit.update(status="SKIPPED", outcome="OUTCOME_UNKNOWN",
-                                    reason=f"BATCH_UNEXPECTED_{type(exc).__name__}")
-            self._finish(batch, f"BATCH_UNEXPECTED_{type(exc).__name__}")
+            self._shared_failure(batch, f"BATCH_UNEXPECTED_{type(exc).__name__}")
+
+    def _shared_failure(self, batch: dict[str, Any], reason: str) -> None:
+        """The Manager's shared safety control failed, not a Target.
+
+        Nothing further is submitted for ANY PPU and no retry is started.
+        Evidence already earned is kept as it stands: a Site whose Job may
+        have reached a PPU keeps ``OUTCOME_UNKNOWN`` and is never resent, and
+        a Site that was provably never submitted is left unexecuted rather
+        than guessed into a failure it did not have.
+        """
+        with self._lock:
+            for unit in batch["units"]:
+                if unit["outcome"] is not None:
+                    continue
+                attempts = unit.get("attempts") or []
+                in_flight = bool(attempts) and attempts[-1].get("outcome") is None
+                unit.update(
+                    status="FINISHED" if in_flight else "SKIPPED",
+                    outcome="OUTCOME_UNKNOWN" if in_flight else None,
+                    reason=f"SHARED_CONTROL_FAILURE_{reason}",
+                    failure_domain=SHARED_CONTROL_FAILURE)
+            batch["failure_domain"] = SHARED_CONTROL_FAILURE
+        self._finish(batch, f"SHARED_CONTROL_FAILURE_{reason}")
 
     def _finish(self, batch: dict[str, Any], reason: str | None) -> None:
         outcome = aggregate_outcome(batch["units"])
-        self._update(batch, state="finished", outcome=outcome,
-                     execution_status="STOPPED" if batch["stop_requested"] else "COMPLETED",
-                     reason=batch_reason(batch["units"], outcome, reason))
+        changes = {
+            "state": "finished", "outcome": outcome,
+            "execution_status": "STOPPED" if batch["stop_requested"] else "COMPLETED",
+            "reason": batch_reason(batch["units"], outcome, reason),
+        }
+        try:
+            self._update(batch, **changes)
+        except Exception:  # noqa: BLE001 - a failed journal is reported, not hidden
+            # The end of this Batch could not be recorded. Nothing further is
+            # submitted either way, and the Batch says plainly that its final
+            # state is not durable rather than implying it was stored.
+            with self._lock:
+                batch.update(changes, journal_persisted=False, updated_at=_now())
 
-    def _skip(self, batch: dict[str, Any], unit: dict[str, Any],
-              status: str, reason: str, outcome: str | None = None) -> None:
+    def _skip(self, batch: dict[str, Any], unit: dict[str, Any], status: str,
+              reason: str, outcome: str | None = None, domain: str | None = None) -> None:
         with self._lock:
-            unit.update(status=status, outcome=outcome, reason=reason)
+            unit.update(status=status, outcome=outcome, reason=reason,
+                        failure_domain=domain)
             batch["updated_at"] = _now()
             self._persist_locked()
 
-    def _run_units(self, batch: dict[str, Any], plan_body: Mapping[str, Any],
-                   first_index: int, first_plan: Mapping[str, Any]) -> None:
+    def _run_units(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
         """Sequential walk of the Target Set. One in-flight run at a time."""
         policy = batch["policy"]
         stop_policy = policy["stop_policy"]
         latched: dict[str, str] = {}
         failed_sites = 0
         reason: str | None = None
-        for index, unit in enumerate(batch["units"]):
+        for unit in batch["units"]:
             alias, site = unit["ppu_alias"], unit["site_id"]
             if unit["outcome"] is not None:
                 # Admitted BLOCKED. It spends no retry budget and, by default,
@@ -762,29 +813,38 @@ class ProgrammingBatchCoordinator:
                 continue
             # Readiness read at admission does not authorise a mutation that
             # happens now. Re-check immediately before operating this PPU.
-            block = self._admission_block(alias, site)
-            if block is not None:
-                self._skip(batch, unit, "BLOCKED", f"EXECUTION_{block}", outcome="BLOCKED")
+            # Never skip this PPU's own check because another one failed.
+            verdict = self._admission_block(alias, site)
+            if verdict is not None:
+                domain, block = verdict
+                if domain == SHARED_CONTROL_FAILURE:
+                    self._shared_failure(batch, block)
+                    return
+                self._skip(batch, unit, "BLOCKED", f"EXECUTION_{block}",
+                           outcome="BLOCKED", domain=domain)
                 continue
-            outcome, unit_reason = self._run_attempts(
-                batch, unit, plan_body, first_plan if index == first_index else None)
+            outcome, unit_reason = self._run_attempts(batch, unit, plan_body)
             with self._lock:
                 unit.update(status=_unit_status(outcome), outcome=outcome, reason=unit_reason)
+                if outcome == "BLOCKED":
+                    unit["failure_domain"] = TARGET_NOT_READY
                 batch["updated_at"] = _now()
                 self._persist_locked()
             if outcome == "OUTCOME_UNKNOWN":
+                # A Job for this PPU may have reached it and its result is
+                # unknown. Latch this PPU, never resend, leave the others be.
+                unit["failure_domain"] = TARGET_TRANSACTION_UNKNOWN
                 latched[alias] = unit_reason or "OUTCOME_UNKNOWN"
             elif outcome == "FAIL":
                 failed_sites += 1
         self._finish(batch, reason)
 
     def _run_attempts(self, batch: dict[str, Any], unit: dict[str, Any],
-                      plan_body: Mapping[str, Any],
-                      planned: Mapping[str, Any] | None = None) -> tuple[str, str | None]:
+                      plan_body: Mapping[str, Any]) -> tuple[str, str | None]:
         """Every attempt for ONE Site. Returns that Site's outcome and reason."""
         alias, site, policy = unit["ppu_alias"], unit["site_id"], batch["policy"]
         site_body = {**plan_body, "site_id": site}
-        plan: Mapping[str, Any] | None = planned
+        plan: Mapping[str, Any] | None = None
         for number in range(1, policy["retry_limit"] + 2):
             if batch["stop_requested"] and number > 1:
                 return "FAIL", "STOP_REQUESTED_NO_FURTHER_ATTEMPT"
