@@ -20,6 +20,23 @@
 5. Mock/CD **必須保留**，逐步改由統一 Manager Programming Engine 執行。
 6. **PR-F 完成前，不得在任何文件、UI 文案、PR 描述或報告中宣稱 Legacy Gateway Batch 已退場。**
 
+### 0.1 不在本清冊範圍：alias-scoped Manager Batch API（owner 決策 B-d，2026-11-13）
+
+`POST /ppus/<alias>/programming/batches` **不屬於**本清冊的 Legacy Gateway Batch 範圍。
+它是 Manager-owned 路徑的一部分，被 PR-B 新增的 canonical `POST /programming/batches`
+取代，而不是被判定為 legacy。
+
+其退場責任明確**從 PR-F 移至 PR-C**。PR-B 保留它為短期相容入口且不修改 `software/web`；
+PR-C 完成 Consumer 遷移與下列 Gate 後直接移除，條件見
+[架構契約 §5.8](../../architecture/unified-programming-architecture-v1.md)：
+Consumer Inventory（EMode／PMode／Console BFF／CLI 與 scripts／API clients／測試與 fixtures／
+已部署的 SWPC Control Station）、start 與 status／query 與 stop 與 reconcile 與
+error／outcome handling 全數遷移、host-only regression 與 API contract 與 Console E2E 通過、
+以及明確的部署順序。
+
+**Console 原始碼已切換不等於已部署的 consumer 已遷移。** 任何無法確認的外部 consumer
+列為明確阻塞項，舊端點就留著。
+
 ---
 
 ## 1. 擋住排程的發現
@@ -192,6 +209,7 @@ legacy，但必須先確認 Mock/CD 與診斷是否依賴，才能判定。
 ## 8. 未決
 
 * 第 3 節「逐項覆核」的 allowlist 條目尚未判定。
+* alias-scoped Batch API 的完整 Consumer Inventory 由 PR-C 產出（見 §0.1）；本清冊不負責。
 * 第 4 節四個刪除候選與 PPU 自主恢復流程的關係尚未查證。
 * Device Personalization（PR-G）對本清冊無直接影響，但其 Profile schema 須與 `flash_cycle`
   退場合併為同一次 Profile 改版，見架構契約 §8.6。
