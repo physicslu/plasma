@@ -6,6 +6,7 @@ export type ConsoleBuildIdentity = {
   releaseId: string | null;
   source: string;
   dirty: boolean;
+  worktreeStatus: "clean" | "changed" | "unverified";
   failureReason?: string;
 };
 
@@ -22,11 +23,17 @@ export function identityFromProvenance(args: {
   gitSha: string | null | undefined;
   dirty?: boolean;
   source?: string;
+  worktreeStatus?: "clean" | "changed" | "unverified";
 }): ConsoleBuildIdentity;
 
 export function buildIdentityForVite(args: {
   mode: "dev" | "build";
   env?: Record<string, string | undefined>;
-  gitProbe?: () => { sha: string | null; dirty: boolean };
+  gitProbe?: () => {
+    sha: string | null; dirty: boolean;
+    headState?: "ok" | "timeout" | "error" | "invalid";
+    statusState?: "ok" | "timeout" | "error";
+    trackedModified?: number; untracked?: number;
+  };
   requireGitCheckout?: boolean;
 }): ConsoleBuildIdentity;
