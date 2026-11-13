@@ -8,6 +8,7 @@ export type ConsoleBuildIdentity = {
   releaseId: string | null;
   source: string;
   dirty: boolean;
+  worktreeStatus: "clean" | "changed" | "unverified";
 };
 
 declare const __PLASMA_BUILD_IDENTITY__: ConsoleBuildIdentity;
@@ -29,6 +30,10 @@ export function consoleBuildDetails(identity: ConsoleBuildIdentity): string {
     `Source SHA: ${identity.gitSha ?? "UNKNOWN"}`,
     `Release ID: ${identity.releaseId ?? "NOT AVAILABLE"}`,
     `Source: ${identity.source}`,
+    `Worktree Status: ${identity.worktreeStatus.toUpperCase()}`,
+    ...(identity.worktreeStatus !== "clean"
+      ? ["Source SHA identifies the Git commit, not the exact compiled artifact."]
+      : []),
     ...(identity.dirty ? ["Uncommitted changes: YES (not an immutable release)"] : []),
   ].join("\n");
 }
