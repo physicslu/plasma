@@ -6,15 +6,9 @@ export type ConsoleBuildIdentity = {
   releaseId: string | null;
   source: string;
   dirty: boolean;
-  failureReason?: string;
 };
 
-export function inspectSourceGit(): {
-  sha: string | null; dirty: boolean;
-  headState: "ok" | "timeout" | "error" | "invalid";
-  statusState: "ok" | "timeout" | "error";
-  trackedModified: number; untracked: number;
-};
+export function inspectSourceGit(): { sha: string | null; dirty: boolean };
 
 export function identityFromProvenance(args: {
   productVersion: string;
@@ -28,5 +22,4 @@ export function buildIdentityForVite(args: {
   mode: "dev" | "build";
   env?: Record<string, string | undefined>;
   gitProbe?: () => { sha: string | null; dirty: boolean };
-  requireGitCheckout?: boolean;
 }): ConsoleBuildIdentity;

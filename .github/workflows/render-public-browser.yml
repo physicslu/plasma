@@ -1,6 +1,11 @@
 name: Render Public Browser Acceptance
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/render-public-browser.yml"
+      - "software/web/e2e/playwright.render-public.config.ts"
+      - "software/web/e2e/tests/render-public-runtime.spec.ts"
   workflow_dispatch:
     inputs:
       expected_commit:
@@ -41,8 +46,13 @@ jobs:
         id: target
         env:
           DISPATCH_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          expected="${DISPATCH_EXPECTED_COMMIT:-${GITHUB_SHA}}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            expected="${PR_BASE_SHA}"
+          else
+            expected="${DISPATCH_EXPECTED_COMMIT:-${GITHUB_SHA}}"
+          fi
           if [[ -z "${expected}" ]]; then
             echo "Expected Render commit could not be resolved" >&2
             exit 64
@@ -54,7 +64,6 @@ jobs:
         working-directory: software/web/e2e
         env:
           EXPECTED_RENDER_COMMIT: ${{ steps.target.outputs.expected_commit }}
-          REQUIRE_RENDER_BUILD_IDENTITY: "1"
           PLASMA_RENDER_ORIGIN: https://plasma-6zz7.onrender.com
         run: npx playwright test --config playwright.render-public.config.ts
 

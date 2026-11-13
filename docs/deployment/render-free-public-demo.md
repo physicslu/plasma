@@ -69,8 +69,6 @@ software/web/dist/standalone/server.js
 
 The legacy `dist-render` static SPA build is no longer part of the deployed public-demo path.
 
-The build logs emit `[render-identity]` checkpoints before and after Python install, before and after npm install, before Vinext, and after artifact validation. They report Git HEAD and status command states, counts of tracked modifications and untracked files, and only the presence/validity/match state of `RENDER_GIT_COMMIT` and `PLASMA_BUILD_GIT_SHA`. SHA values, environment values, file contents, and untracked filenames are not logged. A nonzero count before Python install means the checkout was already dirty at build entry; a count first appearing after a stage identifies the stage that changed it. A preexisting dirty state may involve Render's restored cache, but the checkpoint alone does not prove which cached path caused it. Git command timeouts and execution errors are reported separately. The production identity gate still rejects any unclean, missing, invalid, or conflicting provenance.
-
 `scripts/render-start.sh` performs the following sequence:
 
 1. validates the production Device Catalog before opening the public listener;
