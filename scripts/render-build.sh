@@ -4,6 +4,7 @@ set -Eeuo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 python_dir="${repo_root}/software/python"
 web_dir="${repo_root}/software/web"
+export PLASMA_REQUIRE_BUILD_IDENTITY=1
 
 printf '[render-build] Installing Plasma Python runtime dependencies\n'
 python -m pip install --disable-pip-version-check "${python_dir}"

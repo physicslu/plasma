@@ -1,6 +1,7 @@
 import { access, readdir, readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, relative, resolve, sep } from "node:path";
+import { buildIdentityForVite } from "../build/build-identity.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, "..");
@@ -41,6 +42,24 @@ async function walk(directory) {
 }
 
 await walk(standaloneRoot);
+
+if (process.env.PLASMA_REQUIRE_BUILD_IDENTITY === "1") {
+  const identity = buildIdentityForVite({ mode: "build" });
+  if (identity.mode !== "build") {
+    throw new Error("Render product validation requires a clean, matching Git SHA");
+  }
+  const clientAssets = resolve(standaloneRoot, "dist", "client", "assets");
+  const assets = (await readdir(clientAssets)).filter(name => name.endsWith(".js"));
+  let embedded = false;
+  for (const name of assets) {
+    const source = await readFile(resolve(clientAssets, name), "utf8");
+    if (source.includes(identity.gitSha) && source.includes(identity.releaseId)) {
+      embedded = true;
+      break;
+    }
+  }
+  if (!embedded) throw new Error("Render frontend bundle is missing its full SHA and Release ID");
+}
 
 const sourceRootText = projectRoot.replaceAll("\\", "/");
 const serverText = (await readFile(serverEntry, "utf8")).replaceAll("\\", "/");

@@ -12,6 +12,7 @@ import {
 } from "./production-console-helpers";
 
 const expectedCommit = process.env.EXPECTED_RENDER_COMMIT ?? "";
+const requireBuildIdentity = process.env.REQUIRE_RENDER_BUILD_IDENTITY === "1";
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
 
@@ -84,6 +85,17 @@ async function expectConstrainedProductionJob(page: Page) {
 
 test.beforeAll(async ({ request }) => {
   await requireExpectedDeployment(request);
+});
+
+test("deployed Console build identity matches deployment metadata", async ({ page }) => {
+  test.skip(!requireBuildIdentity, "Run after the identity fix is deployed");
+  expect(expectedCommit).toMatch(/^[a-f0-9]{40}$/);
+  await page.goto("/demo");
+  const identity = page.getByTestId("global-build-id");
+  await expect(identity).toHaveText(`Build ${expectedCommit.slice(0, 12)}`);
+  await expect(identity).toHaveAttribute("title", new RegExp(
+    `Source SHA: ${expectedCommit}\\nRelease ID: [0-9]+\\.[0-9]+\\.[0-9]+-${expectedCommit.slice(0, 12)}`,
+  ));
 });
 
 test("public Render keeps Production Programming Job contained on iPad landscape", async ({ page }) => {

@@ -17,7 +17,7 @@ function cleanSha(value) {
 function gitCommand(args) {
   try {
     return execFileSync("git", args, {
-      cwd: ROOT, encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"],
+      cwd: ROOT, encoding: "utf8", timeout: 30000, stdio: ["ignore", "pipe", "ignore"],
     }).trim();
   } catch {
     return null;
@@ -59,16 +59,19 @@ export function buildIdentityForVite({
 }) {
   const version = MANIFEST.product_version;
   const git = gitProbe();
-  const pinned = env.PLASMA_BUILD_GIT_SHA?.trim() || env.RENDER_GIT_COMMIT?.trim() || null;
-  const validPinned = pinned ? cleanSha(pinned) : null;
+  const supplied = [env.PLASMA_BUILD_GIT_SHA, env.RENDER_GIT_COMMIT]
+    .filter(value => value !== undefined);
+  const validated = supplied.map(cleanSha);
+  const pinned = validated[0] ?? null;
+  const validPinned = supplied.length > 0 && validated.every(sha => sha && sha === pinned);
   // A provided (but invalid or mismatching) source SHA must never fall back
   // to a plausible-looking git HEAD and claim an immutable deployment.
-  const conflict = pinned && (!validPinned || (git.sha && git.sha !== validPinned));
-  const source = pinned ? "build-metadata" : "git-checkout";
+  const conflict = supplied.length > 0 && (!validPinned || (git.sha && git.sha !== pinned));
+  const source = supplied.length > 0 ? "build-metadata" : "git-checkout";
   return identityFromProvenance({
     productVersion: version,
     mode: mode === "dev" ? "dev" : "build",
-    gitSha: conflict ? null : (validPinned || git.sha),
+    gitSha: conflict ? null : (pinned || git.sha),
     dirty: Boolean(git.dirty || conflict),
     source,
   });
