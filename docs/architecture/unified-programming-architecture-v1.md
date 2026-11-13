@@ -154,9 +154,18 @@ load it would silently discard an `OUTCOME_UNKNOWN` the safety contract exists t
 
 The migration reshapes and never reinterprets. It invents no attempt, promotes no outcome, and
 leaves an interrupted attempt interrupted for §5.4 to judge under the same rule it would have
-received before the upgrade. The compatibility read is a dated item, not a permanent one: it may
-be removed once no deployed Manager can still hold a journal of the old schema, and until that is
-shown, it stays.
+received before the upgrade. It is also read-only in the strict sense: the stored journal is
+normalised in memory and is never rewritten, truncated or re-signed. The original evidence stays
+exactly as the interrupted Manager left it. The compatibility read is a dated item, not a
+permanent one: it may be removed once no deployed Manager can still hold a journal of the old
+schema, and until that is shown, it stays.
+
+The v2 journal commits durably, with evidence good enough to recover from a crash rather than
+merely to describe one. An attempt is journalled before it is submitted, and the record survives a
+process that dies at any point between the two. A judgement that this evidence cannot support is
+not made. In particular `BLOCKED` requires positive proof that no Job was submitted: an attempt
+that cannot be proven unsent is `OUTCOME_UNKNOWN`, never `BLOCKED`, and no shortage of evidence
+may be read the other way.
 
 ### 5.5 Stop
 
@@ -209,6 +218,19 @@ judged on its own.
    `failed_sites` stop threshold (§6); only a policy that asks for it may make it count.
 6. Scheduling stays sequential (§7) and there remains exactly one Manager Batch engine. Per-Target
    isolation changes what a Target's state means to its neighbours, not how many run at once.
+7. A Target's guard protects more than that Target. Before it runs, the Manager must still hold
+   mutual exclusion on its PPU, a valid lease on it, and isolation from any other Batch executing
+   there. Isolation narrows what one PPU's state means to another PPU; it never narrows what must
+   be true about the PPU being operated.
+8. Isolation applies to Target state, not to the machinery that judges it. If the shared safety
+   infrastructure fails — the journal cannot be committed, admission cannot be read, the Platform
+   gate cannot be evaluated — the **whole Batch fails closed**. One PPU being unready is isolated;
+   being unable to tell whether a PPU is ready is not.
+9. Bundle v3 and the Resource Set comparison are computed once per PPU and reused across that
+   PPU's Sites (§3). What is reused is the computation, not its authorisation: before each Site is
+   operated, the Platform gate, that PPU's Active Generation and the Resource Identity are
+   re-validated. A reused computation whose preconditions no longer hold is discarded, and the
+   Target does not proceed on it.
 
 ### 5.8 API surface and its retirement
 
