@@ -221,7 +221,10 @@ class FakeGateway:
                 if state == "success":
                     output_files = ["/var/lib/plasma/output/job/read_SITE2_flash.bin"]
             return self._resp(200, {"job": {
-                "job_id": self._job_id(), "state": state, "site_id": 2,
+                "job_id": self._job_id(), "state": state,
+                # The Site the Job was submitted for, not a fixed one: a Batch
+                # walks several Sites of one PPU.
+                "site_id": (self.posts[-1].get("site_id", 2) if self.posts else 2),
                 "operation": kind, "stage": "verify", "progress_percent": 50,
                 "job_binding": echo,
                 "result": {"state": state, "image_sha256": sha if has_image else None,

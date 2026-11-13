@@ -238,8 +238,12 @@ The Batch is owned by the Manager, not by a PPU, so its canonical resource does 
 
 | Endpoint | Status |
 | --- | --- |
-| `POST /programming/batches` | Canonical. Carries the Target Set (§3) and may span many PPUs. |
-| `POST /ppus/<alias>/programming/batches` | Short-term compatibility entry. Equivalent to a single-Target Batch on that alias. |
+| `POST /api/programming/batches` | Canonical. Carries the Target Set (§3) and may span many PPUs. Read and stopped at `/api/programming/batches/<batch_id>[/stop]`. |
+| `POST /api/registry/<alias>/bootstrap/programming/batches` | Short-term compatibility entry. Equivalent to a single-Target Batch on that alias, and it reads only such a Batch. |
+
+(An earlier revision of this section wrote the compatibility entry as
+`/ppus/<alias>/programming/batches`. That shorthand came from the Gate 1 audit and is not a path
+the Manager serves; the table above is the implemented one.)
 
 Both are doors into the **same** Manager Batch engine. Exactly one scheduler, one journal, one
 outcome policy, one recovery path and one retry engine stands behind them. A second implementation

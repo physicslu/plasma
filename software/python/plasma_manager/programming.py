@@ -82,6 +82,9 @@ ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED"
 UPLOAD_CHUNK_BYTES = 256 * 1024
 PLAN_TTL_S = 30 * 60
 MAX_PLANS = 16
+#: Bundle v3 and the Resource Set are pure functions of the Route and the
+#: bytes, so a Batch walking many Sites behind one Route builds them once.
+MAX_BUNDLE_CACHE = 4
 MAX_RUNS_RETAINED = 64
 JOB_TERMINAL = frozenset({"success", "failed", "error", "cancelled", "timeout", "aborted"})
 RUN_TERMINAL = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN", "BLOCKED"})
@@ -238,6 +241,10 @@ class BundleProgrammingWorkflow:
         self.poll_interval_s = poll_interval_s
         self._lock = threading.RLock()
         self._plans: dict[str, _Plan] = {}
+        self._bundle_cache: dict[tuple, tuple] = {}
+        #: How many times a Bundle / Resource Set was actually built. A Batch
+        #: over several Sites of one PPU must not move this more than once.
+        self._bundle_builds = 0
         self._runs: dict[str, _Run] = {}
         self._read_outputs: dict[str, bytes] = {}
         # Start admission records (journalled) and the Batch start IDs that
@@ -431,6 +438,46 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(503, "ppu_resource_identity_unknown", "PPU identity is missing")
         return ppu_id, report
 
+    def _route_resources(self, route: bundle_v3.ProgrammingRoute, *,
+                         image: bytes | None, archive: bytes | None,
+                         filename: str | None) -> tuple:
+        """Bundle v3, the Resource Set and the Image Asset for one Route.
+
+        All three are pure functions of the Route and the submitted bytes, so
+        a Batch that walks several Sites behind the same Route computes them
+        once and reuses them. What is reused is the COMPUTATION, never its
+        authorisation: the caller still reads the Platform state, the PPU's
+        Active Generation and its Resource Identity for every Site, and every
+        Site still gets its own plan, Job Binding and Job.
+        """
+        key = (bundle_v3.sha256_hex(bundle_v3.canonical_json(route.summary())),
+               None if archive is None else bundle_v3.sha256_hex(archive),
+               None if image is None else bundle_v3.sha256_hex(image),
+               filename)
+        with self._lock:
+            cached = self._bundle_cache.get(key)
+        if cached is not None:
+            return cached
+        resource = bundle_v3.resource_set_descriptor(route)
+        resource_sha = bundle_v3.resource_set_sha256(resource)
+        built = image_asset = None
+        derived = image
+        if archive is not None:
+            # Bundle source: the user's own canonical Bundle, never rebuilt
+            # under another identity and never trusted for its declarations.
+            built, derived = bundle_v3.route_bundle_from_archive(route, archive)
+        elif image is not None:
+            built = bundle_v3.build_user_image_bundle(route, image, filename=filename)
+        if derived is not None:
+            image_asset = bundle_v3.image_asset_descriptor(resource, derived)
+        value = (resource, resource_sha, built, derived, image_asset)
+        with self._lock:
+            self._bundle_builds += 1
+            while len(self._bundle_cache) >= MAX_BUNDLE_CACHE:
+                self._bundle_cache.pop(next(iter(self._bundle_cache)))
+            self._bundle_cache[key] = value
+        return value
+
     def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
         allowed = {"icpn", "site_id", "operation", "operations", "image_base64",
                    "image_filename", "bundle_base64", "address", "length"}
@@ -523,19 +570,9 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(409, "programming_route_ambiguous",
                                    "more than one Programming Route matches; refusing to guess")
         route = matches[0]
-        built = image_asset = None
         try:
-            resource = bundle_v3.resource_set_descriptor(route)
-            resource_sha = bundle_v3.resource_set_sha256(resource)
-            if archive is not None:
-                # Bundle source: the user's own canonical Bundle, never rebuilt
-                # under another identity and never trusted for its declarations.
-                built, image = bundle_v3.route_bundle_from_archive(route, archive)
-            elif image is not None:
-                built = bundle_v3.build_user_image_bundle(
-                    route, image, filename=body.get("image_filename"))
-            if image is not None:
-                image_asset = bundle_v3.image_asset_descriptor(resource, image)
+            resource, resource_sha, built, image, image_asset = self._route_resources(
+                route, image=image, archive=archive, filename=body.get("image_filename"))
         except bundle_v3.BundleBuildError as exc:
             code = ("bundle_resource_not_qualified"
                     if str(exc) == "BUNDLE_RESOURCE_NOT_ROUTE" else "bundle_incompatible")

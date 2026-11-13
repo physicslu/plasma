@@ -342,7 +342,8 @@ class ProgrammingBatchCoordinator:
         if self.journal_path is None or not self.journal_path.exists():
             return
         try:
-            data = json.loads(self.journal_path.read_text(encoding="utf-8"))
+            raw = self.journal_path.read_text(encoding="utf-8")
+            data = json.loads(raw)
             if not isinstance(data, dict):
                 raise ValueError("schema")
             schema = data.get("schema")
@@ -360,8 +361,30 @@ class ProgrammingBatchCoordinator:
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise RuntimeError(
                 "Programming batch journal is unreadable; refusing to start") from exc
+        if schema == LEGACY_JOURNAL_SCHEMA:
+            # The migration is read-only, and this is where that is enforced:
+            # the next write is v2, so the original bytes are kept beside it
+            # before anything replaces them. The evidence an operator may have
+            # to reconcile stays exactly as the interrupted Manager left it.
+            self._retain_legacy_journal(raw)
         with self._lock:
             self._persist_locked()
+
+    def _retain_legacy_journal(self, raw: str) -> None:
+        kept = self.journal_path.with_name(self.journal_path.name + ".v1")
+        if kept.exists():
+            return
+        fd, name = tempfile.mkstemp(prefix=f".{kept.name}.", dir=kept.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chmod(name, 0o400)
+            os.replace(name, kept)
+        except BaseException:
+            Path(name).unlink(missing_ok=True)
+            raise
 
     def _close_interrupted(self, batch: dict[str, Any]) -> None:
         """A Batch the Manager was stopped in: decide from the run journal,
