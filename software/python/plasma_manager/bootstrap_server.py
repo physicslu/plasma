@@ -26,6 +26,12 @@ UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 PROGRAMMING_RUN_RE = re.compile(r"^programming/runs/([0-9a-f]{32})$")
 PROGRAMMING_OUTPUT_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/output$")
 PROGRAMMING_BATCH_RE = re.compile(r"^programming/batches/([0-9a-f]{32})$")
+# The Batch is owned by the Manager, not by a PPU, so its canonical resource
+# does not sit under one. The alias-scoped routes above stay as a short-term
+# compatibility entry into the SAME engine and retire in PR-C.
+CANONICAL_BATCHES = "/api/programming/batches"
+CANONICAL_BATCH_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})$")
+CANONICAL_BATCH_STOP_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})/stop$")
 PROGRAMMING_BATCH_STOP_RE = re.compile(r"^programming/batches/([0-9a-f]{32})/stop$")
 PROGRAMMING_ACK_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/acknowledge$")
 PROGRAMMING_START_RE = re.compile(r"^programming/starts/([0-9a-f]{32})$")
@@ -109,7 +115,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 journal = (config.registry_state_path.with_name("programming-batches.json")
                            if config.registry_state_path is not None else None)
                 cls.programming_batches = ProgrammingBatchCoordinator(
-                    workflow, journal_path=journal)
+                    workflow, journal_path=journal,
+                    platform_gate=cls.platform_gate_reason)
             return cls.programming_batches
 
     def _programming_call(self, call) -> None:
@@ -204,27 +211,46 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         return None
 
     def _bootstrap_mutation_allowed(self, alias: str) -> bool:
+        """The Platform gate as an HTTP answer: writes the refusal it decides."""
+        try:
+            block = self._platform_mutation_block(alias)
+        except Exception as exc:
+            self._bootstrap_error(exc)
+            return False
+        if block is None:
+            return True
+        code, message = block
+        self._json(HTTPStatus.CONFLICT,
+                   {"ok": False, "error": {"code": code, "message": message}})
+        return False
+
+    @classmethod
+    def platform_gate_reason(cls, alias: str) -> str | None:
+        """The same gate as a reason string, for a caller that is not a request.
+
+        The Batch coordinator re-evaluates this immediately before it operates
+        each PPU, long after the request that admitted the Batch is gone, so it
+        cannot borrow a live handler. The probe below carries no instance state
+        at all: every helper it reaches reads class-level Manager state (the
+        fleet poller, the Bootstrap coordinator, the registry), which is what
+        this judgement is made of. A PPU whose Platform state cannot be read is
+        never "ready".
+        """
+        probe = object.__new__(cls)
+        try:
+            block = cls._platform_mutation_block(probe, alias)
+        except Exception as exc:  # noqa: BLE001 - unreadable is never ready
+            return f"PPU_PLATFORM_STATE_UNREADABLE_{type(exc).__name__}"
+        return block[0].upper() if block is not None else None
+
+    def _platform_mutation_block(self, alias: str) -> tuple[str, str] | None:
         # Platform maintenance authorization is independent from programming
         # Registration. Registration controls managed Site/programming admission;
         # this gate instead proves the PPU is safe to mutate at the Platform layer.
         if self._alias_has_active_execution(alias):
-            self._json(
-                HTTPStatus.CONFLICT,
-                {
-                    "ok": False,
-                    "error": {
-                        "code": "ppu_busy",
-                        "message": "active PPU Jobs must finish or be cancelled before Platform maintenance",
-                    },
-                },
-            )
-            return False
-
-        try:
-            platform = self._bootstrap().status(alias)
-        except Exception as exc:
-            self._bootstrap_error(exc)
-            return False
+            return ("ppu_busy",
+                    "active PPU Jobs must finish or be cancelled before Platform maintenance")
+        platform = self._bootstrap().status(alias)
         bootstrap = platform.get("bootstrap")
         runtime = bootstrap.get("runtime") if isinstance(bootstrap, dict) else None
         deployment = bootstrap.get("deployment") if isinstance(bootstrap, dict) else None
@@ -232,53 +258,50 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         deployment_state = deployment.get("state") if isinstance(deployment, dict) else None
 
         if runtime_state == "recovery_required" or deployment_state == "recovery_required":
-            self._json(
-                HTTPStatus.CONFLICT,
-                {
-                    "ok": False,
-                    "error": {
-                        "code": "ppu_recovery_required",
-                        "message": "explicit Platform recovery is required before normal Runtime maintenance",
-                    },
-                },
-            )
-            return False
+            return ("ppu_recovery_required",
+                    "explicit Platform recovery is required before normal Runtime maintenance")
 
         # A factory/first-install target has no Runtime whose idle state can be
         # observed yet. Pairing/authentication remains enforced by the Bootstrap
         # coordinator before any mutation reaches the device.
         if runtime_state == "runtime_absent":
-            return True
+            return None
 
         if runtime_state == "runtime_active":
             if not self._trusted_idle_observation(alias):
-                self._json(
-                    HTTPStatus.CONFLICT,
-                    {
-                        "ok": False,
-                        "error": {
-                            "code": "ppu_idle_state_unproven",
-                            "message": (
-                                "a current trusted idle PPU observation is required for normal Runtime maintenance; "
-                                "programming Registration state does not lower this Platform safety gate"
-                            ),
-                        },
-                    },
-                )
-                return False
-            return True
+                return ("ppu_idle_state_unproven",
+                        "a current trusted idle PPU observation is required for normal Runtime "
+                        "maintenance; programming Registration state does not lower this "
+                        "Platform safety gate")
+            return None
 
-        self._json(
-            HTTPStatus.CONFLICT,
-            {
-                "ok": False,
-                "error": {
-                    "code": "ppu_platform_state_invalid",
-                    "message": f"Runtime state {runtime_state!r} is not eligible for normal Platform maintenance",
-                },
-            },
-        )
-        return False
+        return ("ppu_platform_state_invalid",
+                f"Runtime state {runtime_state!r} is not eligible for normal Platform maintenance")
+
+    def _canonical_batch_post(self, path: str) -> bool:
+        """The canonical Manager-owned Batch resource. Not under a PPU.
+
+        The Platform gate is NOT applied once here for one alias: a Batch
+        spans PPUs, so the gate is evaluated per Target by the coordinator at
+        admission and again immediately before each PPU is operated.
+        """
+        stop_match = CANONICAL_BATCH_STOP_RE.fullmatch(path)
+        if stop_match is None and path != CANONICAL_BATCHES:
+            return False
+        try:
+            body = self._read_json_object()
+        except Exception as exc:  # noqa: BLE001 - an unreadable body changes nothing
+            self._bootstrap_error(exc)
+            return True
+        if stop_match is not None:
+            batch_id = stop_match.group(1)
+            # Stop queuing only: allowed in any Platform state.
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().request_stop_batch(batch_id, body)))
+            return True
+        self._programming_call(
+            lambda: (HTTPStatus.ACCEPTED, self._batches().start_batch(body)))
+        return True
 
     def _bootstrap_get(self, alias: str, action: str) -> None:
         if action == "programming/routes":
@@ -641,6 +664,12 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        batch_match = CANONICAL_BATCH_RE.fullmatch(parsed.path)
+        if batch_match is not None:
+            batch_id = batch_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().status_batch(batch_id)))
+            return
         bootstrap = self._parse_bootstrap_route(parsed.path)
         if bootstrap is not None:
             alias, action = bootstrap
@@ -650,6 +679,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if self._canonical_batch_post(parsed.path):
+            return
         bootstrap = self._parse_bootstrap_route(parsed.path)
         if bootstrap is not None:
             alias, action = bootstrap

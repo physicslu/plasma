@@ -320,11 +320,15 @@ def migrate_batch_record(batch: Mapping[str, Any]) -> dict[str, Any]:
 class ProgrammingBatchCoordinator:
     def __init__(self, workflow: BundleProgrammingWorkflow, *,
                  journal_path: Path | None = None,
+                 platform_gate: Callable[[str], str | None] | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  spawn: Callable[[Callable[[], None]], None] | None = None,
                  poll_interval_s: float = 0.5) -> None:
         self.workflow = workflow
         self.journal_path = journal_path
+        # The Manager's Platform maintenance gate, evaluated per Target PPU at
+        # admission and again immediately before each PPU is operated.
+        self.platform_gate = platform_gate
         self.sleep = sleep
         self.spawn = spawn or (lambda target: threading.Thread(
             target=target, name="plasma-programming-batch", daemon=True).start())
@@ -618,9 +622,18 @@ class ProgrammingBatchCoordinator:
         return None
 
     def _admission_block(self, alias: str, site: int) -> str | None:
-        """Readiness of one Target PPU at admission. Never raises: a PPU that
-        cannot be read is not ready, and that is a per-Target answer."""
+        """Readiness of one Target PPU. Never raises: a PPU that cannot be
+        read is not ready, and that is a per-Target answer, not a Batch one.
+
+        Both gates are asked. The Platform gate proves the PPU is safe to
+        mutate at all; ``retry_block`` proves this Site is released. Either
+        one blocks this Target alone.
+        """
         try:
+            if self.platform_gate is not None:
+                blocked = self.platform_gate(alias)
+                if blocked is not None:
+                    return blocked
             return self.workflow.retry_block(alias, site)
         except ProgrammingError as exc:
             return exc.code
