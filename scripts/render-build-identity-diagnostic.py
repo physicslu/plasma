@@ -49,11 +49,17 @@ def main():
     head_match = "mismatch" if head_state == "ok" and any(
         sha and sha != head.lower() for sha in (render_sha, plasma_sha)
     ) else "match" if head_state == "ok" and (render_sha or plasma_sha) else "n/a"
+    # Source commit provenance and working-tree observations are separate.
+    # Never print file paths, environment values, or potentially sensitive diffs.
     print(
         f"[render-identity] stage={stage} head={head_state} "
-        f"status={status_state} tracked_modified={tracked} untracked={untracked} "
         f"render_sha={render_state} plasma_sha={plasma_state} "
         f"metadata_match={metadata_match} head_match={head_match}",
+        flush=True,
+    )
+    print(
+        f"[render-source-integrity] stage={stage} status={status_state} "
+        f"tracked_modified={tracked} untracked={untracked} policy=observe",
         flush=True,
     )
 
