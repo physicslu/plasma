@@ -655,7 +655,10 @@ export default function ManagedProgrammingWorkspace() {
       };
     const operationLabel = operations.map(item => item.toUpperCase()).join(" → ");
     // Site interface the PPU reports: a Mock result is never hardware evidence.
-    const executionInterface = ppu.sites.find(item => item.site_id === started[0])?.interface ?? null;
+    // Per Site: the interface the PPU reports for the Site that actually ran.
+    // A Mock result is never hardware evidence, whichever Site produced it.
+    const sites = ppu.sites;
+    const interfaceOf = (siteId: number) => sites.find(item => item.site_id === siteId)?.interface ?? null;
     const context: RunContext = { alias: ppu.alias, siteIds: started, startedAt: wallClock(), finishedAt: null };
     const abort = new AbortController();
     abortRef.current = abort;
@@ -708,7 +711,9 @@ export default function ManagedProgrammingWorkspace() {
               // identities and its Receipt summary, never the whole JSON Receipt.
               const finishedRun = next.current_run?.run_id === attempt.run_id ? next.current_run : null;
               if (finishedRun) {
-                for (const line of programmingRunLogLines(finishedRun, { executionInterface })) {
+                for (const line of programmingRunLogLines(finishedRun, {
+                  executionInterface: interfaceOf(finishedRun.site_id),
+                })) {
                   appendLog(line, attempt.outcome !== "PASS", "PPU");
                 }
               }

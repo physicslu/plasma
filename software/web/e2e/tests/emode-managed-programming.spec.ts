@@ -1238,7 +1238,7 @@ test("the Retry limit bounds the attempts; an exhausted Batch is one FAIL", asyn
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "1");
   await start.click();
-  await expect(jobLog(workspace)).toContainText(/\[RESULT\] FAIL · RETRY_LIMIT_EXHAUSTED · Batch \S+ · 2 attempt\(s\)/, { timeout: 20_000 });
+  await expect(jobLog(workspace)).toContainText(/\[RESULT\] FAIL · RETRY_LIMIT_EXHAUSTED · Batch \S+ · 1 Site\(s\).*2 attempt\(s\)/, { timeout: 20_000 });
   expect(counters.jobs).toHaveLength(2);
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("0.0%");
@@ -1250,7 +1250,7 @@ test("OUTCOME UNKNOWN is never retried, whatever the Retry limit, and stays latc
   const { workspace, job, start } = await configure(page);
   await setPolicy(job, "5");
   await start.click();
-  await expect(jobLog(workspace)).toContainText(/\[RESULT\] OUTCOME UNKNOWN · JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT · Batch \S+ · 1 attempt\(s\)/);
+  await expect(jobLog(workspace)).toContainText(/\[RESULT\] OUTCOME UNKNOWN · JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT · Batch \S+ · 1 Site\(s\).*1 attempt\(s\)/);
   expect(counters.jobs).toHaveLength(1);
   await expect(jobLog(workspace)).not.toContainText("RETRY ("); // no retry decision
   await expect(workspace.getByTestId("managed-unresolved")).toBeVisible();
@@ -1288,7 +1288,7 @@ test("STOP QUEUING only stops unsubmitted attempts: the running Job is observed 
   await expect(job.getByRole("button", { name: /STOP REQUESTED/ })).toBeDisabled();
   // The submitted Job is still running and is reported as running, not cancelled.
   await expect(jobLog(workspace)).toContainText("no further attempt will be submitted · the running Job is not cancelled");
-  await expect(jobLog(workspace)).toContainText(/\[RESULT\] FAIL · STOP_REQUESTED_NO_FURTHER_ATTEMPT · Batch \S+ · 1 attempt\(s\)/, { timeout: 20_000 });
+  await expect(jobLog(workspace)).toContainText(/\[RESULT\] FAIL · STOP_REQUESTED_NO_FURTHER_ATTEMPT · Batch \S+ · 1 Site\(s\).*1 attempt\(s\)/, { timeout: 20_000 });
   await expect(jobLog(workspace)).toContainText(/\[ATTEMPT 1\/4\] FAIL · PROGRAMMING_NOT_PASS/); // its real result
   expect(counters.jobs).toHaveLength(1);
   expect(counters.stops).toEqual([JSON.stringify({ stop: "STOP_QUEUING" })]);

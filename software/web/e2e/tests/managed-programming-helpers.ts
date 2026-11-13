@@ -551,8 +551,9 @@ export async function mockManager(page: Page, options: {
     const targets = (body.targets ?? []) as Array<{ ppu_alias: string; site_ids: number[] }>;
     const alias = targets[0]?.ppu_alias ?? "";
     counters.batches.push({ alias, body });
-    // A Batch request carries the plan inputs; every attempt is one plan + one start.
-    counters.plans.push({ alias, body });
+    // A Batch request carries the plan inputs; the Manager plans PER SITE, so
+    // the plan counter records the body the first Site is planned with.
+    counters.plans.push({ alias, body: planBodyFor({ alias, body } as MockBatch, batchSites(body)[0]) });
     if (options.batchStatus) {
       return r.fulfill(json({ ok: false, error: options.batchError ?? { code: "manager_unavailable", message: "Manager unavailable" } }, options.batchStatus));
     }

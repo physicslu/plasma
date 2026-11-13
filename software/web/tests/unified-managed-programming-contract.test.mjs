@@ -319,7 +319,7 @@ test("the duplicated result UI is removed from both modes, not hidden", async ()
   for (const field of ["Run \\$\\{run.run_id\\}", "SAFE_OFF", "Job Binding SHA256", "Resource SHA256"]) {
     assert.match(runLog, new RegExp(field));
   }
-  assert.match(emode, /programmingRunLogLines\(finishedRun, \{ executionInterface \}\)/);
+  assert.match(emode, /programmingRunLogLines\(finishedRun, \{\s*executionInterface: interfaceOf\(finishedRun\.site_id\),\s*\}\)/);
   assert.match(factory, /programmingRunLogLines\(record\.run, \{ executionInterface: record\.siteInterface \}\)/);
   // The Log summarises the Manager record; it never prints the whole JSON Receipt.
   assert.doesNotMatch(runLog, /JSON\.stringify/);
@@ -400,7 +400,11 @@ test("PR-C: every Site is judged on its own, and the Batch verdict never replace
   assert.match(core, /export function runOfUnit\(/);
   // The aggregate is necessary but not sufficient: every Site must pass too.
   assert.match(core, /for \(const unit of batch\.units\) \{\s*const judged = batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\);/);
-  assert.match(core, /if \(!run\) return \{ verdict: "FAIL", reason: "RUN_RECORD_MISSING" \};/);
+  // A Site is judged on the Manager's record of it, and on the full receipt
+  // whenever the Browser still holds that Site's run.
+  assert.match(core, /const attempt = unit\.attempts\[unit\.attempts\.length - 1\];/);
+  assert.match(core, /attempt\.safe_off !== true \? "SAFE_OFF_NOT_VERIFIED"/);
+  assert.match(core, /run\.run_id !== attempt\.run_id\) return null;/);
   // The Site row shows that Site's verdict, not the Batch aggregate.
   assert.match(emode, /const rowVerdict = batch && unit\s*\? batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\)\.verdict : null;/);
   // Sequential execution: the run the Browser holds belongs to one Site.

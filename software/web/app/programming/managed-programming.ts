@@ -739,21 +739,35 @@ export async function runManagedBatch(
 export type BatchVerdict = RunVerdict | "PARTIAL" | "STOPPED";
 
 /**
- * One Site's verdict. PASS needs that Site's Manager outcome AND the receipt
- * of its last attempt passing `runVerdict` for exactly the requested list on
- * exactly that PPU and Site. A Site whose run record is missing is not a PASS.
+ * One Site's verdict.
+ *
+ * PASS needs that Site's own Manager outcome AND the evidence the Manager
+ * publishes for its last attempt: a PASS attempt, SAFE_OFF verified and a
+ * confirmed Job Binding. The Batch is sequential, so the Browser holds the
+ * full run receipt of one Site at a time; when it holds THIS Site's run, the
+ * receipt must pass `runVerdict` for exactly the requested list on exactly
+ * this PPU and Site as well. A Site that has moved out of the current run is
+ * judged on the Manager's record of it - never downgraded for being past.
  */
 export function batchSiteVerdict(
   batch: ProgrammingBatch, unit: ProgrammingBatchUnit, run: ProgrammingRun | null,
 ): { verdict: BatchVerdict; reason: string | null } {
   if (unit.outcome == null) return { verdict: "RUNNING", reason: null };
   if (unit.outcome !== "PASS") return { verdict: unit.outcome, reason: unit.reason };
-  if (!run) return { verdict: "FAIL", reason: "RUN_RECORD_MISSING" };
-  const last = runVerdict(run);
-  if (last.verdict !== "PASS") return { verdict: "FAIL", reason: last.reason ?? "LAST_RUN_NOT_PASS" };
-  if (run.ppu_alias !== unit.ppu_alias || run.site_id !== unit.site_id
-    || JSON.stringify(run.receipt?.operations) !== JSON.stringify(batch.operations)) {
-    return { verdict: "FAIL", reason: "RUN_DOES_NOT_MATCH_BATCH" };
+  const attempt = unit.attempts[unit.attempts.length - 1];
+  if (!attempt) return { verdict: "FAIL", reason: "ATTEMPT_RECORD_MISSING" };
+  const failed = attempt.outcome !== "PASS" ? "LAST_ATTEMPT_NOT_PASS"
+    : attempt.safe_off !== true ? "SAFE_OFF_NOT_VERIFIED"
+    : !attempt.job_binding_sha256 ? "JOB_BINDING_MISSING"
+    : null;
+  if (failed) return { verdict: "FAIL", reason: failed };
+  if (run) {
+    const judged = runVerdict(run);
+    if (judged.verdict !== "PASS") return { verdict: "FAIL", reason: judged.reason ?? "LAST_RUN_NOT_PASS" };
+    if (run.ppu_alias !== unit.ppu_alias || run.site_id !== unit.site_id
+      || JSON.stringify(run.receipt?.operations) !== JSON.stringify(batch.operations)) {
+      return { verdict: "FAIL", reason: "RUN_DOES_NOT_MATCH_BATCH" };
+    }
   }
   return { verdict: "PASS", reason: null };
 }
@@ -783,10 +797,17 @@ export function batchVerdict(batch: ProgrammingBatch): { verdict: BatchVerdict; 
   return worst;
 }
 
-/** The run the Browser holds for one Site: the latest attempt's, or none. */
+/**
+ * The run the Browser holds for one Site, or none.
+ *
+ * It is the run of THAT Site's last attempt, matched by run_id: the Batch
+ * carries one run record at a time, so another Site's run is never read as
+ * this Site's evidence.
+ */
 export function runOfUnit(batch: ProgrammingBatch, unit: ProgrammingBatchUnit): ProgrammingRun | null {
   const run = batch.current_run;
-  if (!run) return null;
+  const attempt = unit.attempts[unit.attempts.length - 1];
+  if (!run || !attempt || attempt.run_id == null || run.run_id !== attempt.run_id) return null;
   return run.ppu_alias === unit.ppu_alias && run.site_id === unit.site_id ? run : null;
 }
 
