@@ -44,9 +44,9 @@ async function walk(directory) {
 await walk(standaloneRoot);
 
 if (process.env.PLASMA_REQUIRE_BUILD_IDENTITY === "1") {
-  const identity = buildIdentityForVite({ mode: "build" });
+  const identity = buildIdentityForVite({ mode: "build", requireGitCheckout: true });
   if (identity.mode !== "build") {
-    throw new Error("Render product validation requires a clean, matching Git SHA");
+    throw new Error(`Render product identity denied: ${identity.failureReason}`);
   }
   const clientAssets = resolve(standaloneRoot, "dist", "client", "assets");
   const assets = (await readdir(clientAssets)).filter(name => name.endsWith(".js"));

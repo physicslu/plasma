@@ -16,20 +16,28 @@ function cleanSha(value) {
 
 function gitCommand(args) {
   try {
-    return execFileSync("git", args, {
+    return { state: "ok", output: execFileSync("git", args, {
       cwd: ROOT, encoding: "utf8", timeout: 30000, stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return null;
+    }).trim() };
+  } catch (error) {
+    return { state: error?.code === "ETIMEDOUT" ? "timeout" : "error", output: null };
   }
 }
 
 export function inspectSourceGit() {
-  const sha = cleanSha(gitCommand(["rev-parse", "--verify", "HEAD"]));
+  const head = gitCommand(["rev-parse", "--verify", "HEAD"]);
   const status = gitCommand(["status", "--porcelain", "--untracked-files=normal"]);
+  const sha = cleanSha(head.output);
+  const entries = status.output ? status.output.split("\n") : [];
+  const untracked = entries.filter(entry => entry.startsWith("??")).length;
+  const trackedModified = entries.length - untracked;
   // A packaged source tree may have no .git; trust explicit pinned build
   // metadata there, but never infer an unpinned SHA.
-  return { sha, dirty: sha !== null && (status === null || status.length > 0) };
+  return {
+    sha, dirty: sha !== null && (status.state !== "ok" || entries.length > 0),
+    headState: head.state === "ok" && !sha ? "invalid" : head.state,
+    statusState: status.state, trackedModified, untracked,
+  };
 }
 
 export function identityFromProvenance({
@@ -55,7 +63,7 @@ export function identityFromProvenance({
 }
 
 export function buildIdentityForVite({
-  mode, env = process.env, gitProbe = inspectSourceGit,
+  mode, env = process.env, gitProbe = inspectSourceGit, requireGitCheckout = false,
 }) {
   const version = MANIFEST.product_version;
   const git = gitProbe();
@@ -63,16 +71,30 @@ export function buildIdentityForVite({
     .filter(value => value !== undefined);
   const validated = supplied.map(cleanSha);
   const pinned = validated[0] ?? null;
-  const validPinned = supplied.length > 0 && validated.every(sha => sha && sha === pinned);
+  const metadataInvalid = supplied.length > 0 && validated.some(sha => !sha);
+  const metadataConflict = !metadataInvalid && validated.some(sha => sha !== pinned);
+  const validPinned = supplied.length > 0 && !metadataInvalid && !metadataConflict;
   // A provided (but invalid or mismatching) source SHA must never fall back
   // to a plausible-looking git HEAD and claim an immutable deployment.
-  const conflict = supplied.length > 0 && (!validPinned || (git.sha && git.sha !== pinned));
+  const mismatch = metadataConflict || (validPinned && git.sha && git.sha !== pinned);
+  const checkoutFailure = requireGitCheckout && (!git.sha || git.statusState !== "ok");
+  const conflict = metadataInvalid || mismatch || checkoutFailure;
   const source = supplied.length > 0 ? "build-metadata" : "git-checkout";
-  return identityFromProvenance({
+  const identity = identityFromProvenance({
     productVersion: version,
     mode: mode === "dev" ? "dev" : "build",
     gitSha: conflict ? null : (pinned || git.sha),
     dirty: Boolean(git.dirty || conflict),
     source,
   });
+  if (identity.mode !== "unknown") return identity;
+  const failureReason = git.headState === "timeout" ? "git-head-timeout"
+    : git.headState === "error" ? "git-head-error"
+    : git.statusState === "timeout" ? "git-status-timeout"
+    : git.statusState === "error" && git.sha ? "git-status-error"
+    : metadataInvalid ? "sha-metadata-invalid"
+    : mismatch ? "sha-mismatch"
+    : git.trackedModified > 0 || git.untracked > 0 || git.dirty ? "dirty-source"
+    : "missing-or-invalid-git-head";
+  return { ...identity, failureReason };
 }
