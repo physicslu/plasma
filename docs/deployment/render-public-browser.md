@@ -12,11 +12,9 @@ https://plasma-6zz7.onrender.com
 
 The browser workflow requires an exact deployed commit before running UI assertions.
 
-- On `workflow_dispatch`, the expected commit defaults to the selected ref SHA unless an explicit full commit is supplied. Pull requests do not run this live workflow because the public service may not yet have that commit.
+- On a pull request that changes the browser-acceptance infrastructure itself, the expected commit is the PR base SHA. This proves the public Render service is serving the currently accepted `main`, not the PR branch.
+- On `workflow_dispatch`, the expected commit defaults to the selected ref SHA unless an explicit full commit is supplied.
 - The Playwright preflight polls `/deployment.json` for up to 150 seconds and only proceeds when `git_commit` exactly matches the expected SHA.
-- After the identity fix is deployed, a manual `workflow_dispatch` run also requires the Console header to show `Build <first 12 SHA characters>` and its title to contain the full deployment SHA and Release ID.
-
-For post-deployment acceptance, run the browser workflow on `main` with the deployed full SHA. Record **NOT_RUN** before deployment, **BLOCKED** when the expected SHA has not reached `/deployment.json`, and **PASS** only when the deployment preflight and browser assertions pass.
 
 ## Current browser contracts
 
