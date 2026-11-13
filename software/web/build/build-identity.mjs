@@ -1,6 +1,7 @@
-// Identifies the exact Console source built into its immutable UI bundle.
-// Product version is not a per-commit counter. Never infer a SHA from a
-// running PPU, a Manager API response, or the Browser's current URL.
+// Identifies the Console's Git source commit in its built UI bundle.
+// A commit SHA is source provenance, NOT an attestation that the working tree
+// or compiled artifact is byte-for-byte identical to that Git revision.
+// Product version is not a per-commit counter.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -42,23 +43,25 @@ export function inspectSourceGit() {
 
 export function identityFromProvenance({
   productVersion, mode, gitSha, dirty = false, source = "unknown",
+  worktreeStatus = dirty ? "changed" : "unverified",
 }) {
   const sha = cleanSha(gitSha);
   if (mode === "dev") {
     return {
       productVersion, mode: "dev", gitSha: sha, shortSha: sha?.slice(0, 12) ?? null,
-      releaseId: null, source, dirty: Boolean(dirty),
+      releaseId: null, source, dirty: Boolean(dirty), worktreeStatus,
     };
   }
-  if (!sha || dirty) {
+  if (!sha) {
     return {
       productVersion, mode: "unknown", gitSha: null, shortSha: null,
-      releaseId: null, source: "unknown", dirty: Boolean(dirty),
+      releaseId: null, source: "unknown", dirty: Boolean(dirty), worktreeStatus,
     };
   }
   return {
     productVersion, mode: "build", gitSha: sha, shortSha: sha.slice(0, 12),
-    releaseId: `${productVersion}-${sha.slice(0, 12)}`, source, dirty: false,
+    releaseId: `${productVersion}-${sha.slice(0, 12)}`, source,
+    dirty: Boolean(dirty), worktreeStatus,
   };
 }
 
@@ -77,15 +80,22 @@ export function buildIdentityForVite({
   // A provided (but invalid or mismatching) source SHA must never fall back
   // to a plausible-looking git HEAD and claim an immutable deployment.
   const mismatch = metadataConflict || (validPinned && git.sha && git.sha !== pinned);
-  const checkoutFailure = requireGitCheckout && (!git.sha || git.statusState !== "ok");
+  // Source identity requires a real Git HEAD in Render, but a dirty or
+  // uninspectable working tree is an independent integrity observation.
+  const checkoutFailure = requireGitCheckout && !git.sha;
   const conflict = metadataInvalid || mismatch || checkoutFailure;
   const source = supplied.length > 0 ? "build-metadata" : "git-checkout";
+  const worktreeStatus = git.statusState === "ok"
+    ? (git.dirty ? "changed" : "clean")
+    : git.statusState === undefined
+      ? (git.dirty ? "changed" : "unverified")
+      : "unverified";
   const identity = identityFromProvenance({
     productVersion: version,
     mode: mode === "dev" ? "dev" : "build",
     gitSha: conflict ? null : (pinned || git.sha),
-    dirty: Boolean(git.dirty || conflict),
-    source,
+    dirty: worktreeStatus === "changed",
+    source, worktreeStatus,
   });
   if (identity.mode !== "unknown") return identity;
   const failureReason = git.headState === "timeout" ? "git-head-timeout"
@@ -94,7 +104,6 @@ export function buildIdentityForVite({
     : git.statusState === "error" && git.sha ? "git-status-error"
     : metadataInvalid ? "sha-metadata-invalid"
     : mismatch ? "sha-mismatch"
-    : git.trackedModified > 0 || git.untracked > 0 || git.dirty ? "dirty-source"
     : "missing-or-invalid-git-head";
   return { ...identity, failureReason };
 }
