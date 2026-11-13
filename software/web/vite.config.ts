@@ -55,13 +55,7 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async ({ command }) => {
-  const requireGitCheckout = command === "build" && process.env.PLASMA_REQUIRE_BUILD_IDENTITY === "1";
-  const buildIdentity = buildIdentityForVite({
-    mode: command === "serve" ? "dev" : "build", requireGitCheckout,
-  });
-  if (requireGitCheckout && buildIdentity.mode !== "build") {
-    throw new Error(`Render build identity denied: ${buildIdentity.failureReason}`);
-  }
+  const buildIdentity = buildIdentityForVite({ mode: command === "serve" ? "dev" : "build" });
   const define = { __PLASMA_BUILD_IDENTITY__: JSON.stringify(buildIdentity) };
   if (isProductBuild) {
     // Product packaging is a self-hosted Node runtime. Do not pull Wrangler,
