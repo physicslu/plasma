@@ -121,6 +121,22 @@ A Batch start carries a Manager-issued `start_id` obtained first
 (`plasma_manager/programming.py` `issue_batch_start` → `consume_batch_start`). It is admitted at
 most once; an unknown, used, voided or expired ID is refused with `409` and nothing is submitted.
 
+Admission separates **validity** from **readiness**, and they are refused differently.
+
+- A malformed request, an unknown or unauthorised Target, or a caller without the operation
+  authority refuses the **whole** Batch. Nothing is journalled and the `start_id` is **not**
+  consumed, so the operator may correct the request and resend the same token.
+- A Target that is valid but not ready — Platform `BUSY`, `RECOVERY_REQUIRED`, or an idle state
+  that cannot be proven — does not refuse the Batch. That Target alone is admitted `BLOCKED` with
+  its specific reason recorded, and no Job is submitted for it (§5.7).
+
+A resend never reprograms. A used `start_id` stays a `409`, and the sender recovers the Batch's
+identity and state through the read-only reconciliation of §5.4. No path re-submits a Target that
+already completed or one sitting at `OUTCOME_UNKNOWN`, which continues to require operator
+reconciliation (§6). Partial admission does not weaken this: a Batch admitted with some Targets
+`BLOCKED` has consumed its `start_id`, so those Targets are restarted under a **new** `start_id`,
+never by replaying the old one.
+
 ### 5.4 Disconnection and recovery
 
 The Console may disconnect at any point. Reconnecting re-reads the Batch by `batch_id`; a Console
@@ -140,24 +156,46 @@ A Batch reports an **execution status** and an **outcome**, and they are two sep
 outcome is derived from the Targets, never recorded independently of them, by the priority
 
 ```text
-OUTCOME_UNKNOWN > FAIL > PASS
+OUTCOME_UNKNOWN > FAIL > PARTIAL > PASS
 ```
 
-1. Any Target `OUTCOME_UNKNOWN` makes the Batch `OUTCOME_UNKNOWN`.
+1. Any Target `OUTCOME_UNKNOWN` makes the Batch `OUTCOME_UNKNOWN`. Safety outranks everything
+   below it; no number of passing Targets dilutes it.
 2. With no `OUTCOME_UNKNOWN` present, any Target `FAIL` makes the Batch `FAIL`.
-3. `PASS` requires every scheduled execution unit to have completed **and** every one of them to
-   have passed. A Batch that did not finish its Target Set can never read `PASS`.
-4. Execution status is separate from outcome. `STOPPED`, `NOT_RUN` and `SKIPPED` are statuses;
+3. With neither present, a Batch in which **no** Target executed reads `BLOCKED`, and a Batch in
+   which some executed and at least one did not — `BLOCKED`, `SKIPPED` or `NOT_RUN` — reads
+   `PARTIAL`.
+4. `PASS` requires every scheduled execution unit to have completed **and** every one of them to
+   have passed. An unfinished Target can never let a Batch read `PASS`; that Batch is `PARTIAL`.
+5. Execution status is separate from outcome. `STOPPED`, `NOT_RUN` and `SKIPPED` are statuses;
    none of them may be reported as `FAIL` or as `OUTCOME_UNKNOWN`.
-5. The Batch outcome authorises nothing. Retry eligibility, recovery and the no-auto-resend rule
+6. The Batch outcome authorises nothing. Retry eligibility, recovery and the no-auto-resend rule
    stay per Site and are decided from that Site's own receipt under the §6 safety contract.
-6. Every Target keeps its own Job, run, receipt, SAFE_OFF evidence and Resource Set identity. The
+7. Every Target keeps its own Job, run, receipt, SAFE_OFF evidence and Resource Set identity. The
    aggregate reads them; it never merges, rewrites or stands in for them.
-7. A single-Target Batch reduces to the present behaviour: the Batch outcome is that Target's
+8. A single-Target Batch reduces to the present behaviour: the Batch outcome is that Target's
    outcome, field for field.
 
-PR-B carries positive and negative tests for mixed results, early stop, unknown outcomes, restart
-reconciliation and single-Target compatibility.
+PR-B carries positive and negative tests for mixed results, early stop, unknown outcomes, a Target
+Set mixing `READY`, `BUSY` and `RECOVERY_REQUIRED` PPUs, readiness that changes between admission
+and execution, restart reconciliation and single-Target compatibility.
+
+### 5.7 Per-Target isolation and the Platform gate
+
+One unready PPU does not stop the others. A Batch is admitted partially (§5.3) and every Target is
+judged on its own.
+
+1. Admission reads the authority and the Platform readiness of **every** Target PPU.
+2. A Target that is not ready is admitted `BLOCKED` with its specific reason. No Job is submitted
+   for it and no retry budget is spent on it.
+3. Every `READY` Target still executes. An unrelated PPU's state never blocks them.
+4. Readiness read at admission does not authorise a mutation that happens later. **Each PPU is
+   re-checked immediately before it is operated.** A Target that was ready at admission and is not
+   ready when reached becomes `BLOCKED` at that point, and the walk continues.
+5. A `BLOCKED` Target is not a definite failure. By default it does not count toward a
+   `failed_sites` stop threshold (§6); only a policy that asks for it may make it count.
+6. Scheduling stays sequential (§7) and there remains exactly one Manager Batch engine. Per-Target
+   isolation changes what a Target's state means to its neighbours, not how many run at once.
 
 ## 6. Batch Policy
 
@@ -175,7 +213,8 @@ freezes them rather than introducing them.
 
 1. `OUTCOME_UNKNOWN` is **never** retried, consumes no retry budget, and latches the PPU until an
    operator reconciles and acknowledges it.
-2. `BLOCKED` (nothing submitted) ends the Batch for that Target and is not a FAIL.
+2. `BLOCKED` (nothing submitted) ends the Batch for that Target and is not a FAIL. It does not
+   count toward a `failed_sites` threshold unless the policy asks for it (§5.7).
 3. Only a definite `FAIL` is retry-eligible, and only when the receipt proves exactly one
    submitted Job in a terminal state, SAFE_OFF verified, and a confirmed Job Binding.
 4. Before any retry, the PPU must read as released (Site idle, no Job, no held lease, no recovery
