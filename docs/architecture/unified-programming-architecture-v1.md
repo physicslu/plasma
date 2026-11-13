@@ -134,6 +134,31 @@ judgement.
 `request_stop` means **stop queuing**. It never cancels a submitted Job, releases a lease, resets a
 PPU or clears recovery state. A running attempt is observed to its end.
 
+### 5.6 Aggregate outcome
+
+A Batch reports an **execution status** and an **outcome**, and they are two separate fields. The
+outcome is derived from the Targets, never recorded independently of them, by the priority
+
+```text
+OUTCOME_UNKNOWN > FAIL > PASS
+```
+
+1. Any Target `OUTCOME_UNKNOWN` makes the Batch `OUTCOME_UNKNOWN`.
+2. With no `OUTCOME_UNKNOWN` present, any Target `FAIL` makes the Batch `FAIL`.
+3. `PASS` requires every scheduled execution unit to have completed **and** every one of them to
+   have passed. A Batch that did not finish its Target Set can never read `PASS`.
+4. Execution status is separate from outcome. `STOPPED`, `NOT_RUN` and `SKIPPED` are statuses;
+   none of them may be reported as `FAIL` or as `OUTCOME_UNKNOWN`.
+5. The Batch outcome authorises nothing. Retry eligibility, recovery and the no-auto-resend rule
+   stay per Site and are decided from that Site's own receipt under the §6 safety contract.
+6. Every Target keeps its own Job, run, receipt, SAFE_OFF evidence and Resource Set identity. The
+   aggregate reads them; it never merges, rewrites or stands in for them.
+7. A single-Target Batch reduces to the present behaviour: the Batch outcome is that Target's
+   outcome, field for field.
+
+PR-B carries positive and negative tests for mixed results, early stop, unknown outcomes, restart
+reconciliation and single-Target compatibility.
+
 ## 6. Batch Policy
 
 | Field | Default | Range |
