@@ -55,10 +55,12 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async ({ command }) => {
-  const buildIdentity = buildIdentityForVite({ mode: command === "serve" ? "dev" : "build" });
-  if (command === "build" && process.env.PLASMA_REQUIRE_BUILD_IDENTITY === "1" &&
-      buildIdentity.mode !== "build") {
-    throw new Error("Render build requires a clean source and matching full Git commit SHA");
+  const requireGitCheckout = command === "build" && process.env.PLASMA_REQUIRE_BUILD_IDENTITY === "1";
+  const buildIdentity = buildIdentityForVite({
+    mode: command === "serve" ? "dev" : "build", requireGitCheckout,
+  });
+  if (requireGitCheckout && buildIdentity.mode !== "build") {
+    throw new Error(`Render build identity denied: ${buildIdentity.failureReason}`);
   }
   const define = { __PLASMA_BUILD_IDENTITY__: JSON.stringify(buildIdentity) };
   if (isProductBuild) {

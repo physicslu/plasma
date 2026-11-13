@@ -116,3 +116,24 @@ test("explicit immutable source metadata works when packaged outside git", () =>
   });
   assert.equal(identity.releaseId, "0.2.1-abcdef123456");
 });
+
+test("Render gate distinguishes source, metadata, and Git execution failures", () => {
+  const probe = (overrides = {}) => () => ({
+    sha: SHA, dirty: false, headState: "ok", statusState: "ok",
+    trackedModified: 0, untracked: 0, ...overrides,
+  });
+  const resolve = (gitProbe, env = { RENDER_GIT_COMMIT: SHA }) =>
+    buildIdentityForVite({ mode: "build", env, gitProbe, requireGitCheckout: true });
+
+  assert.equal(resolve(probe()).mode, "build");
+  assert.equal(resolve(probe({ sha: null }), {}).failureReason, "missing-or-invalid-git-head");
+  assert.equal(resolve(probe(), { RENDER_GIT_COMMIT: "invalid" }).failureReason, "sha-metadata-invalid");
+  assert.equal(resolve(probe(), { RENDER_GIT_COMMIT: OTHER }).failureReason, "sha-mismatch");
+  assert.equal(resolve(probe(), { RENDER_GIT_COMMIT: SHA, PLASMA_BUILD_GIT_SHA: OTHER }).failureReason, "sha-mismatch");
+  assert.equal(resolve(probe({ dirty: true, untracked: 1 })).failureReason, "dirty-source");
+  assert.equal(resolve(probe({ dirty: true, trackedModified: 1 })).failureReason, "dirty-source");
+  assert.equal(resolve(probe({ dirty: true, statusState: "timeout" })).failureReason, "git-status-timeout");
+  assert.equal(resolve(probe({ dirty: true, statusState: "error" })).failureReason, "git-status-error");
+  assert.equal(resolve(probe({ sha: null, headState: "timeout" })).failureReason, "git-head-timeout");
+  assert.equal(resolve(probe({ sha: null, headState: "error" })).failureReason, "git-head-error");
+});
