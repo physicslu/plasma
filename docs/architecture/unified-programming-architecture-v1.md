@@ -120,6 +120,15 @@ plan + run + single PPU Job. An attempt is journalled **before** it is submitted
 A Batch start carries a Manager-issued `start_id` obtained first
 (`plasma_manager/programming.py` `issue_batch_start` → `consume_batch_start`). It is admitted at
 most once; an unknown, used, voided or expired ID is refused with `409` and nothing is submitted.
+The canonical resource **requires** it: a Batch without one could not be reconciled after a lost
+answer, so a request that omits it is refused `400` and nothing is recorded. The compatibility
+entry keeps accepting a start that omits it, as it always has, because tightening it would break
+deployed callers before PR-C migrates them (§5.8).
+
+The `start_id` is validated against the PPU it was **issued for**, resolved from the pending
+record, not against whichever Target happens to be listed first. The token is an idempotency
+guard and never an authority: each Target's own authority is verified independently, so the order
+of the Target Set cannot make a legal start illegal.
 
 Admission separates **validity** from **readiness**, and they are refused differently.
 
@@ -129,6 +138,13 @@ Admission separates **validity** from **readiness**, and they are refused differ
 - A Target that is valid but not ready — Platform `BUSY`, `RECOVERY_REQUIRED`, or an idle state
   that cannot be proven — does not refuse the Batch. That Target alone is admitted `BLOCKED` with
   its specific reason recorded, and no Job is submitted for it (§5.7).
+
+A Batch in which **every** Target is `BLOCKED` is still admitted: `202`, journalled, reconcilable,
+outcome `BLOCKED`, execution status `COMPLETED`, no Job submitted, and the `start_id` consumed.
+Readiness is a per-Target answer at every count, including all of them. It follows that the whole
+Batch-level specification — the operations list, the Image or Bundle, the policy — is validated
+**before** any Target's readiness is read: an illegal request must be refused on its own terms and
+can never be mistaken for a legitimately `BLOCKED` Batch.
 
 A resend never reprograms. A used `start_id` stays a `409`, and the sender recovers the Batch's
 identity and state through the read-only reconciliation of §5.4. No path re-submits a Target that
@@ -159,6 +175,24 @@ normalised in memory and is never rewritten, truncated or re-signed. The origina
 exactly as the interrupted Manager left it. The compatibility read is a dated item, not a
 permanent one: it may be removed once no deployed Manager can still hold a journal of the old
 schema, and until that is shown, it stays.
+
+The two schemas live in two files. If the configured journal holds a record of the previous
+schema, that file becomes the legacy journal — opened, never written: not overwritten, truncated,
+deleted, or renamed out of the way — and the v2 writer takes a file of its own beside it
+(`<journal>.v2`). A restarting Manager reads both, legacy first and v2 over it. There is still one Batch engine
+and one in-memory model: the two files are two sources of history, not two implementations. A
+Batch loaded from the legacy journal is never copied into the v2 file, so the legacy file remains
+the only record of its own Batches. No configuration changes; the v2 path is derived.
+
+**A transaction identity that cannot be proven fails closed.** Both journals may hold the same
+Batch, and while they say the same thing about it — the same start, the same Target Set, the same
+outcome, the same Job identities and SAFE_OFF results — that is no conflict and it is loaded
+once. When they disagree there is no safe winner: preferring the later writer can bury an
+`OUTCOME_UNKNOWN` an operator still has to reconcile, and preferring the older one can lose a Job
+that really ran. The same holds for a `start_id` that two Batches claim, from either file, since
+one start admits at most one Batch. The Manager then refuses to start and names the identity it
+could not prove, and an operator reconciles it. **Deleting the v2 journal is not the remedy** —
+it holds real transactions; it is not a rollback path for a disagreement.
 
 The v2 journal commits durably, with evidence good enough to recover from a crash rather than
 merely to describe one. An attempt is journalled before it is submitted, and the record survives a
@@ -232,14 +266,41 @@ judged on its own.
    re-validated. A reused computation whose preconditions no longer hold is discarded, and the
    Target does not proceed on it.
 
+**Failure domains (normative).** What failed decides who is stopped. An exception type, an HTTP
+status or a timeout never decides this on its own; the judgement is made from the actual source of
+the failure, the stage it happened in, and whether a Job was submitted.
+
+| Domain | What it means | What happens |
+| --- | --- | --- |
+| `TARGET_NOT_READY` | this PPU says, readably, that it cannot be operated now | `BLOCKED`, this Target only |
+| `TARGET_STATE_UNAVAILABLE` | this PPU's own state cannot be read, and nothing has been submitted for it | `BLOCKED`, this Target only |
+| `TARGET_TRANSACTION_UNKNOWN` | a Job for this PPU may have been submitted and its result is unknown | `OUTCOME_UNKNOWN`, latch this PPU, never resend; other PPUs continue |
+| `SHARED_CONTROL_FAILURE` | the Manager's own shared safety control is not usable | stop submitting for the **whole** Batch, fail closed |
+
+The shared control is the journal, the shared authorisation, the scheduler's safety state, the
+Platform gate policy itself, and the Manager's ability to judge cross-Batch safety at all. A
+failure there is not one PPU's failure and must never be recorded as one; equally, one PPU's
+failure must never be promoted into one. **If the domain cannot be determined, it is not assumed
+to be local**: the Batch fails closed and the reason is kept.
+
+On a shared failure nothing further is submitted and no retry is started. A submitted Job is not
+cancelled, reset or resent; a Site that may have reached a PPU keeps `OUTCOME_UNKNOWN`; a Site
+provably never submitted is left unexecuted rather than given a failure it did not have. If the
+journal itself cannot be written, the Batch may not claim its state was stored — it reports the
+persistence failure and stops.
+
 ### 5.8 API surface and its retirement
 
 The Batch is owned by the Manager, not by a PPU, so its canonical resource does not sit under one.
 
 | Endpoint | Status |
 | --- | --- |
-| `POST /programming/batches` | Canonical. Carries the Target Set (§3) and may span many PPUs. |
-| `POST /ppus/<alias>/programming/batches` | Short-term compatibility entry. Equivalent to a single-Target Batch on that alias. |
+| `POST /api/programming/batches` | Canonical. Carries the Target Set (§3) and may span many PPUs. Read and stopped at `/api/programming/batches/<batch_id>[/stop]`. |
+| `POST /api/registry/<alias>/bootstrap/programming/batches` | Short-term compatibility entry. Equivalent to a single-Target Batch on that alias, and it reads only such a Batch. |
+
+(An earlier revision of this section wrote the compatibility entry as
+`/ppus/<alias>/programming/batches`. That shorthand came from the Gate 1 audit and is not a path
+the Manager serves; the table above is the implemented one.)
 
 Both are doors into the **same** Manager Batch engine. Exactly one scheduler, one journal, one
 outcome policy, one recovery path and one retry engine stands behind them. A second implementation

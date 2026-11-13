@@ -82,9 +82,30 @@ ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED"
 UPLOAD_CHUNK_BYTES = 256 * 1024
 PLAN_TTL_S = 30 * 60
 MAX_PLANS = 16
+#: Bundle v3 and the Resource Set are pure functions of the Route and the
+#: bytes, so a Batch walking many Sites behind one Route builds them once.
+MAX_BUNDLE_CACHE = 4
 MAX_RUNS_RETAINED = 64
 JOB_TERMINAL = frozenset({"success", "failed", "error", "cancelled", "timeout", "aborted"})
 RUN_TERMINAL = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN", "BLOCKED"})
+
+#: Failure domains. What failed decides who is stopped, and an exception
+#: type, an HTTP status or a timeout never decides this on its own.
+#:  * ``TARGET_NOT_READY``        - this PPU says, readably, that it cannot be
+#:                                  operated now. Block this Target.
+#:  * ``TARGET_STATE_UNAVAILABLE``- this PPU's own state cannot be read while
+#:                                  nothing has been submitted for it. The
+#:                                  doubt is local: block this Target.
+#:  * ``TARGET_TRANSACTION_UNKNOWN`` - a Job for this PPU may have been
+#:                                  submitted and its result is unknown. Latch
+#:                                  this PPU; never resend.
+#:  * ``SHARED_CONTROL_FAILURE``  - the Manager's own shared safety control is
+#:                                  not usable. Nothing further is submitted,
+#:                                  for any PPU.
+TARGET_NOT_READY = "TARGET_NOT_READY"
+TARGET_STATE_UNAVAILABLE = "TARGET_STATE_UNAVAILABLE"
+TARGET_TRANSACTION_UNKNOWN = "TARGET_TRANSACTION_UNKNOWN"
+SHARED_CONTROL_FAILURE = "SHARED_CONTROL_FAILURE"
 
 
 class ProgrammingError(Exception):
@@ -238,6 +259,10 @@ class BundleProgrammingWorkflow:
         self.poll_interval_s = poll_interval_s
         self._lock = threading.RLock()
         self._plans: dict[str, _Plan] = {}
+        self._bundle_cache: dict[tuple, tuple] = {}
+        #: How many times a Bundle / Resource Set was actually built. A Batch
+        #: over several Sites of one PPU must not move this more than once.
+        self._bundle_builds = 0
         self._runs: dict[str, _Run] = {}
         self._read_outputs: dict[str, bytes] = {}
         # Start admission records (journalled) and the Batch start IDs that
@@ -381,32 +406,60 @@ class BundleProgrammingWorkflow:
                 return run
         return None
 
-    def retry_block(self, alias: str, site: int) -> str | None:
-        """Why another attempt may NOT be submitted now (None: nothing blocks).
+    def target_block(self, alias: str, site: int) -> tuple[str, str] | None:
+        """Why this Target may not be operated now, and WHOSE failure it is.
 
-        Read-only. Used by the Batch coordinator after a definite FAIL: the
-        PPU must be reachable, its Site idle with no Job and no held execution
-        lease, no run of this PPU active or OUTCOME_UNKNOWN, and the Active
-        Asset Set must not require recovery. Any doubt blocks the retry.
+        Read-only. The PPU must be reachable, its Site idle with no Job and no
+        held execution lease, no run of this PPU active or OUTCOME_UNKNOWN,
+        and the Active Asset Set must not require recovery. Any doubt blocks
+        it.
+
+        Every answer here is about ONE PPU, and says so. A PPU that readably
+        refuses is ``TARGET_NOT_READY``; a PPU whose own state cannot be read
+        is ``TARGET_STATE_UNAVAILABLE``, which is still local because nothing
+        has been submitted for it. Nothing in this method may conclude that
+        the Manager's shared control failed - that judgement belongs to the
+        caller that owns the shared control.
         """
         with self._lock:
             if self._unknown_latched(alias) is not None:
-                return "OUTCOME_UNKNOWN_UNRESOLVED"
+                return TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED"
             if self._active_run(alias) is not None:
-                return "RUN_IN_PROGRESS"
+                return TARGET_NOT_READY, "RUN_IN_PROGRESS"
         try:
             record = self._record(alias)
-            if getattr(record, "lifecycle", None) != "commissioned":
-                return "PPU_NOT_ENABLED"
+        except ProgrammingError as exc:
+            return TARGET_NOT_READY, exc.code.upper()
+        if getattr(record, "lifecycle", None) != "commissioned":
+            return TARGET_NOT_READY, "PPU_NOT_ENABLED"
+        try:
             if self.coordinator.assets(alias).get("state") == "RECOVERY_REQUIRED":
-                return "PPU_RECOVERY_REQUIRED"
+                return TARGET_NOT_READY, "PPU_RECOVERY_REQUIRED"
             client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
             self._readiness(client, site, None)
         except _StepFailure as exc:
-            return exc.reason
+            return TARGET_NOT_READY, exc.reason
         except Exception as exc:  # noqa: BLE001 - unreadable state is never "released"
-            return f"PPU_STATE_UNREADABLE_{type(exc).__name__}"
+            return TARGET_STATE_UNAVAILABLE, f"PPU_STATE_UNREADABLE_{type(exc).__name__}"
         return None
+
+    def retry_block(self, alias: str, site: int) -> str | None:
+        """``target_block`` as a bare reason (None: nothing blocks a retry)."""
+        verdict = self.target_block(alias, site)
+        return None if verdict is None else verdict[1]
+
+    def batch_start_alias(self, start_id: object) -> str | None:
+        """The PPU a still-admissible Batch start was issued for.
+
+        The start ID is an idempotency token, not an authority: each Target's
+        own authority is verified independently. Resolving the PPU it was
+        ISSUED for, rather than reading it off the first Target, keeps a legal
+        start legal however the Target Set happens to be ordered.
+        """
+        with self._lock:
+            pending = (self._pending_batch_starts.get(start_id)
+                       if type(start_id) is str else None)
+            return None if pending is None else pending[0]
 
     # --------------------------------------------------------------------- API
     def list_routes(self) -> dict[str, Any]:
@@ -431,7 +484,54 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(503, "ppu_resource_identity_unknown", "PPU identity is missing")
         return ppu_id, report
 
-    def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
+    def _route_resources(self, route: bundle_v3.ProgrammingRoute, *,
+                         image: bytes | None, archive: bytes | None,
+                         filename: str | None) -> tuple:
+        """Bundle v3, the Resource Set and the Image Asset for one Route.
+
+        All three are pure functions of the Route and the submitted bytes, so
+        a Batch that walks several Sites behind the same Route computes them
+        once and reuses them. What is reused is the COMPUTATION, never its
+        authorisation: the caller still reads the Platform state, the PPU's
+        Active Generation and its Resource Identity for every Site, and every
+        Site still gets its own plan, Job Binding and Job.
+        """
+        key = (bundle_v3.sha256_hex(bundle_v3.canonical_json(route.summary())),
+               None if archive is None else bundle_v3.sha256_hex(archive),
+               None if image is None else bundle_v3.sha256_hex(image),
+               filename)
+        with self._lock:
+            cached = self._bundle_cache.get(key)
+        if cached is not None:
+            return cached
+        resource = bundle_v3.resource_set_descriptor(route)
+        resource_sha = bundle_v3.resource_set_sha256(resource)
+        built = image_asset = None
+        derived = image
+        if archive is not None:
+            # Bundle source: the user's own canonical Bundle, never rebuilt
+            # under another identity and never trusted for its declarations.
+            built, derived = bundle_v3.route_bundle_from_archive(route, archive)
+        elif image is not None:
+            built = bundle_v3.build_user_image_bundle(route, image, filename=filename)
+        if derived is not None:
+            image_asset = bundle_v3.image_asset_descriptor(resource, derived)
+        value = (resource, resource_sha, built, derived, image_asset)
+        with self._lock:
+            self._bundle_builds += 1
+            while len(self._bundle_cache) >= MAX_BUNDLE_CACHE:
+                self._bundle_cache.pop(next(iter(self._bundle_cache)))
+            self._bundle_cache[key] = value
+        return value
+
+    def _parse_request(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """Everything a programming request can be judged on by itself.
+
+        No PPU, registry, Route or Bundle is touched here. A Batch has to be
+        able to call a request invalid before it reads any Target's readiness,
+        so an illegal operations list or an unusable Image is refused even
+        when every PPU in the Target Set happens to be unready.
+        """
         allowed = {"icpn", "site_id", "operation", "operations", "image_base64",
                    "image_filename", "bundle_base64", "address", "length"}
         if not isinstance(body, Mapping) or not {"icpn", "site_id"} <= set(body) \
@@ -505,6 +605,26 @@ class BundleProgrammingWorkflow:
             address, length = body["address"], body["length"]
             if any(type(v) is not int or isinstance(v, bool) or v < 0 for v in (address, length)):
                 raise ProgrammingError(400, "invalid_request", "address and length must be integers")
+        return {"icpn": icpn, "site": site, "operations": operations,
+                "operation": operation, "image_operation": image_operation,
+                "label": label, "image": image, "archive": archive,
+                "address": address, "length": length}
+
+    def validate_specification(self, body: Mapping[str, Any]) -> None:
+        """Validate a Batch-level programming specification. Touches no PPU.
+
+        A Batch carries no Site of its own, so a Site in range stands in for
+        one. Nothing Site-specific is decided here, and each Target's own Site
+        was already validated with the Target Set.
+        """
+        self._parse_request({**dict(body), "site_id": 1})
+
+    def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
+        parsed = self._parse_request(body)
+        icpn, site = parsed["icpn"], parsed["site"]
+        operations, operation = parsed["operations"], parsed["operation"]
+        label, image, archive = parsed["label"], parsed["image"], parsed["archive"]
+        address, length = parsed["address"], parsed["length"]
         self._require_commissioned(alias)
         routes = self.routes()
         required = operations or [operation]
@@ -523,19 +643,9 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(409, "programming_route_ambiguous",
                                    "more than one Programming Route matches; refusing to guess")
         route = matches[0]
-        built = image_asset = None
         try:
-            resource = bundle_v3.resource_set_descriptor(route)
-            resource_sha = bundle_v3.resource_set_sha256(resource)
-            if archive is not None:
-                # Bundle source: the user's own canonical Bundle, never rebuilt
-                # under another identity and never trusted for its declarations.
-                built, image = bundle_v3.route_bundle_from_archive(route, archive)
-            elif image is not None:
-                built = bundle_v3.build_user_image_bundle(
-                    route, image, filename=body.get("image_filename"))
-            if image is not None:
-                image_asset = bundle_v3.image_asset_descriptor(resource, image)
+            resource, resource_sha, built, image, image_asset = self._route_resources(
+                route, image=image, archive=archive, filename=body.get("image_filename"))
         except bundle_v3.BundleBuildError as exc:
             code = ("bundle_resource_not_qualified"
                     if str(exc) == "BUNDLE_RESOURCE_NOT_ROUTE" else "bundle_incompatible")
@@ -697,6 +807,7 @@ class BundleProgrammingWorkflow:
             self._pending_batch_starts[start_id] = (alias, now)
             self._starts[start_id] = {
                 "start_id": start_id, "kind": "batch", "ppu_alias": alias, "site_id": None,
+                "targets": None,
                 "ppu_id": None, "operation": PROGRAMMING, "operations": None,
                 "job_binding_sha256": None, "state": "ISSUED",
                 "run_id": None, "batch_id": None, "issued_at": _now(), "updated_at": _now()}
@@ -722,8 +833,14 @@ class BundleProgrammingWorkflow:
                     "this start ID was not issued for this PPU, was already used, was "
                     "voided or expired; nothing was started")
 
-    def consume_batch_start(self, alias: str, start_id: str, batch_id: str, site: int) -> None:
-        """One start ID admits one Batch; journalled before the Batch exists."""
+    def consume_batch_start(self, alias: str, start_id: str, batch_id: str,
+                            targets: list[dict[str, Any]]) -> None:
+        """One start ID admits one Batch; journalled before the Batch exists.
+
+        The record carries the whole Target Set, because that is what was
+        admitted. A Batch admitted with some Targets BLOCKED has still
+        consumed this ID: those Targets need a NEW start, never a replay.
+        """
         with self._lock:
             self.require_batch_start(alias, start_id)
             del self._pending_batch_starts[start_id]
@@ -731,7 +848,11 @@ class BundleProgrammingWorkflow:
                 "start_id": start_id, "kind": "batch", "ppu_alias": alias, "ppu_id": None,
                 "operation": PROGRAMMING, "operations": None, "job_binding_sha256": None,
                 "run_id": None, "issued_at": _now()})
-            record.update(state="CONSUMED", batch_id=batch_id, site_id=site, updated_at=_now())
+            sites = [site for target in targets for site in target["site_ids"]]
+            record.update(state="CONSUMED", batch_id=batch_id,
+                          targets=[dict(target) for target in targets],
+                          site_id=sites[0] if len(sites) == 1 else None,
+                          updated_at=_now())
             self._persist_locked()
 
     def void_start(self, alias: str, start_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -814,16 +935,21 @@ class BundleProgrammingWorkflow:
                     return unknown("RUN_OUTCOME_UNRECOGNIZED")
                 return {"ok": True, "reconciliation": view}
             if batch is not None:
-                if batch.get("ppu_alias") != alias or batch.get("start_id") != start_id:
+                targets = batch.get("targets") or []
+                aliases = [target["ppu_alias"] for target in targets]
+                sites = [site for target in targets for site in target["site_ids"]]
+                if alias not in aliases or batch.get("start_id") != start_id:
                     return unknown("START_IDENTITY_MISMATCH")
                 if record is not None and (
                         record["kind"] != "batch" or record["state"] != "CONSUMED"
                         or record.get("batch_id") != batch.get("batch_id")
-                        or record.get("site_id") != batch.get("site_id")):
+                        or record.get("targets") != targets):
                     return unknown("JOURNAL_INCONSISTENT")
-                attempts = batch.get("attempts") or []
+                attempts = [attempt for unit in batch.get("units") or []
+                            for attempt in unit.get("attempts") or []]
                 view.update(kind="batch", batch=batch, outcome=batch.get("outcome"), identity={
-                    "ppu_alias": alias, "site_id": batch.get("site_id"), "ppu_id": None,
+                    "ppu_alias": alias, "site_id": sites[0] if len(sites) == 1 else None,
+                    "targets": targets, "ppu_id": None,
                     "operation": PROGRAMMING, "operations": batch.get("operations"),
                     "job_binding_sha256": (attempts[-1].get("job_binding_sha256")
                                            if attempts else None)})
@@ -836,7 +962,7 @@ class BundleProgrammingWorkflow:
                     if isinstance(current, dict) and current.get("outcome") == "OUTCOME_UNKNOWN":
                         view.update(acknowledged=bool(current.get("acknowledged")),
                                     unknown_run_id=current.get("run_id"))
-                elif outcome in ("PASS", "FAIL", "BLOCKED", "STOPPED"):
+                elif outcome in ("PASS", "FAIL", "PARTIAL", "BLOCKED"):
                     view.update(state="TERMINAL_CONFIRMED", reason=batch.get("reason"))
                 else:
                     return unknown("BATCH_OUTCOME_UNRECOGNIZED")
@@ -845,6 +971,7 @@ class BundleProgrammingWorkflow:
                 return unknown("START_NOT_RECORDED")
             view.update(kind=record["kind"], identity={
                 "ppu_alias": record["ppu_alias"], "site_id": record.get("site_id"),
+                "targets": record.get("targets"),
                 "ppu_id": record.get("ppu_id"), "operation": record.get("operation"),
                 "operations": record.get("operations"),
                 "job_binding_sha256": record.get("job_binding_sha256")})

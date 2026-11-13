@@ -1,20 +1,42 @@
-"""Manager-owned EMode Batch coordinator: safe Retry and Stop Policy.
+"""Manager-owned Batch coordinator over a Target Set: safe Retry and Stop.
 
-One Batch = one PPU, one Site, one programming Job specification (an ordered
-erase / program / verify ``operations`` list with its Programming Image or
-Bundle) and a policy ``{repeat: 1, retry_limit, stop_policy}``. The
-coordinator only decides WHETHER ANOTHER ATTEMPT IS SUBMITTED. Every attempt
-is an ordinary ``BundleProgrammingWorkflow`` plan + run: a new plan, a new run
-and a new PPU Job (new Job ID; the Job Binding is re-derived and re-verified
-by the PPU for that Job) with ``auto_retry = DISABLED``. There is no second
-programming engine, no Gateway batch runtime and no Repeat scheduler here.
+One Batch = an ordered Target Set (``[{ppu_alias, site_ids}]``) spanning one
+or more PPUs, one programming Job specification (an ordered erase / program /
+verify ``operations`` list with its Programming Image or Bundle) and a policy
+``{repeat: 1, retry_limit, stop_policy}``. ICPN and Image are Batch-level and
+never vary per Site.
+
+The coordinator only decides WHETHER ANOTHER ATTEMPT IS SUBMITTED. Every
+attempt is an ordinary ``BundleProgrammingWorkflow`` plan + run: a new plan, a
+new run and a new PPU Job (new Job ID; the Job Binding is re-derived and
+re-verified by the PPU for that Job) with ``auto_retry = DISABLED``. There is
+no second programming engine, no Gateway batch runtime and no Repeat
+scheduler here. Execution is sequential across the whole Batch: one in-flight
+run at a time.
+
+Admission separates validity from readiness. A malformed request, or an
+unknown or unauthorised Target, refuses the whole Batch and does not consume
+the ``start_id``. A Target that is valid but not ready is admitted
+``BLOCKED`` with its reason; the other Targets still run.
+
+Per-Target isolation:
+
+* One unready PPU never blocks another. ``OUTCOME_UNKNOWN`` latches its own
+  PPU and skips that PPU's remaining Sites; other PPUs continue.
+* Readiness read at admission does not authorise a mutation that happens
+  later, so every PPU is re-checked immediately before it is operated.
+* A ``BLOCKED`` Target spends no retry budget and, by default, does not count
+  toward a ``failed_sites`` threshold.
+* If the shared safety infrastructure fails - the journal cannot be
+  committed, PPU state cannot be judged - the whole Batch fails closed.
 
 Retry (never automatic for an unknown outcome):
 
 * ``OUTCOME_UNKNOWN`` (lost submission, timeout, HTTP 5xx, disconnected,
   incomplete evidence, Manager restart) is never retried and stays latched in
   the workflow until an operator reconciles and acknowledges it.
-* ``BLOCKED`` (nothing was submitted) ends the Batch; it is not a FAIL.
+* ``BLOCKED`` (nothing was submitted) ends the Batch for that Target; it is
+  not a FAIL.
 * Only a definite ``FAIL`` is eligible, and only when ALL of these hold:
   the run has a receipt of exactly one submitted Job in a terminal state with
   SAFE_OFF verified, and ``retry_block`` reads the PPU as released (Site idle,
@@ -25,14 +47,21 @@ Stop Policy (controls only attempts that are not submitted yet):
 
 * ``{"kind": "never"}``;
 * ``{"kind": "failed_sites", "threshold": N}``: once N Sites have a FAIL
-  attempt, nothing further is submitted (a Batch has one Site, so N is 1).
+  outcome, nothing further is submitted. ``N`` is 1 to the Batch's Site count.
 * ``request_stop`` (the Console's stop button) is "stop queuing". It never
   cancels a submitted Job, releases a lease, resets a PPU or clears recovery
   state; a running attempt is observed to its end.
 
+Execution status and outcome are separate fields. ``STOPPED`` is a status and
+is never reported as an outcome; the outcome is derived from the Targets by
+``OUTCOME_UNKNOWN > FAIL > PARTIAL > PASS``, and reads ``BLOCKED`` when no
+Target executed at all.
+
 State is journalled before every submission. After a Manager restart nothing
-is resubmitted: an interrupted Batch ends ``OUTCOME_UNKNOWN`` if its last
-attempt may have reached the PPU, else ``BLOCKED``.
+is resubmitted: an interrupted attempt that may have reached a PPU ends
+``OUTCOME_UNKNOWN``; only an attempt provably never submitted ends
+``BLOCKED``. A journal written by the previous schema is migrated on read,
+never refused, and never rewritten in place.
 """
 from __future__ import annotations
 
@@ -46,16 +75,27 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from .programming import BundleProgrammingWorkflow, JOB_TERMINAL, ProgrammingError
+from .programming import (
+    SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
+    TARGET_TRANSACTION_UNKNOWN, BundleProgrammingWorkflow, JOB_TERMINAL, ProgrammingError,
+)
 
-BATCH_SCHEMA = "plasma.manager.programming-batch.v1"
-JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v1"
+BATCH_SCHEMA = "plasma.manager.programming-batch.v2"
+JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v2"
+LEGACY_BATCH_SCHEMA = "plasma.manager.programming-batch.v1"
+LEGACY_JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v1"
 MAX_RETRY_LIMIT = 5
+MAX_TARGETS = 32
+MAX_SITES_PER_BATCH = 64
 STOP_TOKEN = "STOP_QUEUING"
 MAX_BATCHES_RETAINED = 32
-BATCH_TERMINAL = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN", "BLOCKED", "STOPPED"})
-PLAN_KEYS = frozenset({"icpn", "site_id", "operations", "image_base64", "image_filename",
+BATCH_TERMINAL = frozenset({"PASS", "FAIL", "PARTIAL", "OUTCOME_UNKNOWN", "BLOCKED"})
+# A Target counts as executed only when a Job was submitted for it.
+EXECUTED_OUTCOMES = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN"})
+PLAN_KEYS = frozenset({"icpn", "operations", "image_base64", "image_filename",
                        "bundle_base64", "address", "length"})
+TARGET_KEY = "targets"
+LEGACY_SITE_KEY = "site_id"
 POLICY_KEYS = frozenset({"retry_limit", "stop_policy", "repeat"})
 START_KEYS = frozenset({"start_id"})
 
@@ -64,8 +104,62 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def parse_policy(body: Mapping[str, Any]) -> dict[str, Any]:
-    """Validated ``{repeat, retry_limit, stop_policy}``; Repeat is fixed at 1."""
+def parse_targets(body: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
+    """Validated Target Set: ordered, one entry per PPU, no repeated Site.
+
+    Validity is decided before any readiness is read, because an invalid
+    Target Set refuses the whole Batch while an unready PPU does not.
+    """
+    targets = body.get(TARGET_KEY)
+    if not isinstance(targets, list) or not 0 < len(targets) <= MAX_TARGETS:
+        raise ProgrammingError(
+            400, "invalid_request",
+            f"targets must be a list of 1 to {MAX_TARGETS} {{ppu_alias, site_ids}} entries")
+    seen: set[str] = set()
+    parsed: list[dict[str, Any]] = []
+    total = 0
+    for entry in targets:
+        if not isinstance(entry, Mapping) or set(entry) != {"ppu_alias", "site_ids"}:
+            raise ProgrammingError(400, "invalid_request",
+                                   "each target requires exactly ppu_alias and site_ids")
+        alias = entry["ppu_alias"]
+        if type(alias) is not str or not alias.strip() or len(alias) > 96:
+            raise ProgrammingError(400, "invalid_request", "target ppu_alias is invalid")
+        if alias in seen:
+            # One entry per PPU keeps the latch, the lease and the once-per-PPU
+            # Bundle reuse unambiguous.
+            raise ProgrammingError(400, "invalid_request",
+                                   f"ppu_alias {alias} appears in more than one target")
+        seen.add(alias)
+        sites = entry["site_ids"]
+        if not isinstance(sites, list) or not sites:
+            raise ProgrammingError(400, "invalid_request",
+                                   "site_ids must be a non-empty list of Site numbers")
+        for site in sites:
+            if type(site) is not int or isinstance(site, bool) or not 1 <= site <= 64:
+                raise ProgrammingError(400, "invalid_request", "site_id is invalid")
+        if len(set(sites)) != len(sites):
+            raise ProgrammingError(400, "invalid_request",
+                                   f"ppu_alias {alias} repeats a Site")
+        total += len(sites)
+        parsed.append({"ppu_alias": alias, "site_ids": list(sites)})
+    if total > MAX_SITES_PER_BATCH:
+        raise ProgrammingError(400, "invalid_request",
+                               f"a Batch covers at most {MAX_SITES_PER_BATCH} Sites")
+    return tuple(parsed)
+
+
+def site_count(targets) -> int:
+    return sum(len(target["site_ids"]) for target in targets)
+
+
+def parse_policy(body: Mapping[str, Any], sites: int = 1) -> dict[str, Any]:
+    """Validated ``{repeat, retry_limit, stop_policy}``; Repeat is fixed at 1.
+
+    ``sites`` is the Batch's Site count, which bounds a ``failed_sites``
+    threshold at 1..N: a threshold no Batch could ever reach would be a policy
+    that silently means "never".
+    """
     if body.get("repeat", 1) != 1 or type(body.get("repeat", 1)) is not int:
         raise ProgrammingError(400, "repeat_not_supported",
                                "Repeat is not implemented; repeat must be 1")
@@ -77,14 +171,38 @@ def parse_policy(body: Mapping[str, Any]) -> dict[str, Any]:
     if stop == {"kind": "never"}:
         pass
     elif (isinstance(stop, dict) and set(stop) == {"kind", "threshold"}
-          and stop["kind"] == "failed_sites" and stop["threshold"] == 1
-          and type(stop["threshold"]) is int):
-        pass  # one Site per Batch: the only meaningful threshold is 1
+          and stop["kind"] == "failed_sites"
+          and type(stop["threshold"]) is int
+          and 1 <= stop["threshold"] <= sites):
+        pass
     else:
         raise ProgrammingError(
             400, "invalid_request",
-            'stop_policy must be {"kind": "never"} or {"kind": "failed_sites", "threshold": 1}')
+            'stop_policy must be {"kind": "never"} or {"kind": "failed_sites", '
+            f'"threshold": 1..{sites}}}')
     return {"repeat": 1, "retry_limit": retry, "stop_policy": dict(stop)}
+
+
+def aggregate_outcome(units) -> str:
+    """The Batch outcome derived from its Targets.
+
+    ``OUTCOME_UNKNOWN > FAIL > PARTIAL > PASS``. Safety outranks everything
+    below it, so no number of passing Targets dilutes one unknown. ``PASS``
+    requires every scheduled unit to have executed and passed; a Batch that
+    did not finish its Target Set reads ``PARTIAL``, and one where nothing
+    executed at all reads ``BLOCKED``.
+    """
+    outcomes = [unit.get("outcome") for unit in units]
+    if "OUTCOME_UNKNOWN" in outcomes:
+        return "OUTCOME_UNKNOWN"
+    if "FAIL" in outcomes:
+        return "FAIL"
+    executed = [outcome for outcome in outcomes if outcome in EXECUTED_OUTCOMES]
+    if not executed:
+        return "BLOCKED"
+    if len(executed) != len(outcomes):
+        return "PARTIAL"
+    return "PASS"
 
 
 def retry_eligibility(run: Mapping[str, Any]) -> tuple[bool, str]:
@@ -108,76 +226,296 @@ def retry_eligibility(run: Mapping[str, Any]) -> tuple[bool, str]:
     return True, "DEFINITE_FAIL_SAFE_OFF_VERIFIED"
 
 
+def batch_reason(units, outcome: str, fallback: str | None = None) -> str | None:
+    """The reason of the Target that decided the Batch outcome.
+
+    A single-Target Batch therefore reports that Target's reason unchanged,
+    and a mixed Batch reports the reason of the Target whose outcome won the
+    priority rather than inventing a summary of its own.
+    """
+    for unit in units:
+        if unit.get("outcome") == outcome and unit.get("reason"):
+            return unit["reason"]
+    for unit in units:
+        if unit.get("reason"):
+            return unit["reason"]
+    return fallback
+
+
+#: Refusals that describe the REQUEST, not a Target. No other PPU could
+#: satisfy them, so they refuse the whole Batch (§5.3 validity).
+REQUEST_INVALID_CODES = frozenset({
+    "invalid_request", "operations_invalid", "image_too_large", "bundle_too_large",
+})
+
+def _source_of(body: Mapping[str, Any]) -> str:
+    """The Programming Source a Batch carries, read from the request alone."""
+    if "bundle_base64" in body:
+        return "bundle"
+    return "image" if "image_base64" in body else "range"
+
+
+def _unit_status(outcome: str | None, *, stopped: bool = False) -> str:
+    if outcome in EXECUTED_OUTCOMES:
+        return "FINISHED"
+    if outcome == "BLOCKED":
+        return "BLOCKED"
+    return "SKIPPED" if stopped else "NOT_RUN"
+
+
+def migrate_batch_record(batch: Mapping[str, Any]) -> dict[str, Any]:
+    """A journalled Batch of the previous schema, read as a single-Target one.
+
+    Read-only: the caller's record is not modified and the stored journal is
+    never rewritten in place. The shape changes; nothing is reinterpreted. An
+    interrupted attempt stays interrupted, for the restart rule to judge under
+    exactly the rule it would have met before the upgrade.
+    """
+    alias, site = batch["ppu_alias"], batch["site_id"]
+    attempts = [dict(attempt) for attempt in (batch.get("attempts") or [])]
+    for attempt in attempts:
+        attempt.setdefault("job_key", {"batch_id": batch["batch_id"], "ppu_alias": alias,
+                                       "site_id": site, "attempt": attempt.get("attempt")})
+    outcome = batch.get("outcome")
+    # A v1 Batch reported STOPPED in the outcome field. Execution status and
+    # outcome are separate now, so the stop moves to the status it always was.
+    stopped = outcome == "STOPPED"
+    unit_outcome = None if stopped else outcome
+    unit = {
+        "ppu_alias": alias, "site_id": site,
+        "status": _unit_status(unit_outcome, stopped=stopped),
+        "outcome": unit_outcome, "reason": batch.get("reason"),
+        "attempts": attempts,
+    }
+    return {
+        "schema": BATCH_SCHEMA, "batch_id": batch["batch_id"],
+        "start_id": batch.get("start_id"),
+        "targets": [{"ppu_alias": alias, "site_ids": [site]}],
+        "operations": batch.get("operations"), "source": batch.get("source"),
+        "icpn": batch.get("icpn"), "policy": batch.get("policy"),
+        "state": batch.get("state"),
+        "execution_status": ("STOPPED" if stopped or batch.get("stop_requested")
+                             else "COMPLETED" if batch.get("state") == "finished"
+                             else "RUNNING"),
+        "outcome": aggregate_outcome([unit]) if outcome is not None else None,
+        "reason": batch.get("reason"),
+        "stop_requested": bool(batch.get("stop_requested")),
+        "units": [unit],
+        "created_at": batch.get("created_at"), "updated_at": batch.get("updated_at"),
+        "migrated_from": LEGACY_BATCH_SCHEMA,
+    }
+
+
 class ProgrammingBatchCoordinator:
     def __init__(self, workflow: BundleProgrammingWorkflow, *,
                  journal_path: Path | None = None,
+                 platform_gate: Callable[[str], str | None] | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  spawn: Callable[[Callable[[], None]], None] | None = None,
                  poll_interval_s: float = 0.5) -> None:
         self.workflow = workflow
         self.journal_path = journal_path
+        # The Manager's Platform maintenance gate, evaluated per Target PPU at
+        # admission and again immediately before each PPU is operated.
+        self.platform_gate = platform_gate
         self.sleep = sleep
         self.spawn = spawn or (lambda target: threading.Thread(
             target=target, name="plasma-programming-batch", daemon=True).start())
         self.poll_interval_s = poll_interval_s
         self._lock = threading.RLock()
         self._batches: dict[str, dict[str, Any]] = {}
+        #: Where a journal of the previous schema lives, if one does. It is
+        #: opened, never written: not overwritten, truncated, deleted or
+        #: renamed out of the way. The v2 writer keeps its own file.
+        self._legacy_path: Path | None = None
+        self._v2_path: Path | None = journal_path
+        #: Batches that came from the legacy journal. They stay in memory and
+        #: are never copied into the v2 file, so the v1 journal remains the
+        #: one and only record of its own Batches.
+        self._legacy_ids: set[str] = set()
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
-    def _load_journal(self) -> None:
-        if self.journal_path is None or not self.journal_path.exists():
-            return
+    def _read_journal(self, path: Path) -> tuple[str, list[Any]]:
+        """One journal file, by schema. An unreadable journal fails closed."""
         try:
-            data = json.loads(self.journal_path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict) or data.get("schema") != JOURNAL_SCHEMA:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
                 raise ValueError("schema")
-            for batch in data["batches"]:
-                if batch.get("outcome") is None:
-                    self._close_interrupted(batch)
-                self._batches[batch["batch_id"]] = batch
+            schema = data.get("schema")
+            if schema not in (JOURNAL_SCHEMA, LEGACY_JOURNAL_SCHEMA):
+                raise ValueError("schema")
+            batches = data["batches"]
+            if not isinstance(batches, list):
+                raise ValueError("batches")
+            return schema, batches
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise RuntimeError(
                 "Programming batch journal is unreadable; refusing to start") from exc
+
+    def _load_journal(self) -> None:
+        """Load the legacy journal, then the v2 one on top of it.
+
+        The configured path is whatever the last Manager wrote there. If that
+        is a journal of the previous schema, it becomes the legacy file - read
+        and never written - and the v2 writer takes a file of its own beside
+        it. A Manager restarting afterwards reads both: v1 for its history,
+        v2 for everything since. Neither is a second Batch engine; both load
+        into the one canonical in-memory model, and where the two name the
+        same Batch, v2 is the later writer and wins.
+        """
+        if self.journal_path is None:
+            return
+        legacy_records: list[Any] = []
+        v2_records: list[Any] = []
+        if self.journal_path.exists():
+            schema, records = self._read_journal(self.journal_path)
+            if schema == LEGACY_JOURNAL_SCHEMA:
+                self._legacy_path = self.journal_path
+                self._v2_path = self.journal_path.with_name(self.journal_path.name + ".v2")
+                legacy_records = records
+                if self._v2_path.exists():
+                    _schema, v2_records = self._read_journal(self._v2_path)
+            else:
+                v2_records = records
+        # Migrated on read, never refused: an interrupted attempt in a legacy
+        # record is exactly what the restart rule has to judge.
+        legacy = {}
+        for record in legacy_records:
+            batch = migrate_batch_record(record)
+            legacy[batch["batch_id"]] = batch
+        current = {record["batch_id"]: record for record in v2_records}
+        self._refuse_conflicting_identities(legacy, current)
+        for batch_id, batch in legacy.items():
+            if batch_id in current:
+                # Both files tell the same story; the v2 writer owns it from
+                # here, and the legacy copy is not loaded twice.
+                continue
+            self._legacy_ids.add(batch_id)
+            self._admit_loaded(batch)
+        for record in v2_records:
+            self._admit_loaded(record)
         with self._lock:
             self._persist_locked()
 
+    @staticmethod
+    def _transaction_identity(batch: Mapping[str, Any]) -> dict[str, Any]:
+        """What two records of one Batch must agree on to be the same Batch.
+
+        Timestamps and bookkeeping are left out; what is compared is the
+        transaction: which start admitted it, what it was aimed at, what it
+        concluded, and every Job identity and SAFE_OFF result underneath.
+        """
+        return {
+            "start_id": batch.get("start_id"),
+            "targets": batch.get("targets"),
+            "outcome": batch.get("outcome"),
+            "units": [{
+                "ppu_alias": unit.get("ppu_alias"), "site_id": unit.get("site_id"),
+                "outcome": unit.get("outcome"),
+                "attempts": [{key: attempt.get(key) for key in
+                              ("attempt", "plan_id", "run_id", "job_id",
+                               "job_binding_sha256", "outcome", "safe_off")}
+                             for attempt in unit.get("attempts") or []],
+            } for unit in batch.get("units") or []],
+        }
+
+    def _refuse_conflicting_identities(self, legacy: Mapping[str, Any],
+                                       current: Mapping[str, Any]) -> None:
+        """Fail closed on a transaction identity that cannot be proven.
+
+        Two journals may hold the same Batch - that is normal, and harmless
+        while they say the same thing. When they do not, there is no safe way
+        to pick a winner: preferring the later writer can bury an
+        ``OUTCOME_UNKNOWN`` that an operator still has to reconcile, and
+        preferring the older one can lose a Job that really ran. The same is
+        true of a start ID that two different Batches claim, since one start
+        admits at most one Batch. Either way the Manager refuses to start and
+        says exactly which identity it could not prove; an operator reconciles
+        it. Deleting the v2 journal is NOT the remedy - it holds real
+        transactions.
+        """
+        conflicts = []
+        for batch_id, record in current.items():
+            older = legacy.get(batch_id)
+            if older is not None and (self._transaction_identity(older)
+                                      != self._transaction_identity(record)):
+                conflicts.append(f"batch_id {batch_id} differs between the journals")
+        claimed: dict[str, str] = {}
+        for batch_id, record in list(legacy.items()) + list(current.items()):
+            start_id = record.get("start_id")
+            if start_id is None:
+                continue
+            if claimed.setdefault(start_id, batch_id) != batch_id:
+                conflicts.append(
+                    f"start_id {start_id} is claimed by {claimed[start_id]} and {batch_id}")
+        if conflicts:
+            raise RuntimeError(
+                "Programming batch journals disagree about a transaction identity; "
+                "refusing to start without reconciliation: " + "; ".join(sorted(conflicts)))
+
+    def _admit_loaded(self, batch: dict[str, Any]) -> None:
+        if batch.get("outcome") is None:
+            self._close_interrupted(batch)
+        self._batches[batch["batch_id"]] = batch
+
     def _close_interrupted(self, batch: dict[str, Any]) -> None:
         """A Batch the Manager was stopped in: decide from the run journal,
-        never by submitting anything again."""
-        attempts = batch.get("attempts") or []
-        last = attempts[-1] if attempts else None
-        run = self._run_of(batch["ppu_alias"], last) if last else None
-        if last is None or (last.get("run_id") is None and run is None
-                            and last.get("state") == "planned"):
-            outcome, reason = "BLOCKED", "MANAGER_RESTARTED_BEFORE_SUBMISSION"
-        elif run is not None and run.get("outcome") in ("PASS", "FAIL", "BLOCKED"):
-            # The attempt itself finished; only the Batch bookkeeping was cut.
-            self._record_attempt(last, run)
-            outcome = run["outcome"] if run["outcome"] != "FAIL" else "FAIL"
-            reason = ("MANAGER_RESTARTED_NO_FURTHER_ATTEMPT" if outcome == "FAIL"
-                      else run.get("reason"))
-        else:
-            if run is not None:
+        never by submitting anything again. The judgement is per Site."""
+        for unit in batch["units"]:
+            if unit.get("outcome") is not None:
+                continue
+            attempts = unit.get("attempts") or []
+            last = attempts[-1] if attempts else None
+            run = self._run_of(unit["ppu_alias"], last) if last else None
+            if last is None or (last.get("run_id") is None and run is None
+                                and last.get("state") == "planned"):
+                # Provably never submitted - no attempt was journalled, or one
+                # was journalled and never started. That proof is the only
+                # BLOCKED a restart may conclude.
+                outcome, reason = "BLOCKED", "MANAGER_RESTARTED_BEFORE_SUBMISSION"
+            elif run is not None and run.get("outcome") in ("PASS", "FAIL", "BLOCKED"):
+                # The attempt itself finished; only the bookkeeping was cut.
                 self._record_attempt(last, run)
-            outcome, reason = "OUTCOME_UNKNOWN", "MANAGER_RESTARTED_DURING_ATTEMPT"
-        batch.update(state="finished", outcome=outcome, reason=reason, updated_at=_now())
+                outcome = run["outcome"]
+                reason = ("MANAGER_RESTARTED_NO_FURTHER_ATTEMPT" if outcome == "FAIL"
+                          else run.get("reason"))
+            else:
+                # Not provably unsent, so never BLOCKED.
+                if run is not None:
+                    self._record_attempt(last, run)
+                outcome, reason = "OUTCOME_UNKNOWN", "MANAGER_RESTARTED_DURING_ATTEMPT"
+            unit.update(status=_unit_status(outcome), outcome=outcome, reason=reason)
+        outcome = aggregate_outcome(batch["units"])
+        batch.update(state="finished", outcome=outcome,
+                     execution_status="STOPPED" if batch.get("stop_requested") else "COMPLETED",
+                     reason=batch_reason(batch["units"], outcome,
+                                         batch.get("reason") or "MANAGER_RESTARTED"),
+                     updated_at=_now())
 
     def _persist_locked(self) -> None:
-        if self.journal_path is None:
+        """Write the v2 journal, atomically, and never the legacy one.
+
+        Batches that came from the legacy journal are left out: that file is
+        still their only record, and copying them here would turn a read into
+        a rewrite by another route.
+        """
+        if self._v2_path is None:
             return
-        kept = sorted(self._batches.values(), key=lambda b: b["created_at"])[-MAX_BATCHES_RETAINED:]
+        owned = [batch for batch in self._batches.values()
+                 if batch["batch_id"] not in self._legacy_ids]
+        kept = sorted(owned, key=lambda b: b["created_at"])[-MAX_BATCHES_RETAINED:]
         payload = {"schema": JOURNAL_SCHEMA, "batches": kept}
-        parent = self.journal_path.parent
+        parent = self._v2_path.parent
         parent.mkdir(parents=True, exist_ok=True)
-        fd, name = tempfile.mkstemp(prefix=f".{self.journal_path.name}.", dir=parent)
+        fd, name = tempfile.mkstemp(prefix=f".{self._v2_path.name}.", dir=parent)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 json.dump(payload, stream, sort_keys=True)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.chmod(name, 0o600)
-            os.replace(name, self.journal_path)
+            os.replace(name, self._v2_path)
         except BaseException:
             Path(name).unlink(missing_ok=True)
             raise
@@ -214,82 +552,202 @@ class ProgrammingBatchCoordinator:
             job_id=receipt.get("job_id") or job.get("job_id"),
             safe_off=receipt.get("safe_off"), finished_at=run.get("updated_at"))
 
-    def _view(self, batch: Mapping[str, Any]) -> dict[str, Any]:
-        attempts = batch["attempts"]
-        current = self._run_of(batch["ppu_alias"], attempts[-1]) if attempts else None
-        outcome = batch["outcome"]
-        return {**batch, "attempts": [dict(a) for a in attempts], "current_run": current,
-                # One Batch is one IC: counted once, by its final outcome only.
-                "counts": {"pass": 1 if outcome == "PASS" else 0,
-                           "fail": 1 if outcome == "FAIL" else 0,
-                           "attempts": len(attempts)},
-                "auto_retry": "DISABLED"}
+    def _current_run(self, batch: Mapping[str, Any]) -> dict[str, Any] | None:
+        for unit in reversed(batch["units"]):
+            attempts = unit.get("attempts") or []
+            if attempts:
+                return self._run_of(unit["ppu_alias"], attempts[-1])
+        return None
 
-    def _get(self, alias: str, batch_id: str) -> dict[str, Any]:
+    def _view(self, batch: Mapping[str, Any]) -> dict[str, Any]:
+        """The Batch as a reader sees it.
+
+        A single-Site Batch also carries the fields the alias-scoped entry has
+        always returned (``ppu_alias``, ``site_id``, a flat ``attempts``).
+        Those are a projection of the same record, not a second shape of the
+        truth: they are derived here and never stored or judged separately.
+        """
+        units = [{**unit, "attempts": [dict(a) for a in unit.get("attempts") or []]}
+                 for unit in batch["units"]]
+        attempts = [attempt for unit in units for attempt in unit["attempts"]]
+        outcomes = [unit.get("outcome") for unit in units]
+        view = {**batch, "units": units, "attempts": attempts,
+                "current_run": self._current_run(batch),
+                # One Site is one IC: counted once, by its final outcome only.
+                "counts": {"pass": outcomes.count("PASS"), "fail": outcomes.count("FAIL"),
+                           "blocked": outcomes.count("BLOCKED"),
+                           "unknown": outcomes.count("OUTCOME_UNKNOWN"),
+                           "sites": len(units), "attempts": len(attempts)},
+                "auto_retry": "DISABLED"}
+        if len(units) == 1:
+            view["ppu_alias"] = units[0]["ppu_alias"]
+            view["site_id"] = units[0]["site_id"]
+        return view
+
+    @staticmethod
+    def _single_alias(batch: Mapping[str, Any]) -> str | None:
+        """The alias of a single-Target, single-Site Batch, else None."""
+        targets = batch["targets"]
+        if len(targets) == 1 and len(targets[0]["site_ids"]) == 1:
+            return targets[0]["ppu_alias"]
+        return None
+
+    def _get(self, batch_id: str, alias: str | None = None) -> dict[str, Any]:
+        """``alias`` is the compatibility entry: it reads only a Batch that is
+        a single Target on that PPU, exactly as it could before."""
         batch = self._batches.get(batch_id)
-        if batch is None or batch["ppu_alias"] != alias:
+        if batch is None or (alias is not None and self._single_alias(batch) != alias):
             raise ProgrammingError(404, "programming_batch_not_found",
                                    "programming batch was not found")
         return batch
 
     # --------------------------------------------------------------------- API
+    def start_batch(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """The canonical Manager-owned entry: a Batch over a Target Set.
+
+        A Batch carries a Manager-issued ``start_id`` (§5.1, §5.3). It is the
+        sole idempotency token, and a Batch without one cannot be reconciled
+        after a lost answer, so the canonical resource requires it.
+        """
+        return self._start(body, require_start=True)
+
     def start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        if (not isinstance(body, Mapping) or set(body) - PLAN_KEYS - POLICY_KEYS - START_KEYS
-                or "operations" not in body):
+        """The alias-scoped compatibility entry (§5.8).
+
+        It is a door into the same engine, not a second path: the body is
+        normalised into a single-Target Batch and judged by exactly the same
+        admission, isolation and outcome rules.
+        """
+        if not isinstance(body, Mapping) or TARGET_KEY in body or LEGACY_SITE_KEY not in body:
             raise ProgrammingError(
                 400, "invalid_request",
                 "a batch requires icpn, site_id, an operations list with its Programming "
                 "Image, Bundle or erase range, and optional retry_limit / stop_policy")
-        policy = parse_policy(body)
+        normalised = {key: value for key, value in body.items() if key != LEGACY_SITE_KEY}
+        normalised[TARGET_KEY] = [{"ppu_alias": alias, "site_ids": [body[LEGACY_SITE_KEY]]}]
+        # The compatibility entry keeps accepting a start that omits the
+        # token, as it always has. Tightening it would break deployed callers
+        # before PR-C migrates them, and this entry exists to not do that.
+        return self._start(normalised)
+
+    def _start(self, body: Mapping[str, Any], *, require_start: bool = False) -> dict[str, Any]:
+        if (not isinstance(body, Mapping)
+                or set(body) - PLAN_KEYS - {TARGET_KEY} - POLICY_KEYS - START_KEYS
+                or "operations" not in body or TARGET_KEY not in body):
+            raise ProgrammingError(
+                400, "invalid_request",
+                "a batch requires icpn, targets, an operations list with its Programming "
+                "Image, Bundle or erase range, and optional retry_limit / stop_policy")
+        if require_start and "start_id" not in body:
+            raise ProgrammingError(
+                400, "invalid_request",
+                "a Batch requires a Manager-issued start_id; obtain one first")
+        targets = parse_targets(body)
+        policy = parse_policy(body, site_count(targets))
         plan_body = {key: body[key] for key in body if key in PLAN_KEYS}
-        # Optional Manager-issued start ID (Start Outcome Reconciliation). A
-        # start that carries one is admitted at most once and is refused when
-        # the ID is unknown, used, voided or expired.
         start_id = body.get("start_id")
+        aliases = [target["ppu_alias"] for target in targets]
+        # Validity first (§5.3), and all of it before any PPU is read. A Batch
+        # whose specification is illegal is refused even when every PPU in it
+        # happens to be unready, so an unusable Image can never be mistaken
+        # for a legitimately BLOCKED Batch.
+        self.workflow.validate_specification(plan_body)
         with self._lock:
+            # An unknown or unauthorised Target refuses the WHOLE Batch and
+            # leaves the start_id unconsumed, so the operator may correct the
+            # request and resend the same token.
+            for alias in aliases:
+                self.workflow._require_commissioned(alias)
+            start_alias = aliases[0]
             if "start_id" in body:
-                self.workflow.require_batch_start(alias, start_id)
-            if any(b["ppu_alias"] == alias and b["outcome"] is None
-                   for b in self._batches.values()):
+                # Validate the start against the PPU it was ISSUED for, not
+                # against whichever Target happens to be listed first: the
+                # token is an idempotency guard, and every Target's authority
+                # was checked on its own just above.
+                issued_for = self.workflow.batch_start_alias(start_id)
+                if issued_for in aliases:
+                    start_alias = issued_for
+                self.workflow.require_batch_start(start_alias, start_id)
+            if any(batch["outcome"] is None
+                   and {t["ppu_alias"] for t in batch["targets"]} & set(aliases)
+                   for batch in self._batches.values()):
                 raise ProgrammingError(409, "programming_batch_in_progress",
                                        "another programming batch is in progress on this PPU")
-            # An unresolved OUTCOME_UNKNOWN or a run in progress refuses the
-            # whole Batch up front: nothing is planned, queued or journalled.
-            with self.workflow._lock:
-                latched = self.workflow._unknown_latched(alias)
-                busy = self.workflow._active_run(alias)
-            if latched is not None:
-                raise ProgrammingError(
-                    409, "programming_outcome_unknown_unresolved",
-                    f"run {latched.run_id} ended OUTCOME_UNKNOWN; reconcile and acknowledge first")
-            if busy is not None:
-                raise ProgrammingError(409, "programming_run_in_progress",
-                                       "another programming run is in progress on this PPU")
-            # The first plan is made synchronously: a refused request creates
-            # no Batch, and its identities are fixed before anything is queued.
-            planned = self.workflow.plan(alias, plan_body)["plan"]
+            # Readiness second. It never refuses the Batch: a Target that is
+            # not ready is admitted BLOCKED with its own reason, and a Batch
+            # in which EVERY Target is BLOCKED is still admitted, journalled
+            # and reconcilable - it simply submits nothing.
+            units = [{"ppu_alias": target["ppu_alias"], "site_id": site,
+                      "status": "NOT_RUN", "outcome": None, "reason": None,
+                      "failure_domain": None, "attempts": []}
+                     for target in targets for site in target["site_ids"]]
+            for alias, target in zip(aliases, targets):
+                verdict = self._admission_block(alias, target["site_ids"][0])
+                if verdict is None:
+                    continue
+                domain, reason = verdict
+                if domain == SHARED_CONTROL_FAILURE:
+                    # Not one PPU's problem. Nothing is admitted, nothing is
+                    # journalled and the start_id is not consumed.
+                    raise ProgrammingError(
+                        503, "manager_shared_control_failure",
+                        f"Manager shared safety control is not usable ({reason}); "
+                        "no programming Job was submitted")
+                for unit in units:
+                    if unit["ppu_alias"] == alias:
+                        unit.update(status="BLOCKED", outcome="BLOCKED",
+                                    reason=f"ADMISSION_{reason}", failure_domain=domain)
             batch = {
-                "schema": BATCH_SCHEMA, "batch_id": secrets.token_hex(16), "ppu_alias": alias,
+                "schema": BATCH_SCHEMA, "batch_id": secrets.token_hex(16),
                 "start_id": start_id,
-                "site_id": planned["site_id"], "operations": planned["operations"],
-                "source": planned["source"], "icpn": planned["route"]["icpn"],
-                "policy": policy, "state": "running", "outcome": None, "reason": None,
-                "stop_requested": False, "attempts": [],
+                "targets": [dict(target, site_ids=list(target["site_ids"]))
+                            for target in targets],
+                "operations": plan_body["operations"],
+                "source": _source_of(plan_body), "icpn": plan_body.get("icpn"),
+                "policy": policy, "state": "running",
+                "execution_status": "RUNNING", "outcome": None, "reason": None,
+                "stop_requested": False, "failure_domain": None, "units": units,
+                "journal_persisted": True,
                 "created_at": _now(), "updated_at": _now(),
             }
             if start_id is not None:
                 # Admission is journalled first: from here on the start can
-                # never reconcile as "not accepted".
+                # never reconcile as "not accepted". Partial admission has
+                # still consumed it, so a BLOCKED Target needs a NEW start.
                 self.workflow.consume_batch_start(
-                    alias, start_id, batch["batch_id"], planned["site_id"])
+                    start_alias, start_id, batch["batch_id"], batch["targets"])
             self._batches[batch["batch_id"]] = batch
             try:
                 self._persist_locked()
             except BaseException:
                 del self._batches[batch["batch_id"]]
                 raise
-        self.spawn(lambda: self._execute(batch, plan_body, planned))
+        self.spawn(lambda: self._execute(batch, plan_body))
         return {"ok": True, "batch": self._view(batch)}
+
+    def _admission_block(self, alias: str, site: int) -> tuple[str, str] | None:
+        """Whether one Target may be operated, and whose failure it is if not.
+
+        Both gates are asked. The Platform gate proves the PPU is safe to
+        mutate at all; the Target gate proves this Site is released. Either
+        one blocks this Target alone - unless what failed is the Manager's own
+        shared control, which stops the Batch instead.
+
+        An exception escaping either gate is NOT assumed to be local. Both
+        classify every PPU-scoped failure themselves, so anything left is a
+        failure of the machinery that was meant to judge, and the only safe
+        reading of "I could not tell" is to stop submitting.
+        """
+        try:
+            if self.platform_gate is not None:
+                verdict = self.platform_gate(alias)
+                if verdict is not None:
+                    return verdict
+            return self.workflow.target_block(alias, site)
+        except ProgrammingError as exc:
+            return TARGET_NOT_READY, exc.code.upper()
+        except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
+            return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
     def reconcile_start(self, alias: str, start_id: str) -> dict[str, Any]:
         """Read-only: what became of the Start that carried ``start_id``."""
@@ -303,16 +761,28 @@ class ProgrammingBatchCoordinator:
 
     def status(self, alias: str, batch_id: str) -> dict[str, Any]:
         with self._lock:
-            return {"ok": True, "batch": self._view(self._get(alias, batch_id))}
+            return {"ok": True, "batch": self._view(self._get(batch_id, alias))}
+
+    def status_batch(self, batch_id: str) -> dict[str, Any]:
+        with self._lock:
+            return {"ok": True, "batch": self._view(self._get(batch_id))}
 
     def request_stop(self, alias: str, batch_id: str,
                      body: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        return self._request_stop(batch_id, body, alias=alias)
+
+    def request_stop_batch(self, batch_id: str,
+                           body: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        return self._request_stop(batch_id, body)
+
+    def _request_stop(self, batch_id: str, body: Mapping[str, Any] | None,
+                      alias: str | None = None) -> dict[str, Any]:
         """Stop queuing. Never cancels, resets or releases anything on the PPU."""
         if body is not None and dict(body) != {"stop": STOP_TOKEN}:
             raise ProgrammingError(400, "invalid_request",
                                    f"stop requires stop={STOP_TOKEN}")
         with self._lock:
-            batch = self._get(alias, batch_id)
+            batch = self._get(batch_id, alias)
             if batch["outcome"] is None and not batch["stop_requested"]:
                 batch["stop_requested"] = True
                 batch["updated_at"] = _now()
@@ -320,41 +790,146 @@ class ProgrammingBatchCoordinator:
             return {"ok": True, "batch": self._view(batch)}
 
     # ---------------------------------------------------------------- execution
-    def _execute(self, batch: dict[str, Any], plan_body: Mapping[str, Any],
-                 first_plan: Mapping[str, Any]) -> None:
+    def _execute(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
         try:
-            self._run_attempts(batch, plan_body, first_plan)
+            self._run_units(batch, plan_body)
         except Exception as exc:  # noqa: BLE001 - never retried, never a guessed result
-            self._update(batch, state="finished", outcome="OUTCOME_UNKNOWN",
-                         reason=f"BATCH_UNEXPECTED_{type(exc).__name__}")
+            # The machinery that judges Targets failed, not a Target. One PPU
+            # being unready is isolated; being unable to tell is not (§5.7).
+            self._shared_failure(batch, f"BATCH_UNEXPECTED_{type(exc).__name__}")
 
-    def _finish(self, batch: dict[str, Any], outcome: str, reason: str | None) -> None:
-        self._update(batch, state="finished", outcome=outcome, reason=reason)
+    def _shared_failure(self, batch: dict[str, Any], reason: str) -> None:
+        """The Manager's shared safety control failed, not a Target.
 
-    def _run_attempts(self, batch: dict[str, Any], plan_body: Mapping[str, Any],
-                      first_plan: Mapping[str, Any]) -> None:
-        alias, policy = batch["ppu_alias"], batch["policy"]
-        plan: Mapping[str, Any] | None = first_plan
-        for number in range(1, policy["retry_limit"] + 2):
+        Nothing further is submitted for ANY PPU and no retry is started.
+        Evidence already earned is kept as it stands: a Site whose Job may
+        have reached a PPU keeps ``OUTCOME_UNKNOWN`` and is never resent, and
+        a Site that was provably never submitted is left unexecuted rather
+        than guessed into a failure it did not have.
+        """
+        with self._lock:
+            for unit in batch["units"]:
+                if unit["outcome"] is not None:
+                    continue
+                attempts = unit.get("attempts") or []
+                in_flight = bool(attempts) and attempts[-1].get("outcome") is None
+                unit.update(
+                    status="FINISHED" if in_flight else "SKIPPED",
+                    outcome="OUTCOME_UNKNOWN" if in_flight else None,
+                    reason=f"SHARED_CONTROL_FAILURE_{reason}",
+                    failure_domain=SHARED_CONTROL_FAILURE)
+            batch["failure_domain"] = SHARED_CONTROL_FAILURE
+        self._finish(batch, f"SHARED_CONTROL_FAILURE_{reason}")
+
+    def _finish(self, batch: dict[str, Any], reason: str | None) -> None:
+        outcome = aggregate_outcome(batch["units"])
+        changes = {
+            "state": "finished", "outcome": outcome,
+            "execution_status": "STOPPED" if batch["stop_requested"] else "COMPLETED",
+            "reason": batch_reason(batch["units"], outcome, reason),
+        }
+        try:
+            self._update(batch, **changes)
+        except Exception:  # noqa: BLE001 - a failed journal is reported, not hidden
+            # The end of this Batch could not be recorded. Nothing further is
+            # submitted either way, and the Batch says plainly that its final
+            # state is not durable rather than implying it was stored.
+            with self._lock:
+                batch.update(changes, journal_persisted=False, updated_at=_now())
+
+    def _skip(self, batch: dict[str, Any], unit: dict[str, Any], status: str,
+              reason: str, outcome: str | None = None, domain: str | None = None) -> None:
+        with self._lock:
+            unit.update(status=status, outcome=outcome, reason=reason,
+                        failure_domain=domain)
+            batch["updated_at"] = _now()
+            self._persist_locked()
+
+    def _run_units(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
+        """Sequential walk of the Target Set. One in-flight run at a time."""
+        policy = batch["policy"]
+        stop_policy = policy["stop_policy"]
+        latched: dict[str, str] = {}
+        failed_sites = 0
+        reason: str | None = None
+        for unit in batch["units"]:
+            alias, site = unit["ppu_alias"], unit["site_id"]
+            if unit["outcome"] is not None:
+                # Admitted BLOCKED. It spends no retry budget and, by default,
+                # does not count toward the failed_sites threshold.
+                continue
             if batch["stop_requested"]:
-                self._finish(batch, "STOPPED" if number == 1 else "FAIL",
-                             "STOP_REQUESTED_NOTHING_SUBMITTED" if number == 1
-                             else "STOP_REQUESTED_NO_FURTHER_ATTEMPT")
-                return
+                self._skip(batch, unit, "SKIPPED", "STOP_REQUESTED_NOTHING_SUBMITTED")
+                reason = reason or "STOP_REQUESTED"
+                continue
+            if alias in latched:
+                # OUTCOME_UNKNOWN latches its own PPU and skips that PPU's
+                # remaining Sites. Other PPUs are untouched.
+                self._skip(batch, unit, "SKIPPED", f"PPU_LATCHED_{latched[alias]}")
+                continue
+            if (stop_policy["kind"] == "failed_sites"
+                    and failed_sites >= stop_policy["threshold"]):
+                self._skip(batch, unit, "SKIPPED",
+                           "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED")
+                reason = reason or "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED"
+                continue
+            # Readiness read at admission does not authorise a mutation that
+            # happens now. Re-check immediately before operating this PPU.
+            # Never skip this PPU's own check because another one failed.
+            verdict = self._admission_block(alias, site)
+            if verdict is not None:
+                domain, block = verdict
+                if domain == SHARED_CONTROL_FAILURE:
+                    self._shared_failure(batch, block)
+                    return
+                self._skip(batch, unit, "BLOCKED", f"EXECUTION_{block}",
+                           outcome="BLOCKED", domain=domain)
+                continue
+            outcome, unit_reason = self._run_attempts(batch, unit, plan_body)
+            with self._lock:
+                unit.update(status=_unit_status(outcome), outcome=outcome, reason=unit_reason)
+                if outcome == "BLOCKED":
+                    unit["failure_domain"] = TARGET_NOT_READY
+                batch["updated_at"] = _now()
+                self._persist_locked()
+            if outcome == "OUTCOME_UNKNOWN":
+                # A Job for this PPU may have reached it and its result is
+                # unknown. Latch this PPU, never resend, leave the others be.
+                unit["failure_domain"] = TARGET_TRANSACTION_UNKNOWN
+                latched[alias] = unit_reason or "OUTCOME_UNKNOWN"
+            elif outcome == "FAIL":
+                failed_sites += 1
+        self._finish(batch, reason)
+
+    def _run_attempts(self, batch: dict[str, Any], unit: dict[str, Any],
+                      plan_body: Mapping[str, Any]) -> tuple[str, str | None]:
+        """Every attempt for ONE Site. Returns that Site's outcome and reason."""
+        alias, site, policy = unit["ppu_alias"], unit["site_id"], batch["policy"]
+        site_body = {**plan_body, "site_id": site}
+        plan: Mapping[str, Any] | None = None
+        for number in range(1, policy["retry_limit"] + 2):
+            if batch["stop_requested"] and number > 1:
+                return "FAIL", "STOP_REQUESTED_NO_FURTHER_ATTEMPT"
             if plan is None:
                 try:
-                    plan = self.workflow.plan(alias, plan_body)["plan"]
+                    plan = self.workflow.plan(alias, site_body)["plan"]
                 except ProgrammingError as exc:
-                    # The earlier FAIL stands; the retry could not even be planned.
-                    self._finish(batch, "FAIL", f"RETRY_PLAN_REFUSED_{exc.code}")
-                    return
-            attempt = {"attempt": number, "plan_id": plan["plan_id"], "run_id": None,
+                    if number == 1:
+                        # Nothing was submitted for this Site: provably BLOCKED.
+                        return "BLOCKED", exc.code
+                    # The earlier FAIL stands; the retry could not be planned.
+                    return "FAIL", f"RETRY_PLAN_REFUSED_{exc.code}"
+            attempt = {"attempt": number,
+                       "job_key": {"batch_id": batch["batch_id"], "ppu_alias": alias,
+                                   "site_id": site, "attempt": number},
+                       "plan_id": plan["plan_id"], "run_id": None,
                        "job_binding_sha256": plan["job_binding_sha256"], "job_id": None,
                        "state": "planned", "outcome": None, "reason": None,
                        "safe_off": None, "retry": None,
                        "started_at": _now(), "finished_at": None}
             with self._lock:
-                batch["attempts"].append(attempt)
+                unit["attempts"].append(attempt)
+                unit["status"] = "RUNNING"
                 batch["updated_at"] = _now()
                 # Journalled BEFORE the single start of this attempt.
                 self._persist_locked()
@@ -365,9 +940,9 @@ class ProgrammingBatchCoordinator:
                 with self._lock:
                     attempt.update(state="finished", outcome="BLOCKED", reason=exc.code,
                                    finished_at=_now())
-                self._finish(batch, "BLOCKED" if number == 1 else "FAIL",
-                             exc.code if number == 1 else f"RETRY_START_REFUSED_{exc.code}")
-                return
+                if number == 1:
+                    return "BLOCKED", exc.code
+                return "FAIL", f"RETRY_START_REFUSED_{exc.code}"
             with self._lock:
                 attempt.update(run_id=started["run_id"], state="running")
                 batch["updated_at"] = _now()
@@ -381,9 +956,8 @@ class ProgrammingBatchCoordinator:
                 self._persist_locked()
             outcome = run["outcome"]
             if outcome != "FAIL":
-                # PASS ends the Batch; OUTCOME_UNKNOWN and BLOCKED are never retried.
-                self._finish(batch, outcome, run.get("reason"))
-                return
+                # PASS ends this Site; OUTCOME_UNKNOWN and BLOCKED are never retried.
+                return outcome, run.get("reason")
             eligible, why = retry_eligibility(run)
             decision = {"eligible": eligible, "reason": why, "decision": "NO_RETRY"}
             final_reason = run.get("reason")
@@ -392,12 +966,12 @@ class ProgrammingBatchCoordinator:
                 final = "RETRY_LIMIT_EXHAUSTED" if policy["retry_limit"] else None
             elif not eligible:
                 final = f"RETRY_NOT_ELIGIBLE_{why}"
-            elif policy["stop_policy"]["kind"] == "failed_sites":
+            elif self._stop_policy_reached(batch):
                 final = "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED"
             elif batch["stop_requested"]:
                 final = "STOP_REQUESTED_NO_FURTHER_ATTEMPT"
             else:
-                blocked = self.workflow.retry_block(alias, batch["site_id"])
+                blocked = self.workflow.retry_block(alias, site)
                 if blocked is not None:
                     decision.update(eligible=False, reason=f"PPU_NOT_RELEASED_{blocked}")
                     final = f"RETRY_NOT_ELIGIBLE_PPU_NOT_RELEASED_{blocked}"
@@ -408,6 +982,15 @@ class ProgrammingBatchCoordinator:
                 attempt["retry"] = decision
                 self._persist_locked()
             if decision["decision"] != "RETRY":
-                self._finish(batch, "FAIL", final or final_reason)
-                return
+                return "FAIL", final or final_reason
             plan = None  # a retry always gets a new plan, run and Job
+        return "FAIL", final_reason
+
+    def _stop_policy_reached(self, batch: Mapping[str, Any]) -> bool:
+        stop = batch["policy"]["stop_policy"]
+        if stop["kind"] != "failed_sites":
+            return False
+        failed = sum(1 for unit in batch["units"] if unit.get("outcome") == "FAIL")
+        # The Site being judged has not been recorded yet; it is the one that
+        # just failed, so it counts here.
+        return failed + 1 >= stop["threshold"]

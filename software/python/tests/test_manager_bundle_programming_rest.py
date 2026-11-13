@@ -88,6 +88,21 @@ class StubBatches:
             raise ProgrammingError(400, "invalid_request", "stop requires stop=STOP_QUEUING")
         return {"ok": True, "batch": {"batch_id": batch_id, "stop_requested": True}}
 
+    # The canonical resource: no alias, because the Batch is not owned by a PPU.
+    def start_batch(self, body):
+        self.calls.append(("start_batch", dict(body)))
+        return {"ok": True, "batch": {"batch_id": RUN_ID, "outcome": None}}
+
+    def status_batch(self, batch_id):
+        self.calls.append(("status_batch", batch_id))
+        return {"ok": True, "batch": {"batch_id": batch_id, "outcome": "PARTIAL"}}
+
+    def request_stop_batch(self, batch_id, body):
+        self.calls.append(("stop_batch", batch_id, dict(body)))
+        if body != {"stop": "STOP_QUEUING"}:
+            raise ProgrammingError(400, "invalid_request", "stop requires stop=STOP_QUEUING")
+        return {"ok": True, "batch": {"batch_id": batch_id, "stop_requested": True}}
+
 
 @pytest.fixture
 def manager(tmp_path: Path):
@@ -121,7 +136,7 @@ def manager(tmp_path: Path):
         return response.status, payload
 
     try:
-        yield call, workflow, poller
+        yield call, workflow, poller, BootstrapPlasmaManagerHandler.programming_batches
     finally:
         server.shutdown()
         server.server_close()
@@ -133,7 +148,7 @@ BASE = "/api/registry/z2/bootstrap/programming"
 
 
 def test_routes_plan_run_status_and_ack_are_wired(manager):
-    call, workflow, _poller = manager
+    call, workflow, _poller, _batches = manager
     assert call("GET", f"{BASE}/routes")[0] == 200
     status, payload = call("POST", f"{BASE}/plans", {"icpn": "X", "site_id": 2, "firmware_base64": "AA=="})
     assert status == 200 and payload["plan"]["plan_id"] == "e" * 32
@@ -146,13 +161,13 @@ def test_routes_plan_run_status_and_ack_are_wired(manager):
 
 
 def test_workflow_errors_keep_their_status_and_code(manager):
-    call, _workflow, _poller = manager
+    call, _workflow, _poller, _batches = manager
     status, payload = call("POST", f"{BASE}/plans", {"icpn": "missing", "site_id": 2, "firmware_base64": "AA=="})
     assert status == 422 and payload["error"]["code"] == "programming_route_not_found"
 
 
 def test_run_requires_platform_idle_gate(manager):
-    call, workflow, poller = manager
+    call, workflow, poller, _batches = manager
     poller.active = True
     status, payload = call("POST", f"{BASE}/runs", {"plan_id": "e" * 32, "confirm": "PROGRAM"})
     assert status == 409 and payload["error"]["code"] == "ppu_busy"
@@ -165,14 +180,14 @@ def test_run_requires_platform_idle_gate(manager):
     ("POST", f"{BASE}/runs/{RUN_ID}/retry"),
 ])
 def test_unlisted_programming_paths_are_not_allowlisted(manager, method, path):
-    call, workflow, _poller = manager
+    call, workflow, _poller, _batches = manager
     status, payload = call(method, path, {} if method == "POST" else None)
     assert status == 404 and payload["error"]["code"] == "bootstrap_route_not_allowed"
     assert workflow.calls == []
 
 
 def test_read_output_is_a_binary_download_with_its_sha256(manager):
-    call, workflow, _poller = manager
+    call, workflow, _poller, _batches = manager
     status, payload = call("GET", f"{BASE}/runs/{'e' * 32}/output")
     assert status == 409 and payload["error"]["code"] == "read_output_unavailable"
     import urllib.request
@@ -190,7 +205,7 @@ def test_read_output_is_a_binary_download_with_its_sha256(manager):
 
 
 def test_batch_start_status_and_stop_are_wired(manager):
-    call, _workflow, _poller = manager
+    call, _workflow, _poller, _batches = manager
     batches = BootstrapPlasmaManagerHandler.programming_batches
     status, payload = call("POST", f"{BASE}/batches", {
         "icpn": "X", "site_id": 2, "operations": ["erase"], "retry_limit": 1})
@@ -209,7 +224,7 @@ def test_batch_start_status_and_stop_are_wired(manager):
 
 
 def test_start_reconciliation_issue_and_void_are_wired(manager):
-    call, workflow, _poller = manager
+    call, workflow, _poller, _batches = manager
     batches = BootstrapPlasmaManagerHandler.programming_batches
     status, payload = call("POST", f"{BASE}/starts", {"kind": "batch"})
     assert status == 200 and payload["start"]["start_id"] == RUN_ID
@@ -223,10 +238,43 @@ def test_start_reconciliation_issue_and_void_are_wired(manager):
 
 
 def test_reconciliation_is_a_get_only_and_takes_a_strict_start_id(manager):
-    call, workflow, _poller = manager
+    call, workflow, _poller, _batches = manager
     batches = BootstrapPlasmaManagerHandler.programming_batches
     for path in (f"{BASE}/starts/not-an-id", f"{BASE}/starts/{'D' * 32}", f"{BASE}/starts"):
         assert call("GET", path)[0] in (400, 404, 405)
     # A POST to the reconciliation path is never a query and changes nothing.
     assert call("POST", f"{BASE}/starts/{RUN_ID}", {})[0] in (400, 404, 405)
     assert workflow.calls == [] and batches.calls == []
+
+
+CANONICAL = "/api/programming/batches"
+
+
+def test_the_canonical_batch_resource_is_not_under_a_ppu(manager):
+    call, _workflow, _poller, batches = manager
+    targets = [{"ppu_alias": "z2", "site_ids": [2, 3]},
+               {"ppu_alias": "z2b", "site_ids": [2]}]
+    status, payload = call("POST", CANONICAL, {"icpn": "X", "targets": targets,
+                                               "operations": ["erase", "program", "verify"]})
+    assert status == 202 and payload["batch"]["batch_id"] == RUN_ID
+    status, payload = call("GET", f"{CANONICAL}/{RUN_ID}")
+    assert status == 200 and payload["batch"]["outcome"] == "PARTIAL"
+    status, payload = call("POST", f"{CANONICAL}/{RUN_ID}/stop", {"stop": "STOP_QUEUING"})
+    assert status == 200 and payload["batch"]["stop_requested"] is True
+    assert [c[0] for c in batches.calls] == ["start_batch", "status_batch", "stop_batch"]
+    # No alias reached the coordinator: the Target Set carries them all.
+    assert batches.calls[0][1]["targets"] == targets
+
+
+def test_the_canonical_resource_keeps_coordinator_errors(manager):
+    call, _workflow, _poller, _batches = manager
+    status, payload = call("POST", f"{CANONICAL}/{RUN_ID}/stop", {"stop": "now"})
+    assert status == 400 and payload["error"]["code"] == "invalid_request"
+
+
+def test_an_unknown_canonical_batch_path_is_not_claimed(manager):
+    call, _workflow, _poller, batches = manager
+    # Only a 32-hex batch id is a Batch; anything else falls through to the
+    # ordinary Manager routes rather than being answered by this resource.
+    assert call("GET", "/api/programming/batches/not-a-batch")[0] == 404
+    assert batches.calls == []

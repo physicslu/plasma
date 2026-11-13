@@ -313,9 +313,18 @@ def test_read_unknown_blocks_programming_and_programming_unknown_blocks_read(tmp
         assert caught.value.code == "programming_outcome_unknown_unresolved"
         batches = ProgrammingBatchCoordinator(workflow, journal_path=root / "batches.json",
                                               spawn=lambda target: target())
+        start_id = issue(workflow)
+        # Partial admission: the Batch request is valid, so it is admitted and
+        # journalled. The latch is that PPU's readiness, so its only Target is
+        # BLOCKED and no Job is submitted.
+        admitted = batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id})["batch"]
+        assert admitted["outcome"] == "BLOCKED"
+        assert admitted["units"][0]["reason"] == "ADMISSION_OUTCOME_UNKNOWN_UNRESOLVED"
+        assert len(gateway.posts) == 1
+        # That admission consumed the start. Replaying it is still a 409.
         with pytest.raises(ProgrammingError) as caught:
-            batches.start(ALIAS, {**ops_body(FULL), "start_id": issue(workflow)})
-        assert caught.value.code == "programming_outcome_unknown_unresolved"
+            batches.start(ALIAS, {**ops_body(FULL), "start_id": start_id})
+        assert caught.value.code == "programming_start_not_startable"
         assert len(gateway.posts) == 1
         assert rec(workflow, planned["plan_id"])["state"] == "OUTCOME_UNKNOWN"
         # The refused start was never admitted and says so.
