@@ -197,6 +197,41 @@ judged on its own.
 6. Scheduling stays sequential (§7) and there remains exactly one Manager Batch engine. Per-Target
    isolation changes what a Target's state means to its neighbours, not how many run at once.
 
+### 5.8 API surface and its retirement
+
+The Batch is owned by the Manager, not by a PPU, so its canonical resource does not sit under one.
+
+| Endpoint | Status |
+| --- | --- |
+| `POST /programming/batches` | Canonical. Carries the Target Set (§3) and may span many PPUs. |
+| `POST /ppus/<alias>/programming/batches` | Short-term compatibility entry. Equivalent to a single-Target Batch on that alias. |
+
+Both are doors into the **same** Manager Batch engine. Exactly one scheduler, one journal, one
+outcome policy, one recovery path and one retry engine stands behind them. A second implementation
+behind the compatibility entry is forbidden, and so is a second set of semantics: a Batch admitted
+through either door is judged by §5.3, §5.6 and §5.7 identically.
+
+PR-B adds the canonical resource and keeps the compatibility entry. PR-B does not change
+`software/web`.
+
+The compatibility entry retires in **PR-C**, not PR-F. PR-F retires the legacy direct-Gateway
+batch path (§11), which is a different path; the alias-scoped route belongs to the Manager-owned
+path and is superseded by the canonical resource rather than judged as legacy.
+
+PR-C may remove it only after all of:
+
+1. a Consumer Inventory covering EMode, PMode, the Console BFF, CLI and scripts, API clients,
+   tests and fixtures, and the deployed SWPC Control Station;
+2. every consumer migrated for Batch start, status and query, stop, reconcile, and error and
+   outcome handling;
+3. host-only regression, an API contract check and Console E2E passing against the canonical
+   resource;
+4. a stated deployment order, because a Manager that has dropped the entry breaks a Control
+   Station that has not yet shipped.
+
+Console source having switched is **not** evidence that a deployed consumer has. Any consumer that
+cannot be confirmed is a blocking item and the entry stays.
+
 ## 6. Batch Policy
 
 | Field | Default | Range |
@@ -362,6 +397,9 @@ constraints are normative now:
    delete / migrate / keep.
 4. Nothing may claim the legacy path is retired before PR-F lands.
 
+The alias-scoped Manager Batch API is **not** in this scope. It is part of the Manager-owned path,
+it is superseded rather than legacy, and it retires in PR-C under the conditions in §5.8.
+
 ## 12. Delivery order
 
 | PR | Content | Depends on |
@@ -369,7 +407,7 @@ constraints are normative now:
 | PR-A | this contract | — |
 | PR-B1 | mock `run_operations` + per-step evidence | PR-A |
 | PR-B | Manager Batch Orchestrator on `targets[]` | PR-A |
-| PR-C | EMode multi-Site Console | PR-B |
+| PR-C | EMode multi-Site Console; consumers migrated off the alias-scoped Batch API and that entry removed (§5.8) | PR-B |
 | PR-D | PMode shared engine, `operations[]` switch, execution-route constraint lifted | PR-B, PR-B1, PR-C |
 | PR-E | host-only tests and E2E | PR-B..PR-D |
 | PR-F | legacy retirement, per the Inventory | PR-D |
