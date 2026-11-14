@@ -172,6 +172,8 @@
 - **Reference** · `Site 2` · `PR #1304 Draft` · `Host-only` — [Site 2 REST Flash 失敗診斷（2026-11-05）](development/site2-rest-flash-diagnosis-20261105.md)：既有失敗 Job 的 C3 Adapter／OpenOCD／SAFE_OFF 證據缺口與存取限制；不代表真實故障根因已確認或 Z2 實機 Flash PASS。
 - **Plan** · `Gate 1` · `PR #1265 Draft` · `Host-only` — [OpenOCD 5088 ARMv7 CI Build Cache Optimization](development/openocd5088-armv7-ci-build-cache.md)：依實際編譯輸入內容建立快取，保留每次驗證、重新封裝及最新 HEAD Evidence；未合併、不部署、不操作實機。
 
+- **Gate 1 / Host-only Research, L2 BLOCKED** — [NXP MCXN236VKLT ROM ISP/blhost Compatibility PoC](development/nxp-mcxn236-blhost-l2-compat-poc-gate1.md)：固定 MCXN23x／SEC 26.06／SPSDK 3.10.0 來源與 Mock-only 燒錄契約，未註冊 Provider、不提升 L1/L2、不操作硬體。
+
 ## Deployment
 
 - **Reference** · `Host-only` · `PR #1327 Gate 1` — [Z2 Root Privileged Code 受控升級與 Site 2 驗收準備](deployment/z2-root-code-controlled-upgrade-site2.md)：既有 Root Code Manifest 的離線更新與回復方案，修復 Site 2 唯讀偵測工具；未部署 Z2、未重載 FPGA、未燒錄 DUT。
