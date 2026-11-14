@@ -110,11 +110,11 @@ server:
   max_supported_sites: 8
 
 sites:
-  - {id: 1, enabled: false, interface: "mock", target: "STM32F103C8T6"}
+  - {id: 1, enabled: false, interface: "mock"}
   # ... through id: 8
 ```
 
-On an **upgrade**, `/etc/plasma/ppu.yaml` is operator/runtime state and must not be regenerated from first-install defaults. P3 preserves the existing canonical file, including Site Desired records, while updating release/service wiring; the only rewrite is the one-time migration of the exact former first-install line `sites: []` to the disabled defaults. See [Z2 PS installer](z2-ps-installer.md).
+On an **upgrade**, `/etc/plasma/ppu.yaml` is operator/runtime state and must not be regenerated from first-install defaults. The legacy Site `target` is never the source for a real-hardware Job: ICPN must be supplied per Job. New Site Desired writes manage only `enabled` and `interface` and retire any stale per-Site `target` field on that Site; unrelated Sites and settings remain untouched. P3 preserves the existing canonical file, including Site Desired records, while updating release/service wiring; the only rewrite is the one-time migration of the exact former first-install line `sites: []` to the disabled defaults. See [Z2 PS installer](z2-ps-installer.md).
 
 The runtime payload carries no IC Support or Device Catalog data and the installed services set no `PLASMA_IC_SUPPORT_ROOT` / `PLASMA_DEVICE_CATALOG_MANIFEST` (PR-C1). An enabled non-mock Site starts from the Catalog-free runtime (inverse of the historical Z2 D6 regression, `test_enabled_openocd_site_starts_from_catalog_free_runtime`).
 
@@ -171,7 +171,7 @@ Browser Draft
 
 The Site configuration controller serializes Desired writes against this activation transaction. This closes the stale-request race where Desired could otherwise change after the aggregate revision check but before the restart. Separately, SiteManager uses the same authoritative execution lock for Job admission and runtime quiesce, closing the idle-check-to-restart TOCTOU window.
 
-The quiesce lease is bounded and expires automatically. Protocol v3.3 still does not expose dormant interface/target bindings for disabled Sites, so a post-restart state can legitimately remain `partially_observable` instead of being falsely promoted to fully proven `in_sync`.
+The quiesce lease is bounded and expires automatically. Protocol v3.3 still does not expose dormant interface bindings for disabled Sites, so a post-restart state can legitimately remain `partially_observable` instead of being falsely promoted to fully proven `in_sync`.
 
 ## Filesystem/write boundary
 

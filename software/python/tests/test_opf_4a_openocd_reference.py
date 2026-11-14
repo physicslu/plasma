@@ -68,9 +68,9 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
         c3_profile = {"icpn": target_icpn, "target_config": "target/stm32f1x.cfg",
                       "flash_base": 0x08000000, "flash_size": 65536,
                       "erase_granularity": 1024}
-        desc = {"schema": "plasma.ppu.provider-capabilities.v1", "target": target_icpn,
+        desc = {"schema": "plasma.ppu.provider-capabilities.v2", "target": target_icpn,
                 "provider_package": PROVIDER, "operations": ["flash_cycle"],
-                "sites": [1, 2], "transport": "fpga", "driver_abi": DRIVER_ABI,
+                "transport": "fpga", "driver_abi": DRIVER_ABI,
                 "fpga_package": FPGA, "max_image_bytes": 65536}
         desc.update(descriptor_change or {})
         if not with_fpga:

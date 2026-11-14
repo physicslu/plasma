@@ -66,9 +66,9 @@ print('FAKE_PYTHON_PROVIDER_RAN_NOT_FLASH_PASS', flush=True)
 
 def fixture(tmp_path: Path, *, with_authorization=True):
     descriptor = {
-        "schema": "plasma.ppu.provider-capabilities.v1",
+        "schema": "plasma.ppu.provider-capabilities.v2",
         "target": TARGET_ID, "provider_package": PROVIDER,
-        "operations": ["flash_cycle"], "sites": [2], "transport": "ps-only",
+        "operations": ["flash_cycle"], "transport": "ps-only",
         "driver_abi": None, "fpga_package": None, "max_image_bytes": 4096,
     }
     parts = [

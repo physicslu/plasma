@@ -238,7 +238,7 @@ server:
   max_supported_sites: 8
 
 sites:
-  - {id: 1, enabled: false, interface: "mock", target: "STM32F103C8T6"}
+  - {id: 1, enabled: false, interface: "mock"}
   # ... through id: 8
 ```
 
@@ -297,7 +297,7 @@ Two separate races must be closed:
 
 The quiesce lease has a bounded TTL and expires automatically. Gateway/helper failure must not create an indefinite admission lock.
 
-Protocol v3.3 still hides dormant interface/target bindings for disabled Sites. A successful restart can therefore reconcile to `partially_observable`; the UI must not invent evidence and call that state fully proven `in_sync`.
+Protocol v3.3 still hides dormant interface bindings for disabled Sites. A successful restart can therefore reconcile to `partially_observable`; the UI must not invent evidence and call that state fully proven `in_sync`.
 
 ## Deployment activation and rollback
 

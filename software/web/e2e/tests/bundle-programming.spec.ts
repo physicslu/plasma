@@ -37,7 +37,7 @@ const bootstrapStatus = {
 
 const route = {
   route_id: "z2-site2-stm32f103c8t6", target: { platform: "linux-armv7", board: "pynq-z2", fpga_part: "xc7z020clg400-1" },
-  icpn: "STM32F103C8T6", sites: [2], provider: "openocd-platform-reference", profile: "stm32f103c8t6-site2",
+  icpn: "STM32F103C8T6", site_interface: "openocd", provider: "openocd-platform-reference", profile: "stm32f103c8t6-site2",
   operations: ["flash_cycle"], driver_abi: "plasma_swd:5", transport: "fpga", max_image_bytes: 65536,
   target_config: "target/stm32f1x.cfg", flash_base: 134217728, flash_size: 65536,
 };

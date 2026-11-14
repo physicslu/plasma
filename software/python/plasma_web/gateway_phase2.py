@@ -381,10 +381,10 @@ class SiteConfigurationSupportMixin:
         if desired["enabled"] != actual["enabled"]:
             return "restart_required"
         if actual["enabled"]:
-            if desired["interface"] != actual["interface"] or desired["target"] != actual["target"]:
+            if desired["interface"] != actual["interface"]:
                 return "restart_required"
             return "in_sync"
-        # Protocol v3.3 intentionally hides interface/target for a disabled Site.
+        # Protocol v3.3 hides the inactive interface of a disabled Site.
         # We can prove effective disabled state, but not the dormant loaded binding.
         return "disabled_runtime_binding_unobservable"
 
@@ -423,7 +423,6 @@ class SiteConfigurationSupportMixin:
                     "desired": {
                         "enabled": desired_site["enabled"],
                         "interface": desired_site["interface"],
-                        "target": desired_site["target"],
                     },
                     "actual": actual,
                     "reconciliation": state,

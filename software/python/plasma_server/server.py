@@ -426,8 +426,8 @@ class PlasmaServer:
             "execution_image_ref",
             "wait_for_completion",
         }
-        # Exact ICPN: the Job's own target, else (None) the operator's
-        # explicit Site selection resolved by SiteManager. No product default.
+        # Exact ICPN is selected per Job, never inherited from a physical Site.
+        # Mock Jobs may omit it; real-hardware Jobs are admitted only with one.
         target = metadata.get("target")
         if target is not None and not isinstance(target, str):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "target must be a string")

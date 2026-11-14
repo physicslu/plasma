@@ -549,7 +549,6 @@ class SiteManager:
             "resource_set_sha256": identity["resource_set_sha256"],
             "provider": kinds["platform-provider"], "profile": kinds["programming-profile"],
             "icpn": resource["constraints"]["icpn"],
-            "sites": list(resource["constraints"]["sites"]),
             "operations": list(resource["constraints"]["operations"]),
         }
 
@@ -591,17 +590,12 @@ class SiteManager:
                 raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                                   "PROVIDER_JOB_NOT_AUTHORIZED")
         if request.target is None and site_config.interface != "mock":
-            # Real hardware: explicit Job target or the operator's explicit
-            # Site selection only; never a product default. (The Mock
-            # workflow simulator claims no IC support and needs no ICPN.)
-            site_target = site_config.target
-            if not site_target:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT,
-                    "target (exact ICPN) is required: set the Job target or select a Site target",
-                    context={"site_id": request.site_id},
-                )
-            request = replace(request, target=site_target)
+            # IC selection is a Job input, not persistent Site configuration.
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "target (exact ICPN) is required for a real-hardware Job",
+                context={"site_id": request.site_id},
+            )
         if worker.queue.full():
             raise PlasmaError(
                 ErrorCode.SITE_BUSY,
@@ -803,7 +797,7 @@ class SiteManager:
                     "latest_job": self._latest_job_summary(current_id),
                     "queued_jobs": worker.queue.qsize() if worker else 0,
                     "interface": config.interface if config.enabled else None,
-                    "target": config.target if config.enabled else None,
+                    "target": (worker.current.request.target if worker and worker.current else None),
                 }
             )
         ppu = self.ppu_snapshot()

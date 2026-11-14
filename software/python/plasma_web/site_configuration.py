@@ -18,8 +18,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 
 
 SUPPORTED_SITE_INTERFACES = frozenset({"mock", "openocd", "fpga"})
-SITE_DESIRED_FIELDS = frozenset({"enabled", "interface", "target"})
-MAX_TARGET_LENGTH = 256
+SITE_DESIRED_FIELDS = frozenset({"enabled", "interface"})
 DESIRED_REVISION_PREFIX = "sha256:"
 
 
@@ -33,7 +32,7 @@ def _site_id(value: Any) -> int:
     return value
 
 
-def _validated_values(raw: dict[str, Any]) -> tuple[bool, str, str]:
+def _validated_values(raw: dict[str, Any]) -> tuple[bool, str]:
     if not isinstance(raw, dict):
         raise _config_error("Site desired configuration must be an object")
     if set(raw) != SITE_DESIRED_FIELDS:
@@ -47,7 +46,6 @@ def _validated_values(raw: dict[str, Any]) -> tuple[bool, str, str]:
 
     enabled = raw["enabled"]
     interface = raw["interface"]
-    target = raw["target"]
     if not isinstance(enabled, bool):
         raise _config_error("Site desired enabled must be a boolean")
     if not isinstance(interface, str) or interface not in SUPPORTED_SITE_INTERFACES:
@@ -55,17 +53,7 @@ def _validated_values(raw: dict[str, Any]) -> tuple[bool, str, str]:
             "Site desired interface is unsupported",
             context={"interface": interface, "supported": sorted(SUPPORTED_SITE_INTERFACES)},
         )
-    if (
-        not isinstance(target, str)
-        or not target
-        or target != target.strip()
-        or len(target) > MAX_TARGET_LENGTH
-        or any(ord(character) < 0x20 for character in target)
-    ):
-        raise _config_error(
-            f"Site desired target must be a non-empty trimmed string of at most {MAX_TARGET_LENGTH} characters"
-        )
-    return enabled, interface, target
+    return enabled, interface
 
 
 def desired_revision(site: SiteConfig) -> str:
@@ -74,7 +62,6 @@ def desired_revision(site: SiteConfig) -> str:
             "enabled": site.enabled,
             "interface": site.interface,
             "site_id": site.id,
-            "target": site.target,
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -88,7 +75,6 @@ def _site_dict(site: SiteConfig) -> dict[str, Any]:
         "site_id": site.id,
         "enabled": site.enabled,
         "interface": site.interface,
-        "target": site.target,
         "desired_revision": desired_revision(site),
     }
 
@@ -153,7 +139,7 @@ class SiteConfigurationController:
         expected_revision: str,
     ) -> dict[str, Any]:
         normalized_site_id = _site_id(site_id)
-        enabled, interface, target = _validated_values(raw)
+        enabled, interface = _validated_values(raw)
 
         with self._lock:
             if self._runtime_activation_active:
@@ -183,7 +169,6 @@ class SiteConfigurationController:
                 existing,
                 enabled=enabled,
                 interface=interface,
-                target=target,
             )
             candidate_sites = [
                 candidate_site if site.id == normalized_site_id else site
@@ -208,9 +193,10 @@ class SiteConfigurationController:
                 {
                     "enabled": enabled,
                     "interface": interface,
-                    "target": target,
                 }
             )
+            # Retire stale Site/ICPN defaults when this Site's Desired state is saved.
+            matching[0].pop("target", None)
             self._write_atomic(document)
             # Re-load the persisted file instead of returning the candidate object so
             # the response proves the exact on-disk representation remains valid.

@@ -41,14 +41,14 @@ def test_site_desired_write_fails_closed_while_runtime_activation_guard_is_activ
         with pytest.raises(PlasmaError) as exc_info:
             controller.update(
                 1,
-                {"enabled": False, "interface": "mock", "target": "TARGET-A"},
+                {"enabled": False, "interface": "mock"},
                 expected_revision=baseline,
             )
         assert exc_info.value.code is ErrorCode.PPU_BUSY
 
     saved = controller.update(
         1,
-        {"enabled": False, "interface": "mock", "target": "TARGET-A"},
+        {"enabled": False, "interface": "mock"},
         expected_revision=baseline,
     )
     assert saved["sites"][0]["enabled"] is False

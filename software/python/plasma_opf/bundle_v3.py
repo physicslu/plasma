@@ -31,7 +31,7 @@ from typing import Any, Mapping
 
 BUNDLE_SCHEMA = "plasma.ppu.bundle.v3"
 ROUTE_SCHEMA = "plasma.opf.programming-route.v1"
-CAPABILITIES_SCHEMA = "plasma.ppu.provider-capabilities.v1"
+CAPABILITIES_SCHEMA = "plasma.ppu.provider-capabilities.v2"
 OPTIONS_SCHEMA = "plasma.ppu.provider-options.v1"
 FLASH_PROFILE_SCHEMA = "plasma.ppu.openocd-flash-profile.v1"
 # Same identifier/version grammar as the PPU Bundle v3 verifier.
@@ -98,19 +98,25 @@ class ProgrammingRoute:
         return str(self.capabilities["target"])
 
     @property
-    def sites(self) -> tuple[int, ...]:
-        return tuple(self.capabilities["sites"])
-
-    @property
     def max_image_bytes(self) -> int:
         return int(self.capabilities["max_image_bytes"])
+
+    @property
+    def site_interface(self) -> str:
+        """Site interface required by the validated Profile, not a Site allowlist.
+
+        New Profile schema families require a separately qualified mapping.
+        """
+        _need(self.flash_profile["schema"] == FLASH_PROFILE_SCHEMA,
+              "ROUTE_SITE_INTERFACE_UNSUPPORTED")
+        return "openocd"
 
     def summary(self) -> dict[str, Any]:
         return {
             "route_id": self.route_id,
             "target": dict(self.target),
             "icpn": self.icpn,
-            "sites": list(self.sites),
+            "site_interface": self.site_interface,
             "provider": self.provider_id,
             "profile": self.profile_id,
             "operations": list(self.capabilities["operations"]),
@@ -165,7 +171,7 @@ def parse_route(payload: object) -> ProgrammingRoute:
           "ROUTE_PROVIDER_OPTIONS_INVALID")
     caps = profile["capabilities"]
     _need(type(caps) is dict and set(caps) == {
-        "schema", "target", "provider_package", "operations", "sites",
+        "schema", "target", "provider_package", "operations",
         "transport", "driver_abi", "fpga_package", "max_image_bytes"},
         "ROUTE_CAPABILITIES_INVALID")
     _need(caps["schema"] == CAPABILITIES_SCHEMA
@@ -176,9 +182,6 @@ def parse_route(payload: object) -> ProgrammingRoute:
           and type(caps["operations"]) is list and bool(caps["operations"])
           and all(type(op) is str and op in ROUTE_OPERATIONS for op in caps["operations"])
           and len(set(caps["operations"])) == len(caps["operations"])
-          and type(caps["sites"]) is list and bool(caps["sites"])
-          and all(type(s) is int and s > 0 for s in caps["sites"])
-          and caps["sites"] == sorted(set(caps["sites"]))
           and type(caps["max_image_bytes"]) is int
           and 0 < caps["max_image_bytes"] <= MAX_IMAGE_BYTES,
           "ROUTE_CAPABILITIES_INVALID")
@@ -224,12 +227,15 @@ def load_routes(root: Path) -> tuple[ProgrammingRoute, ...]:
     return routes
 
 
-def resolve_routes(routes: tuple[ProgrammingRoute, ...], *, icpn: str, site: int,
+def resolve_routes(routes: tuple[ProgrammingRoute, ...], *, icpn: str,
                    operations: tuple[str, ...] | list[str] | None = None,
                    ) -> tuple[ProgrammingRoute, ...]:
-    """Routes whose Profile declares this exact target and Site and, when
-    given, every one of the Job's basic ``operations``."""
-    return tuple(r for r in routes if r.icpn == icpn and site in r.sites
+    """Routes compatible with the selected IC and operations, independent of Site.
+
+    The PPU is authoritative for actual Site presence and interface capability;
+    the immutable Job Binding still pins the owner's chosen Site.
+    """
+    return tuple(r for r in routes if r.icpn == icpn
                  and (operations is None
                       or all(op in r.capabilities["operations"] for op in operations)))
 
@@ -263,7 +269,7 @@ def safe_image_filename(filename: object) -> str:
 # PPU-side verification, the Bundle archive SHA256 remains the only Active
 # Asset Set, B1/B2/B3 and Job identity, and nothing here may skip B1/B2/B3.
 # --------------------------------------------------------------------------
-RESOURCE_SET_SCHEMA = "plasma.opf.programming-resource-set.v1"
+RESOURCE_SET_SCHEMA = "plasma.opf.programming-resource-set.v2"
 IMAGE_ASSET_SCHEMA = "plasma.opf.job-image-asset.v1"
 JOB_BINDING_SCHEMA = "plasma.opf.job-image-binding.v1"
 # Same vocabulary as plasma_core.assets.ProgrammingAssetFormat; only raw binary
@@ -348,7 +354,7 @@ def resource_set_descriptor(route: ProgrammingRoute) -> dict[str, Any]:
         "target": dict(route.target),
         "abi": {"driver_abi": caps["driver_abi"], "transport": caps["transport"]},
         "constraints": {
-            "icpn": caps["target"], "sites": list(caps["sites"]),
+            "icpn": caps["target"],
             "operations": list(caps["operations"]),
             "max_image_bytes": caps["max_image_bytes"],
             "target_config": flash["target_config"], "flash_base": flash["flash_base"],
@@ -387,12 +393,9 @@ def parse_resource_set(payload: object) -> dict[str, Any]:
           and abi["transport"] == "fpga", "RESOURCE_ABI_INVALID")
     c = payload["constraints"]
     _need(type(c) is dict and set(c) == {
-        "icpn", "sites", "operations", "max_image_bytes", "target_config",
+        "icpn", "operations", "max_image_bytes", "target_config",
         "flash_base", "flash_size", "erase_granularity"}
         and type(c["icpn"]) is str and 0 < len(c["icpn"]) <= 96
-        and type(c["sites"]) is list and bool(c["sites"])
-        and all(_is_int(s) and s > 0 for s in c["sites"])
-        and c["sites"] == sorted(set(c["sites"]))
         and type(c["operations"]) is list and bool(c["operations"])
         and all(type(o) is str and o in OPERATIONS for o in c["operations"])
         and len(set(c["operations"])) == len(c["operations"])
@@ -572,8 +575,7 @@ def job_image_binding(resource: object, asset: object | None = None, *,
     job_range = _job_range(parsed, operation, image, address, length, steps)
     _need(type(ppu_id) is str and SAFE_PPU_ID.fullmatch(ppu_id) is not None,
           "JOB_BINDING_PPU_INVALID")
-    _need(_is_int(site_id) and site_id in parsed["constraints"]["sites"],
-          "JOB_BINDING_SITE_NOT_IN_PROFILE")
+    _need(_is_int(site_id) and site_id >= 1, "JOB_BINDING_SITE_INVALID")
     profile = next(p for p in parsed["packages"] if p["kind"] == "programming-profile")
     return {
         "schema": JOB_BINDING_SCHEMA,

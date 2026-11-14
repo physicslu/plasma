@@ -15,7 +15,7 @@ from typing import Any, Mapping
 import ppu_asset_set
 import ppu_provider_options
 
-SCHEMA = "plasma.ppu.provider-capabilities.v1"
+SCHEMA = "plasma.ppu.provider-capabilities.v2"
 DESCRIPTOR = "data/plasma-provider.json"
 PLATFORM_OPTIONS = "data/plasma-provider-options.json"
 OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
@@ -139,7 +139,7 @@ def resolve(
         except (ValueError, UnicodeError) as exc:
             raise ProviderDenied("PROVIDER_DESCRIPTOR_INVALID") from exc
         _need(type(desc) is dict and set(desc) == {
-            "schema", "target", "provider_package", "operations", "sites",
+            "schema", "target", "provider_package", "operations",
             "transport", "driver_abi", "fpga_package", "max_image_bytes"},
               "PROVIDER_DESCRIPTOR_INVALID")
         _need(desc["schema"] == SCHEMA and type(desc["target"]) is str
@@ -149,10 +149,6 @@ def resolve(
               and all(type(op) is str for op in desc["operations"])
               and len(desc["operations"]) == len(set(desc["operations"]))
               and set(desc["operations"]) <= OPERATIONS
-              and type(desc["sites"]) is list and bool(desc["sites"])
-              and all(type(s) is int for s in desc["sites"])
-              and desc["sites"] == sorted(set(desc["sites"]))
-              and all(type(s) is int and s >= 1 for s in desc["sites"])
               and type(desc["transport"]) is str
               and desc["transport"] in ("ps-only", "fpga")
               and (desc["driver_abi"] is None or type(desc["driver_abi"]) is str)
@@ -189,8 +185,7 @@ def resolve(
                   for observed_site in observed_sites)
           and len(observed_sites) == len(set(observed_sites)),
           "HARDWARE_SITES_INVALID")
-    _need(site_id in desc["sites"] and site_id in observed_sites,
-          "SITE_NOT_SUPPORTED")
+    _need(site_id in observed_sites, "SITE_NOT_SUPPORTED")
     _need(image_size <= desc["max_image_bytes"], "IMAGE_OUT_OF_BOUNDS")
     _need(hardware.get("platform") == manifest["target"]["platform"]
           and hardware.get("board") == manifest["target"]["board"],

@@ -42,7 +42,7 @@ test("Site CAS If-Match crosses the same-origin BFF without forwarding unrelated
         "If-Match": `"${revision}"`,
         "X-Do-Not-Forward": "private-hop-header",
       },
-      body: JSON.stringify({ enabled: true, interface: "mock", target: "TARGET-NEW" }),
+      body: JSON.stringify({ enabled: true, interface: "openocd" }),
     });
 
     const response = await relayManagerPpuAliasRequest(request, "ppu-a", "/api/settings/sites/1");

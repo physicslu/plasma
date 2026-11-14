@@ -410,7 +410,7 @@ class BundleProgrammingWorkflow:
             raise _StepFailure("GATEWAY_RESPONSE_INVALID")
         return value
 
-    def _readiness(self, client: Any, site: int, target: str | None) -> dict[str, Any]:
+    def _readiness(self, client: Any, site: int, site_interface: str | None) -> dict[str, Any]:
         health = self._gateway_get(client, "/api/health/ready")
         status = self._gateway_get(client, f"/api/status?site={site}")
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
@@ -428,8 +428,10 @@ class BundleProgrammingWorkflow:
                  and row.get("queued_jobs") in (0, None))
         if not ready:
             raise _StepFailure("SITE_NOT_READY_OR_BUSY")
-        if target is not None and (row.get("interface") != "openocd" or row.get("target") != target):
-            raise _StepFailure("SITE_TARGET_NOT_FROM_ACTIVE_SET")
+        # This Profile specifies its required execution interface, while the
+        # actual Site interface is PPU-owned (never an IC-specific Site list).
+        if site_interface is not None and row.get("interface") != site_interface:
+            raise _StepFailure("SITE_INTERFACE_NOT_READY")
         return {"ppu_id": ppu.get("ppu_id"), "site_id": site, "state": "idle",
                 "target": row.get("target"),
                 "active_resources": ppu.get("active_resources")}
@@ -655,17 +657,17 @@ class BundleProgrammingWorkflow:
         self._require_commissioned(alias)
         routes = self.routes()
         required = operations or [operation]
-        if not bundle_v3.resolve_routes(routes, icpn=icpn.strip(), site=site):
+        if not bundle_v3.resolve_routes(routes, icpn=icpn.strip()):
             raise ProgrammingError(422, "programming_route_not_found",
-                                   "no Programming Route declares this IC on this Site")
+                                   "no Programming Route declares this IC")
         # The Route is the one whose Profile declares every basic operation of
         # this Job (the legacy flash_cycle Route stays its own Resource Set).
-        matches = bundle_v3.resolve_routes(routes, icpn=icpn.strip(), site=site,
+        matches = bundle_v3.resolve_routes(routes, icpn=icpn.strip(),
                                            operations=required)
         if not matches:
             raise ProgrammingError(
                 422, "operation_not_in_profile",
-                "no Programming Profile for this IC and Site declares " + ", ".join(required))
+                "no Programming Profile for this IC declares " + ", ".join(required))
         if len(matches) > 1:
             raise ProgrammingError(409, "programming_route_ambiguous",
                                    "more than one Programming Route matches; refusing to guess")
@@ -1071,7 +1073,7 @@ class BundleProgrammingWorkflow:
             if signer is not None and hasattr(client, "write_signer"):
                 client.write_signer = signer(run.alias)
             self._update(run, state="preflight")
-            self._readiness(client, run.site, None)
+            self._readiness(client, run.site, plan.route.site_interface)
             self._step(run, "PREFLIGHT", "PASS")
             activated = plan.payload["activation_required"]
             if activated:
@@ -1084,7 +1086,7 @@ class BundleProgrammingWorkflow:
                 raise _StepFailure("ACTIVE_SET_MISMATCH_AFTER_ACTIVATION" if activated
                                    else "ACTIVE_SET_CHANGED_SINCE_PLAN")
             self._update(run, state="submitting")
-            ready = self._readiness(client, run.site, plan.route.icpn)
+            ready = self._readiness(client, run.site, plan.route.site_interface)
             # The PPU itself must prove the Resources the Job is bound to.
             report = ready.get("active_resources")
             if not (isinstance(report, dict) and report.get("state") == "VERIFIED"

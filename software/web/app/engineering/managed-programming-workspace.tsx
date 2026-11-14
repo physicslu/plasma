@@ -24,7 +24,7 @@ import {
   routeDeclaring,
   routesAvailability,
   routeSequenceOperations,
-  routeSites,
+  routeSupportsIc,
   runManagedBatch,
   runManagedRead,
   runProgressPercent,
@@ -361,7 +361,7 @@ export default function ManagedProgrammingWorkspace() {
     () => new Map((ppu?.sites ?? []).map(site => [site.site_id, siteCapability(site, routes, icpn)] as const)),
     [ppu, routes, icpn],
   );
-  // A Site stays selected only while it is programmable for the selected IC.
+  // A Site stays selected only while the PPU reports it ready and a compatible IC Profile exists.
   const siteIds = useMemo(
     () => chosenSiteIds.filter(id => capabilities.get(id)?.programmable).sort((left, right) => left - right),
     [chosenSiteIds, capabilities],
@@ -379,7 +379,7 @@ export default function ManagedProgrammingWorkspace() {
     item => checkedOperations[item] && declaredOperations.includes(item));
   const operations = normalizeOperations(selectedOperations);
   const needsImage = operations != null && operationsTakeImage(operations);
-  // One Route per selected Site. A Site without one is not programmable here.
+  // One IC Profile may serve multiple PPU-reported Sites; each has an independent Job.
   const jobRoutes = useMemo(
     () => (operations ? siteIds.map(id => routeDeclaring(routes, icpn, id, operations)) : []),
     [operations, siteIds, routes, icpn],
@@ -411,7 +411,7 @@ export default function ManagedProgrammingWorkspace() {
         "The previous run on this PPU ended OUTCOME UNKNOWN. Reconcile the PPU and acknowledge it; nothing is resubmitted.");
     }
     if (!icpn) return notReady("NO TARGET", "Select a Target IC.");
-    if (!routeSites(routes, icpn).length) {
+    if (!routeSupportsIc(routes, icpn)) {
       return notReady("NO ROUTE", `No Programming Route declares ${icpn}; this IC cannot be programmed on a managed PPU yet.`);
     }
     return null;
@@ -1174,7 +1174,7 @@ export default function ManagedProgrammingWorkspace() {
                     ? batchSiteVerdict(batch, unit, runOfUnit(batch, unit)).verdict : null;
                   const state = siteRun && siteRun.outcome == null ? runStageLabel(siteRun)
                     : site.enabled ? site.state.toUpperCase() : "DISABLED";
-                  // READ: one button per Site whose Programming Route declares Read.
+                  // READ uses the IC Profile's operations and the PPU Site's current readiness.
                   const canRead = routeDeclaring(routes, icpn, site.site_id, ["read"]) != null;
                   const readBlocked = canRead ? readBlockReason(site.site_id) : null;
                   const readingHere = readSiteId === site.site_id && readPhase !== "idle" && readPhase !== "choosing";

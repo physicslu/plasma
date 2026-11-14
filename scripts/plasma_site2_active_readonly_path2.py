@@ -53,7 +53,7 @@ if record.get('state')=='ACTIVE':
         if valid:
             descriptor=json.loads((root/'assets/staged'/sha/
               'payload/packages/stm32f103c8t6-site2/data/plasma-provider.json').read_bytes())
-            valid=(descriptor.get('schema')=='plasma.ppu.provider-capabilities.v1'
+            valid=(descriptor.get('schema')=='plasma.ppu.provider-capabilities.v2'
               and descriptor.get('provider_package')=='openocd-platform-reference'
               and descriptor.get('target')=='STM32F103C8T6')
         status['opf_static']='PASS' if valid else 'FAIL'

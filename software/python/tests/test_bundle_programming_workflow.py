@@ -112,7 +112,7 @@ class FakeGateway:
 
     def __init__(self, *, image: bytes, safe_off=True, readback_ok=True,
                  post_status=202, post_raises=False, busy=False, job_final="success",
-                 status_target=ICPN, coordinator=None, resource_for=None,
+                 status_target=ICPN, status_interface="openocd", coordinator=None, resource_for=None,
                  resources_state=None, status_raises=False, echo=True, ppu_id="z2-hil"):
         self.image = image
         self.coordinator = coordinator
@@ -128,6 +128,7 @@ class FakeGateway:
         self.busy = busy
         self.job_final = job_final
         self.status_target = status_target
+        self.status_interface = status_interface
         # None: report the executed range truthfully; dict: override fields.
         self.flash_range: dict | None = None
         # programming / read Jobs: per-step evidence overrides and IC content.
@@ -155,7 +156,7 @@ class FakeGateway:
                         "active_resources": self._resources()},
                 "sites": [{"site_id": int(path.rsplit("=", 1)[1]), "enabled": True,
                            "state": "idle", "current_job_id": None, "queued_jobs": 0,
-                           "interface": "openocd", "target": self.status_target}]})
+                           "interface": self.status_interface, "target": self.status_target}]})
         if method == "POST" and path == "/api/jobs":
             self.posts.append(json.loads(body))
             if self.post_raises:
@@ -307,12 +308,19 @@ def run_once(workflow):
     return planned, workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
 
 
-def test_shared_writer_reproduces_historical_bundle_a_bytes():
+def test_shared_writer_reproducibly_emits_site_independent_bundle_v3():
     route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
-    built = bundle_v3.build_image_bundle(
-        route, image(), image_filename="plasma-blue-pill-cdc.bin",
-        asset_package_id="bluepill-cdc-fw-v01", bundle_name="bluepill-site2-fw-v01")
-    assert built.archive_sha256 == "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a"
+    def make_bundle():
+        return bundle_v3.build_image_bundle(
+            route, image(), image_filename="plasma-blue-pill-cdc.bin",
+            asset_package_id="bluepill-cdc-fw-v01", bundle_name="bluepill-site2-fw-v01")
+
+    built, again = make_bundle(), make_bundle()
+    assert built.archive == again.archive
+    assert built.archive_sha256 == again.archive_sha256 == hashlib.sha256(built.archive).hexdigest()
+    # Historical Bundle A used Provider Capability v1 with a physical Site allowlist.
+    # Under Replace-by-Default, v2 bytes and identity MUST change rather than be reused.
+    assert built.archive_sha256 != "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a"
 
 
 def test_user_bundle_is_canonical_and_verifiable(tmp_path):
@@ -404,7 +412,7 @@ def test_binding_echo_with_a_different_range_is_not_confirmed(tmp_path):
 
 @pytest.mark.parametrize("body, code", [
     (plan_body(icpn="STM32F407VGT6"), "programming_route_not_found"),
-    (plan_body(site=3), "programming_route_not_found"),
+    (plan_body(site=65), "invalid_request"),
     (plan_body(raw=b"\x00" * (65536 + 1)), "bundle_incompatible"),
 ])
 def test_incompatible_selection_never_touches_ppu(tmp_path, body, code):
@@ -413,6 +421,59 @@ def test_incompatible_selection_never_touches_ppu(tmp_path, body, code):
         workflow.plan(ALIAS, body)
     assert caught.value.code == code
     assert coord.calls == [] and gateway.posts == []
+
+
+def test_site1_and_site2_share_one_ic_resource_without_a_site_route(tmp_path):
+    workflow, _coordinator, _gateway = make(tmp_path)
+    site1 = workflow.plan(ALIAS, plan_body(site=1))["plan"]
+    site2 = workflow.plan(ALIAS, plan_body(site=2))["plan"]
+    assert site1["site_id"] == 1 and site2["site_id"] == 2
+    assert site1["resource"]["resource_set_sha256"] == site2["resource"]["resource_set_sha256"]
+    assert site1["job_binding"]["site_id"] == 1
+    assert site2["job_binding"]["site_id"] == 2
+    assert site1["job_binding_sha256"] != site2["job_binding_sha256"]
+
+
+
+def test_previously_selected_ic_is_not_a_site_allowlist(tmp_path):
+    """Host-only: ready Sites 1/2 reuse one Profile despite stale Site target."""
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    active_sha = bundle_v3.build_user_image_bundle(
+        route, image(), filename="app.bin").archive_sha256
+    gateway = FakeGateway(image=image(), status_target="LEGACY_SITE_TARGET")
+    workflow, coordinator, gateway = make(
+        tmp_path, coordinator=FakeCoordinator(active_sha=active_sha), gateway=gateway)
+
+    bindings = []
+    for site_id in (1, 2):
+        planned = workflow.plan(ALIAS, plan_body(site=site_id))["plan"]
+        assert planned["activation_required"] is False
+        assert planned["site_id"] == site_id
+        started = workflow.start(
+            ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
+        run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+        assert run["outcome"] == "PASS", run
+        bindings.append(planned["job_binding_sha256"])
+
+    assert bindings[0] != bindings[1]
+    assert [post["site_id"] for post in gateway.posts] == [1, 2]
+    assert all(post["target"] == ICPN for post in gateway.posts)
+    assert not {"B1_create", "B2", "B3"} & set(coordinator.calls)
+
+
+def test_route_interface_mismatch_blocks_before_b1_b2_b3(tmp_path):
+    """Host-only: an FPGAInterface alone cannot satisfy an OpenOCD Profile."""
+    gateway = FakeGateway(image=image(), status_interface="fpga")
+    workflow, coordinator, gateway = make(tmp_path, gateway=gateway)
+    planned = workflow.plan(ALIAS, plan_body(site=1))["plan"]
+    assert planned["activation_required"] is True
+    started = workflow.start(
+        ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
+    run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+    assert run["outcome"] == "FAIL"
+    assert run["reason"] == "SITE_INTERFACE_NOT_READY"
+    assert gateway.posts == []
+    assert not {"B1_create", "B2", "B3"} & set(coordinator.calls)
 
 
 def test_missing_or_consumed_plan_is_bundle_missing(tmp_path):
@@ -702,7 +763,7 @@ def test_committed_routes_keep_legacy_flash_cycle_separate_from_the_operations_r
     assert OPS_RESOURCE_SHA != ROUTE_RESOURCE_SHA
     routes = bundle_v3.load_routes(ROUTES)
     pick = lambda ops: [r.route_id for r in bundle_v3.resolve_routes(  # noqa: E731
-        routes, icpn=ICPN, site=2, operations=ops)]
+        routes, icpn=ICPN, operations=ops)]
     assert pick(["flash_cycle"]) == ["z2-site2-stm32f103c8t6"]
     for ops in LEGAL_LISTS + [["read"]]:
         assert pick(ops) == ["z2-site2-stm32f103c8t6-operations"]
@@ -1122,16 +1183,22 @@ def test_incompatible_bundle_fails_closed_before_any_ppu_contact(
     assert coord.calls == [] and gateway.posts == [] and workflow._plans == {}
 
 
-def test_bundle_for_another_ic_or_site_is_refused(tmp_path):
+def test_bundle_for_another_ic_or_invalid_site_is_refused(tmp_path):
     workflow, coord, gateway = make(tmp_path)
     archive = user_bundle().archive
     for body, code in (
             (bundle_body(archive, icpn="STM32F407VGT6"), "programming_route_not_found"),
-            (bundle_body(archive, site=3), "programming_route_not_found")):
+            (bundle_body(archive, site=65), "invalid_request")):
         with pytest.raises(ProgrammingError) as caught:
             workflow.plan(ALIAS, body)
         assert caught.value.code == code
     assert coord.calls == [] and gateway.posts == []
+    # The same v2 Profile is independent of physical Site; the PPU validates
+    # actual Site/interface availability, and the Job Binding pins each Site.
+    p1 = workflow.plan(ALIAS, bundle_body(archive, site=1))["plan"]
+    p2 = workflow.plan(ALIAS, bundle_body(archive, site=2))["plan"]
+    assert p1["resource"]["resource_set_sha256"] == p2["resource"]["resource_set_sha256"]
+    assert p1["job_binding_sha256"] != p2["job_binding_sha256"]
 
 
 @pytest.mark.parametrize("body", [

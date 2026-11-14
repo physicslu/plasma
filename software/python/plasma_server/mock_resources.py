@@ -66,7 +66,6 @@ def site_geometry(site: SiteConfig) -> dict[str, int]:
 def mock_route(
     *,
     icpn: str,
-    sites: list[int],
     flash_base: int = DEFAULT_FLASH_BASE,
     flash_size: int = DEFAULT_FLASH_SIZE,
     erase_granularity: int = DEFAULT_ERASE_GRANULARITY,
@@ -96,7 +95,6 @@ def mock_route(
                 "target": icpn,
                 "provider_package": provider_id,
                 "operations": list(operations),
-                "sites": sorted(set(sites)),
                 "transport": "fpga",
                 "driver_abi": MOCK_DRIVER_ABI,
                 "fpga_package": None,
@@ -164,7 +162,6 @@ def mock_resources_for_config(config: PlasmaConfig, *,
     _need(len(geometries) == 1, "MOCK_RESOURCES_SITE_GEOMETRY_NOT_UNIFORM")
     route = mock_route(
         icpn=str(targets.pop()),
-        sites=[site.id for site in sites],
         **site_geometry(sites[0]),
     )
     return mock_resource_identity(route, generation=generation)
