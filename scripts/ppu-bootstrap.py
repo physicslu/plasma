@@ -5,25 +5,16 @@ This module intentionally uses only the Python standard library and remains
 compatible with the stock PYNQ-Z2 Python 3.10 runtime. It owns stable identity,
 runtime inspection and systemd-unit rendering while the authenticated mutation
 surface lives in ``ppu-bootstrap-service.py``.
-
-The HTTP server in this module is deliberately read-only and is retained as the
-minimal inspection contract. Production systemd wiring must launch the separate
-authenticated Bootstrap service rather than this read-only server.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import ipaddress
 import json
-import sys
 from dataclasses import asdict, dataclass
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Mapping
-from urllib.parse import urlparse
+from typing import Any
 
 BOOTSTRAP_API_VERSION = "1"
 BOOTSTRAP_VERSION = "0.1.0"
@@ -243,64 +234,6 @@ def _validate_host_port(host: str, port: int) -> tuple[str, int]:
     return str(address), port
 
 
-class _BootstrapHTTPServer(ThreadingHTTPServer):
-    daemon_threads = True
-
-    def __init__(self, address: tuple[str, int], paths: BootstrapPaths):
-        self.bootstrap_paths = paths
-        super().__init__(address, _BootstrapHandler)
-
-
-class _BootstrapHandler(BaseHTTPRequestHandler):
-    server_version = "PlasmaBootstrap/1"
-
-    @property
-    def paths(self) -> BootstrapPaths:
-        return self.server.bootstrap_paths  # type: ignore[attr-defined]
-
-    def log_message(self, fmt: str, *args: object) -> None:
-        sys.stderr.write("bootstrap-http " + (fmt % args) + "\n")
-
-    def _json(self, status: HTTPStatus, payload: Mapping[str, Any]) -> None:
-        body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        self.send_response(int(status))
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.end_headers()
-        self.wfile.write(body)
-
-    def do_GET(self) -> None:  # noqa: N802
-        path = urlparse(self.path).path
-        try:
-            if path == "/v1/health":
-                self._json(
-                    HTTPStatus.OK,
-                    {
-                        "ok": True,
-                        "service": "plasma-ppu-bootstrap",
-                        "api_version": BOOTSTRAP_API_VERSION,
-                        "bootstrap_version": BOOTSTRAP_VERSION,
-                    },
-                )
-                return
-            if path == "/v1/status":
-                self._json(HTTPStatus.OK, status_document(self.paths))
-                return
-            self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not_found"})
-        except BootstrapError as exc:
-            self._json(
-                HTTPStatus.SERVICE_UNAVAILABLE,
-                {"ok": False, "error": "bootstrap_state_invalid", "message": str(exc)},
-            )
-
-    def do_POST(self) -> None:  # noqa: N802
-        self._json(
-            HTTPStatus.METHOD_NOT_ALLOWED,
-            {"ok": False, "error": "mutation_not_enabled"},
-        )
-
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Plasma PPU factory/recovery bootstrap")
@@ -311,9 +244,6 @@ def _parser() -> argparse.ArgumentParser:
 
     sub.add_parser("inspect", help="print bootstrap/identity/runtime state as JSON")
 
-    serve = sub.add_parser("serve", help="serve the read-only bootstrap API")
-    serve.add_argument("--host", required=True, help="explicit IPv4 bind address")
-    serve.add_argument("--port", type=int, default=DEFAULT_PORT)
 
     unit = sub.add_parser("render-systemd-unit", help="render the production Bootstrap systemd unit")
     unit.add_argument("--host", required=True)
@@ -343,16 +273,6 @@ def main(argv: list[str] | None = None) -> int:
             ),
             end="",
         )
-        return 0
-    if args.command == "serve":
-        host, port = _validate_host_port(args.host, args.port)
-        server = _BootstrapHTTPServer((host, port), paths)
-        try:
-            server.serve_forever()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            server.server_close()
         return 0
     raise AssertionError(f"unreachable command: {args.command}")
 
