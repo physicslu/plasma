@@ -14,7 +14,6 @@ export type ProgrammingRoute = {
   route_id: string;
   target: { platform: string; board: string; fpga_part: string };
   icpn: string;
-  sites: number[];
   provider: string;
   profile: string;
   operations: string[];
