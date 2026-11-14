@@ -15,7 +15,7 @@ from typing import Any, Mapping
 import ppu_asset_set
 import ppu_provider_options
 
-SCHEMA = "plasma.ppu.provider-capabilities.v1"
+SCHEMA = "plasma.ppu.provider-capabilities.v2"
 DESCRIPTOR = "data/plasma-provider.json"
 PLATFORM_OPTIONS = "data/plasma-provider-options.json"
 OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
