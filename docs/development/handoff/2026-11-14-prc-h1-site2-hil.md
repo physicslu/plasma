@@ -3,7 +3,7 @@
 2026-11-14. Owner-authorised: deploy PR-C to the SWPC Control Station, one E+P+V flash on
 Site 2, and the Resource Set activation it requires. Two cycles were run; both **PASS**.
 
-Raw evidence (not in the repository): `/storage/projects/plasma-evidence/prc-h1-site2-20261114/`
+Raw evidence (operator-held, not in the repository): `<evidence-root>/prc-h1-site2-20261114/`
 — `SUMMARY.md` plus the request, admission, poll, receipt, reconciliation and snapshot JSON of
 every step.
 
