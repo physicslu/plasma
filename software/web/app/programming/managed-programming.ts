@@ -660,11 +660,14 @@ type WithoutSite<T> = T extends unknown ? Omit<T, "siteId"> : never;
 
 export type ManagedBatchRequest =
   WithoutSite<Extract<ManagedRunRequest, { operations: readonly SequenceOperation[] }>>
-  & { siteIds: readonly number[]; retryLimit: number; stopPolicy: StopPolicy };
+  & { siteIds: readonly number[]; targets?: readonly ProgrammingBatchTarget[];
+    retryLimit: number; stopPolicy: StopPolicy };
 
 export type ManagedBatchEvents = {
   onLocked?: (input: LockedInput) => void;
   onBatch?: (batch: ProgrammingBatch) => void;
+  /** The Manager has issued this immutable Start; persist it before POST. */
+  onStartId?: (startId: string) => void;
   onPollError?: (message: string) => void;
 };
 
@@ -693,6 +696,7 @@ export async function runManagedBatch(
   const common = {
     icpn: request.icpn, alias: request.alias, siteIds: [...request.siteIds],
     retryLimit: request.retryLimit, stopPolicy: request.stopPolicy,
+    ...(request.targets ? { targets: request.targets } : {}),
   };
   const input: BatchInput = request.file === null
     ? { ...common, operations: ["erase"], ...request.range }
@@ -705,6 +709,7 @@ export async function runManagedBatch(
   try {
     startId = await issueBatchStart(request.alias);
     if (!/^[0-9a-f]{32}$/.test(startId)) throw new Error("the Manager issued no start ID");
+    events.onStartId?.(startId);
   } catch (reason) {
     const { code, message } = errorParts(reason);
     throw new ManagedProgrammingBlocked("plan", code,
@@ -723,6 +728,18 @@ export async function runManagedBatch(
       `The Batch request outcome is unknown (${message}). Nothing was resubmitted.`,
       { startId, kind: "batch", siteIds: [...request.siteIds],
         operation: "programming", jobBindingSha256: null });
+  }
+  // The Browser never trusts a Batch answer that names a different Target Set.
+  // A mismatched answer is held for read-only reconciliation, never resent.
+  const expectedTargets = request.targets ?? [{ ppu_alias: request.alias, site_ids: [...request.siteIds] }];
+  const canonical = (targets: readonly ProgrammingBatchTarget[]) => JSON.stringify(
+    targets.map(target => ({ ppu_alias: target.ppu_alias, site_ids: [...target.site_ids].sort((a, b) => a - b) }))
+      .sort((a, b) => a.ppu_alias.localeCompare(b.ppu_alias)));
+  if (batch.start_id !== startId || canonical(batch.targets) !== canonical(expectedTargets)
+      || batch.icpn !== request.icpn || JSON.stringify(batch.operations) !== JSON.stringify(request.operations)) {
+    throw new ManagedStartOutcomeUnknown(startId,
+      "The Manager Batch reply does not match the locked Start/Target Set/IC/Operations; do not resubmit.",
+      { startId, kind: "batch", siteIds: [...request.siteIds], operation: "programming", jobBindingSha256: null });
   }
   events.onBatch?.(batch);
   while (batch.outcome == null) {
