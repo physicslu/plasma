@@ -75,10 +75,10 @@ def test_successful_upgrade_preserves_existing_canonical_site_desired_state(
     config_path.chmod(0o640)
 
     def fake_core_install(*args, **kwargs):
-        installer._core._write_text_atomic(config_path, "sites: []\n", 0o640)
+        kwargs["config_writer"](config_path, "sites: []\n", 0o640)
         return {"site_desired_state": {"runtime_apply_supported": False}}
 
-    monkeypatch.setattr(installer, "_original_install_release", fake_core_install)
+    monkeypatch.setattr(installer, "_install_base_release", fake_core_install)
     calls: list[tuple[str, ...]] = []
     evidence = installer.install_release(
         verified(),
@@ -116,7 +116,7 @@ def test_failed_activation_restores_previous_helper_unit(
     def fail_core_install(*args, **kwargs):
         raise installer.Z2InstallerError("synthetic activation failure")
 
-    monkeypatch.setattr(installer, "_original_install_release", fail_core_install)
+    monkeypatch.setattr(installer, "_install_base_release", fail_core_install)
     calls: list[tuple[str, ...]] = []
     with pytest.raises(installer.Z2InstallerError, match="synthetic activation failure"):
         installer.install_release(
@@ -147,7 +147,7 @@ def test_failed_first_install_removes_candidate_helper_unit(
     def fail_core_install(*args, **kwargs):
         raise installer.Z2InstallerError("synthetic first-install failure")
 
-    monkeypatch.setattr(installer, "_original_install_release", fail_core_install)
+    monkeypatch.setattr(installer, "_install_base_release", fail_core_install)
     calls: list[tuple[str, ...]] = []
     with pytest.raises(installer.Z2InstallerError, match="synthetic first-install failure"):
         installer.install_release(

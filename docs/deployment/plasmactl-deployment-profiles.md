@@ -44,12 +44,11 @@ plasmactl
     └── scripts/plasmactl-z2-ps
         ├── scripts/z2-python-runtime.py
         ├── scripts/ppu-z2-installer.py
-        └── scripts/ppu-z2-installer-core.py
 ```
 
 The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
 
-The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals. The Z2 installer bootstrap is intentionally a two-file unit: the P3 wrapper `ppu-z2-installer.py` requires its sibling `ppu-z2-installer-core.py`.
+The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals. The Z2 installer uses one canonical `ppu-z2-installer.py` containing the verified release core and runtime-activation integration.
 
 ## Backward compatibility
 

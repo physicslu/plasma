@@ -130,7 +130,7 @@ def test_generic_b3_refresh_rejects_bad_policy_or_partial_scripts(tmp_path):
         )
     assert (paths.install_root / POLICY_FILE).read_bytes() == old
     shutil.copyfile(ROOT / "scripts" / POLICY_FILE, source / POLICY_FILE)
-    (source / "ppu-z2-installer-core.py").unlink()
+    (source / "ppu-z2-installer.py").unlink()
     with pytest.raises(installer.BootstrapInstallError, match="factory B3 source set is incomplete"):
         installer.install_bootstrap(
             source_root=source, host="ignored", port=18081,

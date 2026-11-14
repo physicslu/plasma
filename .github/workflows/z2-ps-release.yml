@@ -29,7 +29,6 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
-      - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
@@ -79,7 +78,6 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
-      - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
@@ -134,7 +132,6 @@ jobs:
       - name: Prove clean-PYNQ bootstrap compatibility
         run: |
           python -m py_compile scripts/z2-python-runtime.py
-          python -m py_compile scripts/ppu-z2-installer.py scripts/ppu-z2-installer-core.py
           python -m py_compile scripts/ppu-bootstrap-deployment.py
           bash -n scripts/build-z2-python-runtime.sh
           python scripts/z2-python-runtime.py --help
@@ -501,7 +498,6 @@ jobs:
           cp scripts/plasmactl-z2-ps "$root/scripts/plasmactl-z2-ps"
           cp scripts/ppu-bootstrap-deployment.py "$root/scripts/ppu-bootstrap-deployment.py"
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
-          cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
           cp scripts/ppu_package_units.py "$root/scripts/ppu_package_units.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
           cp scripts/openocd-runtime.py "$root/scripts/openocd-runtime.py"
@@ -513,7 +509,7 @@ jobs:
           chmod +x "$root/scripts/plasmactl" "$root/scripts/plasmactl-z2-ps" \
             "$root/scripts/ppu-bootstrap-deployment.py" "$root/scripts/ppu-z2-installer.py" \
             "$root/scripts/z2-python-runtime.py" "$root/scripts/openocd-runtime.py"
-          test -f "$root/scripts/ppu-z2-installer-core.py"
+          test -f "$root/scripts/ppu-z2-installer.py"
           test -f "$root/scripts/ppu_package_units.py"
           test -f "$root/scripts/ppu_runtime_local_readiness.py"
           python scripts/z2-python-runtime.py verify \

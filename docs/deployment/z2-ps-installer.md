@@ -148,7 +148,6 @@ plasma-z2-ps-kit-<release-id>/
 │   ├── plasmactl
 │   ├── plasmactl-z2-ps
 │   ├── ppu-z2-installer.py
-│   ├── ppu-z2-installer-core.py
 │   ├── z2-python-runtime.py
 │   └── openocd-runtime.py
 ├── artifacts/
@@ -162,7 +161,7 @@ plasma-z2-ps-kit-<release-id>/
     └── README.md
 ```
 
-The P3 installer is intentionally a **two-file bootstrap unit**. `ppu-z2-installer.py` is the P3 wrapper; `ppu-z2-installer-core.py` retains the audited P2 release verification and installation core. The kit is invalid if either file is missing. CI compiles both under Python 3.10, includes both in `SHA256SUMS`, and executes the extracted wrapper with its extracted sibling core.
+The canonical **single-file** `ppu-z2-installer.py` contains release verification, the Z2 installer and P3 runtime-activation integration. It no longer dynamically loads a sibling installer core or modifies a module's global functions. The kit is invalid without the file; CI compiles it under Python 3.10, verifies its `SHA256SUMS` entry, and executes the verified installer.
 
 The Z2 does not need Git, npm, Node.js, Vite, a Plasma source checkout, a compiler, or a local CPython build to consume this kit.
 

@@ -305,7 +305,6 @@ jobs:
           cp scripts/plasmactl-z2-ps "$root/scripts/plasmactl-z2-ps"
           cp scripts/ppu-bootstrap-deployment.py "$root/scripts/ppu-bootstrap-deployment.py"
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
-          cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
           cp scripts/openocd-runtime.py "$root/scripts/openocd-runtime.py"
           cp scripts/ppu_runtime_local_readiness.py "$root/scripts/ppu_runtime_local_readiness.py"
