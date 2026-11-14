@@ -166,7 +166,7 @@ test("no Operation, or Erase + Verify without Program, never reaches the Manager
 });
 
 test("an Operation no Programming Route declares is disabled, not a fake capability", async ({ page }) => {
-  const counters = await mockManager(page, { routes: [route(), operationsRoute([2], ["program", "verify", "read"])] });
+  const counters = await mockManager(page, { routes: [route(), operationsRoute(["program", "verify", "read"])] });
   const { workspace, job, start } = await configure(page);
   await expect(job.getByLabel("Engineering operation erase")).toBeDisabled();
   await expect(job.getByLabel("Engineering operation erase")).not.toBeChecked();
@@ -791,23 +791,25 @@ test("a Batch start ID the Manager does not issue is a refusal: no Batch request
   expect(counters.jobs).toEqual([]);
 });
 
-test("READ is unavailable on a busy or disabled Site and absent where no Route declares Read", async ({ page }) => {
-  // Site 2: Route + busy. Site 3: enabled, no Route. Site 4: Route, disabled on the PPU.
+test("READ requires a compatible Site interface and rejects busy or disabled Sites", async ({ page }) => {
+  // Site 2: OpenOCD + busy. Site 3: enabled but direct FPGA interface is incompatible.
+  // Site 4: disabled. None is given a persistent ICPN-to-Site Route restriction.
   const counters = await mockManager(page, {
-    ppus: [{ ...Z2, enabledSites: [2, 3], busySites: [2] }],
-    routes: [operationsRoute([2, 4])],
+    ppus: [{ ...Z2, enabledSites: [2, 3], busySites: [2], siteInterfaces: { 3: "fpga" } }],
+    routes: [operationsRoute()],
   });
   const { workspace, button } = await readSetup(page, "save");
-  const live = workspace.getByRole("region", { name: "Engineering Site selection" });
-  await expect(live.getByRole("button", { name: /^Read SITE \d+ Flash$/ })).toHaveCount(2);
-  await expect(workspace.getByRole("button", { name: "Read SITE 3 Flash" })).toHaveCount(0);
-  await expect(workspace.getByTestId("site-read-3")).toHaveText("—");
   await expect(button).toBeDisabled();
   await expect(button).toHaveAttribute("title", "The Site is busy or not idle.");
+  const incompatible = workspace.getByRole("button", { name: "Read SITE 3 Flash" });
+  await expect(incompatible).toBeDisabled();
+  await expect(incompatible).toHaveAttribute(
+    "title", "The PPU Site interface does not match the selected IC Profile's required execution interface.");
   const disabled = workspace.getByRole("button", { name: "Read SITE 4 Flash" });
   await expect(disabled).toBeDisabled();
   await expect(disabled).toHaveAttribute("title", "The Site is disabled on the PPU.");
   await button.click({ force: true });
+  await incompatible.click({ force: true });
   await disabled.click({ force: true });
   expect((await pickerProbe(page)).calls).toEqual([]);
   expect(writes(counters)).toEqual([]);
@@ -1327,7 +1329,7 @@ test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page
 test("EMode programs many Sites of one PPU as ONE Batch, and each Site is judged on its own", async ({ page }) => {
   const counters = await mockManager(page, {
     ppus: [{ ...Z2, enabledSites: [2, 3] }],
-    routes: [route([2, 3]), operationsRoute([2, 3])],
+    routes: [route(), operationsRoute()],
     // Site 3 fails definitely; Site 2 passes. One Site's result is never the other's.
     script: (_alias, site) => (site === 3 ? { outcome: "FAIL", reason: "PROGRAMMING_NOT_PASS" } : {}),
   });

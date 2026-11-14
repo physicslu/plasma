@@ -27,11 +27,13 @@ export type MockPpu = {
   deploymentState?: string | null;
   /** Site interface the PPU reports: "openocd" (hardware path) or "mock". */
   siteInterface?: string;
+  /** One PPU can report different interface families on separate Sites. */
+  siteInterfaces?: Record<number, string>;
 };
 
 export const Z2: MockPpu = { alias: "z2", ppuId: "z2-hil", facilityId: "lab", enabledSites: [2] };
 
-export function route(sites = [2], operations = ["flash_cycle"]) {
+export function route(operations = ["flash_cycle"]) {
   return {
     route_id: "z2-site2-stm32f103c8t6", target: { platform: "linux-armv7", board: "pynq-z2", fpga_part: "xc7z020clg400-1" },
     icpn: "STM32F103C8T6", site_interface: "openocd", provider: "openocd-platform-reference", profile: "stm32f103c8t6-site2",
@@ -41,8 +43,8 @@ export function route(sites = [2], operations = ["flash_cycle"]) {
 }
 
 /** The Route of one programming Job (E / P / V list) and of the independent Read Job. */
-export function operationsRoute(sites = [2], operations = ["erase", "program", "verify", "read"]) {
-  return { ...route(sites, operations), route_id: "z2-site2-stm32f103c8t6-operations",
+export function operationsRoute(operations = ["erase", "program", "verify", "read"]) {
+  return { ...route(operations), route_id: "z2-site2-stm32f103c8t6-operations",
     profile: "stm32f103c8t6-site2-operations" };
 }
 
@@ -73,7 +75,8 @@ function fleetView(ppu: MockPpu) {
     return {
       site_id: siteId, enabled: on, state: !on ? "disabled" : busy ? "running" : "idle",
       current_job_id: busy ? "job-busy" : null, latest_job: null,
-      interface: on ? ppu.siteInterface ?? "openocd" : null, target: on ? "STM32F103C8T6" : null,
+      interface: on ? (ppu.siteInterfaces?.[siteId] ?? ppu.siteInterface ?? "openocd") : null,
+      target: null, // ICPN is selected per Job, never the idle Site default.
     };
   });
   return {
