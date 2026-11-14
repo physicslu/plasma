@@ -83,8 +83,6 @@ plasma-ppu-<release-id>-linux-armv7l.tar.gz
 plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256
 plasma-ppu-z2-installer-<release-id>.py
 plasma-ppu-z2-installer-<release-id>.py.sha256
-ppu-z2-installer-core.py
-ppu-z2-installer-core.py.sha256
 ```
 
 CI compiles both bootstrap files under Python 3.10, verifies both detached digests, and executes the packaged wrapper with the packaged sibling core against the canonical PPU release. This is specifically intended to prevent a source-tree-only installer from being published as a valid deployment artifact.

@@ -68,7 +68,6 @@ ROOT_PARSER_FILES = (
 # Root-owned development-mode policy is factory provisioned, not an HTTP grant.
 B3_FILES = (
     "ppu-z2-installer.py",
-    "ppu-z2-installer-core.py",
     "ppu-bundle-install-policy.json",
 )
 

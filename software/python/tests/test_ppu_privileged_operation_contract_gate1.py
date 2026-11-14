@@ -329,7 +329,7 @@ def test_no_flexible_argv_command_or_root_override_in_request() -> None:
 def test_existing_install_root_code_requires_hashes_and_rollback() -> None:
     repository = Path(__file__).resolve().parents[3]
     deployment = (repository / "scripts/ppu-bootstrap-deployment.py").read_text()
-    installer = (repository / "scripts/ppu-z2-installer-core.py").read_text()
+    installer = (repository / "scripts/ppu-z2-installer.py").read_text()
     protected = (repository / "scripts/z2/plasma-path2-root-entry").read_text()
     wordport = (repository / "scripts/plasma_wordport_program.py").read_text()
     assert "self.installer.verify_release(" in deployment

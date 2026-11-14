@@ -642,8 +642,7 @@ def run_bundle_install_subprocess(
     if type(identity) is not str or not UPLOAD_ID_RE.fullmatch(identity):
         raise BootstrapServiceError("B3_CORRELATION_ID_INVALID")
     upload = _upload_paths(paths, upload_id)
-    for script in (paths.deployment_engine_script, paths.z2_installer_script,
-                   paths.z2_installer_script.with_name("ppu-z2-installer-core.py")):
+    for script in (paths.deployment_engine_script, paths.z2_installer_script):
         if script.is_symlink() or not script.is_file():
             raise BootstrapServiceError("B3_INSTALLED_ENGINE_NOT_QUALIFIED")
     _trusted_b3_install_policy(paths)
@@ -1751,9 +1750,6 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                         self.owner.bootstrap_paths.bundle_install_policy,
                         self.owner.bootstrap_paths.deployment_engine_script,
                         self.owner.bootstrap_paths.z2_installer_script,
-                        self.owner.bootstrap_paths.z2_installer_script.with_name(
-                            "ppu-z2-installer-core.py"
-                        ),
                     )
                 )
                 b3_policy = None

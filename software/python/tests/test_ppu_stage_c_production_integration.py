@@ -106,7 +106,7 @@ def test_runtime_dropin_and_tmpfiles_only_add_spec_dir_and_worker_dependency():
 def test_installer_only_refreshes_existing_stage_c_units():
     """First-time Stage C enablement (accounts, units) stays an operator
     step; an install only re-renders existing units for its --plasma-python."""
-    core = (ROOT / "scripts/ppu-z2-installer-core.py").read_text()
+    core = (ROOT / "scripts/ppu-z2-installer.py").read_text()
     assert "render_stage_c_refresh" in core
     assert "useradd" not in core.split("def render_stage_c_refresh", 1)[1].split("\ndef ", 1)[0]
 

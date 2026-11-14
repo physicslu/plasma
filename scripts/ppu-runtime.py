@@ -459,7 +459,7 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
 
 def _validate_control_plane(runtime_dir: Path, manifest: Mapping[str, object], app: Path) -> None:
     """Same verifier the Z2 installer runs, plus the zipapp client protocol."""
-    core = _load_script(REPO_ROOT / "scripts" / "ppu-z2-installer-core.py",
+    core = _load_script(REPO_ROOT / "scripts" / "ppu-z2-installer.py",
                         "plasma_ppu_runtime_installer_core")
     try:
         plane = core.verify_control_plane_tree(runtime_dir, manifest)
