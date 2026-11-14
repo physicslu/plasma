@@ -425,6 +425,33 @@ def test_site1_and_site2_share_one_ic_resource_without_a_site_route(tmp_path):
     assert site1["job_binding_sha256"] != site2["job_binding_sha256"]
 
 
+
+def test_previously_selected_ic_is_not_a_site_allowlist(tmp_path):
+    """Host-only: ready Sites 1/2 reuse one Profile despite stale Site target."""
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    active_sha = bundle_v3.build_user_image_bundle(
+        route, image(), filename="app.bin").archive_sha256
+    gateway = FakeGateway(image=image(), status_target="LEGACY_SITE_TARGET")
+    workflow, coordinator, gateway = make(
+        tmp_path, coordinator=FakeCoordinator(active_sha=active_sha), gateway=gateway)
+
+    bindings = []
+    for site_id in (1, 2):
+        planned = workflow.plan(ALIAS, plan_body(site=site_id))["plan"]
+        assert planned["activation_required"] is False
+        assert planned["site_id"] == site_id
+        started = workflow.start(
+            ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
+        run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+        assert run["outcome"] == "PASS", run
+        bindings.append(planned["job_binding_sha256"])
+
+    assert bindings[0] != bindings[1]
+    assert [post["site_id"] for post in gateway.posts] == [1, 2]
+    assert all(post["target"] == ICPN for post in gateway.posts)
+    assert not {"B1_create", "B2", "B3"} & set(coordinator.calls)
+
+
 def test_missing_or_consumed_plan_is_bundle_missing(tmp_path):
     workflow, _coord, gateway = make(tmp_path)
     with pytest.raises(ProgrammingError) as caught:
