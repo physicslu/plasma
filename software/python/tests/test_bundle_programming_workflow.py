@@ -404,7 +404,6 @@ def test_binding_echo_with_a_different_range_is_not_confirmed(tmp_path):
 
 @pytest.mark.parametrize("body, code", [
     (plan_body(icpn="STM32F407VGT6"), "programming_route_not_found"),
-    (plan_body(site=1), "programming_route_not_found"),
     (plan_body(raw=b"\x00" * (65536 + 1)), "bundle_incompatible"),
 ])
 def test_incompatible_selection_never_touches_ppu(tmp_path, body, code):
@@ -413,6 +412,17 @@ def test_incompatible_selection_never_touches_ppu(tmp_path, body, code):
         workflow.plan(ALIAS, body)
     assert caught.value.code == code
     assert coord.calls == [] and gateway.posts == []
+
+
+def test_site1_and_site2_share_one_ic_resource_without_a_site_route(tmp_path):
+    workflow, _coordinator, _gateway = make(tmp_path)
+    site1 = workflow.plan(ALIAS, plan_body(site=1))["plan"]
+    site2 = workflow.plan(ALIAS, plan_body(site=2))["plan"]
+    assert site1["site_id"] == 1 and site2["site_id"] == 2
+    assert site1["resource"]["resource_set_sha256"] == site2["resource"]["resource_set_sha256"]
+    assert site1["job_binding"]["site_id"] == 1
+    assert site2["job_binding"]["site_id"] == 2
+    assert site1["job_binding_sha256"] != site2["job_binding_sha256"]
 
 
 def test_missing_or_consumed_plan_is_bundle_missing(tmp_path):
