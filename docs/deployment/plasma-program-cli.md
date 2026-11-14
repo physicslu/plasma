@@ -2,7 +2,7 @@
 
 **入口：scripts/plasma_program.py**。名稱與 Path 2、Path 3、Site 2、特定 MCU 無關；這是原一鍵工具的取代版本，不是另一套 Operator、燒錄引擎或 Deployment Coordinator。
 
-命令：diagnose（唯讀）、deploy（只部署/啟用 Bundle）、flash（只對已啟用 Bundle 執行一次 Job）、run（一次執行部署/啟用及 Flash）。所有寫入都必須有既有 Owner／執行環境授權，--approved-once 僅是防誤觸，並非授權憑證。
+命令：diagnose（唯讀）、deploy（只部署/啟用 Bundle）、flash（只對已啟用 Bundle 執行一次 Job）、run（一次執行部署/啟用及 Flash）、runtime-deploy（只透過既有 Bootstrap Coordinator 更新 Runtime）。所有寫入都必須有既有 Owner／執行環境授權，--approved-once 僅是防誤觸，並非授權憑證。
 
 ## 單次執行範例
 
@@ -21,6 +21,14 @@ python3 scripts/plasma_program.py run \
 - --image：非必要，只核對外部 BIN 與選定 Bundle Firmware SHA/大小完全相同，**不會將 BIN 另送至 Z2**。
 - --owner-token-file：讓具既有 Owner 授權的本機/其他路徑使用受保護的 0600 憑證；省略時沿用 SWPC 已配對的 Z2 SSH 憑證路徑。不得在命令參數、PR、Issue、CI log 寫入 Token。
 - --site：從 Bundle Programming Profile 宣告的 sites 驗證。提供其他 Site 不代表可執行，Runtime/Site Worker 仍有最後的硬體 Admission 權限。
+
+## Runtime 部署與 Operations Route 相容性
+
+`runtime-deploy` **只更新 PPU Runtime**；不送出任何 DUT Job，也不執行 Erase／Program／Verify／Read 或 FPGA Reload。此命令核對 Bundle v3 Archive SHA256、Platform Target、Provider／Programming Profile、Firmware Asset、Site、已啟用的 Active Asset Set、裝置／Runtime／Kit 身分及 Coordinator 交易。
+
+既有 Runtime CLI 曾在 `read_bundle()` 強制要求 `flash_cycle`，導致已正式啟用、宣告 `erase`／`program`／`verify`／`read` 的 Operations Profile 無法用標準部署入口升級 Runtime。本次僅允許 **`runtime-deploy`** 在既有 Canonical Bundle Verifier 通過後接受有效的新版 Operations Profile。已指定的 Bundle 必須仍與 Z2 Active Asset Set 的 SHA256 **完全相同**，任何不一致均不得提交部署。
+
+**`flash`／`run` 保持舊有 `flash_cycle` Job 契約**，目前不能對僅有新版 Operations 的 Bundle 執行燒錄；不應將其誤認為新版 Operations Job CLI。Legacy 支援僅限後端相容性，不能加入 Console 操作選單。未實作新的 Runtime 部署器、未取消 Owner、Site、Target、Active Set、Kit/Release、SAFE_OFF／Recovery 等現有安全機制。Host-only 測試不是實機部署資格。
 
 ## 硬體與部署邊界
 

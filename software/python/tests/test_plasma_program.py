@@ -105,6 +105,92 @@ def test_local_bundle_selects_firmware_from_canonical_v3(tmp_path):
         program.read_bundle(output, site=2, package=None, image=wrong)
 
 
+def _operations_bundle(tmp_path: Path) -> Path:
+    """A real canonical Bundle v3 with no legacy flash_cycle capability."""
+    route = bluepill.bundle_v3.load_route(
+        ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6-operations.json")
+    image = (ROOT / "docs/evidence/bluepill-z2-flash-2026-10-27"
+             / "firmware/plasma-blue-pill-cdc.bin").read_bytes()
+    built = bluepill.bundle_v3.build_image_bundle(
+        route, image, image_filename="plasma-blue-pill-cdc.bin",
+        asset_package_id="operations-test-fw", bundle_name="operations-site2-test")
+    output = tmp_path / "operations.zip"
+    output.write_bytes(built.archive)
+    return output
+
+
+def test_runtime_deploy_accepts_canonical_operations_bundle_only(tmp_path):
+    archive = _operations_bundle(tmp_path)
+    selection_ops = program.read_bundle(
+        archive, site=2, package=None, runtime_deploy=True)
+    assert selection_ops.profile == "stm32f103c8t6-site2-operations"
+    assert selection_ops.target == "STM32F103C8T6"
+    assert selection_ops.bundle_sha == program.sha256(archive.read_bytes())
+    # Commands which still submit flash_cycle must never accept this Bundle.
+    with pytest.raises(program.ProgramDenied, match="SITE_OR_TARGET_NOT_QUALIFIED"):
+        program.read_bundle(archive, site=2, package=None)
+    with pytest.raises(program.ProgramDenied, match="SITE_OR_TARGET_NOT_QUALIFIED"):
+        program.read_bundle(archive, site=1, package=None, runtime_deploy=True)
+    with pytest.raises(program.ProgramDenied, match="FIRMWARE_PACKAGE_NOT_FOUND"):
+        program.read_bundle(archive, site=2, package="other",
+                            runtime_deploy=True)
+    # Existing legacy Bundles remain admitted for runtime-only deployment.
+    firmware = (ROOT / "docs/evidence/bluepill-z2-flash-2026-10-27"
+                / "firmware/plasma-blue-pill-cdc.bin")
+    legacy = tmp_path / "legacy.zip"
+    bluepill.build("v0.1", firmware, legacy)
+    assert program.read_bundle(
+        legacy, site=2, package=None, runtime_deploy=True).profile == (
+            "stm32f103c8t6-site2")
+
+
+def test_runtime_deploy_cli_scopes_operations_admission(monkeypatch, capsys):
+    selected = []
+    monkeypatch.setattr(program, "read_bundle",
+                        lambda path, *, site, package, image, runtime_deploy:
+                        selected.append(runtime_deploy) or selection())
+    monkeypatch.setattr(program, "owner_token", lambda *_: "test-only")
+    monkeypatch.setattr(program, "open_bootstrap", lambda *_: object())
+    monkeypatch.setattr(program, "deploy_runtime_kit",
+                        lambda *_args, **_kwargs: {"status": "PASS", "flash": "NOT_RUN"})
+    monkeypatch.setattr(program, "execute",
+                        lambda *_args, **_kwargs: {"status": "PASS", "flash": "NOT_RUN"})
+    common = ["--bundle", "/nonexistent-fixture.zip", "--site", "2",
+              "--host", HOST, "--device-id", DEVICE, "--runtime-sha", RUNTIME,
+              "--approved-once"]
+    assert program.main(["runtime-deploy", *common]) == 0
+    assert program.main(["flash", *common]) == 0
+    assert program.main(["run", *common]) == 0
+    assert selected == [True, False, False]
+    assert capsys.readouterr().out.count('"status":"PASS"') == 3
+
+
+def test_runtime_deploy_operations_bundle_rejects_active_set_drift(
+        tmp_path, monkeypatch):
+    archive = _operations_bundle(tmp_path)
+    selected = program.read_bundle(
+        archive, site=2, package=None, runtime_deploy=True)
+    kit = tmp_path / "trusted-kit.tar.gz"
+    contents = b"host-only-runtime-kit"
+    kit.write_bytes(contents)
+    monkeypatch.setenv("PLASMA_Z2_KIT_ARTIFACT_PATH", str(kit))
+    monkeypatch.setenv("PLASMA_Z2_KIT_SOURCE_SHA", "d" * 40)
+    patch_ready(monkeypatch)
+    client = Client(active="0" * 64)
+    current_status = client.status
+    monkeypatch.setattr(client, "status",
+                        lambda: {**current_status(),
+                                 "capabilities": {"runtime_deployment": True}})
+    monkeypatch.setattr(client, "upload",
+                        lambda *_: pytest.fail("Must not upload on Active Set drift"))
+    with pytest.raises(program.ProgramDenied, match="ACTIVE_SET_CHANGED"):
+        program.deploy_runtime_kit(
+            client, selected, host=HOST, device_id=DEVICE,
+            runtime_sha="d" * 40, kit_sha256=program.sha256(contents),
+            ppu_id="z2-hil", facility_id="lab", display_name="Plasma Z2 PS")
+    assert "assets" in client.events
+
+
 def test_mutation_requires_approval_before_io(monkeypatch):
     client = Client()
     monkeypatch.setattr(program, "readiness", lambda *a: pytest.fail("No I/O"))
