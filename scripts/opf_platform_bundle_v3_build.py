@@ -88,7 +88,7 @@ def _check_inputs(files: dict[str, bytes], target: dict,
         "schema", "target", "provider_package", "operations",
         "transport", "driver_abi", "fpga_package", "max_image_bytes"},
         "PROVIDER_DESCRIPTOR_INVALID")
-    _need(descriptor["schema"] == "plasma.ppu.provider-capabilities.v1"
+    _need(descriptor["schema"] == "plasma.ppu.provider-capabilities.v2"
           and descriptor["provider_package"] == provider_id
           and type(descriptor["target"]) is str and bool(descriptor["target"])
           and descriptor["transport"] == "fpga"
