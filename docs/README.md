@@ -44,6 +44,8 @@
 - **Plan** · `Host-only` — [ADR-0007: PPU Image/Reload 與每 Site 並行所有權](adr/0007-ppu-reload-fence-per-site-locking.md)：保留 Root Guard，PPU Fence 共享／獨占及每 Site 獨占鎖；不宣稱 Z2 或 8-Site HIL。
 - **Plan** · `Accepted policy 2026-11-09` · `not implemented` — [ADR-0008: PLASMA PPU Local Owner Mode](adr/0008-local-owner-mode.md)：使用者離線自主設定、安裝與燒錄，不需帳號／License／原廠操作授權；須經本機控制權建立且保留完整硬體與交易安全檢查。
 
+- **Plan** · `Accepted policy 2026-11-14` · `implementation pending` — [ADR-0009: PLASMA Open Programming Platform](adr/0009-open-programming-platform.md)：OPP 平台定位、保留 OPF、使用者自備主控、Engine/DIB 模組化；現行執行契約不變。
+
 ## PPU architecture and runtime
 
 - **Current** · `PR #1343/#1348 Merged` · `S0–S5 partial` — [PLASMA Core Convergence and Deletion-First Roadmap](architecture/plasma-core-convergence-and-deletion-first-roadmap.md)：後續 OPF／Bundle／Runtime 收斂及舊程式刪除的共同基準；S0–S5 尚待個別 Gate 1，非 Runtime 或實機驗收。

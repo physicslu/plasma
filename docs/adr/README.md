@@ -25,6 +25,8 @@
 | [ADR-0006](0006-independent-swd-engine-and-future-gpio-bus.md) | **Accepted (Owner decision; PR #1189 Draft)** | 雙獨立 SWD NORMAL Engine，移除 SWD Debug Bitbang／0x3C／0x40；只保留 OFF/NORMAL，未來 GPIO Bus 與 JTAG/SPI/UART/I²C 為獨立周邊，尚未實作。 |
 | [ADR-0008](0008-local-owner-mode.md) | **Accepted policy / implementation pending (Owner decision 2026-11-09)** | PLASMA PPU 預設 Local Owner Mode：無帳號／雲端／License／人工 Token／原廠授權依賴；本機設備控制權與交易安全憑證分離，保留硬體安全／UNKNOWN 復原；P2/P1/P3 實作尚未完成。 |
 
+| [ADR-0009](0009-open-programming-platform.md) | **Accepted policy / implementation pending (Owner decision 2026-11-14)** | PLASMA OPP 為開放式燒錄平台；保留 OPF 軟體框架，主控開放、Engine/DIB 模組化與介面標準化。現行執行契約不變。 |
+
 ## Maintenance rule
 
 新增或取代架構決策時：

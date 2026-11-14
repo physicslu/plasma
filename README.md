@@ -1,6 +1,8 @@
 # Plasma
 
-Plasma 是以 PYNQ-Z2（Z2）為目前硬體開發平台的多 Site IC programming system prototype。
+Plasma 的長期定位為 **Open Programming Platform (OPP，開放式燒錄平台)**，保留 **Open Programming Framework (OPF)** 為軟體框架。使用者自備主控、可程式化 Engine 與模組化 DIB 是核准的發展方向，詳見 [ADR-0009](docs/adr/0009-open-programming-platform.md)。
+
+目前實作仍是以 PYNQ-Z2（Z2）為硬體開發平台的多 Site IC programming system prototype；Raspberry Pi 與外接 FPGA 尚未取得資格。
 一台實體燒錄設備建模為 **Plasma Programming Unit (PPU)**；每個 PPU 內含 1～8 個可獨立排程與執行工作的 **Programming Sites**。
 
 Canonical domain hierarchy：
