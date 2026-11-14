@@ -549,7 +549,6 @@ class SiteManager:
             "resource_set_sha256": identity["resource_set_sha256"],
             "provider": kinds["platform-provider"], "profile": kinds["programming-profile"],
             "icpn": resource["constraints"]["icpn"],
-            "sites": list(resource["constraints"]["sites"]),
             "operations": list(resource["constraints"]["operations"]),
         }
 
