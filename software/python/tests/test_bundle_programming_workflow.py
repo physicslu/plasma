@@ -404,7 +404,7 @@ def test_binding_echo_with_a_different_range_is_not_confirmed(tmp_path):
 
 @pytest.mark.parametrize("body, code", [
     (plan_body(icpn="STM32F407VGT6"), "programming_route_not_found"),
-    (plan_body(site=1), "programming_route_not_found"),
+    (plan_body(site=3), "programming_route_not_found"),
     (plan_body(raw=b"\x00" * (65536 + 1)), "bundle_incompatible"),
 ])
 def test_incompatible_selection_never_touches_ppu(tmp_path, body, code):
@@ -1127,7 +1127,7 @@ def test_bundle_for_another_ic_or_site_is_refused(tmp_path):
     archive = user_bundle().archive
     for body, code in (
             (bundle_body(archive, icpn="STM32F407VGT6"), "programming_route_not_found"),
-            (bundle_body(archive, site=1), "programming_route_not_found")):
+            (bundle_body(archive, site=3), "programming_route_not_found")):
         with pytest.raises(ProgrammingError) as caught:
             workflow.plan(ALIAS, body)
         assert caught.value.code == code
