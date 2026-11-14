@@ -428,8 +428,10 @@ class BundleProgrammingWorkflow:
                  and row.get("queued_jobs") in (0, None))
         if not ready:
             raise _StepFailure("SITE_NOT_READY_OR_BUSY")
-        if target is not None and (row.get("interface") != "openocd" or row.get("target") != target):
-            raise _StepFailure("SITE_TARGET_NOT_FROM_ACTIVE_SET")
+        # Hardware/interface readiness belongs to the PPU.  The selected IC
+        # is pinned by the Job Binding, not by a persistent Site target.
+        if target is not None and row.get("interface") != "openocd":
+            raise _StepFailure("SITE_INTERFACE_NOT_READY")
         return {"ppu_id": ppu.get("ppu_id"), "site_id": site, "state": "idle",
                 "target": row.get("target"),
                 "active_resources": ppu.get("active_resources")}
@@ -655,17 +657,17 @@ class BundleProgrammingWorkflow:
         self._require_commissioned(alias)
         routes = self.routes()
         required = operations or [operation]
-        if not bundle_v3.resolve_routes(routes, icpn=icpn.strip(), site=site):
+        if not bundle_v3.resolve_routes(routes, icpn=icpn.strip()):
             raise ProgrammingError(422, "programming_route_not_found",
-                                   "no Programming Route declares this IC on this Site")
+                                   "no Programming Route declares this IC")
         # The Route is the one whose Profile declares every basic operation of
         # this Job (the legacy flash_cycle Route stays its own Resource Set).
-        matches = bundle_v3.resolve_routes(routes, icpn=icpn.strip(), site=site,
+        matches = bundle_v3.resolve_routes(routes, icpn=icpn.strip(),
                                            operations=required)
         if not matches:
             raise ProgrammingError(
                 422, "operation_not_in_profile",
-                "no Programming Profile for this IC and Site declares " + ", ".join(required))
+                "no Programming Profile for this IC declares " + ", ".join(required))
         if len(matches) > 1:
             raise ProgrammingError(409, "programming_route_ambiguous",
                                    "more than one Programming Route matches; refusing to guess")
