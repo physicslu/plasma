@@ -344,7 +344,7 @@ test("removing the duplicated UI keeps the Manager evidence and the safety gates
   assert.match(factory, /Manager Start \$\{managedStartHold\} is unresolved/);
   assert.match(factory, /runOfUnit\(batch, unit\)/);
   assert.match(factoryBackend, /unit\.outcome === "OUTCOME_UNKNOWN"/);
-  assert.match(factory, /\[SITE\] \$\{label\} · \$\{unit\.outcome/);
+  assert.match(factory, /\[SITE\] \$\{label\} · \$\{verdict\.verdict\}/);
 });
 
 // --------------------------------------------------------------------- PR-C
