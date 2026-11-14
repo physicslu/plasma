@@ -273,12 +273,12 @@ test("non-durable: a reload during the batch stops queuing; nothing is resumed o
   await expect(page.getByRole("status", { name: "BATCH STATUS" })).not.toHaveText(/RUNNING|SUCCESS/);
 });
 
-test("a Mock PPU result and a hardware-path result are labelled differently in the same batch", async ({ page }) => {
-  await mockManager(page, { ppus: [Z2, { ...LINE2, siteInterface: "mock" }] });
+test("mixed Mock and OpenOCD Sites cannot bypass one Profile interface qualification", async ({ page }) => {
+  const counters = await mockManager(page, { ppus: [Z2, { ...LINE2, siteInterface: "mock" }] });
   const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  await start.click();
-  await finished(page);
-  await expect(factoryLog(page)).toContainText("[EVIDENCE] Site interface: openocd · PPU z2 · PPU ID z2-hil · SITE-02");
-  await expect(factoryLog(page)).toContainText("[EVIDENCE] MOCK RESULT · Site interface mock");
-  await expect(factoryLog(page)).toContainText("never a hardware qualification");
+  await expect(page.getByTestId("managed-readiness")).toContainText("PROGRAMMING UNAVAILABLE");
+  await expect(start).toBeDisabled();
+  expect(counters.plans).toHaveLength(0);
+  expect(counters.starts).toHaveLength(0);
+  expect(counters.jobs).toHaveLength(0);
 });

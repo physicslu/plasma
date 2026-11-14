@@ -118,7 +118,9 @@ test("EMode has the four chapters, 2-1 … 2-4, and no duplicated result UI", as
     await expect(job.getByLabel(`Engineering operation ${name}`)).toBeChecked();
   }
   const live = workspace.getByRole("region", { name: "Engineering Site selection" });
-  await expect(live.getByRole("button", { name: /^Read SITE \d+ Flash$/ })).toHaveCount(1);
+  await expect(live.getByRole("button", { name: /^Read SITE \d+ Flash$/ })).toHaveCount(8);
+  await expect(live.getByRole("button", { name: "Read SITE 1 Flash" })).toBeDisabled();
+  await expect(live.getByRole("button", { name: "Read SITE 2 Flash" })).toBeEnabled();
   await expect(job.getByRole("radio", { name: "Bundle", exact: true })).toBeVisible();
   await expect(job.getByLabel("Site Retry Limit")).toBeEnabled();
   await expect(job.getByLabel("Engineering Stop Policy")).toBeEnabled();

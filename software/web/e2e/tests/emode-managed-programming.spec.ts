@@ -297,7 +297,10 @@ test("READ sits on the qualified Site row, reads the whole Flash and writes the 
   await expect(workspace.locator('[data-programming-job-operation="read"]')).toHaveCount(0);
   // One button per Site whose Programming Route declares Read; it lives in LIVE SITE STATUS.
   const live = workspace.getByRole("region", { name: "Engineering Site selection" });
-  await expect(live.getByRole("button", { name: /^Read SITE \d+ Flash$/ })).toHaveCount(1);
+  // All discovered Sites stay visible; only a compatible, enabled Site can READ.
+  await expect(live.getByRole("button", { name: /^Read SITE \d+ Flash$/ })).toHaveCount(8);
+  await expect(live.getByRole("button", { name: "Read SITE 1 Flash" })).toBeDisabled();
+  await expect(live.getByRole("button", { name: "Read SITE 2 Flash" })).toBeEnabled();
   // READ needs neither a Programming Image nor the Batch Site checkbox.
   await expect(workspace.getByLabel("Select SITE 2 for programming")).not.toBeChecked();
   await expect(button).toBeEnabled();
@@ -1151,7 +1154,10 @@ test("the Mock-only Engineering provider answering 503 (real PPU Runtime) no lon
 });
 
 test("a run on a Mock Site is labelled a Mock result; a hardware-path Site is not", async ({ page }) => {
-  await mockManager(page, { ppus: [{ ...Z2, siteInterface: "mock" }] });
+  // A Mock Site is only admissible under a matching Mock Profile, never by
+  // silently using an OpenOCD hardware Profile on the wrong interface.
+  await mockManager(page, { ppus: [{ ...Z2, siteInterface: "mock" }],
+    routes: [{ ...operationsRoute(), site_interface: "mock" }] });
   const mock = await configure(page);
   await mock.start.click();
   await expect(jobLog(mock.workspace)).toContainText("[RUN] PASS ·");
