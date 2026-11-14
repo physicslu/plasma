@@ -538,7 +538,10 @@ class Stack:
         return await asyncio.wait_for(asyncio.to_thread(request), timeout=10)
 
     async def flash(self, image: bytes, **extra):
-        body = {"site_id": 2, "operation": "flash_cycle", "asset_name": "fw.bin",
+        # Simulate the Console's explicit per-Job IC selection.  SiteConfig's
+        # legacy target is only test input and is not a Runtime fallback.
+        body = {"site_id": 2, "operation": "flash_cycle", "target": self.site_target,
+                "asset_name": "fw.bin",
                 "asset_type": "image", "asset_format": "binary", "asset_size": len(image),
                 "asset_sha256": hashlib.sha256(image).hexdigest(),
                 "asset_base64": base64.b64encode(image).decode(), **extra}
