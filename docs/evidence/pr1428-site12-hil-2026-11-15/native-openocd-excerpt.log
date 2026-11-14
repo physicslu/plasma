@@ -1,0 +1,47 @@
+Open On-Chip Debugger 0.12.0+dev-g5088db4-dirty (2026-11-03-16:34)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+adapter speed: 500 kHz
+adapter speed: 2000 kHz
+Info : plasma_swd: PS_OWNER_ATTACHED site 1
+Info : clock speed 2000 kHz
+Info : SWD DPIDR 0x1ba01477
+Info : [stm32f1x.cpu] Cortex-M3 r1p1 processor detected
+Info : [stm32f1x.cpu] target has 6 breakpoints, 4 watchpoints
+Info : [stm32f1x.cpu] Examination succeed
+Info : [stm32f1x.cpu] gdb port disabled
+[stm32f1x.cpu] halted due to debug-request, current mode: Thread
+xPSR: 0x01000000 pc: 0x08000ad8 msp: 0x20005000
+Info : device id = 0x20036410
+Info : flash size = 64 KiB
+flash 'stm32f1x' found at 0x08000000
+erased address 0x08000000 (length 19456) in 0.443000s (42.889 KiB/s)
+wrote 18768 bytes from file /tmp/plasma-c3-op-9qj5v_dn/normalized-image.bin in 0.618000s (29.657 KiB/s)
+dumped 18768 bytes in 0.261000s (70.223 KiB/s)
+shutdown command invoked
+Info : plasma_swd: SAFE_OFF_MODE_OFF_VERIFIED
+
+Open On-Chip Debugger 0.12.0+dev-g5088db4-dirty (2026-11-03-16:34)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+adapter speed: 500 kHz
+adapter speed: 2000 kHz
+Info : plasma_swd: PS_OWNER_ATTACHED site 2
+Info : clock speed 2000 kHz
+Info : SWD DPIDR 0x1ba01477
+Info : [stm32f1x.cpu] Cortex-M3 r1p1 processor detected
+Info : [stm32f1x.cpu] target has 6 breakpoints, 4 watchpoints
+Info : [stm32f1x.cpu] Examination succeed
+Info : [stm32f1x.cpu] gdb port disabled
+[stm32f1x.cpu] halted due to debug-request, current mode: Thread
+xPSR: 0x01000000 pc: 0x08000ad8 msp: 0x20005000
+Info : device id = 0x20036410
+Info : flash size = 64 KiB
+flash 'stm32f1x' found at 0x08000000
+erased address 0x08000000 (length 19456) in 0.443000s (42.889 KiB/s)
+wrote 18768 bytes from file /tmp/plasma-c3-op-ppnknh3y/normalized-image.bin in 0.617000s (29.705 KiB/s)
+dumped 18768 bytes in 0.261000s (70.223 KiB/s)
+shutdown command invoked
+Info : plasma_swd: SAFE_OFF_MODE_OFF_VERIFIED
