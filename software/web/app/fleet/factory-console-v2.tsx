@@ -1275,6 +1275,53 @@ export default function FactoryConsoleV2() {
     }
   }
 
+  /** Operator-initiated read-only reconciliation of a lost Manager Start. */
+  async function reconcileHeldManagerStart() {
+    const held = managedStartHold ?? readManagedStart();
+    if (!held || !catalog || !managed) return;
+    try {
+      const reconciled = await getStartReconciliation(held);
+      if (reconciled.start_id !== held || reconciled.kind !== "batch") {
+        throw new Error("Manager answered for a different Start or transaction kind");
+      }
+      if (reconciled.state === "NOT_ACCEPTED") {
+        clearManagedStart();
+        setManagedStartHold(null);
+        setOperatorWarning(null);
+        appendLog(`[START] NOT ACCEPTED · ${held}; Manager proves no Job was admitted`);
+        return;
+      }
+      if (!reconciled.batch?.batch_id) {
+        setOperatorWarning(`Start ${held} is ${reconciled.state}. No resubmission; reconcile again or void a proven unadmitted Start.`);
+        return;
+      }
+      const batch = await getProgrammingBatch(reconciled.batch.batch_id);
+      if (batch.start_id !== held) throw new Error("Manager Batch Start identity mismatch");
+      const snapshot = managedProductionSnapshot(batch, managedTopology);
+      applyBatchSnapshot(snapshot, catalog);
+      logManagedBatch(batch);
+      if (batch.outcome == null) {
+        writeManagedBatch(batch.batch_id);
+        clearManagedStart();
+        setManagedStartHold(null);
+        beginActivity();
+        const generation = ++pollGenerationRef.current;
+        const topology = managedTopology ?? await loadManagedTopology();
+        void pollManagedBatch(batch.batch_id, catalog, generation, topology);
+      } else if (batch.outcome === "OUTCOME_UNKNOWN"
+                 || batch.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")) {
+        setOperatorWarning(`Manager confirms Batch ${batch.batch_id} has OUTCOME UNKNOWN. Reconcile and acknowledge its PPU Run before new work; never resubmit.`);
+      } else {
+        clearManagedStart();
+        setManagedStartHold(null);
+        setOperatorWarning(null);
+      }
+      appendLog(`[START] RECONCILED · ${held} · Batch ${batch.batch_id} · ${batch.outcome ?? "RUNNING"}`);
+    } catch (reason) {
+      setOperatorWarning(`Start ${held} still unresolved: ${reason instanceof Error ? reason.message : "unknown"} · no resubmission`);
+    }
+  }
+
   async function executeBatch() {
     if (managed) {
       await executeManagedBatch();
@@ -1577,6 +1624,7 @@ export default function FactoryConsoleV2() {
                 onRepeatChange: setRepeatCount,
                 retryLabel: text.retry,
                 retryValue: siteRetryLimit,
+                retryMax: managed ? 5 : 20,
                 retryDisabled: batchRunning,
                 note: managed
                   ? "Manager-owned Batch · Repeat 1 · Retry 0–5 only for definite eligible FAIL (never OUTCOME UNKNOWN) · ABORT stops pending submissions but never cancels an accepted Job."
@@ -1604,6 +1652,12 @@ export default function FactoryConsoleV2() {
               onAbort={abortBatch}
             />
 
+            {managed && managedStartHold && !batchRunning && (
+              <button className="ppuSiteButton" type="button" data-testid="reconcile-managed-start"
+                onClick={() => void reconcileHeldManagerStart()}>
+                RECONCILE MANAGER START
+              </button>
+            )}
             {managed && !batchReadiness.ready && !batchRunning && managedReadiness.reason && (
               <div className="factoryWarning" role="status" data-testid="managed-readiness">
                 <span><b>{managedReadiness.label}</b> · {managedReadiness.reason}</span>

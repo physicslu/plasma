@@ -105,7 +105,8 @@ export function managedProductionSnapshot(
   const siteState = (unit: ProgrammingBatchUnit): ServerBatchSiteState => {
     if (unit.outcome === "PASS") return "success";
     if (unit.outcome === "FAIL") return "faulted";
-    if (unit.outcome === "STOPPED") return "stopped";
+    if (unit.outcome === "STOPPED"
+        || (unit.outcome === "BLOCKED" && /STOP_|STOP_POLICY|PPU_LATCHED/.test(unit.reason ?? ""))) return "stopped";
     if (unit.outcome != null) return "error";
     if (unit.attempts.some(item => item.outcome == null)) return "running";
     return batch.stop_requested ? "stopped" : "ready";
@@ -144,7 +145,7 @@ export function managedProductionSnapshot(
   const state: ServerBatchState = batch.outcome == null
     ? batch.stop_requested ? "stopping" : "running"
     : batch.outcome === "PASS" ? "success"
-    : batch.outcome === "PARTIAL" ? "partial"
+    : batch.outcome === "PARTIAL" || (batch.outcome === "FAIL" && batch.counts.pass > 0) ? "partial"
     : batch.outcome === "STOPPED" ? "cancelled"
     : "error";
   return {
