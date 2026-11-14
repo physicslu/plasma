@@ -225,14 +225,12 @@ export function routesAvailability(state: RoutesState | null): ManagedAvailabili
   return READY;
 }
 
-/** Sites a committed Programming Route declares for this IC (capability, not liveness). */
-export function routeSites(routes: ProgrammingRoute[] | null, icpn: string | null): number[] {
-  if (!routes || !icpn) return [];
-  return [...new Set(routes.filter(route => route.icpn === icpn).flatMap(route => route.sites))]
-    .sort((left, right) => left - right);
+/** ICPN capability is profile-owned; physical Site inventory is PPU-owned. */
+export function routeSupportsIc(routes: ProgrammingRoute[] | null, icpn: string | null): boolean {
+  return Boolean(routes && icpn && routes.some(route => route.icpn === icpn));
 }
 
-/** Operations the Route Profile really declares for this IC on this Site, in contract order. */
+/** Operations are declared by the IC Profile, never by a physical Site number. */
 export function routeOperations(
   routes: ProgrammingRoute[] | null,
   icpn: string | null,
@@ -240,7 +238,7 @@ export function routeOperations(
 ): SingleOperation[] {
   if (!routes || !icpn || siteId == null) return [];
   const declared = new Set(routes
-    .filter(route => route.icpn === icpn && route.sites.includes(siteId))
+    .filter(route => route.icpn === icpn)
     .flatMap(route => route.operations));
   return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
 }
@@ -263,7 +261,7 @@ export const PROGRAMMING_OPERATION_LABELS: Record<
   read: { code: "R", label: "Read" },
 };
 
-/** E / P / V steps a committed Route declares for this IC on this Site (fixed order). */
+/** E / P / V steps declared by the IC Profile, independent of Site (fixed order). */
 export function routeSequenceOperations(
   routes: ProgrammingRoute[] | null,
   icpn: string | null,
@@ -271,12 +269,12 @@ export function routeSequenceOperations(
 ): SequenceOperation[] {
   if (!routes || !icpn || siteId == null) return [];
   const declared = new Set(routes
-    .filter(route => route.icpn === icpn && route.sites.includes(siteId))
+    .filter(route => route.icpn === icpn)
     .flatMap(route => route.operations));
   return SEQUENCE_OPERATIONS.filter(operation => declared.has(operation));
 }
 
-/** The Route whose Profile declares every one of these basic operations (the Manager picks the same one). */
+/** The IC/operation Profile chosen by Manager; Site readiness is a separate PPU check. */
 export function routeDeclaring(
   routes: ProgrammingRoute[] | null,
   icpn: string | null,
@@ -284,7 +282,7 @@ export function routeDeclaring(
   operations: readonly string[],
 ): ProgrammingRoute | null {
   if (!routes || !icpn || siteId == null || !operations.length) return null;
-  const matches = routes.filter(route => route.icpn === icpn && route.sites.includes(siteId)
+  const matches = routes.filter(route => route.icpn === icpn
     && operations.every(operation => route.operations.includes(operation)));
   return matches.length === 1 ? matches[0] : null;
 }
@@ -295,7 +293,7 @@ export function isImageOperation(operation: string | null): operation is ImageOp
 
 export type SiteCapability = { programmable: boolean; label: string; reason: string };
 
-/** Site capability = Route declares (IC, Site) AND the PPU reports the Site enabled and idle. */
+/** Capability = an IC Profile exists AND the PPU reports a real, idle Site. */
 export function siteCapability(
   site: FleetSiteView,
   routes: ProgrammingRoute[] | null,
@@ -303,12 +301,16 @@ export function siteCapability(
 ): SiteCapability {
   if (!site.enabled) return { programmable: false, label: "DISABLED", reason: "The Site is disabled on the PPU." };
   if (!icpn) return { programmable: false, label: "NO TARGET IC", reason: "Select a Target IC first." };
-  if (!routeSites(routes, icpn).includes(site.site_id)) {
+  if (!routeSupportsIc(routes, icpn)) {
     return {
       programmable: false,
-      label: "NO ROUTE",
-      reason: `No Programming Route declares ${icpn} on Site ${site.site_id}; the Site is not qualified for it.`,
+      label: "NO PROFILE",
+      reason: `No Programming Profile declares ${icpn}.`,
     };
+  }
+  if (site.interface !== "openocd" && site.interface !== "fpga") {
+    return { programmable: false, label: "INTERFACE UNAVAILABLE",
+      reason: "The PPU has not activated a compatible real programming interface on this Site." };
   }
   if (site.current_job_id || site.state !== "idle") {
     return { programmable: false, label: site.state.toUpperCase(), reason: "The Site is busy or not idle." };
