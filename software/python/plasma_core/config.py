@@ -34,8 +34,8 @@ class SiteConfig:
     id: int
     enabled: bool = False
     interface: str = "mock"
-    # The operator-selected exact ICPN for this Site; no product default.
-    # A Job without its own target uses this explicit Site selection only.
+    # Legacy Mock simulation fixture only; never a real-hardware Job default.
+    # A real Job must declare its exact ICPN independently of Site selection.
     target: str | None = None
     operation_timeout_s: float = 30.0
     max_retries: int = 0
