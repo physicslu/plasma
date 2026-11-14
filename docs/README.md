@@ -25,6 +25,7 @@
 - **Current** — [Web UI domain contract](development/plasma-web.md)
 - **Current** — [Former monolithic contract — entry stub linking the contracts above](development/plasma-autonomous-development-contract-full.md)
 - **Current** — [Documentation maintenance rules — statuses, placement, source priority](development/documentation-maintenance.md)
+- **Plan** · `Issue #1424` · `Draft PR #1425` · `Gate 1` — [OPF Site-independent Programming Audit](development/issue-1424-site-independent-programming-audit.md)：逐層稽核並修復 ICPN 與固定 Site 綁定；PPU 回報 Site、Job 指定 ICPN、保留 Job Binding，Profile／Resource Set 升級 v2。Host-only 檢查與實機驗收分開，尚未 Gate 2。
 - **Reference** · `OPF Bundle v3` · `Host-only Gate 1` — [User Bundle v3 Source-independent Admission Evidence](development/opf-user-bundle-source-agnostic-host-20261106.md)：記錄移除使用者 Bundle Git Source/Publisher 資格限制的 Host-only 實作與測試；新 Z2 B3 仍未實測。
 - **Plan** · `Owner approved 2026-11-09` · `Gate 1` — [OPF Local Owner Mode 授權呼叫鏈稽核與分階段遷移](development/opf-local-owner-mode-gate1-20261109.md)：以最新 main 確認現有 Registry、Bootstrap Token、BFF Cookie、HMAC、PPU 安全守門，提出本機接管與失憑證恢復設計；只做 Host-only 基準測試，不改執行路徑。
 - **Plan** · `Claude Code handoff` · `no implementation` — [OPF Local Owner Mode Claude 完整工作包](development/opf-local-owner-mode-claude-handoff-20261109.md)：D1–D8 技術決策、P2A/P2B/P1/P3/P4 的 PR 分解、程式修改候選、正負向驗收、網路／硬體停止條件；尚未交由 Claude 執行。
