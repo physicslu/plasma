@@ -5,7 +5,7 @@ import copy
 import hashlib
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -37,6 +37,7 @@ EXPECTED_CATALOG_FIELDS = (
 )
 MANUFACTURER_BASELINE_DIRNAME = "manufacturer-baseline"
 MANUFACTURER_BASELINE_GLOB = "*-manufacturer-only-v1.json"
+SOCKET_DESIGN_DIRNAME = "socket-design"
 
 
 class ICSupportIntegrityError(RuntimeError):
@@ -74,6 +75,107 @@ def _load_object(path: Path) -> dict[str, Any]:
         raise ICSupportIntegrityError(f"cannot read IC Support JSON: {path}") from exc
     _require(isinstance(payload, dict), f"{path}: top-level JSON must be an object")
     return payload
+
+
+def _validate_package_hardware_profile(
+    profile: "ResolvedProfile",
+    *,
+    icpn: str,
+    expected_catalog: dict[str, Any],
+) -> None:
+    data = profile.data
+    expected_package = str(expected_catalog["package"])
+    expected_pin_count = int(expected_catalog["pin_count"])
+
+    if profile.status != "pilot_socket_design_input_ready":
+        _require(
+            data.get("package") == expected_package,
+            f"{icpn}: package hardware profile does not match catalog package",
+        )
+        _require(
+            int(data.get("pin_count", -1)) == expected_pin_count,
+            f"{icpn}: package hardware profile does not match catalog pin count",
+        )
+        return
+
+    scope_icpn = profile.scope.get("exact_icpn")
+    _require(
+        scope_icpn == icpn,
+        f"{icpn}: socket-design-input profile must be scoped to the exact ICPN",
+    )
+    _require(
+        profile.scope.get("package") == expected_package
+        and int(profile.scope.get("pin_count", -1)) == expected_pin_count,
+        f"{icpn}: socket-design-input scope does not match catalog package identity",
+    )
+
+    package = data.get("package")
+    _require(isinstance(package, dict), f"{icpn}: socket package data must be an object")
+    _require(
+        int(package.get("pin_count", -1)) == expected_pin_count,
+        f"{icpn}: socket package pin count mismatch",
+    )
+    for field in ("type", "body_size_mm", "lead_span_mm", "lead_pitch_mm", "pin1_reference"):
+        _require(package.get(field) not in (None, ""), f"{icpn}: socket package {field} is required")
+
+    minimum = data.get("pin_level_minimum_programming_hardware")
+    _require(isinstance(minimum, dict), f"{icpn}: minimum programming hardware is required")
+    _require(
+        minimum.get("status") == "socket_design_input_ready",
+        f"{icpn}: minimum programming hardware must be socket_design_input_ready",
+    )
+    contacts = minimum.get("mandatory_contacts")
+    _require(isinstance(contacts, list) and contacts, f"{icpn}: mandatory contacts are required")
+    declared_count = minimum.get("mandatory_contact_count")
+    _require(
+        declared_count == len(contacts),
+        f"{icpn}: mandatory contact count does not match contact list",
+    )
+
+    seen_pins: set[int] = set()
+    seen_roles: set[str] = set()
+    for index, contact in enumerate(contacts):
+        _require(isinstance(contact, dict), f"{icpn}: mandatory contact {index} must be an object")
+        package_pin = contact.get("package_pin")
+        role = contact.get("role")
+        _require(
+            isinstance(package_pin, int) and 1 <= package_pin <= expected_pin_count,
+            f"{icpn}: mandatory contact {index} has invalid package pin",
+        )
+        _require(package_pin not in seen_pins, f"{icpn}: duplicate mandatory package pin {package_pin}")
+        _require(isinstance(role, str) and role, f"{icpn}: mandatory contact {package_pin} role is required")
+        seen_pins.add(package_pin)
+        seen_roles.add(role)
+
+    _require(
+        {"target_power", "target_ground", "analog_power_required", "analog_ground_required",
+         "debug_data_bidirectional", "debug_clock_input", "recovery_reset_active_low"}.issubset(seen_roles),
+        f"{icpn}: socket-design-input profile is missing a required programming contact role",
+    )
+
+    power = data.get("power_and_reset")
+    _require(isinstance(power, dict), f"{icpn}: power/reset design rules are required")
+    _require(
+        power.get("all_main_power_and_ground_contacts_required") is True,
+        f"{icpn}: all main power/ground contacts must be explicitly required",
+    )
+    _require(
+        power.get("target_vdd_v") == {"min": 2.0, "max": 3.6},
+        f"{icpn}: unexpected target VDD range in socket-design input",
+    )
+
+    boundaries = data.get("design_boundaries")
+    _require(isinstance(boundaries, dict), f"{icpn}: design boundaries are required")
+    _require(
+        boundaries.get("socket_design_input_complete") is True
+        and boundaries.get("socket_model_selected") is False
+        and boundaries.get("site_electrical_compatibility") == "not_evaluated"
+        and boundaries.get("socket_compatibility") == "not_evaluated"
+        and boundaries.get("hardware_runtime_ready") is False
+        and boundaries.get("physical_programming_qualified") is False
+        and boundaries.get("hil_required_before_l3") is True,
+        f"{icpn}: socket-design input must not claim physical hardware qualification",
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +357,7 @@ class ResolvedICSupport:
     expected_catalog: dict[str, Any]
     profiles: dict[str, ResolvedProfile]
     revision_overrides: tuple[dict[str, Any], ...]
+    socket_design_input_profile: ResolvedProfile | None = None
     manufacturer_profile: ResolvedManufacturerProfile | None = None
 
     def profile(self, kind: str) -> ResolvedProfile:
@@ -270,6 +373,10 @@ class ResolvedICSupport:
     @property
     def memory_geometry_profile(self) -> ResolvedProfile:
         return self.profile("memory_geometry")
+
+    @property
+    def package_hardware_profile(self) -> ResolvedProfile:
+        return self.profile("package_hardware")
 
     @property
     def openocd_target_config(self) -> str:
@@ -296,6 +403,35 @@ class ResolvedICSupport:
         }
         return payload
 
+    def to_socket_design_input_payload(self) -> dict[str, Any]:
+        """Return evidence-backed design input without claiming a verified Socket."""
+        profile = self.socket_design_input_profile or self.package_hardware_profile
+        data = profile.data
+        if data.get("design_readiness") != "socket_design_input_ready":
+            return {
+                "schema_version": "1.0.0",
+                "icpn": self.icpn,
+                "status": "socket_design_input_not_ready",
+                "package_hardware_profile": profile.to_summary(),
+                "hardware_runtime_ready": False,
+                "physical_programming_qualified": False,
+            }
+
+        return {
+            "schema_version": "1.0.0",
+            "icpn": self.icpn,
+            "status": "socket_design_input_ready",
+            "catalog_identity": {
+                "base_device": self.expected_catalog["base_device"],
+                "package": self.expected_catalog["package"],
+                "pin_count": self.expected_catalog["pin_count"],
+            },
+            "package_hardware_profile": profile.to_summary(),
+            "design_input": copy.deepcopy(data),
+            "hardware_runtime_ready": False,
+            "physical_programming_qualified": False,
+        }
+
     def to_runtime_payload(self) -> dict[str, Any]:
         """Return a browser/log-safe resolution summary, not executable driver state."""
         return {
@@ -309,6 +445,21 @@ class ResolvedICSupport:
             "profiles": {
                 kind: self.profiles[kind].to_summary()
                 for kind in EXPECTED_PROFILE_KINDS
+            },
+            "hardware_design": {
+                "package_hardware_profile_id": self.package_hardware_profile.profile_id,
+                "socket_design_input_profile_id": (
+                    self.socket_design_input_profile.profile_id
+                    if self.socket_design_input_profile is not None
+                    else None
+                ),
+                "socket_design_input_state": (
+                    self.socket_design_input_profile.data.get("design_readiness", "not_ready")
+                    if self.socket_design_input_profile is not None
+                    else "not_ready"
+                ),
+                "hardware_runtime_ready": False,
+                "physical_programming_qualified": False,
             },
             "backends": {
                 "openocd": {
@@ -437,6 +588,12 @@ class ICSupportResolver:
                     )
                     selected[kind] = profile
 
+                _validate_package_hardware_profile(
+                    selected["package_hardware"],
+                    icpn=canonical_icpn,
+                    expected_catalog=expected_catalog,
+                )
+
                 manufacturer_profile = manufacturer_profiles.get(key)
                 if manufacturer_profile is not None:
                     target = manufacturer_profile.target
@@ -471,6 +628,125 @@ class ICSupportResolver:
                 )
 
         _require(records, f"no IC Support exact-ICPN bindings found under {bindings_root}")
+
+        socket_root = resolved_root / SOCKET_DESIGN_DIRNAME
+        if socket_root.exists():
+            legacy_sources_payload = _load_object(resolved_root / "evidence" / "sources.json")
+            legacy_sources = legacy_sources_payload.get("sources")
+            _require(
+                isinstance(legacy_sources, list) and legacy_sources,
+                "IC Support source registry must contain sources",
+            )
+            known_source_ids = {
+                str(item.get("source_id"))
+                for item in legacy_sources
+                if isinstance(item, dict) and isinstance(item.get("source_id"), str)
+            }
+
+            socket_sources_payload = _load_object(socket_root / "evidence" / "sources.json")
+            _require(
+                socket_sources_payload.get("schema_version") == "1.0.0"
+                and socket_sources_payload.get("status") == "engineering_design_input",
+                "Socket design source registry contract drift",
+            )
+            socket_sources = socket_sources_payload.get("sources")
+            _require(
+                isinstance(socket_sources, list) and socket_sources,
+                "Socket design source registry must contain sources",
+            )
+            for index, source in enumerate(socket_sources):
+                _require(
+                    isinstance(source, dict)
+                    and isinstance(source.get("source_id"), str)
+                    and source["source_id"],
+                    f"Socket design source[{index}] requires source_id",
+                )
+                _require(
+                    source.get("authority") == "manufacturer_official",
+                    f"Socket design source {source['source_id']} must be manufacturer-official",
+                )
+                source_id = str(source["source_id"])
+                _require(
+                    source_id not in known_source_ids,
+                    f"duplicate Socket design source_id: {source_id}",
+                )
+                known_source_ids.add(source_id)
+
+            socket_profiles: dict[str, ResolvedProfile] = {}
+            socket_profiles_root = socket_root / "profiles"
+            _require(socket_profiles_root.is_dir(), "Socket design profiles directory is required")
+            for path in sorted(socket_profiles_root.glob("*.json")):
+                profile = ResolvedProfile.from_payload(
+                    _load_object(path),
+                    path=path,
+                    expected_kind="package_hardware",
+                )
+                _require(
+                    profile.status == "pilot_socket_design_input_ready",
+                    f"{profile.profile_id}: unexpected Socket design profile status",
+                )
+                _require(
+                    profile.profile_id not in socket_profiles,
+                    f"duplicate Socket design profile_id: {profile.profile_id}",
+                )
+                for index, evidence in enumerate(profile.evidence):
+                    source_id = evidence.get("source_id")
+                    _require(
+                        source_id in known_source_ids,
+                        f"{profile.profile_id}: evidence[{index}] references unknown source {source_id!r}",
+                    )
+                socket_profiles[profile.profile_id] = profile
+
+            applied_socket_icpns: set[str] = set()
+            socket_bindings_root = socket_root / "bindings"
+            _require(socket_bindings_root.is_dir(), "Socket design bindings directory is required")
+            for path in sorted(socket_bindings_root.glob("*.json")):
+                payload = _load_object(path)
+                _require(
+                    payload.get("schema_version") == "1.0.0"
+                    and payload.get("status") == "design_input_only",
+                    f"{path}: Socket design binding-set contract drift",
+                )
+                bindings = payload.get("bindings")
+                _require(
+                    isinstance(bindings, list) and bindings,
+                    f"{path}: Socket design bindings must be non-empty",
+                )
+                for index, binding in enumerate(bindings):
+                    _require(
+                        isinstance(binding, dict),
+                        f"{path}: Socket design binding[{index}] must be an object",
+                    )
+                    icpn = binding.get("icpn")
+                    profile_id = binding.get("profile_id")
+                    _require(
+                        isinstance(icpn, str) and icpn.strip(),
+                        f"{path}: Socket design binding[{index}] requires exact ICPN",
+                    )
+                    canonical_icpn = icpn.strip()
+                    key = canonical_icpn.casefold()
+                    _require(
+                        key in records,
+                        f"{canonical_icpn}: Socket design overlay requires an existing exact IC Support binding",
+                    )
+                    _require(
+                        canonical_icpn not in applied_socket_icpns,
+                        f"duplicate Socket design overlay for exact ICPN: {canonical_icpn}",
+                    )
+                    _require(
+                        isinstance(profile_id, str) and profile_id in socket_profiles,
+                        f"{canonical_icpn}: dangling Socket design profile {profile_id!r}",
+                    )
+                    profile = socket_profiles[profile_id]
+                    record = records[key]
+                    _validate_package_hardware_profile(
+                        profile,
+                        icpn=canonical_icpn,
+                        expected_catalog=record.expected_catalog,
+                    )
+                    records[key] = replace(record, socket_design_input_profile=profile)
+                    applied_socket_icpns.add(canonical_icpn)
+
         return cls(records, root=resolved_root)
 
     def resolve_exact(self, icpn: str) -> ResolvedICSupport | None:
@@ -496,6 +772,12 @@ class ICSupportResolver:
                 1 for record in self._records.values()
                 if record.manufacturer_profile is not None
             ),
+            "socket_design_input_ready_exact_icpns": sum(
+                1 for record in self._records.values()
+                if record.socket_design_input_profile is not None
+                and record.socket_design_input_profile.data.get("design_readiness")
+                == "socket_design_input_ready"
+            ),
             "native_ppu_runtime_ready_exact_icpns": 0,
             "exact_icpns": list(self.exact_icpns),
         }
@@ -514,16 +796,30 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Resolve evidence-backed Plasma IC Support")
     parser.add_argument("--summary", action="store_true", help="print resolver summary JSON")
     parser.add_argument("--icpn", help="resolve one exact ICPN")
+    parser.add_argument(
+        "--socket-design-input",
+        action="store_true",
+        help="with --icpn, emit evidence-backed Socket design input rather than runtime summary",
+    )
     args = parser.parse_args()
     resolver = get_default_ic_support_resolver()
     if args.icpn:
         resolved = resolver.resolve_exact(args.icpn)
-        payload: dict[str, Any] = (
-            resolved.to_runtime_payload()
-            if resolved is not None
-            else {"icpn": args.icpn, "resolved": False, "runtime_ready": False}
-        )
+        if resolved is None:
+            payload: dict[str, Any] = {
+                "icpn": args.icpn,
+                "resolved": False,
+                "runtime_ready": False,
+            }
+        elif args.socket_design_input:
+            payload = resolved.to_socket_design_input_payload()
+        else:
+            payload = resolved.to_runtime_payload()
     else:
+        _require(
+            not args.socket_design_input,
+            "--socket-design-input requires --icpn",
+        )
         payload = resolver.summary()
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
