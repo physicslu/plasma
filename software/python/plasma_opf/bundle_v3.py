@@ -31,7 +31,7 @@ from typing import Any, Mapping
 
 BUNDLE_SCHEMA = "plasma.ppu.bundle.v3"
 ROUTE_SCHEMA = "plasma.opf.programming-route.v1"
-CAPABILITIES_SCHEMA = "plasma.ppu.provider-capabilities.v1"
+CAPABILITIES_SCHEMA = "plasma.ppu.provider-capabilities.v2"
 OPTIONS_SCHEMA = "plasma.ppu.provider-options.v1"
 FLASH_PROFILE_SCHEMA = "plasma.ppu.openocd-flash-profile.v1"
 # Same identifier/version grammar as the PPU Bundle v3 verifier.
@@ -258,7 +258,7 @@ def safe_image_filename(filename: object) -> str:
 # PPU-side verification, the Bundle archive SHA256 remains the only Active
 # Asset Set, B1/B2/B3 and Job identity, and nothing here may skip B1/B2/B3.
 # --------------------------------------------------------------------------
-RESOURCE_SET_SCHEMA = "plasma.opf.programming-resource-set.v1"
+RESOURCE_SET_SCHEMA = "plasma.opf.programming-resource-set.v2"
 IMAGE_ASSET_SCHEMA = "plasma.opf.job-image-asset.v1"
 JOB_BINDING_SCHEMA = "plasma.opf.job-image-binding.v1"
 # Same vocabulary as plasma_core.assets.ProgrammingAssetFormat; only raw binary
