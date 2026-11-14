@@ -606,6 +606,36 @@ export default function FactoryConsoleV2() {
     appendLog(`[BAT] OBSERVATION TIMEOUT · ${batchId}`, "ERROR");
   }, [apiBase, appendLog, applyBatchSnapshot, endActivity]);
 
+  /** Reload-safe read-only observer of an accepted Manager-owned Batch. */
+  const pollManagedBatch = useCallback(async (
+    batchId: string, sourceCatalog: EngineeringTargetCatalog, generation: number, topology: ManagedTopology,
+  ) => {
+    let failures = 0;
+    for (let attempt = 0; attempt < POLL_LIMIT; attempt += 1) {
+      if (pollGenerationRef.current !== generation) return;
+      try {
+        const current = await getProgrammingBatch(batchId);
+        if (pollGenerationRef.current !== generation) return;
+        failures = 0;
+        setBatchObservationState("connected");
+        setGatewayHealth("online");
+        const snapshot = managedProductionSnapshot(current, topology);
+        applyBatchSnapshot(snapshot, sourceCatalog);
+        logManagedBatch(current);
+        if (current.outcome != null) return;
+      } catch (reason) {
+        failures += 1;
+        if (pollGenerationRef.current !== generation) return;
+        setBatchObservationState("reconnecting");
+        appendLog(`[BAT] MANAGER JOURNAL UNAVAILABLE · ${batchId} · ${reason instanceof Error ? reason.message : "unknown"} · no resubmission`, "WARN");
+        await delay(Math.min(POLL_INTERVAL_MS * 2 ** Math.min(failures, 5), 5000));
+        continue;
+      }
+      await delay(POLL_INTERVAL_MS);
+    }
+    appendLog(`[BAT] MANAGER OBSERVATION EXHAUSTED · ${batchId}; still held for read-only recovery`, "ERROR");
+  }, [appendLog, applyBatchSnapshot, logManagedBatch]);
+
   const loadSelectionRuntimes = useCallback(async (sourceCatalog: EngineeringTargetCatalog, selection: SelectionMap) => {
     const generation = ++runtimeRecoveryGenerationRef.current;
     const targets = sourceCatalog.facilities.flatMap(facility => facility.ppus.flatMap(target => {
@@ -702,8 +732,10 @@ export default function FactoryConsoleV2() {
     void (async () => {
       try {
         let nextCatalog: EngineeringTargetCatalog;
+        let restoredTopology: ManagedTopology | null = null;
         if (managed) {
           const topology = await loadManagedTopology();
+          restoredTopology = topology;
           const routes = topology.ppus[0]
             ? await loadProgrammingRoutes(topology.ppus[0].alias)
             : { routes: [], error: null };
@@ -720,11 +752,40 @@ export default function FactoryConsoleV2() {
         setProviderError(null);
         appendLog(`[PROVIDER] ${nextCatalog.provider.toUpperCase()} · ${nextCatalog.facility_count} Facilities · ${nextCatalog.ppu_count} PPUs · ${nextCatalog.site_count} Sites`);
 
-        // A managed batch lives in the Console session and is not restorable.
-        const stored = managed ? null : readStoredBatch();
+        // Managed mode observes the Manager Journal by immutable Batch ID.
+        // A reload never restarts or resubmits a Batch or any Site Job.
+        let managedId = managed ? readManagedBatch() : null;
+        if (managed) {
+          const pendingStart = readManagedStart();
+          if (pendingStart && !managedId) {
+            setManagedStartHold(pendingStart);
+            try {
+              const result = await getStartReconciliation(pendingStart);
+              if (result.state === "NOT_ACCEPTED") {
+                clearManagedStart();
+                setManagedStartHold(null);
+                appendLog(`[START] NOT ACCEPTED · ${pendingStart} · safe to unlock`);
+              } else if (result.batch?.batch_id) {
+                managedId = result.batch.batch_id;
+                writeManagedBatch(managedId);
+                clearManagedStart();
+                setManagedStartHold(result.state === "OUTCOME_UNKNOWN" ? pendingStart : null);
+              } else {
+                setOperatorWarning(`Manager Start ${pendingStart} remains ${result.state}; no new Job may be submitted until reconciled.`);
+              }
+            } catch (reason) {
+              setOperatorWarning(`Manager Start ${pendingStart} cannot be reconciled: ${reason instanceof Error ? reason.message : "unknown"}. No resubmission.`);
+            }
+          }
+        }
+        const stored = managed
+          ? managedId ? { apiBase, batchId: managedId } : null
+          : readStoredBatch();
         if (stored?.apiBase === apiBase) {
           try {
-            const restored = await getServerBatch(apiBase, stored.batchId);
+            const restored = managed
+              ? managedProductionSnapshot(await getProgrammingBatch(stored.batchId), restoredTopology)
+              : await getServerBatch(apiBase, stored.batchId);
             if (stopped) return;
             setGatewayHealth("online");
             applyBatchSnapshot(restored, nextCatalog);
@@ -732,16 +793,21 @@ export default function FactoryConsoleV2() {
               beginActivity();
               const generation = ++pollGenerationRef.current;
               appendLog(`[BAT] RESTORED · ${restored.batch_id} · ${restored.state.toUpperCase()}`);
-              void pollServerBatch(restored.batch_id, nextCatalog, generation).catch(error => {
+              const observer = managed && restoredTopology
+                ? pollManagedBatch(restored.batch_id, nextCatalog, generation, restoredTopology)
+                : pollServerBatch(restored.batch_id, nextCatalog, generation);
+              void observer.catch(error => {
                 endActivity();
                 appendLog(`[BAT] OBSERVATION ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
               });
               return;
             }
-            clearStoredBatch();
+            if (managed) clearManagedBatch(); else clearStoredBatch();
           } catch (error) {
             setGatewayHealth(gatewayHealthFromError(error));
-            clearStoredBatch();
+            // Unknown Manager state is not grounds to clear a durable Batch ID.
+            if (!managed) clearStoredBatch();
+            else setOperatorWarning(`Manager Batch ${stored.batchId} cannot be read. Retained for read-only reconciliation; no resubmission.`);
           }
         }
 
@@ -767,7 +833,7 @@ export default function FactoryConsoleV2() {
       runtimeRecoveryGenerationRef.current += 1;
       endActivity();
     };
-  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, managed, pollServerBatch, setBatchSelection, workspaceHydrated]);
+  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, managed, pollManagedBatch, pollServerBatch, setBatchSelection, workspaceHydrated]);
 
   // Managed: keep the Fleet observation current so capability is never judged on a stale view.
   useEffect(() => {
