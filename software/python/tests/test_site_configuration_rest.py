@@ -122,7 +122,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
         self.assertEqual(configuration["source"], "canonical_ppu_config")
         self.assertEqual(configuration["reconciliation"], "partially_observable")
         self.assertEqual(configuration["sites"][0]["reconciliation"], "in_sync")
-        self.assertEqual(configuration["sites"][0]["desired"]["target"], "TARGET-A")
+        self.assertNotIn("target", configuration["sites"][0]["desired"])
         self.assertEqual(configuration["sites"][0]["actual"]["target"], "TARGET-A")
         self.assertRegex(configuration["sites"][0]["desired_revision"], r"^sha256:[0-9a-f]{64}$")
         self.assertEqual(
@@ -158,7 +158,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
 
     def test_post_requires_strong_if_match_precondition(self) -> None:
         before = self.path.read_text(encoding="utf-8")
-        body = {"enabled": True, "interface": "mock", "target": "TARGET-NEW"}
+        body = {"enabled": True, "interface": "openocd"}
 
         status, payload = self.request("POST", "/api/settings/sites/1", body)
         self.assertEqual(status, 428)
@@ -175,19 +175,19 @@ class SiteConfigurationRestTests(unittest.TestCase):
         status, payload = self.request(
             "POST",
             "/api/settings/sites/1",
-            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            {"enabled": True, "interface": "openocd"},
             if_match=self.etag(previous_revision),
         )
         self.assertEqual(status, 200)
         site = payload["site_configuration"]["sites"][0]
-        self.assertEqual(site["desired"]["target"], "TARGET-NEW")
-        self.assertEqual(site["actual"]["target"], "TARGET-A")
+        self.assertEqual(site["desired"]["interface"], "openocd")
+        self.assertEqual(site["actual"]["interface"], "mock")
         self.assertEqual(site["reconciliation"], "restart_required")
         self.assertNotEqual(site["desired_revision"], previous_revision)
         self.assertEqual(payload["site_configuration"]["reconciliation"], "restart_required")
         self.assertEqual(
-            SiteConfigurationController(self.path).current()["sites"][0]["target"],
-            "TARGET-NEW",
+            SiteConfigurationController(self.path).current()["sites"][0]["interface"],
+            "openocd",
         )
 
     def test_stale_if_match_returns_412_and_preserves_newer_desired_state(self) -> None:
@@ -195,7 +195,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
         status, first = self.request(
             "POST",
             "/api/settings/sites/1",
-            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            {"enabled": True, "interface": "openocd"},
             if_match=self.etag(stale_revision),
         )
         self.assertEqual(status, 200)
@@ -205,7 +205,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
         status, conflict = self.request(
             "POST",
             "/api/settings/sites/1",
-            {"enabled": True, "interface": "mock", "target": "TARGET-STALE"},
+            {"enabled": True, "interface": "fpga"},
             if_match=self.etag(stale_revision),
         )
         self.assertEqual(status, 412)
@@ -225,7 +225,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
         status, payload = self.request(
             "POST",
             "/api/settings/sites/1",
-            {"enabled": False, "interface": "mock", "target": "TARGET-A"},
+            {"enabled": False, "interface": "mock"},
             if_match=self.etag(revision),
         )
         self.assertEqual(status, 409)
@@ -238,7 +238,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
         status, _ = self.request(
             "POST",
             "/api/settings/sites/9",
-            {"enabled": True, "interface": "mock", "target": "TARGET-X"},
+            {"enabled": True, "interface": "mock"},
             if_match=self.etag(revision),
         )
         self.assertEqual(status, 400)
@@ -247,7 +247,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
         status, _ = self.request(
             "POST",
             "/api/settings/sites/1",
-            {"enabled": True, "interface": "uart", "target": "TARGET-X"},
+            {"enabled": True, "interface": "uart"},
             if_match=self.etag(revision),
         )
         self.assertEqual(status, 400)
