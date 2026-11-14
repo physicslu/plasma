@@ -383,7 +383,8 @@ test("PR-C: the Console reaches the canonical Batch resource, never an alias-sco
 test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () => {
   assert.match(emode, /const \[chosenSiteIds, setChosenSiteIds\] = useState<number\[\]>\(\[\]\);/);
   assert.match(emode, /const next = chosenSiteIds\.includes\(id\)/);
-  assert.match(api, /targets: \[\{ ppu_alias: input\.alias, site_ids: \[\.\.\.input\.siteIds\] \}\]/);
+  assert.match(api, /targets: input\.targets[\s\S]*\? input\.targets\.map\(/);
+  assert.match(api, /: \[\{ ppu_alias: input\.alias, site_ids: \[\.\.\.input\.siteIds\] \}\]/);
   // One PPU per Batch in EMode: the Target Set is built from one alias.
   assert.doesNotMatch(emode, /ppu_alias:|targets:/);
   // The Operations offered are the ones EVERY selected Site declares.
