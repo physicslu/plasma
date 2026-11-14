@@ -225,7 +225,7 @@ test("definite 4xx refusal does not start a Site and does not pretend success", 
   });
   const { start } = await prepare(page, [["z2", [2]]]);
   await start.click();
-  await expect(page.getByText("Resource Set mismatch")).toBeVisible();
+  await expect(factoryLog(page)).toContainText("Resource Set mismatch");
   expect(counters.batches).toHaveLength(1);
   expect(counters.jobs).toHaveLength(0);
 });
@@ -241,7 +241,10 @@ test("browser reload observes the SAME durable Manager Batch, never queues new J
   await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/RUNNING|SUCCESS/, { timeout: 20_000 });
   expect(counters.batches).toHaveLength(1);
   expect(counters.issued).toHaveLength(1);
-  expect(counters.starts.length).toBeGreaterThanOrEqual(1);
+  await finished(page);
+  const reads = counters.requests.filter(item => item.startsWith("GET /api/manager/programming/batches/"));
+  expect(reads.length).toBeLessThan(25); // One bounded observer, no topology/effect feedback loop.
+  expect(counters.starts).toHaveLength(2);
 });
 
 test("UNKNOWN appearing after reload retains a Start hold after terminal Batch cleanup", async ({ page }) => {
@@ -289,4 +292,58 @@ test("Erase-only is one Manager programming Job with an explicit Route flash ran
   expect(counters.batches[0].body).not.toHaveProperty("image_base64");
   expect(counters.batches[0].body.address).toBe(0x08000000);
   expect(counters.batches[0].body.length).toBe(65536);
+});
+
+// A journal outage must not hide or release an already admitted write, even
+// though reload clears the IC/source controls. Reconciliation is GET-only.
+for (const retainStart of [true, false]) {
+ test(`unreadable persisted Batch with ${retainStart ? "immutable Start" : "only the older Batch ID"} stays held before IC selection and submits nothing`, async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ runningPolls: 6 }) });
+  const { start } = await prepare(page, [["z2", [2]]]);
+  await start.click();
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
+  const held = await page.evaluate(() => sessionStorage.getItem("plasma-managed-production-start-v1"));
+  expect(held).toMatch(/^[0-9a-f]{32}$/);
+  if (!retainStart) await page.evaluate(() => sessionStorage.removeItem("plasma-managed-production-start-v1"));
+  await page.route("**/api/manager/programming/batches/*", route => route.fulfill({
+    status: 503, contentType: "application/json", body: JSON.stringify({ error: { message: "Journal unavailable" } }),
+  }));
+  await page.reload();
+  await expect(page.getByTestId("managed-readiness")).toContainText(retainStart ? "START RECONCILIATION REQUIRED" : "BATCH OBSERVATION REQUIRED");
+  await expect(page.getByRole("region", { name: "Production Programming Job" }).getByLabel("Target IC")).toHaveValue("");
+  await expect(page.getByRole("button", { name: /START PROGRAMMING/ })).toBeDisabled();
+  expect(await page.evaluate(() => sessionStorage.getItem("plasma-managed-production-start-v1"))).toBe(retainStart ? held : null);
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
+  await page.unroute("**/api/manager/programming/batches/*");
+  if (retainStart) await page.getByRole("button", { name: "RECONCILE MANAGER START" }).click();
+  else await page.reload();
+  await finished(page);
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
+});
+}
+
+test("a journal response for a different Start cannot replace the immutable reload hold", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ runningPolls: 6 }) });
+  const { start } = await prepare(page, [["z2", [2]]]);
+  const accepted = page.waitForResponse(response => response.request().method() === "POST"
+    && response.url().endsWith("/api/manager/programming/batches"));
+  await start.click();
+  const { batch } = await (await accepted).json();
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
+  await page.route("**/api/manager/programming/batches/*", route => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ ok: true, batch: { ...batch, start_id: "f".repeat(32) } }),
+  }));
+  await page.reload();
+  await expect(page.getByRole("alert")).toContainText("Retained for read-only reconciliation; no resubmission");
+  await expect(page.getByTestId("managed-readiness")).toContainText("START RECONCILIATION REQUIRED");
+  expect(await page.evaluate(() => sessionStorage.getItem("plasma-managed-production-start-v1"))).toBe(batch.start_id);
+  await expect(page.getByRole("button", { name: /START PROGRAMMING/ })).toBeDisabled();
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
 });

@@ -460,6 +460,7 @@ export default function FactoryConsoleV2() {
   const [managedFile, setManagedFile] = useState<File | null>(null);
   const [managedOperations, setManagedOperations] = useState<SequenceOperation[]>(["erase", "program", "verify"]);
   const [managedStartHold, setManagedStartHold] = useState<string | null>(null);
+  const [managedBatchRecoveryId, setManagedBatchRecoveryId] = useState<string | null>(null);
   // Factory Log is a read-only view of the Manager's per-Site Job/Receipt truth.
   const loggedRecords = useRef(new Map<string, string>());
   const managedStartLock = useRef(false);
@@ -482,7 +483,7 @@ export default function FactoryConsoleV2() {
   }, []);
 
   /** Never treat a Batch-level HTTP result as a Site PASS. */
-  const logManagedBatch = useCallback((batch: ProgrammingBatch) => {
+  const logManagedBatch = useCallback((batch: ProgrammingBatch, topology: ManagedTopology | null) => {
     for (const unit of batch.units) {
       const last = unit.attempts[unit.attempts.length - 1] ?? null;
       if (unit.outcome == null && last?.outcome == null) continue;
@@ -491,7 +492,7 @@ export default function FactoryConsoleV2() {
       const signature = `${verdict.verdict}:${last?.attempt ?? 0}:${last?.outcome ?? "—"}`;
       if (loggedRecords.current.get(key) === signature) continue;
       loggedRecords.current.set(key, signature);
-      const ppu = managedTopology?.ppus.find(item => item.alias === unit.ppu_alias);
+      const ppu = topology?.ppus.find(item => item.alias === unit.ppu_alias);
       const interfaceName = ppu?.sites.find(site => site.site_id === unit.site_id)?.interface ?? "unknown";
       const label = `PPU ${unit.ppu_alias} · PPU ID ${ppu?.ppuId ?? "unknown"} · ${siteLabel(unit.site_id)}`;
       const latestRun = runOfUnit(batch, unit);
@@ -512,7 +513,7 @@ export default function FactoryConsoleV2() {
           : `[EVIDENCE] Site interface: ${interfaceName} · ${label}`);
       }
     }
-  }, [appendLog, managedTopology]);
+  }, [appendLog]);
 
   const beginActivity = useCallback(() => {
     if (activityReleaseRef.current) return;
@@ -621,21 +622,31 @@ export default function FactoryConsoleV2() {
       try {
         const current = await getProgrammingBatch(batchId);
         if (pollGenerationRef.current !== generation) return;
+        const heldStart = readManagedStart();
+        if (current.batch_id !== batchId || (heldStart && current.start_id !== heldStart)) {
+          throw new Error("Manager Batch/Start identity mismatch");
+        }
         failures = 0;
         setBatchObservationState("connected");
         setGatewayHealth("online");
         const snapshot = managedProductionSnapshot(current, topology);
         // Persist UNKNOWN/falsely reported PASS *before* a terminal snapshot
         // clears the ordinary active Batch ID. Reload must never unlock it.
-        if (current.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+        if (current.outcome == null || current.outcome === "OUTCOME_UNKNOWN"
+            || current.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
             || (current.outcome === "PASS" && snapshot.state !== "success")) {
           if (/^[0-9a-f]{32}$/.test(current.start_id)) {
             writeManagedStart(current.start_id);
             setManagedStartHold(current.start_id);
           }
         }
+        if (current.outcome != null && current.outcome !== "OUTCOME_UNKNOWN" && !current.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+            && !(current.outcome === "PASS" && snapshot.state !== "success")) {
+          clearManagedStart();
+          setManagedStartHold(null);
+        }
         applyBatchSnapshot(snapshot, sourceCatalog);
-        logManagedBatch(current);
+        logManagedBatch(current, topology);
         if (current.outcome != null) return;
       } catch (reason) {
         failures += 1;
@@ -744,6 +755,13 @@ export default function FactoryConsoleV2() {
     if (!workspaceHydrated) return;
     let stopped = false;
     void (async () => {
+      await Promise.resolve();
+      if (stopped) return;
+      // Durable transaction safety does not depend on Fleet/Route availability.
+      if (managed) {
+        setManagedStartHold(readManagedStart());
+        setManagedBatchRecoveryId(readManagedBatch());
+      }
       try {
         let nextCatalog: EngineeringTargetCatalog;
         let restoredTopology: ManagedTopology | null = null;
@@ -771,10 +789,14 @@ export default function FactoryConsoleV2() {
         let managedId = managed ? readManagedBatch() : null;
         if (managed) {
           const pendingStart = readManagedStart();
+          if (pendingStart) setManagedStartHold(pendingStart);
           if (pendingStart && !managedId) {
             setManagedStartHold(pendingStart);
             try {
               const result = await getStartReconciliation(pendingStart);
+              if (result.start_id !== pendingStart || result.kind !== "batch") {
+                throw new Error("Manager answered for a different Start or transaction kind");
+              }
               if (result.state === "NOT_ACCEPTED") {
                 clearManagedStart();
                 setManagedStartHold(null);
@@ -782,15 +804,10 @@ export default function FactoryConsoleV2() {
               } else if (result.batch?.batch_id) {
                 managedId = result.batch.batch_id;
                 writeManagedBatch(managedId);
-                // An UNKNOWN result may have written to hardware. The durable
-                // Start hold must outlive this tab/reload and the terminal Batch.
-                if (result.state !== "OUTCOME_UNKNOWN") {
-                  clearManagedStart();
-                  setManagedStartHold(null);
-                } else {
-                  writeManagedStart(pendingStart);
-                  setManagedStartHold(pendingStart);
-                }
+                // A Batch ID is an observation key, not proof of safe completion.
+                // Keep the immutable Start until its journal is read successfully.
+                writeManagedStart(pendingStart);
+                setManagedStartHold(pendingStart);
               } else {
                 setOperatorWarning(`Manager Start ${pendingStart} remains ${result.state}; no new Job may be submitted until reconciled.`);
               }
@@ -805,6 +822,11 @@ export default function FactoryConsoleV2() {
         if (stored?.apiBase === apiBase) {
           try {
             const managerTruth = managed ? await getProgrammingBatch(stored.batchId) : null;
+            const heldStart = managed ? readManagedStart() : null;
+            if (managerTruth && (managerTruth.batch_id !== stored.batchId
+                || (heldStart && managerTruth.start_id !== heldStart))) {
+              throw new Error("Manager Batch/Start identity mismatch");
+            }
             const restored = managerTruth
               ? managedProductionSnapshot(managerTruth, restoredTopology)
               : await getServerBatch(apiBase, stored.batchId);
@@ -812,14 +834,22 @@ export default function FactoryConsoleV2() {
             setGatewayHealth("online");
             // The stored Batch can become UNKNOWN while the Browser was gone.
             // Recreate its immutable Start hold before terminal cleanup.
-            if (managerTruth?.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
-                || (managerTruth?.outcome === "PASS" && restored.state !== "success")) {
+            if (managerTruth && (managerTruth.outcome == null || managerTruth.outcome === "OUTCOME_UNKNOWN"
+                || managerTruth.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+                || (managerTruth.outcome === "PASS" && restored.state !== "success"))) {
               if (managerTruth && /^[0-9a-f]{32}$/.test(managerTruth.start_id)) {
                 writeManagedStart(managerTruth.start_id);
                 setManagedStartHold(managerTruth.start_id);
               }
             }
+            if (managerTruth?.outcome != null && managerTruth.outcome !== "OUTCOME_UNKNOWN" && !managerTruth.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+                && !(managerTruth.outcome === "PASS" && restored.state !== "success")) {
+              clearManagedStart();
+              setManagedStartHold(null);
+            }
             applyBatchSnapshot(restored, nextCatalog);
+            if (managerTruth) setManagedBatchRecoveryId(null);
+            if (managerTruth) logManagedBatch(managerTruth, restoredTopology);
             if (!terminalServerBatchStates.has(restored.state)) {
               beginActivity();
               const generation = ++pollGenerationRef.current;
@@ -864,7 +894,7 @@ export default function FactoryConsoleV2() {
       runtimeRecoveryGenerationRef.current += 1;
       endActivity();
     };
-  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, managed, pollManagedBatch, pollServerBatch, setBatchSelection, workspaceHydrated]);
+  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, logManagedBatch, managed, pollManagedBatch, pollServerBatch, setBatchSelection, workspaceHydrated]);
 
   // Managed: keep the Fleet observation current so capability is never judged on a stale view.
   useEffect(() => {
@@ -1043,6 +1073,14 @@ export default function FactoryConsoleV2() {
   const managedReadiness = ((): { code: typeof legacyReadiness.code; label: string; ready: boolean; reason: string } => {
     const blocked = (code: typeof legacyReadiness.code, label: string, reason: string) => ({ code, label, ready: false, reason });
     if (legacyReadiness.code === "running" || legacyReadiness.code === "cancelling") return { ...legacyReadiness, reason: "" };
+    if (managedStartHold) {
+      return blocked("programming-unavailable", "START RECONCILIATION REQUIRED",
+        `Manager Start ${managedStartHold} is unresolved (OUTCOME_UNKNOWN). Inspect its journal before another Batch; nothing is resubmitted.`);
+    }
+    if (managedBatchRecoveryId) {
+      return blocked("programming-unavailable", "BATCH OBSERVATION REQUIRED",
+        `Manager Batch ${managedBatchRecoveryId} has not been read. Reload to observe its journal; no resubmission.`);
+    }
     if (!catalog) return blocked("programming-unavailable", "MANAGER OFFLINE", providerError ?? "The Manager Registry is unavailable.");
     if (!icpn) return blocked("no-target", "NO TARGET", "Select a Target IC.");
     if (!batchCounts.sites) return blocked("no-site", "NO SITE", "Select at least one Site.");
@@ -1052,10 +1090,6 @@ export default function FactoryConsoleV2() {
     const blocker = managedBatchBlocker(managedTopology, managedRoutes.routes, icpn,
       batchTargets.map(active => ({ alias: active.target.ppu_id, siteIds: active.siteIds })));
     if (blocker) return blocked("programming-unavailable", blocker.label, blocker.reason);
-    if (managedStartHold) {
-      return blocked("programming-unavailable", "START RECONCILIATION REQUIRED",
-        `Manager Start ${managedStartHold} is unresolved. Inspect its journal before another Batch; nothing is resubmitted.`);
-    }
     if (!policyValid) return blocked("programming-unavailable", "POLICY INVALID", "Managed Repeat is 1; Retry must be 0–5; Stop threshold must be within the Target Set.");
     if (!managedChosen || !managedRoute) return blocked("no-op", "OPERATIONS INVALID",
       "Select a valid ordered E / P / V list (Erase + Verify without Program is unsupported) with one qualified Route.");
@@ -1268,18 +1302,19 @@ export default function FactoryConsoleV2() {
           setBatchCommandState("idle");
           setBatchObservationState("connected");
           // A confirmed Manager Batch ID is the durable observation key.
-          clearManagedStart();
-          setManagedStartHold(null);
           if (next.outcome == null) writeManagedBatch(next.batch_id);
           const snapshot = managedProductionSnapshot(next, managedTopology);
           applyBatchSnapshot(snapshot, catalog);
-          logManagedBatch(next);
-          if (next.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+          logManagedBatch(next, managedTopology);
+          if (next.outcome == null || next.outcome === "OUTCOME_UNKNOWN" || next.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
               || (next.outcome === "PASS" && snapshot.state !== "success")) {
             // An unknown transaction or invalid PASS evidence requires a hold.
             // Do not silently release it on a terminal Batch or a page reload.
             writeManagedStart(next.start_id);
             setManagedStartHold(next.start_id);
+          } else {
+            clearManagedStart();
+            setManagedStartHold(null);
           }
         },
         onPollError: message => {
@@ -1330,13 +1365,14 @@ export default function FactoryConsoleV2() {
       }
       const batch = await getProgrammingBatch(reconciled.batch.batch_id);
       if (batch.start_id !== held) throw new Error("Manager Batch Start identity mismatch");
+      setManagedBatchRecoveryId(null);
       const snapshot = managedProductionSnapshot(batch, managedTopology);
       applyBatchSnapshot(snapshot, catalog);
-      logManagedBatch(batch);
+      logManagedBatch(batch, managedTopology);
       if (batch.outcome == null) {
         writeManagedBatch(batch.batch_id);
-        clearManagedStart();
-        setManagedStartHold(null);
+        writeManagedStart(held);
+        setManagedStartHold(held);
         beginActivity();
         const generation = ++pollGenerationRef.current;
         const topology = managedTopology ?? await loadManagedTopology();
