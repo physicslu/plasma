@@ -71,7 +71,13 @@ rollback placeholder and `start_scope` is what identifies the start, exactly as 
 * **The reset sequence is not in the receipt.** `observed_steps` records erase, program and
   verify. That the Site adapter brackets them with `reset halt … reset run` is read from the
   deployed Runtime's `scripts/ppu_site_adapter_abi5.py`, not observed in this run's evidence.
-  Confirming it would need the Z2's OpenOCD log.
+  The OpenOCD log would be the direct record.
+
+  **The part is running, though, and that part is observed.** After H1-R the owner confirmed by
+  eye that the DUT's LED shows the v02 firmware behaviour. The readback proves what is *in* the
+  Flash; the LED proves the MCU was *released to execute* it rather than left halted. Together
+  they establish that Site 2 is running the image this Batch wrote. What stays unobserved is only
+  the ordering inside the adapter's own command list.
 
 ## Deployment state after the run
 
