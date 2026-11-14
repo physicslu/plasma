@@ -410,7 +410,7 @@ class BundleProgrammingWorkflow:
             raise _StepFailure("GATEWAY_RESPONSE_INVALID")
         return value
 
-    def _readiness(self, client: Any, site: int, target: str | None) -> dict[str, Any]:
+    def _readiness(self, client: Any, site: int, site_interface: str | None) -> dict[str, Any]:
         health = self._gateway_get(client, "/api/health/ready")
         status = self._gateway_get(client, f"/api/status?site={site}")
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
@@ -428,9 +428,9 @@ class BundleProgrammingWorkflow:
                  and row.get("queued_jobs") in (0, None))
         if not ready:
             raise _StepFailure("SITE_NOT_READY_OR_BUSY")
-        # Hardware/interface readiness belongs to the PPU.  The selected IC
-        # is pinned by the Job Binding, not by a persistent Site target.
-        if target is not None and row.get("interface") != "openocd":
+        # This Profile specifies its required execution interface, while the
+        # actual Site interface is PPU-owned (never an IC-specific Site list).
+        if site_interface is not None and row.get("interface") != site_interface:
             raise _StepFailure("SITE_INTERFACE_NOT_READY")
         return {"ppu_id": ppu.get("ppu_id"), "site_id": site, "state": "idle",
                 "target": row.get("target"),
@@ -1073,7 +1073,7 @@ class BundleProgrammingWorkflow:
             if signer is not None and hasattr(client, "write_signer"):
                 client.write_signer = signer(run.alias)
             self._update(run, state="preflight")
-            self._readiness(client, run.site, None)
+            self._readiness(client, run.site, plan.route.site_interface)
             self._step(run, "PREFLIGHT", "PASS")
             activated = plan.payload["activation_required"]
             if activated:
@@ -1086,7 +1086,7 @@ class BundleProgrammingWorkflow:
                 raise _StepFailure("ACTIVE_SET_MISMATCH_AFTER_ACTIVATION" if activated
                                    else "ACTIVE_SET_CHANGED_SINCE_PLAN")
             self._update(run, state="submitting")
-            ready = self._readiness(client, run.site, plan.route.icpn)
+            ready = self._readiness(client, run.site, plan.route.site_interface)
             # The PPU itself must prove the Resources the Job is bound to.
             report = ready.get("active_resources")
             if not (isinstance(report, dict) and report.get("state") == "VERIFIED"

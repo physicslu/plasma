@@ -112,7 +112,7 @@ class FakeGateway:
 
     def __init__(self, *, image: bytes, safe_off=True, readback_ok=True,
                  post_status=202, post_raises=False, busy=False, job_final="success",
-                 status_target=ICPN, coordinator=None, resource_for=None,
+                 status_target=ICPN, status_interface="openocd", coordinator=None, resource_for=None,
                  resources_state=None, status_raises=False, echo=True, ppu_id="z2-hil"):
         self.image = image
         self.coordinator = coordinator
@@ -128,6 +128,7 @@ class FakeGateway:
         self.busy = busy
         self.job_final = job_final
         self.status_target = status_target
+        self.status_interface = status_interface
         # None: report the executed range truthfully; dict: override fields.
         self.flash_range: dict | None = None
         # programming / read Jobs: per-step evidence overrides and IC content.
@@ -155,7 +156,7 @@ class FakeGateway:
                         "active_resources": self._resources()},
                 "sites": [{"site_id": int(path.rsplit("=", 1)[1]), "enabled": True,
                            "state": "idle", "current_job_id": None, "queued_jobs": 0,
-                           "interface": "openocd", "target": self.status_target}]})
+                           "interface": self.status_interface, "target": self.status_target}]})
         if method == "POST" and path == "/api/jobs":
             self.posts.append(json.loads(body))
             if self.post_raises:
@@ -449,6 +450,21 @@ def test_previously_selected_ic_is_not_a_site_allowlist(tmp_path):
     assert bindings[0] != bindings[1]
     assert [post["site_id"] for post in gateway.posts] == [1, 2]
     assert all(post["target"] == ICPN for post in gateway.posts)
+    assert not {"B1_create", "B2", "B3"} & set(coordinator.calls)
+
+
+def test_route_interface_mismatch_blocks_before_b1_b2_b3(tmp_path):
+    """Host-only: an FPGAInterface alone cannot satisfy an OpenOCD Profile."""
+    gateway = FakeGateway(image=image(), status_interface="fpga")
+    workflow, coordinator, gateway = make(tmp_path, gateway=gateway)
+    planned = workflow.plan(ALIAS, plan_body(site=1))["plan"]
+    assert planned["activation_required"] is True
+    started = workflow.start(
+        ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
+    run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+    assert run["outcome"] == "FAIL"
+    assert run["reason"] == "SITE_INTERFACE_NOT_READY"
+    assert gateway.posts == []
     assert not {"B1_create", "B2", "B3"} & set(coordinator.calls)
 
 

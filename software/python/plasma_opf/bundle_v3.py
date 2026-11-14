@@ -101,11 +101,22 @@ class ProgrammingRoute:
     def max_image_bytes(self) -> int:
         return int(self.capabilities["max_image_bytes"])
 
+    @property
+    def site_interface(self) -> str:
+        """Site interface required by the validated Profile, not a Site allowlist.
+
+        New Profile schema families require a separately qualified mapping.
+        """
+        _need(self.flash_profile["schema"] == FLASH_PROFILE_SCHEMA,
+              "ROUTE_SITE_INTERFACE_UNSUPPORTED")
+        return "openocd"
+
     def summary(self) -> dict[str, Any]:
         return {
             "route_id": self.route_id,
             "target": dict(self.target),
             "icpn": self.icpn,
+            "site_interface": self.site_interface,
             "provider": self.provider_id,
             "profile": self.profile_id,
             "operations": list(self.capabilities["operations"]),

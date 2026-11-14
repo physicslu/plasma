@@ -65,3 +65,5 @@ Operator picks exact ICPN + Image + operations + Site(s)
 - Python/TypeScript build, focused and regression tests, GitHub-hosted CI, positive Site1/Site2 and negative cases, current PR HEAD verified.
 - PPU Status for each actually enabled Site; dynamic programming readiness; no newly invented Site or interface capabilities.
 - Actual Site1 hardware HIL and Site2 regression remain separate field evidence: mark NOT_RUN when not performed; no claim that Host-only CI = DUT PASS.
+- The validated OpenOCD Flash Profile now exposes `site_interface=openocd` in the Route summary. Manager checks that requirement before Resource activation and before Job submission; Console applies the same per-Profile interface compatibility to PPU-observed Sites. An unqualified direct `fpga` interface remains blocked for this OpenOCD Profile, without hardcoding a physical Site number. Future Provider/Profile families require their own validated interface mapping.
+- Host-only regressions exercise switching already-ready Site 1→2 with one Active Resource Set despite a stale legacy Site target; wrong execution interface is rejected before B1/B2/B3 and Job submission.

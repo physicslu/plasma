@@ -308,9 +308,9 @@ export function siteCapability(
       reason: `No Programming Profile declares ${icpn}.`,
     };
   }
-  if (site.interface !== "openocd" && site.interface !== "fpga") {
-    return { programmable: false, label: "INTERFACE UNAVAILABLE",
-      reason: "The PPU has not activated a compatible real programming interface on this Site." };
+  if (!routes?.some(route => route.icpn === icpn && route.site_interface === site.interface)) {
+    return { programmable: false, label: "INTERFACE INCOMPATIBLE",
+      reason: "The PPU Site interface does not match the selected IC Profile's required execution interface." };
   }
   if (site.current_job_id || site.state !== "idle") {
     return { programmable: false, label: site.state.toUpperCase(), reason: "The Site is busy or not idle." };
