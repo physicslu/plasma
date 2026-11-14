@@ -110,7 +110,11 @@ ppu_id, site_id, icpn, profile}`; every field enters the canonical SHA256.
 (`JOB_OPERATION_NOT_IN_PROFILE`). Addresses are absolute target addresses. v1
 has one contiguous range per Job; multi-section reads (Gateway
 `map_data.sections`) need a new contract version.
-`site_id` must be in the Profile's `sites`.
+`site_id` must be a positive one-based integer, selected from an actual
+PPU-observed Site. The Profile has no physical `sites[]` allowlist; the
+PPU must independently reject an absent, disabled, incompatible or busy
+Site before Job execution, and the immutable Job Binding still pins
+the selected Site.
 `verify_job_binding` recomputes the expected binding and accepts only an exact
 match (`JOB_BINDING_MISMATCH` otherwise). No PPU Job id exists before
 submission; OFE-1B binds the accepted Job id in the receipt.
@@ -362,7 +366,7 @@ admits it against the Route resolved from the selected IC/operations (and the PP
 1. the archive is bounded (`MAX_BUNDLE_ARCHIVE_BYTES`, ≤ 64 members) and
    `identity_from_archive` proves manifest / Packages / Files / SHA256;
 2. the Bundle's Programming Resource Set — target platform, Provider,
-   Profile, driver ABI, transport, FPGA requirement, Operations, Sites and
+   Profile, driver ABI, transport, FPGA requirement, Operations and
    flash geometry — is **byte-identical** to the committed Route's
    (`BUNDLE_IC_MISMATCH`, `BUNDLE_TARGET_MISMATCH`, otherwise 422
    `bundle_resource_not_qualified` / `BUNDLE_RESOURCE_NOT_ROUTE`). A Bundle

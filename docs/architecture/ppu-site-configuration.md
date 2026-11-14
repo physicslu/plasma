@@ -148,13 +148,15 @@ The Control Station BFF and Plasma Manager forward `If-Match` only through their
 
 ## Persistence
 
-A successful write updates only these fields for the selected Site:
+A successful write updates only these writable fields for the selected Site:
 
 ```text
 enabled
 interface
-target
 ```
+
+Any obsolete `target` property on that Site is retired by this write.
+The Job's exact ICPN is a separate input, never a persistent Site setting.
 
 Other Site attributes, including timeout/retry/mock settings, are preserved.
 
