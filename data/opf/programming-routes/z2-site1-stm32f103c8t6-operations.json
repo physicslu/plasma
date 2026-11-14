@@ -1,0 +1,54 @@
+{
+  "schema": "plasma.opf.programming-route.v1",
+  "route_id": "z2-site1-stm32f103c8t6-operations",
+  "description": "First-party OpenOCD reference route for one programming Job (ordered erase/program/verify operations list) and an independent read Job: PYNQ-Z2 ABI-v5 plasma_swd Site 1, STM32F103C8T6.",
+  "target": {
+    "platform": "linux-armv7",
+    "board": "pynq-z2",
+    "fpga_part": "xc7z020clg400-1"
+  },
+  "image_package": {
+    "kind": "firmware-asset"
+  },
+  "provider": {
+    "id": "openocd-platform-reference",
+    "version": "1.0.0",
+    "options": {
+      "schema": "plasma.ppu.provider-options.v1",
+      "options": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "profile": {
+    "id": "stm32f103c8t6-site1-operations",
+    "version": "1.0.0",
+    "capabilities": {
+      "schema": "plasma.ppu.provider-capabilities.v1",
+      "target": "STM32F103C8T6",
+      "provider_package": "openocd-platform-reference",
+      "operations": [
+        "erase",
+        "program",
+        "verify",
+        "read"
+      ],
+      "sites": [
+        1
+      ],
+      "transport": "fpga",
+      "driver_abi": "plasma_swd:5",
+      "fpga_package": null,
+      "max_image_bytes": 65536
+    },
+    "flash_profile": {
+      "schema": "plasma.ppu.openocd-flash-profile.v1",
+      "icpn": "STM32F103C8T6",
+      "target_config": "target/stm32f1x.cfg",
+      "flash_base": 134217728,
+      "flash_size": 65536,
+      "erase_granularity": 1024
+    }
+  }
+}

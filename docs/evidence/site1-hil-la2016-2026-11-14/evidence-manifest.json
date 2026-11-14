@@ -1,0 +1,29 @@
+{
+  "schema": "plasma.site1.hil-evidence-manifest.v1",
+  "producer": "SWPC-plasma-codex",
+  "run_id": 43596359892,
+  "artifact_url": "https://github.com/physicslu/plasma/actions/runs/43596359892/artifacts/14115251160",
+  "artifact_zip_sha256": "d0e41883f7d2fbc2307ea6cc2184ccbf77be20bf78df9c6caa315b914246aeb9",
+  "engineering_evidence_tar_sha256": "ccaaff6110f673b33892ab453b92c06457d3fc14dfdfea69f5de023112c3a92e",
+  "raw_bundle_sha256": "054d3009fa02762066101ab7b8c9bad2670339f59959059b9e97c210348e1723",
+  "raw_waveform": {
+    "archive_path": ".plasma-path3-evidence/site1-epv.sr",
+    "size_bytes": 2250393,
+    "sha256": "9ff7c4df08caa46832a6e7f364507023a2ddaaf857069abfa1696bb513b45bf0"
+  },
+  "swd_decode": {
+    "archive_path": ".plasma-path3-evidence/swd-decode.txt",
+    "sha256": "11f80b62704ef66832afcc3e75296ce28422cf3220758951c0660b28520d9db8"
+  },
+  "openocd_stdout": {
+    "archive_path": ".plasma-path3-evidence/native/site1-v2hj3mmh.stdout",
+    "sha256": "45dd5e64fec5875e2e13a6ac2051c5471fb60fa95b4123b911695aae5c0f28ce"
+  },
+  "manager_receipts": {
+    "archive_paths": [
+      ".plasma-path3-evidence/batch-final.json",
+      ".plasma-path3-evidence/start-reconciliation.json"
+    ]
+  },
+  "warning": "Raw waveform is in a GitHub Actions Artifact with finite retention; archive before expiry."
+}
