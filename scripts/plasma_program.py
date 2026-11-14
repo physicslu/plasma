@@ -125,8 +125,7 @@ def read_bundle(path: Path, *, site: int, package: str | None,
             "FIRMWARE_SHA_OR_SIZE_MISMATCH")
     require(descriptor.get("schema") == "plasma.ppu.provider-capabilities.v1"
             and descriptor.get("provider_package") == provider["id"]
-            and descriptor.get("target") and type(descriptor.get("sites")) is list
-            and site in descriptor["sites"]
+            and descriptor.get("target")
             and "flash_cycle" in descriptor.get("operations", []),
             "SITE_OR_TARGET_NOT_QUALIFIED")
     if image is not None:
