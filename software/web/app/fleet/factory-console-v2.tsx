@@ -25,7 +25,7 @@ import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-sel
 import {
   loadManagedTopology, loadProgrammingRoutes,
   ManagedProgrammingBlocked, ManagedStartOutcomeUnknown,
-  PROGRAMMING_OPERATION_LABELS, routeDeclaring, routeSequenceOperations,
+  PROGRAMMING_OPERATION_LABELS, batchSiteVerdict, routeDeclaring, routeSequenceOperations,
   runManagedBatch, runOfUnit,
   type ManagedTopology, type ProgrammingSource, type RoutesState,
 } from "../programming/managed-programming";
@@ -487,7 +487,8 @@ export default function FactoryConsoleV2() {
       const last = unit.attempts[unit.attempts.length - 1] ?? null;
       if (unit.outcome == null && last?.outcome == null) continue;
       const key = `${batch.batch_id}:${unit.ppu_alias}:${unit.site_id}`;
-      const signature = `${unit.outcome ?? "RUNNING"}:${last?.attempt ?? 0}:${last?.outcome ?? "—"}`;
+      const verdict = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
+      const signature = `${verdict.verdict}:${last?.attempt ?? 0}:${last?.outcome ?? "—"}`;
       if (loggedRecords.current.get(key) === signature) continue;
       loggedRecords.current.set(key, signature);
       const ppu = managedTopology?.ppus.find(item => item.alias === unit.ppu_alias);
@@ -496,11 +497,11 @@ export default function FactoryConsoleV2() {
       const latestRun = runOfUnit(batch, unit);
       if (latestRun?.outcome != null) {
         for (const line of programmingRunLogLines(latestRun, { executionInterface: interfaceName })) {
-          appendLog(`${line} · ${label}`, latestRun.outcome === "PASS" ? "INFO" : "ERROR");
+          appendLog(`${line} · ${label}`, verdict.verdict === "PASS" ? "INFO" : "ERROR");
         }
       }
-      appendLog(`[SITE] ${label} · ${unit.outcome ?? last?.outcome ?? "RUNNING"} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${last?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${unit.reason ? " · " + unit.reason : ""}`,
-        unit.outcome === "PASS" ? "INFO" : "WARN");
+      appendLog(`[SITE] ${label} · ${verdict.verdict} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${last?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${verdict.reason ?? unit.reason ? " · " + (verdict.reason ?? unit.reason) : ""}`,
+        verdict.verdict === "PASS" ? "INFO" : "WARN");
       if (unit.outcome === "PASS" || unit.outcome === "FAIL") {
         appendLog(interfaceName === "mock"
           ? `[EVIDENCE] MOCK RESULT · Site interface mock · ${label} · never a hardware qualification`

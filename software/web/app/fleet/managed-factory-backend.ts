@@ -4,7 +4,7 @@
 
 import type { EngineeringTargetCatalog, PPUStatus } from "../plasma-api";
 import {
-  siteCapability, type ManagedTopology, type ProgrammingRoute,
+  batchSiteVerdict, runOfUnit, siteCapability, type ManagedTopology, type ProgrammingRoute,
 } from "../programming/managed-programming";
 import type { ProgrammingBatch, ProgrammingBatchUnit } from "../engineering/bundle-programming-api";
 import type { ProgrammingCapabilityCatalog } from "../programming-capabilities";
@@ -103,8 +103,11 @@ export function managedProductionSnapshot(
   topology: ManagedTopology | null,
 ): ServerBatchSnapshot {
   const siteState = (unit: ProgrammingBatchUnit): ServerBatchSiteState => {
-    if (unit.outcome === "PASS") return "success";
-    if (unit.outcome === "FAIL") return "faulted";
+    // Manager aggregate and raw unit outcome alone NEVER prove PASS. Require
+    // per-Site attempt identity, Binding, SAFE_OFF and receipt when available.
+    const judged = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
+    if (judged.verdict === "PASS") return "success";
+    if (judged.verdict === "FAIL") return "faulted";
     if (unit.outcome === "STOPPED"
         || (unit.outcome === "BLOCKED" && /STOP_|STOP_POLICY|PPU_LATCHED/.test(unit.reason ?? ""))) return "stopped";
     if (unit.outcome != null) return "error";
@@ -115,7 +118,8 @@ export function managedProductionSnapshot(
     const ppu = topology?.ppus.find(item => item.alias === unit.ppu_alias);
     const state = siteState(unit);
     const last = unit.attempts[unit.attempts.length - 1] ?? null;
-    const current = batch.current_run?.run_id === last?.run_id ? batch.current_run : null;
+    const current = runOfUnit(batch, unit);
+    const judged = batchSiteVerdict(batch, unit, current);
     const passed = state === "success";
     return {
       facility_id: ppu?.facilityId ?? "unassigned",
@@ -133,7 +137,7 @@ export function managedProductionSnapshot(
       faulted_operation: null,
       last_failure_source: state === "faulted" || state === "error" ? unit.failure_domain ?? "manager_programming_run" : null,
       error: state === "faulted" || state === "error"
-        ? { message: unit.reason ?? (unit.outcome === "OUTCOME_UNKNOWN" ? "OUTCOME UNKNOWN; do not resubmit" : "Manager reports no PASS") }
+        ? { message: judged.reason ?? unit.reason ?? (unit.outcome === "OUTCOME_UNKNOWN" ? "OUTCOME UNKNOWN; do not resubmit" : "Manager reports no PASS") }
         : null,
       operation_statistics: {},
     };
@@ -142,11 +146,13 @@ export function managedProductionSnapshot(
     ready: 0, running: 0, success: 0, faulted: 0, error: 0, stopped: 0, cancelled: 0,
   };
   for (const site of sites) site_counts[site.state] += 1;
+  const allSitesVerified = sites.length > 0 && site_counts.success === sites.length;
   const state: ServerBatchState = batch.outcome == null
     ? batch.stop_requested ? "stopping" : "running"
-    : batch.outcome === "PASS" ? "success"
-    : batch.outcome === "PARTIAL" || (batch.outcome === "FAIL" && batch.counts.pass > 0) ? "partial"
+    : batch.outcome === "PASS" && allSitesVerified ? "success"
     : batch.outcome === "STOPPED" ? "cancelled"
+    : site_counts.success > 0 && (site_counts.faulted > 0 || site_counts.error > 0 || batch.outcome === "PARTIAL")
+      ? "partial"
     : "error";
   return {
     batch_id: batch.batch_id, state,
