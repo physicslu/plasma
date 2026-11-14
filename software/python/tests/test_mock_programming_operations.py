@@ -328,7 +328,7 @@ def test_a_resource_set_from_another_ppu_is_refused(tmp_path: Path):
         manager, _ = await started_manager(mock_config(tmp_path))
         try:
             other = mock_resources.mock_resource_identity(mock_resources.mock_route(
-                icpn=ICPN, sites=[1, SITE], flash_base=FLASH_BASE,
+                icpn=ICPN, flash_base=FLASH_BASE,
                 flash_size=FLASH_SIZE, erase_granularity=GRANULARITY,
                 profile_id="some-other-programming-profile"))
             with pytest.raises(PlasmaError, match="JOB_RESOURCE_PACKAGE_MISMATCH"):
