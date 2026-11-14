@@ -1,7 +1,7 @@
 {
   "schema": "plasma.opf.programming-route.v1",
   "route_id": "z2-site2-stm32f103c8t6",
-  "description": "First-party OpenOCD reference route: PYNQ-Z2 ABI-v5 plasma_swd Site 2, STM32F103C8T6",
+  "description": "First-party OpenOCD reference route: PYNQ-Z2 ABI-v5 plasma_swd Site-independent, STM32F103C8T6",
   "target": {
     "platform": "linux-armv7",
     "board": "pynq-z2",
@@ -15,7 +15,10 @@
     "version": "1.0.0",
     "options": {
       "schema": "plasma.ppu.provider-options.v1",
-      "options": {"type": "object", "properties": {}}
+      "options": {
+        "type": "object",
+        "properties": {}
+      }
     }
   },
   "profile": {
@@ -25,8 +28,9 @@
       "schema": "plasma.ppu.provider-capabilities.v1",
       "target": "STM32F103C8T6",
       "provider_package": "openocd-platform-reference",
-      "operations": ["flash_cycle"],
-      "sites": [2],
+      "operations": [
+        "flash_cycle"
+      ],
       "transport": "fpga",
       "driver_abi": "plasma_swd:5",
       "fpga_package": null,
