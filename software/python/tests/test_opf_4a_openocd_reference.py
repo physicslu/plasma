@@ -70,7 +70,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                       "erase_granularity": 1024}
         desc = {"schema": "plasma.ppu.provider-capabilities.v1", "target": target_icpn,
                 "provider_package": PROVIDER, "operations": ["flash_cycle"],
-                "sites": [1, 2], "transport": "fpga", "driver_abi": DRIVER_ABI,
+                "transport": "fpga", "driver_abi": DRIVER_ABI,
                 "fpga_package": FPGA, "max_image_bytes": 65536}
         desc.update(descriptor_change or {})
         if not with_fpga:
