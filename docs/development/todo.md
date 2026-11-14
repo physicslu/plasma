@@ -21,6 +21,28 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 **Scope boundary:** documentation only; no source/runtime modification, PR merge, Z2/SWPC/DUT operation or implied HIL result. Do **not** change WBS counts until individually reconciled. Follow the exact Gate 1/Gate 2 boundaries in [AGENTS.md](../../AGENTS.md).
 
+### OPF Programming Profile — Data-driven Memory Regions / Banks / Partitions
+
+**Status:** TODO / DESIGN NOT IMPLEMENTED — recorded 2026-11-11. This backlog item is not approval to change executable contracts, alter PR #1401, merge a PR, deploy, or operate a PPU/DUT.
+
+**Priority / layer:** P1 architecture follow-up — OPF Programming Profile, evidence-backed Device Memory Geometry, Provider qualification, Resource Set / Job Binding, Manager and Console.
+
+**Current limitation:** The committed OPF `plasma.opf.programming-route.v1` Programming Profile has exactly one `flash_profile.flash_base` and `flash_profile.flash_size`. `bundle_v3.py` exposes those as one Resource Set memory window and validates READ/ERASE ranges against it. PR #1401's per-Site READ uses this single-window contract for the full default read; it does **not** implement arbitrary memory regions or partitions.
+
+**Target design — Profile-owned declarations, no MCU-specific regions hardcoded in OPF Core / Provider / Console:**
+
+- Model a variable-length, versioned collection of **Memory Regions** in the Programming Profile. Each declares a stable `region_id`, display name, base address, size, read/write/erase constraints, operation eligibility, optional bank/partition affiliation, and a Profile-defined default-READ selection. Region categories/names/counts must remain data-driven; never assume fixed Main Flash, Data Flash, OTP, Option Bytes, ROM, or a fixed number of banks.
+- Distinguish **physical Memory Region**, **Flash Bank** (when applicable), and **logical Partition** (when declared); relationships and applicable constraints must be explicit. A logical partition must remain within an authorized parent region/bank. Handle overlap/aliases deliberately; do not infer that every memory-mapped region can be read using the same protocol.
+- Preserve source-of-truth separation: authoritative manufacturer/exact-IC **Device Profile** owns memory geometry and evidence; the **Programming Profile** selects/maps that geometry into Provider-specific operations and policy. Cross-check exact ICPN, silicon/revision restrictions, geometry, evidence, Site/Provider qualification and hardware admission. A Profile field alone never elevates an operation to SUPPORTED or authorizes protected/irreversible access.
+- Define an explicit, versioned `region_id` in Resource Set constraints, per-Region operation qualification and Job Binding/Receipt identity; bind each READ/ERASE/PROGRAM/VERIFY to a qualified region and exact address/length. Reject out-of-range, cross-region, overlapping/ambiguous, unsupported or protection-restricted requests **before hardware I/O**. Consider bank/partition identifiers only where needed for unambiguous authority; do not use display labels as identity.
+- Make `default_read`/read policy Profile data, not Console code. Per-Site READ may execute multiple separately admitted regions without silently treating a partial result as full PASS. Keep Region-specific Binary files, SHA256, addresses/sizes, provenance and a manifest/receipt; report `PARTIAL`/FAIL accurately when one region cannot be read. Preserve independent Read Job semantics, SAFE_OFF, owner/lease guards, outcome-unknown reconciliation and **no automatic resubmission**.
+- Keep the operator UX compact: one READ action per qualified Site, no raw address/length input by default. For multiple outputs, support a genuine directory-picker flow where available and a clearly disclosed ZIP/download fallback where not; never claim a chosen folder or successful save without evidence.
+- Design a bounded schema migration/replacement and update all producers/consumers together (Programming Profile, Bundle v3 identity, Provider adapter, Manager, API, Console, tests and docs) under a **separate future Gate 1**. Do not retrofit new Region identity into historical immutable receipts or imply that the existing single-window implementation already supports it.
+
+**Acceptance / Gate evidence:** First conduct a read-only design audit against manufacturer geometry and at least two representative, differently organized MCU families; document schemas and source authority. Then separately authorize Host-only positive/negative tests for multi-bank, disjoint regions, aliasing, protected/unsupported regions, boundary crossings, partial results, recovery and output integrity. Real hardware qualification is independent and must be marked NOT_RUN until measured. No WBS counts change without reconciliation.
+
+**Dependency:** PR #1401 stays scoped to a single Profile-declared Flash window and must not wait for this architecture extension.
+
 ### IC Electrical Programming Profile / Voltage Capability Database
 
 **Status:** TODO / required before physical multi-IC programming qualification
