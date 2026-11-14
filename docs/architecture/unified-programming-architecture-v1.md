@@ -507,19 +507,17 @@ personalization may land much later; the schema may not.
 
 ## 9. Programming Route Admission
 
-Admission is evaluated per `(ppu_alias, site_id, icpn, operations[])`:
+Admission is evaluated per `(ppu_alias, site_id, icpn, operations[])`, but Profile resolution is **Site-independent**:
 
 ```text
 for each target, for each site:
     routes  = load_routes(ppu_alias)        # per PPU; never the first PPU's routes for all
-    matched = resolve_routes(routes, icpn, site, operations)
-    len(matched) == 0 → 422 operation_not_in_profile
+    matched = resolve_routes(routes, icpn, operations)  # Site-independent IC Profile
+    len(matched) == 0 → 422 programming_route_not_found / operation_not_in_profile
     len(matched)  > 1 → 409 programming_route_ambiguous
 ```
 
-The Manager already implements this per plan. The gap is in the Console, which loads one PPU's
-Routes and uses them to gate every PPU (`software/web/app/fleet/factory-console-v2.tsx`). The
-Console must load and apply Routes per PPU.
+Site discovery and current readiness are authoritative PPU observations, not a `sites[]` allowlist in an ICPN Profile. Manager matches the selected IC and operations to Provider/Profile resources, then verifies the PPU actually reports each selected Site present/enabled and with a compatible real interface. Per-Job `ppu_id + site_id + icpn + Profile + Image/operation` remains immutable; a mismatched Job Binding must fail closed. EMode and PMode both derive Site selection from Manager Fleet observations of their own PPUs.
 
 ## 10. Receipt and Recovery
 
