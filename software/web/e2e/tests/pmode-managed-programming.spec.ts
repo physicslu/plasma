@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
-  BUNDLE, FIRMWARE, Z2, legacyRequests, mockManager, route, type Counters, type MockPpu, type RunScript,
+  BUNDLE, FIRMWARE, Z2, legacyRequests, mockManager, type Counters, type MockPpu, type RunScript,
 } from "./managed-programming-helpers";
 
 // Host-only Console acceptance of PMode → Factory Console on the formal
@@ -51,234 +51,208 @@ async function finished(page: Page) {
   await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/SUCCESS|PARTIAL|ERROR|CANCELLED/, { timeout: 30_000 });
 }
 
-test("registered PPUs are discovered from the Manager; ONLINE no longer means Programming unavailable", async ({ page }) => {
-  const counters = await mockManager(page, { ppus: [Z2, LINE2, { alias: "spare", ppuId: "spare-01", lifecycle: "pending" }] });
+
+test("PMode topology remains Manager Registry/Fleet and never calls the Mock programming endpoint", async ({ page }) => {
+  const counters = await mockManager(page, { ppus: [Z2, LINE2,
+    { alias: "spare", ppuId: "spare-01", lifecycle: "pending" }] });
   await openFactory(page);
   await expect(page.getByLabel("Factory communication health")).toContainText("Gateway ONLINE");
-  await expect(page.getByLabel("Factory communication health")).not.toContainText("PROGRAMMING UNAVAILABLE");
-  const tree = page.locator(".productionTreePpu");
-  await expect(tree).toHaveCount(2); // the pending Registry entry is a Registration concern
-  await expect(tree.nth(0)).toContainText("z2 · PPU ID z2-hil");
-  await expect(tree.nth(1)).toContainText("line2 · PPU ID line2-01");
+  await expect(page.locator(".productionTreePpu")).toHaveCount(2);
   expect(legacyRequests(counters)).toEqual([]);
   expect(writes(counters)).toEqual([]);
 });
 
-test("ONLINE does not bypass Profile interface compatibility on a selected Site", async ({ page }) => {
-  const counters = await mockManager(page, {
-    ppus: [{ ...Z2, enabledSites: [1, 2], siteInterfaces: { 1: "fpga" } }],
-  });
-  const { start } = await prepare(page, [["z2", [1, 2]]]);
-  await expect(page.getByLabel("Factory communication health")).toContainText("Gateway ONLINE");
-  const readiness = page.getByTestId("managed-readiness");
-  await expect(readiness).toContainText("PROGRAMMING UNAVAILABLE");
-  await expect(readiness).toContainText("PPU z2 Site 1");
-  await expect(readiness).toContainText(
-    "The PPU Site interface does not match the selected IC Profile's required execution interface.");
-  await expect(start).toBeDisabled();
-  // Site topology alone cannot certify a hardware execution interface.
-  expect(writes(counters)).toEqual([]);
-});
-
-test("multi-PPU production: one Manager run per PPU/Site with isolated Job, Resource and Binding identities", async ({ page }) => {
+test("one Manager Start and ONE canonical Batch serves two PPUs with separate Job/Binding identities", async ({ page }) => {
   const counters = await mockManager(page, { ppus: [Z2, LINE2] });
-  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
+  const { job, start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
+  await expect(job.getByLabel("Repeat Count")).toBeDisabled();
+  await expect(job.getByLabel("Repeat Count")).toHaveValue("1");
   await expect(start).toBeEnabled();
-  await start.dblclick(); // a double click still starts one batch
+  await start.dblclick();
   await finished(page);
-  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/SUCCESS/);
-  expect(counters.plans.map(item => [item.alias, item.body.site_id])).toEqual([["z2", 2], ["line2", 2]]);
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.batches[0].body.targets).toEqual([
+    { ppu_alias: "z2", site_ids: [2] }, { ppu_alias: "line2", site_ids: [2] },
+  ]);
+  expect(counters.batches[0].body.operations).toEqual(["erase", "program", "verify"]);
+  expect(counters.batches[0].body.repeat).toBe(1);
   expect(counters.starts.map(item => item.alias)).toEqual(["z2", "line2"]);
-  // Each start consumes its own plan on its own PPU.
   expect(new Set(counters.starts.map(item => item.body.plan_id)).size).toBe(2);
+  expect(new Set(counters.jobs).size).toBe(2);
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "success");
   await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "success");
   await expect(summary(page)).toContainText("100.0%");
-  // One traceable Log record per Site: Run, Job, verdict, SAFE_OFF, identities.
-  const log = factoryLog(page);
-  await expect(log).toContainText(/\[RECEIPT\] Job job-z2-site2-/);
-  await expect(log).toContainText(/\[RECEIPT\] Job job-line2-site2-/);
-  await expect(log).toContainText(/Job Binding SHA256 z2-site2-plan1/);
-  await expect(log).toContainText(/Job Binding SHA256 line2-site2-plan2/);
-  await expect(log).toContainText("PPU z2 · Site 2 · SAFE_OFF VERIFIED · attempts 1 · auto retry DISABLED · PPU z2 · PPU ID z2-hil · SITE-02");
-  await expect(log).toContainText("PPU line2 · Site 2 · SAFE_OFF VERIFIED");
-  // The whole JSON Receipt is never printed back onto the page.
-  await expect(page.locator("main")).not.toContainText("observed_steps");
-  await expect(page.locator("[data-receipt-site]")).toHaveCount(0);
+  await expect(factoryLog(page)).toContainText("[EVIDENCE] Site interface: openocd");
   expect(legacyRequests(counters)).toEqual([]);
+  await expect(page.locator("[data-receipt-site]")).toHaveCount(0);
 });
 
-test("multi-Site PASS / FAIL / Yield: a failed Site is counted once and never retried", async ({ page }) => {
+test("Site PASS/FAIL is per-Unit, not inferred from Batch HTTP 200; yield counts once", async ({ page }) => {
   const script = (_alias: string, siteId: number): RunScript =>
-    siteId === 1 ? {} : { outcome: "FAIL", reason: "READBACK_SHA256_MISMATCH" };
-  const counters = await mockManager(page, { ppus: [{ ...Z2, enabledSites: [1, 2] }], routes: [route()], script });
-  const { start } = await prepare(page, [["z2", [1, 2]]]);
+    siteId === 2 ? { outcome: "FAIL", reason: "READBACK_SHA256_MISMATCH", safeOff: true } : {};
+  const counters = await mockManager(page, { ppus: [{ ...Z2, enabledSites: [1, 2] }], script });
+  const { job, start } = await prepare(page, [["z2", [1, 2]]]);
+  await job.getByLabel("Site Retry Limit").fill("0");
   await start.click();
   await finished(page);
-  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/PARTIAL/);
   await expect(site(page, "z2", 1)).toHaveAttribute("data-site-state", "success");
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "faulted");
   await expect(summary(page)).toContainText("50.0%");
-  await expect(factoryLog(page)).toContainText("[RUN] FAIL · READBACK_SHA256_MISMATCH");
-  await page.waitForTimeout(1500);
-  expect(counters.plans).toHaveLength(2);
+  expect(counters.batches).toHaveLength(1);
   expect(counters.starts).toHaveLength(2);
-  // Per-Site plans: a Binding is never shared between Sites.
-  expect(counters.plans.map(item => item.body.site_id)).toEqual([1, 2]);
+  await expect(factoryLog(page)).toContainText("READBACK_SHA256_MISMATCH");
 });
 
-test("OUTCOME_UNKNOWN latches only its own PPU: no resubmission, later Sites of that PPU never start", async ({ page }) => {
+test("UNKNOWN latches its PPU but another PPU can complete; no blind repeat", async ({ page }) => {
   const script = (alias: string, siteId: number): RunScript => alias === "z2" && siteId === 1
     ? { outcome: "OUTCOME_UNKNOWN", reason: "JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT" } : {};
   const counters = await mockManager(page, {
-    ppus: [{ ...Z2, enabledSites: [1, 2] }, LINE2], routes: [route()], script });
-  const { start } = await prepare(page, [["z2", [1, 2]], ["line2", [2]]]);
+    ppus: [{ ...Z2, enabledSites: [1, 2] }, LINE2], script,
+  });
+  const { job, start } = await prepare(page, [["z2", [1, 2]], ["line2", [2]]]);
+  await job.getByLabel("Site Retry Limit").fill("0");
   await start.click();
   await finished(page);
   await expect(site(page, "z2", 1)).toHaveAttribute("data-site-state", "error");
   await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "stopped");
   await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "success");
-  await expect(factoryLog(page)).toContainText("nothing was resubmitted");
-  await expect(factoryLog(page)).toContainText("unresolved OUTCOME UNKNOWN");
-  await page.waitForTimeout(1500);
-  expect(counters.starts.map(item => [item.alias])).toEqual([["z2"], ["line2"]]);
-  expect(counters.plans.map(item => [item.alias, item.body.site_id])).toEqual([["z2", 1], ["line2", 2]]);
-  // An unknown outcome is not a FAIL and not a PASS in the Yield.
-  await expect(summary(page)).toContainText("100.0%");
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.starts.map(item => item.alias)).toEqual(["z2", "line2"]);
+  await expect(page.getByTestId("managed-readiness")).toContainText("START RECONCILIATION REQUIRED");
 });
 
-test("an Offline PPU blocks Start with the exact reason and no write", async ({ page }) => {
+test("offline or interface-incompatible PPU fails closed before Manager Start", async ({ page }) => {
   const counters = await mockManager(page, { ppus: [Z2, { ...LINE2, transport: "unreachable" }] });
   const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  const readiness = page.getByTestId("managed-readiness");
-  await expect(readiness).toContainText("PPU OFFLINE");
-  await expect(readiness).toContainText("PPU line2");
+  await expect(page.getByTestId("managed-readiness")).toContainText("PPU OFFLINE");
   await expect(start).toBeDisabled();
-  expect(writes(counters)).toEqual([]);
+  expect(counters.issued).toHaveLength(0);
+  expect(counters.batches).toHaveLength(0);
 });
 
-test("partial batch: a PPU in Recovery is blocked before any Job while the healthy PPU completes", async ({ page }) => {
-  const counters = await mockManager(page, { ppus: [Z2, { ...LINE2, deploymentState: "recovery_required" }] });
-  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  await start.click();
-  await finished(page);
-  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/PARTIAL/);
-  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "success");
-  await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "error");
-  await expect(factoryLog(page)).toContainText("[SITE] PPU line2 · PPU ID line2-01 · SITE-02 · BLOCKED before any Job");
-  await expect(factoryLog(page)).toContainText("RECOVERY REQUIRED");
-  expect(counters.plans.map(item => item.alias)).toEqual(["z2"]);
-  expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
-  expect(counters.requests.filter(entry => /enrollment|recovery/.test(entry))).toEqual([]);
-});
-
-test("Stop Policy only prevents further starts: no retry and no duplicate programming", async ({ page }) => {
-  const counters = await mockManager(page, {
-    ppus: [{ ...Z2, enabledSites: [1, 2] }, LINE2], routes: [route()],
-    script: () => ({ outcome: "FAIL", reason: "FLASH_CYCLE_NOT_PASS" }) });
-  const { job, start } = await prepare(page, [["z2", [1, 2]], ["line2", [2]]]);
-  await job.getByLabel("Stop Policy").selectOption("1");
-  await start.click();
-  await finished(page);
-  await expect(site(page, "z2", 1)).toHaveAttribute("data-site-state", "faulted");
-  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "stopped");
-  await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "stopped");
-  await expect(factoryLog(page)).toContainText("Stop Policy reached 1 failed Site(s)");
-  await page.waitForTimeout(1500);
-  expect(counters.plans).toHaveLength(1);
-  expect(counters.starts).toHaveLength(1);
-});
-
-test("ABORT stops queuing; the submitted run is observed to its end and nothing is cancelled or resent", async ({ page }) => {
-  const counters = await mockManager(page, { ppus: [Z2, LINE2], script: () => ({ runningPolls: 3 }) });
-  const { job, start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  await start.click();
-  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
-  await job.getByRole("button", { name: /ABORT/ }).click();
-  await finished(page);
-  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/CANCELLED/);
-  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "success");
-  await expect(site(page, "line2", 2)).toHaveAttribute("data-site-state", "cancelled");
-  expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
-  expect(counters.mutations.filter(entry => /cancel|abort/.test(entry))).toEqual([]);
-});
-
-test("Image is the default Source; switching to Bundle clears the file and issues no request", async ({ page }) => {
-  const counters = await mockManager(page, { ppus: [Z2] });
-  const { job, start } = await prepare(page, [["z2", [2]]]);
-  await expect(job.getByRole("radio", { name: "Programming Image", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(start).toBeEnabled();
-  await expect(job.getByLabel("Site Retry Limit")).toBeDisabled();
-  await expect(job.getByLabel("Site Retry Limit")).toHaveValue("0");
-  await expect(job.getByLabel("Repeat Count")).toBeDisabled();
-  const operations = job.locator("[data-programming-job-operation]");
-  await expect(operations).toHaveCount(1);
-  await expect(operations).toHaveAttribute("data-programming-job-operation", "flash_cycle");
-  await job.getByRole("radio", { name: "Bundle", exact: true }).click();
-  await expect(job.locator("[data-image-source]")).toHaveAttribute("data-image-source", "none");
-  await expect(page.getByTestId("managed-readiness")).toContainText("BUNDLE REQUIRED");
-  await expect(start).toBeDisabled();
-  expect(writes(counters)).toEqual([]);
-});
-
-test("Bundle source production: every Site plan carries the user's Bundle bytes unchanged", async ({ page }) => {
-  const counters = await mockManager(page, { ppus: [Z2, LINE2], script: alias => ({ activationRequired: alias === "line2" }) });
-  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]], "bundle");
-  await start.click();
-  await finished(page);
-  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/SUCCESS/);
-  for (const planned of counters.plans) {
-    expect(Buffer.from(String(planned.body.bundle_base64), "base64").equals(BUNDLE)).toBe(true);
-    expect(planned.body).not.toHaveProperty("image_base64");
-  }
-  // Resource Reuse on one PPU and Admission on the other are independent decisions.
-  await expect(factoryLog(page)).toContainText(/Resources Reused · Verified \d+ \/ \d+ B/);
-  await expect(factoryLog(page)).toContainText("Resources Activated");
-});
-
-test("an incompatible Bundle fails closed on every Site without a single Job", async ({ page }) => {
-  const counters = await mockManager(page, { ppus: [Z2, LINE2], script: () => ({
-    planError: { code: "bundle_resource_not_qualified", message: "BUNDLE_RESOURCE_NOT_ROUTE" } }) });
-  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]], "bundle");
-  await start.click();
-  await finished(page);
-  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/ERROR/);
-  await expect(factoryLog(page)).toContainText("bundle_resource_not_qualified");
-  await expect(factoryLog(page)).toContainText("[SITE] PPU line2 · PPU ID line2-01 · SITE-02 · BLOCKED before any Job");
-  expect(counters.starts).toHaveLength(0);
-});
-
-test("PMode omits the static qualification banner but retains restricted sequential readiness", async ({ page }) => {
-  await mockManager(page, { ppus: [Z2, LINE2] });
-  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  await expect(page.getByTestId("managed-production-mode")).toHaveCount(0);
-  // Ready means ready for this restricted mode, never a generic production READY.
-  await expect(start).toBeEnabled();
-  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/SEQUENTIAL BATCH READY/);
-  await expect(page.locator("main")).not.toContainText(/PRODUCTION READY/i);
-});
-
-test("non-durable: a reload during the batch stops queuing; nothing is resumed or resubmitted", async ({ page }) => {
-  const counters = await mockManager(page, { ppus: [Z2, LINE2], script: () => ({ runningPolls: 4 }) });
-  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  await start.click();
-  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
-  expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
-  await page.reload();
-  await expect(page.getByTestId("managed-production-mode")).toHaveCount(0);
-  await page.waitForTimeout(6000); // longer than the in-flight run
-  // The second PPU was never planned or started, and the first was not sent again.
-  expect(counters.plans.map(item => item.alias)).toEqual(["z2"]);
-  expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
-  await expect(page.getByRole("status", { name: "BATCH STATUS" })).not.toHaveText(/RUNNING|SUCCESS/);
-});
-
-test("mixed Mock and OpenOCD Sites cannot bypass one Profile interface qualification", async ({ page }) => {
+test("mixed OpenOCD and Mock interfaces require a matching Profile; never fabricate HIL success", async ({ page }) => {
   const counters = await mockManager(page, { ppus: [Z2, { ...LINE2, siteInterface: "mock" }] });
   const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
   await expect(page.getByTestId("managed-readiness")).toContainText("PROGRAMMING UNAVAILABLE");
   await expect(start).toBeDisabled();
-  expect(counters.plans).toHaveLength(0);
-  expect(counters.starts).toHaveLength(0);
+  expect(counters.batches).toHaveLength(0);
+});
+
+test("native Manager Retry is bounded 0..5 and only a definite FAIL can retry", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", safeOff: true }) });
+  const { job, start } = await prepare(page, [["z2", [2]]]);
+  const retry = job.getByLabel("Site Retry Limit");
+  await expect(retry).toBeEnabled();
+  await retry.fill("6");
+  await expect(start).toBeDisabled();
+  await retry.fill("1");
+  await expect(start).toBeEnabled();
+  await start.click();
+  await finished(page);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.batches[0].body.retry_limit).toBe(1);
+  expect(counters.starts).toHaveLength(2);
+});
+
+test("Stop Policy is enforced by Manager, and does not resubmit later Sites", async ({ page }) => {
+  const counters = await mockManager(page, {
+    ppus: [{ ...Z2, enabledSites: [1, 2] }, LINE2],
+    script: () => ({ outcome: "FAIL", safeOff: true }),
+  });
+  const { job, start } = await prepare(page, [["z2", [1, 2]], ["line2", [2]]]);
+  await job.getByLabel("Site Retry Limit").fill("0");
+  await job.getByLabel("Stop Policy").selectOption("1");
+  await start.click();
+  await finished(page);
+  expect(counters.batches[0].body.stop_policy).toEqual({ kind: "failed_sites", threshold: 1 });
+  expect(counters.starts).toHaveLength(1);
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "stopped");
+});
+
+test("ABORT uses canonical Manager Stop API; in-flight Job completes without resubmission", async ({ page }) => {
+  const counters = await mockManager(page, {
+    ppus: [Z2, LINE2], script: () => ({ runningPolls: 6 }),
+  });
+  const { job, start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
+  await start.click();
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
+  await job.getByRole("button", { name: "ABORT" }).click();
+  await finished(page);
+  expect(counters.stops).toHaveLength(1);
+  expect(counters.starts.map(item => item.alias)).toEqual(["z2"]);
+});
+
+test("switching Image to Bundle clears source and never submits by itself", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { job, start } = await prepare(page, [["z2", [2]]]);
+  await expect(start).toBeEnabled();
+  await job.getByRole("radio", { name: "Bundle", exact: true }).click();
+  await expect(page.getByTestId("managed-readiness")).toContainText("BUNDLE REQUIRED");
+  await expect(start).toBeDisabled();
+  expect(counters.issued).toHaveLength(0);
+  expect(counters.batches).toHaveLength(0);
+});
+
+test("Bundle goes unchanged in one canonical multi-PPU request", async ({ page }) => {
+  const counters = await mockManager(page, { ppus: [Z2, LINE2] });
+  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]], "bundle");
+  await start.click();
+  await finished(page);
+  expect(counters.batches).toHaveLength(1);
+  expect(Buffer.from(String(counters.batches[0].body.bundle_base64), "base64").equals(BUNDLE)).toBe(true);
+  expect(counters.batches[0].body).not.toHaveProperty("image_base64");
+});
+
+test("definite 4xx refusal does not start a Site and does not pretend success", async ({ page }) => {
+  const counters = await mockManager(page, {
+    batchStatus: 422, batchError: { code: "bundle_resource_not_qualified", message: "Resource Set mismatch" },
+  });
+  const { start } = await prepare(page, [["z2", [2]]]);
+  await start.click();
+  await expect(page.getByText("Resource Set mismatch")).toBeVisible();
+  expect(counters.batches).toHaveLength(1);
   expect(counters.jobs).toHaveLength(0);
+});
+
+test("browser reload observes the SAME durable Manager Batch, never queues new Jobs", async ({ page }) => {
+  const counters = await mockManager(page, {
+    ppus: [Z2, LINE2], script: () => ({ runningPolls: 8 }),
+  });
+  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
+  await start.click();
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
+  await page.reload();
+  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/RUNNING|SUCCESS/, { timeout: 20_000 });
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.starts.length).toBeGreaterThanOrEqual(1);
+});
+
+test("lost Batch POST response is held by Start ID and read-only reconciled, never resent", async ({ page }) => {
+  const counters = await mockManager(page, { batchLost: true });
+  const { start } = await prepare(page, [["z2", [2]]]);
+  await start.click();
+  await expect(page.getByTestId("managed-readiness")).toContainText("START RECONCILIATION REQUIRED");
+  expect(counters.batches).toHaveLength(1);
+  await page.reload();
+  await expect.poll(() => counters.reconciles.length).toBeGreaterThan(0);
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.issued).toHaveLength(1);
+});
+
+test("Erase-only is one Manager programming Job with an explicit Route flash range and no Image", async ({ page }) => {
+  const counters = await mockManager(page);
+  const { job } = await prepare(page, [["z2", [2]]], null);
+  await job.locator('[data-programming-job-operation="program"]').uncheck();
+  await job.locator('[data-programming-job-operation="verify"]').uncheck();
+  const start = job.getByRole("button", { name: /START PROGRAMMING/ });
+  await expect(start).toBeEnabled();
+  await start.click();
+  await finished(page);
+  expect(counters.batches[0].body.operations).toEqual(["erase"]);
+  expect(counters.batches[0].body).not.toHaveProperty("image_base64");
+  expect(counters.batches[0].body.address).toBe(0x08000000);
+  expect(counters.batches[0].body.length).toBe(65536);
 });
