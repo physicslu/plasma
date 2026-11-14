@@ -308,12 +308,19 @@ def run_once(workflow):
     return planned, workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
 
 
-def test_shared_writer_reproduces_historical_bundle_a_bytes():
+def test_shared_writer_reproducibly_emits_site_independent_bundle_v3():
     route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
-    built = bundle_v3.build_image_bundle(
-        route, image(), image_filename="plasma-blue-pill-cdc.bin",
-        asset_package_id="bluepill-cdc-fw-v01", bundle_name="bluepill-site2-fw-v01")
-    assert built.archive_sha256 == "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a"
+    def make_bundle():
+        return bundle_v3.build_image_bundle(
+            route, image(), image_filename="plasma-blue-pill-cdc.bin",
+            asset_package_id="bluepill-cdc-fw-v01", bundle_name="bluepill-site2-fw-v01")
+
+    built, again = make_bundle(), make_bundle()
+    assert built.archive == again.archive
+    assert built.archive_sha256 == again.archive_sha256 == hashlib.sha256(built.archive).hexdigest()
+    # Historical Bundle A used Provider Capability v1 with a physical Site allowlist.
+    # Under Replace-by-Default, v2 bytes and identity MUST change rather than be reused.
+    assert built.archive_sha256 != "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a"
 
 
 def test_user_bundle_is_canonical_and_verifiable(tmp_path):
