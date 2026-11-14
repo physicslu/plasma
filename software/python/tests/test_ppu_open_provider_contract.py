@@ -31,7 +31,7 @@ def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fp
         "schema": providers.SCHEMA, "target": target,
         "provider_package": provider_id,
         "operations": ["erase", "program", "verify", "read", "flash_cycle"],
-        "sites": [1, 2], "transport": transport,
+        "transport": transport,
         "driver_abi": "example-swd-abi" if transport == "fpga" else None,
         "fpga_package": "example-fpga" if transport == "fpga" else None,
         "max_image_bytes": 4096,

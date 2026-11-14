@@ -55,8 +55,7 @@ Manager programming plan + run → PPU Runtime.
   the Standalone Mock development runtime only and are never used here.
 - Availability is judged in layers, each with an exact reason: PPU ONLINE
   (Fleet transport + current observation), Platform admission (pairing,
-  Runtime active, no recovery) and Programming capability (a committed
-  Programming Route declares the IC on the Site, Site enabled and idle).
+  Runtime active, no recovery) and Programming capability (a committed IC Programming Profile declares the operation, the PPU reports a compatible Site enabled and idle).
   The UI only reads; it never enrolls, rotates a credential or recovers.
 - Programming Source: `Programming Image` (default; e.g. a `.bin`) or `Bundle`, mutually exclusive. These two labels are used on every page (shared `ProgrammingSourceSelector`); the wire values stay `image` / `bundle`.
   Switching clears the file, plan, run view and validation state and issues
@@ -93,8 +92,7 @@ Not implemented, and not to be claimed:
 - **Concurrency.** One run at a time. Parallel Sites on one PPU and parallel
   PPUs are not physically qualified.
 - **Production qualification.** Only PYNQ-Z2 Site 2 has physical evidence.
-  `site_count` is topology, never capability: a Site is programmable only
-  when a committed Programming Route declares the IC on it.
+  `site_count` is topology, never capability: a Site is programmable only when the selected IC's Profile is compatible with a currently observed and admitted Site; never gate by static Profile `sites[]`.
 
 ## Web validation commands
 

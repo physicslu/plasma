@@ -22,7 +22,9 @@ builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
 
 V01 = ROOT / "docs/evidence/bluepill-z2-flash-2026-10-27/firmware/plasma-blue-pill-cdc.bin"
-EXPECTED_V01_BUNDLE_SHA = "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a"
+# Provider Capability v2 drops the static physical Site allowlist, which
+# changes canonical Bundle bytes; retain a fixed v2 hash for regression.
+EXPECTED_V01_BUNDLE_SHA = "28ca8f02a20e1ed151babcfb69f9a7085e78a05fb5bd5c3009d141301b0095ad"
 
 
 def test_v01_fixture_exact_source_reproduces_same_zip(tmp_path):

@@ -46,7 +46,6 @@ def ops_route(operations=ALL) -> bundle_v3.ProgrammingRoute:
     data["provider"]["id"] = C3_PROVIDER
     data["profile"]["id"] = C3_PROFILE
     data["profile"]["capabilities"]["provider_package"] = C3_PROVIDER
-    data["profile"]["capabilities"]["sites"] = [1, 2]
     data["profile"]["capabilities"]["operations"] = list(operations)
     return bundle_v3.parse_route(data)
 

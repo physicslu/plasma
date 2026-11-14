@@ -138,7 +138,7 @@ test("PPU topology remains observed while Site desired configuration is PPU-owne
   assert.match(ppuSiteDesiredCore, /saveManagerPpuSite/);
   assert.match(ppuSiteDesiredCore, /Desired Enabled/);
   assert.match(ppuSiteDesiredCore, /Desired Interface/);
-  assert.match(ppuSiteDesiredCore, /Desired Target/);
+  assert.doesNotMatch(ppuSiteDesiredCore, /Desired Target/); // ICPN is selected per Job
   assert.match(ppuSiteDesiredCore, /<th>Runtime<\/th>/);
   assert.match(ppuSiteDesiredCore, /<th>Reconciliation<\/th>/);
   assert.match(ppuSiteDesiredCore, /Stop or cancel active Jobs before changing Site desired configuration/);

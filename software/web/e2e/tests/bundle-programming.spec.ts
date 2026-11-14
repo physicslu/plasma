@@ -37,7 +37,7 @@ const bootstrapStatus = {
 
 const route = {
   route_id: "z2-site2-stm32f103c8t6", target: { platform: "linux-armv7", board: "pynq-z2", fpga_part: "xc7z020clg400-1" },
-  icpn: "STM32F103C8T6", sites: [2], provider: "openocd-platform-reference", profile: "stm32f103c8t6-site2",
+  icpn: "STM32F103C8T6", site_interface: "openocd", provider: "openocd-platform-reference", profile: "stm32f103c8t6-site2",
   operations: ["flash_cycle"], driver_abi: "plasma_swd:5", transport: "fpga", max_image_bytes: 65536,
   target_config: "target/stm32f1x.cfg", flash_base: 134217728, flash_size: 65536,
 };
@@ -127,7 +127,21 @@ async function mockManager(page: Page, mocks: Mocks = {}) {
   // Default run records follow the plan: a reuse plan yields a reuse run.
   const reuse = mocks.activationRequired === false;
   await page.route(/\/api\/manager\/registry$/, r => r.fulfill(json(registry)));
-  await page.route(/\/api\/fleet$/, r => r.fulfill(json({ ok: true, contract_version: "1", ppus: [] })));
+  // The actual UI discovers Site existence from Manager Fleet, not Route.sites.
+  // Only Site 2 is physically enabled in this host-only fixture.
+  await page.route(/\/api\/fleet$/, r => r.fulfill(json({
+    ok: true, contract_version: "1", observed_at: "2026-11-14T00:00:00Z",
+    ppus: [{
+      alias: ALIAS, transport_state: "reachable", execution_state: "ready",
+      observation: { state: "current", last_success_at: "2026-11-14T00:00:00Z", stale_age_s: 0 },
+      identity: { ppu_id: "z2-hil", facility_id: "lab", model: "PYNQ-Z2", display_name: "z2-hil" },
+      topology: { source: "current", site_count: 2, enabled_site_count: 1, sites: [
+        { site_id: 1, enabled: false, state: "disabled", current_job_id: null, interface: null },
+        { site_id: 2, enabled: true, state: "idle", current_job_id: null, interface: "openocd" },
+      ] },
+      identity_conflict: false, degraded: false,
+    }],
+  })));
   await page.route(/\/api\/manager\/registry\/z2\/bootstrap$/, r => r.fulfill(json(bootstrapStatus)));
   await page.route(/\/api\/manager\/devices\/search\?/, r => r.fulfill(json({
     ok: true, scope: "customer_ic_selector", query: "STM32", levels: [1, 2, 3], catalog_size: 1,

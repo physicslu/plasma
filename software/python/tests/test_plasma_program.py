@@ -95,8 +95,13 @@ def test_local_bundle_selects_firmware_from_canonical_v3(tmp_path):
     assert selected.profile == "stm32f103c8t6-site2"
     assert selected.provider == "openocd-platform-reference"
     assert selected.site == 2
-    with pytest.raises(program.ProgramDenied, match="SITE_OR_TARGET_NOT_QUALIFIED"):
-        program.read_bundle(output, site=3, package=None)
+    # Bundle package selection is independent of physical Site identity.
+    # Actual Site/interface readiness and Job Binding are checked by the
+    # Manager/PPU before submitting a real hardware Job, not by this reader.
+    other_site = program.read_bundle(output, site=3, package=None)
+    assert other_site.site == 3
+    assert other_site.bundle_sha == selected.bundle_sha
+    assert other_site.firmware_sha == selected.firmware_sha
     with pytest.raises(program.ProgramDenied, match="FIRMWARE_PACKAGE_NOT_FOUND"):
         program.read_bundle(output, site=2, package="not-a-package")
     wrong = tmp_path / "wrong.bin"

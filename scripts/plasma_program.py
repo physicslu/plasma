@@ -123,10 +123,9 @@ def read_bundle(path: Path, *, site: int, package: str | None,
     require(sha256(raw_firmware) == entry["sha256"]
             and len(raw_firmware) == entry["size"] and len(raw_firmware) > 0,
             "FIRMWARE_SHA_OR_SIZE_MISMATCH")
-    require(descriptor.get("schema") == "plasma.ppu.provider-capabilities.v1"
+    require(descriptor.get("schema") == "plasma.ppu.provider-capabilities.v2"
             and descriptor.get("provider_package") == provider["id"]
-            and descriptor.get("target") and type(descriptor.get("sites")) is list
-            and site in descriptor["sites"]
+            and descriptor.get("target")
             and "flash_cycle" in descriptor.get("operations", []),
             "SITE_OR_TARGET_NOT_QUALIFIED")
     if image is not None:
@@ -240,8 +239,7 @@ def readiness(host: str, chosen: Selection) -> dict:
             and site.get("site_id") == chosen.site
             and site.get("enabled") is True and site.get("state") == "idle"
             and site.get("current_job_id") is None and site.get("queued_jobs") == 0
-            and site.get("interface") == "openocd"
-            and site.get("target") == chosen.target,
+            and site.get("interface") == "openocd",
             "SITE_NOT_READY_OR_BUSY")
     return {"ppu_id": ident["ppu_id"], "site": chosen.site, "site_idle": True}
 

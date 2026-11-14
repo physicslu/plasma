@@ -11,7 +11,8 @@ remains separate. This contract does not authorize Z2 deployment or DUT work.
 
 One verified Bundle v3 is one Active Asset Set. An explicitly selected
 `programming-profile` resource Package must contain
-`data/plasma-provider.json` using `plasma.ppu.provider-capabilities.v1`.
+`data/plasma-provider.json` using `plasma.ppu.provider-capabilities.v2`
+(v1 retired by Issue #1424; an old Active Set must not be silently reused).
 An unrelated resource Package containing this filename is **not** an admitted
 Programming Profile. Its
 `provider_package` names a `python` or `native-c` Package in the same Bundle;
@@ -21,11 +22,14 @@ entrypoint is a verified Package file, not an executable instruction from the
 descriptor. Bundle install and Active Set activation remain separate.
 
 The descriptor has exactly these fields: `schema`, `target`,
-`provider_package`, `operations`, `sites`, `transport`, `driver_abi`,
+`provider_package`, `operations`, `transport`, `driver_abi`,
 `fpga_package`, `max_image_bytes`. Operations are drawn from
 `erase`, `program`, `verify`, `read`, `flash_cycle`; a requested operation must
 be present. `transport` is `fpga` or `ps-only`. Capability strings and Package
-IDs are Bundle data, never Core allowlist entries. `flash_cycle` still requires
+IDs are Bundle data, never Core allowlist entries. No static Site-ID list
+belongs to the Provider Capability descriptor: the PPU must independently
+attest the actual selected Site and interface compatibility, while each Job
+retains its exact Site/ICPN Binding. `flash_cycle` still requires
 independent complete-cycle evidence from the executor; advertising it alone
 does not prove it. The descriptor is not a Job, authority to execute a Package,
 or authority to access Root, MMIO or the DUT.

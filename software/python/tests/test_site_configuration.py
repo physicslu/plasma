@@ -64,11 +64,11 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         self.assertEqual(len(current["sites"]), 2)
         self.assertEqual(
             {key: value for key, value in current["sites"][0].items() if key != "desired_revision"},
-            {"site_id": 1, "enabled": True, "interface": "mock", "target": "TARGET-A"},
+            {"site_id": 1, "enabled": True, "interface": "mock"},
         )
         self.assertEqual(
             {key: value for key, value in current["sites"][1].items() if key != "desired_revision"},
-            {"site_id": 2, "enabled": False, "interface": "mock", "target": "TARGET-B"},
+            {"site_id": 2, "enabled": False, "interface": "mock"},
         )
         for site in current["sites"]:
             self.assertRegex(site["desired_revision"], r"^sha256:[0-9a-f]{64}$")
@@ -86,25 +86,25 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         current = SiteConfigurationController(self.path).current()
 
         # No product default ICPN: an unselected Site target stays unselected.
-        self.assertIsNone(current["sites"][1]["target"])
+        self.assertNotIn("target", current["sites"][1])
         self.assertRegex(current["sites"][1]["desired_revision"], r"^sha256:[0-9a-f]{64}$")
 
     def test_update_persists_only_writable_site_fields(self) -> None:
         saved = self.controller.update(
             1,
-            {"enabled": False, "interface": "openocd", "target": "STM32F103C8T6"},
+            {"enabled": False, "interface": "openocd"},
             expected_revision=self.revision(1),
         )
         self.assertEqual(
             {key: value for key, value in saved["sites"][0].items() if key != "desired_revision"},
-            {"site_id": 1, "enabled": False, "interface": "openocd", "target": "STM32F103C8T6"},
+            {"site_id": 1, "enabled": False, "interface": "openocd"},
         )
 
         reloaded = load_config(self.path)
         site = next(item for item in reloaded.sites if item.id == 1)
         self.assertFalse(site.enabled)
         self.assertEqual(site.interface, "openocd")
-        self.assertEqual(site.target, "STM32F103C8T6")
+        self.assertIsNone(site.target)  # stale Site target retired when desired is saved
         self.assertEqual(site.operation_timeout_s, 12.5)
         self.assertEqual(site.mock["flash_size"], 4096)
 
@@ -112,7 +112,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         self.path.chmod(0o640)
         self.controller.update(
             1,
-            {"enabled": True, "interface": "mock", "target": "TARGET-MODE"},
+            {"enabled": True, "interface": "mock"},
             expected_revision=self.revision(1),
         )
         self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o640)
@@ -120,7 +120,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
     def test_restart_persistence_round_trip(self) -> None:
         saved = self.controller.update(
             2,
-            {"enabled": True, "interface": "fpga", "target": "TARGET-C"},
+            {"enabled": True, "interface": "fpga"},
             expected_revision=self.revision(2),
         )
         after_restart = SiteConfigurationController(self.path).current()
@@ -131,7 +131,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         before_two = self.revision(2)
         saved = self.controller.update(
             1,
-            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            {"enabled": True, "interface": "openocd"},
             expected_revision=before_one,
         )
         after_one = saved["sites"][0]["desired_revision"]
@@ -144,7 +144,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         stale = self.revision(1)
         self.controller.update(
             1,
-            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            {"enabled": True, "interface": "openocd"},
             expected_revision=stale,
         )
         before_conflict = self.path.read_text(encoding="utf-8")
@@ -152,7 +152,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         with self.assertRaises(SiteConfigurationConflictError) as caught:
             self.controller.update(
                 1,
-                {"enabled": True, "interface": "mock", "target": "TARGET-STALE"},
+                {"enabled": True, "interface": "openocd"},
                 expected_revision=stale,
             )
 
@@ -166,7 +166,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         with self.assertRaises(PlasmaError) as caught:
             self.controller.update(
                 3,
-                {"enabled": True, "interface": "mock", "target": "TARGET-C"},
+                {"enabled": True, "interface": "openocd"},
                 expected_revision=self.revision(1),
             )
         self.assertEqual(caught.exception.code, ErrorCode.SITE_INVALID)
@@ -174,11 +174,11 @@ class SiteConfigurationControllerTests(unittest.TestCase):
 
     def test_invalid_site_payload_fails_closed(self) -> None:
         invalid = (
-            {"enabled": True, "interface": "uart", "target": "TARGET-A"},
-            {"enabled": True, "interface": "mock", "target": ""},
-            {"enabled": 1, "interface": "mock", "target": "TARGET-A"},
-            {"enabled": True, "interface": "mock", "target": " TARGET-A"},
-            {"enabled": True, "interface": "mock", "target": "TARGET-A", "extra": True},
+            {"enabled": True, "interface": "uart"},
+            {"enabled": 1, "interface": "mock"},
+            {"enabled": True, "interface": "mock", "target": "OLD-STATIC-ICPN"},
+            {"interface": "mock"},
+            {"enabled": True, "interface": "mock", "extra": True},
         )
         before = self.path.read_text(encoding="utf-8")
         expected_revision = self.revision(1)
@@ -194,7 +194,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "disk full"):
                 self.controller.update(
                     1,
-                    {"enabled": False, "interface": "mock", "target": "TARGET-A"},
+                    {"enabled": False, "interface": "mock"},
                     expected_revision=self.revision(1),
                 )
         self.assertEqual(self.path.read_text(encoding="utf-8"), before)

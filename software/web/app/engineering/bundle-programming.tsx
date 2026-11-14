@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
+import { loadManagedTopology, type ManagedTopology } from "../programming/managed-programming";
 import { ProgrammingRunView } from "../operator-ui/programming-run-view";
 import {
   acknowledgeProgrammingRun,
@@ -19,8 +20,7 @@ import {
 } from "./bundle-programming-api";
 
 const POLL_MS = 1000;
-// Catalog Level is not a programming gate (Unified Decision 2026-11-04 §1);
-// the Programming Route decides whether a Site can program the IC.
+// The IC Profile determines programming support; the PPU determines which Sites exist.
 const PICKER_LEVELS: Array<1 | 2 | 3> = [1, 2, 3];
 
 function short(value: string | null | undefined): string {
@@ -29,6 +29,7 @@ function short(value: string | null | undefined): string {
 
 export default function BundleProgramming({ alias }: { alias: string }) {
   const [routes, setRoutes] = useState<ProgrammingRoute[] | null>(null);
+  const [topology, setTopology] = useState<ManagedTopology | null>(null);
   const [routesError, setRoutesError] = useState<string | null>(null);
   const [device, setDevice] = useState<DeviceSearchResult | null>(null);
   const [chosenSite, setChosenSite] = useState<number | null>(null);
@@ -51,21 +52,26 @@ export default function BundleProgramming({ alias }: { alias: string }) {
       .catch(reason => {
         if (!cancelled) setRoutesError(reason instanceof Error ? reason.message : "Programming Routes unavailable");
       });
+    loadManagedTopology().then(next => { if (!cancelled) setTopology(next); })
+      .catch(reason => { if (!cancelled) setRoutesError(reason instanceof Error ? reason.message : "PPU Site topology unavailable"); });
     return () => { cancelled = true; };
   }, [alias]);
 
   const icpn = device?.icpn ?? device?.identifier ?? null;
   const siteOptions = useMemo(() => {
-    if (!icpn || !routes) return [];
-    return [...new Set(routes.filter(route => route.icpn === icpn).flatMap(route => route.sites))].sort((a, b) => a - b);
-  }, [icpn, routes]);
+    const ppu = topology?.ppus.find(item => item.alias === alias);
+    if (!ppu?.online) return [];
+    return ppu.sites.filter(site => site.enabled && site.state === "idle"
+      && (site.interface === "openocd" || site.interface === "fpga"))
+      .map(site => site.site_id).sort((a, b) => a - b);
+  }, [alias, topology]);
 
   const siteId = chosenSite != null && siteOptions.includes(chosenSite) ? chosenSite : siteOptions[0] ?? null;
   // Offer only Operations the matching Route Profile declares; the user picks one.
   const operationOptions = useMemo(() => {
     if (!icpn || !routes || siteId == null) return [];
     const declared = new Set(routes
-      .filter(route => route.icpn === icpn && route.sites.includes(siteId))
+      .filter(route => route.icpn === icpn)
       .flatMap(route => route.operations));
     return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
   }, [icpn, routes, siteId]);

@@ -64,16 +64,19 @@ test("registered PPUs are discovered from the Manager; ONLINE no longer means Pr
   expect(writes(counters)).toEqual([]);
 });
 
-test("ONLINE and Programming capability are separate: a Site without a Route blocks Start with the exact Site", async ({ page }) => {
-  const counters = await mockManager(page, { ppus: [{ ...Z2, enabledSites: [1, 2] }] });
+test("ONLINE does not bypass Profile interface compatibility on a selected Site", async ({ page }) => {
+  const counters = await mockManager(page, {
+    ppus: [{ ...Z2, enabledSites: [1, 2], siteInterfaces: { 1: "fpga" } }],
+  });
   const { start } = await prepare(page, [["z2", [1, 2]]]);
   await expect(page.getByLabel("Factory communication health")).toContainText("Gateway ONLINE");
   const readiness = page.getByTestId("managed-readiness");
   await expect(readiness).toContainText("PROGRAMMING UNAVAILABLE");
   await expect(readiness).toContainText("PPU z2 Site 1");
-  await expect(readiness).toContainText("No Programming Route declares STM32F103C8T6 on Site 1");
+  await expect(readiness).toContainText(
+    "The PPU Site interface does not match the selected IC Profile's required execution interface.");
   await expect(start).toBeDisabled();
-  // site_count = 8 never makes eight Sites programmable.
+  // Site topology alone cannot certify a hardware execution interface.
   expect(writes(counters)).toEqual([]);
 });
 
@@ -108,7 +111,7 @@ test("multi-PPU production: one Manager run per PPU/Site with isolated Job, Reso
 test("multi-Site PASS / FAIL / Yield: a failed Site is counted once and never retried", async ({ page }) => {
   const script = (_alias: string, siteId: number): RunScript =>
     siteId === 1 ? {} : { outcome: "FAIL", reason: "READBACK_SHA256_MISMATCH" };
-  const counters = await mockManager(page, { ppus: [{ ...Z2, enabledSites: [1, 2] }], routes: [route([1, 2])], script });
+  const counters = await mockManager(page, { ppus: [{ ...Z2, enabledSites: [1, 2] }], routes: [route()], script });
   const { start } = await prepare(page, [["z2", [1, 2]]]);
   await start.click();
   await finished(page);
@@ -128,7 +131,7 @@ test("OUTCOME_UNKNOWN latches only its own PPU: no resubmission, later Sites of 
   const script = (alias: string, siteId: number): RunScript => alias === "z2" && siteId === 1
     ? { outcome: "OUTCOME_UNKNOWN", reason: "JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT" } : {};
   const counters = await mockManager(page, {
-    ppus: [{ ...Z2, enabledSites: [1, 2] }, LINE2], routes: [route([1, 2])], script });
+    ppus: [{ ...Z2, enabledSites: [1, 2] }, LINE2], routes: [route()], script });
   const { start } = await prepare(page, [["z2", [1, 2]], ["line2", [2]]]);
   await start.click();
   await finished(page);
@@ -171,7 +174,7 @@ test("partial batch: a PPU in Recovery is blocked before any Job while the healt
 
 test("Stop Policy only prevents further starts: no retry and no duplicate programming", async ({ page }) => {
   const counters = await mockManager(page, {
-    ppus: [{ ...Z2, enabledSites: [1, 2] }, LINE2], routes: [route([1, 2])],
+    ppus: [{ ...Z2, enabledSites: [1, 2] }, LINE2], routes: [route()],
     script: () => ({ outcome: "FAIL", reason: "FLASH_CYCLE_NOT_PASS" }) });
   const { job, start } = await prepare(page, [["z2", [1, 2]], ["line2", [2]]]);
   await job.getByLabel("Stop Policy").selectOption("1");
@@ -270,12 +273,12 @@ test("non-durable: a reload during the batch stops queuing; nothing is resumed o
   await expect(page.getByRole("status", { name: "BATCH STATUS" })).not.toHaveText(/RUNNING|SUCCESS/);
 });
 
-test("a Mock PPU result and a hardware-path result are labelled differently in the same batch", async ({ page }) => {
-  await mockManager(page, { ppus: [Z2, { ...LINE2, siteInterface: "mock" }] });
+test("mixed Mock and OpenOCD Sites cannot bypass one Profile interface qualification", async ({ page }) => {
+  const counters = await mockManager(page, { ppus: [Z2, { ...LINE2, siteInterface: "mock" }] });
   const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  await start.click();
-  await finished(page);
-  await expect(factoryLog(page)).toContainText("[EVIDENCE] Site interface: openocd · PPU z2 · PPU ID z2-hil · SITE-02");
-  await expect(factoryLog(page)).toContainText("[EVIDENCE] MOCK RESULT · Site interface mock");
-  await expect(factoryLog(page)).toContainText("never a hardware qualification");
+  await expect(page.getByTestId("managed-readiness")).toContainText("PROGRAMMING UNAVAILABLE");
+  await expect(start).toBeDisabled();
+  expect(counters.plans).toHaveLength(0);
+  expect(counters.starts).toHaveLength(0);
+  expect(counters.jobs).toHaveLength(0);
 });

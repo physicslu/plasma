@@ -85,10 +85,10 @@ def _check_inputs(files: dict[str, bytes], target: dict,
 
     descriptor = _load_json(files["plasma-provider.json"])
     _need(type(descriptor) is dict and set(descriptor) == {
-        "schema", "target", "provider_package", "operations", "sites",
+        "schema", "target", "provider_package", "operations",
         "transport", "driver_abi", "fpga_package", "max_image_bytes"},
         "PROVIDER_DESCRIPTOR_INVALID")
-    _need(descriptor["schema"] == "plasma.ppu.provider-capabilities.v1"
+    _need(descriptor["schema"] == "plasma.ppu.provider-capabilities.v2"
           and descriptor["provider_package"] == provider_id
           and type(descriptor["target"]) is str and bool(descriptor["target"])
           and descriptor["transport"] == "fpga"
@@ -97,10 +97,6 @@ def _check_inputs(files: dict[str, bytes], target: dict,
           and bool(descriptor["driver_abi"])
           and type(descriptor["operations"]) is list
           and "flash_cycle" in descriptor["operations"]
-          and type(descriptor["sites"]) is list
-          and bool(descriptor["sites"])
-          and all(type(s) is int and s > 0 for s in descriptor["sites"])
-          and descriptor["sites"] == sorted(set(descriptor["sites"]))
           and type(descriptor["max_image_bytes"]) is int
           and 0 < descriptor["max_image_bytes"] <= 512 * 1024 * 1024,
           "PROVIDER_DESCRIPTOR_INVALID")

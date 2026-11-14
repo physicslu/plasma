@@ -36,16 +36,14 @@ ACTIVE_SHA = "e" * 64
 
 
 def route_fixture(tmp_path, sites=(2, 3)):
-    """The shipped Routes, re-declared over more than one Site.
+    """The shipped IC Profiles stay identical across any observed Sites.
 
-    Only the Site list changes, which changes the Resource Set identity - so
-    the fake PPU is told the new identity rather than the shipped one.
+    The Site set belongs to PPU topology, not a Profile or its Resource Set.
     """
     root = tmp_path / "routes"
     root.mkdir(parents=True, exist_ok=True)
     for name in ("z2-site2-stm32f103c8t6.json", "z2-site2-stm32f103c8t6-operations.json"):
         data = json.loads((ROUTES / name).read_text(encoding="utf-8"))
-        data["profile"]["capabilities"]["sites"] = list(sites)
         (root / name).write_text(json.dumps(data), encoding="utf-8")
     operations = bundle_v3.load_route(root / "z2-site2-stm32f103c8t6-operations.json")
     return root, bundle_v3.resource_set_sha256(bundle_v3.resource_set_descriptor(operations))
