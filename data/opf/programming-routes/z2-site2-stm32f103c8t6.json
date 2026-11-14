@@ -25,7 +25,7 @@
     "id": "stm32f103c8t6-site2",
     "version": "1.0.0",
     "capabilities": {
-      "schema": "plasma.ppu.provider-capabilities.v1",
+      "schema": "plasma.ppu.provider-capabilities.v2",
       "target": "STM32F103C8T6",
       "provider_package": "openocd-platform-reference",
       "operations": [
