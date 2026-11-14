@@ -1125,7 +1125,6 @@ export default function FactoryConsoleV2() {
     setBatchCommandState("idle");
     setBatchSnapshot(null);
     setOperatorWarning(null);
-    setClockNow(Date.now());
     clearStoredBatch();
     appendLog(`[SET] COMMIT · ${selectionCounts(snapshot).facilities} Facilities · ${selectionCounts(snapshot).ppus} PPUs · ${selectionCounts(snapshot).sites} Sites`);
     await loadSelectionRuntimes(catalog, snapshot);
@@ -1222,7 +1221,6 @@ export default function FactoryConsoleV2() {
     managedStartLock.current = true;
     setBatchCommandState("submitting");
     setOperatorWarning(null);
-    setClockNow(Date.now());
     terminalBatchRef.current = null;
     setBatchObservationState("connected");
     loggedRecords.current.clear();
@@ -1313,7 +1311,6 @@ export default function FactoryConsoleV2() {
     if (!targets.length) return;
 
     setOperatorWarning(null);
-    setClockNow(Date.now());
     terminalBatchRef.current = null;
     setBatchObservationState("connected");
     beginActivity();
