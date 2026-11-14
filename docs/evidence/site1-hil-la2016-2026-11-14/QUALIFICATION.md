@@ -37,3 +37,21 @@
 Codex evidence review `validate.py` PASS (native receipt, Manager, waveform statistics and decode, overlap, release and Root identity). No software/RTL changes or FPGA reload/deploy during real Flash; this PR newly integrates the existing unmerged Site1 Route and adjusts two test negative cases, so **PR CI and change review are still required** before Gate 2. LA2016 initial CLI threshold format error was corrected **before** the Start, without an extra hardware attempt. No automatic retry or Site 2 actuation.
 
 **Gate 2: NOT APPROVED. Draft only; do not merge or deploy.**
+
+## 5 MHz SWD + 100 MHz passive capture retest — BLOCKED / NOT_RUN
+
+[Actions Run #43597625441](https://github.com/physicslu/plasma/actions/runs/43597625441), Path 3, source `0e25ac2900c900bdeee08b3b8926f84ffd2c4413`, owner Work Order SHA256 `8d23e5b518381c32f16bc91f1baded88d5bf4b90216f5e34dd0c8a93af2efdf8`. This section records a separate retest; the earlier physical PASS sections remain unchanged.
+
+**Observed blocker: deployed EngineSelection specifies `adapter_khz: 2000`; no deployed runtime session speed API exists.** Read-only authenticated Z2 inspection found `/etc/plasma/site-worker-engine.json` SHA256 `c07ba04c7398979adc7860aea5e0ec54ab088fec2c5891b6f9248ed749b31b05`. The deployed Site Worker control operations are `open_session`, `open_job_session`, `close_session`, `status`, `bind_image`, `bind_range`, `run`. The deployed service passes the verified EngineSelection speed to its adapter at startup; the adapter checks that speed against the verified engine and emits `adapter speed {self.adapter_khz}`. It offers no per-session speed override. The running Worker PID observed was 15799.
+
+Selecting 5,000 kHz requires changing the deployed selection and activating it in the Worker. The Work Order explicitly requires stopping if an unauthorized deployed configuration mutation is necessary. No configuration write, restart, FPGA reload, deployment, PWM, Start, Batch or Job was performed. Site2 was untouched. Native admission/SAFE_OFF, HIL E/P/V/readback, 100 MHz USB acquisition, waveform overlap/edges/ACK decode and measured 5 MHz are **NOT_RUN**. No new `.sr` exists. No 2 MHz Flash was substituted. This is a configuration/API blocker, not an observed DUT failure or analyzer failure.
+
+| Qualification | Earlier baseline | Requested retest |
+| --- | --- | --- |
+| SWD / sample rate | Measured 2 MHz / 20 MHz | 5 MHz / 100 MHz NOT_RUN |
+| E/P/V + full readback | PASS, Job `job-20261114-124905-661b6d67` | NOT_RUN, zero new jobs |
+| Waveform / ACK decode | PASS, archived above | NOT_RUN, no raw waveform |
+
+Compact result: `5mhz-100mhz-summary.json`. Sanitized deployed-source inspection and hashes are staged in `.plasma-path3-evidence/deployed-speed-inspection.txt` for the existing workflow artifact `plasma-development-codex-43597625441`. The artifact ID, final archive SHA and upload result are pending workflow completion; no precise artifact URL is claimed before upload. Source patches and new documents are retained by the existing workflow for application to **existing Draft PR #1427 only** if publication is unavailable. GitHub CLI currently has no authenticated token; PR checks/publication are **NOT_VERIFIED** from this subprocess. Wrapper EXIT_ZERO does not imply hardware PASS.
+
+Resolution requires owner authorization for the bounded deployed speed selection/activation (or a separately approved runtime speed API change), followed by a newly authorized physical attempt. No retry was made under this Work Order. Gate 2 remains unapproved; no merge.
