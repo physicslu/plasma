@@ -496,8 +496,12 @@ export default function FactoryConsoleV2() {
       const label = `PPU ${unit.ppu_alias} · PPU ID ${ppu?.ppuId ?? "unknown"} · ${siteLabel(unit.site_id)}`;
       const latestRun = runOfUnit(batch, unit);
       if (latestRun?.outcome != null) {
-        for (const line of programmingRunLogLines(latestRun, { executionInterface: interfaceName })) {
-          appendLog(`${line} · ${label}`, verdict.verdict === "PASS" ? "INFO" : "ERROR");
+        if (latestRun.outcome === "PASS" && verdict.verdict !== "PASS") {
+          appendLog(`[EVIDENCE] MANAGER RUN PASS REJECTED · ${verdict.reason ?? "unverified receipt"} · ${label}`, "ERROR");
+        } else {
+          for (const line of programmingRunLogLines(latestRun, { executionInterface: interfaceName })) {
+            appendLog(`${line} · ${label}`, verdict.verdict === "PASS" ? "INFO" : "ERROR");
+          }
         }
       }
       appendLog(`[SITE] ${label} · ${verdict.verdict} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${last?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${verdict.reason ?? unit.reason ? " · " + (verdict.reason ?? unit.reason) : ""}`,

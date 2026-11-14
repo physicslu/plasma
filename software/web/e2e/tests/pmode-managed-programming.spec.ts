@@ -88,6 +88,20 @@ test("one Manager Start and ONE canonical Batch serves two PPUs with separate Jo
   await expect(page.locator("[data-receipt-site]")).toHaveCount(0);
 });
 
+test("a Manager-reported PASS without verified SAFE_OFF is NOT a PMode PASS", async ({ page }) => {
+  const counters = await mockManager(page, { script: () => ({ outcome: "PASS", safeOff: false }) });
+  const { job, start } = await prepare(page, [["z2", [2]]]);
+  await job.getByLabel("Site Retry Limit").fill("0");
+  await start.click();
+  await finished(page);
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "faulted");
+  await expect(summary(page)).not.toContainText("100.0%");
+  await expect(factoryLog(page)).toContainText("SAFE_OFF_NOT_VERIFIED");
+  await expect(factoryLog(page)).toContainText("MANAGER RUN PASS REJECTED");
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.starts).toHaveLength(1);
+});
+
 test("Site PASS/FAIL is per-Unit, not inferred from Batch HTTP 200; yield counts once", async ({ page }) => {
   const script = (_alias: string, siteId: number): RunScript =>
     siteId === 2 ? { outcome: "FAIL", reason: "READBACK_SHA256_MISMATCH", safeOff: true } : {};
