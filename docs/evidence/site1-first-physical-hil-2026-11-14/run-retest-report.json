@@ -1,0 +1,41 @@
+{
+  "attempt_count": 1,
+  "batch_id": "29ae16dca64f6018db50e2d6f80329d0",
+  "batch_terminal_ns": 1794653411065337962,
+  "capture_finish_ns": 1794653439334478066,
+  "capture_start_ns": 1794653402553504359,
+  "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+  "job_binding_sha256": "6a7b83daca3d0d6d460b163f5d86de3d18b2658a45500b932396f7ab2e958148",
+  "job_id": "job-20261114-105004-f42cf854",
+  "la_armed_ns": 1794653402672731702,
+  "la_channels": [
+    "CH3",
+    "CH4",
+    "CH5"
+  ],
+  "la_conn": "1.108",
+  "la_exit_code": 0,
+  "la_requested_samples": 600000000,
+  "la_sample_rate_hz": 20000000,
+  "la_start_observed": true,
+  "la_threshold_v": 1.4,
+  "manager_start_http_status": 202,
+  "manager_start_request_ns": 1794653402672732320,
+  "manager_start_response_ns": 1794653403051468769,
+  "manager_start_submissions": 1,
+  "operations": [
+    "erase",
+    "program",
+    "verify"
+  ],
+  "outcome": "FAIL",
+  "plan_id": "281e8183af0f46242ae12bd1d6a0f59a",
+  "resource_generation_before": 21,
+  "resource_set_sha256": "9e353ab4bcfd80d5d0b8c46bce7442ccf3430388b641346a1c5bcd1dc4487a93",
+  "run_id": "7ddf10e9e90db6f138ac7a382c1a5ffa",
+  "schema": "plasma.site1.first-physical-hil.run-once.v1",
+  "site_id": 1,
+  "start_id": "7b7527c74304ca59efddcd53dd182b3a",
+  "wave_bytes": 1196141,
+  "wave_sha256": "c7fd1409af0fde0006b9fffcb4f6e64d4304f4b4857f2ab8de28143ac76bd313"
+}

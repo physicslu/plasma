@@ -1,0 +1,426 @@
+{
+  "ok": true,
+  "reconciliation": {
+    "schema": "plasma.manager.programming-start-reconciliation.v1",
+    "start_id": "7b7527c74304ca59efddcd53dd182b3a",
+    "ppu_alias": "z2",
+    "kind": "batch",
+    "state": "TERMINAL_CONFIRMED",
+    "reason": "SAFE_OFF_NOT_VERIFIED",
+    "outcome": "FAIL",
+    "identity": {
+      "ppu_alias": "z2",
+      "site_id": 1,
+      "targets": [
+        {
+          "ppu_alias": "z2",
+          "site_ids": [
+            1
+          ]
+        }
+      ],
+      "ppu_id": null,
+      "operation": "programming",
+      "operations": [
+        "erase",
+        "program",
+        "verify"
+      ],
+      "job_binding_sha256": "6a7b83daca3d0d6d460b163f5d86de3d18b2658a45500b932396f7ab2e958148"
+    },
+    "run": null,
+    "batch": {
+      "schema": "plasma.manager.programming-batch.v2",
+      "batch_id": "29ae16dca64f6018db50e2d6f80329d0",
+      "start_id": "7b7527c74304ca59efddcd53dd182b3a",
+      "targets": [
+        {
+          "ppu_alias": "z2",
+          "site_ids": [
+            1
+          ]
+        }
+      ],
+      "operations": [
+        "erase",
+        "program",
+        "verify"
+      ],
+      "source": "image",
+      "icpn": "STM32F103C8T6",
+      "policy": {
+        "repeat": 1,
+        "retry_limit": 0,
+        "stop_policy": {
+          "kind": "failed_sites",
+          "threshold": 1
+        }
+      },
+      "state": "finished",
+      "execution_status": "COMPLETED",
+      "outcome": "FAIL",
+      "reason": "SAFE_OFF_NOT_VERIFIED",
+      "stop_requested": false,
+      "failure_domain": null,
+      "units": [
+        {
+          "ppu_alias": "z2",
+          "site_id": 1,
+          "status": "FINISHED",
+          "outcome": "FAIL",
+          "reason": "SAFE_OFF_NOT_VERIFIED",
+          "failure_domain": null,
+          "attempts": [
+            {
+              "attempt": 1,
+              "job_key": {
+                "batch_id": "29ae16dca64f6018db50e2d6f80329d0",
+                "ppu_alias": "z2",
+                "site_id": 1,
+                "attempt": 1
+              },
+              "plan_id": "c49b170a7a6fa63c065d2fb4c7c07ab9",
+              "run_id": "7ddf10e9e90db6f138ac7a382c1a5ffa",
+              "job_binding_sha256": "6a7b83daca3d0d6d460b163f5d86de3d18b2658a45500b932396f7ab2e958148",
+              "job_id": "job-20261114-105004-f42cf854",
+              "state": "finished",
+              "outcome": "FAIL",
+              "reason": "SAFE_OFF_NOT_VERIFIED",
+              "safe_off": null,
+              "retry": {
+                "eligible": false,
+                "reason": "SAFE_OFF_NOT_VERIFIED",
+                "decision": "NO_RETRY"
+              },
+              "started_at": "2026-11-14T10:50:03.800463+00:00",
+              "finished_at": "2026-11-14T10:50:10.530446+00:00"
+            }
+          ]
+        }
+      ],
+      "journal_persisted": true,
+      "created_at": "2026-11-14T10:50:03.035650+00:00",
+      "updated_at": "2026-11-14T10:50:10.829174+00:00",
+      "attempts": [
+        {
+          "attempt": 1,
+          "job_key": {
+            "batch_id": "29ae16dca64f6018db50e2d6f80329d0",
+            "ppu_alias": "z2",
+            "site_id": 1,
+            "attempt": 1
+          },
+          "plan_id": "c49b170a7a6fa63c065d2fb4c7c07ab9",
+          "run_id": "7ddf10e9e90db6f138ac7a382c1a5ffa",
+          "job_binding_sha256": "6a7b83daca3d0d6d460b163f5d86de3d18b2658a45500b932396f7ab2e958148",
+          "job_id": "job-20261114-105004-f42cf854",
+          "state": "finished",
+          "outcome": "FAIL",
+          "reason": "SAFE_OFF_NOT_VERIFIED",
+          "safe_off": null,
+          "retry": {
+            "eligible": false,
+            "reason": "SAFE_OFF_NOT_VERIFIED",
+            "decision": "NO_RETRY"
+          },
+          "started_at": "2026-11-14T10:50:03.800463+00:00",
+          "finished_at": "2026-11-14T10:50:10.530446+00:00"
+        }
+      ],
+      "current_run": {
+        "schema": "plasma.manager.bundle-programming-run.v1",
+        "run_id": "7ddf10e9e90db6f138ac7a382c1a5ffa",
+        "ppu_alias": "z2",
+        "site_id": 1,
+        "plan": {
+          "schema": "plasma.manager.bundle-programming-plan.v3",
+          "plan_id": "c49b170a7a6fa63c065d2fb4c7c07ab9",
+          "ppu_alias": "z2",
+          "site_id": 1,
+          "operation": "programming",
+          "operations": [
+            "erase",
+            "program",
+            "verify"
+          ],
+          "source": "image",
+          "route": {
+            "route_id": "z2-site1-stm32f103c8t6-operations",
+            "target": {
+              "platform": "linux-armv7",
+              "board": "pynq-z2",
+              "fpga_part": "xc7z020clg400-1"
+            },
+            "icpn": "STM32F103C8T6",
+            "sites": [
+              1
+            ],
+            "provider": "openocd-platform-reference",
+            "profile": "stm32f103c8t6-site1-operations",
+            "operations": [
+              "erase",
+              "program",
+              "verify",
+              "read"
+            ],
+            "driver_abi": "plasma_swd:5",
+            "transport": "fpga",
+            "max_image_bytes": 65536,
+            "target_config": "target/stm32f1x.cfg",
+            "flash_base": 134217728,
+            "flash_size": 65536
+          },
+          "bundle": {
+            "bundle_schema": "plasma.ppu.bundle.v3",
+            "archive_sha256": "824b3119aba007dc69882fd851af068e53a24f227b9acb3e9c9be1a5c555fef9",
+            "archive_size": 21726,
+            "bundle_name": "stm32f103c8t6-site1-operations-img-8d3ffb02b80f",
+            "version": "1.0.0",
+            "target": {
+              "platform": "linux-armv7",
+              "board": "pynq-z2",
+              "fpga_part": "xc7z020clg400-1"
+            },
+            "provider": "openocd-platform-reference",
+            "profile": "stm32f103c8t6-site1-operations",
+            "asset_package_id": "img-8d3ffb02b80f7797",
+            "image_filename": "plasma-blue-pill-cdc.bin",
+            "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+            "image_size": 18768,
+            "icpn": "STM32F103C8T6",
+            "resource_set_sha256": "9e353ab4bcfd80d5d0b8c46bce7442ccf3430388b641346a1c5bcd1dc4487a93",
+            "image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+            "identity_authority": "archive_sha256"
+          },
+          "resource": {
+            "resource_set_sha256": "9e353ab4bcfd80d5d0b8c46bce7442ccf3430388b641346a1c5bcd1dc4487a93",
+            "ppu_reported": {
+              "state": "VERIFIED",
+              "asset_set_sha256": "824b3119aba007dc69882fd851af068e53a24f227b9acb3e9c9be1a5c555fef9",
+              "generation": 21,
+              "resource_set_sha256": "9e353ab4bcfd80d5d0b8c46bce7442ccf3430388b641346a1c5bcd1dc4487a93"
+            },
+            "reuse": true
+          },
+          "image_asset": {
+            "image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+            "sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+            "size": 18768,
+            "load_address": 134217728,
+            "format": "binary"
+          },
+          "job_binding": {
+            "schema": "plasma.opf.job-image-binding.v1",
+            "resource_set_sha256": "9e353ab4bcfd80d5d0b8c46bce7442ccf3430388b641346a1c5bcd1dc4487a93",
+            "operation": "programming",
+            "range": {
+              "address": 134217728,
+              "length": 18768
+            },
+            "image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+            "ppu_id": "z2-hil",
+            "site_id": 1,
+            "icpn": "STM32F103C8T6",
+            "profile": "stm32f103c8t6-site1-operations",
+            "operations": [
+              "erase",
+              "program",
+              "verify"
+            ]
+          },
+          "job_binding_sha256": "6a7b83daca3d0d6d460b163f5d86de3d18b2658a45500b932396f7ab2e958148",
+          "active_asset_set": {
+            "state": "ACTIVE",
+            "asset_set_sha256": "824b3119aba007dc69882fd851af068e53a24f227b9acb3e9c9be1a5c555fef9"
+          },
+          "activation_required": false,
+          "fpga_load": false,
+          "steps": [
+            "RESOURCE_REUSE",
+            "PROGRAMMING_JOB",
+            "VERIFY_RECEIPT"
+          ],
+          "catalog_gate": "NOT_USED",
+          "confirm_required": "PROGRAM"
+        },
+        "state": "finished",
+        "outcome": "FAIL",
+        "reason": "SAFE_OFF_NOT_VERIFIED",
+        "created_at": "2026-11-14T10:50:03.803216+00:00",
+        "updated_at": "2026-11-14T10:50:10.530446+00:00",
+        "steps": [
+          {
+            "step": "PREFLIGHT",
+            "result": "PASS",
+            "at": "2026-11-14T10:50:03.985218+00:00"
+          },
+          {
+            "step": "RESOURCE_REUSE",
+            "result": "PPU_VERIFIED",
+            "at": "2026-11-14T10:50:04.331201+00:00",
+            "asset_set_sha256": "824b3119aba007dc69882fd851af068e53a24f227b9acb3e9c9be1a5c555fef9",
+            "resource_set_sha256": "9e353ab4bcfd80d5d0b8c46bce7442ccf3430388b641346a1c5bcd1dc4487a93",
+            "generation": 21
+          },
+          {
+            "step": "PROGRAMMING_SUBMIT",
+            "result": "ACCEPTED",
+            "at": "2026-11-14T10:50:04.715771+00:00",
+            "job_id": "job-20261114-105004-f42cf854"
+          },
+          {
+            "step": "VERIFY_RECEIPT",
+            "result": "FAIL",
+            "at": "2026-11-14T10:50:10.522747+00:00",
+            "failed_checks": [
+              "SAFE_OFF_NOT_VERIFIED",
+              "JOB_NOT_SUCCESS",
+              "PROGRAMMING_NOT_PASS",
+              "OPERATIONS_MISMATCH",
+              "ERASE_EVIDENCE_MISMATCH",
+              "PROGRAM_EVIDENCE_MISMATCH",
+              "VERIFY_EVIDENCE_MISMATCH"
+            ]
+          }
+        ],
+        "activation": {},
+        "job": {
+          "job_id": "job-20261114-105004-f42cf854",
+          "state": "error",
+          "stage": "programming",
+          "progress_percent": 0.0,
+          "bytes_done": null,
+          "bytes_total": null
+        },
+        "receipt": {
+          "schema": "plasma.manager.programming-receipt.v3",
+          "job_id": "job-20261114-105004-f42cf854",
+          "job_state": "error",
+          "site_id": 1,
+          "operation": "programming",
+          "operations": [
+            "erase",
+            "program",
+            "verify"
+          ],
+          "observed_operations": null,
+          "target": "STM32F103C8T6",
+          "ppu_id": "z2-hil",
+          "expected_image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+          "expected_image_size": 18768,
+          "observed_image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+          "observed_image_size": 18768,
+          "readback_sha256": null,
+          "bytes_verified": null,
+          "expected_flash_range": null,
+          "observed_flash_range": null,
+          "expected_steps": {
+            "erase": {
+              "erase_address": 134217728,
+              "erase_length": 19456
+            },
+            "program": {
+              "write_address": 134217728,
+              "bytes_written": 18768,
+              "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+            },
+            "verify": {
+              "verify_address": 134217728,
+              "bytes_verified": 18768,
+              "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+            }
+          },
+          "observed_steps": {
+            "erase": {
+              "erase_address": null,
+              "erase_length": null
+            },
+            "program": {
+              "write_address": null,
+              "bytes_written": null,
+              "image_sha256": null
+            },
+            "verify": {
+              "verify_address": null,
+              "bytes_verified": null,
+              "readback_sha256": null
+            }
+          },
+          "range": {
+            "address": 134217728,
+            "length": 18768
+          },
+          "read_output": null,
+          "expected_resource_set_sha256": "9e353ab4bcfd80d5d0b8c46bce7442ccf3430388b641346a1c5bcd1dc4487a93",
+          "observed_resource_set_sha256": "9e353ab4bcfd80d5d0b8c46bce7442ccf3430388b641346a1c5bcd1dc4487a93",
+          "expected_job_binding_sha256": "6a7b83daca3d0d6d460b163f5d86de3d18b2658a45500b932396f7ab2e958148",
+          "observed_job_binding_sha256": "6a7b83daca3d0d6d460b163f5d86de3d18b2658a45500b932396f7ab2e958148",
+          "expected_image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+          "observed_image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+          "active_asset_set_sha256": "824b3119aba007dc69882fd851af068e53a24f227b9acb3e9c9be1a5c555fef9",
+          "active_generation": 21,
+          "resource_reuse": true,
+          "safe_off": null,
+          "flash_result": null,
+          "attempts": 1,
+          "error": {
+            "error_code": "E5002",
+            "error_type": "INTERFACE_FAILURE",
+            "message": "C-3 programming failed: OPENOCD_ERASE_FAILED",
+            "recoverable": true,
+            "failure_source": "infrastructure",
+            "timestamp": "2026-11-14T10:50:10.339800+00:00",
+            "site_id": 1,
+            "job_id": "job-20261114-105004-f42cf854",
+            "operation": "programming",
+            "retry_count": 0,
+            "original_exception": null,
+            "context": {
+              "job_id": "job-20261114-105004-f42cf854",
+              "site_id": 1,
+              "icpn": "STM32F103C8T6",
+              "operation": "programming",
+              "operations": [
+                "erase",
+                "program",
+                "verify"
+              ],
+              "address": 134217728,
+              "length": 18768,
+              "site_worker_result": {
+                "adapter": "z2-abi5-swd-openocd5088",
+                "code": "OPENOCD_ERASE_FAILED",
+                "failed_step": "erase",
+                "openocd_rc": 1,
+                "operation": "programming",
+                "result": "FAIL",
+                "safe_off": true,
+                "site": 1
+              }
+            }
+          },
+          "elapsed_ms": 5626
+        },
+        "job_submission_count": 1,
+        "auto_retry": "DISABLED",
+        "acknowledged": false
+      },
+      "counts": {
+        "pass": 0,
+        "fail": 1,
+        "blocked": 0,
+        "unknown": 0,
+        "sites": 1,
+        "attempts": 1
+      },
+      "auto_retry": "DISABLED",
+      "ppu_alias": "z2",
+      "site_id": 1
+    },
+    "acknowledged": null,
+    "unknown_run_id": null,
+    "expires_in_s": null,
+    "read_only": true,
+    "auto_retry": "DISABLED"
+  }
+}

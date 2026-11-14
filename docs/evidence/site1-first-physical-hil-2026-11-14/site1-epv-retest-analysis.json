@@ -1,0 +1,23 @@
+{
+  "sample_rate_hz": 20000000,
+  "samples": 600002496,
+  "duration_s": 30.0001248,
+  "state_counts": {
+    "32": 600002496
+  },
+  "transitions": {
+    "3": 0,
+    "4": 0,
+    "5": 0
+  },
+  "first_transition_sample": {
+    "3": null,
+    "4": null,
+    "5": null
+  },
+  "last_transition_sample": {
+    "3": null,
+    "4": null,
+    "5": null
+  }
+}
