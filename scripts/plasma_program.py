@@ -239,8 +239,7 @@ def readiness(host: str, chosen: Selection) -> dict:
             and site.get("site_id") == chosen.site
             and site.get("enabled") is True and site.get("state") == "idle"
             and site.get("current_job_id") is None and site.get("queued_jobs") == 0
-            and site.get("interface") == "openocd"
-            and site.get("target") == chosen.target,
+            and site.get("interface") == "openocd",
             "SITE_NOT_READY_OR_BUSY")
     return {"ppu_id": ident["ppu_id"], "site": chosen.site, "site_idle": True}
 
