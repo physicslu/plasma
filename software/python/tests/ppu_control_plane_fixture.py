@@ -68,7 +68,7 @@ def real_control_plane():
     if _REAL is None:
         import tempfile
         root = Path(__file__).resolve().parents[3]
-        core = _script("ppu-z2-installer-core.py", "ppu_control_plane_fixture_installer_core")
+        core = _script("ppu-z2-installer.py", "ppu_control_plane_fixture_installer_core")
         runtime_tool = _script("ppu-runtime.py", "ppu_control_plane_fixture_runtime_tool")
         runtime = Path(tempfile.mkdtemp(prefix="plasma-full-copy-runtime-"))
         protocol = runtime_tool._build_control_plane(root, runtime / "control-plane")

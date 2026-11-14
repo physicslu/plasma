@@ -14,7 +14,6 @@ on:
       - "scripts/ppu-bootstrap-installer.py"
       - "scripts/ppu_unified_deployment.py"
       - "scripts/ppu-z2-installer.py"
-      - "scripts/ppu-z2-installer-core.py"
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_owner_authorization.py"
@@ -109,7 +108,6 @@ on:
       - "scripts/ppu-bootstrap-installer.py"
       - "scripts/ppu_unified_deployment.py"
       - "scripts/ppu-z2-installer.py"
-      - "scripts/ppu-z2-installer-core.py"
       - "scripts/ppu-bundle-install-policy.json"
       - "scripts/ppu_asset_set.py"
       - "scripts/ppu_owner_authorization.py"
@@ -311,7 +309,6 @@ jobs:
             scripts/ppu-bootstrap-installer.py \
             scripts/ppu_unified_deployment.py \
             scripts/ppu-z2-installer.py \
-            scripts/ppu-z2-installer-core.py \
             scripts/ppu_asset_set.py \
             scripts/ppu_owner_authorization.py \
             scripts/ppu_bootstrap_request_auth.py \
@@ -401,7 +398,7 @@ jobs:
             > "$RUNNER_TEMP/bootstrap-install-evidence.json"
           test -f "$sandbox/etc/systemd/system/plasma-bootstrap.service"
           test -f "$sandbox/opt/plasma/bootstrap/ppu_unified_deployment.py"
-          test -f "$sandbox/opt/plasma/bootstrap/ppu-z2-installer-core.py"
+          test -f "$sandbox/opt/plasma/bootstrap/ppu-z2-installer.py"
           test -f "$sandbox/opt/plasma/bootstrap/ppu-bundle-install-policy.json"
           test -f "$sandbox/opt/plasma/bootstrap/ppu_fpga_qualification.py"
           test ! -e "$sandbox/opt/plasma/bootstrap/ppu-fpga-image-contracts.json"

@@ -107,7 +107,7 @@ def test_real_ps_only_installer_has_no_engineering_entry(tmp_path: Path) -> None
     # No new Root write path is installed or remotely reachable by this PR.
     spec = importlib.util.spec_from_file_location(
         "ppu_ps_only_installer_gate1",
-        ROOT / "scripts" / "ppu-z2-installer-core.py",
+        ROOT / "scripts" / "ppu-z2-installer.py",
     )
     assert spec and spec.loader
     installer = importlib.util.module_from_spec(spec)
@@ -237,7 +237,7 @@ def test_no_second_ssh_helper_or_installer_added() -> None:
 def test_existing_core_verifies_real_bundle_for_all_three_modules_without_install() -> None:
     spec = importlib.util.spec_from_file_location(
         "ppu_z2_verified_engineering_bundle_gate1",
-        ROOT / "scripts" / "ppu-z2-installer-core.py",
+        ROOT / "scripts" / "ppu-z2-installer.py",
     )
     assert spec and spec.loader
     installer = importlib.util.module_from_spec(spec)
@@ -270,7 +270,7 @@ def test_existing_core_verifies_real_bundle_for_all_three_modules_without_instal
 def test_existing_core_rejects_changed_artifact_and_spoofed_source(tmp_path: Path) -> None:
     spec = importlib.util.spec_from_file_location(
         "ppu_z2_engineering_negative_gate1",
-        ROOT / "scripts" / "ppu-z2-installer-core.py",
+        ROOT / "scripts" / "ppu-z2-installer.py",
     )
     assert spec and spec.loader
     installer = importlib.util.module_from_spec(spec)
@@ -302,7 +302,7 @@ def test_existing_core_rejects_changed_artifact_and_spoofed_source(tmp_path: Pat
 def test_existing_core_rejects_symlink_package(tmp_path: Path) -> None:
     spec = importlib.util.spec_from_file_location(
         "ppu_z2_engineering_symlink_gate1",
-        ROOT / "scripts" / "ppu-z2-installer-core.py",
+        ROOT / "scripts" / "ppu-z2-installer.py",
     )
     assert spec and spec.loader
     installer = importlib.util.module_from_spec(spec)
@@ -321,7 +321,7 @@ def test_existing_core_rejects_symlink_package(tmp_path: Path) -> None:
 
 def test_engineering_bundle_rejects_duplicate_manifest_keys() -> None:
     spec = importlib.util.spec_from_file_location(
-        "ppu_core_duplicate_json_gate1", ROOT / "scripts" / "ppu-z2-installer-core.py"
+        "ppu_core_duplicate_json_gate1", ROOT / "scripts" / "ppu-z2-installer.py"
     )
     assert spec and spec.loader
     installer = importlib.util.module_from_spec(spec)
@@ -339,7 +339,7 @@ def test_engineering_bundle_rejects_zip_symlink(tmp_path: Path) -> None:
     import stat
     import zipfile
     spec = importlib.util.spec_from_file_location(
-        "ppu_core_zip_symlink_gate1", ROOT / "scripts" / "ppu-z2-installer-core.py"
+        "ppu_core_zip_symlink_gate1", ROOT / "scripts" / "ppu-z2-installer.py"
     )
     assert spec and spec.loader
     installer = importlib.util.module_from_spec(spec)

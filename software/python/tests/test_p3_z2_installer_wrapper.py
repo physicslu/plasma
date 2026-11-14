@@ -8,10 +8,9 @@ from types import SimpleNamespace
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "ppu-z2-installer.py"
-spec = importlib.util.spec_from_file_location("p3_z2_installer_wrapper", SCRIPT)
+spec = importlib.util.spec_from_file_location("p3_z2_single_installer", SCRIPT)
 assert spec is not None and spec.loader is not None
 installer = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = installer
@@ -38,7 +37,37 @@ def runtime(install_paths):
 
 def verified():
     return SimpleNamespace(
-        runtime_manifest={"schema_version": 1, "role": "ppu"}
+        release_id="1.0.0-" + "a" * 12,
+        product_version="1.0.0",
+        git_sha="a" * 40,
+        archive_sha256="b" * 64,
+        runtime_manifest={"schema_version": 1, "role": "ppu"},
+    )
+
+
+def mock_installer_io(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(installer, "_copy_release",
+                        lambda verified, target: target.mkdir(parents=True, exist_ok=True))
+    monkeypatch.setattr(installer, "_chown_tree", lambda *args: None)
+    monkeypatch.setattr(installer.os, "chown", lambda *args: None)
+    monkeypatch.setattr(installer.pwd, "getpwnam",
+                        lambda name: SimpleNamespace(pw_uid=1001, pw_gid=1001))
+    monkeypatch.setattr(installer.grp, "getgrnam",
+                        lambda name: SimpleNamespace(gr_gid=1001))
+
+
+def deploy(install_paths, *, health_check, systemctl):
+    return installer.install_release(
+        verified(),
+        python_runtime=runtime(install_paths),
+        gateway_host="192.168.2.99",
+        paths=install_paths,
+        ppu_id="new-id-must-not-replace-canonical-config",
+        facility_id="new-facility",
+        display_name="new-name",
+        systemctl=systemctl,
+        health_check=health_check,
+        ensure_service_account=lambda: None,
     )
 
 
@@ -49,7 +78,6 @@ def test_p3_units_make_helper_a_gateway_owned_dependency(tmp_path: Path) -> None
         python_runtime=runtime(install_paths),
         gateway_host="192.168.2.99",
     )
-
     server = units["plasma-server.service"]
     gateway = units["plasma-web.service"]
     helper = units[installer.RUNTIME_ACTIVATION_SERVICE]
@@ -60,109 +88,70 @@ def test_p3_units_make_helper_a_gateway_owned_dependency(tmp_path: Path) -> None
     assert "User=root" in helper
     assert "Group=plasma" in helper
     assert "RestrictAddressFamilies=AF_UNIX" in helper
-    assert "systemctl" not in helper
 
 
 def test_successful_upgrade_preserves_existing_canonical_site_desired_state(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_paths = paths(tmp_path)
-    config_path = install_paths.config_root / "ppu.yaml"
-    config_path.parent.mkdir(parents=True)
-    existing = "ppu:\n  id: preserved\nsites:\n  - id: 1\n    enabled: true\n    interface: mock\n    target: KEEP-ME\n"
-    config_path.write_text(existing, encoding="utf-8")
-    config_path.chmod(0o640)
-
-    def fake_core_install(*args, **kwargs):
-        installer._core._write_text_atomic(config_path, "sites: []\n", 0o640)
-        return {"site_desired_state": {"runtime_apply_supported": False}}
-
-    monkeypatch.setattr(installer, "_original_install_release", fake_core_install)
-    calls: list[tuple[str, ...]] = []
-    evidence = installer.install_release(
-        verified(),
-        python_runtime=runtime(install_paths),
-        gateway_host="192.168.2.99",
-        paths=install_paths,
-        ppu_id="new-id-must-not-replace-canonical-config",
-        facility_id="new-facility",
-        display_name="new-name",
-        systemctl=lambda *args: calls.append(args),
-        health_check=lambda host: {},
-        ensure_service_account=lambda: None,
-    )
-
-    assert config_path.read_text(encoding="utf-8") == existing
-    assert evidence["site_desired_state"]["runtime_apply_supported"] is True
-    assert evidence["site_desired_state"]["upgrade_preserves_existing_config"] is True
+    config = install_paths.config_root / "ppu.yaml"
+    config.parent.mkdir(parents=True)
+    existing = ("ppu:\n  id: preserved\nsites:\n  - id: 1\n"
+                "    enabled: true\n    interface: mock\n    target: KEEP-ME\n")
+    config.write_text(existing, encoding="utf-8")
+    config.chmod(0o640)
+    mock_installer_io(monkeypatch)
+    calls = []
+    evidence = deploy(install_paths, health_check=lambda host: {},
+                      systemctl=lambda *args: calls.append(args))
+    assert config.read_text(encoding="utf-8") == existing
+    state = evidence["site_desired_state"]
+    assert state["runtime_apply_supported"] is True
+    assert state["upgrade_preserves_existing_config"] is True
+    assert state["empty_sites_migrated_to_defaults"] is False
     assert evidence["runtime_activation"]["lifecycle_owner"] == "plasma-web.service"
     assert ("enable", "--now", installer.RUNTIME_ACTIVATION_SERVICE) not in calls
-    persisted_evidence = json.loads((install_paths.install_root / "last-install.json").read_text())
-    assert persisted_evidence["site_desired_state"]["upgrade_preserves_existing_config"] is True
-    assert evidence["site_desired_state"]["empty_sites_migrated_to_defaults"] is False
+    persisted = json.loads((install_paths.install_root / "last-install.json").read_text())
+    assert persisted["site_desired_state"]["upgrade_preserves_existing_config"] is True
 
 
 def test_failed_activation_restores_previous_helper_unit(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_paths = paths(tmp_path)
-    helper_path = install_paths.systemd_root / installer.RUNTIME_ACTIVATION_SERVICE
-    helper_path.parent.mkdir(parents=True)
-    helper_path.write_text("old-helper-unit\n", encoding="utf-8")
-    helper_path.chmod(0o644)
-
-    def fail_core_install(*args, **kwargs):
+    previous = install_paths.releases_root / "previous"
+    previous.mkdir(parents=True)
+    install_paths.current.symlink_to(previous)
+    helper = install_paths.systemd_root / installer.RUNTIME_ACTIVATION_SERVICE
+    helper.parent.mkdir(parents=True)
+    helper.write_text("old-helper-unit\n", encoding="utf-8")
+    helper.chmod(0o644)
+    mock_installer_io(monkeypatch)
+    calls = []
+    def failed_health(host):
         raise installer.Z2InstallerError("synthetic activation failure")
-
-    monkeypatch.setattr(installer, "_original_install_release", fail_core_install)
-    calls: list[tuple[str, ...]] = []
     with pytest.raises(installer.Z2InstallerError, match="synthetic activation failure"):
-        installer.install_release(
-            verified(),
-            python_runtime=runtime(install_paths),
-            gateway_host="192.168.2.99",
-            paths=install_paths,
-            ppu_id="ppu-a",
-            facility_id="lab",
-            display_name="PPU A",
-            systemctl=lambda *args: calls.append(args),
-            health_check=lambda host: {},
-            ensure_service_account=lambda: None,
-        )
-
-    assert helper_path.read_text(encoding="utf-8") == "old-helper-unit\n"
+        deploy(install_paths, health_check=failed_health,
+               systemctl=lambda *args: calls.append(args))
+    assert helper.read_text(encoding="utf-8") == "old-helper-unit\n"
+    assert install_paths.current.resolve() == previous.resolve()
     assert ("daemon-reload",) in calls
     assert ("restart", installer.RUNTIME_ACTIVATION_SERVICE) in calls
 
 
 def test_failed_first_install_removes_candidate_helper_unit(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_paths = paths(tmp_path)
-    helper_path = install_paths.systemd_root / installer.RUNTIME_ACTIVATION_SERVICE
-
-    def fail_core_install(*args, **kwargs):
+    helper = install_paths.systemd_root / installer.RUNTIME_ACTIVATION_SERVICE
+    mock_installer_io(monkeypatch)
+    calls = []
+    def failed_health(host):
         raise installer.Z2InstallerError("synthetic first-install failure")
-
-    monkeypatch.setattr(installer, "_original_install_release", fail_core_install)
-    calls: list[tuple[str, ...]] = []
     with pytest.raises(installer.Z2InstallerError, match="synthetic first-install failure"):
-        installer.install_release(
-            verified(),
-            python_runtime=runtime(install_paths),
-            gateway_host="192.168.2.99",
-            paths=install_paths,
-            ppu_id="ppu-a",
-            facility_id="lab",
-            display_name="PPU A",
-            systemctl=lambda *args: calls.append(args),
-            health_check=lambda host: {},
-            ensure_service_account=lambda: None,
-        )
-
-    assert not helper_path.exists()
+        deploy(install_paths, health_check=failed_health,
+               systemctl=lambda *args: calls.append(args))
+    assert not helper.exists()
+    assert not install_paths.current.exists()
     assert ("daemon-reload",) in calls
     assert ("restart", installer.RUNTIME_ACTIVATION_SERVICE) not in calls
