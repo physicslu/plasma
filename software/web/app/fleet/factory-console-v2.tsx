@@ -804,21 +804,19 @@ export default function FactoryConsoleV2() {
           : readStoredBatch();
         if (stored?.apiBase === apiBase) {
           try {
-            const restored = managed
-              ? managedProductionSnapshot(await getProgrammingBatch(stored.batchId), restoredTopology)
+            const managerTruth = managed ? await getProgrammingBatch(stored.batchId) : null;
+            const restored = managerTruth
+              ? managedProductionSnapshot(managerTruth, restoredTopology)
               : await getServerBatch(apiBase, stored.batchId);
             if (stopped) return;
             setGatewayHealth("online");
             // The stored Batch can become UNKNOWN while the Browser was gone.
             // Recreate its immutable Start hold before terminal cleanup.
-            if (managed && restoredTopology) {
-              const truth = await getProgrammingBatch(stored.batchId);
-              if (truth.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
-                  || (truth.outcome === "PASS" && restored.state !== "success")) {
-                if (/^[0-9a-f]{32}$/.test(truth.start_id)) {
-                  writeManagedStart(truth.start_id);
-                  setManagedStartHold(truth.start_id);
-                }
+            if (managerTruth?.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+                || (managerTruth?.outcome === "PASS" && restored.state !== "success")) {
+              if (managerTruth && /^[0-9a-f]{32}$/.test(managerTruth.start_id)) {
+                writeManagedStart(managerTruth.start_id);
+                setManagedStartHold(managerTruth.start_id);
               }
             }
             applyBatchSnapshot(restored, nextCatalog);
