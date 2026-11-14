@@ -625,6 +625,15 @@ export default function FactoryConsoleV2() {
         setBatchObservationState("connected");
         setGatewayHealth("online");
         const snapshot = managedProductionSnapshot(current, topology);
+        // Persist UNKNOWN/falsely reported PASS *before* a terminal snapshot
+        // clears the ordinary active Batch ID. Reload must never unlock it.
+        if (current.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+            || (current.outcome === "PASS" && snapshot.state !== "success")) {
+          if (/^[0-9a-f]{32}$/.test(current.start_id)) {
+            writeManagedStart(current.start_id);
+            setManagedStartHold(current.start_id);
+          }
+        }
         applyBatchSnapshot(snapshot, sourceCatalog);
         logManagedBatch(current);
         if (current.outcome != null) return;
@@ -773,8 +782,15 @@ export default function FactoryConsoleV2() {
               } else if (result.batch?.batch_id) {
                 managedId = result.batch.batch_id;
                 writeManagedBatch(managedId);
-                clearManagedStart();
-                setManagedStartHold(result.state === "OUTCOME_UNKNOWN" ? pendingStart : null);
+                // An UNKNOWN result may have written to hardware. The durable
+                // Start hold must outlive this tab/reload and the terminal Batch.
+                if (result.state !== "OUTCOME_UNKNOWN") {
+                  clearManagedStart();
+                  setManagedStartHold(null);
+                } else {
+                  writeManagedStart(pendingStart);
+                  setManagedStartHold(pendingStart);
+                }
               } else {
                 setOperatorWarning(`Manager Start ${pendingStart} remains ${result.state}; no new Job may be submitted until reconciled.`);
               }
@@ -793,6 +809,18 @@ export default function FactoryConsoleV2() {
               : await getServerBatch(apiBase, stored.batchId);
             if (stopped) return;
             setGatewayHealth("online");
+            // The stored Batch can become UNKNOWN while the Browser was gone.
+            // Recreate its immutable Start hold before terminal cleanup.
+            if (managed && restoredTopology) {
+              const truth = await getProgrammingBatch(stored.batchId);
+              if (truth.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+                  || (truth.outcome === "PASS" && restored.state !== "success")) {
+                if (/^[0-9a-f]{32}$/.test(truth.start_id)) {
+                  writeManagedStart(truth.start_id);
+                  setManagedStartHold(truth.start_id);
+                }
+              }
+            }
             applyBatchSnapshot(restored, nextCatalog);
             if (!terminalServerBatchStates.has(restored.state)) {
               beginActivity();
@@ -1248,10 +1276,12 @@ export default function FactoryConsoleV2() {
           const snapshot = managedProductionSnapshot(next, managedTopology);
           applyBatchSnapshot(snapshot, catalog);
           logManagedBatch(next);
-          if (next.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")) {
-            // The PPU may have written. Acknowledge/reconcile explicitly; never re-submit.
-            writeManagedStart(next.start_id ?? "");
-            setManagedStartHold(next.start_id ?? "OUTCOME_UNKNOWN");
+          if (next.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+              || (next.outcome === "PASS" && snapshot.state !== "success")) {
+            // An unknown transaction or invalid PASS evidence requires a hold.
+            // Do not silently release it on a terminal Batch or a page reload.
+            writeManagedStart(next.start_id);
+            setManagedStartHold(next.start_id);
           }
         },
         onPollError: message => {
@@ -1314,8 +1344,11 @@ export default function FactoryConsoleV2() {
         const topology = managedTopology ?? await loadManagedTopology();
         void pollManagedBatch(batch.batch_id, catalog, generation, topology);
       } else if (batch.outcome === "OUTCOME_UNKNOWN"
-                 || batch.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")) {
-        setOperatorWarning(`Manager confirms Batch ${batch.batch_id} has OUTCOME UNKNOWN. Reconcile and acknowledge its PPU Run before new work; never resubmit.`);
+                 || batch.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+                 || (batch.outcome === "PASS" && snapshot.state !== "success")) {
+        writeManagedStart(held);
+        setManagedStartHold(held);
+        setOperatorWarning(`Manager Batch ${batch.batch_id} is not proven safe/complete. Reconcile its PPU Run or evidence before new work; never resubmit.`);
       } else {
         clearManagedStart();
         setManagedStartHold(null);

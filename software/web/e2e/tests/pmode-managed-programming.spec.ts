@@ -244,6 +244,26 @@ test("browser reload observes the SAME durable Manager Batch, never queues new J
   expect(counters.starts.length).toBeGreaterThanOrEqual(1);
 });
 
+test("UNKNOWN appearing after reload retains a Start hold after terminal Batch cleanup", async ({ page }) => {
+  const counters = await mockManager(page, {
+    ppus: [Z2, LINE2],
+    script: (alias) => alias === "z2"
+      ? { outcome: "OUTCOME_UNKNOWN", reason: "JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT", runningPolls: 4 }
+      : { runningPolls: 4 },
+  });
+  const { start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
+  await start.click();
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "running");
+  await page.reload();
+  await expect(page.getByTestId("managed-readiness"))
+    .toContainText("START RECONCILIATION REQUIRED", { timeout: 20_000 });
+  await page.reload();
+  await expect(page.getByTestId("managed-readiness"))
+    .toContainText("START RECONCILIATION REQUIRED", { timeout: 20_000 });
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.batches).toHaveLength(1);
+});
+
 test("lost Batch POST response is held by Start ID and read-only reconciled, never resent", async ({ page }) => {
   const counters = await mockManager(page, { batchLost: true });
   const { start } = await prepare(page, [["z2", [2]]]);
