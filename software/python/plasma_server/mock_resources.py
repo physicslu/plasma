@@ -162,7 +162,6 @@ def mock_resources_for_config(config: PlasmaConfig, *,
     _need(len(geometries) == 1, "MOCK_RESOURCES_SITE_GEOMETRY_NOT_UNIFORM")
     route = mock_route(
         icpn=str(targets.pop()),
-        sites=[site.id for site in sites],
         **site_geometry(sites[0]),
     )
     return mock_resource_identity(route, generation=generation)
