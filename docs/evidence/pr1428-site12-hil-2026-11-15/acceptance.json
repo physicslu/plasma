@@ -1,0 +1,91 @@
+{
+  "schema": "plasma.pr1428.site12.hil-evidence-lock.v1",
+  "source_sha": "783102b9e5521bbced4be4fb1f3f494bdcab299c",
+  "github_run_id": 43621296849,
+  "github_job_id": 132527432483,
+  "artifact_id": 14124701335,
+  "original_artifact_url": "https://github.com/physicslu/plasma/actions/runs/43621296849/artifacts/14124701335",
+  "executed_at": "2026-11-14T17:31:52Z / 2026-11-14T17:32:33Z",
+  "runtime_source_sha": "783102b9e5521bbced4be4fb1f3f494bdcab299c",
+  "resource_set_v2_generation": 22,
+  "resource_set_sha256": "b4495a1c5d97fad15108d27e4886bce3d56108f1d3f7dbddee1aa2d5c6250f95",
+  "fpga_image": "z2-independent-swd-v5-d0add58c",
+  "boot_id": "4cefdc0c-f586-4d19-b126-1d8e1108c8f1",
+  "image": {
+    "name": "plasma-blue-pill-cdc.bin",
+    "size": 18768,
+    "sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+  },
+  "sites": [
+    {
+      "site_id": 1,
+      "start_id": "ba2d324f69cfb1a882efccb4b350e4ea",
+      "batch_id": "cfc9b75fe88de4e01fda5026a7e268e9",
+      "job_id": "job-20261114-173152-251ffbeb",
+      "job_binding_sha256": "6dfbbee81e3fa852f29002242f97c17fff6a95dc67d9c758601533d244727b73",
+      "target": "STM32F103C8T6",
+      "ordered_operations": [
+        "erase",
+        "program",
+        "verify"
+      ],
+      "result": "PASS",
+      "attempts": 1,
+      "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+      "bytes_verified": 18768,
+      "dpidr": "0x1ba01477",
+      "device_id": "0x20036410",
+      "openocd_rc": 0,
+      "native_ps_owner_safe_off": "SAFE_OFF_MODE_OFF_VERIFIED",
+      "admission_revoked": true
+    },
+    {
+      "site_id": 2,
+      "start_id": "8f45084936065f42abf29587a1e5e93e",
+      "batch_id": "5f841fe97e370d2a4f14f6c17b43c7d2",
+      "job_id": "job-20261114-173233-2e834e16",
+      "job_binding_sha256": "c576632928f5d23fa7182fb4ce18dcd6eaea1ebb31b54fc8c8ccd1b4100f4cb7",
+      "target": "STM32F103C8T6",
+      "ordered_operations": [
+        "erase",
+        "program",
+        "verify"
+      ],
+      "result": "PASS",
+      "attempts": 1,
+      "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+      "bytes_verified": 18768,
+      "dpidr": "0x1ba01477",
+      "device_id": "0x20036410",
+      "openocd_rc": 0,
+      "native_ps_owner_safe_off": "SAFE_OFF_MODE_OFF_VERIFIED",
+      "admission_revoked": true
+    }
+  ],
+  "final_state": {
+    "site1": "idle",
+    "site2": "idle",
+    "active_jobs": 0,
+    "openocd_processes": 0,
+    "admission_residue": false,
+    "rollback": "NOT_RUN"
+  },
+  "limits": {
+    "execution": "two sequential Site paths, not simultaneous",
+    "voltage": "NOT_MEASURED",
+    "external_analog_safe_off": "NOT_VERIFIED",
+    "swclk_khz": 2000,
+    "swclk_5000": "NOT_RUN",
+    "production_qualification": "NOT_CLAIMED",
+    "physical_board_serial_independence": "NOT_VERIFIED"
+  },
+  "original_artifact_sha256": {
+    "README.md": "43bf048a1d4b5503533d6943167c3b11174e1fd2664e96ddf167b6781487ad09",
+    "observation.json": "8b418d08371cc08379e19442260b7ca43f702fd1c83e446f4fcd18403dee6ab1",
+    "site1-receipt.json": "159fec779e8b1b4a6bbc53d24c19601e36191b22fb49c1d7b5b43153bf5b4483",
+    "site2-receipt.json": "74c6aa51f34c1f44bdcf85f64d985a39ebf9786f30a002eed149d09958aae8f5",
+    "native-openocd.log": "c819531b5b74c9b43ac8a88657a95daae08c4617c97bfbc5dc1527c106ddda1c",
+    "site1-run.json": "5576a7a3082d81f1ed3b63dde76e3e3f84d6c1b2d41a7a08ea41e021bc89a1c6",
+    "site2-run.json": "e20ba16c4922b582fc0b0dc7f4bef94523cddb76f5331d5c4b203ab21a159d52"
+  }
+}

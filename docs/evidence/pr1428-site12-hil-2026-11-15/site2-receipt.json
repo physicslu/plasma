@@ -1,0 +1,78 @@
+{
+  "schema": "plasma.manager.programming-receipt.v3",
+  "job_id": "job-20261114-173233-2e834e16",
+  "job_state": "success",
+  "site_id": 2,
+  "operation": "programming",
+  "operations": [
+    "erase",
+    "program",
+    "verify"
+  ],
+  "observed_operations": [
+    "erase",
+    "program",
+    "verify"
+  ],
+  "target": "STM32F103C8T6",
+  "ppu_id": "z2-hil",
+  "expected_image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+  "expected_image_size": 18768,
+  "observed_image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+  "observed_image_size": 18768,
+  "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+  "bytes_verified": 18768,
+  "expected_flash_range": null,
+  "observed_flash_range": null,
+  "expected_steps": {
+    "erase": {
+      "erase_address": 134217728,
+      "erase_length": 19456
+    },
+    "program": {
+      "write_address": 134217728,
+      "bytes_written": 18768,
+      "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+    },
+    "verify": {
+      "verify_address": 134217728,
+      "bytes_verified": 18768,
+      "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+    }
+  },
+  "observed_steps": {
+    "erase": {
+      "erase_address": 134217728,
+      "erase_length": 19456
+    },
+    "program": {
+      "write_address": 134217728,
+      "bytes_written": 18768,
+      "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+    },
+    "verify": {
+      "verify_address": 134217728,
+      "bytes_verified": 18768,
+      "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+    }
+  },
+  "range": {
+    "address": 134217728,
+    "length": 18768
+  },
+  "read_output": null,
+  "expected_resource_set_sha256": "b4495a1c5d97fad15108d27e4886bce3d56108f1d3f7dbddee1aa2d5c6250f95",
+  "observed_resource_set_sha256": "b4495a1c5d97fad15108d27e4886bce3d56108f1d3f7dbddee1aa2d5c6250f95",
+  "expected_job_binding_sha256": "c576632928f5d23fa7182fb4ce18dcd6eaea1ebb31b54fc8c8ccd1b4100f4cb7",
+  "observed_job_binding_sha256": "c576632928f5d23fa7182fb4ce18dcd6eaea1ebb31b54fc8c8ccd1b4100f4cb7",
+  "expected_image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+  "observed_image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+  "active_asset_set_sha256": "957ac4e62d23507fd577300c3dc827777fa1ccddb0fffdb13911dc9e8b8d8d83",
+  "active_generation": 22,
+  "resource_reuse": true,
+  "safe_off": true,
+  "flash_result": "PASS",
+  "attempts": 1,
+  "error": null,
+  "elapsed_ms": 6592
+}

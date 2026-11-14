@@ -41,58 +41,48 @@ Do not assume production Z2 needs Node.js, npm, or the development server merely
 
 ## Managed Programming (EMode / PMode) — normative
 
-On a Managed Control Station (`apiMode === "managed"`) Programming has one
-data path, shared by EMode Single PPU and PMode Factory Console
-(`software/web/app/programming/managed-programming.ts`):
+Managed programming uses **one Manager-owned canonical Batch engine**. EMode limits the
+Target Set to one PPU and one or more Sites; PMode accepts multiple PPUs and Sites.
+The Browser is a selection/observation UI, never the Job scheduler.
 
-Console → same-origin BFF → Manager Registry / Fleet / Programming Routes →
-Manager programming plan + run → PPU Runtime.
+Console → same-origin BFF → Manager Registry/Fleet/Programming Route →
+Manager-issued Start ID → **one** canonical `POST /api/programming/batches`
+(`targets:[{ppu_alias,site_ids}]`) → per-Site Manager plan/Job/Receipt →
+PPU Runtime → Provider/FPGA/DUT.
 
-- Topology: commissioned Manager Registry entries joined with the Manager
-  Fleet. The **Manager Alias** is the only routing key; the device **PPU ID**
-  is display identity. The Engineering PPU provider
-  (`/api/engineering/targets`), direct `/api/jobs` and the Batch runtime are
-  the Standalone Mock development runtime only and are never used here.
-- Availability is judged in layers, each with an exact reason: PPU ONLINE
-  (Fleet transport + current observation), Platform admission (pairing,
-  Runtime active, no recovery) and Programming capability (a committed IC Programming Profile declares the operation, the PPU reports a compatible Site enabled and idle).
-  The UI only reads; it never enrolls, rotates a credential or recovers.
-- Programming Source: `Programming Image` (default; e.g. a `.bin`) or `Bundle`, mutually exclusive. These two labels are used on every page (shared `ProgrammingSourceSelector`); the wire values stay `image` / `bundle`.
-  Switching clears the file, plan, run view and validation state and issues
-  no request.
-- One **Start Programming**: lock inputs + SHA256 → Manager plan → exactly
-  one run start → observe. There is no manual Prepare step; the Manager plan
-  is never skipped. `attempts = 1`, `auto_retry = DISABLED`; Repeat / Retry /
-  Stop Policy and ABORT are disabled. A lost start response or
-  `OUTCOME_UNKNOWN` is never followed by another write.
-- PASS in the UI requires the Manager receipt: single submission, verified
-  SAFE_OFF, confirmed Job Binding and Resource Set, matching readback.
-- Browser (Playwright) and Mock results are Host-only evidence and never
-  physical PPU / FPGA / DUT acceptance.
+- Registry Alias routes requests, device PPU ID is display identity. Manager Fleet
+  determines actual Sites and interfaces. A Site is accepted only when enabled,
+  idle, compatible with the IC Profile and authorized; Site count alone means
+  nothing. The Manager/PPU repeat admission independently of the Browser.
+- Image or canonical Bundle v3 is locked as one Batch-wide source. Each Site
+  receives its own plan, Resource Set/Job Binding verification, PPU lease,
+  terminal Receipt and SAFE_OFF result. Different resource identities are
+  activated only through the existing controlled B1/B2/B3 path.
+- Both modes use one ordered `operations[]` E/P/V programming Job, never the
+  legacy `flash_cycle` as a Managed PMode default. EMode READ is a separate
+  per-Site Job. Valid Erase-only takes the qualified Profile Flash range
+  without an Image. Erase + Verify without Program is invalid.
+- The Manager issues an immutable Start ID before the exactly-one Batch POST.
+  Lost replies are held for read-only reconciliation and NEVER re-submitted.
+  The Manager Journal is authoritative, not a Browser queue. A Manager Batch
+  ID allows reload-safe GET/status observation; the Browser must not claim a
+  new Job, release unknown writes or invent SAFE_OFF from an HTTP success.
+- The Manager owns Retry (0..5 eligible confirmed FAIL attempts only), Stop
+  Policy (never or N failed Sites) and ABORT/Stop Queuing. A Stop does **not**
+  cancel an already admitted PPU Job. `OUTCOME_UNKNOWN` latches the affected
+  PPU, blocks blind resend and requires controlled reconciliation.
+- PMode retains Facility → PPU → Site Production Set/Batch Selection, Site LEDs,
+  PASS/FAIL/Yield and Factory Log. EMode retains its engineering diagnostics,
+  per-Site READ and Engineering Job Log. They share backend truth, not screens.
+- **Real Manager Batch Repeat is exactly 1.** The Standalone Mock may have
+  independent repetition capabilities but is not physical qualification.
+- Browser/Playwright and Mock PPU results are Host-only. Historical
+  Site 1 2MHz/LA2016 and Site 2 real HIL evidence remain historical;
+  multi-PPU/multi-Site v2 physical qualification is NOT_RUN.
 
-### PMode Factory Console on the Manager backend
-
-PMode keeps its Facility → PPU → Site UI. On a Managed Control Station the
-catalog is the Manager Registry + Fleet (PPU key = Manager Alias) and a
-production batch is a **sequence of independent Manager programming runs**
-(`software/web/app/fleet/managed-factory-backend.ts`): per-PPU admission on a
-fresh observation, one plan / Site lease / Resource check / Job Binding per
-Site, `attempts = 1`, no retry. An `OUTCOME_UNKNOWN` run stops the later
-Sites of that PPU only; Stop Policy and ABORT only stop queuing.
-
-PMode omits the former permanent red qualification banner per owner UI decision.
-Its ready label remains `SEQUENTIAL BATCH READY` (not generic production
-readiness), with the execution restrictions below unchanged; each receipt names
-the Site interface so a Mock result is never read as hardware evidence.
-
-Not implemented, and not to be claimed:
-
-- **Durable Manager-owned production batch.** The batch lives in the Console
-  session; a reload stops queuing (an in-flight run finishes in the Manager).
-- **Concurrency.** One run at a time. Parallel Sites on one PPU and parallel
-  PPUs are not physically qualified.
-- **Production qualification.** Only PYNQ-Z2 Site 2 has physical evidence.
-  `site_count` is topology, never capability: a Site is programmable only when the selected IC's Profile is compatible with a currently observed and admitted Site; never gate by static Profile `sites[]`.
+Gate 1 implementation: Draft PR #1428. Gate 2 merge/deployment requires its
+current HEAD CI/Ruleset readiness and explicit owner approval; no hardware
+operation is implied by this document.
 
 ## Web validation commands
 

@@ -244,59 +244,47 @@ test("receipt keeps full Job ID and SHA256 identities for diagnosis", () => {
 const factory = await read("app/fleet/factory-console-v2.tsx");
 const factoryBackend = await read("app/fleet/managed-factory-backend.ts");
 
-test("PMode on a Managed Control Station reads Registry / Fleet / Routes, not the Engineering provider", () => {
+test("PMode discovers Manager Registry/Fleet and requires live Site interface admission", () => {
   assert.match(factory, /const managed = apiMode === "managed";/);
-  assert.match(factory, /if \(managed\) \{\s*const topology = await loadManagedTopology\(\);/);
   assert.match(factory, /nextCatalog = managedFactoryCatalog\(topology\);/);
-  assert.match(factory, /managed \? managedPpuStatus\(await loadManagedTopology\(\), alias\) : await getPPUStatus\(targetBase\)/);
-  assert.match(factory, /const stored = managed \? null : readStoredBatch\(\);/);
-  assert.match(factoryBackend, /ppu_id: ppu\.alias,\s*display_name: `\$\{ppu\.alias\} · PPU ID \$\{ppu\.ppuId \?\? "unknown"\}`/);
-});
-
-test("PMode never relabels unavailable Programming as ready: capability is route- and Site-proven", () => {
-  assert.match(factoryBackend, /label: "PROGRAMMING UNAVAILABLE"/);
   assert.match(factoryBackend, /siteCapability\(site, routes, icpn\)/);
   assert.match(factory, /const blocker = managedBatchBlocker\(managedTopology, managedRoutes\.routes, icpn,/);
-  // site_count alone never makes a Site programmable.
   assert.doesNotMatch(factoryBackend, /site_count[^\n]*programmable|siteCount[^\n]*programmable/);
 });
 
-test("PMode production batch is a sequence of independent Manager runs: no second engine, no retry", () => {
-  assert.equal((factoryBackend.match(/runManagedProgramming\(/g) ?? []).length, 1);
-  assert.doesNotMatch(factoryBackend, /planProgramming\(|startProgramming\(|\/api\/jobs|createServerBatch|Promise\.all\(this\.entries/);
-  assert.doesNotMatch(factoryBackend, /retry_count: [1-9]|site_retry_limit: [1-9]/);
-  assert.match(factoryBackend, /repeat_count: 1,\s*site_retry_limit: 0,/);
-  assert.match(factoryBackend, /for \(const entry of this\.entries\) \{/);
-  assert.match(factory, /if \(managed\) \{\s*await executeManagedBatch\(\);\s*return;\s*\}/);
-  assert.match(factory, /if \(!catalog \|\| batchRunning \|\| managedStartLock\.current\) return;/);
+test("PR-D PMode submits ONE canonical Manager Target Set instead of a Browser job queue", () => {
+  assert.match(factory, /await runManagedBatch\(request, \{/);
+  assert.match(factory, /const targets = batchTargets\.map\(active => \(\{/);
+  assert.match(factory, /ppu_alias: active\.target\.ppu_id, site_ids: \[\.\.\.active\.siteIds\]/);
+  assert.match(core, /request\.targets \? \{ targets: request\.targets \} : \{\}/);
+  assert.match(api, /targets: input\.targets/);
+  assert.doesNotMatch(factoryBackend, /class ManagedProductionBatch|runManagedProgramming\(/);
+  assert.doesNotMatch(factory, /new ManagedProductionBatch/);
 });
 
-test("PMode isolates PPUs: per-PPU admission, per-PPU OUTCOME_UNKNOWN latch, stop only prevents starts", () => {
-  assert.match(factoryBackend, /admitted = await this\.admit\(entry\.alias\);/);
-  assert.match(factoryBackend, /this\.skipRemaining\(entry => entry\.alias === alias, "stopped",/);
-  assert.match(factoryBackend, /A run already submitted is never cancelled from the Console/);
-  assert.match(factoryBackend, /this\.stopReason = "failed_site_threshold";/);
-  assert.match(factoryBackend, /completed_rounds: entry\.pass \? 1 : 0,/);
-  assert.match(factoryBackend, /if \(verdict === "PASS"\) \{\s*entry\.pass = true;/);
+test("PR-D Manager controls Retry/Stop and the Browser restores durable Batch by ID", () => {
+  assert.match(factory, /retryValue !== null && retryValue <= 5/);
+  assert.match(factory, /repeatValue: managed \? "1" : repeatCount/);
+  assert.match(factory, /retryValue: siteRetryLimit/);
+  assert.match(factory, /await stopProgrammingBatch\(activeBatchId\)/);
+  assert.match(factory, /managed \? readManagedBatch\(\)/);
+  assert.match(factory, /getStartReconciliation\(pendingStart\)/);
+  assert.match(factory, /await getProgrammingBatch\(batchId\)/);
+  assert.match(factory, /writeManagedStart\(startId\)/);
+  assert.match(factory, /reason instanceof ManagedStartOutcomeUnknown/);
+  assert.match(factoryBackend, /export function managedProductionSnapshot/);
+  assert.match(factoryBackend, /batch\.units\.map\(unit =>/);
+  assert.doesNotMatch(factoryBackend, /startProgrammingBatch|runManagedProgramming|\/api\/jobs/);
 });
 
-test("PMode shares the Source selector and policy with EMode", () => {
+test("PMode retains Factory UI and no Mock is presented as HIL acceptance", () => {
   assert.match(factory, /useState<ProgrammingSource>\("image"\)/);
-  assert.match(factory, /source=\{managed \? \{ value: programmingSource, disabled: batchRunning, onChange: changeProgrammingSource \} : undefined\}/);
-  assert.match(factory, /function changeProgrammingSource\(next: ProgrammingSource\) \{\s*if \(batchRunning \|\| next === programmingSource\) return;\s*setProgrammingSource\(next\);\s*setManagedFile\(null\);/);
+  assert.match(factory, /source=\{managed \? \{ value: programmingSource/);
   assert.match(factory, /repeatDisabled: managed \|\| batchRunning/);
-  assert.match(factory, /retryValue: managed \? "0" : siteRetryLimit/);
-  assert.match(factory, /executionInterface: record\.siteInterface/);
-});
-
-test("PMode keeps sequential readiness and does not render a standing qualification banner", () => {
-  assert.match(factoryBackend, /readyLabel: "SEQUENTIAL BATCH READY"/);
+  assert.match(factoryBackend, /readyLabel: "MANAGER BATCH READY"/);
   assert.doesNotMatch(factory, /data-testid="managed-production-mode"/);
-  assert.doesNotMatch(factory, /factoryProductionMode/);
-  assert.match(factory, /label: MANAGED_PRODUCTION_MODE\.readyLabel, ready: true/);
-  assert.doesNotMatch(factory + factoryBackend, /PRODUCTION READY|Production Ready/);
-  // A reload must never resume or resubmit an in-flight managed batch.
-  assert.doesNotMatch(factoryBackend, /sessionStorage|localStorage|writeStoredBatch/);
+  assert.match(factory, /MOCK RESULT/);
+  assert.match(factoryBackend, /completed_rounds: passed \? 1 : 0/);
 });
 
 // ------------------------------------------- EMode / PMode UI cleanup (Gate 1)
@@ -322,7 +310,7 @@ test("the duplicated result UI is removed from both modes, not hidden", async ()
     assert.match(runLog, new RegExp(field));
   }
   assert.match(emode, /programmingRunLogLines\(finishedRun, \{\s*executionInterface: interfaceOf\(finishedRun\.site_id\),\s*\}\)/);
-  assert.match(factory, /programmingRunLogLines\(record\.run, \{ executionInterface: record\.siteInterface \}\)/);
+  assert.match(factory, /programmingRunLogLines\(latestRun, \{ executionInterface: interfaceName \}\)/);
   // The Log summarises the Manager record; it never prints the whole JSON Receipt.
   assert.doesNotMatch(runLog, /JSON\.stringify/);
 });
@@ -353,10 +341,10 @@ test("removing the duplicated UI keeps the Manager evidence and the safety gates
   assert.match(emode, /async function reconcileStartHold/);
   assert.match(emode, /managed-start-hold/);
   assert.match(emode, /managed-unresolved/);
-  assert.match(factoryBackend, /OUTCOME UNKNOWN \(\$\{reason \?\? "unknown"\}\); nothing was resubmitted/);
-  assert.match(factoryBackend, /records\(\): ManagedSiteRecord\[\]/);
-  // PMode still logs every Site outcome, including the ones that never ran.
-  assert.match(factory, /\[SITE\] \$\{site\} · \$\{record\.note\}/);
+  assert.match(factory, /Manager Start \$\{managedStartHold\} is unresolved/);
+  assert.match(factory, /runOfUnit\(batch, unit\)/);
+  assert.match(factoryBackend, /unit\.outcome === "OUTCOME_UNKNOWN"/);
+  assert.match(factory, /\[SITE\] \$\{label\} · \$\{verdict\.verdict\}/);
 });
 
 // --------------------------------------------------------------------- PR-C
@@ -395,7 +383,8 @@ test("PR-C: the Console reaches the canonical Batch resource, never an alias-sco
 test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () => {
   assert.match(emode, /const \[chosenSiteIds, setChosenSiteIds\] = useState<number\[\]>\(\[\]\);/);
   assert.match(emode, /const next = chosenSiteIds\.includes\(id\)/);
-  assert.match(api, /targets: \[\{ ppu_alias: input\.alias, site_ids: \[\.\.\.input\.siteIds\] \}\]/);
+  assert.match(api, /targets: input\.targets[\s\S]*\? input\.targets\.map\(/);
+  assert.match(api, /: \[\{ ppu_alias: input\.alias, site_ids: \[\.\.\.input\.siteIds\] \}\]/);
   // One PPU per Batch in EMode: the Target Set is built from one alias.
   assert.doesNotMatch(emode, /ppu_alias:|targets:/);
   // The Operations offered are the ones EVERY selected Site declares.

@@ -178,11 +178,13 @@ for (const width of [1680, 820]) {
     await expectJobFieldNumbering(job);
     await expectLabelMetrics(job);
 
-    // PMode semantics are untouched: one Flash Cycle Operation, Retry disabled.
+    // Both managed modes use one ordered E/P/V Job and Manager-owned Retry.
     const operations = job.locator("[data-programming-job-operation]");
-    await expect(operations).toHaveCount(1);
-    await expect(operations).toHaveAttribute("data-programming-job-operation", "flash_cycle");
-    await expect(job.getByLabel("Site Retry Limit")).toBeDisabled();
+    await expect(operations).toHaveCount(3);
+    for (const operation of ["erase", "program", "verify"]) {
+      await expect(job.locator(`[data-programming-job-operation="${operation}"]`)).toBeChecked();
+    }
+    await expect(job.getByLabel("Site Retry Limit")).toBeEnabled();
 
     // Field metrics stay the shared PMode values (no EMode label column leak).
     const fields = await job.locator(".programmingJobField").evaluateAll(nodes => nodes.map(node => {
