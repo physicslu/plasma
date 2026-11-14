@@ -868,9 +868,12 @@ export default function FactoryConsoleV2() {
   const repeatValue = parsePositiveInt(repeatCount);
   const retryValue = parseNonNegativeInt(siteRetryLimit);
   const thresholdValue = failedSiteThreshold === "" ? null : parsePositiveInt(failedSiteThreshold);
-  const policyValid = repeatValue !== null && repeatValue <= 10_000
-    && retryValue !== null && retryValue <= 20
-    && (failedSiteThreshold === "" || (thresholdValue !== null && thresholdValue <= Math.max(1, batchCounts.sites)));
+  const policyValid = managed
+    ? retryValue !== null && retryValue <= 5
+      && (failedSiteThreshold === "" || (thresholdValue !== null && thresholdValue <= Math.max(1, batchCounts.sites)))
+    : repeatValue !== null && repeatValue <= 10_000
+      && retryValue !== null && retryValue <= 20
+      && (failedSiteThreshold === "" || (thresholdValue !== null && thresholdValue <= Math.max(1, batchCounts.sites)));
   const executionPolicy: BatchExecutionPolicy | null = policyValid ? {
     repeat_count: repeatValue!,
     site_retry_limit: retryValue!,
@@ -929,12 +932,16 @@ export default function FactoryConsoleV2() {
 
   // Managed readiness: ONLINE and Programming capability are separate facts.
   const icpn = targetDevice?.icpn ?? targetDevice?.identifier ?? null;
-  // PMode runs Image Operations only; a Route's range Operation (Read) is not offered here.
+  // Both modes use one ordered E / P / V Operations List (never flash_cycle).
+  // Site presence/compatibility is separately certified by the PPU.
   const managedOperationOptions = managed
-    ? routeOperationsForIc(managedRoutes?.routes ?? null, icpn).filter(isImageOperation) : [];
-  const managedOperation = chosenManagedOperation != null && (managedOperationOptions as string[]).includes(chosenManagedOperation)
-    ? chosenManagedOperation
-    : managedOperationOptions.length === 1 ? managedOperationOptions[0] : null;
+    ? routeSequenceOperations(managedRoutes?.routes ?? null, icpn, batchTargets[0]?.siteIds[0] ?? null)
+    : [];
+  const managedChosen = normalizeOperations(managedOperations.filter(item => managedOperationOptions.includes(item)));
+  const managedNeedsFile = managedChosen != null && operationsTakeImage(managedChosen);
+  const managedRoute = managedChosen && batchTargets.length
+    ? routeDeclaring(managedRoutes?.routes ?? null, icpn, batchTargets[0].siteIds[0], managedChosen)
+    : null;
   const managedSourceLimit = programmingSource === "bundle" ? 1024 * 1024 + 256 * 1024 : 1024 * 1024;
   const managedReadiness = ((): { code: typeof legacyReadiness.code; label: string; ready: boolean; reason: string } => {
     const blocked = (code: typeof legacyReadiness.code, label: string, reason: string) => ({ code, label, ready: false, reason });
@@ -948,16 +955,19 @@ export default function FactoryConsoleV2() {
     const blocker = managedBatchBlocker(managedTopology, managedRoutes.routes, icpn,
       batchTargets.map(active => ({ alias: active.target.ppu_id, siteIds: active.siteIds })));
     if (blocker) return blocked("programming-unavailable", blocker.label, blocker.reason);
-    if (!managedOperation) return blocked("no-op", "NO OP", "Select one Operation.");
-    if (!isImageOperation(managedOperation)) {
-      return blocked("programming-unavailable", "OPERATION UNAVAILABLE", `${managedOperation} needs an explicit address range.`);
+    if (managedStartHold) {
+      return blocked("programming-unavailable", "START RECONCILIATION REQUIRED",
+        `Manager Start ${managedStartHold} is unresolved. Inspect its journal before another Batch; nothing is resubmitted.`);
     }
-    if (!managedFile) {
+    if (!policyValid) return blocked("programming-unavailable", "POLICY INVALID", "Managed Repeat is 1; Retry must be 0–5; Stop threshold must be within the Target Set.");
+    if (!managedChosen || !managedRoute) return blocked("no-op", "OPERATIONS INVALID",
+      "Select a valid ordered E / P / V list (Erase + Verify without Program is unsupported) with one qualified Route.");
+    if (managedNeedsFile && !managedFile) {
       return programmingSource === "bundle"
         ? blocked("image-required", "BUNDLE REQUIRED", "Select your canonical Bundle v3 (.zip).")
         : blocked("image-required", "IMAGE REQUIRED", "Select a Programming Image (.bin).");
     }
-    if (managedFile.size <= 0 || managedFile.size > managedSourceLimit) {
+    if (managedNeedsFile && managedFile && (managedFile.size <= 0 || managedFile.size > managedSourceLimit)) {
       return blocked("image-invalid", "FILE INVALID", `The selected file must be 1 to ${managedSourceLimit} bytes.`);
     }
     // Ready for the restricted sequential mode only; never a generic production READY.
@@ -983,7 +993,7 @@ export default function FactoryConsoleV2() {
 
   const plannedIcCount = batchSnapshot
     ? batchSnapshot.sites.length * batchSnapshot.execution_policy.repeat_count
-    : batchCounts.sites * (repeatValue ?? 0);
+    : batchCounts.sites * (managed ? 1 : repeatValue ?? 0);
 
   const kpis = [
     { key: "production-sites", label: "SITES", value: batchSnapshot?.sites.length ?? batchCounts.sites },
@@ -1112,41 +1122,93 @@ export default function FactoryConsoleV2() {
     appendLog(`[SOURCE] ${next.toUpperCase()} · previous file and results cleared`);
   }
 
-  // Managed Start Production: every Site is its own Manager plan + run.
+  // PR-D: ONE canonical Manager-owned Batch across every selected PPU/Site.
+  // The Browser never sequences Site Jobs and never automatically retries a lost Start.
   async function executeManagedBatch() {
     if (!catalog || batchRunning || managedStartLock.current) return;
-    if (!managedReadiness.ready || !icpn || !managedFile || !isImageOperation(managedOperation)) {
+    if (!managedReadiness.ready || !icpn || !managedChosen || !managedRoute || !batchTargets.length
+        || (managedNeedsFile && !managedFile)) {
       setOperatorWarning(`${managedReadiness.label} · ${managedReadiness.reason}`);
       appendLog(`[BAT] BLOCKED · ${managedReadiness.label} · ${managedReadiness.reason}`, "WARN");
       return;
     }
+    const targets = batchTargets.map(active => ({
+      ppu_alias: active.target.ppu_id, site_ids: [...active.siteIds],
+    }));
+    const primary = targets[0];
+    // The Route constrains the operation and erase range, not a physical Site.
+    const request = managedNeedsFile && managedFile
+      ? {
+        alias: primary.ppu_alias, siteIds: primary.site_ids, targets,
+        icpn, operations: managedChosen, source: programmingSource, file: managedFile,
+        retryLimit: retryValue ?? 0,
+        stopPolicy: thresholdValue == null ? { kind: "never" as const }
+          : { kind: "failed_sites" as const, threshold: thresholdValue },
+      }
+      : {
+        alias: primary.ppu_alias, siteIds: primary.site_ids, targets,
+        icpn, operations: ["erase"] as const, source: programmingSource, file: null,
+        range: { address: managedRoute.flash_base, length: managedRoute.flash_size },
+        retryLimit: retryValue ?? 0,
+        stopPolicy: thresholdValue == null ? { kind: "never" as const }
+          : { kind: "failed_sites" as const, threshold: thresholdValue },
+      };
     managedStartLock.current = true;
-    const batch = new ManagedProductionBatch({
-      targets: batchTargets.map(active => ({
-        facilityId: active.facility.facility_id, alias: active.target.ppu_id, siteIds: [...active.siteIds],
-      })),
-      icpn,
-      operation: managedOperation,
-      source: programmingSource,
-      file: managedFile,
-      failedSiteStopThreshold: thresholdValue,
-    });
-    managedBatchRef.current?.dispose();
-    managedBatchRef.current = batch;
+    setBatchCommandState("submitting");
     setOperatorWarning(null);
     setClockNow(Date.now());
     terminalBatchRef.current = null;
     setBatchObservationState("connected");
     loggedRecords.current.clear();
     beginActivity();
-    appendLog(`[BAT] START PRODUCTION · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${managedOperation.toUpperCase()} · ${icpn} · ${programmingSource.toUpperCase()} ${managedFile.name} · attempts ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}`);
-    applyBatchSnapshot(batch.snapshot(), catalog);
-    const generation = ++pollGenerationRef.current;
-    void batch.execute().finally(() => { managedStartLock.current = false; });
-    void pollServerBatch(batch.batchId, catalog, generation).catch(error => {
+    appendLog(`[BAT] START MANAGER · ${targets.length} PPUs · ${batchCounts.sites} Sites · ${managedChosen.join(" → ").toUpperCase()} · ${icpn} · Retry ${retryValue ?? 0} · Stop ${thresholdValue ?? "never"} · Repeat 1`);
+    try {
+      await runManagedBatch(request, {
+        onStartId: startId => {
+          writeManagedStart(startId);
+          setManagedStartHold(startId);
+          appendLog(`[START] Manager issued ${startId}; waiting for canonical Batch acceptance`);
+        },
+        onBatch: next => {
+          setBatchCommandState("idle");
+          setBatchObservationState("connected");
+          // A confirmed Manager Batch ID is the durable observation key.
+          clearManagedStart();
+          setManagedStartHold(null);
+          if (next.outcome == null) writeManagedBatch(next.batch_id);
+          const snapshot = managedProductionSnapshot(next, managedTopology);
+          applyBatchSnapshot(snapshot, catalog);
+          logManagedBatch(next);
+          if (next.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")) {
+            // The PPU may have written. Acknowledge/reconcile explicitly; never re-submit.
+            writeManagedStart(next.start_id ?? "");
+            setManagedStartHold(next.start_id ?? "OUTCOME_UNKNOWN");
+          }
+        },
+        onPollError: message => {
+          setBatchObservationState("reconnecting");
+          appendLog(`[BAT] OBSERVATION UNAVAILABLE · ${message}`, "WARN");
+        },
+      });
+    } catch (reason) {
+      const detail = reason instanceof Error ? reason.message : "Manager Batch failed";
+      if (reason instanceof ManagedProgrammingBlocked) {
+        // Definitive 4xx refusal: Manager confirms no Batch was accepted.
+        clearManagedStart();
+        setManagedStartHold(null);
+      }
+      if (reason instanceof ManagedStartOutcomeUnknown) {
+        // The Start may have been accepted. Keep its ID and block new Start.
+        writeManagedStart(reason.planId);
+        setManagedStartHold(reason.planId);
+      }
+      setOperatorWarning(detail);
+      appendLog(`[BAT] ${reason instanceof ManagedStartOutcomeUnknown ? "START OUTCOME UNKNOWN" : "ERROR"} · ${detail}`, "ERROR");
       endActivity();
-      appendLog(`[BAT] OBSERVATION ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
-    });
+    } finally {
+      managedStartLock.current = false;
+      setBatchCommandState("idle");
+    }
   }
 
   async function executeBatch() {
@@ -1228,19 +1290,17 @@ export default function FactoryConsoleV2() {
   async function abortBatch() {
     const activeBatchId = batchSnapshot?.batch_id;
     if (!activeBatchId || !serverBatchRunning || serverBatchState === "stopping" || batchAborting) return;
-    const managedBatch = managedBatchRef.current;
-    if (managedBatch?.batchId === activeBatchId) {
-      // Stops queuing further Sites; a submitted run is never cancelled from the Console.
-      appendLog(`[BAT] ABORT REQUESTED · ${activeBatchId} · no further Site will start; the run in flight is not cancelled`, "WARN");
-      if (catalog) applyBatchSnapshot(managedBatch.stop(), catalog);
-      return;
-    }
     setBatchCommandState("aborting");
     appendLog(`[BAT] ABORT REQUESTED · ${activeBatchId}`, "WARN");
     try {
-      const next = await cancelServerBatch(apiBase, activeBatchId);
+      if (managed) {
+        const next = await stopProgrammingBatch(activeBatchId);
+        if (catalog) applyBatchSnapshot(managedProductionSnapshot(next, managedTopology), catalog);
+      } else {
+        const next = await cancelServerBatch(apiBase, activeBatchId);
+        if (catalog) applyBatchSnapshot(next, catalog);
+      }
       setGatewayHealth("online");
-      if (catalog) applyBatchSnapshot(next, catalog);
     } catch (error) {
       setGatewayHealth(gatewayHealthFromError(error));
       appendLog(`[BAT] ABORT ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
@@ -1429,13 +1489,14 @@ export default function FactoryConsoleV2() {
               }}
               operationsLabel={text.operations}
               operations={managed ? managedOperationOptions.map(operation => ({
-                // Only Operations a committed Programming Route declares for the IC.
                 key: operation,
                 code: PROGRAMMING_OPERATION_LABELS[operation].code,
                 label: PROGRAMMING_OPERATION_LABELS[operation].label,
-                checked: managedOperation === operation,
-                disabled: batchRunning || !isImageOperation(operation),
-                onChange: () => setChosenManagedOperation(managedOperation === operation ? null : operation),
+                checked: managedOperations.includes(operation),
+                disabled: batchRunning,
+                onChange: () => setManagedOperations(current => current.includes(operation)
+                  ? current.filter(value => value !== operation)
+                  : [...current, operation]),
               })) : operationOrder.map(operation => ({
                 key: operation,
                 code: operationCodes[operation],
@@ -1447,15 +1508,15 @@ export default function FactoryConsoleV2() {
               policyLabel={text.batchPolicy}
               policy={{
                 repeatLabel: text.repeat,
-                repeatValue: managed ? String(MANAGED_JOB_POLICY.attempts) : repeatCount,
+                repeatValue: managed ? "1" : repeatCount,
                 repeatDisabled: managed || batchRunning,
                 repeatAriaLabel: "Repeat Count",
                 onRepeatChange: setRepeatCount,
                 retryLabel: text.retry,
-                retryValue: managed ? "0" : siteRetryLimit,
-                retryDisabled: managed || batchRunning,
+                retryValue: siteRetryLimit,
+                retryDisabled: batchRunning,
                 note: managed
-                  ? `Formal Flash Job: attempts = ${MANAGED_JOB_POLICY.attempts} per Site · auto retry ${MANAGED_JOB_POLICY.auto_retry}. Repeat and Retry are disabled. Stop Policy and ABORT only stop queuing further Sites; one Site runs at a time.`
+                  ? "Manager-owned Batch · Repeat 1 · Retry 0–5 only for definite eligible FAIL (never OUTCOME UNKNOWN) · ABORT stops pending submissions but never cancels an accepted Job."
                   : undefined,
                 retryAriaLabel: "Site Retry Limit",
                 onRetryChange: setSiteRetryLimit,
