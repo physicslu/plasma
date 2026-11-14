@@ -123,7 +123,7 @@ def read_bundle(path: Path, *, site: int, package: str | None,
     require(sha256(raw_firmware) == entry["sha256"]
             and len(raw_firmware) == entry["size"] and len(raw_firmware) > 0,
             "FIRMWARE_SHA_OR_SIZE_MISMATCH")
-    require(descriptor.get("schema") == "plasma.ppu.provider-capabilities.v1"
+    require(descriptor.get("schema") == "plasma.ppu.provider-capabilities.v2"
             and descriptor.get("provider_package") == provider["id"]
             and descriptor.get("target")
             and "flash_cycle" in descriptor.get("operations", []),
