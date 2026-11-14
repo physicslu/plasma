@@ -49,7 +49,7 @@ def source(tmp_path: Path) -> Path:
             "options": {"type": "object", "properties": {}},
         },
         "plasma-provider.json": {
-            "schema": "plasma.ppu.provider-capabilities.v1",
+            "schema": "plasma.ppu.provider-capabilities.v2",
             "target": ICPN, "provider_package": PROVIDER,
             "operations": ["flash_cycle"],
             "transport": "fpga", "driver_abi": "plasma_swd:5",
