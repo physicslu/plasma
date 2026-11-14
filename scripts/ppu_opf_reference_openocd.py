@@ -209,7 +209,7 @@ def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str
               and descriptor.get("target") == target, "REFERENCE_TARGET_MISMATCH")
         _need(provider is None or descriptor.get("provider_package") == provider,
               "PROVIDER_SELECTION_MISMATCH")
-        _need(type(site_id) is int and site_id in descriptor["sites"], "SITE_NOT_SUPPORTED")
+        _need(type(site_id) is int and site_id >= 1, "SITE_ID_INVALID")
         _need(all(op in descriptor["operations"] for op in (operations or (operation,))),
               "OPERATION_UNSUPPORTED")
         _need(not image_operation
