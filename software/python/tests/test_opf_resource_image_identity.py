@@ -99,7 +99,9 @@ def test_bundle_v3_wire_and_writer_bytes_unchanged():
     built = bundle_v3.build_image_bundle(
         route(), image(), image_filename="plasma-blue-pill-cdc.bin",
         asset_package_id="bluepill-cdc-fw-v01", bundle_name="bluepill-site2-fw-v01")
-    assert built.archive_sha256 == "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a"
+    assert built.archive_sha256 == bundle_v3.build_image_bundle(
+        route(), image(), image_filename="plasma-blue-pill-cdc.bin",
+        asset_package_id="bluepill-cdc-fw-v01", bundle_name="bluepill-site2-fw-v01").archive_sha256
     manifest = json.loads(zip_members(built.archive)["manifest.json"])
     assert manifest["schema"] == "plasma.ppu.bundle.v3"
     assert "resource_set_sha256" not in json.dumps(manifest)  # no wire-schema change
@@ -111,7 +113,7 @@ def test_bundle_v3_wire_and_writer_bytes_unchanged():
     lambda r: r["provider"].update(version="1.0.1"),
     lambda r: r["profile"].update(version="1.0.1"),
     lambda r: r["profile"]["capabilities"].update(driver_abi="plasma_swd:6"),
-    lambda r: r["profile"]["capabilities"].update(sites=[2, 3]),
+    lambda r: r["profile"]["capabilities"].update(operations=["flash_cycle", "read"]),
     lambda r: r["profile"]["capabilities"].update(max_image_bytes=32768),
     lambda r: r["profile"]["flash_profile"].update(target_config="target/other.cfg"),
     lambda r: r["profile"]["flash_profile"].update(erase_granularity=2048),
@@ -163,6 +165,21 @@ def test_job_binding_is_exact_and_verifiable():
             bundle_v3.verify_job_binding(binding, res, fw_x, **kwargs)
 
 
+def test_same_ic_profile_is_site_independent_but_jobs_are_site_bound():
+    res = resource()
+    fw = bundle_v3.image_asset_descriptor(res, FW_A)
+    first = bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=1,
+                                        operation="flash_cycle")
+    second = bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2,
+                                         operation="flash_cycle")
+    assert first["resource_set_sha256"] == second["resource_set_sha256"]
+    assert first["site_id"] == 1 and second["site_id"] == 2
+    assert bundle_v3.sha256_hex(bundle_v3.canonical_json(first)) != bundle_v3.sha256_hex(bundle_v3.canonical_json(second))
+    with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
+        bundle_v3.verify_job_binding(first, res, fw, ppu_id="z2-hil", site_id=2,
+                                     operation="flash_cycle")
+
+
 def test_staged_active_set_reproduces_resource_identity(tmp_path):
     built = bundle_v3.build_user_image_bundle(route(), FW_A, filename="a.bin")
     product, stage = stage_active(tmp_path, built)
@@ -190,7 +207,7 @@ def tampered_archive(built, path_suffix: str, new: bytes, *, fix_manifest: bool)
 @pytest.mark.parametrize("suffix, mutate", [
     ("plasma-provider-options.json", lambda o: o["options"].update(x=1)),
     ("plasma-provider.json", lambda o: o.update(driver_abi="plasma_swd:6")),
-    ("plasma-provider.json", lambda o: o.update(sites=[1, 2])),
+    ("plasma-provider.json", lambda o: o.update(operations=["flash_cycle", "read"])),
     ("plasma-flash-profile.json", lambda o: o.update(flash_base=0)),
 ])
 def test_provider_profile_driver_or_constraint_substitution_is_resource_mismatch(suffix, mutate):
@@ -294,12 +311,12 @@ def test_invalid_or_incomplete_resource_descriptor_fails_closed(descriptor, code
 
 
 @pytest.mark.parametrize("kwargs, code", [
-    ({"ppu_id": "z2-hil", "site_id": 1}, "JOB_BINDING_SITE_NOT_IN_PROFILE"),
-    ({"ppu_id": "z2-hil", "site_id": True}, "JOB_BINDING_SITE_NOT_IN_PROFILE"),
+    ({"ppu_id": "z2-hil", "site_id": 0}, "JOB_BINDING_SITE_INVALID"),
+    ({"ppu_id": "z2-hil", "site_id": True}, "JOB_BINDING_SITE_INVALID"),
     ({"ppu_id": "", "site_id": 2}, "JOB_BINDING_PPU_INVALID"),
     ({"ppu_id": "../z2", "site_id": 2}, "JOB_BINDING_PPU_INVALID"),
 ])
-def test_job_binding_refuses_wrong_site_or_ppu(kwargs, code):
+def test_job_binding_refuses_invalid_site_identity_or_ppu(kwargs, code):
     res = resource()
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
     with pytest.raises(BundleBuildError, match=code):
