@@ -120,15 +120,15 @@ plan + run + single PPU Job. An attempt is journalled **before** it is submitted
 A Batch start carries a Manager-issued `start_id` obtained first
 (`plasma_manager/programming.py` `issue_batch_start` → `consume_batch_start`). It is admitted at
 most once; an unknown, used, voided or expired ID is refused with `409` and nothing is submitted.
-The canonical resource **requires** it: a Batch without one could not be reconciled after a lost
-answer, so a request that omits it is refused `400` and nothing is recorded. The compatibility
-entry keeps accepting a start that omits it, as it always has, because tightening it would break
-deployed callers before PR-C migrates them (§5.8).
+The resource **requires** it: a Batch without one could not be reconciled after a lost answer, so
+a request that omits it is refused `400` and nothing is recorded. There is one door since PR-C
+(§5.8), and it is the strict one.
 
-The `start_id` is validated against the PPU it was **issued for**, resolved from the pending
-record, not against whichever Target happens to be listed first. The token is an idempotency
-guard and never an authority: each Target's own authority is verified independently, so the order
-of the Target Set cannot make a legal start illegal.
+The token is **issued under no PPU** (PR-C). A Batch is owned by the Manager, so the ID it is
+admitted with is not issued beneath one of its Targets: issuing it plans nothing, reads no PPU
+and authorises nothing. The token is an idempotency guard and never an authority — each Target's
+own authority is verified independently at admission — so no choice of Targets and no ordering of
+the Target Set can make a legal start illegal.
 
 Admission separates **validity** from **readiness**, and they are refused differently.
 
@@ -138,6 +138,13 @@ Admission separates **validity** from **readiness**, and they are refused differ
 - A Target that is valid but not ready — Platform `BUSY`, `RECOVERY_REQUIRED`, or an idle state
   that cannot be proven — does not refuse the Batch. That Target alone is admitted `BLOCKED` with
   its specific reason recorded, and no Job is submitted for it (§5.7).
+
+**Readiness is read at the scope of the gate that answers it** (PR-C). The Platform gate judges
+the PPU, so it is asked once per PPU and its verdict covers every Site of that PPU. The Target
+gate judges one Site, so it is asked **per Site**: one Site being busy is not evidence about
+another Site of the same PPU, and admitting that other Site `BLOCKED` would report a Site that was
+never read. Both gates are asked again immediately before each Site is operated (§5.2), because
+readiness read at admission does not authorise a mutation that happens later.
 
 A Batch in which **every** Target is `BLOCKED` is still admitted: `202`, journalled, reconcilable,
 outcome `BLOCKED`, execution status `COMPLETED`, no Job submitted, and the `start_id` consumed.
@@ -291,42 +298,85 @@ persistence failure and stops.
 
 ### 5.8 API surface and its retirement
 
-The Batch is owned by the Manager, not by a PPU, so its canonical resource does not sit under one.
+The Batch is owned by the Manager, not by a PPU, so neither it nor the start it is admitted with
+sits under one. **PR-C retired the alias-scoped entry**; this is the whole surface.
 
 | Endpoint | Status |
 | --- | --- |
-| `POST /api/programming/batches` | Canonical. Carries the Target Set (§3) and may span many PPUs. Read and stopped at `/api/programming/batches/<batch_id>[/stop]`. |
-| `POST /api/registry/<alias>/bootstrap/programming/batches` | Short-term compatibility entry. Equivalent to a single-Target Batch on that alias, and it reads only such a Batch. |
+| `POST /api/programming/batches` | Canonical. Carries the Target Set (§3) and may span many PPUs. Read and stopped at `/api/programming/batches/<batch_id>[/stop]`. Requires a `start_id` (§5.3). |
+| `POST /api/programming/starts` | Canonical. Issues the `start_id` for `kind=batch`. Under no PPU: it plans nothing, reads no PPU and authorises nothing. |
+| `GET /api/programming/starts/<start_id>` | Canonical, read-only Start Outcome Reconciliation (§5.4). Answers for a run start (a `plan_id`) or a Batch start. |
+| `POST /api/programming/starts/<start_id>/void` | Canonical. Drops a start that was never admitted; refuses an admitted one. Touches no run, Batch, Job or PPU. |
+| `POST /api/registry/<alias>/bootstrap/programming/batches` | **Retired in PR-C.** Answers `410 programming_route_retired`. |
+| `POST /api/registry/<alias>/bootstrap/programming/starts` | **Retired in PR-C.** Answers `410 programming_route_retired`. |
+
+A PPU-scoped plan, run, acknowledgement and Read Memory output stay exactly where they are, under
+`/api/registry/<alias>/bootstrap/programming/`: those are owned by one PPU and PR-C does not touch
+them.
 
 (An earlier revision of this section wrote the compatibility entry as
-`/ppus/<alias>/programming/batches`. That shorthand came from the Gate 1 audit and is not a path
-the Manager serves; the table above is the implemented one.)
+`/ppus/<alias>/programming/batches`. That shorthand came from the Gate 1 audit and was never a
+path the Manager served.)
 
-Both are doors into the **same** Manager Batch engine. Exactly one scheduler, one journal, one
-outcome policy, one recovery path and one retry engine stands behind them. A second implementation
-behind the compatibility entry is forbidden, and so is a second set of semantics: a Batch admitted
-through either door is judged by §5.3, §5.6 and §5.7 identically.
+There is now exactly **one** door into the Manager Batch engine: one scheduler, one journal, one
+outcome policy, one recovery path and one retry engine. A second implementation or a second set of
+semantics remains forbidden.
 
-PR-B adds the canonical resource and keeps the compatibility entry. PR-B does not change
-`software/web`.
+PR-B added the canonical resource and kept the compatibility entry; PR-B did not change
+`software/web`. PR-C migrated every consumer and removed the entry. PR-F retires the legacy
+direct-Gateway batch path (§11), which is a different path.
 
-The compatibility entry retires in **PR-C**, not PR-F. PR-F retires the legacy direct-Gateway
-batch path (§11), which is a different path; the alias-scoped route belongs to the Manager-owned
-path and is superseded by the canonical resource rather than judged as legacy.
+**The retirement conditions and how PR-C met them.**
 
-PR-C may remove it only after all of:
-
-1. a Consumer Inventory covering EMode, PMode, the Console BFF, CLI and scripts, API clients,
-   tests and fixtures, and the deployed SWPC Control Station;
-2. every consumer migrated for Batch start, status and query, stop, reconcile, and error and
-   outcome handling;
-3. host-only regression, an API contract check and Console E2E passing against the canonical
-   resource;
-4. a stated deployment order, because a Manager that has dropped the entry breaks a Control
-   Station that has not yet shipped.
+1. *Consumer Inventory.* The alias-scoped Batch and start entries had web consumers only:
+   `app/engineering/bundle-programming-api.ts`, `app/programming/managed-programming.ts`,
+   `app/engineering/managed-programming-workspace.tsx`, the BFF allowlist in
+   `app/api/manager/bootstrap-bff.ts`, the web contract and Playwright suites, and
+   `software/python/tests/test_manager_bundle_programming_rest.py`. **No CLI, script or API client
+   consumed them** — `scripts/runtime_acceptance/*` addresses the legacy Gateway `/api/batches`,
+   which belongs to §11. The deployed SWPC Control Station ships the Manager zipapp and the web
+   app in one release (`scripts/control-station-runtime.py`), so it holds no third version.
+2. *Every consumer migrated* for start issuance, Batch start, status and query, stop, reconcile,
+   void, and error and outcome handling.
+3. *Host-only regression, an API contract check and Console E2E* run against the canonical
+   resource.
+4. *Deployment order.* The Manager and the Console are one Control Station release, so the swap is
+   atomic and no ordering between them exists to get wrong. What survives the upgrade is a
+   **browser tab opened before it**, still running the old JavaScript. The retired routes
+   therefore answer `410 programming_route_retired` naming the current resource, and the Console
+   treats it as "reload this page". A `4xx` is a definite refusal under §5.3 — nothing was
+   planned, queued or submitted — so a stale tab can never produce an unknown outcome.
 
 Console source having switched is **not** evidence that a deployed consumer has. Any consumer that
-cannot be confirmed is a blocking item and the entry stays.
+could not be confirmed would have been a blocking item; none remained.
+
+**Authorisation is not relaxed by the move.** A canonical resource is not a lower bar than the
+alias-scoped route it replaces. Every mutation on it carries the Control Station's same-origin
+check **and** the maintenance capability of every PPU it concerns:
+
+| Operation | Whose capability | How the PPU is established |
+| --- | --- | --- |
+| `POST /api/programming/batches` | every Target | the Target Set in the request |
+| `POST …/batches/<id>/stop` | every Target of that Batch | read back from the Manager's own record |
+| `POST …/starts/<id>/void` | the start's PPU, when it has one | the Manager's record; otherwise the caller's declaration |
+| `POST /api/programming/starts` | the PPU the operator is acting for | the caller's declaration (nothing is admitted yet) |
+| `GET …/batches/<id>`, `GET …/starts/<id>` | — | read-only, allowlisted, exactly as the alias-scoped GET was |
+
+Where the Manager knows the PPU, **the Manager's record decides**, so a caller's declaration can
+only narrow and never widen. A declaration is accepted only where no PPU exists yet, which is the
+same boundary the retired alias-scoped `programming/starts` route enforced through its path. An
+operation whose PPU cannot be established is refused rather than authorised against nothing. The
+declaration is a BFF parameter and is never forwarded to the Manager: it is not part of the
+contract, the record or the Batch.
+
+**The canonical start's persistence is backward-compatible, and the placeholder is never an
+identity.** A Batch start has no PPU, and the journal record says so in its own field
+(`start_scope: "manager"`). Beside it, `ppu_alias` is written as the empty string, because a
+Manager rolled back to a pre-PR-C release type-validates that field and would otherwise refuse to
+start rather than read its own journal. The empty string is a rollback placeholder only: it is
+never an alias, it addresses no PPU, it authorises nothing, and a record that claims Manager scope
+while carrying a PPU - or a run start carrying the placeholder - is refused on load. A rolled-back
+Manager reads it as a PPU that matches nothing, which is the only safe reading available to it.
 
 ## 6. Batch Policy
 
@@ -503,7 +553,7 @@ it is superseded rather than legacy, and it retires in PR-C under the conditions
 | PR-A | this contract | — |
 | PR-B1 | mock `run_operations` + per-step evidence | PR-A |
 | PR-B | Manager Batch Orchestrator on `targets[]` | PR-A |
-| PR-C | EMode multi-Site Console; consumers migrated off the alias-scoped Batch API and that entry removed (§5.8) | PR-B |
+| PR-C | EMode multi-Site Console; consumers migrated off the alias-scoped Batch API and that entry removed (§5.8). **Landed.** EMode covers many Sites of **one** PPU; a multi-PPU Console is left to a later PR, and the engine already carries it. | PR-B |
 | PR-D | PMode shared engine, `operations[]` switch, execution-route constraint lifted | PR-B, PR-B1, PR-C |
 | PR-E | host-only tests and E2E | PR-B..PR-D |
 | PR-F | legacy retirement, per the Inventory | PR-D |

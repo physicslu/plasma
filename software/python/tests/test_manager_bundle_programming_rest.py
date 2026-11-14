@@ -55,12 +55,13 @@ class StubWorkflow:
         self.calls.append(("ack", alias, run_id, dict(body)))
         return {"ok": True, "run": {"run_id": run_id, "acknowledged": True}}
 
-    def issue_batch_start(self, alias, body):
-        self.calls.append(("issue", alias, dict(body)))
-        return {"ok": True, "start": {"start_id": RUN_ID, "kind": "batch"}}
+    def issue_batch_start(self, body):
+        self.calls.append(("issue", dict(body)))
+        return {"ok": True, "start": {"start_id": RUN_ID, "kind": "batch",
+                                      "ppu_alias": None}}
 
-    def void_start(self, alias, start_id, body):
-        self.calls.append(("void", alias, start_id, dict(body)))
+    def void_start(self, start_id, body):
+        self.calls.append(("void", start_id, dict(body)))
         if body != {"void": "VOID_UNSTARTED_START"}:
             raise ProgrammingError(400, "invalid_request", "void requires void=VOID_UNSTARTED_START")
         return {"ok": True, "reconciliation": {"start_id": start_id, "state": "NOT_ACCEPTED"}}
@@ -70,23 +71,9 @@ class StubBatches:
     def __init__(self):
         self.calls: list[tuple] = []
 
-    def start(self, alias, body):
-        self.calls.append(("start", alias, dict(body)))
-        return {"ok": True, "batch": {"batch_id": RUN_ID, "outcome": None}}
-
-    def status(self, alias, batch_id):
-        self.calls.append(("status", alias, batch_id))
-        return {"ok": True, "batch": {"batch_id": batch_id, "outcome": "PASS"}}
-
-    def reconcile_start(self, alias, start_id):
-        self.calls.append(("reconcile", alias, start_id))
+    def reconcile_start(self, start_id):
+        self.calls.append(("reconcile", start_id))
         return {"ok": True, "reconciliation": {"start_id": start_id, "state": "OUTCOME_UNKNOWN"}}
-
-    def request_stop(self, alias, batch_id, body):
-        self.calls.append(("stop", alias, batch_id, dict(body)))
-        if body != {"stop": "STOP_QUEUING"}:
-            raise ProgrammingError(400, "invalid_request", "stop requires stop=STOP_QUEUING")
-        return {"ok": True, "batch": {"batch_id": batch_id, "stop_requested": True}}
 
     # The canonical resource: no alias, because the Batch is not owned by a PPU.
     def start_batch(self, body):
@@ -204,50 +191,58 @@ def test_read_output_is_a_binary_download_with_its_sha256(manager):
     assert ("output", "z2", RUN_ID) in workflow.calls
 
 
-def test_batch_start_status_and_stop_are_wired(manager):
-    call, _workflow, _poller, _batches = manager
-    batches = BootstrapPlasmaManagerHandler.programming_batches
-    status, payload = call("POST", f"{BASE}/batches", {
-        "icpn": "X", "site_id": 2, "operations": ["erase"], "retry_limit": 1})
-    assert status == 202 and payload["batch"]["batch_id"] == RUN_ID
-    status, payload = call("GET", f"{BASE}/batches/{RUN_ID}")
-    assert status == 200 and payload["batch"]["outcome"] == "PASS"
-    status, payload = call("POST", f"{BASE}/batches/{RUN_ID}/stop", {"stop": "STOP_QUEUING"})
-    assert status == 200 and payload["batch"]["stop_requested"] is True
-    status, payload = call("POST", f"{BASE}/batches/{RUN_ID}/stop", {"stop": "cancel"})
-    assert status == 400 and payload["error"]["code"] == "invalid_request"
-    assert [c[0] for c in batches.calls] == ["start", "status", "stop", "stop"]
+def test_the_alias_scoped_batch_and_start_routes_are_retired(manager):
+    call, workflow, _poller, batches = manager
+    # A Console tab loaded before the upgrade still asks for these. 410 is a
+    # definite refusal that names the current resource; 5.3 reads a 4xx as a
+    # refusal, so nothing is ever recorded as an unknown outcome.
+    for method, path, body in (
+            ("POST", f"{BASE}/batches", {"icpn": "X", "site_id": 2, "operations": ["erase"]}),
+            ("GET", f"{BASE}/batches/{RUN_ID}", None),
+            ("POST", f"{BASE}/batches/{RUN_ID}/stop", {"stop": "STOP_QUEUING"}),
+            ("POST", f"{BASE}/starts", {"kind": "batch"}),
+            ("GET", f"{BASE}/starts/{RUN_ID}", None),
+            ("POST", f"{BASE}/starts/{RUN_ID}/void", {"void": "VOID_UNSTARTED_START"})):
+        status, payload = call(method, path, body) if body is not None else call(method, path)
+        assert status == 410, (method, path, status)
+        assert payload["error"]["code"] == "programming_route_retired"
+        assert "/api/programming/batches" in payload["error"]["message"]
+    # Nothing reached the engine: no Batch was started, read or stopped.
+    assert workflow.calls == [] and batches.calls == []
     # No cancel / abort route exists for a submitted Job.
     for path in (f"{BASE}/batches/{RUN_ID}/cancel", f"{BASE}/batches/{RUN_ID}/abort",
                  f"{BASE}/runs/{RUN_ID}/cancel"):
         assert call("POST", path, {"x": 1})[0] == 404
 
 
-def test_start_reconciliation_issue_and_void_are_wired(manager):
-    call, workflow, _poller, _batches = manager
-    batches = BootstrapPlasmaManagerHandler.programming_batches
-    status, payload = call("POST", f"{BASE}/starts", {"kind": "batch"})
+CANONICAL = "/api/programming/batches"
+CANONICAL_STARTS = "/api/programming/starts"
+
+
+def test_the_canonical_start_resource_is_not_under_a_ppu(manager):
+    call, workflow, _poller, batches = manager
+    status, payload = call("POST", CANONICAL_STARTS, {"kind": "batch"})
     assert status == 200 and payload["start"]["start_id"] == RUN_ID
-    status, payload = call("GET", f"{BASE}/starts/{RUN_ID}")
+    assert payload["start"]["ppu_alias"] is None
+    status, payload = call("GET", f"{CANONICAL_STARTS}/{RUN_ID}")
     assert status == 200 and payload["reconciliation"]["state"] == "OUTCOME_UNKNOWN"
-    status, payload = call("POST", f"{BASE}/starts/{RUN_ID}/void", {"void": "VOID_UNSTARTED_START"})
+    status, payload = call("POST", f"{CANONICAL_STARTS}/{RUN_ID}/void",
+                           {"void": "VOID_UNSTARTED_START"})
     assert status == 200 and payload["reconciliation"]["state"] == "NOT_ACCEPTED"
-    assert call("POST", f"{BASE}/starts/{RUN_ID}/void", {"void": "x"})[0] == 400
+    assert call("POST", f"{CANONICAL_STARTS}/{RUN_ID}/void", {"void": "x"})[0] == 400
+    # No alias reached the workflow: issuing and voiding name no PPU at all.
     assert [c[0] for c in workflow.calls] == ["issue", "void", "void"]
-    assert batches.calls == [("reconcile", "z2", RUN_ID)]
+    assert workflow.calls[0] == ("issue", {"kind": "batch"})
+    assert batches.calls == [("reconcile", RUN_ID)]
 
 
-def test_reconciliation_is_a_get_only_and_takes_a_strict_start_id(manager):
-    call, workflow, _poller, _batches = manager
-    batches = BootstrapPlasmaManagerHandler.programming_batches
-    for path in (f"{BASE}/starts/not-an-id", f"{BASE}/starts/{'D' * 32}", f"{BASE}/starts"):
+def test_canonical_reconciliation_is_a_get_only_and_takes_a_strict_start_id(manager):
+    call, workflow, _poller, batches = manager
+    for path in (f"{CANONICAL_STARTS}/not-an-id", f"{CANONICAL_STARTS}/{'D' * 32}"):
         assert call("GET", path)[0] in (400, 404, 405)
     # A POST to the reconciliation path is never a query and changes nothing.
-    assert call("POST", f"{BASE}/starts/{RUN_ID}", {})[0] in (400, 404, 405)
+    assert call("POST", f"{CANONICAL_STARTS}/{RUN_ID}", {})[0] in (400, 404, 405)
     assert workflow.calls == [] and batches.calls == []
-
-
-CANONICAL = "/api/programming/batches"
 
 
 def test_the_canonical_batch_resource_is_not_under_a_ppu(manager):

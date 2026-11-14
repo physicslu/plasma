@@ -202,8 +202,19 @@ test("the READ binary path adds no retry and no second Content-Length producer",
     readFile(new URL("../../python/plasma_manager/bootstrap_server.py", import.meta.url), "utf8"),
     readFile(new URL("../../python/plasma_manager/server.py", import.meta.url), "utf8"),
   ]);
-  assert.equal(bff.match(/\bfetch\(/g).length, 1);
-  assert.doesNotMatch(bff, /\bfor\s*\(|\bwhile\s*\(|attempt/i);
+  // Three fetches, each with its own purpose and none of them a retry: the
+  // alias-scoped Bootstrap relay, the canonical programming relay, and the
+  // read that resolves which PPU a canonical mutation acts on.
+  assert.equal(bff.match(/\bfetch\(/g).length, 3);
+  const relays = bff.split("export async function ").slice(1);
+  assert.equal(relays.length, 2);
+  assert.match(bff, /async function managerProgrammingRead\([\s\S]{0,400}?\bfetch\(/);
+  assert.doesNotMatch(bff, /\bwhile\s*\(|attempt/i);
+  // The only loops read a Target Set and check each Target's capability.
+  // None sends anything, so none can become a retry.
+  assert.deepEqual(
+    [...bff.matchAll(/\bfor \(const (\w+) of (\w+)\)/g)].map(match => `${match[1]} of ${match[2]}`),
+    ["target of targets", "target of targets", "alias of aliases"]);
   assert.doesNotMatch(handler, /["']Content-Length["']/);
   assert.match(server, /def _raw_response[\s\S]*?send_header\("Content-Length", str\(len\(body\)\)\)/);
 });

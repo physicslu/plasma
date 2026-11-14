@@ -181,6 +181,13 @@ function base(alias: string): string {
   return `/api/manager/registry/${encodeURIComponent(alias)}/bootstrap/programming`;
 }
 
+/**
+ * The canonical Manager-owned programming resources (ADR 5.8). A Batch and
+ * the start it is admitted with are not under a PPU, because no PPU owns
+ * them. The alias-scoped entry retired in PR-C.
+ */
+const PROGRAMMING = "/api/manager/programming";
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     cache: "no-store",
@@ -301,12 +308,16 @@ export async function getReadOutput(alias: string, runId: string): Promise<Uint8
 export const PROGRAMMING_STOP_TOKEN = "STOP_QUEUING";
 export const MAX_RETRY_LIMIT = 5;
 
-export type StopPolicy = { kind: "never" } | { kind: "failed_sites"; threshold: 1 };
+export type StopPolicy = { kind: "never" } | { kind: "failed_sites"; threshold: number };
 export type BatchPolicy = { repeat: 1; retry_limit: number; stop_policy: StopPolicy };
-export type ProgrammingBatchOutcome = ProgrammingRunOutcome | "STOPPED";
+// A Batch spans Sites, so it has outcomes a single run cannot have:
+// PARTIAL (some Sites passed) and BLOCKED (nothing was submitted).
+export type ProgrammingBatchOutcome = ProgrammingRunOutcome | "PARTIAL" | "STOPPED";
 
 export type ProgrammingBatchAttempt = {
   attempt: number;
+  /** The Manager's identity for this attempt: which PPU, Site and try it was. */
+  job_key: { batch_id: string; ppu_alias: string; site_id: number; attempt: number };
   plan_id: string;
   run_id: string | null;
   job_id: string | null;
@@ -319,62 +330,106 @@ export type ProgrammingBatchAttempt = {
   retry: { eligible: boolean; reason: string; decision: "RETRY" | "NO_RETRY" } | null;
 };
 
+/** One PPU and the Sites of it this Batch covers. */
+export type ProgrammingBatchTarget = { ppu_alias: string; site_ids: number[] };
+
+/**
+ * One Site of one PPU: the unit the Manager schedules, isolates and judges.
+ * A Batch outcome is an aggregate of these, never a substitute for them.
+ */
+export type ProgrammingBatchUnit = {
+  ppu_alias: string;
+  site_id: number;
+  status: string;
+  outcome: ProgrammingBatchOutcome | null;
+  reason: string | null;
+  /** Whose failure it was: the Target, its state, its transaction or shared control. */
+  failure_domain: string | null;
+  attempts: ProgrammingBatchAttempt[];
+};
+
 export type ProgrammingBatch = {
   schema: "plasma.manager.programming-batch.v1";
   batch_id: string;
-  ppu_alias: string;
-  site_id: number;
+  /** The Manager-issued token this Batch was admitted with. */
+  start_id: string | null;
+  targets: ProgrammingBatchTarget[];
+  units: ProgrammingBatchUnit[];
+  /**
+   * A single-Site Batch also carries these. They are a projection of the one
+   * record, so read `units` for anything a multi-Site Batch must show.
+   */
+  ppu_alias?: string;
+  site_id?: number;
   icpn: string;
   operations: SequenceOperation[];
   source: ProgrammingSource | "range";
   policy: BatchPolicy;
   state: string;
+  execution_status: string;
   outcome: ProgrammingBatchOutcome | null;
   reason: string | null;
+  failure_domain: string | null;
   stop_requested: boolean;
+  /** Every attempt of every Site, in order. */
   attempts: ProgrammingBatchAttempt[];
   /** The run of the latest attempt (same record as a single run). */
   current_run: ProgrammingRun | null;
-  /** One Batch is one IC: counted once, by its final outcome. */
-  counts: { pass: number; fail: number; attempts: number };
+  /** One Site is one IC: counted once, by its final outcome. */
+  counts: {
+    pass: number; fail: number; blocked: number; unknown: number;
+    sites: number; attempts: number;
+  };
   auto_retry: "DISABLED";
 };
 
 export type BatchInput = (
-  | { icpn: string; siteId: number; operations: readonly SequenceOperation[]; image: Uint8Array; filename: string }
-  | { icpn: string; siteId: number; operations: readonly SequenceOperation[]; bundle: Uint8Array }
-  | { icpn: string; siteId: number; operations: readonly ["erase"]; address: number; length: number }
-) & { retryLimit: number; stopPolicy: StopPolicy };
+  | { icpn: string; operations: readonly SequenceOperation[]; image: Uint8Array; filename: string }
+  | { icpn: string; operations: readonly SequenceOperation[]; bundle: Uint8Array }
+  | { icpn: string; operations: readonly ["erase"]; address: number; length: number }
+) & {
+  alias: string;
+  siteIds: readonly number[];
+  retryLimit: number;
+  stopPolicy: StopPolicy;
+};
 
+/**
+ * Start one Batch over a Target Set. The Batch is Manager-owned, so it is
+ * started on the canonical resource rather than under a PPU, and it always
+ * carries the Manager-issued start it can be reconciled by.
+ */
 export async function startProgrammingBatch(
-  alias: string, input: BatchInput, startId?: string,
+  input: BatchInput, startId: string,
 ): Promise<ProgrammingBatch> {
   const common = {
-    icpn: input.icpn, site_id: input.siteId, operations: [...input.operations],
+    icpn: input.icpn,
+    targets: [{ ppu_alias: input.alias, site_ids: [...input.siteIds] }],
+    operations: [...input.operations],
     retry_limit: input.retryLimit, stop_policy: input.stopPolicy, repeat: 1,
     // Manager-issued: admits at most one Batch and can be reconciled later.
-    ...(startId ? { start_id: startId } : {}),
+    start_id: startId,
   };
   const body = "image" in input
     ? { ...common, image_base64: bytesToBase64(input.image), image_filename: input.filename }
     : "bundle" in input
     ? { ...common, bundle_base64: bytesToBase64(input.bundle) }
     : { ...common, address: input.address, length: input.length };
-  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${base(alias)}/batches`, {
+  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${PROGRAMMING}/batches`, {
     method: "POST",
     body: JSON.stringify(body),
   });
   return payload.batch;
 }
 
-export async function getProgrammingBatch(alias: string, batchId: string): Promise<ProgrammingBatch> {
-  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${base(alias)}/batches/${batchId}`);
+export async function getProgrammingBatch(batchId: string): Promise<ProgrammingBatch> {
+  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${PROGRAMMING}/batches/${batchId}`);
   return payload.batch;
 }
 
 /** Stop queuing: no further attempt is submitted. Never cancels a submitted Job. */
-export async function stopProgrammingBatch(alias: string, batchId: string): Promise<ProgrammingBatch> {
-  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${base(alias)}/batches/${batchId}/stop`, {
+export async function stopProgrammingBatch(batchId: string): Promise<ProgrammingBatch> {
+  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${PROGRAMMING}/batches/${batchId}/stop`, {
     method: "POST",
     body: JSON.stringify({ stop: PROGRAMMING_STOP_TOKEN }),
   });
@@ -397,15 +452,17 @@ export type StartReconciliationState =
 export type StartReconciliation = {
   schema: "plasma.manager.programming-start-reconciliation.v1";
   start_id: string;
-  ppu_alias: string;
+  /** Read off the run, the Target Set or the record; a Batch start has none. */
+  ppu_alias: string | null;
   kind: "run" | "batch" | null;
   state: StartReconciliationState;
   reason: string | null;
   outcome: ProgrammingBatchOutcome | null;
   /** What the Manager journalled for this start; null when it has no record. */
   identity: {
-    ppu_alias: string;
+    ppu_alias: string | null;
     site_id: number | null;
+    targets?: ProgrammingBatchTarget[] | null;
     ppu_id: string | null;
     operation: string | null;
     operations: string[] | null;
@@ -421,26 +478,44 @@ export type StartReconciliation = {
   auto_retry: "DISABLED";
 };
 
-/** Issue the start ID one Batch start must carry. Submits nothing. */
+/**
+ * Issue the start ID one Batch start must carry. Submits nothing.
+ *
+ * The Manager issues it under no PPU: the Batch is Manager-owned, and each
+ * Target's authority is checked when the Batch is admitted. `alias` is the
+ * PPU this Console is acting for; it is NOT sent to the Manager and never
+ * reaches the record. The BFF uses it to require this operator's maintenance
+ * capability for that PPU, which is the boundary the retired alias-scoped
+ * route enforced through its path.
+ */
 export async function issueBatchStart(alias: string): Promise<string> {
-  const payload = await request<{ ok: true; start: { start_id: string } }>(`${base(alias)}/starts`, {
-    method: "POST",
-    body: JSON.stringify({ kind: "batch" }),
-  });
+  const payload = await request<{ ok: true; start: { start_id: string } }>(
+    `${PROGRAMMING}/starts?ppu_alias=${encodeURIComponent(alias)}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "batch" }),
+    });
   return payload.start.start_id;
 }
 
 /** Read-only. Repeating it never submits, retries or acknowledges anything. */
-export async function getStartReconciliation(alias: string, startId: string): Promise<StartReconciliation> {
-  const payload = await request<{ ok: true; reconciliation: StartReconciliation }>(`${base(alias)}/starts/${startId}`);
+export async function getStartReconciliation(startId: string): Promise<StartReconciliation> {
+  const payload = await request<{ ok: true; reconciliation: StartReconciliation }>(
+    `${PROGRAMMING}/starts/${startId}`);
   return payload.reconciliation;
 }
 
-/** Operator: a start the Manager never admitted may never be admitted. */
-export async function voidStart(alias: string, startId: string): Promise<StartReconciliation> {
-  const payload = await request<{ ok: true; reconciliation: StartReconciliation }>(`${base(alias)}/starts/${startId}/void`, {
-    method: "POST",
-    body: JSON.stringify({ void: PROGRAMMING_VOID_TOKEN }),
-  });
+/**
+ * Operator: a start the Manager never admitted may never be admitted.
+ *
+ * `alias` is the PPU this Console is acting for, for the BFF capability check
+ * only. When the Manager already has a PPU on record for this start, that
+ * record decides and this claim cannot widen it.
+ */
+export async function voidStart(startId: string, alias: string): Promise<StartReconciliation> {
+  const payload = await request<{ ok: true; reconciliation: StartReconciliation }>(
+    `${PROGRAMMING}/starts/${startId}/void?ppu_alias=${encodeURIComponent(alias)}`, {
+      method: "POST",
+      body: JSON.stringify({ void: PROGRAMMING_VOID_TOKEN }),
+    });
   return payload.reconciliation;
 }
