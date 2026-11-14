@@ -512,7 +512,7 @@ def test_upgrade_restarts_running_services_and_migrates_legacy_empty_sites(
     legacy = installer.render_ppu_config(
         ppu_id="kept-id", facility_id="lab", display_name="Kept",
         state_root=paths.state_root, log_root=paths.log_root,
-    ).replace(installer._core.render_default_sites(), "sites: []\n")
+    ).replace(installer.render_default_sites(), "sites: []\n")
     assert "sites: []\n" in legacy
     (paths.config_root / "ppu.yaml").write_text(legacy, encoding="utf-8")
 

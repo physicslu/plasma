@@ -200,7 +200,6 @@ def verify_kit(artifact: Path, *, sidecar: Path, extract_to: Path) -> VerifiedKi
         scripts / "plasmactl-z2-ps",
         scripts / "ppu-bootstrap-deployment.py",
         scripts / "ppu-z2-installer.py",
-        scripts / "ppu-z2-installer-core.py",
         scripts / "z2-python-runtime.py",
         scripts / "openocd-runtime.py",
         scripts / "ppu_runtime_local_readiness.py",
