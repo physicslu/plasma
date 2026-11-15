@@ -64,14 +64,8 @@ def verify_source(expected_sha: str) -> None:
         raise Blocked("SOURCE_DIRTY_OR_UNVERIFIED")
 
 
-def guard_deploy_backend() -> None:
-    """Refuse candidate source without the reviewed PR #1435 preflight hooks."""
-    if not PREFLIGHT.is_file() or PREFLIGHT.is_symlink():
-        raise Blocked("DEPLOY_PREFLIGHT_MISSING")
-    try:
-        source = BACKEND.read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as exc:
-        raise Blocked("DEPLOY_BACKEND_UNREADABLE") from exc
+def guard_deploy_backend(source: str) -> None:
+    """Verify target commit's canonical preflight checkpoints, not adapter code."""
     section = source.split("deploy_profile() {", 1)
     if len(section) != 2:
         raise Blocked("DEPLOY_FUNCTION_MISSING")
@@ -109,6 +103,28 @@ def check_owner_deploy_source(expected_sha: str) -> None:
         raise Blocked("OWNER_CHECKOUT_UNAVAILABLE") from exc
 
 
+def read_owner_deploy_backend(target_sha: str) -> str:
+    """Inspect immutable operator checkout Git objects; no source mutation."""
+    fixed = [SUDO, "-n", "-H", "-u", OWNER, "--", GIT, "-C", str(OWNER_ROOT)]
+    try:
+        checked = subprocess.run(
+            [*fixed, "cat-file", "-e",
+             f"{target_sha}:scripts/plasma_cs_deploy_preflight.py"],
+            capture_output=True, timeout=15, check=False,
+        )
+        source = subprocess.run(
+            [*fixed, "show", f"{target_sha}:scripts/plasmactl-local-control-station"],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+    except (OSError, UnicodeError, subprocess.TimeoutExpired) as exc:
+        raise Blocked("OWNER_DEPLOY_SOURCE_UNAVAILABLE") from exc
+    if (checked.returncode != 0 or source.returncode != 0
+            or not isinstance(source.stdout, str)
+            or not 0 < len(source.stdout) <= 65536):
+        raise Blocked("OWNER_DEPLOY_PREFLIGHT_UNAVAILABLE")
+    return source.stdout
+
+
 def exact_owner_command(operation: str) -> list[str]:
     if operation not in COMMANDS:
         raise Blocked("OPERATION_DENIED")
@@ -122,19 +138,24 @@ def exact_owner_command(operation: str) -> list[str]:
     ]
 
 
-def run(operation: str, expected_sha: str, owner_maintenance_confirmed: bool = False) -> int:
+def run(operation: str, expected_sha: str, owner_maintenance_confirmed: bool = False,
+        target_sha: str | None = None) -> int:
     verify_source(expected_sha)
     if operation not in COMMANDS:
         raise Blocked("OPERATION_DENIED")
     if operation == "deploy":
-        guard_deploy_backend()
         if not owner_maintenance_confirmed:
             raise Blocked("OWNER_MAINTENANCE_EXCLUSIVITY_NOT_CONFIRMED")
-        check_owner_deploy_source(expected_sha)
+        if type(target_sha) is not str or not HEX40.fullmatch(target_sha):
+            raise Blocked("DEPLOY_TARGET_SHA_REQUIRED")
+        # The Path 2 adapter and operator-owned Control Station release are
+        # distinct, independently source-pinned components.
+        check_owner_deploy_source(target_sha)
+        guard_deploy_backend(read_owner_deploy_backend(target_sha))
         # The boolean above records an Owner decision, not a lock. The
         # canonical CLI must independently pass both live preflight snapshots.
-    elif owner_maintenance_confirmed:
-        raise Blocked("MAINTENANCE_FLAG_ONLY_ALLOWED_FOR_DEPLOY")
+    elif owner_maintenance_confirmed or target_sha is not None:
+        raise Blocked("DEPLOY_ONLY_FLAGS_ON_READONLY_OPERATION")
     try:
         result = subprocess.run(
             exact_owner_command(operation), cwd=ROOT,
@@ -156,11 +177,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=COMMANDS)
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--target-sha", default=None,
+                        help="independent SHA of the operator Control Station checkout")
     parser.add_argument("--owner-maintenance-confirmed", action="store_true",
                         help="Owner-attested exclusive maintenance; NOT an atomic lock")
     args = parser.parse_args(argv)
     try:
-        return run(args.operation, args.source_sha, args.owner_maintenance_confirmed)
+        return run(args.operation, args.source_sha, args.owner_maintenance_confirmed, args.target_sha)
     except Blocked as exc:
         print(f"PATH2_CONTROL_STATION_BLOCKED: {exc}", file=sys.stderr)
         return 2
