@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import sys
 import time
 from urllib.error import HTTPError, URLError
@@ -214,6 +215,11 @@ def one_attempt(client: Manager, alias: str, site: int, image: dict,
     return evidence, {"start_id": token, "batch_id": batch_id, "batch": batch}
 
 
+def require_swpc_hostname(name: str) -> None:
+    if sys.platform != "linux" or name.split(".", 1)[0].casefold() != "swpc":
+        raise HILFailure("live engineering HIL is restricted to the SWPC Linux host")
+
+
 def validate_tty(value: str) -> None:
     if not (value == "/dev/ttyACM0" or value.startswith("/dev/serial/by-id/")):
         raise HILFailure("CDC port must be /dev/serial/by-id/... or explicit /dev/ttyACM0")
@@ -230,6 +236,7 @@ def run(args: argparse.Namespace) -> int:
                           "attempts": len(order), "order": order,
                           "hardware": "NOT_RUN"}))
         return 0
+    require_swpc_hostname(socket.gethostname())
     if not 1 <= args.site <= 8 or not re.fullmatch(r"[A-Za-z0-9._:-]{1,96}", args.ppu_alias):
         raise HILFailure("invalid PPU alias or Site")
     os.umask(0o077)
