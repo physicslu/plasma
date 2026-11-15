@@ -340,6 +340,11 @@ Rollback and recovery:
 * control-plane copy or post-copy verification fails → the snapshot is restored byte-exact (files that did not exist are removed); Runtime and Worker were never restarted → `rolled_back`.
 * Runtime activation or readiness fails → the installer calls the coordinator's `on_rollback` **before** restarting the previous Runtime: snapshot restored, Package control + Site Worker restarted on it, then the previous release/config/units are restored → `rolled_back`.
 * any restore or rollback step fails, or the process ends mid-transaction → `recovery_required`. The snapshot is kept; the next deployment is refused and nothing is retried or resent automatically.
+* the kit is refused by verification before any kit command runs → the kit tool exits **3**; the Bootstrap API records `failed` / `kit_preinstall_refused` only after re-proving the Coordinator journal bytes and the `current` release are unchanged. Any other engine failure stays `recovery_required`.
+
+**#1433 one-time transition.** A Bootstrap installed before #1433 (e.g. `783102b9e`) refuses a kit without `scripts/ppu-z2-installer-core.py`. The Z2 PS kit therefore carries that file's exact bytes from `783102b9e` (SHA-256 `8613b3a1…e515`, checked at assembly) as data only: the kit's own `plasmactl` and single-file `ppu-z2-installer.py` never load it, and the Full-Copy coordinator snapshots and then removes it from `/opt/plasma/bootstrap` after a verified control-plane install (a rollback restores it).
+
+**Operator recovery of a pre-install refusal recorded as `recovery_required`** (old Bootstrap): stop only `plasma-bootstrap.service`, run `scripts/ppu-bootstrap-preinstall-recovery.py` as root with the transaction ID and the expected Coordinator journal SHA-256, `current` target and Active Asset Set SHA-256, then start the service. It holds the Coordinator flock, refuses on any mismatch, keeps the original record (and its SHA-256) under `/var/lib/plasma-bootstrap/operator-recovery/`, and atomically records `failed` / `kit_preinstall_refused` with the evidence. It never writes `succeeded` or restores an older record.
 
 Device identity (`/etc/machine-id`), Bootstrap controller/enrollment state, Site seals, the engine selection, FPGA/privileged state and the Active Asset Set are outside the copied file set and are never touched.
 
