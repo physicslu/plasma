@@ -15,14 +15,14 @@ entrypoint. `scripts/plasma_path2_control_station.py` is that bounded adapter.
 It accepts only `status`, `verify`, `deploy`, and a 40-hex exact Git SHA;
 it checks Linux host `swpc`, clean pinned checkout, and the single canonical
 Bash backend. It invokes only the fixed operator-owned backend
-`/storage/projects/plasma/scripts/plasmactl-local-control-station` once,
-without `shell=True` or retry, under existing `gordon` ownership using
-`sudo -n -H -u gordon`. It never asks UID 1000 to execute a Bash script
+the fixed operator checkout's canonical Control Station backend once,
+without `shell=True` or retry, under existing the operator account ownership using
+`sudo -n -H -u operator`. It never asks UID 1000 to execute a Bash script
 from UID 998's private Runner candidate checkout. It supplies UID 1000's
 user-systemd runtime environment. `deploy` additionally checks the
 operator checkout's clean HEAD exactly matches the authorized Path 2 PR
 source SHA; if the required combined PR #1435 + #1443 source has not been
-safely staged for `gordon`, deployment is BLOCKED, not silently performed
+safely staged for the operator account, deployment is BLOCKED, not silently performed
 from a different release. Read-only `status` and `verify` use the existing
 operator checkout and must report its observed source separately from the
 adapter PR source. If delegation or fixed owner checkout is unavailable,
