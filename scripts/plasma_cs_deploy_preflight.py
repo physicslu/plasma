@@ -114,7 +114,7 @@ def http_json(url: str) -> dict:
 
 def check_runtime(manager_url: str, ppu_endpoint: str) -> dict:
     manager = http_json(manager_url.rstrip("/") + "/api/health/live")
-    if manager.get("ok") is False:
+    if manager.get("ok") is not True or manager.get("manager") != "alive":
         raise Blocked("Manager health reported failure")
     status = http_json(ppu_endpoint.rstrip("/") + "/api/status")
     ppu = status.get("ppu")
