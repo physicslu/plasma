@@ -106,3 +106,14 @@ def test_real_outcome_unknown_is_never_upgraded_to_pass() -> None:
     assert view["state"] == "OUTCOME_UNKNOWN"
     assert view["outcome"] == "OUTCOME_UNKNOWN"
     assert view["reason"] == "MANAGER_RESTARTED_DURING_BATCH"
+
+
+@pytest.mark.parametrize("invalid_site", [0, 65, True, -1])
+def test_historical_site_must_be_a_real_one_based_hardware_site(invalid_site) -> None:
+    record = deepcopy(LEGACY_START)
+    batch = deepcopy(TERMINAL_BATCH)
+    record["site_id"] = invalid_site
+    batch["targets"][0]["site_ids"] = [invalid_site]
+    view = reconcile(record, batch)
+    assert view["state"] == "OUTCOME_UNKNOWN"
+    assert view["reason"] == "JOURNAL_INCONSISTENT"
