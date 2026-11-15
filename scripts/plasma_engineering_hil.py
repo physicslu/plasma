@@ -30,7 +30,7 @@ from cdc_probe import run_live  # noqa: E402 - reuse ID + heartbeat verifier
 
 ICPN = "STM32F103C8T6"
 OPERATIONS = ["erase", "program", "verify"]
-HEX32 = re.compile(r"[0-9a-f]{32}\\Z")
+HEX32 = re.compile(r"[0-9a-f]{32}\Z")
 
 
 class HILFailure(Exception):
