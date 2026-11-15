@@ -65,7 +65,7 @@ Select the smallest capable Path. Choosing a Path never grants additional author
 
 ## Core engineering policies
 
-## Engineering simplicity and scope control (normative; no new Gate)
+**Engineering simplicity and scope control (normative; no new Gate)**
 
 1. **Existing First — execute before expanding.** For an approved bounded task, use the existing canonical command/API and current proven route first. Do not add a wrapper, service, architecture layer or new implementation without a specific demonstrated gap. Respect existing admission, authorization and physical safety guards.
 2. **Minimal Scope — solve only the requested problem.** Keep implementation and verification limited to the requested outcome and its necessary dependencies. Do not turn one-Site/one-Flash work into unsolicited A/B/A, burn-in, multi-Site Scheduler changes, CDC qualification, deployment, or broad re-audits. Distinguish required Flash safety from optional post-Flash observations.
