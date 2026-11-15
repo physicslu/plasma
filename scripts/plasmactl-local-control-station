@@ -663,10 +663,15 @@ deploy_profile() {
       systemctl --user stop plasma-local-manager.service
       if [[ -d "$state_dir" && ! -L "$state_dir" ]]; then
         # Preserve failed fresh data too, for engineering diagnosis.
-        mv "$state_dir" "$dev_failed_dir"
+        if ! mv "$state_dir" "$dev_failed_dir"; then
+          say "BLOCKED: failed to preserve fresh state; original at $dev_archive_dir"
+          exit "$rc"
+        fi
       fi
-      mv "$dev_archive_dir" "$state_dir" ||
-        say "BLOCKED: manual recovery needed; original state at $dev_archive_dir"
+      if [[ -e "$state_dir" || -L "$state_dir" ]] || ! mv "$dev_archive_dir" "$state_dir"; then
+        say "BLOCKED: manual recovery needed; original at $dev_archive_dir"
+        exit "$rc"
+      fi
     fi
     ln -sfn "$previous_release" "$current_link"
     [[ -f "$backup_dir/profile.env" ]] && cp -a "$backup_dir/profile.env" "$config_file"
@@ -689,14 +694,16 @@ deploy_profile() {
     systemctl --user stop plasma-control-station.service
     systemctl --user stop plasma-local-manager.service
     check_development_ppu_idle
-    [[ -d "$state_dir" && ! -L "$state_dir" ]] ||
-      die "dev-fresh state directory is missing or a symlink"
+    [[ -d "$state_dir" && ! -L "$state_dir" ]] || {
+      say "BLOCKED: dev-fresh state directory is missing or is a symlink"
+      false
+    }
     dev_archive_dir="$state_home/plasma/local-control-station.archive.$(date -u +%Y%m%dT%H%M%SZ).$"
     dev_failed_dir="$state_home/plasma/local-control-station.failed.$(date -u +%Y%m%dT%H%M%SZ).$"
     [[ ! -e "$dev_archive_dir" && ! -L "$dev_archive_dir" ]] ||
-      die "dev-fresh archive destination exists"
+      { say "BLOCKED: dev-fresh archive destination exists"; false; }
     [[ ! -e "$dev_failed_dir" && ! -L "$dev_failed_dir" ]] ||
-      die "dev-fresh recovery destination exists"
+      { say "BLOCKED: dev-fresh recovery destination exists"; false; }
     mv "$state_dir" "$dev_archive_dir"
     dev_archived=1
     mkdir -m 700 "$state_dir"
