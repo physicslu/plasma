@@ -210,7 +210,14 @@ def one_attempt(client: Manager, alias: str, site: int, image: dict,
         if time.monotonic() >= deadline:
             raise HILFailure(f"start_id={token}, batch_id={batch_id}: poll deadline; do not resubmit")
         time.sleep(poll_s)
-        batch = client.call("GET", f"/api/programming/batches/{batch_id}")["batch"]
+        polled = client.call("GET", f"/api/programming/batches/{batch_id}")
+        next_batch = polled.get("batch")
+        if (not isinstance(next_batch, dict)
+                or next_batch.get("batch_id") != batch_id):
+            raise HILFailure(
+                f"start_id={token}, batch_id={batch_id}: Batch poll identity "
+                "missing/mismatched; do not resubmit")
+        batch = next_batch
     evidence = validate_receipt(batch, alias, site, image, resource)
     return evidence, {"start_id": token, "batch_id": batch_id, "batch": batch}
 
