@@ -280,7 +280,7 @@ def cooperating_site_owners(*, release, admitting_site: int, boot_id: str,
 
 def scan_proc_consumers(*, procroot: Path, release,
                         diagnostic: dict | None = None,
-                        cooperating: dict[str, int] | None = None,
+                        cooperating=None,
                         ) -> tuple[bool, list[str]]:
     """Fail-closed /proc owner census; retry only a confirmed vanished PID.
 
@@ -288,11 +288,14 @@ def scan_proc_consumers(*, procroot: Path, release,
     read-only census, never just skip that PID. Existing conflicts, denied
     visibility or still-live but unreadable PIDs are not retryable.
 
-    ``cooperating`` (Site admission only) maps a PID proven by
-    ``cooperating_site_owners`` to its Site: that PID may hold ``/dev/mem``
-    and map exactly inside its own Site page, nothing else.
+    ``cooperating`` (Site admission only) is a callable returning the PIDs
+    proven by ``cooperating_site_owners`` right now. It is evaluated AFTER a
+    PID's fds and VMAs were read: the native owner takes its Site lock before
+    opening /dev/mem and drops it only after closing it, so an owner seen
+    holding /dev/mem is provable at that moment. A snapshot taken before the
+    scan would miss an owner that attached during it. Such a PID may hold
+    ``/dev/mem`` and map exactly inside its own Site page, nothing else.
     """
-    cooperating = cooperating or {}
     for attempt in range(1, 4):
         conflicts, observed = [], 0
         try:
@@ -319,16 +322,16 @@ def scan_proc_consumers(*, procroot: Path, release,
                 phase = "MAPS"
                 maps = (item / "maps").read_text()
                 observed += 1
-                page = (site_page(release, cooperating[item.name])
-                        if item.name in cooperating else None)
+                hard = devmem_fd = False
+                devmem_maps: list[tuple[int, int]] = []
                 for target in targets:
                     need(bool(target) and target != "UNKNOWN",
                          "INCOMPLETE_FD_OBSERVATION")
-                    if target == "/dev/mem" and page is not None:
-                        continue
-                    if target.startswith("/dev/uio") or target.split(" (deleted)")[0] in (
-                            "/dev/mem", "/dev/xdevcfg", "/dev/fpga0"):
-                        conflicts.append(item.name)
+                    name = target.split(" (deleted)")[0]
+                    if target.startswith("/dev/uio") or name in ("/dev/xdevcfg", "/dev/fpga0"):
+                        hard = True
+                    elif name == "/dev/mem":
+                        devmem_fd = True
                 for line in maps.splitlines():
                     fields = line.split()
                     need(len(fields) >= 5, "MALFORMED_PROC_VMA")
@@ -337,15 +340,22 @@ def scan_proc_consumers(*, procroot: Path, release,
                     device = fields[5]
                     if device.startswith("/dev/uio") or device in (
                             "/dev/xdevcfg", "/dev/fpga0"):
-                        conflicts.append(item.name)
+                        hard = True
                     elif device == "/dev/mem":
                         lo, hi = (int(x, 16) for x in fields[0].split("-"))
                         offset = int(fields[2], 16)
                         if overlaps(offset, hi - lo, release.owner_base,
-                                    release.owner_bytes) and not (
-                                page is not None and page[0] <= offset and
-                                offset + (hi - lo) <= page[1]):
-                            conflicts.append(item.name)
+                                    release.owner_bytes):
+                            devmem_maps.append((offset, hi - lo))
+                if hard:
+                    conflicts.append(item.name)
+                elif devmem_fd or devmem_maps:
+                    owners = cooperating() if cooperating is not None else {}
+                    page = (site_page(release, owners[item.name])
+                            if item.name in owners else None)
+                    if page is None or not all(page[0] <= offset and offset + size <= page[1]
+                                               for offset, size in devmem_maps):
+                        conflicts.append(item.name)
             except (FileNotFoundError, PermissionError, OSError, ValueError) as exc:
                 # Never retry a known conflict even if another process vanished.
                 # Check for ENOENT explicitly; an inaccessible PID is NOT
@@ -383,7 +393,7 @@ def scan_proc_consumers(*, procroot: Path, release,
 
 
 def read_live_z2_facts(*, release, runtime_program_session: bool = False,
-                       cooperating: dict[str, int] | None = None) -> dict:
+                       cooperating=None) -> dict:
     """Keep kernel/image guards; runtime WordPort does not census all PIDs.
 
     Runtime call requires the same protected FPGA lock and is NOT a safe
@@ -548,10 +558,13 @@ class RootZ2TargetPort:
         cooperating = None
         if self._site is not None:
             # Unbound Site admission exempts nothing (fail-closed).
-            cooperating = (cooperating_site_owners(
-                release=self.release, admitting_site=self._site,
-                boot_id=self._site_session[0], session_id=self._site_session[1])
-                if self._site_session is not None else {})
+            if self._site_session is not None:
+                site, (boot_id, session_id) = self._site, self._site_session
+                cooperating = lambda: cooperating_site_owners(  # noqa: E731 (evaluated per PID)
+                    release=self.release, admitting_site=site,
+                    boot_id=boot_id, session_id=session_id)
+            else:
+                cooperating = dict  # unbound Site admission exempts nothing
         return read_live_z2_facts(release=self.release, cooperating=cooperating)
 
     def runtime_program_facts(self) -> dict:

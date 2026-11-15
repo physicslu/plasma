@@ -639,7 +639,7 @@ def test_wp07_census_admits_proven_other_site_owner_only(tmp_path, monkeypatch):
                  session_id="fpga-s1", procroot=proc)
     assert g.cooperating_site_owners(**bound) == {"100": 2}
     complete, conflicts = g.scan_proc_consumers(
-        procroot=proc, release=r.release, cooperating=g.cooperating_site_owners(**bound))
+        procroot=proc, release=r.release, cooperating=lambda: g.cooperating_site_owners(**bound))
     # The proven owner passes; a PID with no lock evidence is still a conflict.
     assert complete is True and conflicts == ["200"]
 
@@ -674,7 +674,7 @@ def test_wp07_census_unverified_owner_stays_conflict(tmp_path, monkeypatch, case
         boot_id="boot-a", session_id="fpga-s1", procroot=proc)
     assert owners == {}
     assert g.scan_proc_consumers(procroot=proc, release=r.release,
-                                 cooperating=owners)[1] == ["100"]
+                                 cooperating=lambda: owners)[1] == ["100"]
 
 
 @pytest.mark.parametrize("fds,maps", [
@@ -690,8 +690,42 @@ def test_wp07_proven_owner_cross_site_or_fpga_resource_still_conflicts(
     g = r.guard
     proc = _wp07_proc(tmp_path, r, {"100": (fds, maps)})
     assert g.scan_proc_consumers(procroot=proc, release=r.release,
-                                 cooperating={"100": 2})[1] == ["100"]
+                                 cooperating=lambda: {"100": 2})[1] == ["100"]
 
+
+
+def test_wp07_owner_attaching_during_the_census_is_proven_at_observation(tmp_path, monkeypatch):
+    """Z2 step 6 (2026-11-15): Site 2's OpenOCD attached after a pre-scan
+    snapshot of /proc/locks, so Site 1's census saw /dev/mem without proof."""
+    import os
+    r = _wp07_root(tmp_path, monkeypatch)
+    g = r.guard
+    site2_lock = g.site_lock_path(2)
+    site2_lock.touch(); r.fence.touch()
+    proc = _wp07_proc(tmp_path, r, {"100": (["/dev/mem"], [(0x43C02000, 0x1000, "/dev/mem")])})
+    _wp07_locks(proc, [])  # nothing locked when the census starts
+    r.record(2)
+    bound = dict(release=r.release, admitting_site=1, boot_id="boot-a",
+                 session_id="fpga-s1", procroot=proc)
+    real_readlink = os.readlink
+
+    def attach_then_read(path):
+        # The native owner locks BEFORE opening /dev/mem: by the time its fd is
+        # observed, its Site lock and fence SH are held.
+        if "/100/fd/" in str(path):
+            _wp07_locks(proc, [("WRITE", "100", site2_lock), ("READ", "100", r.fence)])
+        return real_readlink(path)
+
+    monkeypatch.setattr(g.os, "readlink", attach_then_read)
+    stale = g.cooperating_site_owners(**bound)
+    assert stale == {}  # what a pre-scan snapshot would have used
+    _wp07_locks(proc, [])
+    assert g.scan_proc_consumers(procroot=proc, release=r.release,
+                                 cooperating=lambda: g.cooperating_site_owners(**bound)) == (True, [])
+    # The pre-fix snapshot semantics deny the same, legitimate owner.
+    _wp07_locks(proc, [])
+    assert g.scan_proc_consumers(procroot=proc, release=r.release,
+                                 cooperating=lambda: stale)[1] == ["100"]
 
 def test_wp07_unbound_site_admission_exempts_nothing(tmp_path, monkeypatch):
     r = _wp07_root(tmp_path, monkeypatch)
@@ -700,7 +734,7 @@ def test_wp07_unbound_site_admission_exempts_nothing(tmp_path, monkeypatch):
                         lambda **kw: seen.setdefault("cooperating", kw.get("cooperating")))
     with r.port().exclusive(site=1) as port:
         port.current_facts()
-        assert seen["cooperating"] == {}
+        assert callable(seen["cooperating"]) and seen["cooperating"]() == {}
         with pytest.raises(r.guard.TargetSafetyDenied, match="SITE_SESSION_BINDING_INVALID"):
             port.bind_site_session(boot_id="", session_id="fpga-s1")
     seen.clear()
