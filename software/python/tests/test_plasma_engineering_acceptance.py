@@ -45,6 +45,25 @@ class FakeCommands:
             raise acceptance.AcceptanceBlocked("RECEIPT_UNKNOWN_DO_NOT_RETRY")
         if tag == ["status", "local-control-station"]:
             return f"Profile: local-control-station\nGit SHA: {self.deployed_sha}\n"
+        if tag == ["hil", "programming"] and "--execute" in argv:
+            root = Path(argv[argv.index("--output") + 1])
+            run = root / "fixture"
+            run.mkdir(parents=True)
+            report = {
+                "schema": "plasma.engineering.hil-e2e.v1",
+                "result": "PASS", "mode": "smoke",
+                "ppu_alias": "z2", "site_id": 2,
+                "results": [
+                    {
+                        "version": ver, "cdc": "PASS", "safe_off": True,
+                        "firmware_sha256": "a" * 64,
+                        "readback_sha256": "a" * 64,
+                        "batch_id": "b" * 32,
+                    }
+                    for ver in ("v0.1", "v0.2", "v0.1")
+                ],
+            }
+            (run / "summary.json").write_text(json.dumps(report))
         return "PASS"
 
 
@@ -144,6 +163,47 @@ def test_no_hil_or_deploy_retry_after_stage_failure(
     assert operations.count(["hil", "programming"]) <= 2
     report_file = next((tmp_path / "evidence").glob("*/summary.json"))
     assert json.loads(report_file.read_text())["result"] == "BLOCKED"
+
+
+def test_hil_success_exit_without_receipt_cannot_be_pass(tmp_path: Path) -> None:
+    with pytest.raises(acceptance.AcceptanceBlocked, match="HIL_EVIDENCE_ROOT_MISSING"):
+        acceptance.validate_hil_evidence(
+            tmp_path / "missing", ppu_alias="z2", site=2
+        )
+
+
+def test_wrong_cdc_in_child_evidence_is_blocked(tmp_path: Path) -> None:
+    root = tmp_path / "hil"
+    run = root / "attempt"
+    run.mkdir(parents=True)
+    data = {
+        "schema": "plasma.engineering.hil-e2e.v1", "result": "PASS",
+        "mode": "smoke", "ppu_alias": "z2", "site_id": 2,
+        "results": [
+            {
+                "version": ver, "cdc": "FAIL" if index == 1 else "PASS",
+                "safe_off": True, "firmware_sha256": "a" * 64,
+                "readback_sha256": "a" * 64, "batch_id": "b" * 32,
+            }
+            for index, ver in enumerate(("v0.1", "v0.2", "v0.1"))
+        ],
+    }
+    (run / "summary.json").write_text(json.dumps(data))
+    with pytest.raises(acceptance.AcceptanceBlocked, match="HIL_ATTEMPT_EVIDENCE"):
+        acceptance.validate_hil_evidence(root, ppu_alias="z2", site=2)
+
+
+def test_hil_report_with_wrong_site_is_blocked(tmp_path: Path) -> None:
+    root = tmp_path / "hil"
+    run = root / "attempt"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text(json.dumps({
+        "schema": "plasma.engineering.hil-e2e.v1", "result": "PASS",
+        "mode": "smoke", "ppu_alias": "z2", "site_id": 3,
+        "results": [],
+    }))
+    with pytest.raises(acceptance.AcceptanceBlocked, match="HIL_EVIDENCE_IDENTITY"):
+        acceptance.validate_hil_evidence(root, ppu_alias="z2", site=2)
 
 
 def test_real_runner_guards_are_not_bypassed_by_composition() -> None:
