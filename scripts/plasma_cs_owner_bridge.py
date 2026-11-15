@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import pwd
-import re
 import stat
 import subprocess
 import sys
@@ -23,9 +22,7 @@ OWNER_UID = 1000
 RUNNER_UID = 998
 OWNER_LOGIN = "gordon"
 RUNNER_LOGIN = "plasma-codex"
-GIT = "/usr/bin/git"
 BASH = "/usr/bin/bash"
-SOURCE_SHA = re.compile(r"[a-f0-9]{40}\Z")
 
 
 class Blocked(RuntimeError):
