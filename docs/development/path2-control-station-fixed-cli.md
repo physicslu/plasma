@@ -1,74 +1,66 @@
-# SWPC Control Station — Path 2 fixed CLI adapter (Gate 1)
+# SWPC Control Station — fixed Path 2 owner CLI adapter (Gate 1)
 
-**Status:** Draft PR #1443; Host-only implementation. SWPC Path 2
-execution, Control Station deployment and hardware HIL are **NOT_RUN**.
+**Status:** Draft PR #1443, Host-only. No SWPC execution, live deployment
+or HIL qualification. **Current adapter allows read-only status/verify only.**
 
-## Responsibility boundary
+## Responsibility and privilege boundary
 
-- **Path 3:** diagnose, fix, test, and review implementation changes.
-- **Path 2:** issue owner-approved, source-pinned, deterministic
-  `status`, `verify` or `deploy` commands with a real execution receipt.
-- The existing Issue #981 Dispatcher and non-root Runner are reused.
-  No new Runner, privileged installer, generic shell bridge or sudoers edit.
+Path 3 performs autonomous diagnosis, source changes and fix/retest.
+Path 2 performs deterministic, source-pinned operations through the
+existing Issue #981 Dispatcher and SWPC non-root Runner.
 
-The existing canonical Control Station backend is a Bash script and
-the existing Path 2 `operator-cli` admits a reviewed Python `.py` entrypoint.
-`scripts/plasma_path2_control_station.py` is the narrowly bounded adapter.
-It never executes the UID 998 Runner's private checkout as UID 1000.
-Instead it invokes the existing fixed operator-owned checkout, under the
-existing operator user-systemd account and only if actual OS permissions
-permit. Failure to cross this boundary is BLOCKED, not PASS.
+The Path 2 Dispatcher admits reviewed Python entrypoints, not arbitrary
+Bash commands. `scripts/plasma_path2_control_station.py` is a fixed Python
+adapter. It verifies its own exact 40-character source HEAD and clean
+checkout before a one-shot execution of the independently installed
+fixed Control Station owner bridge:
 
-## Independent source identities
+```text
+/usr/local/libexec/plasma/plasma-control-station-owner-bridge
+```
 
-**These are two distinct source identities, not one SHA:**
+The sole privileged operation issued by the adapter is `sudo -n -H -u
+<operator-role> -- <installed-fixed-bridge> status|verify`. It does
+**not** execute sudo Bash, Git, Python, env, systemctl, arbitrary
+commands or shell under UID 1000. The bridge is a distinct root-owned,
+immutable, trusted-administrator-installed program governed by
+Draft PR #1429. The Runner cannot install the bridge or edit sudoers.
 
-1. **Adapter source SHA:** the exact owner-approved PR #1443 HEAD, bound
-   by the trusted Path 2 Dispatcher and validated in the Runner checkout.
-   This controls which Python adapter is permitted to execute.
-2. **Target source SHA:** the separately reviewed Control Station candidate
-   (e.g. PR #1435 HEAD), passed as `--target-sha` in the immutable
-   owner Work Order for `deploy` only. The adapter checks the operator-owned
-   checkout's exact HEAD and clean tracked state, and checks the immutable
-   target Git objects contain both the Preflight script and canonical
-   deployment function with its two Preflight checkpoints.
+No evidence yet proves this bridge is installed or that its exact-argv
+sudoers allowance exists. An unavailable or denied bridge is explicitly
+BLOCKED / NOT_RUN, not a successful check. Only actual run receipts can
+demonstrate SWPC owner-service access.
 
-No unreviewed candidate checkout may be inferred from a branch name.
-Read-only `status` and `verify` need only the Adapter SHA and report the
-actual operator checkout separately; `--target-sha` and maintenance flags
-are rejected for those two operations. All execution is one-shot. A nonzero
-exit, missing permission, invalid provenance, or timeout must be recorded
-without automatic retry.
+## Deploy remains fail-closed
 
-## Safe sequence and current blocker
+The `deploy` word remains an explicit CLI choice only to return a
+predictable `DEPLOY_BRIDGE_NOT_QUALIFIED` refusal. Supplying a
+`--target-sha` or `--owner-maintenance-confirmed` flag does **not**
+enable deployment. These flags are rejected with read-only operations.
 
-1. PR #1435 recorded **six legacy CONSUMED Starts** with live Manager
-   `JOURNAL_INCONSISTENT`. Preserve all originals and prove their identity;
-   never delete the journal or auto-acknowledge unknown transactions.
-   PR #1444 proposes a narrowly scoped, read-only legacy compatibility
-   rule and separate negative regressions. This is not deployed.
-2. Independently establish operational maintenance exclusivity and
-   suspension of new Manager admission. Two Preflight snapshots and the
-   `--owner-maintenance-confirmed` flag are **not** a lock. Without that
-   evidence, do **not** dispatch `deploy`.
-3. Verify the current installed SHA, rollback pin, Manager/Console health,
-   Start/Run/Batch journals, and PPU execution ownership via read-only
-   commands.
-4. Only after (1) and (2) are genuinely satisfied, use a source-pinned
-   Path 2 Work Order with both SHAs to request a single deploy.
-   The canonical backend must check Preflight before release creation
-   and immediately before activation.
-5. Re-run independent `verify`; preserve actual Run ID, Job ID, exit code,
-   current/previous release SHAs and safe rollback evidence.
+Future deployment will need an independently reviewed fixed-command
+Bridge upgrade with two distinct source identities:
 
-**Do not deploy solely because this adapter passes CI.** No PPU Runtime,
-FPGA or DUT action is implicit in Control Station deployment. PR #1436
-Blue Pill smoke/burn-in requires separate physical qualification.
+1. Adapter source SHA — the trusted Path 2 Dispatcher-pinned PR HEAD.
+2. Target release SHA — the independently reviewed immutable Control
+   Station source, including PR #1435 double Preflight and any required
+   Manager legacy Start reconciliation.
 
-## Work Order template (read-only qualification)
+Do **not** combine these SHAs or infer identity from mutable branch names.
 
-Use the existing owner-only Issue #981 work-order path. Replace the SHA
-placeholder with the then-current exact PR #1443 HEAD:
+Current blockers include six live `CONSUMED Start` responses of
+`JOURNAL_INCONSISTENT` on the existing Manager, no proof of atomic
+maintenance/no-new-admission exclusivity, and a version transition
+deadlock because PR #1444's compatibility exists only in the NEW
+Manager. Neither a manual maintenance flag nor two idle snapshots
+establish exclusivity. No journal rewrite, automatic UNKNOWN
+acknowledgement, unreviewed sudoers change or forced restart is allowed.
+
+## Owner Work Order shape — read-only example only
+
+An authenticated owner may later issue a pinned read-only Work Order
+through existing Issue #981 after the trust boundary is reviewed.
+Replace both SHA placeholders with the exact current PR #1443 HEAD.
 
 ```json
 {
@@ -81,32 +73,21 @@ placeholder with the then-current exact PR #1443 HEAD:
   "script": "scripts/plasma_path2_control_station.py",
   "argv": ["status", "--source-sha", "<ADAPTER_SHA_40_HEX>"],
   "timeout_seconds": 120,
-  "monitor_summary": "SWPC Control Station read only status",
-  "objective": "Read-only inspection of the operator-owned Control Station.",
-  "acceptance": "Observed Runner, Run/Job, source and installed release; no mutation."
+  "monitor_summary": "SWPC Control Station readonly status",
+  "objective": "Observe installed Control Station state without mutation.",
+  "acceptance": "Record real Run/Job/exit/installed identity; no writes."
 }
 ```
 
-For a separately owner-reviewed **future** deploy, change only the
-bounded argument list and Work Order objective/acceptance after safety
-prerequisites are proven:
+This document does **not** authorize a deploy Work Order. The fixed
+bridge and local Controller must remain in separate security domains.
+After any future owner-approved source upgrade, separately verify
+release/rollback pin, Manager+Console health, PPU transaction ownership
+and HIL evidence. All such operations are currently NOT_RUN.
 
-```json
-["deploy", "--source-sha", "<ADAPTER_SHA_40_HEX>",
- "--target-sha", "<CONTROL_STATION_SHA_40_HEX>",
- "--owner-maintenance-confirmed"]
-```
+## Host-only regressions
 
-The source SHA and target SHA serve different trust boundaries. The
-Dispatcher validates the adapter PR; the operator-owned checkout must
-match the target SHA. A status query is **not** deployment admission.
-
-## Host-only qualification
-
-Positive/negative tests cover source SHA, dirty checkouts, wrong host,
-invalid or missing target SHA, missing Git objects, missing dual
-preflight, fixed owner invocation, unauthorized operations and flags,
-nonzero exit, unknown timeout and one-shot semantics.
-
-GitHub-hosted tests are **not** evidence of actual SWPC permission,
-user-systemd behavior, release activation, rollback, Z2 or DUT.
+Tests cover exact source SHA, wrong host, dirty/untracked checkout,
+immutable command vector, no arbitrary privilege escalation, forbidden
+deployment and extra arguments, permission denial, timeout, and no retry.
+CI success is never substitute for physical or live SWPC qualification.
