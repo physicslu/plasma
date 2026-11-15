@@ -71,6 +71,18 @@ MAX_COORDINATOR_JOURNAL_BYTES = 1024 * 1024
 B2_ADMISSION_TTL_S = 3600
 
 
+class DeploymentNotExecuted(RuntimeError):
+    """The kit tool refused the kit during verification (exit 3).
+
+    Only a claim: the worker accepts it as ``failed`` after it re-proves the
+    Coordinator journal and the current release are byte/target identical.
+    """
+
+
+KIT_PREINSTALL_REFUSED_EXIT = 3
+KIT_PREINSTALL_REFUSED_CODE = "kit_preinstall_refused"
+
+
 class BootstrapServiceError(RuntimeError):
     pass
 
@@ -509,6 +521,9 @@ def run_deployment_subprocess(
         text=True,
         timeout=1200,
     )
+    if completed.returncode == KIT_PREINSTALL_REFUSED_EXIT:
+        tail = completed.stdout[-8000:] if completed.stdout else ""
+        raise DeploymentNotExecuted(f"deployment kit refused before install: {tail}")
     if completed.returncode != 0:
         tail = completed.stdout[-8000:] if completed.stdout else ""
         raise BootstrapServiceError(f"deployment engine failed with exit {completed.returncode}: {tail}")
@@ -1164,6 +1179,9 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
             }
             _atomic_json(self.bootstrap_paths.deployment_record, record)
 
+            journal_before = _file_sha256(self.bootstrap_paths.coordinator_journal)
+            current_before = _current_release_target(self.bootstrap_paths)
+
             def worker() -> None:
                 record["state"] = "running"
                 record["updated_at_epoch_s"] = time.time()
@@ -1181,6 +1199,18 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                         ),
                         runner_result=result,
                     )
+                except DeploymentNotExecuted as exc:
+                    # Verification refusal: proven not executed only when the
+                    # Coordinator journal and the current release are unchanged.
+                    unchanged = (
+                        _file_sha256(self.bootstrap_paths.coordinator_journal) == journal_before
+                        and _current_release_target(self.bootstrap_paths) == current_before
+                    )
+                    record["state"] = "failed" if unchanged else "recovery_required"
+                    record["error_code"] = (KIT_PREINSTALL_REFUSED_CODE if unchanged
+                                            else "coordinator_result_unreconciled")
+                    record["error"] = str(exc)
+                    record["result"] = None
                 except Exception as exc:
                     # A failed/ambiguous runner may already have activated a
                     # release. Do not make this transaction retryable without
@@ -1234,6 +1264,14 @@ class ReconciliationDenied(BootstrapServiceError):
 def _deny(condition: bool, code: str, detail: Any = None) -> None:
     if not condition:
         raise ReconciliationDenied(code, detail)
+
+
+def _current_release_target(paths: ServicePaths) -> str | None:
+    """Where ``<product>/current`` points now (None if absent or unreadable)."""
+    try:
+        return os.readlink(paths.product_root / "current")
+    except OSError:
+        return None
 
 
 def _file_sha256(path: Path) -> str | None:

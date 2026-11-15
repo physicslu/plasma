@@ -272,6 +272,41 @@ def test_redeploying_the_same_release_changes_nothing_and_needs_no_bootstrap_res
     assert [p.name for p in paths.control_plane_snapshots.iterdir()] == ["tx-second"]
 
 
+LEGACY_CORE = "ppu-z2-installer-core.py"
+
+
+def _seed_legacy_core(paths) -> bytes:
+    """A pre-#1433 Bootstrap tree still holds the retired installer core."""
+    payload = b"# pre-#1433 installer core (fixture bytes)\n"
+    (paths.bootstrap_install_root / LEGACY_CORE).write_bytes(payload)
+    return payload
+
+
+def test_full_copy_retires_the_legacy_installer_core_after_verified_install(tmp_path: Path):
+    _seed_device(tmp_path)
+    paths = _paths(tmp_path)
+    _seed_legacy_core(paths)
+    result = _coordinator(tmp_path, FullCopyInstaller()).execute(_request(tmp_path))
+    assert result["result"] == "PASS"
+    assert not (paths.bootstrap_install_root / LEGACY_CORE).exists()
+    plane = verify_real_control_plane()
+    assert LEGACY_CORE not in plane.files  # single-file installer only
+    index = json.loads((Path(result["control_plane"]["snapshot"]) / "index.json").read_text())
+    entry = next(e for e in index["entries"] if e["path"] == LEGACY_CORE)
+    assert entry["existed"] is True  # snapshotted, so a rollback can restore it
+
+
+def test_rollback_restores_the_legacy_installer_core_for_the_old_bootstrap(tmp_path: Path):
+    _seed_device(tmp_path)
+    paths = _paths(tmp_path)
+    payload = _seed_legacy_core(paths)
+    old_tree = _tree(paths.bootstrap_install_root)
+    with pytest.raises(deployment.DeploymentError, match="deployment failed"):
+        _coordinator(tmp_path, FullCopyInstaller(fail_install=True)).execute(_request(tmp_path))
+    assert _tree(paths.bootstrap_install_root) == old_tree
+    assert (paths.bootstrap_install_root / LEGACY_CORE).read_bytes() == payload
+
+
 # ---------------------------------------------------------- coordinator: rollback
 
 

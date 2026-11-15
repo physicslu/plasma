@@ -34,6 +34,15 @@ class BootstrapKitError(RuntimeError):
     pass
 
 
+class KitPreinstallRefused(BootstrapKitError):
+    """The kit was refused by verification; no kit tooling was executed."""
+
+
+# Exit code reserved for a verification refusal before any kit command ran.
+# Every other failure (exit 2) may have executed install tooling.
+EXIT_PREINSTALL_REFUSED = 3
+
+
 @dataclass(frozen=True)
 class VerifiedKit:
     root: Path
@@ -327,7 +336,10 @@ def deploy_kit(
     api_transaction_id: str | None = None,
 ) -> dict[str, object]:
     with tempfile.TemporaryDirectory(prefix="plasma-bootstrap-kit-") as temporary:
-        kit = verify_kit(artifact, sidecar=sidecar, extract_to=Path(temporary) / "kit")
+        try:
+            kit = verify_kit(artifact, sidecar=sidecar, extract_to=Path(temporary) / "kit")
+        except BootstrapKitError as exc:
+            raise KitPreinstallRefused(str(exc)) from exc
         return install_verified_kit(
             kit,
             gateway_host=gateway_host,
@@ -389,6 +401,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
+    except KitPreinstallRefused as exc:
+        print(f"ppu-bootstrap-kit: preinstall refused: {exc}", file=sys.stderr)
+        return EXIT_PREINSTALL_REFUSED
     except BootstrapKitError as exc:
         print(f"ppu-bootstrap-kit: {exc}", file=sys.stderr)
         return 2

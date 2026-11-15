@@ -53,6 +53,10 @@ QUALIFICATION_HEALTH_FAILURE = "qualification-injected post-activation health-ch
 CONTROL_PLANE_IDENTITY = "control-plane.json"
 CONTROL_PLANE_IDENTITY_SCHEMA = "plasma.ppu.control-plane-identity.v1"
 CONTROL_PLANE_SNAPSHOT_SCHEMA = "plasma.ppu.control-plane-snapshot.v1"
+# Retired Bootstrap files a pre-#1433 Bootstrap still holds. Snapshotted (so a
+# rollback restores the old Bootstrap intact) and removed after a verified
+# control-plane install, so only the single-file installer remains.
+RETIRED_CONTROL_PLANE_FILES = ("ppu-z2-installer-core.py",)
 CONTROL_PLANE_SERVICES = ("plasma-package-control.service", "plasma-site-worker.service")
 ENGINE_SELECTION_NAME = "site-worker-engine.json"
 
@@ -1357,7 +1361,8 @@ class DeploymentCoordinator:
             target = snapshots / transaction_id
             target.mkdir(mode=0o700)
             entries: list[dict[str, Any]] = []
-            for relative in sorted({*plane.files, CONTROL_PLANE_IDENTITY}):
+            for relative in sorted({*plane.files, CONTROL_PLANE_IDENTITY,
+                                    *RETIRED_CONTROL_PLANE_FILES}):
                 path = install_root / relative
                 if path.is_symlink():
                     raise DeploymentError(f"CONTROL_PLANE_DESTINATION_SYMLINK:{relative}")
@@ -1403,6 +1408,12 @@ class DeploymentCoordinator:
             path = install_root / relative
             if path.is_symlink() or not path.is_file() or _file_sha256(path) != digest:
                 raise DeploymentError(f"CONTROL_PLANE_INSTALL_UNVERIFIED:{relative}")
+        for relative in RETIRED_CONTROL_PLANE_FILES:
+            if relative in plane.files:
+                raise DeploymentError(f"CONTROL_PLANE_RETIRED_FILE_SHIPPED:{relative}")
+            path = install_root / relative
+            if path.is_symlink() or path.exists():
+                path.unlink()
         identity = {
             "schema": CONTROL_PLANE_IDENTITY_SCHEMA,
             "release_id": verified.release_id,

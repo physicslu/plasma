@@ -128,8 +128,16 @@ def test_release_workflows_ship_one_canonical_installer() -> None:
     ppu = (ROOT / ".github/workflows/ppu-release.yml").read_text(encoding="utf-8")
     for source in (z2, ppu):
         assert "scripts/ppu-z2-installer.py" in source
-        assert "scripts/ppu-z2-installer-core.py" not in source
+        assert "cp scripts/ppu-z2-installer-core.py" not in source
         assert "python -m py_compile scripts/ppu-z2-installer.py" in source
+    assert "scripts/ppu-z2-installer-core.py" not in ppu
+    # Only the one-time #1433 transition: pinned old bytes as kit data, never built or run.
+    mentions = [line.strip() for line in z2.splitlines() if "ppu-z2-installer-core.py" in line]
+    assert mentions and all(
+        line.startswith('git show "$LEGACY_INSTALLER_CORE_COMMIT:scripts/ppu-z2-installer-core.py"')
+        or '"$root/scripts/ppu-z2-installer-core.py"' in line
+        or "$root/scripts/ppu-z2-installer-core.py\" | sha256sum -c -" in line
+        for line in mentions), mentions
     assert 'cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"' in z2
     assert 'test -f "$root/scripts/ppu-z2-installer.py"' in z2
     assert 'sha256sum "$(basename "$installer")"' in ppu

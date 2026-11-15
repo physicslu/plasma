@@ -491,6 +491,8 @@ jobs:
         env:
           IDENTITY: ${{ steps.release.outputs.identity }}
           PPU_ARCHIVE: ${{ steps.release.outputs.archive }}
+          LEGACY_INSTALLER_CORE_COMMIT: 783102b9e5521bbced4be4fb1f3f494bdcab299c
+          LEGACY_INSTALLER_CORE_SHA256: 8613b3a14c0854f08c9dc69f4cd68b098deb75f2eda36f159356bddf8a18e515
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/plasma-z2-ps-kit-$IDENTITY"
@@ -503,6 +505,13 @@ jobs:
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
           cp scripts/openocd-runtime.py "$root/scripts/openocd-runtime.py"
           cp scripts/ppu_runtime_local_readiness.py "$root/scripts/ppu_runtime_local_readiness.py"
+          # One-time #1433 transition: a pre-#1433 installed Bootstrap (783102b9e)
+          # refuses a kit without this file. Exact pinned bytes from that commit;
+          # this kit's single-file installer never loads it, and the Full-Copy
+          # coordinator removes it from /opt/plasma/bootstrap after install.
+          git show "$LEGACY_INSTALLER_CORE_COMMIT:scripts/ppu-z2-installer-core.py" \
+            > "$root/scripts/ppu-z2-installer-core.py"
+          echo "$LEGACY_INSTALLER_CORE_SHA256  $root/scripts/ppu-z2-installer-core.py" | sha256sum -c -
           cp "$PPU_ARCHIVE" "$PPU_ARCHIVE.sha256" "$root/artifacts/"
           cp "$RUNNER_TEMP/z2-python-artifact/"* "$root/artifacts/"
           cp "$RUNNER_TEMP/openocd-artifact/"* "$root/artifacts/"
