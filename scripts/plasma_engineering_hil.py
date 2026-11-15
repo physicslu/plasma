@@ -73,6 +73,7 @@ class Manager:
         self.url = require_loopback(url)
         self.last_start_id: str | None = None
         self.last_batch_id: str | None = None
+        self.last_preview_plan_id: str | None = None
 
     def call(self, method: str, route: str, body: dict | None = None) -> dict:
         data = None if body is None else json.dumps(body).encode("utf-8")
@@ -104,6 +105,9 @@ def issue_and_check_reuse(client: Manager, alias: str, site: int, image: dict) -
     if not isinstance(plan, dict) or not HEX32.fullmatch(str(plan.get("plan_id"))):
         raise HILFailure("Manager plan identity not confirmed; do not proceed")
     plan_id = plan["plan_id"]
+    # Keep the exact issued identity even if the subsequent VOID request fails.
+    # A preview Start must be reconciled rather than silently abandoned.
+    client.last_preview_plan_id = plan_id
     # The preview wrote a run Start to the Manager journal. Void it before
     # returning; this tool submits programming only through canonical Batch.
     void = client.call("POST", f"/api/programming/starts/{plan_id}/void",
@@ -184,6 +188,7 @@ def one_attempt(client: Manager, alias: str, site: int, image: dict,
                 timeout_s: float, poll_s: float) -> tuple[dict, dict]:
     client.last_start_id = None
     client.last_batch_id = None
+    client.last_preview_plan_id = None
     resource = issue_and_check_reuse(client, alias, site, image)
     start = client.call("POST", "/api/programming/starts", {"kind": "batch"})
     token = (start.get("start") or {}).get("start_id")
@@ -277,9 +282,10 @@ def run(args: argparse.Namespace) -> int:
                   flush=True)
         report["result"] = "PASS"
         return 0
-    except (HILFailure, AssertionError, OSError, ImportError, RuntimeError) as exc:
+    except (HILFailure, AssertionError, OSError, ImportError, RuntimeError, UnicodeError) as exc:
         report["result"] = "BLOCKED"
         report["reason"] = f"{type(exc).__name__}: {str(exc)[:500]}"
+        report["last_preview_plan_id"] = client.last_preview_plan_id
         report["last_start_id"] = client.last_start_id
         report["last_batch_id"] = client.last_batch_id
         print(f"HIL BLOCKED: {report['reason']}", file=sys.stderr)
@@ -289,6 +295,7 @@ def run(args: argparse.Namespace) -> int:
         # exits; leave the exact Start/Batch IDs for read-only reconciliation.
         report["result"] = "OUTCOME_UNKNOWN"
         report["reason"] = "OPERATOR_INTERRUPTED_OBSERVER_DO_NOT_RESUBMIT"
+        report["last_preview_plan_id"] = client.last_preview_plan_id
         report["last_start_id"] = client.last_start_id
         report["last_batch_id"] = client.last_batch_id
         return 130
