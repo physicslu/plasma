@@ -7,6 +7,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit, urlunsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
+from .shared_control import SharedControlError
+
 
 class PPUHTTPError(RuntimeError):
     """Raised when a configured PPU cannot satisfy the fleet-facing REST contract."""
@@ -56,12 +58,12 @@ def _cloudflare_access_headers(endpoint: str) -> dict[str, str]:
     if not any(value is not None for value in configured):
         return {}
     if not all(isinstance(value, str) and value.strip() for value in configured):
-        raise PPUTransportError("Manager Cloudflare Access service identity is incomplete")
+        raise SharedControlError("Manager Cloudflare Access service identity is incomplete")
 
     normalized_origin = _normalize_origin(origin or "")
     normalized_endpoint = _normalize_origin(endpoint)
     if normalized_origin is None:
-        raise PPUTransportError("Manager Cloudflare Access origin is invalid")
+        raise SharedControlError("Manager Cloudflare Access origin is invalid")
     if normalized_endpoint != normalized_origin:
         return {}
     return {

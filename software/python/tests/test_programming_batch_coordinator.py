@@ -344,6 +344,7 @@ def test_manager_restart_never_resubmits_and_closes_the_batch_conservatively(tmp
     assert len(batch["attempts"]) == 1 and batch["attempts"][0]["outcome"] == "OUTCOME_UNKNOWN"
     assert gateway.posts == [] and gateway2.posts == []  # nothing was (re)submitted
     # A Batch started while that PPU is latched is admitted and submits nothing.
+    reloaded.spawn = lambda target: target()
     again = start(reloaded, ALIAS, body())["batch"]
     assert again["outcome"] == "BLOCKED"
     assert again["units"][0]["reason"] == "ADMISSION_OUTCOME_UNKNOWN_UNRESOLVED"

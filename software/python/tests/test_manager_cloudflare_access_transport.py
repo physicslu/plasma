@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 from plasma_manager.client import PPUHttpClient, PPUTransportError
+from plasma_manager.shared_control import SharedControlError
 
 
 class _HeaderCaptureHandler(BaseHTTPRequestHandler):
@@ -88,7 +89,7 @@ def test_incomplete_service_identity_fails_closed(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("PLASMA_MANAGER_CF_ACCESS_CLIENT_ID", "service-id.example.access")
     monkeypatch.delenv("PLASMA_MANAGER_CF_ACCESS_CLIENT_SECRET", raising=False)
 
-    with pytest.raises(PPUTransportError, match="service identity is incomplete"):
+    with pytest.raises(SharedControlError, match="service identity is incomplete"):
         PPUHttpClient(endpoint, timeout_s=1.0)
 
 

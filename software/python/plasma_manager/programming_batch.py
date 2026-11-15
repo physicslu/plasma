@@ -11,8 +11,8 @@ attempt is an ordinary ``BundleProgrammingWorkflow`` plan + run: a new plan, a
 new run and a new PPU Job (new Job ID; the Job Binding is re-derived and
 re-verified by the PPU for that Job) with ``auto_retry = DISABLED``. There is
 no second programming engine, no Gateway batch runtime and no Repeat
-scheduler here. Execution is sequential across the whole Batch: one in-flight
-run at a time.
+scheduler here. Bounded Site lanes advance independently through the same
+workflow, with at most one in-flight run per Site.
 
 Admission separates validity from readiness. A malformed request, or an
 unknown or unauthorised Target, refuses the whole Batch and does not consume
@@ -71,9 +71,10 @@ import secrets
 import tempfile
 import threading
 import time
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Generator, Mapping
 
 from .programming import (
     SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
@@ -97,6 +98,10 @@ PLAN_KEYS = frozenset({"icpn", "operations", "image_base64", "image_filename",
 TARGET_KEY = "targets"
 POLICY_KEYS = frozenset({"retry_limit", "stop_policy", "repeat"})
 START_KEYS = frozenset({"start_id"})
+
+
+class _SharedControlFailure(RuntimeError):
+    """A classified global failure, retaining its actionable reason."""
 
 
 def _now() -> str:
@@ -308,7 +313,8 @@ def migrate_batch_record(batch: Mapping[str, Any]) -> dict[str, Any]:
 class ProgrammingBatchCoordinator:
     def __init__(self, workflow: BundleProgrammingWorkflow, *,
                  journal_path: Path | None = None,
-                 platform_gate: Callable[[str], str | None] | None = None,
+                 platform_gate: Callable[[str], tuple[str, str] | None] | None = None,
+                 shared_control_gate: Callable[[], tuple[str, str] | None] | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  spawn: Callable[[Callable[[], None]], None] | None = None,
                  poll_interval_s: float = 0.5) -> None:
@@ -317,12 +323,16 @@ class ProgrammingBatchCoordinator:
         # The Manager's Platform maintenance gate, evaluated per Target PPU at
         # admission and again immediately before each PPU is operated.
         self.platform_gate = platform_gate
+        self.shared_control_gate = shared_control_gate or getattr(
+            getattr(platform_gate, "__self__", None), "shared_control_gate", None)
+        self.workflow.shared_control_gate = self.shared_control_gate
         self.sleep = sleep
         self.spawn = spawn or (lambda target: threading.Thread(
             target=target, name="plasma-programming-batch", daemon=True).start())
         self.poll_interval_s = poll_interval_s
         self._lock = threading.RLock()
         self._batches: dict[str, dict[str, Any]] = {}
+        self._control_failure: str | None = None
         #: Where a journal of the previous schema lives, if one does. It is
         #: opened, never written: not overwritten, truncated, deleted or
         #: renamed out of the way. The v2 writer keeps its own file.
@@ -493,6 +503,15 @@ class ProgrammingBatchCoordinator:
                      updated_at=_now())
 
     def _persist_locked(self) -> None:
+        try:
+            self._write_journal_locked()
+        except Exception as exc:
+            self._control_failure = f"BATCH_JOURNAL_{type(exc).__name__}"
+            with self.workflow._lock:
+                self.workflow._control_failure = self._control_failure
+            raise
+
+    def _write_journal_locked(self) -> None:
         """Write the v2 journal, atomically, and never the legacy one.
 
         Batches that came from the legacy journal are left out: that file is
@@ -503,7 +522,9 @@ class ProgrammingBatchCoordinator:
             return
         owned = [batch for batch in self._batches.values()
                  if batch["batch_id"] not in self._legacy_ids]
-        kept = sorted(owned, key=lambda b: b["created_at"])[-MAX_BATCHES_RETAINED:]
+        kept = sorted((b for b in owned if b["outcome"] not in (None, "OUTCOME_UNKNOWN")),
+                      key=lambda b: b["created_at"])[-MAX_BATCHES_RETAINED:]
+        kept += [b for b in owned if b["outcome"] in (None, "OUTCOME_UNKNOWN")]
         payload = {"schema": JOURNAL_SCHEMA, "batches": kept}
         parent = self._v2_path.parent
         parent.mkdir(parents=True, exist_ok=True)
@@ -604,7 +625,11 @@ class ProgrammingBatchCoordinator:
         consumer was migrated to this resource first, and the Manager keeps
         exactly one door into the engine rather than two sets of semantics.
         """
-        return self._start(body)
+        from .shared_control import SharedControlError
+        try:
+            return self._start(body)
+        except SharedControlError as exc:
+            raise ProgrammingError(503, "manager_shared_control_failure", str(exc)) from exc
 
     def _start(self, body: Mapping[str, Any]) -> dict[str, Any]:
         if (not isinstance(body, Mapping)
@@ -629,6 +654,14 @@ class ProgrammingBatchCoordinator:
         # for a legitimately BLOCKED Batch.
         self.workflow.validate_specification(plan_body)
         with self._lock:
+            shared = self._shared_block()
+            if shared is not None:
+                raise ProgrammingError(503, "manager_shared_control_failure", shared)
+            if (self._control_failure is not None or self.workflow._control_failure is not None
+                    or self.workflow._journal_failure is not None):
+                raise ProgrammingError(503, "manager_shared_control_failure",
+                                       self._control_failure or self.workflow._control_failure
+                                       or self.workflow._journal_failure)
             # An unknown or unauthorised Target refuses the WHOLE Batch and
             # leaves the start_id unconsumed, so the operator may correct the
             # request and resend the same token.
@@ -644,40 +677,13 @@ class ProgrammingBatchCoordinator:
                    for batch in self._batches.values()):
                 raise ProgrammingError(409, "programming_batch_in_progress",
                                        "another programming batch is in progress on this PPU")
-            # Readiness second. It never refuses the Batch: a Target that is
-            # not ready is admitted BLOCKED with its own reason, and a Batch
-            # in which EVERY Target is BLOCKED is still admitted, journalled
-            # and reconcilable - it simply submits nothing.
+            # Accept and journal validity before any remote readiness I/O.
+            # Bounded lanes independently resolve readiness into BLOCKED or
+            # proceed through the same canonical plan/Start/Run lifecycle.
             units = [{"ppu_alias": target["ppu_alias"], "site_id": site,
                       "status": "NOT_RUN", "outcome": None, "reason": None,
                       "failure_domain": None, "attempts": []}
                      for target in targets for site in target["site_ids"]]
-            for target in targets:
-                alias = target["ppu_alias"]
-                # The two gates have different scopes, so they are asked
-                # differently. The Platform gate judges the PPU: one verdict
-                # covers every Site of that PPU. The Target gate judges ONE
-                # Site and is asked per Site - a busy Site 1 is not evidence
-                # about Site 2, and blocking Site 2 for it would report a
-                # Site that was never read as BLOCKED.
-                platform = self._platform_block(alias)
-                for unit in units:
-                    if unit["ppu_alias"] != alias:
-                        continue
-                    verdict = (platform if platform is not None
-                               else self._site_block(alias, unit["site_id"]))
-                    if verdict is None:
-                        continue
-                    domain, reason = verdict
-                    if domain == SHARED_CONTROL_FAILURE:
-                        # Not one PPU's problem. Nothing is admitted, nothing
-                        # is journalled and the start_id is not consumed.
-                        raise ProgrammingError(
-                            503, "manager_shared_control_failure",
-                            f"Manager shared safety control is not usable ({reason}); "
-                            "no programming Job was submitted")
-                    unit.update(status="BLOCKED", outcome="BLOCKED",
-                                reason=f"ADMISSION_{reason}", failure_domain=domain)
             batch = {
                 "schema": BATCH_SCHEMA, "batch_id": secrets.token_hex(16),
                 "start_id": start_id,
@@ -703,7 +709,11 @@ class ProgrammingBatchCoordinator:
                 del self._batches[batch["batch_id"]]
                 raise
         self.spawn(lambda: self._execute(batch, plan_body))
-        return {"ok": True, "batch": self._view(batch)}
+        return self.status_batch(batch["batch_id"])
+
+    def _shared_block(self):
+        from .shared_control import shared_control_reason
+        return shared_control_reason(self.shared_control_gate)
 
     def _platform_block(self, alias: str) -> tuple[str, str] | None:
         """Whether this PPU may be mutated at all. PPU-scoped: one verdict
@@ -714,17 +724,35 @@ class ProgrammingBatchCoordinator:
         try:
             return self.platform_gate(alias)
         except ProgrammingError as exc:
-            return TARGET_NOT_READY, exc.code.upper()
+            return (SHARED_CONTROL_FAILURE if exc.code == "manager_shared_control_failure"
+                    else TARGET_NOT_READY), exc.code.upper()
         except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
             return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
     def _site_block(self, alias: str, site: int) -> tuple[str, str] | None:
         """Whether THIS Site is released. Site-scoped: a verdict about one
         Site is never read as a verdict about another Site of the same PPU."""
+        with self._lock:
+            for batch in self._batches.values():
+                for unit in batch["units"]:
+                    if unit["ppu_alias"] != alias or unit.get("outcome") != "OUTCOME_UNKNOWN":
+                        continue
+                    attempts = unit.get("attempts") or []
+                    run = self._run_of(alias, attempts[-1] if attempts else None)
+                    # An absent Run answer cannot clear a durable Batch unknown.
+                    if run is None or not run.get("acknowledged"):
+                        return TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED"
+            # This coordinator admits at most one active Batch per PPU.
+            # Carry its exact owner across readiness I/O: a healthy peer may
+            # acquire the lease while this Site's HTTP response is delayed.
+            owner = next((batch["batch_id"] for batch in self._batches.values()
+                          if batch["outcome"] is None and any(
+                              t["ppu_alias"] == alias for t in batch["targets"])), None)
         try:
-            return self.workflow.target_block(alias, site)
+            return self.workflow.target_block(alias, site, execution_owner_id=owner)
         except ProgrammingError as exc:
-            return TARGET_NOT_READY, exc.code.upper()
+            return (SHARED_CONTROL_FAILURE if exc.code == "manager_shared_control_failure"
+                    else TARGET_NOT_READY), exc.code.upper()
         except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
             return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
@@ -777,6 +805,8 @@ class ProgrammingBatchCoordinator:
     def _execute(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
         try:
             self._run_units(batch, plan_body)
+        except _SharedControlFailure as exc:
+            self._shared_failure(batch, str(exc))
         except Exception as exc:  # noqa: BLE001 - never retried, never a guessed result
             # The machinery that judges Targets failed, not a Target. One PPU
             # being unready is isolated; being unable to tell is not (§5.7).
@@ -792,17 +822,36 @@ class ProgrammingBatchCoordinator:
         than guessed into a failure it did not have.
         """
         with self._lock:
-            for unit in batch["units"]:
-                if unit["outcome"] is not None:
-                    continue
-                attempts = unit.get("attempts") or []
-                in_flight = bool(attempts) and attempts[-1].get("outcome") is None
-                unit.update(
-                    status="FINISHED" if in_flight else "SKIPPED",
-                    outcome="OUTCOME_UNKNOWN" if in_flight else None,
-                    reason=f"SHARED_CONTROL_FAILURE_{reason}",
-                    failure_domain=SHARED_CONTROL_FAILURE)
+            self._control_failure = reason
+            with self.workflow._lock:
+                self.workflow._control_failure = reason
             batch["failure_domain"] = SHARED_CONTROL_FAILURE
+        for unit in batch["units"]:
+            if unit["outcome"] is not None:
+                continue
+            attempts = unit.get("attempts") or []
+            last = attempts[-1] if attempts else None
+            run = self._run_of(unit["ppu_alias"], last)
+            if run is not None:
+                try:
+                    while run.get("outcome") is None:
+                        self.sleep(self.poll_interval_s)
+                        run = self.workflow.run_status(unit["ppu_alias"], run["run_id"])["run"]
+                except Exception:
+                    run = None
+            with self._lock:
+                if run is not None:
+                    self._record_attempt(last, run)
+                    outcome = run["outcome"]
+                    if (run.get("reason") == "manager_shared_control_failure"
+                            and not run.get("job_submission_count")):
+                        outcome = None
+                else:
+                    possible = last is not None and last.get("state") not in ("planned", "finished")
+                    outcome = "OUTCOME_UNKNOWN" if possible else None
+                unit.update(status=_unit_status(outcome, stopped=outcome is None),
+                            outcome=outcome, reason=f"SHARED_CONTROL_FAILURE_{reason}",
+                            failure_domain=SHARED_CONTROL_FAILURE)
         self._finish(batch, f"SHARED_CONTROL_FAILURE_{reason}")
 
     def _finish(self, batch: dict[str, Any], reason: str | None) -> None:
@@ -815,6 +864,7 @@ class ProgrammingBatchCoordinator:
         try:
             self._update(batch, **changes)
         except Exception:  # noqa: BLE001 - a failed journal is reported, not hidden
+            self._control_failure = "BATCH_FINAL_JOURNAL_UNAVAILABLE"
             # The end of this Batch could not be recorded. Nothing further is
             # submitted either way, and the Batch says plainly that its final
             # state is not durable rather than implying it was stored.
@@ -829,71 +879,156 @@ class ProgrammingBatchCoordinator:
             batch["updated_at"] = _now()
             self._persist_locked()
 
-    def _run_units(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
-        """Sequential walk of the Target Set. One in-flight run at a time."""
-        policy = batch["policy"]
-        stop_policy = policy["stop_policy"]
-        latched: dict[str, str] = {}
-        failed_sites = 0
-        reason: str | None = None
+    def _dispatch_block(self, batch: Mapping[str, Any], alias: str) -> str | None:
+        """Called with the journal lock at every new attempt boundary."""
+        shared = self._shared_block()
+        if shared is not None:
+            self._control_failure = shared
+        if self.workflow._control_failure is not None:
+            self._control_failure = self.workflow._control_failure
+        if self.workflow._journal_failure is not None:
+            self._control_failure = self.workflow._journal_failure
+        if self._control_failure is not None:
+            with self.workflow._lock:
+                self.workflow._control_failure = self._control_failure
+            raise _SharedControlFailure(self._control_failure)
+        if batch["stop_requested"]:
+            return "STOP_REQUESTED_NOTHING_SUBMITTED"
         for unit in batch["units"]:
-            alias, site = unit["ppu_alias"], unit["site_id"]
-            if unit["outcome"] is not None:
-                # Admitted BLOCKED. It spends no retry budget and, by default,
-                # does not count toward the failed_sites threshold.
-                continue
-            if batch["stop_requested"]:
-                self._skip(batch, unit, "SKIPPED", "STOP_REQUESTED_NOTHING_SUBMITTED")
-                reason = reason or "STOP_REQUESTED"
-                continue
-            if alias in latched:
-                # OUTCOME_UNKNOWN latches its own PPU and skips that PPU's
-                # remaining Sites. Other PPUs are untouched.
-                self._skip(batch, unit, "SKIPPED", f"PPU_LATCHED_{latched[alias]}")
-                continue
-            if (stop_policy["kind"] == "failed_sites"
-                    and failed_sites >= stop_policy["threshold"]):
-                self._skip(batch, unit, "SKIPPED",
-                           "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED")
-                reason = reason or "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED"
-                continue
-            # Readiness read at admission does not authorise a mutation that
-            # happens now. Re-check immediately before operating this PPU.
-            # Never skip this PPU's own check because another one failed.
-            verdict = self._admission_block(alias, site)
-            if verdict is not None:
-                domain, block = verdict
-                if domain == SHARED_CONTROL_FAILURE:
-                    self._shared_failure(batch, block)
-                    return
-                self._skip(batch, unit, "BLOCKED", f"EXECUTION_{block}",
-                           outcome="BLOCKED", domain=domain)
-                continue
-            outcome, unit_reason = self._run_attempts(batch, unit, plan_body)
+            if unit["ppu_alias"] == alias and unit.get("outcome") == "OUTCOME_UNKNOWN":
+                return f"PPU_LATCHED_{unit.get('reason') or 'OUTCOME_UNKNOWN'}"
+        stop = batch["policy"]["stop_policy"]
+        if (stop["kind"] == "failed_sites" and
+                sum(u.get("outcome") == "FAIL" for u in batch["units"]) >= stop["threshold"]):
+            return "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED"
+        return None
+
+    def _run_units(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
+        """One bounded host worker per admitted lane, using the canonical workflow.
+
+        Target Set limits bound host scheduling, not qualified hardware capacity.
+        No remote readiness/Plan/Start call holds another lane's worker.
+        """
+        def step(unit, lane):
+            try:
+                next(lane)
+                return False
+            except StopIteration as done:
+                outcome, reason = done.value
+                with self._lock:
+                    if self._control_failure is not None or self.workflow._control_failure is not None:
+                        raise _SharedControlFailure(self._control_failure or self.workflow._control_failure)
+                    unit.update(status=_unit_status(outcome, stopped=outcome is None),
+                                outcome=outcome, reason=reason)
+                    if outcome == "BLOCKED" and unit["failure_domain"] is None:
+                        unit["failure_domain"] = TARGET_NOT_READY
+                    elif outcome == "OUTCOME_UNKNOWN":
+                        unit["failure_domain"] = TARGET_TRANSACTION_UNKNOWN
+                    batch["updated_at"] = _now()
+                    self._persist_locked()
+                return True
+
+        def latch(exc):
+            reason = (str(exc) if isinstance(exc, _SharedControlFailure)
+                      else f"BATCH_UNEXPECTED_{type(exc).__name__}")
             with self._lock:
-                unit.update(status=_unit_status(outcome), outcome=outcome, reason=unit_reason)
-                if outcome == "BLOCKED":
-                    unit["failure_domain"] = TARGET_NOT_READY
-                batch["updated_at"] = _now()
-                self._persist_locked()
-            if outcome == "OUTCOME_UNKNOWN":
-                # A Job for this PPU may have reached it and its result is
-                # unknown. Latch this PPU, never resend, leave the others be.
-                unit["failure_domain"] = TARGET_TRANSACTION_UNKNOWN
-                latched[alias] = unit_reason or "OUTCOME_UNKNOWN"
-            elif outcome == "FAIL":
-                failed_sites += 1
-        self._finish(batch, reason)
+                self._control_failure = self._control_failure or reason
+                with self.workflow._lock:
+                    self.workflow._control_failure = self._control_failure
+                return self._control_failure
+
+        def advance(unit, lane):
+            try:
+                return step(unit, lane)
+            except Exception as exc:
+                # Includes terminal journal failures, not just generator errors.
+                raise _SharedControlFailure(latch(exc)) from exc
+
+        # Share only the initial PPU-wide Platform verdict. Site readiness
+        # remains independent; no remote call runs under the Journal lock.
+        platforms = {}
+        lanes = []
+        for unit in batch["units"]:
+            if unit["outcome"] is not None:
+                continue
+            alias = unit["ppu_alias"]
+            leader = alias not in platforms
+            future = platforms.setdefault(alias, Future())
+            lanes.append((unit, self._run_attempts(
+                batch, unit, plan_body, future, leader)))
+        failure = None
+        if lanes:
+            with ThreadPoolExecutor(max_workers=len(lanes),
+                                    thread_name_prefix="plasma-batch-lane") as pool:
+                try:
+                    pending = {pool.submit(advance, *lane): lane for lane in lanes}
+                    while pending:
+                        ready, _ = wait(pending, return_when=FIRST_COMPLETED)
+                        for future in ready:
+                            lane = pending.pop(future)
+                            try:
+                                finished = future.result()
+                            except _SharedControlFailure as exc:
+                                failure = str(exc)
+                                continue
+                            if not finished and failure is None:
+                                pending[pool.submit(advance, *lane)] = lane
+                        if pending:
+                            self.sleep(self.poll_interval_s)
+                except Exception as exc:
+                    # Publish scheduler failures before pool shutdown waits on
+                    # slow remote calls; they cannot admit further dispatches.
+                    raise _SharedControlFailure(latch(exc)) from exc
+        if failure is not None:
+            raise _SharedControlFailure(failure)
+        self._finish(batch, None)
 
     def _run_attempts(self, batch: dict[str, Any], unit: dict[str, Any],
-                      plan_body: Mapping[str, Any]) -> tuple[str, str | None]:
+                      plan_body: Mapping[str, Any], platform: Future,
+                      platform_leader: bool) -> Generator[
+                          None, None, tuple[str | None, str | None]]:
         """Every attempt for ONE Site. Returns that Site's outcome and reason."""
         alias, site, policy = unit["ppu_alias"], unit["site_id"], batch["policy"]
         site_body = {**plan_body, "site_id": site}
         plan: Mapping[str, Any] | None = None
+        if platform_leader:
+            platform.set_result(self._platform_block(alias))
+        verdict = platform.result()
+        with self._lock:
+            self._dispatch_block(batch, alias)
+        if verdict is None:
+            verdict = self._site_block(alias, site)
+        if verdict is not None:
+            domain, reason = verdict
+            if domain == SHARED_CONTROL_FAILURE:
+                raise _SharedControlFailure(reason)
+            with self._lock:
+                unit["failure_domain"] = domain
+            return "BLOCKED", f"ADMISSION_{reason}"
         for number in range(1, policy["retry_limit"] + 2):
-            if batch["stop_requested"] and number > 1:
-                return "FAIL", "STOP_REQUESTED_NO_FURTHER_ATTEMPT"
+            # Recheck after every yield, including the planning/Start gap.
+            while True:
+                with self._lock:
+                    block = self._dispatch_block(batch, alias)
+                if block is not None:
+                    return ("FAIL" if number > 1 else None), block
+                verdict = self._admission_block(alias, site)
+                if verdict is None:
+                    break
+                domain, reason = verdict
+                if domain == SHARED_CONTROL_FAILURE:
+                    raise _SharedControlFailure(reason)
+                # An exclusive activation must finish before peer planning.
+                # It is a wait, never a fabricated blocked Site or a reload.
+                if reason == "RUN_IN_PROGRESS" and any(
+                        u is not unit and u["ppu_alias"] == alias
+                        and u["status"] == "RUNNING" and u["outcome"] is None
+                        for u in batch["units"]):
+                    yield
+                    continue
+                with self._lock:
+                    unit["failure_domain"] = domain
+                return ("FAIL" if number > 1 else "BLOCKED"), f"EXECUTION_{reason}"
             if plan is None:
                 try:
                     plan = self.workflow.plan(alias, site_body)["plan"]
@@ -912,15 +1047,39 @@ class ProgrammingBatchCoordinator:
                        "safe_off": None, "retry": None,
                        "started_at": _now(), "finished_at": None}
             with self._lock:
+                block = self._dispatch_block(batch, alias)
+                if block is not None:
+                    return ("FAIL" if number > 1 else None), block
                 unit["attempts"].append(attempt)
                 unit["status"] = "RUNNING"
                 batch["updated_at"] = _now()
                 # Journalled BEFORE the single start of this attempt.
                 self._persist_locked()
+                block = self._dispatch_block(batch, alias)
+                if block is not None:
+                    return ("FAIL" if number > 1 else None), block
+                # Once this durable boundary is crossed, a crash must never
+                # treat a missing Run answer as proof that Start was unsent.
+                attempt["state"] = "starting"
+                self._persist_locked()
             try:
+                with self._lock:
+                    block = self._dispatch_block(batch, alias)
+                    if block is not None:
+                        attempt.update(state="finished", outcome="BLOCKED", reason=block)
+                        self._persist_locked()
+                        return ("FAIL" if number > 1 else None), block
+                # starting is a durable dispatch reservation. StopQueuing
+                # forbids subsequent reservations, never cancels committed work.
+                # Release the Journal lock before Start/spawn/remote I/O.
                 started = self.workflow.start(
-                    alias, {"plan_id": plan["plan_id"], "confirm": "PROGRAM"})["run"]
+                    alias, {"plan_id": plan["plan_id"], "confirm": "PROGRAM"},
+                    execution_owner_id=batch["batch_id"])["run"]
             except ProgrammingError as exc:
+                if exc.code == "manager_shared_control_failure":
+                    with self._lock:
+                        attempt.update(state="finished", reason=exc.code, finished_at=_now())
+                    raise _SharedControlFailure(exc.code) from exc
                 with self._lock:
                     attempt.update(state="finished", outcome="BLOCKED", reason=exc.code,
                                    finished_at=_now())
@@ -933,7 +1092,7 @@ class ProgrammingBatchCoordinator:
                 self._persist_locked()
             run = started
             while run.get("outcome") is None:
-                self.sleep(self.poll_interval_s)
+                yield
                 run = self.workflow.run_status(alias, started["run_id"])["run"]
             with self._lock:
                 self._record_attempt(attempt, run)
