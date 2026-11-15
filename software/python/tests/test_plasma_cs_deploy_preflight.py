@@ -510,6 +510,8 @@ def test_actual_deploy_flow_stops_at_either_checkpoint(tmp_path, checkpoint):
     # call is forbidden; second-check failure may only follow release build.
     stubs = '''
 set -Eeuo pipefail
+# Extracted deploy_profile() needs the CLI mode flag initialized explicitly.
+dev_fresh_state=0
 require_linux_user_runtime() { :; }
 require_command() { :; }
 resolve_base_python() { :; }
