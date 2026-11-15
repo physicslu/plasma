@@ -16,6 +16,7 @@
 ## 治理：從這裡開始
 
 - **Current** — [Root AGENTS.md — primary operating contract and domain routing](../AGENTS.md)
+- **Plan** · `Owner Gate 1 2026-11-15` · `Docs-only` — [Unified 8-Site Scheduler, Manual Repeat and Work Order Quantity v1](architecture/unified-8site-scheduler-repeat-work-order-v1.md)：EMode/PMode 共用 Scheduler／Site Lane；Manual 1～10000 Cycle 與換料確認；Automation 全域 PASS 工單配額、有限補量、每 Site 並行、UNKNOWN／SAFE_OFF 安全及 MES/PLC 交握。尚未實作或完成多 Site HIL。
 - **Plan** · `Issue #1424` · `Draft PR #1425` · `Gate 1` — [OPF Site-independent Programming Audit](development/issue-1424-site-independent-programming-audit.md)：逐層稽核並修復 ICPN 與固定 Site 綁定；PPU 回報 Site、Job 指定 ICPN、保留 Job Binding，Profile／Resource Set 升級 v2。Host-only 檢查與實機驗收分開，尚未 Gate 2。
 - **Current** — [Shared Development Contract — shared clauses, execution zones, domain routing](development/plasma-development-common.md)
 - **Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli, CPU-only and Vivado host build](development/plasma-path2-cli.md)
@@ -34,6 +35,7 @@
 ## Architecture Decision Records
 
 - **Current** — [ADR Index](adr/README.md)：所有 ADR 與其 Proposed／Accepted／Superseded 狀態。
+- **Plan** · `ADR-0010` · `2026-11-15` — [ADR-0010：Unified 8-Site Scheduler / Repeat / Work Order](adr/0010-unified-site-scheduler-repeat-work-order.md)：已接受設計決策，程式、實機並行及 MES 交握仍待實作與驗收。
 - **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
 - **Current** — [ADR-0002: IC Discovery、Catalog Level 與 Catalog 可見性統一政策](adr/0002-openocd-software-qualified-catalog-visibility.md)：所有 Manufacturer 使用 L0 `DISCOVERED` → L1 `PROGRAMMING_CANDIDATE` → L2 `PROGRAMMABLE` → L3 `PLASMA_VERIFIED`；L0 是 Internal Research Registry、一般 IC Selector 對客戶顯示 L1–L3 並提供 Level Filter、Job Picker 維持 L2/L3，L3 表示至少一組版本化 PLASMA configuration 已 HIL PASS。Active API/runtime 不保留 `phase1_*`／`phase2_*`／`phase3_*` 欄位。
 - **Historical** · `superseded by ADR-0004` — [ADR-0003: Runtime FPGA Driver 與固定映像候選責任邊界](adr/0003-runtime-fpga-driver-reconfiguration-boundary.md)：UIO-first Driver 選型候選、單一 PPU FPGA Configuration Owner、Linux 無須 Reboot 的 Bitstream 切換；尚待 Z2 Kernel／UIO／Bridge 證據，不是 Accepted Contract。

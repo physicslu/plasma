@@ -27,6 +27,8 @@
 
 | [ADR-0009](0009-open-programming-platform.md) | **Accepted policy / implementation pending (Owner decision 2026-11-14)** | PLASMA OPP 為開放式燒錄平台；保留 OPF 軟體框架，主控開放、Engine/DIB 模組化與介面標準化。現行執行契約不變。 |
 
+| [ADR-0010](0010-unified-site-scheduler-repeat-work-order.md) | **Accepted (implementation pending)** | EMode/PMode 共用單一 Scheduler／Repeat Engine；Manual 1～10000、Automation 以全域 PASS Target Quantity 計數，per-Site 並行、安全對帳與有限補量。僅架構凍結，未實作／未 HIL。 |
+
 ## Maintenance rule
 
 新增或取代架構決策時：
