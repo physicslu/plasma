@@ -17,6 +17,8 @@ No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approve
 
 **Default mode: DEVELOPMENT MODE — owner-operated prototype.** Optimize Build → Run → Observe → Fix and the smallest meaningful real result. This does not remove electrical, OS permission, hardware ownership or recovery guards. PASS/FAIL/NOT_RUN must correspond to observed execution.
 
+**Development priority — EFFICIENCY FIRST, essential safety always (normative).** In owner-operated prototype development, optimize for the shortest safe path to an observed functional result, not maximum preflight coverage or production-style qualification. Reuse qualified evidence and prefer existing commands, focused delta checks, bounded experiments and rapid Build → Run → Observe → Fix. **Apply only safeguards tied to a concrete relevant hazard or invariant** (electrical/power safety, OS/device ownership, resource isolation, durable state and UNKNOWN/no-blind-resend); do not waive them to gain speed. Any proposed additional test, stop or prerequisite must identify the actual risk and use the least burdensome effective mitigation. Defer unrelated, speculative or production-only checks as NOT_RUN/NOT_VERIFIED without blocking otherwise authorised development. Where a small reversible experiment can safely answer the question, prefer it to another broad audit.
+
 ## Development autonomy and restriction provenance (normative)
 
 - **Do not invent restrictions.** Do not add unrequested approval steps, blanket deployment/FPGA/Site bans, arbitrary test limits or production-grade prerequisites without a basis in the owner-approved Gate 1, applicable repository contracts, executable guards or demonstrated engineering safety. Missing evidence is NOT_VERIFIED, not proof of failure or an automatic ban on unrelated safe work.
@@ -66,6 +68,15 @@ Path 2 / Path 3 are selected independently of domain. Skipping unrelated documen
 Select the smallest capable Path. Choosing a Path never grants additional authority beyond the approved Gate 1 scope, actual Linux privileges, Root Guard and safety checks.
 
 ## Core engineering policies
+
+**Delta Verification / reuse accepted evidence (normative; ChatGPT Direct, Path 2, Path 3)**
+
+- **Start from the last accepted baseline, not from zero.** For each request, identify the actual source/config/interface/hardware delta and the specific new outcome. Reuse prior observed PASS, approved Gates and immutable evidence when their tested conditions still apply. Do not restart a repository-wide architecture/ADR/PR/CI audit or ask the owner to restate known decisions merely because a new task begins.
+- **Verify the affected surface only.** Execute the smallest relevant functional check, boundary/negative regression and applicable safety guard for the delta. Expand only when a material dependency changed, evidence no longer covers the requested behavior, an observed failure points outside the initial scope, or an executable policy explicitly requires it. A checklist is not evidence that every item must be rerun.
+- **Preserve evidence type and validity.** Confirm only the baseline identity and conditions needed for reuse (e.g. exact source/test SHA, changed dependencies, runtime configuration and hardware mapping). Hosted CI/Mock PASS is reusable software evidence, never a substitute for new physical HIL. A materially changed source requires the relevant new tests and the required exact-HEAD CI/merge checks; unchanged historical checks do not become new work.
+- **Do not manufacture approval gates or blanket prohibitions.** An already approved Gate 1 covers its bounded work; Gate 2 still governs PR merge. Distinguish legitimate safety checks before an authorized hardware operation from fresh owner approval, speculative factory prerequisites and unrelated full requalification.
+- **Example — WP-01 after #1439/#1441 merge:** Retain accepted architecture and Hosted CI evidence; the next unsolved question is whether the real Z2 PPU can run its two installed Sites concurrently. Check effective PPU concurrency and shared electrical/FPGA ownership, then prove two real overlapping Flash/Verify executions with independent Job/Receipt and safe outcomes under an authorized HIL scope. Do **not** redo all single-Site or 8-Site Host-only work just to start 2-Site qualification.
+- **Report the delta, not a recycled audit.** Summarize (1) reused evidence, (2) new checks actually run and their PASS/FAIL/NOT_RUN, (3) specific unresolved blockers and next action. Never represent a prior PASS as a new execution, or omit a necessary safety check in the name of efficiency.
 
 **Engineering simplicity and scope control (normative; no new Gate)**
 
