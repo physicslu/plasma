@@ -252,3 +252,84 @@ def test_duplicate_or_invalid_starts_block(state: Path) -> None:
     set_starts(state, [start_record(status="SURPRISE")])
     with pytest.raises(preflight.Blocked, match="duplicate/invalid"):
         check(state)
+
+
+def test_migrated_v1_v2_same_transaction_is_not_a_conflict(state: Path) -> None:
+    attempt = {"attempt": 1, "plan_id": START_ID, "run_id": "run1",
+               "job_id": "job1", "job_binding_sha256": "b" * 64,
+               "outcome": "PASS", "safe_off": True}
+    legacy = {"batch_id": "batch-1", "start_id": START_ID,
+              "ppu_alias": "z2", "site_id": 2,
+              "state": "finished", "outcome": "PASS",
+              "attempts": [attempt]}
+    current = {"batch_id": "batch-1", "start_id": START_ID,
+               "state": "finished", "execution_status": "COMPLETED",
+               "outcome": "PASS",
+               "targets": [{"ppu_alias": "z2", "site_ids": [2]}],
+               "units": [{"ppu_alias": "z2", "site_id": 2,
+                          "outcome": "PASS", "status": "FINISHED",
+                          "attempts": [{**attempt, "job_key": {"attempt": 1}}]}],
+               "updated_at": "2026-11-15T12:00:00Z"}
+    set_starts(state, [start_record(status="CONSUMED", batch_id="batch-1")])
+    write_journal(state, "programming-batches.json",
+                  "plasma.manager.programming-batch-journal.v1", "batches", [legacy])
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2", "batches", [current])
+    assert check(state)["journal"]["batches"] == 1
+
+    # A later v2 writer may change bookkeeping but never Job identity.
+    current["units"][0]["attempts"][0]["job_id"] = "different-job"
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2", "batches", [current])
+    with pytest.raises(preflight.Blocked, match="transaction identity"):
+        check(state)
+
+
+def test_missing_run_start_ledger_with_batches_blocks(state: Path) -> None:
+    (state / "bundle-programming-runs.json").unlink()
+    with pytest.raises(preflight.Blocked, match="Run/Start journal missing"):
+        # Even an empty Batch ledger demonstrates this is not an all-empty system.
+        check(state)
+
+
+def test_bogus_terminal_batch_outcome_blocks(state: Path) -> None:
+    row = completed_v2_batch()
+    row["outcome"] = "UNRECOGNIZED_PASS"
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2", "batches", [row])
+    with pytest.raises(preflight.Blocked, match="nonterminal or invalid outcome"):
+        check(state)
+
+
+def test_bogus_site_and_attempt_outcomes_block(state: Path) -> None:
+    row = completed_v2_batch()
+    row["units"][0]["outcome"] = "ALMOST_PASS"
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2", "batches", [row])
+    with pytest.raises(preflight.Blocked, match="Site outcome"):
+        check(state)
+    row["units"][0]["outcome"] = "PASS"
+    row["units"][0]["attempts"][0]["outcome"] = "UNDEFINED"
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2", "batches", [row])
+    with pytest.raises(preflight.Blocked, match="attempt"):
+        check(state)
+
+
+def test_unknown_batch_execution_status_blocks(state: Path) -> None:
+    row = completed_v2_batch()
+    row["execution_status"] = "QUEUED"
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2", "batches", [row])
+    with pytest.raises(preflight.Blocked, match="execution status"):
+        check(state)
+
+
+def test_duplicate_start_claim_by_distinct_batches_blocks(state: Path) -> None:
+    first = completed_v2_batch()
+    second = {**first, "batch_id": "batch-2"}
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2",
+                  "batches", [first, second])
+    with pytest.raises(preflight.Blocked, match="claimed by multiple Batches"):
+        check(state)
