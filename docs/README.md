@@ -16,6 +16,7 @@
 ## 治理：從這裡開始
 
 - **Current** — [Root AGENTS.md — primary operating contract and domain routing](../AGENTS.md)
+- **Plan** · `Owner Gate 1 2026-11-15` · `Docs-only` — [Unified 8-Site Scheduler, Manual Repeat and Work Order Quantity v1](architecture/unified-8site-scheduler-repeat-work-order-v1.md)：EMode/PMode 共用 Scheduler／Site Lane；Manual 1～10000 Cycle 與換料確認；Automation 全域 PASS 工單配額、有限補量、每 Site 並行、UNKNOWN／SAFE_OFF 安全及 MES/PLC 交握。尚未實作或完成多 Site HIL。
 - **Plan** · `Issue #1424` · `Draft PR #1425` · `Gate 1` — [OPF Site-independent Programming Audit](development/issue-1424-site-independent-programming-audit.md)：逐層稽核並修復 ICPN 與固定 Site 綁定；PPU 回報 Site、Job 指定 ICPN、保留 Job Binding，Profile／Resource Set 升級 v2。Host-only 檢查與實機驗收分開，尚未 Gate 2。
 - **Current** — [Shared Development Contract — shared clauses, execution zones, domain routing](development/plasma-development-common.md)
 - **Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli, CPU-only and Vivado host build](development/plasma-path2-cli.md)
