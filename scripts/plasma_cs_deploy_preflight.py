@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import yaml
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -18,17 +19,30 @@ class Blocked(Exception):
     pass
 
 
-def read_journal(path: Path, schemas: set[str], field: str) -> list[dict]:
-    if not path.exists():
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def read_journal(path: Path, schemas: set[str], field: str, *, optional=False) -> list[dict]:
+    if optional and not path.exists() and not path.is_symlink():
         return []
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
+        data = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
+    except (OSError, ValueError, UnicodeError) as exc:
         raise Blocked(f"{path.name}: unreadable journal") from exc
-    if (not isinstance(data, dict) or data.get("schema") not in schemas
+    if (not isinstance(data, dict) or not isinstance(data.get("schema"), str)
+            or data["schema"] not in schemas
             or not isinstance(data.get(field), list)
             or any(not isinstance(item, dict) for item in data[field])):
         raise Blocked(f"{path.name}: invalid schema or records")
+    if (data["schema"] == "plasma.manager.programming-batch-journal.v2"
+            and any("units" not in row for row in data[field])):
+        raise Blocked(f"{path.name}: missing v2 units")
     return data[field]
 
 
@@ -76,7 +90,6 @@ def check_transactions(state_dir: Path) -> dict:
     current = "plasma.manager.programming-batch-journal.v2"
     files = (("programming-batches.json", {legacy, current}),
              ("programming-batches.json.v2", {current}))
-    batches: list[dict] = []
     seen: dict[str, dict] = {}
     # A recorded Batch necessarily has a Manager-issued Start. An absent
     # Run/Start ledger while a Batch ledger remains is not an empty system.
@@ -85,12 +98,17 @@ def check_transactions(state_dir: Path) -> dict:
         raise Blocked("Run/Start journal missing with Batch history")
     claimed_starts: dict[str, str] = {}
     for name, schemas in files:
-        records = read_journal(state_dir / name, schemas, "batches")
+        records = read_journal(state_dir / name, schemas, "batches",
+                               optional=name.endswith(".v2"))
+        local_ids = set()
         for raw in records:
             batch = dict(raw)
+            is_legacy = "units" not in batch
             # v1 has one Site and flat attempts. Never require a v2-only
             # units[] field from immutable legacy evidence.
-            if "units" not in batch:
+            if is_legacy:
+                if schemas == {current}:
+                    raise Blocked(f"{name}: missing v2 units")
                 if "site_id" not in batch or "ppu_alias" not in batch:
                     raise Blocked(f"{name}: invalid legacy Site identity")
                 batch["units"] = [{
@@ -104,10 +122,12 @@ def check_transactions(state_dir: Path) -> dict:
             batch_id = batch.get("batch_id")
             if not isinstance(batch_id, str) or not batch_id:
                 raise Blocked(f"{name}: invalid batch identity")
+            if batch_id in local_ids:
+                raise Blocked(f"{name}: duplicate Batch identity")
+            local_ids.add(batch_id)
             if batch_id in seen and batch_identity(seen[batch_id]) != batch_identity(batch):
                 raise Blocked("conflicting Batch transaction identity between journals")
             seen[batch_id] = batch
-            batches.append(batch)
             start_id = batch.get("start_id")
             if start_id is not None:
                 if not isinstance(start_id, str) or not start_id:
@@ -123,7 +143,7 @@ def check_transactions(state_dir: Path) -> dict:
                 raise Blocked(f"Batch {batch_id}: nonterminal or invalid outcome")
             if (batch.get("state") != "finished"
                     or batch.get("execution_status") not in
-                       (None, "COMPLETED", "STOPPED")):
+                       ((None, "COMPLETED", "STOPPED") if is_legacy else ("COMPLETED", "STOPPED"))):
                 raise Blocked(f"Batch {batch_id}: nonterminal or invalid execution status")
             units = batch.get("units")
             if not isinstance(units, list) or not units:
@@ -132,22 +152,45 @@ def check_transactions(state_dir: Path) -> dict:
                 if not isinstance(unit, dict):
                     raise Blocked(f"Batch {batch_id}: invalid unit")
                 if unit.get("outcome") not in ("PASS", "FAIL", "BLOCKED"):
-                    raise Blocked(f"Batch {batch_id}: unresolved/invalid Site outcome")
-                attempts = unit.get("attempts", [])
+                    # StopQueuing leaves never-submitted Sites SKIPPED. This
+                    # is terminal bookkeeping, not an unknown submitted Job.
+                    if not (unit.get("outcome") is None and unit.get("status") == "SKIPPED"
+                            and unit.get("attempts") == []
+                            and batch.get("execution_status") == "STOPPED"):
+                        raise Blocked(f"Batch {batch_id}: unresolved/invalid Site outcome")
+                if (not isinstance(unit.get("ppu_alias"), str) or not unit["ppu_alias"]
+                        or type(unit.get("site_id")) is not int or unit["site_id"] < 1):
+                    raise Blocked(f"Batch {batch_id}: invalid Site identity")
+                attempts = unit.get("attempts")
                 if not isinstance(attempts, list):
                     raise Blocked(f"Batch {batch_id}: invalid attempts")
                 if any(not isinstance(attempt, dict)
                        or attempt.get("outcome") not in ("PASS", "FAIL", "BLOCKED")
+                       or attempt.get("state") != "finished"
                        for attempt in attempts):
                     raise Blocked(f"Batch {batch_id}: unresolved/invalid attempt")
+            # Validate the declared Target Set even if no duplicate row caused
+            # identity comparison. A terminal label cannot mask malformed routing.
+            identity = batch_identity(batch)
+            declared = []
+            for target in identity["targets"]:
+                alias, sites = target.get("ppu_alias"), target.get("site_ids")
+                if (not isinstance(alias, str) or not alias or not isinstance(sites, list)
+                        or not sites or any(type(site) is not int or site < 1 for site in sites)):
+                    raise Blocked(f"Batch {batch_id}: invalid Target Set")
+                declared.extend((alias, site) for site in sites)
+            actual = [(u["ppu_alias"], u["site_id"]) for u in units]
+            if (len(set(declared)) != len(declared) or len(set(actual)) != len(actual)
+                    or set(declared) != set(actual)):
+                raise Blocked(f"Batch {batch_id}: Target Set/Site identity mismatch")
             # The Manager's aggregation rule is a transaction invariant:
             # a claimed PASS cannot hide a FAILED or BLOCKED Site.
             outcomes = [unit["outcome"] for unit in units]
             if "FAIL" in outcomes:
                 aggregate = "FAIL"
-            elif all(outcome == "BLOCKED" for outcome in outcomes):
+            elif not any(outcome == "PASS" for outcome in outcomes):
                 aggregate = "BLOCKED"
-            elif "BLOCKED" in outcomes:
+            elif any(outcome != "PASS" for outcome in outcomes):
                 aggregate = "PARTIAL"
             else:
                 aggregate = "PASS"
@@ -157,16 +200,27 @@ def check_transactions(state_dir: Path) -> dict:
     runs = read_journal(data, {"plasma.manager.bundle-programming-journal.v1"}, "runs")
     # Acknowledgement is explicit on the run; a consumed Start is not itself
     # proof that a Job is still running, so do not invent a deployment blocker.
+    run_ids = set()
+    plan_ids = set()
     for run in runs:
         ident = run.get("run_id")
+        plan = run.get("plan")
+        if (not isinstance(ident, str) or not ident or ident in run_ids
+                or not isinstance(plan, dict)
+                or not isinstance(plan.get("plan_id"), str) or not plan["plan_id"]
+                or plan["plan_id"] in plan_ids):
+            raise Blocked("Run: invalid/duplicate Run or plan identity")
+        run_ids.add(ident)
+        plan_ids.add(plan["plan_id"])
+        if run.get("outcome") is None or run.get("state") != "finished":
+            raise Blocked(f"Run {ident}: outcome not terminal")
         if run.get("outcome") not in ("PASS", "FAIL", "BLOCKED", "OUTCOME_UNKNOWN"):
-            raise Blocked(f"Run {ident}: outcome not terminal or invalid")
-        if run.get("state") not in (None, "finished"):
-            raise Blocked(f"Run {ident}: state not terminal")
+            raise Blocked(f"Run {ident}: invalid terminal outcome")
+        if type(run.get("acknowledged")) is not bool:
+            raise Blocked(f"Run {ident}: invalid acknowledgement")
         if run.get("outcome") == "OUTCOME_UNKNOWN" and run.get("acknowledged") is not True:
             raise Blocked(f"Run {ident}: outcome unknown/unacknowledged")
-    starts = (read_journal(data, {"plasma.manager.bundle-programming-journal.v1"},
-                           "starts") if data.exists() else [])
+    starts = read_journal(data, {"plasma.manager.bundle-programming-journal.v1"}, "starts")
     return {"batches": len(seen), "runs": len(runs), "starts": starts, "batch_records": seen,
             "run_records": runs}
 
@@ -215,14 +269,32 @@ def check_start_reconciliation(journal: dict, manager_url: str) -> int:
         else:
             if matched_batches or matched_runs:
                 raise Blocked(f"Start {start_id}: issued Start has admitted transaction")
-            response = http_json(manager_url.rstrip("/") + "/api/programming/starts/" + start_id)
-            reconciliation = response.get("reconciliation")
-            if (response.get("ok") is not True or not isinstance(reconciliation, dict)
-                    or reconciliation.get("start_id") != start_id
-                    or reconciliation.get("kind") != kind
-                    or reconciliation.get("read_only") is not True
-                    or reconciliation.get("state") != "NOT_ACCEPTED"):
-                raise Blocked(f"Start {start_id}: admission not proved inactive")
+        # The live Manager may have detected an identity mismatch or admitted
+        # a transaction since the disk snapshot. Check every Start, including
+        # CONSUMED and VOIDED; local terminal rows alone do not prove admission.
+        response = http_json(manager_url.rstrip("/") + "/api/programming/starts/" + start_id)
+        reconciliation = response.get("reconciliation")
+        expected = "TERMINAL_CONFIRMED" if state == "CONSUMED" else "NOT_ACCEPTED"
+        if state == "CONSUMED" and kind == "run" and matched_runs[0]["outcome"] == "OUTCOME_UNKNOWN":
+            expected = "OUTCOME_UNKNOWN"
+        if (response.get("ok") is not True or not isinstance(reconciliation, dict)
+                or reconciliation.get("start_id") != start_id
+                or reconciliation.get("kind") != kind
+                or reconciliation.get("read_only") is not True
+                or reconciliation.get("state") != expected):
+            raise Blocked(f"Start {start_id}: admission not proved inactive")
+        if state == "CONSUMED":
+            record = batches[ident] if kind == "batch" else matched_runs[0]
+            live_record = reconciliation.get(kind)
+            key = "batch_id" if kind == "batch" else "run_id"
+            if (not isinstance(live_record, dict) or live_record.get(key) != ident
+                    or reconciliation.get("outcome") != record["outcome"]
+                    or live_record.get("outcome") != record["outcome"]):
+                raise Blocked(f"Start {start_id}: live transaction mismatch")
+            if expected == "OUTCOME_UNKNOWN" and (
+                    reconciliation.get("acknowledged") is not True
+                    or live_record.get("acknowledged") is not True):
+                raise Blocked(f"Start {start_id}: unknown/unacknowledged live Run")
     return len(starts)
 
 
@@ -232,8 +304,8 @@ def http_json(url: str) -> dict:
         with urlopen(request, timeout=4) as response:
             if response.status != 200:
                 raise Blocked("HTTP endpoint did not return 200")
-            payload = json.loads(response.read(1024 * 1024))
-    except (HTTPError, URLError, OSError, ValueError) as exc:
+            payload = json.loads(response.read(1024 * 1024), object_pairs_hook=unique_object)
+    except (HTTPError, URLError, OSError, ValueError, UnicodeError) as exc:
         raise Blocked(f"endpoint unavailable or invalid ({type(exc).__name__})") from exc
     if not isinstance(payload, dict):
         raise Blocked("endpoint response is not an object")
@@ -252,15 +324,25 @@ def check_runtime(manager_url: str, ppu_endpoint: str) -> dict:
     if (execution.get("busy") is not False
             or type(execution.get("active_job_count")) is not int
             or execution["active_job_count"] != 0
-            or execution.get("owner_kind") is not None
-            or execution.get("owner_id") is not None):
+            or "owner_kind" not in execution or execution["owner_kind"] is not None
+            or "owner_id" not in execution or execution["owner_id"] is not None):
         raise Blocked("PPU has active/unknown execution owner")
     return {"manager_health": "PASS", "ppu_execution": "IDLE"}
 
 
-def check(state_dir: Path, manager_url: str, ppu_endpoint: str) -> dict:
+def check(state_dir: Path, manager_url: str, ppu_endpoint: str, manager_config: Path) -> dict:
     if not state_dir.is_dir():
         raise Blocked("Control Station state directory missing")
+    # Use the same YAML loader as Manager. The profile invokes this script
+    # with the active release venv, which already contains PyYAML.
+    try:
+        config = yaml.safe_load(manager_config.read_text(encoding="utf-8"))
+        registry = config["manager"]["registry_state_path"]
+        if (not isinstance(registry, str) or not Path(registry).is_absolute()
+                or Path(registry).resolve() != (state_dir / "registry.json").resolve()):
+            raise ValueError("registry location")
+    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as exc:
+        raise Blocked("Manager config: journal location not proved by registry_state_path") from exc
     journal = check_transactions(state_dir)
     checked_starts = check_start_reconciliation(journal, manager_url)
     runtime = check_runtime(manager_url, ppu_endpoint)
@@ -276,9 +358,10 @@ def main() -> int:
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--manager-url", required=True)
     parser.add_argument("--ppu-endpoint", required=True)
+    parser.add_argument("--manager-config", type=Path, required=True)
     args = parser.parse_args()
     try:
-        print(json.dumps(check(args.state_dir, args.manager_url, args.ppu_endpoint),
+        print(json.dumps(check(args.state_dir, args.manager_url, args.ppu_endpoint, args.manager_config),
                          sort_keys=True))
         return 0
     except Blocked as exc:

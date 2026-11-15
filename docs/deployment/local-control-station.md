@@ -154,7 +154,20 @@ release**, `plasmactl deploy local-control-station` runs the read-only
 
 - checks legacy/v2 Manager Batch journals and the Run/Start journal without
   modifying or deleting evidence;
+- resolves their location from `manager.yaml`'s explicit absolute
+  `manager.registry_state_path`, which must match this profile's state directory;
+  the journals are siblings of the registry (as in `bootstrap_server.py`);
+- requires the base Batch journal and Run/Start journal, including an explicit
+  `starts` list. A missing ledger is unverified history, not definite idle or
+  proof of a new installation. The optional `.v2` sidecar is read when present;
 - blocks an active, unresolved or `OUTCOME_UNKNOWN` attempt or Run;
+- validates known terminal outcomes, execution states, transaction identities,
+  duplicates and migrated v1/v2 agreement; a Run with unknown outcome requires
+  an explicit boolean acknowledgement;
+- reconciles every recorded Start through the live Manager GET endpoint:
+  consumed Starts must match their terminal transaction, and issued/voided
+  Starts must prove `NOT_ACCEPTED`. A live `JOURNAL_INCONSISTENT` blocks even
+  when local Batch rows say PASS;
 - requires local Manager health and an observable, idle PPU execution owner
   (`GET /api/status`: no busy owner, no active Job);
 - fails closed when journal data is unreadable or PPU execution cannot be
@@ -166,6 +179,17 @@ Batch after the final snapshot. A true quiesce/maintenance transaction must be
 implemented before claiming race-free unattended or factory deployment.
 SWPC HIL programming is separately controlled and does not implicitly run from
 `deploy`. GitHub PR CI does not run any physical programming.
+
+The preflight runs with the active release's venv (including Manager's YAML
+parser). It never constructs a workflow/coordinator, rewrites journals,
+acknowledges unknown outcomes, voids Starts or retries a Job. A stopped v2
+Batch can contain never-submitted `SKIPPED` Sites with no attempts; its
+aggregate outcome must still match the Manager's rule.
+
+For an owner work order requiring exclusive maintenance with no new Manager
+admission, two passing snapshots alone are insufficient. Verify that condition
+through the existing operational controls before deploying; otherwise report
+deployment `NOT_RUN`. This preflight does not supply a maintenance lock.
 
 ## Deploy
 

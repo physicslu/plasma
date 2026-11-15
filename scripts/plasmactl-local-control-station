@@ -572,8 +572,9 @@ run_deployment_preflight() {
   # This is a read-only transaction/PPU-idle snapshot, not an admission lock.
   # Check again after the possibly lengthy release build, before changing
   # the current release or restarting the Manager.
-  "$base_python" "$repo_root/scripts/plasma_cs_deploy_preflight.py" \
+  "$current_link/venv/bin/python" "$repo_root/scripts/plasma_cs_deploy_preflight.py" \
     --state-dir "$state_dir" \
+    --manager-config "$manager_config" \
     --manager-url "http://$manager_host:$manager_port" \
     --ppu-endpoint "$ppu_endpoint" || \
       die "deployment blocked by Manager transaction or PPU execution preflight"
