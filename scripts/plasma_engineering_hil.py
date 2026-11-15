@@ -13,6 +13,7 @@ from contextlib import redirect_stdout
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -316,7 +317,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--execute", action="store_true",
                    help="explicitly use current Manager/PPU owner authorization to program DUT")
     args = p.parse_args(argv)
-    if (args.batch_timeout < 30 or not 0.2 <= args.poll_interval <= 10
+    if (not all(math.isfinite(value) for value in
+                (args.batch_timeout, args.poll_interval,
+                 args.cdc_duration, args.cdc_tolerance))
+            or args.batch_timeout < 30 or not 0.2 <= args.poll_interval <= 10
             or args.cdc_duration < 10 or not 0.0 < args.cdc_tolerance <= 1.0):
         p.error("invalid bounded time/tolerance values")
     try:
