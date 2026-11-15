@@ -25,7 +25,9 @@ def backend(tmp_path: Path, monkeypatch):
     scripts.mkdir()
     file = scripts / "plasmactl-local-control-station"
     file.write_text(
-        "run_deployment_preflight() { true; }\n"
+        "run_deployment_preflight() {\n"
+        "  python scripts/plasma_cs_deploy_preflight.py\n"
+        "}\n"
         "deploy_profile() {\n"
         "  run_deployment_preflight\n"
         "  prepare_release\n"
