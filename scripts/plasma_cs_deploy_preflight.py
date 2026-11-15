@@ -32,6 +32,45 @@ def read_journal(path: Path, schemas: set[str], field: str) -> list[dict]:
     return data[field]
 
 
+def batch_identity(batch: dict) -> dict:
+    """Match Manager's persisted *transaction* identity, not v1/v2 JSON layout.
+
+    v1 rows store ppu_alias/site_id/attempts flat; v2 nests those under
+    targets/units and adds bookkeeping, timestamps and status fields.
+    A matching migrated row must not be mistaken for a conflict; a changed
+    Start, Job, outcome or SAFE_OFF must always be rejected.
+    """
+    units = batch.get("units")
+    if not isinstance(units, list) or not units:
+        raise Blocked("Batch: missing or invalid Site units")
+    targets = batch.get("targets")
+    if targets is None:
+        targets = [{"ppu_alias": batch.get("ppu_alias"),
+                    "site_ids": [batch.get("site_id")]}]
+    if (not isinstance(targets, list) or not targets
+            or any(not isinstance(t, dict) for t in targets)):
+        raise Blocked("Batch: missing or invalid Target Set")
+    projected = []
+    for unit in units:
+        if not isinstance(unit, dict):
+            raise Blocked("Batch: invalid Site unit")
+        attempts = unit.get("attempts") or []
+        if not isinstance(attempts, list) or any(not isinstance(a, dict) for a in attempts):
+            raise Blocked("Batch: invalid Site attempts")
+        projected.append({
+            "ppu_alias": unit.get("ppu_alias"),
+            "site_id": unit.get("site_id"),
+            "outcome": unit.get("outcome"),
+            "attempts": [{
+                key: attempt.get(key) for key in
+                ("attempt", "plan_id", "run_id", "job_id",
+                 "job_binding_sha256", "outcome", "safe_off")
+            } for attempt in attempts],
+        })
+    return {"start_id": batch.get("start_id"), "targets": targets,
+            "outcome": batch.get("outcome"), "units": projected}
+
+
 def check_transactions(state_dir: Path) -> dict:
     legacy = "plasma.manager.programming-batch-journal.v1"
     current = "plasma.manager.programming-batch-journal.v2"
@@ -39,6 +78,12 @@ def check_transactions(state_dir: Path) -> dict:
              ("programming-batches.json.v2", {current}))
     batches: list[dict] = []
     seen: dict[str, dict] = {}
+    # A recorded Batch necessarily has a Manager-issued Start. An absent
+    # Run/Start ledger while a Batch ledger remains is not an empty system.
+    if (not (state_dir / "bundle-programming-runs.json").exists()
+            and any((state_dir / name).exists() for name, _ in files)):
+        raise Blocked("Run/Start journal missing with Batch history")
+    claimed_starts: dict[str, str] = {}
     for name, schemas in files:
         records = read_journal(state_dir / name, schemas, "batches")
         for raw in records:
@@ -59,30 +104,42 @@ def check_transactions(state_dir: Path) -> dict:
             batch_id = batch.get("batch_id")
             if not isinstance(batch_id, str) or not batch_id:
                 raise Blocked(f"{name}: invalid batch identity")
-            if batch_id in seen and seen[batch_id] != batch:
-                raise Blocked("conflicting Batch records between journals")
+            if batch_id in seen and batch_identity(seen[batch_id]) != batch_identity(batch):
+                raise Blocked("conflicting Batch transaction identity between journals")
             seen[batch_id] = batch
             batches.append(batch)
+            start_id = batch.get("start_id")
+            if start_id is not None:
+                if not isinstance(start_id, str) or not start_id:
+                    raise Blocked(f"Batch {batch_id}: invalid Start identity")
+                if claimed_starts.setdefault(start_id, batch_id) != batch_id:
+                    raise Blocked(f"Start {start_id}: claimed by multiple Batches")
             if (batch.get("outcome") is None
                     or batch.get("outcome") == "OUTCOME_UNKNOWN"
                     or batch.get("execution_status") == "RUNNING"
                     or batch.get("state") == "running"):
                 raise Blocked(f"Batch {batch_id}: unresolved/running")
+            if batch.get("outcome") not in ("PASS", "FAIL", "PARTIAL", "BLOCKED"):
+                raise Blocked(f"Batch {batch_id}: nonterminal or invalid outcome")
+            if (batch.get("state") != "finished"
+                    or batch.get("execution_status") not in
+                       (None, "COMPLETED", "STOPPED")):
+                raise Blocked(f"Batch {batch_id}: nonterminal or invalid execution status")
             units = batch.get("units")
-            if not isinstance(units, list):
+            if not isinstance(units, list) or not units:
                 raise Blocked(f"Batch {batch_id}: invalid units")
             for unit in units:
                 if not isinstance(unit, dict):
                     raise Blocked(f"Batch {batch_id}: invalid unit")
-                if unit.get("outcome") is None or unit.get("outcome") == "OUTCOME_UNKNOWN":
-                    raise Blocked(f"Batch {batch_id}: unresolved Site outcome")
+                if unit.get("outcome") not in ("PASS", "FAIL", "BLOCKED"):
+                    raise Blocked(f"Batch {batch_id}: unresolved/invalid Site outcome")
                 attempts = unit.get("attempts", [])
                 if not isinstance(attempts, list):
                     raise Blocked(f"Batch {batch_id}: invalid attempts")
-                if any(not isinstance(attempt, dict) or attempt.get("outcome") is None
-                       or attempt.get("outcome") == "OUTCOME_UNKNOWN"
+                if any(not isinstance(attempt, dict)
+                       or attempt.get("outcome") not in ("PASS", "FAIL", "BLOCKED")
                        for attempt in attempts):
-                    raise Blocked(f"Batch {batch_id}: unresolved attempt")
+                    raise Blocked(f"Batch {batch_id}: unresolved/invalid attempt")
     data = state_dir / "bundle-programming-runs.json"
     runs = read_journal(data, {"plasma.manager.bundle-programming-journal.v1"}, "runs")
     # Acknowledgement is explicit on the run; a consumed Start is not itself
