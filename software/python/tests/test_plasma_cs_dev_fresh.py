@@ -71,7 +71,7 @@ deploy_profile
 def invoke(tmp_path: Path, mode: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["bash", "-c", HARNESS, "test-fresh", str(BACKEND), str(tmp_path)],
-        capture_output=True, text=True, timeout=30, env={"MODE": mode, "PATH": "/usr/bin:/bin"},
+        capture_output=True, text=True, timeout=30, env={"MODE": mode, "PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
         check=False,
     )
 
