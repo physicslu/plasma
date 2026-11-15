@@ -698,8 +698,8 @@ deploy_profile() {
       say "BLOCKED: dev-fresh state directory is missing or is a symlink"
       false
     }
-    dev_archive_dir="$state_home/plasma/local-control-station.archive.$(date -u +%Y%m%dT%H%M%SZ).$"
-    dev_failed_dir="$state_home/plasma/local-control-station.failed.$(date -u +%Y%m%dT%H%M%SZ).$"
+    dev_archive_dir="$state_home/plasma/local-control-station.archive.$(date -u +%Y%m%dT%H%M%SZ).pid$BASHPID"
+    dev_failed_dir="$state_home/plasma/local-control-station.failed.$(date -u +%Y%m%dT%H%M%SZ).pid$BASHPID"
     [[ ! -e "$dev_archive_dir" && ! -L "$dev_archive_dir" ]] ||
       { say "BLOCKED: dev-fresh archive destination exists"; false; }
     [[ ! -e "$dev_failed_dir" && ! -L "$dev_failed_dir" ]] ||
