@@ -937,7 +937,7 @@ class BundleProgrammingWorkflow:
             return False
         sites = target.get("site_ids")
         return (isinstance(sites, list) and len(sites) == 1
-                and type(sites[0]) is int
+                and type(sites[0]) is int and 1 <= sites[0] <= 64
                 and type(record.get("site_id")) is int
                 and sites[0] == record["site_id"]
                 and type(target.get("ppu_alias")) is str
