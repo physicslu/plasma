@@ -36,6 +36,8 @@ def backend(tmp_path: Path, monkeypatch):
     (scripts / "plasma_cs_deploy_preflight.py").write_text("# stub fixture", encoding="utf-8")
     monkeypatch.setattr(adapter, "ROOT", tmp_path)
     monkeypatch.setattr(adapter, "BACKEND", file)
+    monkeypatch.setattr(adapter, "OWNER_ROOT", tmp_path)
+    monkeypatch.setattr(adapter, "OWNER_BACKEND", file)
     monkeypatch.setattr(adapter, "PREFLIGHT", scripts / "plasma_cs_deploy_preflight.py")
     monkeypatch.setattr(adapter.socket, "gethostname", lambda: "SWPC")
     monkeypatch.setattr(adapter.sys, "platform", "linux")
@@ -60,7 +62,7 @@ def test_read_only_verify_uses_pinned_owner_and_fixed_shell(backend) -> None:
         "/usr/bin/sudo", "-n", "-H", "-u", "gordon", "--", "/usr/bin/env",
         "XDG_RUNTIME_DIR=/run/user/1000",
         "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus",
-        "/usr/bin/bash", str(adapter.BACKEND), "verify",
+        "/usr/bin/bash", str(adapter.OWNER_BACKEND), "verify",
     ]
 
 
@@ -148,3 +150,35 @@ def test_maintenance_flag_rejected_for_readonly(backend) -> None:
     with pytest.raises(adapter.Blocked, match="FLAG_ONLY_ALLOWED"):
         adapter.run("verify", SHA, True)
     assert len(calls) == 2
+
+
+def test_deploy_owner_checkout_mismatch_blocks_before_execution(backend, monkeypatch) -> None:
+    _, calls = backend
+
+    def wrong_owner(cmd, **kwargs):
+        calls.append(list(cmd))
+        if "rev-parse" in cmd:
+            if cmd[0] == adapter.SUDO:
+                return SimpleNamespace(returncode=0, stdout="f" * 40 + "\\n")
+            return SimpleNamespace(returncode=0, stdout=SHA + "\\n")
+        return SimpleNamespace(returncode=0)
+    monkeypatch.setattr(adapter.subprocess, "run", wrong_owner)
+    with pytest.raises(adapter.Blocked, match="OWNER_CHECKOUT_SHA_MISMATCH"):
+        adapter.run("deploy", SHA, True)
+    assert all(call[-1] != "deploy" for call in calls)
+
+
+def test_deploy_owner_checkout_dirty_blocks_before_execution(backend, monkeypatch) -> None:
+    _, calls = backend
+
+    def dirty_owner(cmd, **kwargs):
+        calls.append(list(cmd))
+        if "rev-parse" in cmd:
+            return SimpleNamespace(returncode=0, stdout=SHA + "\\n")
+        if "diff" in cmd:
+            return SimpleNamespace(returncode=1 if cmd[0] == adapter.SUDO else 0)
+        return SimpleNamespace(returncode=0)
+    monkeypatch.setattr(adapter.subprocess, "run", dirty_owner)
+    with pytest.raises(adapter.Blocked, match="OWNER_CHECKOUT_DIRTY"):
+        adapter.run("deploy", SHA, True)
+    assert all(call[-1] != "deploy" for call in calls)
