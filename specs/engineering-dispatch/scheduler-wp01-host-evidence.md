@@ -146,3 +146,11 @@ ef4ad9f64947941af94fa0c38423c92c92adb11bb98fa2e198e5c2ba5b0fb4bd  software/pytho
 Model/request/token and subscription-allowance metrics are not available to
 this session; no usage or billing inference is made. Wrapper telemetry is a
 separate evidence source, not functional acceptance.
+
+## Post-publication independent check (2026-11-15)
+
+The trusted Path 3 Publisher **did complete** after the above author-time observation. GitHub Actions [run #43676267155](https://github.com/physicslu/plasma/actions/runs/43676267155), job #132697029714, concluded **success**. The trusted run log observed `PATH3_AUTHORIZED_PR_PUBLISHED` and a normal non-force push to the reviewed PR branch. The resulting tested-source publication commit is `bddf79bd05ae3674912aca71f358b0444561ba99` (5 files: two Manager modules, two tests, this evidence). The successful run proves execution/publication, not physical qualification.
+
+For that published commit, 13 GitHub Actions workflow runs initially returned `action_required`, and their jobs had not run. **This is a workflow-admission state, not a failed test result or a CI PASS.** The owner-linked GitHub commit that adds this post-publication evidence is intended to trigger a fresh eligible PR check; its exact resulting HEAD and actual completed outcomes must be checked separately. Do not infer acceptance from this note.
+
+Outstanding: GitHub-hosted exact-HEAD tests (including socket-dependent suites), independent concurrency/lock review, and contract PR #1439 merge dependency. Current source still supports only `repeat=1`; Manual Repeat/MES remain outside WP-01. HIL / deployment: NOT_RUN. Gate 2 remains NOT_GRANTED.
