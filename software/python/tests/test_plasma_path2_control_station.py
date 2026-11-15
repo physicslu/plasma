@@ -1,4 +1,4 @@
-"""Host-only safety tests; no SWPC Runner, user-systemd, PPU or DUT touched."""
+"""Path 2 fixed owner bridge negative tests (Host-only; zero SWPC mutation)."""
 from __future__ import annotations
 
 import importlib.util
@@ -11,216 +11,130 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 SOURCE = ROOT / "scripts/plasma_path2_control_station.py"
 spec = importlib.util.spec_from_file_location("plasma_path2_control_station", SOURCE)
-assert spec is not None and spec.loader is not None
+assert spec and spec.loader
 adapter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adapter)
 
-SHA = "a" * 40
+SOURCE_SHA = "a" * 40
 TARGET_SHA = "b" * 40
 
 
 @pytest.fixture()
-def backend(tmp_path: Path, monkeypatch):
-    scripts = tmp_path / "scripts"
-    scripts.mkdir()
-    file = scripts / "plasmactl-local-control-station"
-    file.write_text(
-        "run_deployment_preflight() {\n"
-        "  python scripts/plasma_cs_deploy_preflight.py\n"
-        "}\n"
-        "deploy_profile() {\n"
-        "  run_deployment_preflight\n"
-        "  prepare_release\n"
-        "  run_deployment_preflight\n"
-        "}\n"
-        "parse_options() { true; }\n",
-        encoding="utf-8",
-    )
-    (scripts / "plasma_cs_deploy_preflight.py").write_text("# stub fixture", encoding="utf-8")
+def runner(tmp_path, monkeypatch):
     monkeypatch.setattr(adapter, "ROOT", tmp_path)
-    monkeypatch.setattr(adapter, "BACKEND", file)
-    monkeypatch.setattr(adapter, "OWNER_ROOT", tmp_path)
-    monkeypatch.setattr(adapter, "OWNER_BACKEND", file)
-    monkeypatch.setattr(adapter, "PREFLIGHT", scripts / "plasma_cs_deploy_preflight.py")
     monkeypatch.setattr(adapter.socket, "gethostname", lambda: "SWPC")
     monkeypatch.setattr(adapter.sys, "platform", "linux")
     calls = []
 
-    def fake_run(cmd, **kwargs):
+    def fake(cmd, **kwargs):
         calls.append(list(cmd))
         if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=(TARGET_SHA if cmd[0] == adapter.SUDO else SHA) + "\n")
-        if "show" in cmd:
-            return SimpleNamespace(returncode=0, stdout=file.read_text(encoding="utf-8"))
-        return SimpleNamespace(returncode=0, stdout="")
+            return SimpleNamespace(returncode=0, stdout=SOURCE_SHA + "\n")
+        if "--porcelain=v1" in cmd:
+            return SimpleNamespace(returncode=0, stdout="")
+        return SimpleNamespace(returncode=0)
 
-    monkeypatch.setattr(adapter.subprocess, "run", fake_run)
-    return file, calls
+    monkeypatch.setattr(adapter.subprocess, "run", fake)
+    return calls
 
 
-def test_read_only_verify_uses_pinned_owner_and_fixed_shell(backend) -> None:
-    _, calls = backend
-    assert adapter.run("verify", SHA) == 0
-    assert len(calls) == 3
-    final = calls[-1]
-    assert final == [
-        "/usr/bin/sudo", "-n", "-H", "-u", "gordon", "--", "/usr/bin/env",
-        "XDG_RUNTIME_DIR=/run/user/1000",
-        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus",
-        "/usr/bin/bash", str(adapter.OWNER_BACKEND), "verify",
+@pytest.mark.parametrize("operation", ["status", "verify"])
+def test_only_exact_fixed_owner_bridge_used(operation, runner):
+    assert adapter.run(operation, SOURCE_SHA) == 0
+    assert len(runner) == 3
+    assert runner[-1] == [
+        "/usr/bin/sudo", "-n", "-H", "-u", "gordon", "--",
+        "/usr/local/libexec/plasma/plasma-control-station-owner-bridge",
+        operation,
     ]
 
 
-def test_status_is_read_only_and_not_a_deploy(backend) -> None:
-    _, calls = backend
-    assert adapter.run("status", SHA) == 0
-    assert calls[-1][-1] == "status"
+@pytest.mark.parametrize("operation", [
+    "deploy", "shell", "install", "rollback", "git", "sudo"
+])
+def test_arbitrary_or_deploy_command_cannot_invoke_bridge(operation, runner):
+    with pytest.raises(adapter.Blocked):
+        adapter.run(operation, SOURCE_SHA, TARGET_SHA, True)
+    assert all(adapter.BRIDGE not in c for c in runner)
 
 
-def test_deploy_requires_explicit_maintenance_and_two_preflight_checkpoints(backend) -> None:
-    backend_file, calls = backend
-    with pytest.raises(adapter.Blocked, match="MAINTENANCE_EXCLUSIVITY"):
-        adapter.run("deploy", SHA)
-    assert len(calls) == 2  # git source checks, never sudo
-    assert adapter.run("deploy", SHA, True, target_sha=TARGET_SHA) == 0
-    assert calls[-1][-1] == "deploy"
-    backend_file.write_text("deploy_profile() {\n  prepare_release\n}\n")
-    with pytest.raises(adapter.Blocked, match="PREFLIGHT"):
-        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
+def test_deploy_without_owner_intent_still_refused(runner):
+    with pytest.raises(adapter.Blocked, match="DEPLOY_BRIDGE_NOT_QUALIFIED"):
+        adapter.run("deploy", SOURCE_SHA)
+    assert len(runner) == 2
+    assert all(adapter.BRIDGE not in c for c in runner)
 
 
-def test_wrong_source_and_hostname_fail_before_sudo(backend, monkeypatch) -> None:
-    _, calls = backend
-    with pytest.raises(adapter.Blocked, match="SOURCE_SHA_INVALID"):
-        adapter.run("verify", "not-a-sha")
-    assert not calls
-    with pytest.raises(adapter.Blocked, match="SOURCE_SHA_MISMATCH"):
-        adapter.run("verify", "b" * 40)
-    assert len(calls) == 1
-    monkeypatch.setattr(adapter.socket, "gethostname", lambda: "other")
+@pytest.mark.parametrize("operation", ["status", "verify"])
+def test_deploy_only_args_rejected_on_readonly(operation, runner):
+    with pytest.raises(adapter.Blocked, match="DEPLOY_ONLY_ARGUMENT"):
+        adapter.run(operation, SOURCE_SHA, target_sha=TARGET_SHA)
+    with pytest.raises(adapter.Blocked, match="DEPLOY_ONLY_ARGUMENT"):
+        adapter.run(operation, SOURCE_SHA, owner_maintenance_confirmed=True)
+    assert all(adapter.BRIDGE not in c for c in runner)
+
+
+def test_reject_invalid_source_sha_before_any_io(runner):
+    with pytest.raises(adapter.Blocked, match="ADAPTER_SOURCE_SHA_INVALID"):
+        adapter.run("status", "not-a-SHA")
+    assert runner == []
+
+
+def test_reject_forged_source_sha_and_wrong_host(runner, monkeypatch):
+    with pytest.raises(adapter.Blocked, match="ADAPTER_SOURCE_SHA_MISMATCH"):
+        adapter.run("verify", "f" * 40)
+    assert len(runner) == 2
+    monkeypatch.setattr(adapter.socket, "gethostname", lambda: "unknown-host")
     with pytest.raises(adapter.Blocked, match="SWPC_LINUX_REQUIRED"):
-        adapter.run("verify", SHA)
+        adapter.run("verify", SOURCE_SHA)
 
 
-def test_dirty_source_and_sudo_failure_never_retry(backend, monkeypatch) -> None:
-    _, calls = backend
-
-    def dirty(cmd, **kwargs):
+def test_reject_dirty_untracked_candidate_source(runner, monkeypatch):
+    def fake(cmd, **kwargs):
+        runner.append(list(cmd))
         if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=SHA)
-        return SimpleNamespace(returncode=1)
-    monkeypatch.setattr(adapter.subprocess, "run", dirty)
-    with pytest.raises(adapter.Blocked, match="SOURCE_DIRTY"):
-        adapter.run("verify", SHA)
+            return SimpleNamespace(returncode=0, stdout=SOURCE_SHA + "\n")
+        return SimpleNamespace(returncode=0, stdout="?? injected.py\n")
+    monkeypatch.setattr(adapter.subprocess, "run", fake)
+    with pytest.raises(adapter.Blocked, match="ADAPTER_WORKTREE_DIRTY"):
+        adapter.run("status", SOURCE_SHA)
+    assert all(adapter.BRIDGE not in c for c in runner)
 
-    def failed(cmd, **kwargs):
-        calls.append(cmd)
+
+@pytest.mark.parametrize("code,reason", [
+    (77, "PERMISSION_DENIED"),
+    (2, "FAILED_2"),
+])
+def test_bridge_failure_never_retries(code, reason, runner, monkeypatch):
+    def fake(cmd, **kwargs):
+        runner.append(list(cmd))
         if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=SHA)
-        if "diff" in cmd:
-            return SimpleNamespace(returncode=0)
-        return SimpleNamespace(returncode=1)
-    monkeypatch.setattr(adapter.subprocess, "run", failed)
-    with pytest.raises(adapter.Blocked, match="NO_RETRY"):
-        adapter.run("verify", SHA)
-    assert sum(x[-1] == "verify" for x in calls) == 1
+            return SimpleNamespace(returncode=0, stdout=SOURCE_SHA + "\n")
+        if "--porcelain=v1" in cmd:
+            return SimpleNamespace(returncode=0, stdout="")
+        return SimpleNamespace(returncode=code)
+    monkeypatch.setattr(adapter.subprocess, "run", fake)
+    with pytest.raises(adapter.Blocked, match=reason):
+        adapter.run("status", SOURCE_SHA)
+    assert sum(adapter.BRIDGE in c for c in runner) == 1
 
 
-def test_deploy_timeout_is_outcome_unknown_not_auto_retried(backend, monkeypatch) -> None:
-    _, calls = backend
-
-    def fake_run(cmd, **kwargs):
-        calls.append(cmd)
+def test_unknown_bridge_timeout_is_nonretry(runner, monkeypatch):
+    def fake(cmd, **kwargs):
+        runner.append(list(cmd))
         if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=(TARGET_SHA if cmd[0] == adapter.SUDO else SHA))
-        if "diff" in cmd or "cat-file" in cmd:
-            return SimpleNamespace(returncode=0)
-        if "show" in cmd:
-            return SimpleNamespace(returncode=0, stdout=adapter.BACKEND.read_text(encoding="utf-8"))
+            return SimpleNamespace(returncode=0, stdout=SOURCE_SHA + "\n")
+        if "--porcelain=v1" in cmd:
+            return SimpleNamespace(returncode=0, stdout="")
         raise adapter.subprocess.TimeoutExpired(cmd, kwargs["timeout"])
-
-    monkeypatch.setattr(adapter.subprocess, "run", fake_run)
-    with pytest.raises(adapter.Blocked, match="TIMED_OUT_OUTCOME_UNKNOWN"):
-        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
-    assert sum(x[-1] == "deploy" for x in calls) == 1
-
-
-def test_arbitrary_operations_cannot_run(backend) -> None:
-    _, calls = backend
-    with pytest.raises(adapter.Blocked, match="OPERATION_DENIED"):
-        adapter.run("shell", SHA)
-    assert len(calls) == 2
+    monkeypatch.setattr(adapter.subprocess, "run", fake)
+    with pytest.raises(adapter.Blocked, match="BRIDGE_UNAVAILABLE"):
+        adapter.run("verify", SOURCE_SHA)
+    assert sum(adapter.BRIDGE in c for c in runner) == 1
 
 
-def test_maintenance_flag_rejected_for_readonly(backend) -> None:
-    _, calls = backend
-    with pytest.raises(adapter.Blocked, match="DEPLOY_ONLY_FLAGS"):
-        adapter.run("verify", SHA, True)
-    assert len(calls) == 2
-
-
-def test_deploy_owner_checkout_mismatch_blocks_before_execution(backend, monkeypatch) -> None:
-    _, calls = backend
-
-    def wrong_owner(cmd, **kwargs):
-        calls.append(list(cmd))
-        if "rev-parse" in cmd:
-            if cmd[0] == adapter.SUDO:
-                return SimpleNamespace(returncode=0, stdout="f" * 40 + "\n")
-            return SimpleNamespace(returncode=0, stdout=SHA + "\n")
-        return SimpleNamespace(returncode=0)
-    monkeypatch.setattr(adapter.subprocess, "run", wrong_owner)
-    with pytest.raises(adapter.Blocked, match="OWNER_CHECKOUT_SHA_MISMATCH"):
-        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
-    assert all(call[-1] != "deploy" for call in calls)
-
-
-def test_deploy_owner_checkout_dirty_blocks_before_execution(backend, monkeypatch) -> None:
-    _, calls = backend
-
-    def dirty_owner(cmd, **kwargs):
-        calls.append(list(cmd))
-        if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=(TARGET_SHA if cmd[0] == adapter.SUDO else SHA) + "\n")
-        if "diff" in cmd:
-            return SimpleNamespace(returncode=1 if cmd[0] == adapter.SUDO else 0)
-        return SimpleNamespace(returncode=0)
-    monkeypatch.setattr(adapter.subprocess, "run", dirty_owner)
-    with pytest.raises(adapter.Blocked, match="OWNER_CHECKOUT_DIRTY"):
-        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
-    assert all(call[-1] != "deploy" for call in calls)
-
-
-def test_target_sha_is_distinct_and_mandatory_for_deploy(backend) -> None:
-    _, calls = backend
-    with pytest.raises(adapter.Blocked, match="DEPLOY_TARGET_SHA_REQUIRED"):
-        adapter.run("deploy", SHA, True)
-    assert len(calls) == 2
-    with pytest.raises(adapter.Blocked, match="DEPLOY_TARGET_SHA_REQUIRED"):
-        adapter.run("deploy", SHA, True, target_sha="untrusted")
-    assert len(calls) == 4
-    assert adapter.run("deploy", SHA, True, target_sha=TARGET_SHA) == 0
-    assert calls[-1][-1] == "deploy"
-
-
-def test_target_sha_cannot_be_given_to_readonly_command(backend) -> None:
-    _, calls = backend
-    with pytest.raises(adapter.Blocked, match="DEPLOY_ONLY_FLAGS"):
-        adapter.run("verify", SHA, target_sha=TARGET_SHA)
-    assert len(calls) == 2
-
-
-def test_target_preflight_git_object_missing_fails_closed(backend, monkeypatch) -> None:
-    _, calls = backend
-
-    def missing_preflight(cmd, **kwargs):
-        calls.append(list(cmd))
-        if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=(TARGET_SHA if cmd[0] == adapter.SUDO else SHA))
-        if "cat-file" in cmd:
-            return SimpleNamespace(returncode=1)
-        return SimpleNamespace(returncode=0, stdout=adapter.BACKEND.read_text(encoding="utf-8"))
-    monkeypatch.setattr(adapter.subprocess, "run", missing_preflight)
-    with pytest.raises(adapter.Blocked, match="OWNER_DEPLOY_PREFLIGHT_UNAVAILABLE"):
-        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
-    assert all(call[-1] != "deploy" for call in calls)
+def test_cli_reports_bridge_permission_denied_as_77(runner, monkeypatch):
+    monkeypatch.setattr(adapter, "run",
+                        lambda *args: (_ for _ in ()).throw(
+                            adapter.Blocked("FIXED_OWNER_BRIDGE_PERMISSION_DENIED")))
+    assert adapter.main(["status", "--source-sha", SOURCE_SHA]) == 77
