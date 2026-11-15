@@ -14,11 +14,19 @@ The Dispatcher accepts a repository-relative Python script as its fixed
 entrypoint. `scripts/plasma_path2_control_station.py` is that bounded adapter.
 It accepts only `status`, `verify`, `deploy`, and a 40-hex exact Git SHA;
 it checks Linux host `swpc`, clean pinned checkout, and the single canonical
-Bash backend. It invokes that backend once, without `shell=True` or retry,
-under the existing operator `gordon` user through `sudo -n -H -u gordon`.
-It supplies the existing UID 1000 user-systemd runtime environment. If
-delegation, file access or Node/Python dependencies are unavailable, record
-BLOCKED/NOT_RUN, never call it a successful deploy.
+Bash backend. It invokes only the fixed operator-owned backend
+`/storage/projects/plasma/scripts/plasmactl-local-control-station` once,
+without `shell=True` or retry, under existing `gordon` ownership using
+`sudo -n -H -u gordon`. It never asks UID 1000 to execute a Bash script
+from UID 998's private Runner candidate checkout. It supplies UID 1000's
+user-systemd runtime environment. `deploy` additionally checks the
+operator checkout's clean HEAD exactly matches the authorized Path 2 PR
+source SHA; if the required combined PR #1435 + #1443 source has not been
+safely staged for `gordon`, deployment is BLOCKED, not silently performed
+from a different release. Read-only `status` and `verify` use the existing
+operator checkout and must report its observed source separately from the
+adapter PR source. If delegation or fixed owner checkout is unavailable,
+record BLOCKED/NOT_RUN, never call it a successful deploy.
 
 A Path 2 Runner is UID 998 and is **not** implicitly the user-systemd owner.
 The existing developer sudo delegation, if present, remains operator-managed
@@ -89,7 +97,8 @@ authorized by this adapter. #1436 HIL remains a separate work order.
 ## Qualification
 
 Host-only unit tests check the bounded operation, exact SHA, wrong host,
-dirty source, fixed owner command, required dual preflight hooks,
+dirty source, operator-checkout SHA / dirty-source rejection, fixed owner command,
+required dual preflight hooks,
 maintenance intent guard, nonzero command result and timeout with no retry.
 
 A green hosted Python CI proves only the adapter's host-only contract.
