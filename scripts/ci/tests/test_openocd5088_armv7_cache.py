@@ -132,22 +132,34 @@ class WorkflowContractTests(unittest.TestCase):
     def test_required_job_fresh_receipt_and_identical_artifact(self):
         wf = (REPO / ".github/workflows/swd-openocd5088-armv7-candidate.yml").read_text()
         self.assertIn("  armv7-source-locked-candidate:", wf)
-        # OpenOCD binary cache is independent, but every Root/Admission
-        # interface change must repackage a fresh candidate with its exact
-        # current Site Admission source and checksum.
+        # This expensive candidate is for binary/toolchain changes only.
+        # Python Admission and Root changes must run PS source tests instead;
+        # an ARMv7 cache miss must not rebuild OpenOCD for those changes.
         triggers = wf.split("\npermissions:", 1)[0]
+        paths = {
+            line.strip().removeprefix('- "').removesuffix('"')
+            for line in triggers.splitlines()
+            if line.strip().startswith('- "')
+        }
+        self.assertEqual(paths, {
+            ".github/workflows/swd-openocd5088-armv7-candidate.yml",
+            "scripts/ci/inject-plasma-openocd5088-native.py",
+            "scripts/ci/build-openocd5088-armv7.sh",
+            "scripts/ci/verify-openocd5088-armv7.sh",
+            "scripts/ci/openocd5088-armv7-cache.py",
+            "software/native/swd/**",
+        })
+        python_wf = (REPO / ".github/workflows/python-tests.yml").read_text()
+        python_triggers = python_wf.split("\nconcurrency:", 1)[0]
         for path in (
             "scripts/z2/plasma_swd_site_admission.py",
             "pl/hil/fpga_image_root.py",
             "pl/hil/fpga_image_admission.py",
-            "scripts/ppu_site_engine.py",
+            "scripts/ci/tests/test_openocd5088_armv7_cache.py",
         ):
-            self.assertIn(f'"{path}"', triggers)
-        python_wf = (REPO / ".github/workflows/python-tests.yml").read_text()
-        self.assertIn(
-            'scripts/z2/plasma_swd_site_admission.py',
-            python_wf.split("\nconcurrency:", 1)[0],
-        )
+            self.assertEqual(python_triggers.count(f'"{path}"'), 2, path)
+        self.assertIn("Enforce ARMv7 binary build trigger isolation (host-only)", python_wf)
+        self.assertIn("python3 -m unittest discover -s scripts/ci/tests -p test_openocd5088_armv7_cache.py -v", python_wf)
         self.assertIn(
             "Deny Site admission and revocation without Root ownership", python_wf
         )
