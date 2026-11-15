@@ -23,6 +23,10 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "scripts/plasmactl-local-control-station"
 PREFLIGHT = ROOT / "scripts/plasma_cs_deploy_preflight.py"
+# Owner-managed, known Control Station checkout. Never execute a candidate
+# Bash script from the UID 998 Runner workspace as UID 1000.
+OWNER_ROOT = Path("/storage/projects/plasma")
+OWNER_BACKEND = OWNER_ROOT / "scripts/plasmactl-local-control-station"
 GIT = "/usr/bin/git"
 SUDO = "/usr/bin/sudo"
 BASH = "/usr/bin/bash"
@@ -80,6 +84,31 @@ def guard_deploy_backend() -> None:
         raise Blocked("DEPLOY_PREFLIGHT_CHECKPOINTS_MISSING")
 
 
+def check_owner_deploy_source(expected_sha: str) -> None:
+    """Deploy only if the operator's checkout is exactly the approved source.
+
+    The Path 2 PR checkout may be hidden under UID 998's private runner home.
+    The operator-owned checkout is a separate trust boundary; it must not be
+    assumed to be identical just because the runner candidate is clean.
+    """
+    fixed = [SUDO, "-n", "-H", "-u", OWNER, "--", GIT, "-C", str(OWNER_ROOT)]
+    try:
+        observed = subprocess.run(
+            [*fixed, "rev-parse", "--verify", "HEAD"],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+        if observed.returncode or observed.stdout.strip() != expected_sha:
+            raise Blocked("OWNER_CHECKOUT_SHA_MISMATCH")
+        clean = subprocess.run(
+            [*fixed, "diff", "--quiet", "HEAD", "--"],
+            capture_output=True, timeout=15, check=False,
+        )
+        if clean.returncode:
+            raise Blocked("OWNER_CHECKOUT_DIRTY_OR_UNVERIFIED")
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise Blocked("OWNER_CHECKOUT_UNAVAILABLE") from exc
+
+
 def exact_owner_command(operation: str) -> list[str]:
     if operation not in COMMANDS:
         raise Blocked("OPERATION_DENIED")
@@ -89,7 +118,7 @@ def exact_owner_command(operation: str) -> list[str]:
         SUDO, "-n", "-H", "-u", OWNER, "--", ENV,
         f"XDG_RUNTIME_DIR=/run/user/{OWNER_UID}",
         f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{OWNER_UID}/bus",
-        BASH, str(BACKEND), operation,
+        BASH, str(OWNER_BACKEND), operation,
     ]
 
 
@@ -101,6 +130,7 @@ def run(operation: str, expected_sha: str, owner_maintenance_confirmed: bool = F
         guard_deploy_backend()
         if not owner_maintenance_confirmed:
             raise Blocked("OWNER_MAINTENANCE_EXCLUSIVITY_NOT_CONFIRMED")
+        check_owner_deploy_source(expected_sha)
         # The boolean above records an Owner decision, not a lock. The
         # canonical CLI must independently pass both live preflight snapshots.
     elif owner_maintenance_confirmed:
