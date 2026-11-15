@@ -1,0 +1,13 @@
+## step5b-concurrent-epv outcome PASS batch 025ccf49d73ea76d094edfa5e63ce511
+ Z2 job window 12.613 s; resources over job window:
+  {"samples": 23, "cpu_avg_pct": 77.6, "cpu_peak_pct": 100.0, "mem_total_kb": 503464, "mem_avail_min_kb": 367364, "mem_avail_avg_kb": 382048, "mem_used_peak_kb": 136100, "openocd": {"1": {"pids": ["18796", "18855"], "samples": 10, "cpu_avg_pct": 72.3, "cpu_peak_pct": 97.0, "rss_peak_kb": 16620, "pss_peak_kb": 10480}, "2": {"pids": ["18784", "18840"], "samples": 10, "cpu_avg_pct": 74.0, "cpu_peak_pct": 99.8, "rss_peak_kb": 15808, "pss_peak_kb": 9402}}}
+ whole capture: {"1": {"pids": ["18796", "18855"], "samples": 10, "cpu_avg_pct": 72.3, "cpu_peak_pct": 97.0, "rss_peak_kb": 16620, "pss_peak_kb": 10480}, "2": {"pids": ["18784", "18840"], "samples": 10, "cpu_avg_pct": 74.0, "cpu_peak_pct": 99.8, "rss_peak_kb": 15808, "pss_peak_kb": 9402}}
+## step6b-verify-only-sitefail outcome FAIL batch 332df1a4a0faaa643a937da7d0b3b735
+ Z2 job window 8.811 s; resources over job window:
+  {"samples": 16, "cpu_avg_pct": 77.2, "cpu_peak_pct": 100.0, "mem_total_kb": 503464, "mem_avail_min_kb": 369080, "mem_avail_avg_kb": 381978, "mem_used_peak_kb": 134384, "openocd": {"1": {"pids": ["18278", "18319"], "samples": 3, "cpu_avg_pct": 94.0, "cpu_peak_pct": 94.0, "rss_peak_kb": 16628, "pss_peak_kb": 10282}, "2": {"pids": ["18291", "18337"], "samples": 3, "cpu_avg_pct": 80.7, "cpu_peak_pct": 80.7, "rss_peak_kb": 16940, "pss_peak_kb": 10537}}}
+ whole capture: {"1": {"pids": ["18278", "18319"], "samples": 3, "cpu_avg_pct": 94.0, "cpu_peak_pct": 94.0, "rss_peak_kb": 16628, "pss_peak_kb": 10282}, "2": {"pids": ["18291", "18337"], "samples": 3, "cpu_avg_pct": 80.7, "cpu_peak_pct": 80.7, "rss_peak_kb": 16940, "pss_peak_kb": 10537}}
+## throughput (2 x 62,800 B E/P/V)
+ single-Site PPU job durations (2a,2b): [10.47, 9.488] serial sum 19.958 s
+ concurrent PPU job durations: {'1': 11.02, '2': 11.654} combined window 12.613 s
+ speedup 1.58 x; per-Site slowdown [1.053, 1.228]
+ programmed bytes/s: serial 6293 concurrent 9958
