@@ -21,6 +21,7 @@
 - **Current** — [Shared Development Contract — shared clauses, execution zones, domain routing](development/plasma-development-common.md)
 - **Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli, CPU-only and Vivado host build](development/plasma-path2-cli.md)
 - **Current** — [Path 3 SWPC Codex Contract](development/plasma-path3-codex.md)
+- **Plan** · `Gate 1 Draft` · `Host-only` — [SWPC Engineering Manager Batch → Blue Pill CDC HIL](development/swpc-engineering-hil-e2e.md)：Path 2／3 共用工程 CLI；v0.1/v0.2 Readback + Firmware ID/Heartbeat 驗收，實機 HIL 尚未執行，並行與 UI E2E 不在本 PR。
 - **Current** — [FPGA / PL domain contract](development/plasma-fpga.md)
 - **Current** — [Embedded / Z2 PS domain contract](development/plasma-embedded.md)
 - **Current** — [Manager / Gateway / backend domain contract](development/plasma-manager.md)

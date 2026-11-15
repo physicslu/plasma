@@ -118,6 +118,8 @@ Profile-aware commands:
   plasmactl verify z2-ps             Real Z2 ARMv7 PS runtime + local PS diagnostic loopback only
   plasmactl status z2-ps             Installed release, Plasma Python and system-service state
 
+  hil programming --profile bluepill-ab ...  SWPC engineering-only Manager Batch + USB CDC E2E
+
 Integration-only commands retained unchanged:
   update | test | restart | web-restart | start | stop | ports | logs [TARGET]
   update-and-restart                  Alias of `deploy integration`
@@ -174,6 +176,12 @@ case "$command" in
         deploy
         ;;
     esac
+    ;;
+  hil)
+    [[ "${1:-}" == "programming" ]] || wrapper_die "hil supports programming only"
+    shift
+    # SWPC engineering CLI only; the Python runner requires --execute for HIL writes.
+    exec python3 "$repo_root/scripts/plasma_engineering_hil.py" "$@"
     ;;
   bootstrap-sites)
     [[ "${1:-}" == "swpc-z2like" ]] || wrapper_die "bootstrap-sites currently supports swpc-z2like only"
