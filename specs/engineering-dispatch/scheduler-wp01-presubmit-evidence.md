@@ -192,3 +192,11 @@ f0db37747c9bf2631eeda0f0b88ca007c419d57a08ad0187fd8f8a1197978a34  software/pytho
 Model/request/token billing metrics are unavailable in this engineering
 session; no subscription allowance inference is made. Wrapper telemetry is a
 separate source, not functional acceptance.
+
+## Independent post-publication reconciliation (2026-11-15)
+
+The trusted Path 3 follow-up [run #43678691721](https://github.com/physicslu/plasma/actions/runs/43678691721) **completed SUCCESS**: owner authorizer job `132705353285` SUCCESS and `development-codex` job `132705390522` SUCCESS. The job log shows `PATH3_AUTHORIZED_PR_PUBLISHED` and a normal non-force push. The source-and-test publication commit is **`6112bad3660c41002c0e2ddcc2ea015892074d89`**, 7 changed files. The original `PENDING` note above is the worker's earlier observation, not the final result. The publisher artifact `plasma-development-codex-43678691721` ID `14148445330` was uploaded.
+
+**Hosted CI admission:** GitHub created 13 PR workflows for the bot-published commit but returned `action_required`, with no test jobs executed. A subsequent owner-linked commit appending this reconciliation aims to trigger eligible Hosted CI; the exact resulting HEAD and completed CI must be checked separately before Gate 2. The worker's **307-pass** selected Host-only regression and **29-pass × 5** focused runs remain valid only for the tested source hashes recorded above.
+
+**Independent contract-review concern:** `docs/architecture/unified-programming-architecture-v1.md` §5.3 distinguishes invalid/unauthorized admission refusal from target readiness and preserves Start reconciliation. The initial `programming_batch.py::_start` previously read Platform admission before consuming the Start. In the new pre-submit isolation design, some Platform shared-control failures are detected **after** the Batch has been journalled and `start_id` consumed, changing the observed HTTP/refusal/reconciliation behavior tested in `test_programming_batch_targets.py`. Although all new paths fail closed for submission, the external contract compatibility has **not** been independently approved. Require a narrowly scoped compatible correction or an explicit source-backed architecture decision before Gate 2; do not silently relax the previous semantics. No production equipment operations or merge are authorized.
