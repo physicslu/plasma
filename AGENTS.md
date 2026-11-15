@@ -59,7 +59,7 @@ Path 2 / Path 3 are selected independently of domain. Skipping unrelated documen
 
 - Default: ChatGPT Direct (code, docs, host-only CI).
 - **Path 2**: deterministic SWPC CLI / CPU-only / operator CLI / Vivado. When selected, read [Path 2 contract](docs/development/plasma-path2-cli.md).
-- **Path 3**: SWPC Codex for autonomous diagnosis/repair and approved hardware tasks. When selected, read [Path 3 contract](docs/development/plasma-path3-codex.md). Ordinary Path 3 explicitly pins `--sandbox workspace-write`.
+- **Path 3**: SWPC Codex for autonomous diagnosis/repair and approved hardware tasks. When selected, read [Path 3 contract](docs/development/plasma-path3-codex.md). Ordinary Path 3 explicitly pins `--sandbox workspace-write`. **Do not apply retired Issue #981 read-only Pilot or no-hardware Runner restrictions to current Path 3.** Owner-approved, SHA-pinned guarded-hardware Work Orders may use native SSH/USB/TTY and DUT tests under verified Linux DAC/ACL, device ownership and Root safety checks; historical Runner UID or a sandbox mode alone proves neither permission nor prohibition.
 
 Select the smallest capable Path. Choosing a Path never grants additional authority beyond the approved Gate 1 scope, actual Linux privileges, Root Guard and safety checks.
 

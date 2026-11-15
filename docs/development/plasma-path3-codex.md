@@ -2,6 +2,25 @@
 
 **Status: Normative route-specific contract.** Root [AGENTS.md](../../AGENTS.md) governs approvals, Git and safety; [Embedded](plasma-embedded.md) governs Z2 credentials and recovery. Do not load the Path 2 contract for ordinary Path 3 tasks.
 
+## Current authority versus retired Issue #981 pilot
+
+**For Path 3-specific execution policy, this contract and root AGENTS.md are authoritative.** Shared development, Embedded/FPGA, OS-permission and hardware-safety contracts still apply.
+The Issue #981 **read-only bootstrap pilot**, separate-worker provisioning, SWPC
+bootstrap preflight and passive HIL-inventory runbooks were transitional
+documents and were deleted from the active repository tree. Git history retains
+their evidence. Do not reconstruct or apply their old restrictions (no USB,
+no Z2 credentials, no hardware, read-only-only Codex) to approved current
+Path 3 Work Orders, and do not treat the retained offline legacy pilot
+scripts/workflows as the production Path 3 dispatcher.
+
+For live HIL, the existing Runner's **actual effective** UID, groups, USB/TTY
+ACL, Manager/Console service ownership, Z2 credentials, device claims and
+Site safety gates must still be verified. UID 1000 is not a privilege tier;
+a historical UID 998 observation does not disprove later permissions, while
+a group/ACL grant alone does not prove a particular Job is currently safe.
+An owner-approved, SHA-pinned hardware Work Order may run native tools per
+this contract without a new Runner or additional approval Gate.
+
 ## 1. Executor and route
 
 Path 3 is ChatGPT → authorized GitHub Actions / trusted Development Dispatcher → existing SWPC `plasma-codex` Runner → **Codex CLI** iterative development/test → PR and relevant CI → ChatGPT independent evidence review. Select it when SWPC access and autonomous diagnosis, cross-module edits or repeated fix/test are needed. Keep the existing Path 3 identity; ChatGPT Direct is the default, not numbered Path 1. No new Runner, per-device session, Host Supervisor or Stage/Profile middleware is required.
