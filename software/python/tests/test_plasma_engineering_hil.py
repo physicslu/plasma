@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -201,3 +203,75 @@ def test_hil_rejects_nonfinite_timeout_or_tolerance(flag: str, bad: str) -> None
                   "--image-v02", "/missing/v02.bin",
                   "--port", "/dev/ttyACM0", flag, bad])
     assert exc.value.code == 2
+
+
+def _runner_args(tmp_path: Path) -> argparse.Namespace:
+    return argparse.Namespace(
+        profile="bluepill-ab", mode="smoke", cycles=1,
+        manager_url="http://127.0.0.1:18280", ppu_alias="z2", site=2,
+        port="/dev/ttyACM0", image_v01=Path("/unused/v01.bin"),
+        image_v02=Path("/unused/v02.bin"), batch_timeout=30.0,
+        poll_interval=1.0, cdc_duration=30.0, cdc_tolerance=0.2,
+        output=tmp_path, execute=True,
+    )
+
+
+def test_preview_void_uncertain_preserves_start_identity_in_evidence(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    class UncertainVoidManager(StubManager):
+        def __init__(self, url: str):
+            super().__init__()
+            self.last_start_id = None
+            self.last_batch_id = None
+            self.last_preview_plan_id = None
+
+        def call(self, method: str, route: str, body=None):
+            if route.endswith("/void"):
+                self.calls.append((method, route, body))
+                raise hil.HILFailure("VOID outcome unobservable; do not resubmit")
+            return super().call(method, route, body)
+
+    monkeypatch.setattr(hil, "Manager", UncertainVoidManager)
+    monkeypatch.setattr(hil, "image_spec", lambda path, version: IMAGE)
+    monkeypatch.setattr(hil, "require_swpc_hostname", lambda hostname: None)
+    prior_umask = hil.os.umask(0o077)
+    try:
+        assert hil.run(_runner_args(tmp_path)) == 2
+    finally:
+        hil.os.umask(prior_umask)
+    summary = json.loads(next(tmp_path.glob("*/summary.json")).read_text())
+    assert summary["result"] == "BLOCKED"
+    assert summary["last_preview_plan_id"] == PLAN_ID
+    assert summary["last_start_id"] is None
+    assert summary["last_batch_id"] is None
+
+
+def test_cdc_decode_error_writes_terminal_evidence(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    class SuccessfulBatchManager(StubManager):
+        def __init__(self, url: str):
+            super().__init__()
+            self.last_start_id = None
+            self.last_batch_id = None
+            self.last_preview_plan_id = None
+
+    def malformed_cdc(*args, **kwargs):
+        raise UnicodeDecodeError("ascii", b"\\xff", 0, 1, "invalid ASCII")
+
+    monkeypatch.setattr(hil, "Manager", SuccessfulBatchManager)
+    monkeypatch.setattr(hil, "image_spec", lambda path, version: IMAGE)
+    monkeypatch.setattr(hil, "require_swpc_hostname", lambda hostname: None)
+    monkeypatch.setattr(hil, "run_live", malformed_cdc)
+    prior_umask = hil.os.umask(0o077)
+    try:
+        assert hil.run(_runner_args(tmp_path)) == 2
+    finally:
+        hil.os.umask(prior_umask)
+    summary = json.loads(next(tmp_path.glob("*/summary.json")).read_text())
+    assert summary["result"] == "BLOCKED"
+    assert summary["last_preview_plan_id"] == PLAN_ID
+    assert summary["last_start_id"] == START_ID
+    assert summary["last_batch_id"] == BATCH_ID
+    assert "UnicodeDecodeError" in summary["reason"]
