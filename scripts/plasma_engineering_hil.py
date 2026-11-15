@@ -69,6 +69,8 @@ def require_loopback(url: str) -> str:
 class Manager:
     def __init__(self, url: str):
         self.url = require_loopback(url)
+        self.last_start_id: str | None = None
+        self.last_batch_id: str | None = None
 
     def call(self, method: str, route: str, body: dict | None = None) -> dict:
         data = None if body is None else json.dumps(body).encode("utf-8")
@@ -162,8 +164,10 @@ def validate_receipt(batch: dict, alias: str, site: int, image: dict,
     for field, expected in required.items():
         if receipt.get(field) != expected:
             raise HILFailure(f"Receipt {field}: mismatch")
-    if (receipt.get("expected_job_binding_sha256")
-            != receipt.get("observed_job_binding_sha256")
+    binding = receipt.get("expected_job_binding_sha256")
+    if (not isinstance(binding, str) or not re.fullmatch(r"[0-9a-f]{64}", binding)
+            or binding != receipt.get("observed_job_binding_sha256")
+            or not isinstance(receipt.get("expected_steps"), dict)
             or receipt.get("expected_steps") != receipt.get("observed_steps")):
         raise HILFailure("Job Binding or operation evidence mismatch")
     if run.get("job_submission_count") != 1:
@@ -176,11 +180,14 @@ def validate_receipt(batch: dict, alias: str, site: int, image: dict,
 
 def one_attempt(client: Manager, alias: str, site: int, image: dict,
                 timeout_s: float, poll_s: float) -> tuple[dict, dict]:
+    client.last_start_id = None
+    client.last_batch_id = None
     resource = issue_and_check_reuse(client, alias, site, image)
     start = client.call("POST", "/api/programming/starts", {"kind": "batch"})
     token = (start.get("start") or {}).get("start_id")
     if not isinstance(token, str) or not HEX32.fullmatch(token):
         raise HILFailure("start_id unavailable; do not submit")
+    client.last_start_id = token
     body = {"start_id": token, "icpn": ICPN, "targets": [
         {"ppu_alias": alias, "site_ids": [site]}],
         "operations": OPERATIONS, "image_base64": image["image_base64"],
@@ -196,6 +203,7 @@ def one_attempt(client: Manager, alias: str, site: int, image: dict,
     batch_id = batch.get("batch_id") if isinstance(batch, dict) else None
     if not isinstance(batch_id, str) or not HEX32.fullmatch(batch_id):
         raise HILFailure(f"start_id={token}: batch identity missing; do not resubmit")
+    client.last_batch_id = batch_id
     deadline = time.monotonic() + timeout_s
     while batch.get("outcome") is None:
         if time.monotonic() >= deadline:
@@ -257,8 +265,18 @@ def run(args: argparse.Namespace) -> int:
     except (HILFailure, AssertionError, OSError, ImportError, RuntimeError) as exc:
         report["result"] = "BLOCKED"
         report["reason"] = f"{type(exc).__name__}: {str(exc)[:500]}"
+        report["last_start_id"] = client.last_start_id
+        report["last_batch_id"] = client.last_batch_id
         print(f"HIL BLOCKED: {report['reason']}", file=sys.stderr)
         return 2
+    except KeyboardInterrupt:
+        # A running Manager Batch is not cancelled just because this observer
+        # exits; leave the exact Start/Batch IDs for read-only reconciliation.
+        report["result"] = "OUTCOME_UNKNOWN"
+        report["reason"] = "OPERATOR_INTERRUPTED_OBSERVER_DO_NOT_RESUBMIT"
+        report["last_start_id"] = client.last_start_id
+        report["last_batch_id"] = client.last_batch_id
+        return 130
     finally:
         (directory / "summary.json").write_text(
             json.dumps(report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
