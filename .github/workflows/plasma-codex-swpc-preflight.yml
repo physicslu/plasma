@@ -1,4 +1,4 @@
-name: PLASMA Codex SWPC bootstrap preflight (Issue 981)
+name: PLASMA historical Codex SWPC bootstrap preflight (host-only)
 
 # Owner-triggered, read-only inventory using the EXISTING trusted main-only
 # integration runner. This never executes Codex or changes SWPC settings.
@@ -8,13 +8,11 @@ on:
     paths:
       - ".github/workflows/plasma-codex-swpc-preflight.yml"
       - "scripts/plasma-codex-swpc-preflight.py"
-      - "docs/development/plasma-codex-swpc-bootstrap-preflight.md"
   push:
     branches: [main]
     paths:
       - ".github/workflows/plasma-codex-swpc-preflight.yml"
       - "scripts/plasma-codex-swpc-preflight.py"
-      - "docs/development/plasma-codex-swpc-bootstrap-preflight.md"
 
 permissions:
   contents: read

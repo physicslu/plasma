@@ -1,6 +1,6 @@
 # PLASMA Issue #981 — reproduce working Codex hardware capabilities
 
-**Gate 1 approved for source, SWPC access migration and bounded nondestructive verification. Gate 2 required for merge.**
+**Historical (2026-10-23) hardware-permission migration record; not a current Path 3 authorization or access-denial rule.** See [current Path 3 contract](plasma-path3-codex.md) for approved hardware execution; verify current Linux permissions directly.
 No additional HIL Gateway, Controller, device driver or REST API.
 
 ## Previous proof and gaps
@@ -52,7 +52,7 @@ Compare operator/worker permissions and the existing KINGST AppImage state witho
 
 Z2 SSH access: configure a **separate owner-authorized worker credential or key** in the `plasma-codex` private HOME using the established Z2 credential interface. Do not blindly copy the operator's whole `.ssh` or private credential file. The host script never accesses secrets.
 
-## Current USB Hub / Z2 power topology (owner-reported, 2026-10-23)
+## USB Hub / Z2 power topology observed in 2026-10 (historical snapshot)
 
 This is a **current read-only observation**, not a fixed software port
 allowlist and not authorization to switch power. It supersedes the **port
