@@ -4,7 +4,7 @@
 
 ## Current authority versus retired Issue #981 pilot
 
-**Only this Path 3 contract and the primary AGENTS.md define current Path 3 execution policy.**
+**For Path 3-specific execution policy, this contract and root AGENTS.md are authoritative.** Shared development, Embedded/FPGA, OS-permission and hardware-safety contracts still apply.
 The Issue #981 **read-only bootstrap pilot**, separate-worker provisioning, SWPC
 bootstrap preflight and passive HIL-inventory runbooks were transitional
 documents and were deleted from the active repository tree. Git history retains
