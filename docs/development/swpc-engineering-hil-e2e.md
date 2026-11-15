@@ -16,7 +16,7 @@ independently qualified execution identity and physical USB/Manager access:
 the restricted read-only SWPC Codex Runner is **not** qualified to run Flash.
 
 ```bash
-cd /storage/projects/plasma
+cd "$PLASMA_REPO"  # authorized SWPC engineering checkout
 # Preview: validates local firmware bytes and arguments; makes no HTTP request.
 ./scripts/plasmactl hil programming --profile bluepill-ab \
   --mode smoke --site 2 --ppu-alias z2 \
