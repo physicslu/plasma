@@ -40,7 +40,22 @@ def check_transactions(state_dir: Path) -> dict:
     batches: list[dict] = []
     seen: dict[str, dict] = {}
     for name, schemas in files:
-        for batch in read_journal(state_dir / name, schemas, "batches"):
+        records = read_journal(state_dir / name, schemas, "batches")
+        for raw in records:
+            batch = dict(raw)
+            # v1 has one Site and flat attempts. Never require a v2-only
+            # units[] field from immutable legacy evidence.
+            if "units" not in batch:
+                if "site_id" not in batch or "ppu_alias" not in batch:
+                    raise Blocked(f"{name}: invalid legacy Site identity")
+                batch["units"] = [{
+                    "ppu_alias": batch["ppu_alias"], "site_id": batch["site_id"],
+                    "outcome": None if batch.get("outcome") == "STOPPED"
+                               else batch.get("outcome"),
+                    "attempts": batch.get("attempts", []),
+                }]
+                if batch.get("outcome") == "STOPPED":
+                    raise Blocked(f"{name}: stopped legacy Batch requires reconciliation")
             batch_id = batch.get("batch_id")
             if not isinstance(batch_id, str) or not batch_id:
                 raise Blocked(f"{name}: invalid batch identity")
