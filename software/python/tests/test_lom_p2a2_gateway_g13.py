@@ -341,7 +341,7 @@ def test_deployed_gateway_requires_an_explicit_admission_mode():
     assert gateway_phase3.Phase3PlasmaWebHandler.__mro__.index(ControllerWriteAdmissionMixin) == 1
     source = inspect.getsource(gateway_phase3._parser)
     assert "--controller-admission-socket" in source and "--host-lab-unauthenticated-writes" in source
-    core = (ROOT / "scripts/ppu-z2-installer-core.py").read_text()
+    core = (ROOT / "scripts/ppu-z2-installer.py").read_text()
     assert re.search(r"--controller-admission-socket \{CONTROLLER_ADMISSION_SOCKET\}", core)
 
 

@@ -48,7 +48,7 @@ def _load(path: Path, name: str) -> ModuleType:
     return module
 
 
-core_path = Path(os.environ.get(CORE_OVERRIDE, str(SCRIPT_DIR / "ppu-z2-installer-core.py"))).resolve()
+core_path = Path(os.environ.get(CORE_OVERRIDE, str(SCRIPT_DIR / "ppu-z2-installer.py"))).resolve()
 _core = _load(core_path, "plasma_z2like_demo_installer_core")
 
 Z2InstallerError = _core.Z2InstallerError

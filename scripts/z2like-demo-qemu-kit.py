@@ -367,7 +367,7 @@ def deploy(
         )
         kit_scripts = verified.root / "scripts"
         coordinator = kit_scripts / "ppu-bootstrap-deployment.py"
-        installer_core = kit_scripts / "ppu-z2-installer-core.py"
+        installer_core = kit_scripts / "ppu-z2-installer.py"
         installer = kit_scripts / "z2like-demo-qemu-installer.py"
         for path in (coordinator, installer_core, installer):
             if not path.is_file():
