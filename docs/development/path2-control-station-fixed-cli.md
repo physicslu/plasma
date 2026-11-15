@@ -64,7 +64,7 @@ and supply the approved Objective and Acceptance before submission.
   "execution_path": "path2-cli",
   "capability": "operator-cli",
   "scope": "guarded-hardware",
-  "pr_number": 0,
+  "pr_number": 1443,
   "source_sha": "<HEAD_SHA_40_HEX>",
   "script": "scripts/plasma_path2_control_station.py",
   "argv": ["status", "--source-sha", "<HEAD_SHA_40_HEX>"],
@@ -75,10 +75,10 @@ and supply the approved Objective and Acceptance before submission.
 }
 ```
 
-**Important:** `pr_number: 0` in this illustration is usable only after the
-script has merged to trusted main; an unmerged candidate must use its exact
-same-repository owner PR number and its verified HEAD. The Dispatcher does
-not accept a branch plus a different arbitrary SHA.
+**Important:** the example is bound to Draft PR #1443 and must use the
+**actual current PR HEAD** in both SHA positions. Once merged to trusted main,
+a new Work Order with `pr_number: 0` must instead use the current main SHA.
+The Dispatcher does not accept a branch with a different arbitrary SHA.
 
 For a separately authorized later deploy, replace the fixed `argv` by
 `["deploy","--source-sha","<HEAD_SHA_40_HEX>","--owner-maintenance-confirmed"]`
