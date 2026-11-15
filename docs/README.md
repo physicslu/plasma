@@ -20,6 +20,7 @@
 - **Current** — [Shared Development Contract — shared clauses, execution zones, domain routing](development/plasma-development-common.md)
 - **Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli, CPU-only and Vivado host build](development/plasma-path2-cli.md)
 - **Plan** · `Draft PR #1429` · `Gate 1` — [Control Station fixed owner delegation bridge](development/path3-control-station-owner-delegation-gate1.md)：受保護唯讀操作委派候選，需獨立可信管理員安裝；未取得 SWPC 授權與部署證據。
+- **Plan** · `Draft PR #1429` · `Gate 1` — [Control Station owner bridge trusted-admin staging / rollback](development/control-station-owner-bridge-install-gate1.md)：管理員專用最小 sudoers 與固定路徑安裝計畫；Runner 不安裝，Deploy 保持拒絕。
 - **Current** — [Path 3 SWPC Codex Contract](development/plasma-path3-codex.md)
 - **Current** — [FPGA / PL domain contract](development/plasma-fpga.md)
 - **Current** — [Embedded / Z2 PS domain contract](development/plasma-embedded.md)
