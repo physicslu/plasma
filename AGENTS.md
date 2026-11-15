@@ -67,6 +67,15 @@ Select the smallest capable Path. Choosing a Path never grants additional author
 
 ## Core engineering policies
 
+**Delta Verification / reuse accepted evidence (normative; ChatGPT Direct, Path 2, Path 3)**
+
+- **Start from the last accepted baseline, not from zero.** For each request, identify the actual source/config/interface/hardware delta and the specific new outcome. Reuse prior observed PASS, approved Gates and immutable evidence when their tested conditions still apply. Do not restart a repository-wide architecture/ADR/PR/CI audit or ask the owner to restate known decisions merely because a new task begins.
+- **Verify the affected surface only.** Execute the smallest relevant functional check, boundary/negative regression and applicable safety guard for the delta. Expand only when a material dependency changed, evidence no longer covers the requested behavior, an observed failure points outside the initial scope, or an executable policy explicitly requires it. A checklist is not evidence that every item must be rerun.
+- **Preserve evidence type and validity.** Confirm only the baseline identity and conditions needed for reuse (e.g. exact source/test SHA, changed dependencies, runtime configuration and hardware mapping). Hosted CI/Mock PASS is reusable software evidence, never a substitute for new physical HIL. A materially changed source requires the relevant new tests and the required exact-HEAD CI/merge checks; unchanged historical checks do not become new work.
+- **Do not manufacture approval gates or blanket prohibitions.** An already approved Gate 1 covers its bounded work; Gate 2 still governs PR merge. Distinguish legitimate safety checks before an authorized hardware operation from fresh owner approval, speculative factory prerequisites and unrelated full requalification.
+- **Example — WP-01 after #1439/#1441 merge:** Retain accepted architecture and Hosted CI evidence; the next unsolved question is whether the real Z2 PPU can run its two installed Sites concurrently. Check effective PPU concurrency and shared electrical/FPGA ownership, then prove two real overlapping Flash/Verify executions with independent Job/Receipt and safe outcomes under an authorized HIL scope. Do **not** redo all single-Site or 8-Site Host-only work just to start 2-Site qualification.
+- **Report the delta, not a recycled audit.** Summarize (1) reused evidence, (2) new checks actually run and their PASS/FAIL/NOT_RUN, (3) specific unresolved blockers and next action. Never represent a prior PASS as a new execution, or omit a necessary safety check in the name of efficiency.
+
 **Engineering simplicity and scope control (normative; no new Gate)**
 
 1. **Existing First — execute before expanding.** For an approved bounded task, use the existing canonical command/API and current proven route first. Do not add a wrapper, service, architecture layer or new implementation without a specific demonstrated gap. Respect existing admission, authorization and physical safety guards.
