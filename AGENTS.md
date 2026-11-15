@@ -65,6 +65,16 @@ Select the smallest capable Path. Choosing a Path never grants additional author
 
 ## Core engineering policies
 
+**Engineering simplicity and scope control (normative; no new Gate)**
+
+1. **Existing First — execute before expanding.** For an approved bounded task, use the existing canonical command/API and current proven route first. Do not add a wrapper, service, architecture layer or new implementation without a specific demonstrated gap. Respect existing admission, authorization and physical safety guards.
+2. **Minimal Scope — solve only the requested problem.** Keep implementation and verification limited to the requested outcome and its necessary dependencies. Do not turn one-Site/one-Flash work into unsolicited A/B/A, burn-in, multi-Site Scheduler changes, CDC qualification, deployment, or broad re-audits. Distinguish required Flash safety from optional post-Flash observations.
+3. **One Task, One Result — no silent amplification.** A request for one Flash authorizes at most one intended programming attempt, not extra repetitions or automatic retries. Record the real Job/Receipt and report PASS, FAIL, BLOCKED or NOT_RUN. If submission outcome is unknown, reconcile it; never blindly resubmit.
+4. **Evidence Before Code — diagnose the actual failure.** Inspect the existing implementation and observed error before modifying code. A successful workflow/Codex exit is not a substitute for the requested functional or physical result. Fix the smallest evidence-backed cause, then run the relevant focused regression and safety checks; do not claim unrun checks as PASS.
+5. **Complexity Budget — default to zero new files.** Prefer simplifying or deleting duplicate paths over adding abstractions. For engineering changes, report added LOC, removed LOC, net LOC, new files and why each addition was necessary. Zero new files is the default target, not an excuse to omit necessary tests or safety fixes.
+
+These rules apply to ChatGPT Direct, Path 2 and Path 3. They do not add approval gates, weaken safety/transaction guarantees, or override the exact owner-approved task scope.
+
 **Replace-by-Default.** New versions replace old versions directly across API, Schema, Protocol, Package, FPGA IP, Driver and tools. Migrate dependents (implementation, callers, tests, docs, CI) in the same change. Do not keep Compatibility Layers or dual-track architectures merely for old tests. Exceptions require explicit owner approval.
 
 **Source priority:** executable code/config > `scripts/plasmactl` > package manifests > tests > current docs > historical discussion. Inspect actual implementation; never infer support from metadata or mocks.
