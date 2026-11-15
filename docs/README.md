@@ -19,6 +19,7 @@
 - **Plan** · `Issue #1424` · `Draft PR #1425` · `Gate 1` — [OPF Site-independent Programming Audit](development/issue-1424-site-independent-programming-audit.md)：逐層稽核並修復 ICPN 與固定 Site 綁定；PPU 回報 Site、Job 指定 ICPN、保留 Job Binding，Profile／Resource Set 升級 v2。Host-only 檢查與實機驗收分開，尚未 Gate 2。
 - **Current** — [Shared Development Contract — shared clauses, execution zones, domain routing](development/plasma-development-common.md)
 - **Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli, CPU-only and Vivado host build](development/plasma-path2-cli.md)
+- **Plan** · `Draft PR #1429` · `Gate 1` — [Control Station fixed owner delegation bridge](development/path3-control-station-owner-delegation-gate1.md)：受保護唯讀操作委派候選，需獨立可信管理員安裝；未取得 SWPC 授權與部署證據。
 - **Current** — [Path 3 SWPC Codex Contract](development/plasma-path3-codex.md)
 - **Current** — [FPGA / PL domain contract](development/plasma-fpga.md)
 - **Current** — [Embedded / Z2 PS domain contract](development/plasma-embedded.md)
