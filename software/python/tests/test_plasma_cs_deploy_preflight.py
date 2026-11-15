@@ -333,3 +333,25 @@ def test_duplicate_start_claim_by_distinct_batches_blocks(state: Path) -> None:
                   "batches", [first, second])
     with pytest.raises(preflight.Blocked, match="claimed by multiple Batches"):
         check(state)
+
+
+def test_batch_aggregate_disagrees_with_site_blocks(state: Path) -> None:
+    row = completed_v2_batch()
+    row["units"][0]["outcome"] = "BLOCKED"
+    row["units"][0]["attempts"] = []
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2",
+                  "batches", [row])
+    with pytest.raises(preflight.Blocked, match="aggregate/Site outcomes disagree"):
+        check(state)
+
+
+def test_run_invalid_terminal_state_or_outcome_blocks(state: Path) -> None:
+    run = {"run_id": "x", "state": "accepted", "outcome": "PASS"}
+    set_starts(state, [], [run])
+    with pytest.raises(preflight.Blocked, match="state not terminal"):
+        check(state)
+    run.update(state="finished", outcome="UNRECOGNIZED")
+    set_starts(state, [], [run])
+    with pytest.raises(preflight.Blocked, match="outcome not terminal or invalid"):
+        check(state)
