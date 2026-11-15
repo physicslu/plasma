@@ -159,3 +159,28 @@ def test_no_auto_deploy_or_legacy_programmer() -> None:
     assert "plasma_wordport_program.py" not in source
     assert "plasmactl deploy" not in source
     assert "--execute" in source
+
+
+@pytest.mark.parametrize("bad_poll", [
+    {},
+    {"batch": None},
+    {"batch": {"batch_id": "f" * 32, "outcome": "PASS"}},
+])
+def test_malformed_batch_poll_fails_closed_without_resubmission(bad_poll) -> None:
+    class PollManager(StubManager):
+        def call(self, method: str, route: str, body=None):
+            if method == "POST" and route == "/api/programming/batches":
+                self.calls.append((method, route, body))
+                return {"ok": True, "batch": {
+                    "batch_id": BATCH_ID, "outcome": None}}
+            if method == "GET" and route == f"/api/programming/batches/{BATCH_ID}":
+                self.calls.append((method, route, body))
+                return {"ok": True, **bad_poll}
+            return super().call(method, route, body)
+
+    manager = PollManager()
+    with pytest.raises(hil.HILFailure, match="Batch poll identity missing/mismatched"):
+        hil.one_attempt(manager, "z2", 2, IMAGE, 10, 0)
+    assert manager.last_start_id == START_ID
+    assert manager.last_batch_id == BATCH_ID
+    assert [r for _, r, _ in manager.calls].count("/api/programming/batches") == 1
