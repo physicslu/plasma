@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""Fixed SWPC Path 2 Control Station operator CLI adapter.
+"""Source-pinned Path 2 Control Station read-only operator CLI adapter.
 
-The trusted Path 2 dispatcher runs only pinned Python files under its
-non-root Runner. The canonical Control Station CLI is Bash owned by gordon.
-This adapter offers a bounded bridge, not a generic shell or privilege
-escalation: exact source, exact owner, exact CLI, exact operations.
-
-Deploy never bypasses the Control Station's dual read-only preflight. The
-explicit maintenance confirmation is a human/Work Order prerequisite, NOT
-an atomic Manager admission lock or proof that concurrent admission stopped.
+This runs only the fixed, independently owner-installed UID bridge, never
+sudo bash/git/python or the operator's private service environment directly.
+Deployment stays disabled until a separate reviewed fixed-bridge release
+qualifies transaction history, maintenance exclusivity and rollback.
 """
 from __future__ import annotations
 
@@ -21,172 +17,84 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKEND = ROOT / "scripts/plasmactl-local-control-station"
-PREFLIGHT = ROOT / "scripts/plasma_cs_deploy_preflight.py"
-# Owner-managed, known Control Station checkout. Never execute a candidate
-# Bash script from the UID 998 Runner workspace as UID 1000.
-OWNER_ROOT = Path("/storage/projects/plasma")
-OWNER_BACKEND = OWNER_ROOT / "scripts/plasmactl-local-control-station"
 GIT = "/usr/bin/git"
 SUDO = "/usr/bin/sudo"
-BASH = "/usr/bin/bash"
-ENV = "/usr/bin/env"
-HEX40 = re.compile(r"[a-f0-9]{40}\Z")
 OWNER = "gordon"
-OWNER_UID = 1000
-COMMANDS = ("status", "verify", "deploy")
+BRIDGE = "/usr/local/libexec/plasma/plasma-control-station-owner-bridge"
+HEX40 = re.compile(r"[a-f0-9]{40}\Z")
+READ_ONLY = ("status", "verify")
+OPERATIONS = (*READ_ONLY, "deploy")
 
 
 class Blocked(Exception):
     pass
 
 
-def verify_source(expected_sha: str) -> None:
-    if not HEX40.fullmatch(expected_sha):
-        raise Blocked("SOURCE_SHA_INVALID")
-    if sys.platform != "linux" or socket.gethostname().split(".", 1)[0].casefold() != "swpc":
+def verify_source(source_sha: str) -> None:
+    """Source SHA is the pinned Path 2 adapter, not the installed release."""
+    if type(source_sha) is not str or not HEX40.fullmatch(source_sha):
+        raise Blocked("ADAPTER_SOURCE_SHA_INVALID")
+    if (sys.platform != "linux"
+            or socket.gethostname().split(".", 1)[0].lower() != "swpc"):
         raise Blocked("SWPC_LINUX_REQUIRED")
-    if not BACKEND.is_file() or BACKEND.is_symlink() or not BACKEND.resolve().is_relative_to(ROOT):
-        raise Blocked("CANONICAL_BACKEND_UNAVAILABLE")
-    if not all(Path(p).is_file() for p in (GIT, BASH, ENV, SUDO)):
-        raise Blocked("FIXED_EXECUTABLE_UNAVAILABLE")
-    observed = subprocess.run(
-        [GIT, "-C", str(ROOT), "rev-parse", "--verify", "HEAD"],
-        capture_output=True, text=True, check=False, timeout=10,
-    )
-    if observed.returncode or observed.stdout.strip() != expected_sha:
-        raise Blocked("SOURCE_SHA_MISMATCH")
-    changed = subprocess.run(
-        [GIT, "-C", str(ROOT), "diff", "--quiet", "HEAD", "--"],
-        capture_output=True, check=False, timeout=10,
-    )
-    if changed.returncode != 0:
-        raise Blocked("SOURCE_DIRTY_OR_UNVERIFIED")
-
-
-def guard_deploy_backend(source: str) -> None:
-    """Verify target commit's canonical preflight checkpoints, not adapter code."""
-    section = source.split("deploy_profile() {", 1)
-    if len(section) != 2:
-        raise Blocked("DEPLOY_FUNCTION_MISSING")
-    deploy = section[1].split("parse_options()", 1)[0]
-    if (deploy.count("run_deployment_preflight") != 2
-            or "run_deployment_preflight() {" not in source
-            or "plasma_cs_deploy_preflight.py" not in source
-            or "prepare_release" not in deploy
-            or deploy.index("run_deployment_preflight") > deploy.index("prepare_release")):
-        raise Blocked("DEPLOY_PREFLIGHT_CHECKPOINTS_MISSING")
-
-
-def check_owner_deploy_source(expected_sha: str) -> None:
-    """Deploy only if the operator's checkout is exactly the approved source.
-
-    The Path 2 PR checkout may be hidden under UID 998's private runner home.
-    The operator-owned checkout is a separate trust boundary; it must not be
-    assumed to be identical just because the runner candidate is clean.
-    """
-    fixed = [SUDO, "-n", "-H", "-u", OWNER, "--", GIT, "-C", str(OWNER_ROOT)]
     try:
-        observed = subprocess.run(
-            [*fixed, "rev-parse", "--verify", "HEAD"],
-            capture_output=True, text=True, timeout=15, check=False,
+        head = subprocess.run(
+            [GIT, "-C", str(ROOT), "rev-parse", "--verify", "HEAD"],
+            capture_output=True, text=True, check=False, timeout=10,
         )
-        if observed.returncode or observed.stdout.strip() != expected_sha:
-            raise Blocked("OWNER_CHECKOUT_SHA_MISMATCH")
-        clean = subprocess.run(
-            [*fixed, "diff", "--quiet", "HEAD", "--"],
-            capture_output=True, timeout=15, check=False,
+        dirty = subprocess.run(
+            [GIT, "-C", str(ROOT), "status", "--porcelain=v1",
+             "--untracked-files=all"],
+            capture_output=True, text=True, check=False, timeout=10,
         )
-        if clean.returncode:
-            raise Blocked("OWNER_CHECKOUT_DIRTY_OR_UNVERIFIED")
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise Blocked("OWNER_CHECKOUT_UNAVAILABLE") from exc
+        raise Blocked("ADAPTER_SOURCE_UNAVAILABLE") from exc
+    if (head.returncode != 0 or head.stdout.strip() != source_sha):
+        raise Blocked("ADAPTER_SOURCE_SHA_MISMATCH")
+    if dirty.returncode or dirty.stdout:
+        raise Blocked("ADAPTER_WORKTREE_DIRTY")
 
 
-def read_owner_deploy_backend(target_sha: str) -> str:
-    """Inspect immutable operator checkout Git objects; no source mutation."""
-    fixed = [SUDO, "-n", "-H", "-u", OWNER, "--", GIT, "-C", str(OWNER_ROOT)]
-    try:
-        checked = subprocess.run(
-            [*fixed, "cat-file", "-e",
-             f"{target_sha}:scripts/plasma_cs_deploy_preflight.py"],
-            capture_output=True, timeout=15, check=False,
-        )
-        source = subprocess.run(
-            [*fixed, "show", f"{target_sha}:scripts/plasmactl-local-control-station"],
-            capture_output=True, text=True, timeout=15, check=False,
-        )
-    except (OSError, UnicodeError, subprocess.TimeoutExpired) as exc:
-        raise Blocked("OWNER_DEPLOY_SOURCE_UNAVAILABLE") from exc
-    if (checked.returncode != 0 or source.returncode != 0
-            or not isinstance(source.stdout, str)
-            or not 0 < len(source.stdout) <= 65536):
-        raise Blocked("OWNER_DEPLOY_PREFLIGHT_UNAVAILABLE")
-    return source.stdout
-
-
-def exact_owner_command(operation: str) -> list[str]:
-    if operation not in COMMANDS:
+def run(operation: str, source_sha: str, target_sha: str | None = None,
+        owner_maintenance_confirmed: bool = False) -> int:
+    if operation not in OPERATIONS:
         raise Blocked("OPERATION_DENIED")
-    # Explicit, bounded sudo under an existing owner-administered delegation.
-    # This script neither writes sudoers nor changes Linux identities.
-    return [
-        SUDO, "-n", "-H", "-u", OWNER, "--", ENV,
-        f"XDG_RUNTIME_DIR=/run/user/{OWNER_UID}",
-        f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{OWNER_UID}/bus",
-        BASH, str(OWNER_BACKEND), operation,
-    ]
-
-
-def run(operation: str, expected_sha: str, owner_maintenance_confirmed: bool = False,
-        target_sha: str | None = None) -> int:
-    verify_source(expected_sha)
-    if operation not in COMMANDS:
-        raise Blocked("OPERATION_DENIED")
+    verify_source(source_sha)
     if operation == "deploy":
-        if not owner_maintenance_confirmed:
-            raise Blocked("OWNER_MAINTENANCE_EXCLUSIVITY_NOT_CONFIRMED")
-        if type(target_sha) is not str or not HEX40.fullmatch(target_sha):
-            raise Blocked("DEPLOY_TARGET_SHA_REQUIRED")
-        # The Path 2 adapter and operator-owned Control Station release are
-        # distinct, independently source-pinned components.
-        check_owner_deploy_source(target_sha)
-        guard_deploy_backend(read_owner_deploy_backend(target_sha))
-        # The boolean above records an Owner decision, not a lock. The
-        # canonical CLI must independently pass both live preflight snapshots.
-    elif owner_maintenance_confirmed or target_sha is not None:
-        raise Blocked("DEPLOY_ONLY_FLAGS_ON_READONLY_OPERATION")
+        # Gate 1: the installed UID bridge admits only status/verify.
+        # Future deploy requires an independently audited admission barrier
+        # and immutable evidence. No bypass via owner intent or target SHA.
+        raise Blocked("DEPLOY_BRIDGE_NOT_QUALIFIED")
+    if target_sha is not None or owner_maintenance_confirmed:
+        raise Blocked("DEPLOY_ONLY_ARGUMENT_ON_READONLY_OPERATION")
     try:
         result = subprocess.run(
-            exact_owner_command(operation), cwd=ROOT,
-            check=False, timeout=1700,
+            [SUDO, "-n", "-H", "-u", OWNER, "--", BRIDGE, operation],
+            cwd=ROOT, check=False, timeout=220,
         )
-    except (PermissionError, FileNotFoundError) as exc:
-        raise Blocked("OWNER_EXECUTION_UNAVAILABLE") from exc
-    except subprocess.TimeoutExpired:
-        # A timed-out deploy may already have restarted Manager. Do NOT retry.
-        raise Blocked("OWNER_COMMAND_TIMED_OUT_OUTCOME_UNKNOWN")
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise Blocked("FIXED_OWNER_BRIDGE_UNAVAILABLE") from exc
+    if result.returncode == 77:
+        raise Blocked("FIXED_OWNER_BRIDGE_PERMISSION_DENIED")
     if result.returncode != 0:
-        # Never auto-retry a process that may have entered the activation step.
-        raise Blocked(f"OWNER_COMMAND_NONZERO_{result.returncode}_NO_RETRY")
-    print(f"PATH2_CONTROL_STATION_{operation.upper()}_COMMAND_EXIT_0")
+        raise Blocked(f"FIXED_OWNER_BRIDGE_FAILED_{result.returncode}")
+    print(f"PATH2_CONTROL_STATION_{operation.upper()}_EXIT_ZERO")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=COMMANDS)
+    parser.add_argument("operation", choices=OPERATIONS)
     parser.add_argument("--source-sha", required=True)
-    parser.add_argument("--target-sha", default=None,
-                        help="independent SHA of the operator Control Station checkout")
-    parser.add_argument("--owner-maintenance-confirmed", action="store_true",
-                        help="Owner-attested exclusive maintenance; NOT an atomic lock")
+    parser.add_argument("--target-sha", default=None)
+    parser.add_argument("--owner-maintenance-confirmed", action="store_true")
     args = parser.parse_args(argv)
     try:
-        return run(args.operation, args.source_sha, args.owner_maintenance_confirmed, args.target_sha)
+        return run(args.operation, args.source_sha, args.target_sha,
+                   args.owner_maintenance_confirmed)
     except Blocked as exc:
         print(f"PATH2_CONTROL_STATION_BLOCKED: {exc}", file=sys.stderr)
-        return 2
+        return (77 if "BRIDGE" in str(exc) else 2)
 
 
 if __name__ == "__main__":
