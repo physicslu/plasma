@@ -13,10 +13,8 @@ an atomic Manager admission lock or proof that concurrent admission stopped.
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 import re
-import shutil
 import socket
 import subprocess
 import sys
@@ -29,7 +27,7 @@ GIT = "/usr/bin/git"
 SUDO = "/usr/bin/sudo"
 BASH = "/usr/bin/bash"
 ENV = "/usr/bin/env"
-HEX40 = re.compile(r"[a-f0-9]{40}\\Z")
+HEX40 = re.compile(r"[a-f0-9]{40}\Z")
 OWNER = "gordon"
 OWNER_UID = 1000
 COMMANDS = ("status", "verify", "deploy")
@@ -77,6 +75,7 @@ def guard_deploy_backend() -> None:
     if (deploy.count("run_deployment_preflight") != 2
             or "run_deployment_preflight() {" not in source
             or "plasma_cs_deploy_preflight.py" not in source
+            or "prepare_release" not in deploy
             or deploy.index("run_deployment_preflight") > deploy.index("prepare_release")):
         raise Blocked("DEPLOY_PREFLIGHT_CHECKPOINTS_MISSING")
 
