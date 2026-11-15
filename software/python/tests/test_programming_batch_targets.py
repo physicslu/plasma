@@ -3,8 +3,8 @@
 Real ``BundleProgrammingWorkflow`` + ``ProgrammingBatchCoordinator``; fake
 Bootstrap coordinators and fake PPU Gateways, one per PPU. No PPU, FPGA or
 DUT. A PASS here proves the admission, isolation, aggregation and recovery
-contract only - never that eight Sites program in parallel, which nothing
-here even attempts: execution is sequential by contract.
+contract only. Event-controlled lane overlap is tested separately in
+``test_programming_batch_lanes.py``; neither is physical HIL.
 
 The Programming Routes shipped in ``data/opf`` declare Site 2 only, so the
 multi-Site cases build a Route fixture under ``tmp_path``. Production route
@@ -585,11 +585,11 @@ def test_a_restart_judges_every_site_and_resubmits_nothing(tmp_path):
     reloaded = ProgrammingBatchCoordinator(workflow, journal_path=tmp_path / "batches.json")
     batch = reloaded.status_batch(started["batch"]["batch_id"])["batch"]
     # Site 2 of z2 was in flight: not provably unsent, so never BLOCKED.
-    # The Sites after it were never reached: provably unsent, so BLOCKED.
+    # All independent lanes crossed Start before the dispatcher was cut.
     assert [u["outcome"] for u in batch["units"]] == [
-        "OUTCOME_UNKNOWN", "BLOCKED", "BLOCKED"]
+        "OUTCOME_UNKNOWN", "OUTCOME_UNKNOWN", "OUTCOME_UNKNOWN"]
     assert batch["units"][0]["reason"] == "MANAGER_RESTARTED_DURING_ATTEMPT"
-    assert batch["units"][1]["reason"] == "MANAGER_RESTARTED_BEFORE_SUBMISSION"
+    assert batch["units"][1]["reason"] == "MANAGER_RESTARTED_DURING_ATTEMPT"
     assert batch["outcome"] == "OUTCOME_UNKNOWN"
     assert gateways["z2b"].posts == []  # nothing was submitted for the other PPU
 

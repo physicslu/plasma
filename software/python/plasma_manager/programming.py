@@ -282,6 +282,8 @@ class BundleProgrammingWorkflow:
         self.job_deadline_s = job_deadline_s
         self.poll_interval_s = poll_interval_s
         self._lock = threading.RLock()
+        self._journal_failure: str | None = None
+        self._control_failure: str | None = None
         self._plans: dict[str, _Plan] = {}
         self._bundle_cache: dict[tuple, tuple] = {}
         #: How many times a Bundle / Resource Set was actually built. A Batch
@@ -337,9 +339,20 @@ class BundleProgrammingWorkflow:
             raise RuntimeError("Bundle programming journal is unreadable; refusing to start") from exc
 
     def _persist_locked(self) -> None:
+        try:
+            self._write_journal_locked()
+        except Exception as exc:
+            self._journal_failure = f"RUN_JOURNAL_{type(exc).__name__}"
+            raise
+
+    def _write_journal_locked(self) -> None:
         if self.journal_path is None:
             return
-        runs = sorted(self._runs.values(), key=lambda r: r.created_at)[-MAX_RUNS_RETAINED:]
+        protected = [r for r in self._runs.values() if r.outcome is None
+                     or r.outcome == "OUTCOME_UNKNOWN"]
+        terminal = sorted((r for r in self._runs.values() if r not in protected),
+                          key=lambda r: r.created_at)[-MAX_RUNS_RETAINED:]
+        runs = terminal + protected
         starts = sorted(self._starts.values(), key=lambda s: s["issued_at"])
         for stale in starts[:-MAX_STARTS_RETAINED]:
             # A dropped record is never read as "not accepted": an unrecorded
@@ -410,7 +423,8 @@ class BundleProgrammingWorkflow:
             raise _StepFailure("GATEWAY_RESPONSE_INVALID")
         return value
 
-    def _readiness(self, client: Any, site: int, site_interface: str | None) -> dict[str, Any]:
+    def _readiness(self, client: Any, site: int, site_interface: str | None,
+                   execution_owner_id: str | None = None) -> dict[str, Any]:
         health = self._gateway_get(client, "/api/health/ready")
         status = self._gateway_get(client, f"/api/status?site={site}")
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
@@ -420,8 +434,16 @@ class BundleProgrammingWorkflow:
         if not (isinstance(sites, list) and len(sites) == 1 and isinstance(sites[0], dict)):
             raise _StepFailure("PPU_STATUS_UNTRUSTED")
         row = sites[0]
+        # Only the canonical Batch's existing REST owner may share a lease.
+        # A busy lease without exact owner evidence remains fail-closed.
+        released = lease.get("busy") is False and lease.get("active_job_count") == 0
+        owned = (execution_owner_id is not None and lease.get("busy") is True
+                 and lease.get("owner_kind") == "rest_client"
+                 and lease.get("owner_id") == execution_owner_id
+                 and type(lease.get("active_job_count")) is int
+                 and lease["active_job_count"] > 0)
         ready = (health.get("ok") is True and health.get("execution") == "ready"
-                 and lease.get("busy") is False and lease.get("active_job_count") == 0
+                 and (released or owned)
                  and (not isinstance(activation, dict) or activation.get("active") is False)
                  and row.get("site_id") == site and row.get("enabled") is True
                  and row.get("state") == "idle" and row.get("current_job_id") is None
@@ -452,7 +474,7 @@ class BundleProgrammingWorkflow:
         """Why this Target may not be operated now, and WHOSE failure it is.
 
         Read-only. The PPU must be reachable, its Site idle with no Job and no
-        held execution lease, no run of this PPU active or OUTCOME_UNKNOWN,
+        foreign execution lease, no run of this Site active or PPU OUTCOME_UNKNOWN,
         and the Active Asset Set must not require recovery. Any doubt blocks
         it.
 
@@ -466,8 +488,11 @@ class BundleProgrammingWorkflow:
         with self._lock:
             if self._unknown_latched(alias) is not None:
                 return TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED"
-            if self._active_run(alias) is not None:
+            active = [r for r in self._runs.values() if r.alias == alias and r.outcome is None]
+            if any(r.site == site or r.plan.get("activation_required")
+                   or not r.plan.get("execution_owner_id") for r in active):
                 return TARGET_NOT_READY, "RUN_IN_PROGRESS"
+            owner = active[0].plan.get("execution_owner_id") if active else None
         try:
             record = self._record(alias)
         except ProgrammingError as exc:
@@ -478,7 +503,7 @@ class BundleProgrammingWorkflow:
             if self.coordinator.assets(alias).get("state") == "RECOVERY_REQUIRED":
                 return TARGET_NOT_READY, "PPU_RECOVERY_REQUIRED"
             client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
-            self._readiness(client, site, None)
+            self._readiness(client, site, None, owner)
         except _StepFailure as exc:
             return TARGET_NOT_READY, exc.reason
         except Exception as exc:  # noqa: BLE001 - unreadable state is never "released"
@@ -774,7 +799,8 @@ class BundleProgrammingWorkflow:
                 raise
         return {"ok": True, "plan": payload}
 
-    def start(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
+    def start(self, alias: str, body: Mapping[str, Any], *,
+              execution_owner_id: str | None = None) -> dict[str, Any]:
         if not isinstance(body, Mapping) or set(body) != {"plan_id", "confirm"}:
             raise ProgrammingError(400, "invalid_request", "run requires only plan_id and confirm")
         if body["confirm"] != CONFIRM_TOKEN:
@@ -782,6 +808,9 @@ class BundleProgrammingWorkflow:
                                    "explicit programming confirmation is required")
         self._require_commissioned(alias)
         with self._lock:
+            if self._journal_failure is not None or self._control_failure is not None:
+                raise ProgrammingError(503, "manager_shared_control_failure",
+                                       self._journal_failure or self._control_failure)
             plan = self._plans.get(body["plan_id"]) if type(body["plan_id"]) is str else None
             if (plan is None or plan.alias != alias
                     or self.monotonic() - plan.created_monotonic > PLAN_TTL_S):
@@ -791,9 +820,19 @@ class BundleProgrammingWorkflow:
             if latched is not None:
                 raise ProgrammingError(409, "programming_outcome_unknown_unresolved",
                                        f"run {latched.run_id} ended OUTCOME_UNKNOWN; reconcile and acknowledge first")
-            if self._active_run(alias) is not None:
+            active = [r for r in self._runs.values() if r.alias == alias and r.outcome is None]
+            if active and (execution_owner_id is None or any(
+                    r.site == plan.site
+                    or r.plan.get("execution_owner_id") != execution_owner_id
+                    or r.plan.get("activation_required") or plan.payload["activation_required"]
+                    or r.plan.get("resource") != plan.payload["resource"]
+                    or r.plan.get("image_asset") != plan.payload["image_asset"]
+                    or r.plan.get("active_asset_set") != plan.payload["active_asset_set"]
+                    for r in active)):
                 raise ProgrammingError(409, "programming_run_in_progress",
-                                       "another programming run is in progress on this PPU")
+                                       "an incompatible programming run is in progress on this PPU")
+            if execution_owner_id is not None:
+                plan.payload["execution_owner_id"] = execution_owner_id
             # One plan, one run: a consumed plan can never be re-submitted.
             del self._plans[plan.plan_id]
             run = _Run(run_id=secrets.token_hex(16), alias=alias, site=plan.site,
@@ -1066,6 +1105,17 @@ class BundleProgrammingWorkflow:
     # ---------------------------------------------------------------- execution
     def _execute(self, run: _Run, plan: _Plan) -> None:
         try:
+            self._execute_run(run, plan)
+        except Exception as exc:
+            # Even a failed terminal journal write must leave an observable
+            # unknown, never a permanently running thread with no result.
+            with self._lock:
+                run.state, run.outcome = "finished", "OUTCOME_UNKNOWN"
+                run.reason = f"RUN_CONTROL_FAILURE_{type(exc).__name__}"
+                run.updated_at = _now()
+
+    def _execute_run(self, run: _Run, plan: _Plan) -> None:
+        try:
             record = self._record(run.alias)
             client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
             # LOM-P2A-2 G13: Job submission is signed under the enrolled controller.
@@ -1073,7 +1123,8 @@ class BundleProgrammingWorkflow:
             if signer is not None and hasattr(client, "write_signer"):
                 client.write_signer = signer(run.alias)
             self._update(run, state="preflight")
-            self._readiness(client, run.site, plan.route.site_interface)
+            self._readiness(client, run.site, plan.route.site_interface,
+                            plan.payload.get("execution_owner_id"))
             self._step(run, "PREFLIGHT", "PASS")
             activated = plan.payload["activation_required"]
             if activated:
@@ -1086,7 +1137,8 @@ class BundleProgrammingWorkflow:
                 raise _StepFailure("ACTIVE_SET_MISMATCH_AFTER_ACTIVATION" if activated
                                    else "ACTIVE_SET_CHANGED_SINCE_PLAN")
             self._update(run, state="submitting")
-            ready = self._readiness(client, run.site, plan.route.site_interface)
+            ready = self._readiness(client, run.site, plan.route.site_interface,
+                            plan.payload.get("execution_owner_id"))
             # The PPU itself must prove the Resources the Job is bound to.
             report = ready.get("active_resources")
             if not (isinstance(report, dict) and report.get("state") == "VERIFIED"
@@ -1110,8 +1162,15 @@ class BundleProgrammingWorkflow:
         except ProgrammingError as exc:
             self._update(run, state="finished", outcome="BLOCKED", reason=exc.code)
         except Exception as exc:  # noqa: BLE001 - any unexpected error is reported, never retried
-            self._update(run, state="finished", outcome="OUTCOME_UNKNOWN",
-                         reason=f"UNEXPECTED_{type(exc).__name__}")
+            with self._lock:
+                run.state, run.outcome = "finished", "OUTCOME_UNKNOWN"
+                run.reason = f"UNEXPECTED_{type(exc).__name__}"
+                run.updated_at = _now()
+                try:
+                    self._persist_locked()
+                except Exception:
+                    pass  # failure latch prevents any subsequent Start
+
 
     def _activate(self, run: _Run, plan: _Plan) -> None:
         alias, archive = run.alias, plan.bundle.archive
@@ -1206,13 +1265,22 @@ class BundleProgrammingWorkflow:
             **({"operation": plan.operation} if plan.operations is None
                else {"operations": plan.operations}),
         }
+        if plan.payload.get("execution_owner_id") is not None:
+            payload["execution_owner_id"] = plan.payload["execution_owner_id"]
         if plan.image is not None:
             payload["image_asset"] = plan.image_asset
             payload["asset_base64"] = base64.b64encode(plan.image).decode("ascii")
         if not self.gate.try_begin_managed_write(run.alias):
             raise _StepFailure("PPU_PLATFORM_MAINTENANCE_STARTING", outcome="BLOCKED")
         try:
-            self._update(run, job_submission_count=1)
+            with self._lock:
+                if self._journal_failure is not None or self._control_failure is not None:
+                    raise _StepFailure("MANAGER_SHARED_CONTROL_FAILURE", outcome="BLOCKED")
+                if self._unknown_latched(run.alias) is not None:
+                    raise _StepFailure("OUTCOME_UNKNOWN_UNRESOLVED", outcome="BLOCKED")
+                # Submission commits under the same lock as the global latch.
+                # After this durable point it is possibly sent, never resent.
+                self._update(run, job_submission_count=1)
             try:
                 status, _headers, body = client.relay(
                     "POST", "/api/jobs",
