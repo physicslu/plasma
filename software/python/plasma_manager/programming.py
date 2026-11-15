@@ -916,6 +916,34 @@ class BundleProgrammingWorkflow:
             self._persist_locked()
         return self.reconcile_start(start_id)
 
+    @staticmethod
+    def _legacy_single_site_batch_start_matches(
+            record: Mapping[str, Any], targets: list[dict[str, Any]]) -> bool:
+        """Read-only compatibility with pre-Manager-scoped single-Site Starts.
+
+        Old consumed Batch Starts named the PPU and Site directly but did not
+        journal `targets` or the later `start_scope` field. Only that exact
+        old shape can be corroborated by a single-Target Batch journal.
+        A modern Manager-scoped Start missing its Target Set stays UNKNOWN:
+        this predicate must never silently repair a corrupted journal.
+        """
+        if (record.get("targets") is not None or "start_scope" in record
+                or record.get("kind") != "batch"
+                or record.get("operation") != PROGRAMMING
+                or len(targets) != 1):
+            return False
+        target = targets[0]
+        if not isinstance(target, dict):
+            return False
+        sites = target.get("site_ids")
+        return (isinstance(sites, list) and len(sites) == 1
+                and type(sites[0]) is int
+                and type(record.get("site_id")) is int
+                and sites[0] == record["site_id"]
+                and type(target.get("ppu_alias")) is str
+                and bool(target["ppu_alias"])
+                and record.get("ppu_alias") == target["ppu_alias"])
+
     def reconcile_start(self, start_id: str,
                         find_batch: Callable[[str], dict[str, Any] | None] | None = None,
                         ) -> dict[str, Any]:
@@ -981,7 +1009,9 @@ class BundleProgrammingWorkflow:
                 if record is not None and (
                         record["kind"] != "batch" or record["state"] != "CONSUMED"
                         or record.get("batch_id") != batch.get("batch_id")
-                        or record.get("targets") != targets):
+                        or (record.get("targets") != targets
+                            and not self._legacy_single_site_batch_start_matches(
+                                record, targets))):
                     return unknown("JOURNAL_INCONSISTENT")
                 # One Target: the Batch has a PPU. Several: it has none, and
                 # saying otherwise would name a PPU the Batch does not belong to.
