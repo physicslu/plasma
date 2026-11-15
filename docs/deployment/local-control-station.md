@@ -146,6 +146,100 @@ These are intentional `local-control-station` profile defaults, not replacements
 
 `install` builds an immutable release, writes profile configuration and user-systemd units, and enables the units. It does not start them.
 
+## Engineering deploy preflight (SWPC)
+
+Before constructing a release, and **again immediately before changing the active
+release**, `plasmactl deploy local-control-station` runs the read-only
+`scripts/plasma_cs_deploy_preflight.py`:
+
+- checks legacy/v2 Manager Batch journals and the Run/Start journal without
+  modifying or deleting evidence;
+- resolves their location from `manager.yaml`'s explicit absolute
+  `manager.registry_state_path`, which must match this profile's state directory;
+  the journals are siblings of the registry (as in `bootstrap_server.py`);
+- requires the base Batch journal and Run/Start journal, including an explicit
+  `starts` list. A missing ledger is unverified history, not definite idle or
+  proof of a new installation. The optional `.v2` sidecar is read when present;
+- blocks an active, unresolved or `OUTCOME_UNKNOWN` attempt or Run;
+- validates known terminal outcomes, execution states, transaction identities,
+  duplicates and migrated v1/v2 agreement; a Run with unknown outcome requires
+  an explicit boolean acknowledgement;
+- reconciles every recorded Start through the live Manager GET endpoint:
+  consumed Starts must match their terminal transaction, and issued/voided
+  Starts must prove `NOT_ACCEPTED`. A live `JOURNAL_INCONSISTENT` blocks even
+  when local Batch rows say PASS;
+- requires local Manager health and an observable, idle PPU execution owner
+  (`GET /api/status`: no busy owner, no active Job);
+- fails closed when journal data is unreadable or PPU execution cannot be
+  observed. It does **not** retry, stop or resubmit Jobs.
+
+This gate protects against deployment with a job already in flight. It is **not
+an atomic Manager admission barrier**: a concurrent operator could start a new
+Batch after the final snapshot. A true quiesce/maintenance transaction must be
+implemented before claiming race-free unattended or factory deployment.
+SWPC HIL programming is separately controlled and does not implicitly run from
+`deploy`. GitHub PR CI does not run any physical programming.
+
+The preflight runs with the active release's venv (including Manager's YAML
+parser). It never constructs a workflow/coordinator, rewrites journals,
+acknowledges unknown outcomes, voids Starts or retries a Job. A stopped v2
+Batch can contain never-submitted `SKIPPED` Sites with no attempts; its
+aggregate outcome must still match the Manager's rule.
+
+For an owner work order requiring exclusive maintenance with no new Manager
+admission, two passing snapshots alone are insufficient. Verify that condition
+through the existing operational controls before deploying; otherwise report
+deployment `NOT_RUN`. This preflight does not supply a maintenance lock.
+
+## Development-mode clean State cutover (Replace, Not Migrate)
+
+For the single-owner development laboratory, use **one explicit opt-in** to
+replace the active Control Station's application state with a new empty
+namespace. It does **not** convert historical v1/v2 Journals, copy the old
+Manager registry, preserve old test transactions as live admission evidence,
+or silently acknowledge UNKNOWN outcomes.
+
+```bash
+# Only in an approved, clean, committed Control Station source checkout on SWPC.
+# No currently executing programming Jobs; no new Console/Manager admission
+# during cutover. Never operate a DUT or Z2 runtime from this command.
+./scripts/plasmactl deploy local-control-station --dev-fresh-state
+./scripts/plasmactl verify local-control-station
+./scripts/plasmactl status local-control-station
+```
+
+This is a **destructive-to-active-development-state** operation, not a
+production upgrade. It preserves all old data without deletion, by moving the
+entire existing `~/.local/state/plasma/local-control-station` directory to
+a timestamped `local-control-station.archive.*` sibling. Only after the
+Console and Manager services are stopped, with PPU execution still observed
+idle, is a new empty State directory created. Old Journal/registry/pairing
+data remain in the archived directory; the new Manager starts with its
+current canonical schema and configured PPU seed. New device enrollment or
+commissioning may be required after the clean reset.
+
+The immutable new release is constructed **before** stopping the services.
+The CLI checks the configured PPU's read-only `GET /api/status` before
+build, after build and again after the two SWPC user services stop. Each
+check requires `busy=false`, `active_job_count=0`, and empty execution
+owner identity. An unavailable PPU, any active Job or unknown owner is
+BLOCKED. Stopping the local Manager closes the managed admission entrypoint;
+it does not block a separate external operator with direct PPU access, which
+remains outside this single-owner development profile.
+
+The CLI preserves old release/config/systemd artifacts and performs its
+existing post-activation verification. On a command error it restores the
+prior release, config and archived State, then restarts the original services.
+Any partially created new State is saved as
+`local-control-station.failed.*` for diagnosis. An abrupt power loss or
+`SIGKILL` during the rename is **not** a proved automatic rollback; inspect
+the archived state, installed SHA and user units before recovery. No
+unattended fleet/production migration claim is made.
+
+**Default `deploy` (without the flag) remains the strict, transaction-aware
+deployment path.** `--dev-fresh-state` is not accepted by install, verify
+or status. The flag never changes PPU/Z2 firmware, FPGA, Site or DUT power.
+
 ## Deploy
 
 ```bash

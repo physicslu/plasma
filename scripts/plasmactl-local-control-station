@@ -20,6 +20,7 @@ manager_unit="$unit_dir/plasma-local-manager.service"
 console_unit="$unit_dir/plasma-control-station.service"
 unit_marker="# Managed by Plasma local-control-station profile"
 registry_state="$state_dir/registry.json"
+dev_fresh_state=0
 # Manager-owned Device Selector Catalog (OPF S5 / PR-C2). A non-editable venv
 # cannot locate repository data, so each immutable release ships the committed
 # data/release trees and the Manager unit points at them explicitly.
@@ -568,6 +569,51 @@ backup_file_if_present() {
   [[ -f "$source" ]] && cp -a "$source" "$target"
 }
 
+run_deployment_preflight() {
+  # This is a read-only transaction/PPU-idle snapshot, not an admission lock.
+  # Check again after the possibly lengthy release build, before changing
+  # the current release or restarting the Manager.
+  "$current_link/venv/bin/python" "$repo_root/scripts/plasma_cs_deploy_preflight.py" \
+    --state-dir "$state_dir" \
+    --manager-config "$manager_config" \
+    --manager-url "http://$manager_host:$manager_port" \
+    --ppu-endpoint "$ppu_endpoint" || \
+      die "deployment blocked by Manager transaction or PPU execution preflight"
+}
+
+check_development_ppu_idle() {
+  # Dev-only cutover: ignore completed *historical* ledgers, never ignore a
+  # currently executing PPU Job or unobservable execution owner.
+  "$base_python" - "$ppu_endpoint" <<'PY_PPU_IDLE'
+import json
+import sys
+from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+
+url = sys.argv[1].rstrip("/") + "/api/status"
+parts = urlsplit(url)
+if parts.scheme not in ("http", "https") or not parts.hostname:
+    raise SystemExit("BLOCKED: invalid configured PPU endpoint")
+try:
+    with urlopen(Request(url, headers={"Accept": "application/json"}), timeout=5) as reply:
+        if reply.status != 200:
+            raise ValueError("non-200 status")
+        status = json.load(reply)
+except (OSError, ValueError, KeyError, TypeError) as exc:
+    raise SystemExit("BLOCKED: PPU execution is unobservable") from exc
+ppu = status.get("ppu") if isinstance(status, dict) else None
+execution = ppu.get("execution") if isinstance(ppu, dict) else None
+if (not isinstance(execution, dict)
+        or execution.get("busy") is not False
+        or type(execution.get("active_job_count")) is not int
+        or execution["active_job_count"] != 0
+        or execution.get("owner_kind", "MISSING") is not None
+        or execution.get("owner_id", "MISSING") is not None):
+    raise SystemExit("BLOCKED: PPU is busy or execution ownership is unknown")
+print("PASS: PPU idle, zero active Jobs, no execution owner (snapshot)")
+PY_PPU_IDLE
+}
+
 deploy_profile() {
   require_linux_user_runtime
   require_command git
@@ -576,13 +622,30 @@ deploy_profile() {
   validate_settings
   require_clean_source
   require_owned_installation
+  if (( dev_fresh_state )); then
+    # Development uses the canonical new Manager schema in a fresh namespace.
+    # Existing historical journals stay intact in their archived directory.
+    systemctl --user is-active --quiet plasma-local-manager.service ||
+      die "dev-fresh requires the current Manager service to be active"
+    systemctl --user is-active --quiet plasma-control-station.service ||
+      die "dev-fresh requires the current Console service to be active"
+    check_development_ppu_idle
+  else
+    run_deployment_preflight
+  fi
 
-  local sha release previous_release backup_dir
+  local sha release previous_release backup_dir dev_archive_dir="" dev_failed_dir="" dev_archived=0
   sha="$(current_sha)"
   prepare_release "$sha"
   release="$prepared_release"
+  if (( dev_fresh_state )); then
+    check_development_ppu_idle
+  else
+    run_deployment_preflight
+  fi
   previous_release="$(readlink -f "$current_link")"
-  backup_dir="$(mktemp -d "$state_dir/deploy-backup.XXXXXX")"
+  # A dev-fresh cutover moves the old state tree. Keep rollback inputs OUTSIDE it.
+  backup_dir="$(mktemp -d "$state_home/plasma/local-control-station-deploy-backup.XXXXXX")"
   backup_file_if_present "$config_file" "$backup_dir/profile.env"
   backup_file_if_present "$manager_config" "$backup_dir/manager.yaml"
   backup_file_if_present "$evidence" "$backup_dir/install.json"
@@ -594,6 +657,22 @@ deploy_profile() {
     trap - ERR
     say "activation failed; restoring previous local Control Station release/configuration"
     set +e
+    if (( dev_archived )); then
+      # Stop any new Manager instance before restoring its previous state.
+      systemctl --user stop plasma-control-station.service
+      systemctl --user stop plasma-local-manager.service
+      if [[ -d "$state_dir" && ! -L "$state_dir" ]]; then
+        # Preserve failed fresh data too, for engineering diagnosis.
+        if ! mv "$state_dir" "$dev_failed_dir"; then
+          say "BLOCKED: failed to preserve fresh state; original at $dev_archive_dir"
+          exit "$rc"
+        fi
+      fi
+      if [[ -e "$state_dir" || -L "$state_dir" ]] || ! mv "$dev_archive_dir" "$state_dir"; then
+        say "BLOCKED: manual recovery needed; original at $dev_archive_dir"
+        exit "$rc"
+      fi
+    fi
     ln -sfn "$previous_release" "$current_link"
     [[ -f "$backup_dir/profile.env" ]] && cp -a "$backup_dir/profile.env" "$config_file"
     [[ -f "$backup_dir/manager.yaml" ]] && cp -a "$backup_dir/manager.yaml" "$manager_config"
@@ -608,6 +687,28 @@ deploy_profile() {
     exit "$rc"
   }
   trap rollback ERR
+
+  if (( dev_fresh_state )); then
+    # Stop the only managed admission entrypoint before swapping state.
+    # Never stop/restart the Z2 PPU or turn DUT power off from this command.
+    systemctl --user stop plasma-control-station.service
+    systemctl --user stop plasma-local-manager.service
+    check_development_ppu_idle
+    [[ -d "$state_dir" && ! -L "$state_dir" ]] || {
+      say "BLOCKED: dev-fresh state directory is missing or is a symlink"
+      false
+    }
+    dev_archive_dir="$state_home/plasma/local-control-station.archive.$(date -u +%Y%m%dT%H%M%SZ).pid$BASHPID"
+    dev_failed_dir="$state_home/plasma/local-control-station.failed.$(date -u +%Y%m%dT%H%M%SZ).pid$BASHPID"
+    [[ ! -e "$dev_archive_dir" && ! -L "$dev_archive_dir" ]] ||
+      { say "BLOCKED: dev-fresh archive destination exists"; false; }
+    [[ ! -e "$dev_failed_dir" && ! -L "$dev_failed_dir" ]] ||
+      { say "BLOCKED: dev-fresh recovery destination exists"; false; }
+    mv "$state_dir" "$dev_archive_dir"
+    dev_archived=1
+    mkdir -m 700 "$state_dir"
+    say "dev-fresh: archived previous state at $dev_archive_dir (no journal migration)"
+  fi
 
   write_profile_config
   write_manager_config
@@ -626,6 +727,9 @@ deploy_profile() {
   trap - ERR
   rm -rf --one-file-system "$backup_dir"
   say "deployment complete: ${sha:0:12}"
+  if (( dev_fresh_state )); then
+    say "dev-fresh PASS: current canonical state is new; historical state preserved at $dev_archive_dir"
+  fi
 }
 
 parse_options() {
@@ -646,6 +750,8 @@ parse_options() {
       --manager-port)
         (($# >= 2)) || die "--manager-port requires PORT"
         manager_port="$2"; shift 2 ;;
+      --dev-fresh-state)
+        dev_fresh_state=1; shift ;;
       -h|--help)
         usage; exit 0 ;;
       *) die "unknown option: $1" ;;
@@ -663,6 +769,7 @@ Linux reference deployment for the local Control Station role:
 Commands:
   install   Build immutable runtime, write user-systemd units/config, do not start
   deploy    Activate current clean committed source, restart and verify local runtime
+            --dev-fresh-state: archive old development State and start clean (no migration)
   verify    Verify Console + Manager only; target PPU reachability is reported separately
   status    Show release, target configuration and user-service state
 
@@ -689,6 +796,9 @@ EOF
 command="${1:-help}"
 shift || true
 parse_options "$@"
+if (( dev_fresh_state )) && [[ "$command" != "deploy" ]]; then
+  die "--dev-fresh-state is valid only for deploy"
+fi
 case "$command" in
   install) install_profile ;;
   deploy) deploy_profile ;;
