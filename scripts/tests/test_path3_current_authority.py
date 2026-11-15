@@ -16,6 +16,7 @@ for old in OLD:
     assert not (ROOT / old).exists(), f"Obsolete Path 3 guide restored: {old}"
     assert old.removeprefix("docs/") not in index, f"Obsolete Plan reindexed: {old}"
 assert "docs/development/plasma-path3-codex.md" in agents
+assert "Do not apply retired Issue #981 read-only Pilot" in agents
 assert "guarded-hardware-no-sandbox" in policy
 assert "Use native CLI, SSH, USB/TTY" in policy
 assert "For Path 3-specific execution policy" in policy
