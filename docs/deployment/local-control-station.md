@@ -194,9 +194,9 @@ deployment `NOT_RUN`. This preflight does not supply a maintenance lock.
 ## Development-mode clean State cutover (Replace, Not Migrate)
 
 For the single-owner development laboratory, use **one explicit opt-in** to
-replace the active Control Station's application state with a new empty
-namespace. It does **not** convert historical v1/v2 Journals, copy the old
-Manager registry, preserve old test transactions as live admission evidence,
+replace the active Control Station's transaction state with a new empty
+namespace while retaining Manager pairing. It does **not** convert historical
+v1/v2 Journals, copy old transactions as live admission evidence,
 or silently acknowledge UNKNOWN outcomes.
 
 ```bash
@@ -213,10 +213,11 @@ production upgrade. It preserves all old data without deletion, by moving the
 entire existing `~/.local/state/plasma/local-control-station` directory to
 a timestamped `local-control-station.archive.*` sibling. Only after the
 Console and Manager services are stopped, with PPU execution still observed
-idle, is a new empty State directory created. Old Journal/registry/pairing
-data remain in the archived directory; the new Manager starts with its
-current canonical schema and configured PPU seed. New device enrollment or
-commissioning may be required after the clean reset.
+idle, is a new State directory created. Old Journals remain only in the
+archive. Existing `registry.json` and `bootstrap-credentials.json` are copied
+unchanged into the new State, preserving the paired Device ID, Controller ID,
+generation and credential; absent files remain absent for an unpaired install.
+The Manager uses the configured PPU seed only when no Registry file exists.
 
 The immutable new release is constructed **before** stopping the services.
 The CLI checks the configured PPU's read-only `GET /api/status` before
