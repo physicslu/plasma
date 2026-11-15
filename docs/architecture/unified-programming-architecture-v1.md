@@ -422,6 +422,20 @@ found in the source, and no bounded starvation or latency measurement exists. **
 concurrency must not be claimed, enabled by default, or implied in any UI.** Raising concurrency
 is a separate Gate 1 with its own hardware acceptance.
 
+### 7.1 Accepted future Scheduler / Repeat / Work Order direction (ADR-0010)
+
+The **current implementation remains sequential** and the existing Manager API still
+rejects `repeat != 1`. The owner-approved 2026-11-15 [Unified 8-Site Scheduler,
+Manual Repeat and Work Order Quantity v1](unified-8site-scheduler-repeat-work-order-v1.md)
+freezes a **future** replacement: EMode/PMode share one Scheduler/Repeat Engine,
+Manual 1..10000 Cycles per Site with optional new-IC acknowledgement, and
+Automation Work Order `target_quantity` as **one global PASS-unit quota**.
+Retry, Cycle, physical Presentation and Work Order units are distinct; Sites
+may overlap only after qualifying PPU/PL/fixture safety and journal recovery.
+This cross-reference **does not** claim the future policy is accepted by the
+current REST API or hardware, and does not override the fail-closed
+unknown-outcome, owner or SAFE_OFF invariants above.
+
 ## 8. Device Personalization (D-4)
 
 Generic contract only. This section freezes **responsibilities and the extension boundary**; it
