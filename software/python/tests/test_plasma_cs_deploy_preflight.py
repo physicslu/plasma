@@ -136,3 +136,119 @@ def test_deployment_hook_runs_preflight_twice_and_never_uses_z2_ssh() -> None:
     assert section.index("run_deployment_preflight") < section.index("prepare_release")
     assert "plasma_cs_deploy_preflight.py" in code
     assert "ssh " not in section
+
+
+START_ID = "a" * 32
+OTHER_START_ID = "b" * 32
+
+
+def set_starts(state: Path, starts: list[dict], runs: list[dict] | None = None) -> None:
+    path = state / "bundle-programming-runs.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["starts"] = starts
+    if runs is not None:
+        data["runs"] = runs
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def start_record(kind: str = "batch", status: str = "ISSUED", **extra) -> dict:
+    return {"start_id": START_ID, "kind": kind, "state": status, **extra}
+
+
+def completed_v2_batch(start_id: str = START_ID) -> dict:
+    return {"batch_id": "batch-1", "start_id": start_id,
+            "state": "finished", "execution_status": "COMPLETED", "outcome": "PASS",
+            "units": [{"outcome": "PASS", "attempts": [{"outcome": "PASS"}]}]}
+
+
+def test_consumed_start_requires_matching_batch(state: Path) -> None:
+    set_starts(state, [start_record(status="CONSUMED", batch_id="batch-1")])
+    with pytest.raises(preflight.Blocked, match="admitted Batch record missing"):
+        check(state)
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2",
+                  "batches", [completed_v2_batch()])
+    assert check(state)["journal"]["starts"] == 1
+
+
+def test_consumed_batch_identity_mismatch_blocks(state: Path) -> None:
+    set_starts(state, [start_record(status="CONSUMED", batch_id="batch-1")])
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2",
+                  "batches", [completed_v2_batch(OTHER_START_ID)])
+    with pytest.raises(preflight.Blocked, match="admitted Batch record missing"):
+        check(state)
+
+
+def test_consumed_start_requires_matching_run(state: Path) -> None:
+    set_starts(state, [start_record(kind="run", status="CONSUMED", run_id="run-1")])
+    with pytest.raises(preflight.Blocked, match="admitted Run record missing"):
+        check(state)
+    set_starts(state, [start_record(kind="run", status="CONSUMED", run_id="run-1")],
+               [{"run_id": "run-1", "plan": {"plan_id": START_ID}, "outcome": "PASS"}])
+    assert check(state)["result"] == "PASS"
+
+
+def test_consumed_run_unknown_requires_explicit_acknowledgement(state: Path) -> None:
+    record = start_record(kind="run", status="CONSUMED", run_id="run-1")
+    run = {"run_id": "run-1", "plan": {"plan_id": START_ID},
+           "outcome": "OUTCOME_UNKNOWN", "acknowledged": False}
+    set_starts(state, [record], [run])
+    with pytest.raises(preflight.Blocked, match="unknown/unacknowledged"):
+        check(state)
+    run["acknowledged"] = True
+    set_starts(state, [record], [run])
+    assert check(state)["result"] == "PASS"
+
+
+def test_issued_start_must_be_reconciled_not_accepted(state: Path, monkeypatch) -> None:
+    set_starts(state, [start_record()])
+    def pending(url: str) -> dict:
+        if "/api/programming/starts/" in url:
+            return {"ok": True, "reconciliation": {
+                "start_id": START_ID, "kind": "batch", "read_only": True,
+                "state": "ACCEPTANCE_PENDING"}}
+        return fake_http(url)
+    monkeypatch.setattr(preflight, "http_json", pending)
+    with pytest.raises(preflight.Blocked, match="admission not proved inactive"):
+        check(state)
+
+    def expired(url: str) -> dict:
+        value = pending(url)
+        if "/api/programming/starts/" in url:
+            value["reconciliation"]["state"] = "NOT_ACCEPTED"
+        return value
+    monkeypatch.setattr(preflight, "http_json", expired)
+    assert check(state)["journal"]["starts"] == 1
+
+
+def test_issued_start_reconciliation_mismatch_fails_closed(state: Path, monkeypatch) -> None:
+    set_starts(state, [start_record()])
+    def wrong(url: str) -> dict:
+        if "/api/programming/starts/" in url:
+            return {"ok": True, "reconciliation": {
+                "start_id": OTHER_START_ID, "kind": "batch", "read_only": True,
+                "state": "NOT_ACCEPTED"}}
+        return fake_http(url)
+    monkeypatch.setattr(preflight, "http_json", wrong)
+    with pytest.raises(preflight.Blocked, match="admission not proved inactive"):
+        check(state)
+
+
+def test_voided_start_has_no_admitted_transaction(state: Path) -> None:
+    set_starts(state, [start_record(status="VOIDED")])
+    assert check(state)["journal"]["starts"] == 1
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2",
+                  "batches", [completed_v2_batch()])
+    with pytest.raises(preflight.Blocked, match="voided Start has admitted"):
+        check(state)
+
+
+def test_duplicate_or_invalid_starts_block(state: Path) -> None:
+    set_starts(state, [start_record(status="VOIDED"), start_record(status="VOIDED")])
+    with pytest.raises(preflight.Blocked, match="duplicate/invalid"):
+        check(state)
+    set_starts(state, [start_record(status="SURPRISE")])
+    with pytest.raises(preflight.Blocked, match="duplicate/invalid"):
+        check(state)
