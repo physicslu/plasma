@@ -11,9 +11,15 @@ is performed here.
 
 ## One entrypoint for Path 2 and Path 3
 
-Both trusted engineering Paths invoke the identical CLI. Path 3 must have an
-independently qualified execution identity and physical USB/Manager access:
-the restricted read-only SWPC Codex Runner is **not** qualified to run Flash.
+Both trusted engineering Paths invoke the identical CLI. Current Path 3
+already supports owner-approved guarded-hardware Work Orders and native
+SSH/USB/TTY tools on the existing `SWPC-plasma-codex` Runner. The earlier
+read-only pilot is historical, not a blanket prohibition on Flash. Live
+execution must still prove the active worker's effective Linux UID/groups,
+USB CDC device ACL, Manager/Console ownership, authorized Z2 transport and
+per-Job safety/admission; UID 1000 service ownership must not be inferred
+from a different Runner UID or from sandbox configuration. No new Runner
+or third approval Gate is required.
 
 ```bash
 cd "$PLASMA_REPO"  # authorized SWPC engineering checkout
