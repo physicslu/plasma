@@ -86,6 +86,13 @@ def test_smoke_and_burnin_separate_sequences() -> None:
         hil.sequence("smoke", 2)
 
 
+def test_live_hil_is_swpc_linux_only() -> None:
+    if hil.sys.platform == "linux":
+        hil.require_swpc_hostname("SWPC")
+    with pytest.raises(hil.HILFailure, match="restricted to the SWPC"):
+        hil.require_swpc_hostname("untrusted-runner")
+
+
 def test_external_manager_rejected() -> None:
     with pytest.raises(hil.HILFailure, match="SWPC loopback"):
         hil.require_loopback("http://192.168.2.99:18280")
@@ -131,6 +138,7 @@ def test_no_resubmit_on_unknown_batch_post() -> None:
     with pytest.raises(hil.HILFailure, match="start_id="):
         hil.one_attempt(manager, "z2", 2, IMAGE, 10, 1)
     assert [x[1] for x in manager.calls].count("/api/programming/batches") == 1
+    assert manager.last_start_id == START_ID
 
 
 @pytest.mark.parametrize("bad_field,bad_value", [
