@@ -39,7 +39,9 @@ PLASMA is a configurable, multi-Site IC programmer; **PPU means Plasma Programmi
 
 SWPC may build/test OpenOCD offline but must **not** host live OpenOCD or forward per-bit SWD traffic as the product path. Changing this placement requires an explicit revised Gate 1 architecture decision plus synchronized contract, implementation and CI. See [OpenOCD architecture](docs/architecture/ic-support-openocd-plan-executor.md).
 
-**Current Z2 Blue Pill physical SWD path (normative):** Z2 PS-local OpenOCD → WordPort → paired PL image → PMOD. Do not select retired SWD entrypoints. Details: [SWD retirement](docs/development/swd-legacy-path-retirement.md) and the FPGA / Embedded contracts.
+**ST-LINK control group (owner-approved 2026-11-15):** an ST-LINK attached to SWPC may run OpenOCD against a DUT as an independent verification control group (for example, reading DPIDR to separate a DUT fault from a Z2/PL/wiring fault). It is not the product path, and its result is never Site, Z2 or E/P/V evidence. It may stay wired alongside the Z2 PMOD; the operator must not drive both at the same time.
+
+**Current Z2 Blue Pill physical SWD path (normative):** Z2 PS-local OpenOCD `plasma_swd` adapter → paired PL ABI-v5 SWD engine image → PMOD (WordPort/Remote Bitbang is kept only as an experiment/comparison path). Do not select retired SWD entrypoints. Details: [SWD retirement](docs/development/swd-legacy-path-retirement.md) and the FPGA / Embedded contracts.
 
 ## Domain contract routing (normative)
 

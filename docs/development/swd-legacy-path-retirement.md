@@ -37,7 +37,7 @@ The direct legacy Python CLI guards prevent ordinary `python -m ...` execution, 
 ## Operator / Codex selection rule
 
 1. Confirm the actual current Git worktree, SHA and owner-approved Gate 1 hardware scope. Old Worktrees and historical README search hits do not define current architecture.
-2. Only select Z2 PS-local ARMv7 OpenOCD, reviewed UNIX WordPort bridge, exact paired PL Image/Manifest and physical PMOD wiring for external MCU; never select either retired project by name or alphabetical order.
-3. Require live Z2 Boot ID, Root source SHA and manifest, FPGA Manager load/current image/owner-lock/MMIO lease, validated Golden recovery and legal 3.3V/common-ground/no competing SWD driver. LA2016 passively observes signal only.
+2. Only select Z2 PS-local ARMv7 OpenOCD with the `plasma_swd` adapter, exact paired PL ABI-v5 Image/Manifest and physical PMOD wiring for external MCU; never select either retired project by name or alphabetical order.
+3. Require live Z2 Boot ID, Root source SHA and manifest, FPGA Manager load/current image/owner-lock/MMIO lease, validated Golden recovery and legal 3.3V/common-ground. An ST-LINK control group may stay wired to the same DUT (owner decision 2026-11-15); the operator must not drive it and Z2 at the same time. LA2016 passively observes signal only.
 4. 2026-10-23 ST-LINK true successful Golden DPIDR `0x1BA01477` is independent reference. SWD-03 synthetic `0x2BA01477` is **not** the real DUT. Record fresh `.sr` capture and local OpenOCD/WordPort command exits; absent physical evidence is NOT_RUN, even if GitHub job exits zero.
 5. Retained shared code exists only for proven imports and host regressions; migrate those consumers before future physical deletion. Do not conflate retirement of old **Image selection** with deletion of shared FPGA safety locks or `one_shot` code.

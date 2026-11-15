@@ -84,8 +84,9 @@ of the approved Path 3 work order; do not silently change a scoped task.
 An authenticated Path 3 hardware Work Order may carry an artifact_source object
 containing exactly source_sha (40-digit commit) and run_id (successful Z2 PS
 release CI run). The trusted GitHub Actions step checks producer repository,
-workflow, push to main, complete source SHA, successful conclusion, Artifact
-identity, expiry and ZIP SHA-256. It then verifies the Kit sidecar, complete
+workflow, main branch with event push or a first-attempt manual
+workflow_dispatch started by the repository owner, complete source SHA,
+successful conclusion, Artifact identity, expiry and ZIP SHA-256. It then verifies the Kit sidecar, complete
 internal SHA256SUMS, and embedded PPU release.json source identity. Only
 verified Kit and Sidecar paths are exported to the Path 3 subprocess.
 The token remains confined to the trusted Actions step. No fixed release is
