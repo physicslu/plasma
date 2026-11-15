@@ -16,6 +16,7 @@ import signal
 import stat
 import subprocess
 import threading
+import time
 
 SYS = Path("/sys")
 PROC = Path("/proc")
@@ -34,6 +35,8 @@ GLOBAL_LOCK = OWNER_DIR / "supervisor.lock"
 # Additional additive fence: each SWD Site holds LOCK_SH, Root reload LOCK_EX.
 # Root Guard source-pin, provenance and supervisor.lock remain authoritative.
 PPU_RELOAD_FENCE = Path("/run/lock/plasma-mmio.lock")
+# Bounded wait so two concurrent Site admissions serialize instead of failing.
+SITE_ADMISSION_SUPERVISOR_WAIT_S = 30.0
 MANAGER = SYS / "class/fpga_manager/fpga0"
 
 
@@ -182,14 +185,114 @@ def scan_kernel_owners(*, sysroot: Path, release) -> tuple[list[str], list[str]]
     return uio, platform
 
 
+def site_lock_path(site: int) -> Path:
+    """The native ``plasma_swd`` per-Site EX lock (``<fence>.site-N``)."""
+    need(site in (1, 2), "SITE_INVALID")
+    return PPU_RELOAD_FENCE.with_name(f"{PPU_RELOAD_FENCE.name}.site-{site}")
+
+
+def site_admission_records() -> set[int]:
+    """Sites holding an un-revoked Root admission record (any state)."""
+    return {site for site in (1, 2)
+            if os.path.lexists(OWNER_DIR / f"swd-site{site}-admission")}
+
+
+def _site_record(site: int) -> dict | None:
+    """A root-private ``key=value`` admission record, or None if unusable."""
+    path = OWNER_DIR / f"swd-site{site}-admission"
+    try:
+        info = os.lstat(path)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or
+                info.st_mode & 0o077 or info.st_size > 8192):
+            return None
+        fields = dict(line.split("=", 1)
+                      for line in path.read_text().splitlines() if "=" in line)
+    except (OSError, ValueError, UnicodeDecodeError):
+        return None
+    return fields
+
+
+def _proc_flocks(procroot: Path) -> dict[tuple[int, int], set[tuple[str, str]]]:
+    """Granted FLOCKs from /proc/locks: (dev, inode) -> {(pid, READ|WRITE)}."""
+    held: dict[tuple[int, int], set[tuple[str, str]]] = {}
+    for line in (procroot / "locks").read_text().splitlines():
+        fields = line.split()
+        # "<n>: FLOCK ADVISORY WRITE <pid> <maj>:<min>:<ino> 0 EOF";
+        # blocked waiters carry "->" and are not holders.
+        if len(fields) < 6 or fields[1] != "FLOCK" or "->" in fields:
+            continue
+        major, minor, inode = fields[5].split(":")
+        key = (os.makedev(int(major, 16), int(minor, 16)), int(inode))
+        held.setdefault(key, set()).add((fields[4], fields[3]))
+    return held
+
+
+def site_page(release, site: int) -> tuple[int, int]:
+    need(release.site_bitmap == 3 and release.axi_bytes == 0x2000 and
+         site in (1, 2), "SITE_PAGE_DENIED")
+    base = release.axi_base + (site - 1) * 0x1000
+    return base, base + 0x1000
+
+
+def cooperating_site_owners(*, release, admitting_site: int, boot_id: str,
+                            session_id: str, procroot: Path = PROC,
+                            now: float | None = None) -> dict[str, int]:
+    """PIDs proven to be the *other* Site's admitted native owner.
+
+    A PID qualifies only when ALL hold: the other Site has a root-private
+    admission record of this boot and this Root IMAGE session that has not
+    expired; /proc/locks shows that PID as the single WRITE holder of that
+    Site's lock and a READ holder of the PPU fence. Process names are never
+    used. Anything else yields no exemption, so the census stays fail-closed.
+    """
+    need(admitting_site in (1, 2), "SITE_INVALID")
+    now = time.time() if now is None else now
+    held = _proc_flocks(procroot)
+
+    def key(path: Path) -> tuple[int, int] | None:
+        try:
+            info = os.stat(path, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
+        return (info.st_dev, info.st_ino)
+
+    fence = key(PPU_RELOAD_FENCE)
+    owners: dict[str, int] = {}
+    for other in (1, 2):
+        if other == admitting_site:
+            continue
+        record = _site_record(other)
+        try:
+            valid = (record is not None and record.get("site_id") == str(other) and
+                     record.get("boot_id") == boot_id and
+                     record.get("root_image_session_id") == session_id and
+                     int(record.get("record_expires_epoch", "0")) > now)
+        except ValueError:
+            valid = False
+        lock = key(site_lock_path(other))
+        if not valid or lock is None or fence is None:
+            continue
+        writers = [pid for pid, mode in held.get(lock, ()) if mode == "WRITE"]
+        if len(writers) == 1 and (writers[0], "READ") in held.get(fence, ()):
+            owners[writers[0]] = other
+    return owners
+
+
 def scan_proc_consumers(*, procroot: Path, release,
-                        diagnostic: dict | None = None) -> tuple[bool, list[str]]:
+                        diagnostic: dict | None = None,
+                        cooperating: dict[str, int] | None = None,
+                        ) -> tuple[bool, list[str]]:
     """Fail-closed /proc owner census; retry only a confirmed vanished PID.
 
     A vanished process invalidates that snapshot. We restart the *whole*
     read-only census, never just skip that PID. Existing conflicts, denied
     visibility or still-live but unreadable PIDs are not retryable.
+
+    ``cooperating`` (Site admission only) maps a PID proven by
+    ``cooperating_site_owners`` to its Site: that PID may hold ``/dev/mem``
+    and map exactly inside its own Site page, nothing else.
     """
+    cooperating = cooperating or {}
     for attempt in range(1, 4):
         conflicts, observed = [], 0
         try:
@@ -216,9 +319,13 @@ def scan_proc_consumers(*, procroot: Path, release,
                 phase = "MAPS"
                 maps = (item / "maps").read_text()
                 observed += 1
+                page = (site_page(release, cooperating[item.name])
+                        if item.name in cooperating else None)
                 for target in targets:
                     need(bool(target) and target != "UNKNOWN",
                          "INCOMPLETE_FD_OBSERVATION")
+                    if target == "/dev/mem" and page is not None:
+                        continue
                     if target.startswith("/dev/uio") or target.split(" (deleted)")[0] in (
                             "/dev/mem", "/dev/xdevcfg", "/dev/fpga0"):
                         conflicts.append(item.name)
@@ -235,7 +342,9 @@ def scan_proc_consumers(*, procroot: Path, release,
                         lo, hi = (int(x, 16) for x in fields[0].split("-"))
                         offset = int(fields[2], 16)
                         if overlaps(offset, hi - lo, release.owner_base,
-                                    release.owner_bytes):
+                                    release.owner_bytes) and not (
+                                page is not None and page[0] <= offset and
+                                offset + (hi - lo) <= page[1]):
                             conflicts.append(item.name)
             except (FileNotFoundError, PermissionError, OSError, ValueError) as exc:
                 # Never retry a known conflict even if another process vanished.
@@ -273,7 +382,8 @@ def scan_proc_consumers(*, procroot: Path, release,
     raise AssertionError("unreachable bounded process scan")
 
 
-def read_live_z2_facts(*, release, runtime_program_session: bool = False) -> dict:
+def read_live_z2_facts(*, release, runtime_program_session: bool = False,
+                       cooperating: dict[str, int] | None = None) -> dict:
     """Keep kernel/image guards; runtime WordPort does not census all PIDs.
 
     Runtime call requires the same protected FPGA lock and is NOT a safe
@@ -303,7 +413,8 @@ def read_live_z2_facts(*, release, runtime_program_session: bool = False) -> dic
     else:
         proc_diagnostic = {}
         complete, conflicts = scan_proc_consumers(
-            procroot=PROC, release=release, diagnostic=proc_diagnostic)
+            procroot=PROC, release=release, diagnostic=proc_diagnostic,
+            cooperating=cooperating)
     boot_after = (PROC / "sys/kernel/random/boot_id").read_text().strip()
     need(boot_before == boot_after, "BOOT_CHANGED_DURING_SCAN")
     return {
@@ -326,6 +437,8 @@ class RootZ2TargetPort:
         self._lock_owner_pid = None
         self._lock_owner_thread = None
         self._reload_fence_fd: int | None = None
+        self._site: int | None = None
+        self._site_session: tuple[str, str] | None = None
 
     def _require_locked(self) -> None:
         need(self._locked and self._lock_owner_pid == os.getpid() and
@@ -333,19 +446,40 @@ class RootZ2TargetPort:
              "FPGA_OWNER_LOCK_REQUIRED")
 
     @contextmanager
-    def exclusive(self):
+    def exclusive(self, *, site: int | None = None):
+        """Root owner. ``site=None``: PPU reload, fence EX (unchanged).
+
+        ``site=1|2`` (ADR-0007 Site admission only): the same supervisor
+        lock, waited for a bounded time so two Site admissions serialize;
+        the PPU fence SH, so another Site's running OpenOCD (also SH) stays
+        compatible while any reload (EX) is excluded; and this Site's lock
+        EX for the admission itself. A Site admission record is the
+        admission-to-attach reservation: a second admission of the same Site
+        and every reload are refused while any record exists.
+        """
         need(os.geteuid() == 0, "Z2_ROOT_REQUIRED")
         need(not self._locked, "REENTRANT_TARGET_LOCK_DENIED")
+        need(site in (None, 1, 2), "SITE_INVALID")
         OWNER_DIR.mkdir(mode=0o700, exist_ok=True)
         protected(GLOBAL_LOCK.parent, file=False)
         fd = os.open(GLOBAL_LOCK, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-        fence_fd = None
+        fence_fd = site_fd = None
         try:
             st = os.fstat(fd)
             need(stat.S_ISREG(st.st_mode) and st.st_uid == 0 and
                  st.st_nlink == 1 and st.st_mode & 0o077 == 0,
                  "GLOBAL_FPGA_LOCK_UNTRUSTED")
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if site is None:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            else:
+                deadline = time.monotonic() + SITE_ADMISSION_SUPERVISOR_WAIT_S
+                while True:
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        need(time.monotonic() < deadline, "ROOT_SUPERVISOR_BUSY")
+                        time.sleep(0.05)
             # Existing exclusive Root Guard is held FIRST. The same PPU
             # lock is held SH by all new per-Site SWD processes; reload
             # cannot run until every cooperating Site releases. This is
@@ -356,20 +490,51 @@ class RootZ2TargetPort:
             need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
                  st.st_mode & 0o002 == 0,
                  "PPU_RELOAD_FENCE_UNTRUSTED")
-            fcntl.flock(fence_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if site is None:
+                fcntl.flock(fence_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # No reload between a Site admission and its OpenOCD attach.
+                need(not site_admission_records(), "SITE_ADMISSION_RECORD_PRESENT")
+            else:
+                try:
+                    fcntl.flock(fence_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    need(False, "PPU_RELOAD_IN_PROGRESS")
+                site_fd = os.open(site_lock_path(site),
+                                  os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+                st = os.fstat(site_fd)
+                need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
+                     st.st_mode & 0o002 == 0, "SITE_LOCK_UNTRUSTED")
+                try:
+                    fcntl.flock(site_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    need(False, "SITE_OWNER_PRESENT")
+                need(site not in site_admission_records(),
+                     "SITE_ADMISSION_RECORD_PRESENT")
             self._locked = True
             self._lock_owner_pid = os.getpid()
             self._lock_owner_thread = threading.get_ident()
-            self._reload_fence_fd = fence_fd
+            self._reload_fence_fd = fence_fd if site is None else None
+            self._site = site
             yield self
         finally:
             self._locked = False
             self._lock_owner_pid = None
             self._lock_owner_thread = None
             self._reload_fence_fd = None
+            self._site = None
+            self._site_session = None
+            if site_fd is not None:
+                os.close(site_fd)
             if fence_fd is not None:
                 os.close(fence_fd)
             os.close(fd)
+
+    def bind_site_session(self, *, boot_id: str, session_id: str) -> None:
+        """Pin the Root IMAGE session a cooperating Site record must match."""
+        self._require_locked()
+        need(self._site is not None and type(boot_id) is str and boot_id and
+             type(session_id) is str and session_id, "SITE_SESSION_BINDING_INVALID")
+        self._site_session = (boot_id, session_id)
 
     def inherited_reload_fence(self) -> int:
         """Return the held Root flock FD only to a bounded identity child."""
@@ -380,7 +545,14 @@ class RootZ2TargetPort:
 
     def current_facts(self) -> dict:
         self._require_locked()
-        return read_live_z2_facts(release=self.release)
+        cooperating = None
+        if self._site is not None:
+            # Unbound Site admission exempts nothing (fail-closed).
+            cooperating = (cooperating_site_owners(
+                release=self.release, admitting_site=self._site,
+                boot_id=self._site_session[0], session_id=self._site_session[1])
+                if self._site_session is not None else {})
+        return read_live_z2_facts(release=self.release, cooperating=cooperating)
 
     def runtime_program_facts(self) -> dict:
         """Read-only program admission, never FPGA reconfiguration authority."""
