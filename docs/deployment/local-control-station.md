@@ -146,6 +146,27 @@ These are intentional `local-control-station` profile defaults, not replacements
 
 `install` builds an immutable release, writes profile configuration and user-systemd units, and enables the units. It does not start them.
 
+## Engineering deploy preflight (SWPC)
+
+Before constructing a release, and **again immediately before changing the active
+release**, `plasmactl deploy local-control-station` runs the read-only
+`scripts/plasma_cs_deploy_preflight.py`:
+
+- checks legacy/v2 Manager Batch journals and the Run/Start journal without
+  modifying or deleting evidence;
+- blocks an active, unresolved or `OUTCOME_UNKNOWN` attempt or Run;
+- requires local Manager health and an observable, idle PPU execution owner
+  (`GET /api/status`: no busy owner, no active Job);
+- fails closed when journal data is unreadable or PPU execution cannot be
+  observed. It does **not** retry, stop or resubmit Jobs.
+
+This gate protects against deployment with a job already in flight. It is **not
+an atomic Manager admission barrier**: a concurrent operator could start a new
+Batch after the final snapshot. A true quiesce/maintenance transaction must be
+implemented before claiming race-free unattended or factory deployment.
+SWPC HIL programming is separately controlled and does not implicitly run from
+`deploy`. GitHub PR CI does not run any physical programming.
+
 ## Deploy
 
 ```bash
