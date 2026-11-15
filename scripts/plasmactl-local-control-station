@@ -568,6 +568,17 @@ backup_file_if_present() {
   [[ -f "$source" ]] && cp -a "$source" "$target"
 }
 
+run_deployment_preflight() {
+  # This is a read-only transaction/PPU-idle snapshot, not an admission lock.
+  # Check again after the possibly lengthy release build, before changing
+  # the current release or restarting the Manager.
+  "$base_python" "$repo_root/scripts/plasma_cs_deploy_preflight.py" \
+    --state-dir "$state_dir" \
+    --manager-url "http://$manager_host:$manager_port" \
+    --ppu-endpoint "$ppu_endpoint" || \
+      die "deployment blocked by Manager transaction or PPU execution preflight"
+}
+
 deploy_profile() {
   require_linux_user_runtime
   require_command git
@@ -576,11 +587,13 @@ deploy_profile() {
   validate_settings
   require_clean_source
   require_owned_installation
+  run_deployment_preflight
 
   local sha release previous_release backup_dir
   sha="$(current_sha)"
   prepare_release "$sha"
   release="$prepared_release"
+  run_deployment_preflight
   previous_release="$(readlink -f "$current_link")"
   backup_dir="$(mktemp -d "$state_dir/deploy-backup.XXXXXX")"
   backup_file_if_present "$config_file" "$backup_dir/profile.env"
