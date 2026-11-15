@@ -77,7 +77,7 @@ host contract behavior only, not physical PPU/ABI/Site readiness.
 - `scripts/ppu-bootstrap-deployment.py`
 - `scripts/ppu-bootstrap-service.py`
 - `scripts/ppu-bundle-v3-smoke.py`
-- `scripts/ppu-z2-installer-core.py`
+- `scripts/ppu-z2-installer.py`
 - `scripts/ppu_asset_set.py`
 - `scripts/ppu_deploy_api.py`
 - `scripts/ppu_path2_hardware_baseline.py`

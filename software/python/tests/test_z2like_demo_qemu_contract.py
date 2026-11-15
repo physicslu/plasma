@@ -175,7 +175,7 @@ def test_simulation_reuses_kit_local_deployment_coordinator_and_installer_core()
     source = KIT.read_text(encoding="utf-8")
     assert 'kit_scripts = verified.root / "scripts"' in source
     assert 'coordinator = kit_scripts / "ppu-bootstrap-deployment.py"' in source
-    assert 'installer_core = kit_scripts / "ppu-z2-installer-core.py"' in source
+    assert 'installer_core = kit_scripts / "ppu-z2-installer.py"' in source
     assert 'CORE_OVERRIDE: str(installer_core)' in source
     assert "_install_openocd_from_verified_kit" in source
     assert 'argv.extend(["--api-transaction-id", api_transaction_id])' in source

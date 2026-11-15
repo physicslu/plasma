@@ -27,7 +27,7 @@ the parts already exist on `main` but are not connected:
 
 | Existing part | Location | Status |
 |---|---|---|
-| B3 content-addressed install | `scripts/ppu-z2-installer-core.py::install_verified_bundle_v3` | Physical PASS |
+| B3 content-addressed install | `scripts/ppu-z2-installer.py::install_verified_bundle_v3` | Physical PASS |
 | Active Set pointer + Runtime Job Quiesce | `assets/active.json`, `hold_asset_activation` ([P1](ppu-single-active-asset-set-gate1.md)) | Host-only |
 | FPGA handoff resolution | `resolve_active_fpga_handoff` ([P2](ppu-fpga-asset-handoff-gate1.md)) | Host-only |
 | Root format check + files-only staging | `pl/hil/fpga_image_root.py::validate_bundle_fpga_handoff`, `stage_bundle_fpga_files_only` | Host-only, no caller |
