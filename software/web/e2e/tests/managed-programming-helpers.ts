@@ -367,7 +367,7 @@ export async function mockManager(page: Page, options: {
   // over a Target Set, walking its Sites sequentially like the real one.
   type MockAttempt = { attempt: number; planId: string; runId: string; retry: Record<string, unknown> | null };
   type MockUnit = {
-    siteId: number; status: string; outcome: string | null; reason: string | null;
+    alias: string; siteId: number; status: string; outcome: string | null; reason: string | null;
     failureDomain: string | null; attempts: MockAttempt[];
   };
   type MockBatch = {
@@ -376,9 +376,11 @@ export async function mockManager(page: Page, options: {
   };
   const batches = new Map<string, MockBatch>();
 
-  function batchSites(body: Record<string, unknown>): number[] {
+  function batchSites(body: Record<string, unknown>): Array<{ alias: string; siteId: number }> {
     const targets = (body.targets ?? []) as Array<{ ppu_alias: string; site_ids: number[] }>;
-    return targets.flatMap(target => target.site_ids.map(Number));
+    return targets.flatMap(target => target.site_ids.map(siteId => ({
+      alias: target.ppu_alias, siteId: Number(siteId),
+    })));
   }
 
   function planBodyFor(batch: MockBatch, siteId: number) {
@@ -390,11 +392,11 @@ export async function mockManager(page: Page, options: {
 
   function submitAttempt(batch: MockBatch, unit: MockUnit, planId: string) {
     const runId = hex32(0xb000 + runs.size + 1);
-    runs.set(runId, { alias: batch.alias, planId, polls: 0, acknowledged: false });
+    runs.set(runId, { alias: unit.alias, planId, polls: 0, acknowledged: false });
     unit.attempts.push({ attempt: unit.attempts.length + 1, planId, runId, retry: null });
     unit.status = "RUNNING";
     Object.assign(startRecords.get(planId)!, { state: "CONSUMED", runId });
-    counters.starts.push({ alias: batch.alias, body: { plan_id: planId, confirm: "PROGRAM" } });
+    counters.starts.push({ alias: unit.alias, body: { plan_id: planId, confirm: "PROGRAM" } });
     counters.jobs.push(runRecord(runId).job.job_id);
   }
 
@@ -402,7 +404,7 @@ export async function mockManager(page: Page, options: {
   function startUnit(batch: MockBatch): boolean {
     const unit = batch.units[batch.index];
     if (!unit) return false;
-    const made = makePlan(batch.alias, planBodyFor(batch, unit.siteId), 1);
+    const made = makePlan(unit.alias, planBodyFor(batch, unit.siteId), 1);
     if (!made.payload) {
       // Nothing was submitted for this Site: provably BLOCKED, and the rest
       // of the Batch is untouched.
@@ -419,7 +421,6 @@ export async function mockManager(page: Page, options: {
   /** Move to the next Site, or finish. Returns whether a Job was submitted. */
   function nextUnit(batch: MockBatch): boolean {
     const failed = batch.units.filter(unit => unit.outcome === "FAIL").length;
-    const latched = batch.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN");
     const stop = batch.body.stop_policy as { kind: string; threshold?: number } | undefined;
     batch.index += 1;
     const skip = (reason: string) => {
@@ -438,11 +439,23 @@ export async function mockManager(page: Page, options: {
       finish(batch, null);
       return false;
     }
-    // One PPU: an unknown outcome latches it and skips its remaining Sites.
-    if (latched) return skip("PPU_LATCHED_OUTCOME_UNKNOWN");
     if (batch.stopRequested) return skip("STOP_REQUESTED_NOTHING_SUBMITTED");
     if (stop?.kind === "failed_sites" && failed >= Number(stop.threshold ?? 1)) {
       return skip("STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED");
+    }
+    // UNKNOWN latches only that PPU; other PPUs remain independently admissible.
+    const held = new Set(batch.units.filter(unit => unit.outcome === "OUTCOME_UNKNOWN").map(unit => unit.alias));
+    while (batch.index < batch.units.length && held.has(batch.units[batch.index].alias)) {
+      const next = batch.units[batch.index];
+      next.status = "SKIPPED";
+      next.outcome = "BLOCKED";
+      next.reason = "PPU_LATCHED_OUTCOME_UNKNOWN";
+      next.failureDomain = "TARGET_TRANSACTION_UNKNOWN";
+      batch.index += 1;
+    }
+    if (batch.index >= batch.units.length) {
+      finish(batch, null);
+      return false;
     }
     return startUnit(batch);
   }
@@ -499,7 +512,7 @@ export async function mockManager(page: Page, options: {
       nextUnit(batch);
       return;
     }
-    const made = makePlan(batch.alias, planBodyFor(batch, unit.siteId), last.attempt + 1);
+    const made = makePlan(unit.alias, planBodyFor(batch, unit.siteId), last.attempt + 1);
     submitAttempt(batch, unit, String(made.payload!.plan_id));
   }
 
@@ -508,14 +521,14 @@ export async function mockManager(page: Page, options: {
     const attemptsOf = (unit: MockUnit) => unit.attempts.map(item => {
       const run = runRecord(item.runId);
       return { attempt: item.attempt,
-        job_key: { batch_id: batchId, ppu_alias: batch.alias, site_id: unit.siteId, attempt: item.attempt },
+        job_key: { batch_id: batchId, ppu_alias: unit.alias, site_id: unit.siteId, attempt: item.attempt },
         plan_id: item.planId, run_id: item.runId, job_id: run.job.job_id,
         job_binding_sha256: plans.get(item.planId)!.payload.job_binding_sha256,
         state: run.outcome ? "finished" : "running", outcome: run.outcome, reason: run.reason,
         safe_off: run.receipt?.safe_off ?? null, retry: item.retry };
     });
     const units = batch.units.map(unit => ({
-      ppu_alias: batch.alias, site_id: unit.siteId, status: unit.status, outcome: unit.outcome,
+      ppu_alias: unit.alias, site_id: unit.siteId, status: unit.status, outcome: unit.outcome,
       reason: unit.reason, failure_domain: unit.failureDomain, attempts: attemptsOf(unit),
     }));
     const attempts = units.flatMap(unit => unit.attempts);
@@ -544,7 +557,7 @@ export async function mockManager(page: Page, options: {
     };
     // The projection a single-Site Batch has always carried.
     if (units.length === 1) {
-      record.ppu_alias = batch.alias;
+      record.ppu_alias = units[0].ppu_alias;
       record.site_id = units[0].site_id;
     }
     return record;
@@ -558,7 +571,7 @@ export async function mockManager(page: Page, options: {
     counters.batches.push({ alias, body });
     // A Batch request carries the plan inputs; the Manager plans PER SITE, so
     // the plan counter records the body the first Site is planned with.
-    counters.plans.push({ alias, body: planBodyFor({ alias, body } as MockBatch, batchSites(body)[0]) });
+    counters.plans.push({ alias, body: planBodyFor({ alias, body } as MockBatch, batchSites(body)[0].siteId) });
     if (options.batchStatus) {
       return r.fulfill(json({ ok: false, error: options.batchError ?? { code: "manager_unavailable", message: "Manager unavailable" } }, options.batchStatus));
     }
@@ -571,7 +584,7 @@ export async function mockManager(page: Page, options: {
       return r.fulfill(json({ ok: false, error: { code: "programming_start_not_startable", message: "this start ID is unknown, was already used, was voided or expired; nothing was started" } }, 409));
     }
     const sites = batchSites(body);
-    const first = makePlan(alias, planBodyFor({ alias, body } as MockBatch, sites[0]), 1);
+    const first = makePlan(sites[0].alias, planBodyFor({ alias, body } as MockBatch, sites[0].siteId), 1);
     if (!first.payload) return r.fulfill(json({ ok: false, error: first.error }, first.status));
     const planned = plans.get(String(first.payload.plan_id))!;
     if (planned.script.startError) {
@@ -581,14 +594,14 @@ export async function mockManager(page: Page, options: {
     const batchId = hex32(0xba000 + batches.size + 1);
     const batch: MockBatch = {
       alias, body, stopRequested: false, startId, index: 0, outcome: null, reason: null,
-      units: sites.map(siteId => ({
-        siteId, status: "NOT_RUN", outcome: null, reason: null, failureDomain: null, attempts: [],
+      units: sites.map(({ alias: targetAlias, siteId }) => ({
+        alias: targetAlias, siteId, status: "NOT_RUN", outcome: null, reason: null, failureDomain: null, attempts: [],
       })),
     };
     pendingBatchStarts.delete(startId);
     Object.assign(startRecords.get(startId)!, {
       state: "CONSUMED", batchId, alias, targets: body.targets,
-      siteId: sites.length === 1 ? sites[0] : null,
+      siteId: sites.length === 1 ? sites[0].siteId : null,
     });
     batches.set(batchId, batch);
     submitAttempt(batch, batch.units[0], String(first.payload.plan_id));

@@ -23,16 +23,16 @@ import type {
 import { programmingRunLogLines } from "../programming/programming-run-log";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import {
-  isImageOperation,
-  loadManagedTopology,
-  loadProgrammingRoutes,
-  MANAGED_JOB_POLICY,
-  PROGRAMMING_OPERATION_LABELS,
-  routeOperationsForIc,
-  type ManagedTopology,
-  type ProgrammingSource,
-  type RoutesState,
+  loadManagedTopology, loadProgrammingRoutes,
+  ManagedProgrammingBlocked, ManagedStartOutcomeUnknown,
+  PROGRAMMING_OPERATION_LABELS, batchSiteVerdict, routeDeclaring, routeSequenceOperations,
+  runManagedBatch, runOfUnit,
+  type ManagedTopology, type ProgrammingSource, type RoutesState,
 } from "../programming/managed-programming";
+import { getProgrammingBatch, getStartReconciliation, normalizeOperations,
+  operationsTakeImage, stopProgrammingBatch,
+  type ProgrammingBatch, type SequenceOperation,
+} from "../engineering/bundle-programming-api";
 import { resolveProgrammingCapabilities } from "../programming-capabilities";
 import {
   cancelServerBatch,
@@ -59,9 +59,7 @@ import {
   managedBatchBlocker,
   managedFactoryCatalog,
   managedPpuStatus,
-  MANAGED_PRODUCTION_MODE,
-  ManagedProductionBatch,
-  type ManagedSiteRecord,
+  MANAGED_PRODUCTION_MODE, managedProductionSnapshot,
 } from "./managed-factory-backend";
 import ProductionLogPanel, { type ProductionLogEntry } from "./production-log-panel";
 import "./factory-console-v2.css";
@@ -112,6 +110,8 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const POLL_INTERVAL_MS = 250;
 const POLL_LIMIT = 14_400;
 const ACTIVE_BATCH_STORAGE_KEY = "plasma-production-active-batch-v1";
+const MANAGED_BATCH_STORAGE_KEY = "plasma-managed-production-batch-v1";
+const MANAGED_START_STORAGE_KEY = "plasma-managed-production-start-v1";
 const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
 const operationCodes: Record<Operation, string> = { erase: "E", program: "P", verify: "V", read: "R" };
 
@@ -363,6 +363,30 @@ function clearStoredBatch(): void {
     notifyBatchExecutionActivityChanged();
   } catch { /* optional */ }
 }
+function readManagedBatch(): string | null {
+  try { return window.sessionStorage.getItem(MANAGED_BATCH_STORAGE_KEY); } catch { return null; }
+}
+function writeManagedBatch(id: string): void {
+  try {
+    window.sessionStorage.setItem(MANAGED_BATCH_STORAGE_KEY, id);
+    notifyBatchExecutionActivityChanged();
+  } catch { /* optional */ }
+}
+function clearManagedBatch(): void {
+  try {
+    window.sessionStorage.removeItem(MANAGED_BATCH_STORAGE_KEY);
+    notifyBatchExecutionActivityChanged();
+  } catch { /* optional */ }
+}
+function readManagedStart(): string | null {
+  try { return window.sessionStorage.getItem(MANAGED_START_STORAGE_KEY); } catch { return null; }
+}
+function writeManagedStart(id: string): void {
+  try { window.sessionStorage.setItem(MANAGED_START_STORAGE_KEY, id); } catch { /* optional */ }
+}
+function clearManagedStart(): void {
+  try { window.sessionStorage.removeItem(MANAGED_START_STORAGE_KEY); } catch { /* optional */ }
+}
 
 function formatBatchTime(snapshot: ServerBatchSnapshot | null, now: number): string {
   if (!snapshot?.started_at) return "00:00:00";
@@ -434,11 +458,11 @@ export default function FactoryConsoleV2() {
   const [managedRoutes, setManagedRoutes] = useState<RoutesState | null>(null);
   const [programmingSource, setProgrammingSource] = useState<ProgrammingSource>("image");
   const [managedFile, setManagedFile] = useState<File | null>(null);
-  const [chosenManagedOperation, setChosenManagedOperation] = useState<string | null>(null);
-  // Per-Site Manager runs are written to the Factory Log, the single on-screen
-  // operation record; the Manager keeps the full Run / Job / Receipt evidence.
+  const [managedOperations, setManagedOperations] = useState<SequenceOperation[]>(["erase", "program", "verify"]);
+  const [managedStartHold, setManagedStartHold] = useState<string | null>(null);
+  const [managedBatchRecoveryId, setManagedBatchRecoveryId] = useState<string | null>(null);
+  // Factory Log is a read-only view of the Manager's per-Site Job/Receipt truth.
   const loggedRecords = useRef(new Map<string, string>());
-  const managedBatchRef = useRef<ManagedProductionBatch | null>(null);
   const managedStartLock = useRef(false);
 
   const logSequence = useRef(0);
@@ -458,21 +482,36 @@ export default function FactoryConsoleV2() {
     }].slice(-500));
   }, []);
 
-  /** One Log record per Site as soon as its Manager run or its note is final. */
-  const logManagedRecords = useCallback((records: ManagedSiteRecord[]) => {
-    for (const record of records) {
-      const finished = record.run?.outcome != null;
-      if (!finished && !record.note) continue;
-      const signature = `${record.run?.run_id ?? "—"}:${record.run?.outcome ?? "—"}:${record.note ?? "—"}`;
-      if (loggedRecords.current.get(record.key) === signature) continue;
-      loggedRecords.current.set(record.key, signature);
-      const site = `PPU ${record.alias} · PPU ID ${record.ppuId ?? "unknown"} · ${siteLabel(record.siteId)}`;
-      if (record.run) {
-        for (const line of programmingRunLogLines(record.run, { executionInterface: record.siteInterface })) {
-          appendLog(`${line} · ${site}`, record.run.outcome === "PASS" ? "INFO" : "ERROR");
+  /** Never treat a Batch-level HTTP result as a Site PASS. */
+  const logManagedBatch = useCallback((batch: ProgrammingBatch, topology: ManagedTopology | null) => {
+    for (const unit of batch.units) {
+      const last = unit.attempts[unit.attempts.length - 1] ?? null;
+      if (unit.outcome == null && last?.outcome == null) continue;
+      const key = `${batch.batch_id}:${unit.ppu_alias}:${unit.site_id}`;
+      const verdict = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
+      const signature = `${verdict.verdict}:${last?.attempt ?? 0}:${last?.outcome ?? "—"}`;
+      if (loggedRecords.current.get(key) === signature) continue;
+      loggedRecords.current.set(key, signature);
+      const ppu = topology?.ppus.find(item => item.alias === unit.ppu_alias);
+      const interfaceName = ppu?.sites.find(site => site.site_id === unit.site_id)?.interface ?? "unknown";
+      const label = `PPU ${unit.ppu_alias} · PPU ID ${ppu?.ppuId ?? "unknown"} · ${siteLabel(unit.site_id)}`;
+      const latestRun = runOfUnit(batch, unit);
+      if (latestRun?.outcome != null) {
+        if (latestRun.outcome === "PASS" && verdict.verdict !== "PASS") {
+          appendLog(`[EVIDENCE] MANAGER RUN PASS REJECTED · ${verdict.reason ?? "unverified receipt"} · ${label}`, "ERROR");
+        } else {
+          for (const line of programmingRunLogLines(latestRun, { executionInterface: interfaceName })) {
+            appendLog(`${line} · ${label}`, verdict.verdict === "PASS" ? "INFO" : "ERROR");
+          }
         }
       }
-      if (record.note) appendLog(`[SITE] ${site} · ${record.note}`, "WARN");
+      appendLog(`[SITE] ${label} · ${verdict.verdict} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${last?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${verdict.reason ?? unit.reason ? " · " + (verdict.reason ?? unit.reason) : ""}`,
+        verdict.verdict === "PASS" ? "INFO" : "WARN");
+      if (unit.outcome === "PASS" || unit.outcome === "FAIL") {
+        appendLog(interfaceName === "mock"
+          ? `[EVIDENCE] MOCK RESULT · Site interface mock · ${label} · never a hardware qualification`
+          : `[EVIDENCE] Site interface: ${interfaceName} · ${label}`);
+      }
     }
   }, [appendLog]);
 
@@ -488,7 +527,7 @@ export default function FactoryConsoleV2() {
 
   const finalizeBatch = useCallback((snapshot: ServerBatchSnapshot) => {
     if (!terminalServerBatchStates.has(snapshot.state)) return;
-    clearStoredBatch();
+    if (managed) clearManagedBatch(); else clearStoredBatch();
     endActivity();
     setBatchObservationState("connected");
     if (terminalBatchRef.current === snapshot.batch_id) return;
@@ -496,7 +535,7 @@ export default function FactoryConsoleV2() {
     pollGenerationRef.current += 1;
     appendLog(`[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.completed_rounds), 0)} · FAIL ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0)} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0}`,
       snapshot.state === "error" ? "ERROR" : snapshot.state === "cancelled" || snapshot.state === "partial" ? "WARN" : "INFO");
-  }, [appendLog, endActivity]);
+  }, [appendLog, endActivity, managed]);
 
   const applyBatchSnapshot = useCallback((next: ServerBatchSnapshot, sourceCatalog: EngineeringTargetCatalog) => {
     setBatchSnapshot(next);
@@ -543,13 +582,7 @@ export default function FactoryConsoleV2() {
       if (pollGenerationRef.current !== generation) return;
       let next: ServerBatchSnapshot;
       try {
-        const managedBatch = managedBatchRef.current;
-        if (managedBatch?.batchId === batchId) {
-          next = managedBatch.snapshot();
-          logManagedRecords(managedBatch.records());
-        } else {
-          next = await getServerBatch(apiBase, batchId);
-        }
+        next = await getServerBatch(apiBase, batchId);
       } catch (error) {
         if (pollGenerationRef.current !== generation) return;
         consecutiveFailures += 1;
@@ -577,7 +610,56 @@ export default function FactoryConsoleV2() {
     }
     endActivity();
     appendLog(`[BAT] OBSERVATION TIMEOUT · ${batchId}`, "ERROR");
-  }, [apiBase, appendLog, applyBatchSnapshot, endActivity, logManagedRecords]);
+  }, [apiBase, appendLog, applyBatchSnapshot, endActivity]);
+
+  /** Reload-safe read-only observer of an accepted Manager-owned Batch. */
+  const pollManagedBatch = useCallback(async (
+    batchId: string, sourceCatalog: EngineeringTargetCatalog, generation: number, topology: ManagedTopology,
+  ) => {
+    let failures = 0;
+    for (let attempt = 0; attempt < POLL_LIMIT; attempt += 1) {
+      if (pollGenerationRef.current !== generation) return;
+      try {
+        const current = await getProgrammingBatch(batchId);
+        if (pollGenerationRef.current !== generation) return;
+        const heldStart = readManagedStart();
+        if (current.batch_id !== batchId || (heldStart && current.start_id !== heldStart)) {
+          throw new Error("Manager Batch/Start identity mismatch");
+        }
+        failures = 0;
+        setBatchObservationState("connected");
+        setGatewayHealth("online");
+        const snapshot = managedProductionSnapshot(current, topology);
+        // Persist UNKNOWN/falsely reported PASS *before* a terminal snapshot
+        // clears the ordinary active Batch ID. Reload must never unlock it.
+        if (current.outcome == null || current.outcome === "OUTCOME_UNKNOWN"
+            || current.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+            || (current.outcome === "PASS" && snapshot.state !== "success")) {
+          if (/^[0-9a-f]{32}$/.test(current.start_id)) {
+            writeManagedStart(current.start_id);
+            setManagedStartHold(current.start_id);
+          }
+        }
+        if (current.outcome != null && current.outcome !== "OUTCOME_UNKNOWN" && !current.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+            && !(current.outcome === "PASS" && snapshot.state !== "success")) {
+          clearManagedStart();
+          setManagedStartHold(null);
+        }
+        applyBatchSnapshot(snapshot, sourceCatalog);
+        logManagedBatch(current, topology);
+        if (current.outcome != null) return;
+      } catch (reason) {
+        failures += 1;
+        if (pollGenerationRef.current !== generation) return;
+        setBatchObservationState("reconnecting");
+        appendLog(`[BAT] MANAGER JOURNAL UNAVAILABLE · ${batchId} · ${reason instanceof Error ? reason.message : "unknown"} · no resubmission`, "WARN");
+        await delay(Math.min(POLL_INTERVAL_MS * 2 ** Math.min(failures, 5), 5000));
+        continue;
+      }
+      await delay(POLL_INTERVAL_MS);
+    }
+    appendLog(`[BAT] MANAGER OBSERVATION EXHAUSTED · ${batchId}; still held for read-only recovery`, "ERROR");
+  }, [appendLog, applyBatchSnapshot, logManagedBatch]);
 
   const loadSelectionRuntimes = useCallback(async (sourceCatalog: EngineeringTargetCatalog, selection: SelectionMap) => {
     const generation = ++runtimeRecoveryGenerationRef.current;
@@ -673,10 +755,19 @@ export default function FactoryConsoleV2() {
     if (!workspaceHydrated) return;
     let stopped = false;
     void (async () => {
+      await Promise.resolve();
+      if (stopped) return;
+      // Durable transaction safety does not depend on Fleet/Route availability.
+      if (managed) {
+        setManagedStartHold(readManagedStart());
+        setManagedBatchRecoveryId(readManagedBatch());
+      }
       try {
         let nextCatalog: EngineeringTargetCatalog;
+        let restoredTopology: ManagedTopology | null = null;
         if (managed) {
           const topology = await loadManagedTopology();
+          restoredTopology = topology;
           const routes = topology.ppus[0]
             ? await loadProgrammingRoutes(topology.ppus[0].alias)
             : { routes: [], error: null };
@@ -693,28 +784,91 @@ export default function FactoryConsoleV2() {
         setProviderError(null);
         appendLog(`[PROVIDER] ${nextCatalog.provider.toUpperCase()} · ${nextCatalog.facility_count} Facilities · ${nextCatalog.ppu_count} PPUs · ${nextCatalog.site_count} Sites`);
 
-        // A managed batch lives in the Console session and is not restorable.
-        const stored = managed ? null : readStoredBatch();
+        // Managed mode observes the Manager Journal by immutable Batch ID.
+        // A reload never restarts or resubmits a Batch or any Site Job.
+        let managedId = managed ? readManagedBatch() : null;
+        if (managed) {
+          const pendingStart = readManagedStart();
+          if (pendingStart) setManagedStartHold(pendingStart);
+          if (pendingStart && !managedId) {
+            setManagedStartHold(pendingStart);
+            try {
+              const result = await getStartReconciliation(pendingStart);
+              if (result.start_id !== pendingStart || result.kind !== "batch") {
+                throw new Error("Manager answered for a different Start or transaction kind");
+              }
+              if (result.state === "NOT_ACCEPTED") {
+                clearManagedStart();
+                setManagedStartHold(null);
+                appendLog(`[START] NOT ACCEPTED · ${pendingStart} · safe to unlock`);
+              } else if (result.batch?.batch_id) {
+                managedId = result.batch.batch_id;
+                writeManagedBatch(managedId);
+                // A Batch ID is an observation key, not proof of safe completion.
+                // Keep the immutable Start until its journal is read successfully.
+                writeManagedStart(pendingStart);
+                setManagedStartHold(pendingStart);
+              } else {
+                setOperatorWarning(`Manager Start ${pendingStart} remains ${result.state}; no new Job may be submitted until reconciled.`);
+              }
+            } catch (reason) {
+              setOperatorWarning(`Manager Start ${pendingStart} cannot be reconciled: ${reason instanceof Error ? reason.message : "unknown"}. No resubmission.`);
+            }
+          }
+        }
+        const stored = managed
+          ? managedId ? { apiBase, batchId: managedId } : null
+          : readStoredBatch();
         if (stored?.apiBase === apiBase) {
           try {
-            const restored = await getServerBatch(apiBase, stored.batchId);
+            const managerTruth = managed ? await getProgrammingBatch(stored.batchId) : null;
+            const heldStart = managed ? readManagedStart() : null;
+            if (managerTruth && (managerTruth.batch_id !== stored.batchId
+                || (heldStart && managerTruth.start_id !== heldStart))) {
+              throw new Error("Manager Batch/Start identity mismatch");
+            }
+            const restored = managerTruth
+              ? managedProductionSnapshot(managerTruth, restoredTopology)
+              : await getServerBatch(apiBase, stored.batchId);
             if (stopped) return;
             setGatewayHealth("online");
+            // The stored Batch can become UNKNOWN while the Browser was gone.
+            // Recreate its immutable Start hold before terminal cleanup.
+            if (managerTruth && (managerTruth.outcome == null || managerTruth.outcome === "OUTCOME_UNKNOWN"
+                || managerTruth.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+                || (managerTruth.outcome === "PASS" && restored.state !== "success"))) {
+              if (managerTruth && /^[0-9a-f]{32}$/.test(managerTruth.start_id)) {
+                writeManagedStart(managerTruth.start_id);
+                setManagedStartHold(managerTruth.start_id);
+              }
+            }
+            if (managerTruth?.outcome != null && managerTruth.outcome !== "OUTCOME_UNKNOWN" && !managerTruth.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+                && !(managerTruth.outcome === "PASS" && restored.state !== "success")) {
+              clearManagedStart();
+              setManagedStartHold(null);
+            }
             applyBatchSnapshot(restored, nextCatalog);
+            if (managerTruth) setManagedBatchRecoveryId(null);
+            if (managerTruth) logManagedBatch(managerTruth, restoredTopology);
             if (!terminalServerBatchStates.has(restored.state)) {
               beginActivity();
               const generation = ++pollGenerationRef.current;
               appendLog(`[BAT] RESTORED · ${restored.batch_id} · ${restored.state.toUpperCase()}`);
-              void pollServerBatch(restored.batch_id, nextCatalog, generation).catch(error => {
+              const observer = managed && restoredTopology
+                ? pollManagedBatch(restored.batch_id, nextCatalog, generation, restoredTopology)
+                : pollServerBatch(restored.batch_id, nextCatalog, generation);
+              void observer.catch(error => {
                 endActivity();
                 appendLog(`[BAT] OBSERVATION ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
               });
               return;
             }
-            clearStoredBatch();
+            if (managed) clearManagedBatch(); else clearStoredBatch();
           } catch (error) {
             setGatewayHealth(gatewayHealthFromError(error));
-            clearStoredBatch();
+            // Unknown Manager state is not grounds to clear a durable Batch ID.
+            if (!managed) clearStoredBatch();
+            else setOperatorWarning(`Manager Batch ${stored.batchId} cannot be read. Retained for read-only reconciliation; no resubmission.`);
           }
         }
 
@@ -740,9 +894,7 @@ export default function FactoryConsoleV2() {
       runtimeRecoveryGenerationRef.current += 1;
       endActivity();
     };
-  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, managed, pollServerBatch, setBatchSelection, workspaceHydrated]);
-
-  useEffect(() => () => managedBatchRef.current?.dispose(), []);
+  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, logManagedBatch, managed, pollManagedBatch, pollServerBatch, setBatchSelection, workspaceHydrated]);
 
   // Managed: keep the Fleet observation current so capability is never judged on a stale view.
   useEffect(() => {
@@ -843,9 +995,12 @@ export default function FactoryConsoleV2() {
   const repeatValue = parsePositiveInt(repeatCount);
   const retryValue = parseNonNegativeInt(siteRetryLimit);
   const thresholdValue = failedSiteThreshold === "" ? null : parsePositiveInt(failedSiteThreshold);
-  const policyValid = repeatValue !== null && repeatValue <= 10_000
-    && retryValue !== null && retryValue <= 20
-    && (failedSiteThreshold === "" || (thresholdValue !== null && thresholdValue <= Math.max(1, batchCounts.sites)));
+  const policyValid = managed
+    ? retryValue !== null && retryValue <= 5
+      && (failedSiteThreshold === "" || (thresholdValue !== null && thresholdValue <= Math.max(1, batchCounts.sites)))
+    : repeatValue !== null && repeatValue <= 10_000
+      && retryValue !== null && retryValue <= 20
+      && (failedSiteThreshold === "" || (thresholdValue !== null && thresholdValue <= Math.max(1, batchCounts.sites)));
   const executionPolicy: BatchExecutionPolicy | null = policyValid ? {
     repeat_count: repeatValue!,
     site_retry_limit: retryValue!,
@@ -904,16 +1059,28 @@ export default function FactoryConsoleV2() {
 
   // Managed readiness: ONLINE and Programming capability are separate facts.
   const icpn = targetDevice?.icpn ?? targetDevice?.identifier ?? null;
-  // PMode runs Image Operations only; a Route's range Operation (Read) is not offered here.
+  // Both modes use one ordered E / P / V Operations List (never flash_cycle).
+  // Site presence/compatibility is separately certified by the PPU.
   const managedOperationOptions = managed
-    ? routeOperationsForIc(managedRoutes?.routes ?? null, icpn).filter(isImageOperation) : [];
-  const managedOperation = chosenManagedOperation != null && (managedOperationOptions as string[]).includes(chosenManagedOperation)
-    ? chosenManagedOperation
-    : managedOperationOptions.length === 1 ? managedOperationOptions[0] : null;
+    ? routeSequenceOperations(managedRoutes?.routes ?? null, icpn, batchTargets[0]?.siteIds[0] ?? null)
+    : [];
+  const managedChosen = normalizeOperations(managedOperations.filter(item => managedOperationOptions.includes(item)));
+  const managedNeedsFile = managedChosen != null && operationsTakeImage(managedChosen);
+  const managedRoute = managedChosen && batchTargets.length
+    ? routeDeclaring(managedRoutes?.routes ?? null, icpn, batchTargets[0].siteIds[0], managedChosen)
+    : null;
   const managedSourceLimit = programmingSource === "bundle" ? 1024 * 1024 + 256 * 1024 : 1024 * 1024;
   const managedReadiness = ((): { code: typeof legacyReadiness.code; label: string; ready: boolean; reason: string } => {
     const blocked = (code: typeof legacyReadiness.code, label: string, reason: string) => ({ code, label, ready: false, reason });
     if (legacyReadiness.code === "running" || legacyReadiness.code === "cancelling") return { ...legacyReadiness, reason: "" };
+    if (managedStartHold) {
+      return blocked("programming-unavailable", "START RECONCILIATION REQUIRED",
+        `Manager Start ${managedStartHold} is unresolved (OUTCOME_UNKNOWN). Inspect its journal before another Batch; nothing is resubmitted.`);
+    }
+    if (managedBatchRecoveryId) {
+      return blocked("programming-unavailable", "BATCH OBSERVATION REQUIRED",
+        `Manager Batch ${managedBatchRecoveryId} has not been read. Reload to observe its journal; no resubmission.`);
+    }
     if (!catalog) return blocked("programming-unavailable", "MANAGER OFFLINE", providerError ?? "The Manager Registry is unavailable.");
     if (!icpn) return blocked("no-target", "NO TARGET", "Select a Target IC.");
     if (!batchCounts.sites) return blocked("no-site", "NO SITE", "Select at least one Site.");
@@ -923,16 +1090,15 @@ export default function FactoryConsoleV2() {
     const blocker = managedBatchBlocker(managedTopology, managedRoutes.routes, icpn,
       batchTargets.map(active => ({ alias: active.target.ppu_id, siteIds: active.siteIds })));
     if (blocker) return blocked("programming-unavailable", blocker.label, blocker.reason);
-    if (!managedOperation) return blocked("no-op", "NO OP", "Select one Operation.");
-    if (!isImageOperation(managedOperation)) {
-      return blocked("programming-unavailable", "OPERATION UNAVAILABLE", `${managedOperation} needs an explicit address range.`);
-    }
-    if (!managedFile) {
+    if (!policyValid) return blocked("programming-unavailable", "POLICY INVALID", "Managed Repeat is 1; Retry must be 0–5; Stop threshold must be within the Target Set.");
+    if (!managedChosen || !managedRoute) return blocked("no-op", "OPERATIONS INVALID",
+      "Select a valid ordered E / P / V list (Erase + Verify without Program is unsupported) with one qualified Route.");
+    if (managedNeedsFile && !managedFile) {
       return programmingSource === "bundle"
         ? blocked("image-required", "BUNDLE REQUIRED", "Select your canonical Bundle v3 (.zip).")
         : blocked("image-required", "IMAGE REQUIRED", "Select a Programming Image (.bin).");
     }
-    if (managedFile.size <= 0 || managedFile.size > managedSourceLimit) {
+    if (managedNeedsFile && managedFile && (managedFile.size <= 0 || managedFile.size > managedSourceLimit)) {
       return blocked("image-invalid", "FILE INVALID", `The selected file must be 1 to ${managedSourceLimit} bytes.`);
     }
     // Ready for the restricted sequential mode only; never a generic production READY.
@@ -958,7 +1124,7 @@ export default function FactoryConsoleV2() {
 
   const plannedIcCount = batchSnapshot
     ? batchSnapshot.sites.length * batchSnapshot.execution_policy.repeat_count
-    : batchCounts.sites * (repeatValue ?? 0);
+    : batchCounts.sites * (managed ? 1 : repeatValue ?? 0);
 
   const kpis = [
     { key: "production-sites", label: "SITES", value: batchSnapshot?.sites.length ?? batchCounts.sites },
@@ -1024,7 +1190,6 @@ export default function FactoryConsoleV2() {
     setBatchCommandState("idle");
     setBatchSnapshot(null);
     setOperatorWarning(null);
-    setClockNow(Date.now());
     clearStoredBatch();
     appendLog(`[SET] COMMIT · ${selectionCounts(snapshot).facilities} Facilities · ${selectionCounts(snapshot).ppus} PPUs · ${selectionCounts(snapshot).sites} Sites`);
     await loadSelectionRuntimes(catalog, snapshot);
@@ -1087,41 +1252,146 @@ export default function FactoryConsoleV2() {
     appendLog(`[SOURCE] ${next.toUpperCase()} · previous file and results cleared`);
   }
 
-  // Managed Start Production: every Site is its own Manager plan + run.
+  // PR-D: ONE canonical Manager-owned Batch across every selected PPU/Site.
+  // The Browser never sequences Site Jobs and never automatically retries a lost Start.
   async function executeManagedBatch() {
     if (!catalog || batchRunning || managedStartLock.current) return;
-    if (!managedReadiness.ready || !icpn || !managedFile || !isImageOperation(managedOperation)) {
+    if (!managedReadiness.ready || !icpn || !managedChosen || !managedRoute || !batchTargets.length
+        || (managedNeedsFile && !managedFile)) {
       setOperatorWarning(`${managedReadiness.label} · ${managedReadiness.reason}`);
       appendLog(`[BAT] BLOCKED · ${managedReadiness.label} · ${managedReadiness.reason}`, "WARN");
       return;
     }
+    const targets = batchTargets.map(active => ({
+      ppu_alias: active.target.ppu_id, site_ids: [...active.siteIds],
+    }));
+    const primary = targets[0];
+    // The Route constrains the operation and erase range, not a physical Site.
+    const request = managedNeedsFile && managedFile
+      ? {
+        alias: primary.ppu_alias, siteIds: primary.site_ids, targets,
+        icpn, operations: managedChosen, source: programmingSource, file: managedFile,
+        retryLimit: retryValue ?? 0,
+        stopPolicy: thresholdValue == null ? { kind: "never" as const }
+          : { kind: "failed_sites" as const, threshold: thresholdValue },
+      }
+      : {
+        alias: primary.ppu_alias, siteIds: primary.site_ids, targets,
+        icpn, operations: ["erase"] as const, source: programmingSource, file: null,
+        range: { address: managedRoute.flash_base, length: managedRoute.flash_size },
+        retryLimit: retryValue ?? 0,
+        stopPolicy: thresholdValue == null ? { kind: "never" as const }
+          : { kind: "failed_sites" as const, threshold: thresholdValue },
+      };
     managedStartLock.current = true;
-    const batch = new ManagedProductionBatch({
-      targets: batchTargets.map(active => ({
-        facilityId: active.facility.facility_id, alias: active.target.ppu_id, siteIds: [...active.siteIds],
-      })),
-      icpn,
-      operation: managedOperation,
-      source: programmingSource,
-      file: managedFile,
-      failedSiteStopThreshold: thresholdValue,
-    });
-    managedBatchRef.current?.dispose();
-    managedBatchRef.current = batch;
+    setBatchCommandState("submitting");
     setOperatorWarning(null);
-    setClockNow(Date.now());
     terminalBatchRef.current = null;
     setBatchObservationState("connected");
     loggedRecords.current.clear();
     beginActivity();
-    appendLog(`[BAT] START PRODUCTION · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${managedOperation.toUpperCase()} · ${icpn} · ${programmingSource.toUpperCase()} ${managedFile.name} · attempts ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}`);
-    applyBatchSnapshot(batch.snapshot(), catalog);
-    const generation = ++pollGenerationRef.current;
-    void batch.execute().finally(() => { managedStartLock.current = false; });
-    void pollServerBatch(batch.batchId, catalog, generation).catch(error => {
+    appendLog(`[BAT] START MANAGER · ${targets.length} PPUs · ${batchCounts.sites} Sites · ${managedChosen.join(" → ").toUpperCase()} · ${icpn} · Retry ${retryValue ?? 0} · Stop ${thresholdValue ?? "never"} · Repeat 1`);
+    try {
+      await runManagedBatch(request, {
+        onStartId: startId => {
+          writeManagedStart(startId);
+          setManagedStartHold(startId);
+          appendLog(`[START] Manager issued ${startId}; waiting for canonical Batch acceptance`);
+        },
+        onBatch: next => {
+          setBatchCommandState("idle");
+          setBatchObservationState("connected");
+          // A confirmed Manager Batch ID is the durable observation key.
+          if (next.outcome == null) writeManagedBatch(next.batch_id);
+          const snapshot = managedProductionSnapshot(next, managedTopology);
+          applyBatchSnapshot(snapshot, catalog);
+          logManagedBatch(next, managedTopology);
+          if (next.outcome == null || next.outcome === "OUTCOME_UNKNOWN" || next.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+              || (next.outcome === "PASS" && snapshot.state !== "success")) {
+            // An unknown transaction or invalid PASS evidence requires a hold.
+            // Do not silently release it on a terminal Batch or a page reload.
+            writeManagedStart(next.start_id);
+            setManagedStartHold(next.start_id);
+          } else {
+            clearManagedStart();
+            setManagedStartHold(null);
+          }
+        },
+        onPollError: message => {
+          setBatchObservationState("reconnecting");
+          appendLog(`[BAT] OBSERVATION UNAVAILABLE · ${message}`, "WARN");
+        },
+      });
+    } catch (reason) {
+      const detail = reason instanceof Error ? reason.message : "Manager Batch failed";
+      if (reason instanceof ManagedProgrammingBlocked) {
+        // Definitive 4xx refusal: Manager confirms no Batch was accepted.
+        clearManagedStart();
+        setManagedStartHold(null);
+      }
+      if (reason instanceof ManagedStartOutcomeUnknown) {
+        // The Start may have been accepted. Keep its ID and block new Start.
+        writeManagedStart(reason.planId);
+        setManagedStartHold(reason.planId);
+      }
+      setOperatorWarning(detail);
+      appendLog(`[BAT] ${reason instanceof ManagedStartOutcomeUnknown ? "START OUTCOME UNKNOWN" : "ERROR"} · ${detail}`, "ERROR");
       endActivity();
-      appendLog(`[BAT] OBSERVATION ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
-    });
+    } finally {
+      managedStartLock.current = false;
+      setBatchCommandState("idle");
+    }
+  }
+
+  /** Operator-initiated read-only reconciliation of a lost Manager Start. */
+  async function reconcileHeldManagerStart() {
+    const held = managedStartHold ?? readManagedStart();
+    if (!held || !catalog || !managed) return;
+    try {
+      const reconciled = await getStartReconciliation(held);
+      if (reconciled.start_id !== held || reconciled.kind !== "batch") {
+        throw new Error("Manager answered for a different Start or transaction kind");
+      }
+      if (reconciled.state === "NOT_ACCEPTED") {
+        clearManagedStart();
+        setManagedStartHold(null);
+        setOperatorWarning(null);
+        appendLog(`[START] NOT ACCEPTED · ${held}; Manager proves no Job was admitted`);
+        return;
+      }
+      if (!reconciled.batch?.batch_id) {
+        setOperatorWarning(`Start ${held} is ${reconciled.state}. No resubmission; reconcile again or void a proven unadmitted Start.`);
+        return;
+      }
+      const batch = await getProgrammingBatch(reconciled.batch.batch_id);
+      if (batch.start_id !== held) throw new Error("Manager Batch Start identity mismatch");
+      setManagedBatchRecoveryId(null);
+      const snapshot = managedProductionSnapshot(batch, managedTopology);
+      applyBatchSnapshot(snapshot, catalog);
+      logManagedBatch(batch, managedTopology);
+      if (batch.outcome == null) {
+        writeManagedBatch(batch.batch_id);
+        writeManagedStart(held);
+        setManagedStartHold(held);
+        beginActivity();
+        const generation = ++pollGenerationRef.current;
+        const topology = managedTopology ?? await loadManagedTopology();
+        void pollManagedBatch(batch.batch_id, catalog, generation, topology);
+      } else if (batch.outcome === "OUTCOME_UNKNOWN"
+                 || batch.units.some(unit => unit.outcome === "OUTCOME_UNKNOWN")
+                 || (batch.outcome === "PASS" && snapshot.state !== "success")) {
+        writeManagedStart(held);
+        setManagedStartHold(held);
+        setOperatorWarning(`Manager Batch ${batch.batch_id} is not proven safe/complete. Reconcile its PPU Run or evidence before new work; never resubmit.`);
+      } else {
+        clearManagedStart();
+        setManagedStartHold(null);
+        setOperatorWarning(null);
+      }
+      appendLog(`[START] RECONCILED · ${held} · Batch ${batch.batch_id} · ${batch.outcome ?? "RUNNING"}`);
+    } catch (reason) {
+      setOperatorWarning(`Start ${held} still unresolved: ${reason instanceof Error ? reason.message : "unknown"} · no resubmission`);
+    }
   }
 
   async function executeBatch() {
@@ -1160,7 +1430,6 @@ export default function FactoryConsoleV2() {
     if (!targets.length) return;
 
     setOperatorWarning(null);
-    setClockNow(Date.now());
     terminalBatchRef.current = null;
     setBatchObservationState("connected");
     beginActivity();
@@ -1203,19 +1472,17 @@ export default function FactoryConsoleV2() {
   async function abortBatch() {
     const activeBatchId = batchSnapshot?.batch_id;
     if (!activeBatchId || !serverBatchRunning || serverBatchState === "stopping" || batchAborting) return;
-    const managedBatch = managedBatchRef.current;
-    if (managedBatch?.batchId === activeBatchId) {
-      // Stops queuing further Sites; a submitted run is never cancelled from the Console.
-      appendLog(`[BAT] ABORT REQUESTED · ${activeBatchId} · no further Site will start; the run in flight is not cancelled`, "WARN");
-      if (catalog) applyBatchSnapshot(managedBatch.stop(), catalog);
-      return;
-    }
     setBatchCommandState("aborting");
     appendLog(`[BAT] ABORT REQUESTED · ${activeBatchId}`, "WARN");
     try {
-      const next = await cancelServerBatch(apiBase, activeBatchId);
+      if (managed) {
+        const next = await stopProgrammingBatch(activeBatchId);
+        if (catalog) applyBatchSnapshot(managedProductionSnapshot(next, managedTopology), catalog);
+      } else {
+        const next = await cancelServerBatch(apiBase, activeBatchId);
+        if (catalog) applyBatchSnapshot(next, catalog);
+      }
       setGatewayHealth("online");
-      if (catalog) applyBatchSnapshot(next, catalog);
     } catch (error) {
       setGatewayHealth(gatewayHealthFromError(error));
       appendLog(`[BAT] ABORT ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
@@ -1404,13 +1671,14 @@ export default function FactoryConsoleV2() {
               }}
               operationsLabel={text.operations}
               operations={managed ? managedOperationOptions.map(operation => ({
-                // Only Operations a committed Programming Route declares for the IC.
                 key: operation,
                 code: PROGRAMMING_OPERATION_LABELS[operation].code,
                 label: PROGRAMMING_OPERATION_LABELS[operation].label,
-                checked: managedOperation === operation,
-                disabled: batchRunning || !isImageOperation(operation),
-                onChange: () => setChosenManagedOperation(managedOperation === operation ? null : operation),
+                checked: managedOperations.includes(operation),
+                disabled: batchRunning,
+                onChange: () => setManagedOperations(current => current.includes(operation)
+                  ? current.filter(value => value !== operation)
+                  : [...current, operation]),
               })) : operationOrder.map(operation => ({
                 key: operation,
                 code: operationCodes[operation],
@@ -1422,15 +1690,16 @@ export default function FactoryConsoleV2() {
               policyLabel={text.batchPolicy}
               policy={{
                 repeatLabel: text.repeat,
-                repeatValue: managed ? String(MANAGED_JOB_POLICY.attempts) : repeatCount,
+                repeatValue: managed ? "1" : repeatCount,
                 repeatDisabled: managed || batchRunning,
                 repeatAriaLabel: "Repeat Count",
                 onRepeatChange: setRepeatCount,
                 retryLabel: text.retry,
-                retryValue: managed ? "0" : siteRetryLimit,
-                retryDisabled: managed || batchRunning,
+                retryValue: siteRetryLimit,
+                retryMax: managed ? 5 : 20,
+                retryDisabled: batchRunning,
                 note: managed
-                  ? `Formal Flash Job: attempts = ${MANAGED_JOB_POLICY.attempts} per Site · auto retry ${MANAGED_JOB_POLICY.auto_retry}. Repeat and Retry are disabled. Stop Policy and ABORT only stop queuing further Sites; one Site runs at a time.`
+                  ? "Manager-owned Batch · Repeat 1 · Retry 0–5 only for definite eligible FAIL (never OUTCOME UNKNOWN) · ABORT stops pending submissions but never cancels an accepted Job."
                   : undefined,
                 retryAriaLabel: "Site Retry Limit",
                 onRetryChange: setSiteRetryLimit,
@@ -1455,6 +1724,12 @@ export default function FactoryConsoleV2() {
               onAbort={abortBatch}
             />
 
+            {managed && managedStartHold && !batchRunning && (
+              <button className="ppuSiteButton" type="button" data-testid="reconcile-managed-start"
+                onClick={() => void reconcileHeldManagerStart()}>
+                RECONCILE MANAGER START
+              </button>
+            )}
             {managed && !batchReadiness.ready && !batchRunning && managedReadiness.reason && (
               <div className="factoryWarning" role="status" data-testid="managed-readiness">
                 <span><b>{managedReadiness.label}</b> · {managedReadiness.reason}</span>

@@ -552,7 +552,7 @@ it is superseded rather than legacy, and it retires in PR-C under the conditions
 | PR-B1 | mock `run_operations` + per-step evidence | PR-A |
 | PR-B | Manager Batch Orchestrator on `targets[]` | PR-A |
 | PR-C | EMode multi-Site Console; consumers migrated off the alias-scoped Batch API and that entry removed (§5.8). **Landed.** EMode covers many Sites of **one** PPU; a multi-PPU Console is left to a later PR, and the engine already carries it. | PR-B |
-| PR-D | PMode shared engine, `operations[]` switch, execution-route constraint lifted | PR-B, PR-B1, PR-C |
+| PR-D | PMode shared engine, `operations[]` switch, execution-route constraint lifted. **Gate 1 Draft PR #1428 in progress; no HIL qualification or merge.** | PR-B, PR-B1, PR-C |
 | PR-E | host-only tests and E2E | PR-B..PR-D |
 | PR-F | legacy retirement, per the Inventory | PR-D |
 | PR-G | Device Personalization implementation | PR-A, PR-B |

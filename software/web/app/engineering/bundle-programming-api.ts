@@ -390,6 +390,8 @@ export type BatchInput = (
 ) & {
   alias: string;
   siteIds: readonly number[];
+  /** PR-D: optional canonical multi-PPU Target Set; absent for EMode. */
+  targets?: readonly ProgrammingBatchTarget[];
   retryLimit: number;
   stopPolicy: StopPolicy;
 };
@@ -404,7 +406,9 @@ export async function startProgrammingBatch(
 ): Promise<ProgrammingBatch> {
   const common = {
     icpn: input.icpn,
-    targets: [{ ppu_alias: input.alias, site_ids: [...input.siteIds] }],
+    targets: input.targets
+      ? input.targets.map(target => ({ ppu_alias: target.ppu_alias, site_ids: [...target.site_ids] }))
+      : [{ ppu_alias: input.alias, site_ids: [...input.siteIds] }],
     operations: [...input.operations],
     retry_limit: input.retryLimit, stop_policy: input.stopPolicy, repeat: 1,
     // Manager-issued: admits at most one Batch and can be reconciled later.
