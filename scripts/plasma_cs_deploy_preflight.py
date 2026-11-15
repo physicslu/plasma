@@ -140,14 +140,29 @@ def check_transactions(state_dir: Path) -> dict:
                        or attempt.get("outcome") not in ("PASS", "FAIL", "BLOCKED")
                        for attempt in attempts):
                     raise Blocked(f"Batch {batch_id}: unresolved/invalid attempt")
+            # The Manager's aggregation rule is a transaction invariant:
+            # a claimed PASS cannot hide a FAILED or BLOCKED Site.
+            outcomes = [unit["outcome"] for unit in units]
+            if "FAIL" in outcomes:
+                aggregate = "FAIL"
+            elif all(outcome == "BLOCKED" for outcome in outcomes):
+                aggregate = "BLOCKED"
+            elif "BLOCKED" in outcomes:
+                aggregate = "PARTIAL"
+            else:
+                aggregate = "PASS"
+            if batch["outcome"] != aggregate:
+                raise Blocked(f"Batch {batch_id}: aggregate/Site outcomes disagree")
     data = state_dir / "bundle-programming-runs.json"
     runs = read_journal(data, {"plasma.manager.bundle-programming-journal.v1"}, "runs")
     # Acknowledgement is explicit on the run; a consumed Start is not itself
     # proof that a Job is still running, so do not invent a deployment blocker.
     for run in runs:
         ident = run.get("run_id")
-        if run.get("outcome") is None:
-            raise Blocked(f"Run {ident}: outcome not terminal")
+        if run.get("outcome") not in ("PASS", "FAIL", "BLOCKED", "OUTCOME_UNKNOWN"):
+            raise Blocked(f"Run {ident}: outcome not terminal or invalid")
+        if run.get("state") not in (None, "finished"):
+            raise Blocked(f"Run {ident}: state not terminal")
         if run.get("outcome") == "OUTCOME_UNKNOWN" and run.get("acknowledged") is not True:
             raise Blocked(f"Run {ident}: outcome unknown/unacknowledged")
     starts = (read_journal(data, {"plasma.manager.bundle-programming-journal.v1"},
