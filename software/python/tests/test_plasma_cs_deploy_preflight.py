@@ -21,7 +21,7 @@ def write_journal(root: Path, name: str, schema: str, field: str, records: list)
 
 def fake_http(url: str) -> dict:
     if url.endswith("/api/health/live"):
-        return {"ok": True}
+        return {"ok": True, "manager": "alive"}
     if url.endswith("/api/status"):
         return {"ppu": {"execution": {
             "busy": False, "active_job_count": 0,
@@ -117,7 +117,7 @@ def test_ppu_busy_blocks(state: Path, monkeypatch) -> None:
 
 def test_unobservable_ppu_blocks(state: Path, monkeypatch) -> None:
     def broken(url: str) -> dict:
-        return {"ok": True} if url.endswith("/api/health/live") else {"ppu": {}}
+        return {"ok": True, "manager": "alive"} if url.endswith("/api/health/live") else {"ppu": {}}
     monkeypatch.setattr(preflight, "http_json", broken)
     with pytest.raises(preflight.Blocked, match="not observable"):
         check(state)
