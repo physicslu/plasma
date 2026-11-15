@@ -118,6 +118,10 @@ Profile-aware commands:
   plasmactl verify z2-ps             Real Z2 ARMv7 PS runtime + local PS diagnostic loopback only
   plasmactl status z2-ps             Installed release, Plasma Python and system-service state
 
+SWPC engineering-only (requires reviewed deploy and HIL commands):
+  plasmactl acceptance full --profile bluepill-ab ... [--execute]
+    Default: PLAN_ONLY; --execute: source-pinned Deploy -> Verify -> single-Site HIL
+
 Integration-only commands retained unchanged:
   update | test | restart | web-restart | start | stop | ports | logs [TARGET]
   update-and-restart                  Alias of `deploy integration`
@@ -174,6 +178,11 @@ case "$command" in
         deploy
         ;;
     esac
+    ;;
+  acceptance)
+    [[ "${1:-}" == "full" ]] || wrapper_die "acceptance supports full only"
+    shift
+    exec python3 "$repo_root/scripts/plasma_engineering_acceptance.py" "$@"
     ;;
   bootstrap-sites)
     [[ "${1:-}" == "swpc-z2like" ]] || wrapper_die "bootstrap-sites currently supports swpc-z2like only"
