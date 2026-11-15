@@ -159,8 +159,8 @@ def test_deploy_owner_checkout_mismatch_blocks_before_execution(backend, monkeyp
         calls.append(list(cmd))
         if "rev-parse" in cmd:
             if cmd[0] == adapter.SUDO:
-                return SimpleNamespace(returncode=0, stdout="f" * 40 + "\\n")
-            return SimpleNamespace(returncode=0, stdout=SHA + "\\n")
+                return SimpleNamespace(returncode=0, stdout="f" * 40 + "\n")
+            return SimpleNamespace(returncode=0, stdout=SHA + "\n")
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(adapter.subprocess, "run", wrong_owner)
     with pytest.raises(adapter.Blocked, match="OWNER_CHECKOUT_SHA_MISMATCH"):
@@ -174,7 +174,7 @@ def test_deploy_owner_checkout_dirty_blocks_before_execution(backend, monkeypatc
     def dirty_owner(cmd, **kwargs):
         calls.append(list(cmd))
         if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=SHA + "\\n")
+            return SimpleNamespace(returncode=0, stdout=SHA + "\n")
         if "diff" in cmd:
             return SimpleNamespace(returncode=1 if cmd[0] == adapter.SUDO else 0)
         return SimpleNamespace(returncode=0)
