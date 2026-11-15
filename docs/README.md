@@ -207,6 +207,7 @@
 - **Current** — [Deployment Index](deployment/README.md)
 - **Current** — [`plasmactl` Deployment Profiles](deployment/plasmactl-deployment-profiles.md)：定義統一 operator CLI、`integration`／`local-control-station`／`swpc-z2like` profile ownership、activation rollback 與 qualification boundary。
 - **Current** — [Deployment Port / Profile Matrix](deployment/port-profile-matrix.md)：定義 production、SWPC engineering 與 `z2like-demo` scenario 的 profile-specific port ownership、exposure 與安全邊界。
+- **Plan** · `Gate 1 Draft` · `Host-only` — [SWPC Engineering Acceptance — independent Deploy/HIL/Full](development/swpc-engineering-acceptance-full.md)：工程用 `plasmactl acceptance full` 將已審核部署、驗證與單 Site Blue Pill CDC HIL 串接；預設 PLAN_ONLY，實機需 Source SHA Pin 與明確 `--execute`。相依 PR #1435／#1436，尚未合併或實機驗證。
 - **Current** — [Local Control Station Reference Deployment](deployment/local-control-station.md)：定義 Linux user-systemd 的 Console/BFF + Manager 本機參考部署、可設定 PPU Endpoint、loopback-only ingress、immutable release 與 rollback；macOS／Windows 保留相同產品契約但使用平台原生 packaging。
 - **Plan** · `partly implemented` — [Product Deployment Foundation](deployment/product-deployment-foundation.md)：定義跨平台 Control Station（macOS／Linux／Windows）、Z2 PPU、SWPC integration host 的產品部署責任邊界，以及 immutable release 與跨平台 read-only readiness audit。
 - **Current** — [Product Release Format v1](deployment/product-release-format.md)：定義 product version、release manifest、角色／平台 artifact matrix、SHA-256 integrity、safe verification 與 clean-extraction acceptance。
