@@ -1,5 +1,7 @@
 # Site2 Flash execution reconciliation — 2026-11-15
 
+> Historical run 43711950640 report. Superseded by [one-shot Site2 Flash PASS, run 43712609056](../evidence/site2-one-flash-2026-11-15/README.md). CDC mapping is optional observation and is not required to select the SWD Site.
+
 **Physical smoke: NOT_RUN. Previous submission reconciliation: OUTCOME_UNKNOWN. No resend.**
 
 Observed 12:05–12:07 UTC on SWPC, UID 998, Path 3, Runner `plasma-codex`,
