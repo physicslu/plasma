@@ -66,13 +66,53 @@ def hil_arguments(args: argparse.Namespace) -> list[str]:
     ]
 
 
+def validate_hil_evidence(root: Path, *, ppu_alias: str, site: int) -> Path:
+    """Require the child's own durable three-attempt HIL summary to claim PASS."""
+    if not root.is_dir() or root.is_symlink():
+        raise AcceptanceBlocked("HIL_EVIDENCE_ROOT_MISSING")
+    results = list(root.glob("*/summary.json"))
+    if len(results) != 1 or results[0].is_symlink():
+        raise AcceptanceBlocked("HIL_EVIDENCE_AMBIGUOUS_OR_MISSING")
+    path = results[0]
+    if path.parent.is_symlink():
+        raise AcceptanceBlocked("HIL_EVIDENCE_SYMLINK_DENIED")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise AcceptanceBlocked("HIL_EVIDENCE_UNREADABLE") from exc
+    if (not isinstance(payload, dict)
+            or payload.get("schema") != "plasma.engineering.hil-e2e.v1"
+            or payload.get("result") != "PASS"
+            or payload.get("mode") != "smoke"
+            or payload.get("ppu_alias") != ppu_alias
+            or payload.get("site_id") != site):
+        raise AcceptanceBlocked("HIL_EVIDENCE_IDENTITY_OR_RESULT_MISMATCH")
+    attempts = payload.get("results")
+    if not isinstance(attempts, list) or len(attempts) != 3:
+        raise AcceptanceBlocked("HIL_ATTEMPT_COUNT_MISMATCH")
+    for attempt, expected_version in zip(attempts, ("v0.1", "v0.2", "v0.1")):
+        if (not isinstance(attempt, dict)
+                or attempt.get("version") != expected_version
+                or attempt.get("cdc") != "PASS"
+                or attempt.get("safe_off") is not True
+                or not isinstance(attempt.get("firmware_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", attempt["firmware_sha256"])
+                or attempt.get("readback_sha256") != attempt["firmware_sha256"]
+                or not isinstance(attempt.get("batch_id"), str)
+                or not attempt["batch_id"]):
+            raise AcceptanceBlocked("HIL_ATTEMPT_EVIDENCE_MISMATCH")
+    return path.parent
+
+
 def steps(run_cmd, args: argparse.Namespace, *, sha: str, report: dict) -> None:
     hil = hil_arguments(args)
     # Validate locked fixture bytes and the CLI contract BEFORE changing the
     # currently installed software. With no --execute, HIL makes no API call.
+    print("ACCEPTANCE: HIL fixture preflight", flush=True)
     run_cmd(hil, 60)
     report["stages"].append({"name": "HIL_FIXTURE_PREFLIGHT", "result": "PASS"})
 
+    print("ACCEPTANCE: Control Station deployment", flush=True)
     run_cmd([str(PLASMACTL), "deploy", "local-control-station"], args.deploy_timeout)
     report["stages"].append({"name": "DEPLOY", "result": "PASS"})
 
@@ -82,13 +122,21 @@ def steps(run_cmd, args: argparse.Namespace, *, sha: str, report: dict) -> None:
         raise AcceptanceBlocked("DEPLOYED_RELEASE_SHA_MISMATCH")
     report["stages"].append({"name": "RELEASE_IDENTITY", "result": "PASS"})
 
+    print("ACCEPTANCE: release identity and postflight", flush=True)
     run_cmd([str(PLASMACTL), "verify", "local-control-station"], 45)
     report["stages"].append({"name": "POSTFLIGHT", "result": "PASS"})
 
     # Last stage: performs real Erase/Program/Verify on the selected Site.
     # Never send it a retry flag. If the POST outcome is unobservable, the
     # HIL runner preserves the start_id and refuses to re-submit.
-    run_cmd([*hil, "--execute"], args.hil_timeout)
+    report["hil_evidence_root"] = str(Path(report["evidence_dir"]) / "hil")
+    print("ACCEPTANCE: Manager Batch → DUT → CDC HIL", flush=True)
+    run_cmd([*hil, "--output", report["hil_evidence_root"], "--execute"],
+            args.hil_timeout)
+    actual = validate_hil_evidence(
+        Path(report["hil_evidence_root"]), ppu_alias=args.ppu_alias, site=args.site
+    )
+    report["hil_evidence_dir"] = str(actual)
     report["stages"].append({"name": "MANAGER_BATCH_CDC_HIL", "result": "PASS"})
 
 
@@ -124,7 +172,7 @@ def run(args: argparse.Namespace, run_cmd=subprocess_run) -> int:
         "source_sha": sha, "profile": "local-control-station",
         "ppu_alias": args.ppu_alias, "site": args.site,
         "result": "IN_PROGRESS", "stages": [],
-        "hil_automatic_retry": False,
+        "hil_automatic_retry": False, "evidence_dir": str(directory),
     }
     try:
         steps(run_cmd, args, sha=sha, report=report)
