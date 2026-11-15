@@ -258,7 +258,7 @@ def test_cdc_decode_error_writes_terminal_evidence(
             self.last_preview_plan_id = None
 
     def malformed_cdc(*args, **kwargs):
-        raise UnicodeDecodeError("ascii", b"\\xff", 0, 1, "invalid ASCII")
+        raise UnicodeDecodeError("ascii", bytes([0xFF]), 0, 1, "invalid ASCII")
 
     monkeypatch.setattr(hil, "Manager", SuccessfulBatchManager)
     monkeypatch.setattr(hil, "image_spec", lambda path, version: IMAGE)
