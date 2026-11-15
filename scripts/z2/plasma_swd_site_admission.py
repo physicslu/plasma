@@ -136,13 +136,18 @@ def admit(site: int) -> dict:
          "RELEASE_NOT_ABI5_INDEPENDENT")
     port = guard.RootZ2TargetPort(release=release)
     now = time.time()
-    with port.exclusive():
+    # ADR-0007: fence SH + this Site's lock EX, so the other Site's running
+    # OpenOCD stays compatible while reload and this Site's owner are refused.
+    with port.exclusive(site=site):
         state = root.read_state(release)
         need(state is not None and state["status"] == "IMAGE" and
              state["image"] == release.firmware_name and
              state["manifest_sha256"] == root.manifest_sha256() and
              state["firmware_sha256"] == release.firmware_sha256,
              "ROOT_JOURNAL_NOT_HELD_IMAGE")
+        # The census exempts only the other Site's owner admitted on this
+        # exact boot and Root IMAGE session.
+        port.bind_site_session(boot_id=state["boot_id"], session_id=state["session_id"])
         # The protected Root journal has already proved the same-boot Image.
         # Runtime admission checks live hardware; dmesg history is not durable.
         report = root.live_site_admission_report(port, release)

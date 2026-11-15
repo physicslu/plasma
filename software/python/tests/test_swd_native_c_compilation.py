@@ -455,6 +455,260 @@ def test_root_guard_reload_fence_blocks_site_without_loading_fpga(tmp_path, monk
             pass
 
 
+# --- WP-07: concurrent Site admission (ADR-0007), Host-only --------------------
+# Real kernel flock on temp files; Root identity (uid 0) is mocked ONLY here.
+# Site owners are LinuxMMIO(site_owner=N), the same fence SH + Site EX
+# protocol as the native plasma_swd ps_owner. No FPGA, /dev/mem or DUT.
+
+def _wp07_root(tmp_path, monkeypatch, *, wait_s=0.3):
+    import os
+    from types import SimpleNamespace
+    from pl.hil import fpga_image_guard as guard
+    from plasma_interfaces.linux_mmio import LinuxMMIO
+    from plasma_interfaces.swd_native_linux_mmio import swd_site_aperture
+    from plasma_interfaces.swd_site import SITE_BASES
+
+    owner_dir = tmp_path / "owner"
+    owner_dir.mkdir(mode=0o700)
+    fence = tmp_path / "plasma-mmio.lock"
+    fake_mem = tmp_path / "sparse-fake-image"
+    with fake_mem.open("wb") as handle:
+        handle.truncate(SITE_BASES[2] + 4096)
+    real_fstat, real_lstat = os.fstat, os.lstat
+
+    def as_root(info):
+        return SimpleNamespace(st_mode=info.st_mode, st_uid=0, st_nlink=info.st_nlink,
+                               st_size=info.st_size, st_dev=info.st_dev, st_ino=info.st_ino)
+
+    monkeypatch.setattr(guard, "OWNER_DIR", owner_dir)
+    monkeypatch.setattr(guard, "GLOBAL_LOCK", owner_dir / "supervisor.lock")
+    monkeypatch.setattr(guard, "PPU_RELOAD_FENCE", fence)
+    monkeypatch.setattr(guard, "SITE_ADMISSION_SUPERVISOR_WAIT_S", wait_s)
+    monkeypatch.setattr(guard, "protected", lambda *args, **kwargs: None)
+    monkeypatch.setattr(guard.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(guard.os, "fstat", lambda fd: as_root(real_fstat(fd)))
+    monkeypatch.setattr(guard.os, "lstat", lambda p: as_root(real_lstat(p)))
+    release = SimpleNamespace(site_bitmap=3, axi_base=0x43C01000, axi_bytes=0x2000,
+                              owner_base=0x43C00000, owner_bytes=0x10000)
+
+    def site_owner(site_id):
+        return LinuxMMIO((swd_site_aperture(site_id),), device=str(fake_mem),
+                         owner_lock=str(fence), site_owner=site_id)
+
+    def record(site_id, *, boot="boot-a", session="fpga-s1", expires=2**40):
+        path = owner_dir / f"swd-site{site_id}-admission"
+        path.write_text(f"site_id={site_id}\nboot_id={boot}\n"
+                        f"root_image_session_id={session}\nrecord_expires_epoch={expires}\n")
+        path.chmod(0o600)
+        return path
+
+    return SimpleNamespace(guard=guard, release=release, fence=fence,
+                           site_owner=site_owner, record=record,
+                           port=lambda: guard.RootZ2TargetPort(release=release))
+
+
+def test_wp07_other_site_running_sh_admits_this_site_sh(tmp_path, monkeypatch):
+    r = _wp07_root(tmp_path, monkeypatch)
+    for running, admitting in ((1, 2), (2, 1)):
+        with r.site_owner(running):
+            with r.port().exclusive(site=admitting) as port:
+                assert port._locked and port._reload_fence_fd is None
+                with pytest.raises(r.guard.TargetSafetyDenied,
+                                   match="ROOT_RELOAD_FENCE_NOT_HELD"):
+                    port.inherited_reload_fence()  # identity child stays EX-only
+            # After admission, this Site's own native owner can attach SH/EX.
+            with r.site_owner(admitting):
+                pass
+
+
+def test_wp07_same_site_second_owner_denied(tmp_path, monkeypatch):
+    r = _wp07_root(tmp_path, monkeypatch)
+    with r.site_owner(1):
+        with pytest.raises(r.guard.TargetSafetyDenied, match="SITE_OWNER_PRESENT"):
+            with r.port().exclusive(site=1):
+                raise AssertionError("second Site 1 owner admitted")
+    # Admitted but not yet attached: the record reserves the Site.
+    r.record(2)
+    with pytest.raises(r.guard.TargetSafetyDenied, match="SITE_ADMISSION_RECORD_PRESENT"):
+        with r.port().exclusive(site=2):
+            raise AssertionError("Site 2 admitted twice")
+    with r.port().exclusive(site=1):
+        pass
+
+
+def test_wp07_reload_ex_denied_while_any_site_active_or_admitted(tmp_path, monkeypatch):
+    r = _wp07_root(tmp_path, monkeypatch)
+    for site_id in (1, 2):
+        with r.site_owner(site_id):
+            with pytest.raises(BlockingIOError):
+                with r.port().exclusive():
+                    raise AssertionError("reload entered during a live Site")
+    # Admission-to-attach window: no owner holds a lock yet, only the record.
+    path = r.record(2)
+    with pytest.raises(r.guard.TargetSafetyDenied, match="SITE_ADMISSION_RECORD_PRESENT"):
+        with r.port().exclusive():
+            raise AssertionError("reload entered between admission and attach")
+    path.unlink()
+    with r.port().exclusive() as port:
+        assert port.inherited_reload_fence() >= 3
+
+
+def test_wp07_site_admission_denied_while_reload_ex_active(tmp_path, monkeypatch):
+    import fcntl, os
+    r = _wp07_root(tmp_path, monkeypatch)
+    with r.port().exclusive():
+        for site_id in (1, 2):
+            with pytest.raises(r.guard.TargetSafetyDenied, match="ROOT_SUPERVISOR_BUSY"):
+                with r.port().exclusive(site=site_id):
+                    raise AssertionError("Site admitted during reload")
+    # Fence EX held by a reload path without the supervisor lock: still denied.
+    fd = os.open(r.fence, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        with pytest.raises(r.guard.TargetSafetyDenied, match="PPU_RELOAD_IN_PROGRESS"):
+            with r.port().exclusive(site=1):
+                raise AssertionError("Site admitted under fence EX")
+    finally:
+        os.close(fd)
+
+
+def test_wp07_concurrent_admissions_serialize_and_both_pass(tmp_path, monkeypatch):
+    import threading
+    r = _wp07_root(tmp_path, monkeypatch, wait_s=5.0)
+    inside, release_first, results = threading.Event(), threading.Event(), {}
+
+    def first():
+        with r.port().exclusive(site=1):
+            inside.set()
+            release_first.wait(5)
+        results[1] = "ADMITTED"
+
+    def second():
+        inside.wait(5)
+        with r.port().exclusive(site=2):
+            results[2] = ("ADMITTED", 1 in results)
+
+    a, b = threading.Thread(target=first), threading.Thread(target=second)
+    a.start(); b.start()
+    assert inside.wait(5)
+    release_first.set()
+    a.join(10); b.join(10)
+    # The second admission waited for the supervisor, then passed after Site 1's.
+    assert results == {1: "ADMITTED", 2: ("ADMITTED", True)}
+
+
+def _wp07_proc(tmp_path, r, pids):
+    """Synthetic /proc: {pid: (fd_targets, [(offset, size, device)])} plus locks."""
+    import os
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    for pid, (fds, maps) in pids.items():
+        (proc / pid / "fd").mkdir(parents=True)
+        for n, target in enumerate(fds, start=3):
+            os.symlink(target, proc / pid / "fd" / str(n))
+        (proc / pid / "maps").write_text("".join(
+            f"b6f00000-{0xb6f00000 + size:08x} rw-s {offset:08x} 00:06 1 {device}\n"
+            for offset, size, device in maps))
+    return proc
+
+
+def _wp07_locks(proc, entries):
+    import os
+    lines = []
+    for n, (mode, pid, path) in enumerate(entries, start=1):
+        info = os.stat(path)
+        lines.append(f"{n}: FLOCK  ADVISORY  {mode} {pid} "
+                     f"{os.major(info.st_dev):02x}:{os.minor(info.st_dev):02x}:{info.st_ino} 0 EOF")
+    (proc / "locks").write_text("\n".join(lines) + "\n")
+
+
+def test_wp07_census_admits_proven_other_site_owner_only(tmp_path, monkeypatch):
+    r = _wp07_root(tmp_path, monkeypatch)
+    g = r.guard
+    site2_lock = g.site_lock_path(2)
+    site2_lock.touch(); r.fence.touch()
+    own_page = [(0x43C02000, 0x1000, "/dev/mem")]
+    proc = _wp07_proc(tmp_path, r, {
+        "100": (["/dev/mem"], own_page),                                 # proven Site 2 owner
+        "200": (["/dev/mem"], own_page),                                 # named "openocd", no locks
+        "300": (["/dev/null"], []),                                      # unrelated
+    })
+    _wp07_locks(proc, [("WRITE", "100", site2_lock), ("READ", "100", r.fence)])
+    r.record(2)
+    bound = dict(release=r.release, admitting_site=1, boot_id="boot-a",
+                 session_id="fpga-s1", procroot=proc)
+    assert g.cooperating_site_owners(**bound) == {"100": 2}
+    complete, conflicts = g.scan_proc_consumers(
+        procroot=proc, release=r.release, cooperating=g.cooperating_site_owners(**bound))
+    # The proven owner passes; a PID with no lock evidence is still a conflict.
+    assert complete is True and conflicts == ["200"]
+
+    # Without exemption (legacy census) both /dev/mem users conflict.
+    assert g.scan_proc_consumers(procroot=proc, release=r.release)[1] == ["100", "200"]
+
+
+@pytest.mark.parametrize("case", [
+    "session_mismatch", "boot_mismatch", "expired", "no_record", "wrong_site_record",
+    "lock_by_other_pid", "no_fence_read", "admitting_own_site"])
+def test_wp07_census_unverified_owner_stays_conflict(tmp_path, monkeypatch, case):
+    r = _wp07_root(tmp_path, monkeypatch)
+    g = r.guard
+    site2_lock = g.site_lock_path(2)
+    site2_lock.touch(); r.fence.touch()
+    proc = _wp07_proc(tmp_path, r, {"100": (["/dev/mem"], [(0x43C02000, 0x1000, "/dev/mem")])})
+    locks = [("WRITE", "100", site2_lock), ("READ", "100", r.fence)]
+    record = {}
+    if case == "session_mismatch": record = {"session": "fpga-other"}
+    if case == "boot_mismatch": record = {"boot": "boot-b"}
+    if case == "expired": record = {"expires": 1}
+    if case == "lock_by_other_pid": locks[0] = ("WRITE", "999", site2_lock)
+    if case == "no_fence_read": locks = locks[:1]
+    _wp07_locks(proc, locks)
+    if case == "wrong_site_record":
+        r.record(2).write_text("site_id=1\nboot_id=boot-a\nroot_image_session_id=fpga-s1\n"
+                               "record_expires_epoch=1099511627776\n")
+    elif case != "no_record":
+        r.record(2, **record)
+    owners = g.cooperating_site_owners(
+        release=r.release, admitting_site=2 if case == "admitting_own_site" else 1,
+        boot_id="boot-a", session_id="fpga-s1", procroot=proc)
+    assert owners == {}
+    assert g.scan_proc_consumers(procroot=proc, release=r.release,
+                                 cooperating=owners)[1] == ["100"]
+
+
+@pytest.mark.parametrize("fds,maps", [
+    (["/dev/mem"], [(0x43C01000, 0x1000, "/dev/mem")]),            # maps the admitting Site's page
+    (["/dev/mem"], [(0x43C02000, 0x2000, "/dev/mem")]),            # spills past its own page
+    (["/dev/mem"], [(0x43C00000, 0x1000, "/dev/mem")]),            # PPU owner/ABI page
+    (["/dev/mem", "/dev/uio0"], [(0x43C02000, 0x1000, "/dev/mem")]),
+    (["/dev/mem", "/dev/xdevcfg"], [(0x43C02000, 0x1000, "/dev/mem")]),
+])
+def test_wp07_proven_owner_cross_site_or_fpga_resource_still_conflicts(
+        tmp_path, monkeypatch, fds, maps):
+    r = _wp07_root(tmp_path, monkeypatch)
+    g = r.guard
+    proc = _wp07_proc(tmp_path, r, {"100": (fds, maps)})
+    assert g.scan_proc_consumers(procroot=proc, release=r.release,
+                                 cooperating={"100": 2})[1] == ["100"]
+
+
+def test_wp07_unbound_site_admission_exempts_nothing(tmp_path, monkeypatch):
+    r = _wp07_root(tmp_path, monkeypatch)
+    seen = {}
+    monkeypatch.setattr(r.guard, "read_live_z2_facts",
+                        lambda **kw: seen.setdefault("cooperating", kw.get("cooperating")))
+    with r.port().exclusive(site=1) as port:
+        port.current_facts()
+        assert seen["cooperating"] == {}
+        with pytest.raises(r.guard.TargetSafetyDenied, match="SITE_SESSION_BINDING_INVALID"):
+            port.bind_site_session(boot_id="", session_id="fpga-s1")
+    seen.clear()
+    with r.port().exclusive() as port:  # reload: no Site exemption at all
+        port.current_facts()
+        assert seen["cooperating"] is None
+
+
 def test_native_v5_word_access_c_compilation_and_owner_fail_closed(tmp_path):
     """C word MMIO driver from PR #1199 technique, v5/2-Site synthetic only.
 
@@ -655,5 +909,5 @@ def test_site_admission_never_loads_fpga_or_writes_journal():
     for forbidden in ("manager_write", "write_state(", "root.run(",
                       "LinuxMMIO", "/dev/mem", "record_json"):
         assert forbidden not in text
-    assert "require_mmio=True" in text and "port.exclusive()" in text
+    assert "require_mmio=True" in text and "port.exclusive(site=site)" in text
     assert '"voltage_source": "NOT_MEASURED"' in text
