@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -53,6 +54,7 @@ def test_z2_installer_preserves_existing_desired_state_and_bounds_privilege() ->
     spec = importlib.util.spec_from_file_location("ppu_z2_p3", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     source = path.read_text(encoding="utf-8")
     assert 'if path == config_path and existing_config.existed:' in source

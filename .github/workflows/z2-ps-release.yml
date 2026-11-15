@@ -132,6 +132,7 @@ jobs:
       - name: Prove clean-PYNQ bootstrap compatibility
         run: |
           python -m py_compile scripts/z2-python-runtime.py
+          python -m py_compile scripts/ppu-z2-installer.py
           python -m py_compile scripts/ppu-bootstrap-deployment.py
           bash -n scripts/build-z2-python-runtime.sh
           python scripts/z2-python-runtime.py --help
