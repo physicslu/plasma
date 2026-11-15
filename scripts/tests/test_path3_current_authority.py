@@ -18,7 +18,7 @@ for old in OLD:
 assert "docs/development/plasma-path3-codex.md" in agents
 assert "guarded-hardware-no-sandbox" in policy
 assert "Use native CLI, SSH, USB/TTY" in policy
-assert "Only this Path 3 contract" in policy
+assert "For Path 3-specific execution policy" in policy
 assert "Do not reconstruct or apply their old restrictions" in policy
 
 legacy = (
