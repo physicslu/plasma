@@ -16,6 +16,7 @@ adapter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adapter)
 
 SHA = "a" * 40
+TARGET_SHA = "b" * 40
 
 
 @pytest.fixture()
@@ -46,7 +47,9 @@ def backend(tmp_path: Path, monkeypatch):
     def fake_run(cmd, **kwargs):
         calls.append(list(cmd))
         if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=SHA + "\n")
+            return SimpleNamespace(returncode=0, stdout=(TARGET_SHA if cmd[0] == adapter.SUDO else SHA) + "\n")
+        if "show" in cmd:
+            return SimpleNamespace(returncode=0, stdout=file.read_text(encoding="utf-8"))
         return SimpleNamespace(returncode=0, stdout="")
 
     monkeypatch.setattr(adapter.subprocess, "run", fake_run)
@@ -77,11 +80,11 @@ def test_deploy_requires_explicit_maintenance_and_two_preflight_checkpoints(back
     with pytest.raises(adapter.Blocked, match="MAINTENANCE_EXCLUSIVITY"):
         adapter.run("deploy", SHA)
     assert len(calls) == 2  # git source checks, never sudo
-    assert adapter.run("deploy", SHA, True) == 0
+    assert adapter.run("deploy", SHA, True, target_sha=TARGET_SHA) == 0
     assert calls[-1][-1] == "deploy"
     backend_file.write_text("deploy_profile() {\n  prepare_release\n}\n")
     with pytest.raises(adapter.Blocked, match="PREFLIGHT"):
-        adapter.run("deploy", SHA, True)
+        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
 
 
 def test_wrong_source_and_hostname_fail_before_sudo(backend, monkeypatch) -> None:
@@ -127,14 +130,16 @@ def test_deploy_timeout_is_outcome_unknown_not_auto_retried(backend, monkeypatch
     def fake_run(cmd, **kwargs):
         calls.append(cmd)
         if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=SHA)
-        if "diff" in cmd:
+            return SimpleNamespace(returncode=0, stdout=(TARGET_SHA if cmd[0] == adapter.SUDO else SHA))
+        if "diff" in cmd or "cat-file" in cmd:
             return SimpleNamespace(returncode=0)
+        if "show" in cmd:
+            return SimpleNamespace(returncode=0, stdout=adapter.BACKEND.read_text(encoding="utf-8"))
         raise adapter.subprocess.TimeoutExpired(cmd, kwargs["timeout"])
 
     monkeypatch.setattr(adapter.subprocess, "run", fake_run)
     with pytest.raises(adapter.Blocked, match="TIMED_OUT_OUTCOME_UNKNOWN"):
-        adapter.run("deploy", SHA, True)
+        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
     assert sum(x[-1] == "deploy" for x in calls) == 1
 
 
@@ -147,7 +152,7 @@ def test_arbitrary_operations_cannot_run(backend) -> None:
 
 def test_maintenance_flag_rejected_for_readonly(backend) -> None:
     _, calls = backend
-    with pytest.raises(adapter.Blocked, match="FLAG_ONLY_ALLOWED"):
+    with pytest.raises(adapter.Blocked, match="DEPLOY_ONLY_FLAGS"):
         adapter.run("verify", SHA, True)
     assert len(calls) == 2
 
@@ -164,7 +169,7 @@ def test_deploy_owner_checkout_mismatch_blocks_before_execution(backend, monkeyp
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(adapter.subprocess, "run", wrong_owner)
     with pytest.raises(adapter.Blocked, match="OWNER_CHECKOUT_SHA_MISMATCH"):
-        adapter.run("deploy", SHA, True)
+        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
     assert all(call[-1] != "deploy" for call in calls)
 
 
@@ -174,11 +179,46 @@ def test_deploy_owner_checkout_dirty_blocks_before_execution(backend, monkeypatc
     def dirty_owner(cmd, **kwargs):
         calls.append(list(cmd))
         if "rev-parse" in cmd:
-            return SimpleNamespace(returncode=0, stdout=SHA + "\n")
+            return SimpleNamespace(returncode=0, stdout=(TARGET_SHA if cmd[0] == adapter.SUDO else SHA) + "\n")
         if "diff" in cmd:
             return SimpleNamespace(returncode=1 if cmd[0] == adapter.SUDO else 0)
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(adapter.subprocess, "run", dirty_owner)
     with pytest.raises(adapter.Blocked, match="OWNER_CHECKOUT_DIRTY"):
+        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
+    assert all(call[-1] != "deploy" for call in calls)
+
+
+def test_target_sha_is_distinct_and_mandatory_for_deploy(backend) -> None:
+    _, calls = backend
+    with pytest.raises(adapter.Blocked, match="DEPLOY_TARGET_SHA_REQUIRED"):
         adapter.run("deploy", SHA, True)
+    assert len(calls) == 2
+    with pytest.raises(adapter.Blocked, match="DEPLOY_TARGET_SHA_REQUIRED"):
+        adapter.run("deploy", SHA, True, target_sha="untrusted")
+    assert len(calls) == 4
+    assert adapter.run("deploy", SHA, True, target_sha=TARGET_SHA) == 0
+    assert calls[-1][-1] == "deploy"
+
+
+def test_target_sha_cannot_be_given_to_readonly_command(backend) -> None:
+    _, calls = backend
+    with pytest.raises(adapter.Blocked, match="DEPLOY_ONLY_FLAGS"):
+        adapter.run("verify", SHA, target_sha=TARGET_SHA)
+    assert len(calls) == 2
+
+
+def test_target_preflight_git_object_missing_fails_closed(backend, monkeypatch) -> None:
+    _, calls = backend
+
+    def missing_preflight(cmd, **kwargs):
+        calls.append(list(cmd))
+        if "rev-parse" in cmd:
+            return SimpleNamespace(returncode=0, stdout=(TARGET_SHA if cmd[0] == adapter.SUDO else SHA))
+        if "cat-file" in cmd:
+            return SimpleNamespace(returncode=1)
+        return SimpleNamespace(returncode=0, stdout=adapter.BACKEND.read_text(encoding="utf-8"))
+    monkeypatch.setattr(adapter.subprocess, "run", missing_preflight)
+    with pytest.raises(adapter.Blocked, match="OWNER_DEPLOY_PREFLIGHT_UNAVAILABLE"):
+        adapter.run("deploy", SHA, True, target_sha=TARGET_SHA)
     assert all(call[-1] != "deploy" for call in calls)
