@@ -191,6 +191,55 @@ admission, two passing snapshots alone are insufficient. Verify that condition
 through the existing operational controls before deploying; otherwise report
 deployment `NOT_RUN`. This preflight does not supply a maintenance lock.
 
+## Development-mode clean State cutover (Replace, Not Migrate)
+
+For the single-owner development laboratory, use **one explicit opt-in** to
+replace the active Control Station's application state with a new empty
+namespace. It does **not** convert historical v1/v2 Journals, copy the old
+Manager registry, preserve old test transactions as live admission evidence,
+or silently acknowledge UNKNOWN outcomes.
+
+```bash
+# Only in an approved, clean, committed Control Station source checkout on SWPC.
+# No currently executing programming Jobs; no new Console/Manager admission
+# during cutover. Never operate a DUT or Z2 runtime from this command.
+./scripts/plasmactl deploy local-control-station --dev-fresh-state
+./scripts/plasmactl verify local-control-station
+./scripts/plasmactl status local-control-station
+```
+
+This is a **destructive-to-active-development-state** operation, not a
+production upgrade. It preserves all old data without deletion, by moving the
+entire existing `~/.local/state/plasma/local-control-station` directory to
+a timestamped `local-control-station.archive.*` sibling. Only after the
+Console and Manager services are stopped, with PPU execution still observed
+idle, is a new empty State directory created. Old Journal/registry/pairing
+data remain in the archived directory; the new Manager starts with its
+current canonical schema and configured PPU seed. New device enrollment or
+commissioning may be required after the clean reset.
+
+The immutable new release is constructed **before** stopping the services.
+The CLI checks the configured PPU's read-only `GET /api/status` before
+build, after build and again after the two SWPC user services stop. Each
+check requires `busy=false`, `active_job_count=0`, and empty execution
+owner identity. An unavailable PPU, any active Job or unknown owner is
+BLOCKED. Stopping the local Manager closes the managed admission entrypoint;
+it does not block a separate external operator with direct PPU access, which
+remains outside this single-owner development profile.
+
+The CLI preserves old release/config/systemd artifacts and performs its
+existing post-activation verification. On a command error it restores the
+prior release, config and archived State, then restarts the original services.
+Any partially created new State is saved as
+`local-control-station.failed.*` for diagnosis. An abrupt power loss or
+`SIGKILL` during the rename is **not** a proved automatic rollback; inspect
+the archived state, installed SHA and user units before recovery. No
+unattended fleet/production migration claim is made.
+
+**Default `deploy` (without the flag) remains the strict, transaction-aware
+deployment path.** `--dev-fresh-state` is not accepted by install, verify
+or status. The flag never changes PPU/Z2 firmware, FPGA, Site or DUT power.
+
 ## Deploy
 
 ```bash
