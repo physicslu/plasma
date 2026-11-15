@@ -93,9 +93,65 @@ def check_transactions(state_dir: Path) -> dict:
             raise Blocked(f"Run {ident}: outcome not terminal")
         if run.get("outcome") == "OUTCOME_UNKNOWN" and run.get("acknowledged") is not True:
             raise Blocked(f"Run {ident}: outcome unknown/unacknowledged")
-    if data.exists():
-        read_journal(data, {"plasma.manager.bundle-programming-journal.v1"}, "starts")
-    return {"batches": len(seen), "runs": len(runs)}
+    starts = (read_journal(data, {"plasma.manager.bundle-programming-journal.v1"},
+                           "starts") if data.exists() else [])
+    return {"batches": len(seen), "runs": len(runs), "starts": starts, "batch_records": seen,
+            "run_records": runs}
+
+
+def check_start_reconciliation(journal: dict, manager_url: str) -> int:
+    """Fail closed if Start admission cannot be accounted for without any writes.
+
+    CONSUMED must identify an existing completed Batch or Run. ISSUED is
+    allowed only when Manager's read-only reconciliation proves NOT_ACCEPTED;
+    an older never-admitted Start must not block deployments indefinitely.
+    """
+    starts = journal["starts"]
+    batches = journal["batch_records"]
+    runs = journal["run_records"]
+    known = set()
+    for start in starts:
+        start_id = start.get("start_id")
+        kind = start.get("kind")
+        state = start.get("state")
+        if (not isinstance(start_id, str) or len(start_id) != 32
+                or any(c not in "0123456789abcdef" for c in start_id)
+                or start_id in known or kind not in ("run", "batch")
+                or state not in ("ISSUED", "CONSUMED", "VOIDED")):
+            raise Blocked("Start journal: duplicate/invalid identity or state")
+        known.add(start_id)
+        matched_batches = [b for b in batches.values() if b.get("start_id") == start_id]
+        matched_runs = [r for r in runs if isinstance(r.get("plan"), dict)
+                        and r["plan"].get("plan_id") == start_id]
+        if len(matched_batches) + len(matched_runs) > 1:
+            raise Blocked(f"Start {start_id}: conflicting transaction records")
+        if state == "CONSUMED":
+            if kind == "batch":
+                ident = start.get("batch_id")
+                if (not isinstance(ident, str) or ident not in batches
+                        or batches[ident].get("start_id") != start_id
+                        or len(matched_batches) != 1 or matched_runs):
+                    raise Blocked(f"Start {start_id}: admitted Batch record missing/mismatched")
+            else:
+                ident = start.get("run_id")
+                if (not isinstance(ident, str) or len(matched_runs) != 1
+                        or matched_runs[0].get("run_id") != ident or matched_batches):
+                    raise Blocked(f"Start {start_id}: admitted Run record missing/mismatched")
+        elif state == "VOIDED":
+            if matched_batches or matched_runs:
+                raise Blocked(f"Start {start_id}: voided Start has admitted transaction")
+        else:
+            if matched_batches or matched_runs:
+                raise Blocked(f"Start {start_id}: issued Start has admitted transaction")
+            response = http_json(manager_url.rstrip("/") + "/api/programming/starts/" + start_id)
+            reconciliation = response.get("reconciliation")
+            if (response.get("ok") is not True or not isinstance(reconciliation, dict)
+                    or reconciliation.get("start_id") != start_id
+                    or reconciliation.get("kind") != kind
+                    or reconciliation.get("read_only") is not True
+                    or reconciliation.get("state") != "NOT_ACCEPTED"):
+                raise Blocked(f"Start {start_id}: admission not proved inactive")
+    return len(starts)
 
 
 def http_json(url: str) -> dict:
@@ -134,8 +190,11 @@ def check(state_dir: Path, manager_url: str, ppu_endpoint: str) -> dict:
     if not state_dir.is_dir():
         raise Blocked("Control Station state directory missing")
     journal = check_transactions(state_dir)
+    checked_starts = check_start_reconciliation(journal, manager_url)
     runtime = check_runtime(manager_url, ppu_endpoint)
-    return {"result": "PASS", "journal": journal, **runtime,
+    return {"result": "PASS",
+            "journal": {"batches": journal["batches"], "runs": journal["runs"],
+                        "starts": checked_starts}, **runtime,
             "admission_quiesce": "NOT_IMPLEMENTED",
             "meaning": "read-only snapshot; recheck before activation"}
 
