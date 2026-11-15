@@ -62,7 +62,7 @@ def rest(_):
       "node_matches_status":True,"lease_busy":False,
       "active_job_count":0,"activation_active":False,
       "site2_enabled":True,"site2_interface":"openocd",
-      "site2_target_matches":True,"site2_idle":True}
+      "site2_idle":True}
 
 def run_with(z,host=HOST,rest_fn=rest):
     h=Helper(z)

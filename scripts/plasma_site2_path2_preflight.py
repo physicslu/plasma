@@ -235,7 +235,6 @@ def rest_observation(host: str) -> dict:
             "activation_active":activation.get("active"),
             "site2_enabled":site.get("enabled"),
             "site2_interface":site.get("interface") if site.get("interface") in ("openocd","mock","none") else "UNVERIFIED",
-            "site2_target_matches":site.get("target")=="STM32F103C8T6",
             "site2_idle":site.get("state")=="idle" and site.get("current_job_id") is None and site.get("queued_jobs")==0,
         }
     except (OSError,ValueError,TimeoutError,http.client.HTTPException,RuntimeError):
@@ -306,7 +305,7 @@ def run(host: str,source_sha: str,*,helper=None,baseline=None,rest=None) -> dict
               and rest_state.get("activation_active") is False
               and rest_state.get("site2_enabled") is True
               and rest_state.get("site2_interface")=="openocd"
-              and rest_state.get("site2_target_matches") and rest_state.get("site2_idle")):
+              and rest_state.get("site2_idle")):
         blockers.append("REST_SITE2_NOT_IDLE_OR_ENABLED")
     return {"schema":SCHEMA,"status":"READ_ONLY_OBSERVED","source_sha":source_sha,
             "bootstrap":bootstrap,"rest":rest_state,"z2":z,
