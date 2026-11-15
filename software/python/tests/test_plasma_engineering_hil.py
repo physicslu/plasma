@@ -184,3 +184,20 @@ def test_malformed_batch_poll_fails_closed_without_resubmission(bad_poll) -> Non
     assert manager.last_start_id == START_ID
     assert manager.last_batch_id == BATCH_ID
     assert [r for _, r, _ in manager.calls].count("/api/programming/batches") == 1
+
+
+@pytest.mark.parametrize("flag,bad", [
+    ("--batch-timeout", "nan"),
+    ("--batch-timeout", "inf"),
+    ("--poll-interval", "nan"),
+    ("--cdc-duration", "nan"),
+    ("--cdc-duration", "inf"),
+    ("--cdc-tolerance", "nan"),
+])
+def test_hil_rejects_nonfinite_timeout_or_tolerance(flag: str, bad: str) -> None:
+    with pytest.raises(SystemExit) as exc:
+        hil.main(["--profile", "bluepill-ab",
+                  "--image-v01", "/missing/v01.bin",
+                  "--image-v02", "/missing/v02.bin",
+                  "--port", "/dev/ttyACM0", flag, bad])
+    assert exc.value.code == 2
