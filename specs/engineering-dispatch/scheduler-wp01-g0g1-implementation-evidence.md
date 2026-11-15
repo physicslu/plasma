@@ -179,3 +179,12 @@ real Flash: **NOT_RUN**. No physical SAFE_OFF or recovery qualification claim.
 No model-request/token/billing metrics are available in this step; no inferred
 subscription use. Inspection ended after required code/test evidence and
 source hash verification; pending integration is reported without another Gate.
+
+
+## Independent post-publication checkpoint (2026-11-15)
+
+The trusted Path 3 run [43697191800](https://github.com/physicslu/plasma/actions/runs/43697191800) completed: `development-authorize` SUCCESS, `development-codex` SUCCESS; its candidate source and this evidence were published at exact PR #1441 HEAD `24a0fa939845aa35e6676ed2333821fc0f13cacb`. This is a **post-publication verification**, not a change to the preceding original-executor evidence or its claims.
+
+At that HEAD, 14 pull-request-triggered GitHub Actions runs were observed as `completed/action_required` with **zero executed successful jobs**. They are not functional test failures or CI PASS. This checkpoint only updates the existing evidence record on the same Draft PR to request a fresh CI trigger from a non-automated source edit; **actual subsequent workflow execution and conclusions must be verified against the resulting new commit**. The pending socket-bound integrations remain NOT_RUN and cannot be re-labelled by this edit.
+
+Independent source-delta audit relative to main `98652acaba5b1bb5f3e32bb6aa1d6a21219e5d6a` at the published source: production files **527 insertions / 154 deletions** (net +373) across 7 files; tests and evidence are tracked separately. Source priority for final acceptance: retain G0 refusal/unconsumed start ID, local G1 isolation, G2 pre-submit fail-closed, journal/UNKNOWN evidence and real one-Site Flash safety. Do not shorten these guards just to reduce LOC. #1439 remains a separate, unmerged documentation dependency. No merge, deployment, Z2/DUT or physical HIL was authorized.
