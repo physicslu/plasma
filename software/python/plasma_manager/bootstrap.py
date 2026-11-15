@@ -12,6 +12,7 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
 from . import bootstrap_request_auth as request_auth
+from .shared_control import shared_boundary
 from .client import PPUHTTPError, PPUHttpClient
 from .config import normalize_endpoint
 from .registry import PPURegistryStore, RegistryEntryNotFound, normalize_registry_alias
@@ -568,17 +569,36 @@ class ManagerBootstrapCoordinator:
         self.timeout_s = timeout_s
         self.client_factory = client_factory
 
+    def shared_control_check(self):
+        # No PPU I/O. File persistence may be optional: in-memory registry and
+        # credentials are valid. Enrollment remains an alias-specific decision.
+        from .client import _cloudflare_access_headers
+        with shared_boundary("BOOTSTRAP_SHARED_AUTHORITY"):
+            records = self.registry.records()
+            _managed_bootstrap_transport_enabled()
+            _cloudflare_access_headers("")
+            with self.credentials._lock:
+                aliases = tuple(self.credentials._credentials)
+            for alias in aliases:
+                self.credentials.public_state(alias)
+                self.credentials.record_for(alias)
+            for record in records:
+                self.credentials.public_state(record.alias)
+                bootstrap_endpoint_for_gateway(record.endpoint)
+
     def _entry(self, alias: str):
         normalized = normalize_registry_alias(alias)
-        record = self.registry.record_by_alias(normalized)
+        with shared_boundary("REGISTRY_READ"):
+            record = self.registry.record_by_alias(normalized)
         if record is None:
             raise RegistryEntryNotFound(f"PPU registry alias was not found: {normalized}")
         return normalized, record
 
     def _live(self, alias: str):
         normalized, record = self._entry(alias)
-        endpoint = bootstrap_endpoint_for_gateway(record.endpoint)
-        client = self.client_factory(endpoint, self.timeout_s)
+        with shared_boundary("BOOTSTRAP_CLIENT_CONFIGURATION"):
+            endpoint = bootstrap_endpoint_for_gateway(record.endpoint)
+            client = self.client_factory(endpoint, self.timeout_s)
         status, payload = client.status()
         bootstrap = payload.get("bootstrap")
         if status != 200 or not isinstance(bootstrap, dict) or bootstrap.get("state") != "bootstrap_ready":
@@ -589,9 +609,11 @@ class ManagerBootstrapCoordinator:
     def _authenticated(self, alias: str):
         """Paired device proven by a MACed status, never by an anonymous read."""
         normalized, record = self._entry(alias)
-        enrolled = self.credentials.record_for(normalized)
+        with shared_boundary("CREDENTIAL_READ", local_refusals=(BootstrapCredentialError,)):
+            enrolled = self.credentials.record_for(normalized)
         device_id, token = enrolled.device_id, enrolled.token
-        client = self.client_factory(bootstrap_endpoint_for_gateway(record.endpoint), self.timeout_s)
+        with shared_boundary("BOOTSTRAP_CLIENT_CONFIGURATION"):
+            client = self.client_factory(bootstrap_endpoint_for_gateway(record.endpoint), self.timeout_s)
         client.expected_generation = enrolled.generation
         status, payload = client.status(token, device_id)
         if status in (401, 503):
@@ -608,7 +630,8 @@ class ManagerBootstrapCoordinator:
 
     def status(self, alias: str) -> dict[str, Any]:
         normalized, _record, _client, payload, device_id = self._live(alias)
-        pairing = dict(self.credentials.public_state(normalized))
+        with shared_boundary("CREDENTIAL_PUBLIC_STATE"):
+            pairing = dict(self.credentials.public_state(normalized))
         # device_match means the paired credential is PROVEN by this device's
         # MACed status, not merely that an anonymous status echoed the ID.
         pairing["device_match"] = pairing.get("device_id") is None

@@ -313,7 +313,8 @@ def migrate_batch_record(batch: Mapping[str, Any]) -> dict[str, Any]:
 class ProgrammingBatchCoordinator:
     def __init__(self, workflow: BundleProgrammingWorkflow, *,
                  journal_path: Path | None = None,
-                 platform_gate: Callable[[str], str | None] | None = None,
+                 platform_gate: Callable[[str], tuple[str, str] | None] | None = None,
+                 shared_control_gate: Callable[[], tuple[str, str] | None] | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  spawn: Callable[[Callable[[], None]], None] | None = None,
                  poll_interval_s: float = 0.5) -> None:
@@ -322,6 +323,9 @@ class ProgrammingBatchCoordinator:
         # The Manager's Platform maintenance gate, evaluated per Target PPU at
         # admission and again immediately before each PPU is operated.
         self.platform_gate = platform_gate
+        self.shared_control_gate = shared_control_gate or getattr(
+            getattr(platform_gate, "__self__", None), "shared_control_gate", None)
+        self.workflow.shared_control_gate = self.shared_control_gate
         self.sleep = sleep
         self.spawn = spawn or (lambda target: threading.Thread(
             target=target, name="plasma-programming-batch", daemon=True).start())
@@ -621,7 +625,11 @@ class ProgrammingBatchCoordinator:
         consumer was migrated to this resource first, and the Manager keeps
         exactly one door into the engine rather than two sets of semantics.
         """
-        return self._start(body)
+        from .shared_control import SharedControlError
+        try:
+            return self._start(body)
+        except SharedControlError as exc:
+            raise ProgrammingError(503, "manager_shared_control_failure", str(exc)) from exc
 
     def _start(self, body: Mapping[str, Any]) -> dict[str, Any]:
         if (not isinstance(body, Mapping)
@@ -646,9 +654,14 @@ class ProgrammingBatchCoordinator:
         # for a legitimately BLOCKED Batch.
         self.workflow.validate_specification(plan_body)
         with self._lock:
-            if self._control_failure is not None or self.workflow._journal_failure is not None:
+            shared = self._shared_block()
+            if shared is not None:
+                raise ProgrammingError(503, "manager_shared_control_failure", shared)
+            if (self._control_failure is not None or self.workflow._control_failure is not None
+                    or self.workflow._journal_failure is not None):
                 raise ProgrammingError(503, "manager_shared_control_failure",
-                                       self._control_failure or self.workflow._journal_failure)
+                                       self._control_failure or self.workflow._control_failure
+                                       or self.workflow._journal_failure)
             # An unknown or unauthorised Target refuses the WHOLE Batch and
             # leaves the start_id unconsumed, so the operator may correct the
             # request and resend the same token.
@@ -698,6 +711,10 @@ class ProgrammingBatchCoordinator:
         self.spawn(lambda: self._execute(batch, plan_body))
         return self.status_batch(batch["batch_id"])
 
+    def _shared_block(self):
+        from .shared_control import shared_control_reason
+        return shared_control_reason(self.shared_control_gate)
+
     def _platform_block(self, alias: str) -> tuple[str, str] | None:
         """Whether this PPU may be mutated at all. PPU-scoped: one verdict
         covers every Site of that PPU, and asking it once per PPU is also
@@ -707,7 +724,8 @@ class ProgrammingBatchCoordinator:
         try:
             return self.platform_gate(alias)
         except ProgrammingError as exc:
-            return TARGET_NOT_READY, exc.code.upper()
+            return (SHARED_CONTROL_FAILURE if exc.code == "manager_shared_control_failure"
+                    else TARGET_NOT_READY), exc.code.upper()
         except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
             return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
@@ -733,7 +751,8 @@ class ProgrammingBatchCoordinator:
         try:
             return self.workflow.target_block(alias, site, execution_owner_id=owner)
         except ProgrammingError as exc:
-            return TARGET_NOT_READY, exc.code.upper()
+            return (SHARED_CONTROL_FAILURE if exc.code == "manager_shared_control_failure"
+                    else TARGET_NOT_READY), exc.code.upper()
         except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
             return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
@@ -824,6 +843,9 @@ class ProgrammingBatchCoordinator:
                 if run is not None:
                     self._record_attempt(last, run)
                     outcome = run["outcome"]
+                    if (run.get("reason") == "manager_shared_control_failure"
+                            and not run.get("job_submission_count")):
+                        outcome = None
                 else:
                     possible = last is not None and last.get("state") not in ("planned", "finished")
                     outcome = "OUTCOME_UNKNOWN" if possible else None
@@ -859,9 +881,16 @@ class ProgrammingBatchCoordinator:
 
     def _dispatch_block(self, batch: Mapping[str, Any], alias: str) -> str | None:
         """Called with the journal lock at every new attempt boundary."""
+        shared = self._shared_block()
+        if shared is not None:
+            self._control_failure = shared
+        if self.workflow._control_failure is not None:
+            self._control_failure = self.workflow._control_failure
         if self.workflow._journal_failure is not None:
             self._control_failure = self.workflow._journal_failure
         if self._control_failure is not None:
+            with self.workflow._lock:
+                self.workflow._control_failure = self._control_failure
             raise _SharedControlFailure(self._control_failure)
         if batch["stop_requested"]:
             return "STOP_REQUESTED_NOTHING_SUBMITTED"
@@ -887,6 +916,8 @@ class ProgrammingBatchCoordinator:
             except StopIteration as done:
                 outcome, reason = done.value
                 with self._lock:
+                    if self._control_failure is not None or self.workflow._control_failure is not None:
+                        raise _SharedControlFailure(self._control_failure or self.workflow._control_failure)
                     unit.update(status=_unit_status(outcome, stopped=outcome is None),
                                 outcome=outcome, reason=reason)
                     if outcome == "BLOCKED" and unit["failure_domain"] is None:
@@ -963,6 +994,8 @@ class ProgrammingBatchCoordinator:
         if platform_leader:
             platform.set_result(self._platform_block(alias))
         verdict = platform.result()
+        with self._lock:
+            self._dispatch_block(batch, alias)
         if verdict is None:
             verdict = self._site_block(alias, site)
         if verdict is not None:
@@ -1044,6 +1077,8 @@ class ProgrammingBatchCoordinator:
                     execution_owner_id=batch["batch_id"])["run"]
             except ProgrammingError as exc:
                 if exc.code == "manager_shared_control_failure":
+                    with self._lock:
+                        attempt.update(state="finished", reason=exc.code, finished_at=_now())
                     raise _SharedControlFailure(exc.code) from exc
                 with self._lock:
                     attempt.update(state="finished", outcome="BLOCKED", reason=exc.code,

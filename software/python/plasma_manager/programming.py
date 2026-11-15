@@ -59,6 +59,9 @@ from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
 from plasma_opf import bundle_v3
+from .shared_control import SharedControlError, shared_boundary, shared_control_reason
+from .bootstrap import BootstrapManagerError
+from .client import PPUHTTPError
 
 ROUTES_ENV = "PLASMA_PROGRAMMING_ROUTES_ROOT"
 ROUTES_RELATIVE = Path("data/opf/programming-routes")
@@ -126,8 +129,10 @@ class ProgrammingError(Exception):
 class _StepFailure(Exception):
     """Definitive, safe failure: the device state is known (no unknown write)."""
 
-    def __init__(self, reason: str, outcome: str = "FAIL") -> None:
+    def __init__(self, reason: str, outcome: str = "FAIL", *,
+                 failure_domain: str = TARGET_NOT_READY) -> None:
         super().__init__(reason)
+        self.failure_domain = failure_domain
         self.reason = reason
         self.outcome = outcome
 
@@ -284,6 +289,7 @@ class BundleProgrammingWorkflow:
         self._lock = threading.RLock()
         self._journal_failure: str | None = None
         self._control_failure: str | None = None
+        self.shared_control_gate = None
         self._plans: dict[str, _Plan] = {}
         self._bundle_cache: dict[tuple, tuple] = {}
         #: How many times a Bundle / Resource Set was actually built. A Batch
@@ -391,7 +397,8 @@ class BundleProgrammingWorkflow:
 
     # ------------------------------------------------------------------ helpers
     def _record(self, alias: str):
-        record = self.registry.record_by_alias(alias)
+        with shared_boundary("PROGRAMMING_REGISTRY_READ"):
+            record = self.registry.record_by_alias(alias)
         if record is None:
             raise ProgrammingError(404, "ppu_not_found", "configured PPU alias was not found")
         return record
@@ -414,12 +421,20 @@ class BundleProgrammingWorkflow:
                                    f"Programming Routes are unavailable: {exc}") from exc
 
     def _gateway_get(self, client: Any, path: str) -> dict[str, Any]:
-        status, _headers, body = client.relay(
-            "GET", path, headers={"Accept": "application/json"}, body=None,
-            timeout_s=self.request_timeout_s, max_response_bytes=1024 * 1024)
+        try:
+            status, _headers, body = client.relay(
+                "GET", path, headers={"Accept": "application/json"}, body=None,
+                timeout_s=self.request_timeout_s, max_response_bytes=1024 * 1024)
+        except (PPUHTTPError, TimeoutError, ConnectionError) as exc:
+            raise _StepFailure(f"PPU_STATE_UNREADABLE_{type(exc).__name__}", outcome="BLOCKED",
+                               failure_domain=TARGET_STATE_UNAVAILABLE) from exc
         if status != 200:
             raise _StepFailure(f"GATEWAY_READ_HTTP_{status}")
-        value = json.loads(body)
+        try:
+            value = json.loads(body)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise _StepFailure("GATEWAY_RESPONSE_INVALID",
+                               failure_domain=TARGET_STATE_UNAVAILABLE) from exc
         if not isinstance(value, dict):
             raise _StepFailure("GATEWAY_RESPONSE_INVALID")
         return value
@@ -480,12 +495,9 @@ class BundleProgrammingWorkflow:
         and the Active Asset Set must not require recovery. Any doubt blocks
         it.
 
-        Every answer here is about ONE PPU, and says so. A PPU that readably
-        refuses is ``TARGET_NOT_READY``; a PPU whose own state cannot be read
-        is ``TARGET_STATE_UNAVAILABLE``, which is still local because nothing
-        has been submitted for it. Nothing in this method may conclude that
-        the Manager's shared control failed - that judgement belongs to the
-        caller that owns the shared control.
+        Remote unreadiness/transport is local. Shared store/configuration
+        failures carry their source boundary through this method; an unknown
+        failure origin is shared, never silently downgraded to a PPU fault.
         """
         with self._lock:
             if self._unknown_latched(alias) is not None:
@@ -508,12 +520,15 @@ class BundleProgrammingWorkflow:
         try:
             if self.coordinator.assets(alias).get("state") == "RECOVERY_REQUIRED":
                 return TARGET_NOT_READY, "PPU_RECOVERY_REQUIRED"
-            client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+            with shared_boundary("GATEWAY_CLIENT_CONFIGURATION"):
+                client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
             self._readiness(client, site, None, owner)
         except _StepFailure as exc:
-            return TARGET_NOT_READY, exc.reason
-        except Exception as exc:  # noqa: BLE001 - unreadable state is never "released"
+            return exc.failure_domain, exc.reason
+        except (BootstrapManagerError, PPUHTTPError) as exc:
             return TARGET_STATE_UNAVAILABLE, f"PPU_STATE_UNREADABLE_{type(exc).__name__}"
+        except Exception as exc:
+            return SHARED_CONTROL_FAILURE, f"SITE_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}"
         return None
 
     def retry_block(self, alias: str, site: int) -> str | None:
@@ -529,9 +544,12 @@ class BundleProgrammingWorkflow:
         """PPU id + the Resource identity the PPU derived from its Active Set."""
         record = self._record(alias)
         try:
-            client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+            with shared_boundary("GATEWAY_CLIENT_CONFIGURATION"):
+                client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
             status = self._gateway_get(client, f"/api/status?site={site}")
-        except Exception as exc:  # noqa: BLE001 - read-only; never guess a reuse decision
+        except SharedControlError:
+            raise
+        except (_StepFailure, PPUHTTPError) as exc:
             raise ProgrammingError(503, "ppu_resource_identity_unknown",
                                    "PPU Resource identity could not be read; nothing was changed") from exc
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
@@ -810,6 +828,14 @@ class BundleProgrammingWorkflow:
                 raise
         return {"ok": True, "plan": payload}
 
+    def _check_shared_control(self):
+        reason = shared_control_reason(self.shared_control_gate)
+        if reason is not None:
+            self._control_failure = reason
+        if self._journal_failure is not None or self._control_failure is not None:
+            raise ProgrammingError(503, "manager_shared_control_failure",
+                                   self._journal_failure or self._control_failure)
+
     def start(self, alias: str, body: Mapping[str, Any], *,
               execution_owner_id: str | None = None) -> dict[str, Any]:
         if not isinstance(body, Mapping) or set(body) != {"plan_id", "confirm"}:
@@ -819,9 +845,7 @@ class BundleProgrammingWorkflow:
                                    "explicit programming confirmation is required")
         self._require_commissioned(alias)
         with self._lock:
-            if self._journal_failure is not None or self._control_failure is not None:
-                raise ProgrammingError(503, "manager_shared_control_failure",
-                                       self._journal_failure or self._control_failure)
+            self._check_shared_control()
             plan = self._plans.get(body["plan_id"]) if type(body["plan_id"]) is str else None
             if (plan is None or plan.alias != alias
                     or self.monotonic() - plan.created_monotonic > PLAN_TTL_S):
@@ -1128,7 +1152,8 @@ class BundleProgrammingWorkflow:
     def _execute_run(self, run: _Run, plan: _Plan) -> None:
         try:
             record = self._record(run.alias)
-            client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+            with shared_boundary("GATEWAY_CLIENT_CONFIGURATION"):
+                client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
             # LOM-P2A-2 G13: Job submission is signed under the enrolled controller.
             signer = getattr(self.coordinator, "gateway_signer", None)
             if signer is not None and hasattr(client, "write_signer"):
@@ -1170,6 +1195,10 @@ class BundleProgrammingWorkflow:
             self._update(run, state="finished", outcome="OUTCOME_UNKNOWN", reason=exc.reason)
         except _StepFailure as exc:
             self._update(run, state="finished", outcome=exc.outcome, reason=exc.reason)
+        except SharedControlError as exc:
+            with self._lock:
+                self._control_failure = str(exc)
+            self._update(run, state="finished", outcome="BLOCKED", reason="manager_shared_control_failure")
         except ProgrammingError as exc:
             self._update(run, state="finished", outcome="BLOCKED", reason=exc.code)
         except Exception as exc:  # noqa: BLE001 - any unexpected error is reported, never retried
@@ -1285,8 +1314,7 @@ class BundleProgrammingWorkflow:
             raise _StepFailure("PPU_PLATFORM_MAINTENANCE_STARTING", outcome="BLOCKED")
         try:
             with self._lock:
-                if self._journal_failure is not None or self._control_failure is not None:
-                    raise _StepFailure("MANAGER_SHARED_CONTROL_FAILURE", outcome="BLOCKED")
+                self._check_shared_control()
                 if self._unknown_latched(run.alias) is not None:
                     raise _StepFailure("OUTCOME_UNKNOWN_UNRESOLVED", outcome="BLOCKED")
                 # Submission commits under the same lock as the global latch.

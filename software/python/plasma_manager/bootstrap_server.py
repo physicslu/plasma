@@ -22,6 +22,7 @@ from .programming import (
 )
 from .programming_batch import ProgrammingBatchCoordinator
 from .registry import RegistryEntryNotFound
+from .shared_control import SharedControlError, shared_boundary
 from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
 BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
@@ -129,7 +130,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                            if config.registry_state_path is not None else None)
                 cls.programming_batches = ProgrammingBatchCoordinator(
                     workflow, journal_path=journal,
-                    platform_gate=cls.platform_gate_reason)
+                    platform_gate=cls.platform_gate_reason,
+                    shared_control_gate=cls.shared_control_gate)
             return cls.programming_batches
 
     def _programming_call(self, call) -> None:
@@ -237,6 +239,30 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                    {"ok": False, "error": {"code": code, "message": message}})
         return False
 
+    def _programming_fleet_item_for_alias(self, alias):
+        with shared_boundary("FLEET_CACHE_READ"):
+            snapshot = self._poller().snapshot()
+            ppus = snapshot["ppus"]
+            if not isinstance(ppus, list):
+                raise ValueError("invalid fleet cache")
+            matches = [item for item in ppus if isinstance(item, dict) and item.get("alias") == alias]
+            return matches[0] if len(matches) == 1 else None
+
+    @classmethod
+    def shared_control_gate(cls):
+        try:
+            with shared_boundary("MANAGER_SHARED_AUTHORITY"):
+                if cls.registry_store is None or cls.poller is None or cls.bootstrap_coordinator is None:
+                    return SHARED_CONTROL_FAILURE, "MANAGER_CONTROL_PLANE_UNAVAILABLE"
+                cls.registry_store.records()
+                cls.poller.shared_control_check()
+                if cls.bootstrap_coordinator.registry is not cls.registry_store:
+                    return SHARED_CONTROL_FAILURE, "MANAGER_REGISTRY_AUTHORITY_MISMATCH"
+                cls.bootstrap_coordinator.shared_control_check()
+        except SharedControlError as exc:
+            return SHARED_CONTROL_FAILURE, str(exc)
+        return None
+
     @classmethod
     def platform_gate_reason(cls, alias: str) -> tuple[str, str] | None:
         """The same gate, classified by failure domain, for a non-request caller.
@@ -255,14 +281,19 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         through. A failure while reading ONE PPU's Platform state is local to
         that PPU, and nothing has been submitted for it at this point.
         """
-        if cls.registry_store is None or cls.poller is None or cls.bootstrap_coordinator is None:
-            return SHARED_CONTROL_FAILURE, "MANAGER_CONTROL_PLANE_UNAVAILABLE"
+        shared = cls.shared_control_gate()
+        if shared is not None:
+            return shared
         probe = object.__new__(cls)
+        # Only programming admission uses strict cache provenance. Keep the
+        # other existing Bootstrap HTTP surfaces on their own policy path.
+        probe._fleet_item_for_alias = probe._programming_fleet_item_for_alias
         try:
             block = cls._platform_mutation_block(probe, alias)
-        except Exception as exc:  # noqa: BLE001 - unreadable is never ready
-            return (TARGET_STATE_UNAVAILABLE,
-                    f"PPU_PLATFORM_STATE_UNREADABLE_{type(exc).__name__}")
+        except (BootstrapManagerError, PPUHTTPError) as exc:
+            return TARGET_STATE_UNAVAILABLE, f"PPU_PLATFORM_STATE_UNREADABLE_{type(exc).__name__}"
+        except Exception as exc:
+            return SHARED_CONTROL_FAILURE, f"PLATFORM_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}"
         return None if block is None else (TARGET_NOT_READY, block[0].upper())
 
     def _platform_mutation_block(self, alias: str) -> tuple[str, str] | None:

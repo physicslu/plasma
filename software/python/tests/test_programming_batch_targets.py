@@ -108,7 +108,7 @@ class MultiplexGateway(FakeGateway):
 
 
 def rig(tmp_path, *, aliases=("z2",), sites=(2, 3), spawn_batch=None, per_alias=None,
-        platform_gate=None, **gateway_kw):
+        platform_gate=None, shared_control_gate=None, **gateway_kw):
     root, resource_sha = route_fixture(tmp_path, sites)
     coordinators, gateways, endpoints = {}, {}, {}
     for alias in aliases:
@@ -127,6 +127,7 @@ def rig(tmp_path, *, aliases=("z2",), sites=(2, 3), spawn_batch=None, per_alias=
         sleep=lambda _s: None, spawn=lambda target: target(), poll_interval_s=0.0)
     batches = ProgrammingBatchCoordinator(
         workflow, journal_path=tmp_path / "batches.json", platform_gate=platform_gate,
+        shared_control_gate=shared_control_gate,
         sleep=lambda _s: None,
         spawn=spawn_batch or (lambda target: target()), poll_interval_s=0.0)
     return batches, workflow, gateways, coordinators
@@ -714,7 +715,7 @@ def break_gateway(gateways, alias, exc):
     ("recovery", "TARGET_NOT_READY", "PPU_RECOVERY_REQUIRED"),
     ("timeout", "TARGET_STATE_UNAVAILABLE", "PPU_STATE_UNREADABLE_TimeoutError"),
     ("unreachable", "TARGET_STATE_UNAVAILABLE", "PPU_STATE_UNREADABLE_ConnectionError"),
-    ("platform_unreadable", "TARGET_STATE_UNAVAILABLE", "PPU_STATE_UNREADABLE_RuntimeError"),
+    ("platform_unreadable", "TARGET_STATE_UNAVAILABLE", "PPU_STATE_UNREADABLE_BootstrapManagerError"),
 ])
 def test_one_broken_ppu_is_isolated_and_the_healthy_one_still_runs(
         tmp_path, fault, domain, reason_fragment):
@@ -728,7 +729,8 @@ def test_one_broken_ppu_is_isolated_and_the_healthy_one_still_runs(
     elif fault == "unreachable":
         break_gateway(gateways, "z2", ConnectionError("runtime unreachable"))
     else:
-        break_assets(coordinators, "z2", raises=RuntimeError("platform state unreadable"))
+        from plasma_manager.bootstrap import BootstrapManagerError
+        break_assets(coordinators, "z2", raises=BootstrapManagerError("remote asset response untrusted"))
     started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     broken, healthy = batch["units"]
@@ -767,10 +769,13 @@ SHARED_GATES = [
 
 @pytest.mark.parametrize("label, gate", SHARED_GATES, ids=[s[0] for s in SHARED_GATES])
 def test_a_shared_control_failure_stops_the_whole_batch_at_admission(tmp_path, label, gate):
-    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
-    batch = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))['batch']
-    assert batch['failure_domain'] == 'SHARED_CONTROL_FAILURE'
-    assert all(not u['attempts'] for u in batch['units'])
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), shared_control_gate=lambda: gate("manager-shared"))
+    with pytest.raises(ProgrammingError) as caught:
+        batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
+    # Not one PPU's problem: nothing is admitted and nothing is submitted.
+    assert caught.value.code == "manager_shared_control_failure"
+    assert caught.value.status == 503
+    assert batches._batches == {}
     assert gateways["z2"].posts == [] and gateways["z2b"].posts == []
 
 
@@ -819,26 +824,40 @@ def test_a_gate_that_cannot_be_executed_is_shared_not_local(tmp_path):
     def gate(alias):
         raise RuntimeError("fleet poller is not configured")
 
-    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
-    batch = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))['batch']
-    assert batch['failure_domain'] == 'SHARED_CONTROL_FAILURE'
-    assert 'GATE_NOT_EXECUTABLE_RuntimeError' in batch['reason']
+    batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), shared_control_gate=lambda: gate("manager-shared"))
+    with pytest.raises(ProgrammingError) as caught:
+        batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
+    # "I could not tell" is never read as "only this PPU is affected".
+    assert caught.value.code == "manager_shared_control_failure"
+    assert "GATE_NOT_EXECUTABLE_RuntimeError" in caught.value.message
     assert gateways["z2"].posts == [] and gateways["z2b"].posts == []
 
 
 def test_a_journal_that_cannot_be_written_stops_submission_and_says_so(tmp_path):
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"))
-    original = batches._persist_locked
-    state = {"writes": 0}
+    import threading
+    failed = threading.Event()
+    original = batches._write_journal_locked
+    readiness = workflow.target_block
+
+    def held_peer(alias, site, **kwargs):
+        if alias == "z2b":
+            assert failed.wait(10)
+        return readiness(alias, site, **kwargs)
 
     def persist():
-        state["writes"] += 1
-        # The journal fails once the first Site has been recorded.
-        if state["writes"] > 3:
+        batch = next(iter(batches._batches.values()), None)
+        # Fail the real durable starting boundary of z2. The peer cannot
+        # race ahead and acquire its own attempt before this precise failure.
+        if failed.is_set() or (batch and any(
+                u["ppu_alias"] == "z2" and any(a["state"] == "starting" for a in u["attempts"])
+                for u in batch["units"])):
+            failed.set()
             raise OSError("journal device is full")
         original()
 
-    batches._persist_locked = persist
+    workflow.target_block = held_peer
+    batches._write_journal_locked = persist
     started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     assert batch["failure_domain"] == "SHARED_CONTROL_FAILURE"
