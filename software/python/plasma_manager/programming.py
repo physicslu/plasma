@@ -289,6 +289,7 @@ class BundleProgrammingWorkflow:
         #: How many times a Bundle / Resource Set was actually built. A Batch
         #: over several Sites of one PPU must not move this more than once.
         self._bundle_builds = 0
+        self._bundle_build_lock = threading.Lock()
         self._runs: dict[str, _Run] = {}
         self._read_outputs: dict[str, bytes] = {}
         # Start admission records (journalled) and the Batch start IDs that
@@ -470,7 +471,8 @@ class BundleProgrammingWorkflow:
                 return run
         return None
 
-    def target_block(self, alias: str, site: int) -> tuple[str, str] | None:
+    def target_block(self, alias: str, site: int, *,
+                     execution_owner_id: str | None = None) -> tuple[str, str] | None:
         """Why this Target may not be operated now, and WHOSE failure it is.
 
         Read-only. The PPU must be reachable, its Site idle with no Job and no
@@ -490,9 +492,13 @@ class BundleProgrammingWorkflow:
                 return TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED"
             active = [r for r in self._runs.values() if r.alias == alias and r.outcome is None]
             if any(r.site == site or r.plan.get("activation_required")
-                   or not r.plan.get("execution_owner_id") for r in active):
+                   or not r.plan.get("execution_owner_id")
+                   or (execution_owner_id is not None
+                       and r.plan.get("execution_owner_id") != execution_owner_id)
+                   for r in active):
                 return TARGET_NOT_READY, "RUN_IN_PROGRESS"
-            owner = active[0].plan.get("execution_owner_id") if active else None
+            owner = (execution_owner_id or
+                     (active[0].plan.get("execution_owner_id") if active else None))
         try:
             record = self._record(alias)
         except ProgrammingError as exc:
@@ -538,7 +544,12 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(503, "ppu_resource_identity_unknown", "PPU identity is missing")
         return ppu_id, report
 
-    def _route_resources(self, route: bundle_v3.ProgrammingRoute, *,
+    def _route_resources(self, route: bundle_v3.ProgrammingRoute, **kwargs) -> tuple:
+        # Pure local computation only; remote planning stays lane-independent.
+        with self._bundle_build_lock:
+            return self._build_route_resources(route, **kwargs)
+
+    def _build_route_resources(self, route: bundle_v3.ProgrammingRoute, *,
                          image: bytes | None, archive: bytes | None,
                          filename: str | None) -> tuple:
         """Bundle v3, the Resource Set and the Image Asset for one Route.

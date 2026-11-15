@@ -77,6 +77,36 @@ class Coordinators:
         return getattr(next(iter(self.per_alias.values())), name)
 
 
+class MultiplexGateway(FakeGateway):
+    """Legacy immediate-terminal fake, with independent per-Job receipts."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        import threading
+        self.job_lock = threading.RLock()
+        self.job_kwargs = kwargs
+        self.jobs = {}
+
+    def relay(self, method, path, **kwargs):
+        with self.job_lock:
+            if method == 'POST' and path == '/api/jobs':
+                options = dict(self.job_kwargs)
+                if isinstance(self.job_final, list):
+                    options['job_final'] = self.job_final[min(len(self.posts), len(self.job_final) - 1)]
+                child = FakeGateway(**options)
+                job_id = 'job-20261109-120000-%08x' % (0x0123abcd + len(self.posts))
+                child._job_id = lambda: job_id
+                # Keep possibly-sent posts even when the answer is lost.
+                self.posts.append(json.loads(kwargs['body']))
+                self.jobs[job_id] = child
+                return child.relay(method, path, **kwargs)
+            if method == 'GET' and path.startswith('/api/status?job='):
+                child = self.jobs[path.split('=', 1)[1]]
+                result = child.relay(method, path, **kwargs)
+                self.polls += 1
+                return result
+            return super().relay(method, path, **kwargs)
+
+
 def rig(tmp_path, *, aliases=("z2",), sites=(2, 3), spawn_batch=None, per_alias=None,
         platform_gate=None, **gateway_kw):
     root, resource_sha = route_fixture(tmp_path, sites)
@@ -84,7 +114,7 @@ def rig(tmp_path, *, aliases=("z2",), sites=(2, 3), spawn_batch=None, per_alias=
     for alias in aliases:
         coordinator = FakeCoordinator(active_sha=ACTIVE_SHA)
         kw = {**gateway_kw, **(per_alias or {}).get(alias, {})}
-        gateway = FakeGateway(image=image(), coordinator=coordinator,
+        gateway = MultiplexGateway(image=image(), coordinator=coordinator,
                               resource_for=lambda _a, sha=resource_sha: sha, **kw)
         endpoint = f"http://192.0.2.{10 + len(endpoints)}:18080"
         coordinators[alias], gateways[alias], endpoints[alias] = coordinator, gateway, endpoint
@@ -126,6 +156,15 @@ def one(alias, *sites):
 
 def units_of(batch):
     return [(u["ppu_alias"], u["site_id"], u["outcome"], u["status"]) for u in batch["units"]]
+
+
+def defer_admission(batches, workflow, predicate, event):
+    original = batches._site_block
+    def admission(alias, site):
+        if predicate(alias, site):
+            assert event.wait(10)
+        return original(alias, site)
+    batches._site_block = admission
 
 
 # ---------------------------------------------------------------- Target Set
@@ -232,16 +271,26 @@ def test_a_failing_ppu_does_not_stop_an_unrelated_one(tmp_path):
 def test_an_unknown_outcome_latches_its_own_ppu_only(tmp_path):
     batches, workflow, gateways, _c = rig(
         tmp_path, aliases=("z2", "z2b"), per_alias={"z2": {"post_raises": True}})
+    import threading
+    unknown = threading.Event()
+    original_start = workflow.start
+    def start(alias, body, **kwargs):
+        result = original_start(alias, body, **kwargs)
+        if alias == 'z2':
+            unknown.set()
+        return result
+    workflow.start = start
+    defer_admission(batches, workflow, lambda a, site: a == 'z2' and site == 3, unknown)
     started = batches.start_batch(with_start(workflow, [one("z2", 2, 3), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     # Safety outranks the PASS next to it.
     assert batch["outcome"] == "OUTCOME_UNKNOWN"
     assert units_of(batch) == [
         ("z2", 2, "OUTCOME_UNKNOWN", "FINISHED"),
-        ("z2", 3, None, "SKIPPED"),          # that PPU's remaining Site
+        ("z2", 3, "BLOCKED", "BLOCKED"),  # observed unknown before admission
         ("z2b", 2, "PASS", "FINISHED"),      # the other PPU continued
     ]
-    assert batch["units"][1]["reason"].startswith("PPU_LATCHED_")
+    assert "OUTCOME_UNKNOWN" in batch["units"][1]["reason"]
     # The lost submission was attempted exactly once and never repeated.
     assert len(gateways["z2"].posts) == 1 and len(gateways["z2b"].posts) == 1
     assert workflow._unknown_latched("z2") is not None
@@ -330,6 +379,15 @@ def test_an_unknown_target_refuses_the_whole_batch(tmp_path):
 
 def test_the_stop_policy_counts_sites_across_ppus(tmp_path):
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), job_final="failed")
+    import threading
+    threshold = threading.Event()
+    persist = batches._persist_locked
+    def record():
+        persist()
+        if sum(u.get('outcome') == 'FAIL' for b in batches._batches.values() for u in b['units']) >= 2:
+            threshold.set()
+    batches._persist_locked = record
+    defer_admission(batches, workflow, lambda a, site: a == 'z2b', threshold)
     started = batches.start_batch(with_start(workflow, 
         [one("z2", 2, 3), one("z2b", 2)], retry_limit=0,
         stop_policy={"kind": "failed_sites", "threshold": 2}))
@@ -596,6 +654,9 @@ def test_a_restart_judges_every_site_and_resubmits_nothing(tmp_path):
 
 def test_a_stop_mid_batch_leaves_the_running_site_alone_and_queues_nothing(tmp_path):
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"))
+    import threading
+    stopped = threading.Event()
+    defer_admission(batches, workflow, lambda a, site: (a, site) != ('z2', 2), stopped)
     original = gateways["z2"].relay
     seen = {}
 
@@ -604,6 +665,7 @@ def test_a_stop_mid_batch_leaves_the_running_site_alone_and_queues_nothing(tmp_p
         if method == "GET" and path.startswith("/api/status?job=") and not seen:
             batch_id = next(iter(batches._batches))
             seen["view"] = batches.request_stop_batch(batch_id, {"stop": "STOP_QUEUING"})
+            stopped.set()
         return original(method, path, **kw)
 
     gateways["z2"].relay = relay
@@ -706,25 +768,41 @@ SHARED_GATES = [
 @pytest.mark.parametrize("label, gate", SHARED_GATES, ids=[s[0] for s in SHARED_GATES])
 def test_a_shared_control_failure_stops_the_whole_batch_at_admission(tmp_path, label, gate):
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
-    with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
-    # Not one PPU's problem: nothing is admitted and nothing is submitted.
-    assert caught.value.code == "manager_shared_control_failure"
-    assert caught.value.status == 503
-    assert batches._batches == {}
+    batch = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))['batch']
+    assert batch['failure_domain'] == 'SHARED_CONTROL_FAILURE'
+    assert all(not u['attempts'] for u in batch['units'])
     assert gateways["z2"].posts == [] and gateways["z2b"].posts == []
 
 
 def test_a_shared_control_failure_mid_batch_submits_nothing_further(tmp_path):
+    import threading
+    first_done = threading.Event()
     seen = {"n": 0}
 
     def gate(alias):
         # Two admission checks and the first Site's execution check pass;
         # the shared control then fails before the second PPU is operated.
         seen["n"] += 1
-        return None if seen["n"] <= 3 else ("SHARED_CONTROL_FAILURE", "SCHEDULER_STATE_CORRUPT")
+        if alias == 'z2b':
+            assert first_done.wait(10)
+            return 'SHARED_CONTROL_FAILURE', 'SCHEDULER_STATE_CORRUPT'
+        return None
 
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
+    original_status = workflow.run_status
+    def status(*args, **kwargs):
+        result = original_status(*args, **kwargs)
+        if result['run']['outcome'] is not None:
+            first_done.set()
+        return result
+    workflow.run_status = status
+    # Synchronous test workflow can complete inside Start before status polling.
+    original_start = workflow.start
+    def start(*args, **kwargs):
+        result = original_start(*args, **kwargs)
+        first_done.set()
+        return result
+    workflow.start = start
     started = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     assert batch["failure_domain"] == "SHARED_CONTROL_FAILURE"
@@ -742,11 +820,9 @@ def test_a_gate_that_cannot_be_executed_is_shared_not_local(tmp_path):
         raise RuntimeError("fleet poller is not configured")
 
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"), platform_gate=gate)
-    with pytest.raises(ProgrammingError) as caught:
-        batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))
-    # "I could not tell" is never read as "only this PPU is affected".
-    assert caught.value.code == "manager_shared_control_failure"
-    assert "GATE_NOT_EXECUTABLE_RuntimeError" in caught.value.message
+    batch = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)]))['batch']
+    assert batch['failure_domain'] == 'SHARED_CONTROL_FAILURE'
+    assert 'GATE_NOT_EXECUTABLE_RuntimeError' in batch['reason']
     assert gateways["z2"].posts == [] and gateways["z2b"].posts == []
 
 
@@ -778,10 +854,9 @@ def test_a_shared_failure_starts_no_new_job_and_no_retry(tmp_path):
 
     batches, workflow, gateways, _c = rig(tmp_path, aliases=("z2", "z2b"),
                                     platform_gate=gate, job_final="failed")
-    with pytest.raises(ProgrammingError):
-        batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)], retry_limit=3))
+    batch = batches.start_batch(with_start(workflow, [one("z2", 2), one("z2b", 2)], retry_limit=3))['batch']
+    assert batch['failure_domain'] == 'SHARED_CONTROL_FAILURE'
     assert gateways["z2"].posts == [] and gateways["z2b"].posts == []
-    assert batches._batches == {}
 
 
 # ------------------------------------------ admission reads each Site itself
@@ -833,7 +908,7 @@ def test_the_platform_gate_is_asked_once_per_ppu_and_covers_its_sites(tmp_path):
     batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
     # The Platform gate judges the PPU, so one verdict covers every Site of
     # that PPU and the Batch does not read the same Platform state N times.
-    assert asked == ["z2", "z2b"]
+    assert sorted(asked) == ["z2", "z2b"]
     assert [u["outcome"] for u in batch["units"]] == ["BLOCKED"] * 3
     assert all(u["reason"] == "ADMISSION_PPU_PLATFORM_STATE_INVALID" for u in batch["units"])
     assert gateways["z2"].posts == [] and gateways["z2b"].posts == []

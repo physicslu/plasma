@@ -201,13 +201,27 @@ def test_unknown_latches_only_its_ppu_without_resend(tmp_path):
     bad, good = h.gateways["z2"], h.gateways["peer"]
     bad.unknown.add(1)
     h.workflow.spawn = lambda target: target()
+    unknown = threading.Event()
+    original_start = h.workflow.start
+    def start(alias, body, **kwargs):
+        result = original_start(alias, body, **kwargs)
+        if alias == 'z2':
+            unknown.set()
+        return result
+    h.workflow.start = start
+    original_admission = h.batches._site_block
+    def admission(alias, site):
+        if alias == 'z2' and site == 2:
+            assert unknown.wait(WAIT)
+        return original_admission(alias, site)
+    h.batches._site_block = admission
     good.release[1].set()
     good.release[2].set()
     h.start([one("z2", 1, 2), one("peer", 1, 2)], retry_limit=3)
     batch = h.finish()
     assert len(bad.posts) == 1 and len(good.posts) == 2
     assert batch["units"][0]["outcome"] == "OUTCOME_UNKNOWN"
-    assert batch["units"][1]["status"] == "SKIPPED"
+    assert batch["units"][1]["status"] in ("SKIPPED", "BLOCKED")
     assert all(u["outcome"] == "PASS" for u in batch["units"][2:])
     assert h.workflow.target_block("z2", 2)[1] == "OUTCOME_UNKNOWN_UNRESOLVED"
 
@@ -291,6 +305,12 @@ def test_shared_failure_stops_global_admission_and_observes_accepted_job(tmp_pat
             failed.set()  # actual global latch precedes draining accepted runs
         return original_status(*args, **kwargs)
     h.workflow.run_status = status
+    original_plan = h.workflow.plan
+    def plan(alias, body):
+        if alias == 'third':
+            assert failed.wait(WAIT)
+        return original_plan(alias, body)
+    h.workflow.plan = plan
     original_spawn = h.batches.spawn
     def spawn(target):
         armed.set()
@@ -317,19 +337,34 @@ def test_journal_failure_never_submits_peer_or_retry(tmp_path, journal):
     gateway = h.gateways["z2"]
     armed = threading.Event()
     if journal == "batch":
-        original = h.batches._persist_locked
+        original = h.batches._write_journal_locked
         def persist():
             if armed.is_set():
+                failed.set()
                 raise OSError("journal unavailable")
             original()
-        h.batches._persist_locked = persist
+        h.batches._write_journal_locked = persist
     else:
         original = h.workflow._write_journal_locked
         def persist():
             if armed.is_set():
+                failed.set()
                 raise OSError("journal unavailable")
             original()
         h.workflow._write_journal_locked = persist
+    failed = threading.Event()
+    original_plan = h.workflow.plan
+    def plan(alias, body):
+        if body['site_id'] == 2:
+            assert failed.wait(WAIT)
+        return original_plan(alias, body)
+    h.workflow.plan = plan
+    original_status = h.workflow.run_status
+    def status(*args, **kwargs):
+        if h.batches._control_failure is not None:
+            failed.set()
+        return original_status(*args, **kwargs)
+    h.workflow.run_status = status
     gateway.before_post = lambda _post: armed.set()
     # Causal fault boundary: the first Start returns only after its POST and
     # subsequent journal failure; peers have not crossed their Start yet.
@@ -363,6 +398,7 @@ def test_crash_boundary_without_run_answer_never_resubmits(tmp_path, state, expe
     assert gateways["z2"].posts == []
     if state == "starting":
         assert restarted._site_block("z2", 2)[1] == "OUTCOME_UNKNOWN_UNRESOLVED"
+        restarted.spawn = lambda target: target()
         another = restarted.start_batch(with_start(workflow, [one("z2", 2)]))["batch"]
         assert another["outcome"] == "BLOCKED" and gateways["z2"].posts == []
 
@@ -437,3 +473,73 @@ def test_sealed_site_cannot_start_or_retry_and_peer_passes(tmp_path, seal_before
     assert batch["units"][0]["outcome"] == ("BLOCKED" if seal_before_start else "FAIL")
     assert batch["units"][1]["outcome"] == "PASS"
     assert len(gateway.posts) == (1 if seal_before_start else 2)
+
+
+@pytest.mark.parametrize('stage', ['readiness', 'plan', 'start'])
+@pytest.mark.parametrize('shared_ppu', [False, True])
+def test_pre_submit_blocked_lane_cannot_delay_healthy_post(tmp_path, stage, shared_ppu):
+    h = Harness(tmp_path, (1, 2), aliases=('z2', 'peer'))
+    entered, release = threading.Event(), threading.Event()
+    method = {'readiness': 'target_block', 'plan': 'plan', 'start': 'start'}[stage]
+    original = getattr(h.workflow, method)
+
+    phase = threading.local()
+    if stage == 'start':
+        # Make Start synchronously drive its real pre-submit HTTP path, as
+        # permitted by the workflow's injected spawn contract. Job observation
+        # is also held, so B must POST while A's Start is still blocked.
+        h.workflow.spawn = lambda target: target()
+
+    def held(alias, body, **kwargs):
+        site = body if stage == 'readiness' else (
+            body['site_id'] if stage == 'plan' else h.workflow._plans[body['plan_id']].site)
+        if (alias, site) != ('z2', 1):
+            assert entered.wait(WAIT), 'establish slow HTTP before healthy dispatch'
+        phase.current = stage
+        try:
+            return original(alias, body, **kwargs)
+        finally:
+            phase.current = None
+
+    setattr(h.workflow, method, held)
+    client = h.workflow.gateway_client_factory(h.workflow._record('z2').endpoint, 5)
+    relay = client.relay
+    def remote(method, path, **kwargs):
+        if (method == 'GET' and path == '/api/status?site=1'
+                and getattr(phase, 'current', None) == stage):
+            entered.set()
+            assert release.wait(WAIT), 'test must release slow remote HTTP'
+        return relay(method, path, **kwargs)
+    client.relay = remote
+    peer = h.gateways['z2' if shared_ppu else 'peer']
+    h.start([one('z2', 1, 2)] if shared_ppu else [one('z2', 1), one('peer', 2)])
+    try:
+        assert entered.wait(WAIT)
+        assert peer.submitted[2].wait(WAIT), 'healthy POST must precede slow lane release'
+        assert not release.is_set() and not h.gateways['z2'].submitted[1].is_set()
+        runs = h.workflow._runs.values()
+        assert any(r.site == 2 and r.alias == ('z2' if shared_ppu else 'peer') for r in runs)
+    finally:
+        release.set()
+        batch = h.finish()
+    assert batch['counts']['pass'] == 2
+
+
+def test_slow_platform_admission_does_not_delay_other_ppu(tmp_path):
+    entered, release = threading.Event(), threading.Event()
+    def platform(alias):
+        if alias == 'z2':
+            entered.set()
+            assert release.wait(WAIT)
+        else:
+            assert entered.wait(WAIT)
+    h = Harness(tmp_path, (1,), aliases=('z2', 'peer'), platform_gate=platform)
+    h.start([one('z2', 1), one('peer', 1)])
+    try:
+        assert entered.wait(WAIT)
+        assert h.gateways['peer'].submitted[1].wait(WAIT)
+        assert not release.is_set() and not h.gateways['z2'].posts
+    finally:
+        release.set()
+        batch = h.finish()
+    assert batch['outcome'] == 'PASS'

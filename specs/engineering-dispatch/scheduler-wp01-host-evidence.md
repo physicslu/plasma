@@ -1,5 +1,7 @@
 # WP-01 Host-only engineering evidence — PR #1441
 
+> Follow-up pre-submit repair and current evidence: [WP-01 pre-submit independence](scheduler-wp01-presubmit-evidence.md). The initial round-robin implementation described below did not isolate blocking admission/Plan/Start; see the follow-up for its replacement and remaining CI/publication obligations.
+
 Date: 2026-11-15. Path 3, existing SWPC `SWPC-plasma-codex` worker,
 `development-codex`, Python 3.12.13 / pytest 9.2.0, workspace-write.
 [Actions run 43676267155 / job 132697029714](https://github.com/physicslu/plasma/actions/runs/43676267155/job/132697029714).
