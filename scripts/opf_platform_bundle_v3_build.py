@@ -102,10 +102,11 @@ def _check_inputs(files: dict[str, bytes], target: dict,
           "PROVIDER_DESCRIPTOR_INVALID")
 
     profile = _load_json(files["plasma-flash-profile.json"])
-    _need(type(profile) is dict and set(profile) == {
-        "schema", "icpn", "target_config", "flash_base",
-        "flash_size", "erase_granularity"},
-        "FLASH_PROFILE_INVALID")
+    required_flash = {"schema", "icpn", "target_config",
+                      "flash_base", "flash_size", "erase_granularity"}
+    _need(type(profile) is dict and required_flash <= set(profile)
+          and set(profile) <= required_flash | {"transport_settings"},
+          "FLASH_PROFILE_INVALID")
     _need(profile["schema"] == "plasma.ppu.openocd-flash-profile.v1"
           and profile["icpn"] == descriptor["target"]
           and type(profile["target_config"]) is str
@@ -119,6 +120,14 @@ def _check_inputs(files: dict[str, bytes], target: dict,
           and profile["flash_size"] % profile["erase_granularity"] == 0
           and descriptor["max_image_bytes"] <= profile["flash_size"],
           "FLASH_PROFILE_INVALID")
+    if "transport_settings" in profile:
+        settings = profile["transport_settings"]
+        _need(type(settings) is dict and set(settings) == {"protocol", "clock_hz"}
+              and settings["protocol"] == "swd"
+              and type(settings["clock_hz"]) is int
+              and 1000 <= settings["clock_hz"] <= 12_500_000
+              and settings["clock_hz"] % 1000 == 0,
+              "TRANSPORT_CLOCK_INVALID")
 
 
 def build_bundle(source: Path, output: Path, *, target: dict,
