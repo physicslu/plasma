@@ -733,9 +733,9 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                     not any(ord(c) < 32 or ord(c) == 127 for c in a)
                     for a in task["argv"]) and
                 type(task.get("script")) is str and
-                re.fullmatch(
+                (task["script"] == "scripts/plasmactl" or re.fullmatch(
                     r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
-                    task["script"]) is not None and
+                    task["script"]) is not None) and
                 type(task.get("work_order_sha256")) is str and
                 SHA256.fullmatch(task["work_order_sha256"]) is not None and
                 approval.get("task_id") == DYNAMIC_TASKS["path2-cli"] and

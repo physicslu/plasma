@@ -114,9 +114,9 @@ class Path2OperatorCLI(unittest.TestCase):
                 with tempfile.TemporaryDirectory() as td:
                     source = Path(td) / "scripts/plasmactl"
                     source.parent.mkdir(parents=True)
-                    source.write_text("#!/usr/bin/env bash\\nexit 0\\n")
+                    source.write_text("#!/usr/bin/env bash\nexit 0\n")
                     executor = Mock(return_value=subprocess.CompletedProcess(
-                        args=[], returncode=0, stdout=b"mock\\n", stderr=b""))
+                        args=[], returncode=0, stdout=b"mock\n", stderr=b""))
                     result = dispatch.run_task(
                         task, workspace=Path(td), approval=approval,
                         executor=executor, sandbox=False)
@@ -134,7 +134,7 @@ class Path2OperatorCLI(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             source = Path(td) / "scripts/plasmactl"
             source.parent.mkdir(parents=True)
-            source.write_text("#!/usr/bin/env bash\\nexit 0\\n")
+            source.write_text("#!/usr/bin/env bash\nexit 0\n")
             executor = Mock()
             with self.assertRaisesRegex(dispatch.Denied, "OPERATOR_CLI_COMMAND_DENIED"):
                 dispatch.run_task(task, workspace=Path(td), approval=approval,
@@ -156,7 +156,7 @@ class Path2OperatorCLI(unittest.TestCase):
             source = Path(td) / "scripts/plasmactl"
             source.parent.mkdir(parents=True)
             outside = Path(td) / "outside"
-            outside.write_text("#!/usr/bin/env bash\\nexit 0\\n")
+            outside.write_text("#!/usr/bin/env bash\nexit 0\n")
             source.symlink_to(outside)
             executor = Mock()
             with self.assertRaisesRegex(dispatch.Denied, "SCRIPT_NOT_FOUND"):
