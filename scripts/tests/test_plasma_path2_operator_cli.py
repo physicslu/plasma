@@ -102,6 +102,68 @@ class Path2OperatorCLI(unittest.TestCase):
         self.assertEqual(result["physical_hil"], "NOT_VERIFIED")
         self.assertEqual(result["exit_code"], 0)
 
+
+    def test_canonical_plasmactl_runs_via_bash_without_shell(self):
+        # These are pure executor mocks: no Control Station is deployed.
+        for verb in ("status", "verify", "deploy"):
+            with self.subTest(verb=verb):
+                task, approval = admitted(work_order(
+                    script="scripts/plasmactl",
+                    argv=[verb, "local-control-station"],
+                    timeout_seconds=1800))
+                with tempfile.TemporaryDirectory() as td:
+                    source = Path(td) / "scripts/plasmactl"
+                    source.parent.mkdir(parents=True)
+                    source.write_text("#!/usr/bin/env bash\nexit 0\n")
+                    executor = Mock(return_value=subprocess.CompletedProcess(
+                        args=[], returncode=0, stdout=b"mock\n", stderr=b""))
+                    result = dispatch.run_task(
+                        task, workspace=Path(td), approval=approval,
+                        executor=executor, sandbox=False)
+                args, kwargs = executor.call_args
+                self.assertEqual(args[0],
+                                 ["/bin/bash", str(source), verb, "local-control-station"])
+                self.assertEqual(kwargs["timeout"], 1800)
+                self.assertFalse(kwargs.get("shell", False))
+                self.assertEqual(result["status"],
+                                 "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED")
+
+    def test_plasmactl_never_bypasses_signature_or_sandbox_guards(self):
+        task, approval = admitted(work_order(
+            script="scripts/plasmactl", argv=["status", "local-control-station"]))
+        with tempfile.TemporaryDirectory() as td:
+            source = Path(td) / "scripts/plasmactl"
+            source.parent.mkdir(parents=True)
+            source.write_text("#!/usr/bin/env bash\nexit 0\n")
+            executor = Mock()
+            with self.assertRaisesRegex(dispatch.Denied, "OPERATOR_CLI_COMMAND_DENIED"):
+                dispatch.run_task(task, workspace=Path(td), approval=approval,
+                                  executor=executor, sandbox=True)
+            with self.assertRaisesRegex(dispatch.Denied, "OPERATOR_CLI_COMMAND_DENIED"):
+                dispatch.run_task({**task, "argv": ["deploy", "z2-ps"]},
+                                  workspace=Path(td), approval=approval,
+                                  executor=executor)
+            with self.assertRaisesRegex(dispatch.Denied, "OPERATOR_CLI_APPROVAL_DENIED"):
+                dispatch.run_task(task, workspace=Path(td),
+                                  approval={**approval, "work_order_sha256": "b" * 64},
+                                  executor=executor)
+            executor.assert_not_called()
+
+    def test_plasmactl_symlink_is_denied_before_spawn(self):
+        task, approval = admitted(work_order(
+            script="scripts/plasmactl", argv=["status", "local-control-station"]))
+        with tempfile.TemporaryDirectory() as td:
+            source = Path(td) / "scripts/plasmactl"
+            source.parent.mkdir(parents=True)
+            outside = Path(td) / "outside"
+            outside.write_text("#!/usr/bin/env bash\nexit 0\n")
+            source.symlink_to(outside)
+            executor = Mock()
+            with self.assertRaisesRegex(dispatch.Denied, "SCRIPT_NOT_FOUND"):
+                dispatch.run_task(task, workspace=Path(td), approval=approval,
+                                  executor=executor)
+            executor.assert_not_called()
+
     def test_invalid_fields_paths_and_timeouts_fail_before_execution(self):
         cases = (
             {"scope": "host-only"},
@@ -110,6 +172,13 @@ class Path2OperatorCLI(unittest.TestCase):
             {"script": "/usr/bin/python3"},
             {"script": "scripts/../private.py"},
             {"script": "scripts/experiments/bad.sh"},
+            {"script": "scripts/plasmactl-local-control-station"},
+            {"script": "scripts/plasmactl", "argv": ["install", "local-control-station"]},
+            {"script": "scripts/plasmactl", "argv": ["deploy", "z2-ps"]},
+            {"script": "scripts/plasmactl", "argv": ["deploy", "local-control-station", "--dev-fresh-state"]},
+            {"script": "scripts/plasmactl", "argv": ["update", "z2like-demo"]},
+            {"script": "scripts/plasmactl", "argv": ["deploy"]},
+            {"script": "scripts/plasmactl", "argv": ["status", "local-control-station", "--anything"]},
             {"script": "scripts/experiments/../bad.py"},
             {"timeout_seconds": 1801},
             {"timeout_seconds": 0},

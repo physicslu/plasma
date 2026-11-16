@@ -328,14 +328,21 @@ def parse_dynamic_work_order(event: object) -> dict:
                  "artifact_source"},
                 "WORK_ORDER_OPERATOR_CLI_FIELDS_DENIED")
         script = order["script"]
-        require(type(script) is str and re.fullmatch(
-            r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
-            script) is not None, "WORK_ORDER_OPERATOR_CLI_SCRIPT_DENIED")
+        # Reuse the canonical Bash operator entrypoint; do not admit arbitrary
+        # shell scripts, command strings, or privilege-changing profiles.
+        require(type(script) is str and
+                (script == "scripts/plasmactl" or re.fullmatch(
+                    r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
+                    script) is not None),
+                "WORK_ORDER_OPERATOR_CLI_SCRIPT_DENIED")
         argv = order["argv"]
         require(type(argv) is list and len(argv) <= 32 and all(
             type(arg) is str and len(arg) <= 2048 and
             not any(ord(ch) < 32 or ord(ch) == 127 for ch in arg)
             for arg in argv), "WORK_ORDER_OPERATOR_CLI_ARGS_DENIED")
+        if script == "scripts/plasmactl":
+            require(tuple(argv) in CONTROL_STATION_OPERATOR_COMMANDS,
+                    "WORK_ORDER_OPERATOR_CLI_COMMAND_DENIED")
         timeout_seconds = order.get("timeout_seconds", 600)
         require(type(timeout_seconds) is int and
                 1 <= timeout_seconds <= 1800,
@@ -387,6 +394,15 @@ def parse_dynamic_work_order(event: object) -> dict:
                 "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED")
     return order
 
+
+# One native Bash entrypoint without a generic shell-command execution route.
+# Only the existing Control Station upgrade/read-only commands are admitted;
+# --dev-fresh-state, install and Z2/PPU profiles require separate explicit work.
+CONTROL_STATION_OPERATOR_COMMANDS = frozenset({
+    ("deploy", "local-control-station"),
+    ("verify", "local-control-station"),
+    ("status", "local-control-station"),
+})
 
 def work_order_digest(order: dict) -> str:
     data = json.dumps(order, sort_keys=True,
@@ -717,9 +733,9 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                     not any(ord(c) < 32 or ord(c) == 127 for c in a)
                     for a in task["argv"]) and
                 type(task.get("script")) is str and
-                re.fullmatch(
+                (task["script"] == "scripts/plasmactl" or re.fullmatch(
                     r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
-                    task["script"]) is not None and
+                    task["script"]) is not None) and
                 type(task.get("work_order_sha256")) is str and
                 SHA256.fullmatch(task["work_order_sha256"]) is not None and
                 approval.get("task_id") == DYNAMIC_TASKS["path2-cli"] and
@@ -762,7 +778,12 @@ def run_task(task: dict, *, workspace: Path = ROOT,
     require(script.is_relative_to(workspace_root) and
             requested_script.is_file() and not requested_script.is_symlink(),
             "SCRIPT_NOT_FOUND")
-    command = [sys.executable, str(script), *task["argv"]]
+    if task.get("capability") == "operator-cli" and task["script"] == "scripts/plasmactl":
+        require(tuple(task["argv"]) in CONTROL_STATION_OPERATOR_COMMANDS and not sandbox,
+                "OPERATOR_CLI_COMMAND_DENIED")
+        command = ["/bin/bash", str(script), *task["argv"]]
+    else:
+        command = [sys.executable, str(script), *task["argv"]]
     if sandbox:
         # Fail closed on SWPC if the OS-level CPU-only namespace sandbox
         # is missing/unavailable. Never execute untrusted candidate Python
