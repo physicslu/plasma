@@ -108,7 +108,7 @@ class DeploymentRequest:
     ppu_id: str
     facility_id: str
     display_name: str
-    site_count: int = 8  # Fresh-install topology; existing ppu.yaml always wins.
+    site_count: int = 8  # Fresh-install topology; existing canonical config wins.
     qualification_fail_health_check: bool = False
     api_transaction_id: str | None = None
 
