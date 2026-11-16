@@ -1612,6 +1612,9 @@ def install_release(
     ensure_service_account=_ensure_service_account,
     on_rollback=None,
 ) -> dict[str, object]:
+    # Reject invalid fresh-install topology before any files or units are touched.
+    if type(site_count) is not int or not 1 <= site_count <= MAX_SUPPORTED_SITES:
+        raise Z2InstallerError("site_count must be an integer between 1 and 8")
     config_path = paths.config_root / "ppu.yaml"
     helper_unit = paths.systemd_root / RUNTIME_ACTIVATION_SERVICE
     helper_snapshot = _snapshot_file(helper_unit)
