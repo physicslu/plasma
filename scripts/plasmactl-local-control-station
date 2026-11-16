@@ -46,6 +46,7 @@ fi
 [[ -n "$env_manager_port" ]] && PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT="$env_manager_port"
 
 base_python="${PLASMA_LOCAL_CONTROL_STATION_PYTHON:-}"
+plasma_python_root="/opt/plasma/python"
 ppu_alias="${PLASMA_LOCAL_CONTROL_STATION_PPU_ALIAS:-local-ppu}"
 ppu_endpoint="${PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT:-}"
 console_host="127.0.0.1"
@@ -116,8 +117,9 @@ PY
 }
 
 resolve_base_python() {
-  local candidate
+  local candidate canonical
   local -a candidates=()
+  local -A seen=()
   if [[ -n "$base_python" ]]; then
     [[ -x "$base_python" ]] || die "configured Python is not executable: $base_python"
     python_is_supported "$base_python" || die "local Control Station requires Python >= 3.11: $base_python"
@@ -125,8 +127,14 @@ resolve_base_python() {
   fi
 
   shopt -s nullglob
-  for candidate in /opt/plasma/python/*/bin/python3; do
-    [[ -x "$candidate" ]] && python_is_supported "$candidate" && candidates+=("$candidate")
+  for candidate in "$plasma_python_root"/*/bin/python3; do
+    [[ -x "$candidate" ]] || continue
+    python_is_supported "$candidate" || continue
+    canonical="$(readlink -e -- "$candidate")" || continue
+    [[ -z "${seen[$canonical]:-}" ]] || continue
+    seen["$canonical"]=1
+    # Select the actual interpreter, not a venv alias with different sys.prefix.
+    candidates+=("$canonical")
   done
   shopt -u nullglob
   if (( ${#candidates[@]} == 1 )); then
