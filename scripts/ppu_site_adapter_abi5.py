@@ -224,6 +224,11 @@ class Abi5OpenocdAdapter:
             raise TransportDenied("IMAGE_PATH_INVALID")
         return "{" + raw + "}"
 
+    def _clock_khz(self, profile: FlashProfile) -> int:
+        # An admitted Bundle Profile owns the Job speed; Engine selection is
+        # the default for Profiles without transport_settings.
+        return self.adapter_khz if profile.clock_hz is None else profile.clock_hz // 1000
+
     def _operation_argv(self, site: int, bound: FlashImage | FlashRange,
                         actions: list[str]) -> list[str]:
         """The qualified flash_cycle preamble and ending around exactly the
@@ -231,7 +236,7 @@ class Abi5OpenocdAdapter:
         return [
             *self._base_argv(site),
             "-f", self._target_config(bound),
-            "-c", f"adapter speed {self.adapter_khz}",
+            "-c", f"adapter speed {self._clock_khz(bound.profile)}",
             "-c", "init",
             "-c", "reset halt",
             "-c", "poll off",
@@ -280,7 +285,7 @@ class Abi5OpenocdAdapter:
             address, length = flash_range.address, flash_range.length
             erase_address, erase_length = address, length
         base = {"icpn": bound.icpn, "target_config": bound.profile.target_config,
-                "adapter_khz": self.adapter_khz}
+                "adapter_khz": self._clock_khz(bound.profile)}
 
         with tempfile.TemporaryDirectory(prefix="plasma-c3-op-") as directory:
             staged = Path(directory) / "normalized-image.bin"
@@ -378,8 +383,8 @@ class Abi5OpenocdAdapter:
             *self._base_argv(site),
             "-f", self._target_config(image),
             # Target configs may force their own SWCLK (stm32f1x.cfg: 1000 kHz);
-            # the selected engine's qualified adapter speed wins.
-            "-c", f"adapter speed {self.adapter_khz}",
+            # the verified Bundle Profile clock wins; Engine supplies fallback.
+            "-c", f"adapter speed {self._clock_khz(image.profile)}",
             "-c", "init",
             # A plain ``halt`` of running firmware leaves the stm32f1x write
             # algorithm stuck after the erase (Driver track HIL 2026-11-04,
@@ -532,7 +537,7 @@ class Abi5OpenocdAdapter:
                             "openocd_rc": rc, **safe_off.receipt()}
                 return {"result": "PASS", "icpn": image.icpn,
                         "target_config": image.profile.target_config,
-                        "adapter_khz": self.adapter_khz,
+                        "adapter_khz": self._clock_khz(image.profile),
                         "bytes_verified": len(observed),
                         "readback_sha256": observed_sha,
                         "load_address": image.load_address, **executed,
