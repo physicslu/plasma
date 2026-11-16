@@ -31,6 +31,7 @@ class EventGateway(FakeGateway):
         self.terminal_barrier = None
         self.sealed = set()
         self.safe_off_by_site = {}
+        self.worker_failure_by_site = {}
 
     def relay(self, method, path, **kw):
         if method == "POST" and path == "/api/jobs":
@@ -46,6 +47,7 @@ class EventGateway(FakeGateway):
                                     resource_for=self.resource_for,
                                     job_final=self.finals.get(site, "success"),
                                     safe_off=self.safe_off_by_site.get(site, True))
+                child.worker_failure = self.worker_failure_by_site.get(site, False)
                 job_id = f"job-{len(self.jobs) + 1}"
                 child._job_id = lambda: job_id
                 child.relay(method, path, **kw)
@@ -454,6 +456,36 @@ def test_missing_safe_off_blocks_retry_while_healthy_peer_passes(tmp_path):
     assert [u["outcome"] for u in batch["units"]] == ["FAIL", "PASS"]
     assert batch["units"][0]["reason"] == "RETRY_NOT_ELIGIBLE_SAFE_OFF_NOT_VERIFIED"
     assert len(gateway.posts) == 2
+
+
+@pytest.mark.parametrize("retry_limit, decision", [(0, "NO_RETRY"), (1, "RETRY")])
+def test_definite_site_fail_in_ppu_error_shape_is_safe_off_verified(tmp_path, retry_limit,
+                                                                     decision):
+    """WP-07 step 6b: a VERIFY_MISMATCH reported as a PPU Job ``error`` keeps
+    the Site Worker's SAFE_OFF, so it is a retry-eligible definite FAIL."""
+    h = Harness(tmp_path, (1, 2))
+    gateway = h.gateways["z2"]
+    gateway.finals[1] = "error"
+    gateway.worker_failure_by_site[1] = True
+    def before_post(post):
+        if post["site_id"] == 1 and any(p["site_id"] == 1 for p in gateway.posts):
+            gateway.finals[1] = "success"
+            gateway.worker_failure_by_site[1] = False
+    gateway.before_post = before_post
+    h.start(retry_limit=retry_limit)
+    try:
+        assert all(e.wait(WAIT) for e in gateway.submitted.values())
+    finally:
+        batch = h.finish()
+    first = batch["units"][0]["attempts"][0]
+    assert first["outcome"] == "FAIL" and first["safe_off"] is True
+    assert first["retry"] == {"eligible": True, "reason": "DEFINITE_FAIL_SAFE_OFF_VERIFIED",
+                              "decision": decision}
+    assert batch["units"][1]["outcome"] == "PASS"
+    if retry_limit:
+        assert batch["units"][0]["outcome"] == "PASS" and len(gateway.posts) == 3
+    else:
+        assert batch["units"][0]["outcome"] == "FAIL" and len(gateway.posts) == 2
 
 
 @pytest.mark.parametrize("seal_before_start", [True, False])

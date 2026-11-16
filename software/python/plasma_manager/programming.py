@@ -254,6 +254,39 @@ def _strict_base64(value: object, field: str = "image") -> bytes:
                                f"{field}_base64 is not strict base64") from exc
 
 
+
+def _site_worker_failure(run: _Run, plan: _Plan, job: Mapping[str, Any],
+                         result: Mapping[str, Any]) -> dict[str, Any]:
+    """The Site Worker result of ONE definite FAIL of this Job, or ``{}``.
+
+    The C-3 Site Worker reports a FAIL with its SAFE_OFF observation in the
+    PPU Job error (``context.site_worker_result``), not in ``details``. It is
+    used only when every identity matches and nothing marks the outcome as
+    unknown; a failed session close replaces this error with one that carries
+    no Site Worker result, so a present one means the release was confirmed.
+    """
+    error = result.get("error")
+    context = error.get("context") if isinstance(error, dict) else None
+    worker = context.get("site_worker_result") if isinstance(context, dict) else None
+    if not isinstance(worker, dict):
+        return {}
+    job_id = job.get("job_id")
+    trusted = (job.get("state") in ("failed", "error") and result.get("state") == job.get("state")
+               and type(result.get("attempts")) is int and result.get("attempts") == 1
+               and not context.get("outcome_unknown")
+               and type(job_id) is str and context.get("job_id") == job_id
+               and error.get("job_id") == job_id
+               and job.get("site_id") == run.site and error.get("site_id") == run.site
+               and context.get("site_id") == run.site
+               and job.get("operation") == plan.operation
+               # The flash_cycle error context names no operation.
+               and context.get("operation", plan.operation) == plan.operation
+               and type(worker.get("site")) is int and worker.get("site") == run.site
+               and worker.get("operation") == plan.operation
+               and worker.get("result") == "FAIL"
+               and type(worker.get("safe_off")) is bool)
+    return dict(worker) if trusted else {}
+
 class BundleProgrammingWorkflow:
     def __init__(
         self,
@@ -1448,6 +1481,10 @@ class BundleProgrammingWorkflow:
         details = result.get("details") if isinstance(result.get("details"), dict) else {}
         # The Job kind's own evidence block: flash_cycle / programming / read.
         evidence = details.get(plan.operation) if isinstance(details.get(plan.operation), dict) else {}
+        # A definite Site Worker FAIL carries no details block; its SAFE_OFF
+        # observation travels in the PPU Job error instead.
+        failure = {} if evidence else _site_worker_failure(run, plan, job, result)
+        safe_off = failure.get("safe_off") if failure else evidence.get("safe_off")
         flash = evidence if plan.operation == "flash_cycle" else {}
         steps = evidence.get("steps") if isinstance(evidence.get("steps"), dict) else {}
         echo = job.get("job_binding") if isinstance(job.get("job_binding"), dict) else {}
@@ -1545,7 +1582,10 @@ class BundleProgrammingWorkflow:
             "active_asset_set_sha256": echo.get("asset_set_sha256"),
             "active_generation": echo.get("generation"),
             "resource_reuse": not plan.payload["activation_required"],
-            "safe_off": evidence.get("safe_off"), "flash_result": evidence.get("result"),
+            "safe_off": safe_off,
+            "safe_off_source": ("site_worker_failure" if failure
+                                else "job_details" if evidence else None),
+            "flash_result": failure.get("result") if failure else evidence.get("result"),
             "attempts": result.get("attempts"), "error": result.get("error"),
             "elapsed_ms": result.get("elapsed_ms"),
         }
@@ -1555,7 +1595,7 @@ class BundleProgrammingWorkflow:
                          if plan.image is not None else not result.get("image_size")))
         # SAFE_OFF first so an unsafe end state is always the reported reason.
         checks = [
-            (evidence.get("safe_off") is True, "SAFE_OFF_NOT_VERIFIED"),
+            (safe_off is True, "SAFE_OFF_NOT_VERIFIED"),
             (plan.operation in RECEIPT_OPERATIONS, "OPERATION_RECEIPT_UNSUPPORTED"),
             (job.get("state") == "success" and result.get("state") == "success", "JOB_NOT_SUCCESS"),
             (job.get("site_id") == run.site and job.get("operation") == plan.operation,
