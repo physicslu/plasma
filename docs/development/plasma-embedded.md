@@ -124,4 +124,4 @@ was invoked, *Golden recovered*; report each only when actually observed.
 
 ## Programming operations (one Job, `operations` list)
 
-Erase / Program / Verify run as ONE `programming` Job with an ordered `operations` list (one Job ID, lease, Job Binding and receipt); `read` is an independent Job; `flash_cycle` is the unchanged legacy contract. Normative detail: [OPF Programming Operations v1](../architecture/opf-programming-operations-v1.md). Host-only tests are not a hardware qualification of any operation.
+Erase / Program / Verify run as ONE `programming` Job with an ordered `operations` list (one Job ID, lease, Job Binding and receipt); `read` is an independent Job; `flash_cycle` is retired and rejected by current admission. Normative detail: [OPF Programming Operations v1](../architecture/opf-programming-operations-v1.md). Host-only tests are not a hardware qualification of any operation.

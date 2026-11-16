@@ -60,10 +60,10 @@ CONTROL_OPS = frozenset({"open_session", "open_job_session", "close_session", "s
                          "bind_image", "bind_range", "run"})
 # Flash operations of one bound Profile. ``programming`` runs the session's
 # ordered ``operations`` list (erase -> program -> verify) as ONE operation;
-# ``read`` is an independent operation; ``flash_cycle`` is the legacy cycle.
+# ``read`` is an independent operation.
 PROGRAMMING = "programming"
 SEQUENCE_OPERATIONS = ("erase", "program", "verify")
-FLASH_OPERATIONS = frozenset({"flash_cycle", PROGRAMMING, "read"})
+FLASH_OPERATIONS = frozenset({PROGRAMMING, "read"})
 
 
 def parse_operations(raw: object) -> tuple[str, ...]:
@@ -221,7 +221,7 @@ def operation_receipt_error(operation: str, result: Mapping[str, Any], *,
 
     The Adapter reports what it executed and observed; a PASS is accepted only
     for exactly the bound Image / range. With an Image the erase range is the
-    Image's whole erase window. ``flash_cycle`` keeps its own checks.
+    Image's whole erase window.
     """
     if operation == "program":
         if (image is None or result.get("write_address") != image.load_address
@@ -259,20 +259,10 @@ def operation_receipt_error(operation: str, result: Mapping[str, Any], *,
     return None
 
 
-FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
-                      "write_address", "verify_address", "readback_address")
 
 
-def flash_range_expected(image: FlashImage) -> dict[str, int]:
-    """The only range a flash_cycle receipt may report for this bound Image."""
-    erase_address, erase_length = image.erase_range
-    return {"load_address": image.load_address, "erase_address": erase_address,
-            "erase_length": erase_length, "write_address": image.load_address,
-            "verify_address": image.load_address, "readback_address": image.load_address}
 
 
-def flash_range_receipt(result: Mapping[str, Any]) -> dict[str, Any]:
-    return {key: result.get(key) for key in FLASH_RANGE_FIELDS}
 
 
 def parse_flash_profile(raw: object) -> FlashProfile:
@@ -523,7 +513,6 @@ class SiteWorkerCore:
                 _require(s is not None and not s.closed, "SESSION_UNKNOWN")
                 _require(s.image is None and s.flash_range is None, "IMAGE_ALREADY_BOUND")
                 _require(s.provider_route is None
-                         or s.provider_route["operation"] == "flash_cycle"
                          or (s.provider_route["operation"] == PROGRAMMING
                              and needs_image(tuple(s.provider_route["operations"]))),
                          "OPERATION_TAKES_NO_IMAGE")
@@ -754,9 +743,7 @@ class SiteWorkerCore:
             _require(site in s.sites, "SITE_NOT_AUTHORIZED")
             _require(site not in self._sealed, "SITE_SEALED")
             steps: tuple[str, ...] | None = None
-            if op == "flash_cycle":
-                _require(s.image is not None, "IMAGE_NOT_BOUND")
-            elif op == PROGRAMMING:
+            if op == PROGRAMMING:
                 _require(s.provider_route is not None
                          and s.provider_route["operation"] == PROGRAMMING,
                          "OPERATIONS_NOT_BOUND")
@@ -785,11 +772,7 @@ class SiteWorkerCore:
             # fsynced before native admission, SWD, MMIO or OpenOCD can start.
             self._begin_operation_guard(site)
             try:
-                if op == "flash_cycle":
-                    result = dict(self.adapter.run(
-                        site, op, deadline=s.expires, cancel=s.cancel, image=s.image
-                    ))
-                elif op == PROGRAMMING:
+                if op == PROGRAMMING:
                     result = dict(self.adapter.run(
                         site, op, deadline=s.expires, cancel=s.cancel, image=s.image,
                         flash_range=s.flash_range, operations=steps
@@ -839,17 +822,6 @@ class SiteWorkerCore:
             if result.get("safe_off") is not True:
                 self._seal(site, "SAFE_OFF_NOT_VERIFIED", s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED")
-            if op == "flash_cycle" and result.get("result") == "PASS":
-                if (s.image is None or result.get("readback_sha256") != s.image.sha256
-                        or result.get("bytes_verified") != len(s.image.payload)):
-                    self._seal(site, "READBACK_NOT_VERIFIED", s)
-                    raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:READBACK_NOT_VERIFIED")
-                # The Adapter reports the range it actually executed (OpenOCD
-                # erase observation + executed write/verify/readback commands).
-                # Anything but the bound Job window is not a proven PASS.
-                if flash_range_receipt(result) != flash_range_expected(s.image):
-                    self._seal(site, "FLASH_RANGE_NOT_VERIFIED", s)
-                    raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FLASH_RANGE_NOT_VERIFIED")
             unproven = None
             if result.get("result") == "PASS" and op == PROGRAMMING:
                 unproven = programming_receipt_error(

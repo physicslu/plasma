@@ -86,7 +86,7 @@ The JSON example below documents the **existing PLASMA PPU Bundle-bound selectio
 
 **Only three universal programming selections:** `provider`, `profile`, and optional `timeout_ms`. `schema` identifies the contract version; `options` is an opaque Provider-specific JSON object, not a set of PPU Core knobs. The Provider declares a separate, versioned schema for its options and validates it **before** any hardware operation. Core must never interpret arbitrary Provider options as a waiver of a safety gate.
 
-For the current C-3 `POST /api/jobs` `flash_cycle` route, the REST body accepts
+For the historical C-3 `POST /api/jobs` `flash_cycle` route (retired by PR #1469; current Jobs use [programming operations](opf-programming-operations-v1.md)), the REST body accepts
 `provider` and `profile` as Package IDs from the single Active Asset Set. Both
 must be supplied together. A Job without them is accepted only when the Set
 contains exactly one Programming Profile. Runtime checks the selected Profile's

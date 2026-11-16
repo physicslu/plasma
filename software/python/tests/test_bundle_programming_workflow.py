@@ -103,7 +103,7 @@ class FakeCoordinator:
 
 
 ROUTE_RESOURCE_SHA = bundle_v3.resource_set_sha256(bundle_v3.resource_set_descriptor(
-    bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")))
+    bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")))
 
 
 class FakeGateway:
@@ -194,12 +194,7 @@ class FakeGateway:
             has_image = "asset_base64" in post
             address, length = binding["range"]["address"], binding["range"]["length"]
             output_files = []
-            if kind == "flash_cycle":
-                evidence = {"result": result,
-                            "readback_sha256": sha if self.readback_ok else "0" * 64,
-                            "bytes_verified": len(self.image),
-                            **self._executed_range(binding), "safe_off": self.safe_off}
-            elif kind == "programming":
+            if kind == "programming":
                 operations = post["operations"]
                 steps = {}
                 if "erase" in operations:
@@ -325,9 +320,11 @@ def make(tmp_path, *, coordinator=None, gateway=None, registry=None, journal=Tru
 
 
 def plan_body(raw: bytes | None = None, site: int = 2, icpn: str = ICPN,
-              operation: str = "flash_cycle"):
+              operation: str = "programming"):
     raw = image() if raw is None else raw
-    return {"icpn": icpn, "site_id": site, "operation": operation,
+    return {"icpn": icpn, "site_id": site,
+            **({"operations": ["erase", "program", "verify"]} if operation == "programming"
+               else {"operation": operation}),
             "image_base64": base64.b64encode(raw).decode(), "image_filename": "app.bin"}
 
 
@@ -338,7 +335,7 @@ def run_once(workflow):
 
 
 def test_shared_writer_reproducibly_emits_site_independent_bundle_v3():
-    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
     def make_bundle():
         return bundle_v3.build_image_bundle(
             route, image(), image_filename="plasma-blue-pill-cdc.bin",
@@ -353,7 +350,7 @@ def test_shared_writer_reproducibly_emits_site_independent_bundle_v3():
 
 
 def test_user_bundle_is_canonical_and_verifiable(tmp_path):
-    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
     built = bundle_v3.build_user_image_bundle(route, image(), filename="../evil name.bin")
     again = bundle_v3.build_user_image_bundle(route, image(), filename="../evil name.bin")
     assert built.archive == again.archive
@@ -366,7 +363,7 @@ def test_user_bundle_is_canonical_and_verifiable(tmp_path):
         "platform-provider", "programming-profile", "firmware-asset"]
 
 
-def test_success_with_activation_runs_b1_b2_b3_then_one_flash_cycle(tmp_path):
+def test_success_with_activation_runs_b1_b2_b3_then_one_programming_job(tmp_path):
     workflow, coord, gateway = make(tmp_path)
     planned, run = run_once(workflow)
     assert planned["activation_required"] is True
@@ -376,7 +373,8 @@ def test_success_with_activation_runs_b1_b2_b3_then_one_flash_cycle(tmp_path):
     assert bytes(coord.uploaded) and coord.upload_sha == planned["bundle"]["archive_sha256"]
     assert len(gateway.posts) == 1 and run["job_submission_count"] == 1
     post = gateway.posts[0]
-    assert post["operation"] == "flash_cycle" and post["site_id"] == 2
+    assert post["operations"] == ["erase", "program", "verify"] and post["site_id"] == 2
+    assert "operation" not in post
     # Job Image source: Binding + Image Asset; never the Bundle reference.
     assert not {"asset_set_sha256", "asset_package_id", "bundle_asset_sha256"} & set(post)
     assert post["job_binding"] == planned["job_binding"]
@@ -389,14 +387,14 @@ def test_success_with_activation_runs_b1_b2_b3_then_one_flash_cycle(tmp_path):
     assert receipt["resource_reuse"] is False
     assert [s["step"] for s in run["steps"]] == [
         "PREFLIGHT", "B1_UPLOAD", "B2_ADMIT", "B3_SUBMIT", "B3_ACTIVATE",
-        "FLASH_CYCLE_SUBMIT", "VERIFY_RECEIPT"]
+        "PROGRAMMING_SUBMIT", "VERIFY_RECEIPT"]
     # journal is durable and holds no image/bundle bytes
     journal = (tmp_path / "runs.json").read_text()
     assert run["run_id"] in journal and base64.b64encode(image()[:64]).decode() not in journal
 
 
 def test_already_active_skips_b1_b2_b3(tmp_path):
-    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
     sha = bundle_v3.build_user_image_bundle(route, image(), filename="app.bin").archive_sha256
     workflow, coord, gateway = make(tmp_path, coordinator=FakeCoordinator(active_sha=sha))
     planned, run = run_once(workflow)
@@ -405,31 +403,13 @@ def test_already_active_skips_b1_b2_b3(tmp_path):
     assert not {"B1_create", "B2", "B3"} & set(coord.calls)
     assert len(gateway.posts) == 1
     assert [s["step"] for s in run["steps"]] == [
-        "PREFLIGHT", "RESOURCE_REUSE", "FLASH_CYCLE_SUBMIT", "VERIFY_RECEIPT"]
+        "PREFLIGHT", "RESOURCE_REUSE", "PROGRAMMING_SUBMIT", "VERIFY_RECEIPT"]
 
 
-@pytest.mark.parametrize("override", [
-    {"erase_address": 0x08000400},           # executed somewhere else
-    {"write_address": 0x08000400},
-    {"readback_address": 0x08000400},
-    {"erase_length": 4096},
-    {"load_address": None, "erase_address": None, "erase_length": None,
-     "write_address": None, "verify_address": None, "readback_address": None},  # no range
-])
-def test_ppu_pass_without_the_binding_flash_range_is_never_a_pass(tmp_path, override):
-    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
-    sha = bundle_v3.build_user_image_bundle(route, image(), filename="app.bin").archive_sha256
-    workflow, _coord, gateway = make(tmp_path, coordinator=FakeCoordinator(active_sha=sha))
-    gateway.flash_range = override
-    _planned, run = run_once(workflow)
-    assert run["outcome"] == "FAIL" and run["reason"] == "FLASH_RANGE_MISMATCH"
-    receipt = run["receipt"]
-    assert receipt["expected_flash_range"]["write_address"] == 0x08000000
-    assert receipt["observed_flash_range"] != receipt["expected_flash_range"]
 
 
 def test_binding_echo_with_a_different_range_is_not_confirmed(tmp_path):
-    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
     sha = bundle_v3.build_user_image_bundle(route, image(), filename="app.bin").archive_sha256
     gateway = FakeGateway(image=image(),
                           echo={"range": {"address": 0x08000400, "length": len(image())}})
@@ -466,7 +446,7 @@ def test_site1_and_site2_share_one_ic_resource_without_a_site_route(tmp_path):
 
 def test_previously_selected_ic_is_not_a_site_allowlist(tmp_path):
     """Host-only: ready Sites 1/2 reuse one Profile despite stale Site target."""
-    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
     active_sha = bundle_v3.build_user_image_bundle(
         route, image(), filename="app.bin").archive_sha256
     gateway = FakeGateway(image=image(), status_target="LEGACY_SITE_TARGET")
@@ -687,7 +667,7 @@ def test_readback_mismatch_fails(tmp_path):
     gateway = FakeGateway(image=image(), readback_ok=False)
     workflow, _c, _ = make(tmp_path, gateway=gateway)
     _planned, run = run_once(workflow)
-    assert run["outcome"] == "FAIL" and run["reason"] == "READBACK_SHA256_MISMATCH"
+    assert run["outcome"] == "FAIL" and run["reason"] == "VERIFY_EVIDENCE_MISMATCH"
 
 
 def test_job_rejected_by_ppu_is_definitive_fail(tmp_path):
@@ -817,7 +797,7 @@ def test_unprovable_resource_identity_fails_closed_before_any_write(tmp_path, ga
 
 
 def test_active_set_change_between_plan_and_run_fails_closed(tmp_path):
-    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
     sha = bundle_v3.build_user_image_bundle(route, image(), filename="app.bin").archive_sha256
     coord = FakeCoordinator(active_sha=sha)
     workflow, _c, gateway = make(tmp_path, coordinator=coord)
@@ -847,11 +827,13 @@ def test_operation_contract_is_validated_before_ppu(tmp_path, change, status, co
 
 
 def legacy_only_routes(tmp_path) -> Path:
-    """Only the legacy flash_cycle Route (as on a not-yet-updated deployment)."""
+    """A limited Profile declaring only erase."""
     root = tmp_path / "legacy-routes"
     root.mkdir()
-    name = "z2-site2-stm32f103c8t6.json"
-    (root / name).write_text((ROUTES / name).read_text())
+    name = "z2-site2-stm32f103c8t6-operations.json"
+    data = json.loads((ROUTES / name).read_text())
+    data["profile"]["capabilities"]["operations"] = ["erase"]
+    (root / name).write_text(json.dumps(data))
     return root
 
 
@@ -879,17 +861,6 @@ def ops_workflow(tmp_path, *, active=True, **gateway_kw):
     return workflow, coord, gateway
 
 
-def test_committed_routes_keep_legacy_flash_cycle_separate_from_the_operations_route():
-    legacy = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
-    assert legacy.capabilities["operations"] == ["flash_cycle"]  # legacy identity untouched
-    assert OPS_ROUTE.capabilities["operations"] == ["erase", "program", "verify", "read"]
-    assert OPS_RESOURCE_SHA != ROUTE_RESOURCE_SHA
-    routes = bundle_v3.load_routes(ROUTES)
-    pick = lambda ops: [r.route_id for r in bundle_v3.resolve_routes(  # noqa: E731
-        routes, icpn=ICPN, operations=ops)]
-    assert pick(["flash_cycle"]) == ["z2-site2-stm32f103c8t6"]
-    for ops in LEGAL_LISTS + [["read"]]:
-        assert pick(ops) == ["z2-site2-stm32f103c8t6-operations"]
 
 
 def test_operation_not_declared_by_profile_is_refused(tmp_path):
@@ -986,16 +957,6 @@ def test_programming_success_claim_without_proof_of_every_step_is_not_a_pass(
     assert len(gateway.posts) == 1  # never resubmitted
 
 
-def test_legacy_flash_cycle_request_still_uses_the_unchanged_legacy_route(tmp_path):
-    workflow, _c, gateway = make(tmp_path)
-    planned, run = run_once(workflow)
-    assert planned["operation"] == "flash_cycle" and planned["operations"] is None
-    assert planned["route"]["route_id"] == "z2-site2-stm32f103c8t6"
-    assert planned["resource"]["resource_set_sha256"] == ROUTE_RESOURCE_SHA
-    post = gateway.posts[0]
-    assert post["operation"] == "flash_cycle" and "operations" not in post
-    assert "operations" not in post["job_binding"]
-    assert run["outcome"] == "PASS" and run["receipt"]["expected_steps"] is None
 
 
 @pytest.mark.parametrize("op, address, length, code", [
@@ -1132,7 +1093,7 @@ def test_receipt_keeps_expected_observed_and_readback_distinct(tmp_path):
     assert receipt["expected_image_size"] == receipt["observed_image_size"] == len(image())
     assert receipt["expected_resource_set_sha256"] == planned["resource"]["resource_set_sha256"]
     assert receipt["expected_job_binding_sha256"] == planned["job_binding_sha256"]
-    assert receipt["operation"] == "flash_cycle" and receipt["target"] == ICPN
+    assert receipt["operation"] == "programming" and receipt["target"] == ICPN
     assert receipt["site_id"] == 2 and receipt["ppu_id"] == "z2-hil"
 
 
@@ -1161,7 +1122,7 @@ def test_observed_image_differs_from_expected_fails(tmp_path):
 # canonical Bundle v3. Host-only; fake PPU / fake Provider.
 
 def _route():
-    return bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    return bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
 
 
 def user_bundle(raw: bytes | None = None, *, route=None, version: str = "2.3.0"):
@@ -1172,13 +1133,15 @@ def user_bundle(raw: bytes | None = None, *, route=None, version: str = "2.3.0")
 
 
 def bundle_body(archive: bytes, *, site: int = 2, icpn: str = ICPN,
-                operation: str = "flash_cycle", **extra):
-    return {"icpn": icpn, "site_id": site, "operation": operation,
+                operation: str = "programming", **extra):
+    return {"icpn": icpn, "site_id": site,
+            **({"operations": ["erase", "program", "verify"]} if operation == "programming"
+               else {"operation": operation}),
             "bundle_base64": base64.b64encode(archive).decode(), **extra}
 
 
 def _variant_route(**flash):
-    data = json.loads((ROUTES / "z2-site2-stm32f103c8t6.json").read_text())
+    data = json.loads((ROUTES / "z2-site2-stm32f103c8t6-operations.json").read_text())
     target = flash.pop("target", None)
     if target:
         data["target"].update(target)
@@ -1341,11 +1304,10 @@ def test_bundle_source_request_shape_is_strict(tmp_path, body):
 
 
 def test_bundle_source_must_carry_the_resources_of_the_route_that_declares_its_operations(tmp_path):
-    """A Bundle built for the legacy flash_cycle Route cannot run an operations
-    list: its Profile does not declare those operations (fail closed)."""
+    """A Bundle with different Flash geometry cannot substitute for the selected Route."""
     workflow, coord, gateway = make(tmp_path)
-    body = bundle_body(user_bundle().archive)
-    del body["operation"]
+    body = bundle_body(user_bundle(route=_variant_route(erase_granularity=2048)).archive)
+    body.pop("operation", None)
     with pytest.raises(ProgrammingError) as caught:
         workflow.plan(ALIAS, {**body, "operations": ["erase", "program", "verify"]})
     assert caught.value.code == "bundle_resource_not_qualified"
@@ -1353,7 +1315,7 @@ def test_bundle_source_must_carry_the_resources_of_the_route_that_declares_its_o
     # The same list with a Bundle of the operations Route is admitted.
     own = user_bundle(route=OPS_ROUTE)
     admitted = bundle_body(own.archive)
-    del admitted["operation"]
+    admitted.pop("operation", None)
     planned = workflow.plan(
         ALIAS, {**admitted, "operations": ["erase", "program", "verify"]})["plan"]
     assert planned["source"] == "bundle" and planned["operations"] == ["erase", "program", "verify"]

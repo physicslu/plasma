@@ -81,15 +81,11 @@ Unchanged from [OPF Programming Operations v1](opf-programming-operations-v1.md)
 `flash_cycle` is retired under D-1. Two implementation consequences are in scope and must land
 with the switch, not after it:
 
-* `plasma_server/execution_router.py` admits the OPF Package Provider route only for
-  `Operation.FLASH_CYCLE`. That constraint is lifted to the `programming` Job kind.
-* `plasma_handlers/programming.py` dispatches `Operation.PROGRAMMING` to
-  `interface.run_operations(...)`. `plasma_interfaces/openocd.py` overrides it;
-  `plasma_interfaces/mock.py` did not, and so inherited the generic composition that
-  `BaseInterface.run_operations` provides. **That was a divergence, not a refusal**: the inherited
-  default writes at offset 0 instead of the Binding's address, erases the whole simulated device
-  instead of the Image's window, and returns no step evidence at all. A Mock Site is kept (D-2),
-  so it gains its own `run_operations` with read-back evidence **before** the switch (PR-B1).
+* Runtime admits the OPF Package Provider seam for `Operation.PROGRAMMING`; its unqualified
+  process result still cannot prove programming PASS. C-3 programming/read require an exact
+  admitted Job Binding, with every E/P/V step pinned in `operations`.
+* Mock retains its own bound `run_operations` and per-step evidence. There is no separate
+  complete-cycle route or default. This retirement changes neither Target Finalization nor Repeat.
 
 Retiring `flash_cycle` changes the Programming Profile, therefore the Resource Set SHA256,
 therefore every PPU needs one B1/B2/B3 reactivation. See §8.6 for why this must happen once.

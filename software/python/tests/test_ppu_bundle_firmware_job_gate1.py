@@ -148,19 +148,6 @@ def test_active_pointer_drift_fails_closed(tmp_path):
         resolve(product)
 
 
-def test_gateway_bundle_reference_carries_no_inline_image():
-    handler = object.__new__(PlasmaWebHandler)
-    request = handler._job_request({
-        "site_id": 2, "operation": "flash_cycle",
-        "target": "STM32F103C8T6", "provider": PROVIDER, "profile": PROFILE,
-        "asset_set_sha256": SET_SHA, "asset_package_id": FIRMWARE,
-        "bundle_asset_sha256": digest(PAYLOAD),
-    }, client_id="plasma-web")
-    assert request.operation is Operation.FLASH_CYCLE
-    assert request.image == b"" and request.image_ref is None
-    assert request.metadata["bundle_asset_set_sha256"] == SET_SHA
-    assert request.metadata["bundle_asset_package_id"] == FIRMWARE
-    assert request.metadata["bundle_asset_sha256"] == digest(PAYLOAD)
 
 
 @pytest.mark.parametrize("change", [

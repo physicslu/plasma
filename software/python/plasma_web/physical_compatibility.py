@@ -120,6 +120,7 @@ class PhysicalCompatibilityRegistry:
                         raw = (root / rel).read_bytes()
                         job = json.loads(raw)["job"]
                         outcome = job["result"]
+                        # Immutable historical L3 evidence, never an execution selector.
                         flash = outcome["details"]["flash_cycle"]
                     except (OSError, ValueError, KeyError, TypeError) as exc:
                         raise DeviceCatalogIntegrityError(f"L3 receipt unavailable/invalid: {rel}") from exc

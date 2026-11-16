@@ -132,13 +132,6 @@ class PackageActionRuntime:
             site_manager._active_asset_set_reader = (
                 lambda: _load(control_plane, "ppu_asset_set.py").read_active(self.product_root)
             )
-        # Bundle Programming Asset is selected only inside SiteManager's existing Job lease.
-        # The trusted control-plane resolver revalidates Active Set + B3 files.
-        if (hasattr(site_manager, "_bundle_firmware_resolver")
-                and site_manager._bundle_firmware_resolver is None):
-            active_helper = _load(control_plane, "ppu_asset_set.py")
-            site_manager._bundle_firmware_resolver = partial(
-                active_helper.resolve_active_firmware, self.product_root)
         # OFE-1B: PPU-derived Resource identity of the pinned Active Set, used by
         # SiteManager Job Binding admission under the same Job lease.
         if (hasattr(site_manager, "_active_resource_resolver")
@@ -186,13 +179,14 @@ class PackageActionRuntime:
             raise ValueError("PROVIDER_PROGRAMMING_REQUEST_INVALID")
         programming = request["programming"]
         required = {"site_id", "target", "operation", "profile",
-                    "asset_package_id", "asset_sha256"}
+                    "asset_package_id", "asset_sha256", "operations"}
         if (type(programming) is not dict or set(programming) != required
                 or type(programming["site_id"]) is not int
                 or programming["site_id"] < 1
                 or any(type(programming[k]) is not str or not programming[k]
-                       for k in required - {"site_id"})
-                or programming["operation"] != "flash_cycle"
+                       for k in required - {"site_id", "operations"})
+                or programming["operation"] != "programming"
+                or type(programming["operations"]) is not list
                 or self.hardware_observer is None):
             raise ValueError("PROVIDER_PROGRAMMING_NOT_QUALIFIED")
         data = {key: request[key] for key in request if key != "programming"}
@@ -220,11 +214,12 @@ class PackageActionRuntime:
         route = self.provider_contract.resolve(
             self.product_root, asset_set_sha256=typed.asset_set_sha256,
             target=programming["target"], provider=typed.package_id,
-            profile=programming["profile"], operation="flash_cycle",
+            profile=programming["profile"], operation="programming",
+            operations=tuple(programming["operations"]),
             site_id=site_id, image_size=len(resolved["image"]),
             hardware=hardware, options={})
         job = JobRequest(
-            site_id=site_id, operation=Operation.FLASH_CYCLE,
+            site_id=site_id, operation=Operation.PROGRAMMING,
             image=resolved["image"], target=programming["target"],
             job_id=typed.job_id, timeout_s=float(resources["max_runtime_s"]),
             max_retries=0, client_id="plasma-programming-package",

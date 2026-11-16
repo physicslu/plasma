@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bundle-driven PLASMA programming CLI, independent of the execution path.
 
-Uses existing Bootstrap B1/B2/B3 and Gateway flash_cycle APIs. The Runtime and
+Uses existing Bootstrap B1/B2/B3 and Gateway programming APIs. The Runtime and
 Site Worker own all physical admission, FPGA/SWD and SAFE_OFF operations.
 One invocation selects exactly one Bundle and one Site. Never retry a write.
 """
@@ -126,14 +126,14 @@ def read_bundle(path: Path, *, site: int, package: str | None,
     require(descriptor.get("schema") == "plasma.ppu.provider-capabilities.v2"
             and descriptor.get("provider_package") == provider["id"]
             and descriptor.get("target")
-            and "flash_cycle" in descriptor.get("operations", []),
+            and {"erase", "program", "verify"} <= set(descriptor.get("operations", [])),
             "SITE_OR_TARGET_NOT_QUALIFIED")
     if image is not None:
         require(not image.is_symlink() and image.is_file()
                 and image.stat().st_size == len(raw_firmware)
                 and sha256(image.read_bytes()) == entry["sha256"],
                 "EXTERNAL_IMAGE_NOT_IN_BUNDLE")
-    # Firmware bytes are NEVER sent to the Gateway: only the selected Set IDs.
+    # The canonical Job sends the Image with its exact Resource/Job Binding.
     return Selection(archive, digest, firmware["id"], entry["sha256"],
                      entry["size"], profile["id"], provider["id"],
                      descriptor["target"], site)
@@ -307,14 +307,27 @@ def _gateway_challenge(host: str, device_id: str, auth) -> str:
 
 
 def post_once(host: str, selection: Selection, *, credential: str, device_id: str) -> str:
-    """Submit ONE flash_cycle Job, signed under the enrolled PPU controller (G13)."""
+    """Submit ONE programming Job, signed under the enrolled PPU controller (G13)."""
+    # Reuse the Runtime/Manager identity writer. No unbound execution fallback.
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "software/python"))
+    from plasma_opf import bundle_v3
+    resource, asset = bundle_v3.identity_from_archive(selection.archive)
+    identity = readiness(host, selection)
+    operations = ["erase", "program", "verify"]
+    binding = bundle_v3.job_image_binding(
+        resource, asset, ppu_id=identity["ppu_id"], site_id=selection.site,
+        operation="programming", operations=operations)
+    with zipfile.ZipFile(io.BytesIO(selection.archive)) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        package = next(p for p in manifest["packages"] if p["id"] == selection.firmware_package)
+        image = archive.read(package["files"][0]["path"])
+    import base64
     payload = {
-        "site_id": selection.site, "operation": "flash_cycle", "timeout_s": 180.0,
+        "site_id": selection.site, "operations": operations, "timeout_s": 180.0,
         "target": selection.target, "provider": selection.provider,
-        "profile": selection.profile,
-        "asset_set_sha256": selection.bundle_sha,
-        "asset_package_id": selection.firmware_package,
-        "bundle_asset_sha256": selection.firmware_sha,
+        "profile": selection.profile, "job_binding": binding,
+        "image_asset": asset, "asset_base64": base64.b64encode(image).decode(),
     }
     auth = ppu_deploy_api._request_auth_module()
     body = json.dumps(payload, sort_keys=True).encode()
@@ -371,22 +384,25 @@ def poll_job(host: str, job_id: str) -> dict:
 def verify_job(job: dict, selection: Selection) -> dict:
     result = job.get("result")
     details = result.get("details") if type(result) is dict else None
-    flash = details.get("flash_cycle") if type(details) is dict else None
+    flash = details.get("programming") if type(details) is dict else None
+    verify = (flash.get("steps", {}).get("verify", {}) if type(flash) is dict else {})
     good = (job.get("state") == "success" and job.get("site_id") == selection.site
-            and job.get("operation") == "flash_cycle"
+            and job.get("operation") == "programming"
             and type(result) is dict and result.get("state") == "success"
             and result.get("image_sha256") == selection.firmware_sha
             and result.get("image_size") == selection.firmware_size
             and result.get("attempts") == 1
             and type(flash) is dict and flash.get("result") == "PASS"
-            and flash.get("readback_sha256") == selection.firmware_sha
-            and flash.get("bytes_verified") == selection.firmware_size
+            and flash.get("operations") == ["erase", "program", "verify"]
+            and set(flash.get("steps", {})) == {"erase", "program", "verify"}
+            and verify.get("readback_sha256") == selection.firmware_sha
+            and verify.get("bytes_verified") == selection.firmware_size
             and flash.get("safe_off") is True)
     return {"status": "PASS" if good else "FAIL_OR_INCOMPLETE",
             "job_id": job.get("job_id"), "job_state": job.get("state"),
             "firmware_sha256": selection.firmware_sha,
-            "readback_sha256": flash.get("readback_sha256") if type(flash) is dict else None,
-            "bytes_verified": flash.get("bytes_verified") if type(flash) is dict else None,
+            "readback_sha256": verify.get("readback_sha256") if type(flash) is dict else None,
+            "bytes_verified": verify.get("bytes_verified") if type(flash) is dict else None,
             "safe_off": flash.get("safe_off") if type(flash) is dict else None,
             "submission_count": 1}
 

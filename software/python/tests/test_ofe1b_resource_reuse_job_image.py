@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts"))
 import ppu_asset_set as assets  # noqa: E402
 
-ROUTE_PATH = ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6.json"
+ROUTE_PATH = ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6-operations.json"
 FW_A = bytes(range(256)) * 4
 FW_B = bytes(reversed(range(256))) * 3 + b"OFE-1B"
 
@@ -90,7 +90,7 @@ def test_ppu_derives_same_resource_for_firmware_a_and_b(tmp_path):
 @pytest.mark.parametrize("caps", [
     {"driver_abi": "plasma_swd:6"},
     {"max_image_bytes": 32768},
-    {"operations": ["flash_cycle", "erase"]},
+    {"operations": ["erase", "program", "verify"]},
 ])
 def test_different_profile_or_driver_abi_is_a_different_resource(tmp_path, caps):
     base = bundle_v3.build_user_image_bundle(route(), FW_A)
@@ -147,19 +147,22 @@ def test_generation_change_during_derivation_fails_closed(tmp_path, monkeypatch)
 PPU_ID = "local-ppu"
 
 
-def binding_for(resource, image: bytes | None, *, operation="flash_cycle", site=2,
+def binding_for(resource, image: bytes | None, *, operation="programming", site=2,
                 ppu_id=PPU_ID, address=None, length=None, load_address=None):
     asset = None if image is None else bundle_v3.image_asset_descriptor(
         resource, image, load_address=load_address)
     binding = bundle_v3.job_image_binding(resource, asset, ppu_id=ppu_id, site_id=site,
-                                          operation=operation, address=address, length=length)
+                                          operation=operation, address=address, length=length,
+                                          operations=["erase", "program", "verify"] if operation == "programming" else None)
     return asset, binding
 
 
-def job_body(resource, image: bytes | None, *, operation="flash_cycle", **kw):
+def job_body(resource, image: bytes | None, *, operation="programming", **kw):
     asset, binding = binding_for(resource, image, operation=operation, **kw)
     kinds = {p["kind"]: p["id"] for p in resource["packages"]}
-    body = {"site_id": kw.get("site", 2), "operation": operation,
+    body = {"site_id": kw.get("site", 2),
+            **({"operations": ["erase", "program", "verify"]} if operation == "programming"
+               else {"operation": operation}),
             "target": resource["constraints"]["icpn"],
             "provider": kinds["platform-provider"], "profile": kinds["programming-profile"],
             "job_binding": binding}
@@ -173,14 +176,14 @@ def gateway_request(body):
 
 
 WIDE = bundle_v3.resource_set_descriptor(route(
-    operations=["flash_cycle", "erase", "program", "verify", "read"]))
+    operations=["erase", "program", "verify", "read"]))
 
 
 def test_gateway_accepts_exclusive_job_image_source():
     request = gateway_request(job_body(WIDE, FW_A))
-    assert request.operation is Operation.FLASH_CYCLE and request.image == FW_A
+    assert request.operation is Operation.PROGRAMMING and request.image == FW_A
     assert request.max_retries == 0 and request.image_ref is None
-    assert request.metadata["job_binding"]["operation"] == "flash_cycle"
+    assert request.metadata["job_binding"]["operation"] == "programming"
     assert request.metadata["job_image_asset"]["sha256"] == hashlib.sha256(FW_A).hexdigest()
     assert not {"bundle_asset_set_sha256", "bundle_asset_sha256"} & set(request.metadata)
 
@@ -297,9 +300,9 @@ def test_firmware_a_then_b_reuse_same_active_resources_on_c3():
                     status, job = await submit(stack, body)
                     assert status == 202, job
                     assert job["state"] == "success", json.dumps(job)
-                    cycle = job["result"]["details"]["flash_cycle"]
+                    cycle = job["result"]["details"]["programming"]
                     assert cycle["result"] == "PASS" and cycle["safe_off"] is True
-                    assert cycle["readback_sha256"] == hashlib.sha256(firmware).hexdigest()
+                    assert cycle["steps"]["verify"]["readback_sha256"] == hashlib.sha256(firmware).hexdigest()
                     assert job["result"]["image_sha256"] == hashlib.sha256(firmware).hexdigest()
                     echo = job["job_binding"]
                     assert echo["job_binding_sha256"] == bundle_v3.sha256_hex(
@@ -348,7 +351,7 @@ def test_unsafe_or_unproven_job_binding_never_opens_c3(case, expect):
     async def scenario():
         with short_tmp() as folder:
             async with Stack(Path(folder), in_process=True) as stack:
-                wide = stack_resource(operations=["flash_cycle", "erase", "program", "read"])
+                wide = stack_resource(operations=["erase", "program", "verify", "read"])
                 resource = wide if case.endswith("_backend") else stack_resource()
                 install_resolver(stack, resource,
                                  generation_delta=1 if case == "generation_moved" else 0)
@@ -373,8 +376,8 @@ def test_unsafe_or_unproven_job_binding_never_opens_c3(case, expect):
                 elif case == "program_backend":
                     body = job_body(resource, FW_A, operation="program")
                 elif case == "not_in_profile":
-                    body = job_body(wide, None, operation="erase",
-                                    address=0x08000000, length=1024)
+                    install_resolver(stack, stack_resource(operations=["program"]))
+                    body = job_body(resource, FW_A)
                 elif case == "fpga_reload_lock":
                     stack.manager.acquire_asset_set_quiesce()
                 await _denied(stack, body, expect)
@@ -385,8 +388,6 @@ def test_unsafe_or_unproven_job_binding_never_opens_c3(case, expect):
 
 # --------------------------- Job Binding address end to end (OFE-1B PR-A, Gate 1 B)
 SECOND_PAGE = 0x08000400
-FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
-                      "write_address", "verify_address", "readback_address")
 
 
 def c3_route() -> bundle_v3.ProgrammingRoute:
@@ -425,12 +426,13 @@ def test_real_resolver_reuses_resources_and_writes_firmware_b_at_its_binding_add
                     status, job = await submit(stack, body)
                     assert status == 202, job
                     assert job["state"] == "success", json.dumps(job)
-                    cycle = job["result"]["details"]["flash_cycle"]
+                    cycle = job["result"]["details"]["programming"]
                     erase_length = -(-len(firmware) // 1024) * 1024
-                    assert {k: cycle[k] for k in FLASH_RANGE_FIELDS} == {
-                        "load_address": address, "erase_address": address,
-                        "erase_length": erase_length, "write_address": address,
-                        "verify_address": address, "readback_address": address}
+                    assert cycle["steps"]["erase"] == {
+                        "erase_address": address, "erase_length": erase_length}
+                    assert cycle["steps"]["program"]["write_address"] == address
+                    assert cycle["steps"]["verify"]["verify_address"] == address
+                    assert cycle["steps"]["verify"]["readback_sha256"] == hashlib.sha256(firmware).hexdigest()
                     assert cycle["job_binding_sha256"] == job["job_binding"]["job_binding_sha256"]
                     commands = [a for a in stack.sim.argvs[-1] if a.startswith(
                         ("flash erase_address", "flash write_image", "flash verify_image",
@@ -465,9 +467,9 @@ def test_non_base_job_never_passes_unless_the_executed_range_is_proven(fault):
                 assert status == 202, job
                 assert job["state"] != "success", json.dumps(job)
                 text = json.dumps(job)
-                expect = {"forged_erase_report": "FLASH_RANGE_NOT_OBSERVED",
-                          "write_lands_elsewhere": "OPENOCD_FLASH_FAILED",
-                          "readback_corrupt": "READBACK_MISMATCH"}[fault]
+                expect = {"forged_erase_report": "ERASE_RANGE_NOT_OBSERVED",
+                          "write_lands_elsewhere": "VERIFY_MISMATCH",
+                          "readback_corrupt": "VERIFY_MISMATCH"}[fault]
                 assert expect in text, text
     run(scenario())
 

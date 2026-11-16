@@ -297,7 +297,7 @@ def test_programming_without_an_admitted_binding_is_refused(tmp_path: Path):
             # the interface has no default list or range to fall back on.
             result = await manager.submit(JobRequest(
                 site_id=SITE, operation=Operation.PROGRAMMING, image=IMAGE_A,
-                target=ICPN, max_retries=0, timeout_s=10.0))
+                target=ICPN, max_retries=0, timeout_s=10.0, metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}}))
             assert result.state is not JobState.SUCCESS
             assert "requires a Job Binding operations list" in result.error.message
             assert "programming" not in (result.details or {})

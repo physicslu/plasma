@@ -26,8 +26,8 @@ def test_c3_flash_route_uses_bundle_not_exact_icpn_catalog():
                       openocd={"site_worker_socket": "/tmp/s1c-test-c3.sock"})
     interface = OpenOCDInterface(site.openocd)
     router = SiteExecutionRouter(site, interface)
-    request = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
-                         target="UNREGISTERED-ICPN", image=b"TEST")
+    request = JobRequest(site_id=2, operation=Operation.PROGRAMMING,
+                         target="UNREGISTERED-ICPN", image=b"TEST", metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}})
     admitted = router.admit(request)
     assert admitted.metadata[ROUTE_METADATA_KEY]["mode"] == OPENOCD_ROUTE
     assert router.interface_for(admitted) is interface
@@ -72,8 +72,8 @@ def test_legacy_non_c3_openocd_runtime_path_is_removed():
                                "target_cfg": "target/stm32f1x.cfg"})
     router = SiteExecutionRouter(site, OpenOCDInterface(site.openocd))
     with pytest.raises(PlasmaError, match="NO_QUALIFIED_JOB_PROVIDER"):
-        router.admit(JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
-                                target="STM32F103C8T6", image=b"TEST"))
+        router.admit(JobRequest(site_id=2, operation=Operation.PROGRAMMING,
+                                target="STM32F103C8T6", image=b"TEST", metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}}))
 
 
 @pytest.mark.parametrize("field", [ROUTE_METADATA_KEY, "resolved_ic_support"])
@@ -93,8 +93,8 @@ def test_signed_package_provider_is_selected_by_job_not_static_site_interface():
     package.wire_runtime(lambda *_: {})
     router = SiteExecutionRouter(site, base, package)
     trusted = TrustedProviderAction(None, {}, None, SimpleNamespace())
-    request = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
-                         target="UNREGISTERED-ICPN", image=b"TEST")
+    request = JobRequest(site_id=2, operation=Operation.PROGRAMMING,
+                         target="UNREGISTERED-ICPN", image=b"TEST", metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}})
     admitted = router.admit(request, trusted_provider=trusted)
     assert admitted.metadata[ROUTE_METADATA_KEY]["mode"] == PACKAGE_PROVIDER_ROUTE
     assert router.interface_for(admitted) is package
@@ -111,15 +111,15 @@ def test_same_site_selects_openocd_or_package_per_authorized_job_without_fallbac
     package.wire_runtime(lambda *_: {})
     router = SiteExecutionRouter(site, openocd, package)
     trusted = TrustedProviderAction(None, {}, None, SimpleNamespace())
-    direct = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
-                        target="STM32F103C8T6", image=b"IMAGE", job_id="direct-job")
-    signed = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
-                        target="EXTERNAL-PROVIDER-TARGET", image=b"IMAGE", job_id="signed-job")
+    direct = JobRequest(site_id=2, operation=Operation.PROGRAMMING,
+                        target="STM32F103C8T6", image=b"IMAGE", job_id="direct-job", metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}})
+    signed = JobRequest(site_id=2, operation=Operation.PROGRAMMING,
+                        target="EXTERNAL-PROVIDER-TARGET", image=b"IMAGE", job_id="signed-job", metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}})
     assert router.interface_for(router.admit(direct)) is openocd
     assert router.interface_for(router.admit(signed, trusted_provider=trusted)) is package
     assert router.interface_for(router.admit(direct)) is openocd
     # A tampered route from public metadata cannot switch a direct Job.
-    forged = JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
+    forged = JobRequest(site_id=2, operation=Operation.PROGRAMMING,
                         target="STM32F103C8T6", image=b"IMAGE",
                         metadata={ROUTE_METADATA_KEY: {"mode": PACKAGE_PROVIDER_ROUTE}})
     with pytest.raises(PlasmaError) as error:
@@ -136,9 +136,9 @@ def test_site_manager_rejects_legacy_route_before_queue_or_lease(tmp_path: Path)
         manager = SiteManager(config)
         await manager.start()
         try:
-            with pytest.raises(PlasmaError, match="NO_QUALIFIED_JOB_PROVIDER"):
-                manager.enqueue(JobRequest(site_id=2, operation=Operation.FLASH_CYCLE,
-                                           target="STM32F103C8T6", image=b"TEST"))
+            with pytest.raises(PlasmaError, match="JOB_BINDING_NOT_QUALIFIED"):
+                manager.enqueue(JobRequest(site_id=2, operation=Operation.PROGRAMMING,
+                                           target="STM32F103C8T6", image=b"TEST", metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}}))
             assert manager.registry.all() == []
             assert not manager.execution_lease_snapshot()["busy"]
         finally:

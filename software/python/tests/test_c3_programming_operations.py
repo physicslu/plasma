@@ -36,7 +36,7 @@ import ppu_site_worker as worker  # noqa: E402
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"),
                                 reason="Linux AF_UNIX + SO_PEERCRED")
 BASE = 0x08000000
-ALL = ["flash_cycle", "erase", "program", "verify", "read"]
+ALL = ["erase", "program", "verify", "read"]
 LEGAL = [["erase"], ["program"], ["verify"], ["erase", "program"], ["program", "verify"],
          ["erase", "program", "verify"]]
 
@@ -118,13 +118,10 @@ def test_operations_list_is_ordered_unique_and_erase_verify_is_refused():
 def test_binding_identity_carries_the_list_and_legacy_binding_is_unchanged():
     resource = bundle_v3.resource_set_descriptor(ops_route())
     asset = bundle_v3.image_asset_descriptor(resource, FW_A)
-    legacy = bundle_v3.job_image_binding(resource, asset, ppu_id=PPU_ID, site_id=2,
-                                         operation="flash_cycle")
-    assert "operations" not in legacy  # the legacy identity gained no field
     full = ops_body(resource, ["erase", "program", "verify"], FW_A)["job_binding"]
     assert full["operation"] == "programming"
     assert full["operations"] == ["erase", "program", "verify"]
-    assert full["range"] == legacy["range"]
+    assert full["range"] == {"address": BASE, "length": len(FW_A)}
     shas = {bundle_v3.sha256_hex(bundle_v3.canonical_json(
         ops_body(resource, ops, FW_A if bundle_v3.operations_take_image(ops) else None,
                  **({} if bundle_v3.operations_take_image(ops)
@@ -142,7 +139,7 @@ def test_binding_identity_carries_the_list_and_legacy_binding_is_unchanged():
         ops_body(resource, ["erase"], FW_A)
     with pytest.raises(bundle_v3.BundleBuildError, match="JOB_IMAGE_ASSET_REQUIRED"):
         ops_body(resource, ["program"], None, address=BASE, length=1024)
-    narrow = bundle_v3.resource_set_descriptor(ops_route(["flash_cycle", "program"]))
+    narrow = bundle_v3.resource_set_descriptor(ops_route(["program"]))
     with pytest.raises(bundle_v3.BundleBuildError, match="JOB_OPERATION_NOT_IN_PROFILE"):
         ops_body(narrow, ["erase", "program"], FW_A)
 
@@ -185,6 +182,7 @@ def test_every_legal_list_is_one_job_one_session_one_receipt(operations):
                 assert actions(stack.sim.argvs[0]) == EXPECTED_ACTIONS[tuple(operations)]
                 details = job["result"]["details"]
                 assert details["operations"] == operations and "flash_cycle" not in details
+                assert commands(stack.sim.argvs[-1])[-2:] == ["reset run", "shutdown"]
                 evidence = details["programming"]
                 assert evidence["result"] == "PASS" and evidence["safe_off"] is True
                 assert evidence["operations"] == operations
@@ -352,7 +350,7 @@ def route_wire(operations=None, operation="programming"):
 
 def test_worker_session_pins_the_list_and_binds_only_what_it_needs(tmp_path):
     class Ops(type(abi5_stub())):
-        operations = frozenset({"probe", "flash_cycle", "programming", "read"})
+        operations = frozenset({"probe", "programming", "read"})
 
     core = worker.SiteWorkerCore(Ops(), runtime_pid=os.getpid,
                                  lease_verifier=lambda j, k: True,
@@ -420,11 +418,6 @@ def test_worker_session_pins_the_list_and_binds_only_what_it_needs(tmp_path):
     bound = call("bind_range", session_id=sid, address=BASE + 3, length=17)
     assert bound["ok"] and bound["result"]["operation"] == "read"
     close(sid)
-    # The legacy flash_cycle session is unchanged and takes no range.
-    sid = session(route_wire(operation="flash_cycle"))
-    assert call("bind_range", session_id=sid, address=BASE,
-                length=1024)["error"] == "OPERATION_TAKES_NO_RANGE"
-    close(sid)
     assert core._sealed == set()
 
 
@@ -435,7 +428,7 @@ def test_gateway_and_runtime_refuse_before_any_hardware_session(case):
     async def scenario():
         with short_tmp() as folder:
             stack, resource = ops_stack(
-                folder, ["flash_cycle", "program", "verify"] if case == "not_in_profile" else ALL)
+                folder, ["program", "verify"] if case == "not_in_profile" else ALL)
             async with stack:
                 body = ops_body(resource, ["program", "verify"], FW_A)
                 if case == "erase_verify":
@@ -466,7 +459,7 @@ def test_active_profile_that_does_not_declare_a_step_fails_closed_at_execution()
     """Even if admission were fooled, the pinned Active Profile decides."""
     async def scenario():
         with short_tmp() as folder:
-            stack, _narrow = ops_stack(folder, ["flash_cycle"])
+            stack, _narrow = ops_stack(folder, ["program"])
             async with stack:
                 wide = bundle_v3.resource_set_descriptor(ops_route())
                 active = stack.manager._active_resource_resolver()
@@ -482,22 +475,6 @@ def test_active_profile_that_does_not_declare_a_step_fails_closed_at_execution()
     run(scenario())
 
 
-def test_legacy_flash_cycle_job_is_unchanged_next_to_the_new_model():
-    async def scenario():
-        with short_tmp() as folder:
-            stack, resource = ops_stack(folder)
-            async with stack:
-                status, job = await submit(stack, job_body(resource, FW_A))
-                assert status == 202 and job["state"] == "success", json.dumps(job)
-                assert job["operation"] == "flash_cycle"
-                assert "operations" not in job["job_binding"]
-                assert job["result"]["details"]["flash_cycle"]["result"] == "PASS"
-                assert actions(stack.sim.argvs[0]) == [
-                    "flash erase_address", "flash write_image", "flash verify_image",
-                    "dump_image"]
-                [opened] = [r for r in stack.worker_requests if r["op"] == "open_job_session"]
-                assert "operations" not in opened["provider_route"]
-    run(scenario())
 
 
 # ------------------------------------------------------------------ read Job
@@ -592,3 +569,80 @@ def test_read_is_refused_while_a_programming_job_owns_the_site():
                 assert status != 202, second  # the Site lease is not shared
                 assert len(stack.sim.argvs) == 1
     run(scenario())
+
+
+def test_retired_flash_cycle_is_rejected_at_enum_schema_and_gateway():
+    from plasma_core.enums import Operation
+    from plasma_web.gateway_phase2 import PlasmaWebHandler
+    with pytest.raises(ValueError):
+        Operation("flash_cycle")
+    with pytest.raises(bundle_v3.BundleBuildError):
+        ops_route(["flash_cycle"])
+    with pytest.raises(ValueError):
+        object.__new__(PlasmaWebHandler)._job_request(
+            {"site_id": 2, "operation": "flash_cycle"}, client_id="negative-test")
+    resource = bundle_v3.resource_set_descriptor(ops_route())
+    with pytest.raises(bundle_v3.BundleBuildError, match="JOB_OPERATION_UNSUPPORTED"):
+        bundle_v3.job_image_binding(resource, None, ppu_id=PPU_ID, site_id=2,
+                                    operation="flash_cycle")
+
+
+def test_two_programming_sites_overlap_and_one_failure_does_not_cancel_the_other(tmp_path):
+    """Real C-3 sessions/locks/guards, synthetic transport; no hardware or sockets."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    entered = {site: threading.Event() for site in (1, 2)}
+    release = {site: threading.Event() for site in (1, 2)}
+
+    class Independent(type(abi5_stub())):
+        operations = frozenset({"programming"})
+
+        def run(self, site, operation, *, deadline, cancel, image=None,
+                flash_range=None, operations=None):
+            entered[site].set()
+            assert release[site].wait(5)
+            assert not cancel.is_set()
+            if site == 1:
+                raise worker.TransportFailed("SYNTHETIC_SAFE_FAILURE")
+            return {"result": "PASS", "safe_off": True, "operations": ["program"],
+                    "steps": {"program": {"write_address": BASE, "bytes_written": 4}}}
+
+    images = tmp_path / "images"
+    images.mkdir()
+    core = worker.SiteWorkerCore(Independent(), runtime_pid=os.getpid,
+                                 lease_verifier=lambda _j, _k: True,
+                                 seal_dir=tmp_path / "seals", image_root=images)
+    peer = (os.getpid(), os.getuid(), os.getgid())
+
+    def call(op, **fields):
+        return core.handle({"protocol": worker.PROTOCOL, "op": op, **fields}, peer, "control")
+
+    sessions = {}
+    for site in (1, 2):
+        job_id = f"job-independent-{site}"
+        (images / f"{job_id}.bin").write_bytes(b"DATA")
+        route = {**route_wire(["program"]), "site_id": site}
+        opened = call("open_job_session", job_id=job_id, sites=[site], max_runtime_s=30,
+                      profile=PROFILE, provider_route=route,
+                      deadline_monotonic=time.monotonic() + 20)
+        assert opened["ok"], opened
+        sessions[site] = opened["result"]["session_id"]
+        assert call("bind_image", session_id=sessions[site], image_size=4,
+                    load_address=BASE, image_sha256=hashlib.sha256(b"DATA").hexdigest())["ok"]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = {site: pool.submit(call, "run", session_id=sessions[site],
+                                     site=site, operation="programming") for site in (1, 2)}
+        try:
+            assert all(event.wait(5) for event in entered.values())  # actual overlap
+            release[1].set()
+            assert futures[1].result(5)["error"].startswith("OPERATION_FAILED_SAFE:")
+            assert not futures[2].done()  # unrelated Site retains its session
+            release[2].set()
+            assert futures[2].result(5)["result"]["result"] == "PASS"
+        finally:
+            for event in release.values():
+                event.set()
+    for session in sessions.values():
+        assert call("close_session", session_id=session)["result"]["closed"]
+    assert not core._sealed and not core._sessions and not core._site_owners

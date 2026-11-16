@@ -24,14 +24,14 @@ class OpenOCDInterface(BaseInterface):
     erase / program / verify ``operations`` list of its SiteManager-admitted
     Job Binding as ONE Job in ONE C-3 session (Program never erases, Verify
     never writes); ``read`` is an independent Job on its bound range;
-    ``flash_cycle`` is the legacy complete cycle. Separate erase / program /
+    Separate erase / program /
     verify Jobs are not offered. The target config and Flash geometry come
     from the selected verified Bundle Profile. There is no IC Catalog,
     exact-ICPN compiler or software-validation process path. Without a Site
     Worker socket the interface cannot execute anything.
     """
 
-    OPERATIONS = frozenset({Operation.FLASH_CYCLE, Operation.PROGRAMMING, Operation.READ})
+    OPERATIONS = frozenset({Operation.PROGRAMMING, Operation.READ})
     CONSUMES_JOB_BINDING = True
 
     def __init__(self, options: dict[str, Any]) -> None:
@@ -54,8 +54,8 @@ class OpenOCDInterface(BaseInterface):
         """Pin the Runtime-admitted context for one Job attempt.
 
         Its ``admitted_job_binding`` is the SiteManager-verified Binding whose
-        ``range.address`` is the write address; it is absent only for the
-        separate inline / bundle-reference flash_cycle contract. A trusted
+        ``range.address`` is the write address; it is required for every
+        programming or read Job. A trusted
         Provider Action is not an authorization this path accepts.
         """
         context = self._require_runtime_context(context)
@@ -84,7 +84,7 @@ class OpenOCDInterface(BaseInterface):
         raise PlasmaError(
             ErrorCode.OPERATION_UNSUPPORTED,
             "the C-3 Site Worker path offers programming (an operations list), "
-            "read and the legacy flash_cycle, not a separate " + operation.value + " Job",
+            "read, not a separate " + operation.value + " Job",
             context={"operation": operation.value},
         )
 
@@ -112,16 +112,14 @@ class OpenOCDInterface(BaseInterface):
         if not self._context.matches(request.job_id, request.site_id):
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                               "RUNTIME_CONTEXT_JOB_MISMATCH")
-        if request.operation is not Operation.FLASH_CYCLE:
-            self._binding(request.operation)
+        self._binding(request.operation)
         try:
             self.opf_flash_preflight(
                 active_asset_set=thaw(self._context.active_asset_set), target=request.target,
                 site_id=request.site_id, image_size=request.image_size,
                 job_binding=thaw(self._context.admitted_job_binding),
                 provider=request.metadata.get("provider"), profile=request.metadata.get("profile"),
-                **({} if request.operation is Operation.FLASH_CYCLE
-                   else {"operation": request.operation.value}))
+                operation=request.operation.value)
         except (ValueError, OSError, KeyError, TypeError) as exc:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                               "OPF_FLASH_DENIED:" + str(exc)) from exc
@@ -212,35 +210,6 @@ class OpenOCDInterface(BaseInterface):
             await progress(length, length)
         return data
 
-    async def flash_cycle(
-        self,
-        image: bytes,
-        progress: ProgressCallback | None = None,
-    ) -> dict[str, object]:
-        self._require_ready()
-        request = self._request
-        if request is None or request.operation is not Operation.FLASH_CYCLE:
-            raise PlasmaError(
-                ErrorCode.INTERFACE_NOT_CONFIGURED,
-                "OpenOCD operation has no matching prepared Job",
-            )
-        if image != request.image or not image:
-            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "OpenOCD Job image mismatch")
-        assert self._site_worker is not None
-        if (self.opf_flash_executor is None or self._context is None
-                or not self._context.matches(request.job_id, request.site_id)):
-            raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED,
-                              "OPF_RUNTIME_NOT_WIRED")
-        evidence = await self.opf_flash_executor(
-            self._site_worker, request=request,
-            active_asset_set=thaw(self._context.active_asset_set),
-            job_deadline_monotonic=self._context.deadline_monotonic,
-            image_root=self.normalized_image_root,
-            job_binding=thaw(self._context.admitted_job_binding),
-        )
-        if progress:
-            await progress(len(image), len(image))
-        return evidence
 
     async def safe_shutdown(self) -> None:
         # The context never outlives the Job it was bound for.

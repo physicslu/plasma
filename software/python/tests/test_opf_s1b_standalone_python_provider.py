@@ -46,7 +46,7 @@ def script(tmp_path: Path, body: str) -> Path:
 
 
 def run(provider: PythonProvider, *, selection=None, image=IMAGE):
-    return asyncio.run(provider.flash_cycle(selection or selected(), image))
+    return asyncio.run(provider.run_operations(selection or selected(), image, ("erase", "program", "verify")))
 
 
 def test_standalone_import_does_not_load_any_ppu_bundle_openocd_or_hardware_modules():
@@ -74,8 +74,9 @@ import json
 import os
 from pathlib import Path
 import sys
-assert sys.argv[1] == 'flash_cycle'
-raw = Path(sys.argv[2]).read_bytes()
+assert sys.argv[1] == 'programming'
+assert json.loads(sys.argv[2]) == ['erase', 'program', 'verify']
+raw = Path(sys.argv[3]).read_bytes()
 assert raw == bytes.fromhex('310259ff')
 assert os.environ['OPF_PROFILE'] == 'synthetic-target'
 assert json.loads(os.environ['OPF_OPTIONS_JSON']) == {'mode': 'fake'}
@@ -140,7 +141,7 @@ time.sleep(30)
 """)
     async def scenario():
         task = asyncio.create_task(
-            PythonProvider("host-fake", fake).flash_cycle(selected(), IMAGE)
+            PythonProvider("host-fake", fake).run_operations(selected(), IMAGE, ("erase", "program", "verify"))
         )
         for _ in range(100):
             if pidfile.exists():

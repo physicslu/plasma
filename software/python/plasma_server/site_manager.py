@@ -73,7 +73,6 @@ class SiteManager:
         self.registry = JobRegistry()
         self._active_asset_set_reader = active_asset_set_reader
         # Wired by the trusted PPU PackageActionRuntime, never from a Job or ZIP.
-        self._bundle_firmware_resolver: Callable[..., dict[str, Any]] | None = None
         # OFE-1B: PPU-derived Resource identity of the Active Set (same wiring rule).
         self._active_resource_resolver: Callable[[], dict[str, Any]] | None = None
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
@@ -580,13 +579,9 @@ class SiteManager:
             # Provider and Profile are part of a Job Binding's own identity, so
             # an interface that admits Bindings may carry them -- the Binding is
             # still re-verified under the Job lease before anything executes.
-            # The C-3 path also carries them for the separate bundle-reference
-            # flash_cycle contract, which has no Binding.
             admits_binding = (getattr(interface, "CONSUMES_JOB_BINDING", False)
                               and bool(JOB_BINDING_KEYS.intersection(request.metadata)))
-            c3_ready = (isinstance(interface, OpenOCDInterface)
-                        and interface.site_worker_ready)
-            if not (admits_binding or c3_ready):
+            if not admits_binding:
                 raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                                   "PROVIDER_JOB_NOT_AUTHORIZED")
         if request.target is None and site_config.interface != "mock":
@@ -619,55 +614,11 @@ class SiteManager:
             }
             selected = bundle_keys.intersection(request.metadata)
             binding_selected = bool(JOB_BINDING_KEYS.intersection(request.metadata))
-            if selected and binding_selected:
+            if selected:
                 raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                                   "JOB_IMAGE_SOURCE_NOT_EXCLUSIVE")
             if binding_selected:
                 runtime.job_binding = self._admit_job_binding(request, pinned)
-            if selected:
-                if (selected != bundle_keys
-                        or request.operation is not Operation.FLASH_CYCLE
-                        or request.image or request.image_ref is not None
-                        or request.max_retries != 0
-                        or not isinstance(self.interfaces[request.site_id], OpenOCDInterface)
-                        or not self.interfaces[request.site_id].site_worker_ready
-                        or self._bundle_firmware_resolver is None
-                        or type(request.metadata.get("profile")) is not str
-                        or type(request.metadata.get("provider")) is not str):
-                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                      "BUNDLE_ASSET_JOB_NOT_QUALIFIED")
-                digest = request.metadata["bundle_asset_set_sha256"]
-                if (type(pinned) is not dict or pinned.get("state") != "ACTIVE"
-                        or pinned.get("asset_set_sha256") != digest):
-                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                      "BUNDLE_ASSET_ACTIVE_SET_MISMATCH")
-                try:
-                    resolved = self._bundle_firmware_resolver(
-                        asset_set_sha256=digest,
-                        asset_package_id=request.metadata["bundle_asset_package_id"],
-                        profile_package_id=request.metadata["profile"],
-                        asset_sha256=request.metadata["bundle_asset_sha256"],
-                    )
-                except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
-                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                      "BUNDLE_ASSET_RESOLUTION_DENIED") from exc
-                if (type(resolved) is not dict
-                        or type(resolved.get("image")) is not bytes
-                        or not resolved["image"]
-                        or resolved.get("asset_set_sha256") != digest
-                        or resolved.get("asset_package_id")
-                            != request.metadata["bundle_asset_package_id"]
-                        or resolved.get("profile_package_id") != request.metadata["profile"]
-                        or resolved.get("image_sha256")
-                            != request.metadata["bundle_asset_sha256"]):
-                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
-                                      "BUNDLE_ASSET_RESOLVER_CONTRACT_INVALID")
-                request = replace(request, image=resolved["image"], metadata={
-                    **request.metadata,
-                    "image_name": resolved["image_name"],
-                    "source_asset_name": resolved["image_name"],
-                    "source_asset_sha256": resolved["image_sha256"],
-                })
             request = self.execution_routers[request.site_id].admit(
                 request, trusted_provider=trusted_provider)
             if trusted_provider is not None:

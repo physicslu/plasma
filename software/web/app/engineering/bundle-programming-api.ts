@@ -33,13 +33,10 @@ export type ProgrammingRoute = {
 // operations it supports.
 export const SEQUENCE_OPERATIONS = ["erase", "program", "verify"] as const;
 export type SequenceOperation = typeof SEQUENCE_OPERATIONS[number];
-// Jobs addressed by a single `operation`: the independent `read` Job and the
-// legacy complete `flash_cycle`. A single erase / program / verify is never
-// a Job of its own.
-export const PROGRAMMING_OPERATIONS = ["flash_cycle", "read"] as const;
-export type SingleOperation = typeof PROGRAMMING_OPERATIONS[number];
-export type ProgrammingOperation = SingleOperation | "programming";
-export const IMAGE_OPERATIONS: ReadonlySet<string> = new Set(["flash_cycle"]);
+// Programming carries operations[]; read is an independent Job.
+export const PROGRAMMING_OPERATIONS = ["programming", "read"] as const;
+export type ProgrammingOperation = typeof PROGRAMMING_OPERATIONS[number];
+export const IMAGE_OPERATIONS: ReadonlySet<string> = new Set(["programming"]);
 
 /** The list in its fixed order; null when it is empty or not a legal Job. */
 export function normalizeOperations(selected: Iterable<string>): SequenceOperation[] | null {
@@ -65,7 +62,7 @@ export type ProgrammingPlan = {
   ppu_alias: string;
   site_id: number;
   operation: ProgrammingOperation;
-  /** The ordered list of a programming Job; null for read / legacy flash_cycle. */
+  /** The ordered list of a programming Job; null for read. */
   operations: SequenceOperation[] | null;
   source: ProgrammingSource | "range";
   route: ProgrammingRoute;
@@ -228,12 +225,10 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-export type ImageOperation = "flash_cycle";
+
 
 /** One programming Job (`operations`) or a single-operation Job (`operation`). */
-type JobSelector =
-  | { operations: readonly SequenceOperation[] }
-  | { operation: ImageOperation };
+type JobSelector = { operations: readonly SequenceOperation[] };
 
 export type PlanInput =
   | ({ icpn: string; siteId: number; image: Uint8Array; filename: string } & JobSelector)

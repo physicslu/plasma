@@ -107,6 +107,11 @@ class ProgrammingOperationHandler(BaseHandler):
             # The ordered list is the admitted Job Binding's; it has no default.
             binding = request.metadata.get("job_binding")
             operations = binding.get("operations") if isinstance(binding, dict) else None
+            if operations is None:
+                # The Root-only Package seam has its own trusted route identity.
+                # It still refuses PASS until Provider evidence is qualified.
+                admitted = getattr(self.interface, "admitted_operations", None)
+                operations = list(admitted) if admitted is not None else None
             if (not isinstance(operations, list) or not operations
                     or operations != [op for op in ("erase", "program", "verify")
                                       if op in operations]
@@ -132,28 +137,6 @@ class ProgrammingOperationHandler(BaseHandler):
                     "operations": list(operations),
                     "image_sha256": request.image_sha256 if request.image else None,
                     "programming": dict(evidence or {}),
-                }
-            )
-
-        if operation is Operation.FLASH_CYCLE:
-            if not request.image:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT, "flash_cycle requires a non-empty inline image"
-                )
-            evidence = await self._stage(
-                "flash_cycle",
-                stage_callback,
-                lambda progress: self.interface.flash_cycle(request.image, progress),
-                stage_index=0,
-                stage_count=1,
-                byte_progress=True,
-            )
-            return ExecutionOutput(
-                details={
-                    "stages": ["erase", "program", "verify", "readback"],
-                    "bytes_programmed": request.image_size,
-                    "image_sha256": request.image_sha256,
-                    "flash_cycle": dict(evidence or {}),
                 }
             )
 

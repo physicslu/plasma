@@ -24,8 +24,7 @@ the Manager then
    Job carrying the user's ordered ``operations`` list (erase -> program ->
    verify; any legal selection, all three included): one Job ID, one Site
    lease, one Binding and one receipt. ``read`` is an independent Job whose
-   bytes the Manager fetches and re-hashes. ``flash_cycle`` is the legacy
-   complete cycle, kept unchanged until the new model is HIL qualified,
+   bytes the Manager fetches and re-hashes,
 5. observes ``/api/status?job=`` and verifies the PPU-echoed Binding, Image
    identity, every listed step's range / readback evidence and SAFE_OFF.
 
@@ -71,11 +70,9 @@ RECEIPT_SCHEMA = "plasma.manager.programming-receipt.v3"
 # Job kinds with a PPU backend (C-3 OpenOCD) and a receipt contract. A single
 # erase / program / verify is never a Job: it is a step of ``programming``.
 PROGRAMMING = bundle_v3.PROGRAMMING
-RECEIPT_OPERATIONS = frozenset({"flash_cycle", PROGRAMMING, "read"})
+RECEIPT_OPERATIONS = frozenset({PROGRAMMING, "read"})
 READ_OUTPUT_MAX_BYTES = 16 * 1024 * 1024
 MAX_READ_OUTPUTS_RETAINED = 8
-FLASH_RANGE_FIELDS = ("load_address", "erase_address", "erase_length",
-                      "write_address", "verify_address", "readback_address")
 START_SCHEMA = "plasma.manager.programming-start-reconciliation.v1"
 VOID_TOKEN = "VOID_UNSTARTED_START"
 MAX_STARTS_RETAINED = 256
@@ -279,7 +276,7 @@ def _site_worker_failure(run: _Run, plan: _Plan, job: Mapping[str, Any],
                and job.get("site_id") == run.site and error.get("site_id") == run.site
                and context.get("site_id") == run.site
                and job.get("operation") == plan.operation
-               # The flash_cycle error context names no operation.
+               # Historical error contexts may omit the operation.
                and context.get("operation", plan.operation) == plan.operation
                and type(worker.get("site")) is int and worker.get("site") == run.site
                and worker.get("operation") == plan.operation
@@ -654,7 +651,7 @@ class BundleProgrammingWorkflow:
                 or len({"operation", "operations"} & set(body)) != 1 or set(body) - allowed:
             raise ProgrammingError(400, "invalid_request",
                                    "plan requires icpn, site_id, exactly one of operations "
-                                   "(erase/program/verify list) or operation (read, flash_cycle) "
+                                   "(erase/program/verify list) or operation (read) "
                                    "and its image_base64, bundle_base64 or address/length")
         icpn, site = body["icpn"], body["site_id"]
         operations: list[str] | None = None
@@ -685,9 +682,9 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(400, "invalid_request", "site_id is invalid")
         # The Operation is the user's choice; the Manager never rewrites it.
         if operations is None and (type(operation) is not str
-                                   or operation not in ("read", "flash_cycle")):
+                                   or operation != "read"):
             raise ProgrammingError(400, "invalid_request",
-                                   "operation must be read or flash_cycle")
+                                   "operation must be read; programming requires operations[]")
         image_operation = (bundle_v3.operations_take_image(operations)
                            if operations is not None
                            else operation in bundle_v3.IMAGE_OPERATIONS)
@@ -748,7 +745,7 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(422, "programming_route_not_found",
                                    "no Programming Route declares this IC")
         # The Route is the one whose Profile declares every basic operation of
-        # this Job (the legacy flash_cycle Route stays its own Resource Set).
+        # this Job.
         matches = bundle_v3.resolve_routes(routes, icpn=icpn.strip(),
                                            operations=required)
         if not matches:
@@ -808,7 +805,7 @@ class BundleProgrammingWorkflow:
         payload = {
             "schema": PLAN_SCHEMA, "plan_id": plan_id, "ppu_alias": alias,
             "site_id": site, "operation": operation,
-            # The ordered list one programming Job runs (null: read / legacy flash_cycle).
+            # The ordered list one programming Job runs (null: read).
             "operations": operations,
             "source": ("bundle" if archive is not None
                        else "image" if image is not None else "range"),
@@ -1479,13 +1476,12 @@ class BundleProgrammingWorkflow:
     def _verify(self, run: _Run, plan: _Plan, job: dict[str, Any], client: Any = None) -> None:
         result = job.get("result") if isinstance(job.get("result"), dict) else {}
         details = result.get("details") if isinstance(result.get("details"), dict) else {}
-        # The Job kind's own evidence block: flash_cycle / programming / read.
+        # The Job kind's own evidence block: programming / read.
         evidence = details.get(plan.operation) if isinstance(details.get(plan.operation), dict) else {}
         # A definite Site Worker FAIL carries no details block; its SAFE_OFF
         # observation travels in the PPU Job error instead.
         failure = {} if evidence else _site_worker_failure(run, plan, job, result)
         safe_off = failure.get("safe_off") if failure else evidence.get("safe_off")
-        flash = evidence if plan.operation == "flash_cycle" else {}
         steps = evidence.get("steps") if isinstance(evidence.get("steps"), dict) else {}
         echo = job.get("job_binding") if isinstance(job.get("job_binding"), dict) else {}
         binding = plan.binding
@@ -1500,13 +1496,6 @@ class BundleProgrammingWorkflow:
         operations = plan.operations
         expected_range: dict[str, Any] | None = None
         observed_range: dict[str, Any] | None = None
-        if plan.operation == "flash_cycle":
-            expected_range = {
-                "load_address": address, "erase_address": address,
-                "erase_length": erase_length,
-                "write_address": address, "verify_address": address,
-                "readback_address": address}
-            observed_range = {key: flash.get(key) for key in FLASH_RANGE_FIELDS}
 
         def step(name: str) -> dict[str, Any]:
             return steps.get(name) if isinstance(steps.get(name), dict) else {}
@@ -1550,9 +1539,7 @@ class BundleProgrammingWorkflow:
                            "sha256": evidence.get("sha256"),
                            "filename": f"read-{plan.route.icpn}-0x{address:08x}-{length}.bin",
                            "available": read_bytes is not None}
-        if plan.operation == "flash_cycle":
-            readback_sha, bytes_verified = flash.get("readback_sha256"), flash.get("bytes_verified")
-        elif operations is not None and "verify" in operations:
+        if operations is not None and "verify" in operations:
             readback_sha = step("verify").get("readback_sha256")
             bytes_verified = step("verify").get("bytes_verified")
         else:
@@ -1611,14 +1598,7 @@ class BundleProgrammingWorkflow:
             (image_ok, "IMAGE_IDENTITY_MISMATCH"),
             (result.get("attempts") == 1, "JOB_ATTEMPTS_NOT_ONE"),
         ]
-        if plan.operation == "flash_cycle":
-            checks += [
-                (flash.get("result") == "PASS", "FLASH_CYCLE_NOT_PASS"),
-                (flash.get("readback_sha256") == expected_sha, "READBACK_SHA256_MISMATCH"),
-                (flash.get("bytes_verified") == expected_size, "VERIFIED_BYTES_MISMATCH"),
-                (observed_range == expected_range, "FLASH_RANGE_MISMATCH"),
-            ]
-        elif operations is not None:
+        if operations is not None:
             checks += [
                 (evidence.get("result") == "PASS", "PROGRAMMING_NOT_PASS"),
                 # Exactly the planned list ran: nothing skipped, nothing added.

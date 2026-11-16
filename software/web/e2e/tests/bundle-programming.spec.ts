@@ -36,9 +36,9 @@ const bootstrapStatus = {
 };
 
 const route = {
-  route_id: "z2-site2-stm32f103c8t6", target: { platform: "linux-armv7", board: "pynq-z2", fpga_part: "xc7z020clg400-1" },
+  route_id: "z2-site2-stm32f103c8t6-operations", target: { platform: "linux-armv7", board: "pynq-z2", fpga_part: "xc7z020clg400-1" },
   icpn: "STM32F103C8T6", site_interface: "openocd", provider: "openocd-platform-reference", profile: "stm32f103c8t6-site2",
-  operations: ["flash_cycle"], driver_abi: "plasma_swd:5", transport: "fpga", max_image_bytes: 65536,
+  operations: ["erase", "program", "verify"], driver_abi: "plasma_swd:5", transport: "fpga", max_image_bytes: 65536,
   target_config: "target/stm32f1x.cfg", flash_base: 134217728, flash_size: 65536,
 };
 
@@ -56,7 +56,7 @@ const device = {
 
 function plan(activationRequired: boolean) {
   return {
-    plan_id: "e".repeat(32), ppu_alias: ALIAS, site_id: 2, operation: "flash_cycle", route,
+    plan_id: "e".repeat(32), ppu_alias: ALIAS, site_id: 2, operation: "programming", operations: ["erase", "program", "verify"], route,
     bundle: { archive_sha256: BUNDLE_SHA, archive_size: 5000, bundle_name: "stm32f103c8t6-site2-img-ffffffffffff",
       provider: route.provider, profile: route.profile, asset_package_id: "img-ffffffffffffffff",
       image_filename: "app.bin", image_sha256: IMAGE_SHA, image_size: FIRMWARE.length, icpn: route.icpn },
@@ -65,12 +65,12 @@ function plan(activationRequired: boolean) {
         resource_set_sha256: activationRequired ? "7".repeat(64) : RESOURCE_SHA } },
     image_asset: { image_asset_sha256: "6".repeat(64), sha256: IMAGE_SHA, size: FIRMWARE.length,
       load_address: 134217728, format: "binary" },
-    job_binding: { operation: "flash_cycle", range: { address: 134217728, length: FIRMWARE.length },
+    job_binding: { operation: "programming", operations: ["erase", "program", "verify"], range: { address: 134217728, length: FIRMWARE.length },
       image_asset_sha256: "6".repeat(64), resource_set_sha256: RESOURCE_SHA },
     job_binding_sha256: BINDING_SHA,
     active_asset_set: { state: "ACTIVE", asset_set_sha256: ACTIVE_SET_SHA },
     activation_required: activationRequired, fpga_load: false,
-    steps: [...(activationRequired ? ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] : ["RESOURCE_REUSE"]), "FLASH_CYCLE_JOB", "VERIFY_RECEIPT"],
+    steps: [...(activationRequired ? ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] : ["RESOURCE_REUSE"]), "PROGRAMMING_JOB", "VERIFY_RECEIPT"],
     catalog_gate: "NOT_USED", confirm_required: "PROGRAM",
   };
 }
@@ -90,7 +90,7 @@ function run(outcome: Outcome | null, reason: string | null = null, safeOff = tr
         { step: "B2_ADMIT", result: "PASS", at: "t" },
         { step: "B3_ACTIVATE", result: "PASS", at: "t" },
       ]),
-    { step: "FLASH_CYCLE_SUBMIT", result: "ACCEPTED", at: "t" },
+    { step: "PROGRAMMING_SUBMIT", result: "ACCEPTED", at: "t" },
   ];
   return {
     schema: "plasma.manager.bundle-programming-run.v1", run_id: RUN_ID, ppu_alias: ALIAS, site_id: 2,
@@ -100,7 +100,7 @@ function run(outcome: Outcome | null, reason: string | null = null, safeOff = tr
     job: { job_id: "job-20261109-120000-0123abcd", state: outcome ? "success" : "running", progress_percent: outcome ? 100 : 40 },
     receipt: outcome && outcome !== "OUTCOME_UNKNOWN" ? {
       schema: "plasma.manager.programming-receipt.v2",
-      job_id: "job-20261109-120000-0123abcd", job_state: "success", operation: "flash_cycle",
+      job_id: "job-20261109-120000-0123abcd", job_state: "success", operation: "programming", operations: ["erase", "program", "verify"],
       site_id: 2, target: route.icpn, readback_sha256: IMAGE_SHA,
       expected_image_sha256: IMAGE_SHA, expected_image_size: FIRMWARE.length,
       observed_image_sha256: IMAGE_SHA, observed_image_size: FIRMWARE.length,
@@ -193,19 +193,20 @@ async function openAndSelect(page: Page) {
   return panel;
 }
 
-test("User programs image: IC → image → PPU/Site → Bundle → B1/B2/B3 → flash_cycle → receipt", async ({ page }) => {
+test("User programs image: IC → image → PPU/Site → Bundle → B1/B2/B3 → programming → receipt", async ({ page }) => {
   const counters = await mockManager(page);
   const panel = await openAndSelect(page);
-  await expect(panel.getByLabel("Programming Operation")).toHaveValue("flash_cycle");
+  await expect(panel.getByLabel("Programming Operation")).toHaveValue("programming");
   await panel.getByRole("button", { name: "Prepare Programming" }).click();
   await expect(panel.getByTestId("plan-resource-sha")).toHaveText(RESOURCE_SHA);
-  await expect(panel.getByTestId("plan-operation")).toHaveText("flash_cycle");
+  await expect(panel.getByTestId("plan-operation")).toHaveText("programming");
   await expect(panel.getByTestId("plan-activation")).toContainText("B3 activate Bundle");
   await expect(panel.getByTestId("plan-activation")).toContainText("(no FPGA load)");
   const body = counters.planBodies[0];
   expect(body.icpn).toBe("STM32F103C8T6");
   expect(body.site_id).toBe(2);
-  expect(body.operation).toBe("flash_cycle");
+  expect(body.operations).toEqual(["erase", "program", "verify"]);
+  expect(body).not.toHaveProperty("operation");
   expect(Buffer.from(String(body.image_base64), "base64").equals(FIRMWARE)).toBe(true);
   const start = panel.getByRole("button", { name: "Start Programming" });
   await expect(start).toBeDisabled(); // explicit confirmation required
@@ -218,7 +219,7 @@ test("User programs image: IC → image → PPU/Site → Bundle → B1/B2/B3 →
   expect(counters.starts).toBe(1);
 });
 
-test("Resource Reuse: same PPU-verified Resources → no B1/B2/B3 → one flash_cycle → Reused receipt", async ({ page }) => {
+test("Resource Reuse: same PPU-verified Resources → no B1/B2/B3 → one programming → Reused receipt", async ({ page }) => {
   const counters = await mockManager(page, { activationRequired: false });
   const panel = await openAndSelect(page);
   await panel.getByRole("button", { name: "Prepare Programming" }).click();
@@ -250,7 +251,7 @@ test("Resource Reuse: same PPU-verified Resources → no B1/B2/B3 → one flash_
   await expect(panel.getByTestId("run-outcome")).toHaveText("PASS");
   const steps = panel.getByRole("list", { name: "Programming steps" }).getByRole("listitem");
   await expect(steps).toHaveText([
-    "PREFLIGHT: PASS", "RESOURCE_REUSE: PPU_VERIFIED", "FLASH_CYCLE_SUBMIT: ACCEPTED", "VERIFY_RECEIPT: PASS",
+    "PREFLIGHT: PASS", "RESOURCE_REUSE: PPU_VERIFIED", "PROGRAMMING_SUBMIT: ACCEPTED", "VERIFY_RECEIPT: PASS",
   ]);
 
   // Receipt: Reused Resources, the planned Binding, readback, bytes and SAFE_OFF.
@@ -271,7 +272,7 @@ test("Resource Reuse: same PPU-verified Resources → no B1/B2/B3 → one flash_
 });
 
 test("Operation choice is limited to single-operation Jobs of the Route Profile; read sends a range, no image", async ({ page }) => {
-  const wide = { ...route, operations: ["flash_cycle", "erase", "read"] };
+  const wide = { ...route, operations: ["erase", "program", "verify", "read"] };
   const counters = await mockManager(page, {
     routes: [wide],
     planStatus: 409,
@@ -280,7 +281,7 @@ test("Operation choice is limited to single-operation Jobs of the Route Profile;
   const panel = await openAndSelectIc(page);
   const select = panel.getByLabel("Programming Operation");
   // erase / program / verify are steps of one programming Job (EMode), never a Job of their own.
-  await expect(select.locator("option")).toHaveText(["flash_cycle", "read"]);
+  await expect(select.locator("option")).toHaveText(["programming", "read"]);
   await select.selectOption("read");
   await expect(panel.getByLabel("Image file")).toHaveCount(0);
   const prepare = panel.getByRole("button", { name: "Prepare Programming" });

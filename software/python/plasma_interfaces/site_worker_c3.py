@@ -4,7 +4,7 @@ plasma-server (the trusted Runtime, identified by the Worker through its
 systemd MainPID) runs one REST Site Job through C-3 as:
 
   stage Job-owned Normalized Image -> open_job_session(profile)
-  -> bind_image(image identity) -> run(flash_cycle) -> close_session -> remove staged image
+  -> bind_image(image identity) -> run(programming) -> close_session -> remove staged image
 
 A ``programming`` Job runs its ordered erase / program / verify ``operations``
 list in ONE session: a list with program or verify binds its Image the same
@@ -118,97 +118,6 @@ def _refusal(stage: str, exc: SiteWorkerRefused, **context: Any) -> PlasmaError:
     )
 
 
-async def run_flash_cycle(
-    client: SiteWorkerControlClient,
-    *,
-    job_id: str,
-    site_id: int,
-    icpn: str,
-    image: bytes,
-    image_root: Path,
-    max_runtime_s: int,
-    session_factory: Callable[[], Mapping[str, Any]],
-    load_address: int,
-    erase_length: int,
-) -> dict[str, Any]:
-    """One complete C-3 Flash cycle for one REST Job. Cancellation (task
-    cancel / timeout) closes the session, which cancels the in-flight
-    OpenOCD operation inside the Worker. An unproven SAFE_OFF remains sealed;
-    the staged image is always removed."""
-    digest = hashlib.sha256(image).hexdigest()
-    context = {"job_id": job_id, "site_id": site_id, "icpn": icpn,
-               "load_address": load_address}
-    # The one range this Job may touch; the Worker re-derives it independently
-    # and the Adapter must report exactly this executed range.
-    expected_range = {"load_address": load_address, "erase_address": load_address,
-                      "erase_length": erase_length, "write_address": load_address,
-                      "verify_address": load_address, "readback_address": load_address}
-    staged = stage_image(image_root, job_id, image)
-    session_id: str | None = None
-    try:
-        try:
-            # The verified OPF Session opener owns the single Profile binding.
-            opened = await asyncio.to_thread(session_factory)
-            session_id = str(opened["session_id"])
-            bound = await asyncio.to_thread(
-                client.call, "bind_image", session_id=session_id,
-                image_sha256=digest, image_size=len(image), load_address=load_address)
-            if ({k: bound.get(k) for k in ("load_address", "erase_address", "erase_length")}
-                    != {k: expected_range[k]
-                        for k in ("load_address", "erase_address", "erase_length")}):
-                raise PlasmaError(
-                    ErrorCode.INTERFACE_FAILURE,
-                    "C-3 Site Worker bound a different Flash range than the Job Binding",
-                    context={**context, "site_worker_stage": "bind_image",
-                             "site_worker_bind": dict(bound)},
-                )
-            result = await asyncio.to_thread(
-                client.call, "run", timeout_s=max_runtime_s + 30.0, session_id=session_id,
-                site=site_id, operation="flash_cycle")
-        except SiteWorkerRefused as exc:
-            stage = "open" if session_id is None else "run"
-            raise _refusal(stage, exc, **context) from None
-        if result.get("result") != "PASS":
-            raise PlasmaError(
-                ErrorCode.INTERFACE_FAILURE,
-                f"C-3 Flash cycle failed: {result.get('code', 'FAIL')}",
-                recoverable=result.get("safe_off") is True,
-                context={**context, "site_worker_result": result},
-            )
-        if result.get("readback_sha256") != digest or result.get("bytes_verified") != len(image):
-            raise PlasmaError(
-                ErrorCode.INTERFACE_FAILURE,
-                "C-3 Flash cycle readback evidence does not match the Job image",
-                context={**context, "expected_sha256": digest, "site_worker_result": result},
-            )
-        if {k: result.get(k) for k in expected_range} != expected_range:
-            raise PlasmaError(
-                ErrorCode.INTERFACE_FAILURE,
-                "C-3 Flash cycle range evidence does not match the Job Binding",
-                context={**context, "expected_range": expected_range,
-                         "site_worker_result": result, "outcome_unknown": True},
-            )
-        return {**result, "image_sha256": digest, "session_id": session_id}
-    finally:
-        try:
-            if session_id is not None:
-                # A retry is safe only after close has waited for the native
-                # operation and its cleanup to finish. Failed close is
-                # authoritative even if the Flash result had SAFE_OFF.
-                closed = await asyncio.shield(asyncio.to_thread(
-                    _close_quietly, client, session_id))
-                if closed is None or not closed.get("closed") or closed.get("sealed_sites"):
-                    raise PlasmaError(
-                        ErrorCode.INTERFACE_FAILURE,
-                        "C-3 Site Worker close did not confirm hardware release",
-                        context={**context, "site_worker_stage": "close",
-                                 "outcome_unknown": True},
-                    )
-        finally:
-            try:
-                staged.unlink()
-            except FileNotFoundError:
-                pass
 
 
 def _close_quietly(client: SiteWorkerControlClient, session_id: str) -> Mapping[str, Any] | None:
@@ -268,8 +177,8 @@ async def run_job_operations(
     """One ``programming`` Job (ordered erase / program / verify list) or one
     independent ``read`` Job, in ONE C-3 session.
 
-    Same session, cancellation, close and SAFE_OFF contract as
-    ``run_flash_cycle``. A list containing program or verify binds the exact
+    The session, cancellation, close and SAFE_OFF contract is shared by all
+    supported Jobs. A list containing program or verify binds the exact
     Job Image; erase-only and read bind the exact Job range and stage nothing.
     A ``read`` returns its bytes under ``data`` only after length and SHA256
     are proven.

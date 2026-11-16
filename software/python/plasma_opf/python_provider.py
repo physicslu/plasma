@@ -48,12 +48,19 @@ class PythonProvider:
     script: Path
     option_keys: frozenset[str] = field(default_factory=frozenset)
 
-    async def flash_cycle(
-        self, selection: ProgrammingSelection, image: bytes,
+    async def run_operations(
+        self, selection: ProgrammingSelection, image: bytes, operations: tuple[str, ...],
     ) -> ProcessObservation:
+        from .bundle_v3 import BundleBuildError, normalize_operations, operations_take_image
+        if type(operations) is not tuple:
+            raise OpfContractError("PROVIDER_OPERATIONS_INVALID")
+        try:
+            steps = normalize_operations(list(operations))
+        except BundleBuildError as exc:
+            raise OpfContractError("PROVIDER_OPERATIONS_INVALID") from exc
         if not isinstance(selection, ProgrammingSelection) or selection.provider != self.name:
             raise OpfContractError("PROVIDER_SELECTION_MISMATCH")
-        if not isinstance(image, bytes) or not image:
+        if not isinstance(image, bytes) or bool(image) != operations_take_image(steps):
             raise OpfContractError("PROVIDER_IMAGE_INVALID")
         if set(selection.options) - self.option_keys:
             raise OpfContractError("PROVIDER_OPTIONS_UNSUPPORTED")
@@ -76,7 +83,7 @@ class PythonProvider:
                 try:
                     process = await asyncio.create_subprocess_exec(
                         sys.executable, "-I", "-B", "-S", str(script),
-                        "flash_cycle", str(image_path),
+                        "programming", json.dumps(steps), str(image_path),
                         stdout=stdout, stderr=stderr, stdin=asyncio.subprocess.DEVNULL,
                         cwd=work, start_new_session=True,
                         env={

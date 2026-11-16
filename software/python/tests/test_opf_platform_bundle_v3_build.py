@@ -51,7 +51,7 @@ def source(tmp_path: Path) -> Path:
         "plasma-provider.json": {
             "schema": "plasma.ppu.provider-capabilities.v2",
             "target": ICPN, "provider_package": PROVIDER,
-            "operations": ["flash_cycle"],
+            "operations": ["erase", "program", "verify"],
             "transport": "fpga", "driver_abi": "plasma_swd:5",
             "fpga_package": None, "max_image_bytes": FLASH_SIZE,
         },
@@ -146,7 +146,7 @@ def test_produced_bundle_passes_opf_provider_resolution_after_host_only_b3(tmp_p
     co.activate_staged_asset_set(digest, quiescence_lease=nullcontext)
     route = ppu_provider_contract.resolve(
         co.paths.product_root, asset_set_sha256=digest, target=ICPN,
-        provider=PROVIDER, profile=PROFILE, operation="flash_cycle",
+        provider=PROVIDER, profile=PROFILE, operation="programming",
         site_id=2, image_size=18768, options={},
         hardware={
             **TARGET, "sites": [2], "driver_abi": "plasma_swd:5",
@@ -154,7 +154,7 @@ def test_produced_bundle_passes_opf_provider_resolution_after_host_only_b3(tmp_p
             "worker_identity": {"status": "IMAGE", "image_id": "test-image"},
             "loaded_fpga_package": None,
         },
-    )
+    operations=("erase", "program", "verify"))
     assert route.provider_package == PROVIDER
     assert route.profile_package == PROFILE
     assert route.options_json == b"{}"
@@ -214,3 +214,16 @@ def test_does_not_overwrite_existing_archive(tmp_path):
     with pytest.raises(FileExistsError):
         build(inputs, archive)
     assert archive.read_bytes() == old_bytes
+
+
+@pytest.mark.parametrize("operations", [["flash_cycle"], ["erase", "flash_cycle"], [{"operation": "erase"}]])
+def test_builder_rejects_retired_or_malformed_profile_operations(tmp_path, operations):
+    inputs = source(tmp_path)
+    path = inputs / "plasma-provider.json"
+    descriptor = json.loads(path.read_bytes())
+    descriptor["operations"] = operations
+    path.write_bytes(_raw(descriptor))
+    archive = tmp_path / "retired.zip"
+    with pytest.raises(ValueError, match="PROVIDER_DESCRIPTOR_INVALID"):
+        build(inputs, archive)
+    assert not archive.exists()

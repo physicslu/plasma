@@ -1,5 +1,9 @@
 # PLASMA Core Convergence and Deletion-First Roadmap
 
+> Historical design snapshot. Current execution and admission supersede the cycle-only descriptions
+> below: [OPF Programming Operations](opf-programming-operations-v1.md) is normative.
+> PR #1469 retires `flash_cycle`; historical HIL results and receipts below remain unchanged.
+
 > **Status (updated 2026-11-08):** Approved roadmap (#1343/#1348); S1-B standalone Host-only merged #1349; S1-C single PPU route merged #1347, S2 fail-closed fix merged #1350, real new-path Site 2 Bundle A/B Flash/Readback/SAFE_OFF PASS. These are two independent one-Site hardware Jobs, not S2/S3 multi-Site or non-OpenOCD qualification. Original inventory baseline: `main@5b61e28f34f02ab924daf3e1f70be87f6d346ed0`; S1-C implementation baseline: `main@47a8c6abc674f3975047834a06f9496d4b8245df` (2026-11-08).
 > **Purpose:** A single, long-lived reference for subsequent implementation PRs; it is **not** implementation approval, evidence of hardware readiness, or a new approval gate.
 > **Authority:** [AGENTS.md](../../AGENTS.md), the [shared development contract](../development/plasma-development-common.md), [OPF architecture](opf-architecture.md), [Unified Bundle-driven Programming Decision](unified-bundle-driven-programming-decision-2026-11-04.md), and [Bundle v3](ppu-canonical-bundle-packages.md). Where a proposal here conflicts with approved contracts or actual executable safeguards, resolve the conflict explicitly through the existing Gate 1 process; do not silently weaken a guard.

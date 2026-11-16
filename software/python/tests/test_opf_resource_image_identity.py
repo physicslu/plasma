@@ -37,11 +37,11 @@ FW_B = bytes(reversed(range(256))) * 4 + b"\x01"
 
 
 def route():
-    return bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6.json")
+    return bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
 
 
 def route_payload():
-    return json.loads((ROUTES / "z2-site2-stm32f103c8t6.json").read_text())
+    return json.loads((ROUTES / "z2-site2-stm32f103c8t6-operations.json").read_text())
 
 
 def resource():
@@ -113,7 +113,7 @@ def test_bundle_v3_wire_and_writer_bytes_unchanged():
     lambda r: r["provider"].update(version="1.0.1"),
     lambda r: r["profile"].update(version="1.0.1"),
     lambda r: r["profile"]["capabilities"].update(driver_abi="plasma_swd:6"),
-    lambda r: r["profile"]["capabilities"].update(operations=["flash_cycle", "read"]),
+    lambda r: r["profile"]["capabilities"].update(operations=["program", "verify"]),
     lambda r: r["profile"]["capabilities"].update(max_image_bytes=32768),
     lambda r: r["profile"]["flash_profile"].update(target_config="target/other.cfg"),
     lambda r: r["profile"]["flash_profile"].update(erase_granularity=2048),
@@ -149,18 +149,18 @@ def test_job_binding_is_exact_and_verifiable():
     res = resource()
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
     binding = bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2,
-                                          operation="flash_cycle")
+                                          operation="programming", operations=["erase", "program", "verify"])
     assert binding["resource_set_sha256"] == bundle_v3.resource_set_sha256(res)
     assert binding["image_asset_sha256"] == bundle_v3.image_asset_sha256(fw)
-    assert binding["profile"] == "stm32f103c8t6-site2" and binding["icpn"] == "STM32F103C8T6"
-    assert binding["operation"] == "flash_cycle"
+    assert binding["profile"] == "stm32f103c8t6-site2-operations" and binding["icpn"] == "STM32F103C8T6"
+    assert binding["operation"] == "programming"
     assert binding["range"] == {"address": 0x08000000, "length": len(FW_A)}
     digest = bundle_v3.verify_job_binding(binding, res, fw, ppu_id="z2-hil", site_id=2,
-                                          operation="flash_cycle")
+                                          operation="programming", operations=["erase", "program", "verify"])
     assert len(digest) == 64
     fw_b = bundle_v3.image_asset_descriptor(res, FW_B)
-    for kwargs, fw_x in (({"ppu_id": "other-ppu", "site_id": 2, "operation": "flash_cycle"}, fw),
-                         ({"ppu_id": "z2-hil", "site_id": 2, "operation": "flash_cycle"}, fw_b)):
+    for kwargs, fw_x in (({"ppu_id": "other-ppu", "site_id": 2, "operation": "programming", "operations": ["erase", "program", "verify"]}, fw),
+                         ({"ppu_id": "z2-hil", "site_id": 2, "operation": "programming", "operations": ["erase", "program", "verify"]}, fw_b)):
         with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
             bundle_v3.verify_job_binding(binding, res, fw_x, **kwargs)
 
@@ -175,18 +175,18 @@ def test_profile_clock_changes_resource_binding_but_all_sites_share_one_profile(
     assert bundle_v3.resource_set_sha256(clocked) != bundle_v3.resource_set_sha256(baseline)
     image = bundle_v3.image_asset_descriptor(clocked, FW_A)
     bindings = [bundle_v3.job_image_binding(
-        clocked, image, ppu_id="z2-hil", site_id=site, operation="flash_cycle")
+        clocked, image, ppu_id="z2-hil", site_id=site, operation="programming", operations=["erase", "program", "verify"])
         for site in (1, 2)]
     assert bindings[0]["resource_set_sha256"] == bindings[1]["resource_set_sha256"]
     assert bindings[0]["site_id"] != bindings[1]["site_id"]
     for site, binding in zip((1, 2), bindings):
         assert bundle_v3.verify_job_binding(
             binding, clocked, image, ppu_id="z2-hil", site_id=site,
-            operation="flash_cycle")
+            operation="programming", operations=["erase", "program", "verify"])
     with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
         bundle_v3.verify_job_binding(
             bindings[0], baseline, bundle_v3.image_asset_descriptor(baseline, FW_A),
-            ppu_id="z2-hil", site_id=1, operation="flash_cycle")
+            ppu_id="z2-hil", site_id=1, operation="programming", operations=["erase", "program", "verify"])
 
 
 @pytest.mark.parametrize("clock", [False, 0, 5_000_001, 12_501_000])
@@ -203,15 +203,15 @@ def test_same_ic_profile_is_site_independent_but_jobs_are_site_bound():
     res = resource()
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
     first = bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=1,
-                                        operation="flash_cycle")
+                                        operation="programming", operations=["erase", "program", "verify"])
     second = bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2,
-                                         operation="flash_cycle")
+                                         operation="programming", operations=["erase", "program", "verify"])
     assert first["resource_set_sha256"] == second["resource_set_sha256"]
     assert first["site_id"] == 1 and second["site_id"] == 2
     assert bundle_v3.sha256_hex(bundle_v3.canonical_json(first)) != bundle_v3.sha256_hex(bundle_v3.canonical_json(second))
     with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
         bundle_v3.verify_job_binding(first, res, fw, ppu_id="z2-hil", site_id=2,
-                                     operation="flash_cycle")
+                                     operation="programming", operations=["erase", "program", "verify"])
 
 
 def test_staged_active_set_reproduces_resource_identity(tmp_path):
@@ -241,7 +241,7 @@ def tampered_archive(built, path_suffix: str, new: bytes, *, fix_manifest: bool)
 @pytest.mark.parametrize("suffix, mutate", [
     ("plasma-provider-options.json", lambda o: o["options"].update(x=1)),
     ("plasma-provider.json", lambda o: o.update(driver_abi="plasma_swd:6")),
-    ("plasma-provider.json", lambda o: o.update(operations=["flash_cycle", "read"])),
+    ("plasma-provider.json", lambda o: o.update(operations=["program", "verify"])),
     ("plasma-flash-profile.json", lambda o: o.update(flash_base=0)),
 ])
 def test_provider_profile_driver_or_constraint_substitution_is_resource_mismatch(suffix, mutate):
@@ -354,19 +354,19 @@ def test_job_binding_refuses_invalid_site_identity_or_ppu(kwargs, code):
     res = resource()
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
     with pytest.raises(BundleBuildError, match=code):
-        bundle_v3.job_image_binding(res, fw, operation="flash_cycle", **kwargs)
+        bundle_v3.job_image_binding(res, fw, operation="programming", **kwargs, operations=["erase", "program", "verify"])
 
 
 def test_job_binding_refuses_firmware_for_other_target():
     res = resource()
     fw = {**bundle_v3.image_asset_descriptor(res, FW_A), "icpn": "STM32F103CBT6"}
     with pytest.raises(BundleBuildError, match="IMAGE_ASSET_TARGET_MISMATCH"):
-        bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2, operation="flash_cycle")
+        bundle_v3.job_image_binding(res, fw, ppu_id="z2-hil", site_id=2, operation="programming", operations=["erase", "program", "verify"])
 
 
 # ------------------------------------------- user-selected Operation (Gate 2)
 BASE = 0x08000000
-ALL_OPS = ["erase", "program", "verify", "read", "flash_cycle"]
+ALL_OPS = ["erase", "program", "verify", "read"]
 
 
 def resource_with(operations):
@@ -376,6 +376,8 @@ def resource_with(operations):
 
 
 def bind(res, asset=None, **kw):
+    if kw.get("operation") == "programming":
+        kw.setdefault("operations", ["erase", "program", "verify"])
     return bundle_v3.job_image_binding(res, asset, ppu_id=kw.pop("ppu_id", "z2-hil"),
                                        site_id=kw.pop("site_id", 2), **kw)
 
@@ -392,7 +394,7 @@ def test_operation_vocabulary_matches_core_operation_enum():
         "status", "cancel", bundle_v3.PROGRAMMING}
     assert Operation.PROGRAMMING.value == bundle_v3.PROGRAMMING
     assert set(bundle_v3.SEQUENCE_OPERATIONS) < set(bundle_v3.OPERATIONS)
-    assert bundle_v3.IMAGE_OPERATIONS == {"program", "verify", "flash_cycle"}
+    assert bundle_v3.IMAGE_OPERATIONS == {"program", "verify"}
 
 
 def test_operation_and_image_change_binding_identity():
@@ -400,10 +402,10 @@ def test_operation_and_image_change_binding_identity():
     fw_a = bundle_v3.image_asset_descriptor(res, FW_A)
     fw_b = bundle_v3.image_asset_descriptor(res, FW_B)
     shas = {binding_sha(bind(res, fw, operation=op))
-            for op in ("program", "verify", "flash_cycle") for fw in (fw_a, fw_b)}
+            for op in ("program", "verify", "programming") for fw in (fw_a, fw_b)}
     assert len(shas) == 6
     # Resource identity is independent of which Operation a Job selects.
-    assert bundle_v3.resource_set_sha256(res) != bundle_v3.resource_set_sha256(resource())
+    assert bundle_v3.resource_set_sha256(res) == bundle_v3.resource_set_sha256(resource())
     assert all(bind(res, fw_a, operation=op)["resource_set_sha256"]
                == bundle_v3.resource_set_sha256(res) for op in ("program", "verify"))
 
@@ -440,22 +442,22 @@ def test_image_operation_range_is_the_image_range():
     assert binding_sha(at_base) != binding_sha(implicit)
 
 
-def test_flash_cycle_binding_carries_the_image_write_address_not_flash_base():
+def test_programming_binding_carries_the_image_write_address_not_flash_base():
     """flash_base is the bank start; the Binding range is the Job write window."""
     res = resource_with(ALL_OPS)
     offset = BASE + 2048
     fw = bundle_v3.image_asset_descriptor(res, FW_A, load_address=offset)
-    for operation in ("flash_cycle", "program", "verify"):
+    for operation in ("programming", "program", "verify"):
         assert bind(res, fw, operation=operation)["range"] == {
             "address": offset, "length": len(FW_A)}
     at_base = bundle_v3.image_asset_descriptor(res, FW_A)
-    assert bind(res, at_base, operation="flash_cycle")["range"]["address"] == BASE
+    assert bind(res, at_base, operation="programming")["range"]["address"] == BASE
     # A Binding whose range disagrees with its Image is never admitted.
-    forged = bind(res, at_base, operation="flash_cycle")
+    forged = bind(res, at_base, operation="programming")
     forged["range"]["address"] = offset
     with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH|JOB_RANGE_MISMATCH"):
         bundle_v3.verify_job_binding(forged, res, at_base, ppu_id="z2-hil", site_id=2,
-                                     operation="flash_cycle")
+                                     operation="programming", operations=["erase", "program", "verify"])
 
 
 def test_image_erase_window_not_only_its_bytes_must_fit_the_bank():
@@ -487,29 +489,29 @@ def test_unknown_operation_is_refused(operation):
 
 @pytest.mark.parametrize("operation", ["erase", "program", "verify", "read"])
 def test_operation_not_declared_by_profile_is_refused(operation):
-    # The committed Site 2 route declares only flash_cycle.
-    res = resource()
+    # Construct a Profile that excludes the requested basic operation.
+    res = resource_with(["read"] if operation != "read" else ["program"])
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
     asset = fw if operation in bundle_v3.IMAGE_OPERATIONS else None
     with pytest.raises(BundleBuildError, match="JOB_OPERATION_NOT_IN_PROFILE"):
         bind(res, asset, operation=operation, address=BASE, length=1024)
 
 
-def test_flash_cycle_not_declared_is_refused():
+def test_programming_step_not_declared_is_refused():
     res = resource_with(["read"])
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
     with pytest.raises(BundleBuildError, match="JOB_OPERATION_NOT_IN_PROFILE"):
-        bind(res, fw, operation="flash_cycle")
+        bind(res, fw, operation="programming")
 
 
 @pytest.mark.parametrize("operation, use_image, address, length, code", [
     ("program", False, None, None, "JOB_IMAGE_ASSET_REQUIRED"),
     ("verify", False, None, None, "JOB_IMAGE_ASSET_REQUIRED"),
-    ("flash_cycle", False, None, None, "JOB_IMAGE_ASSET_REQUIRED"),
+    ("programming", False, None, None, "JOB_IMAGE_ASSET_REQUIRED"),
     ("program", True, BASE + 1024, len(FW_A), "JOB_RANGE_MISMATCH"),
     ("verify", True, BASE, len(FW_A) + 1, "JOB_RANGE_MISMATCH"),
-    ("flash_cycle", True, BASE, None, "JOB_RANGE_MISMATCH"),
-    ("flash_cycle", True, BASE, True, "JOB_RANGE_MISMATCH"),
+    ("programming", True, BASE, None, "JOB_RANGE_MISMATCH"),
+    ("programming", True, BASE, True, "JOB_RANGE_MISMATCH"),
     ("erase", True, BASE, 1024, "JOB_IMAGE_ASSET_NOT_ALLOWED"),
     ("read", True, BASE, 1024, "JOB_IMAGE_ASSET_NOT_ALLOWED"),
     ("erase", False, None, None, "JOB_RANGE_REQUIRED"),
@@ -553,7 +555,7 @@ def test_resource_operations_need_not_include_flash_cycle(operations, ok):
 def test_route_declares_only_known_basic_operations():
     """A Route declares basic operations only. Declaring one opens no
     execution by itself: the C-3 Runtime runs a declared list as one
-    ``programming`` Job, ``read`` as its own Job and the legacy ``flash_cycle``."""
+    ``programming`` Job and ``read`` as its own Job."""
     payload = route_payload()
     payload["profile"]["capabilities"]["operations"] = ["erase", "program", "verify", "read"]
     assert bundle_v3.parse_route(payload).capabilities["operations"] == [
@@ -565,8 +567,8 @@ def test_route_declares_only_known_basic_operations():
 
 
 @pytest.mark.parametrize("operation", ["erase", "program", "verify", "read"])
-def test_gateway_bundle_reference_stays_flash_cycle_only(operation):
-    """Runtime admission unchanged: the Bundle Asset reference is flash_cycle only."""
+def test_gateway_rejects_retired_bundle_reference(operation):
+    """Current Jobs carry an explicit Binding; retired Bundle references are refused."""
     body = {"site_id": 2, "operation": operation, "target": "STM32F103C8T6",
             "provider": PROVIDER_ID, "profile": "stm32f103c8t6-site2",
             "asset_set_sha256": "a" * 64, "asset_package_id": "img-0000000000000000",
@@ -664,7 +666,7 @@ def test_same_resources_new_firmware_reuses_ppu_verified_resources(tmp_path):
     assert not {"B1_create", "B2", "B3"} & set(coord.calls)
     assert coord.active_sha == other.archive_sha256
     assert set(gateway.posts[0]) == {
-        "site_id", "operation", "timeout_s", "target", "provider", "profile",
+        "site_id", "operations", "timeout_s", "target", "provider", "profile",
         "job_binding", "image_asset", "asset_base64"}
 
 

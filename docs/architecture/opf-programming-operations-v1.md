@@ -9,7 +9,6 @@ statement below about Z2 / Site 2 is a contract, not evidence. See "Qualificatio
 | --- | --- | --- | --- |
 | `programming` | `operations: [...]` (never an `operation`) | the ordered list, in ONE Job | per-step evidence |
 | `read` | `operation: "read"` + `address` / `length` | one independent read | bytes + SHA256 + binary |
-| `flash_cycle` | `operation: "flash_cycle"` | legacy complete cycle | unchanged |
 
 * The basic operations are `erase`, `program`, `verify`. The order is always
   **erase → program → verify**; only the listed ones run.
@@ -19,9 +18,10 @@ statement below about Z2 / Site 2 is a contract, not evidence. See "Qualificatio
   and has no special branch.
 * A single `erase` / `program` / `verify` is never a Job of its own (the PPU and the Manager
   refuse `operation: "erase"` etc.); send `operations: ["erase"]`.
-* `flash_cycle` is a **legacy contract**. Its code path, wire format, Job Binding identity and
-  committed Route (`z2-site2-stm32f103c8t6`, Resource Set unchanged) are untouched and stay
-  available until the new model has passed Host-only and Site 2 HIL acceptance.
+* `flash_cycle` is retired. API, enum, Profile schema, Job Binding, Provider and C-3
+  admission reject it. Current callers submit the explicit ordered list; there is no
+  compatibility executor or implicit complete-cycle selector. Historical HIL receipts remain
+  immutable evidence of the implementation that actually ran.
 * `read` is not part of a list and not part of a Batch.
 
 ### Legal lists
@@ -38,7 +38,7 @@ Refused everywhere (UI, Manager plan `422 operations_invalid`, Job Binding, PPU,
 
 ### Step semantics (C-3 OpenOCD reference Provider)
 
-Common preamble and ending are the ones qualified for `flash_cycle`
+Target Finalization is unchanged by retirement: the existing preamble and ending remain
 (`reset halt` → `poll off` → `flash probe 0` … `reset run` → `shutdown`).
 
 | Step | Action | Never does |
@@ -51,15 +51,15 @@ Common preamble and ending are the ones qualified for `flash_cycle`
 ## Identity
 
 * A Route Profile declares the **basic** operations it supports (`erase`, `program`, `verify`,
-  `read`, legacy `flash_cycle`); it never declares `programming`. Every operation of a Job must
+  `read`); it never declares `programming`. Every operation of a Job must
   be declared by one Route (Manager) and by the Active Profile descriptor (PPU).
-* The Manager picks the Route whose Profile declares every operation of the Job. The committed
-  `z2-site2-stm32f103c8t6-operations` Route declares `erase, program, verify, read`; the legacy
-  Route keeps declaring only `flash_cycle`. They are different Resource Sets: switching between
-  them is a normal B1/B2/B3 activation (`fpga_load=false`) with an Image.
+* The Manager picks one Route whose Profile declares every operation of the Job. The committed
+  `z2-site2-stm32f103c8t6-operations` Route declares `erase, program, verify, read`.
+  The former cycle-only Route is deleted. A previously active cycle Profile cannot be reused:
+  operators must activate the current Resource Set through B1/B2/B3 under separate authorization.
 * Job Binding (`plasma.opf.job-image-binding.v1`): a `programming` Binding has
   `operation: "programming"` plus `operations: [...]`; the list is part of the Binding SHA256.
-  A `flash_cycle` / `read` Binding has no `operations` field (legacy identity is byte-identical).
+  A `read` Binding has no `operations` field.
 * Range: a list with `program` or `verify` requires the Image Asset and acts on exactly its
   range; an erase-only list and `read` take an explicit range and no Image. Erase ranges are
   whole erase units; every range must lie inside the Profile Flash bank. There is no MMIO or
@@ -68,7 +68,7 @@ Common preamble and ending are the ones qualified for `flash_cycle`
 ## Layers
 
 1. **Manager plan** (`POST …/programming/plans`): exactly one of `operations` or `operation`
-   (`read`, `flash_cycle`). Unchanged: Registry, pairing, Recovery, Resource Reuse / B1–B3,
+   (`read` only). Unchanged: Registry, pairing, Recovery, Resource Reuse / B1–B3,
    plan TTL, one plan → one run, OUTCOME_UNKNOWN latch, `auto_retry = DISABLED`.
 2. **PPU Gateway** `/api/jobs`: `operations` (+ `job_binding`) → `Operation.PROGRAMMING`.
 3. **SiteManager**: re-derives the Resource Set, re-validates the list and verifies the exact
@@ -76,9 +76,9 @@ Common preamble and ending are the ones qualified for `flash_cycle`
 4. **Execution router / OpenOCD interface**: `programming` and `read` run only under an
    admitted Binding; a separate erase / program / verify Job is `OPERATION_UNSUPPORTED`.
 5. **OPF reference executor**: Active Set, Profile descriptor (every operation declared),
-   engine and FPGA identity as for `flash_cycle`; the ordered list is pinned in the Provider
+   selected engine and FPGA identity; the ordered list is pinned in the Provider
    route of the C-3 session.
-6. **C-3 Site Worker** (`plasma.ppu.site-worker.v3`, additive): operation `programming` with
+6. **C-3 Site Worker** (`plasma.ppu.site-worker.v3`): operation `programming` with
    the route's `operations`; `bind_image` when the list programs or verifies, `bind_range` for
    erase-only and `read`. One operation guard, one Site lock, SAFE_OFF, FPGA identity checks.
 7. **ABI-v5 adapter**: one admitted OpenOCD session; evidence per step from what actually ran.
@@ -117,7 +117,8 @@ the contract, the argv and the evidence logic. They do **not** prove that the Op
 sequences above work on a real STM32F103 through `plasma_swd`. Until Site 2 HIL passes:
 
 * `programming` (every list) and `read`: **NOT hardware qualified**;
-* `flash_cycle`: existing qualification unchanged.
+* Historical HIL and cycle receipts are retained unchanged; they do not qualify this retirement.
+* Retirement HIL / deployment: **NOT_RUN**, outside PR #1469 Gate 1.
 
 Nothing here is deployed by merging. The operations Route is used only after its Resources are
 activated on a PPU by an explicit programming run.

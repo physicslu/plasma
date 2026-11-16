@@ -73,7 +73,9 @@ export default function BundleProgramming({ alias }: { alias: string }) {
     const declared = new Set(routes
       .filter(route => route.icpn === icpn)
       .flatMap(route => route.operations));
-    return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
+    return PROGRAMMING_OPERATIONS.filter(operation => operation === "programming"
+      ? ["erase", "program", "verify"].every(step => declared.has(step))
+      : declared.has(operation));
   }, [icpn, routes, siteId]);
   const operation = chosenOperation != null && (operationOptions as readonly string[]).includes(chosenOperation)
     ? chosenOperation
@@ -102,7 +104,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
       let input: PlanInput;
       if (needsImage && file) {
         input = {
-          icpn, siteId, operation: "flash_cycle",
+          icpn, siteId, operations: ["erase", "program", "verify"],
           image: new Uint8Array(await file.arrayBuffer()), filename: file.name,
         };
       } else {

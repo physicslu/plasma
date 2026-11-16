@@ -13,15 +13,12 @@ import {
   getProgrammingRoutes,
   getProgrammingRun,
   getReadOutput,
-  IMAGE_OPERATIONS,
   issueBatchStart,
   planProgramming,
   SEQUENCE_OPERATIONS,
-  PROGRAMMING_OPERATIONS,
   startProgramming,
   startProgrammingBatch,
   type BatchInput,
-  type ImageOperation,
   type ProgrammingBatch,
   type ProgrammingBatchUnit,
   type StopPolicy,
@@ -29,10 +26,8 @@ import {
   type ProgrammingPlan,
   type ProgrammingRoute,
   type ProgrammingRun,
-  type PlanInput,
   type ProgrammingSource,
   type SequenceOperation,
-  type SingleOperation,
   type StartReconciliation,
 } from "../engineering/bundle-programming-api";
 import { getManagerFleet, getManagerRegistry, type ManagerRegistryPayload } from "../engineering/ppu-registry-api";
@@ -230,31 +225,10 @@ export function routeSupportsIc(routes: ProgrammingRoute[] | null, icpn: string 
   return Boolean(routes && icpn && routes.some(route => route.icpn === icpn));
 }
 
-/** Operations are declared by the IC Profile, never by a physical Site number. */
-export function routeOperations(
-  routes: ProgrammingRoute[] | null,
-  icpn: string | null,
-  siteId: number | null,
-): SingleOperation[] {
-  if (!routes || !icpn || siteId == null) return [];
-  const declared = new Set(routes
-    .filter(route => route.icpn === icpn)
-    .flatMap(route => route.operations));
-  return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
-}
-
-/** Operations any committed Route declares for this IC (multi-Site selection). */
-export function routeOperationsForIc(routes: ProgrammingRoute[] | null, icpn: string | null): SingleOperation[] {
-  if (!routes || !icpn) return [];
-  const declared = new Set(routes.filter(route => route.icpn === icpn).flatMap(route => route.operations));
-  return PROGRAMMING_OPERATIONS.filter(operation => declared.has(operation));
-}
-
 export const PROGRAMMING_OPERATION_LABELS: Record<
-  SingleOperation | "erase" | "program" | "verify",
+  SequenceOperation | "read",
   { code: string; label: string }
 > = {
-  flash_cycle: { code: "F", label: "Flash Cycle" },
   program: { code: "P", label: "Program" },
   verify: { code: "V", label: "Verify" },
   erase: { code: "E", label: "Erase" },
@@ -285,10 +259,6 @@ export function routeDeclaring(
   const matches = routes.filter(route => route.icpn === icpn
     && operations.every(operation => route.operations.includes(operation)));
   return matches.length === 1 ? matches[0] : null;
-}
-
-export function isImageOperation(operation: string | null): operation is ImageOperation {
-  return operation != null && IMAGE_OPERATIONS.has(operation);
 }
 
 export type SiteCapability = { programmable: boolean; label: string; reason: string };
@@ -330,8 +300,6 @@ export type ManagedRunRequest = {
   | { operations: readonly SequenceOperation[]; operation?: undefined; file: File }
   // An erase-only list: no Image, an explicit erase range.
   | { operations: readonly ["erase"]; operation?: undefined; file: null; range: { address: number; length: number } }
-  // Legacy complete cycle (PMode).
-  | { operation: ImageOperation; operations?: undefined; file: File }
 );
 
 export type LockedInput = { name: string; size: number; sha256: string; source: ProgrammingSource };
@@ -475,96 +443,6 @@ function errorParts(reason: unknown): { status: number | null; code: string | nu
     code: typeof record?.code === "string" ? record.code : null,
     message: typeof record?.message === "string" && record.message ? record.message : "request failed",
   };
-}
-
-function planEchoMismatch(plan: ProgrammingPlan, request: ManagedRunRequest, sha256: string | null): string | null {
-  if (plan.ppu_alias !== request.alias) return "PPU";
-  if (plan.site_id !== request.siteId) return "Site";
-  if (request.operations) {
-    // Exactly the selected list, as one programming Job; never another Operation.
-    if (plan.operation !== "programming"
-      || JSON.stringify(plan.operations) !== JSON.stringify(request.operations)
-      || JSON.stringify(plan.job_binding.operations) !== JSON.stringify(request.operations)) return "Operations";
-  } else if (plan.operation !== request.operation || plan.operations != null) {
-    return "Operation";
-  }
-  if (plan.route.icpn !== request.icpn) return "IC";
-  if (plan.fpga_load !== false) return "FPGA Load";
-  if (request.file === null) {
-    const range = plan.job_binding.range;
-    return plan.source === "range" && plan.image_asset == null
-      && range.address === request.range.address && range.length === request.range.length ? null : "Erase range";
-  }
-  if (plan.source !== request.source) return "Programming Source";
-  const lockedSha = request.source === "bundle" ? plan.bundle?.archive_sha256 : plan.image_asset?.sha256;
-  if (lockedSha !== sha256) return request.source === "bundle" ? "Bundle SHA256" : "Programming Image SHA256";
-  return null;
-}
-
-/**
- * One Start: lock -> plan -> exactly one start -> observe the Manager run.
- *
- * The Backend plan is never skipped; only the manual Prepare step is gone.
- * A plan is consumed by its single start; neither a lost start response nor
- * OUTCOME_UNKNOWN is ever followed by another write. Status reads repeat.
- */
-export async function runManagedProgramming(
-  request: ManagedRunRequest,
-  events: ManagedRunEvents = {},
-  signal?: AbortSignal,
-): Promise<ProgrammingRun> {
-  let bytes: Uint8Array | null = null;
-  let sha256: string | null = null;
-  if (request.file !== null) {
-    try {
-      bytes = new Uint8Array(await request.file.arrayBuffer());
-      if (bytes.length === 0) throw new Error("the selected file is empty");
-      sha256 = await sha256Hex(bytes);
-    } catch (reason) {
-      throw new ManagedProgrammingBlocked("lock", "file_unreadable",
-        `The selected ${request.source === "bundle" ? "Bundle" : "Programming Image"} could not be read: ${errorParts(reason).message}`);
-    }
-    events.onLocked?.({ name: request.file.name, size: bytes.length, sha256, source: request.source });
-  }
-
-  const target = { icpn: request.icpn, siteId: request.siteId };
-  const selector = request.operations
-    ? { operations: request.operations } : { operation: request.operation };
-  const input: PlanInput = request.file === null
-    ? { ...target, operations: ["erase"], ...request.range }
-    : request.source === "bundle"
-      ? { ...target, ...selector, bundle: bytes! }
-      : { ...target, ...selector, image: bytes!, filename: request.file.name };
-  let plan: ProgrammingPlan;
-  try {
-    plan = await planProgramming(request.alias, input);
-  } catch (reason) {
-    const { code, message } = errorParts(reason);
-    throw new ManagedProgrammingBlocked("plan", code, message);
-  }
-  const mismatch = planEchoMismatch(plan, request, sha256);
-  if (mismatch) {
-    throw new ManagedProgrammingBlocked("plan", "plan_echo_mismatch",
-      `The Manager plan does not match the locked ${mismatch}; nothing was started.`);
-  }
-  events.onPlan?.(plan);
-
-  let run: ProgrammingRun;
-  try {
-    run = await startProgramming(request.alias, plan.plan_id);
-  } catch (reason) {
-    const { status, code, message } = errorParts(reason);
-    // A 4xx is a definite refusal. Anything else may have reached the Manager.
-    if (status != null && status >= 400 && status < 500) {
-      throw new ManagedProgrammingBlocked("start", code, message);
-    }
-    throw new ManagedStartOutcomeUnknown(plan.plan_id,
-      `The start request outcome is unknown (${message}). Nothing was resubmitted.`,
-      { startId: plan.plan_id, kind: "run", siteIds: [plan.site_id], operation: plan.operation,
-        jobBindingSha256: plan.job_binding_sha256 });
-  }
-  events.onRun?.(run);
-  return observeRun(request.alias, run, events, signal);
 }
 
 async function observeRun(
@@ -883,7 +761,7 @@ export function runVerdict(run: ProgrammingRun): { verdict: RunVerdict; reason: 
     : receipt.observed_job_binding_sha256 !== receipt.expected_job_binding_sha256 ? "JOB_BINDING_NOT_CONFIRMED"
     : receipt.observed_resource_set_sha256 !== receipt.expected_resource_set_sha256 ? "RESOURCE_SET_NOT_CONFIRMED"
     // A readback is owed only when the Job verifies: the legacy cycle or a list with Verify.
-    : (receipt.operation === "flash_cycle" || receipt.operations?.includes("verify"))
+    : receipt.operations?.includes("verify")
       && (receipt.expected_image_sha256 == null || receipt.readback_sha256 !== receipt.expected_image_sha256)
       ? "READBACK_SHA256_MISMATCH"
     : receipt.operation === "programming"

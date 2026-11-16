@@ -52,12 +52,12 @@ test("ONLINE and Programming capability are judged separately with exact reasons
 });
 
 test("one Start: lock -> plan -> exactly one start -> observe; no retry of any write", () => {
-  // Two entry points, each with exactly one plan and one start: the Batch
-  // programming Job and the independent Read Memory Job.
-  assert.equal((core.match(/planProgramming\(/g) ?? []).length, 2);
-  assert.equal((core.match(/startProgramming\(/g) ?? []).length, 2);
+  // Only independent Read plans/starts a run in the Browser; programming
+  // submits one Manager Batch and the Manager owns every Site plan/Job.
+  assert.equal((core.match(/planProgramming\(/g) ?? []).length, 1);
+  assert.equal((core.match(/startProgramming\(/g) ?? []).length, 1);
   assert.match(core, /export async function runManagedRead\(/);
-  // EMode starts one Manager Batch; PMode keeps the single-run entry point.
+  // Both modes use the canonical Manager Batch entry point.
   assert.equal((emode.match(/runManagedBatch\(/g) ?? []).length, 1);
   assert.doesNotMatch(emode, /planProgramming\(|startProgramming\(/);
   // The only loops are the read-only status polls (run, Batch).
@@ -176,7 +176,8 @@ test("EMode sections are numbered 1 / 2 (2-1 … 2-4) / 3 / 4 and no current fea
 
 test("the standing PROGRAMMING PLAN panel is gone; the Backend plan still runs and is logged", () => {
   assert.doesNotMatch(emode, /PROGRAMMING PLAN|managed-plan|aria-label="Programming plan"/);
-  assert.match(core, /plan = await planProgramming\(request\.alias, input\)/);
+  assert.match(core, /plan = await planProgramming\(request\.alias, \{/);
+  assert.match(core, /batch = await startProgrammingBatch\(input, startId\)/);
   assert.match(emode, /\[PLAN\] \$\{planned\.plan_id\} · Route/);
   assert.match(emode, /Resource SHA256 \$\{planned\.resource\.resource_set_sha256\} · Job Binding SHA256/);
 });
@@ -337,7 +338,8 @@ test("EMode and PMode number the same four chapters and the same Programming Job
 
 test("removing the duplicated UI keeps the Manager evidence and the safety gates", () => {
   // Admission, Job Binding, Resource identity and Start reconciliation are untouched.
-  assert.match(core, /plan = await planProgramming\(request\.alias, input\)/);
+  assert.match(core, /plan = await planProgramming\(request\.alias, \{/);
+  assert.match(core, /batch = await startProgrammingBatch\(input, startId\)/);
   assert.match(emode, /async function reconcileStartHold/);
   assert.match(emode, /managed-start-hold/);
   assert.match(emode, /managed-unresolved/);

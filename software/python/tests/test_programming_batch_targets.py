@@ -42,7 +42,7 @@ def route_fixture(tmp_path, sites=(2, 3)):
     """
     root = tmp_path / "routes"
     root.mkdir(parents=True, exist_ok=True)
-    for name in ("z2-site2-stm32f103c8t6.json", "z2-site2-stm32f103c8t6-operations.json"):
+    for name in ("z2-site2-stm32f103c8t6-operations.json", "z2-site2-stm32f103c8t6-operations.json"):
         data = json.loads((ROUTES / name).read_text(encoding="utf-8"))
         (root / name).write_text(json.dumps(data), encoding="utf-8")
     operations = bundle_v3.load_route(root / "z2-site2-stm32f103c8t6-operations.json")

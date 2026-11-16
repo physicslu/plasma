@@ -1,5 +1,9 @@
 # PPU Bootstrap / Runtime / Stage C responsibility boundaries
 
+> Historical design snapshot. Current execution and admission supersede the cycle-only descriptions
+> below: [OPF Programming Operations](opf-programming-operations-v1.md) is normative.
+> PR #1469 retires `flash_cycle`; historical HIL results and receipts below remain unchanged.
+
 **Status:** Phase 1 documentation of current implementation and its limitations; no deployment or hardware qualification implied.  
 **Source baseline:** `main` at `082f018941b508a1310556a2242b112a6ad57dfe` (2026-11-10).  
 **Evidence convention:** `CONFIRMED` means the stated *source-code behavior* is directly supported by a path and exact line range. `NOT_VERIFIED` denotes a fact not established by source inspection. A target architecture is labeled `TARGET`, not an installed fact.

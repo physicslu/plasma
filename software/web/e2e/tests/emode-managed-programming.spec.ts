@@ -176,8 +176,8 @@ test("an Operation no Programming Route declares is disabled, not a fake capabil
   expect(counters.plans[0].body.operations).toEqual(["program", "verify"]);
 });
 
-test("a deployment with only the legacy flash_cycle Route offers no E / P / V and no Read", async ({ page }) => {
-  const counters = await mockManager(page, { routes: [route()] });
+test("a deployment with no supported Route offers no E / P / V and no Read", async ({ page }) => {
+  const counters = await mockManager(page, { routes: [] });
   const { workspace, job, start } = await configure(page);
   for (const name of ["erase", "program", "verify"]) {
     await expect(job.getByLabel(`Engineering operation ${name}`)).toBeDisabled();

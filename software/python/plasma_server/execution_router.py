@@ -65,7 +65,7 @@ class SiteExecutionRouter:
                     or self.site.interface == "mock"
                     or self.package_interface is None
                     or not self.package_interface.runtime_wired
-                    or request.operation is not Operation.FLASH_CYCLE):
+                    or request.operation is not Operation.PROGRAMMING):
                 raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PACKAGE_PROVIDER_NOT_READY")
             return self._decorate(request, route={
                 "mode": PACKAGE_PROVIDER_ROUTE,
@@ -85,13 +85,12 @@ class SiteExecutionRouter:
             if request.operation not in OpenOCDInterface.OPERATIONS:
                 raise PlasmaError(
                     ErrorCode.OPERATION_UNSUPPORTED,
-                    "C-3 runs programming (an operations list), read or the legacy "
-                    "flash_cycle; a separate " + request.operation.value + " Job is not offered")
+                    "C-3 runs programming (an operations list) or read; "
+                    "a separate " + request.operation.value + " Job is not offered")
             # programming / read have no default range or list: they run only
             # under an exact Job Binding, which SiteManager verifies under the
             # Job lease before execution.
-            if (request.operation is not Operation.FLASH_CYCLE
-                    and not isinstance(request.metadata.get("job_binding"), dict)):
+            if not isinstance(request.metadata.get("job_binding"), dict):
                 raise PlasmaError(
                     ErrorCode.OPERATION_UNSUPPORTED,
                     f"C-3 {request.operation.value} requires a Job Binding")

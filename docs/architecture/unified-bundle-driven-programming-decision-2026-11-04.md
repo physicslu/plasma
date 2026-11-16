@@ -1,5 +1,9 @@
 # PLASMA — Unified Bundle-driven Programming Execution (Owner Decision)
 
+> Historical design snapshot. Current execution and admission supersede the cycle-only descriptions
+> below: [OPF Programming Operations](opf-programming-operations-v1.md) is normative.
+> PR #1469 retires `flash_cycle`; historical HIL results and receipts below remain unchanged.
+
 **Decision date:** 2026-11-04 (owner).  
 **Status:** Normative target architecture; **implementation is incomplete**.  
 **Scope:** The **IC programming execution flow** only. Existing Engineering Mode

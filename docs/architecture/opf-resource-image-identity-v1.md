@@ -1,5 +1,9 @@
 # OPF Programming Resource Set / Job Image Asset Identity v1 (OFE-1A Gate 1)
 
+> Historical design snapshot. Current execution and admission supersede the cycle-only descriptions
+> below: [OPF Programming Operations](opf-programming-operations-v1.md) is normative.
+> PR #1469 retires `flash_cycle`; historical HIL results and receipts below remain unchanged.
+
 Terminology: the owner request's "Job Firmware Asset" is named **Job Image
 Asset** in code and schemas, following the canonical Programming Asset /
 Normalized Image vocabulary enforced by

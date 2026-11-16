@@ -30,7 +30,7 @@ def staged_provider(tmp_path, *, provider_id="reference-provider", transport="fp
     descriptor = {
         "schema": providers.SCHEMA, "target": target,
         "provider_package": provider_id,
-        "operations": ["erase", "program", "verify", "read", "flash_cycle"],
+        "operations": ["erase", "program", "verify", "read"],
         "transport": transport,
         "driver_abi": "example-swd-abi" if transport == "fpga" else None,
         "fpga_package": "example-fpga" if transport == "fpga" else None,
@@ -139,10 +139,10 @@ def test_two_provider_routes_use_one_bundle_job_contract_without_catalog(tmp_pat
                                           provider_id=provider_id, transport=transport)
         route = resolve(root, asset_set_sha256=digest, target="arbitrary-target",
                                   provider=provider_id, profile="profile",
-                                  operation="flash_cycle", site_id=2, image_size=1024,
-                                  hardware=observed(transport=transport))
+                                  operation="programming", site_id=2, image_size=1024,
+                                  hardware=observed(transport=transport), operations=("erase", "program", "verify"))
         assert route.provider_package == provider_id
-        assert route.operation == "flash_cycle" and route.site_id == 2
+        assert route.operation == "programming" and route.site_id == 2
         assert route.transport == transport
         assert route.options_json == b"{}"
         assert route.options_sha256 == hashlib.sha256(b"{}").hexdigest()
@@ -159,8 +159,8 @@ def test_incomplete_provider_contract_fails_closed(tmp_path, change, code):
     with pytest.raises(providers.ProviderDenied, match=code):
         resolve(root, asset_set_sha256=digest, target="arbitrary-target",
                           provider="reference-provider", profile="profile",
-                          operation="flash_cycle", site_id=2, image_size=1024,
-                          hardware=observed())
+                          operation="programming", site_id=2, image_size=1024,
+                          hardware=observed(), operations=("erase", "program", "verify"))
 
 
 def test_actual_hardware_and_active_bytes_must_still_match(tmp_path):
@@ -184,13 +184,13 @@ def test_explicit_provider_profile_selection_allows_same_target_multi_provider(t
     root, digest, _ = staged_provider(tmp_path, additional_provider=True)
     reference = resolve(
         root, asset_set_sha256=digest, target="arbitrary-target",
-        provider="reference-provider", profile="profile", operation="flash_cycle",
-        site_id=2, image_size=1024, hardware=observed())
+        provider="reference-provider", profile="profile", operation="programming",
+        site_id=2, image_size=1024, hardware=observed(), operations=("erase", "program", "verify"))
     alternative = resolve(
         root, asset_set_sha256=digest, target="arbitrary-target",
         provider="alternate-provider", profile="alternate-profile",
-        operation="flash_cycle", site_id=2, image_size=1024,
-        hardware=observed(transport="ps-only"))
+        operation="programming", site_id=2, image_size=1024,
+        hardware=observed(transport="ps-only"), operations=("erase", "program", "verify"))
     assert (reference.provider_package, reference.profile_package) == (
         "reference-provider", "profile")
     assert (alternative.provider_package, alternative.profile_package) == (
@@ -209,16 +209,16 @@ def test_explicit_selection_mismatch_denied(tmp_path, provider, profile, code):
     with pytest.raises(providers.ProviderDenied, match=code):
         resolve(
             root, asset_set_sha256=digest, target="arbitrary-target",
-            provider=provider, profile=profile, operation="flash_cycle",
-            site_id=2, image_size=1024, hardware=observed())
+            provider=provider, profile=profile, operation="programming",
+            site_id=2, image_size=1024, hardware=observed(), operations=("erase", "program", "verify"))
 
 
 def test_native_c_provider_entrypoint_is_resolved_without_execution(tmp_path):
     root, digest, _ = staged_provider(tmp_path, provider_kind="native-c")
     route = resolve(
         root, asset_set_sha256=digest, target="arbitrary-target",
-        provider="reference-provider", profile="profile", operation="flash_cycle",
-        site_id=2, image_size=1024, hardware=observed())
+        provider="reference-provider", profile="profile", operation="programming",
+        site_id=2, image_size=1024, hardware=observed(), operations=("erase", "program", "verify"))
     assert route.provider_package == "reference-provider"
     assert route.transport == "fpga"
     assert len(route.options_schema_sha256) == 64
@@ -236,9 +236,9 @@ def test_opf1_selection_binds_to_opf2_active_bundle_route(tmp_path):
     route = resolve(
         root, asset_set_sha256=digest, target="arbitrary-target",
         provider=selection.provider, profile=selection.profile,
-        operation="flash_cycle", site_id=2, image_size=1024,
+        operation="programming", site_id=2, image_size=1024,
         hardware=observed(transport="ps-only"), options=selection.options,
-    )
+    operations=("erase", "program", "verify"))
     assert (route.provider_package, route.profile_package, route.transport) == (
         "alternate-provider", "alternate-profile", "ps-only"
     )
@@ -259,9 +259,9 @@ def test_opf1_well_formed_selection_cannot_override_bundle_provider_binding(tmp_
         resolve(
             root, asset_set_sha256=digest, target="arbitrary-target",
             provider=selection.provider, profile=selection.profile,
-            operation="flash_cycle", site_id=2, image_size=1024,
+            operation="programming", site_id=2, image_size=1024,
             hardware=observed(transport="ps-only"),
-        )
+        operations=("erase", "program", "verify"))
 
 
 def test_non_programming_profile_resource_cannot_be_selected(tmp_path):
@@ -270,8 +270,8 @@ def test_non_programming_profile_resource_cannot_be_selected(tmp_path):
         resolve(
             root, asset_set_sha256=digest, target="arbitrary-target",
             provider="reference-provider", profile="profile",
-            operation="flash_cycle", site_id=2, image_size=1024, hardware=observed(),
-        )
+            operation="programming", site_id=2, image_size=1024, hardware=observed(),
+        operations=("erase", "program", "verify"))
 
 
 @pytest.mark.parametrize("sites", [None, 2, "2", [True], ["2"], [2, 2]])
@@ -281,9 +281,9 @@ def test_malformed_trusted_hardware_site_observation_fails_closed(tmp_path, site
         resolve(
             root, asset_set_sha256=digest, target="arbitrary-target",
             provider="reference-provider", profile="profile",
-            operation="flash_cycle", site_id=2, image_size=1024,
+            operation="programming", site_id=2, image_size=1024,
             hardware={**observed(), "sites": sites},
-        )
+        operations=("erase", "program", "verify"))
 
 
 def test_selected_provider_schema_not_cross_provider_fallback(tmp_path):
