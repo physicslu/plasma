@@ -186,9 +186,11 @@ def parse_route(payload: object) -> ProgrammingRoute:
           and 0 < caps["max_image_bytes"] <= MAX_IMAGE_BYTES,
           "ROUTE_CAPABILITIES_INVALID")
     flash = profile["flash_profile"]
-    _need(type(flash) is dict and set(flash) == {
-        "schema", "icpn", "target_config", "flash_base", "flash_size", "erase_granularity"},
-        "ROUTE_FLASH_PROFILE_INVALID")
+    required_flash = {"schema", "icpn", "target_config", "flash_base",
+                      "flash_size", "erase_granularity"}
+    _need(type(flash) is dict and required_flash <= set(flash)
+          and set(flash) <= required_flash | {"transport_settings"},
+          "ROUTE_FLASH_PROFILE_INVALID")
     _need(flash["schema"] == FLASH_PROFILE_SCHEMA and flash["icpn"] == caps["target"]
           and type(flash["target_config"]) is str and bool(flash["target_config"])
           and all(type(flash[k]) is int for k in ("flash_base", "flash_size", "erase_granularity"))
@@ -197,6 +199,14 @@ def parse_route(payload: object) -> ProgrammingRoute:
           and flash["flash_size"] % flash["erase_granularity"] == 0
           and caps["max_image_bytes"] <= flash["flash_size"],
           "ROUTE_FLASH_PROFILE_INVALID")
+    if "transport_settings" in flash:
+        settings = flash["transport_settings"]
+        _need(type(settings) is dict and set(settings) == {"protocol", "clock_hz"}
+              and settings["protocol"] == "swd"
+              and type(settings["clock_hz"]) is int
+              and 1000 <= settings["clock_hz"] <= 12_500_000
+              and settings["clock_hz"] % 1000 == 0,
+              "ROUTE_TRANSPORT_CLOCK_INVALID")
     return ProgrammingRoute(
         route_id=route_id, target=dict(target), image_package_kind=image_package["kind"],
         provider_id=provider["id"], provider_version=provider["version"],
