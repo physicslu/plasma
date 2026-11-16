@@ -1,0 +1,18 @@
+{
+ "site1_clk": "CH3",
+ "site1_active_s": [
+  14.29689955,
+  18.78083745
+ ],
+ "site1_active_ms_windows": 3807,
+ "site2_clk": "CH0",
+ "site2_active_s": [
+  13.19382365,
+  17.691197
+ ],
+ "site2_active_ms_windows": 3820,
+ "interval_overlap_s": 3.39429745,
+ "both_clocking_ms_windows": 2565,
+ "first_both_ms": 14297,
+ "last_both_ms": 17691
+}
