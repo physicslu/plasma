@@ -1,0 +1,93 @@
+{
+ "samplerate_hz": 100000000.0,
+ "samples": 3000002161,
+ "duration_s": 30.00002161,
+ "channels": {
+  "site1": {
+   "swclk": "CH3",
+   "swdio": "CH4",
+   "swclk_rising_edges": 850673,
+   "swdio_edges": 260028,
+   "period_samples_median": 50.0,
+   "swclk_freq_median_hz": 2000000.0,
+   "swclk_freq_p5_p95_hz": [
+    2000000.0,
+    2000000.0
+   ],
+   "period_hist_top": {
+    "50": 819879,
+    "49": 7966,
+    "51": 7082,
+    "53": 6651,
+    "52": 181,
+    "54": 86
+   },
+   "active_first_s": 10.683144,
+   "active_last_s": 12.16240818,
+   "bursts_10ms_gap": [
+    [
+     10.6831,
+     10.6951
+    ],
+    [
+     10.7493,
+     11.2282
+    ],
+    [
+     11.2384,
+     12.1079
+    ],
+    [
+     12.1624,
+     12.1624
+    ]
+   ],
+   "active_1ms_windows": 1175
+  },
+  "site2": {
+   "swclk": "CH0",
+   "swdio": "CH1",
+   "swclk_rising_edges": 862985,
+   "swdio_edges": 263512,
+   "period_samples_median": 50.0,
+   "swclk_freq_median_hz": 2000000.0,
+   "swclk_freq_p5_p95_hz": [
+    2000000.0,
+    2000000.0
+   ],
+   "period_hist_top": {
+    "50": 839843,
+    "53": 6684,
+    "49": 4228,
+    "51": 2940,
+    "52": 258,
+    "54": 251
+   },
+   "active_first_s": 9.53703816,
+   "active_last_s": 11.05091094,
+   "bursts_10ms_gap": [
+    [
+     9.537,
+     9.5496
+    ],
+    [
+     9.6008,
+     10.0682
+    ],
+    [
+     10.0843,
+     10.997
+    ],
+    [
+     11.0509,
+     11.0509
+    ]
+   ],
+   "active_1ms_windows": 1203
+  }
+ },
+ "overlap": {
+  "interval_overlap_s": 0.3677669399999992,
+  "both_active_1ms_windows": 165
+ }
+}

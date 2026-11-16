@@ -1,0 +1,18 @@
+SWD clock (#1458) 2-Site concurrent HIL, 2026-11-16 ~14:15-14:25Z
+Z2 Runtime 0.2.1-c633e1c5b0eb, SWPC CS c633e1c5b0eb, max_concurrent_jobs=2, Sites 1+2 openocd, ops erase/program/verify.
+LA2016 100 MHz, 1.4 V, 30 s: Site1 SWCLK=CH3 SWDIO=CH4, Site2 SWCLK=CH0 SWDIO=CH1. Analysis: la_analyze.py -> <run>/la-analysis.json.
+
+Method: temporary Manager route root (systemd drop-in PLASMA_PROGRAMMING_ROUTES_ROOT) whose operations Route adds
+flash_profile.transport_settings {swd, clock_hz} (profile version 1.0.0-swd<k>k); Resource Set pre-activated via
+Bootstrap B1-B3 activation-only (activate_route.py, fpga_load false) so the Batch reuses it and both Sites run concurrently.
+
+| run | Active Set (gen) | batch | image | Site1 | Site2 | receipt khz/half/nominal | LA SWCLK median | SWD overlap |
+| 2 MHz | 108a90cc (23) | d283829f | v0.1 18768 B | PASS 8.26 s | PASS 8.80 s | 2000/25/2.000 MHz | 2.000 MHz both (p5-p95 2.000) | 0.368 s, 165 1-ms windows |
+| 5 MHz | 8338ef40 (24) | a4feeeff | v0.2 62800 B | PASS 11.68 s | PASS 11.06 s | 5000/10/5.000 MHz | 5.000 MHz both (p5-p95 5.000) | 3.516 s, 2462 1-ms windows |
+All readback == image sha, safe_off true, one attempt each.
+SWD active spans: 2 MHz S1 10.683-12.162 s, S2 9.537-11.051 s; 5 MHz S1 9.419-13.976 s, S2 10.461-15.007 s
+(image sizes differ, so durations are not a speed comparison). 2 MHz overlap is short because SWD (~1.5 s) < the ~1 s
+serialized Root admission offset. Site1 5 MHz: 2 periods of 2 samples (20 ns) seen = isolated glitch/noise, not decoded.
+
+Restore: drop-in removed, Manager restarted (release routes); Active Set re-activated 957ac4e6 -> gen 25 (tx bbbb6f26),
+no DUT op. Final DUT content: both Sites v0.2. CS verify PASS, z2 READY.
