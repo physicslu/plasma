@@ -271,6 +271,9 @@ def test_bundle_profile_5mhz_overrides_engine_default_per_job_for_both_sites(sit
         result = _execute(env, site_id=site_id)
         assert result["result"] == "PASS"
         assert "adapter speed 5000" in env["sim"].argvs[0]
+        assert result["adapter_khz"] == 5000
+        assert result["swclk_requested_hz"] == result["swclk_nominal_hz"] == 5_000_000
+        assert result["swclk_half_period"] == 10
         assert result["opf_profile_sha256"] == reference.preflight_runtime_flash(
             product_root=env["product_root"],
             active_asset_set=env["active_asset_set"], target=ICPN,
@@ -278,6 +281,17 @@ def test_bundle_profile_5mhz_overrides_engine_default_per_job_for_both_sites(sit
         )["profile_sha256"]
         assert env["engine_record"].read_bytes() == before
         assert env["adapter"].adapter_khz == env["engine_data"]["adapter_khz"] == 500
+
+
+def test_non_divisor_profile_clock_records_nominal_fpga_rate_not_requested():
+    with installed_bundle(profile_change={
+            "transport_settings": {"protocol": "swd", "clock_hz": 4_000_000}}) as env:
+        result = _execute(env)
+        assert result["result"] == "PASS"
+        assert "adapter speed 4000" in env["sim"].argvs[0]
+        assert result["swclk_requested_hz"] == 4_000_000
+        assert result["swclk_half_period"] == 13
+        assert result["swclk_nominal_hz"] == 3_846_153
 
 
 def test_legacy_bundle_profile_uses_selected_engine_default():
