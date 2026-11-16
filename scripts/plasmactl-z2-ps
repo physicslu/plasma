@@ -142,6 +142,7 @@ parse_activation_args() {
     esac
   done
 
+  [[ "$site_count" =~ ^[1-8]$ ]] || die "--site-count must be an integer from 1 to 8"
   [[ -n "$release_artifact" ]] || die "--release-artifact is required"
   [[ -n "$gateway_host" ]] || die "--gateway-host is required"
   require_file "$release_artifact" "PPU release artifact"
