@@ -389,10 +389,12 @@ function clearManagedStart(): void {
 }
 
 function formatBatchTime(snapshot: ServerBatchSnapshot | null, now: number): string {
-  if (!snapshot?.started_at) return "00:00:00";
+  if (!snapshot) return "00:00:00";
+  if (!snapshot.started_at) return snapshot.state === "queued" ? "00:00:00" : "UNKNOWN";
   const start = Date.parse(snapshot.started_at);
+  if (terminalServerBatchStates.has(snapshot.state) && !snapshot.finished_at) return "UNKNOWN";
   const end = snapshot.finished_at ? Date.parse(snapshot.finished_at) : now;
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "00:00:00";
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "UNKNOWN";
   const elapsedSeconds = Math.floor((end - start) / 1000);
   const hours = Math.floor(elapsedSeconds / 3600);
   const minutes = Math.floor((elapsedSeconds % 3600) / 60);
@@ -548,7 +550,8 @@ export default function FactoryConsoleV2() {
 
   const finalizeBatch = useCallback((snapshot: ServerBatchSnapshot) => {
     if (!terminalServerBatchStates.has(snapshot.state)) return;
-    if (managed) clearManagedBatch(); else clearStoredBatch();
+    // Keep the Managed observation key so reload can read terminal timing.
+    if (!managed) clearStoredBatch();
     endActivity();
     setBatchObservationState("connected");
     if (terminalBatchRef.current === snapshot.batch_id) return;
@@ -888,7 +891,7 @@ export default function FactoryConsoleV2() {
               });
               return;
             }
-            if (managed) clearManagedBatch(); else clearStoredBatch();
+            if (!managed) clearStoredBatch();
           } catch (error) {
             setGatewayHealth(gatewayHealthFromError(error));
             // Unknown Manager state is not grounds to clear a durable Batch ID.
@@ -969,10 +972,11 @@ export default function FactoryConsoleV2() {
   }, [batchRunning, batchSelection, runtimes, setBatchSelection]);
 
   useEffect(() => {
-    if (!serverBatchRunning || !batchSnapshot?.started_at) return;
+    if (!serverBatchRunning || !batchSnapshot?.started_at
+        || !Number.isFinite(Date.parse(batchSnapshot.started_at)) || batchSnapshot.finished_at) return;
     const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [batchSnapshot?.batch_id, batchSnapshot?.started_at, serverBatchRunning]);
+  }, [batchSnapshot?.batch_id, batchSnapshot?.started_at, batchSnapshot?.finished_at, serverBatchRunning]);
 
   const draftCounts = useMemo(() => selectionCounts(draftSelection), [draftSelection]);
   const productionSetCounts = useMemo(() => selectionCounts(productionSet), [productionSet]);
@@ -1214,6 +1218,7 @@ export default function FactoryConsoleV2() {
     setBatchSelection(snapshot);
     setBatchCommandState("idle");
     setBatchSnapshot(null);
+    if (managed) clearManagedBatch();
     setOperatorWarning(null);
     clearStoredBatch();
     appendLog(`[SET] COMMIT · ${selectionCounts(snapshot).facilities} Facilities · ${selectionCounts(snapshot).ppus} PPUs · ${selectionCounts(snapshot).sites} Sites`);
@@ -1272,6 +1277,7 @@ export default function FactoryConsoleV2() {
     setProgrammingSource(next);
     setManagedFile(null);
     setBatchSnapshot(null);
+    clearManagedBatch();
     loggedRecords.current.clear();
     setOperatorWarning(null);
     appendLog(`[SOURCE] ${next.toUpperCase()} · previous file and results cleared`);
@@ -1319,6 +1325,7 @@ export default function FactoryConsoleV2() {
     try {
       await runManagedBatch(request, {
         onStartId: startId => {
+          clearManagedBatch();
           writeManagedStart(startId);
           setManagedStartHold(startId);
           appendLog(`[START] Manager issued ${startId}; waiting for canonical Batch acceptance`);
@@ -1327,7 +1334,7 @@ export default function FactoryConsoleV2() {
           setBatchCommandState("idle");
           setBatchObservationState("connected");
           // A confirmed Manager Batch ID is the durable observation key.
-          if (next.outcome == null) writeManagedBatch(next.batch_id);
+          writeManagedBatch(next.batch_id);
           const snapshot = managedProductionSnapshot(next, managedTopology);
           applyBatchSnapshot(snapshot, catalog);
           logManagedBatch(next, managedTopology);
@@ -1390,12 +1397,14 @@ export default function FactoryConsoleV2() {
       }
       const batch = await getProgrammingBatch(reconciled.batch.batch_id);
       if (batch.start_id !== held) throw new Error("Manager Batch Start identity mismatch");
+      // Reconciliation may first observe an already terminal Batch. Retain its
+      // identity before releasing the Start hold so reload restores its time.
+      writeManagedBatch(batch.batch_id);
       setManagedBatchRecoveryId(null);
       const snapshot = managedProductionSnapshot(batch, managedTopology);
       applyBatchSnapshot(snapshot, catalog);
       logManagedBatch(batch, managedTopology);
       if (batch.outcome == null) {
-        writeManagedBatch(batch.batch_id);
         writeManagedStart(held);
         setManagedStartHold(held);
         beginActivity();
@@ -1671,6 +1680,7 @@ export default function FactoryConsoleV2() {
                 onFileChange: file => {
                   setManagedFile(file);
                   setBatchSnapshot(null);
+                  clearManagedBatch();
                   loggedRecords.current.clear();
                   if (file) appendLog(`[IMG] SELECTED ${programmingSource.toUpperCase()} · ${file.name} · ${file.size} bytes`);
                 },

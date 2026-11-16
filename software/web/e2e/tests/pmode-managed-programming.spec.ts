@@ -382,3 +382,60 @@ test("concurrent Site lanes: every Site gets its own Manager run receipt and one
   expect(counters.batches).toHaveLength(1);
   expect(counters.jobs).toHaveLength(2);
 });
+
+
+for (const count of [1, 2, 8]) {
+  test(`${count} concurrent Sites display 16s Batch wall-clock and retain it after reload`, async ({ page }) => {
+    const sites = Array.from({ length: count }, (_, i) => i + 1);
+    const counters = await mockManager(page, {
+      ppus: [{ ...Z2, enabledSites: sites }], concurrentLanes: true,
+      batchTiming: { startedAt: "2026-11-16T12:00:00+00:00", finishedAt: "2026-11-16T12:00:16+00:00" },
+    });
+    const { start } = await prepare(page, [["z2", sites]]);
+    await start.click();
+    await finished(page);
+    const time = page.locator('[data-kpi="batch-time"]');
+    await expect(time).toContainText("00:00:16");
+    await page.reload();
+    await expect(time).toContainText("00:00:16");
+    expect(counters.batches).toHaveLength(1);
+    expect(counters.jobs).toHaveLength(count);
+  });
+}
+
+test("running Manager Batch Time ticks without another submission and refresh resumes it", async ({ page }) => {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
+  const counters = await mockManager(page, {
+    script: () => ({ runningPolls: 1000 }),
+    batchTiming: { startedAt, finishedAt: new Date().toISOString() },
+  });
+  const { start } = await prepare(page, [["z2", [2]]]);
+  await start.click();
+  const time = page.locator('[data-kpi="batch-time"]');
+  await expect(time).not.toContainText("UNKNOWN");
+  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/RUNNING/);
+  const before = await time.innerText();
+  await expect.poll(() => time.innerText()).not.toBe(before);
+  await page.reload();
+  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/RUNNING/);
+  await expect(time).not.toContainText("UNKNOWN");
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.jobs).toHaveLength(1);
+});
+
+
+test("a lost Start reconciled after completion retains terminal Batch Time on reload", async ({ page }) => {
+  const counters = await mockManager(page, { batchLost: true });
+  const { start } = await prepare(page, [["z2", [2]]]);
+  await start.click();
+  await expect(page.getByTestId("managed-readiness")).toContainText("START RECONCILIATION REQUIRED");
+  await page.getByRole("button", { name: "RECONCILE MANAGER START" }).click();
+  await finished(page);
+  const time = page.locator('[data-kpi="batch-time"]');
+  await expect(time).toContainText("00:00:16");
+  await page.reload();
+  await expect(time).toContainText("00:00:16");
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.issued).toHaveLength(1);
+  expect(counters.jobs).toHaveLength(1);
+});

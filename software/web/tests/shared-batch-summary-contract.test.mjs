@@ -60,3 +60,39 @@ test("mode-local CSS cannot override BatchSummary KPI internals or shared title 
   assert.doesNotMatch(emodeCss, /batchSummaryHeader|batchSummaryGrid article|data-kpi=/);
   assert.match(emodeCss, /\.engineeringProgrammingV2 \.batchSummary\s*\{\s*margin-top:\s*7px;/);
 });
+
+
+test("Manager Batch Time uses authoritative wall clock, freezes and rejects missing or invalid evidence", () => {
+  // Execute the actual formatting function; no second implementation of the clock.
+  const source = pmod.slice(pmod.indexOf("function formatBatchTime("), pmod.indexOf("function ppuState("));
+  const js = source.replace("snapshot: ServerBatchSnapshot | null, now: number): string", "snapshot, now)");
+  const format = new Function("terminalServerBatchStates", `${js}; return formatBatchTime;`)(
+    new Set(["success", "partial", "error", "cancelled"]));
+  const start = "2026-11-16T12:00:00+00:00";
+  const end = "2026-11-16T12:00:16+00:00";
+  const now = Date.parse(start) + 9000;
+  assert.equal(format(null, now), "00:00:00");
+  assert.equal(format({ state: "queued" }, now), "00:00:00");
+  assert.equal(format({ state: "running", started_at: start }, now), "00:00:09");
+  for (const state of ["success", "partial", "error", "cancelled"]) {
+    for (const count of [1, 2, 8]) {
+      const snapshot = { state, started_at: start, finished_at: end,
+        sites: Array.from({ length: count }, () => ({ duration_ms: 16000 })) };
+      assert.equal(format(snapshot, now + 600000), "00:00:16");
+      assert.equal(format(snapshot, now + 900000), "00:00:16");
+    }
+    assert.equal(format({ state, started_at: start }, now), "UNKNOWN");
+    assert.equal(format({ state, updated_at: end, created_at: start }, now), "UNKNOWN");
+  }
+  for (const [started_at, finished_at] of [["invalid", end], [start, "invalid"], [end, start]]) {
+    assert.equal(format({ state: "success", started_at, finished_at }, now), "UNKNOWN");
+  }
+});
+
+
+test("terminal Start reconciliation retains the Batch before releasing its hold", () => {
+  const reconcile = pmod.slice(pmod.indexOf("const batch = await getProgrammingBatch(reconciled.batch.batch_id)"));
+  assert.match(reconcile, /if \(batch.start_id !== held\) throw new Error/);
+  assert.ok(reconcile.indexOf("writeManagedBatch(batch.batch_id)") < reconcile.indexOf("applyBatchSnapshot(snapshot, catalog)"));
+  assert.ok(reconcile.indexOf("writeManagedBatch(batch.batch_id)") < reconcile.indexOf("if (batch.outcome == null)"));
+});

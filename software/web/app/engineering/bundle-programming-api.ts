@@ -369,6 +369,10 @@ export type ProgrammingBatchUnitProgress = {
 export type ProgrammingBatch = {
   schema: "plasma.manager.programming-batch.v1";
   batch_id: string;
+  /** Manager UTC wall clock; absent/null on journals predating Batch timing. */
+  created_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
   /** The Manager-issued token this Batch was admitted with. */
   start_id: string | null;
   targets: ProgrammingBatchTarget[];

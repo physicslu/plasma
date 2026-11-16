@@ -972,3 +972,63 @@ def test_a_consumed_or_unknown_start_is_refused(tmp_path):
         assert caught.value.code == "programming_start_not_startable"
         assert caught.value.status == 409
     assert len(gateways["z2"].posts) == 1
+
+
+@pytest.mark.parametrize("outcome,stop", [("PASS", False), ("FAIL", False),
+    ("PARTIAL", False), ("OUTCOME_UNKNOWN", False), ("BLOCKED", True)])
+def test_terminal_batch_time_freezes_for_all_verdicts(tmp_path, monkeypatch, outcome, stop):
+    from datetime import datetime, timezone
+    import plasma_manager.programming_batch as module
+    held = []
+    batches, workflow, gateways, _ = rig(tmp_path, spawn_batch=held.append)
+    started = batches.start_batch(with_start(workflow, [one("z2", 2)]))["batch"]
+    record = batches._batches[started["batch_id"]]
+    start = "2026-11-16T12:00:00+00:00"
+    end = "2026-11-16T12:00:16+00:00"
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.fromisoformat(end)
+
+    monkeypatch.setattr(module, "datetime", Clock)
+    record.update(started_at=start, stop_requested=stop)
+    # Exercise finalization for the aggregate verdict, without remote Jobs.
+    verdicts = ["PASS", "BLOCKED"] if outcome == "PARTIAL" else [outcome]
+    record["units"] = [dict(record["units"][0], site_id=i + 1, outcome=v)
+                       for i, v in enumerate(verdicts)]
+    batches._finish(record, None)
+    assert record["outcome"] == outcome
+    for _ in range(2):
+        view = batches.status_batch(record["batch_id"])["batch"]
+        assert (view["started_at"], view["finished_at"]) == (start, end)
+    restored = ProgrammingBatchCoordinator(workflow, journal_path=tmp_path / "batches.json")
+    assert restored.status_batch(record["batch_id"])["batch"]["finished_at"] == end
+    assert not gateways["z2"].posts
+
+
+def test_batch_acceptance_reconciliation_recovery_and_untimed_history(tmp_path):
+    held = []
+    batches, workflow, gateways, _ = rig(tmp_path, spawn_batch=held.append)
+    request = with_start(workflow, [one("z2", 2)])
+    accepted = batches.start_batch(request)["batch"]
+    assert accepted["started_at"] is not None
+    assert accepted["finished_at"] is None
+    reconciled = batches.reconcile_start(request["start_id"])["reconciliation"]["batch"]
+    assert reconciled["started_at"] == accepted["started_at"]
+    assert reconciled["finished_at"] is None
+    path = tmp_path / "batches.json"
+    restored = ProgrammingBatchCoordinator(workflow, journal_path=path)
+    terminal = restored.status_batch(accepted["batch_id"])["batch"]
+    assert terminal["started_at"] == accepted["started_at"]
+    assert terminal["finished_at"] >= accepted["started_at"]
+    assert not gateways["z2"].posts
+    data = json.loads(path.read_text())
+    for record in data["batches"]:
+        record.pop("started_at", None)
+        record.pop("finished_at", None)
+    path.write_text(json.dumps(data))
+    historical = ProgrammingBatchCoordinator(workflow, journal_path=path)
+    view = historical.status_batch(accepted["batch_id"])["batch"]
+    assert view["started_at"] is None
+    assert view["finished_at"] is None
