@@ -127,6 +127,7 @@ ppu:
 
 server:
   max_supported_sites: 8
+  max_concurrent_jobs: 2  # follows the two configured Sites
   max_queue_depth_per_site: 16
 
 sites:

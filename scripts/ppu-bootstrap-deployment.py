@@ -108,6 +108,7 @@ class DeploymentRequest:
     ppu_id: str
     facility_id: str
     display_name: str
+    site_count: int = 8  # Fresh-install topology; existing canonical config wins.
     qualification_fail_health_check: bool = False
     api_transaction_id: str | None = None
 
@@ -518,6 +519,8 @@ class DeploymentCoordinator:
                 fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
 
     def execute(self, request: DeploymentRequest) -> Mapping[str, Any]:
+        if type(request.site_count) is not int or not 1 <= request.site_count <= 8:
+            raise DeploymentError("site_count must be an integer between 1 and 8")
         # This is an audit correlation tag only, never a Root/Master grant.
         if request.api_transaction_id is not None and (
             not isinstance(request.api_transaction_id, str)
@@ -1568,6 +1571,7 @@ class DeploymentCoordinator:
                     ppu_id=request.ppu_id,
                     facility_id=request.facility_id,
                     display_name=request.display_name,
+                    site_count=request.site_count,
                     health_check=health_check,
                     # Restore the previous control plane and restart the Worker
                     # on it BEFORE the previous Runtime is restarted.
@@ -1738,6 +1742,8 @@ def _parser() -> argparse.ArgumentParser:
     deploy.add_argument("--ppu-id", required=True)
     deploy.add_argument("--facility-id", required=True)
     deploy.add_argument("--display-name", default="Plasma PPU")
+    deploy.add_argument("--site-count", type=int, default=8,
+                        help="Site count for fresh PPU configuration (1..8); upgrades preserve existing YAML")
     deploy.add_argument("--api-transaction-id", help="optional Bootstrap API correlation ID; not authority")
     b3 = sub.add_parser("install-bundle", help="B3 canonical v3 Install/Activate or explicit stage_only")
     b3.add_argument("--release-artifact", type=Path, required=True)
@@ -1800,6 +1806,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ppu_id=args.ppu_id,
         facility_id=args.facility_id,
         display_name=args.display_name,
+        site_count=args.site_count,
         qualification_fail_health_check=bool(args.qualification_fail_health_check),
         api_transaction_id=args.api_transaction_id,
     )

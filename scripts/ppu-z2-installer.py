@@ -675,6 +675,7 @@ def render_ppu_config(
     display_name: str,
     state_root: Path,
     log_root: Path,
+    site_count: int = MAX_SUPPORTED_SITES,
 ) -> str:
     for label, value in (
         ("ppu-id", ppu_id),
@@ -683,6 +684,8 @@ def render_ppu_config(
     ):
         if not value or "\n" in value or "\r" in value:
             raise Z2InstallerError(f"{label} must be a non-empty single-line value")
+    if type(site_count) is not int or not 1 <= site_count <= MAX_SUPPORTED_SITES:
+        raise Z2InstallerError("site_count must be an integer between 1 and 8")
     return "\n".join(
         [
             "ppu:",
@@ -695,7 +698,7 @@ def render_ppu_config(
             "  host: 127.0.0.1",
             "  port: 9900",
             f"  max_supported_sites: {MAX_SUPPORTED_SITES}",
-            "  max_concurrent_jobs: 1",
+            f"  max_concurrent_jobs: {site_count}",
             "  max_queue_depth_per_site: 16",
             f"  output_root: {state_root / 'output'}",
             f"  log_root: {log_root}",
@@ -703,7 +706,7 @@ def render_ppu_config(
             "  max_map_bytes: 1048576",
             "  max_binary_bytes: 67108864",
             "",
-            render_default_sites(),
+            render_default_sites(site_count),
         ]
     )
 
@@ -1116,6 +1119,7 @@ def _install_base_release(
     ppu_id: str,
     facility_id: str,
     display_name: str,
+    site_count: int = MAX_SUPPORTED_SITES,
     systemctl: Callable[..., None] = _systemctl,
     health_check: Callable[[str], Mapping[str, object]] = _health_ready,
     ensure_service_account: Callable[[], None] = _ensure_service_account,
@@ -1156,6 +1160,7 @@ def _install_base_release(
         display_name=display_name,
         state_root=paths.state_root,
         log_root=paths.log_root,
+        site_count=site_count,
     )
     units = (unit_renderer or _render_base_systemd_units)(
         paths=paths,
@@ -1601,11 +1606,15 @@ def install_release(
     ppu_id: str,
     facility_id: str,
     display_name: str,
+    site_count: int = MAX_SUPPORTED_SITES,
     systemctl=_systemctl,
     health_check=_health_ready,
     ensure_service_account=_ensure_service_account,
     on_rollback=None,
 ) -> dict[str, object]:
+    # Reject invalid fresh-install topology before any files or units are touched.
+    if type(site_count) is not int or not 1 <= site_count <= MAX_SUPPORTED_SITES:
+        raise Z2InstallerError("site_count must be an integer between 1 and 8")
     config_path = paths.config_root / "ppu.yaml"
     helper_unit = paths.systemd_root / RUNTIME_ACTIVATION_SERVICE
     helper_snapshot = _snapshot_file(helper_unit)
@@ -1645,6 +1654,7 @@ def install_release(
             ppu_id=ppu_id,
             facility_id=facility_id,
             display_name=display_name,
+            site_count=site_count,
             systemctl=systemctl,
             health_check=health_check,
             ensure_service_account=ensure_service_account,
@@ -1717,6 +1727,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     install.add_argument("--ppu-id", default="z2-dev-01")
     install.add_argument("--facility-id", default="lab")
     install.add_argument("--display-name", default="Plasma Z2 PS")
+    install.add_argument("--site-count", type=int, default=MAX_SUPPORTED_SITES,
+                         help="Site topology for a fresh ppu.yaml (1..8); upgrades retain existing config")
     install.add_argument("--product-root", type=Path, default=Path("/opt/plasma"))
     install.add_argument("--config-root", type=Path, default=Path("/etc/plasma"))
     install.add_argument("--state-root", type=Path, default=Path("/var/lib/plasma"))
@@ -1767,6 +1779,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ppu_id=args.ppu_id,
                 facility_id=args.facility_id,
                 display_name=args.display_name,
+                site_count=args.site_count,
             )
             print(json.dumps(evidence, indent=2, sort_keys=True))
             return 0

@@ -160,6 +160,34 @@ def test_successful_transaction_orders_verify_stage_activate_health(tmp_path: Pa
     assert coordinator.paths.lock.stat().st_mode & 0o077 == 0
 
 
+@pytest.mark.parametrize("site_count", [1, 2, 4, 8])
+def test_deployment_coordinator_forwards_site_count_to_fresh_installer(
+    tmp_path: Path, site_count: int
+):
+    class FreshInstaller(FakeInstaller):
+        def _previous_current(self, current):
+            self.calls.append("previous")
+            return None
+
+        def install_release(self, verified, **kwargs):
+            assert kwargs["site_count"] == site_count
+            return super().install_release(verified, **kwargs)
+
+    request = replace(_request(tmp_path), site_count=site_count)
+    result = _coordinator(tmp_path, FreshInstaller()).execute(request)
+    assert result["result"] == "PASS"
+
+
+@pytest.mark.parametrize("site_count", [0, 9, True, "2"])
+def test_invalid_deployment_site_count_fails_before_mutation(tmp_path: Path, site_count):
+    installer = FakeInstaller()
+    coordinator = _coordinator(tmp_path, installer)
+    with pytest.raises(deployment.DeploymentError, match="site_count"):
+        coordinator.execute(replace(_request(tmp_path), site_count=site_count))
+    assert installer.calls == []
+    assert not coordinator.paths.journal.exists()
+
+
 def test_api_transaction_id_is_recorded_by_the_locked_coordinator(tmp_path: Path):
     coordinator = _coordinator(tmp_path, FakeInstaller())
     api_id = "f" * 32

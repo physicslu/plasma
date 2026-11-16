@@ -91,6 +91,7 @@ Install/deploy options:
   --ppu-id ID               PPU identity (default z2-dev-01)
   --facility-id ID          Facility identity (default lab)
   --display-name NAME       Human display name (default Plasma Z2 PS)
+  --site-count N            Fresh-install Site topology count (1..8, default 8)
 
 A first install requires either --python-artifact or --plasma-python and a qualified
 --openocd-artifact. Deploy reuses /opt/plasma/install/python-runtime.json and
@@ -118,6 +119,7 @@ parse_activation_args() {
   ppu_id="z2-dev-01"
   facility_id="lab"
   display_name="Plasma Z2 PS"
+  site_count="8"
   api_transaction_id=""
 
   while (($#)); do
@@ -133,12 +135,14 @@ parse_activation_args() {
       --ppu-id) (($# >= 2)) || die "--ppu-id requires a value"; ppu_id="$2"; shift 2 ;;
       --facility-id) (($# >= 2)) || die "--facility-id requires a value"; facility_id="$2"; shift 2 ;;
       --display-name) (($# >= 2)) || die "--display-name requires a value"; display_name="$2"; shift 2 ;;
+      --site-count) (($# >= 2)) || die "--site-count requires a value"; site_count="$2"; shift 2 ;;
       --api-transaction-id) (($# >= 2)) || die "--api-transaction-id requires a value"; api_transaction_id="$2"; shift 2 ;;
       -h|--help) usage; exit 0 ;;
       *) die "unknown option: $1" ;;
     esac
   done
 
+  [[ "$site_count" =~ ^[1-8]$ ]] || die "--site-count must be an integer from 1 to 8"
   [[ -n "$release_artifact" ]] || die "--release-artifact is required"
   [[ -n "$gateway_host" ]] || die "--gateway-host is required"
   require_file "$release_artifact" "PPU release artifact"
@@ -220,6 +224,7 @@ activate_release() {
     --ppu-id "$ppu_id"
     --facility-id "$facility_id"
     --display-name "$display_name"
+    --site-count "$site_count"
   )
   [[ -n "$release_sidecar" ]] && args+=(--sidecar "$release_sidecar")
   [[ -n "$api_transaction_id" ]] && args+=(--api-transaction-id "$api_transaction_id")

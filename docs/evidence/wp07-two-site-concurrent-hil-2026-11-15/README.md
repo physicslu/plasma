@@ -51,7 +51,7 @@ Root Site admission takes about 6 s and serializes on the supervisor lock; for a
 ## Known gaps
 
 - Manager receipt reports `safe_off=None` / `SAFE_OFF_NOT_VERIFIED` for a definite FAIL whose Site Worker result has `safe_off: true`, making it non-retryable (conservative).
-- ~~The Z2 installer still writes `max_concurrent_jobs: 1` on reinstall.~~ Corrected 2026-11-16: only a fresh install (no `/etc/plasma/ppu.yaml`) writes `1`. An upgrade or reinstall, including Bootstrap Full-Copy, keeps the existing `ppu.yaml` byte for byte. During WP-07 the value returned to `1` only because the operator restored the backup after each failed step (`step4*-z2-config.log`). Regression tests: `test_ppu_z2_installer.py::test_upgrade_preserves_the_operator_concurrency_limit_byte_for_byte` and related tests.
+- ~~The Z2 installer still writes `max_concurrent_jobs: 1` on reinstall.~~ Corrected 2026-11-16: at WP-07 time only a fresh install (no `/etc/plasma/ppu.yaml`) wrote `1`; the proposed Site Count installer change makes fresh installs derive `max_concurrent_jobs` from their declared Site topology (1..8, default 8). An upgrade or reinstall, including Bootstrap Full-Copy, continues to keep the existing `ppu.yaml` byte for byte. During WP-07 the value returned to `1` only because the operator restored the backup after each failed step (`step4*-z2-config.log`). Regression tests: `test_ppu_z2_installer.py::test_upgrade_preserves_the_operator_concurrency_limit_byte_for_byte` and related tests.
 - Two OpenOCD processes use about 1.5 of Z2's two cores; CPU will bound 4/8-Site scaling.
 - Root admission latency (~6 s, serialized) dominates short operations.
 
