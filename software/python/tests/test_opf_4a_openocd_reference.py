@@ -262,6 +262,59 @@ def test_verified_reference_executes_existing_c3_abi5_flash_and_readback():
         assert env["core"]._site_owners == {} and env["core"]._sealed == set()
 
 
+@pytest.mark.parametrize("site_id", [1, 2])
+def test_bundle_profile_5mhz_overrides_engine_default_per_job_for_both_sites(site_id):
+    # One verified Profile sets the same clock for any selected Site.
+    setting = {"protocol": "swd", "clock_hz": 5_000_000}
+    with installed_bundle(profile_change={"transport_settings": setting}) as env:
+        before = env["engine_record"].read_bytes()
+        result = _execute(env, site_id=site_id)
+        assert result["result"] == "PASS"
+        assert "adapter speed 5000" in env["sim"].argvs[0]
+        assert result["adapter_khz"] == 5000
+        assert result["swclk_requested_hz"] == result["swclk_nominal_hz"] == 5_000_000
+        assert result["swclk_half_period"] == 10
+        assert result["opf_profile_sha256"] == reference.preflight_runtime_flash(
+            product_root=env["product_root"],
+            active_asset_set=env["active_asset_set"], target=ICPN,
+            site_id=site_id, image_size=len(IMAGE), job_binding=None,
+        )["profile_sha256"]
+        assert env["engine_record"].read_bytes() == before
+        assert env["adapter"].adapter_khz == env["engine_data"]["adapter_khz"] == 500
+
+
+def test_non_divisor_profile_clock_records_nominal_fpga_rate_not_requested():
+    with installed_bundle(profile_change={
+            "transport_settings": {"protocol": "swd", "clock_hz": 4_000_000}}) as env:
+        result = _execute(env)
+        assert result["result"] == "PASS"
+        assert "adapter speed 4000" in env["sim"].argvs[0]
+        assert result["swclk_requested_hz"] == 4_000_000
+        assert result["swclk_half_period"] == 13
+        assert result["swclk_nominal_hz"] == 3_846_153
+
+
+def test_legacy_bundle_profile_uses_selected_engine_default():
+    with installed_bundle() as env:
+        assert _execute(env)["result"] == "PASS"
+        assert "adapter speed 500" in env["sim"].argvs[0]
+
+
+@pytest.mark.parametrize("settings,code", [
+    ({"protocol": "swd", "clock_hz": True}, "PROFILE_CLOCK_INVALID"),
+    ({"protocol": "swd", "clock_hz": 0}, "PROFILE_CLOCK_INVALID"),
+    ({"protocol": "swd", "clock_hz": 12_501_000}, "PROFILE_CLOCK_INVALID"),
+    ({"protocol": "swd", "clock_hz": 5_000_001}, "PROFILE_CLOCK_INVALID"),
+    ({"protocol": "spi", "clock_hz": 5_000_000}, "PROFILE_TRANSPORT_INVALID"),
+    ({"clock_hz": 5_000_000}, "PROFILE_TRANSPORT_INVALID"),
+])
+def test_bundle_profile_invalid_swd_clock_refused_before_site_admission(settings, code):
+    with installed_bundle(profile_change={"transport_settings": settings}) as env:
+        with pytest.raises(ValueError, match=code):
+            _qualify(env)
+        assert not env["sim"].argvs and not env["core"]._sessions
+
+
 def test_reselection_without_worker_restart_denies_before_site_ownership():
     with installed_bundle() as env:
         # An operator selects a different speed/record but has not restarted

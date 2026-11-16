@@ -224,6 +224,24 @@ class Abi5OpenocdAdapter:
             raise TransportDenied("IMAGE_PATH_INVALID")
         return "{" + raw + "}"
 
+    def _clock_khz(self, profile: FlashProfile) -> int:
+        # An admitted Bundle Profile owns the Job speed; Engine selection is
+        # the default for Profiles without transport_settings.
+        return self.adapter_khz if profile.clock_hz is None else profile.clock_hz // 1000
+
+    def _clock_evidence(self, profile: FlashProfile) -> dict[str, int]:
+        khz = self._clock_khz(profile)
+        evidence = {"adapter_khz": khz}
+        # Preserve the exact legacy receipt when the selected Bundle Profile
+        # has no transport_settings; only explicit Profile clocks add evidence.
+        if profile.clock_hz is not None:
+            # Match native plasma_swd_khz's ceil division and FPGA bounds.
+            half_period = min(65535, max(4, (50000 + khz - 1) // khz))
+            evidence.update(swclk_requested_hz=khz * 1000,
+                            swclk_half_period=half_period,
+                            swclk_nominal_hz=50_000_000 // half_period)
+        return evidence
+
     def _operation_argv(self, site: int, bound: FlashImage | FlashRange,
                         actions: list[str]) -> list[str]:
         """The qualified flash_cycle preamble and ending around exactly the
@@ -231,7 +249,7 @@ class Abi5OpenocdAdapter:
         return [
             *self._base_argv(site),
             "-f", self._target_config(bound),
-            "-c", f"adapter speed {self.adapter_khz}",
+            "-c", f"adapter speed {self._clock_khz(bound.profile)}",
             "-c", "init",
             "-c", "reset halt",
             "-c", "poll off",
@@ -280,7 +298,7 @@ class Abi5OpenocdAdapter:
             address, length = flash_range.address, flash_range.length
             erase_address, erase_length = address, length
         base = {"icpn": bound.icpn, "target_config": bound.profile.target_config,
-                "adapter_khz": self.adapter_khz}
+                **self._clock_evidence(bound.profile)}
 
         with tempfile.TemporaryDirectory(prefix="plasma-c3-op-") as directory:
             staged = Path(directory) / "normalized-image.bin"
@@ -378,8 +396,8 @@ class Abi5OpenocdAdapter:
             *self._base_argv(site),
             "-f", self._target_config(image),
             # Target configs may force their own SWCLK (stm32f1x.cfg: 1000 kHz);
-            # the selected engine's qualified adapter speed wins.
-            "-c", f"adapter speed {self.adapter_khz}",
+            # the verified Bundle Profile clock wins; Engine supplies fallback.
+            "-c", f"adapter speed {self._clock_khz(image.profile)}",
             "-c", "init",
             # A plain ``halt`` of running firmware leaves the stm32f1x write
             # algorithm stuck after the erase (Driver track HIL 2026-11-04,
@@ -532,7 +550,7 @@ class Abi5OpenocdAdapter:
                             "openocd_rc": rc, **safe_off.receipt()}
                 return {"result": "PASS", "icpn": image.icpn,
                         "target_config": image.profile.target_config,
-                        "adapter_khz": self.adapter_khz,
+                        **self._clock_evidence(image.profile),
                         "bytes_verified": len(observed),
                         "readback_sha256": observed_sha,
                         "load_address": image.load_address, **executed,

@@ -126,6 +126,8 @@ class FlashProfile:
     flash_base: int
     flash_size: int
     erase_granularity: int
+    # Bundle Profile SWD clock; None retains the selected Engine default.
+    clock_hz: int | None = None
 
     def erase_length(self, size: int) -> int:
         """Image size rounded up to whole erase units."""
@@ -275,9 +277,9 @@ def flash_range_receipt(result: Mapping[str, Any]) -> dict[str, Any]:
 
 def parse_flash_profile(raw: object) -> FlashProfile:
     """Validate the Runtime-supplied profile shape; raises SiteWorkerDenied."""
-    _require(isinstance(raw, dict) and set(raw) == {
-        "icpn", "target_config", "flash_base", "flash_size", "erase_granularity"},
-        "PROFILE_INVALID")
+    required = {"icpn", "target_config", "flash_base", "flash_size", "erase_granularity"}
+    _require(type(raw) is dict and required <= set(raw)
+             and set(raw) <= required | {"transport_settings"}, "PROFILE_INVALID")
     icpn, cfg = raw["icpn"], raw["target_config"]
     base, size, unit = raw["flash_base"], raw["flash_size"], raw["erase_granularity"]
     _require(type(icpn) is str and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}", icpn)
@@ -287,7 +289,17 @@ def parse_flash_profile(raw: object) -> FlashProfile:
     _require(all(type(v) is int for v in (base, size, unit)) and base >= 0 and size > 0
              and unit > 0 and unit & (unit - 1) == 0 and size % unit == 0
              and base % unit == 0 and base + size <= 1 << 32, "PROFILE_GEOMETRY_INVALID")
-    return FlashProfile(icpn, cfg, base, size, unit)
+    clock_hz = None
+    if "transport_settings" in raw:
+        settings = raw["transport_settings"]
+        _require(type(settings) is dict and set(settings) == {"protocol", "clock_hz"}
+                 and settings["protocol"] == "swd", "PROFILE_TRANSPORT_INVALID")
+        clock_hz = settings["clock_hz"]
+        # Current ABI-v5: OpenOCD accepts integer kHz, PL FCLK=100 MHz,
+        # HALF_PERIOD >= 4. Never round an unrepresentable Profile silently.
+        _require(type(clock_hz) is int and 1000 <= clock_hz <= 12_500_000
+                 and clock_hz % 1000 == 0, "PROFILE_CLOCK_INVALID")
+    return FlashProfile(icpn, cfg, base, size, unit, clock_hz)
 
 
 class SiteTransportAdapter(Protocol):

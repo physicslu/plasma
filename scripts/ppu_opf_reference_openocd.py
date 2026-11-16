@@ -84,10 +84,11 @@ def _parse_profile(raw: bytes, target: str, image_size: int | None) -> dict[str,
         payload = json.loads(raw, object_pairs_hook=ppu_provider_contract._pairs)
     except (ValueError, UnicodeError) as exc:
         raise ReferenceDenied("REFERENCE_PROFILE_INVALID") from exc
-    _need(type(payload) is dict and set(payload) == {
-        "schema", "icpn", "target_config", "flash_base", "flash_size",
-        "erase_granularity"} and payload.get("schema") == PROFILE_SCHEMA,
-        "REFERENCE_PROFILE_INVALID")
+    required = {"schema", "icpn", "target_config", "flash_base", "flash_size",
+                "erase_granularity"}
+    _need(type(payload) is dict and required <= set(payload)
+          and set(payload) <= required | {"transport_settings"}
+          and payload.get("schema") == PROFILE_SCHEMA, "REFERENCE_PROFILE_INVALID")
     values = {key: value for key, value in payload.items() if key != "schema"}
     try:
         checked = ppu_site_worker.parse_flash_profile(values)
@@ -262,8 +263,8 @@ def qualify_reference(
         hardware=hardware, options=selected.options, operations=operations)
     _need(route.transport == "fpga",
           "REFERENCE_TRANSPORT_UNSUPPORTED")
-    # No option is silently ignored. Clock and adapter choices belong to the
-    # trusted engine-selection record, not untrusted Bundle options.
+    # No option is silently ignored. Job options cannot override the
+    # Bundle-bound Programming Profile's transport clock.
     _need(route.options_json == b"{}", "REFERENCE_OPTIONS_UNSUPPORTED")
     try:
         engine = ppu_site_engine.load_engine(

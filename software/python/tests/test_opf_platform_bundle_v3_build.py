@@ -75,6 +75,38 @@ def build(path: Path, output: Path) -> str:
     )
 
 
+def test_builder_embeds_profile_owned_swd_clock_without_engine_sha_pin(tmp_path):
+    inputs = source(tmp_path)
+    path = inputs / "plasma-flash-profile.json"
+    profile = json.loads(path.read_bytes())
+    profile["transport_settings"] = {"protocol": "swd", "clock_hz": 5_000_000}
+    path.write_bytes(_raw(profile))
+    archive = tmp_path / "5mhz.zip"
+    build(inputs, archive)
+    with zipfile.ZipFile(archive) as bundle:
+        manifest = json.loads(bundle.read("manifest.json"))
+        selected = next(p for p in manifest["packages"] if p["kind"] == "programming-profile")
+        filename = next(item["path"] for item in selected["files"]
+                        if item["path"].endswith("plasma-flash-profile.json"))
+        raw = bundle.read(filename)
+        assert json.loads(raw)["transport_settings"]["clock_hz"] == 5_000_000
+        assert hashlib.sha256(raw).hexdigest() == next(
+            item["sha256"] for item in selected["files"] if item["path"] == filename)
+
+
+@pytest.mark.parametrize("clock", [0, -1, 5_000_001, 12_501_000, True, "5000000"])
+def test_builder_denies_invalid_profile_clock_before_zip(tmp_path, clock):
+    inputs = source(tmp_path)
+    path = inputs / "plasma-flash-profile.json"
+    profile = json.loads(path.read_bytes())
+    profile["transport_settings"] = {"protocol": "swd", "clock_hz": clock}
+    path.write_bytes(_raw(profile))
+    archive = tmp_path / "invalid.zip"
+    with pytest.raises(ValueError, match="TRANSPORT_CLOCK_INVALID"):
+        build(inputs, archive)
+    assert not archive.exists()
+
+
 def test_bundle_is_deterministic_and_has_exact_platform_provider_file_set(tmp_path):
     inputs = source(tmp_path)
     archive = tmp_path / "bundle.zip"
