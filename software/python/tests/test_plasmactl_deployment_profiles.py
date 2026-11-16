@@ -118,6 +118,61 @@ def test_local_control_station_profile_delegates_to_dedicated_backend(tmp_path: 
     assert log.read_text(encoding="utf-8").splitlines() == [expected for _, expected in cases]
 
 
+
+def _resolve_local_python_from_fixture(root: Path, configured: str = "") -> subprocess.CompletedProcess[str]:
+    """Execute only the pinned Bash resolver using temporary fake executables."""
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    resolver = "python_is_supported() {" + source.split("python_is_supported() {", 1)[1].split("\nrequire_clean_source() {", 1)[0]
+    harness = (
+        "set -euo pipefail\n"
+        'die() { printf "%s\\n" "$*" >&2; exit 77; }\n'
+        f"plasma_python_root={shlex.quote(str(root))}\n"
+        f"base_python={shlex.quote(configured)}\n"
+        f"{resolver}\n"
+        # Replace qualification with a safe executable check. This test checks
+        # path identity; real version gating remains in python_is_supported().
+        'python_is_supported() { [[ -x "$1" ]]; }\n'
+        'resolve_base_python\nprintf "%s\\n" "$base_python"\n'
+    )
+    return subprocess.run(
+        ["bash", "-c", harness], capture_output=True, text=True, check=False, timeout=10
+    )
+
+
+def test_local_control_station_runtime_aliases_are_one_canonical_interpreter(tmp_path: Path) -> None:
+    base = tmp_path / "cpython-3.12.13-linux-x86_64-gnu"
+    interpreter = base / "bin" / "python3"
+    interpreter.parent.mkdir(parents=True)
+    interpreter.write_text("#!/bin/sh\\nexit 0\\n", encoding="utf-8")
+    interpreter.chmod(0o755)
+
+    (tmp_path / "cpython-3.12-linux-x86_64-gnu").symlink_to(base, target_is_directory=True)
+    venv_alias = tmp_path / "3.12.13" / "bin" / "python3"
+    venv_alias.parent.mkdir(parents=True)
+    venv_alias.symlink_to(interpreter)
+    (tmp_path / "broken").symlink_to(tmp_path / "missing-runtime", target_is_directory=True)
+
+    result = _resolve_local_python_from_fixture(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == str(interpreter.resolve())
+    # The saved explicit path must remain unchanged: do not silently change
+    # the installed Control Station's selected venv or config.
+    selected = _resolve_local_python_from_fixture(tmp_path, str(venv_alias))
+    assert selected.returncode == 0
+    assert selected.stdout.strip() == str(venv_alias)
+
+
+def test_local_control_station_distinct_interpreters_still_fail_closed(tmp_path: Path) -> None:
+    for name in ("cpython-3.12.13-linux-x86_64-gnu", "cpython-3.13.0-linux-x86_64-gnu"):
+        python = tmp_path / name / "bin" / "python3"
+        python.parent.mkdir(parents=True)
+        python.write_text("#!/bin/sh\\nexit 0\\n", encoding="utf-8")
+        python.chmod(0o755)
+    result = _resolve_local_python_from_fixture(tmp_path)
+    assert result.returncode == 77
+    assert "multiple Plasma Python runtimes found" in result.stderr
+
+
 def test_local_control_station_is_console_manager_only_and_loopback_bound() -> None:
     source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
     assert 'console_host="127.0.0.1"' in source
