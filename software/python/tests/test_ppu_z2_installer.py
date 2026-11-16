@@ -414,7 +414,8 @@ def test_bootstrap_source_does_not_import_project_or_python311_only_tomllib() ->
     assert "releaselevel" in source
 
 
-def test_rendered_config_lists_every_supported_site_disabled(tmp_path: Path) -> None:
+@pytest.mark.parametrize("site_count", [1, 2, 4, 8])
+def test_rendered_config_matches_declared_site_count(tmp_path: Path, site_count: int) -> None:
     # The Python 3.10 installer-only CI job runs without the Plasma package;
     # the full suite (Python >= 3.11) validates with the real config loader.
     try:
@@ -430,12 +431,16 @@ def test_rendered_config_lists_every_supported_site_disabled(tmp_path: Path) -> 
             display_name="Plasma Z2 PS",
             state_root=tmp_path / "state",
             log_root=tmp_path / "log",
+            site_count=site_count,
         ),
         encoding="utf-8",
     )
     config = load_config(config_path)
     config.validate()
-    assert [site.id for site in config.sites] == list(range(1, 9))
+    assert [site.id for site in config.sites] == list(range(1, site_count + 1))
+    assert config.site_count == site_count
+    assert config.server.max_supported_sites == installer.MAX_SUPPORTED_SITES
+    assert config.server.max_concurrent_jobs == site_count
     assert all(site.enabled is False for site in config.sites)
     assert {site.interface for site in config.sites} == {"mock"}
     # No product default ICPN: the exact target is an explicit operator choice.
@@ -476,7 +481,8 @@ def _install_paths(tmp_path: Path):
     )
 
 
-def _run_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, paths) -> list[tuple[str, ...]]:
+def _run_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, paths,
+                 site_count: int = installer.MAX_SUPPORTED_SITES) -> list[tuple[str, ...]]:
     artifact = _fake_release(tmp_path)
     verified = installer.verify_release(artifact, extract_to=tmp_path / "verified")
     monkeypatch.setattr(installer, "_chown_tree", lambda *args: None)
@@ -494,6 +500,7 @@ def _run_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, paths) -> list
         ppu_id="z2-dev-01",
         facility_id="lab",
         display_name="Plasma Z2 PS",
+        site_count=site_count,
         systemctl=lambda *args: calls.append(args),
         health_check=lambda host: {"gateway": "alive", "execution": "ready"},
         ensure_service_account=lambda: None,
@@ -544,16 +551,16 @@ def _operator_config(paths, max_concurrent_jobs: int) -> str:
         ppu_id="z2-hil", facility_id="lab", display_name="Z2 HIL",
         state_root=paths.state_root, log_root=paths.log_root,
     )
-    assert rendered.count("  max_concurrent_jobs: 1\n") == 1
+    assert rendered.count("  max_concurrent_jobs: 8\n") == 1
     return (rendered
-            .replace("  max_concurrent_jobs: 1\n", f"  max_concurrent_jobs: {max_concurrent_jobs}\n")
+            .replace("  max_concurrent_jobs: 8\n", f"  max_concurrent_jobs: {max_concurrent_jobs}\n")
             .replace('  - {id: 1, enabled: false, interface: "mock"}',
                      "  - {id: 1, enabled: true, interface: openocd, target: STM32F103C8T6}")
             .replace('  - {id: 2, enabled: false, interface: "mock"}',
                      "  - {id: 2, enabled: true, interface: openocd, target: STM32F103C8T6}"))
 
 
-@pytest.mark.parametrize("max_concurrent_jobs", [2, 8])
+@pytest.mark.parametrize("max_concurrent_jobs", [1, 2, 4, 8])
 def test_upgrade_preserves_the_operator_concurrency_limit_byte_for_byte(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, max_concurrent_jobs: int
 ) -> None:
@@ -590,7 +597,7 @@ def test_legacy_empty_sites_migration_keeps_the_concurrency_limit(
         ppu_id="kept-id", facility_id="lab", display_name="Kept",
         state_root=paths.state_root, log_root=paths.log_root,
     ).replace(installer.render_default_sites(), "sites: []\n").replace(
-        "  max_concurrent_jobs: 1\n", "  max_concurrent_jobs: 2\n")
+        "  max_concurrent_jobs: 8\n", "  max_concurrent_jobs: 2\n")
     (paths.config_root / "ppu.yaml").write_text(legacy, encoding="utf-8")
 
     _run_install(tmp_path, monkeypatch, paths)
@@ -601,20 +608,34 @@ def test_legacy_empty_sites_migration_keeps_the_concurrency_limit(
     assert "  max_concurrent_jobs: 2\n" in migrated
 
 
-def test_fresh_install_writes_the_conservative_single_job_default(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("site_count", [1, 2, 4, 8])
+def test_fresh_install_writes_site_count_as_concurrency_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, site_count: int
 ) -> None:
-    # No ppu.yaml yet: every Site is disabled Mock and one Job runs at a time
-    # until an operator raises the limit for qualified Sites.
+    # The canonical PPU YAML records its own topology. Disabled Sites are
+    # not a reason to override its declared Job-concurrency ceiling.
     paths = _install_paths(tmp_path)
-    _run_install(tmp_path, monkeypatch, paths)
+    _run_install(tmp_path, monkeypatch, paths, site_count=site_count)
     text = (paths.config_root / "ppu.yaml").read_text(encoding="utf-8")
-    assert text.count("max_concurrent_jobs") == 1 and "  max_concurrent_jobs: 1\n" in text
+    assert text.count("max_concurrent_jobs") == 1
+    assert f"  max_concurrent_jobs: {site_count}\n" in text
+    assert text.count("enabled: false") == site_count
     load_config = _config_loader()
     if load_config is not None:
         config = load_config(paths.config_root / "ppu.yaml")
-        assert config.server.max_concurrent_jobs == 1
+        assert config.site_count == site_count
+        assert config.server.max_concurrent_jobs == site_count
         assert not any(site.enabled for site in config.sites)
+
+
+@pytest.mark.parametrize("site_count", [0, 9, True, 2.5, "2"])
+def test_invalid_fresh_site_count_rejected_before_config_generation(tmp_path, site_count) -> None:
+    with pytest.raises(installer.Z2InstallerError, match="site_count"):
+        installer.render_ppu_config(
+            ppu_id="z2-dev-01", facility_id="lab", display_name="Z2",
+            state_root=tmp_path / "state", log_root=tmp_path / "log",
+            site_count=site_count,
+        )
 
 
 def test_full_copy_activates_through_the_preserving_installer() -> None:
@@ -626,6 +647,7 @@ def test_full_copy_activates_through_the_preserving_installer() -> None:
     assert source.count("self.installer.install_release(") == 1
     assert "config_writer" not in source
     assert "ppu.yaml" not in source
+    assert "site_count=request.site_count" in source
 
 
 def test_fresh_install_does_not_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
