@@ -230,16 +230,19 @@ The helper is `PartOf=plasma-web.service`; Gateway `Requires=` it. It is not ind
 
 ## First install versus upgrade
 
-A first install creates every supported Site, **disabled**:
+A first install creates each PPU's declared Site topology, disabled, in its own `/etc/plasma/ppu.yaml`. The installer accepts `--site-count N` (1..8, default 8), forwarded through the existing deployment coordinator. It derives the concurrency ceiling from that same count; `max_supported_sites: 8` remains the capacity ceiling, not the number of configured Sites:
 
 ```yaml
 server:
   max_supported_sites: 8
+  max_concurrent_jobs: 2
 
 sites:
   - {id: 1, enabled: false, interface: "mock"}
-  # ... through id: 8
+  - {id: 2, enabled: false, interface: "mock"}
 ```
+
+This example is a 2-Site PPU. A 1/4/8-Site fresh install generates exactly 1/4/8 Site entries and matches the concurrency limit. `enabled` remains independent. The Bootstrap API / unparameterized factory deployment currently defaults to 8 and does not infer actual physical Site count. Other topologies must be explicitly provisioned. No new configuration store or hardware-verification dependency is introduced.
 
 The Gateway Site desired-state path (`POST /api/settings/sites/{id}` with a
 strong `If-Match` ETag, then runtime activation) edits **existing** Sites
