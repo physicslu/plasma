@@ -331,6 +331,32 @@ Architectural invariant:
 
 ## Deferred product capability
 
+
+### Factory Log / Engineering Job Log — six-category classification and operator audit
+
+**Status:** TODO / owner requested 2026-11-16; documentation only, implementation NOT_RUN. **Priority:** after Engineering Repeat/burn-in functionality, unless a measured logging defect blocks Repeat HIL.
+
+**Scope:** Reuse the existing shared PMode/EMode Operator Log UI and Manager/PPU event sources. Current `production-log-panel.tsx` infers categories from message prefixes and sends unmatched `[RUN]`, `[SITE]`, `[STEPS]`, `[RECEIPT]`, `[EVIDENCE]` to `SYS`; `USR` does not record normal operator commands.
+
+Required event ownership:
+
+- **USR:** operator IC/Image/Bundle/Site selection, E/P/V configuration, Retry/Stop/Repeat changes, Production Set commit, START/ABORT requests and log clearing. Skip cosmetic UI activity. A click records intent, never evidence that Manager accepted it.
+- **NET:** Manager/Gateway/PPU connectivity, transport/observation timeout and reconnection.
+- **PPU:** genuine per-Site/PPU execution, admission, hardware, fault, SAFE_OFF and sealed state based on observed evidence.
+- **DAT:** Image/Bundle/Job Binding/Resource hashes and verified Readback/Receipt metadata, excluding sensitive content and firmware bytes.
+- **BAT:** Manager Start/Batch acceptance, Site scheduling/Retry/Stop, terminal outcomes and unit/cycle counters.
+- **SYS:** actual service/application/configuration lifecycle and system errors, not arbitrary unrecognized programming events.
+
+Implementation principles and acceptance:
+
+- Prefer a small structured `category` + stable `event_code` + severity/time/source/identity contract at the producer over `startsWith()` inference; correlate authoritative Manager/PPU evidence with Start/Batch/Run/Job/PPU/Site IDs. Keep one shared PMode/EMode component and no second Logger.
+- Distinguish browser operator intent from Manager acceptance and PPU observed result. Deduplicate polling/reload events, preserve independent concurrent Site logs, and never turn UNKNOWN or unverified SAFE_OFF into PASS.
+- Phase A: fix existing category producers, ordering, filters, download and browser log boundedness with unit and Playwright positive/negative tests covering all six categories and two-Site concurrency.
+- Phase B: separately qualify PPU `JobEventLogger` JSONL → bounded read-only Gateway API → authenticated Manager aggregation → durable retention/search/export. Current browser `Download .log` is not the full production audit ledger.
+- Log clearing must not erase authoritative audit proof. Do not invent authenticated user IDs in Local Owner Mode or log secrets, raw images or arbitrary filesystem paths.
+- Closure requires six categories with real producers, tested USR actions, no incorrect SYS fallback for programming evidence, EMode/PMode parity and stable identity correlation; production traceability claims require Phase B acceptance.
+
+
 ### Control Station Product Version / Build Identity Visibility
 
 **Status:** TODO / product traceability follow-up
