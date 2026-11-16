@@ -1,0 +1,411 @@
+{
+ "ok": true,
+ "batch": {
+  "schema": "plasma.manager.programming-batch.v2",
+  "batch_id": "d283829fadc2f2f0b72d990c398bdca2",
+  "start_id": "2e5a05fd57a69699e798b113f58c623c",
+  "targets": [
+   {
+    "ppu_alias": "z2",
+    "site_ids": [
+     1,
+     2
+    ]
+   }
+  ],
+  "operations": [
+   "erase",
+   "program",
+   "verify"
+  ],
+  "source": "image",
+  "icpn": "STM32F103C8T6",
+  "policy": {
+   "repeat": 1,
+   "retry_limit": 0,
+   "stop_policy": {
+    "kind": "failed_sites",
+    "threshold": 1
+   }
+  },
+  "state": "finished",
+  "execution_status": "COMPLETED",
+  "outcome": "PASS",
+  "reason": null,
+  "stop_requested": false,
+  "failure_domain": null,
+  "units": [
+   {
+    "ppu_alias": "z2",
+    "site_id": 1,
+    "status": "FINISHED",
+    "outcome": "PASS",
+    "reason": null,
+    "failure_domain": null,
+    "attempts": [
+     {
+      "attempt": 1,
+      "job_key": {
+       "batch_id": "d283829fadc2f2f0b72d990c398bdca2",
+       "ppu_alias": "z2",
+       "site_id": 1,
+       "attempt": 1
+      },
+      "plan_id": "f5fe6e4694986be86e4f93e5c7f1a8f8",
+      "run_id": "60474636ec4c0b097243a54d368e5673",
+      "job_binding_sha256": "0710cd9e873fb1ad5581136a4b545a897fe240045251646deca3df62c7ad48d3",
+      "job_id": "job-20261116-141708-bf829495",
+      "state": "finished",
+      "outcome": "PASS",
+      "reason": null,
+      "safe_off": true,
+      "retry": null,
+      "started_at": "2026-11-16T14:17:07.762269+00:00",
+      "finished_at": "2026-11-16T14:17:18.860935+00:00"
+     }
+    ],
+    "progress": {
+     "attempt": 1,
+     "run_id": "60474636ec4c0b097243a54d368e5673",
+     "job_id": "job-20261116-141708-bf829495",
+     "job_state": "success",
+     "stage": "programming",
+     "progress_percent": 100.0
+    }
+   },
+   {
+    "ppu_alias": "z2",
+    "site_id": 2,
+    "status": "FINISHED",
+    "outcome": "PASS",
+    "reason": null,
+    "failure_domain": null,
+    "attempts": [
+     {
+      "attempt": 1,
+      "job_key": {
+       "batch_id": "d283829fadc2f2f0b72d990c398bdca2",
+       "ppu_alias": "z2",
+       "site_id": 2,
+       "attempt": 1
+      },
+      "plan_id": "f985a43b457ecc76d500bfd04fd1097d",
+      "run_id": "12b7f0d1e979e26ee6c29e02449a825e",
+      "job_binding_sha256": "b3ed707bb8aa80b60db367e927b677922f709fed93a31bdf1dbfab1326980d2d",
+      "job_id": "job-20261116-141708-bebf0f22",
+      "state": "finished",
+      "outcome": "PASS",
+      "reason": null,
+      "safe_off": true,
+      "retry": null,
+      "started_at": "2026-11-16T14:17:07.605565+00:00",
+      "finished_at": "2026-11-16T14:17:17.747761+00:00"
+     }
+    ],
+    "progress": {
+     "attempt": 1,
+     "run_id": "12b7f0d1e979e26ee6c29e02449a825e",
+     "job_id": "job-20261116-141708-bebf0f22",
+     "job_state": "success",
+     "stage": "programming",
+     "progress_percent": 100.0
+    }
+   }
+  ],
+  "journal_persisted": true,
+  "created_at": "2026-11-16T14:17:05.847264+00:00",
+  "updated_at": "2026-11-16T14:17:19.633124+00:00",
+  "started_at": "2026-11-16T14:17:05.847264+00:00",
+  "finished_at": "2026-11-16T14:17:19.633107+00:00",
+  "attempts": [
+   {
+    "attempt": 1,
+    "job_key": {
+     "batch_id": "d283829fadc2f2f0b72d990c398bdca2",
+     "ppu_alias": "z2",
+     "site_id": 1,
+     "attempt": 1
+    },
+    "plan_id": "f5fe6e4694986be86e4f93e5c7f1a8f8",
+    "run_id": "60474636ec4c0b097243a54d368e5673",
+    "job_binding_sha256": "0710cd9e873fb1ad5581136a4b545a897fe240045251646deca3df62c7ad48d3",
+    "job_id": "job-20261116-141708-bf829495",
+    "state": "finished",
+    "outcome": "PASS",
+    "reason": null,
+    "safe_off": true,
+    "retry": null,
+    "started_at": "2026-11-16T14:17:07.762269+00:00",
+    "finished_at": "2026-11-16T14:17:18.860935+00:00"
+   },
+   {
+    "attempt": 1,
+    "job_key": {
+     "batch_id": "d283829fadc2f2f0b72d990c398bdca2",
+     "ppu_alias": "z2",
+     "site_id": 2,
+     "attempt": 1
+    },
+    "plan_id": "f985a43b457ecc76d500bfd04fd1097d",
+    "run_id": "12b7f0d1e979e26ee6c29e02449a825e",
+    "job_binding_sha256": "b3ed707bb8aa80b60db367e927b677922f709fed93a31bdf1dbfab1326980d2d",
+    "job_id": "job-20261116-141708-bebf0f22",
+    "state": "finished",
+    "outcome": "PASS",
+    "reason": null,
+    "safe_off": true,
+    "retry": null,
+    "started_at": "2026-11-16T14:17:07.605565+00:00",
+    "finished_at": "2026-11-16T14:17:17.747761+00:00"
+   }
+  ],
+  "current_run": {
+   "schema": "plasma.manager.bundle-programming-run.v1",
+   "run_id": "12b7f0d1e979e26ee6c29e02449a825e",
+   "ppu_alias": "z2",
+   "site_id": 2,
+   "plan": {
+    "schema": "plasma.manager.bundle-programming-plan.v3",
+    "plan_id": "f985a43b457ecc76d500bfd04fd1097d",
+    "ppu_alias": "z2",
+    "site_id": 2,
+    "operation": "programming",
+    "operations": [
+     "erase",
+     "program",
+     "verify"
+    ],
+    "source": "image",
+    "route": {
+     "route_id": "z2-site2-stm32f103c8t6-operations",
+     "target": {
+      "platform": "linux-armv7",
+      "board": "pynq-z2",
+      "fpga_part": "xc7z020clg400-1"
+     },
+     "icpn": "STM32F103C8T6",
+     "site_interface": "openocd",
+     "provider": "openocd-platform-reference",
+     "profile": "stm32f103c8t6-site2-operations",
+     "operations": [
+      "erase",
+      "program",
+      "verify",
+      "read"
+     ],
+     "driver_abi": "plasma_swd:5",
+     "transport": "fpga",
+     "max_image_bytes": 65536,
+     "target_config": "target/stm32f1x.cfg",
+     "flash_base": 134217728,
+     "flash_size": 65536
+    },
+    "bundle": {
+     "bundle_schema": "plasma.ppu.bundle.v3",
+     "archive_sha256": "108a90ccfcbed92042a8e31f1d604e93ca3d8e06d04a3d3737398906cc5b39c3",
+     "archive_size": 21782,
+     "bundle_name": "stm32f103c8t6-site2-operations-img-8d3ffb02b80f",
+     "version": "1.0.0",
+     "target": {
+      "platform": "linux-armv7",
+      "board": "pynq-z2",
+      "fpga_part": "xc7z020clg400-1"
+     },
+     "provider": "openocd-platform-reference",
+     "profile": "stm32f103c8t6-site2-operations",
+     "asset_package_id": "img-8d3ffb02b80f7797",
+     "image_filename": "plasma-blue-pill-cdc.bin",
+     "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+     "image_size": 18768,
+     "icpn": "STM32F103C8T6",
+     "resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498",
+     "image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+     "identity_authority": "archive_sha256"
+    },
+    "resource": {
+     "resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498",
+     "ppu_reported": {
+      "state": "VERIFIED",
+      "asset_set_sha256": "108a90ccfcbed92042a8e31f1d604e93ca3d8e06d04a3d3737398906cc5b39c3",
+      "generation": 23,
+      "resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498"
+     },
+     "reuse": true
+    },
+    "image_asset": {
+     "image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+     "sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+     "size": 18768,
+     "load_address": 134217728,
+     "format": "binary"
+    },
+    "job_binding": {
+     "schema": "plasma.opf.job-image-binding.v1",
+     "resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498",
+     "operation": "programming",
+     "range": {
+      "address": 134217728,
+      "length": 18768
+     },
+     "image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+     "ppu_id": "z2-hil",
+     "site_id": 2,
+     "icpn": "STM32F103C8T6",
+     "profile": "stm32f103c8t6-site2-operations",
+     "operations": [
+      "erase",
+      "program",
+      "verify"
+     ]
+    },
+    "job_binding_sha256": "b3ed707bb8aa80b60db367e927b677922f709fed93a31bdf1dbfab1326980d2d",
+    "active_asset_set": {
+     "state": "ACTIVE",
+     "asset_set_sha256": "108a90ccfcbed92042a8e31f1d604e93ca3d8e06d04a3d3737398906cc5b39c3"
+    },
+    "activation_required": false,
+    "fpga_load": false,
+    "steps": [
+     "RESOURCE_REUSE",
+     "PROGRAMMING_JOB",
+     "VERIFY_RECEIPT"
+    ],
+    "catalog_gate": "NOT_USED",
+    "confirm_required": "PROGRAM",
+    "execution_owner_id": "d283829fadc2f2f0b72d990c398bdca2"
+   },
+   "state": "finished",
+   "outcome": "PASS",
+   "reason": null,
+   "created_at": "2026-11-16T14:17:07.612485+00:00",
+   "updated_at": "2026-11-16T14:17:17.747761+00:00",
+   "steps": [
+    {
+     "step": "PREFLIGHT",
+     "result": "PASS",
+     "at": "2026-11-16T14:17:07.917107+00:00"
+    },
+    {
+     "step": "RESOURCE_REUSE",
+     "result": "PPU_VERIFIED",
+     "at": "2026-11-16T14:17:08.333336+00:00",
+     "asset_set_sha256": "108a90ccfcbed92042a8e31f1d604e93ca3d8e06d04a3d3737398906cc5b39c3",
+     "resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498",
+     "generation": 23
+    },
+    {
+     "step": "PROGRAMMING_SUBMIT",
+     "result": "ACCEPTED",
+     "at": "2026-11-16T14:17:08.857310+00:00",
+     "job_id": "job-20261116-141708-bebf0f22"
+    },
+    {
+     "step": "VERIFY_RECEIPT",
+     "result": "PASS",
+     "at": "2026-11-16T14:17:17.738232+00:00",
+     "failed_checks": []
+    }
+   ],
+   "activation": {},
+   "job": {
+    "job_id": "job-20261116-141708-bebf0f22",
+    "state": "success",
+    "stage": "programming",
+    "progress_percent": 100.0,
+    "bytes_done": 18768,
+    "bytes_total": 18768
+   },
+   "receipt": {
+    "schema": "plasma.manager.programming-receipt.v3",
+    "job_id": "job-20261116-141708-bebf0f22",
+    "job_state": "success",
+    "site_id": 2,
+    "operation": "programming",
+    "operations": [
+     "erase",
+     "program",
+     "verify"
+    ],
+    "observed_operations": [
+     "erase",
+     "program",
+     "verify"
+    ],
+    "target": "STM32F103C8T6",
+    "ppu_id": "z2-hil",
+    "expected_image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "expected_image_size": 18768,
+    "observed_image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "observed_image_size": 18768,
+    "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+    "bytes_verified": 18768,
+    "expected_flash_range": null,
+    "observed_flash_range": null,
+    "expected_steps": {
+     "erase": {
+      "erase_address": 134217728,
+      "erase_length": 19456
+     },
+     "program": {
+      "write_address": 134217728,
+      "bytes_written": 18768,
+      "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+     },
+     "verify": {
+      "verify_address": 134217728,
+      "bytes_verified": 18768,
+      "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+     }
+    },
+    "observed_steps": {
+     "erase": {
+      "erase_address": 134217728,
+      "erase_length": 19456
+     },
+     "program": {
+      "write_address": 134217728,
+      "bytes_written": 18768,
+      "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+     },
+     "verify": {
+      "verify_address": 134217728,
+      "bytes_verified": 18768,
+      "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d"
+     }
+    },
+    "range": {
+     "address": 134217728,
+     "length": 18768
+    },
+    "read_output": null,
+    "expected_resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498",
+    "observed_resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498",
+    "expected_job_binding_sha256": "b3ed707bb8aa80b60db367e927b677922f709fed93a31bdf1dbfab1326980d2d",
+    "observed_job_binding_sha256": "b3ed707bb8aa80b60db367e927b677922f709fed93a31bdf1dbfab1326980d2d",
+    "expected_image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+    "observed_image_asset_sha256": "80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568",
+    "active_asset_set_sha256": "108a90ccfcbed92042a8e31f1d604e93ca3d8e06d04a3d3737398906cc5b39c3",
+    "active_generation": 23,
+    "resource_reuse": true,
+    "safe_off": true,
+    "safe_off_source": "job_details",
+    "flash_result": "PASS",
+    "attempts": 1,
+    "error": null,
+    "elapsed_ms": 8800
+   },
+   "job_submission_count": 1,
+   "auto_retry": "DISABLED",
+   "acknowledged": false
+  },
+  "counts": {
+   "pass": 2,
+   "fail": 0,
+   "blocked": 0,
+   "unknown": 0,
+   "sites": 2,
+   "attempts": 2
+  },
+  "auto_retry": "DISABLED"
+ }
+}

@@ -1,0 +1,144 @@
+{
+ "schema": "plasma.wp07.hil-step.v1",
+ "label": "run-2000k",
+ "sites": [
+  1,
+  2
+ ],
+ "operations": [
+  "erase",
+  "program",
+  "verify"
+ ],
+ "image": "v01",
+ "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+ "post_count": 1,
+ "retry_limit": 0,
+ "runtime_release": "0.2.1-c633e1c5b0eb",
+ "active_set_before": {
+  "already_active": false,
+  "asset_set_sha256": "108a90ccfcbed92042a8e31f1d604e93ca3d8e06d04a3d3737398906cc5b39c3",
+  "generation": 23
+ },
+ "plans": {
+  "1": {
+   "plan_id": "caa75d4e66121744f05f375c3b73664a",
+   "route": "z2-site2-stm32f103c8t6-operations",
+   "resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498",
+   "job_binding_sha256": "0710cd9e873fb1ad5581136a4b545a897fe240045251646deca3df62c7ad48d3",
+   "active_generation": 23
+  },
+  "2": {
+   "plan_id": "0ff9adb6a37c93db8eaa85b2c369a064",
+   "route": "z2-site2-stm32f103c8t6-operations",
+   "resource_set_sha256": "4c7833d89a59f814799c7d30404cc6a1d7bf4ddb114d2a210a4790c4b6055498",
+   "job_binding_sha256": "b3ed707bb8aa80b60db367e927b677922f709fed93a31bdf1dbfab1326980d2d",
+   "active_generation": 23
+  }
+ },
+ "plan_activation": {
+  "1": {
+   "activation_required": false,
+   "reuse": true
+  },
+  "2": {
+   "activation_required": false,
+   "reuse": true
+  }
+ },
+ "start_id": "2e5a05fd57a69699e798b113f58c623c",
+ "la_session_starting_mono_ns": 2175245792683366,
+ "la_session_starting_wall_ns": 1794838625838275512,
+ "post_mono_ns": 2175245793139548,
+ "post_wall_ns": 1794838625838730098,
+ "post_http": 202,
+ "batch_id": "d283829fadc2f2f0b72d990c398bdca2",
+ "batch_terminal_mono_ns": 2175259861438309,
+ "la_exit": 0,
+ "outcome": "PASS",
+ "counts": {
+  "pass": 2,
+  "fail": 0,
+  "blocked": 0,
+  "unknown": 0,
+  "sites": 2,
+  "attempts": 2
+ },
+ "units": {
+  "1": {
+   "outcome": "PASS",
+   "reason": null,
+   "attempts": 1,
+   "run_id": "60474636ec4c0b097243a54d368e5673",
+   "job_id": "job-20261116-141708-bf829495",
+   "safe_off": true,
+   "attempt_started_at": "2026-11-16T14:17:07.762269+00:00",
+   "attempt_finished_at": "2026-11-16T14:17:18.860935+00:00",
+   "run_http": 200,
+   "ppu_job": {
+    "state": "success",
+    "created_at": "2026-11-16T14:17:09.613358+00:00",
+    "started_at": "2026-11-16T14:17:10.512260+00:00",
+    "updated_at": "2026-11-16T14:17:18.787377+00:00"
+   },
+   "attempt_runs": [
+    {
+     "n": 1,
+     "run_id": "60474636ec4c0b097243a54d368e5673",
+     "job_id": "job-20261116-141708-bf829495",
+     "outcome": "PASS",
+     "safe_off": true,
+     "retry": null,
+     "run_http": 200,
+     "reason": null,
+     "receipt_safe_off": true,
+     "safe_off_source": "job_details",
+     "flash_result": "PASS"
+    }
+   ]
+  },
+  "2": {
+   "outcome": "PASS",
+   "reason": null,
+   "attempts": 1,
+   "run_id": "12b7f0d1e979e26ee6c29e02449a825e",
+   "job_id": "job-20261116-141708-bebf0f22",
+   "safe_off": true,
+   "attempt_started_at": "2026-11-16T14:17:07.605565+00:00",
+   "attempt_finished_at": "2026-11-16T14:17:17.747761+00:00",
+   "run_http": 200,
+   "ppu_job": {
+    "state": "success",
+    "created_at": "2026-11-16T14:17:08.512799+00:00",
+    "started_at": "2026-11-16T14:17:08.838871+00:00",
+    "updated_at": "2026-11-16T14:17:17.653313+00:00"
+   },
+   "attempt_runs": [
+    {
+     "n": 1,
+     "run_id": "12b7f0d1e979e26ee6c29e02449a825e",
+     "job_id": "job-20261116-141708-bebf0f22",
+     "outcome": "PASS",
+     "safe_off": true,
+     "retry": null,
+     "run_http": 200,
+     "reason": null,
+     "receipt_safe_off": true,
+     "safe_off_source": "job_details",
+     "flash_result": "PASS"
+    }
+   ]
+  }
+ },
+ "active_set_after": {
+  "already_active": false,
+  "asset_set_sha256": "108a90ccfcbed92042a8e31f1d604e93ca3d8e06d04a3d3737398906cc5b39c3",
+  "generation": 23
+ },
+ "post_execution": {
+  "busy": false,
+  "owner_kind": null,
+  "owner_id": null,
+  "active_job_count": 0
+ }
+}

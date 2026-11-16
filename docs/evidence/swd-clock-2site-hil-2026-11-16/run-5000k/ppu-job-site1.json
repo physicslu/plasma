@@ -1,0 +1,159 @@
+{
+ "protocol_version": "3.3",
+ "message_type": "response",
+ "ok": true,
+ "job": {
+  "job_id": "job-20261116-142035-061810e8",
+  "site_id": 1,
+  "operation": "programming",
+  "state": "success",
+  "created_at": "2026-11-16T14:20:35.443882+00:00",
+  "started_at": "2026-11-16T14:20:35.773363+00:00",
+  "cancel_requested": false,
+  "stage": "programming",
+  "stage_state": "completed",
+  "stage_progress_percent": 100.0,
+  "progress_percent": 100.0,
+  "bytes_done": 62800,
+  "bytes_total": 62800,
+  "attempt": 1,
+  "attempt_history": [
+   {
+    "attempt": 1,
+    "state": "success",
+    "started_at": "2026-11-16T14:20:35.790859+00:00",
+    "finished_at": "2026-11-16T14:20:47.474776+00:00",
+    "elapsed_ms": 11684,
+    "retry_scheduled": false,
+    "error": null
+   }
+  ],
+  "retry_exhausted": false,
+  "active_asset_set": {
+   "schema": "plasma.ppu.active-assets.v1",
+   "state": "ACTIVE",
+   "asset_set_sha256": "8338ef4004941b6d6740e73a1055957ef1125a858938aced46ca5f83181556c4",
+   "generation": 24,
+   "ready": false,
+   "fpga": "NOT_VERIFIED",
+   "profile": "NOT_VERIFIED"
+  },
+  "job_binding": {
+   "schema": "plasma.opf.job-image-binding.v1",
+   "job_binding_sha256": "498bb6c2b7e765576978fc311dd286d214b6782c8140ef58d44585f29049785a",
+   "resource_set_sha256": "6f1df96a68b146878aaa4ae7db44a91b3ab4a9d9ba8bc1ed58a7706dfb080c3a",
+   "image_asset_sha256": "200eb75daeff3dc79b148bb2bfd05956477c7e3d63a1bfa1ebfe4ad6772b6453",
+   "operation": "programming",
+   "range": {
+    "address": 134217728,
+    "length": 62800
+   },
+   "operations": [
+    "erase",
+    "program",
+    "verify"
+   ],
+   "ppu_id": "z2-hil",
+   "site_id": 1,
+   "icpn": "STM32F103C8T6",
+   "profile": "stm32f103c8t6-site2-operations",
+   "asset_set_sha256": "8338ef4004941b6d6740e73a1055957ef1125a858938aced46ca5f83181556c4",
+   "generation": 24
+  },
+  "updated_at": "2026-11-16T14:20:47.476774+00:00",
+  "result": {
+   "job_id": "job-20261116-142035-061810e8",
+   "site_id": 1,
+   "operation": "programming",
+   "state": "success",
+   "created_at": "2026-11-16T14:20:35.443882+00:00",
+   "started_at": "2026-11-16T14:20:35.773363+00:00",
+   "finished_at": "2026-11-16T14:20:47.474958+00:00",
+   "elapsed_ms": 11684,
+   "attempts": 1,
+   "retry_exhausted": false,
+   "attempt_history": [
+    {
+     "attempt": 1,
+     "state": "success",
+     "started_at": "2026-11-16T14:20:35.790859+00:00",
+     "finished_at": "2026-11-16T14:20:47.474776+00:00",
+     "elapsed_ms": 11684,
+     "retry_scheduled": false,
+     "error": null
+    }
+   ],
+   "image_name": "job-image-e691ab23b835bfe0.bin",
+   "image_size": 62800,
+   "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+   "output_files": [],
+   "error": null,
+   "details": {
+    "stages": [
+     "erase",
+     "program",
+     "verify"
+    ],
+    "operations": [
+     "erase",
+     "program",
+     "verify"
+    ],
+    "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+    "programming": {
+     "adapter": "z2-abi5-swd-openocd5088",
+     "adapter_khz": 5000,
+     "icpn": "STM32F103C8T6",
+     "load_address": 134217728,
+     "openocd_rc": 0,
+     "operation": "programming",
+     "operations": [
+      "erase",
+      "program",
+      "verify"
+     ],
+     "result": "PASS",
+     "safe_off": true,
+     "safe_off_evidence": {
+      "admission_revoked": true,
+      "marker_present": true,
+      "termination_reason": null
+     },
+     "site": 1,
+     "steps": {
+      "erase": {
+       "erase_address": 134217728,
+       "erase_length": 63488
+      },
+      "program": {
+       "bytes_written": 62800,
+       "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+       "write_address": 134217728
+      },
+      "verify": {
+       "bytes_verified": 62800,
+       "readback_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+       "verify_address": 134217728
+      }
+     },
+     "swclk_half_period": 10,
+     "swclk_nominal_hz": 5000000,
+     "swclk_requested_hz": 5000000,
+     "target_config": "target/stm32f1x.cfg",
+     "session_id": "1a43cb584a6b64f9f139a9b7276ff1cc",
+     "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+     "opf_provider_package": "openocd-platform-reference",
+     "opf_profile_package": "stm32f103c8t6-site2-operations",
+     "opf_asset_set_sha256": "8338ef4004941b6d6740e73a1055957ef1125a858938aced46ca5f83181556c4",
+     "opf_profile_sha256": "b5bfc56a9ec9e106c466b7a39e7c8a006018401ad03d5f64071e96f017776edd",
+     "opf_driver_abi": "plasma_swd:5",
+     "opf_openocd_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+     "opf_engine_selection_sha256": "665d0d9523044958576656d1eaa8684b5ff9f20cd9e48540028dee6ab036605c",
+     "opf_worker_engine_selection_sha256": "665d0d9523044958576656d1eaa8684b5ff9f20cd9e48540028dee6ab036605c",
+     "opf_worker_epoch": "6afd980124800c89e77a56745d0df026",
+     "job_binding_sha256": "498bb6c2b7e765576978fc311dd286d214b6782c8140ef58d44585f29049785a"
+    }
+   }
+  }
+ }
+}
