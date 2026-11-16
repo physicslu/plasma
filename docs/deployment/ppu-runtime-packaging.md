@@ -101,15 +101,16 @@ The bootstrap remains Python-3.10-compatible. The installed Plasma runtime requi
 
 ## First-install versus upgrade configuration ownership
 
-A clean first installation generates every supported Site (1..`max_supported_sites`), disabled, so the Gateway desired-state path can enable any of them:
+A clean first installation generates the PPU's declared Site topology (1..`site_count`), disabled, in the canonical `ppu.yaml`. The installer accepts `--site-count N` (1..8, default 8); it writes exactly N Site entries and `server.max_concurrent_jobs=N`. `max_supported_sites=8` remains the capacity ceiling and is not the configured topology count. Unparameterized Bootstrap API deployment defaults to 8; it does not autodetect hardware:
 
 ```yaml
 server:
   max_supported_sites: 8
+  max_concurrent_jobs: 2  # example: 2 configured Sites
 
 sites:
   - {id: 1, enabled: false, interface: "mock"}
-  # ... through id: 8
+  - {id: 2, enabled: false, interface: "mock"}
 ```
 
 On an **upgrade**, `/etc/plasma/ppu.yaml` is operator/runtime state and must not be regenerated from first-install defaults. The legacy Site `target` is never the source for a real-hardware Job: ICPN must be supplied per Job. New Site Desired writes manage only `enabled` and `interface` and retire any stale per-Site `target` field on that Site; unrelated Sites and settings remain untouched. P3 preserves the existing canonical file, including Site Desired records, while updating release/service wiring; the only rewrite is the one-time migration of the exact former first-install line `sites: []` to the disabled defaults. See [Z2 PS installer](z2-ps-installer.md).
