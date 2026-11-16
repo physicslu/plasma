@@ -203,7 +203,7 @@ def test_failed_readback_or_safe_off_not_pass(monkeypatch):
     assert program.verify_job(bad, selection())["status"] == "FAIL_OR_INCOMPLETE"
 
 
-def test_job_http_payload_carries_one_programming_list_and_binding(monkeypatch):
+def test_job_http_payload_carries_one_programming_list_and_binding(monkeypatch, tmp_path):
     """The Job is signed under the enrolled controller (LOM-P2A-2 G13)."""
     auth = program.ppu_deploy_api._request_auth_module()
     credential, device = "c" * 64, "ppu-device-0123456789abcdef01234567"
@@ -243,10 +243,11 @@ def test_job_http_payload_carries_one_programming_list_and_binding(monkeypatch):
     from plasma_opf import bundle_v3
     route = bundle_v3.load_route(ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6-operations.json")
     built = bundle_v3.build_user_image_bundle(route, b"TEST")
-    chosen = program.Selection(built.archive, built.archive_sha256, built.asset_package_id,
-                               built.image_sha256, built.image_size, built.profile_id,
-                               route.provider_id, route.icpn, 2)
-    patch_ready(monkeypatch)
+    archive = tmp_path / "programming.zip"
+    archive.write_bytes(built.archive)
+    chosen = program.read_bundle(archive, site=2, package=None)
+    from .test_ofe1b_resource_reuse_job_image import submit, PPU_ID
+    monkeypatch.setattr(program, "readiness", lambda *args: {"ppu_id": PPU_ID})
     assert program.post_once(HOST, chosen, credential=credential, device_id=device) == JOB
     assert len(observed) == 1
     body = observed[0]
@@ -255,6 +256,28 @@ def test_job_http_payload_carries_one_programming_list_and_binding(monkeypatch):
     assert body["job_binding"]["site_id"] == 2
     assert body["image_asset"]["sha256"] == chosen.firmware_sha
     assert "asset_base64" in body and "operation" not in body
+
+    # Admit the CLI's actual signed payload through the real PPU pipeline,
+    # rather than accepting a fabricated 202 as proof of compatibility.
+    from .test_c3_rest_flash_cycle import Stack, short_tmp, run
+
+    async def scenario():
+        with short_tmp() as folder:
+            async with Stack(Path(folder), in_process=True,
+                             bundle_options={"programming_bundle": built}) as stack:
+                status, job = await submit(stack, body)
+                assert status == 202 and job["state"] == "success", job
+                expected_sha = bundle_v3.sha256_hex(bundle_v3.canonical_json(body["job_binding"]))
+                assert job["job_binding"]["job_binding_sha256"] == expected_sha
+                assert job["result"]["details"]["programming"]["job_binding_sha256"] == expected_sha
+                assert program.verify_job(job, chosen)["status"] == "PASS"
+                job["result"]["details"]["programming"]["safe_off"] = False
+                assert program.verify_job(job, chosen)["status"] == "FAIL_OR_INCOMPLETE"
+                body["job_binding"]["site_id"] = 1
+                status, denied = await submit(stack, body)
+                assert status == 400, denied
+                assert len(stack.sim.argvs) == 1  # no second execution
+    run(scenario())
 
 
 def test_existing_private_bootstrap_assets_read_only(monkeypatch):

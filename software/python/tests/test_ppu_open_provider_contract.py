@@ -149,6 +149,7 @@ def test_two_provider_routes_use_one_bundle_job_contract_without_catalog(tmp_pat
 
 
 @pytest.mark.parametrize("change,code", [
+    ({"operations": ["flash_cycle"]}, "PROVIDER_DESCRIPTOR_INVALID"),
     ({"operations": ["program"]}, "OPERATION_UNSUPPORTED"),
     ({"provider_package": "missing"}, "PROVIDER_SELECTION_MISMATCH"),
     ({"max_image_bytes": 4}, "IMAGE_OUT_OF_BOUNDS"),
@@ -161,6 +162,15 @@ def test_incomplete_provider_contract_fails_closed(tmp_path, change, code):
                           provider="reference-provider", profile="profile",
                           operation="programming", site_id=2, image_size=1024,
                           hardware=observed(), operations=("erase", "program", "verify"))
+
+
+def test_retired_flash_cycle_job_is_rejected_before_provider_resolution(tmp_path):
+    root, digest, _ = staged_provider(tmp_path)
+    with pytest.raises(providers.ProviderDenied, match="JOB_CONTRACT_INVALID"):
+        resolve(root, asset_set_sha256=digest, target="arbitrary-target",
+                provider="reference-provider", profile="profile",
+                operation="flash_cycle", site_id=2, image_size=1024,
+                hardware=observed())
 
 
 def test_actual_hardware_and_active_bytes_must_still_match(tmp_path):

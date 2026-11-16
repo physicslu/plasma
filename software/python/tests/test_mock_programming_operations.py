@@ -289,18 +289,25 @@ def test_a_failed_closing_step_never_reports_safe_off(tmp_path: Path):
 # ------------------------------------------------------- admission is not skipped
 
 
-def test_programming_without_an_admitted_binding_is_refused(tmp_path: Path):
+@pytest.mark.parametrize("metadata", [{}, {"job_binding": {
+    "operation": "programming", "operations": ["erase", "program", "verify"]}}])
+def test_programming_without_an_admitted_binding_is_refused(tmp_path: Path, metadata):
     async def scenario():
         manager, identity = await started_manager(mock_config(tmp_path))
         try:
             # No job_binding metadata at all: nothing admits this Job, and
             # the interface has no default list or range to fall back on.
-            result = await manager.submit(JobRequest(
+            request = JobRequest(
                 site_id=SITE, operation=Operation.PROGRAMMING, image=IMAGE_A,
-                target=ICPN, max_retries=0, timeout_s=10.0, metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}}))
-            assert result.state is not JobState.SUCCESS
-            assert "requires a Job Binding operations list" in result.error.message
-            assert "programming" not in (result.details or {})
+                target=ICPN, max_retries=0, timeout_s=10.0, metadata=metadata)
+            if metadata:
+                with pytest.raises(PlasmaError, match="JOB_BINDING_NOT_QUALIFIED"):
+                    await manager.submit(request)
+            else:
+                result = await manager.submit(request)
+                assert result.state is not JobState.SUCCESS
+                assert "requires a Job Binding operations list" in result.error.message
+                assert "programming" not in (result.details or {})
         finally:
             await manager.shutdown()
     asyncio.run(scenario())

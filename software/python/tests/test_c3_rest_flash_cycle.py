@@ -372,6 +372,16 @@ class Stack:
         self.max_retries = max_retries
 
     async def __aenter__(self):
+        try:
+            return await self._enter()
+        except BaseException:
+            # __aexit__ is not called when setup fails (e.g. socket denied).
+            # Restore the Engine patch before another Stack is constructed.
+            if hasattr(self, "opf_context"):
+                self.opf_context.close()
+            raise
+
+    async def _enter(self):
         # Real installed/verified Bundle + production Runtime composition.
         # Only root ownership and physical process edges are test substitutes.
         from .test_opf_4a_openocd_reference import installed_bundle

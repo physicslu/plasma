@@ -98,6 +98,31 @@ EXPECTED_ACTIONS = {
 
 # ---------------------------------------------------------- operations contract
 
+def test_stack_setup_failure_restores_engine_selection(monkeypatch):
+    import ppu_site_engine
+    from plasma_server.server import PlasmaServer
+    original = ppu_site_engine.load_engine
+
+    async def denied(*args, **kwargs):
+        raise PermissionError("synthetic socket denial")
+
+    monkeypatch.setattr(PlasmaServer, "start", denied)
+
+    async def scenario():
+        with short_tmp() as folder:
+            with pytest.raises(PermissionError, match="synthetic socket denial"):
+                async with Stack(Path(folder), in_process=False):
+                    pytest.fail("setup must fail")
+        assert ppu_site_engine.load_engine is original
+        with short_tmp() as folder:
+            stack, _ = ops_stack(folder)
+            async with stack:
+                assert stack.adapter.openocd_root.exists()
+        assert ppu_site_engine.load_engine is original
+
+    run(scenario())
+
+
 def test_operations_list_is_ordered_unique_and_erase_verify_is_refused():
     for legal in LEGAL:
         assert bundle_v3.normalize_operations(legal) == legal
