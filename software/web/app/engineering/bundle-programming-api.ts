@@ -169,6 +169,9 @@ export type ProgrammingRun = {
     active_asset_set_sha256: string | null;
     resource_reuse: boolean;
     safe_off: boolean | null;
+    // Where SAFE_OFF was read: the Job details (any outcome) or, for a
+    // definite Site Worker FAIL, the PPU Job error. Absent on older receipts.
+    safe_off_source?: "job_details" | "site_worker_failure" | null;
     flash_result: string | null;
     elapsed_ms: number | null;
   } | null;

@@ -24,6 +24,7 @@ from plasma_manager.programming import (  # noqa: E402
     CONFIRM_TOKEN,
     BundleProgrammingWorkflow,
     ProgrammingError,
+    _site_worker_failure,
 )
 from plasma_manager.server import PPUOperationGate  # noqa: E402
 from plasma_opf import bundle_v3  # noqa: E402
@@ -138,6 +139,10 @@ class FakeGateway:
         self.read_file_tamper = False
         self.downloads = 0
         self.posts: list[dict] = []
+        # The real C-3 PPU shape of a definite Site Worker FAIL: Job ``error``,
+        # empty ``details``, Worker result in ``error.context``. A dict tampers
+        # ``site_worker_result`` (key "context" tampers the context instead).
+        self.worker_failure: bool | dict = False
         self.polls = 0
 
     def _resp(self, status, payload):
@@ -221,6 +226,9 @@ class FakeGateway:
                             "safe_off": self.safe_off}
                 if state == "success":
                     output_files = ["/var/lib/plasma/output/job/read_SITE2_flash.bin"]
+            error, details = None, {kind: evidence}
+            if self.worker_failure and state in ("failed", "error"):
+                error, details = self._worker_error(post, kind, binding), {}
             return self._resp(200, {"job": {
                 "job_id": self._job_id(), "state": state,
                 # The Site the Job was submitted for, not a fixed one: a Batch
@@ -230,9 +238,9 @@ class FakeGateway:
                 "job_binding": echo,
                 "result": {"state": state, "image_sha256": sha if has_image else None,
                            "image_size": len(sent) if has_image else 0,
-                           "attempts": 1, "elapsed_ms": 10000, "error": None,
+                           "attempts": 1, "elapsed_ms": 10000, "error": error,
                            "output_files": output_files,
-                           "details": {kind: evidence}}}})
+                           "details": details}}})
         if method == "GET" and path.endswith("/files/read_SITE2_flash.bin"):
             self.downloads += 1
             length = self.posts[-1]["job_binding"]["range"]["length"]
@@ -241,6 +249,27 @@ class FakeGateway:
                 data = b"X" + data[1:]
             return 200, {"Content-Type": "application/octet-stream"}, data
         raise AssertionError(f"unexpected Gateway call {method} {path}")
+
+    def _worker_error(self, post, kind, binding):
+        site = post.get("site_id", 2)
+        tamper = dict(self.worker_failure) if isinstance(self.worker_failure, dict) else {}
+        context_tamper = tamper.pop("context", {})
+        worker = {"site": site, "operation": kind, "adapter": "z2-abi5-swd-openocd5088",
+                  "result": "FAIL", "code": "VERIFY_MISMATCH", "failed_step": "verify",
+                  "openocd_rc": 0, "readback_sha256": "0" * 64,
+                  "safe_off": self.safe_off,
+                  "safe_off_evidence": {"admission_revoked": True, "marker_present": True,
+                                        "termination_reason": None}, **tamper}
+        context = {"job_id": self._job_id(), "site_id": site, "icpn": ICPN,
+                   **({"operation": kind, "operations": post["operations"],
+                       "address": binding["range"]["address"],
+                       "length": binding["range"]["length"]} if kind == "programming" else {}),
+                   "site_worker_result": worker, **context_tamper}
+        return {"error_code": "E5002", "error_type": "INTERFACE_FAILURE",
+                "message": "C-3 programming failed: VERIFY_MISMATCH", "recoverable": True,
+                "failure_source": "infrastructure", "site_id": site,
+                "job_id": self._job_id(), "operation": kind, "retry_count": 0,
+                "context": context}
 
     def _job_id(self):
         # Every submitted Job has its own identity.
@@ -558,6 +587,100 @@ def test_safe_off_failure_is_reported_as_distinct_fail(tmp_path):
     _planned, run = run_once(workflow)
     assert run["outcome"] == "FAIL" and run["reason"] == "SAFE_OFF_NOT_VERIFIED"
     assert run["receipt"]["safe_off"] is False and len(gateway.posts) == 1
+
+
+@pytest.mark.parametrize("operations", [None, ["verify"], ["erase", "program", "verify"]])
+def test_definite_site_worker_fail_keeps_its_safe_off_observation(tmp_path, operations):
+    """WP-07 step 6b: the PPU reports a Site Worker FAIL as a Job ``error``
+    with the SAFE_OFF observation in ``error.context.site_worker_result``."""
+    if operations is None:
+        gateway = FakeGateway(image=image(), job_final="error")
+        workflow, _c, _ = make(tmp_path, gateway=gateway)
+        planned = workflow.plan(ALIAS, plan_body())["plan"]
+    else:
+        workflow, _c, gateway = ops_workflow(tmp_path, job_final="error")
+        planned = workflow.plan(ALIAS, ops_body(operations))["plan"]
+    gateway.worker_failure = True
+    started = workflow.start(ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
+    run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+    receipt = run["receipt"]
+    assert run["outcome"] == "FAIL" and run["reason"] == "JOB_NOT_SUCCESS", run
+    assert receipt["safe_off"] is True and receipt["flash_result"] == "FAIL"
+    assert receipt["safe_off_source"] == "site_worker_failure"
+    assert receipt["error"]["context"]["site_worker_result"]["code"] == "VERIFY_MISMATCH"
+    failed = [s for s in run["steps"] if s["step"] == "VERIFY_RECEIPT"][0]["failed_checks"]
+    assert "SAFE_OFF_NOT_VERIFIED" not in failed
+    assert len(gateway.posts) == 1
+
+
+@pytest.mark.parametrize("tamper", [
+    {"safe_off": False},
+    {"safe_off": None},
+    {"safe_off": "true"},
+    {"result": "PASS"},
+    {"site": 1},
+    {"site": True},
+    {"operation": "flash_cycle"},
+    {"context": {"outcome_unknown": True}},
+    {"context": {"site_id": 1}},
+    {"context": {"job_id": "job-other"}},
+    {"context": {"operation": "read"}},
+    {"context": {"site_worker_result": "FAIL"}},
+])
+def test_site_worker_fail_without_matching_proof_is_not_safe_off(tmp_path, tamper):
+    workflow, _c, gateway = ops_workflow(tmp_path, job_final="error")
+    gateway.worker_failure = tamper
+    planned = workflow.plan(ALIAS, ops_body(["verify"]))["plan"]
+    started = workflow.start(ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
+    run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+    assert run["outcome"] == "FAIL" and run["reason"] == "SAFE_OFF_NOT_VERIFIED", run
+    assert run["receipt"]["safe_off"] in (None, False)
+
+
+def test_worker_failure_proof_never_rescues_a_job_reported_success(tmp_path):
+    # Only a terminal failure may use the error context; details stay the
+    # only evidence for a success claim.
+    workflow, _c, gateway = ops_workflow(tmp_path, safe_off=False)
+    gateway.worker_failure = True
+    planned = workflow.plan(ALIAS, ops_body(["verify"]))["plan"]
+    started = workflow.start(ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
+    run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+    assert run["reason"] == "SAFE_OFF_NOT_VERIFIED"
+    assert run["receipt"]["safe_off_source"] == "job_details"
+
+
+def _ppu_failed_job(**change):
+    worker = {"site": 1, "operation": "programming", "result": "FAIL",
+              "code": "VERIFY_MISMATCH", "safe_off": True}
+    context = {"job_id": "job-1", "site_id": 1, "operation": "programming",
+               "site_worker_result": worker}
+    error = {"job_id": "job-1", "site_id": 1, "context": context}
+    result = {"state": "error", "attempts": 1, "details": {}, "error": error}
+    job = {"job_id": "job-1", "state": "error", "site_id": 1, "operation": "programming",
+           "result": result}
+    for path, value in change.items():
+        *parents, key = path.split(".")
+        target = {"job": job, "result": result, "error": error, "context": context,
+                  "worker": worker}[parents[0]] if parents else job
+        target[key] = value
+    return job, result
+
+
+@pytest.mark.parametrize("change", [
+    {"job.state": "success"}, {"job.state": "cancelled"}, {"result.state": "success"},
+    {"result.attempts": 2}, {"result.attempts": True},
+    {"job.job_id": None}, {"error.job_id": "job-2"}, {"context.job_id": "job-2"},
+    {"job.site_id": 2}, {"error.site_id": 2}, {"context.site_id": 2}, {"worker.site": 2},
+    {"job.operation": "read"}, {"context.operation": "read"}, {"worker.operation": "read"},
+    {"context.outcome_unknown": True}, {"worker.result": "PASS"}, {"worker.safe_off": 1},
+    {"context.site_worker_result": None}, {"error.context": None}, {"result.error": None},
+])
+def test_site_worker_failure_requires_every_identity(change):
+    run, plan = SimpleNamespace(site=1), SimpleNamespace(operation="programming")
+    job, result = _ppu_failed_job()
+    assert _site_worker_failure(run, plan, job, result)["safe_off"] is True
+    job, result = _ppu_failed_job(**change)
+    assert _site_worker_failure(run, plan, job, result) == {}
 
 
 def test_readback_mismatch_fails(tmp_path):
