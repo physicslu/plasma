@@ -157,8 +157,9 @@ export function managedProductionSnapshot(
     : "error";
   return {
     batch_id: batch.batch_id, state,
-    // The current Manager Batch response has no timestamps; never fabricate one.
-    created_at: "", started_at: null, finished_at: null,
+    // Forward Manager truth unchanged, including unknown historical timing.
+    created_at: batch.created_at ?? "",
+    started_at: batch.started_at ?? null, finished_at: batch.finished_at ?? null,
     operations: [...batch.operations],
     execution_policy: {
       repeat_count: 1,

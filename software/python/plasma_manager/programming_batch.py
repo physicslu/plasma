@@ -306,6 +306,7 @@ def migrate_batch_record(batch: Mapping[str, Any]) -> dict[str, Any]:
         "stop_requested": bool(batch.get("stop_requested")),
         "units": [unit],
         "created_at": batch.get("created_at"), "updated_at": batch.get("updated_at"),
+        "started_at": batch.get("started_at"), "finished_at": batch.get("finished_at"),
         "migrated_from": LEGACY_BATCH_SCHEMA,
     }
 
@@ -464,6 +465,9 @@ class ProgrammingBatchCoordinator:
                 "refusing to start without reconciliation: " + "; ".join(sorted(conflicts)))
 
     def _admit_loaded(self, batch: dict[str, Any]) -> None:
+        # Old journals have no authoritative timing; never infer it from updates.
+        batch.setdefault("started_at", None)
+        batch.setdefault("finished_at", None)
         if batch.get("outcome") is None:
             self._close_interrupted(batch)
         self._batches[batch["batch_id"]] = batch
@@ -500,7 +504,7 @@ class ProgrammingBatchCoordinator:
                      execution_status="STOPPED" if batch.get("stop_requested") else "COMPLETED",
                      reason=batch_reason(batch["units"], outcome,
                                          batch.get("reason") or "MANAGER_RESTARTED"),
-                     updated_at=_now())
+                     finished_at=self._terminal_time(batch), updated_at=_now())
 
     def _persist_locked(self) -> None:
         try:
@@ -707,6 +711,7 @@ class ProgrammingBatchCoordinator:
                       "status": "NOT_RUN", "outcome": None, "reason": None,
                       "failure_domain": None, "attempts": []}
                      for target in targets for site in target["site_ids"]]
+            accepted_at = _now()
             batch = {
                 "schema": BATCH_SCHEMA, "batch_id": secrets.token_hex(16),
                 "start_id": start_id,
@@ -718,7 +723,8 @@ class ProgrammingBatchCoordinator:
                 "execution_status": "RUNNING", "outcome": None, "reason": None,
                 "stop_requested": False, "failure_domain": None, "units": units,
                 "journal_persisted": True,
-                "created_at": _now(), "updated_at": _now(),
+                "created_at": accepted_at, "updated_at": accepted_at,
+                "started_at": accepted_at, "finished_at": None,
             }
             # Admission is journalled first: from here on the start can
             # never reconcile as "not accepted". Partial admission has still
@@ -877,10 +883,25 @@ class ProgrammingBatchCoordinator:
                             failure_domain=SHARED_CONTROL_FAILURE)
         self._finish(batch, f"SHARED_CONTROL_FAILURE_{reason}")
 
+    @staticmethod
+    def _terminal_time(batch: Mapping[str, Any]) -> str | None:
+        # Recovery terminalizes NOW, not at an imagined last Job completion.
+        # A wall-clock correction must never produce a negative duration.
+        if batch.get("finished_at") is not None:
+            return batch["finished_at"]
+        try:
+            start = datetime.fromisoformat(batch["started_at"])
+            if start.utcoffset() is None:
+                return None
+        except (KeyError, TypeError, ValueError):
+            return None
+        return max(datetime.now(timezone.utc), start).astimezone(timezone.utc).isoformat()
+
     def _finish(self, batch: dict[str, Any], reason: str | None) -> None:
         outcome = aggregate_outcome(batch["units"])
         changes = {
             "state": "finished", "outcome": outcome,
+            "finished_at": self._terminal_time(batch),
             "execution_status": "STOPPED" if batch["stop_requested"] else "COMPLETED",
             "reason": batch_reason(batch["units"], outcome, reason),
         }

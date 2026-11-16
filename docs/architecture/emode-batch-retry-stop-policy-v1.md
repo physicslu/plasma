@@ -81,3 +81,14 @@ started, the attempt's own outcome when the run had finished, otherwise `OUTCOME
 under a PPU alias; the alias-scoped entry retired in PR-C (architecture contract §5.8).
 A Batch is refused up front (no Batch, no plan) while another Batch or run is in progress or an
 `OUTCOME_UNKNOWN` run is unacknowledged on that PPU.
+
+Batch timing uses Manager UTC ISO timestamps: `started_at` is persisted at Batch
+acceptance, and `finished_at` at terminalization after all lanes finish (including
+Stop Queuing, blocked, failure and unknown outcomes). Recovery terminalizes an
+interrupted Batch at recovery time; it does not infer when a remote Job finished.
+The finish is stable across GET/reconciliation and restart, and is clamped to the
+start if the Manager clock moves backwards. Duration is per-Batch wall time,
+never summed Site/attempt time. Older journals without authoritative timestamps
+remain unknown; `created_at` and mutable `updated_at` are not timing substitutes.
+The Console preview shows zero, active timing ticks each second, and terminal
+timing freezes at the Manager finish; missing/invalid timing displays `UNKNOWN`.
