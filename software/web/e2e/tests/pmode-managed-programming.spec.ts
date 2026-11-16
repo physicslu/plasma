@@ -347,3 +347,30 @@ test("a journal response for a different Start cannot replace the immutable relo
   expect(counters.batches).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
 });
+
+
+test("concurrent Site lanes: every Site gets its own Manager run receipt and one evidence line", async ({ page }) => {
+  // WP-07: with max_concurrent_jobs 2 the Manager runs both Sites at once and
+  // the Batch carries only the most recently submitted run as current_run.
+  const counters = await mockManager(page, { ppus: [{ ...Z2, enabledSites: [1, 2] }], concurrentLanes: true });
+  const { job, start } = await prepare(page, [["z2", [1, 2]]]);
+  await job.getByLabel("Site Retry Limit").fill("0");
+  await start.click();
+  await finished(page);
+  await expect(site(page, "z2", 1)).toHaveAttribute("data-site-state", "success");
+  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "success");
+  const log = factoryLog(page);
+  for (const siteId of [1, 2]) {
+    const label = `PPU z2 · PPU ID z2-hil · SITE-0${siteId}`;
+    await expect(log).toContainText(new RegExp(`\\[RUN\\] PASS · Run [0-9a-f]{32} · Job \\S+ · PPU z2 · Site ${siteId} · SAFE_OFF VERIFIED.* · ${label}`));
+    await expect(log).toContainText(new RegExp(`\\[RECEIPT\\] Job \\S+ · Operations .* · ${label}`));
+    await expect(log).toContainText(`[SITE] ${label} · PASS`);
+  }
+  const text = await log.innerText();
+  for (const siteId of [1, 2]) {
+    const evidence = `[EVIDENCE] Site interface: openocd · PPU z2 · PPU ID z2-hil · SITE-0${siteId}`;
+    expect(text.split(evidence).length - 1).toBe(1);
+  }
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.jobs).toHaveLength(2);
+});

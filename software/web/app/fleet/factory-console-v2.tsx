@@ -26,12 +26,12 @@ import {
   loadManagedTopology, loadProgrammingRoutes,
   ManagedProgrammingBlocked, ManagedStartOutcomeUnknown,
   PROGRAMMING_OPERATION_LABELS, batchSiteVerdict, routeDeclaring, routeSequenceOperations,
-  runManagedBatch, runOfUnit,
+  loadUnitRun, runManagedBatch, runOfUnit,
   type ManagedTopology, type ProgrammingSource, type RoutesState,
 } from "../programming/managed-programming";
 import { getProgrammingBatch, getStartReconciliation, normalizeOperations,
   operationsTakeImage, stopProgrammingBatch,
-  type ProgrammingBatch, type SequenceOperation,
+  type ProgrammingBatch, type ProgrammingRun, type SequenceOperation,
 } from "../engineering/bundle-programming-api";
 import { resolveProgrammingCapabilities } from "../programming-capabilities";
 import {
@@ -482,35 +482,53 @@ export default function FactoryConsoleV2() {
     }].slice(-500));
   }, []);
 
-  /** Never treat a Batch-level HTTP result as a Site PASS. */
+  /**
+   * Never treat a Batch-level HTTP result as a Site PASS.
+   *
+   * The Manager runs Sites in concurrent lanes while a Batch carries one
+   * current_run, so each finished Site's run is read by its run_id and that
+   * Site's lines are logged together once it is loaded.
+   */
   const logManagedBatch = useCallback((batch: ProgrammingBatch, topology: ManagedTopology | null) => {
     for (const unit of batch.units) {
       const last = unit.attempts[unit.attempts.length - 1] ?? null;
       if (unit.outcome == null && last?.outcome == null) continue;
       const key = `${batch.batch_id}:${unit.ppu_alias}:${unit.site_id}`;
-      const verdict = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
-      const signature = `${verdict.verdict}:${last?.attempt ?? 0}:${last?.outcome ?? "—"}`;
+      const signature = `${unit.outcome ?? "—"}:${last?.attempt ?? 0}:${last?.outcome ?? "—"}`;
       if (loggedRecords.current.get(key) === signature) continue;
       loggedRecords.current.set(key, signature);
       const ppu = topology?.ppus.find(item => item.alias === unit.ppu_alias);
       const interfaceName = ppu?.sites.find(site => site.site_id === unit.site_id)?.interface ?? "unknown";
       const label = `PPU ${unit.ppu_alias} · PPU ID ${ppu?.ppuId ?? "unknown"} · ${siteLabel(unit.site_id)}`;
-      const latestRun = runOfUnit(batch, unit);
-      if (latestRun?.outcome != null) {
-        if (latestRun.outcome === "PASS" && verdict.verdict !== "PASS") {
-          appendLog(`[EVIDENCE] MANAGER RUN PASS REJECTED · ${verdict.reason ?? "unverified receipt"} · ${label}`, "ERROR");
-        } else {
-          for (const line of programmingRunLogLines(latestRun, { executionInterface: interfaceName })) {
-            appendLog(`${line} · ${label}`, verdict.verdict === "PASS" ? "INFO" : "ERROR");
+      const logUnit = (latestRun: ProgrammingRun | null, loadFailed: boolean) => {
+        const verdict = batchSiteVerdict(batch, unit, latestRun);
+        let evidenceLogged = false;
+        if (latestRun?.outcome != null) {
+          if (latestRun.outcome === "PASS" && verdict.verdict !== "PASS") {
+            appendLog(`[EVIDENCE] MANAGER RUN PASS REJECTED · ${verdict.reason ?? "unverified receipt"} · ${label}`, "ERROR");
+          } else {
+            // These lines carry the Site interface [EVIDENCE] line already.
+            for (const line of programmingRunLogLines(latestRun, { executionInterface: interfaceName })) {
+              appendLog(`${line} · ${label}`, verdict.verdict === "PASS" ? "INFO" : "ERROR");
+            }
+            evidenceLogged = true;
           }
+        } else if (loadFailed) {
+          appendLog(`[RUN] Run ${last?.run_id ?? "—"} · receipt not loaded from the Manager · ${label}`, "WARN");
         }
-      }
-      appendLog(`[SITE] ${label} · ${verdict.verdict} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${last?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${verdict.reason ?? unit.reason ? " · " + (verdict.reason ?? unit.reason) : ""}`,
-        verdict.verdict === "PASS" ? "INFO" : "WARN");
-      if (unit.outcome === "PASS" || unit.outcome === "FAIL") {
-        appendLog(interfaceName === "mock"
-          ? `[EVIDENCE] MOCK RESULT · Site interface mock · ${label} · never a hardware qualification`
-          : `[EVIDENCE] Site interface: ${interfaceName} · ${label}`);
+        appendLog(`[SITE] ${label} · ${verdict.verdict} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${last?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${verdict.reason ?? unit.reason ? " · " + (verdict.reason ?? unit.reason) : ""}`,
+          verdict.verdict === "PASS" ? "INFO" : "WARN");
+        if ((unit.outcome === "PASS" || unit.outcome === "FAIL") && !evidenceLogged) {
+          appendLog(interfaceName === "mock"
+            ? `[EVIDENCE] MOCK RESULT · Site interface mock · ${label} · never a hardware qualification`
+            : `[EVIDENCE] Site interface: ${interfaceName} · ${label}`);
+        }
+      };
+      const held = runOfUnit(batch, unit);
+      if (held || !last?.run_id) {
+        logUnit(held, false);
+      } else {
+        void loadUnitRun(batch, unit).then(run => logUnit(run, run == null), () => logUnit(null, true));
       }
     }
   }, [appendLog]);
