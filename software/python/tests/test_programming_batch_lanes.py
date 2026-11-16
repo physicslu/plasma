@@ -606,3 +606,39 @@ def test_slow_platform_admission_does_not_delay_other_ppu(tmp_path):
         release.set()
         batch = h.finish()
     assert batch['outcome'] == 'PASS'
+
+
+@pytest.mark.parametrize("count", [1, 2, 8])
+def test_batch_wall_clock_is_16_seconds_for_overlapping_sites(tmp_path, monkeypatch, count):
+    from datetime import datetime, timezone
+    import plasma_manager.programming_batch as module
+
+    class Clock(datetime):
+        value = datetime(2026, 11, 16, 12, tzinfo=timezone.utc)
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.value
+
+    monkeypatch.setattr(module, "datetime", Clock)
+    h = Harness(tmp_path, range(1, count + 1))
+    gateway = h.gateways["z2"]
+    h.start()
+    try:
+        assert all(event.wait(WAIT) for event in gateway.submitted.values())
+        assert gateway.max_active == count
+        saved = json.loads((tmp_path / "batches.json").read_text())["batches"][0]
+        assert saved["started_at"] == Clock.value.isoformat()
+        assert saved["finished_at"] is None
+        assert h.started["batch"]["started_at"] == saved["started_at"]
+        Clock.value = datetime(2026, 11, 16, 12, 0, 16, tzinfo=timezone.utc)
+    finally:
+        batch = h.finish()
+    assert batch["counts"]["pass"] == count
+    assert (datetime.fromisoformat(batch["finished_at"])
+            - datetime.fromisoformat(batch["started_at"])).total_seconds() == 16
+    for _ in range(2):
+        assert h.batches.status_batch(batch["batch_id"])["batch"]["finished_at"] == batch["finished_at"]
+    reloaded = ProgrammingBatchCoordinator(h.workflow, journal_path=tmp_path / "batches.json")
+    assert reloaded.status_batch(batch["batch_id"])["batch"]["finished_at"] == batch["finished_at"]
+    assert len(gateway.posts) == count

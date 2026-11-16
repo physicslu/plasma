@@ -185,6 +185,8 @@ export async function mockManager(page: Page, options: {
   concurrentLanes?: boolean;
   /** false: a Manager older than per-unit `progress` (only current_run has progress). */
   unitProgress?: boolean;
+  /** Authoritative Manager wall-clock fixture; never a sum of Site durations. */
+  batchTiming?: { startedAt: string; finishedAt: string };
 } = {}) {
   const ppus = options.ppus ?? [Z2];
   const counters: Counters = { plans: [], starts: [], downloads: [], batches: [], stops: [], jobs: [], polls: 0, acks: 0, issued: [], reconciles: [], voids: [], requests: [], mutations: [] };
@@ -575,6 +577,8 @@ export async function mockManager(page: Page, options: {
       icpn: "STM32F103C8T6", operations: batch.body.operations,
       source: "bundle_base64" in batch.body ? "bundle" : "image_base64" in batch.body ? "image" : "range",
       policy: { repeat: 1, retry_limit: Number(batch.body.retry_limit ?? 0), stop_policy: batch.body.stop_policy ?? { kind: "never" } },
+      started_at: options.batchTiming?.startedAt ?? "2026-11-16T12:00:00+00:00",
+      finished_at: batch.outcome ? (options.batchTiming?.finishedAt ?? "2026-11-16T12:00:16+00:00") : null,
       state: batch.outcome ? "finished" : "running",
       execution_status: batch.outcome ? (batch.stopRequested ? "STOPPED" : "COMPLETED") : "RUNNING",
       outcome: batch.outcome, reason: batch.reason, failure_domain: null,

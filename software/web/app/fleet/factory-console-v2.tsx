@@ -1397,12 +1397,14 @@ export default function FactoryConsoleV2() {
       }
       const batch = await getProgrammingBatch(reconciled.batch.batch_id);
       if (batch.start_id !== held) throw new Error("Manager Batch Start identity mismatch");
+      // Reconciliation may first observe an already terminal Batch. Retain its
+      // identity before releasing the Start hold so reload restores its time.
+      writeManagedBatch(batch.batch_id);
       setManagedBatchRecoveryId(null);
       const snapshot = managedProductionSnapshot(batch, managedTopology);
       applyBatchSnapshot(snapshot, catalog);
       logManagedBatch(batch, managedTopology);
       if (batch.outcome == null) {
-        writeManagedBatch(batch.batch_id);
         writeManagedStart(held);
         setManagedStartHold(held);
         beginActivity();
