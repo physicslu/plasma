@@ -27,8 +27,19 @@ Options object for this Reference implementation. It then checks:
    verifies both OpenOCD and Admission Python digests independently.
    Generic v3 opaque-resource admission does not grant execution.
 2. Selected Profile Package contains `data/plasma-flash-profile.json`, schema
-   `plasma.ppu.openocd-flash-profile.v1`, with exactly `icpn`, `target_config`,
+   `plasma.ppu.openocd-flash-profile.v1`, with `icpn`, `target_config`,
    `flash_base`, `flash_size`, and `erase_granularity` plus `schema`.
+   The optional `transport_settings: {"protocol":"swd","clock_hz":5000000}`
+   declares the Profile-owned SWD clock for all Sites of one Batch. Clock must
+   be an integer multiple of 1 kHz, 1 kHz..12.5 MHz (ABI-v5 RTL design ceiling,
+   **not** a DUT electrical or production qualification). Older existing
+   Profiles lacking this field keep the selected Engine's default speed;
+   no second Provider route, Bundle-side Engine SHA pin or Core version list
+   is introduced. A Job cannot override it through Provider Options.
+   Each Job's existing Profile SHA256 binding ensures immutable clock identity.
+   The C-3 adapter applies `adapter speed <kHz>` after the OpenOCD target cfg
+   and before `init`; per-Site execution remains isolated. Changing the
+   clock never requires an Engine re-selection, Worker restart or PL rebuild.
    The hash-verified selected Active Bundle supplies the Flash Profile for
    C-3 OPF `flash_cycle`; the Runtime checks the requested target, erase
    alignment and image-size bounds using the existing C-3 Worker validator.
