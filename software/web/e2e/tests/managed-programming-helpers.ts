@@ -177,6 +177,12 @@ export async function mockManager(page: Page, options: {
   reconcile?: (view: Record<string, unknown>) => Record<string, unknown> | number;
   /** HTTP status of the Batch start ID issue (default 200). */
   issueStatus?: number;
+  /**
+   * true: a Batch runs its Sites in concurrent lanes, as the real Manager does
+   * with max_concurrent_jobs > 1. Every Site is submitted at once and the
+   * Batch's current_run is only the most recently submitted run.
+   */
+  concurrentLanes?: boolean;
 } = {}) {
   const ppus = options.ppus ?? [Z2];
   const counters: Counters = { plans: [], starts: [], downloads: [], batches: [], stops: [], jobs: [], polls: 0, acks: 0, issued: [], reconciles: [], voids: [], requests: [], mutations: [] };
@@ -364,7 +370,8 @@ export async function mockManager(page: Page, options: {
     await r.fulfill(json({ ok: true, run: runRecord(runId) }));
   });
   // ---- EMode Batch: the mock Manager applies the same Retry / Stop contract
-  // over a Target Set, walking its Sites sequentially like the real one.
+  // over a Target Set. By default it walks the Sites one at a time; with
+  // `concurrentLanes` it runs them at once like the real lanes.
   type MockAttempt = { attempt: number; planId: string; runId: string; retry: Record<string, unknown> | null };
   type MockUnit = {
     alias: string; siteId: number; status: string; outcome: string | null; reason: string | null;
@@ -373,6 +380,7 @@ export async function mockManager(page: Page, options: {
   type MockBatch = {
     alias: string; body: Record<string, unknown>; stopRequested: boolean; startId: string | null;
     units: MockUnit[]; index: number; outcome: string | null; reason: string | null;
+    lastRunId?: string;
   };
   const batches = new Map<string, MockBatch>();
 
@@ -394,6 +402,7 @@ export async function mockManager(page: Page, options: {
     const runId = hex32(0xb000 + runs.size + 1);
     runs.set(runId, { alias: unit.alias, planId, polls: 0, acknowledged: false });
     unit.attempts.push({ attempt: unit.attempts.length + 1, planId, runId, retry: null });
+    batch.lastRunId = runId;
     unit.status = "RUNNING";
     Object.assign(startRecords.get(planId)!, { state: "CONSUMED", runId });
     counters.starts.push({ alias: unit.alias, body: { plan_id: planId, confirm: "PROGRAM" } });
@@ -477,8 +486,20 @@ export async function mockManager(page: Page, options: {
 
   function advance(batch: MockBatch) {
     if (batch.outcome) return;
+    if (options.concurrentLanes) {
+      // Every lane advances on its own; the Batch ends when every Site has.
+      for (const unit of batch.units) {
+        if (unit.outcome == null && unit.attempts.length) advanceUnit(batch, unit, () => {});
+      }
+      if (batch.units.every(unit => unit.outcome != null)) finish(batch, null);
+      return;
+    }
     const unit = batch.units[batch.index];
     if (!unit || !unit.attempts.length) return;
+    advanceUnit(batch, unit, () => nextUnit(batch));
+  }
+
+  function advanceUnit(batch: MockBatch, unit: MockUnit, done: () => void) {
     const last = unit.attempts[unit.attempts.length - 1];
     runs.get(last.runId)!.polls += 1;
     const run = runRecord(last.runId);
@@ -488,7 +509,7 @@ export async function mockManager(page: Page, options: {
       unit.outcome = run.outcome;
       unit.reason = run.reason;
       if (run.outcome === "OUTCOME_UNKNOWN") unit.failureDomain = "TARGET_TRANSACTION_UNKNOWN";
-      nextUnit(batch);
+      done();
       return;
     }
     const retryLimit = Number(batch.body.retry_limit ?? 0);
@@ -509,7 +530,7 @@ export async function mockManager(page: Page, options: {
       unit.status = "COMPLETED";
       unit.outcome = "FAIL";
       unit.reason = final;
-      nextUnit(batch);
+      done();
       return;
     }
     const made = makePlan(unit.alias, planBodyFor(batch, unit.siteId), last.attempt + 1);
@@ -533,8 +554,10 @@ export async function mockManager(page: Page, options: {
     }));
     const attempts = units.flatMap(unit => unit.attempts);
     const running = batch.units[batch.index] ?? batch.units[batch.units.length - 1];
-    const last = running?.attempts[running.attempts.length - 1]
-      ?? [...batch.units].reverse().flatMap(unit => unit.attempts).slice(-1)[0];
+    const last = options.concurrentLanes && batch.lastRunId
+      ? { runId: batch.lastRunId }
+      : running?.attempts[running.attempts.length - 1]
+        ?? [...batch.units].reverse().flatMap(unit => unit.attempts).slice(-1)[0];
     const outcomes = units.map(unit => unit.outcome);
     const record: Record<string, unknown> = {
       schema: "plasma.manager.programming-batch.v1", batch_id: batchId, start_id: batch.startId,
@@ -605,6 +628,19 @@ export async function mockManager(page: Page, options: {
     });
     batches.set(batchId, batch);
     submitAttempt(batch, batch.units[0], String(first.payload.plan_id));
+    if (options.concurrentLanes) {
+      for (const unit of batch.units.slice(1)) {
+        const made = makePlan(unit.alias, planBodyFor(batch, unit.siteId), 1);
+        if (made.payload) {
+          submitAttempt(batch, unit, String(made.payload.plan_id));
+        } else {
+          unit.status = "BLOCKED";
+          unit.outcome = "BLOCKED";
+          unit.reason = "programming_plan_refused";
+          unit.failureDomain = "TARGET_NOT_READY";
+        }
+      }
+    }
     if (options.batchLost) {
       return r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Manager unavailable" } }, 504));
     }

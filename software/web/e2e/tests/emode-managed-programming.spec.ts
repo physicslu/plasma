@@ -1229,8 +1229,8 @@ test("a definite FAIL is retried by the Manager with a new plan, run and Job; th
   expect(new Set(counters.jobs).size).toBe(2);
   expect(new Set(counters.starts.map(item => item.body.plan_id)).size).toBe(2);
   const log = jobLog(workspace);
-  await expect(log).toContainText(/\[ATTEMPT 1\/3\] FAIL · VERIFY_EVIDENCE_MISMATCH · Run \S+ · Job \S+ · SAFE_OFF VERIFIED · RETRY \(DEFINITE_FAIL_SAFE_OFF_VERIFIED\)/);
-  await expect(log).toContainText(/\[ATTEMPT 2\/3\] PASS · Run \S+ · Job \S+ · SAFE_OFF VERIFIED/);
+  await expect(log).toContainText(/\[ATTEMPT 1\/3\] SITE-02 · FAIL · VERIFY_EVIDENCE_MISMATCH · Run \S+ · Job \S+ · SAFE_OFF VERIFIED · RETRY \(DEFINITE_FAIL_SAFE_OFF_VERIFIED\)/);
+  await expect(log).toContainText(/\[ATTEMPT 2\/3\] SITE-02 · PASS · Run \S+ · Job \S+ · SAFE_OFF VERIFIED/);
   // One IC: PASS 1, FAIL 0, Yield 100 %; the failed attempt is not a FAIL IC.
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("100.0%");
@@ -1297,7 +1297,7 @@ test("STOP QUEUING only stops unsubmitted attempts: the running Job is observed 
   // The submitted Job is still running and is reported as running, not cancelled.
   await expect(jobLog(workspace)).toContainText("no further attempt will be submitted · the running Job is not cancelled");
   await expect(jobLog(workspace)).toContainText(/\[RESULT\] FAIL · STOP_REQUESTED_NO_FURTHER_ATTEMPT · Batch \S+ · 1 Site\(s\).*1 attempt\(s\)/, { timeout: 20_000 });
-  await expect(jobLog(workspace)).toContainText(/\[ATTEMPT 1\/4\] FAIL · PROGRAMMING_NOT_PASS/); // its real result
+  await expect(jobLog(workspace)).toContainText(/\[ATTEMPT 1\/4\] SITE-02 · FAIL · PROGRAMMING_NOT_PASS/); // its real result
   expect(counters.jobs).toHaveLength(1);
   expect(counters.stops).toEqual([JSON.stringify({ stop: "STOP_QUEUING" })]);
   // No cancel / abort / reset / recovery request ever left the Browser.
@@ -1351,7 +1351,7 @@ test("EMode programs many Sites of one PPU as ONE Batch, and each Site is judged
     /\[RESULT\] FAIL · \S+ · Batch \S+ · 2 Site\(s\) · PASS 1 · FAIL 1 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\) · one IC per Site/,
     { timeout: 20_000 });
   // ONE Batch carrying ONE Target Set, and one Job per Site: the Manager
-  // walks the Sites sequentially and the Browser never starts a second Batch.
+  // runs every Site of the Target Set and the Browser never starts a second Batch.
   expect(counters.batches).toHaveLength(1);
   expect(counters.batches[0].body.targets).toEqual([{ ppu_alias: "z2", site_ids: [2, 3] }]);
   expect(counters.batches[0].body).not.toHaveProperty("site_id");
@@ -1362,9 +1362,48 @@ test("EMode programs many Sites of one PPU as ONE Batch, and each Site is judged
   await expect(jobLog(workspace)).toContainText("[SITE RESULT] SITE-02 · PASS");
   await expect(jobLog(workspace)).toContainText("[SITE RESULT] SITE-03 · FAIL");
   await expect(jobLog(workspace)).toContainText("SITE-02, SITE-03 (2 Sites)");
+  // Each Site has its own attempt 1: neither attempt is hidden by the other.
+  await expect(jobLog(workspace)).toContainText("[ATTEMPT 1/1] SITE-02 · PASS");
+  await expect(jobLog(workspace)).toContainText("[ATTEMPT 1/1] SITE-03 · FAIL");
   // The Batch is one IC per Site: two ICs, one PASS and one FAIL.
   const kpis = workspace.getByLabel("Engineering Site status");
   await expect(workspace.locator('tr[data-site-selected="true"]')).toHaveCount(2);
   await expect(kpis).toBeVisible();
   expect(legacyRequests(counters)).toEqual([]);
+});
+
+
+test("concurrent Site lanes: every Site's attempt and Manager run receipt is logged, not only the current run", async ({ page }) => {
+  // WP-07: with max_concurrent_jobs 2 the Manager runs both Sites at once and
+  // the Batch carries only the most recently submitted run as current_run.
+  const counters = await mockManager(page, {
+    ppus: [{ ...Z2, enabledSites: [2, 3] }],
+    routes: [route(), operationsRoute()],
+    concurrentLanes: true,
+  });
+  const workspace = await open(page);
+  const job = await selectIc(page);
+  await workspace.getByLabel("Select SITE 2 for programming").check();
+  await workspace.getByLabel("Select SITE 3 for programming").check();
+  await job.getByLabel("Engineering Programming Image file").setInputFiles(firmwareFile);
+  await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
+
+  const log = jobLog(workspace);
+  await expect(log).toContainText(
+    /\[RESULT\] PASS · Batch \S+ · 2 Site\(s\) · PASS 2 · FAIL 0 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\)/,
+    { timeout: 20_000 });
+  for (const site of ["SITE-02", "SITE-03"]) {
+    await expect(log).toContainText(`[ATTEMPT 1/1] ${site} · PASS`);
+    await expect(log).toContainText(new RegExp(`\\[RUN\\] PASS · Run [0-9a-f]{32} · Job \\S+ · PPU z2 · Site ${Number(site.slice(-2))} · SAFE_OFF VERIFIED.* · ${site}`));
+    await expect(log).toContainText(new RegExp(`\\[RECEIPT\\] Job \\S+ · Operations .* · ${site}`));
+  }
+  // The receipts are read before the Site and Batch results are written; the
+  // Log shows the newest line first, so every receipt sits below every result.
+  const text = await log.innerText();
+  expect(text.indexOf("[RUN] PASS")).toBeGreaterThan(text.lastIndexOf("[SITE RESULT]"));
+  // The Console no longer claims a sequential Batch.
+  await expect(log).toContainText("· parallel Site lanes");
+  expect(text).not.toContain("sequential");
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.jobs).toHaveLength(2);
 });

@@ -349,7 +349,7 @@ test("removing the duplicated UI keeps the Manager evidence and the safety gates
 
 // --------------------------------------------------------------------- PR-C
 // The Batch and its start are Manager-owned resources, and EMode covers many
-// Sites of one PPU as ONE Batch the Manager schedules sequentially.
+// Sites of one PPU as ONE Batch the Manager runs in concurrent per-Site lanes.
 
 test("PR-C: the Console reaches the canonical Batch resource, never an alias-scoped one", async () => {
   const route = await read("app/api/manager/programming/[...path]/route.ts");
@@ -413,4 +413,18 @@ test("PR-C: every Site is judged on its own, and the Batch verdict never replace
   assert.match(emode, /run\.site_id === site\.site_id && run\.ppu_alias === ppu\?\.alias \? run : null/);
   // A lost Start answer holds every Site it was for.
   assert.match(emode, /const siteRefusal = holdSites\(held\)\.map\(id => \{/);
+});
+
+// WP-07 (2026-11-16): the Manager runs Sites of one PPU in concurrent lanes but
+// a Batch carries one current_run, so both pages read each Site's run by its
+// run_id, and EMode keys each attempt by its Site.
+test("concurrent lanes: each Site's run is read by run_id and each attempt is keyed by Site", () => {
+  assert.match(core, /export async function loadAttemptRun\(/);
+  assert.match(core, /run\.run_id === runId && run\.ppu_alias === alias && run\.site_id === siteId \? run : null/);
+  assert.match(emode, /const attemptKey = `\$\{attemptSite\}:\$\{attempt\.attempt\}`;/);
+  assert.match(emode, /loadAttemptRun\(next, request\.alias, attemptSite, attempt\.run_id\)/);
+  assert.match(emode, /await Promise\.allSettled\(pendingRunLogs\);/);
+  assert.match(factory, /loadUnitRun\(batch, unit\)/);
+  // The Console never claims a sequential Batch any more.
+  assert.doesNotMatch(emode, /· sequential/);
 });

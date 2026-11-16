@@ -11,6 +11,7 @@ import { programmingRunLogLines, safeOffLogLabel } from "../programming/programm
 import {
   batchSiteVerdict,
   batchVerdict,
+  loadAttemptRun,
   runOfUnit,
   describeBlocked,
   loadManagedTopology,
@@ -211,8 +212,9 @@ export default function ManagedProgrammingWorkspace() {
   const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
   const [source, setSource] = useState<ProgrammingSource>("image");
   const [file, setFile] = useState<File | null>(null);
-  // EMode covers many Sites of ONE PPU: the Manager schedules them
-  // sequentially as one Batch and judges each Site on its own.
+  // EMode covers many Sites of ONE PPU: the Manager runs them as one Batch in
+  // concurrent per-Site lanes (bounded by the PPU job limit) and judges each
+  // Site on its own.
   const [chosenSiteIds, setChosenSiteIds] = useState<number[]>([]);
   const [checkedOperations, setCheckedOperations] = useState(ALL_OPERATIONS);
 
@@ -247,7 +249,8 @@ export default function ManagedProgrammingWorkspace() {
   const [jobCollapsed, setJobCollapsed] = useState(false);
 
   const startLock = useRef(false);
-  const loggedAttempts = useRef(new Map<number, string>());
+  // Keyed by Site and attempt: every Site of a Batch has its own attempt 1.
+  const loggedAttempts = useRef(new Map<string, string>());
   const loggedBatchId = useRef<string | null>(null);
   const readUrls = useRef(new Map<number, string>());
   const logSequence = useRef(0);
@@ -662,12 +665,14 @@ export default function ManagedProgrammingWorkspace() {
     const context: RunContext = { alias: ppu.alias, siteIds: started, startedAt: wallClock(), finishedAt: null };
     const abort = new AbortController();
     abortRef.current = abort;
+    // Run receipts read by run_id log before the Site and Batch results.
+    const pendingRunLogs: Promise<void>[] = [];
     clearRunState();
     setRunContext(context);
     setPhase("locking");
     appendLog(`[START] ${operationLabel} · PPU ${ppu.alias} (${ppu.ppuId ?? "—"}) · ${started.map(siteLabel).join(", ")} (${started.length} Site${started.length === 1 ? "" : "s"}) · ${icpn} · ${
       request.file ? `${source.toUpperCase()} ${request.file.name}` : `no Programming Image · ${hex(request.range.address)} + ${request.range.length} B`
-    } · Retry ${retryLimit} · Stop Policy ${stopPolicy.kind === "never" ? "never" : `${stopPolicy.threshold} failed Site${stopPolicy.threshold === 1 ? "" : "s"}`} · Repeat 1 · sequential`, false, "USR");
+    } · Retry ${retryLimit} · Stop Policy ${stopPolicy.kind === "never" ? "never" : `${stopPolicy.threshold} failed Site${stopPolicy.threshold === 1 ? "" : "s"}`} · Repeat 1 · parallel Site lanes`, false, "USR");
     try {
       const final = await runManagedBatch(request, {
         onLocked: input => {
@@ -690,10 +695,13 @@ export default function ManagedProgrammingWorkspace() {
           // The Backend plan runs for every attempt; its technical result lives
           // in the Log and in Receipts & Diagnostics, not in a standing panel.
           for (const attempt of next.attempts) {
-            const seen = loggedAttempts.current.get(attempt.attempt);
+            const attemptSite = attempt.job_key.site_id;
+            const attemptKey = `${attemptSite}:${attempt.attempt}`;
+            const attemptLabel = `[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}] ${siteLabel(attemptSite)}`;
+            const seen = loggedAttempts.current.get(attemptKey);
             if (seen === undefined) {
-              loggedAttempts.current.set(attempt.attempt, "planned");
-              appendLog(`[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}] Plan ${attempt.plan_id} · Job Binding SHA256 ${attempt.job_binding_sha256}`, false, "DAT");
+              loggedAttempts.current.set(attemptKey, "planned");
+              appendLog(`${attemptLabel} · Plan ${attempt.plan_id} · Job Binding SHA256 ${attempt.job_binding_sha256}`, false, "DAT");
               const planned = next.current_run?.plan;
               if (planned?.plan_id === attempt.plan_id) {
                 const range = planned.job_binding.range;
@@ -703,25 +711,29 @@ export default function ManagedProgrammingWorkspace() {
               }
             }
             if (attempt.outcome && seen !== "finished") {
-              loggedAttempts.current.set(attempt.attempt, "finished");
+              loggedAttempts.current.set(attemptKey, "finished");
               const retry = attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} (${attempt.retry.reason})` : "";
-              appendLog(`[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}] ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOffLogLabel(attempt.safe_off, true)}${retry}`,
+              appendLog(`${attemptLabel} · ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOffLogLabel(attempt.safe_off, true)}${retry}`,
                 attempt.outcome !== "PASS", "PPU");
               // The Log is the only on-screen operation record: the Manager run
               // identities and its Receipt summary, never the whole JSON Receipt.
-              const finishedRun = next.current_run?.run_id === attempt.run_id ? next.current_run : null;
-              if (finishedRun) {
+              // Concurrent lanes: this attempt's run may not be the Batch's
+              // current_run, so it is read from the Manager by its run_id.
+              const failed = attempt.outcome !== "PASS";
+              pendingRunLogs.push(loadAttemptRun(next, request.alias, attemptSite, attempt.run_id).then(finishedRun => {
+                if (!finishedRun) return;
                 for (const line of programmingRunLogLines(finishedRun, {
                   executionInterface: interfaceOf(finishedRun.site_id),
                 })) {
-                  appendLog(line, attempt.outcome !== "PASS", "PPU");
+                  appendLog(`${line} · ${siteLabel(attemptSite)}`, failed, "PPU");
                 }
-              }
+              }, () => appendLog(`[RUN] ${siteLabel(attemptSite)} · Run ${attempt.run_id ?? "—"} · receipt not loaded from the Manager`, true, "PPU")));
             }
           }
         },
         onPollError: message => setStatusNote(message),
       }, abort.signal);
+      await Promise.allSettled(pendingRunLogs);
       const { verdict, reason } = batchVerdict(final);
       for (const unit of final.units) {
         const site = batchSiteVerdict(final, unit, runOfUnit(final, unit));
@@ -1150,7 +1162,7 @@ export default function ManagedProgrammingWorkspace() {
           <OperatorPanelHeader
             number={3}
             title="LIVE SITE STATUS"
-            meta={`${ppu?.displayName ?? "Selected PPU"} · ${ppu?.sites.length ?? 0} Sites · Selected ${siteIds.length} · sequential · Manager Fleet polling ${TOPOLOGY_POLL_MS / 1000} s`}
+            meta={`${ppu?.displayName ?? "Selected PPU"} · ${ppu?.sites.length ?? 0} Sites · Selected ${siteIds.length} · parallel Site lanes · Manager Fleet polling ${TOPOLOGY_POLL_MS / 1000} s`}
           />
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
             <table className="channelTable">
@@ -1163,8 +1175,8 @@ export default function ManagedProgrammingWorkspace() {
                   const selected = siteIds.includes(site.site_id);
                   const unit = batch?.units.find(item => item.site_id === site.site_id
                     && item.ppu_alias === (ppu?.alias ?? "")) ?? null;
-                  // The run the Browser holds belongs to ONE Site at a time:
-                  // the Batch is sequential, so another Site's row shows none.
+                  // The Batch carries ONE current_run; a concurrently running
+                  // Site without it shows the PPU Site state instead of progress.
                   const siteRun = run != null && runContext?.alias === ppu?.alias
                     && run.site_id === site.site_id && run.ppu_alias === ppu?.alias ? run : null;
                   const progress = siteRun ? runProgressPercent(siteRun) : null;

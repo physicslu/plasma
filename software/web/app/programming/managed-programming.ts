@@ -762,8 +762,9 @@ export type BatchVerdict = RunVerdict | "PARTIAL" | "STOPPED";
  *
  * PASS needs that Site's own Manager outcome AND the evidence the Manager
  * publishes for its last attempt: a PASS attempt, SAFE_OFF verified and a
- * confirmed Job Binding. The Batch is sequential, so the Browser holds the
- * full run receipt of one Site at a time; when it holds THIS Site's run, the
+ * confirmed Job Binding. The Batch carries one `current_run` while its Site
+ * lanes run concurrently, so the caller may hold THIS Site's run either from
+ * that field or read by run_id (`loadUnitRun`); when it holds it, the
  * receipt must pass `runVerdict` for exactly the requested list on exactly
  * this PPU and Site as well. A Site that has moved out of the current run is
  * judged on the Manager's record of it - never downgraded for being past.
@@ -834,6 +835,33 @@ export function runOfUnit(batch: ProgrammingBatch, unit: ProgrammingBatchUnit): 
   const attempt = unit.attempts[unit.attempts.length - 1];
   if (!run || !attempt || attempt.run_id == null || run.run_id !== attempt.run_id) return null;
   return run.ppu_alias === unit.ppu_alias && run.site_id === unit.site_id ? run : null;
+}
+
+/**
+ * The Manager run of one attempt of one Site, for the Log and the Site verdict.
+ *
+ * The Manager runs the Sites of one PPU in concurrent lanes but a Batch
+ * carries only one `current_run`, so a Site whose run is not that one is read
+ * from the Manager by its run_id. The run counts only when it is exactly that
+ * run on that PPU and Site; anything else is null, never another Site's evidence.
+ */
+export async function loadAttemptRun(
+  batch: ProgrammingBatch, alias: string, siteId: number, runId: string | null | undefined,
+  fetchRun: (alias: string, runId: string) => Promise<ProgrammingRun> = getProgrammingRun,
+): Promise<ProgrammingRun | null> {
+  if (!runId) return null;
+  const held = batch.current_run;
+  const run = held && held.run_id === runId ? held : await fetchRun(alias, runId);
+  return run.run_id === runId && run.ppu_alias === alias && run.site_id === siteId ? run : null;
+}
+
+/** The run of a Site's last attempt (see `loadAttemptRun`). */
+export function loadUnitRun(
+  batch: ProgrammingBatch, unit: ProgrammingBatchUnit,
+  fetchRun?: (alias: string, runId: string) => Promise<ProgrammingRun>,
+): Promise<ProgrammingRun | null> {
+  const attempt = unit.attempts[unit.attempts.length - 1];
+  return loadAttemptRun(batch, unit.ppu_alias, unit.site_id, attempt?.run_id, fetchRun);
 }
 
 export type RunVerdict = "RUNNING" | "PASS" | "FAIL" | "BLOCKED" | "OUTCOME_UNKNOWN";
