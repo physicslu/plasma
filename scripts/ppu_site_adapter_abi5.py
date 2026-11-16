@@ -231,11 +231,16 @@ class Abi5OpenocdAdapter:
 
     def _clock_evidence(self, profile: FlashProfile) -> dict[str, int]:
         khz = self._clock_khz(profile)
-        # Match native plasma_swd_khz's ceil division and FPGA divider bounds.
-        half_period = min(65535, max(4, (50000 + khz - 1) // khz))
-        return {"adapter_khz": khz, "swclk_requested_hz": khz * 1000,
-                "swclk_half_period": half_period,
-                "swclk_nominal_hz": 50_000_000 // half_period}
+        evidence = {"adapter_khz": khz}
+        # Preserve the exact legacy receipt when the selected Bundle Profile
+        # has no transport_settings; only explicit Profile clocks add evidence.
+        if profile.clock_hz is not None:
+            # Match native plasma_swd_khz's ceil division and FPGA bounds.
+            half_period = min(65535, max(4, (50000 + khz - 1) // khz))
+            evidence.update(swclk_requested_hz=khz * 1000,
+                            swclk_half_period=half_period,
+                            swclk_nominal_hz=50_000_000 // half_period)
+        return evidence
 
     def _operation_argv(self, site: int, bound: FlashImage | FlashRange,
                         actions: list[str]) -> list[str]:
