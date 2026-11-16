@@ -165,6 +165,40 @@ def test_job_binding_is_exact_and_verifiable():
             bundle_v3.verify_job_binding(binding, res, fw_x, **kwargs)
 
 
+def test_profile_clock_changes_resource_binding_but_all_sites_share_one_profile():
+    baseline = resource()
+    updated = route_payload()
+    updated["profile"]["flash_profile"]["transport_settings"] = {
+        "protocol": "swd", "clock_hz": 5_000_000,
+    }
+    clocked = bundle_v3.resource_set_descriptor(bundle_v3.parse_route(updated))
+    assert bundle_v3.resource_set_sha256(clocked) != bundle_v3.resource_set_sha256(baseline)
+    image = bundle_v3.image_asset_descriptor(clocked, FW_A)
+    bindings = [bundle_v3.job_image_binding(
+        clocked, image, ppu_id="z2-hil", site_id=site, operation="flash_cycle")
+        for site in (1, 2)]
+    assert bindings[0]["resource_set_sha256"] == bindings[1]["resource_set_sha256"]
+    assert bindings[0]["site_id"] != bindings[1]["site_id"]
+    for site, binding in zip((1, 2), bindings):
+        assert bundle_v3.verify_job_binding(
+            binding, clocked, image, ppu_id="z2-hil", site_id=site,
+            operation="flash_cycle")
+    with pytest.raises(BundleBuildError, match="JOB_BINDING_MISMATCH"):
+        bundle_v3.verify_job_binding(
+            bindings[0], baseline, bundle_v3.image_asset_descriptor(baseline, FW_A),
+            ppu_id="z2-hil", site_id=1, operation="flash_cycle")
+
+
+@pytest.mark.parametrize("clock", [False, 0, 5_000_001, 12_501_000])
+def test_route_rejects_invalid_swd_profile_clock(clock):
+    updated = route_payload()
+    updated["profile"]["flash_profile"]["transport_settings"] = {
+        "protocol": "swd", "clock_hz": clock,
+    }
+    with pytest.raises(BundleBuildError, match="ROUTE_TRANSPORT_CLOCK_INVALID"):
+        bundle_v3.parse_route(updated)
+
+
 def test_same_ic_profile_is_site_independent_but_jobs_are_site_bound():
     res = resource()
     fw = bundle_v3.image_asset_descriptor(res, FW_A)
