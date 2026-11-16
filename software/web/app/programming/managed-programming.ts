@@ -901,6 +901,41 @@ export function runProgressPercent(run: ProgrammingRun): number | null {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
 }
 
+/**
+ * This Site's own PPU progress, never another Site's.
+ *
+ * Prefers the Manager's per-unit projection of the Site's latest attempt;
+ * falls back to the Batch's `current_run` when it is this Site's run (older
+ * Managers). null when neither reports any progress for that attempt.
+ */
+export function unitProgressPercent(batch: ProgrammingBatch, unit: ProgrammingBatchUnit): number | null {
+  const own = ownUnitProgress(unit);
+  if (own) {
+    const value = own.progress_percent;
+    if (typeof value === "number" && Number.isFinite(value)) return Math.max(0, Math.min(100, value));
+  }
+  const held = runOfUnit(batch, unit);
+  return held ? runProgressPercent(held) : null;
+}
+
+/** The running stage of this Site's latest attempt; null once it has an outcome. */
+export function unitStageLabel(batch: ProgrammingBatch, unit: ProgrammingBatchUnit): string | null {
+  const last = unit.attempts[unit.attempts.length - 1];
+  if (!last || last.outcome != null) return null;
+  const own = ownUnitProgress(unit);
+  const stage = own?.stage ?? own?.job_state;
+  if (stage) return String(stage).toUpperCase();
+  const held = runOfUnit(batch, unit);
+  return held && held.outcome == null ? runStageLabel(held) : null;
+}
+
+function ownUnitProgress(unit: ProgrammingBatchUnit) {
+  const last = unit.attempts[unit.attempts.length - 1];
+  const own = unit.progress;
+  if (!last || !own || own.attempt !== last.attempt) return null;
+  return last.run_id == null || own.run_id === last.run_id ? own : null;
+}
+
 export function runStageLabel(run: ProgrammingRun): string {
   if (run.outcome != null) return run.outcome.replace("_", " ");
   const last = run.steps[run.steps.length - 1];

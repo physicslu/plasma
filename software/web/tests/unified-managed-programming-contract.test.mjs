@@ -409,8 +409,8 @@ test("PR-C: every Site is judged on its own, and the Batch verdict never replace
   assert.match(core, /run\.run_id !== attempt\.run_id\) return null;/);
   // The Site row shows that Site's verdict, not the Batch aggregate.
   assert.match(emode, /const rowVerdict = batch && unit\s*\? batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\)\.verdict : null;/);
-  // Sequential execution: the run the Browser holds belongs to one Site.
-  assert.match(emode, /run\.site_id === site\.site_id && run\.ppu_alias === ppu\?\.alias \? run : null/);
+  // A Site row's progress is that Site's own, never another Site's run.
+  assert.match(emode, /const progress = ownBatch \? unitProgressPercent\(batch, unit\) : null;/);
   // A lost Start answer holds every Site it was for.
   assert.match(emode, /const siteRefusal = holdSites\(held\)\.map\(id => \{/);
 });
@@ -418,7 +418,7 @@ test("PR-C: every Site is judged on its own, and the Batch verdict never replace
 // WP-07 (2026-11-16): the Manager runs Sites of one PPU in concurrent lanes but
 // a Batch carries one current_run, so both pages read each Site's run by its
 // run_id, and EMode keys each attempt by its Site.
-test("concurrent lanes: each Site's run is read by run_id and each attempt is keyed by Site", () => {
+test("concurrent lanes: each Site's run is read by run_id and each attempt is keyed by Site", async () => {
   assert.match(core, /export async function loadAttemptRun\(/);
   assert.match(core, /run\.run_id === runId && run\.ppu_alias === alias && run\.site_id === siteId \? run : null/);
   assert.match(emode, /const attemptKey = `\$\{attemptSite\}:\$\{attempt\.attempt\}`;/);
@@ -427,4 +427,11 @@ test("concurrent lanes: each Site's run is read by run_id and each attempt is ke
   assert.match(factory, /loadUnitRun\(batch, unit\)/);
   // The Console never claims a sequential Batch any more.
   assert.doesNotMatch(emode, /· sequential/);
+  // Each Site shows its own progress: the Manager's per-unit projection of
+  // that Site's latest attempt, current_run only as an older-Manager fallback.
+  assert.match(core, /export function unitProgressPercent\(/);
+  assert.match(core, /if \(!last \|\| !own \|\| own\.attempt !== last\.attempt\) return null;/);
+  assert.match(await read("app/fleet/managed-factory-backend.ts"), /progress_percent: passed \? 100 : unitProgressPercent\(batch, unit\) \?\? 0,/);
+  // The TERMINAL line waits for Site run lines read by run_id.
+  assert.match(factory, /unitLogsRef\.current = Promise\.allSettled\(\[unitLogsRef\.current, loaded\]\);/);
 });

@@ -15,6 +15,8 @@ export function safeOffLogLabel(safeOff: boolean | null | undefined, finished: b
  * Log is the single on-screen operation record: Run ID, Job ID, verdict,
  * reason, SAFE_OFF and the identities the PPU confirmed. It is a summary of
  * the Manager run record, never the full JSON Receipt; the Manager keeps that.
+ * Each caller appends its own PPU / Site label to every line, so the lines do
+ * not repeat the target themselves.
  */
 export function programmingRunLogLines(
   run: ProgrammingRun,
@@ -25,7 +27,7 @@ export function programmingRunLogLines(
   const finished = run.outcome != null;
   const lines = [
     `[RUN] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · Run ${run.run_id} · Job ${receipt?.job_id ?? run.job?.job_id ?? "—"}`
-      + ` · PPU ${run.ppu_alias} · Site ${run.site_id} · SAFE_OFF ${safeOffLogLabel(receipt?.safe_off, finished)}`
+      + ` · SAFE_OFF ${safeOffLogLabel(receipt?.safe_off, finished)}`
       + ` · attempts ${run.job_submission_count} · auto retry ${run.auto_retry}`,
   ];
   if (run.steps.length) {

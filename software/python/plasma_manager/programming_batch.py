@@ -572,6 +572,28 @@ class ProgrammingBatchCoordinator:
             job_id=receipt.get("job_id") or job.get("job_id"),
             safe_off=receipt.get("safe_off"), finished_at=run.get("updated_at"))
 
+    def _unit_progress(self, unit: Mapping[str, Any]) -> dict[str, Any] | None:
+        """Read-only PPU progress of this Site's latest attempt.
+
+        Lanes run concurrently while a Batch carries one ``current_run``, so a
+        reader needs each Site's own progress. It is a projection of that
+        Site's run record for display only; it never judges an outcome.
+        """
+        attempts = unit.get("attempts") or []
+        if not attempts:
+            return None
+        attempt = attempts[-1]
+        run = self._run_of(unit["ppu_alias"], attempt)
+        if run is None or run.get("site_id") != unit["site_id"]:
+            return None
+        job = run.get("job") if isinstance(run.get("job"), dict) else {}
+        percent = job.get("progress_percent")
+        return {
+            "attempt": attempt.get("attempt"), "run_id": run.get("run_id"),
+            "job_id": job.get("job_id"), "job_state": job.get("state"), "stage": job.get("stage"),
+            "progress_percent": percent if type(percent) in (int, float) else None,
+        }
+
     def _current_run(self, batch: Mapping[str, Any]) -> dict[str, Any] | None:
         for unit in reversed(batch["units"]):
             attempts = unit.get("attempts") or []
@@ -587,7 +609,8 @@ class ProgrammingBatchCoordinator:
         Those are a projection of the same record, not a second shape of the
         truth: they are derived here and never stored or judged separately.
         """
-        units = [{**unit, "attempts": [dict(a) for a in unit.get("attempts") or []]}
+        units = [{**unit, "attempts": [dict(a) for a in unit.get("attempts") or []],
+                  "progress": self._unit_progress(unit)}
                  for unit in batch["units"]]
         attempts = [attempt for unit in units for attempt in unit["attempts"]]
         outcomes = [unit.get("outcome") for unit in units]

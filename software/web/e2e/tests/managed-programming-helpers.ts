@@ -183,6 +183,8 @@ export async function mockManager(page: Page, options: {
    * Batch's current_run is only the most recently submitted run.
    */
   concurrentLanes?: boolean;
+  /** false: a Manager older than per-unit `progress` (only current_run has progress). */
+  unitProgress?: boolean;
 } = {}) {
   const ppus = options.ppus ?? [Z2];
   const counters: Counters = { plans: [], starts: [], downloads: [], batches: [], stops: [], jobs: [], polls: 0, acks: 0, issued: [], reconciles: [], voids: [], requests: [], mutations: [] };
@@ -548,9 +550,17 @@ export async function mockManager(page: Page, options: {
         state: run.outcome ? "finished" : "running", outcome: run.outcome, reason: run.reason,
         safe_off: run.receipt?.safe_off ?? null, retry: item.retry };
     });
+    const progressOf = (unit: MockUnit) => {
+      const latest = unit.attempts[unit.attempts.length - 1];
+      if (!latest) return null;
+      const job = runRecord(latest.runId).job;
+      return { attempt: latest.attempt, run_id: latest.runId, job_id: job.job_id, job_state: job.state,
+        stage: job.stage, progress_percent: job.progress_percent };
+    };
     const units = batch.units.map(unit => ({
       ppu_alias: unit.alias, site_id: unit.siteId, status: unit.status, outcome: unit.outcome,
       reason: unit.reason, failure_domain: unit.failureDomain, attempts: attemptsOf(unit),
+      ...(options.unitProgress === false ? {} : { progress: progressOf(unit) }),
     }));
     const attempts = units.flatMap(unit => unit.attempts);
     const running = batch.units[batch.index] ?? batch.units[batch.units.length - 1];

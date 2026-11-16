@@ -1394,7 +1394,10 @@ test("concurrent Site lanes: every Site's attempt and Manager run receipt is log
     { timeout: 20_000 });
   for (const site of ["SITE-02", "SITE-03"]) {
     await expect(log).toContainText(`[ATTEMPT 1/1] ${site} · PASS`);
-    await expect(log).toContainText(new RegExp(`\\[RUN\\] PASS · Run [0-9a-f]{32} · Job \\S+ · PPU z2 · Site ${Number(site.slice(-2))} · SAFE_OFF VERIFIED.* · ${site}`));
+    await expect(log).toContainText(new RegExp(`\\[RUN\\] PASS · Run [0-9a-f]{32} · Job \\S+ · SAFE_OFF VERIFIED.* · ${site}`));
+    // Every Site's plan detail is logged, labelled with that Site.
+    await expect(log).toContainText(new RegExp(`\\[PLAN\\] [0-9a-f]{32} · Route \\S+ .* · ${site}`));
+    await expect(log).toContainText(`[PLAN] Resource Reuse: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load) · ${site}`);
     await expect(log).toContainText(new RegExp(`\\[RECEIPT\\] Job \\S+ · Operations .* · ${site}`));
   }
   // The receipts are read before the Site and Batch results are written; the
@@ -1404,6 +1407,42 @@ test("concurrent Site lanes: every Site's attempt and Manager run receipt is log
   // The Console no longer claims a sequential Batch.
   await expect(log).toContainText("· parallel Site lanes");
   expect(text).not.toContain("sequential");
+  // The [RUN] line carries the target once: the Site label the Log appends.
+  expect(text).not.toMatch(/· PPU z2 · Site \d+ · SAFE_OFF/);
   expect(counters.batches).toHaveLength(1);
   expect(counters.jobs).toHaveLength(2);
 });
+
+
+for (const unitProgress of [true, false]) {
+  test(`concurrent Site lanes: LIVE SITE STATUS progress ${unitProgress ? "shows every running Site at once" : "falls back to current_run on an older Manager"}`, async ({ page }) => {
+    await mockManager(page, {
+      ppus: [{ ...Z2, enabledSites: [2, 3] }],
+      routes: [route(), operationsRoute()],
+      concurrentLanes: true,
+      unitProgress,
+      // Both lanes stay running for several polls, so both rows are observed together.
+      script: () => ({ runningPolls: 6 }),
+    });
+    const workspace = await open(page);
+    const job = await selectIc(page);
+    await workspace.getByLabel("Select SITE 2 for programming").check();
+    await workspace.getByLabel("Select SITE 3 for programming").check();
+    await job.getByLabel("Engineering Programming Image file").setInputFiles(firmwareFile);
+    await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
+
+    const row = (siteId: number) => workspace.locator("tr", { has: page.getByLabel(`Select SITE ${siteId} for programming`) });
+    const bar = (siteId: number) => row(siteId).locator(".tableProgress b");
+    if (unitProgress) {
+      await expect(bar(2)).toHaveText("40%", { timeout: 10_000 });
+      await expect(bar(3)).toHaveText("40%");
+      await expect(row(2).locator(".state")).not.toHaveText(/READY|IDLE/i);
+      await expect(row(3).locator(".state")).not.toHaveText(/READY|IDLE/i);
+    } else {
+      // Only the Batch's current_run (the last submitted Site) has progress.
+      await expect(bar(3)).toHaveText("40%", { timeout: 10_000 });
+      await expect(bar(2)).toHaveCount(0);
+    }
+    await expect(jobLog(workspace)).toContainText(/\[RESULT\] PASS · Batch/, { timeout: 30_000 });
+  });
+}

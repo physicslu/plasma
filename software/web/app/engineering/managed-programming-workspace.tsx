@@ -28,7 +28,8 @@ import {
   routeSupportsIc,
   runManagedBatch,
   runManagedRead,
-  runProgressPercent,
+  unitProgressPercent,
+  unitStageLabel,
   runStageLabel,
   runVerdict,
   siteCapability,
@@ -251,6 +252,8 @@ export default function ManagedProgrammingWorkspace() {
   const startLock = useRef(false);
   // Keyed by Site and attempt: every Site of a Batch has its own attempt 1.
   const loggedAttempts = useRef(new Map<string, string>());
+  // Plan IDs whose [PLAN] detail lines were written (one set per Site attempt).
+  const loggedPlans = useRef(new Set<string>());
   const loggedBatchId = useRef<string | null>(null);
   const readUrls = useRef(new Map<number, string>());
   const logSequence = useRef(0);
@@ -571,6 +574,7 @@ export default function ManagedProgrammingWorkspace() {
     setLocked(null);
     setBatch(null);
     loggedAttempts.current = new Map();
+    loggedPlans.current = new Set();
     loggedBatchId.current = null;
     setRun(null);
     setRunContext(null);
@@ -667,6 +671,17 @@ export default function ManagedProgrammingWorkspace() {
     abortRef.current = abort;
     // Run receipts read by run_id log before the Site and Batch results.
     const pendingRunLogs: Promise<void>[] = [];
+    // The [PLAN] detail of one Site attempt, once, labelled with that Site.
+    const logPlan = (siteRun: ProgrammingRun, planId: string) => {
+      const planned = siteRun.plan;
+      if (planned?.plan_id !== planId || loggedPlans.current.has(planId)) return;
+      loggedPlans.current.add(planId);
+      const label = siteLabel(siteRun.site_id);
+      const range = planned.job_binding.range;
+      appendLog(`[PLAN] ${planned.plan_id} · Route ${planned.route.route_id} (${planned.route.provider} → ${planned.route.profile}) · Source ${planned.source} · Operations ${(planned.operations ?? [planned.operation]).join(" → ")} · ${label}`, false, "DAT");
+      appendLog(`[PLAN] Range ${hex(range.address)} + ${range.length} B · Resource SHA256 ${planned.resource.resource_set_sha256} · Job Binding SHA256 ${planned.job_binding_sha256} · ${label}`, false, "DAT");
+      appendLog(`[PLAN] ${planned.activation_required ? "Activation: B1 upload → B2 admit → B3 activate (no FPGA load)" : "Resource Reuse: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load)"} · ${label}`, false, "DAT");
+    };
     clearRunState();
     setRunContext(context);
     setPhase("locking");
@@ -702,14 +717,10 @@ export default function ManagedProgrammingWorkspace() {
             if (seen === undefined) {
               loggedAttempts.current.set(attemptKey, "planned");
               appendLog(`${attemptLabel} · Plan ${attempt.plan_id} · Job Binding SHA256 ${attempt.job_binding_sha256}`, false, "DAT");
-              const planned = next.current_run?.plan;
-              if (planned?.plan_id === attempt.plan_id) {
-                const range = planned.job_binding.range;
-                appendLog(`[PLAN] ${planned.plan_id} · Route ${planned.route.route_id} (${planned.route.provider} → ${planned.route.profile}) · Source ${planned.source} · Operations ${(planned.operations ?? [planned.operation]).join(" → ")}`, false, "DAT");
-                appendLog(`[PLAN] Range ${hex(range.address)} + ${range.length} B · Resource SHA256 ${planned.resource.resource_set_sha256} · Job Binding SHA256 ${planned.job_binding_sha256}`, false, "DAT");
-                appendLog(`[PLAN] ${planned.activation_required ? "Activation: B1 upload → B2 admit → B3 activate (no FPGA load)" : "Resource Reuse: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load)"}`, false, "DAT");
-              }
             }
+            // Plan details come from the Site's own run: the Batch's current_run
+            // now, or the run read by run_id when the attempt finishes.
+            if (next.current_run?.site_id === attemptSite) logPlan(next.current_run, attempt.plan_id);
             if (attempt.outcome && seen !== "finished") {
               loggedAttempts.current.set(attemptKey, "finished");
               const retry = attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} (${attempt.retry.reason})` : "";
@@ -722,6 +733,7 @@ export default function ManagedProgrammingWorkspace() {
               const failed = attempt.outcome !== "PASS";
               pendingRunLogs.push(loadAttemptRun(next, request.alias, attemptSite, attempt.run_id).then(finishedRun => {
                 if (!finishedRun) return;
+                logPlan(finishedRun, attempt.plan_id);
                 for (const line of programmingRunLogLines(finishedRun, {
                   executionInterface: interfaceOf(finishedRun.site_id),
                 })) {
@@ -1175,17 +1187,16 @@ export default function ManagedProgrammingWorkspace() {
                   const selected = siteIds.includes(site.site_id);
                   const unit = batch?.units.find(item => item.site_id === site.site_id
                     && item.ppu_alias === (ppu?.alias ?? "")) ?? null;
-                  // The Batch carries ONE current_run; a concurrently running
-                  // Site without it shows the PPU Site state instead of progress.
-                  const siteRun = run != null && runContext?.alias === ppu?.alias
-                    && run.site_id === site.site_id && run.ppu_alias === ppu?.alias ? run : null;
-                  const progress = siteRun ? runProgressPercent(siteRun) : null;
+                  // Each Site's own PPU progress (lanes run concurrently; the
+                  // Batch's current_run is only one Site).
+                  const ownBatch = batch != null && unit != null && runContext?.alias === ppu?.alias;
+                  const progress = ownBatch ? unitProgressPercent(batch, unit) : null;
+                  const stage = ownBatch ? unitStageLabel(batch, unit) : null;
                   // The Site result is that Site's own verdict, never the
                   // Batch aggregate and never an intermediate attempt.
                   const rowVerdict = batch && unit
                     ? batchSiteVerdict(batch, unit, runOfUnit(batch, unit)).verdict : null;
-                  const state = siteRun && siteRun.outcome == null ? runStageLabel(siteRun)
-                    : site.enabled ? site.state.toUpperCase() : "DISABLED";
+                  const state = stage ?? (site.enabled ? site.state.toUpperCase() : "DISABLED");
                   // READ uses the IC Profile's operations and the PPU Site's current readiness.
                   const canRead = routeDeclaring(routes, icpn, site.site_id, ["read"]) != null;
                   const readBlocked = canRead ? readBlockReason(site.site_id) : null;
