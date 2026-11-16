@@ -527,6 +527,107 @@ def test_upgrade_restarts_running_services_and_migrates_legacy_empty_sites(
     assert evidence["site_desired_state"]["empty_sites_migrated_to_defaults"] is True
 
 
+def _config_loader():
+    # The Python 3.10 installer-only CI job has no Plasma package; the byte
+    # checks still run there and the full suite also parses the config.
+    try:
+        from plasma_core.config import load_config
+    except ImportError:
+        return None
+    return load_config
+
+
+def _operator_config(paths, max_concurrent_jobs: int) -> str:
+    """An installed ppu.yaml after an operator raised the concurrency limit
+    and the Gateway enabled two Sites (the WP-07 Z2 shape)."""
+    rendered = installer.render_ppu_config(
+        ppu_id="z2-hil", facility_id="lab", display_name="Z2 HIL",
+        state_root=paths.state_root, log_root=paths.log_root,
+    )
+    assert rendered.count("  max_concurrent_jobs: 1\n") == 1
+    return (rendered
+            .replace("  max_concurrent_jobs: 1\n", f"  max_concurrent_jobs: {max_concurrent_jobs}\n")
+            .replace('  - {id: 1, enabled: false, interface: "mock"}',
+                     "  - {id: 1, enabled: true, interface: openocd, target: STM32F103C8T6}")
+            .replace('  - {id: 2, enabled: false, interface: "mock"}',
+                     "  - {id: 2, enabled: true, interface: openocd, target: STM32F103C8T6}"))
+
+
+@pytest.mark.parametrize("max_concurrent_jobs", [2, 8])
+def test_upgrade_preserves_the_operator_concurrency_limit_byte_for_byte(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, max_concurrent_jobs: int
+) -> None:
+    # WP-07: an upgrade / reinstall (Bootstrap Full-Copy calls this same
+    # install_release) must never reset max_concurrent_jobs to the fresh default.
+    paths = _install_paths(tmp_path)
+    previous = paths.releases_root / "0.0.9-previous"
+    previous.mkdir(parents=True)
+    paths.current.symlink_to(previous)
+    paths.config_root.mkdir(parents=True)
+    operator = _operator_config(paths, max_concurrent_jobs)
+    (paths.config_root / "ppu.yaml").write_text(operator, encoding="utf-8")
+
+    _run_install(tmp_path, monkeypatch, paths)
+
+    assert (paths.config_root / "ppu.yaml").read_text(encoding="utf-8") == operator
+    load_config = _config_loader()
+    if load_config is not None:
+        loaded = load_config(paths.config_root / "ppu.yaml")
+        assert loaded.server.max_concurrent_jobs == max_concurrent_jobs
+    evidence = json.loads((paths.install_root / "last-install.json").read_text(encoding="utf-8"))
+    assert evidence["site_desired_state"]["empty_sites_migrated_to_defaults"] is False
+
+
+def test_legacy_empty_sites_migration_keeps_the_concurrency_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _install_paths(tmp_path)
+    previous = paths.releases_root / "0.0.9-previous"
+    previous.mkdir(parents=True)
+    paths.current.symlink_to(previous)
+    paths.config_root.mkdir(parents=True)
+    legacy = installer.render_ppu_config(
+        ppu_id="kept-id", facility_id="lab", display_name="Kept",
+        state_root=paths.state_root, log_root=paths.log_root,
+    ).replace(installer.render_default_sites(), "sites: []\n").replace(
+        "  max_concurrent_jobs: 1\n", "  max_concurrent_jobs: 2\n")
+    (paths.config_root / "ppu.yaml").write_text(legacy, encoding="utf-8")
+
+    _run_install(tmp_path, monkeypatch, paths)
+
+    migrated = (paths.config_root / "ppu.yaml").read_text(encoding="utf-8")
+    assert "sites: []" not in migrated
+    assert migrated.count("max_concurrent_jobs") == 1
+    assert "  max_concurrent_jobs: 2\n" in migrated
+
+
+def test_fresh_install_writes_the_conservative_single_job_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # No ppu.yaml yet: every Site is disabled Mock and one Job runs at a time
+    # until an operator raises the limit for qualified Sites.
+    paths = _install_paths(tmp_path)
+    _run_install(tmp_path, monkeypatch, paths)
+    text = (paths.config_root / "ppu.yaml").read_text(encoding="utf-8")
+    assert text.count("max_concurrent_jobs") == 1 and "  max_concurrent_jobs: 1\n" in text
+    load_config = _config_loader()
+    if load_config is not None:
+        config = load_config(paths.config_root / "ppu.yaml")
+        assert config.server.max_concurrent_jobs == 1
+        assert not any(site.enabled for site in config.sites)
+
+
+def test_full_copy_activates_through_the_preserving_installer() -> None:
+    # Bootstrap Full-Copy loads ppu-z2-installer.py and calls its
+    # install_release without overriding the config writer, so the
+    # preservation above is the only ppu.yaml path of a Runtime deployment.
+    source = (ROOT / "scripts" / "ppu-bootstrap-deployment.py").read_text(encoding="utf-8")
+    assert 'with_name("ppu-z2-installer.py")' in source
+    assert source.count("self.installer.install_release(") == 1
+    assert "config_writer" not in source
+    assert "ppu.yaml" not in source
+
+
 def test_fresh_install_does_not_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     calls = _run_install(tmp_path, monkeypatch, _install_paths(tmp_path))
     assert ("enable", "--now", "plasma-server.service") in calls
