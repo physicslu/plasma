@@ -229,6 +229,14 @@ class Abi5OpenocdAdapter:
         # the default for Profiles without transport_settings.
         return self.adapter_khz if profile.clock_hz is None else profile.clock_hz // 1000
 
+    def _clock_evidence(self, profile: FlashProfile) -> dict[str, int]:
+        khz = self._clock_khz(profile)
+        # Match native plasma_swd_khz's ceil division and FPGA divider bounds.
+        half_period = min(65535, max(4, (50000 + khz - 1) // khz))
+        return {"adapter_khz": khz, "swclk_requested_hz": khz * 1000,
+                "swclk_half_period": half_period,
+                "swclk_nominal_hz": 50_000_000 // half_period}
+
     def _operation_argv(self, site: int, bound: FlashImage | FlashRange,
                         actions: list[str]) -> list[str]:
         """The qualified flash_cycle preamble and ending around exactly the
@@ -285,7 +293,7 @@ class Abi5OpenocdAdapter:
             address, length = flash_range.address, flash_range.length
             erase_address, erase_length = address, length
         base = {"icpn": bound.icpn, "target_config": bound.profile.target_config,
-                "adapter_khz": self._clock_khz(bound.profile)}
+                **self._clock_evidence(bound.profile)}
 
         with tempfile.TemporaryDirectory(prefix="plasma-c3-op-") as directory:
             staged = Path(directory) / "normalized-image.bin"
@@ -537,7 +545,7 @@ class Abi5OpenocdAdapter:
                             "openocd_rc": rc, **safe_off.receipt()}
                 return {"result": "PASS", "icpn": image.icpn,
                         "target_config": image.profile.target_config,
-                        "adapter_khz": self._clock_khz(image.profile),
+                        **self._clock_evidence(image.profile),
                         "bytes_verified": len(observed),
                         "readback_sha256": observed_sha,
                         "load_address": image.load_address, **executed,
