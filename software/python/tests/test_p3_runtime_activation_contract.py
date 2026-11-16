@@ -142,6 +142,14 @@ def test_release_workflows_ship_one_canonical_installer() -> None:
     assert 'test -f "$root/scripts/ppu-z2-installer.py"' in z2
     assert 'sha256sum "$(basename "$installer")"' in ppu
     assert "installer_core" not in ppu
+    # #1433: retired installer-core must not return through any canonical
+    # shipped, kit-verification or on-device Bootstrap execution path.
+    assert not (ROOT / "scripts/ppu-z2-installer-core.py").exists()
+    bootstrap_kit = (ROOT / "scripts/ppu-bootstrap-kit.py").read_text(encoding="utf-8")
+    bootstrap_service = (ROOT / "scripts/ppu-bootstrap-service.py").read_text(encoding="utf-8")
+    installer_source = (ROOT / "scripts/ppu-z2-installer.py").read_text(encoding="utf-8")
+    for source in (bootstrap_kit, bootstrap_service, installer_source):
+        assert "ppu-z2-installer-core.py" not in source
 
 
 def test_web_exposes_one_ppu_level_activation_action() -> None:

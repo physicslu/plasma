@@ -10,7 +10,10 @@ on:
       - "software/python/**"
       - "software/native/swd/**"
       - "scripts/ci/inject-plasma-openocd5088-native.py"
+      - "scripts/ci/tests/test_openocd5088_armv7_cache.py"
       - "scripts/z2/plasma_swd_site_admission.py"
+      - "pl/hil/fpga_image_root.py"
+      - "pl/hil/fpga_image_admission.py"
       - "scripts/ppu_asset_execution.py"
       - "scripts/ppu_package_launcher.py"
       - "scripts/ppu_site_worker.py"
@@ -49,7 +52,10 @@ on:
       - "software/python/**"
       - "software/native/swd/**"
       - "scripts/ci/inject-plasma-openocd5088-native.py"
+      - "scripts/ci/tests/test_openocd5088_armv7_cache.py"
       - "scripts/z2/plasma_swd_site_admission.py"
+      - "pl/hil/fpga_image_root.py"
+      - "pl/hil/fpga_image_admission.py"
       - "scripts/ppu_asset_execution.py"
       - "scripts/ppu_package_launcher.py"
       - "scripts/ppu_site_worker.py"
@@ -108,6 +114,8 @@ jobs:
         run: |
           python scripts/ci/runtime-data-root-contract.py --self-test
           python scripts/ci/runtime-data-root-contract.py
+      - name: Enforce ARMv7 binary build trigger isolation (host-only)
+        run: python3 -m unittest discover -s scripts/ci/tests -p test_openocd5088_armv7_cache.py -v
       - name: Test local AI launcher
         run: bash scripts/tests/test-local-ai-harness.sh
       - name: Test deployment config migration

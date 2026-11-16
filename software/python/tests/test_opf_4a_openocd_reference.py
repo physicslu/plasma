@@ -437,8 +437,13 @@ def test_profile_provider_only_runtime_flash_uses_installed_platform(monkeypatch
         assert all(not f["executable"] for p in manifest["packages"] for f in p["files"])
 
 
-def test_platform_provider_accepts_new_verified_engine_without_bundle_pins(monkeypatch):
-    updated_engine = b"\x7fELF-updated-plasma-swd-v5"
+@pytest.mark.parametrize("updated_engine", [
+    b"\x7fELF-updated-plasma-swd-v5",
+    b"\x7fELF-independent-plasma-swd-v5-next",
+])
+def test_platform_provider_accepts_new_verified_engine_without_bundle_pins(monkeypatch, updated_engine):
+    # #1329: two distinct qualified installed Engine identities must both PASS
+    # without editing Bundle bytes or adding a version-specific SHA allowlist.
     with installed_bundle(with_control_socket=False, with_fpga=False,
                           platform_provider=True, engine_binary=updated_engine) as env:
         result = _runtime_execute(env, monkeypatch)
