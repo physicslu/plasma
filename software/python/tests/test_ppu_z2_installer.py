@@ -648,6 +648,9 @@ def test_full_copy_activates_through_the_preserving_installer() -> None:
     assert "config_writer" not in source
     assert "ppu.yaml" not in source
     assert "site_count=request.site_count" in source
+    cli = (ROOT / "scripts" / "plasmactl-z2-ps").read_text(encoding="utf-8")
+    assert '--site-count "$site_count"' in cli
+    assert '[[ "$site_count" =~ ^[1-8]$ ]]' in cli
 
 
 def test_fresh_install_does_not_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
