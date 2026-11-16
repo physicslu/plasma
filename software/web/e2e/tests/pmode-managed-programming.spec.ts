@@ -362,7 +362,7 @@ test("concurrent Site lanes: every Site gets its own Manager run receipt and one
   const log = factoryLog(page);
   for (const siteId of [1, 2]) {
     const label = `PPU z2 · PPU ID z2-hil · SITE-0${siteId}`;
-    await expect(log).toContainText(new RegExp(`\\[RUN\\] PASS · Run [0-9a-f]{32} · Job \\S+ · PPU z2 · Site ${siteId} · SAFE_OFF VERIFIED.* · ${label}`));
+    await expect(log).toContainText(new RegExp(`\\[RUN\\] PASS · Run [0-9a-f]{32} · Job \\S+ · SAFE_OFF VERIFIED.* · ${label}`));
     await expect(log).toContainText(new RegExp(`\\[RECEIPT\\] Job \\S+ · Operations .* · ${label}`));
     await expect(log).toContainText(`[SITE] ${label} · PASS`);
   }
@@ -371,6 +371,14 @@ test("concurrent Site lanes: every Site gets its own Manager run receipt and one
     const evidence = `[EVIDENCE] Site interface: openocd · PPU z2 · PPU ID z2-hil · SITE-0${siteId}`;
     expect(text.split(evidence).length - 1).toBe(1);
   }
+  // The [RUN] line names the target once (the appended label), not twice.
+  expect(text).not.toMatch(/· PPU z2 · Site \d+ · SAFE_OFF/);
+  // The Log shows the newest line first: TERMINAL is written after every
+  // Site's run lines, including a Site whose run was read by run_id.
+  await expect(log).toContainText("[BAT] TERMINAL · SUCCESS");
+  const ordered = await log.innerText();
+  expect(ordered.indexOf("[BAT] TERMINAL")).toBeLessThan(ordered.indexOf("[RUN] PASS"));
+  expect(ordered.indexOf("[BAT] TERMINAL")).toBeLessThan(ordered.indexOf("[SITE] PPU z2"));
   expect(counters.batches).toHaveLength(1);
   expect(counters.jobs).toHaveLength(2);
 });

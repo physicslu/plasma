@@ -349,6 +349,21 @@ export type ProgrammingBatchUnit = {
   /** Whose failure it was: the Target, its state, its transaction or shared control. */
   failure_domain: string | null;
   attempts: ProgrammingBatchAttempt[];
+  /**
+   * Read-only PPU progress of this Site's latest attempt (display only).
+   * Lanes run concurrently while the Batch carries one `current_run`.
+   * Absent from Managers older than this field.
+   */
+  progress?: ProgrammingBatchUnitProgress | null;
+};
+
+export type ProgrammingBatchUnitProgress = {
+  attempt: number | null;
+  run_id: string | null;
+  job_id: string | null;
+  job_state: string | null;
+  stage: string | null;
+  progress_percent: number | null;
 };
 
 export type ProgrammingBatch = {

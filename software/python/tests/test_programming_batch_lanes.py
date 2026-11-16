@@ -165,6 +165,37 @@ def test_independent_sites_overlap_and_persist_terminal_updates(tmp_path, count)
     assert len(gateway.posts) == count
 
 
+def test_every_running_site_reports_its_own_progress(tmp_path):
+    """A Batch has one current_run; each unit still carries its own Site's progress."""
+    h = Harness(tmp_path, (1, 2))
+    gateway = h.gateways["z2"]
+    h.start()
+    try:
+        assert gateway.submitted[1].wait(WAIT) and gateway.submitted[2].wait(WAIT)
+        deadline = time.monotonic() + WAIT
+        while not all((r.job or {}).get("job_id") for r in list(h.workflow._runs.values())):
+            assert time.monotonic() < deadline, "runs never recorded their Job"
+            time.sleep(0.001)
+        for run in list(h.workflow._runs.values()):
+            h.workflow._update(run, job={**run.job, "state": "running", "stage": "program",
+                                         "progress_percent": 30 + run.site})
+        live = h.batches.status_batch(h.started["batch"]["batch_id"])["batch"]
+        assert live["current_run"]["site_id"] in (1, 2)
+        for unit in live["units"]:
+            attempt = unit["attempts"][-1]
+            run = h.workflow._runs[attempt["run_id"]]
+            assert run.site == unit["site_id"]
+            assert unit["progress"] == {
+                "attempt": 1, "run_id": attempt["run_id"], "job_id": run.job["job_id"],
+                "job_state": "running", "stage": "program", "progress_percent": 30 + unit["site_id"]}
+        assert len({u["progress"]["job_id"] for u in live["units"]}) == 2
+        stored = json.loads((tmp_path / "batches.json").read_text())["batches"][0]
+        assert all("progress" not in u for u in stored["units"]), "display projection is never journaled"
+    finally:
+        batch = h.finish()
+    assert [u["outcome"] for u in batch["units"]] == ["PASS", "PASS"]
+
+
 @pytest.mark.parametrize("peer_final", ["success", "failed"])
 def test_slow_site_does_not_hold_peer_or_site_local_fail(tmp_path, peer_final):
     h = Harness(tmp_path, (1, 2))

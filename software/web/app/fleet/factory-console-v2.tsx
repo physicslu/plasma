@@ -470,6 +470,8 @@ export default function FactoryConsoleV2() {
   const pollGenerationRef = useRef(0);
   const runtimeRecoveryGenerationRef = useRef(0);
   const terminalBatchRef = useRef<string | null>(null);
+  // Site run lines read from the Manager by run_id; the TERMINAL line waits for them.
+  const unitLogsRef = useRef<Promise<unknown>>(Promise.resolve());
   const initialProductionSet = useRef(productionSet);
   const initialBatchSelection = useRef(batchSelection);
 
@@ -528,7 +530,8 @@ export default function FactoryConsoleV2() {
       if (held || !last?.run_id) {
         logUnit(held, false);
       } else {
-        void loadUnitRun(batch, unit).then(run => logUnit(run, run == null), () => logUnit(null, true));
+        const loaded = loadUnitRun(batch, unit).then(run => logUnit(run, run == null), () => logUnit(null, true));
+        unitLogsRef.current = Promise.allSettled([unitLogsRef.current, loaded]);
       }
     }
   }, [appendLog]);
@@ -551,8 +554,12 @@ export default function FactoryConsoleV2() {
     if (terminalBatchRef.current === snapshot.batch_id) return;
     terminalBatchRef.current = snapshot.batch_id;
     pollGenerationRef.current += 1;
-    appendLog(`[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.completed_rounds), 0)} · FAIL ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0)} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0}`,
-      snapshot.state === "error" ? "ERROR" : snapshot.state === "cancelled" || snapshot.state === "partial" ? "WARN" : "INFO");
+    const terminal = `[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.completed_rounds), 0)} · FAIL ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0)} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0}`;
+    const level = snapshot.state === "error" ? "ERROR" : snapshot.state === "cancelled" || snapshot.state === "partial" ? "WARN" : "INFO";
+    // The terminal snapshot is applied just before its Site lines are logged in
+    // the same handler; wait (one microtask, then any run_id reads) so the
+    // TERMINAL line follows every Site's run lines.
+    void Promise.resolve().then(() => unitLogsRef.current).then(() => appendLog(terminal, level));
   }, [appendLog, endActivity, managed]);
 
   const applyBatchSnapshot = useCallback((next: ServerBatchSnapshot, sourceCatalog: EngineeringTargetCatalog) => {
