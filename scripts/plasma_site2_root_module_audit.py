@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Read-only Z2 protected FPGA Root source identity audit via existing paired SSH.
 
-Compares two fixed privileged Python source modules and their protected code
+Compares three fixed privileged Python source modules and their protected code
 manifest against this source-pinned PR. Uses a separate native Python process
 only to inspect module import identity; it never mutates Z2, starts/stops
 services, admits a Site, invokes FPGA/MMIO or flashes DUT.
@@ -26,13 +26,14 @@ MARK = "PLASMA_SITE2_ROOT_MODULES="
 FILES = (
     "pl/hil/fpga_image_root.py",
     "pl/hil/fpga_image_admission.py",
+    "pl/hil/fpga_image_guard.py",
 )
 
 REMOTE = r'''
 import hashlib,json,stat,subprocess,re
 from pathlib import Path
 root=Path("/opt/plasma/privileged/fpga-root")
-files=("pl/hil/fpga_image_root.py","pl/hil/fpga_image_admission.py")
+files=("pl/hil/fpga_image_root.py","pl/hil/fpga_image_admission.py","pl/hil/fpga_image_guard.py")
 def bounded(root_path, max_size):
     p=Path(root_path)
     st=p.lstat()
