@@ -596,6 +596,7 @@ def test_wp07_distinct_site_admissions_overlap_while_reload_stays_exclusive(tmp_
             with pytest.raises(BlockingIOError):
                 with r.port().exclusive():
                     raise AssertionError("reload bypassed two Site admissions")
+            results["reload"] = "DENIED"
 
     a, b = threading.Thread(target=first), threading.Thread(target=second)
     a.start(); b.start()
@@ -606,7 +607,7 @@ def test_wp07_distinct_site_admissions_overlap_while_reload_stays_exclusive(tmp_
         release_first.set()
         a.join(10); b.join(10)
     assert not a.is_alive() and not b.is_alive()
-    assert results == {1: "ENTERED", 2: "ENTERED"}
+    assert results == {1: "ENTERED", 2: "ENTERED", "reload": "DENIED"}
 
 
 def test_wp07_same_site_root_admissions_do_not_overlap(tmp_path, monkeypatch):
