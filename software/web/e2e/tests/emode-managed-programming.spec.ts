@@ -176,7 +176,7 @@ test("an Operation no Programming Route declares is disabled, not a fake capabil
   expect(counters.plans[0].body.operations).toEqual(["program", "verify"]);
 });
 
-test("a deployment with no supported Route offers no E / P / V and no Read", async ({ page }) => {
+test("no supported Route blocks Site admission, Start and Read despite editable E / P / V preferences", async ({ page }) => {
   const counters = await mockManager(page, { routes: [] });
   // With no qualifying Route, Site selection must fail closed. Do not call
   // configure(): its positive-route helper deliberately checks SITE 2.
@@ -184,8 +184,12 @@ test("a deployment with no supported Route offers no E / P / V and no Read", asy
   const job = await selectIc(page);
   const start = job.getByRole("button", { name: /START PROGRAMMING/ });
   await expect(workspace.getByLabel("Select SITE 2 for programming")).toBeDisabled();
+  // These controls express operator preferences, not execution authority.
+  // They remain editable with no selected Site, but cannot admit a Job.
   for (const name of ["erase", "program", "verify"]) {
-    await expect(job.getByLabel(`Engineering operation ${name}`)).toBeDisabled();
+    const preference = job.getByLabel(`Engineering operation ${name}`);
+    await expect(preference).toBeEnabled();
+    await preference.uncheck();
   }
   await expect(start).toBeDisabled();
   await expect(workspace.getByTestId("managed-readiness")).toContainText("NO ROUTE");
