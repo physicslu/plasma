@@ -178,12 +178,17 @@ test("an Operation no Programming Route declares is disabled, not a fake capabil
 
 test("a deployment with no supported Route offers no E / P / V and no Read", async ({ page }) => {
   const counters = await mockManager(page, { routes: [] });
-  const { workspace, job, start } = await configure(page);
+  // With no qualifying Route, Site selection must fail closed. Do not call
+  // configure(): its positive-route helper deliberately checks SITE 2.
+  const workspace = await open(page);
+  const job = await selectIc(page);
+  const start = job.getByRole("button", { name: /START PROGRAMMING/ });
+  await expect(workspace.getByLabel("Select SITE 2 for programming")).toBeDisabled();
   for (const name of ["erase", "program", "verify"]) {
     await expect(job.getByLabel(`Engineering operation ${name}`)).toBeDisabled();
   }
   await expect(start).toBeDisabled();
-  await expect(workspace.getByTestId("managed-readiness")).toContainText("OPERATIONS UNAVAILABLE");
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("NO ROUTE");
   await expect(workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toHaveCount(0);
   expect(writes(counters)).toEqual([]);
 });
