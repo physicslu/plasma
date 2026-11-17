@@ -228,7 +228,7 @@ export async function mockManager(page: Page, options: {
   });
   await page.route(/\/bootstrap\/programming\/routes$/, r => r.fulfill(options.routesStatus
     ? json({ ok: false, error: { code: "programming_routes_unavailable", message: "Programming Routes are unavailable: ROUTE_ROOT_UNAVAILABLE" } }, options.routesStatus)
-    : json({ ok: true, routes: options.routes ?? [route(), operationsRoute()] })));
+    : json({ ok: true, routes: options.routes ?? [operationsRoute()] })));
 
   function makePlan(alias: string, body: Record<string, unknown>, attempt: number) {
     const siteId = Number(body.site_id);

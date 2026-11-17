@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
-  BUNDLE, FIRMWARE, RESOURCE_SHA, Z2, flashBytes, legacyRequests, mockManager, operationsRoute, route,
+  BUNDLE, FIRMWARE, RESOURCE_SHA, Z2, flashBytes, legacyRequests, mockManager, operationsRoute,
   type Counters, type MockPpu,
 } from "./managed-programming-helpers";
 
@@ -166,7 +166,7 @@ test("no Operation, or Erase + Verify without Program, never reaches the Manager
 });
 
 test("an Operation no Programming Route declares is disabled, not a fake capability", async ({ page }) => {
-  const counters = await mockManager(page, { routes: [route(), operationsRoute(["program", "verify", "read"])] });
+  const counters = await mockManager(page, { routes: [operationsRoute(["program", "verify", "read"])] });
   const { workspace, job, start } = await configure(page);
   await expect(job.getByLabel("Engineering operation erase")).toBeDisabled();
   await expect(job.getByLabel("Engineering operation erase")).not.toBeChecked();
@@ -176,14 +176,23 @@ test("an Operation no Programming Route declares is disabled, not a fake capabil
   expect(counters.plans[0].body.operations).toEqual(["program", "verify"]);
 });
 
-test("a deployment with no supported Route offers no E / P / V and no Read", async ({ page }) => {
+test("no supported Route blocks Site admission, Start and Read despite editable E / P / V preferences", async ({ page }) => {
   const counters = await mockManager(page, { routes: [] });
-  const { workspace, job, start } = await configure(page);
+  // With no qualifying Route, Site selection must fail closed. Do not call
+  // configure(): its positive-route helper deliberately checks SITE 2.
+  const workspace = await open(page);
+  const job = await selectIc(page);
+  const start = job.getByRole("button", { name: /START PROGRAMMING/ });
+  await expect(workspace.getByLabel("Select SITE 2 for programming")).toBeDisabled();
+  // These controls express operator preferences, not execution authority.
+  // They remain editable with no selected Site, but cannot admit a Job.
   for (const name of ["erase", "program", "verify"]) {
-    await expect(job.getByLabel(`Engineering operation ${name}`)).toBeDisabled();
+    const preference = job.getByLabel(`Engineering operation ${name}`);
+    await expect(preference).toBeEnabled();
+    await preference.uncheck();
   }
   await expect(start).toBeDisabled();
-  await expect(workspace.getByTestId("managed-readiness")).toContainText("OPERATIONS UNAVAILABLE");
+  await expect(workspace.getByTestId("managed-readiness")).toContainText("NO ROUTE");
   await expect(workspace.getByRole("button", { name: "Read SITE 2 Flash" })).toHaveCount(0);
   expect(writes(counters)).toEqual([]);
 });
@@ -1335,7 +1344,7 @@ test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page
 test("EMode programs many Sites of one PPU as ONE Batch, and each Site is judged on its own", async ({ page }) => {
   const counters = await mockManager(page, {
     ppus: [{ ...Z2, enabledSites: [2, 3] }],
-    routes: [route(), operationsRoute()],
+    routes: [operationsRoute()],
     // Site 3 fails definitely; Site 2 passes. One Site's result is never the other's.
     script: (_alias, site) => (site === 3 ? { outcome: "FAIL", reason: "PROGRAMMING_NOT_PASS" } : {}),
   });
@@ -1378,7 +1387,7 @@ test("concurrent Site lanes: every Site's attempt and Manager run receipt is log
   // the Batch carries only the most recently submitted run as current_run.
   const counters = await mockManager(page, {
     ppus: [{ ...Z2, enabledSites: [2, 3] }],
-    routes: [route(), operationsRoute()],
+    routes: [operationsRoute()],
     concurrentLanes: true,
   });
   const workspace = await open(page);
@@ -1418,7 +1427,7 @@ for (const unitProgress of [true, false]) {
   test(`concurrent Site lanes: LIVE SITE STATUS progress ${unitProgress ? "shows every running Site at once" : "falls back to current_run on an older Manager"}`, async ({ page }) => {
     await mockManager(page, {
       ppus: [{ ...Z2, enabledSites: [2, 3] }],
-      routes: [route(), operationsRoute()],
+      routes: [operationsRoute()],
       concurrentLanes: true,
       unitProgress,
       // Both lanes stay running for several polls, so both rows are observed together.

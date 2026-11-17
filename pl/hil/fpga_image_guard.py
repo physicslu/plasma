@@ -35,7 +35,7 @@ GLOBAL_LOCK = OWNER_DIR / "supervisor.lock"
 # Additional additive fence: each SWD Site holds LOCK_SH, Root reload LOCK_EX.
 # Root Guard source-pin, provenance and supervisor.lock remain authoritative.
 PPU_RELOAD_FENCE = Path("/run/lock/plasma-mmio.lock")
-# Bounded wait so two concurrent Site admissions serialize instead of failing.
+# Bounded wait when a Site admission overlaps Root configuration/reload.
 SITE_ADMISSION_SUPERVISOR_WAIT_S = 30.0
 MANAGER = SYS / "class/fpga_manager/fpga0"
 
@@ -393,7 +393,7 @@ def scan_proc_consumers(*, procroot: Path, release,
 
 
 def read_live_z2_facts(*, release, runtime_program_session: bool = False,
-                       cooperating=None) -> dict:
+                       cooperating=None, timing_ms: dict[str, float] | None = None) -> dict:
     """Keep kernel/image guards; runtime WordPort does not census all PIDs.
 
     Runtime call requires the same protected FPGA lock and is NOT a safe
@@ -407,13 +407,20 @@ def read_live_z2_facts(*, release, runtime_program_session: bool = False,
          recovery.parent == FIRMWARE, "UNREVIEWED_FIRMWARE_PATH")
     boot_before = (PROC / "sys/kernel/random/boot_id").read_text().strip()
     need(bool(boot_before), "BOOT_ID_UNAVAILABLE")
+    hash_start_ns = time.monotonic_ns()
     candidate_sha = sha_file(candidate, release.firmware_sha256)
     recovery_sha = sha_file(recovery, GOLDEN_RECOVERY_SHA256)
+    if timing_ms is not None:
+        timing_ms["image_hash"] = round((time.monotonic_ns() - hash_start_ns) / 1e6, 3)
+    kernel_start_ns = time.monotonic_ns()
     compatible = (PROC / "device-tree/compatible").read_bytes().split(b"\0")
     need(release.soc_compatible.encode("ascii") in compatible,
          "SOC_FAMILY_MISMATCH")
     manager = (SYS / "class/fpga_manager/fpga0/state").read_text().strip()
     uio, platform = scan_kernel_owners(sysroot=SYS, release=release)
+    if timing_ms is not None:
+        timing_ms["kernel_owners"] = round((time.monotonic_ns() - kernel_start_ns) / 1e6, 3)
+    proc_start_ns = time.monotonic_ns()
     if runtime_program_session:
         # The session holds the global configuration lock. External device
         # consumers remain checked by the engine's scoped fuser preflight.
@@ -425,6 +432,8 @@ def read_live_z2_facts(*, release, runtime_program_session: bool = False,
         complete, conflicts = scan_proc_consumers(
             procroot=PROC, release=release, diagnostic=proc_diagnostic,
             cooperating=cooperating)
+    if timing_ms is not None:
+        timing_ms["process_census"] = round((time.monotonic_ns() - proc_start_ns) / 1e6, 3)
     boot_after = (PROC / "sys/kernel/random/boot_id").read_text().strip()
     need(boot_before == boot_after, "BOOT_CHANGED_DURING_SCAN")
     return {
@@ -443,6 +452,7 @@ class RootZ2TargetPort:
     """Same exclusive global FPGA owner, bound to one source-authorized release."""
     def __init__(self, *, release):
         self.release = release
+        self.admission_timing_ms: dict[str, float] = {}
         self._locked = False
         self._lock_owner_pid = None
         self._lock_owner_thread = None
@@ -459,8 +469,8 @@ class RootZ2TargetPort:
     def exclusive(self, *, site: int | None = None):
         """Root owner. ``site=None``: PPU reload, fence EX (unchanged).
 
-        ``site=1|2`` (ADR-0007 Site admission only): the same supervisor
-        lock, waited for a bounded time so two Site admissions serialize;
+        ``site=1|2`` (ADR-0007 Site admission only): supervisor SH
+        permits independent admissions while excluding Root configuration EX;
         the PPU fence SH, so another Site's running OpenOCD (also SH) stays
         compatible while any reload (EX) is excluded; and this Site's lock
         EX for the admission itself. A Site admission record is the
@@ -485,7 +495,7 @@ class RootZ2TargetPort:
                 deadline = time.monotonic() + SITE_ADMISSION_SUPERVISOR_WAIT_S
                 while True:
                     try:
-                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
                         break
                     except BlockingIOError:
                         need(time.monotonic() < deadline, "ROOT_SUPERVISOR_BUSY")
@@ -565,7 +575,9 @@ class RootZ2TargetPort:
                     boot_id=boot_id, session_id=session_id)
             else:
                 cooperating = dict  # unbound Site admission exempts nothing
-        return read_live_z2_facts(release=self.release, cooperating=cooperating)
+        return read_live_z2_facts(
+            release=self.release, cooperating=cooperating,
+            timing_ms=self.admission_timing_ms if self._site is not None else None)
 
     def runtime_program_facts(self) -> dict:
         """Read-only program admission, never FPGA reconfiguration authority."""

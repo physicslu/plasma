@@ -787,7 +787,7 @@ class ProgramSessionProcScanSplitTests(unittest.TestCase):
         state.parent.mkdir(parents=True)
         state.write_text("operating")
 
-    def facts(self, *, runtime, scan):
+    def facts(self, *, runtime, scan, timing_ms=None):
         with patch.object(guard, "SYS", self.sys), \
                 patch.object(guard, "PROC", self.proc), \
                 patch.object(guard, "FIRMWARE", self.firmware), \
@@ -797,7 +797,19 @@ class ProgramSessionProcScanSplitTests(unittest.TestCase):
                              return_value=(["uio1"], ["40000000.fabric"])), \
                 patch.object(guard, "scan_proc_consumers", side_effect=scan):
             return guard.read_live_z2_facts(
-                release=self.release, runtime_program_session=runtime)
+                release=self.release, runtime_program_session=runtime,
+                timing_ms=timing_ms)
+
+    def test_admission_timing_preserves_process_conflict_evidence(self):
+        timings = {}
+        facts = self.facts(runtime=False,
+                           scan=lambda **kw: (True, ["untrusted-owner"]),
+                           timing_ms=timings)
+        self.assertEqual(facts["proc_conflicts"], ["untrusted-owner"])
+        self.assertEqual(set(timings),
+                         {"image_hash", "kernel_owners", "process_census"})
+        self.assertTrue(all(type(ms) is float and ms >= 0
+                            for ms in timings.values()))
 
     def test_runtime_never_enumerates_all_proc_pids(self):
         def forbidden(**kwargs):

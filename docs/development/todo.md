@@ -9,7 +9,7 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ### Legacy `flash_cycle` Retirement — Path 3 implementation Gate 1
 
-**Status:** Candidate implementation for Draft PR #1469 (owner-approved Path 3, 2026-11-16): legacy admission/executors removed; clients migrated to ordered operations and independent read. Focused Host-only checks run; exact published-HEAD CI and socket/Web build coverage remain required. HIL/deployment NOT_RUN. **Gate 2 merge not approved.**
+**Status:** PR #1469 merged at `b3cd58d3dc86667a1b9c708ecd943ec84b8d94d7`; post-merge Python/Web regression follow-up is pending in Draft PR #1470 under the same approved Path 3 Gate 1. Legacy admission/executors are removed; clients use ordered operations and independent read. Corrective PR acceptance and separate Gate 2 remain pending. HIL/deployment NOT_RUN.
 
 **Scope:** Replace legacy single `flash_cycle` operation throughout current Manager/PPU Gateway/Runtime/OpenOCD/Provider/Bundle/Route/CLI/Web contracts and active tests with ONE `programming` Job using ordered `operations[]` (Erase/Program/Verify); keep independent `read`. Existing EMode/PMode execution and multi-Site scheduling are the baseline.
 
