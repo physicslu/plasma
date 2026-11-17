@@ -26,6 +26,7 @@ import plasma_development_dispatch as dispatch
 import test_plasma_path2_operator_cli as op
 
 SHA = "c" * 40
+MAIN_SHA = "d" * 40
 WF = ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml"
 # Frozen from main aaacc16a8: the A2 one-shot contract must stay byte-identical.
 A2_BLOCK_SHA256 = {
@@ -244,10 +245,14 @@ class HostedClaimEntry(unittest.TestCase):
         gh = FakeGitHub()
         with tempfile.TemporaryDirectory() as td:
             req, args = self.args(load_order(), td)
-            env = {"GITHUB_TOKEN": "t" * 20, "GITHUB_RUN_ATTEMPT": "1"}
+            env = {"GITHUB_TOKEN": "t" * 20, "GITHUB_RUN_ATTEMPT": "1", "GITHUB_SHA": MAIN_SHA}
             with patch.dict(os.environ, env):
                 receipt = dispatch.p2hw_claim_main(req, args, transport=lambda token: (gh.create, gh.read))
                 self.assertNotIn("GITHUB_TOKEN", os.environ)
+            # The ref points at trusted main (like A2), never the candidate PR.
+            self.assertNotEqual(MAIN_SHA, req["source_sha"])
+            self.assertEqual(gh.refs[args.claim_ref], MAIN_SHA)
+            self.assertEqual((receipt["sha"], receipt["pinned_sha"]), (MAIN_SHA, req["source_sha"]))
             path = Path(td) / "plasma-p2hw-claim.json"
             self.assertEqual(json.loads(path.read_text())["claim_ref"], args.claim_ref)
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
@@ -265,8 +270,16 @@ class HostedClaimEntry(unittest.TestCase):
                            {"claim_ref": dispatch.P2HW_CLAIM_PREFIX + "0" * 64},
                            {"pinned_sha": "f" * 40}):
                 req, args = self.args(load_order(), td, **change)
-                with patch.dict(os.environ, {"GITHUB_TOKEN": "t" * 20, "GITHUB_RUN_ATTEMPT": "1"}):
+                with patch.dict(os.environ, {"GITHUB_TOKEN": "t" * 20, "GITHUB_RUN_ATTEMPT": "1",
+                                             "GITHUB_SHA": MAIN_SHA}):
                     with self.assertRaisesRegex(dispatch.Denied, "P2HW_CLAIM_BINDING_DENIED"):
+                        dispatch.p2hw_claim_main(req, args, transport=transport)
+            req, args = self.args(load_order(), td)
+            for bad in ({}, {"GITHUB_SHA": "not-a-sha"}):
+                env = {"GITHUB_TOKEN": "t" * 20, "GITHUB_RUN_ATTEMPT": "1", **bad}
+                with patch.dict(os.environ, env, clear=False):
+                    os.environ.pop("GITHUB_SHA", None) if not bad else None
+                    with self.assertRaisesRegex(dispatch.Denied, "P2HW_CLAIM_TRUSTED_SHA_REQUIRED"):
                         dispatch.p2hw_claim_main(req, args, transport=transport)
         transport.assert_not_called()
 

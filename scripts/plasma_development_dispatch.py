@@ -1653,11 +1653,19 @@ def p2hw_claim_main(req: dict, args, transport=github_claim_transport) -> dict:
             args.pinned_sha == req.get("source_sha"),
             "P2HW_CLAIM_BINDING_DENIED")
     require(args.evidence_dir is not None, "P2HW_CLAIM_EVIDENCE_DIR_REQUIRED")
+    # Like A2, the claim ref points at the trusted main commit running this
+    # Job, never the candidate PR commit: a GITHUB_TOKEN without `workflows`
+    # permission may not create a branch ref at a commit that changes
+    # .github/workflows. The candidate SHA stays bound via the digest/receipt.
+    trusted_sha = os.environ.get("GITHUB_SHA")
+    require(type(trusted_sha) is str and SHA40.fullmatch(trusted_sha) is not None,
+            "P2HW_CLAIM_TRUSTED_SHA_REQUIRED")
     create, read = transport(token)
     receipt = claim_hardware_once(create, read, claim_ref=args.claim_ref,
-                                  sha=args.pinned_sha,
+                                  sha=trusted_sha,
                                   run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"))
     receipt.update(work_order_sha256=req["work_order_sha256"],
+                   pinned_sha=args.pinned_sha,
                    comment_id=req.get("comment_id"), issue_number=ISSUE,
                    run_id=os.environ.get("GITHUB_RUN_ID", ""))
     with (args.evidence_dir / "plasma-p2hw-claim.json").open("x", encoding="utf-8") as f:
