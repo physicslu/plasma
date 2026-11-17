@@ -1,5 +1,9 @@
 # PPU Runtime interface module inventory (Phase 1)
 
+> Historical design snapshot. Current execution and admission supersede the cycle-only descriptions
+> below: [OPF Programming Operations](opf-programming-operations-v1.md) is normative.
+> PR #1469 retires `flash_cycle`; historical HIL results and receipts below remain unchanged.
+
 **Status:** Source classification only; not a packaging change or retirement authorization.  
 **Source baseline:** `main` at `082f018941b508a1310556a2242b112a6ad57dfe` (2026-11-10).  
 **Scope:** The 29 Python files directly under `software/python/plasma_interfaces/`, including `__init__.py`.

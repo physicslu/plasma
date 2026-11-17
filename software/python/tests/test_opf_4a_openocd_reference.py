@@ -56,7 +56,7 @@ def _json(payload):
 @contextmanager
 def installed_bundle(*, profile_change=None, descriptor_change=None,
                      engine_binary=OPENOCD, options_schema=None,
-                     with_control_socket=True, verified_worker=True,
+                     with_control_socket=False, verified_worker=True,
                      with_fpga=True, platform_provider=False, platform_extra_files=None,
                      profile_count=1, target_icpn=ICPN, other_target=None,
                      programming_bundle=None):
@@ -69,7 +69,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                       "flash_base": 0x08000000, "flash_size": 65536,
                       "erase_granularity": 1024}
         desc = {"schema": "plasma.ppu.provider-capabilities.v2", "target": target_icpn,
-                "provider_package": PROVIDER, "operations": ["flash_cycle"],
+                "provider_package": PROVIDER, "operations": ["erase", "program", "verify"],
                 "transport": "fpga", "driver_abi": DRIVER_ABI,
                 "fpga_package": FPGA, "max_image_bytes": 65536}
         desc.update(descriptor_change or {})
@@ -156,6 +156,16 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
         server = worker.SiteWorkerServer(core, path / "c3.sock", role="control", mode=0o600)
         if with_control_socket:
             server.start()
+        client = SiteWorkerControlClient(path / "c3.sock")
+        if not with_control_socket:
+            def local_call(op, *, timeout_s=None, **fields):
+                reply = core.handle({"protocol": worker.PROTOCOL, "op": op, **fields},
+                                    (os.getpid(), os.getuid(), os.getgid()), "control")
+                if not reply["ok"]:
+                    from plasma_interfaces.site_worker_c3 import SiteWorkerRefused
+                    raise SiteWorkerRefused(reply["error"])
+                return reply["result"]
+            client.call = local_call
         try:
             yield {
                 "product_root": co.paths.product_root, "asset_set_sha256": digest,
@@ -172,7 +182,7 @@ def installed_bundle(*, profile_change=None, descriptor_change=None,
                 "runtime_profile": c3_profile,
                 "engine_record": engine_record, "engine_base": path / "openocd",
                 "require_root": False, "image_root": image_root,
-                "client": SiteWorkerControlClient(path / "c3.sock"),
+                "client": client,
                 "job_id": "job-1", "image": IMAGE,
                 "job_deadline_monotonic": time.monotonic() + 5,
                 "job_timeout_s": 5.0,
@@ -190,9 +200,13 @@ def _execute(env, **changes):
                           "image_root", "hardware",
                           "job_deadline_monotonic", "job_timeout_s", "engine_record",
                           "engine_base", "require_root"}}
-    payload["job_binding"] = None  # inline contract: writes at Profile flash_base
+    payload["job_binding"] = {"operation": "programming", "operations": ["erase", "program", "verify"],
+                              "site_id": env["site_id"], "profile": env["selection"]["profile"],
+                              "range": {"address": env["runtime_profile"]["flash_base"], "length": len(env["image"])}}
     payload.update(changes)
-    return asyncio.run(reference.execute_reference_flash(**payload))
+    if "job_binding" not in changes:
+        payload["job_binding"]["site_id"] = payload["site_id"]
+    return run(reference.execute_reference_flash(**payload))
 
 
 def _qualify(env, **changes):
@@ -201,6 +215,7 @@ def _qualify(env, **changes):
                           "policy", "site_id", "target", "hardware",
                           "engine_record", "engine_base", "require_root"}}
     payload["image_size"] = len(env["image"])
+    payload["operations"] = ("erase", "program", "verify")
     payload.update(changes)
     return reference.qualify_reference(**payload)
 
@@ -210,7 +225,7 @@ def test_bundle_profile_accepts_new_icpn_without_core_registry():
     with installed_bundle(target_icpn=unknown) as env:
         preflight = reference.preflight_runtime_flash(
             product_root=env["product_root"], active_asset_set=env["active_asset_set"],
-            target=unknown, site_id=2, image_size=len(IMAGE), job_binding=None)
+            target=unknown, site_id=2, image_size=len(IMAGE), job_binding=_binding(address=0x08000000, length=len(IMAGE)))
         assert preflight["profile"]["icpn"] == unknown
         result = _execute(env)
         assert result["result"] == "PASS" and result["safe_off"] is True
@@ -223,7 +238,7 @@ def test_two_targets_select_their_declared_profiles_in_one_active_bundle():
         for target, profile_id in ((ICPN, PROFILE), (other, "other-profile")):
             pinned = reference.preflight_runtime_flash(
                 product_root=env["product_root"], active_asset_set=env["active_asset_set"],
-                target=target, site_id=2, image_size=len(IMAGE), job_binding=None,
+                target=target, site_id=2, image_size=len(IMAGE), job_binding=_binding(address=0x08000000, length=len(IMAGE), profile=profile_id),
                 provider=PROVIDER, profile=profile_id)
             assert pinned["profile_package"] == profile_id
             assert pinned["profile"]["icpn"] == target
@@ -235,11 +250,11 @@ def test_bundle_profile_image_bounds_and_target_claim_fail_closed():
         with pytest.raises(ValueError, match="IMAGE_OUT_OF_BOUNDS"):
             reference.preflight_runtime_flash(
                 product_root=env["product_root"], active_asset_set=env["active_asset_set"],
-                target=ICPN, site_id=2, image_size=65537, job_binding=None)
+                target=ICPN, site_id=2, image_size=65537, job_binding=_binding(address=0x08000000, length=len(IMAGE)))
         with pytest.raises(ValueError, match="REFERENCE_TARGET_MISMATCH"):
             reference.preflight_runtime_flash(
                 product_root=env["product_root"], active_asset_set=env["active_asset_set"],
-                target="ANOTHER-UNLISTED-MCU", site_id=2, image_size=len(IMAGE), job_binding=None)
+                target="ANOTHER-UNLISTED-MCU", site_id=2, image_size=len(IMAGE), job_binding=_binding(address=0x08000000, length=len(IMAGE)))
         assert not env["sim"].argvs and not env["core"]._sessions
 
 
@@ -247,8 +262,8 @@ def test_verified_reference_executes_existing_c3_abi5_flash_and_readback():
     with installed_bundle() as env:
         result = _execute(env)
         assert result["result"] == "PASS" and result["safe_off"] is True
-        assert result["readback_sha256"] == result["image_sha256"] == hashlib.sha256(IMAGE).hexdigest()
-        assert result["bytes_verified"] == len(IMAGE)
+        assert result["steps"]["verify"]["readback_sha256"] == result["image_sha256"] == hashlib.sha256(IMAGE).hexdigest()
+        assert result["steps"]["verify"]["bytes_verified"] == len(IMAGE)
         assert result["opf_provider_package"] == PROVIDER
         assert result["opf_profile_package"] == PROFILE
         assert result["opf_asset_set_sha256"] == env["asset_set_sha256"]
@@ -277,7 +292,7 @@ def test_bundle_profile_5mhz_overrides_engine_default_per_job_for_both_sites(sit
         assert result["opf_profile_sha256"] == reference.preflight_runtime_flash(
             product_root=env["product_root"],
             active_asset_set=env["active_asset_set"], target=ICPN,
-            site_id=site_id, image_size=len(IMAGE), job_binding=None,
+            site_id=site_id, image_size=len(IMAGE), job_binding=_binding(address=0x08000000, length=len(IMAGE), site_id=site_id),
         )["profile_sha256"]
         assert env["engine_record"].read_bytes() == before
         assert env["adapter"].adapter_khz == env["engine_data"]["adapter_khz"] == 500
@@ -404,7 +419,7 @@ def test_worker_lease_denial_no_second_site_lock_or_flash():
 def test_verified_safe_failure_does_not_seal_site_or_schedule_a_new_retry_owner():
     with installed_bundle() as env:
         env["sim"].corrupt = True
-        with pytest.raises(Exception, match="READBACK_MISMATCH"):
+        with pytest.raises(Exception, match="VERIFY_MISMATCH"):
             _execute(env)
         assert env["core"]._sealed == set()
         assert env["core"]._site_owners == {}
@@ -463,12 +478,12 @@ def _runtime_execute(env, monkeypatch):
 
     monkeypatch.setattr(env["client"], "call", worker_call)
     request = JobRequest(job_id="job-1", site_id=2, target=env["target"],
-                         operation=Operation.FLASH_CYCLE, image=IMAGE, timeout_s=5.0)
+                         operation=Operation.PROGRAMMING, image=IMAGE, timeout_s=5.0, metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}})
     return run(reference.execute_runtime_flash(
         env["client"], product_root=env["product_root"], request=request,
         active_asset_set=env["active_asset_set"],
         job_deadline_monotonic=time.monotonic() + 5,
-        image_root=env["image_root"], job_binding=None))
+        image_root=env["image_root"], job_binding=_binding(address=0x08000000, length=len(IMAGE))))
 
 
 def test_profile_provider_only_runtime_flash_uses_installed_platform(monkeypatch):
@@ -476,8 +491,8 @@ def test_profile_provider_only_runtime_flash_uses_installed_platform(monkeypatch
                           platform_provider=True) as env:
         result = _runtime_execute(env, monkeypatch)
         assert result["result"] == "PASS" and result["safe_off"] is True
-        assert result["readback_sha256"] == hashlib.sha256(IMAGE).hexdigest()
-        assert result["bytes_verified"] == len(IMAGE)
+        assert result["steps"]["verify"]["readback_sha256"] == hashlib.sha256(IMAGE).hexdigest()
+        assert result["steps"]["verify"]["bytes_verified"] == len(IMAGE)
         assert bytes(env["sim"].memory[:len(IMAGE)]) == IMAGE
         assert len(env["sim"].argvs) == 1
         assert set(env["worker_calls"]) == {
@@ -591,7 +606,7 @@ F103_PROFILE = {"icpn": ICPN, "target_config": "target/stm32f1x.cfg",
 
 
 def _binding(address=0x08000400, length=20, **changes):
-    return {"operation": "flash_cycle", "site_id": 2, "profile": PROFILE,
+    return {"operation": "programming", "operations": ["erase", "program", "verify"], "site_id": 2, "profile": PROFILE,
             "range": {"address": address, "length": length}, **changes}
 
 
@@ -601,10 +616,6 @@ def test_job_window_uses_the_binding_address_not_flash_base():
     assert window == {"load_address": 0x08000400, "erase_length": 2048}
 
 
-def test_job_without_binding_is_the_explicit_flash_base_contract():
-    window = reference.job_flash_window(F103_PROFILE, profile_package=PROFILE, site_id=2,
-                                        image_size=20, job_binding=None)
-    assert window == {"load_address": 0x08000000, "erase_length": 1024}
 
 
 @pytest.mark.parametrize("binding,code", [
@@ -646,3 +657,9 @@ def test_preflight_pins_the_binding_window_before_any_session():
                 job_binding=_binding(address=0x08000001, length=len(IMAGE)),
                 provider=PROVIDER, profile=PROFILE)
         assert not env["sim"].argvs and not env["core"]._sessions
+
+
+def test_job_without_binding_is_refused():
+    with pytest.raises(ValueError, match="JOB_BINDING_REQUIRED"):
+        reference.job_flash_window(F103_PROFILE, profile_package=PROFILE, site_id=2,
+                                   image_size=20, job_binding=None)

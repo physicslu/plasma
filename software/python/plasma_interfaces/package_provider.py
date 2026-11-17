@@ -66,6 +66,11 @@ class PackageProviderInterface(BaseInterface):
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_NOT_AUTHORIZED")
         self._trusted = trusted
 
+    @property
+    def admitted_operations(self) -> tuple[str, ...] | None:
+        """The immutable Root-admitted Provider route, never public metadata."""
+        return None if self._trusted is None else self._trusted.route.operations
+
     def prepare_request(self, request: JobRequest) -> None:
         if (self._trusted is None or request.job_id != self._trusted.asset_request.job_id
                 or request.metadata.get("provider") != self._trusted.route.provider_package
@@ -76,11 +81,12 @@ class PackageProviderInterface(BaseInterface):
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "PROVIDER_JOB_BINDING_MISMATCH")
         self._job = request
 
-    async def flash_cycle(self, image: bytes,
+    async def run_operations(self, operations: tuple[str, ...], image: bytes,
                           progress: ProgressCallback | None = None) -> dict[str, object]:
         if self._run is None or self._job is None or self._trusted is None:
             raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED, "PROVIDER_RUNTIME_NOT_WIRED")
-        if image != self._job.image or self._running is not None:
+        if (image != self._job.image or self._running is not None
+                or operations != self._trusted.route.operations):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "PROVIDER_IMAGE_OR_STATE_MISMATCH")
         self._cancel = threading.Event()
         self._running = asyncio.create_task(asyncio.to_thread(

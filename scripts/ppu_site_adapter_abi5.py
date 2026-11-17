@@ -12,13 +12,10 @@ operation it composes ONLY existing, reviewed owners:
   it reads no admission record and no electrical attestation)  ->  revoke.
 
 Operations (allowlist): ``probe`` = OpenOCD ``dap init`` + ``dpreg 0`` with a
-fixed argv (no target, flash, erase, program or reset); ``flash_cycle`` =
-``reset halt`` -> ``poll off`` -> ``flash probe 0`` -> erase (image rounded up
-to erase units) -> write -> verify -> full readback compare -> ``reset run``
--> ``shutdown`` for the session-bound, Runtime-resolved Flash profile
-(target config + geometry). ``programming`` shares that preamble
-(``reset halt`` -> ``poll off`` -> ``flash probe 0``) and ending (``reset run``
--> ``shutdown``) and runs exactly the session's ordered list in ONE OpenOCD
+fixed argv (no target, flash, erase, program or reset); ``programming`` runs
+exactly the session's ordered list in ONE OpenOCD session, with the existing
+preamble (``reset halt`` -> ``poll off`` -> ``flash probe 0``) and ending
+(``reset run`` -> ``shutdown``) for the session-bound Profile. In that
 session: ``erase`` = erase the Image's erase window (erase-only: the bound
 range + full blank readback); ``program`` = write the bound Image, never an
 erase; ``verify`` = read back the Image range and compare, never a write.
@@ -106,9 +103,9 @@ class SafeOff:
 class Abi5OpenocdAdapter:
     name = "z2-abi5-swd-openocd5088"
     supported_sites = frozenset({1, 2})
-    # ``flash_cycle`` is the legacy complete cycle; ``programming`` runs any
+    # ``programming`` runs any
     # legal ordered erase / program / verify list; ``read`` is independent.
-    operations = frozenset({"probe", "flash_cycle", PROGRAMMING, "read"})
+    operations = frozenset({"probe", PROGRAMMING, "read"})
 
     def __init__(self, *, openocd_root: Path, python: Path, adapter_khz: int,
                  adapter_driver: str = "plasma_swd",
@@ -244,7 +241,7 @@ class Abi5OpenocdAdapter:
 
     def _operation_argv(self, site: int, bound: FlashImage | FlashRange,
                         actions: list[str]) -> list[str]:
-        """The qualified flash_cycle preamble and ending around exactly the
+        """The qualified programming preamble and ending around exactly the
         given actions; no caller-supplied Tcl."""
         return [
             *self._base_argv(site),
@@ -378,73 +375,7 @@ class Abi5OpenocdAdapter:
             return {"result": "PASS", **base, "operations": list(operations), "steps": steps,
                     "load_address": address, "openocd_rc": 0, **safe_off.receipt()}
 
-    def _flash_argv(self, site: int, image: FlashImage, staged: Path, readback: Path) -> list[str]:
-        """Flash sequence for the session-bound profile; no caller-supplied Tcl."""
-        def tcl_path(path: Path) -> str:
-            raw = path.resolve().as_posix()
-            if "{" in raw or "}" in raw or any(ord(ch) < 32 for ch in raw):
-                raise TransportDenied("IMAGE_PATH_INVALID")
-            return "{" + raw + "}"
 
-        # The Job Binding address, not the bank's flash_base, is the write
-        # target; FlashImage already proved the whole erase window in-bank.
-        size = len(image.payload)
-        erase_address, erase_length = image.erase_range
-        address = f"0x{image.load_address:08x}"
-        source, output = tcl_path(staged), tcl_path(readback)
-        return [
-            *self._base_argv(site),
-            "-f", self._target_config(image),
-            # Target configs may force their own SWCLK (stm32f1x.cfg: 1000 kHz);
-            # the verified Bundle Profile clock wins; Engine supplies fallback.
-            "-c", f"adapter speed {self._clock_khz(image.profile)}",
-            "-c", "init",
-            # A plain ``halt`` of running firmware leaves the stm32f1x write
-            # algorithm stuck after the erase (Driver track HIL 2026-11-04,
-            # runbook section 10): every Flash operation starts from reset.
-            "-c", "reset halt",
-            # Match the proven Site 2 A/B OpenOCD sequence: avoid background
-            # target-state polling and explicitly probe bank 0 before erase.
-            "-c", "poll off",
-            "-c", "flash probe 0",
-            "-c", f"flash erase_address 0x{erase_address:08x} 0x{erase_length:08x}",
-            "-c", f"flash write_image {source} {address} bin",
-            "-c", f"flash verify_image {source} {address} bin",
-            "-c", f"dump_image {output} {address} 0x{size:08x}",
-            "-c", "reset run",
-            "-c", "shutdown",
-        ]
-
-    @staticmethod
-    def _executed_flash_range(argv: list[str], log: str, size: int) -> dict[str, int] | None:
-        """Range evidence from what actually ran, never from the request.
-
-        Addresses come from the exact OpenOCD commands executed; the erase
-        range is additionally OpenOCD's own ``erased address`` report, and the
-        written/verified byte counts must equal the Image. Any missing,
-        duplicated or disagreeing observation returns None (not proven).
-        """
-        commands = [argv[i + 1] for i, part in enumerate(argv[:-1]) if part == "-c"]
-
-        def one(pattern: re.Pattern[str]) -> tuple[str, ...] | None:
-            found = [m.groups() for m in map(pattern.match, commands) if m]
-            return found[0] if len(found) == 1 else None
-
-        erase, write, verify, dump = (one(_ERASE_CMD), one(_WRITE_CMD),
-                                      one(_VERIFY_CMD), one(_DUMP_CMD))
-        erased = ERASED.findall(log)
-        wrote, verified = WROTE.findall(log), VERIFIED.findall(log)
-        if (erase is None or write is None or verify is None or dump is None
-                or len(erased) != 1
-                or wrote != [str(size)] or verified != [str(size)]):
-            return None
-        commanded = (int(erase[0], 16), int(erase[1], 16))
-        observed = (int(erased[0][0], 16), int(erased[0][1]))
-        if commanded != observed or int(dump[1], 16) != size:
-            return None
-        return {"erase_address": observed[0], "erase_length": observed[1],
-                "write_address": int(write[0], 16), "verify_address": int(verify[0], 16),
-                "readback_address": int(dump[0], 16)}
 
     def _revoke(self, site: int) -> bool:
         try:
@@ -513,48 +444,6 @@ class Abi5OpenocdAdapter:
         if operation == "read":
             return self._run_operations(site, ("read",), deadline=deadline, cancel=cancel,
                                         image=None, flash_range=flash_range)
-        if operation == "flash_cycle":
-            if (image is None
-                    or not (0 < len(image.payload) <= image.profile.flash_size)
-                    or hashlib.sha256(image.payload).hexdigest() != image.sha256):
-                raise TransportDenied("FLASH_IMAGE_NOT_BOUND")
-            try:
-                image.erase_range  # re-prove the Job window before any admission
-            except SiteWorkerDenied:
-                raise TransportDenied("FLASH_RANGE_INVALID") from None
-            with tempfile.TemporaryDirectory(prefix="plasma-c3-flash-") as directory:
-                staged = Path(directory) / "normalized-image.bin"
-                readback = Path(directory) / "readback.bin"
-                staged.write_bytes(image.payload)
-                staged.chmod(0o600)
-                argv = self._flash_argv(site, image, staged, readback)
-                log, rc, safe_off = self._session(
-                    site, deadline=deadline, cancel=cancel,
-                    argv=argv, max_duration_s=300,
-                )
-                if rc != 0:
-                    return {"result": "FAIL", "code": "OPENOCD_FLASH_FAILED",
-                            "openocd_rc": rc, **safe_off.receipt()}
-                if not readback.is_file():
-                    return {"result": "FAIL", "code": "READBACK_MISSING",
-                            "openocd_rc": rc, **safe_off.receipt()}
-                observed = readback.read_bytes()
-                observed_sha = hashlib.sha256(observed).hexdigest()
-                if observed != image.payload:
-                    return {"result": "FAIL", "code": "READBACK_MISMATCH",
-                            "openocd_rc": rc, "expected_sha256": image.sha256,
-                            "readback_sha256": observed_sha, **safe_off.receipt()}
-                executed = self._executed_flash_range(argv, log, len(image.payload))
-                if executed is None:
-                    return {"result": "FAIL", "code": "FLASH_RANGE_NOT_OBSERVED",
-                            "openocd_rc": rc, **safe_off.receipt()}
-                return {"result": "PASS", "icpn": image.icpn,
-                        "target_config": image.profile.target_config,
-                        **self._clock_evidence(image.profile),
-                        "bytes_verified": len(observed),
-                        "readback_sha256": observed_sha,
-                        "load_address": image.load_address, **executed,
-                        "openocd_rc": 0, **safe_off.receipt()}
         log, rc, safe_off = self._session(site, deadline=deadline, cancel=cancel)
         connect, dpreg = DPIDR.findall(log), DPREG0.findall(log)
         values = {int(v, 16) for v in connect + dpreg}

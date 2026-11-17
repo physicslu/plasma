@@ -130,7 +130,7 @@ class ProgrammingRoute:
 
 
 # Basic operations a Route Profile may declare (same set as OPERATIONS below).
-ROUTE_OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
+ROUTE_OPERATIONS = frozenset({"erase", "program", "verify", "read"})
 
 
 def parse_route(payload: object) -> ProgrammingRoute:
@@ -289,13 +289,13 @@ IMAGE_FORMATS = frozenset({"binary"})
 # plasma_core.enums.Operation (status/cancel are control operations). A Profile
 # declares the subset it supports; declaring one here grants NO execution: the
 # PPU Runtime route admission (execution_router) stays the execution authority.
-OPERATIONS = ("erase", "program", "verify", "read", "flash_cycle")
-IMAGE_OPERATIONS = frozenset({"program", "verify", "flash_cycle"})
+OPERATIONS = ("erase", "program", "verify", "read")
+IMAGE_OPERATIONS = frozenset({"program", "verify"})
 # The formal execution model: ONE ``programming`` Job runs an ordered
 # ``operations`` list drawn from erase -> program -> verify. Every legal E/P/V
 # selection (all three included) is this one Job kind with one Job Binding and
 # one receipt; a Profile declares the basic operations, never ``programming``.
-# ``flash_cycle`` is the legacy complete cycle; ``read`` is an independent Job.
+# ``read`` is an independent Job.
 PROGRAMMING = "programming"
 SEQUENCE_OPERATIONS = ("erase", "program", "verify")
 
@@ -565,7 +565,7 @@ def job_image_binding(resource: object, asset: object | None = None, *,
     window); erase-only takes an explicit erase-aligned range and no Image.
 
     ``operation`` is user-selected and must be declared by the Resource Profile.
-    ``program``/``verify``/``flash_cycle`` require an applicable Image Asset and
+    ``program``/``verify`` require an applicable Image Asset and
     act on exactly its range; ``erase``/``read`` take an explicit range and no
     Image Asset. No I/O; a valid Binding authorizes nothing by itself.
     """
@@ -594,8 +594,7 @@ def job_image_binding(resource: object, asset: object | None = None, *,
         "image_asset_sha256": None if image is None else image_asset_sha256(image),
         "ppu_id": ppu_id, "site_id": site_id,
         "icpn": parsed["constraints"]["icpn"], "profile": profile["id"],
-        # Only a ``programming`` Binding carries the list; a legacy
-        # flash_cycle / read Binding keeps its exact previous identity.
+        # Only a ``programming`` Binding carries the list.
         **({} if steps is None else {"operations": steps}),
     }
 

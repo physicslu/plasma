@@ -6,6 +6,18 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ## High Priority
 
+
+### Legacy `flash_cycle` Retirement — Path 3 implementation Gate 1
+
+**Status:** Candidate implementation for Draft PR #1469 (owner-approved Path 3, 2026-11-16): legacy admission/executors removed; clients migrated to ordered operations and independent read. Focused Host-only checks run; exact published-HEAD CI and socket/Web build coverage remain required. HIL/deployment NOT_RUN. **Gate 2 merge not approved.**
+
+**Scope:** Replace legacy single `flash_cycle` operation throughout current Manager/PPU Gateway/Runtime/OpenOCD/Provider/Bundle/Route/CLI/Web contracts and active tests with ONE `programming` Job using ordered `operations[]` (Erase/Program/Verify); keep independent `read`. Existing EMode/PMode execution and multi-Site scheduling are the baseline.
+
+**Required:** Inventory actual live callers and deploy tools, remove legacy alternate dispatch/admission/receipt/schema/enum/provider/adapter code and migrate still-used CLI or frontend callers to the canonical API/Job Binding. Update normative documentation and focused positive/negative tests; keep immutable historical evidence and old HIL receipts unchanged. No permanent compatibility shim or parallel execution paths. Preserve safety/authorization, stable identities, Resource Set/Job Binding/SAFE_OFF, Site isolation, `OUTCOME_UNKNOWN` no-blind-resend, cancellation/recovery and exact E/P/V/R semantics. Verify with relevant Host-only tests and GitHub CI; report exact SHA and added/removed LOC and any remaining legacy references.
+
+**Exclusions:** Repeat implementation, default Target Finalization/`reset run` behavior changes, FPGA RTL, deployment and any SWPC/Z2/DUT operation. Do not merge without explicit owner Gate 2 approval. This backlog entry is not evidence that the removal is complete.
+
+
 ### PLASMA M0–M4 — 安裝／執行／OpenOCD 架構精簡與八通道燒錄路線圖
 
 **Status:** PLANNED — 2026-11-03 Owner roadmap recorded; **no Gate 1 implementation scope or Gate 2 merge approval granted by this documentation item**.

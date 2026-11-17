@@ -1,7 +1,7 @@
 {
   "schema": "plasma.opf.programming-route.v1",
   "route_id": "z2-site2-stm32f103c8t6-operations",
-  "description": "First-party OpenOCD reference route for one programming Job (ordered erase/program/verify operations list) and the independent read Job: PYNQ-Z2 ABI-v5 plasma_swd Site-independent, STM32F103C8T6. The legacy flash_cycle route remains a distinct Operation Profile.",
+  "description": "First-party OpenOCD reference route for one programming Job (ordered erase/program/verify operations list) and the independent read Job: PYNQ-Z2 ABI-v5 plasma_swd Site-independent, STM32F103C8T6.",
   "target": {
     "platform": "linux-armv7",
     "board": "pynq-z2",

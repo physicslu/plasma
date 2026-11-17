@@ -68,7 +68,7 @@ def fixture(tmp_path: Path, *, with_authorization=True):
     descriptor = {
         "schema": "plasma.ppu.provider-capabilities.v2",
         "target": TARGET_ID, "provider_package": PROVIDER,
-        "operations": ["flash_cycle"], "transport": "ps-only",
+        "operations": ["erase", "program", "verify"], "transport": "ps-only",
         "driver_abi": None, "fpga_package": None, "max_image_bytes": 4096,
     }
     parts = [
@@ -111,7 +111,7 @@ def fixture(tmp_path: Path, *, with_authorization=True):
         "package_version": package.version, "package_kind": "python",
         "package_identity_sha256": identity, "job_id": JOB,
         "programming": {
-            "site_id": 2, "target": TARGET_ID, "operation": "flash_cycle",
+            "site_id": 2, "target": TARGET_ID, "operation": "programming", "operations": ["erase", "program", "verify"],
             "profile": PROFILE, "asset_package_id": FIRMWARE,
             "asset_sha256": hashlib.sha256(IMAGE).hexdigest(),
         },
@@ -248,7 +248,7 @@ def test_plain_rest_or_protocol_cannot_claim_trusted_provider_authority(tmp_path
         try:
             with pytest.raises(Exception, match="PROVIDER_JOB_NOT_AUTHORIZED"):
                 manager.enqueue(JobRequest(
-                    site_id=2, operation=Operation.FLASH_CYCLE,
+                    site_id=2, operation=Operation.PROGRAMMING,
                     image=IMAGE, job_id=JOB, target=TARGET_ID,
                     metadata={"provider": PROVIDER, "profile": PROFILE}))
         finally:

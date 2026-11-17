@@ -139,7 +139,7 @@ def no_catalog(monkeypatch, tmp_path):
 
 def _scenario(case):
     """Run one Bundle-driven Job; return the Runtime decision summary."""
-    bundle_icpn = NON_CATALOG_ICPN if case != "catalog-known-bundle" else CATALOG_KNOWN_ICPN
+    bundle_icpn = NON_CATALOG_ICPN if case not in {"catalog-known-bundle", "no-active-set"} else CATALOG_KNOWN_ICPN
     target = {"non-catalog-bundle": NON_CATALOG_ICPN,
               "catalog-known-bundle": CATALOG_KNOWN_ICPN,
               "catalog-qualified-target-without-bundle": CATALOG_KNOWN_ICPN,
@@ -147,9 +147,16 @@ def _scenario(case):
               "unsupported-operation": NON_CATALOG_ICPN}[case]
 
     async def body():
+        from plasma_opf import bundle_v3
+        data = json.loads((ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6-operations.json").read_text())
+        data["provider"]["id"] = "openocd-reference"
+        data["profile"]["id"] = "stm32f103-c8"
+        data["profile"]["capabilities"].update(provider_package="openocd-reference", target=bundle_icpn)
+        data["profile"]["flash_profile"]["icpn"] = bundle_icpn
+        built = bundle_v3.build_user_image_bundle(bundle_v3.parse_route(data), b"BASELINE")
         with short_tmp() as directory:
             async with Stack(Path(directory), site_target=target, in_process=True,
-                             bundle_options={"target_icpn": bundle_icpn}) as stack:
+                             bundle_options={"programming_bundle": built}) as stack:
                 if case == "no-active-set":
                     stack.manager._active_asset_set_reader = lambda: {"state": "EMPTY"}
                 extra = {"operation": "erase"} if case == "unsupported-operation" else {}
@@ -161,7 +168,7 @@ def _scenario(case):
                 _job_id, job = outcome
                 summary.update(state=job["state"], detail=json.dumps(job, sort_keys=True))
                 if job["state"] == "success":
-                    cycle = job["result"]["details"]["flash_cycle"]
+                    cycle = job["result"]["details"]["programming"]
                     summary.update(result=cycle["result"], icpn=cycle["icpn"],
                                    safe_off=cycle["safe_off"])
                 return summary
@@ -177,8 +184,8 @@ def test_verified_bundle_for_non_catalog_icpn_flashes_without_catalog(no_catalog
 
 
 @pytest.mark.parametrize("case,code", [
-    ("catalog-qualified-target-without-bundle", "REFERENCE_TARGET_MISMATCH"),
-    ("no-active-set", "OPF_ACTIVE_SET_REQUIRED"),
+    ("catalog-qualified-target-without-bundle", "job_binding does not match this Job request"),
+    ("no-active-set", "JOB_RESOURCE_NOT_ACTIVE"),
     ("unsupported-operation", None),
 ])
 def test_runtime_refuses_without_bundle_authority_and_never_queries_catalog(no_catalog, case, code):

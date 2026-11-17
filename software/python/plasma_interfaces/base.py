@@ -116,20 +116,6 @@ class BaseInterface(ABC):
                 )
         return {}
 
-    async def flash_cycle(
-        self,
-        image: bytes,
-        progress: ProgressCallback | None = None,
-    ) -> dict[str, object]:
-        """Complete Flash cycle (Erase -> Program -> Verify -> full Readback).
-
-        Returns evidence (e.g. readback SHA256). Interfaces that cannot prove
-        every step must not emulate it from separate operations.
-        """
-        raise PlasmaError(
-            ErrorCode.OPERATION_UNSUPPORTED,
-            "interface does not support the complete Flash cycle",
-        )
 
     @abstractmethod
     async def verify(

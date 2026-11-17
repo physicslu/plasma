@@ -23,7 +23,7 @@ const BOOTSTRAP_POST_ACTIONS = [
   new RegExp(`^uploads/${UPLOAD_ID}/chunks$`),
   new RegExp(`^uploads/${UPLOAD_ID}/commit$`),
   // Console-driven Bundle programming (Gate 1, 2026-11-09). The Manager builds
-  // the Bundle and owns B1/B2/B3 + flash_cycle; the Browser only plans,
+  // the Bundle and owns B1/B2/B3 + programming; the Browser only plans,
   // confirms, starts once and reads the run.
   /^programming\/plans$/,
   /^programming\/runs$/,

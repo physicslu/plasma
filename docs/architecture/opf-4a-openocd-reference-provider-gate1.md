@@ -1,5 +1,9 @@
 # OPF-4A — OpenOCD / ABI v5 Reference Provider (Gate 1)
 
+> Historical design snapshot. Current execution and admission supersede the cycle-only descriptions
+> below: [OPF Programming Operations](opf-programming-operations-v1.md) is normative.
+> PR #1469 retires `flash_cycle`; historical HIL results and receipts below remain unchanged.
+
 **Status:** Production REST Runtime source cutover; validation is Host-only, not HIL qualification.
 **Scope:** One selected Bundle v3 Active Asset Set, one `flash_cycle` Job, one existing C-3 Site Worker.
 

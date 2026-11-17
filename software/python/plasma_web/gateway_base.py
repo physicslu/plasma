@@ -561,9 +561,6 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "asset_size",
                 "asset_sha256",
                 "asset_base64",
-                "asset_set_sha256",
-                "asset_package_id",
-                "bundle_asset_sha256",
                 "job_binding",
                 "image_asset",
                 "operations",
@@ -586,40 +583,24 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         operation = Operation(str(body["operation"]))
         if operation not in {
             Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ,
-            Operation.FLASH_CYCLE,
         }:
-            raise ValueError("web gateway supports erase, program, verify, read and flash_cycle")
+            raise ValueError("web gateway supports programming operations[] and independent read")
         target = body.get("target")
         if target is not None and (not isinstance(target, str) or not target):
             raise ValueError("target must be a non-empty exact ICPN string")
 
-        bundle_fields = {"asset_set_sha256", "asset_package_id", "bundle_asset_sha256"}
-        bundle_selected = bool(bundle_fields.intersection(body))
-        if bundle_selected:
-            if (operation is not Operation.FLASH_CYCLE or not allow_inline_asset
-                    or not bundle_fields.issubset(body)
-                    or any(key in body for key in (
-                        "asset_name", "asset_type", "asset_format",
-                        "asset_size", "asset_sha256", "asset_base64"))):
-                raise ValueError("Bundle Programming Asset reference must be a complete, exclusive flash_cycle input")
-            if not all(type(body[key]) is str and body[key] for key in bundle_fields):
-                raise ValueError("Bundle Programming Asset reference fields must be nonempty strings")
-
         if "job_binding" in body or "image_asset" in body:
-            if bundle_selected or not allow_inline_asset:
-                raise ValueError("Job Image source must not be combined with a Bundle Programming Asset reference")
+            if not allow_inline_asset:
+                raise ValueError("Job Binding requests require the PPU Gateway inline-asset API")
             return self._job_image_request(body, operation, client_id=client_id,
                                            default_timeout_s=default_timeout_s)
 
         common_fields = {"site_id", "operation", "timeout_s", "map_data", "target", "provider", "profile"}
-        image_operations = {Operation.PROGRAM, Operation.VERIFY, Operation.FLASH_CYCLE}
+        image_operations = {Operation.PROGRAM, Operation.VERIFY}
         if operation is Operation.READ:
             allowed_fields = common_fields | {"offset", "length"}
         elif operation in image_operations:
-            if bundle_selected:
-                allowed_fields = common_fields | bundle_fields
-                required_fields = {"site_id", "operation", "target", "provider", "profile"} | bundle_fields
-            elif allow_inline_asset:
+            if allow_inline_asset:
                 allowed_fields = common_fields | {
                     "asset_name",
                     "asset_type",
@@ -668,13 +649,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             if not all(isinstance(body.get(key), str) and body[key] for key in ("provider", "profile")):
                 raise ValueError("provider and profile must both be non-empty strings")
             metadata.update(provider=body["provider"], profile=body["profile"])
-        if bundle_selected:
-            metadata.update({
-                "bundle_asset_set_sha256": body["asset_set_sha256"],
-                "bundle_asset_package_id": body["asset_package_id"],
-                "bundle_asset_sha256": body["bundle_asset_sha256"],
-            })
-        elif operation in image_operations and allow_inline_asset:
+        if operation in image_operations and allow_inline_asset:
             asset = self._inline_asset(body)
             normalized = asset.normalize_image()
             image = normalized.data
@@ -849,10 +824,6 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                         allow_inline_asset=False,
                     )
                     operation = request.operation
-                    if operation is Operation.FLASH_CYCLE:
-                        raise ValueError(
-                            "flash_cycle is accepted only by the PPU Gateway with an inline asset"
-                        )
                     session_id = (
                         body["session_id"]
                         if operation in {Operation.PROGRAM, Operation.VERIFY}

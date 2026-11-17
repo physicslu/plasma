@@ -33,9 +33,9 @@ export type MockPpu = {
 
 export const Z2: MockPpu = { alias: "z2", ppuId: "z2-hil", facilityId: "lab", enabledSites: [2] };
 
-export function route(operations = ["flash_cycle"]) {
+export function route(operations = ["erase", "program", "verify", "read"]) {
   return {
-    route_id: "z2-site2-stm32f103c8t6", target: { platform: "linux-armv7", board: "pynq-z2", fpga_part: "xc7z020clg400-1" },
+    route_id: "z2-site2-stm32f103c8t6-operations", target: { platform: "linux-armv7", board: "pynq-z2", fpga_part: "xc7z020clg400-1" },
     icpn: "STM32F103C8T6", site_interface: "openocd", provider: "openocd-platform-reference", profile: "stm32f103c8t6-site2",
     operations, driver_abi: "plasma_swd:5", transport: "fpga", max_image_bytes: 65536,
     target_config: "target/stm32f1x.cfg", flash_base: 134217728, flash_size: 65536,
@@ -236,7 +236,7 @@ export async function mockManager(page: Page, options: {
     if (script.planError) return { error: script.planError, status: script.planStatus ?? 422 };
     sequence += 1;
     const planId = hex32(sequence);
-    // One programming Job carries `operations`; read / legacy flash_cycle a single `operation`.
+    // One programming Job carries `operations`; read carries a single `operation`.
     const operations = Array.isArray(body.operations) ? body.operations as string[] : null;
     const kind = operations ? "programming" : String(body.operation);
     const hasImage = "bundle_base64" in body || "image_base64" in body;
@@ -247,7 +247,7 @@ export async function mockManager(page: Page, options: {
       : { address: Number(body.address), length: Number(body.length) };
     const activation = script.activationRequired ?? false;
     const ppu = ppus.find(item => item.alias === alias);
-    const planRoute = kind === "flash_cycle" ? route() : operationsRoute();
+    const planRoute = operationsRoute();
     const payload = {
       schema: "plasma.manager.bundle-programming-plan.v3", plan_id: planId, ppu_alias: alias, site_id: siteId,
       operation: kind, operations, source, route: planRoute,
@@ -306,7 +306,7 @@ export async function mockManager(page: Page, options: {
     if (operations?.includes("verify")) expectedSteps.verify = { verify_address: range.address, bytes_verified: range.length, readback_sha256: imageSha };
     const observedSteps = { ...expectedSteps,
       ...(expectedSteps.verify ? { verify: { ...expectedSteps.verify, readback_sha256: readback } } : {}) };
-    const verifies = kind === "flash_cycle" || Boolean(operations?.includes("verify"));
+    const verifies = Boolean(operations?.includes("verify"));
     const readSha = createHash("sha256").update(flashBytes(range.address, range.length)).digest("hex");
     const jobId = `job-${planned.alias}-site${planned.siteId}-${state.planId.slice(-4)}`;
     const steps = [

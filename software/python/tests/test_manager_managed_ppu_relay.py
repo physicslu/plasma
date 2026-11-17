@@ -178,7 +178,7 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
             self.assertFalse(any("/api/devices/search" in r["path"]
                                  for r in FakeManagedPPUGatewayHandler.requests[before:]))
 
-            body = json.dumps({"site_id": 1, "operation": "flash_cycle"}).encode("utf-8")
+            body = json.dumps({"site_id": 1, "operations": ["erase", "program", "verify"]}).encode("utf-8")
             status, _, data = self.relay(
                 "POST", "/api/jobs", body=body,
                 headers={"Content-Type": "application/json", "Idempotency-Key": "catalog-down-1"},

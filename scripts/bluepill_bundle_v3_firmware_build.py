@@ -3,7 +3,8 @@
 
 Thin wrapper over the shared ``plasma_opf.bundle_v3`` writer and the committed
 first-party Programming Route; it only pins the historical firmware digests and
-package names so the two fixture Bundles stay byte-identical.
+package names. Newly built Bundles use the current Programming Route; their
+Resource identity changes when that Profile changes. Stored historical archives are untouched.
 This developer tool does not deploy a Bundle, select FPGA, or operate a DUT.
 Only original firmware bytes matching the historical CI digest are accepted.
 The two versions each produce a distinct whole Active Asset Set.
@@ -22,7 +23,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT / "software" / "python"))
 from plasma_opf import bundle_v3  # noqa: E402  single shared Bundle v3 writer
 
-ROUTE_FILE = _ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6.json"
+ROUTE_FILE = _ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6-operations.json"
 _ROUTE = bundle_v3.load_route(ROUTE_FILE)
 TARGET = dict(_ROUTE.target)
 PROVIDER = _ROUTE.provider_id

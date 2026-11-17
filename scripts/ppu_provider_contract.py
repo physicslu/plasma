@@ -18,7 +18,7 @@ import ppu_provider_options
 SCHEMA = "plasma.ppu.provider-capabilities.v2"
 DESCRIPTOR = "data/plasma-provider.json"
 PLATFORM_OPTIONS = "data/plasma-provider-options.json"
-OPERATIONS = frozenset({"erase", "program", "verify", "read", "flash_cycle"})
+OPERATIONS = frozenset({"erase", "program", "verify", "read"})
 # One Job running an ordered erase -> program -> verify ``operations`` list.
 # A Profile never declares it: it declares the basic operations of the list.
 PROGRAMMING = "programming"

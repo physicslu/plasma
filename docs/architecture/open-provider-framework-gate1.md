@@ -1,5 +1,9 @@
 # Open Programming Framework — Gate 1 Host-only contract
 
+> Historical design snapshot. Current execution and admission supersede the cycle-only descriptions
+> below: [OPF Programming Operations](opf-programming-operations-v1.md) is normative.
+> PR #1469 retires `flash_cycle`; historical HIL results and receipts below remain unchanged.
+
 **Owner scope (historical label):** 2026-11-04 Open Provider Framework Gate 1, grounded in the
 [Unified Bundle-driven Programming Decision](unified-bundle-driven-programming-decision-2026-11-04.md).
 Engineering and Production share the same PPU execution path. Console policy

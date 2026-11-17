@@ -53,7 +53,8 @@ class _Route:
     target = "MOCK"
     provider_package = "p"
     profile_package = "q"
-    operation = "flash_cycle"
+    operation = "programming"
+    operations = ("erase", "program", "verify")
 
 
 class _AssetRequest:
@@ -248,3 +249,29 @@ def test_a_binding_hook_failure_resolves_the_job_and_releases_the_lease(tmp_path
         finally:
             await manager.shutdown()
     asyncio.run(scenario())
+
+
+def test_root_provider_list_executes_without_fabricating_a_job_binding():
+    from plasma_handlers.programming import ProgrammingOperationHandler
+    from .test_c3_rest_flash_cycle import run
+
+    async def scenario():
+        provider = PackageProviderInterface()
+        calls = []
+        provider.wire_runtime(lambda admitted, _cancel: calls.append(admitted) or {"result": "SUCCEEDED"})
+        authority = trusted()
+        provider.bind_runtime_job(context(trusted_provider=authority,
+                                         active_asset_set={"asset_set_sha256": "a" * 64}))
+        request = JobRequest(job_id="job-1", site_id=2, target="MOCK", image=b"DATA",
+                             operation=Operation.PROGRAMMING,
+                             metadata={"provider": "p", "profile": "q"})
+        async def stage(*_args):
+            pass
+        try:
+            with pytest.raises(PlasmaError, match="PROVIDER_PROGRAMMING_EVIDENCE_NOT_QUALIFIED"):
+                await ProgrammingOperationHandler(provider).execute(request, stage)
+            assert calls == [authority]
+            assert "job_binding" not in request.metadata
+        finally:
+            await provider.safe_shutdown()
+    run(scenario())

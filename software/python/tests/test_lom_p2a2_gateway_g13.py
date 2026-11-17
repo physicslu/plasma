@@ -47,7 +47,7 @@ def _load(name: str, file_name: str):
 
 service = _load("lom_p2a2_g13_service", "ppu-bootstrap-service.py")
 bootstrap_base = _load("lom_p2a2_g13_base", "ppu-bootstrap.py")
-JOB = {"site_id": 2, "operation": "flash_cycle"}
+JOB = {"site_id": 2, "operations": ["erase", "program", "verify"]}
 
 
 class _Routes(gateway_phase3.Phase3RouteHandler):

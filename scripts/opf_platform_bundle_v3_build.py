@@ -15,6 +15,7 @@ import stat
 import zipfile
 from pathlib import Path
 
+import ppu_provider_contract
 import ppu_provider_options
 import ppu_unified_deployment
 
@@ -96,7 +97,10 @@ def _check_inputs(files: dict[str, bytes], target: dict,
           and type(descriptor["driver_abi"]) is str
           and bool(descriptor["driver_abi"])
           and type(descriptor["operations"]) is list
-          and "flash_cycle" in descriptor["operations"]
+          and bool(descriptor["operations"])
+          and all(type(op) is str for op in descriptor["operations"])
+          and len(descriptor["operations"]) == len(set(descriptor["operations"]))
+          and set(descriptor["operations"]) <= ppu_provider_contract.OPERATIONS
           and type(descriptor["max_image_bytes"]) is int
           and 0 < descriptor["max_image_bytes"] <= 512 * 1024 * 1024,
           "PROVIDER_DESCRIPTOR_INVALID")

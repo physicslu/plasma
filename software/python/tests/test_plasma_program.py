@@ -71,14 +71,16 @@ def patch_ready(monkeypatch):
 def successful_job():
     chosen = selection()
     return {
-        "job_id": JOB, "site_id": chosen.site, "operation": "flash_cycle",
+        "job_id": JOB, "site_id": chosen.site, "operation": "programming",
         "state": "success",
         "result": {
             "state": "success", "image_sha256": chosen.firmware_sha,
             "image_size": chosen.firmware_size, "attempts": 1,
-            "details": {"flash_cycle": {
-                "result": "PASS", "readback_sha256": chosen.firmware_sha,
-                "bytes_verified": chosen.firmware_size, "safe_off": True}},
+            "details": {"programming": {
+                "result": "PASS", "operations": ["erase", "program", "verify"],
+                "steps": {"erase": {}, "program": {}, "verify": {
+                    "readback_sha256": chosen.firmware_sha, "bytes_verified": chosen.firmware_size}},
+                "safe_off": True}},
         },
     }
 
@@ -92,7 +94,7 @@ def test_local_bundle_selects_firmware_from_canonical_v3(tmp_path):
         output, site=2, package=None, image=image)
     assert selected.bundle_sha == built["archive_sha256"]
     assert selected.firmware_sha == built["firmware_sha256"]
-    assert selected.profile == "stm32f103c8t6-site2"
+    assert selected.profile == "stm32f103c8t6-site2-operations"
     assert selected.provider == "openocd-platform-reference"
     assert selected.site == 2
     # Bundle package selection is independent of physical Site identity.
@@ -194,14 +196,14 @@ def test_submitted_job_unknown_preserves_id_and_does_not_retry(monkeypatch):
 
 def test_failed_readback_or_safe_off_not_pass(monkeypatch):
     bad = successful_job()
-    bad["result"]["details"]["flash_cycle"]["safe_off"] = False
+    bad["result"]["details"]["programming"]["safe_off"] = False
     assert program.verify_job(bad, selection())["status"] == "FAIL_OR_INCOMPLETE"
-    bad["result"]["details"]["flash_cycle"]["safe_off"] = True
-    bad["result"]["details"]["flash_cycle"]["readback_sha256"] = "0" * 64
+    bad["result"]["details"]["programming"]["safe_off"] = True
+    bad["result"]["details"]["programming"]["steps"]["verify"]["readback_sha256"] = "0" * 64
     assert program.verify_job(bad, selection())["status"] == "FAIL_OR_INCOMPLETE"
 
 
-def test_job_http_payload_uses_reference_not_firmware(monkeypatch):
+def test_job_http_payload_carries_one_programming_list_and_binding(monkeypatch, tmp_path):
     """The Job is signed under the enrolled controller (LOM-P2A-2 G13)."""
     auth = program.ppu_deploy_api._request_auth_module()
     credential, device = "c" * 64, "ppu-device-0123456789abcdef01234567"
@@ -238,13 +240,44 @@ def test_job_http_payload_uses_reference_not_firmware(monkeypatch):
         def consume(self, value):
             return value == nonce
     monkeypatch.setattr(program.http.client, "HTTPConnection", HTTP)
-    assert program.post_once(HOST, selection(), credential=credential, device_id=device) == JOB
+    from plasma_opf import bundle_v3
+    route = bundle_v3.load_route(ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6-operations.json")
+    built = bundle_v3.build_user_image_bundle(route, b"TEST")
+    archive = tmp_path / "programming.zip"
+    archive.write_bytes(built.archive)
+    chosen = program.read_bundle(archive, site=2, package=None)
+    from .test_ofe1b_resource_reuse_job_image import submit, PPU_ID
+    monkeypatch.setattr(program, "readiness", lambda *args: {"ppu_id": PPU_ID})
+    assert program.post_once(HOST, chosen, credential=credential, device_id=device) == JOB
     assert len(observed) == 1
     body = observed[0]
-    assert body["bundle_asset_sha256"] == "b" * 64
-    assert body["asset_set_sha256"] == "a" * 64
-    assert body["asset_package_id"] == "bluepill-cdc-fw-v01"
-    assert "asset_base64" not in body and "asset_name" not in body
+    assert body["operations"] == ["erase", "program", "verify"]
+    assert body["job_binding"]["operations"] == body["operations"]
+    assert body["job_binding"]["site_id"] == 2
+    assert body["image_asset"]["sha256"] == chosen.firmware_sha
+    assert "asset_base64" in body and "operation" not in body
+
+    # Admit the CLI's actual signed payload through the real PPU pipeline,
+    # rather than accepting a fabricated 202 as proof of compatibility.
+    from .test_c3_rest_flash_cycle import Stack, short_tmp, run
+
+    async def scenario():
+        with short_tmp() as folder:
+            async with Stack(Path(folder), in_process=True,
+                             bundle_options={"programming_bundle": built}) as stack:
+                status, job = await submit(stack, body)
+                assert status == 202 and job["state"] == "success", job
+                expected_sha = bundle_v3.sha256_hex(bundle_v3.canonical_json(body["job_binding"]))
+                assert job["job_binding"]["job_binding_sha256"] == expected_sha
+                assert job["result"]["details"]["programming"]["job_binding_sha256"] == expected_sha
+                assert program.verify_job(job, chosen)["status"] == "PASS"
+                job["result"]["details"]["programming"]["safe_off"] = False
+                assert program.verify_job(job, chosen)["status"] == "FAIL_OR_INCOMPLETE"
+                body["job_binding"]["site_id"] = 1
+                status, denied = await submit(stack, body)
+                assert status == 400, denied
+                assert len(stack.sim.argvs) == 1  # no second execution
+    run(scenario())
 
 
 def test_existing_private_bootstrap_assets_read_only(monkeypatch):

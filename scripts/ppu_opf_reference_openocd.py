@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from plasma_interfaces.site_worker_c3 import (
-    SiteWorkerControlClient, SiteWorkerRefused, run_flash_cycle, run_job_operations,
+    SiteWorkerControlClient, SiteWorkerRefused, run_job_operations,
 )
 from plasma_opf import TimeoutPolicy, parse_programming_selection
 from plasma_core.errors import ErrorCode, PlasmaError
@@ -52,7 +52,7 @@ class ReferenceBinding:
 
 
 PROGRAMMING = ppu_provider_contract.PROGRAMMING
-JOB_OPERATIONS = frozenset({"flash_cycle", PROGRAMMING, "read"})
+JOB_OPERATIONS = frozenset({PROGRAMMING, "read"})
 
 
 def job_operations(operation: str, job_binding: Mapping[str, Any] | None,
@@ -73,7 +73,7 @@ def job_operations(operation: str, job_binding: Mapping[str, Any] | None,
 
 
 def _takes_image(operation: str, operations: tuple[str, ...] | None) -> bool:
-    return operation == "flash_cycle" or (
+    return (
         operations is not None and ppu_site_worker.needs_image(operations))
 
 
@@ -134,28 +134,22 @@ def job_operation_range(profile: Mapping[str, Any], *, profile_package: str, sit
 
 def job_flash_window(profile: Mapping[str, Any], *, profile_package: str, site_id: int,
                      image_size: int, job_binding: Mapping[str, Any] | None,
-                     operation: str = "flash_cycle") -> dict[str, int]:
+                     operation: str = PROGRAMMING) -> dict[str, int]:
     """The Flash window one Job writes: ``{"load_address", "erase_length"}``.
 
     ``flash_base`` is the physical start of the Flash bank; the Job write
-    address is the admitted Job Binding ``range.address``. A Job without a
-    Binding is the separate inline / bundle-reference contract, which by
-    definition writes at ``flash_base`` (explicit, not a fallback). Every
+    address is the admitted Job Binding ``range.address``. Every Job requires an admitted Binding. Every
     window is re-proven in-bank, aligned and non-empty, erase rounding included.
     """
-    if job_binding is None:
-        # Only the legacy inline / bundle-reference flash_cycle has no Binding.
-        _need(operation == "flash_cycle", "JOB_BINDING_REQUIRED")
-        address = profile["flash_base"]
-    else:
-        job_range = job_binding.get("range")
-        _need(job_binding.get("operation") == operation
-              and job_binding.get("site_id") == site_id
-              and job_binding.get("profile") == profile_package
-              and type(job_range) is dict and set(job_range) == {"address", "length"}
-              and type(job_range["address"]) is int and job_range["length"] == image_size
-              and type(job_range["length"]) is int, "JOB_BINDING_RANGE_MISMATCH")
-        address = job_range["address"]
+    _need(isinstance(job_binding, Mapping), "JOB_BINDING_REQUIRED")
+    job_range = job_binding.get("range")
+    _need(job_binding.get("operation") == operation
+          and job_binding.get("site_id") == site_id
+          and job_binding.get("profile") == profile_package
+          and type(job_range) is dict and set(job_range) == {"address", "length"}
+          and type(job_range["address"]) is int and job_range["length"] == image_size
+          and type(job_range["length"]) is int, "JOB_BINDING_RANGE_MISMATCH")
+    address = job_range["address"]
     try:
         checked = ppu_site_worker.parse_flash_profile(dict(profile))
         erase_address, erase_length = checked.flash_window(address, image_size)
@@ -168,7 +162,7 @@ def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str
                             target: str, site_id: int, image_size: int,
                             job_binding: Mapping[str, Any] | None,
                             provider: str | None = None, profile: str | None = None,
-                            operation: str = "flash_cycle") -> dict[str, Any]:
+                            operation: str = PROGRAMMING) -> dict[str, Any]:
     """Verify the pinned Active Bundle Profile; no IC registry or hardware claims.
 
     Every basic operation of the Job must be declared by the Profile
@@ -245,7 +239,7 @@ def qualify_reference(
     engine_record: Path = ppu_site_engine.ENGINE_SELECTION,
     engine_base: Path = ppu_site_engine.ENGINE_BASE,
     require_root: bool = True,
-    operation: str = "flash_cycle",
+    operation: str = PROGRAMMING,
     operations: tuple[str, ...] | None = None,
 ) -> ReferenceBinding:
     """Bind immutable Provider/Profile files to the installed selected engine.
@@ -326,7 +320,7 @@ async def execute_reference_flash(
     engine_record: Path = ppu_site_engine.ENGINE_SELECTION,
     engine_base: Path = ppu_site_engine.ENGINE_BASE,
     require_root: bool = True,
-    operation: str = "flash_cycle",
+    operation: str = PROGRAMMING,
 ) -> dict[str, Any]:
     """Run the *existing* native ABI-v5 flash cycle through C-3; no Provider subprocess.
 
@@ -380,14 +374,7 @@ async def execute_reference_flash(
         worker_receipt = bound
         return {"session_id": bound.session_id}
 
-    if operation == "flash_cycle":
-        result = await run_flash_cycle(
-            client, job_id=job_id, site_id=site_id, icpn=binding.profile["icpn"],
-            image=image, image_root=image_root, max_runtime_s=math.ceil(job_timeout_s),
-            session_factory=open_session, load_address=window["load_address"],
-            erase_length=window["erase_length"])
-    else:
-        result = await run_job_operations(
+    result = await run_job_operations(
             client, operation=operation, operations=operations, job_id=job_id,
             site_id=site_id, icpn=binding.profile["icpn"],
             image=image if image_operation else None,

@@ -5,8 +5,7 @@ Host-only. Mock subprocesses throughout; no Z2, MMIO, FPGA, OpenOCD or DUT.
 ``_session`` is the only place that proves a Site was left safe, and it is the
 only place that may say so. These tests hold two things:
 
-* every public entry point -- ``probe``, ``programming``, ``read`` and the
-  legacy ``flash_cycle`` -- fails closed when the native ps_owner marker is
+* every public entry point -- ``probe``, ``programming``, ``read`` -- fails closed when the native ps_owner marker is
   absent, so no receipt can carry a safe release the session did not observe;
 * the receipt and the root-private evidence record report the same
   observation, because both read one ``SafeOff``.
@@ -54,12 +53,10 @@ def call(adapter, operation: str):
         kwargs["operations"] = ("erase", "program", "verify")
     elif operation == "read":
         kwargs["flash_range"] = read_range()
-    elif operation == "flash_cycle":
-        kwargs["image"] = flash_image(PAYLOAD, load_address=ADDRESS)
     return adapter.run(2, operation, **kwargs)
 
 
-OPERATIONS = ["probe", "programming", "read", "flash_cycle"]
+OPERATIONS = ["probe", "programming", "read"]
 
 
 # ------------------------------------------------- the observation itself
@@ -111,7 +108,7 @@ def test_a_missing_marker_is_never_rescued_by_a_successful_operation(tmp_path, o
 # ------------------------------------------------------- receipt and evidence agree
 
 
-@pytest.mark.parametrize("operation", ["probe", "programming", "read", "flash_cycle"])
+@pytest.mark.parametrize("operation", ["probe", "programming", "read"])
 def test_the_receipt_reports_the_observation(tmp_path, operation):
     readback = PAYLOAD if operation != "read" else b"\x00" * 1024
     log = (GOOD if operation == "probe"
