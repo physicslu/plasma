@@ -19,12 +19,13 @@ ROOT=Path(__file__).resolve().parents[1]
 SHA40=re.compile(r"[0-9a-f]{40}\Z")
 MARK="PLASMA_SITE2_ADMISSION_DIAGNOSTIC="
 REMOTE=r'''
-import json,os,pathlib,re,stat,subprocess,sys
+import json,os,pathlib,re,stat,subprocess,sys,time
 from pathlib import Path
 MARK="PLASMA_SWD_SITE_ADMISSION="
 out={"schema":"plasma.site2.admission-diagnostic.v1","result":"NOT_RUN",
      "code":"NOT_RUN","revoke":"NOT_RUN","record_present":False,
-     "fpga_manager_state":"NOT_VERIFIED"}
+     "fpga_manager_state":"NOT_VERIFIED",
+     "admit_wall_ms":None,"admission_timing_ms":None}
 try:
     if os.geteuid()!=0:raise RuntimeError("ROOT_REQUIRED")
     manager=Path("/sys/class/fpga_manager/fpga0/state")
@@ -60,7 +61,9 @@ try:
         return subprocess.run(argv+[action,"2"],capture_output=True,text=True,
                               timeout=100,stdin=subprocess.DEVNULL)
     try:
+        started=time.monotonic_ns()
         attempt=call("admit")
+        out["admit_wall_ms"]=round((time.monotonic_ns()-started)/1_000_000,3)
         found=[x[len(MARK):] for x in attempt.stdout.splitlines()
                if x.startswith(MARK)]
         if len(found)!=1:
@@ -74,6 +77,11 @@ try:
             # the old code regex hid the only actionable Root denial as UNRECOGNIZED.
             out["code"]=code if re.fullmatch(r"[\x20-\x7e]{1,160}",code) else "DENIAL_CODE_NONPRINTABLE"
             out["result"]="ADMITTED" if attempt.returncode==0 and payload.get("result")=="SITE_ADMISSION_RECORD_ISSUED" else "DENIED"
+            timing=payload.get("timing_ms")
+            if out["result"]=="ADMITTED" and type(timing) is dict and 0<len(timing)<=16 and all(
+                type(k) is str and re.fullmatch(r"[a-z_]{1,40}",k)
+                and type(v) in (int,float) and 0<=v<1000000 for k,v in timing.items()):
+                out["admission_timing_ms"]=timing
     except (OSError,ValueError,subprocess.SubprocessError):
         out["result"]="INCOMPLETE";out["code"]="ADMISSION_EXECUTION_FAILED"
     finally:
@@ -135,8 +143,18 @@ def run(host,sha,*,preflight=None,helper=None):
     hits=re.findall(r"(?m)^PLASMA_SITE2_ADMISSION_DIAGNOSTIC=(\{[^\r\n]{1,4096}\})\s*$",out)
     if len(hits)!=1:raise RuntimeError("REMOTE_DIAGNOSTIC_RECEIPT_INVALID")
     data=json.loads(hits[0])
-    fields={"schema","result","code","revoke","record_present","fpga_manager_state"}
-    if type(data)!=dict or set(data)!=fields or data["schema"]!="plasma.site2.admission-diagnostic.v1":
+    fields={"schema","result","code","revoke","record_present","fpga_manager_state",
+            "admit_wall_ms","admission_timing_ms"}
+    if (type(data)!=dict or set(data)!=fields or data["schema"]!="plasma.site2.admission-diagnostic.v1"
+        or (data["admit_wall_ms"] is not None and
+            (type(data["admit_wall_ms"]) not in (int,float) or
+             not 0<=data["admit_wall_ms"]<1000000))
+        or (data["admission_timing_ms"] is not None and
+            (type(data["admission_timing_ms"]) is not dict or
+             not 0<len(data["admission_timing_ms"])<=16 or
+             any(type(k) is not str or not re.fullmatch(r"[a-z_]{1,40}",k) or
+                 type(v) not in (int,float) or not 0<=v<1000000
+                 for k,v in data["admission_timing_ms"].items())))):
         raise RuntimeError("REMOTE_DIAGNOSTIC_RECEIPT_INVALID")
     return {"schema":"plasma.site2.path2-admission-diagnostic.v1",
             "source_sha":sha,"observation":data,

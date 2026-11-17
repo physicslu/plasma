@@ -2471,7 +2471,9 @@ class GenericWorkOrderContracts(unittest.TestCase):
         content = WORKFLOW.read_text()
         self.assertIn("'/plasma-dispatch work-order 981'", content)
         self.assertNotIn('"z2-root-operation"', content)
-        self.assertIn('"operator-cli"', content)
+        # operator-cli remains routed; one-shot hardware additionally needs the
+        # hosted cross-Run claim (scripts/tests/test_plasma_p2hw_claim.py).
+        self.assertIn("execution_capability == 'operator-cli'", content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
             "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)

@@ -29,6 +29,7 @@ on:
       - "scripts/plasma_engineering_activity.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
+      - "scripts/tests/test_plasma_p2hw_claim.py"
       - "scripts/tests/test_plasma_development_blocking.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/tests/test_plasma_vivado_host_build_contracts.py"
@@ -62,6 +63,7 @@ on:
       - "scripts/plasma_engineering_activity.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
+      - "scripts/tests/test_plasma_p2hw_claim.py"
       - "scripts/tests/test_plasma_development_blocking.py"
       - "scripts/plasma_vivado_host_build.py"
       - "scripts/tests/test_plasma_vivado_host_build_contracts.py"
@@ -111,6 +113,7 @@ jobs:
           python3 scripts/tests/test-plasma-codex-hardware-parity.py
           python3 scripts/tests/test_plasma_development_dispatch.py
           python3 scripts/tests/test_plasma_path2_operator_cli.py
+          python3 scripts/tests/test_plasma_p2hw_claim.py
           python3 scripts/tests/test_plasma_programming_load.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
@@ -202,6 +205,7 @@ jobs:
       comment_id: ${{ steps.approve.outputs.comment_id }}
       claim_ref: ${{ steps.approve.outputs.claim_ref }}
       work_order_sha256: ${{ steps.approve.outputs.work_order_sha256 }}
+      hardware_claim_ref: ${{ steps.approve.outputs.hardware_claim_ref }}
     steps:
       - name: Checkout trusted main dispatcher
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -280,7 +284,7 @@ jobs:
               for k in ("pinned_sha","trusted_sha","pr_number",
                         "registry_sha256","execution_path","execution_capability","task_id"):
                   f.write(f"{k}={data[k]}\n")
-              for k in ("comment_id","claim_ref","work_order_sha256",
+              for k in ("comment_id","claim_ref","work_order_sha256","hardware_claim_ref",
                         "monitor_summary","monitor_stage","monitor_phase",
                         "artifact_run_id","artifact_source_sha"):
                   f.write(f"{k}={data.get(k,'')}\n")
@@ -387,18 +391,75 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  development-hardware-claim:
+    # Path 2 one-shot hardware only (not A2): hosted atomic protected-ref
+    # creation keyed by the FULL Work Order digest is the cross-Run
+    # exactly-once gate. Duplicate/ambiguous creation fails closed, no retry.
+    needs: development-authorize
+    if: >-
+      github.event_name == 'issue_comment' &&
+      needs.development-authorize.result == 'success' &&
+      needs.development-authorize.outputs.execution_path == 'path2-cli' &&
+      needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
+      needs.development-authorize.outputs.hardware_claim_ref != '' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      hardware_claim_ref: ${{ steps.claim.outputs.hardware_claim_ref }}
+    steps:
+      - name: Checkout trusted main dispatcher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Atomically claim the exact one-shot hardware Work Order digest
+        id: claim
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HARDWARE_CLAIM_REF: ${{ needs.development-authorize.outputs.hardware_claim_ref }}
+          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+          WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(git -C trusted rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 trusted/scripts/plasma_development_dispatch.py p2hw-claim \
+            --event "$GITHUB_EVENT_PATH" --claim-ref "$HARDWARE_CLAIM_REF" \
+            --pinned-sha "$PINNED_SHA" --work-order-sha256 "$WORK_ORDER_SHA256" \
+            --evidence-dir "$RUNNER_TEMP"
+          echo "hardware_claim_ref=$HARDWARE_CLAIM_REF" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: plasma-p2hw-claim-${{ github.run_id }}
+          path: ${{ runner.temp }}/plasma-p2hw-claim.json
+          if-no-files-found: warn
+          retention-days: 14
+
   development-execute:
     # Path 2 invokes its trusted Root operation provider; no automatic chaining.
     # Hardware-capable A2 retains its existing one-shot claim gate.
-    needs: [development-authorize, development-claim]
+    needs: [development-authorize, development-claim, development-hardware-claim]
     if: >-
       always() &&
       needs.development-authorize.result == 'success' &&
       (
         (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
          (
-          contains(fromJSON('["cpu-only","vivado-host-build","operator-cli"]'),
+          contains(fromJSON('["cpu-only","vivado-host-build"]'),
                    needs.development-authorize.outputs.execution_capability) ||
+          (needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
+           needs.development-authorize.outputs.hardware_claim_ref == '') ||
+          (needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
+           needs.development-authorize.outputs.hardware_claim_ref != '' &&
+           needs.development-hardware-claim.result == 'success' &&
+           needs.development-hardware-claim.outputs.hardware_claim_ref == needs.development-authorize.outputs.hardware_claim_ref &&
+           github.run_attempt == 1) ||
           (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
            needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
            needs.development-claim.result == 'success' &&
@@ -512,6 +573,7 @@ jobs:
           WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
           EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
           PLASMA_HIL_A2_CLAIM_REF: ${{ needs.development-claim.outputs.claim_ref }}
+          PLASMA_P2HW_CLAIM_REF: ${{ needs.development-hardware-claim.outputs.hardware_claim_ref }}
           PLASMA_HIL_A2_WORK_ORDER_SHA256: ${{ needs.development-claim.outputs.work_order_sha256 }}
           PLASMA_HIL_A2_ARTIFACT_DIR: ${{ runner.temp }}/plasma-hil-a2-source
           PLASMA_Z2_KIT_ARTIFACT_DIR: ${{ runner.temp }}/plasma-z2-kit-source
