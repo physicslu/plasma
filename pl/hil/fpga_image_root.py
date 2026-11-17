@@ -663,9 +663,10 @@ def live_site_admission_report(port: guard.RootZ2TargetPort,
         root_port=port, release=release,
         expected_firmware=release.firmware_name,
         require_mmio=True, require_manager_provenance=False)
+    # collect_live/check_exact already verified both physical file hashes.
     need(report["expected_manager_firmware"] == release.firmware_name and
-         port.image_sha256("candidate") == release.firmware_sha256 and
-         port.image_sha256("recovery") == guard.GOLDEN_RECOVERY_SHA256,
+         report["bin_sha256"] == release.firmware_sha256 and
+         report["recovery_sha256"] == guard.GOLDEN_RECOVERY_SHA256,
          "CURRENT_IMAGE_OR_RECOVERY_CHANGED")
     return report
 

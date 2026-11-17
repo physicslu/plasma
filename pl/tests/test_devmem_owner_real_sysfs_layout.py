@@ -89,9 +89,9 @@ class RealSysfsLayoutTests(unittest.TestCase):
                 manager, patch.object(admission.os, "geteuid", return_value=0):
             port = Port(self.release, self.facts)
             if site_admission:
-                port.image_sha256 = lambda which: (
-                    self.release.firmware_sha256 if which == "candidate"
-                    else self.release.recovery_sha256)
+                def unexpected_rehash(which):
+                    raise AssertionError("Site rehashed an already verified Image")
+                port.image_sha256 = unexpected_rehash
                 return root.live_site_admission_report(port, self.release)
             return admission.collect_live(
                 root_port=port, release=self.release,
