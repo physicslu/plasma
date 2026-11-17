@@ -176,6 +176,7 @@ def sample(args, root=Path('/proc'), stop=None):
                   hz=hz, interval_s=args.interval, requested_duration_s=args.duration,
                   elapsed_s=elapsed, termination='SIGNAL' if stop.is_set() else 'DURATION',
                   cpu_units='PID/observer:100%=one core;host:100%=all cores; RSS/memory:KiB',
+                  cpu_accounting='PID/observer sampled CPU = user+system ticks; observer average = process_time user+system; host busy includes user/nice/system/irq/softirq/steal, excludes idle+iowait',
                   observer_average_cpu_pct_one_core=100*(time.process_time()-own_start)/elapsed,
                   observer_peak_rss_kib=max((f['observer_rss_kib'] or 0 for f in frames), default=0),
                   concurrency='CONCURRENCY_CONFIRMED' if dual_count else 'NOT_OBSERVED',
@@ -253,6 +254,8 @@ def comparison(frames, submitted, terminal, recovery_start, interval):
         if f['errors'] or any(p['site'] not in (1, 2) for p in f['processes']):
             continue
         sites = {p['site'] for p in f['processes']}
+        if sites and (t < submitted or t >= recovery_start):
+            continue  # Never relabel pre-submission/recovery activity as Batch load.
         phase = ('idle' if t < submitted and not sites else
                  'recovery' if t >= recovery_start and not sites else
                  'dual_site' if sites == {1, 2} else
@@ -296,7 +299,9 @@ def comparison(frames, submitted, terminal, recovery_start, interval):
         identities = lambda f: {(p['pid'],p['starttime'],p['site']) for p in f['processes']}
         common = identities(a) & identities(b)
         dt = b['monotonic_s']-a['monotonic_s']
-        if not a['errors'] and not b['errors'] and {p[2] for p in common} == {1,2} and dt <= interval*1.5:
+        if (submitted <= a['monotonic_s'] < b['monotonic_s'] < recovery_start
+                and not a['errors'] and not b['errors']
+                and {p[2] for p in common} == {1,2} and dt <= interval*1.5):
             overlap += dt
     max_gap = max((b['monotonic_s']-a['monotonic_s'] for a,b in zip(frames,frames[1:])),default=0)
     return dict(phases=result, pids=process_report, sampled_pid_overlap_s=overlap,
@@ -801,19 +806,27 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
         phase_csv(output,report['comparison'])
         write_hashes(output)
     if report.get('execution_path') == 'path2-cli':
+        created = []
         try:
             import tarfile
             artifact = Path(os.environ['RUNNER_TEMP'])/'plasma-path2-loading-benchmark.tar.gz'
-            with artifact.open('xb') as stream, tarfile.open(fileobj=stream,mode='w:gz') as archive:
+            with artifact.open('xb') as stream:
+                created.append(artifact)
                 os.chmod(artifact,0o600)
-                for path in sorted(output.iterdir()):
-                    require(path.is_file() and not path.is_symlink(), 'ARTIFACT_ENTRY_INVALID')
-                    archive.add(path,arcname=path.name,recursive=False)
+                with tarfile.open(fileobj=stream,mode='w:gz') as archive:
+                    for path in sorted(output.iterdir()):
+                        require(path.is_file() and not path.is_symlink(), 'ARTIFACT_ENTRY_INVALID')
+                        archive.add(path,arcname=path.name,recursive=False)
             with artifact.with_suffix(artifact.suffix+'.sha256').open('x') as sidecar:
+                created.append(artifact.with_suffix(artifact.suffix+'.sha256'))
                 sidecar.write(digest(artifact.read_bytes())+'  '+artifact.name+'\n')
         except Exception as exc:
+            # Do not publish an archive whose report predates this failure.
+            for path in created:
+                path.unlink(missing_ok=True)
             report['artifact_error'] = type(exc).__name__
-            report['outcome'] = 'FAIL' if report['batch_post_count'] else 'NOT_RUN'
+            if report['outcome'] not in ('OUTCOME_UNKNOWN', 'NOT_RUN'):
+                report['outcome'] = 'FAIL'
             save()
             atomic_json(output/'report.json',report)
             write_hashes(output)
@@ -881,7 +894,7 @@ def main(argv=None):
         if not report_existed and saved.is_file():
             prior = json.loads(saved.read_text())
             if prior.get('batch_post_count'):
-                result.update(outcome='FAIL',source_sha=prior.get('source_sha'),
+                result.update(outcome='OUTCOME_UNKNOWN',source_sha=prior.get('source_sha'),
                               start_id=prior.get('start_id'),batch_id=prior.get('batch_id'))
     # Large CSV/JSON remain artifacts; stdout is always a small non-secret receipt.
     print(json.dumps({k:result.get(k) for k in ('schema','outcome','blocker','source_sha','start_id','batch_id')},separators=(',',':')))

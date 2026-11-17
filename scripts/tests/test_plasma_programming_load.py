@@ -143,6 +143,51 @@ class Guards(unittest.TestCase):
         self.assertEqual(task['capability'],'operator-cli')
         self.assertEqual(approved['execution_path'],'path2-cli')
 
+    def test_dispatcher_executes_real_no_flash_entrypoint(self):
+        spec=importlib.util.spec_from_file_location('operator_tests',ROOT/'scripts/tests/test_plasma_path2_operator_cli.py')
+        m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        with tempfile.TemporaryDirectory() as tmp:
+            task,approval=m.admitted(m.work_order(script='scripts/plasma_programming_load.py',
+                argv=['measure','--output',tmp+'/out']))
+            # Real child CLI; trusted admission uses fixtures. No Manager or SSH.
+            with self.assertRaisesRegex(dispatch.Denied,'OPERATOR_CLI_NOT_RUN_RESOURCE_UNAVAILABLE'):
+                dispatch.run_task(task,workspace=ROOT,approval=approval,
+                                  evidence_dir=Path(tmp),sandbox=False)
+            receipt=json.loads((Path(tmp)/'plasma-path2-process.json').read_text())
+            self.assertEqual(receipt['exit_code'],69)
+            report=json.loads((Path(tmp)/'out/report.json').read_text())
+            self.assertEqual(report['blocker'],'EXPLICIT_RUN_BATCH_REQUIRED')
+            self.assertEqual((report['batch_post_count'],report['start_post_count']),(0,0))
+            self.assertEqual(report['hardware'],'NOT_RUN')
+            schema=json.loads((ROOT/'specs/programming-loading-benchmark-v1.schema.json').read_text())
+            self.assertTrue(set(schema['required']) <= report.keys())
+            self.assertIn(report['outcome'],schema['properties']['outcome']['enum'])
+            self.assertEqual(report['schema'],schema['properties']['schema']['const'])
+
+    def test_workflow_artifact_contract(self):
+        workflow=(ROOT/'.github/workflows/plasma-engineering-runtime-dispatch.yml').read_text()
+        for name in ('plasma-path2-loading-benchmark.tar.gz','plasma-path2-loading-benchmark.tar.gz.sha256'):
+            self.assertIn('${{ runner.temp }}/'+name,workflow)
+        self.assertIn('python3 scripts/tests/test_plasma_programming_load.py',workflow)
+
+    def test_phase_boundaries_exclude_unrelated_processes(self):
+        result=b.comparison([frame(0,(1,2)),frame(1,(1,)),frame(2),frame(3,(1,2))],.5,.6,.7,.25)
+        self.assertEqual(result['phases']['dual_site']['n'],0)
+        self.assertEqual(result['phases']['single_site']['n'],0)
+        outside=[frame(i,(1,2)) for i in range(4)]
+        self.assertEqual(b.comparison(outside,.5,.6,.7,.25)['sampled_pid_overlap_s'],0)
+
+    def test_late_exception_preserves_unknown_submission(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output=Path(tmp)/'out'
+            def fail(*args):
+                output.mkdir()
+                b.atomic_json(output/'report.json',dict(batch_post_count=1,source_sha='a'*40))
+                raise OSError()
+            with patch.object(b,'measure',side_effect=fail),patch('builtins.print') as printed:
+                self.assertEqual(b.main(['measure','--output',str(output)]),1)
+            self.assertEqual(json.loads(printed.call_args.args[0])['outcome'],'OUTCOME_UNKNOWN')
+
     def test_sampler_signal_cleanup_real_proc(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix=Path(tmp)/'samples'
@@ -252,7 +297,7 @@ class BoundaryGuards(unittest.TestCase):
 
 class EndToEnd(unittest.TestCase):
     def test_one_batch_same_sampler_baselines_and_partial_failure(self):
-        for partial in (False,True):
+        for partial, packaging_failure in ((False,False),(True,False),(False,True)):
             with tempfile.TemporaryDirectory() as tmp:
                 checks=BoundaryGuards();cfg=checks.config()
                 image=Path(tmp)/'image';image.write_bytes(b'ab')
@@ -311,6 +356,8 @@ class EndToEnd(unittest.TestCase):
                     def remove(self,*args):return {'ephemeral_removed':True}
                     def collect(self,*args):return dict(frames=self.frames,termination='SIGNAL',observer_average_cpu_pct_one_core=1)
                 remote=Remote();remote.frames=[]
+                if packaging_failure:
+                    (Path(tmp)/'plasma-path2-loading-benchmark.tar.gz.sha256').write_text('existing')
                 class Event:
                     def wait(self,*a):pass
                     def is_set(self):return False
@@ -319,10 +366,14 @@ class EndToEnd(unittest.TestCase):
                      patch.object(b,'check_plan'),patch.object(b.threading,'Event',Event):
                     result=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{'work_order_sha256':'f'*64,'source_sha':'d'*40,
                          'execution_path':'path2-cli','dispatcher_timeout_seconds':300})
-                self.assertEqual(result['outcome'],'FAIL' if partial else 'PASS',result.get('blocker'))
+                self.assertEqual(result['outcome'],'FAIL' if partial or packaging_failure else 'PASS',result.get('blocker'))
                 self.assertEqual(client.posts.count('/api/programming/batches'),1)
                 self.assertTrue(remote.stopped)
                 artifact=Path(tmp)/'plasma-path2-loading-benchmark.tar.gz'
+                if packaging_failure:
+                    self.assertFalse(artifact.exists())
+                    self.assertEqual(artifact.with_suffix('.gz.sha256').read_text(),'existing')
+                    continue
                 self.assertTrue(artifact.is_file())
                 self.assertEqual(artifact.with_suffix('.gz.sha256').read_text().split()[0],b.digest(artifact.read_bytes()))
                 import tarfile
@@ -330,6 +381,10 @@ class EndToEnd(unittest.TestCase):
                     self.assertIn('report.json',packed.getnames())
                     self.assertIn('SHA256SUMS',packed.getnames())
                     self.assertIn('phases.csv',packed.getnames())
+                    self.assertEqual(json.loads(packed.extractfile('report.json').read()),result)
+                    for line in packed.extractfile('SHA256SUMS').read().decode().splitlines():
+                        sha,name=line.split('  ')
+                        self.assertEqual(sha,b.digest(packed.extractfile(name).read()))
                 self.assertTrue(result['final_idle'])
                 self.assertGreaterEqual(result['comparison']['phases']['idle']['duration_s'],15)
                 self.assertGreaterEqual(result['comparison']['phases']['recovery']['duration_s'],15)
