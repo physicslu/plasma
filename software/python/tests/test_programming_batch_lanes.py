@@ -332,12 +332,6 @@ def test_shared_failure_stops_global_admission_and_observes_accepted_job(tmp_pat
             assert h.gateways["z2"].submitted[1].wait(WAIT)
             return "SHARED_CONTROL_FAILURE", "AUTHORITY_UNAVAILABLE"
     h = Harness(tmp_path, (1,), aliases=("z2", "peer", "third"), platform_gate=gate)
-    original_status = h.workflow.run_status
-    def status(*args, **kwargs):
-        if h.batches._control_failure is not None:
-            failed.set()  # actual global latch precedes draining accepted runs
-        return original_status(*args, **kwargs)
-    h.workflow.run_status = status
     original_plan = h.workflow.plan
     def plan(alias, body):
         if alias == 'third':
@@ -351,14 +345,22 @@ def test_shared_failure_stops_global_admission_and_observes_accepted_job(tmp_pat
     h.batches.spawn = spawn
     h.start([one("z2", 1), one("peer", 1), one("third", 1)])
     try:
-        assert failed.wait(WAIT)
+        # Observe the latch independently of run_status: pool shutdown can
+        # wait for third's Plan before accepted-run draining calls run_status.
+        deadline = time.monotonic() + WAIT
+        while h.batches._control_failure is None:
+            assert time.monotonic() < deadline, "shared failure never latched"
+            time.sleep(0.001)
+        failed.set()
         with pytest.raises(ProgrammingError) as caught:
             h.batches.start_batch(with_start(h.workflow, [one("third", 1)]))
         assert caught.value.code == "manager_shared_control_failure"
         assert not h.gateways["peer"].posts and not h.gateways["third"].posts
         assert not h.done.is_set()
     finally:
+        failed.set()
         batch = h.finish()
+    assert h.gateways["z2"].observed[1].is_set()
     assert batch["failure_domain"] == "SHARED_CONTROL_FAILURE"
     assert [u["outcome"] for u in batch["units"]] == ["PASS", None, None]
     assert "AUTHORITY_UNAVAILABLE" in batch["reason"]

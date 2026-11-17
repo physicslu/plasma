@@ -159,9 +159,13 @@ def test_bundle_v3_mock_flash_passes_with_selector_and_catalog_absent(selector_a
     assert selector_absent.calls == []
 
 
+# #1469 makes the Gateway enforce the exact Job Binding *before* invoking
+# the Provider, and it rejects an inactive Resource Set at PPU Job admission.
+# These are earlier fail-closed barriers, not permission to bypass them merely
+# to reach the historical downstream Provider-specific error codes.
 @pytest.mark.parametrize("case,code", [
-    ("catalog-qualified-target-without-bundle", "REFERENCE_TARGET_MISMATCH"),
-    ("no-active-set", "OPF_ACTIVE_SET_REQUIRED"),
+    ("catalog-qualified-target-without-bundle", "job_binding does not match this Job request"),
+    ("no-active-set", "JOB_RESOURCE_NOT_ACTIVE"),
     ("unsupported-operation", None),
 ])
 def test_bundle_target_provider_negatives_hold_with_selector_absent(selector_absent, case, code):

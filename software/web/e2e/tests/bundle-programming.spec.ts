@@ -99,8 +99,9 @@ function run(outcome: Outcome | null, reason: string | null = null, safeOff = tr
     activation: reuse ? {} : { b3_transaction_id: "c".repeat(32) },
     job: { job_id: "job-20261109-120000-0123abcd", state: outcome ? "success" : "running", progress_percent: outcome ? 100 : 40 },
     receipt: outcome && outcome !== "OUTCOME_UNKNOWN" ? {
-      schema: "plasma.manager.programming-receipt.v2",
+      schema: "plasma.manager.programming-receipt.v3",
       job_id: "job-20261109-120000-0123abcd", job_state: "success", operation: "programming", operations: ["erase", "program", "verify"],
+      observed_operations: ["erase", "program", "verify"],
       site_id: 2, target: route.icpn, readback_sha256: IMAGE_SHA,
       expected_image_sha256: IMAGE_SHA, expected_image_size: FIRMWARE.length,
       observed_image_sha256: IMAGE_SHA, observed_image_size: FIRMWARE.length,
