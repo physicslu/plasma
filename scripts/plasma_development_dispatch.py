@@ -404,6 +404,101 @@ CONTROL_STATION_OPERATOR_COMMANDS = frozenset({
     ("status", "local-control-station"),
 })
 
+# --- Path 2 one-shot hardware: cross-Run exactly-once claim -----------------
+# Reuses the A2 MECHANISM (protected, never-updatable claim namespace; hosted
+# atomic ref creation; readback) without touching the A2 contract. The key is
+# the FULL Work Order digest, not the comment ID, so a re-run, a re-posted
+# identical Work Order or a concurrent independent Run all collide. Creating
+# the ref consumes the authorization whatever the later outcome.
+P2HW_SCRIPT = "scripts/plasma_programming_load.py"
+P2HW_FLAG = "--run-batch"
+P2HW_CLAIM_PREFIX = f"refs/heads/plasma-engineering-claims/{ISSUE}/p2hw-"
+P2HW_GITHUB_API = "https://api.github.com/repos/physicslu/plasma/git/"
+
+
+def one_shot_hardware(task: object) -> bool:
+    """True for every argv argparse would read as --run-batch (incl. abbrev)."""
+    if (type(task) is not dict or task.get("capability") != "operator-cli" or
+            task.get("script") != P2HW_SCRIPT or type(task.get("argv")) is not list):
+        return False
+    return any(type(a) is str and len(a) > 2 and
+               P2HW_FLAG.startswith(a.split("=", 1)[0]) for a in task["argv"])
+
+
+def p2hw_claim_ref(work_order_sha256: object) -> str:
+    require(type(work_order_sha256) is str and
+            SHA256.fullmatch(work_order_sha256) is not None,
+            "P2HW_WORK_ORDER_DIGEST_INVALID")
+    return P2HW_CLAIM_PREFIX + work_order_sha256
+
+
+def claim_hardware_once(create, read, *, claim_ref: str, sha: str,
+                        run_attempt: object) -> dict:
+    """Create the protected claim ref exactly once; never retry or update.
+
+    ``create(ref, sha)`` / ``read(ref)`` return ``(status, json_body)``.
+    Duplicate -> P2HW_CLAIM_DUPLICATE. Any ambiguous transport result is
+    P2HW_CLAIM_UNKNOWN: the authorization may be consumed, so nothing runs
+    and only a NEW owner Work Order can authorize another attempt.
+    """
+    require(run_attempt == "1", "P2HW_REPLAY_RUN_ATTEMPT_DENIED")
+    require(type(claim_ref) is str and claim_ref.startswith(P2HW_CLAIM_PREFIX) and
+            SHA256.fullmatch(claim_ref[len(P2HW_CLAIM_PREFIX):]) is not None,
+            "P2HW_CLAIM_REF_INVALID")
+    require(type(sha) is str and SHA40.fullmatch(sha) is not None,
+            "P2HW_CLAIM_SHA_INVALID")
+
+    def matches(status, body, expected):
+        obj = body.get("object") if type(body) is dict else None
+        return (status == expected and type(body) is dict and
+                body.get("ref") == claim_ref and type(obj) is dict and
+                obj.get("sha") == sha)
+    try:
+        status, body = create(claim_ref, sha)
+    except Exception:
+        raise Denied("P2HW_CLAIM_UNKNOWN") from None
+    if status == 422:
+        try:
+            exists = read(claim_ref)[0] == 200
+        except Exception:
+            exists = False
+        raise Denied("P2HW_CLAIM_DUPLICATE" if exists else "P2HW_CLAIM_REJECTED")
+    require(matches(status, body, 201), "P2HW_CLAIM_UNKNOWN")
+    try:
+        status, body = read(claim_ref)
+    except Exception:
+        raise Denied("P2HW_CLAIM_READBACK_DENIED") from None
+    require(matches(status, body, 200), "P2HW_CLAIM_READBACK_DENIED")
+    return {"status": "CLAIM_CREATED_AND_READBACK", "schema": "plasma.p2hw.claim.v1",
+            "claim_ref": claim_ref, "sha": sha, "run_attempt": 1}
+
+
+def github_claim_transport(token: object):
+    """Fixed-endpoint GitHub ref transport for the hosted claim Job only."""
+    require(type(token) is str and len(token) >= 16, "P2HW_CLAIM_TOKEN_MISSING")
+
+    def call(method: str, url: str, payload: dict | None = None):
+        req = Request(url, method=method,
+                      data=(json.dumps(payload, sort_keys=True).encode()
+                            if payload is not None else None),
+                      headers={"Authorization": "Bearer " + token,
+                               "Accept": "application/vnd.github+json",
+                               "X-GitHub-Api-Version": "2022-11-28",
+                               "Content-Type": "application/json"})
+        try:
+            with urlopen(req, timeout=10) as response:
+                return response.status, json.loads(response.read(8192))
+        except HTTPError as err:
+            return err.code, {}
+
+    def create(ref: str, sha: str):
+        return call("POST", P2HW_GITHUB_API + "refs", {"ref": ref, "sha": sha})
+
+    def read(ref: str):
+        return call("GET", P2HW_GITHUB_API + "ref/" + ref[len("refs/"):])
+    return create, read
+
+
 def work_order_digest(order: dict) -> str:
     data = json.dumps(order, sort_keys=True,
                       separators=(",", ":"), ensure_ascii=False).encode("utf-8")
@@ -592,6 +687,11 @@ def authorize(event: object, context: dict, registry: object,
             "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
+    p2hw_claim = {}
+    if one_shot_hardware(task):
+        require(context.get("GITHUB_RUN_ATTEMPT") == "1",
+                "P2HW_REPLAY_RUN_ATTEMPT_DENIED")
+        p2hw_claim = {"hardware_claim_ref": p2hw_claim_ref(req["work_order_sha256"])}
     if task.get("capability") in ("vivado-host-build", "operator-cli"):
         # Owner-approved immutable PR SHA is admissible before merge.
         # verify_pr() above has already checked the live same-repo owner PR,
@@ -636,6 +736,7 @@ def authorize(event: object, context: dict, registry: object,
             "artifact_source_sha": task["artifact_source"]["source_sha"]}
           if "artifact_source" in task else {}),
         **a2_claim,
+        **p2hw_claim,
     }
 
 
@@ -756,6 +857,11 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                 approval.get("auto_download_after_build_success") is False and
                 approval.get("auto_test_after_download_success") is False,
                 "OPERATOR_CLI_APPROVAL_DENIED")
+        if one_shot_hardware(task):
+            expected = p2hw_claim_ref(task["work_order_sha256"])
+            require(approval.get("hardware_claim_ref") == expected and
+                    os.environ.get("PLASMA_P2HW_CLAIM_REF") == expected,
+                    "OPERATOR_CLI_HARDWARE_CLAIM_REQUIRED")
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -1539,10 +1645,40 @@ def live_pr_metadata(req: dict) -> dict | None:
         raise Denied("LIVE_PR_VERIFICATION_FAILED") from None
 
 
+def p2hw_claim_main(req: dict, args, transport=github_claim_transport) -> dict:
+    """Hosted claim Job: re-derive the key from the owner event, then claim."""
+    token = os.environ.pop("GITHUB_TOKEN", None)
+    require(args.work_order_sha256 == req.get("work_order_sha256") and
+            args.claim_ref == p2hw_claim_ref(req.get("work_order_sha256")) and
+            args.pinned_sha == req.get("source_sha"),
+            "P2HW_CLAIM_BINDING_DENIED")
+    require(args.evidence_dir is not None, "P2HW_CLAIM_EVIDENCE_DIR_REQUIRED")
+    # Like A2, the claim ref points at the trusted main commit running this
+    # Job, never the candidate PR commit: a GITHUB_TOKEN without `workflows`
+    # permission may not create a branch ref at a commit that changes
+    # .github/workflows. The candidate SHA stays bound via the digest/receipt.
+    trusted_sha = os.environ.get("GITHUB_SHA")
+    require(type(trusted_sha) is str and SHA40.fullmatch(trusted_sha) is not None,
+            "P2HW_CLAIM_TRUSTED_SHA_REQUIRED")
+    create, read = transport(token)
+    receipt = claim_hardware_once(create, read, claim_ref=args.claim_ref,
+                                  sha=trusted_sha,
+                                  run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"))
+    receipt.update(work_order_sha256=req["work_order_sha256"],
+                   pinned_sha=args.pinned_sha,
+                   comment_id=req.get("comment_id"), issue_number=ISSUE,
+                   run_id=os.environ.get("GITHUB_RUN_ID", ""))
+    with (args.evidence_dir / "plasma-p2hw-claim.json").open("x", encoding="utf-8") as f:
+        os.chmod(f.name, 0o600)
+        json.dump(receipt, f, indent=2, sort_keys=True)
+        f.write("\n")
+    return receipt
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=(
-        "request", "authorize", "execute", "execute-codex",
+        "request", "authorize", "execute", "execute-codex", "p2hw-claim",
     ))
     parser.add_argument("--event", type=Path, required=True)
     parser.add_argument("--registry", type=Path, default=MANIFEST)
@@ -1555,12 +1691,15 @@ def main() -> int:
     parser.add_argument("--execution-capability")
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
+    parser.add_argument("--claim-ref")
     args = parser.parse_args()
     try:
         event = parse_json(args.event)
         req = request(event, os.environ)
         if args.action == "request":
             plan = {"status": "VALID_OWNER_REQUEST", **req}
+        elif args.action == "p2hw-claim":
+            plan = p2hw_claim_main(req, args)
         else:
             registry = parse_json(args.registry)
             pr = parse_json(args.pr_info) if args.pr_info else None
