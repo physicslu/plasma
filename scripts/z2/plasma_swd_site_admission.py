@@ -122,6 +122,7 @@ def _write_private(path: Path, text: str) -> None:
 def admit(site: int) -> dict:
     need(site in (1, 2), "SITE_INVALID")
     need(os.geteuid() == 0, "ROOT_REQUIRED")
+    started_ns = time.monotonic_ns()
     code_sha256 = verify_protected_tree()
     source_info = _private_root_file(PROTECTED_ROOT / ".plasma-privileged-code.json")
     sys.path.insert(0, str(PROTECTED_ROOT))
@@ -136,9 +137,11 @@ def admit(site: int) -> dict:
          "RELEASE_NOT_ABI5_INDEPENDENT")
     port = guard.RootZ2TargetPort(release=release)
     now = time.time()
+    preflight_ns = time.monotonic_ns()
     # ADR-0007: fence SH + this Site's lock EX, so the other Site's running
     # OpenOCD stays compatible while reload and this Site's owner are refused.
     with port.exclusive(site=site):
+        lock_ns = time.monotonic_ns()
         state = root.read_state(release)
         need(state is not None and state["status"] == "IMAGE" and
              state["image"] == release.firmware_name and
@@ -150,7 +153,9 @@ def admit(site: int) -> dict:
         port.bind_site_session(boot_id=state["boot_id"], session_id=state["session_id"])
         # The protected Root journal has already proved the same-boot Image.
         # Runtime admission checks live hardware; dmesg history is not durable.
+        journal_ns = time.monotonic_ns()
         report = root.live_site_admission_report(port, release)
+        live_ns = time.monotonic_ns()
         need(report["target_boot_id"] == state["boot_id"],
              "BOOT_CHANGED_MANUAL_REVIEW")
         need(report["mmio_backend"] == "devmem" and
@@ -181,6 +186,7 @@ def admit(site: int) -> dict:
         guard.protected(RECORD_DIR, file=False)
         target = RECORD_DIR / f"swd-site{site}-admission"
         _write_private(target, record)
+        record_ns = time.monotonic_ns()
     return {
         "result": "SITE_ADMISSION_RECORD_ISSUED", "site_id": site,
         "record": str(target),
@@ -192,6 +198,15 @@ def admit(site: int) -> dict:
         "production_qualification": report["production_qualification"],
         "voltage_source": "NOT_MEASURED",
         "record_expires_epoch": int(now) + RECORD_TTL_S,
+        "timing_ms": {
+            "preflight": round((preflight_ns - started_ns) / 1e6, 3),
+            "lock_and_fence": round((lock_ns - preflight_ns) / 1e6, 3),
+            "root_journal": round((journal_ns - lock_ns) / 1e6, 3),
+            "live_report": round((live_ns - journal_ns) / 1e6, 3),
+            "record_commit": round((record_ns - live_ns) / 1e6, 3),
+            "total": round((time.monotonic_ns() - started_ns) / 1e6, 3),
+            **port.admission_timing_ms,
+        },
     }
 
 
