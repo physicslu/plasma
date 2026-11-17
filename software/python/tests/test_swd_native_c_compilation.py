@@ -572,29 +572,50 @@ def test_wp07_site_admission_denied_while_reload_ex_active(tmp_path, monkeypatch
         os.close(fd)
 
 
-def test_wp07_concurrent_admissions_serialize_and_both_pass(tmp_path, monkeypatch):
+def test_wp07_distinct_site_admissions_overlap_while_reload_stays_exclusive(tmp_path, monkeypatch):
+    """Real host flock: Site 2 enters while Site 1 still holds Root SH."""
     import threading
-    r = _wp07_root(tmp_path, monkeypatch, wait_s=5.0)
-    inside, release_first, results = threading.Event(), threading.Event(), {}
+    r = _wp07_root(tmp_path, monkeypatch, wait_s=1.0)
+    first_inside, release_first = threading.Event(), threading.Event()
+    second_inside, results = threading.Event(), {}
 
     def first():
         with r.port().exclusive(site=1):
-            inside.set()
+            results[1] = "ENTERED"
+            first_inside.set()
             release_first.wait(5)
-        results[1] = "ADMITTED"
 
     def second():
-        inside.wait(5)
+        if not first_inside.wait(5):
+            results[2] = "FIRST_NOT_READY"
+            return
         with r.port().exclusive(site=2):
-            results[2] = ("ADMITTED", 1 in results)
+            results[2] = "ENTERED"
+            second_inside.set()
+            # Both site admissions exist: a concurrent Root reload is denied.
+            with pytest.raises(BlockingIOError):
+                with r.port().exclusive():
+                    raise AssertionError("reload bypassed two Site admissions")
 
     a, b = threading.Thread(target=first), threading.Thread(target=second)
     a.start(); b.start()
-    assert inside.wait(5)
-    release_first.set()
-    a.join(10); b.join(10)
-    # The second admission waited for the supervisor, then passed after Site 1's.
-    assert results == {1: "ADMITTED", 2: ("ADMITTED", True)}
+    try:
+        assert first_inside.wait(5)
+        assert second_inside.wait(2), "Site 2 was serialized behind Site 1"
+    finally:
+        release_first.set()
+        a.join(10); b.join(10)
+    assert not a.is_alive() and not b.is_alive()
+    assert results == {1: "ENTERED", 2: "ENTERED"}
+
+
+def test_wp07_same_site_root_admissions_do_not_overlap(tmp_path, monkeypatch):
+    r = _wp07_root(tmp_path, monkeypatch)
+    with r.port().exclusive(site=1):
+        with pytest.raises(r.guard.TargetSafetyDenied, match="SITE_OWNER_PRESENT"):
+            with r.port().exclusive(site=1):
+                raise AssertionError("same Site acquired twice")
+
 
 
 def _wp07_proc(tmp_path, r, pids):
