@@ -214,6 +214,24 @@ class BoundaryGuards(unittest.TestCase):
             j=self.job();j['result']['details']['programming'][key]=value
             with self.assertRaises(b.Blocked):b.check_job(j,1,self.config())
 
+    def test_controller_signal_stops_before_io(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            image=Path(tmp)/'image';image.write_bytes(b'ab')
+            cfg={**self.config(), 'image':str(image),'image_sha256':b.digest(b'ab'),
+                 'image_filename':'image.bin','fixture':['A'*12,'B'*12],
+                 'z2_python':'/opt/plasma/python/3.12.13/bin/python3','manager':'http://127.0.0.1:18280'}
+            config=Path(tmp)/'config';config.write_text(json.dumps(cfg))
+            args=argparse.Namespace(output=tmp+'/out',timeout_sec=180,run_batch=True,
+                  config=str(config),config_sha256=b.digest(config.read_bytes()))
+            client=Mock();remote=Mock()
+            def register(sig,handler):
+                if sig == signal.SIGTERM and callable(handler):handler(sig,None)
+                return signal.SIG_DFL
+            with patch.object(b,'fixture_observation',return_value=[]),patch.object(b.signal,'signal',side_effect=register):
+                result=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{})
+            self.assertEqual(result['blocker'],'INTERRUPTED')
+            client.request.assert_not_called();remote.launch.assert_not_called()
+
     def test_timeout_and_bad_config_stop_before_io(self):
         for reason in ('BENCHMARK_TIMEOUT',):
             with tempfile.TemporaryDirectory() as tmp:
@@ -299,10 +317,19 @@ class EndToEnd(unittest.TestCase):
                     def set(self):pass
                 with patch.dict(os.environ,{'RUNNER_TEMP':tmp}),patch.object(b,'fixture_observation',return_value=[]),patch.object(b,'check_remote'), \
                      patch.object(b,'check_plan'),patch.object(b.threading,'Event',Event):
-                    result=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{'work_order_sha256':'f'*64,'source_sha':'d'*40})
+                    result=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{'work_order_sha256':'f'*64,'source_sha':'d'*40,
+                         'execution_path':'path2-cli','dispatcher_timeout_seconds':300})
                 self.assertEqual(result['outcome'],'FAIL' if partial else 'PASS',result.get('blocker'))
                 self.assertEqual(client.posts.count('/api/programming/batches'),1)
                 self.assertTrue(remote.stopped)
+                artifact=Path(tmp)/'plasma-path2-loading-benchmark.tar.gz'
+                self.assertTrue(artifact.is_file())
+                self.assertEqual(artifact.with_suffix('.gz.sha256').read_text().split()[0],b.digest(artifact.read_bytes()))
+                import tarfile
+                with tarfile.open(artifact) as packed:
+                    self.assertIn('report.json',packed.getnames())
+                    self.assertIn('SHA256SUMS',packed.getnames())
+                    self.assertIn('phases.csv',packed.getnames())
                 self.assertTrue(result['final_idle'])
                 self.assertGreaterEqual(result['comparison']['phases']['idle']['duration_s'],15)
                 self.assertGreaterEqual(result['comparison']['phases']['recovery']['duration_s'],15)

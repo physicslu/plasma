@@ -797,15 +797,47 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
         with (output/'SHA256SUMS').open('w') as f:
             for p in paths:
                 f.write(digest(p.read_bytes())+'  '+p.name+'\n')
+    if report.get('comparison'):
+        phase_csv(output,report['comparison'])
+        write_hashes(output)
     if report.get('execution_path') == 'path2-cli':
-        import tarfile
-        artifact = Path(os.environ['RUNNER_TEMP'])/'plasma-path2-loading-benchmark.tar.gz'
-        with artifact.open('xb') as stream, tarfile.open(fileobj=stream,mode='w:gz') as archive:
-            for path in sorted(output.iterdir()):
-                require(path.is_file() and not path.is_symlink(), 'ARTIFACT_ENTRY_INVALID')
-                archive.add(path,arcname=path.name,recursive=False)
-        artifact.with_suffix(artifact.suffix+'.sha256').write_text(digest(artifact.read_bytes())+'  '+artifact.name+'\n')
+        try:
+            import tarfile
+            artifact = Path(os.environ['RUNNER_TEMP'])/'plasma-path2-loading-benchmark.tar.gz'
+            with artifact.open('xb') as stream, tarfile.open(fileobj=stream,mode='w:gz') as archive:
+                os.chmod(artifact,0o600)
+                for path in sorted(output.iterdir()):
+                    require(path.is_file() and not path.is_symlink(), 'ARTIFACT_ENTRY_INVALID')
+                    archive.add(path,arcname=path.name,recursive=False)
+            with artifact.with_suffix(artifact.suffix+'.sha256').open('x') as sidecar:
+                sidecar.write(digest(artifact.read_bytes())+'  '+artifact.name+'\n')
+        except Exception as exc:
+            report['artifact_error'] = type(exc).__name__
+            report['outcome'] = 'FAIL' if report['batch_post_count'] else 'NOT_RUN'
+            save()
+            atomic_json(output/'report.json',report)
+            write_hashes(output)
     return report
+
+
+def write_hashes(output):
+    with (output/'SHA256SUMS').open('w') as stream:
+        for path in sorted(output.iterdir()):
+            if path.is_file() and path.name != 'SHA256SUMS':
+                stream.write(digest(path.read_bytes())+'  '+path.name+'\n')
+
+
+def phase_csv(output, comparison):
+    fields=['phase','n','duration_s','quality','cpu_mean','cpu_p95','cpu_peak','ram_mean_kib',
+            'ram_p95_kib','ram_peak_kib','cpu_mean_delta_pp','ram_mean_delta_pp','cpu_headroom_pct']
+    with (output/'phases.csv').open('x',newline='') as stream:
+        writer=csv.DictWriter(stream,fieldnames=fields);writer.writeheader()
+        for phase,p in comparison['phases'].items():
+            writer.writerow(dict(phase=phase,n=p['n'],duration_s=p['duration_s'],quality=p['quality'],
+                cpu_mean=p['cpu_pct']['mean'],cpu_p95=p['cpu_pct']['p95'],cpu_peak=p['cpu_pct']['peak'],
+                ram_mean_kib=p['ram_used_kib']['mean'],ram_p95_kib=p['ram_used_kib']['p95'],
+                ram_peak_kib=p['ram_used_kib']['peak'],cpu_mean_delta_pp=p['cpu_delta_pp']['mean'],
+                ram_mean_delta_pp=p['ram_delta_pp']['mean'],cpu_headroom_pct=p['cpu_headroom_pct']))
 
 
 def main(argv=None):
@@ -840,10 +872,17 @@ def main(argv=None):
     if args.run_batch and (not args.config or not args.config_sha256 or not HEX64.fullmatch(args.config_sha256)):
         parser.error('--run-batch requires --config and --config-sha256')
     os.umask(0o077)
+    report_existed = (Path(args.output)/'report.json').exists()
     try:
         result = measure(args,argv)
     except Exception as exc:
         result = dict(schema=SCHEMA,outcome='NOT_RUN',blocker=str(exc) if isinstance(exc,Blocked) else type(exc).__name__)
+        saved = Path(args.output)/'report.json'
+        if not report_existed and saved.is_file():
+            prior = json.loads(saved.read_text())
+            if prior.get('batch_post_count'):
+                result.update(outcome='FAIL',source_sha=prior.get('source_sha'),
+                              start_id=prior.get('start_id'),batch_id=prior.get('batch_id'))
     # Large CSV/JSON remain artifacts; stdout is always a small non-secret receipt.
     print(json.dumps({k:result.get(k) for k in ('schema','outcome','blocker','source_sha','start_id','batch_id')},separators=(',',':')))
     return 0 if result['outcome']=='PASS' else 69 if result['outcome']=='NOT_RUN' else 1
