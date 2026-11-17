@@ -164,6 +164,13 @@ class Guards(unittest.TestCase):
             self.assertIn(report['outcome'],schema['properties']['outcome']['enum'])
             self.assertEqual(report['schema'],schema['properties']['schema']['const'])
 
+    def test_workflow_rerun_cannot_replay_hardware(self):
+        env={'GITHUB_RUN_ATTEMPT':'2','RUNNER_NAME':dispatch.EXPECTED_RUNNER,'RUNNER_ENVIRONMENT':'self-hosted'}
+        with patch.dict(os.environ,env),patch.object(dispatch,'parse_json') as parsed:
+            with self.assertRaisesRegex(b.Blocked,'RUN_ATTEMPT_REPLAY_DENIED'):
+                b.authorization(['measure','--run-batch'])
+            parsed.assert_not_called()
+
     def test_workflow_artifact_contract(self):
         workflow=(ROOT/'.github/workflows/plasma-engineering-runtime-dispatch.yml').read_text()
         for name in ('plasma-path2-loading-benchmark.tar.gz','plasma-path2-loading-benchmark.tar.gz.sha256'):
@@ -297,7 +304,8 @@ class BoundaryGuards(unittest.TestCase):
 
 class EndToEnd(unittest.TestCase):
     def test_one_batch_same_sampler_baselines_and_partial_failure(self):
-        for partial, packaging_failure in ((False,False),(True,False),(False,True)):
+        for mode in ('pass','partial','packaging','claimed','collect'):
+            partial,packaging_failure=mode=='partial',mode=='packaging'
             with tempfile.TemporaryDirectory() as tmp:
                 checks=BoundaryGuards();cfg=checks.config()
                 image=Path(tmp)/'image';image.write_bytes(b'ab')
@@ -354,10 +362,14 @@ class EndToEnd(unittest.TestCase):
                             f['monotonic_s']=self.t;self.frames.append(f)
                         return dict(ready=self.frames[0],latest=self.frames[-1],alive=True,finished=self.stopped)
                     def remove(self,*args):return {'ephemeral_removed':True}
-                    def collect(self,*args):return dict(frames=self.frames,termination='SIGNAL',observer_average_cpu_pct_one_core=1)
+                    def collect(self,*args):
+                        if mode=='collect':raise OSError()
+                        return dict(frames=self.frames,termination='SIGNAL',observer_average_cpu_pct_one_core=1)
                 remote=Remote();remote.frames=[]
                 if packaging_failure:
                     (Path(tmp)/'plasma-path2-loading-benchmark.tar.gz.sha256').write_text('existing')
+                if mode=='claimed':
+                    (Path(tmp)/('plasma-loading-'+'f'*64+'.claim')).write_text('{}')
                 class Event:
                     def wait(self,*a):pass
                     def is_set(self):return False
@@ -366,6 +378,17 @@ class EndToEnd(unittest.TestCase):
                      patch.object(b,'check_plan'),patch.object(b.threading,'Event',Event):
                     result=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{'work_order_sha256':'f'*64,'source_sha':'d'*40,
                          'execution_path':'path2-cli','dispatcher_timeout_seconds':300})
+                if mode=='claimed':
+                    # Claim precedes every Z2 observer and Start side effect.
+                    self.assertEqual((result['outcome'],result['blocker']),('NOT_RUN','FileExistsError'))
+                    self.assertFalse([x for x in client.posts if x.endswith(('/starts','/batches'))])
+                    self.assertEqual(remote.frames,[])
+                    continue
+                if mode=='collect':
+                    # Lost sampler evidence never turns a known Batch into UNKNOWN.
+                    self.assertEqual((result['outcome'],result['batch_outcome'],result['cleanup']),('FAIL','PASS','OSError'))
+                    self.assertEqual(client.posts.count('/api/programming/batches'),1)
+                    continue
                 self.assertEqual(result['outcome'],'FAIL' if partial or packaging_failure else 'PASS',result.get('blocker'))
                 self.assertEqual(client.posts.count('/api/programming/batches'),1)
                 self.assertTrue(remote.stopped)

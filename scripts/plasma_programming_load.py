@@ -517,6 +517,9 @@ print('BENCH_JSON='+json.dumps({'bytes':base64.b64encode(b).decode()}))
 
 def authorization(argv):
     import plasma_development_dispatch as dispatch
+    # A workflow re-run replays the same owner event with a fresh RUNNER_TEMP
+    # and workspace, so no local claim survives it. Never resubmit hardware.
+    require(os.environ.get('GITHUB_RUN_ATTEMPT') == '1', 'RUN_ATTEMPT_REPLAY_DENIED')
     require(os.geteuid() != 0 and os.environ.get('RUNNER_NAME') == dispatch.EXPECTED_RUNNER
             and os.environ.get('RUNNER_ENVIRONMENT') == 'self-hosted', 'NONROOT_APPROVED_RUNNER_REQUIRED')
     event = dispatch.parse_json(Path(os.environ.get('GITHUB_EVENT_PATH','/nonexistent')))
@@ -659,6 +662,13 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
             plan = receipt('plan-site%d'%site,client.request('POST',
                     '/api/registry/z2/bootstrap/programming/plans',{**image_body,'site_id':site}))['plan']
             check_plan(plan,cfg,site,image)
+        # The existing dispatcher owns durable event admission. Also prevent a
+        # second local invocation in this run BEFORE any Z2 or Start side effect.
+        claim_path = Path(os.environ['RUNNER_TEMP'])/('plasma-loading-'+report['work_order_sha256']+'.claim')
+        with claim_path.open('x') as claim_file:
+            os.chmod(claim_path,0o600)
+            json.dump(dict(source_sha=report['source_sha'],journal=str((output/'submission-journal.json').resolve())),claim_file)
+            claim_file.flush();os.fsync(claim_file.fileno())
         observer = remote.launch(cfg,args)
         report['observer'] = observer;save()
         ready_deadline = time.monotonic()+20
@@ -692,13 +702,6 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
         body = dict(image_body,start_id=start,targets=[{'ppu_alias':'z2','site_ids':[1,2]}],
                     repeat=1,retry_limit=0,stop_policy={'kind':'never'})
         receipt('batch-request',{k:v for k,v in body.items() if k != 'image_base64'})
-        # The existing dispatcher owns durable event admission. Also prevent
-        # a second local invocation with a different output directory in this run.
-        claim_path = Path(os.environ['RUNNER_TEMP'])/('plasma-loading-'+report['work_order_sha256']+'.claim')
-        with claim_path.open('x') as claim_file:
-            os.chmod(claim_path,0o600)
-            json.dump(dict(start_id=start,source_sha=report['source_sha'],journal=str((output/'submission-journal.json').resolve())),claim_file)
-            claim_file.flush();os.fsync(claim_file.fileno())
         batch_id = submit_once(client,body,report,save)
         report['hardware'] = 'SUBMITTED';save()
         batch = get('batch-latest','/api/programming/batches/'+batch_id)['batch']
@@ -793,7 +796,9 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
                         report['outcome']='NOT_OBSERVED'
             except Exception as exc:
                 report['cleanup'] = str(exc) if isinstance(exc,Blocked) else type(exc).__name__
-                report['outcome'] = 'OUTCOME_UNKNOWN' if report['batch_post_count'] else 'NOT_RUN'
+                # Measurement evidence failed; a known hardware outcome stays known.
+                report['outcome'] = ('FAIL' if report.get('batch_outcome') in TERMINAL - {'OUTCOME_UNKNOWN'}
+                                     else 'OUTCOME_UNKNOWN' if report['batch_post_count'] else 'NOT_RUN')
         for sig,handler in previous_handlers.items():
             signal.signal(sig,handler)
         save()
