@@ -51,3 +51,132 @@ Execute real SWPC acceptance **before Gate 2** if the task requires it. Record a
 ## 5. Shared clauses retained by reference
 
 Read [AGENTS.md](../../AGENTS.md) for Development Mode, source-of-truth, two-Gate, Git/CI and security; read [Embedded](plasma-embedded.md) for Z2 credentials, hardware ownership, protected Root and recovery.
+
+## Programming loading benchmark (bounded two-Site development measurement)
+
+Reviewed source: `scripts/plasma_programming_load.py`; data contract:
+`specs/programming-loading-benchmark-v1.schema.json`
+(`plasma.programming.loading-benchmark.v1`). This composes Manager plans,
+Start/Batch and PPU Job receipts; it adds no programming engine or deployment.
+
+On the existing non-root SWPC Runner, within an authenticated Work Order:
+
+```bash
+python3 scripts/plasma_programming_load.py measure --ppu z2 --sites 1,2 \
+  --baseline-sec 15 --interval-ms 250 --recovery-sec 15 --timeout-sec 180 \
+  --config /approved/loading.json --config-sha256 CONFIG_SHA256 \
+  --output .plasma-path3-evidence/loading-benchmark --run-batch
+```
+
+The hash must be the SHA256 of the exact private JSON configuration bytes.
+Without `--run-batch`, this command reports NOT_RUN without network or DUT I/O.
+Use a **new** output directory for each owner-authorized measurement. An existing
+submission journal always refuses another submission; never delete a journal to
+retry an ambiguous operation. Reconcile its recorded `start_id` through
+`GET /api/programming/starts/{start_id}`. A new output name is not permission
+for another Batch under the same bounded Work Order.
+
+**Cross-Run exactly-once.** `--run-batch` refuses (`HARDWARE_CLAIM_REQUIRED`,
+before any configuration, Manager, Z2 or DUT I/O) unless the trusted Dispatcher
+passes `PLASMA_P2HW_CLAIM_REF` equal to
+`refs/heads/plasma-engineering-claims/981/p2hw-<work_order_sha256>`. That
+protected ref is created atomically once per Work Order digest before execution
+and can never be updated or deleted; a re-run, a re-posted identical Work Order
+or a concurrent independent Run is denied. Creating it consumes the
+authorization whatever the outcome. A workflow re-run (`GITHUB_RUN_ATTEMPT` != 1)
+is additionally refused. A new physical attempt requires a new owner Work Order.
+
+**Lost responses.** A lost Start response is recorded `start_issuance:
+UNKNOWN` (random ID nobody holds; it expires) and no Batch is posted. A lost
+Batch response is reconciled read-only; a still-admissible Start
+(`ACCEPTANCE_PENDING`) is voided through `POST
+/api/programming/starts/{id}/void`. The Manager serializes void and admission:
+either the Start becomes `NOT_ACCEPTED` (reported NOT_RUN, never resent) or the
+void is refused and the admitted Batch is tracked. Anything else stays
+OUTCOME_UNKNOWN. `hardware_trace` (Start/Batch/per-Site physical result) and
+`measurement_trace` (observer/benchmark result) are reported separately; a
+measurement failure never rewrites a known Batch outcome to OUTCOME_UNKNOWN.
+
+Example owner Issue #981 comment (replace the candidate PR/HEAD and configuration
+hash; for merged main omit `pr_number`/`source_sha`, which are event-pinned):
+
+```text
+/plasma-dispatch work-order 981
+{"schema":"plasma.development.work_order.v1","objective":"Measure one admitted two-Site Z2 E/P/V Batch with same-run idle and recovery baselines","acceptance":"Retain CSV/JSON/SHA256, exact Start/Batch/Job receipts and truthful physical outcome; no resend, install or merge","execution_path":"path2-cli","capability":"operator-cli","scope":"guarded-hardware","pr_number":1234,"source_sha":"REPLACE_WITH_REVIEWED_40_HEX_PR_HEAD","script":"scripts/plasma_programming_load.py","argv":["measure","--ppu","z2","--sites","1,2","--baseline-sec","15","--interval-ms","250","--recovery-sec","15","--timeout-sec","180","--config","/approved/loading.json","--config-sha256","REPLACE_WITH_CONFIG_SHA256","--output",".plasma-path3-evidence/loading-benchmark","--run-batch"],"verification":"exit-code","timeout_seconds":300}
+```
+
+Configuration fields (all required; identities describe the **current accepted
+installed route**, never a static Engine version allowlist):
+
+```json
+{
+  "manager": "http://127.0.0.1:18280",
+  "image": "/approved/plasma-blue-pill-cdc-v0.2.bin",
+  "image_filename": "plasma-blue-pill-cdc-v0.2.bin",
+  "image_sha256": "REPLACE_WITH_64_HEX",
+  "device_id": "REPLACE_WITH_ENROLLED_DEVICE_ID",
+  "deployed_sha": "REPLACE_WITH_INSTALLED_SOURCE_SHA",
+  "asset_set_sha256": "REPLACE_WITH_ACCEPTED_ACTIVE_SET_SHA256",
+  "generation": 25,
+  "resource_set_sha256": "REPLACE_WITH_RESOURCE_SET_SHA256",
+  "route_id": "z2-site2-stm32f103c8t6-operations",
+  "profile": "stm32f103c8t6-site2-operations",
+  "fpga_image_id": "REPLACE_WITH_SAME_BOOT_ACCEPTED_IMAGE_ID",
+  "fixture": ["REPLACE_CDC_SERIAL_1", "REPLACE_CDC_SERIAL_2"],
+  "z2_python": "/opt/plasma/python/3.12.13/bin/python3"
+}
+```
+
+The fixture field is the observed two-board CDC serial **pair**, not an inferred
+CDC-to-Site association. The accepted physical Site wiring is reused; both
+Site targets, route, profile, image, active set and loaded ABI-v5 identity must
+still match. Serial symlinks are observed without opening USB/TTY. A live SWPC
+OpenOCD process blocks the benchmark to avoid simultaneous ST-LINK driving.
+The existing enrolled SSH helper retains its pinned host key and owner-only
+credential store; existing installed Root/Engine guards and the Site Worker
+retain lease, admission, UNKNOWN, recovery and SAFE_OFF authority. No sudoers,
+Runner, service, route, profile, firmware or Bundle is changed.
+
+One Z2 PS-local sampler runs unprivileged as `xilinx`, reading `/proc` only.
+The controller uses the existing enrolled SSH transport for metadata and
+bounded ephemeral staging; it never runs live OpenOCD on SWPC. READY includes
+an actual first sample. The controller waits for at least 15 seconds of idle
+samples, rechecks admission, issues one Start, journals intent **before** its
+single Batch POST (repeat=1/retry=0), and observes exact-ID Batch/Job receipts.
+Lost POST answers reconcile by Start ID; no branch retries POST. A lost Start
+answer also stops without retry. Unsupported Batch collection GETs are unused.
+Recovery begins after both terminal Jobs and observed OpenOCD exits, and lasts
+at least 15 seconds. Existing post-program `reset run` is accepted for this
+measurement; this is **not** no-reset or analog electrical qualification.
+
+CSV contains UTC and Z2 monotonic time, PID/starttime/PPID, exact `plasma_swd`
+Site mapping, CPU/RSS, host CPU and memory, observer overhead and scan duration.
+JSON includes raw frames, lifecycle events, missed samples, phase n/duration,
+mean/nearest-rank P95/peak, same-run idle deltas (CPU and RAM percentage points),
+headroom, per-PID CPU/RSS, sampled overlap with uncertainty, bytes/elapsed,
+readback and SAFE_OFF receipts, source and deployed identities. Host CPU uses
+all-core capacity; PID CPU uses single-core capacity. RAM used is MemTotal minus
+MemAvailable. Sample means are arithmetic, not time-weighted. Host load includes
+sampler and SSH/control observation overhead; the baseline uses the same method.
+Pre-POST and terminal boundaries use the last Z2 sample observed at each event;
+uncertainty includes sampling gaps and scan time. No scaling to eight Sites.
+Sparse phases are INSUFFICIENT_SAMPLES; absent overlap is NOT_OBSERVED. Separate
+historic idle results remain illustrative NON_COMPARABLE evidence.
+
+Output is private (0700 directory/0600 files), CSV + JSON + receipt files and
+SHA256SUMS; stdout contains only a small bounded receipt (well below 64 KiB).
+Use `.plasma-path3-evidence/` for the existing engineering artifact collector;
+Path 2 packages the dedicated output as
+`RUNNER_TEMP/plasma-path2-loading-benchmark.tar.gz` plus SHA256 through the
+existing CLI artifact upload (no new evidence service). No credentials or raw
+SSH transcript are stored. Each remotely collected file is capped at 64 MiB.
+SIGINT/SIGTERM/timeout stops future Batch queueing through the supported exact-ID
+stop API, observes already running Jobs for a bounded grace period and stops
+only the sampler's verified PID/starttime. The Worker owns in-flight SAFE_OFF;
+unconfirmed cleanup is OUTCOME_UNKNOWN, never NOT_RUN or a blind retry.
+
+Historical source/evidence reused: observer Run 43890273943 / Artifact
+14235919788 (PID-safe sampling), dual-Site HIL Run 44014287054 / Artifact
+14298761141 (existing route and receipts). Those are prior evidence, not a new
+execution of this CLI. Offline checks: `python3
+scripts/tests/test_plasma_programming_load.py` and existing operator CLI tests.
