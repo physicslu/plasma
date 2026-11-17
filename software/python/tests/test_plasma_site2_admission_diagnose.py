@@ -37,7 +37,8 @@ def reply():
     return {"schema":"plasma.site2.admission-diagnostic.v1",
             "result":"DENIED","code":"RELEASE_NOT_ABI5_INDEPENDENT",
             "revoke":"NOT_NEEDED","record_present":False,
-            "fpga_manager_state":"operating"}
+            "fpga_manager_state":"operating",
+            "admit_wall_ms":6123.4,"admission_timing_ms":None}
 def test_root_entry_diagnostic_is_source_pinned_and_releases_record():
     h=Helper(reply())
     with patch.object(SCRIPT.subprocess,"run",return_value=SimpleNamespace(stdout=SHA+"\n")):
@@ -114,3 +115,28 @@ def test_root_denial_with_oserror_punctuation_is_not_masked():
     raw = "[Errno 2] No such file or directory: '/opt/plasma/privileged-code'"
     assert all(0x20 <= ord(ch) <= 0x7e for ch in raw)
 
+
+def test_timing_receipt_preserves_successful_new_root_measurement():
+    payload = reply()
+    payload.update(result="ADMITTED", revoke="PASS",
+                   admit_wall_ms=83.25,
+                   admission_timing_ms={"preflight": 11.2, "image_hash": 3.4,
+                                        "total": 82.0})
+    h = Helper(payload)
+    with patch.object(SCRIPT.subprocess, "run", return_value=SimpleNamespace(stdout=SHA + "\n")):
+        result = SCRIPT.run(HOST, SHA, preflight=Pre(state()), helper=h)
+    assert result["observation"]["admission_timing_ms"]["total"] == 82.0
+    assert result["observation"]["admit_wall_ms"] == 83.25
+
+
+@pytest.mark.parametrize("invalid", [True, -1, float("nan"), {"total": -2}, {"bad name": 1}])
+def test_malformed_timing_receipt_fails_closed(invalid):
+    payload = reply()
+    if type(invalid) is dict:
+        payload["admission_timing_ms"] = invalid
+    else:
+        payload["admit_wall_ms"] = invalid
+    h = Helper(payload)
+    with patch.object(SCRIPT.subprocess, "run", return_value=SimpleNamespace(stdout=SHA + "\n")):
+        with pytest.raises(RuntimeError, match="REMOTE_DIAGNOSTIC_RECEIPT_INVALID"):
+            SCRIPT.run(HOST, SHA, preflight=Pre(state()), helper=h)

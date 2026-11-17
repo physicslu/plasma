@@ -38,7 +38,7 @@ class Helper:
         return 0, audit.MARK + json.dumps(self.payload) + "\n"
 
 
-def observed(root_sha, admission_sha):
+def observed(root_sha, admission_sha, guard_sha="g" * 64):
     return {
         "schema": audit.SCHEMA, "observation": "OBSERVED",
         "manifest": "PARSED", "manifest_sha256": "e" * 64,
@@ -54,6 +54,12 @@ def observed(root_sha, admission_sha):
                 "manifest_match": True,
                 "references_devmem_independent_images": False,
             },
+            audit.FILES[2]: {
+                "sha256": guard_sha,
+                "manifest_sha256": guard_sha,
+                "manifest_match": True,
+                "references_devmem_independent_images": False,
+            },
         },
     }
 
@@ -61,13 +67,15 @@ def observed(root_sha, admission_sha):
 def test_static_comparison_is_source_pinned_and_read_only():
     git_root = hashlib.sha256((ROOT / audit.FILES[0]).read_bytes()).hexdigest()
     git_admission = hashlib.sha256((ROOT / audit.FILES[1]).read_bytes()).hexdigest()
-    helper = Helper(observed("f" * 64, git_admission))
+    git_guard = hashlib.sha256((ROOT / audit.FILES[2]).read_bytes()).hexdigest()
+    helper = Helper(observed("f" * 64, git_admission, git_guard))
     with patch.object(audit.subprocess, "run", return_value=SimpleNamespace(stdout=SHA + "\n")):
         result = audit.run(SHA, helper=helper)
     assert result["result"] == "OBSERVED"
     assert result["modules"][audit.FILES[0]]["matches_git"] is False
     assert result["modules"][audit.FILES[0]]["matches_installed_manifest"] is True
     assert result["modules"][audit.FILES[1]]["matches_git"] is True
+    assert result["modules"][audit.FILES[2]]["matches_git"] is True
     assert result["modules"][audit.FILES[0]]["references_devmem_independent_images"] is True
     assert helper.calls[0][:3] == ["python3", "-I", "-c"]
     assert "read_bytes()" in helper.calls[0][3]
@@ -85,6 +93,23 @@ def test_missing_source_pin_fails_before_ssh():
 def test_broken_protected_manifest_never_claims_observed():
     payload = observed("f" * 64, "e" * 64)
     payload["observation"] = "BLOCKED"
+    helper = Helper(payload)
+    with patch.object(audit.subprocess, "run", return_value=SimpleNamespace(stdout=SHA + "\n")):
+        with pytest.raises(RuntimeError, match="ROOT_AUDIT_INCOMPLETE"):
+            audit.run(SHA, helper=helper)
+
+def test_guard_digest_mismatch_is_reported_and_never_claimed_matched():
+    payload = observed("f" * 64, "e" * 64, "0" * 64)
+    helper = Helper(payload)
+    with patch.object(audit.subprocess, "run", return_value=SimpleNamespace(stdout=SHA + "\n")):
+        result = audit.run(SHA, helper=helper)
+    assert result["modules"]["pl/hil/fpga_image_guard.py"]["matches_git"] is False
+    assert result["modules"]["pl/hil/fpga_image_guard.py"]["matches_installed_manifest"] is True
+
+
+def test_guard_field_absence_fails_closed():
+    payload = observed("f" * 64, "e" * 64)
+    del payload["modules"]["pl/hil/fpga_image_guard.py"]
     helper = Helper(payload)
     with patch.object(audit.subprocess, "run", return_value=SimpleNamespace(stdout=SHA + "\n")):
         with pytest.raises(RuntimeError, match="ROOT_AUDIT_INCOMPLETE"):
