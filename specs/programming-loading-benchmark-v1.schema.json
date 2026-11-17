@@ -3,7 +3,7 @@
   "$id": "plasma.programming.loading-benchmark.v1",
   "title": "PLASMA Programming Loading Benchmark v1",
   "type": "object",
-  "required": ["schema", "outcome", "source_sha", "blocker", "batch_post_count", "start_post_count", "hardware", "reset_run"],
+  "required": ["schema", "outcome", "source_sha", "blocker", "batch_post_count", "start_post_count", "hardware", "reset_run", "hardware_trace", "measurement_trace"],
   "properties": {
     "schema": {"const": "plasma.programming.loading-benchmark.v1"},
     "outcome": {"enum": ["PASS", "FAIL", "NOT_RUN", "OUTCOME_UNKNOWN", "INSUFFICIENT_SAMPLES", "NOT_OBSERVED"]},
@@ -31,12 +31,33 @@
         "missed_samples": {"type": "integer", "minimum": 0}
       }
     },
-    "jobs": {"type": "array", "maxItems": 2, "items": {"type": "object"}}
+    "jobs": {"type": "array", "maxItems": 2, "items": {"type": "object"}},
+    "hardware_claim_ref": {"type": "string", "pattern": "^refs/heads/plasma-engineering-claims/981/p2hw-[0-9a-f]{64}$"},
+    "hardware_trace": {
+      "type": "object",
+      "required": ["start_issuance", "start_id", "submission", "batch_id", "batch_outcome", "sites", "final_idle"],
+      "properties": {
+        "start_issuance": {"enum": ["NOT_REQUESTED", "UNKNOWN", "ISSUED"]},
+        "submission": {"enum": ["NOT_SUBMITTED", "UNKNOWN", "NOT_ACCEPTED", "ACCEPTED"]},
+        "sites": {"type": "array", "maxItems": 2, "items": {"type": "object", "required": ["site_id", "result"],
+          "properties": {"site_id": {"enum": [1, 2]}, "result": {"enum": ["PASS", "FAIL"]}}}}
+      }
+    },
+    "measurement_trace": {
+      "type": "object",
+      "required": ["measurement_outcome", "comparison"],
+      "properties": {
+        "measurement_outcome": {"enum": ["NOT_STARTED", "FAILED", "NO_BATCH_WINDOW", "INSUFFICIENT_SAMPLES", "NOT_OBSERVED", "OBSERVED"]},
+        "comparison": {"type": "boolean"}
+      }
+    }
   },
   "allOf": [{"if": {"properties": {"outcome": {"const": "PASS"}}},
-    "then": {"required": ["jobs", "comparison", "batch_id", "start_id", "deployed_identity", "final_idle", "throughput"],
+    "then": {"required": ["jobs", "comparison", "batch_id", "start_id", "deployed_identity", "final_idle", "throughput", "hardware_claim_ref"],
       "properties": {"final_idle": {"const": true}, "batch_post_count": {"const": 1},
-                     "jobs": {"minItems": 2}}}}],
+                     "jobs": {"minItems": 2},
+                     "hardware_trace": {"properties": {"submission": {"const": "ACCEPTED"}}},
+                     "measurement_trace": {"properties": {"measurement_outcome": {"const": "OBSERVED"}}}}}}],
   "$defs": {
     "stats": {
       "type": "object", "required": ["n", "mean", "p95", "peak"],

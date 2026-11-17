@@ -76,6 +76,27 @@ retry an ambiguous operation. Reconcile its recorded `start_id` through
 `GET /api/programming/starts/{start_id}`. A new output name is not permission
 for another Batch under the same bounded Work Order.
 
+**Cross-Run exactly-once.** `--run-batch` refuses (`HARDWARE_CLAIM_REQUIRED`,
+before any configuration, Manager, Z2 or DUT I/O) unless the trusted Dispatcher
+passes `PLASMA_P2HW_CLAIM_REF` equal to
+`refs/heads/plasma-engineering-claims/981/p2hw-<work_order_sha256>`. That
+protected ref is created atomically once per Work Order digest before execution
+and can never be updated or deleted; a re-run, a re-posted identical Work Order
+or a concurrent independent Run is denied. Creating it consumes the
+authorization whatever the outcome. A workflow re-run (`GITHUB_RUN_ATTEMPT` != 1)
+is additionally refused. A new physical attempt requires a new owner Work Order.
+
+**Lost responses.** A lost Start response is recorded `start_issuance:
+UNKNOWN` (random ID nobody holds; it expires) and no Batch is posted. A lost
+Batch response is reconciled read-only; a still-admissible Start
+(`ACCEPTANCE_PENDING`) is voided through `POST
+/api/programming/starts/{id}/void`. The Manager serializes void and admission:
+either the Start becomes `NOT_ACCEPTED` (reported NOT_RUN, never resent) or the
+void is refused and the admitted Batch is tracked. Anything else stays
+OUTCOME_UNKNOWN. `hardware_trace` (Start/Batch/per-Site physical result) and
+`measurement_trace` (observer/benchmark result) are reported separately; a
+measurement failure never rewrites a known Batch outcome to OUTCOME_UNKNOWN.
+
 Example owner Issue #981 comment (replace the candidate PR/HEAD and configuration
 hash; for merged main omit `pr_number`/`source_sha`, which are event-pinned):
 

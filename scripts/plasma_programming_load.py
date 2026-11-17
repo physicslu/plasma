@@ -213,6 +213,10 @@ TARGET = 'STM32F103C8T6'
 OPERATIONS = ['erase', 'program', 'verify']
 TERMINAL = {'PASS', 'FAIL', 'PARTIAL', 'BLOCKED', 'OUTCOME_UNKNOWN', 'CANCELLED'}
 HEX64 = re.compile(r'[0-9a-f]{64}\Z')
+# Trusted Dispatcher creates this protected, never-updatable ref once per
+# Work Order digest BEFORE execution (cross-Run exactly-once; PR-H).
+CLAIM_PREFIX = 'refs/heads/plasma-engineering-claims/981/p2hw-'
+VOID_TOKEN = 'VOID_UNSTARTED_START'
 ID = re.compile(r'[0-9a-f]{32}\Z')
 
 
@@ -324,7 +328,8 @@ class HTTP:
     def request(self, method, path, body=None):
         remaining = getattr(self,'deadline',time.monotonic()+10)-time.monotonic()
         require(remaining > 0,'BENCHMARK_TIMEOUT')
-        conn = http.client.HTTPConnection(self.host, self.port, timeout=min(10,remaining))
+        limit = 30 if (method, path) == ('POST', '/api/programming/batches') else 10
+        conn = http.client.HTTPConnection(self.host, self.port, timeout=min(limit,remaining))
         try:
             conn.request(method, path, body=json.dumps(body) if body is not None else None,
                          headers={'Content-Type':'application/json', 'Accept':'application/json'})
@@ -369,26 +374,95 @@ def check_plan(plan, cfg, site, image):
 
 
 def submit_once(client, body, journal, save):
-    """A durable intent precedes POST. Even explicit rejection never retries."""
+    """A durable intent precedes POST. Even explicit rejection never retries.
+
+    A lost response is reconciled read-only. A Start that is still admissible
+    (ACCEPTANCE_PENDING) is voided: the Manager serializes void and admission,
+    so either the Start can never be admitted (NOT_ACCEPTED) or the void is
+    refused because the Batch exists and is then tracked. Never resent.
+    """
     require(journal.get('batch_post_count',0) == 0, 'DUPLICATE_SUBMISSION_DENIED')
-    journal.update(batch_post_count=1, outcome='OUTCOME_UNKNOWN', start_id=body['start_id'])
+    journal.update(batch_post_count=1, outcome='OUTCOME_UNKNOWN', start_id=body['start_id'],
+                   submission='UNKNOWN')
     save()
+    start_path = '/api/programming/starts/'+body['start_id']
     try:
         response = client.request('POST','/api/programming/batches',body)
         batch = response['batch']
     except Exception:
-        reconciled = client.request('GET','/api/programming/starts/'+body['start_id'])
-        journal['reconciliation'] = reconciled
-        save()
-        rec = reconciled['reconciliation']
-        require(rec['start_id'] == body['start_id'] and rec['state'] in
-                ('ACCEPTED_RUNNING','TERMINAL_CONFIRMED'), 'SUBMISSION_UNKNOWN_NO_RESEND')
+        def reconcile(name):
+            journal[name] = client.request('GET',start_path)
+            save()
+            rec = journal[name]['reconciliation']
+            require(rec['start_id'] == body['start_id'], 'SUBMISSION_UNKNOWN_NO_RESEND')
+            return rec
+        rec = reconcile('reconciliation')
+        if rec['state'] == 'ACCEPTANCE_PENDING':
+            journal['void_post_count'] = 1;save()
+            try:
+                journal['void'] = client.request('POST',start_path+'/void',{'void':VOID_TOKEN})
+                save()
+            except Exception:
+                pass  # Refused/lost void: only the read-only view decides.
+            rec = reconcile('reconciliation_after_void')
+        if rec['state'] == 'NOT_ACCEPTED':
+            journal['submission'] = 'NOT_ACCEPTED';save()
+            raise Blocked('SUBMISSION_NOT_ACCEPTED_NO_RESEND')
+        require(rec['state'] in ('ACCEPTED_RUNNING','TERMINAL_CONFIRMED'), 'SUBMISSION_UNKNOWN_NO_RESEND')
         batch = rec['batch']
     require(ID.fullmatch(batch['batch_id']) and batch['start_id'] == body['start_id']
             and batch['targets'] == [{'ppu_alias':'z2','site_ids':[1,2]}], 'BATCH_IDENTITY_MISMATCH')
     journal['batch_id'] = batch['batch_id']
+    journal['submission'] = 'ACCEPTED'
     save()
     return batch['batch_id']
+
+
+def require_hardware_claim(report):
+    """Fail closed before any IO unless the trusted cross-Run claim exists."""
+    sha = report.get('work_order_sha256')
+    require(isinstance(sha,str) and HEX64.fullmatch(sha)
+            and os.environ.get('PLASMA_P2HW_CLAIM_REF') == CLAIM_PREFIX+sha,
+            'HARDWARE_CLAIM_REQUIRED')
+    report['hardware_claim_ref'] = CLAIM_PREFIX+sha
+
+
+def site_result(job, site, cfg):
+    """Per-Site physical result, recorded even when another Site failed."""
+    try:
+        return check_job(job, site, cfg)
+    except (Blocked, KeyError, TypeError) as exc:
+        receipt = ((job.get('result') or {}).get('details') or {}).get('programming') or {}
+        return dict(job_id=job.get('job_id'), site_id=site, result='FAIL', state=job.get('state'),
+                    safe_off=receipt.get('safe_off'), blocker=str(exc) if isinstance(exc,Blocked) else type(exc).__name__)
+
+
+def trace(report):
+    """Physical Batch result and Observer/benchmark result, separately traceable."""
+    if not report['batch_post_count']:
+        submission = 'NOT_SUBMITTED'
+    else:
+        submission = report.get('submission') or 'UNKNOWN'
+    report['hardware_trace'] = dict(
+        start_issuance=report.get('start_issuance','NOT_REQUESTED'), start_id=report.get('start_id'),
+        submission=submission, batch_id=report.get('batch_id'),
+        batch_outcome=report.get('batch_outcome') or report.get('cleanup_batch_outcome'),
+        sites=report.get('site_results',[]), final_idle=report.get('final_idle'))
+    c = report.get('comparison')
+    if report.get('observer') is None:
+        measured = 'NOT_STARTED'
+    elif report.get('cleanup'):
+        measured = 'FAILED'
+    elif not c:
+        measured = 'NO_BATCH_WINDOW'
+    elif report.get('measurement_insufficient'):
+        measured = 'INSUFFICIENT_SAMPLES'
+    elif not c['sampled_pid_overlap_s']:
+        measured = 'NOT_OBSERVED'
+    else:
+        measured = 'OBSERVED'
+    report['measurement_trace'] = dict(observer_termination=report.get('observer_termination'),
+        error=report.get('cleanup'), comparison=bool(c), measurement_outcome=measured)
 
 
 def check_job(job, site, cfg):
@@ -615,6 +689,7 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
             report['blocker'] = 'EXPLICIT_RUN_BATCH_REQUIRED'
             return report
         report.update(authenticate(argv));save()
+        require_hardware_claim(report);save()
         if report.get('execution_path') == 'path2-cli':
             require(report['dispatcher_timeout_seconds'] >= args.timeout_sec+120,'DISPATCH_TIMEOUT_TOO_SHORT')
         raw = Path(args.config).read_bytes()
@@ -689,8 +764,11 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
             interrupted.wait(.5);state = status()
         preflight()  # Recheck after baseline, before the only submission.
         bounded()
-        report['start_post_count'] = 1;save()
+        report['start_post_count'] = 1;report['start_issuance'] = 'UNKNOWN';save()
+        # A lost Start response is harmless (random ID, nobody holds it; expires),
+        # but stays UNKNOWN rather than a plain NOT_RUN.
         issued = receipt('start-response',client.request('POST','/api/programming/starts',{'kind':'batch'}))
+        report['start_issuance'] = 'ISSUED'
         start = issued['start']['start_id']
         require(ID.fullmatch(start), 'START_ID_INVALID')
         report['start_id'] = start;save()
@@ -731,6 +809,7 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
         report['final_idle'] = True
         report['batch_outcome'] = batch['outcome']
         report['clock_bounds'] = dict(submitted=submitted,terminal=terminal,recovery_start=recovery_start)
+        report['site_results'] = [site_result(job,site,cfg) for site,job in jobs]
         summaries=[]
         for site,job in jobs:
             summaries.append(check_job(job,site,cfg))
@@ -742,7 +821,8 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
         report['outcome'] = 'PASS'
     except Exception as exc:
         report['blocker'] = str(exc) if isinstance(exc,Blocked) else type(exc).__name__
-        report['outcome'] = 'OUTCOME_UNKNOWN' if report['batch_post_count'] else 'NOT_RUN'
+        report['outcome'] = ('NOT_RUN' if not report['batch_post_count']
+                             or report.get('submission') == 'NOT_ACCEPTED' else 'OUTCOME_UNKNOWN')
         if report.get('batch_outcome') in TERMINAL - {'OUTCOME_UNKNOWN'}:
             report['outcome'] = 'FAIL'
     finally:
@@ -790,7 +870,9 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
                     c=report['clock_bounds']
                     report['comparison'] = comparison(sampler['frames'],c['submitted'],c['terminal'] or float('inf'),c['recovery_start'] or float('inf'),args.interval_ms/1000)
                     p=report['comparison']['phases']
-                    if report['outcome'] == 'PASS' and (p['idle']['duration_s'] < args.baseline_sec or p['recovery']['duration_s'] < args.recovery_sec):
+                    report['measurement_insufficient'] = (p['idle']['duration_s'] < args.baseline_sec
+                                                          or p['recovery']['duration_s'] < args.recovery_sec)
+                    if report['outcome'] == 'PASS' and report['measurement_insufficient']:
                         report['outcome']='INSUFFICIENT_SAMPLES'
                     elif report['outcome'] == 'PASS' and not report['comparison']['sampled_pid_overlap_s']:
                         report['outcome']='NOT_OBSERVED'
@@ -798,9 +880,11 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
                 report['cleanup'] = str(exc) if isinstance(exc,Blocked) else type(exc).__name__
                 # Measurement evidence failed; a known hardware outcome stays known.
                 report['outcome'] = ('FAIL' if report.get('batch_outcome') in TERMINAL - {'OUTCOME_UNKNOWN'}
-                                     else 'OUTCOME_UNKNOWN' if report['batch_post_count'] else 'NOT_RUN')
+                                     else 'NOT_RUN' if not report['batch_post_count']
+                                     or report.get('submission') == 'NOT_ACCEPTED' else 'OUTCOME_UNKNOWN')
         for sig,handler in previous_handlers.items():
             signal.signal(sig,handler)
+        trace(report)
         save()
         atomic_json(output/'report.json',report)
         paths = sorted(p for p in output.iterdir() if p.is_file() and p.name != 'SHA256SUMS')

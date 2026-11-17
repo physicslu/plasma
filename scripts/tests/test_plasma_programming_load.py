@@ -19,6 +19,9 @@ sys.path.insert(0,str(ROOT/'scripts'))
 import plasma_programming_load as b
 import plasma_development_dispatch as dispatch
 
+WO='f'*64
+CLAIMED={'PLASMA_P2HW_CLAIM_REF':b.CLAIM_PREFIX+WO}
+
 
 def proc(pid=1,start=10,ticks=0,site=1):
     return dict(pid=pid,starttime=start,ticks=ticks,site=site,ppid=7,rss_kib=100,cpu_pct_one_core=50)
@@ -29,6 +32,27 @@ def frame(i,sites=(),cpu=10):
                 processes=[proc(pid=s,site=s) for s in sites],host_cpu_pct_all_cores=cpu,
                 mem_total_kib=1000,mem_available_kib=800,observer_cpu_pct_one_core=2,
                 observer_rss_kib=30,scan_duration_s=.01,missed_samples=0)
+
+
+def schema_check(test,report):
+    """Offline subset of the versioned contract (no third-party validator)."""
+    import re
+    schema=json.loads((ROOT/'specs/programming-loading-benchmark-v1.schema.json').read_text())
+    props=schema['properties']
+    test.assertTrue(set(schema['required'])<=report.keys())
+    test.assertIn(report['outcome'],props['outcome']['enum'])
+    for name in ('hardware_trace','measurement_trace'):
+        test.assertTrue(set(props[name]['required'])<=report[name].keys())
+        for key,rule in props[name]['properties'].items():
+            if 'enum' in rule:test.assertIn(report[name][key],rule['enum'],key)
+    for site in report['hardware_trace']['sites']:
+        test.assertIn(site['result'],['PASS','FAIL'])
+    if report['outcome']=='PASS':
+        then=schema['allOf'][0]['then']
+        test.assertTrue(set(then['required'])<=report.keys())
+        test.assertRegex(report['hardware_claim_ref'],props['hardware_claim_ref']['pattern'])
+        test.assertEqual(report['hardware_trace']['submission'],'ACCEPTED')
+        test.assertEqual(report['measurement_trace']['measurement_outcome'],'OBSERVED')
 
 
 class Arithmetic(unittest.TestCase):
@@ -100,6 +124,54 @@ class Submission(unittest.TestCase):
                 b.submit_once(client,self.body,{},lambda:None)
             self.assertEqual([c.args[0] for c in client.request.call_args_list],['POST','GET'])
 
+    def rec(self,state,batch=None):
+        return {'reconciliation':dict(start_id='a'*32,state=state,batch=batch)}
+
+    def test_pending_start_is_voided_never_resent(self):
+        client=Mock();journal={}
+        client.request.side_effect=[TimeoutError(),self.rec('ACCEPTANCE_PENDING'),
+                                    self.rec('NOT_ACCEPTED'),self.rec('NOT_ACCEPTED')]
+        with self.assertRaisesRegex(b.Blocked,'SUBMISSION_NOT_ACCEPTED_NO_RESEND'):
+            b.submit_once(client,self.body,journal,lambda:None)
+        calls=[c.args[:2] for c in client.request.call_args_list]
+        self.assertEqual(calls,[('POST','/api/programming/batches'),('GET','/api/programming/starts/'+'a'*32),
+                                ('POST','/api/programming/starts/'+'a'*32+'/void'),('GET','/api/programming/starts/'+'a'*32)])
+        self.assertEqual(client.request.call_args_list[2].args[2],{'void':'VOID_UNSTARTED_START'})
+        self.assertEqual((journal['submission'],journal['void_post_count']),('NOT_ACCEPTED',1))
+
+    def test_refused_void_tracks_the_admitted_batch(self):
+        client=Mock()
+        client.request.side_effect=[TimeoutError(),self.rec('ACCEPTANCE_PENDING'),
+                                    b.Blocked('HTTP_REQUEST_REJECTED'),self.rec('ACCEPTED_RUNNING',self.batch)]
+        journal={}
+        self.assertEqual(b.submit_once(client,self.body,journal,lambda:None),'b'*32)
+        self.assertEqual(journal['submission'],'ACCEPTED')
+        self.assertEqual([c.args[1] for c in client.request.call_args_list].count('/api/programming/batches'),1)
+
+    def test_still_pending_after_void_stays_unknown(self):
+        client=Mock()
+        client.request.side_effect=[TimeoutError(),self.rec('ACCEPTANCE_PENDING'),
+                                    TimeoutError(),self.rec('ACCEPTANCE_PENDING')]
+        journal={}
+        with self.assertRaisesRegex(b.Blocked,'SUBMISSION_UNKNOWN_NO_RESEND'):
+            b.submit_once(client,self.body,journal,lambda:None)
+        self.assertEqual(journal['submission'],'UNKNOWN')
+        self.assertEqual(client.request.call_count,4)
+
+    def test_batch_post_has_admission_bound(self):
+        seen=[]
+        class Conn:
+            def __init__(self,host,port,timeout):seen.append(timeout)
+            def request(self,*a,**k):pass
+            def getresponse(self):
+                r=Mock();r.status=200;r.read.return_value=b'{"ok":true}';return r
+            def close(self):pass
+        client=b.HTTP('http://127.0.0.1:18280');client.deadline=b.time.monotonic()+100
+        with patch.object(b.http.client,'HTTPConnection',Conn):
+            client.request('POST','/api/programming/batches',{})
+            client.request('POST','/api/programming/starts',{})
+        self.assertEqual(seen[0],30);self.assertEqual(seen[1],10)
+
     def test_journal_saved_before_post(self):
         journal={}
         def request(*args):
@@ -163,6 +235,21 @@ class Guards(unittest.TestCase):
             self.assertTrue(set(schema['required']) <= report.keys())
             self.assertIn(report['outcome'],schema['properties']['outcome']['enum'])
             self.assertEqual(report['schema'],schema['properties']['schema']['const'])
+
+    def test_run_batch_requires_cross_run_claim_before_io(self):
+        for env in ({},{'PLASMA_P2HW_CLAIM_REF':b.CLAIM_PREFIX+'e'*64},{'PLASMA_P2HW_CLAIM_REF':'refs/heads/x'}):
+            with tempfile.TemporaryDirectory() as tmp:
+                args=argparse.Namespace(output=tmp+'/out',timeout_sec=180,run_batch=True,
+                                        config=tmp+'/absent',config_sha256='0'*64)
+                client=Mock();remote=Mock()
+                clean={k:v for k,v in os.environ.items() if k!='PLASMA_P2HW_CLAIM_REF'}
+                with patch.dict(os.environ,{**clean,**env},clear=True):
+                    r=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{'work_order_sha256':WO})
+                self.assertEqual((r['outcome'],r['blocker']),('NOT_RUN','HARDWARE_CLAIM_REQUIRED'))
+                self.assertEqual((r['start_post_count'],r['batch_post_count']),(0,0))
+                self.assertEqual(r['hardware_trace']['submission'],'NOT_SUBMITTED')
+                self.assertEqual(r['measurement_trace']['measurement_outcome'],'NOT_STARTED')
+                client.request.assert_not_called();remote.launch.assert_not_called()
 
     def test_workflow_rerun_cannot_replay_hardware(self):
         env={'GITHUB_RUN_ATTEMPT':'2','RUNNER_NAME':dispatch.EXPECTED_RUNNER,'RUNNER_ENVIRONMENT':'self-hosted'}
@@ -279,8 +366,8 @@ class BoundaryGuards(unittest.TestCase):
             def register(sig,handler):
                 if sig == signal.SIGTERM and callable(handler):handler(sig,None)
                 return signal.SIG_DFL
-            with patch.object(b,'fixture_observation',return_value=[]),patch.object(b.signal,'signal',side_effect=register):
-                result=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{})
+            with patch.dict(os.environ,CLAIMED),patch.object(b,'fixture_observation',return_value=[]),patch.object(b.signal,'signal',side_effect=register):
+                result=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{'work_order_sha256':WO})
             self.assertEqual(result['blocker'],'INTERRUPTED')
             client.request.assert_not_called();remote.launch.assert_not_called()
 
@@ -296,15 +383,15 @@ class BoundaryGuards(unittest.TestCase):
                       config=str(config),config_sha256=b.digest(config.read_bytes()))
                 remote=Mock();client=Mock()
                 # Raise at the first bounded API operation; no POST can occur.
-                with patch.object(b,'fixture_observation',return_value=[]),patch.object(b.time,'monotonic',side_effect=[0,181]):
-                    r=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{})
+                with patch.dict(os.environ,CLAIMED),patch.object(b,'fixture_observation',return_value=[]),patch.object(b.time,'monotonic',side_effect=[0,181]):
+                    r=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{'work_order_sha256':WO})
                 self.assertEqual(r['outcome'],'NOT_RUN');self.assertEqual(r['blocker'],'BENCHMARK_TIMEOUT')
                 client.request.assert_not_called();remote.launch.assert_not_called()
 
 
 class EndToEnd(unittest.TestCase):
     def test_one_batch_same_sampler_baselines_and_partial_failure(self):
-        for mode in ('pass','partial','packaging','claimed','collect'):
+        for mode in ('pass','partial','packaging','claimed','collect','startlost'):
             partial,packaging_failure=mode=='partial',mode=='packaging'
             with tempfile.TemporaryDirectory() as tmp:
                 checks=BoundaryGuards();cfg=checks.config()
@@ -329,7 +416,9 @@ class EndToEnd(unittest.TestCase):
                         if method=='POST':
                             self.posts.append(path)
                             if path.endswith('/plans'):return {'plan':checks.plan()}
-                            if path.endswith('/starts'):return {'start':{'start_id':'a'*32}}
+                            if path.endswith('/starts'):
+                                if mode=='startlost':raise TimeoutError()
+                                return {'start':{'start_id':'a'*32}}
                             if path.endswith('/batches'):
                                 self.submitted=True;return {'batch':batch}
                         if path.endswith('/bootstrap'):return dict(pairing=dict(device_authenticated=True,device_id='device'),
@@ -374,11 +463,18 @@ class EndToEnd(unittest.TestCase):
                     def wait(self,*a):pass
                     def is_set(self):return False
                     def set(self):pass
-                with patch.dict(os.environ,{'RUNNER_TEMP':tmp}),patch.object(b,'fixture_observation',return_value=[]),patch.object(b,'check_remote'), \
+                with patch.dict(os.environ,{'RUNNER_TEMP':tmp,**CLAIMED}),patch.object(b,'fixture_observation',return_value=[]),patch.object(b,'check_remote'), \
                      patch.object(b,'check_plan'),patch.object(b.threading,'Event',Event):
                     result=b.measure(args,[],client=client,remote=remote,authenticate=lambda argv:{'work_order_sha256':'f'*64,'source_sha':'d'*40,
                          'execution_path':'path2-cli','dispatcher_timeout_seconds':300})
+                hw,ms=result['hardware_trace'],result['measurement_trace']
+                if mode=='startlost':
+                    # Lost Start response: no Batch POST, recorded as UNKNOWN issuance.
+                    self.assertEqual((result['outcome'],hw['start_issuance'],hw['submission']),('NOT_RUN','UNKNOWN','NOT_SUBMITTED'))
+                    self.assertNotIn('/api/programming/batches',client.posts)
+                    continue
                 if mode=='claimed':
+                    self.assertEqual((hw['submission'],ms['measurement_outcome']),('NOT_SUBMITTED','NOT_STARTED'))
                     # Claim precedes every Z2 observer and Start side effect.
                     self.assertEqual((result['outcome'],result['blocker']),('NOT_RUN','FileExistsError'))
                     self.assertFalse([x for x in client.posts if x.endswith(('/starts','/batches'))])
@@ -387,9 +483,18 @@ class EndToEnd(unittest.TestCase):
                 if mode=='collect':
                     # Lost sampler evidence never turns a known Batch into UNKNOWN.
                     self.assertEqual((result['outcome'],result['batch_outcome'],result['cleanup']),('FAIL','PASS','OSError'))
+                    self.assertEqual((hw['submission'],hw['batch_outcome'],ms['measurement_outcome']),('ACCEPTED','PASS','FAILED'))
+                    self.assertEqual([x['result'] for x in hw['sites']],['PASS','PASS'])
                     self.assertEqual(client.posts.count('/api/programming/batches'),1)
                     continue
                 self.assertEqual(result['outcome'],'FAIL' if partial or packaging_failure else 'PASS',result.get('blocker'))
+                self.assertEqual((hw['start_issuance'],hw['submission'],hw['batch_id']),('ISSUED','ACCEPTED','b'*32))
+                # A failed Site never hides the other Site's physical result.
+                self.assertEqual([(x['site_id'],x['result']) for x in hw['sites']],
+                                 [(1,'PASS'),(2,'FAIL' if partial else 'PASS')])
+                self.assertEqual(ms['measurement_outcome'],'OBSERVED')
+                self.assertEqual(result['hardware_claim_ref'],b.CLAIM_PREFIX+WO)
+                schema_check(self,result)
                 self.assertEqual(client.posts.count('/api/programming/batches'),1)
                 self.assertTrue(remote.stopped)
                 artifact=Path(tmp)/'plasma-path2-loading-benchmark.tar.gz'
