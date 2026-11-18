@@ -369,7 +369,11 @@ def summarize(*, report: dict | None, jobs: list[dict], la: dict | None) -> str:
         throughput = report.get("throughput") or {}
         lines.append(f"  throughput {throughput.get('bytes')} B / "
                      f"{round(throughput.get('elapsed_s', 0), 2)} s = "
-                     f"{round(throughput.get('bytes_per_s', 0))} B/s")
+                     f"{round(throughput.get('bytes_per_s', 0))} B/s"
+                     f" ({throughput.get('elapsed_basis', 'OBSERVER_TERMINAL_SAMPLE')})")
+        if throughput.get("observed_elapsed_s"):
+            lines.append(f"  observer-read elapsed {round(throughput['observed_elapsed_s'], 2)} s "
+                         f"(includes benchmark polling delay)")
         comparison = report.get("comparison") or {}
         if "sampled_pid_overlap_s" in comparison:
             lines.append(f"  OpenOCD PID overlap {round(comparison['sampled_pid_overlap_s'], 2)} s"
@@ -377,10 +381,10 @@ def summarize(*, report: dict | None, jobs: list[dict], la: dict | None) -> str:
         lines.append("  phase        n    CPU mean  CPU peak  RAM peak KiB")
         for name, phase in (comparison.get("phases") or {}).items():
             cpu, ram = phase.get("cpu_pct") or {}, phase.get("ram_used_kib") or {}
-            mean = cpu.get("mean")
+            mean, peak = cpu.get("mean"), cpu.get("peak")
             lines.append(f"  {name:<12}{phase.get('n', 0):>4}  "
                          f"{'-' if mean is None else f'{mean:.1f}%':>8}  "
-                         f"{'-' if cpu.get('peak') is None else str(cpu['peak']) + '%':>8}"
+                         f"{'-' if peak is None else f'{peak:.1f}%':>8}"
                          f"  {ram.get('peak', '-'):>12}")
     if jobs:
         jobs = sorted(jobs, key=lambda j: j["site_id"] or 0)

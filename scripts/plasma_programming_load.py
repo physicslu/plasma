@@ -250,6 +250,21 @@ def stats(values):
                 p95=values[math.ceil(.95*len(values))-1], peak=values[-1])
 
 
+def manager_batch_elapsed(batch):
+    """Batch duration on the Manager's own clock (both ends from one host)."""
+    def parse(value):
+        try:
+            moment = datetime.datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return None
+        return moment if moment.utcoffset() is not None else None
+    started, finished = parse(batch.get('started_at')), parse(batch.get('finished_at'))
+    elapsed = ((finished-started).total_seconds()
+               if started is not None and finished is not None and finished > started else None)
+    return dict(started_at=batch.get('started_at'), finished_at=batch.get('finished_at'),
+                elapsed_s=elapsed)
+
+
 def comparison(frames, submitted, terminal, recovery_start, interval):
     """Phase boundaries are Z2 monotonic times; never compare host monotonic clocks."""
     phases = {k: [] for k in ('idle', 'single_site', 'dual_site', 'batch_no_pid', 'recovery')}
@@ -783,8 +798,11 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
         batch_id = submit_once(client,body,report,save)
         report['hardware'] = 'SUBMITTED';save()
         batch = get('batch-latest','/api/programming/batches/'+batch_id)['batch']
+        # Poll the Manager only. Each observer read is a new password SSH session
+        # to Z2 (~2-4 s), which made the observed terminal lag the real Batch end
+        # by ~5.7 s on 2026-11-18; the observer keeps sampling on Z2 regardless.
         while batch.get('outcome') not in TERMINAL:
-            interrupted.wait(.5);status()
+            interrupted.wait(.5)
             batch = get('batch-latest','/api/programming/batches/'+batch_id)['batch']
         receipt('batch-final',batch)
         state = status();terminal = state['latest']['monotonic_s']
@@ -815,9 +833,16 @@ def measure(args, argv, *, client=None, remote=None, authenticate=authorization)
             summaries.append(check_job(job,site,cfg))
         require(sorted(j['site_id'] for j in summaries)==[1,2] and batch['outcome']=='PASS', 'BATCH_OR_SITE_FAILED')
         report['jobs'] = summaries
-        elapsed = terminal-submitted
-        report['throughput'] = dict(bytes=sum(j['bytes'] for j in summaries),elapsed_s=elapsed,
-                                   bytes_per_s=sum(j['bytes'] for j in summaries)/elapsed)
+        observed = terminal-submitted
+        manager = manager_batch_elapsed(batch)
+        report['manager_batch'] = manager
+        elapsed = manager['elapsed_s'] if manager['elapsed_s'] else observed
+        total = sum(j['bytes'] for j in summaries)
+        report['throughput'] = dict(bytes=total,elapsed_s=elapsed,bytes_per_s=total/elapsed,
+                                   elapsed_basis=('MANAGER_BATCH_STARTED_TO_FINISHED'
+                                                  if manager['elapsed_s'] else 'OBSERVER_TERMINAL_SAMPLE'),
+                                   observed_elapsed_s=observed,
+                                   observed_bytes_per_s=total/observed if observed > 0 else None)
         report['outcome'] = 'PASS'
     except Exception as exc:
         report['blocker'] = str(exc) if isinstance(exc,Blocked) else type(exc).__name__

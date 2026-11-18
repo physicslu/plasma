@@ -76,6 +76,15 @@ class Arithmetic(unittest.TestCase):
         self.assertEqual(b.transitions({(1,10):proc()},{}),[dict(event='NO_LONGER_OBSERVED',pid=1,starttime=10)])
         self.assertTrue(b.dual([proc(),proc(pid=2,site=2)]))
 
+    def test_manager_batch_elapsed_uses_one_clock_and_rejects_bad_times(self):
+        ok=b.manager_batch_elapsed(dict(started_at='2026-11-18T12:18:29.760586+00:00',
+                                        finished_at='2026-11-18T12:18:47.509393+00:00'))
+        self.assertEqual(ok['elapsed_s'],17.748807)
+        for bad in (dict(),dict(started_at='2026-11-18T12:18:29',finished_at='2026-11-18T12:18:47'),
+                    dict(started_at='2026-11-18T12:18:47+00:00',finished_at='2026-11-18T12:18:29+00:00'),
+                    dict(started_at='nope',finished_at=None)):
+            self.assertIsNone(b.manager_batch_elapsed(bad)['elapsed_s'],bad)
+
     def test_phases_same_baseline_delta_and_overlap(self):
         frames=[frame(i,() if i<64 or i>=90 else (1,) if i<70 else (1,2),
                       10 if i<64 else 50) for i in range(155)]
@@ -433,22 +442,29 @@ class EndToEnd(unittest.TestCase):
                         if path.endswith('/status'):return copy.deepcopy(status)
                         if '/starts/' in path:return {'reconciliation':dict(state='TERMINAL_CONFIRMED',batch=batch)}
                         if '/batches/' in path:
-                            self.polls+=1;self.done=self.polls>=4
-                            return {'batch':{**batch,'outcome':('PARTIAL' if partial else 'PASS') if self.done else None}}
+                            self.polls+=1;remote.sample();self.done=self.polls>=4
+                            times=dict(started_at='2026-11-18T12:18:29.760586+00:00',
+                                       finished_at='2026-11-18T12:18:47.509393+00:00') if self.done else {}
+                            return {'batch':{**batch,**times,'outcome':('PARTIAL' if partial else 'PASS') if self.done else None}}
                         raise AssertionError((method,path))
                 client=Client()
                 class Remote:
                     t=-1
                     frames=[]
                     stopped=False
+                    batch_wait_status_reads=0
                     def launch(self,*args):return {'source_sha256':'test'}
                     def inspect(self):return {'metadata':{'fpga':{}}}
-                    def status(self,observer,stop=False):
-                        if stop:self.stopped=True
+                    def sample(self):
+                        # The real observer samples on Z2 by itself; reads are optional.
                         if not self.stopped:
                             self.t+=1
                             f=frame(self.t,(1,2) if client.submitted and not client.done else ())
                             f['monotonic_s']=self.t;self.frames.append(f)
+                    def status(self,observer,stop=False):
+                        if stop:self.stopped=True
+                        if client.submitted and not client.done:self.batch_wait_status_reads+=1
+                        self.sample()
                         return dict(ready=self.frames[0],latest=self.frames[-1],alive=True,finished=self.stopped)
                     def remove(self,*args):return {'ephemeral_removed':True}
                     def collect(self,*args):
@@ -514,6 +530,14 @@ class EndToEnd(unittest.TestCase):
                         sha,name=line.split('  ')
                         self.assertEqual(sha,b.digest(packed.extractfile(name).read()))
                 self.assertTrue(result['final_idle'])
+                # Waiting for the Batch never opens an observer (SSH) session per poll.
+                self.assertEqual(remote.batch_wait_status_reads,0)
+                if not partial:
+                    # Throughput uses the Manager's own Batch clock, not the observer read time.
+                    self.assertEqual(result['manager_batch']['elapsed_s'],17.748807)
+                    self.assertEqual(result['throughput']['elapsed_basis'],'MANAGER_BATCH_STARTED_TO_FINISHED')
+                    self.assertEqual(result['throughput']['elapsed_s'],17.748807)
+                    self.assertGreater(result['throughput']['observed_elapsed_s'],0)
                 self.assertGreaterEqual(result['comparison']['phases']['idle']['duration_s'],15)
                 self.assertGreaterEqual(result['comparison']['phases']['recovery']['duration_s'],15)
                 self.assertGreater(result['comparison']['sampled_pid_overlap_s'],0)

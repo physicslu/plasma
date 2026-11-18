@@ -68,6 +68,7 @@
 
 - **兩 Site 是否真的並行：** 看 LA `both-active` 與 `start gap`，以及 `openocd start gap`。
 - **等待在哪裡：** 比較各 Site 的 `t_ms`。若先開始的 Site 在某一階段停住、等另一個 Site 趕上，就是串行點。`proc-analyze` 的 `lock_or_uninterruptible_waits` 可以排除或確認 lock。
+- **Batch 時間的基準：** `throughput.elapsed_s` 用 Manager 自己記錄的 Batch `started_at`→`finished_at`（`elapsed_basis = MANAGER_BATCH_STARTED_TO_FINISHED`）。`observed_elapsed_s` 是量測程式讀到 Z2 取樣的時間，含輪詢延遲；2026-11-18 以前的報告只有這個值，曾因每次輪詢都開新的 SSH 而多算約 5.7 秒。
 - **時間花在哪裡：** `site_worker.admission_ms`、`openocd_ms` 與各 `duration_ms`。Z2 只有 2 核心，兩 Site 同時跑時 CPU 會滿載，移到背景執行緒只消除排隊，不會減少計算量。
 
 ## 5. 2026-11-18 基準
