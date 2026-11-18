@@ -160,7 +160,9 @@ def test_summarize_combines_report_job_logs_and_la(tmp_path):
               "site_results": [{"site_id": 1, "job_id": "job-1", "result": "PASS",
                                 "elapsed_ms": 13823, "readback_sha256": "e691ab23" + "0" * 56,
                                 "safe_off": True}],
-              "throughput": {"bytes": 125600, "elapsed_s": 23.5, "bytes_per_s": 5344.7},
+              "throughput": {"bytes": 125600, "elapsed_s": 17.75, "bytes_per_s": 7076.1,
+                             "elapsed_basis": "MANAGER_BATCH_STARTED_TO_FINISHED",
+                             "observed_elapsed_s": 23.5},
               "comparison": {"sampled_pid_overlap_s": 3.5, "overlap_boundary_uncertainty_s": 0.43,
                              "phases": {"idle": {"n": 101, "cpu_pct": {"mean": 50.47, "peak": 100.0},
                                                  "ram_used_kib": {"peak": 140836}}}}}
@@ -178,7 +180,9 @@ def test_summarize_combines_report_job_logs_and_la(tmp_path):
         "--job-log", str(_job_log(tmp_path / "1.jsonl", 1, "T1", phases)),
         "--output", str(out)]) == 0
     text = out.read_text()
-    assert "outcome PASS" in text and "5345 B/s" in text
+    assert "outcome PASS" in text and "7076 B/s (MANAGER_BATCH_STARTED_TO_FINISHED)" in text
+    assert "observer-read elapsed 23.5 s" in text
+    assert "idle         101     50.5%    100.0%" in text
     assert "Site 1 job_started T1" in text.splitlines()[text.splitlines().index(
         next(line for line in text.splitlines() if line.startswith("stage timing"))) + 1]
     assert "site_worker.admission_ms" in text and "site_worker.admission_root_total" in text
