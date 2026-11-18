@@ -84,7 +84,7 @@ test("uses same-origin as the default Browser route with no fixed remote Gateway
   // Deployment API defaults are owned by the integration backend; the top-level
   // plasmactl script is now only the deployment-profile router.
   const plasmactlIntegration = await readFile(
-    new URL("../../../scripts/plasmactl-integration", import.meta.url),
+    new URL("../../../utilities/plasmactl/backends/plasmactl-integration", import.meta.url),
     "utf8",
   );
 
