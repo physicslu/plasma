@@ -1,6 +1,6 @@
 # PLASMA Catalog Database v1 + Data-only Publication Contract
 
-- **Status:** Gate 1 design contract — owner-approved direction (2026-11-18), Draft PR; **implementation not yet authorized as deployed**.
+- **Status:** Gate 1 design contract approved by owner (2026-11-18); Gate 2 is the single PR merge approval. This document is an architectural contract, **not** an implemented or deployed database.
 - **Scope:** Canonical Exact ICPN Catalog, IC Selector, evidence, geometry, Provider Qualification and Controller-local overlays. This is a Catalog data-plane change, **not** a change to PPU programming execution, Bundle v3 or FPGA.
 - **Normative dependencies:** [ADR-0002](../adr/0002-openocd-software-qualified-catalog-visibility.md), [IC Selector](ic-selector.md), [Unified Bundle-driven Programming](unified-bundle-driven-programming-decision-2026-11-04.md), [OPF Operations](opf-programming-operations-v1.md).
 - **Separation requirement:** A Catalog row, an L2 claim, a Job Picker selection and a permitted programming Job are **four different decisions**. None implies the next.
@@ -105,25 +105,25 @@ import / edit / download
 - GitHub `paths`-filtered workflows can reduce *code PR* CI but cannot solve the architecture problem alone. Once DB data-only publication is implemented, **ordinary Catalog updates must bypass repository software release triggers entirely**.
 - CI must still exercise corrupted data, duplicate ICPNs, inconsistent Geometry, mismatched Provider version, unsupported operations, L3 preservation, partial SQLite write/power-loss, rollback, concurrent readers, offline Controller, cross-tenant isolation and authority spoofing.
 
-## 6. Migration and acceptance gates
+## 6. Implementation milestones (not approval gates)
 
-**G0 — Contract and dependency inventory (this Draft PR).**
+**Milestone A — Contract and dependency inventory (PR #1478).**
 Freeze boundary and list current seams: `plasma_web/device_catalog.py` (manifest/CSV and process cache), `plasma_web/programming_qualification.py` (provider projections/cache), `catalog_promotion_framework.py`, Manager search and BFF, `data/device-catalog/**`, `data/ic-support/**`, `release/openocd-qualification/**`, `.github/workflows/ic-support-validation.yml`, `.github/workflows/openocd-software-qualification.yml`, Catalog Promotion and cross-repository exact-count tests. Document-only; no runtime behavior change.
 
-**G1 — SQLite shadow importer + repository interface.**
+**Milestone B — SQLite shadow importer + repository interface.**
 Implement `CatalogRepository` abstraction; import current canonical Catalog/Qualification/evidence into a separately versioned SQLite database. Run both legacy and SQLite projections on the same frozen revision, comparing *full exact-ICPN sets, levels, sort/pagination, provider bindings, exclusions and source-lineage hashes*, not just totals. Store remains passive; no UI/Job behavior change.
 
-**G2 — Manager read-path switch with rollback.**
+**Milestone C — Manager read-path switch with rollback.**
 Route current Selector API and Qualification projection to the SQLite repository behind a feature flag. Preserve L0 invisibility, L1 not selectable, L2/L3 standard picker, 503 semantics and PPU Catalog-free contract. Verify cold start, offline mode, cache invalidation, concurrency, rollback and equivalence before retiring CSV/JSON runtime readers.
 
-**G3 — Data-only revision publisher and Controller overlay.**
+**Milestone D — Data-only revision publisher and Controller overlay.**
 Add staging/import, deterministic validators, local edit/create, atomic publish/rollback, audit and namespace isolation. Demonstrate revision publication **without GitHub PR, Python redeploy, PPU image rebuild, or Z2/DUT activity**. Backend code/schema upgrades still use normal targeted CI.
 
-**G4 — Remove duplicated static coupling.**
-After parity and rollback evidence, retire dynamic per-IC Python registration, global count assertions and Catalog data-triggered product pipelines. Keep versioned manufacturer/Provider evidence available for audits and repeatable snapshots.
+**Milestone E — Remove duplicated static coupling.**
+After parity and rollback evidence, retire dynamic per-IC Python registration, global count assertions and Catalog data-triggered product pipelines. Temporary legacy/SQLite parallel reading must exist only in the shadow-comparison phase and be removed when the canonical read path switches, consistent with Replace-by-Default. Keep versioned manufacturer/Provider evidence available for audits and repeatable snapshots.
 
 **Migration fixture:** use the existing **STM32F103 Low-density 12 exact ICPNs** from separate [PR #1147](https://github.com/physicslu/plasma/pull/1147) as a *replay fixture* (not a second authority or duplicate PR). Verify a 12-row delta, three excluded conflicted T4/T6 parts unchanged, legacy 77 L3 preserved and an 89-entry L2-or-higher projection **only when that source revision is actually admitted**. If #1147 is still Draft/unmerged, do not secretly publish its candidate records as official main.
 
 ## 7. Gate 2 readiness for this contract
 
-Gate 2 review should verify: (a) agreement with ADR-0002/OPF/Bundle v3, (b) SQLite-first and PostgreSQL-ready interfaces without premature distributed infrastructure, (c) clear global vs Controller-local authority, (d) no runtime authorization from Catalog, (e) data-only non-code publication with transactional rollback, and (f) measurable G1–G4 migration acceptance. This PR authorizes **documentation/design review only**; it does not authorize merge, DB installation, SWPC/Z2 operation or production data migration.
+Gate 2 review should verify: (a) agreement with ADR-0002/OPF/Bundle v3, (b) SQLite-first and PostgreSQL-ready interfaces without premature distributed infrastructure, (c) clear global vs Controller-local authority, (d) no runtime authorization from Catalog, (e) data-only non-code publication with transactional rollback, and (f) measurable Milestones B–E migration acceptance. Gate 2 is **only the owner-authorized merge of this documentation PR**, not an additional implementation gate. The owner approved proceeding to Gate 2 on 2026-11-18. Merging this contract does not itself install a DB, switch Manager reads, deploy to SWPC/Z2 or authorize production data migration. Those engineering milestones require implementation and actual acceptance under their approved scope, without inventing extra owner gates.
