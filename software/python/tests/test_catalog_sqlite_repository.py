@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import replace
+import hashlib
+import threading
+from dataclasses import asdict, replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,6 +19,8 @@ from plasma_web.device_catalog import (
     get_default_device_catalog,
 )
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
+from plasma_web.catalog_sqlite_selector import read_selector_view
+from plasma_web import legacy_device_selector as selector
 
 
 @pytest.fixture
@@ -135,3 +139,149 @@ def test_incompatible_schema_fails_closed(tmp_path: Path) -> None:
         repo.read_active()
     with pytest.raises(DeviceCatalogIntegrityError, match="unsupported SQLite Catalog schema"):
         repo.import_verified_manifest(default_catalog_manifest_path())
+
+
+def _publisher_fixture(tmp_path: Path):
+    repo = CatalogSqliteShadowRepository(tmp_path / "published.sqlite3")
+    registry = get_default_programming_qualification_registry()
+    initial = repo.import_verified_manifest(default_catalog_manifest_path(), qualification_registry=registry)
+    source = get_default_device_catalog()
+    st = next(row for row in source.records if row.identifier == "STM32F103C8T6")
+    candidate = next(row for row in source.records
+                     if registry.describe(row.vendor, row.identifier)["catalog_level"] == 1)
+    record = replace(st, identifier="STM32F103C8T6-TEST-EXACT",
+                     source_reference="https://example.test/official/exact-and-route",
+                     source_authority="STMicroelectronics official",
+                     source_type="official_exact_and_route",
+                     catalog_origin="data-only-publication-test")
+    l1 = registry.describe(candidate.vendor, candidate.identifier).copy()
+    l1["route_evidence"] = "https://example.test/official/exact-and-route"
+    return repo, initial, record, l1, registry.describe(st.vendor, st.identifier)
+
+
+def test_data_only_publish_l1_search_rollback_and_audit(tmp_path: Path, monkeypatch) -> None:
+    repo, initial, record, l1, _ = _publisher_fixture(tmp_path)
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
+    assert selector.search_response("q=STM32F103C8T6-TEST-EXACT")[1]["total_count"] == 0
+    stage = repo.stage_revision([{"record": asdict(record), "qualification": l1}], actor="catalog-owner")
+    assert repo.read_active().revision_sha256 == initial
+    published = repo.publish_staged(stage, actor="catalog-owner")
+    assert published != initial
+    assert repo.publish_staged(stage, actor="catalog-owner") == published
+    status, body = selector.search_response("q=STM32F103C8T6-TEST-EXACT")
+    assert status == 200 and body["total_count"] == 1
+    item = body["results"][0]
+    assert item["catalog_level"] == 1 and item["job_selectable"] is False
+    assert item["catalog"]["revision_sha256"] != record.catalog_revision_sha256
+    assert item["selected_profile"] is None
+    assert item["manufacturer_device_basic_profile"] is None
+    assert item["backend_providers"] == []
+    assert selector.search_response("q=STM32F103C8T6-TEST-EXACT&levels=2,3")[1]["total_count"] == 0
+    repo.rollback(initial, actor="catalog-owner")
+    assert repo.read_active().revision_sha256 == initial
+    assert selector.search_response("q=STM32F103C8T6-TEST-EXACT")[1]["total_count"] == 0
+    with sqlite3.connect(repo.path) as conn:
+        actions = [row[0] for row in conn.execute("SELECT action FROM catalog_audit_events ORDER BY event_id")]
+    assert actions == ["STAGE", "PUBLISH", "ROLLBACK"]
+
+
+def test_l1_to_l2_requires_evidence_and_known_provider_profile(tmp_path: Path, monkeypatch) -> None:
+    repo, initial, record, l1, supported = _publisher_fixture(tmp_path)
+    baseline_l3 = {key for key, q in repo.read_active().qualifications.items()
+                   if q["catalog_level"] == 3}
+    repo.publish_staged(repo.stage_revision([{"record": asdict(record), "qualification": l1}], actor="owner"), actor="owner")
+    l2 = json.loads(json.dumps(supported))
+    l2.update(catalog_level=2, catalog_level_state="PROGRAMMABLE", ppu_ready=False,
+              socket_ready=False, ppu_readiness_source=None, family_ready=None,
+              verified_configurations=[])
+    evidence_path = tmp_path / "reviewed-source.json"
+    evidence_path.write_text(json.dumps({"manufacturer": record.vendor, "exact_icpn": record.identifier,
+                                         "provider": l2["provider"], "profile": l2["programming"]}), encoding="utf-8")
+    l2["publication_evidence"] = {
+        "manufacturer": record.vendor, "exact_icpn": record.identifier,
+        "source_authority": record.source_authority, "source_reference": record.source_reference,
+        "source_path": str(evidence_path),
+        "source_sha256": hashlib.sha256(evidence_path.read_bytes()).hexdigest(),
+        "provider_id": l2["provider"]["provider_id"],
+        "provider_version": l2["provider"]["version"],
+        "profile_id": l2["programming"]["programming_profile_id"],
+    }
+    with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
+        repo.stage_revision([{"record": asdict(record), "qualification": {**l2, "publication_evidence": None}}], actor="owner")
+    bad = json.loads(json.dumps(l2))
+    bad["provider"]["provider_id"] = "invented-provider"
+    with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
+        repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
+    bad = json.loads(json.dumps(l2))
+    bad["programming"]["programming_profile_id"] = "wrong-profile"
+    with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
+        repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
+    stage = repo.stage_revision([{"record": asdict(record), "qualification": l2}], actor="owner")
+    source_bytes = evidence_path.read_bytes()
+    evidence_path.write_text("tampered", encoding="utf-8")
+    before = repo.read_active().revision_sha256
+    with pytest.raises(DeviceCatalogIntegrityError, match="evidence bytes"):
+        repo.publish_staged(stage, actor="owner")
+    assert repo.read_active().revision_sha256 == before
+    evidence_path.write_bytes(source_bytes)
+    revision = repo.publish_staged(stage, actor="owner")
+    catalog, qualifications, _ = read_selector_view(str(repo.path))
+    assert catalog.resolve(record.vendor, record.identifier)
+    assert qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 2
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
+    status, body = selector.search_response("q=STM32F103C8T6-TEST-EXACT&levels=2,3")
+    assert status == 200 and body["total_count"] == 1
+    assert body["results"][0]["programming_qualification"]["provider"]["provider_id"] == "openocd-upstream"
+    assert {key for key, q in qualifications.items() if q["catalog_level"] == 3} == baseline_l3
+    assert revision != initial
+
+
+def test_rejected_publication_keeps_active_and_local_namespace_isolated(tmp_path: Path) -> None:
+    repo, initial, record, l1, supported = _publisher_fixture(tmp_path)
+    duplicate = [{"record": asdict(record), "qualification": l1}] * 2
+    with pytest.raises(DeviceCatalogIntegrityError, match="duplicate"):
+        repo.stage_revision(duplicate, actor="owner")
+    stage = repo.stage_revision([{"record": asdict(record), "qualification": l1}], actor="owner")
+    with pytest.raises(DeviceCatalogIntegrityError, match="actor mismatch"):
+        repo.publish_staged(stage, actor="other")
+    assert repo.read_active().revision_sha256 == initial
+    existing = next(row for row in repo.read_active().catalog.records if row.identifier == "STM32F103C8T6")
+    downgrade = {**supported, "catalog_level": 1, "catalog_level_state": "PROGRAMMING_CANDIDATE",
+                 "state": "CANDIDATE", "job_selectable": False, "provider": None, "programming": None,
+                 "ppu_ready": False, "socket_ready": False, "verified_configurations": [],
+                 "route_evidence": existing.source_reference}
+    degrade_stage = repo.stage_revision([{"record": asdict(existing), "qualification": downgrade}], actor="owner")
+    with pytest.raises(DeviceCatalogIntegrityError, match="L3 revision"):
+        repo.publish_staged(degrade_stage, actor="owner")
+    assert repo.read_active().revision_sha256 == initial
+    profile = {"profile_id": "local-v1", "official": False, "execution_authorized": False,
+               "catalog_level": 1}
+    repo.put_local_profile("controller-a", record.vendor, record.identifier, profile, actor="owner")
+    assert repo.get_local_profile("controller-a", record.vendor, record.identifier) == profile
+    assert repo.get_local_profile("controller-b", record.vendor, record.identifier) is None
+    with pytest.raises(DeviceCatalogIntegrityError, match="official L2"):
+        repo.put_local_profile("controller-a", record.vendor, record.identifier,
+                               {**profile, "catalog_level": 2}, actor="owner")
+    assert repo.read_active().revision_sha256 == initial
+
+
+def test_readers_observe_complete_revision_during_publish(tmp_path: Path) -> None:
+    repo, initial, record, l1, _ = _publisher_fixture(tmp_path)
+    stage = repo.stage_revision([{"record": asdict(record), "qualification": l1}], actor="owner")
+    observed: list[tuple[str, int]] = []
+    failures: list[Exception] = []
+    def reader() -> None:
+        try:
+            for _ in range(25):
+                snapshot = repo.read_active()
+                observed.append((snapshot.revision_sha256, snapshot.size))
+        except Exception as exc:
+            failures.append(exc)
+    threads = [threading.Thread(target=reader) for _ in range(3)]
+    for thread in threads:
+        thread.start()
+    published = repo.publish_staged(stage, actor="owner")
+    for thread in threads:
+        thread.join()
+    assert not failures
+    assert set(observed) <= {(initial, repo.read_active().size - 1), (published, repo.read_active().size)}

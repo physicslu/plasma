@@ -119,6 +119,34 @@ Route current Selector API and Qualification projection to the SQLite repository
 **Milestone D — Data-only revision publisher and Controller overlay.**
 Add staging/import, deterministic validators, local edit/create, atomic publish/rollback, audit and namespace isolation. Demonstrate revision publication **without GitHub PR, Python redeploy, PPU image rebuild, or Z2/DUT activity**. Backend code/schema upgrades still use normal targeted CI.
 
+### Milestone D host publisher interface
+
+The Manager-owned SQLite file is selected with `--db`. Initial migration imports the
+verified manifest with `--with-qualification`. Subsequent JSON change sets contain
+`[{"record": <DeviceCatalogRecord fields>, "qualification": <projection fields>}]`.
+The publisher stages against the active digest, checks every exact identity and
+source-backed route, then publishes the complete snapshot in one SQLite transaction.
+The same database file must be writable only by the trusted Manager/Publisher OS
+identity; `--actor` is an audit label, not an authentication secret. Evidence paths
+for L2 must be locally available to that identity at both stage and publish time;
+the recorded SHA-256 is checked against actual bytes. The Publisher uses only
+Provider release/Profile locks already admitted in the active Catalog. A new
+Provider implementation, Profile schema or release requires a code/schema change.
+
+```bash
+python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --stage-file changes.json --actor catalog-owner
+python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --publish-stage STAGE_DIGEST --actor catalog-owner
+python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --rollback PREVIOUS_REVISION --actor catalog-owner
+```
+
+Controller-local Profiles use `--local-file` with `namespace`, `manufacturer`,
+`exact_icpn` and `profile`; they remain in `controller_overlays`, outside the
+official Selector. Their payload must have `official=false`,
+`execution_authorized=false` and cannot claim L2/L3. The Controller's own
+authorization and Job policy remain separate. The publisher does not call PPU,
+Provider, FPGA or Job execution code. No PR #1147 candidate is published by this
+Milestone D implementation.
+
 **Milestone E — Remove duplicated static coupling.**
 After parity and rollback evidence, retire dynamic per-IC Python registration, global count assertions and Catalog data-triggered product pipelines. Temporary legacy/SQLite parallel reading must exist only in the shadow-comparison phase and be removed when the canonical read path switches, consistent with Replace-by-Default. Keep versioned manufacturer/Provider evidence available for audits and repeatable snapshots.
 
